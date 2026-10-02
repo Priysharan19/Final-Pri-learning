@@ -4,6 +4,7 @@ import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-r
 import { api } from './api.js';
 import { applyTheme, cleanThemePref, followSystemTheme, resolveTheme, storedThemePref } from './lib/theme.js';
 import { requestPersistentStorage } from './local/idb.js';
+import { onCloudSessionChange } from './platform/cloudSession.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
 import { setLanguage, signInLanguage, useT } from './i18n/index.js';
@@ -154,6 +155,19 @@ export default function App() {
   useEffect(() => {
     refreshUser().then(u => { if (u) { refreshDue(); refreshRecent(); } }).catch(() => { });
   }, [refreshUser, refreshDue, refreshRecent]);
+
+  // Signing in or out of a cloud account changes what the profile view reports
+  // (cloudLinked, which decides default server reading). A failed re-read here
+  // keeps the current profile rather than signing the student out.
+  useEffect(() => {
+    let stop = () => {};
+    try {
+      stop = onCloudSessionChange(() => {
+        api.get('/me').then(r => { if (r?.user) setUser(r.user); }).catch(() => { });
+      });
+    } catch { /* non-browser runtimes */ }
+    return () => { try { stop(); } catch { /* already gone */ } };
+  }, []);
 
   // Guard months of practice from storage eviction — ask the browser once per boot.
   useEffect(() => { requestPersistentStorage(); }, []);

@@ -16,7 +16,7 @@ import {
   saveInkDraft, savePendingSubmission, submissionContentKey
 } from './practiceRecovery.js';
 import { nativePhotoAvailable, recognizePhoto } from '../native/photo.js';
-import { cloudReadingEnabled, readPhotoWithCloud } from '../ink/cloudReader.js';
+import { cloudReadingEnabled, photoReadingBlockedKey, readPhotoWithCloud, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
 import { plotSpecFor } from '../engine/plotSpec.js';
@@ -249,6 +249,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [restoredInk] = useState(() => readInkDraft(question.id));
   const [mode, setMode] = useState(() => (restoredInk ? 'write' : preferMode()));       // 'type' | 'write' | 'photo'
   const [inkResult, setInkResult] = useState(null);
+  // Whether the page has any ink at all: strokes with no readable answer line
+  // get an honest "couldn't read that yet" instead of a silently disabled Submit.
+  const [inkHasStrokes, setInkHasStrokes] = useState(false);
   const [hints, setHints] = useState([]);
   const [hintsLeft, setHintsLeft] = useState(question.hintsAvailable);
   const [showTutor, setShowTutor] = useState(false);
@@ -270,6 +273,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [photo, setPhoto] = useState(null);
   const [pdfUnread, setPdfUnread] = useState(null);
   const [photoOCR, setPhotoOCR] = useState({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
+  // One quiet line, once per device, the first time a photo is read on the
+  // server for a student who never chose either way in Settings.
+  const [cloudNotice, setCloudNotice] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [inkPhase, setInkPhase] = useState(() => (inkModule ? 'ready' : 'idle'));   // idle | loading | ready | failed
   const [inkTry, setInkTry] = useState(0);
@@ -314,7 +320,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   useEffect(() => {
     const draft = readDraft('question', question.id);
-    setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setHints([]); setHintsLeft(question.hintsAvailable);
+    setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setInkHasStrokes(false); setHints([]); setHintsLeft(question.hintsAvailable);
     setShowTutor(false); setTutorUsed(question.tutorLevel || 0);
     setWorking(draft?.working || ''); setShowWorking(!!draft?.working);
     setState({ phase: 'answering' }); setBusy(false);
@@ -364,15 +370,21 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
    */
   const readOnePage = useCallback(async (dataURL) => {
     const lastLine = t => String(t || '').split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
+    let cloudOutcome = null;
     if (cloudReadingEnabled(user)) {
-      const outcome = await readPhotoWithCloud(dataURL, { user });
-      if (outcome?.reason === 'allowance' && !nativePhotoAvailable()) return { allowance: true };
-      if (outcome && !outcome.error && !outcome.reason) {
-        const text = String(outcome.transcription.text || '').trim();
-        if (text) return { text, markable: lastLine(text), confidence: outcome.transcription.confidence, engine: outcome.transcription.engine };
+      cloudOutcome = await readPhotoWithCloud(dataURL, { user });
+      if (cloudOutcome?.reason === 'allowance' && !nativePhotoAvailable()) return { allowance: true };
+      if (cloudOutcome && !cloudOutcome.error && !cloudOutcome.reason) {
+        const text = String(cloudOutcome.transcription.text || '').trim();
+        if (text) return { text, markable: lastLine(text), confidence: cloudOutcome.transcription.confidence, engine: cloudOutcome.transcription.engine };
       }
     }
-    if (!nativePhotoAvailable()) return null;
+    if (!nativePhotoAvailable()) {
+      // The photo itself was the problem: say so. Anything else is the server
+      // route being unavailable, and the student is told the actual reason.
+      if (cloudOutcome && ['unreadable', 'empty'].includes(cloudOutcome.reason)) return null;
+      return { blocked: photoReadingBlockedKey(user, { outcome: cloudOutcome }) };
+    }
     try {
       const result = await recognizePhoto(dataURL);
       const text = String(result?.text || '').trim();
@@ -387,7 +399,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (!cloudReadingEnabled(user) && !nativePhotoAvailable()) {
       setPhotoOCR({
         phase: 'unavailable', text: '', confidence: 0, engine: null,
-        error: tLater('verdict.photoReadingUnavailable')
+        error: tLater(photoReadingBlockedKey(user))
       });
       return;
     }
@@ -400,6 +412,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       });
       return;
     }
+    if (page?.blocked) {
+      setPhotoOCR({
+        phase: 'unavailable', text: '', confidence: 0, engine: null,
+        error: tLater(page.blocked)
+      });
+      return;
+    }
     if (!page) {
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
@@ -409,6 +428,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     }
     if (isWorking && page.text) { setWorking(page.text); setShowWorking(true); }
     if (page.markable) setAnswer(page.markable);
+    if (String(page.engine || '').startsWith('cloud') && takeCloudReadingNotice(user)) setCloudNotice(true);
     setPhotoOCR({ phase: 'done', text: page.text, confidence: Number(page.confidence || 0), error: '', engine: page.engine });
   }, [isWorking, user, readOnePage, t]);
 
@@ -593,6 +613,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const onInkStrokes = useCallback((strokes) => {
     if (inFlightRef.current || attemptRef.current) return;
     latestInk.current = strokes;
+    setInkHasStrokes(Array.isArray(strokes) && strokes.length > 0);
     if (inkSaveTimer.current) { clearTimeout(inkSaveTimer.current); inkSaveTimer.current = null; }
     const asked = Date.now();
     if (!saveInkDraft(question.id, strokes, { label: question.subtopicName })) { setSaveState('failed'); return; }
@@ -1118,11 +1139,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           : resolved ? 'saved'
             : saveState === 'saved' ? (offline ? 'offline' : 'saved')
               : 'idle';
+  const inkUnread = writeMode && !isMcq && inkHasStrokes && !needsCheck
+    && (isWorking ? !inkResult?.lines?.length : !inkResult?.answerLine);
   const statusText = busy ? t('verdict.statusChecking')
     : cloudPending ? t('verdict.statusMethod')
       : saveState === 'failed' ? t('verdict.statusNotSaved')
         : saveState === 'saving' ? t('verdict.statusSaving')
           : resolved ? t('verdict.statusMarked')
+            : inkUnread ? t('verdict.statusInkUnread')
             : saveState === 'saved' ? t(offline ? 'verdict.statusSavedOffline' : 'verdict.statusSaved')
               : (writeMode && !isMcq ? t('verdict.statusWriteHint') : '');
 
@@ -1344,6 +1368,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                               <pre style={{ whiteSpace: 'pre-wrap', margin: 0, font: 'inherit', color: 'var(--ink)' }}>{photoOCR.text}</pre>
                               <div className="muted" style={{ marginTop: 6 }}>{t('verdict.filledFromLastLine')}</div>
                               {pdfUnread && <div className="verdict-body" style={{ marginTop: 6 }}>{t('verdict.pdfPagesUnread', pdfUnread)}</div>}
+                              {cloudNotice && String(photoOCR.engine || '').startsWith('cloud') && (
+                                <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>{t('verdict.photoReadOnServerNotice')}</div>
+                              )}
                             </>
                           )}
                           {(photoOCR.phase === 'failed' || photoOCR.phase === 'unavailable') && <span className="verdict-body">{photoOCR.error}</span>}
