@@ -1,5 +1,5 @@
 import { asyncRouter } from './asyncRouter.js';
-import { clientCompatibility } from './clientCompatibility.js';
+import { clientCompatibility, compatibilityStatus } from './clientCompatibility.js';
 import { googleNotificationBacklog } from './googleBilling.js';
 import { asStore } from './store.js';
 import { createAccountRouter } from './accounts.js';
@@ -44,6 +44,8 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     res.json({
       ok: true,
       service: 'pri-learning-platform',
+      // The active shell floors and how many requests they turned away (CP-11).
+      clientCompatibility: compatibilityStatus(),
       releaseIdentity: serverReleaseIdentity(),
       schemaVersion: (await db.get("SELECT value FROM platform_meta WHERE key='schema_version'"))?.value || null,
       billingSchemaVersion: (await db.get("SELECT value FROM platform_meta WHERE key='billing_schema_version'"))?.value || null,

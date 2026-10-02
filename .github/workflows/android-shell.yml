@@ -18,6 +18,8 @@ on:
       - 'server/app.js'
       - 'server/package-lock.json'
       - 'client/src/lib/files.js'
+      - 'scripts/release-matrix.mjs'
+      - 'release/metadata.json'
       - '.github/workflows/android-shell.yml'
   push:
     branches: [main]
@@ -25,6 +27,8 @@ on:
       - 'android/**'
       - 'client/src/platform/**'
       - 'scripts/sync-android.mjs'
+      - 'scripts/release-matrix.mjs'
+      - 'release/metadata.json'
       - '.github/workflows/android-shell.yml'
 
 concurrency:

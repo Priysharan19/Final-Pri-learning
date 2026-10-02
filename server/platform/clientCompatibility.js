@@ -10,17 +10,46 @@
 // deployment configuration (PRI_MIN_IOS_BUILD, PRI_MIN_ANDROID_BUILD); unset
 // means no floor. The web app is always current and has none.
 //
-// Always allowed, whatever the build: health, and the routes a student needs to
-// leave or take their data — logout, account export and account deletion.
+// Always allowed, whatever the build: health, and every route a student needs
+// to get back into their account and then leave or take their data — sign-in
+// (password or Apple/Google, including the nonce a social re-auth needs),
+// password recovery, email verification, the session check the account screen
+// starts with, devices (revoking a session is a security exit), logout, export
+// and deletion. Sync, billing and recognition answer 426; local learning on the
+// device never depends on any of them.
+//
+// The floor is an upgrade NUDGE, not a security control: any non-browser client
+// can claim any build. Never raise it as a substitute for a server-side fix.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const FLOOR = Object.freeze({ 'ios-native-v1': ['ios', 'PRI_MIN_IOS_BUILD'], 'android-native-v1': ['android', 'PRI_MIN_ANDROID_BUILD'] });
 const EXEMPT = [
-  ['GET', /^\/health$/],
-  ['POST', /^\/account\/logout$/],
-  ['GET', /^\/account\/export$/],
-  ['DELETE', /^\/account\/?$/],
+  ['GET', /^\/health\/?$/i],
+  ['HEAD', /^\/health\/?$/i],
+  ['POST', /^\/account\/login\/?$/i],
+  ['GET', /^\/account\/me\/?$/i],
+  ['POST', /^\/account\/logout\/?$/i],
+  ['POST', /^\/account\/identity\/nonce\/?$/i],
+  ['POST', /^\/account\/identity\/[a-z]+\/sign-in\/?$/i],
+  ['POST', /^\/account\/password\/reset-request\/?$/i],
+  ['POST', /^\/account\/password\/reset\/?$/i],
+  ['POST', /^\/account\/email\/verification-request\/?$/i],
+  ['POST', /^\/account\/email\/verify\/?$/i],
+  ['GET', /^\/account\/devices\/?$/i],
+  ['DELETE', /^\/account\/devices\/[^/]+\/?$/i],
+  ['GET', /^\/account\/export\/?$/i],
+  ['DELETE', /^\/account\/?$/i],
 ];
+
+let refused = 0;
+
+/** Active floors and how many requests they turned away (for /health; no ids). */
+export function compatibilityStatus(env = process.env) {
+  return {
+    minBuild: { ios: positiveInt(env.PRI_MIN_IOS_BUILD), android: positiveInt(env.PRI_MIN_ANDROID_BUILD) },
+    upgradeRequiredResponses: refused
+  };
+}
 
 function positiveInt(raw) {
   const text = String(raw ?? '').trim();
@@ -50,7 +79,10 @@ export function clientCompatibility(env = process.env) {
     if (EXEMPT.some(([method, path]) => req.method === method && path.test(req.path))) return next();
     const build = positiveInt(req.get('x-pri-shell-build'));
     if (build !== null && build >= minBuild) return next();
+    refused++;
     res.set('Cache-Control', 'no-store');
+    // RFC 9110 §15.5.22: a 426 names what to upgrade to.
+    res.set('Upgrade', 'pri-shell');
     return res.status(426).json({
       error: {
         code: 'CLIENT_UPGRADE_REQUIRED',
