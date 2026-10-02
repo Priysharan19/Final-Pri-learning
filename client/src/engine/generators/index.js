@@ -11,6 +11,7 @@ import { makeRng } from '../qhelpers.js';
 import { dotpointById, dotpointAt, formDotpoints } from '../curriculum.js';
 import { hasJeePyqGenerator, loadJeePyqGenerator } from './jee-pyq-runtime.js';
 import { hasPyqGenerator } from '../pyq/pyqCoverage.js';
+import { stampContent } from '../contentIdentity.js';
 
 // ── Banks ────────────────────────────────────────────────────────────────────
 
@@ -346,7 +347,7 @@ function difficultyFor(dp, difficulty, seed) {
 /**
  * Generate a question for a subtopic at a difficulty (1–4).
  * Returns { seed, subtopic, difficulty, dotpoint, dotpoints, dotpointSource,
- * ...payload }.
+ * contentId, contentVersion, contentHash, ...payload }.
  *
  * `dotpoints` is every dot point the declaration behind this question credits,
  * as ids; `dotpoint` is the single id when — and only when — the question can
@@ -425,5 +426,7 @@ export function generateQuestion(subtopicId, difficulty, seed, dotpointId) {
     // point alone — which is exactly `q.dotpoint`.
     q.dotpointExact = perQuestion ? q.dotpoints.includes(requested.id) : q.dotpoint === requested.id;
   }
-  return q;
+  // contentId / contentVersion / contentHash: what makes an attempt on this
+  // question interpretable after the bank changes (engine/contentIdentity.js).
+  return stampContent(q, subtopicId);
 }

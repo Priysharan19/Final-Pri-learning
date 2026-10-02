@@ -219,7 +219,8 @@ const CONVERTED = [
   // wrong: the DPDP Act gives a reader the right to the notice in their own
   // language, and chrome in English over a Hindi notice takes part of that back.
   'src/pages/Legal.jsx',
-  'src/components/QuestionCard.jsx'
+  'src/components/QuestionCard.jsx',
+  'src/pages/Placement.jsx'
 ];
 
 // Attributes a person reads or hears. `className`, `style`, `role`, `id` and

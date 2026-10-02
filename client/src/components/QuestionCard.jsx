@@ -235,7 +235,11 @@ const REASON_TAG_KEY = {
   'new-ground': 'verdict.newGround', interleave: 'verdict.interleaving'
 };
 
-export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, compact = false }) {
+// `diagnostic` turns the card into a placement-check item: the answer goes to
+// `diagnostic.submitPath`, it is marked once by the same deterministic marker,
+// and nothing that belongs to practice is offered — no hints, no favourite, no
+// reveal, no self-marking, no XP or mastery tags. `I don't know` records a miss.
+export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, compact = false, diagnostic = null }) {
   const { celebrate, refreshUser, refreshDue, refreshRecent, toast, user } = useApp();
   const t = useT();
   const tx = useTx();
@@ -532,7 +536,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (resolved) return;
     if (!String(typed).trim() && !String(wk).trim()) { clearDraft('question', question.id); return; }
     queueDraft('question', question.id, { typed, working: wk }, {
-      label: question.subtopicName, note: t('verdict.answerInProgress'), path: '/practice'
+      label: question.subtopicName, note: t('verdict.answerInProgress'), path: diagnostic ? '/placement' : '/practice'
     });
   };
   const editAnswer = (v) => { setAnswer(v); stash(v, working); };
@@ -630,7 +634,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     pendingRef.current = { submissionId, contentKey };
     const ms = Date.now() - startRef.current;
     // On disk before the request leaves: a relaunch replays it under this key.
-    savePendingSubmission(question.id, { submissionId, answer: String(given), steps, viaInk, ms, lines }, { label: question.subtopicName });
+    // A placement answer is not replayed through practice on relaunch: the
+    // placement session itself resumes at this exact question.
+    if (!diagnostic) savePendingSubmission(question.id, { submissionId, answer: String(given), steps, viaInk, ms, lines }, { label: question.subtopicName });
     const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
       ? compactInkStrokes(scribbleRef.current.getStrokes())
       : undefined;
@@ -646,7 +652,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     inkFrozenRef.current = !recovering || inkFrozenRef.current;
     setBusy(true);
     try {
-      const r = await api.post(`/practice/${question.id}/submit`, body);
+      const r = diagnostic
+        // A diagnostic keeps no ink, photo or scribble: only the reading the
+        // student submitted is marked, and only its outcome is stored.
+        ? await api.post(diagnostic.submitPath, { answer: body.answer, ms: body.ms, steps: body.steps, viaInk: body.viaInk })
+        : await api.post(`/practice/${question.id}/submit`, body);
       pendingRef.current = null;
       clearPendingSubmission(question.id);
       const live = mountedRef.current;
@@ -657,9 +667,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         if (live) {
           setAttempt(bound);
           setState({ phase: 'resolved', res: r });
-          if (!r.replayed) celebrate(r);
-          refreshUser(); refreshDue(); refreshRecent?.();
-          toast(<div><b>{t('verdict.outcomeUpdated')}</b><div className="badge-desc">{t('verdict.outcomeBasis', { topic: question.subtopicName })}</div></div>, 4200);
+          if (!diagnostic) {
+            if (!r.replayed) celebrate(r);
+            refreshUser(); refreshDue(); refreshRecent?.();
+            toast(<div><b>{t('verdict.outcomeUpdated')}</b><div className="badge-desc">{t('verdict.outcomeBasis', { topic: question.subtopicName })}</div></div>, 4200);
+          }
         }
         // The attempt is recorded whether or not this card is still on screen,
         // so the session still counts it — exactly once, because the pending
@@ -693,6 +705,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // back the verdict it already recorded, or marks it now if the first delivery
   // never landed. One attempt either way, and the student sees which.
   useEffect(() => {
+    if (diagnostic) return;
     const pending = readPendingSubmission(question.id);
     if (!pending) return;
     pendingRef.current = { submissionId: pending.submissionId, contentKey: submissionContentKey(pending.answer, pending.steps) };
@@ -725,6 +738,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       setHints(h => [...h, r.hint]);
       setHintsLeft(r.remaining);
     } catch { }
+  }
+
+  async function dontKnow() {
+    if (busy || resolved || !diagnostic) return;
+    setBusy(true);
+    try {
+      const r = await api.post(diagnostic.submitPath, { skip: true, ms: Date.now() - startRef.current });
+      setState({ phase: 'resolved', res: r });
+      onResolved?.(r);
+    } catch (e) {
+      setState({ phase: 'retry', res: { feedback: e.message, invalid: true } });
+    } finally { setBusy(false); }
   }
 
   async function reveal() {
@@ -806,7 +831,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // deterministic engine and does not move when this arrives.
   const [cloudCheckFor, setCloudCheckFor] = useState(null);   // { submissionId, result }
   const cloudCheckRef = useRef(null);
+  const cloudCheckAbortRef = useRef(null);
   useEffect(() => { setCloudCheckFor(null); }, [question?.id]);
+  // The request belongs to the attempt, not to the render that sent it, so it
+  // is cancelled only when the card goes away.
+  useEffect(() => () => { cloudCheckAbortRef.current?.abort?.(); }, []);
   useEffect(() => {
     if (!writeMode || !resolved) return;
     // The lines checked are the lines that were submitted and marked — not
@@ -823,19 +852,23 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (cloudCheckRef.current === key) return;              // already asked for this attempt
     cloudCheckRef.current = key;
 
-    let live = true;
+    // No per-render cleanup here. Resolving refreshes the user, which re-runs
+    // this effect; a cleanup that aborted the request on that re-run, followed
+    // by the "already asked" guard above, meant the answer was thrown away and
+    // never asked for again — the working note almost never appeared.
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    cloudCheckAbortRef.current = controller;
     checkWorkingWithCloud(lines, {
       user,
       prompt: question?.prompt || '',
       signal: controller?.signal
     }).then(result => {
-      // Dropped unless it still describes the attempt on screen.
-      if (!live || !result || result.error) return;
+      // Dropped unless the card is still up and still showing this attempt.
+      if (!mountedRef.current || controller?.signal?.aborted) return;
+      if (!result || result.error) return;
       if (attemptRef.current?.submissionId !== bound.submissionId) return;
       setCloudCheckFor({ submissionId: bound.submissionId, result });
     }).catch(() => { });
-    return () => { live = false; controller?.abort?.(); };
   }, [writeMode, resolved, res?.correct, res?.invalid, res?.revealed, attempt, activeReport, user, question?.id, question?.prompt]);
 
   const cloudCheck = cloudCheckFor && attempt?.submissionId && cloudCheckFor.submissionId === attempt.submissionId
@@ -941,16 +974,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       : [...(showWorking && working ? working.split('\n').filter(Boolean) : []), answer].filter(Boolean);
 
   return (
-    <div className="qpage">
+    // The opaque question id, so a test (or support) can tell two questions
+    // apart even when a generator happens to write the same prompt twice.
+    <div className="qpage" data-question-id={question.id}>
       {/* left action rail */}
       <div className="q-rail no-print">
-        <button className={`q-rail-btn ${bookmarked ? 'on' : ''}`} title={t('verdict.favorite')} aria-label={t('verdict.favoriteThis')} aria-pressed={bookmarked} onClick={toggleBookmark}>☆</button>
+        {!diagnostic && <button className={`q-rail-btn ${bookmarked ? 'on' : ''}`} title={t('verdict.favorite')} aria-label={t('verdict.favoriteThis')} aria-pressed={bookmarked} onClick={toggleBookmark}>☆</button>}
         <button className={`q-rail-btn ${showWhy ? 'on' : ''}`} title={t('verdict.whyThis')} aria-label={t('verdict.whyThis')} aria-pressed={showWhy} onClick={() => setShowWhy(s => !s)}>ⓘ</button>
         <button className={`q-rail-btn ${showScribble ? 'on' : ''}`} title={t('verdict.scribblePad')} aria-label={t('verdict.scribblePad')} aria-pressed={showScribble} onClick={() => setShowScribble(s => !s)}>✎</button>
       </div>
 
       {/* hint bulbs */}
-      {!isMcq && question.hintsAvailable > 0 && (
+      {!diagnostic && !isMcq && question.hintsAvailable > 0 && (
         <div className="hint-rail no-print">
           {Array.from({ length: question.hintsAvailable }, (_, i) => (
             <button key={i} className={`hint-bulb ${i < hintsUsed ? 'lit' : ''}`}
@@ -988,7 +1023,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       <MathText block className="q-prompt" text={question.prompt} />
       {figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: figure }} />}
 
-      {resolved && (
+      {resolved && !diagnostic && (
         <div className="row no-print" style={{ margin: '14px 0 2px' }}>
           <button className="redo-chip" onClick={() => onRedo ? onRedo() : onNext?.()}>{t('verdict.redoQuestion')}</button>
         </div>
@@ -1391,13 +1426,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 <div style={{ marginTop: 4 }}>{t('verdict.expected')} <b><MathText text={res.solution.answerText} /></b></div>
               )}
               {res.stepReport && <StepReport report={res.stepReport} />}
-              <div className="row" style={{ marginTop: 10, flexWrap: 'wrap', gap: 8 }}>
+              {!diagnostic && <div className="row" style={{ marginTop: 10, flexWrap: 'wrap', gap: 8 }}>
                 <span className="tag">{t('verdict.mastery', { n: res.mastery })}</span>
                 <span className="tag" style={{ color: res.ratingDelta >= 0 ? 'var(--good)' : 'var(--bad)' }}>
                   {t(res.ratingDelta >= 0 ? 'verdict.skillUp' : 'verdict.skillDown', { n: Math.abs(res.ratingDelta) })}
                 </span>
                 {res.predicted && <span className="tag">{t('verdict.predictedMark', { mark: res.predicted.mark })}</span>}
-              </div>
+              </div>}
+              {diagnostic && <p className="muted" style={{ marginTop: 10, fontSize: 12.5 }}>{t('placement.cardNote')}</p>}
             </div>
 
             {res.solution?.steps && (
@@ -1429,7 +1465,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             )}
           </div>
 
-          {res.solution?.criteria && (
+          {!diagnostic && res.solution?.criteria && (
             <CriteriaTable
               criteria={res.solution.criteria}
               correct={verdictGood}
@@ -1448,7 +1484,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               {t(busy ? 'verdict.marking' : 'verdict.submit')}
             </button>
           )}
-          <button className="btn btn-quiet" onClick={reveal} disabled={busy}>{t('verdict.showSolution')}</button>
+          {diagnostic
+            ? <button className="btn btn-quiet" onClick={dontKnow} disabled={busy}>{t('placement.dontKnow')}</button>
+            : <button className="btn btn-quiet" onClick={reveal} disabled={busy}>{t('verdict.showSolution')}</button>}
           {!writeMode && !isMcq && <span className="muted" style={{ marginLeft: 'auto' }}>{tx('verdict.pressEnter', { key: <span className="kbd">{t('verdict.enterKey')}</span> })}</span>}
         </div>
       )}

@@ -626,6 +626,9 @@ export function pickNextAmong({ candidates, ratings, reviewsDue, rand = Math.ran
     // 4. Coverage — unseen ground in the student's own year fills the syllabus in.
     if (!st.attempts) score += ownYear ? 0.80 : 0.30;
     else if (st.attempts < 3) score += 0.22;
+    // 5. A diagnostic prior (the placement check) on ground with no practice
+    //    evidence yet: bounded, and gone the moment the chapter is attempted.
+    if (!st.attempts && s.prior) score += Math.max(-0.4, Math.min(0.4, Number(s.prior) || 0));
 
     score *= interleavePenalty(s.id, seen, st);
     score *= 0.88 + 0.24 * jitterFor(s.id, rand);

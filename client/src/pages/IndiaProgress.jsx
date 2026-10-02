@@ -6,6 +6,8 @@ import { predictionSentence } from '../engine/markPredictor.js';
 import { tLater, useT } from '../i18n/index.js';
 import TermGloss from '../components/TermGloss.jsx';
 import { PROGRESS_THRESHOLDS, accuracyClaim } from '../engine/progressTruth.js';
+import { indiaProgressPracticeHref } from '../lib/practiceLinks.js';
+import { featureEnabled } from '../platform/features.js';
 
 function scopeFor(curriculum, user) {
   if (!curriculum) return null;
@@ -79,6 +81,16 @@ export default function IndiaProgress() {
         </div>
         <p className="muted" style={{ marginTop: 12, maxWidth: 820 }}>{t('progress.honesty')}</p>
       </div>
+
+      {featureEnabled('placement') && <div className="card" data-placement-entry>
+        <div className="spread" style={{ gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div style={{ maxWidth: 640 }}>
+            <div className="card-title" style={{ marginBottom: 4 }}>{t('placement.progressTitle')}</div>
+            <p className="muted" style={{ margin: 0 }}>{t('placement.progressBody')}</p>
+          </div>
+          <button className="btn btn-ghost" onClick={() => nav('/placement')}>{t('placement.seeResult')}</button>
+        </div>
+      </div>}
 
       {prediction && (
         <div className="card">
@@ -176,7 +188,7 @@ export default function IndiaProgress() {
                     <td>{evidence.correct}</td>
                     <td>{evidence.attempts === 0 ? t('common.none') : evidence.enough ? t('common.percent', { n: evidence.accuracy }) : <span className="muted">{t('progress.tooFewAnswers')}</span>}</td>
                     <td>
-                      <button className="btn btn-quiet btn-sm" onClick={() => nav(`/practice?subtopic=${encodeURIComponent(row.id)}&track=${encodeURIComponent(user.indiaTrack || 'cbse')}`)}>
+                      <button className="btn btn-quiet btn-sm" onClick={() => nav(indiaProgressPracticeHref(row, user.indiaTrack))}>
                         {t('progress.practise')}
                       </button>
                     </td>
