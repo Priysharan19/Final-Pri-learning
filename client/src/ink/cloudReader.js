@@ -21,6 +21,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { rasterizeInk } from './cloudRaster.js';
+import { onEntitlementChange } from '../platform/cloudSession.js';
 import { preparePhoto } from './photoRaster.js';
 
 /** How the returned reading is labelled, so History and evidence can tell. */
@@ -32,6 +33,24 @@ const READINESS_TTL_MS = 60_000;
 // the deployment has recovered. Errors are never cached at all.
 export const UNAVAILABLE_READINESS_TTL_MS = 15_000;
 let readinessCache = { expiresAt: 0, value: null };
+// The server said this account's daily cloud-reading allowance is used up
+// (SEC-COMM-01). Until it resets, no doomed request is sent; an entitlement
+// change (an upgrade) clears it at once.
+let allowanceExhaustedUntil = 0;
+export const ALLOWANCE_CODE = 'AI_ALLOWANCE_EXHAUSTED';
+export function cloudAllowanceExhausted(now = Date.now()) { return now < allowanceExhaustedUntil; }
+export function clearCloudAllowanceExhausted() { allowanceExhaustedUntil = 0; }
+function noteAllowance(error, now = Date.now()) {
+  if (error?.code !== ALLOWANCE_CODE) return;
+  const reset = Number(error.resetAt);
+  // Trust a sane reset time from the server; otherwise back off for 30 minutes.
+  allowanceExhaustedUntil = Number.isFinite(reset) && reset > now && reset - now <= 25 * 60 * 60 * 1000 ? reset : now + 30 * 60 * 1000;
+}
+let listening = false;
+function listenForEntitlementChanges() {
+  if (listening) return;
+  try { onEntitlementChange(() => clearCloudAllowanceExhausted()); listening = typeof globalThis.addEventListener === 'function'; } catch { /* non-browser runtimes */ }
+}
 const diagnosticState = {
   localNativeAvailable: null,
   cloudAvailable: false,
@@ -207,6 +226,8 @@ export async function readWithCloud(strokes, {
   readiness = cloudHandwritingReadiness
 } = {}) {
   if (!cloudReadingEnabled(user, { available })) return { reason: 'disabled' };
+  listenForEntitlementChanges();
+  if (cloudAllowanceExhausted()) return { reason: 'allowance', until: allowanceExhaustedUntil };
 
   const ready = await readiness({ user, transport, available, signal });
   if (!cloudReadingEnabled(user, { available, readiness: ready })) {
@@ -264,7 +285,9 @@ export async function readWithCloud(strokes, {
       : error?.name === 'TimeoutError'
         ? 'HANDWRITING_TIMEOUT'
         : safeFailureCode(error?.code, 'HANDWRITING_FAILED');
+    noteAllowance(error);
     recordCloudDiagnostics({ available: true, latencyMs: Date.now() - started, failureCode: code, releaseSha: ready?.releaseSha });
+    if (code === ALLOWANCE_CODE) return { reason: 'allowance', until: allowanceExhaustedUntil, readiness: ready, diagnostics: handwritingDiagnostics() };
     return { error: { code, message: error?.message || '' }, readiness: ready, diagnostics: handwritingDiagnostics() };
   }
 }
@@ -311,6 +334,8 @@ export async function readPhotoWithCloud(dataUrl, {
   readiness = cloudHandwritingReadiness
 } = {}) {
   if (!cloudReadingEnabled(user, { available })) return { reason: 'disabled' };
+  listenForEntitlementChanges();
+  if (cloudAllowanceExhausted()) return { reason: 'allowance', until: allowanceExhaustedUntil };
   const ready = await readiness({ user, transport, available, signal });
   if (!cloudReadingEnabled(user, { available, readiness: ready })) {
     return { reason: ready?.lastFailureCode === 'HANDWRITING_CANCELLED' ? 'cancelled' : 'unavailable', readiness: ready };
@@ -355,7 +380,9 @@ export async function readPhotoWithCloud(dataUrl, {
       : error?.name === 'TimeoutError'
         ? 'HANDWRITING_TIMEOUT'
         : safeFailureCode(error?.code, 'HANDWRITING_FAILED');
+    noteAllowance(error);
     recordCloudDiagnostics({ available: true, latencyMs: Date.now() - started, failureCode: code, releaseSha: ready?.releaseSha });
+    if (code === ALLOWANCE_CODE) return { reason: 'allowance', until: allowanceExhaustedUntil, readiness: ready, diagnostics: handwritingDiagnostics() };
     return { error: { code, message: error?.message || '' }, readiness: ready, diagnostics: handwritingDiagnostics() };
   }
 }
