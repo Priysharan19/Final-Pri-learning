@@ -316,6 +316,10 @@ jobs:
           cache-dependency-path: client/package-lock.json
       - name: Install client dependencies
         run: npm ci --prefix client
+      # tour-otp-onboarding.js drives the real platform server in-process
+      # (SMS/email test adapters), so the browser job needs its dependencies.
+      - name: Install server dependencies
+        run: npm ci --prefix server
       - name: Install Chromium and WebKit
         working-directory: client
         run: npx playwright install --with-deps chromium webkit
