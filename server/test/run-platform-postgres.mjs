@@ -35,6 +35,7 @@ export const ENGINE_SUITES = [
   'sync-idempotency-contract-check.mjs',
   'practice-attempt-sync-check.mjs',
   'account-lifecycle-contract-check.mjs',
+  'account-lifecycle-journey-check.mjs',
   'account-deletion-reauth-check.mjs',
   'guardian-consent-lifecycle-check.mjs',
   'verification-enforcement-check.mjs',

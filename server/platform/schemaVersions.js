@@ -12,4 +12,7 @@
 //    (supabase/migrations/20261002010000_tutor_cache.sql). SQLite creates the
 //    same table in tutor.js, as it does every lazily built table.
 export const SCHEMA_VERSION = 8;
-export const BILLING_SCHEMA_VERSION = 3;
+// Billing 4: billing_payments keeps its row when the account is deleted
+//    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
+//    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).
+export const BILLING_SCHEMA_VERSION = 4;

@@ -17,8 +17,12 @@
 //      pulled toward the answer because it is never told the answer.
 //   3. The image is untrusted data, never instructions. A student could write
 //      "ignore your instructions" on the page.
-//   4. Nothing is retained by the provider (`store: false`), and the API key
-//      never leaves this process.
+//   4. Nothing is persisted by this server — the image lives in memory for one
+//      request — and every call sets `store: false`, so the provider does not
+//      keep the response for later retrieval. That is NOT zero data retention:
+//      under the provider's standard API terms inputs may still be held for a
+//      limited period for abuse monitoring (docs/privacy/data-retention.md §4).
+//      The API key never leaves this process.
 //
 // The provider is configurable so a deployment can point at whichever vision
 // model it has an account with; the contract is the JSON schema below.
@@ -340,7 +344,8 @@ async function callModel({ model, imageDataUrl, config, fetchImpl, signal }) {
       },
       body: JSON.stringify({
         model,
-        // Nothing is retained by the provider.
+        // The provider does not keep the response for retrieval. Not zero
+        // retention: see docs/privacy/data-retention.md §4.
         store: false,
         reasoning: { effort: 'low' },
         input: [
