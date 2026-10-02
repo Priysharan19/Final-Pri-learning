@@ -18,9 +18,10 @@
     <!-- Paints the remembered theme before first paint; see src/lib/theme.js. -->
     <script src="/theme-boot.js"></script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
     <link rel="apple-touch-icon" href="/icons/icon-180.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <script type="module" crossorigin src="/assets/index-C92To0nZ.js"></script>
+    <script type="module" crossorigin src="/assets/index-IACSRYBj.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/rolldown-runtime-CbXtAM7H.js">
     <link rel="modulepreload" crossorigin href="/assets/preload-helper-Czpn1I53.js">
     <link rel="modulepreload" crossorigin href="/assets/vendor-react--RPKHV-1.js">
@@ -34,12 +35,22 @@
     <link rel="modulepreload" crossorigin href="/assets/cloudSession-CGpa1dya.js">
     <link rel="modulepreload" crossorigin href="/assets/api-BykUmnyp.js">
     <link rel="modulepreload" crossorigin href="/assets/defineProperty-BbfpZ9Tg.js">
-    <link rel="modulepreload" crossorigin href="/assets/App-C7wbiepL.js">
+    <link rel="modulepreload" crossorigin href="/assets/App-Bfw8F2Dd.js">
     <link rel="modulepreload" crossorigin href="/assets/releaseIdentity-8UFb1lMI.js">
     <link rel="modulepreload" crossorigin href="/assets/formFactor-BnmfV6N0.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-a6TypyYg.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-CfNhr36X.css">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><!-- P-prime splash: drawn once while the app loads, replaced by the first
+      React render. Static under prefers-reduced-motion. --><div class="boot-splash" aria-hidden="true"><svg viewBox="0 0 100 100" width="96" height="96"><style>
+.boot-splash{position:fixed;inset:0;display:grid;place-items:center;background:#f2f0ea}
+[data-theme=dark] .boot-splash{background:#121210}
+.boot-splash .s,.boot-splash .b{fill:none;stroke:#1a1d21}[data-theme=dark] .boot-splash .s,[data-theme=dark] .boot-splash .b{stroke:#f3efe6}
+.boot-splash .s{stroke-width:17;stroke-dasharray:76;stroke-dashoffset:76;animation:pri-d .3s cubic-bezier(.6,0,.3,1) .05s forwards}
+.boot-splash .b{stroke-width:14;stroke-dasharray:106;stroke-dashoffset:106;animation:pri-d .42s cubic-bezier(.5,0,.25,1) .33s forwards}
+.boot-splash .p{fill:#b8402a;transform-box:fill-box;transform-origin:70% 0;transform:scale(1,0);animation:pri-q .2s cubic-bezier(.2,.8,.3,1) .78s forwards}
+[data-theme=dark] .boot-splash .p{fill:#d9604a}
+@keyframes pri-d{to{stroke-dashoffset:0}}@keyframes pri-q{to{transform:scale(1,1)}}
+@media (prefers-reduced-motion:reduce){.boot-splash .s,.boot-splash .b,.boot-splash .p{animation:none;stroke-dashoffset:0;transform:none}}</style><g transform="translate(0 2) scale(1)"><path class="s" d="M24 13V88"/><path class="b" d="M24 20H47a21.5 21.5 0 0 1 0 43H24"/><path class="p" d="M82 5L92.5 7.2L83.5 30L77 28.4Z"/></g></svg></div></div>
   </body>
 </html>
