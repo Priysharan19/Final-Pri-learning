@@ -556,7 +556,14 @@ function Flashcards({ chapter, points, onClose }) {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = prevOverflow; opener.current?.focus?.(); };
   }, []);
-  useEffect(() => { dialog.current?.querySelector('.nt-card, .nt-cards-done button')?.focus(); }, [finished]);
+  // The card is re-keyed per index (so it slides in), which drops focus with the
+  // old node; put it back so arrow keys keep working inside the dialog.
+  useEffect(() => {
+    const el = dialog.current;
+    if (el && (!el.contains(document.activeElement) || document.activeElement === document.body || finished)) {
+      el.querySelector('.nt-card, .nt-cards-done button')?.focus();
+    }
+  }, [i, finished]);
 
   const onKey = (e) => {
     if (e.key === 'Escape') { e.preventDefault(); onClose(); return; }

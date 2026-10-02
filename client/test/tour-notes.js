@@ -34,7 +34,21 @@ const shot = async (page, name, opts = {}) => { if (SHOTS) await page.screenshot
 
 async function startDemo(page, origin) {
   await page.goto(origin, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('button', { name: /Try the demo/ }).first().click();
+  // A fresh local Class 10 CBSE profile, made through the real onboarding.
+  await page.getByRole('button', { name: 'Get Started' }).click();
+  await page.waitForSelector('[data-onboarding-step="1"]');
+  await page.getByRole('button', { name: 'Student', exact: true }).click();
+  await page.locator('.auth-card .btn-primary').click();
+  await page.waitForSelector('[data-onboarding-step="2"]');
+  await page.locator('#signup-track').selectOption('10');
+  await page.locator('.auth-card .btn-primary').click();
+  await page.waitForSelector('[data-onboarding-step="3"]');
+  await page.locator('#signup-name').fill('Notes Student');
+  await page.locator('.auth-card .btn-primary').click();
+  await page.waitForSelector('[data-onboarding-step="4"]');
+  await page.locator('.auth-card .btn-primary').click();
+  await page.waitForSelector('[data-onboarding-step="5"]');
+  await page.locator('.auth-card .btn-primary').click();
   await page.waitForSelector('.home-greet', { timeout: 120000 });
 }
 
@@ -63,7 +77,7 @@ try {
   await page.locator('.sidebar a[href="/notes"]').first().click();
   await page.waitForSelector('[data-testid="notes-chapter"]');
   await check('Notes opens from the navigation', page.url().endsWith('/notes'));
-  await check('it opens on Class 10, the demo student’s class',
+  await check('it opens on Class 10, the student’s class',
     await page.locator('[role="tab"][aria-selected="true"]').innerText() === 'Class 10');
   await check('every Class 10 chapter is listed', await page.locator('[data-testid="notes-chapter"]').count() === 14);
   await page.waitForSelector('.nt-map-node');
