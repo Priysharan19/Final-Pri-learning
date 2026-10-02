@@ -750,7 +750,7 @@ async function run() {
       }
       if (!(await page.locator('.eval-card').count())) {
         const reveal = page.getByRole('button', { name: 'Show solution' });
-        if (await reveal.count()) { await reveal.click(); await wait(page, 1400); }
+        if (await reveal.count()) { await reveal.click(); await reveal.click(); await wait(page, 1400); }
       }
       await page.waitForSelector('.eval-card', { timeout: 20000 });
       const after = await page.evaluate(() =>

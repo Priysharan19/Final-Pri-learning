@@ -54,6 +54,7 @@ async function answerCurrentQuestion(page) {
   const reveal = page.getByRole('button', { name: /Show solution/i }).first();
   if (await reveal.isVisible().catch(() => false)) {
     await reveal.click();
+    await reveal.click();   // Show solution forfeits the marks, so it asks twice
     await page.waitForTimeout(220);
   }
 }

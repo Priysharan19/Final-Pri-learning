@@ -247,7 +247,7 @@ export default function Home() {
           </div>
           {open && (
             <div className="gen-panel" id="gen-panel">
-              <div className="gen-cats">
+              <div className="gen-cats" role="tablist" aria-label={t('home.showFilters')}>
                 {[
                   ['year', t(india ? 'home.catClass' : 'home.catYear')], ['course', t(india ? 'home.catTrack' : 'home.catCourse')], ['topics', t('home.catTopics')],
                   ['dots', t('home.catDots')], ['difficulty', t('home.catDifficulty')],
@@ -255,6 +255,7 @@ export default function Home() {
                   <button
                     key={k}
                     className={`gen-cat ${cat === k ? 'on' : ''}`}
+                  role="tab" aria-selected={cat === k} aria-controls="gen-pane"
                     disabled={(k === 'topics' && !section) || (k === 'dots' && !selSub)}
                     onClick={() => setCat(k)}
                   >
@@ -264,13 +265,13 @@ export default function Home() {
                 ))}
               </div>
 
-              <div className="gen-pane">
+              <div className="gen-pane" id="gen-pane" role="tabpanel">
                 {cat === 'year' && (
                   <>
                     <div className="gen-pane-title">{t(india ? 'home.pickClass' : 'home.pickYear')}</div>
                     <div className="gen-opts">
                       {[7, 8, 9, 10, 11, 12].map(y => (
-                        <button key={y} className={`gen-opt ${year === y ? 'on' : ''}`}
+                        <button key={y} className={`gen-opt ${year === y ? 'on' : ''}`} aria-pressed={year === y}
                           onClick={() => { setYear(y); setSectionKey(null); setSubtopic(null); setDotpoint(null); setCat('course'); }}>
                           {t(india ? 'common.classNumber' : 'common.yearNumber', { n: y })}{y === user.year ? <small>{t('home.yours')}</small> : null}
                         </button>
@@ -284,7 +285,7 @@ export default function Home() {
                     <div className="gen-pane-title">{t(india ? 'home.pickTrack' : 'home.pickCourse')}</div>
                     <div className="gen-opts">
                       {sections.map(s => (
-                        <button key={s.key} className={`gen-opt ${sectionKey === s.key ? 'on' : ''}`}
+                        <button key={s.key} className={`gen-opt ${sectionKey === s.key ? 'on' : ''}`} aria-pressed={sectionKey === s.key}
                           onClick={() => { setSectionKey(s.key); setSubtopic(null); setDotpoint(null); setCat('topics'); }}>
                           {s.label}
                         </button>
@@ -309,7 +310,7 @@ export default function Home() {
                           {subs.map(s => {
                             const available = topicAvailability(s).selectable;
                             return (
-                              <button key={s.id} className={`gen-opt ${subtopic === s.id ? 'on' : ''}`} style={{ textAlign: 'left' }}
+                              <button key={s.id} className={`gen-opt ${subtopic === s.id ? 'on' : ''}`} aria-pressed={subtopic === s.id} style={{ textAlign: 'left' }}
                                 disabled={!available}
                                 aria-label={available ? s.name : t('home.topicComingSoon', { topic: s.name })}
                                 onClick={() => { if (!available) return; setSubtopic(subtopic === s.id ? null : s.id); setDotpoint(null); }}>
@@ -332,7 +333,7 @@ export default function Home() {
                         const text = typeof dp === 'string' ? dp : dp.text;
                         const available = dotpointAvailable(dp);
                         return (
-                          <button key={i} className={`gen-opt ${dotpoint === i ? 'on' : ''}`} style={{ textAlign: 'left' }}
+                          <button key={i} className={`gen-opt ${dotpoint === i ? 'on' : ''}`} aria-pressed={dotpoint === i} style={{ textAlign: 'left' }}
                             disabled={!available}
                             aria-label={available ? text : t('home.dotpointComingSoon', { dotpoint: text })}
                             onClick={() => { if (available) setDotpoint(dotpoint === i ? null : i); }}>
@@ -350,7 +351,7 @@ export default function Home() {
                     <div className="gen-pane-title">{t('home.pickDifficulty')}</div>
                     <div className="gen-opts">
                       {[1, 2, 3, 4].filter(d => !section?.difficultyCeiling || d <= section.difficultyCeiling).map(d => (
-                        <button key={d} className={`gen-opt ${difficulty === d ? 'on' : ''}`}
+                        <button key={d} className={`gen-opt ${difficulty === d ? 'on' : ''}`} aria-pressed={difficulty === d}
                           onClick={() => setDifficulty(difficulty === d ? null : d)}>
                           D{d} · {t(DIFF_KEYS[d])}
                         </button>

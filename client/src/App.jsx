@@ -592,16 +592,16 @@ function ThemeToggle() {
   return (
     <button className="btn btn-quiet btn-sm" onClick={flip}
       aria-label={user.theme === 'dark' ? t('app.themeToLight') : t('app.themeToDark')}
-      style={{ padding: '6px 9px' }}>
+      style={{ minWidth: 44, minHeight: 44, padding: 0 }}>
       <Icon name={user.theme === 'dark' ? 'sun' : 'moon'} size={17} />
     </button>
   );
 }
 
 function ToastLayer({ toasts }) {
-  if (!toasts.length) return null;
+  // Always mounted, so a screen reader hears each toast as it arrives.
   return (
-    <div className="toast-wrap">
+    <div className="toast-wrap" role="status" aria-live="polite">
       {toasts.map(t => <div key={t.id} className={`toast ${t.kind}`}>{t.content}</div>)}
     </div>
   );

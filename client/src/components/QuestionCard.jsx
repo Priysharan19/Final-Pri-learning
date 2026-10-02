@@ -232,6 +232,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [selfSaved, setSelfSaved] = useState(false);
   const [selfOpen, setSelfOpen] = useState(false);
   const [photo, setPhoto] = useState(null);
+  const [pdfUnread, setPdfUnread] = useState(null);
   const [photoOCR, setPhotoOCR] = useState({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
   const [elapsed, setElapsed] = useState(0);
   const [inkPhase, setInkPhase] = useState(() => (inkModule ? 'ready' : 'idle'));   // idle | loading | ready | failed
@@ -265,7 +266,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setState({ phase: 'answering' }); setBusy(false);
     setSelfMarks({}); setSelfSaved(false); setSelfOpen(false); setPhoto(null); setBookmarked(false); setElapsed(0);
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
-    setChecking(false); setVouched(null);
+    setChecking(false); setVouched(null); setPdfUnread(null);
     setSaveState(draft?.typed || draft?.working || question.inkDraft?.length ? 'saved' : null);
     latestInk.current = null;
     setPeekOpen(false);
@@ -393,6 +394,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // Presenting two of three pages as the whole of the working would submit
       // an answer the student never wrote.
       toast(<span>{t('verdict.pdfPagesUnread', { unread, total: pages.length })}</span>);
+      setPdfUnread({ unread, total: pages.length });
     }
     const joined = texts.join('\n');
     if (isWorking) { setWorking(joined); setShowWorking(true); }
@@ -574,6 +576,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     .replace(/\s+/g, ' ').trim(), [question.prompt]);
   // A page of paper sized to the device: a phone gets a shorter first sheet so
   // the action bar and the question are never pushed off-screen.
+  const [, setViewportKey] = useState(0);
+  useEffect(() => {
+    const onResize = () => setViewportKey(k => k + 1);
+    window.addEventListener('orientationchange', onResize);
+    window.addEventListener('resize', onResize);
+    return () => { window.removeEventListener('orientationchange', onResize); window.removeEventListener('resize', onResize); };
+  }, []);
   const inkPageHeight = typeof window === 'undefined' ? 420
     : window.innerWidth <= 760 ? 340
       : window.innerHeight > window.innerWidth ? Math.min(640, Math.round(window.innerHeight * 0.48)) : 420;
@@ -697,8 +706,19 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     } catch { }
   }
 
+  // Showing the solution ends the attempt with no marks, so it takes two
+  // deliberate presses: a slip of the Pencil beside Submit cannot do it.
+  const [revealArmed, setRevealArmed] = useState(false);
+  useEffect(() => {
+    if (!revealArmed) return;
+    const disarm = setTimeout(() => setRevealArmed(false), 5000);
+    return () => clearTimeout(disarm);
+  }, [revealArmed]);
+
   async function reveal() {
     if (busy || resolved) return;
+    if (!revealArmed) { setRevealArmed(true); return; }
+    setRevealArmed(false);
     setBusy(true);
     try {
       const r = await api.post(`/practice/${question.id}/reveal`, { ms: Date.now() - startRef.current });
@@ -1080,8 +1100,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                             not move. */}
                         {photo
                           ? <div className="photo-thumb"><img src={photo} alt={t('history.paperWorking')} /><button aria-label={t('verdict.removePhoto')} onClick={() => { setPhoto(null); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>
-                          : <div className="photo-thumb" aria-hidden="true" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}>▤<button aria-label={t('verdict.removeAttachment')} onClick={() => setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null })}>✕</button></div>}
-                        <div style={{ flex: 1 }}>
+                          : <div className="photo-thumb" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}><span aria-hidden="true">▤</span><button aria-label={t('verdict.removeAttachment')} onClick={() => setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null })}>✕</button></div>}
+                        <div style={{ flex: 1 }} role="status" aria-live="polite">
                           {photoOCR.phase === 'reading' && (
                             <span className="muted">{cloudReadingEnabled(user) ? t('verdict.readingWork') : t('verdict.readingWithVision')}</span>
                           )}
@@ -1095,6 +1115,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                               </div>
                               <pre style={{ whiteSpace: 'pre-wrap', margin: 0, font: 'inherit', color: 'var(--ink)' }}>{photoOCR.text}</pre>
                               <div className="muted" style={{ marginTop: 6 }}>{t('verdict.filledFromLastLine')}</div>
+                              {pdfUnread && <div className="verdict-body" style={{ marginTop: 6 }}>{t('verdict.pdfPagesUnread', pdfUnread)}</div>}
                             </>
                           )}
                           {(photoOCR.phase === 'failed' || photoOCR.phase === 'unavailable') && <span className="verdict-body">{photoOCR.error}</span>}
@@ -1109,7 +1130,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   ref={inputRef}
                   className="working-input"
                   aria-label={t('verdict.workingAria')}
-                  style={{ background: 'none', border: 'none', outline: 'none', color: 'var(--ink)' }}
+                  style={{ background: 'none', border: 'none', color: 'var(--ink)' }}
                   placeholder={question.inputHint || t('verdict.workingPlaceholder')}
                   value={working} disabled={resolved}
                   onChange={e => editWorking(e.target.value)}
@@ -1380,7 +1401,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               : statusText}
           </span>
           <div className="ws-actions-btns">
-            {!resolved && <button className="btn btn-quiet" onClick={reveal} disabled={busy}>{t('verdict.showSolution')}</button>}
+            {!resolved && (
+              <button className={`btn ${revealArmed ? 'btn-ghost' : 'btn-quiet'}`} onClick={reveal} disabled={busy} aria-live="polite">
+                {revealArmed ? t('verdict.showSolutionConfirm') : t('verdict.showSolution')}
+              </button>
+            )}
             {resolved && <button className="btn btn-quiet redo-chip" onClick={() => onRedo ? onRedo() : onNext?.()}>{t('verdict.redoQuestion')}</button>}
             <button className="btn btn-primary" onClick={primary.run} disabled={primary.disabled} aria-busy={busy || undefined}>
               {primary.label}

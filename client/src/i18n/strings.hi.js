@@ -1009,4 +1009,8 @@ export default {
   'verdict.alreadyFinishedTitle': "यह प्रश्न पहले ही पूरा हो चुका है",
   'verdict.nextAfterConflict': "यह कहीं और पूरा हुआ, शायद दूसरे टैब में। अगले प्रश्न पर जाएँ।",
   'ink.webReader': "इस ब्राउज़र में पढ़ा गया (वैकल्पिक रीडर)",
+
+  // Guideline pass
+  'verdict.showSolutionConfirm': "हल दिखाएँ: इस प्रयास पर अंक नहीं मिलेंगे",
+  'ink.undoClear': "पृष्ठ मिटाया · वापस लाएँ",
 };

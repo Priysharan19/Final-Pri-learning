@@ -376,10 +376,30 @@ export default function InkAnswer({
     runRecognition(strokesRef.current, next);
   };
 
+  // Undo and redo move strokes, not the student's tap-to-correct fixes; only
+  // clearing the page starts the readings over. A clear can be taken back in
+  // one tap for a few seconds, because it sits beside Undo where a Pencil slips.
+  const [cleared, setCleared] = useState(null);
+  useEffect(() => {
+    if (!cleared) return;
+    const gone = setTimeout(() => setCleared(null), 6000);
+    return () => clearTimeout(gone);
+  }, [cleared]);
   const act = (fn) => () => {
-    setOverrides({});
     setPicker(null);
+    if (fn === 'clear') {
+      const before = strokesRef.current;
+      if (!before.length) return;
+      setCleared({ strokes: before, overrides });
+      setOverrides({});
+    }
     canvasRef.current?.[fn]();
+  };
+  const undoClear = () => {
+    if (!cleared) return;
+    setOverrides(cleared.overrides);
+    canvasRef.current?.setStrokes?.(cleared.strokes);
+    setCleared(null);
   };
 
   // Which engine actually produced what is on screen. A server reading was
@@ -426,7 +446,9 @@ export default function InkAnswer({
             <Icon name="finger" /><span className="ink-tool-label">{t('ink.finger')}</span>
           </button>
         )}
-        <span className="ink-hint">{t('ink.hint')}</span>
+        {cleared
+          ? <button type="button" className="ink-tool on" onClick={undoClear} aria-live="polite">{t('ink.undoClear')}</button>
+          : <span className="ink-hint">{t('ink.hint')}</span>}
       </div>
 
       <div className="ink-stage">

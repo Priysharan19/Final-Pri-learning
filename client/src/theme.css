@@ -2350,3 +2350,27 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 @media (pointer: coarse), (max-width: 760px) {
   .ws-bar .icon-btn, .ws-bar .ctx-next, .ws-tools .icon-btn, .ws-tools .seg > button, .exam-head .icon-btn, .exam-head .btn, .ink-tool, .editor-tool, .exam-flag, .exam-dot { min-height: 44px; min-width: 44px; }
 }
+
+/* ── Guideline pass: keyboard, focus and touch ─────────────────────────── */
+/* The rail opens for keyboard focus exactly as it does for a pointer. */
+.sidebar:focus-within .sidebar-inner { width: 224px; background: var(--surface); box-shadow: var(--shadow); }
+.sidebar:focus-within .nav-label, .sidebar:focus-within .nav-badge, .sidebar:focus-within .nav-hist { opacity: 1; }
+.sidebar:focus-within .nav-section-label { max-height: 22px; opacity: 1; padding-top: 4px; }
+/* A touch screen wider than a tablet (13" iPad landscape) has no hover either. */
+@media (hover: none) and (min-width: 1181px) {
+  .sidebar { width: 178px; }
+  .sidebar-inner, .sidebar:hover .sidebar-inner { width: 178px; box-shadow: none; }
+  .nav-label, .nav-badge { opacity: 1; }
+  .nav-section-label { max-height: 22px; opacity: 1; padding: 4px 12px 0; }
+  .nav-hist { display: none; }
+}
+/* The answer surface shows focus as a ring on the whole sheet. */
+.editor-shell:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-line); }
+.editor-body .answer-input:focus-visible, .editor-body textarea:focus-visible { outline: none; }
+/* Every correction and filter control is a finger-sized target on touch. */
+@media (pointer: coarse) {
+  .ink-sym, .sym-key, .ink-pick { min-width: 44px; min-height: 44px; }
+  .chip-x, .genbar-toggle { min-width: 44px; min-height: 44px; display: inline-grid; place-items: center; }
+  .photo-thumb button { width: 32px; height: 32px; }
+}
+.photo-thumb { width: 96px; height: 96px; }
