@@ -13,8 +13,6 @@
 // present without it: the reveal classes only ever hide what is already there.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import katex from 'katex';
-import 'katex/dist/katex.min.css';
 import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
@@ -62,11 +60,6 @@ function useReveal(rootRef, deps) {
     return () => io.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
-}
-
-function tex(source, display = true) {
-  try { return katex.renderToString(source, { displayMode: display, throwOnError: false, strict: false }); }
-  catch { return ''; }
 }
 
 function useNotes(grade) {
@@ -496,12 +489,13 @@ function Concepts({ concepts }) {
 }
 
 function Formula({ f, i }) {
-  const html = useMemo(() => tex(f.tex, true), [f.tex]);
+  // Rendered through MathText, the one escaped KaTeX sink, in display style.
+  const text = useMemo(() => `$\\displaystyle ${f.tex}$`, [f.tex]);
   return (
     <figure className="nt-formula nt-reveal" style={{ '--i': i }}>
       <figcaption><MathText text={f.label} /></figcaption>
       <div className="nt-ink">
-        <div className="nt-ink-tex" dangerouslySetInnerHTML={{ __html: html }} />
+        <MathText block className="nt-ink-tex" text={text} />
         <span className="nt-ink-veil" aria-hidden="true" />
       </div>
       <svg className="nt-ink-stroke" viewBox="0 0 300 10" preserveAspectRatio="none" aria-hidden="true">
