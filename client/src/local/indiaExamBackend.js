@@ -414,7 +414,7 @@ async function submitExam(profile, id, body = {}) {
   // deadline only the responses saved before it count.
   const inputs = examMarkingInputs(exam, body, now);
   // Never earlier than the paper has already seen (see observeClock).
-  const at = Math.max(now, Number(exam.latestSeenAt) || 0);
+  const at = Number(exam.latestSeenAt) || now;   // the paper's time, after any rollback correction
   const answers = inputs.answers;
   const workings = inputs.workings;
   const times = inputs.times;

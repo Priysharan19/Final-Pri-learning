@@ -289,6 +289,43 @@ const rbRow = await idb.get('exams', rb.id);
 ok(rbRow.final.clockRolledBack === true && rbRow.clockRollbacks >= 1, 'the frozen record notes that the clock was wound back');
 ok(rbRow.finishedAt >= rbRow.deadlineAt, 'the finalisation time is never earlier than a time the paper had already seen');
 
+// ── 11 · real time after a rollback still counts toward the deadline ────────
+// Saved at +50 min; the device clock is then wound back 30 min and the paper is
+// NOT reloaded. The room's 30-second heartbeat save is the first thing to see
+// the wound-back clock. Real time carries on: at real +55 (device +25) five
+// minutes are left, not thirty-five; at real +88 (device +58) the paper is past
+// its real deadline, so the autosave is refused and the submit marks only saved
+// work. (Time between the last observation and the rollback cannot be seen by
+// anyone; the heartbeat bounds it to 30 seconds.)
+offset = 0;
+const rt = (await call('POST', '/exams', { seed: 991 })).exam;
+const rtMcq = rt.questions.filter(q => q.answerType === 'mcq');
+const rtRight = String((await payloadOf(rtMcq[0].id)).answer.correctIndex);
+const rtWrong = String((Number(rtRight) + 1) % 4);
+offset = 50 * MIN;
+const atFifty = await call('POST', `/exams/${rt.id}/responses`, { answers: { [rtMcq[0].id]: rtWrong } });
+eq(atFifty.now - (await idb.get('exams', rt.id)).startedAt >= 50 * MIN, true, 'a save reports the paper\'s own time');
+const WOUND = -30 * MIN;          // device reads 30 minutes earlier than real time from here on
+offset = 50 * MIN + WOUND;        // the heartbeat, just after the rollback: real +50, device +20
+await call('POST', `/exams/${rt.id}/responses`, { answers: { [rtMcq[0].id]: rtWrong } });
+offset = 50 * MIN + WOUND + 5 * MIN;   // real +55, device +25
+const afterWind = await call('POST', `/exams/${rt.id}/responses`, { answers: { [rtMcq[0].id]: rtWrong } });
+const leftAfterWind = (await idb.get('exams', rt.id)).deadlineAt - afterWind.now;
+ok(Math.abs(leftAfterWind - 5 * MIN) < 1000, `five real minutes after a 30-minute rollback, five minutes are left — not thirty-five (${Math.round(leftAfterWind / 1000)} s left)`);
+ok(afterWind.now - Date.now() >= 30 * MIN - 1000, 'the save tells the room how far its clock is behind the paper');
+const viewAfterWind = (await call('GET', `/exams/${rt.id}`)).exam.session;
+ok(viewAfterWind.remainingMs <= 5 * MIN && viewAfterWind.remainingMs > 4 * MIN, `the paper view reports the real time left (${Math.round(viewAfterWind.remainingMs / 1000)} s)`);
+offset = 88 * MIN + WOUND;   // real +88, device +58 — before the deadline by the device clock alone
+await rejectsWith(call('POST', `/exams/${rt.id}/responses`, { answers: { [rtMcq[0].id]: rtRight } }), 'EXAM_DEADLINE_PASSED', 'an autosave after the real deadline is refused even though the wound-back device clock reads +58 min');
+const rtView = (await call('GET', `/exams/${rt.id}`)).exam.session;
+eq([rtView.expired, rtView.remainingMs], [true, 0], 'the paper reads as expired at the real deadline without a reload');
+const rtMarked = await call('POST', `/exams/${rt.id}/submit`, { answers: { [rtMcq[0].id]: rtRight }, submissionKey: 'real-time' });
+eq(rtMarked.detail.find(d => d.id === rtMcq[0].id)?.given, rtWrong, 'the submit after the real deadline marks only the saved answer');
+eq([rtMarked.final.late, rtMarked.final.finalisedBy], [true, 'deadline'], 'and it is recorded as late, finalised by the deadline');
+const rtRow = await idb.get('exams', rt.id);
+ok(rtRow.clockOffsetMs >= 30 * MIN - 1000 && rtRow.final.clockRolledBack === true, `the forward-only correction equals the rollback (${Math.round((rtRow.clockOffsetMs || 0) / 1000)} s) and is recorded`);
+ok(rtRow.finishedAt >= rtRow.deadlineAt + 27 * MIN, 'the finalisation time is the paper\'s real time, not the wound-back device time');
+
 Date.now = realNow;
 console.log(failures.length
   ? `EXAM SESSION: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`

@@ -23,9 +23,10 @@
 //
 //   · THE CLOCK ONLY MOVES FORWARD. Every read, save and submit records the
 //     latest time it has seen on the row (`latestSeenAt`). A device clock that
-//     is wound back reads as that latest time instead, so rolling the clock
-//     back can neither reopen an expired paper nor buy more time; the frozen
-//     record notes that a rollback was seen.
+//     is wound back is corrected by a forward-only offset (`clockOffsetMs`):
+//     the paper resumes from the latest time seen and real time elapsed after
+//     the rollback still counts, so rolling the clock back can neither reopen
+//     an expired paper nor buy more time. The frozen record notes it.
 //
 //   · THE MARK INPUTS ARE DECIDED HERE. A submit that arrives inside the
 //     deadline, or within SUBMIT_GRACE_MS (5 seconds) after it — the time the
@@ -68,13 +69,22 @@ const durationMs = exam => Math.max(1, Number(exam?.durationMin) || 60) * 60000;
  * the latest time seen, so it cannot reopen an expired paper or add time.
  */
 export function observeClock(exam, now = Date.now()) {
+  // The paper's time is the device time plus a correction (`clockOffsetMs`)
+  // that is only ever increased. When the device reads earlier than a time the
+  // paper has already seen, the correction grows by exactly the gap, so the
+  // paper resumes from where it was — and every millisecond the device clock
+  // advances AFTER the rollback still counts toward the deadline. A rollback
+  // freezes nothing; it is simply undone.
+  const offset = finite(exam?.clockOffsetMs) ? exam.clockOffsetMs : 0;
+  let at = now + offset;
   const seen = finite(exam?.latestSeenAt) ? exam.latestSeenAt : null;
-  if (seen !== null && now < seen) {
+  if (seen !== null && at < seen) {
     exam.clockRollbacks = (Number(exam.clockRollbacks) || 0) + 1;
-    return seen;
+    exam.clockOffsetMs = offset + (seen - at);
+    at = seen;
   }
-  exam.latestSeenAt = now;
-  return now;
+  exam.latestSeenAt = at;
+  return at;
 }
 
 /**
@@ -85,9 +95,9 @@ export function observeClock(exam, now = Date.now()) {
 export function ensureExamClock(exam, now = Date.now()) {
   if (!exam) return false;
   // A finalised paper's clock is history; reading it changes nothing.
-  const before = `${exam.latestSeenAt}:${exam.clockRollbacks}`;
+  const before = `${exam.latestSeenAt}:${exam.clockRollbacks}:${exam.clockOffsetMs}`;
   if (!exam.finishedAt) now = observeClock(exam, now);
-  let changed = before !== `${exam.latestSeenAt}:${exam.clockRollbacks}`;
+  let changed = before !== `${exam.latestSeenAt}:${exam.clockRollbacks}:${exam.clockOffsetMs}`;
   if (!finite(exam.startedAt)) {
     exam.startedAt = finite(exam.createdAt) ? exam.createdAt : now;
     changed = true;
@@ -235,7 +245,9 @@ export function saveExamResponses(exam, body = {}, now = Date.now()) {
     }
   }
   exam.responses = next;
-  return { savedAt: now, rev: next.rev, deadlineAt: exam.deadlineAt };
+  // `now` is the paper's time, so the room can correct a wound-back device
+  // clock without a reload.
+  return { savedAt: now, now, rev: next.rev, deadlineAt: exam.deadlineAt };
 }
 
 /**
@@ -244,7 +256,6 @@ export function saveExamResponses(exam, body = {}, now = Date.now()) {
  * it did not carry; after it, only the autosave written before the deadline.
  */
 export function examMarkingInputs(exam, body = {}, now = Date.now()) {
-  const deviceNow = now;
   ensureExamClock(exam, now);
   now = exam.latestSeenAt;
   const allowed = allowedKeys(exam);
@@ -261,7 +272,7 @@ export function examMarkingInputs(exam, body = {}, now = Date.now()) {
   return {
     answers, workings, times, ms,
     source: inTime ? 'submission' : 'autosave-before-deadline',
-    clockRolledBack: deviceNow < now || (Number(exam.clockRollbacks) || 0) > 0,
+    clockRolledBack: (Number(exam.clockRollbacks) || 0) > 0,
     late: !inTime,
     finalisedBy: inTime ? (body.reason === 'deadline' ? 'deadline' : 'student') : 'deadline'
   };
@@ -294,7 +305,7 @@ export function paperFingerprint(rows) {
 
 /** Write the frozen record of a finalised paper onto its row. */
 export function freezeExam(exam, { inputs, paperVersion, submissionKey = null, now = Date.now() }) {
-  now = observeClock(exam, now);
+  // `now` is already the paper's time (the caller read it through observeClock).
   const inks = exam.responses?.inks || {};
   exam.final = {
     submittedAt: now,

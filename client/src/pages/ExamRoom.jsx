@@ -33,6 +33,7 @@ import { tLater, useT, useTx } from '../i18n/index.js';
 
 const SAVE_DEBOUNCE_MS = 600;
 const INK_POINTS_PER_SAVE = 9000;
+const HEARTBEAT_MS = 30000;
 const OBJECTIVE = new Set(['mcq', 'multi-mcq']);
 const NUMERIC_SINGLE_GLYPH_ALPHABET = Array.from({ length: 10 }, (_, i) => String(i));
 
@@ -120,9 +121,16 @@ export default function ExamRoom() {
   // room counts from the paper's time, not the wound-back one.
   const skewRef = useRef(0);
   const clockNow = () => Date.now() + skewRef.current;
+  // Every answer from the backend carries the paper's own time; the room
+  // re-learns how far behind the device clock is each time, so a clock wound
+  // back while the app was in the background is corrected without a reload.
+  const learnClock = paperNow => {
+    const n = Number(paperNow);
+    if (Number.isFinite(n) && n > 0) skewRef.current = Math.max(0, n - Date.now());
+  };
 
   const setPhaseBoth = p => { phaseRef.current = p; setPhase(p); };
-  latest.current = { answers, workings, inks, modes, cur, exam };
+  latest.current = { answers, workings, inks, modes, cur, exam, deadlineAt };
 
   // ── Time on each question ──────────────────────────────────────────────────
   // Measured while the question is on screen and the page is visible; a hidden
@@ -174,7 +182,7 @@ export default function ExamRoom() {
       // "now", which would turn a crash into extra time.
       setDeadlineAt(session.deadlineAt || ((e.createdAt || Date.now()) + e.durationMin * 60000));
       setExam(e);
-      skewRef.current = Math.max(0, (Number(session.now) || 0) - Date.now());
+      learnClock(session.now);
       setNow(clockNow());
       setPhaseBoth('sitting');
     }).catch(() => nav('/exams'));
@@ -207,7 +215,9 @@ export default function ExamRoom() {
       inks: Object.fromEntries(sent.map(k => [k, snap.inks[k] || { strokes: [], lines: [] }]))
     };
     setSaveState('saving');
-    saveChain.current = saveChain.current.catch(() => {}).then(() => api.post(`/exams/${id}/responses`, body)).then(() => {
+    saveChain.current = saveChain.current.catch(() => {}).then(() => api.post(`/exams/${id}/responses`, body)).then(res => {
+      learnClock(res?.now);
+      setNow(clockNow());
       for (const k of sent) if (latest.current.inks[k] === snap.inks[k]) dirtyInk.current.delete(k);
       setSaveState(dirtyInk.current.size ? 'saving' : 'saved');
       if (dirtyInk.current.size && phaseRef.current === 'sitting') {
@@ -216,7 +226,13 @@ export default function ExamRoom() {
       }
     }, err => {
       setSaveState('error');
-      if (err?.code === 'EXAM_DEADLINE_PASSED') setNow(clockNow());
+      // The paper's time is past the deadline even if this device's clock
+      // says otherwise: count from the deadline, which submits the paper.
+      if (err?.code === 'EXAM_DEADLINE_PASSED') {
+        const deadline = latest.current.deadlineAt;
+        if (Number.isFinite(deadline)) skewRef.current = Math.max(skewRef.current, deadline - Date.now());
+        setNow(clockNow());
+      }
     });
     return saveChain.current;
   }, [id, accrue]);
@@ -246,20 +262,34 @@ export default function ExamRoom() {
     });
   }, [answers, workings, inks, modes, cur]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // A hidden tab may never come back: save now, not in 600 ms.
+  // A hidden tab may never come back: save now, not in 600 ms. Coming back
+  // (visible again, or the window refocused) saves too — the reply carries the
+  // paper's time, which corrects a device clock changed while the app was away.
   useEffect(() => {
-    const onHide = () => {
+    const onVisibility = () => {
       if (document.visibilityState === 'hidden') save();
-      else accrue();
+      else { accrue(); save(); }
     };
     const onPageHide = () => save();
-    document.addEventListener('visibilitychange', onHide);
+    const onFocus = () => save();
+    document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('pagehide', onPageHide);
+    window.addEventListener('focus', onFocus);
     return () => {
-      document.removeEventListener('visibilitychange', onHide);
+      document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('focus', onFocus);
     };
   }, [save, accrue]);
+
+  // A heartbeat save every 30 seconds while the paper is open. The backend's
+  // clock correction can only see a wound-back device clock when something
+  // reads it; this bounds the time a rollback could ever hide to 30 seconds.
+  useEffect(() => {
+    if (phase !== 'sitting') return;
+    const beat = setInterval(() => save(), HEARTBEAT_MS);
+    return () => clearInterval(beat);
+  }, [phase, save]);
 
   // Moving between questions closes one question's clock and opens the next.
   useEffect(() => {

@@ -6,6 +6,9 @@
 // before the app loads, sits a JEE Main paper (one multiple-choice answer,
 // autosaved), then fast-forwards past the 60-minute deadline and proves:
 //
+//   · winding the device clock back 30 minutes mid-paper (no reload — the
+//     student just comes back to the app) buys no time: the room re-learns the
+//     paper's time from its next save and still counts to the REAL deadline;
 //   · the room submits on its own, without the student pressing anything;
 //   · the result says the paper was submitted when time ran out;
 //   · the saved answer is what was marked;
@@ -55,8 +58,32 @@ export const flow = {
     const [qid, answer] = Object.entries(saved?.answers || {})[0] || [];
     await check('the chosen option is autosaved before time runs out', answer === '2', JSON.stringify(saved?.answers));
 
-    // An hour and a minute later.
-    await page.clock.fastForward('01:01:00');
+    const secondsLeft = async () => {
+      const m = /(\d+):(\d\d)/.exec(await page.locator('.exam-timer').innerText());
+      return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+    };
+
+    // Fifty minutes in, the device clock is wound back thirty minutes while
+    // the app is in the background; the student comes back to it.
+    await page.clock.fastForward('50:00');
+    await page.waitForTimeout(300);
+    const beforeWind = await secondsLeft();
+    await check('fifty minutes in, about ten minutes are left', beforeWind !== null && beforeWind <= 600 && beforeWind > 540, `timer at ${beforeWind}s`);
+    const deviceNow = await page.evaluate(() => Date.now());
+    await page.clock.setSystemTime(deviceNow - 30 * 60000);
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    let afterWind = null;
+    for (let i = 0; i < 40; i++) {
+      await page.clock.runFor(250);
+      afterWind = await secondsLeft();
+      if (afterWind !== null && afterWind <= 600) break;
+    }
+    await check('winding the device clock back gains no time — the room re-learns the paper\'s time without a reload',
+      afterWind !== null && afterWind <= 600, `timer at ${afterWind}s after a 30-minute rollback (it would read ~2400s if the rollback counted)`);
+
+    // Eleven real minutes later the REAL deadline has passed, although the
+    // wound-back device clock reads only forty-one minutes in.
+    await page.clock.fastForward('11:00');
     const marked = await page.waitForSelector('.hero-num', { timeout: 60000 }).then(() => true).catch(() => false);
     await check('the room submits the paper on its own when the deadline passes', marked);
     const head = (await page.locator('.card').first().innerText()).replace(/\s+/g, ' ');

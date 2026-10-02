@@ -3064,7 +3064,7 @@ const routes = {
     const now = Date.now();
     // After the deadline only what was autosaved before it is marked.
     const inputs = examMarkingInputs(e, body || {}, now);
-    const at = Math.max(now, Number(e.latestSeenAt) || 0);
+    const at = Number(e.latestSeenAt) || now;   // the paper's time, after any rollback correction
     const answers = inputs.answers;
     const workings = inputs.workings;
     const totalMs = Number(inputs.ms) || 0;
