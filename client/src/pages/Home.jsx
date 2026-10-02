@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { cloud } from '../platform/cloudTransport.js';
-import { resolveHomeRecommendation } from '../home/recommendation.js';
+import { resolveHomeRecommendation, actionOpenable } from '../home/recommendation.js';
+import { cacheAssignments, cachedAssignments, loadSavedFilters, saveFilters } from '../home/homeCache.js';
 import { useApp } from '../App.jsx';
 import { dotpointAvailable, practiceTargetAvailable, topicAvailability } from '../engine/curriculumAvailability.js';
 import { dayKey, formatWeekday } from '../lib/locale.js';
@@ -29,9 +30,6 @@ const TAGLINE_KEYS = [
 
 const DIFF_KEYS = { 1: 'difficulty.1', 2: 'difficulty.2', 3: 'difficulty.3', 4: 'difficulty.4' };
 
-function loadSaved() {
-  try { return JSON.parse(localStorage.getItem('pri-gen-filters')) || {}; } catch { return {}; }
-}
 
 export default function Home() {
   const { user, dueCount } = useApp();
@@ -45,7 +43,9 @@ export default function Home() {
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' ? true : navigator.onLine !== false);
   const [open, setOpen] = useState(false);
   const [cat, setCat] = useState('year');
-  const saved = useRef(loadSaved());
+  // Filters are saved under the class/track they were chosen in (homeCache.js).
+  const filterOwner = useRef(user);
+  const saved = useRef(loadSavedFilters(user));
   const [year, setYear] = useState(saved.current.year ?? user.year);
   const [sectionKey, setSectionKey] = useState(saved.current.sectionKey ?? null);
   const [subtopic, setSubtopic] = useState(saved.current.subtopic ?? null);
@@ -97,7 +97,9 @@ export default function Home() {
       try {
         const [me, result] = await Promise.all([cloud.me(), cloud.assignments()]);
         if (!live) return;
-        setAssignments(me?.account?.role === 'student' && Array.isArray(result?.assignments) ? result.assignments : null);
+        const rows = me?.account?.role === 'student' && Array.isArray(result?.assignments) ? result.assignments : null;
+        if (rows) cacheAssignments(user, rows);
+        setAssignments(rows);
       } catch (err) {
         if (!live) return;
         setAssignments(err?.status === 401 || err?.code === 'CLOUD_DISABLED' ? null : false);
@@ -115,7 +117,7 @@ export default function Home() {
     api.get('/placement').then(setPlacement).catch(() => { });
   }, [user.course, user.role]);
   useEffect(() => {
-    localStorage.setItem('pri-gen-filters', JSON.stringify({ year, sectionKey, subtopic, dotpoint, difficulty }));
+    saveFilters(filterOwner.current, { year, sectionKey, subtopic, dotpoint, difficulty });
   }, [year, sectionKey, subtopic, dotpoint, difficulty]);
 
   const hour = new Date().getHours();
@@ -215,7 +217,8 @@ export default function Home() {
 
   const homeDecision = useMemo(() => local ? resolveHomeRecommendation({
     user, stats, dueCount, tasks: local.tasks, exams: local.exams, resume: local.resume,
-    assignments: Array.isArray(assignments) ? assignments : [], online, cloudReady: Array.isArray(assignments)
+    assignments: Array.isArray(assignments) ? assignments : [], online, cloudReady: Array.isArray(assignments),
+    cachedAssignments: assignments === false ? cachedAssignments(user) : []
   }) : { primary: null, alternatives: [] }, [local, user, stats, dueCount, assignments, online]);
 
   return (
@@ -235,7 +238,7 @@ export default function Home() {
           onSkip={() => { setPlacement(p => ({ ...p, status: 'skipped' })); api.post('/placement/skip', {}).catch(() => { }); }} />
         <GoalCard user={user} activity={stats?.activity || []} onGo={() => nav('/practice')} />
         {homeDecision.alternatives.map(item => (
-          <HomeAction key={item.kind + ':' + item.id} action={item} nav={nav} />
+          <HomeAction key={item.kind + ':' + item.id} action={item} nav={nav} online={online} />
         ))}
       </div>
 
@@ -439,6 +442,8 @@ function actionCopy(action, user, t) {
   }[action.kind];
   const title = (action.kind === 'task-resume' ? t('common.continue') + ': ' : '') + (d.title || t(genericTitle, d));
   let reason = action.kind === 'exam' ? 'home.reason.examInProgress'
+    : action.kind === 'exam-expired' ? 'home.reason.examExpired'
+    : action.kind === 'assignment' && d.cached ? 'home.reason.assignmentCached'
     : action.kind === 'assignment' || action.kind === 'task' ? WORK_REASONS[d.status]
       : action.kind.endsWith('resume') ? 'home.reason.resume'
       : action.kind === 'reviews' ? 'home.reviewDue'
@@ -446,15 +451,17 @@ function actionCopy(action, user, t) {
       : action.kind === 'adaptive' ? 'home.reason.adaptive'
       : action.offlineCaveat ? 'home.reason.practiceOffline' : 'home.reason.practice';
   const cta = action.kind === 'reviews' ? 'nav.review'
+    : action.kind === 'exam-expired' ? 'home.next.examResult'
     : ['exam', 'assignment', 'task', 'task-resume', 'practice-resume'].includes(action.kind) ? 'common.continue' : 'nav.practice';
   return { title, reason: t(reason, { ...d, date: action.dueAt ? new Date(action.dueAt).toLocaleDateString() : '' }), cta: t(cta) };
 }
 
-function HomeAction({ action, nav, primary }) {
+function HomeAction({ action, nav, primary, online = true }) {
   const { user } = useApp();
   const t = useT();
   if (!action) return null;
   const copy = actionCopy(action, user, t);
+  const openable = actionOpenable(action, { online });
   if (!primary) {
     // Alternatives share CTA words ("Continue", "Practice"), so each button is
     // named by its own card title and described by its own reason.
@@ -467,7 +474,8 @@ function HomeAction({ action, nav, primary }) {
         <p id={reasonId}>{copy.reason}</p>
         <button className="btn btn-ghost btn-sm" aria-describedby={reasonId}
           aria-labelledby={`${titleId}-cta ${copy.title === copy.cta ? reasonId : titleId}`}
-          onClick={() => nav(action.destination)}><span id={`${titleId}-cta`}>{copy.cta}</span></button>
+          disabled={!openable} data-home-alt-offline={openable ? undefined : ''}
+          onClick={() => { if (openable) nav(action.destination); }}><span id={`${titleId}-cta`}>{openable ? copy.cta : t('home.needsConnection')}</span></button>
       </article>
     );
   }
