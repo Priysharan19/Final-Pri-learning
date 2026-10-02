@@ -246,7 +246,7 @@ export default function Login() {
           : t('login.notChosen'))
     : (selectedCourse?.[1] || form.course.toUpperCase()) + ' · ' + t('common.yearNumber', { n: form.year });
 
-  async function go(path, body) {
+  async function go(path, body, { cloud = cloudIntent } = {}) {
     setBusy(true); setError('');
     try {
       const r = await api.post(path, body);
@@ -254,7 +254,7 @@ export default function Login() {
       // the authenticated shell. Move the cloud handoff first so the destination
       // cannot be lost during that identity transition. The local profile is
       // already authoritative here because the POST completed successfully.
-      if (cloudIntent) nav(CLOUD_ACCOUNT_ROUTE, { replace: true, flushSync: true });
+      if (cloud) nav(CLOUD_ACCOUNT_ROUTE, { replace: true, flushSync: true });
       setUser(r.user);
       refreshDue();
       return r;
@@ -285,6 +285,16 @@ export default function Login() {
     localStorage.setItem('pri-seen-hero', '1');
     if (profiles?.length) setStage('pick');
     else beginCreate(false);
+  };
+
+  /** The README's "Try the demo": one tap from the welcome screen to a seeded
+      Class 10 student, without first creating a profile of your own. */
+  const tryDemo = () => {
+    localStorage.setItem('pri-seen-hero', '1');
+    // A cloud sign-in started earlier and backed out of must not send the
+    // demo student to the account page.
+    setCloudIntent(false);
+    void go('/profiles/demo', {}, { cloud: false });
   };
 
   /** Open/select the local profile first, then hand it to the real cloud account panel. */
@@ -426,6 +436,12 @@ export default function Login() {
           <div className="row" style={{ marginTop: 34 }}>
             <button className="btn btn-primary btn-lg" onClick={enter}>{t('login.getStarted')}</button>
           </div>
+          <div style={{ textAlign: 'center', marginTop: 14 }}>
+            <button className="linklike" type="button" data-testid="hero-try-demo" disabled={busy} onClick={tryDemo}>
+              {t('login.tryDemoIndia')}
+            </button>
+          </div>
+          {error && <div className="error-box" role="alert" style={{ marginTop: 12 }}>{error}</div>}
           <p className="muted" style={{ marginTop: 26, textAlign: 'center' }}>{t('login.heroPrivacy')}</p>
           <div style={{ textAlign: 'center', marginTop: 10 }}>
             <button className="linklike" onClick={cloudSignIn}>{t('login.cloudSignIn')}</button>
