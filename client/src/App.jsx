@@ -3,15 +3,18 @@ import React, { createContext, useContext, useEffect, useMemo, useState, useCall
 import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { api } from './api.js';
 import { requestPersistentStorage } from './local/idb.js';
-import { installAutoSync } from './platform/cloudSyncScheduler.js';
-import { cancelRemindersOnSignOut } from './reminders/index.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
 import { setLanguage, signInLanguage, useT } from './i18n/index.js';
 import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
-import Legal from './pages/Legal.jsx';
+// The legal notices are a route of their own: nothing on the first screen
+// reads them, and the four English documents they carry are 16 kB of text that
+// otherwise rode in the shell's preload list on every cold open. The chunk is
+// warmed in the background, so the pages still open offline; the Hindi copies
+// stay behind their own import() in Legal.jsx.
+const Legal = React.lazy(() => import('./pages/Legal.jsx'));
 
 // ── Routes nobody has opened yet ─────────────────────────────────────────────
 // Login, Home, Practice and Legal are the screens a first run reaches: the
@@ -170,11 +173,27 @@ export default function App() {
   // foreground, shortly after an answer and every 15 minutes while visible —
   // for the signed-in profile only, and a no-op offline or unlinked. When a
   // pull restored work done on another device, the screens reading it refresh.
+  //
+  // The scheduler is reached through import() rather than named at the top of
+  // this file: it pulls the sync worker and the cloud-restore path with it, and
+  // a static import here put 53 kB of them in the shell's own preload list —
+  // paid for on every cold open, by every student, before the first screen.
+  // Nothing about sync is needed before first paint: it is network-dependent
+  // and a no-op offline, so it is installed once the module arrives. The
+  // cleanup covers both orders — the effect torn down before the module lands
+  // (nothing to uninstall, and the late arrival installs nothing) and after.
   useEffect(() => {
     if (!user?.id) return undefined;
-    return installAutoSync(user.id, {
-      onSynced: result => { if (result?.restoredEvents > 0) { refreshUser(); refreshDue(); refreshRecent(); } }
-    });
+    const pid = user.id;
+    let uninstall = null;
+    let torn = false;
+    void import('./platform/cloudSyncScheduler.js').then(({ installAutoSync }) => {
+      if (torn) return;
+      uninstall = installAutoSync(pid, {
+        onSynced: result => { if (result?.restoredEvents > 0) { refreshUser(); refreshDue(); refreshRecent(); } }
+      });
+    }).catch(() => { });
+    return () => { torn = true; if (uninstall) uninstall(); };
   }, [user?.id, refreshUser, refreshDue, refreshRecent]);
 
   // The interface follows the profile's own language. Before a profile is
@@ -300,15 +319,17 @@ export default function App() {
   if (!user) {
     return (
       <AppCtx.Provider value={ctx}>
-        <Routes>
-          {/* A store reviewer and a payment provider open these without an
-              account, so they are reachable before the profile gate. */}
-          <Route path="/privacy" element={<Legal />} />
-          <Route path="/terms" element={<Legal />} />
-          <Route path="/refund-policy" element={<Legal />} />
-          <Route path="/grievance" element={<Legal />} />
-          <Route path="*" element={<Login />} />
-        </Routes>
+        <React.Suspense fallback={<RouteLoading />}>
+          <Routes>
+            {/* A store reviewer and a payment provider open these without an
+                account, so they are reachable before the profile gate. */}
+            <Route path="/privacy" element={<Legal />} />
+            <Route path="/terms" element={<Legal />} />
+            <Route path="/refund-policy" element={<Legal />} />
+            <Route path="/grievance" element={<Legal />} />
+            <Route path="*" element={<Login />} />
+          </Routes>
+        </React.Suspense>
         <ToastLayer toasts={toasts} />
       </AppCtx.Provider>
     );
@@ -339,7 +360,10 @@ export default function App() {
   };
 
   const switchProfile = async () => {
-    try { await cancelRemindersOnSignOut(user?.id); } catch { }
+    // The reminders runtime is loaded here, on the way out, rather than named
+    // at the top of this file: a static import carried the study planner it
+    // depends on into the shell's preload list for every student at every boot.
+    try { const { cancelRemindersOnSignOut } = await import('./reminders/index.js'); await cancelRemindersOnSignOut(user?.id); } catch { }
     try { await api.post('/auth/logout'); } catch { }
     // A role-specific route belongs to the profile that just signed out.
     // Neutralise it before showing the picker so selecting a different role

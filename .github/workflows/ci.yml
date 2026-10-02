@@ -91,7 +91,7 @@ jobs:
           grep -Fq 'PDF WORKING: PASS — 25/25 checks' suites.log
           grep -Fq 'MCQ DISTINCTNESS: PASS — 14/14 checks' suites.log
           grep -Fq 'INDIA NATIVE SURFACES: PASS — 31/31 checks' suites.log
-          grep -Eq 'INSTALL BUDGET: PASS — 47/47 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
+          grep -Eq 'INSTALL BUDGET: PASS — 48/48 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
           grep -Fq 'nothing emitted left uncovered.' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 59/59 checks' suites.log

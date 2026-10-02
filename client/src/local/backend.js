@@ -61,8 +61,15 @@ import { featureEnabled } from '../platform/features.js';
 import { stageAttemptProgress } from '../platform/profileOutbox.js';
 import { requestTutorHelp } from './tutorBridge.js';
 import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
-import { createTutorAskRoute } from '../tutor/askRoute.js';
 import { priNative } from '../platform/native/index.js';
+
+// True in a production build made with the tutor off. tutorFeatureEnabled() is
+// then false on every device, so the ask route below is dead code; written as
+// a literal test of the build constants (not a helper in flag.js) because the
+// bundler folds only what it can see in this module, and that fold is what
+// keeps askRoute.js and the conversation code out of a dark build entirely.
+/* global __PRI_FEATURE_TUTOR__, __PRI_PRODUCTION_BUILD__ */
+const TUTOR_BUILT_OUT = typeof __PRI_PRODUCTION_BUILD__ === 'boolean' && __PRI_PRODUCTION_BUILD__ && __PRI_FEATURE_TUTOR__ !== true;
 
 export const COURSES = {
   nsw: { name: 'NSW · HSC', junior: y => `Year ${y} · Stage ${y <= 8 ? 4 : 5}`, senior: y => y === 11 ? 'Year 11 · Mathematics Advanced' : 'Year 12 · Mathematics Advanced (HSC)' },
@@ -2478,6 +2485,13 @@ function importProgress(src) {
 
 // ── Route implementations ────────────────────────────────────────────────────
 
+// The tutor conversation route, built on first use from its own module (see
+// the 'POST /practice/:id/tutor/ask' entry below). Function declarations above
+// and below this table are hoisted, so the deps are live by the time it runs.
+let tutorAskRoutePromise = null;
+const tutorAskRoute = () => (tutorAskRoutePromise ||= import('../tutor/askRoute.js')
+  .then(m => m.createTutorAskRoute({ requireProfile, get, assertPracticeRow, tutorRequest, tutorWork, displayAnswer, sanitizeText })));
+
 const routes = {
 
   // ---- profiles / accounts ----
@@ -3118,7 +3132,13 @@ const routes = {
   },
   // The student's own question, between levels 1 and 3. Grounded and streamed
   // here (client/src/tutor/askRoute.js); the panel never sees the solution.
-  'POST /practice/:id/tutor/ask': createTutorAskRoute({ requireProfile, get, assertPracticeRow, tutorRequest, tutorWork, displayAnswer, sanitizeText }),
+  // The route module (and the conversation and streaming code behind it) is
+  // reached through import() on the first question, and in a production build
+  // with the tutor off it is not built at all: the route then refuses with
+  // TUTOR_DISABLED exactly as the built route does when the flag is off.
+  'POST /practice/:id/tutor/ask': TUTOR_BUILT_OUT
+    ? async () => { throw tutorDisabledError(); }
+    : (body, params) => tutorAskRoute().then(route => route(body, params)),
 
 
   // A misconception the cloud working checker PROPOSED for a wrong answer the

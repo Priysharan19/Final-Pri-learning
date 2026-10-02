@@ -168,7 +168,15 @@ export const ON_DEMAND = [
   // they are question banks for one class each, exactly like the rest of this
   // rule. Without naming them they fell through to the warm set, so a Class 10
   // student was fetching 90 kB of Class 11 and 12 questions in the background.
-  [/(^|\/)(year(7|8|9|10|11|12)|streams-(standard|ext)|india-(algebra|calculus|class10|class11|class12|coordinate|foundation|junior-overlay|olympiad|senior|native-helpers))-[^/]*\.js$/, 'question bank for another year'],
+  // multipart is the HSC Section II bank: structured papers that only the
+  // legacy NSW exam route (`POST /exams` in local/backend.js) composes, behind
+  // the import() that route already holds, and never reached by a CBSE or JEE
+  // paper (local/indiaExamBackend.js). The NSW track sits behind the
+  // EXTENDED_TRACKS flag, so without naming it every Indian student warmed
+  // 16 kB of Australian exam questions; a profile that holds the NSW course has
+  // it from its first paper on, and backend.js already charges an unreachable
+  // fetch to that one paper rather than every paper after it.
+  [/(^|\/)(year(7|8|9|10|11|12)|streams-(standard|ext)|multipart|india-(algebra|calculus|class10|class11|class12|coordinate|foundation|junior-overlay|olympiad|senior|native-helpers))-[^/]*\.js$/, 'question bank for another year'],
 
   // The source-audited NCERT Class 7–9 production banks: each class's
   // generators, topper notes, worked examples and answer audits. They used to
