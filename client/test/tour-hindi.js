@@ -174,7 +174,7 @@ export const flow = {
         const sym = page.locator('.ink-preview .ink-sym').first();
         const symLabel = await sym.getAttribute('aria-label');
         await check('Handwriting: a read symbol is labelled in Hindi',
-          symLabel.startsWith(hi['ink.symbolAria'].split('{n}')[0]) && DEVANAGARI.test(symLabel), JSON.stringify(symLabel));
+          symLabel.startsWith(hi['ink.symbolLabel'].split('{n}')[0]) && DEVANAGARI.test(symLabel), JSON.stringify(symLabel));
         await check('Handwriting: a read symbol is titled in Hindi', await sym.getAttribute('title') === hi['ink.tapToCorrect']);
         await sym.click();
         await page.waitForSelector('.ink-picker', { timeout: 5000 }).catch(() => {});
