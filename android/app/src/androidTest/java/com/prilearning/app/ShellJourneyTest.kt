@@ -113,6 +113,19 @@ class ShellJourneyTest {
         instrumentation.sendPointerSync(MotionEvent.obtain(t, t + 60, MotionEvent.ACTION_UP, x, y, 0))
     }
 
+    /** Reach Progress the way a student does: the visible nav link, or the
+     *  compact "More" sheet. (A synthetic history.pushState bypasses the router's
+     *  history index, which made Back depend on timing — not a product path.) */
+    private fun openProgress(s: ActivityScenario<MainActivity>) {
+        val link = "[].slice.call(document.querySelectorAll('a[href=\"/progress\"]')).find(function(a){return a.offsetParent;})"
+        if (eval(s, "!!($link)") != "true") {
+            click(s, "document.querySelector('.mobilenav button[aria-expanded]')")
+            waitFor(s, "!!($link)")
+        }
+        click(s, link)
+        waitFor(s, "location.pathname === '/progress'")
+    }
+
     private fun backWanted(s: ActivityScenario<MainActivity>): Boolean {
         var wanted = false
         s.onActivity { wanted = it.bridge?.backWanted == true }
@@ -169,9 +182,10 @@ class ShellJourneyTest {
             waitFor(s, "document.querySelector('.home-greet')")
             eval(s, "localStorage.setItem('pri-android-marker','kept')")
             // Progress before any attempt: nothing answered yet.
-            eval(s, "(function(){history.pushState({},'','/progress');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
+            openProgress(s)
             assertEquals("a new profile has answered nothing", "\"0\"", waitFor(s, ANSWERED))
-            eval(s, "(function(){history.back();return true;})()")
+            awaitBackWanted(s, true)
+            pressBack()
             waitFor(s, "location.pathname === '/' && document.querySelector('.home-greet')")
 
             Log.i("PRITEST", "SPA routing through the bundled origin, and history Back")
@@ -231,10 +245,12 @@ class ShellJourneyTest {
             assertEquals("a Next control is offered", "true", eval(s, "!!document.querySelector('.ctx-next')"))
             eval(s, "(function(){window.__q=document.querySelector('.q-prompt');document.querySelector('.ctx-next').click();return true;})()")
             waitFor(s, "document.querySelector('.q-prompt') && document.querySelector('.q-prompt') !== window.__q && !document.querySelector('.verdict')")
-            eval(s, "(function(){history.pushState({},'','/progress');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
+            openProgress(s)
             val answeredAfter = waitFor(s, ANSWERED).trim('"').toIntOrNull() ?: 0
             assertTrue("Progress counts the attempt just marked ($answeredAfter answered)", answeredAfter >= 1)
-            eval(s, "(function(){history.back();return true;})()")
+            // The real Back key walks the app's own history: Progress → Practice → Home.
+            awaitBackWanted(s, true)
+            pressBack()
             waitFor(s, "location.pathname === '/practice'")
             awaitBackWanted(s, true)
             pressBack()
