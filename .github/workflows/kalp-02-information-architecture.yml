@@ -7,6 +7,12 @@ on:
       - 'client/src/pages/History.jsx'
       - 'client/src/pages/Teach.jsx'
       - 'client/src/components/FreeCapNotice.jsx'
+      - 'client/src/components/PageLink.jsx'
+      - 'client/src/platform/pageLink.js'
+      - 'client/src/pages/Legal.jsx'
+      - 'client/src/pages/Login.jsx'
+      - 'client/src/pages/PracticeBase.jsx'
+      - 'client/test/page-link-history-check.mjs'
       - 'client/src/i18n/**'
       - 'client/src/theme.css'
       - 'client/test/kalp02-navigation-check.mjs'
@@ -40,6 +46,9 @@ jobs:
 
       - name: KALP-02 route and role source gate
         run: node client/test/kalp02-navigation-check.mjs
+
+      - name: Page links push or replace by the real URL (Back-race regression)
+        run: node client/test/page-link-history-check.mjs
 
       - name: KALP-01 visual-system regression gate
         run: node client/test/design-system-check.mjs

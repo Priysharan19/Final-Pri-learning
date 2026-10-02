@@ -1,6 +1,8 @@
 import { featureEnabled } from './platform/features.js';
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import PageLink from './components/PageLink.jsx';
+import { isCurrentUrl } from './platform/pageLink.js';
 import { api } from './api.js';
 import { requestPersistentStorage } from './local/idb.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
@@ -315,12 +317,12 @@ export default function App() {
   const destinationLink = (item, className, onClick) => {
     const active = isDestinationActive(loc, item.to);
     return (
-      <Link key={item.to} to={item.to} className={`${className}${active ? ' active' : ''}`}
+      <PageLink key={item.to} to={item.to} className={`${className}${active ? ' active' : ''}`}
         aria-current={active ? 'page' : undefined} onClick={onClick}>
         <span className="nav-ico" aria-hidden="true">{item.ico}</span>
         <span className="nav-label">{t(item.key)}</span>
         {item.to === '/' && dueCount > 0 && <span className="nav-badge">{t('nav.due', { count: dueCount, n: dueCount })}</span>}
-      </Link>
+      </PageLink>
     );
   };
 
@@ -338,7 +340,7 @@ export default function App() {
       <div className="shell">
         <a className="skip-link" href="#main" onClick={skipToMain}>{t('app.skipToMain')}</a>
         <header className="topbar">
-          <Logo onClick={() => nav('/')} />
+          <Logo onClick={() => nav('/', { replace: isCurrentUrl('/') })} />
           <div className="top-stats">
             {user.streak > 0 && <span className="chip" title={t('app.dayStreak')}><span className="flame">▲</span><b>{user.streak}</b></span>}
             <ThemeToggle />
@@ -407,10 +409,10 @@ export default function App() {
         {mobilePrimary.map(item => {
           const active = isDestinationActive(loc, item.to);
           return (
-            <Link key={item.to} to={item.to} className={`mnav-item${active ? ' active' : ''}`}
+            <PageLink key={item.to} to={item.to} className={`mnav-item${active ? ' active' : ''}`}
               aria-current={active ? 'page' : undefined}>
               <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{t(item.key)}</span>
-            </Link>
+            </PageLink>
           );
         })}
         <button
@@ -433,10 +435,10 @@ export default function App() {
             {mobileMore.map(item => {
               const active = isDestinationActive(loc, item.to);
               return (
-                <Link key={item.to} to={item.to} className={`mnav-sheet-item${active ? ' active' : ''}`}
+                <PageLink key={item.to} to={item.to} className={`mnav-sheet-item${active ? ' active' : ''}`}
                   aria-current={active ? 'page' : undefined} onClick={() => closeMore(false)}>
                   <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{t(item.key)}</span>
-                </Link>
+                </PageLink>
               );
             })}
           </div>
