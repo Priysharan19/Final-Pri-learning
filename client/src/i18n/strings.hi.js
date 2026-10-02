@@ -1757,6 +1757,7 @@ export default {
   'cloud.resetFailed': 'पासवर्ड वापस पाने का अनुरोध नहीं भेजा जा सका।',
   'cloud.syncComplete': 'सिंक पूरा हुआ: भेजे गए — {pushedEvents} लर्निंग इवेंट, {pushedEntities} रिकॉर्ड; मिले — {pulledEvents} इवेंट, {pulledEntities} रिकॉर्ड।',
   'cloud.syncFailed': 'सिंक पूरा नहीं हो सका। आपका स्थानीय काम इस डिवाइस पर अब भी सुरक्षित है।',
+  'cloud.upgradeRequired': 'Pri Learning का यह संस्करण सिंक के लिए बहुत पुराना है। स्टोर से ऐप अपडेट करें — सब कुछ इसी डिवाइस पर सहेजा रहेगा, और आप अब भी अपना खाता निर्यात या हटा सकते हैं।',
   'cloud.checkoutFailed': 'सब्सक्रिप्शन का चेकआउट शुरू नहीं हो सका।',
   'cloud.webRestored': 'भुगतान प्रदाता से सब्सक्रिप्शन की स्थिति वापस ले आई गई है।',
   'cloud.webRestoreFailed': 'वेब सब्सक्रिप्शन वापस नहीं लाया जा सका।',

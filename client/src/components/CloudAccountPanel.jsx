@@ -272,7 +272,12 @@ export default function CloudAccountPanel() {
         pulledEvents: result.pulledEvents || 0, pulledEntities: result.pulledEntities || 0
       }));
       await reload({ verify: false });
-    } catch (err) { setError(err.message || tLater('cloud.syncFailed')); }
+    } catch (err) {
+      // CP-11: below the server's minimum shell build. Say what to do; the
+      // outbox keeps every change on this device until the app is updated.
+      setError(err?.code === 'CLIENT_UPGRADE_REQUIRED' ? tLater('cloud.upgradeRequired') : (err.message || tLater('cloud.syncFailed')));
+      await reload({ verify: false }).catch(() => {});
+    }
     finally { setBusy(''); }
   }
 
@@ -601,7 +606,9 @@ export default function CloudAccountPanel() {
             <div className="sc-label">{t('cloud.syncStatus')}</div>
             <div style={{ fontWeight: 650, marginTop: 3 }}>{pending ? t('cloud.pendingChanges', { count: pending, n: pending }) : t('cloud.outboxClear')}</div>
             <div className="muted" style={{ fontSize: 12 }}>{t('cloud.lastSync', { when: when(status?.lastSyncAt, t) })}</div>
-            {status?.lastError && <div style={{ color: 'var(--bad)', fontSize: 12 }}>{t('cloud.lastError', { error: status.lastError })}</div>}
+            {status?.lastError === 'CLIENT_UPGRADE_REQUIRED'
+              ? <div role="status" data-cloud-upgrade style={{ color: 'var(--bad)', fontSize: 12 }}>{t('cloud.upgradeRequired')}</div>
+              : status?.lastError && <div style={{ color: 'var(--bad)', fontSize: 12 }}>{t('cloud.lastError', { error: status.lastError })}</div>}
           </div>
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
             <button className="btn btn-primary" type="button" onClick={doSync} disabled={!canSync || !!busy}>{busy === 'sync' ? t('cloud.syncing') : t('cloud.syncNow')}</button>
