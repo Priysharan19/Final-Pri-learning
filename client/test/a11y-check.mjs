@@ -981,7 +981,9 @@ async function run() {
     });
 
     await step('india exam room · section analysis', '/exams/:id', async () => {
-      await click(page, 'button.btn-primary', { text: 'Submit paper' });
+      await click(page, '.exam-head .btn', { text: 'Review and submit' });
+      await page.waitForSelector('[role="dialog"]', { timeout: 10000 });
+      await click(page, '[role="dialog"] button.btn-primary', { text: 'Submit paper' });
       await page.waitForSelector('.exam-analysis', { timeout: 60000 });
       await wait(page, 700);
     });

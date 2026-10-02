@@ -181,6 +181,7 @@ export const flow = {
         for (let i = 1; i <= 8; i++) await page.mouse.move(low.x + low.width * (0.2 + 0.3 * i / 8), low.y + low.height * 0.9);
         await page.mouse.up();
         await page.waitForTimeout(150);
+        const beforeWiden = await inkBox();
         // Phone → tablet roughly doubles the sheet's width: the widening case.
         await page.setViewportSize({ width: 820, height: 1180 });
         await page.waitForTimeout(400);
@@ -196,6 +197,13 @@ export const flow = {
         await check(`${tag}: widening to a tablet keeps every stroke on the sheet`,
           !!rotated && !rotated.empty && rotated.maxY >= rotated.h * 0.5 && rotated.maxY <= rotated.h - 4 && rotated.maxX < rotated.w - 1,
           JSON.stringify(rotated));
+        // And it was scaled, not merely left in place: the ink's right edge
+        // keeps its share of the sheet's width (unscaled ink would halve it).
+        const shareBefore = beforeWiden && !beforeWiden.empty ? beforeWiden.maxX / beforeWiden.w : null;
+        const shareAfter = rotated && !rotated.empty ? rotated.maxX / rotated.w : null;
+        await check(`${tag}: widening scales the ink with the sheet`,
+          shareBefore != null && shareAfter != null && Math.abs(shareAfter - shareBefore) <= 0.08,
+          JSON.stringify({ shareBefore, shareAfter }));
         // (Ink pushed past the foot is painted up to the very edge and cut off;
         //  the clamp leaves the lowest point 8px above it.)
         await page.setViewportSize({ width: 360, height: 640 });
@@ -263,7 +271,7 @@ export const flow = {
       });
       await check(`${tag}: Pri Explain is offered once a worked solution exists`, launcher.present, JSON.stringify(launcher));
       await check(`${tag}: its launcher sits in the page flow, clear of Next, inside the screen and pressable`,
-        launcher.present && !launcher.overlap && launcher.inside && launcher.pressable && launcher.position === 'static',
+        launcher.present && !launcher.overlap && !launcher.underBar && launcher.inside && launcher.pressable && launcher.position === 'static',
         JSON.stringify(launcher));
 
       // ── iPad composition: the top bar and sidebar line up ─────────────────

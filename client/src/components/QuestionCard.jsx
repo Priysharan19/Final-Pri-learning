@@ -1670,7 +1670,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <span className="status-line" data-state={statusState} role="status" aria-live="polite">
             {statusState !== 'idle' && <span className="dot" aria-hidden="true" />}
             {writeMode && inkResult?.answerLine && !needsCheck && !resolved
-              ? <span className="ws-answer-preview">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(isWorking ? inkResult.lines[inkResult.lines.length - 1] : inkResult.answerLine)}$`} /></span>
+              ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(isWorking ? inkResult.lines[inkResult.lines.length - 1] : inkResult.answerLine)}$`} /></span>
               : statusText}
           </span>
           <div className="ws-actions-btns">

@@ -169,7 +169,9 @@ export const flow = {
     await check('the handwritten answer is still the answer', (await page.locator('.answer-row input.answer-input').inputValue()) === '42');
 
     // ── 5 · submit, and the section analysis ─────────────────────────────────
-    await page.getByRole('button', { name: 'Submit paper' }).click();
+    // Formal submission is confirmed: the bar opens a review of what is unanswered.
+    await page.locator('.exam-head').getByRole('button', { name: 'Review and submit' }).click();
+    await page.locator('[role="dialog"]').getByRole('button', { name: 'Submit paper' }).click();
     await page.waitForSelector('.hero-num', { timeout: 60000 });
     const analysis = page.locator('.exam-analysis');
     await check('the marked paper carries a section analysis', await analysis.count() === 1);

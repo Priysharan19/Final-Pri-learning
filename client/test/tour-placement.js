@@ -89,7 +89,7 @@ export const flow = {
         await page.getByRole('button', { name: /I don.t know/ }).click();
       } else if (await mcq.count()) {
         await mcq.click();
-        await page.locator('.row.no-print .btn-primary:visible').first().click();
+        await page.locator('.ws-actions .btn-primary:visible, .row.no-print .btn-primary:visible').first().click();
       } else if (await input.count()) {
         await input.fill('0');
         await page.locator('.editor-foot .btn-primary:visible').first().click();
