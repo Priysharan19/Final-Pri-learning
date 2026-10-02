@@ -284,6 +284,14 @@ await check('a crash inside India exam evidence leaves neither attempt nor queue
   assert.equal((await attemptsOf(me.id, t.id)).length, 1); assert.equal((await queued(me.id, t.id)).length, 1);
 });
 
+// The schema-upgrade companion runs in its own process: it needs a database
+// that starts on an older schema, which this suite's shared one is not.
+await check('an IndexedDB upgrade with a pending queue loses and duplicates nothing', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const out = execFileSync(process.execPath, [(await import('node:url')).fileURLToPath(new URL('./idb-upgrade-pending-queue-check.mjs', import.meta.url))], { encoding: 'utf8' });
+  assert.match(out, /IDB UPGRADE WITH PENDING QUEUE: PASS/);
+});
+
 if (failures.length) {
   console.log(`\n✖ submission sync durability — ${failures.length} failed, ${passed} passed\n`);
   for (const f of failures) console.log('  ' + f + '\n');
