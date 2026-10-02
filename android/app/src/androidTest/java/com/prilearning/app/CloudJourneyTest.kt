@@ -260,7 +260,7 @@ class CloudJourneyTest {
             openSettings(s)
             waitFor(s, "$stateTag === 'Connected'")
             // Reconnected (the same server came back): the attempt made offline is pushed.
-            eval(s, "($byText)('Sync now').click()")
+            waitFor(s, "(function(){var b=($byText)('Sync now');if(!b||b.disabled)return false;b.click();return true;})()")
             val pushed = waitFor(s, "(function(){var t=document.querySelector('section[aria-labelledby=\"cloud-account-title\"]').innerText;var m=t.match(/Sync complete: (\\d+) learning event/);return m?m[1]:false;})()", 60_000)
             assertTrue("work done offline reaches the server on reconnect ($pushed learning event(s) pushed)", (pushed.trim('"').toIntOrNull() ?: 0) >= 1)
             eval(s, "($byText)('Disconnect').click()")
