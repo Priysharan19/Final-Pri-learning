@@ -137,9 +137,12 @@ jobs:
           node client/test/india-exam-blueprint-check.mjs
           node client/test/india-progress-product-check.mjs
           node tools/india-production-census.mjs
-      - name: Real ink diagnostic
+      - name: Real ink diagnostic (advisory in PR CI)
         if: always()
-        run: npm run --silent test:real || true
+        continue-on-error: true
+        run: |
+          echo '::warning title=Real ink is advisory here::test:real is a diagnostic in PR CI (|| true). The blocking floor (node client/test/inkcheck-real.mjs --strict --gate, handwriting/v17/real-ink-floor.json) runs only in release-candidate.yml.'
+          npm run --silent test:real || true
       - name: Suite log
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -178,6 +181,10 @@ jobs:
           cache-dependency-path: server/package-lock.json
       - name: Install server dependencies
         run: npm ci --prefix server
+      - name: Handwriting stays answer-blind (static, client + server route)
+        run: npm run test:ink:blind
+      - name: Cloud reader evaluation tool self-test (fake provider, no spend)
+        run: npm run test:ink:cloud-eval
       - name: Server release identity
         run: node server/test/release-identity-check.mjs
       - name: Runtime dependency security floor
