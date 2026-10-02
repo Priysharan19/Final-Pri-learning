@@ -117,8 +117,8 @@ export function Logo({ large = false, onClick }) {
     : {};
   return (
     <Tag className={`logo ${large ? 'logo-lg' : ''}${onClick ? ' logo-btn' : ''}`} {...controlProps}>
-      <span className="logo-bb">P</span>
-      <span className="logo-name">ri Learning<span className="logo-dot">.</span></span>
+      <span className="logo-bb" aria-hidden="true">P</span>
+      <span className="logo-name">Pri Learning<span className="logo-dot">.</span></span>
     </Tag>
   );
 }
