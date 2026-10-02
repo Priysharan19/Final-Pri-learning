@@ -51,7 +51,8 @@ run relaunchAfterProcessDeath "$@"
 summary="journey, process death, relaunch"
 if [ "$EXPECT" != "floor" ]; then
   run "com.prilearning.app.FileExchangeTest#shareFilePickerCameraAndPrint" "$@"
-  summary="$summary, share/picker/camera/print"
+  run "com.prilearning.app.InkInputTest#fingerAndStylusWriteThroughTheSharedCanvas" "$@"
+  summary="$summary, share/picker/camera/print, finger + stylus ink"
 fi
 
 if [ -n "${PRI_CLOUD_ORIGIN:-}" ] && [ "$EXPECT" != "floor" ]; then
