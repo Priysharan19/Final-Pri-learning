@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="12" fill="#fbfaf7"/>
-  <rect x="5" y="5" width="54" height="54" rx="8" fill="none" stroke="#1c1b18" stroke-width="3.5"/>
-  <line x1="5" y1="50" x2="59" y2="50" stroke="#0b6e69" stroke-width="2"/>
-  <text x="33" y="44" font-family="'Latin Modern Roman', 'Computer Modern', Georgia, 'Times New Roman', serif" font-style="italic" font-size="38" fill="#1c1b18" text-anchor="middle">P</text>
-</svg>
