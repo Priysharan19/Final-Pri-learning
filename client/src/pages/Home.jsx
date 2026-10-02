@@ -10,6 +10,7 @@ import { useT, useTx } from '../i18n/index.js';
 import { practiceDifficulties, practiceHref } from '../lib/practiceLinks.js';
 import { textMatches, useGlossary } from '../i18n/glossary.js';
 import TermGloss from '../components/TermGloss.jsx';
+import { featureEnabled } from '../platform/features.js';
 
 // Jokes in the idiom of a maths classroom — "The proof is left as an exercise
 // for you", "Integrate practice. Differentiate yourself." A translated pun is
@@ -106,6 +107,13 @@ export default function Home() {
     load();
     return () => { live = false; };
   }, [online, user.id]);
+  // The placement check (flagged, off in production builds) is offered to
+  // Indian students after onboarding until they take it or say not now.
+  const [placement, setPlacement] = useState(null);
+  useEffect(() => {
+    if (!featureEnabled('placement') || user.course !== 'in' || user.role === 'teacher') return;
+    api.get('/placement').then(setPlacement).catch(() => { });
+  }, [user.course, user.role]);
   useEffect(() => {
     localStorage.setItem('pri-gen-filters', JSON.stringify({ year, sectionKey, subtopic, dotpoint, difficulty }));
   }, [year, sectionKey, subtopic, dotpoint, difficulty]);
@@ -223,6 +231,8 @@ export default function Home() {
       )}
 
       <div className="home-cards home-support-grid">
+        <PlacementCard placement={placement} onGo={path => nav(path)}
+          onSkip={() => { setPlacement(p => ({ ...p, status: 'skipped' })); api.post('/placement/skip', {}).catch(() => { }); }} />
         <GoalCard user={user} activity={stats?.activity || []} onGo={() => nav('/practice')} />
         {homeDecision.alternatives.map(item => (
           <HomeAction key={item.kind + ':' + item.id} action={item} nav={nav} />
@@ -376,7 +386,40 @@ export default function Home() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
 
+function PlacementCard({ placement, onGo, onSkip }) {
+  const t = useT();
+  if (!placement?.available || placement.status === 'skipped' || placement.status === 'unavailable') return null;
+  const root = placement.result?.rootGaps?.[0] || null;
+  const rootChapter = root ? (placement.chapters || []).find(c => c.id === root.chapterId) : null;
+  const asked = placement.progress?.asked || 0;
+  return (
+    <div className="home-card" data-placement-card={placement.status}>
+      <span className="sc-label" style={{ margin: 0 }}>{t('placement.title')}</span>
+      <p style={{ fontSize: 17, lineHeight: 1.4, margin: '8px 0 12px', maxWidth: 420 }}>
+        {placement.status === 'active' ? t('placement.homeActive', { count: asked, n: asked })
+          : placement.status === 'finished'
+            ? (rootChapter ? t('placement.homeDone', { chapter: rootChapter.name, grade: rootChapter.grade }) : t('placement.homeDoneClean'))
+            : t('placement.homeOffer')}
+      </p>
+      <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+        {placement.status === 'none' && (
+          <>
+            <button className="btn btn-primary" onClick={() => onGo('/placement?go=1')}>{t('placement.start')}</button>
+            <button className="btn btn-quiet" onClick={onSkip}>{t('placement.notNow')}</button>
+          </>
+        )}
+        {placement.status === 'active' && <button className="btn btn-primary" onClick={() => onGo('/placement')}>{t('placement.resume')}</button>}
+        {placement.status === 'finished' && (
+          <>
+            {rootChapter && <button className="btn btn-primary" onClick={() => onGo(practiceHref({ subtopic: rootChapter.id, track: 'cbse' }))}>{t('placement.practiseRoot', { chapter: rootChapter.name })}</button>}
+            <button className="btn btn-ghost" onClick={() => onGo('/placement')}>{t('placement.seeResult')}</button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
