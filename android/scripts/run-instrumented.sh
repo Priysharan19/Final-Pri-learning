@@ -50,6 +50,7 @@ sleep 2
 if adb shell pidof com.prilearning.app >/dev/null 2>&1; then echo "the app process survived force-stop" >&2; exit 1; fi
 run relaunchAfterProcessDeath "$@"
 summary="journey, process death, relaunch"
+case " $* " in *" priRotate false "*) summary="$summary (rotation skipped: priRotate=false)";; esac
 if [ "$EXPECT" != "floor" ]; then
   run "com.prilearning.app.FileExchangeTest#shareFilePickerCameraAndPrint" "$@"
   run "com.prilearning.app.InkInputTest#fingerAndStylusWriteThroughTheSharedCanvas" "$@"
