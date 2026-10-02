@@ -31,7 +31,16 @@
 const DEFAULT_ENDPOINT = 'https://api.openai.com/v1/responses';
 const DEFAULT_PRIMARY_MODEL = 'gpt-5.6-terra';
 const DEFAULT_FALLBACK_MODEL = 'gpt-5.6-sol';
-const DEFAULT_TIMEOUT_MS = 20_000;
+// The whole reading budget for one request, both models included. A first read
+// that ran past 20 s and succeeded on retry (production, 2026-10) showed 20 s
+// was too tight for a vision read with reasoning.
+const DEFAULT_TIMEOUT_MS = 45_000;
+// When the first model times out, the fallback is tried once inside what is
+// left of the budget, so the primary gets this share of it.
+const PRIMARY_TIMEOUT_SHARE = 0.6;
+const MIN_FALLBACK_BUDGET_MS = 500;
+const REASONING_EFFORTS = Object.freeze(['minimal', 'low', 'medium']);
+const DEFAULT_REASONING_EFFORT = 'low';
 const PROBE_TIMEOUT_MS = 5_000;
 const PROBE_TTL_MS = 60_000;
 let probeCache = { key: null, expiresAt: 0, value: null };
@@ -114,6 +123,11 @@ export function providerConfig(env = process.env) {
     primaryModel: String(env.PRI_HANDWRITING_MODEL || DEFAULT_PRIMARY_MODEL).trim() || DEFAULT_PRIMARY_MODEL,
     fallbackModel: String(env.PRI_HANDWRITING_FALLBACK_MODEL || DEFAULT_FALLBACK_MODEL).trim() || DEFAULT_FALLBACK_MODEL,
     timeoutMs: Math.min(60_000, Math.max(2_000, Number(env.PRI_HANDWRITING_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS)),
+    // Transcription needs little reasoning. 'minimal' is opt-in per deployment
+    // because not every model accepts it.
+    reasoningEffort: REASONING_EFFORTS.includes(String(env.PRI_HANDWRITING_REASONING_EFFORT || '').trim())
+      ? String(env.PRI_HANDWRITING_REASONING_EFFORT).trim()
+      : DEFAULT_REASONING_EFFORT,
     // The threshold below which a read is offered for confirmation rather than
     // used. Deliberately high: a confident wrong transcription is the worst
     // outcome, because the marker would score it.
@@ -136,6 +150,8 @@ export function providerStaticStatus(env = process.env) {
       const raw = Number(env.PRI_HANDWRITING_TIMEOUT_MS);
       if (!Number.isFinite(raw) || raw < 2_000 || raw > 60_000) problems.push('timeout-invalid');
     }
+    const effort = String(env.PRI_HANDWRITING_REASONING_EFFORT || '').trim();
+    if (effort && !REASONING_EFFORTS.includes(effort)) problems.push('reasoning-effort-invalid');
     if (String(env.PRI_HANDWRITING_PROBE_ENDPOINT || '').trim() && !probeOverrideUrl(env, config)) problems.push('probe-endpoint-invalid');
     if (String(env.PRI_HANDWRITING_CONFIDENCE_FLOOR || '').trim()) {
       const raw = Number(env.PRI_HANDWRITING_CONFIDENCE_FLOOR);
@@ -152,6 +168,7 @@ export function providerStaticStatus(env = process.env) {
     primaryModel: config.primaryModel,
     fallbackModel: config.fallbackModel,
     timeoutMs: config.timeoutMs,
+    reasoningEffort: config.reasoningEffort,
     confidenceFloor: config.confidenceFloor
   });
 }
@@ -326,9 +343,9 @@ export function normalizeResult(parsed, { model, confidenceFloor }) {
   });
 }
 
-async function callModel({ model, imageDataUrl, config, fetchImpl, signal }) {
+async function callModel({ model, imageDataUrl, config, fetchImpl, signal, timeoutMs = config.timeoutMs }) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), config.timeoutMs);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   const onAbort = () => controller.abort();
   if (signal?.aborted) controller.abort();
   else signal?.addEventListener?.('abort', onAbort, { once: true });
@@ -347,7 +364,7 @@ async function callModel({ model, imageDataUrl, config, fetchImpl, signal }) {
         // The provider does not keep the response for retrieval. Not zero
         // retention: see docs/privacy/data-retention.md §4.
         store: false,
-        reasoning: { effort: 'low' },
+        reasoning: { effort: config.reasoningEffort },
         input: [
           { role: 'system', content: [{ type: 'input_text', text: SYSTEM_INSTRUCTIONS }] },
           {
@@ -445,11 +462,35 @@ export async function transcribeHandwriting(imageDataUrl, {
   validateImage(imageDataUrl);
   const started = Date.now();
 
+  const hasFallback = config.fallbackModel !== config.primaryModel;
+  const primaryBudget = hasFallback ? Math.round(config.timeoutMs * PRIMARY_TIMEOUT_SHARE) : config.timeoutMs;
+
+  let timeoutFallbackTried = false;
   try {
-    const first = normalizeResult(
-      await callModel({ model: config.primaryModel, imageDataUrl, config, fetchImpl, signal }),
-      { model: config.primaryModel, confidenceFloor: config.confidenceFloor }
-    );
+    let raw;
+    try {
+      raw = await callModel({ model: config.primaryModel, imageDataUrl, config, fetchImpl, signal, timeoutMs: primaryBudget });
+    } catch (error) {
+      // A slow primary is not a reason to fail the student: try the fallback
+      // once, inside what is left of the same budget.
+      const remaining = config.timeoutMs - (Date.now() - started);
+      if (error?.code !== 'HANDWRITING_TIMEOUT' || !hasFallback || remaining < MIN_FALLBACK_BUDGET_MS) throw error;
+      const verdict = await authorizeFallback();
+      if (verdict) throw error;
+      timeoutFallbackTried = true;
+      const rescued = normalizeResult(
+        await callModel({ model: config.fallbackModel, imageDataUrl, config, fetchImpl, signal, timeoutMs: remaining }),
+        { model: config.fallbackModel, confidenceFloor: config.confidenceFloor }
+      );
+      recordProviderDiagnostics({
+        lastFailureCode: rescued.needsConfirmation ? 'HANDWRITING_LOW_CONFIDENCE' : null,
+        lastLatencyMs: Date.now() - started,
+        lastFallbackAttempted: true,
+        lastFallbackFailureCode: null
+      });
+      return { ...rescued, escalated: true, fallbackAttempted: true, fallbackFailureCode: null, primaryFailureCode: 'HANDWRITING_TIMEOUT', latencyMs: Date.now() - started };
+    }
+    const first = normalizeResult(raw, { model: config.primaryModel, confidenceFloor: config.confidenceFloor });
     if (!first.needsConfirmation || config.fallbackModel === config.primaryModel) {
       recordProviderDiagnostics({
         lastFailureCode: first.needsConfirmation ? 'HANDWRITING_LOW_CONFIDENCE' : null,
@@ -477,7 +518,10 @@ export async function transcribeHandwriting(imageDataUrl, {
 
     try {
       const second = normalizeResult(
-        await callModel({ model: config.fallbackModel, imageDataUrl, config, fetchImpl, signal }),
+        await callModel({
+          model: config.fallbackModel, imageDataUrl, config, fetchImpl, signal,
+          timeoutMs: Math.max(MIN_FALLBACK_BUDGET_MS, config.timeoutMs - (Date.now() - started))
+        }),
         { model: config.fallbackModel, confidenceFloor: config.confidenceFloor }
       );
       const best = second.confidence > first.confidence ? second : first;
@@ -502,8 +546,8 @@ export async function transcribeHandwriting(imageDataUrl, {
     recordProviderDiagnostics({
       lastFailureCode: error?.code || 'HANDWRITING_PROVIDER_ERROR',
       lastLatencyMs: Date.now() - started,
-      lastFallbackAttempted: false,
-      lastFallbackFailureCode: null
+      lastFallbackAttempted: timeoutFallbackTried,
+      lastFallbackFailureCode: timeoutFallbackTried ? (error?.code || 'HANDWRITING_FALLBACK_FAILED') : null
     });
     throw error;
   }

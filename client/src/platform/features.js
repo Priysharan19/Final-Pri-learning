@@ -9,6 +9,9 @@
 //   PRI_FEATURE_PLACEMENT=1   the placement diagnostic (onboarding offer, Home
 //                             and Progress entry points, /placement, and the
 //                             adaptive picker's diagnostic prior)
+//   PRI_FEATURE_AUSTRALIA=1   the onboarding link to the Australian syllabuses
+//                             (V1 is India-only; existing Australian profiles
+//                             keep working either way)
 //
 // client/vite.config.js turns each PRI_FEATURE_* environment variable into a
 // compile-time boolean (`__PRI_FEATURE_PLACEMENT__`). `vite build` without the
@@ -24,9 +27,10 @@
 // needs coordinator approval, not a code change.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/* global __PRI_FEATURE_PLACEMENT__ */
+/* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_AUSTRALIA__ */
 const BUILT = {
-  placement: typeof __PRI_FEATURE_PLACEMENT__ === 'boolean' ? __PRI_FEATURE_PLACEMENT__ : null
+  placement: typeof __PRI_FEATURE_PLACEMENT__ === 'boolean' ? __PRI_FEATURE_PLACEMENT__ : null,
+  australia: typeof __PRI_FEATURE_AUSTRALIA__ === 'boolean' ? __PRI_FEATURE_AUSTRALIA__ : null
 };
 
 const productionBuild = () => {
