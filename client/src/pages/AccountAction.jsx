@@ -5,7 +5,7 @@ import { tLater, useT, useTx } from '../i18n/index.js';
 function Shell({ children }) {
   return (
     <div className="auth-wrap">
-      <div className="card" style={{ width: 'min(520px, calc(100vw - 32px))', margin: 'auto', padding: 28 }}>
+      <div className="card" style={{ width: 'min(520px, calc(100% - 32px))', margin: 'auto', padding: 28 }}>
         <div className="logo logo-lg" aria-label="Pri Learning">
           <span className="logo-bb">P</span><span className="logo-name">ri Learning<span className="logo-dot">.</span></span>
         </div>

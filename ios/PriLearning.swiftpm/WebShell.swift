@@ -56,6 +56,17 @@ struct WebShell: UIViewRepresentable {
             forMainFrameOnly: true
         )
         config.userContentController.addUserScript(nativeFlag)
+        // Dynamic Type from the first paint: rewrite the page's viewport meta the
+        // moment it is parsed, so a large-text student never sees the page laid
+        // out at full width and then rescaled. Later text-size or window changes
+        // are applied by Coordinator.applyTextSize().
+        let launchViewport = Coordinator.viewportContent(width: UIScreen.main.bounds.width,
+                                                         category: UIApplication.shared.preferredContentSizeCategory)
+        config.userContentController.addUserScript(WKUserScript(
+            source: "(function(c){var set=function(m){if(m.getAttribute('content')!==c)m.setAttribute('content',c);};var mo=new MutationObserver(function(){var m=document.querySelector('meta[name=viewport]');if(m){set(m);mo.disconnect();}});mo.observe(document,{childList:true,subtree:true});})('\(launchViewport)');",
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        ))
         config.userContentController.add(context.coordinator, name: "priBridge")
         config.userContentController.add(context.coordinator, name: "priShare")
         config.userContentController.add(context.coordinator, name: "priInk")
@@ -128,6 +139,7 @@ struct WebShell: UIViewRepresentable {
         // ── Native ink ──
         let ink = InkBridge()
         private var scrollObservation: NSKeyValueObservation?
+        private var zoomObservation: NSKeyValueObservation?
         private var demoDriver: InkDemoDriver?
 
         func attachInk(to webView: WKWebView, in container: UIView) {
@@ -139,6 +151,12 @@ struct WebShell: UIViewRepresentable {
             // surface welded to the paper without a bridge hop per frame.
             scrollObservation = webView.scrollView.observe(\.contentOffset, options: [.initial, .new]) { [weak self] _, _ in
                 self?.ink.webViewDidScroll()
+            }
+            // The page's scale (Dynamic Type through the viewport, pinch) moves the
+            // writing area too: re-place the surface whenever WebKit applies a new
+            // zoom scale, whenever that happens.
+            zoomObservation = webView.scrollView.observe(\.zoomScale, options: [.new]) { [weak self] _, _ in
+                self?.ink.webViewDidResize()
             }
             // Debug only: walk the app to a question and write on it, so the
             // native surface can be seen in the real layout.
@@ -153,7 +171,9 @@ struct WebShell: UIViewRepresentable {
 
         func detachInk() {
             scrollObservation?.invalidate()
+            zoomObservation?.invalidate()
             scrollObservation = nil
+            zoomObservation = nil
             shellWebView = nil
         }
 
@@ -203,12 +223,21 @@ struct WebShell: UIViewRepresentable {
         }
 
         /// Dynamic Type: the page is laid out in CSS pixels, so the system text
-        /// size is applied as page zoom. It is capped so the CSS viewport never
+        /// size scales the whole page. It is capped so the CSS viewport never
         /// drops below 360px wide (the narrowest layout the product is tested at).
-        func applyTextSize() {
-            guard let webView = shellWebView else { return }
+        ///
+        /// The scale is applied through the viewport (`width = view width ÷
+        /// scale`), not `pageZoom`: WKWebView's page zoom magnifies without
+        /// reflowing the layout width, so at large text the page was laid out at
+        /// the full width and clipped on the right (found by the CP-05
+        /// largest-text journey). A narrower viewport makes WebKit reflow the
+        /// page to the narrower CSS width and scale it to fit the screen.
+        /// The viewport for a window width and text size: the scale is capped so
+        /// the CSS viewport never drops below 360 px (on a 402 pt iPhone that is
+        /// about 1.12× even at the largest size; up to 1.5× on iPad).
+        static func viewportContent(width rawWidth: CGFloat, category: UIContentSizeCategory) -> String {
             let scale: CGFloat
-            switch UIApplication.shared.preferredContentSizeCategory {
+            switch category {
             case .extraSmall, .small, .medium, .large: scale = 1.0
             case .extraLarge: scale = 1.1
             case .extraExtraLarge: scale = 1.2
@@ -217,12 +246,21 @@ struct WebShell: UIViewRepresentable {
             case .accessibilityLarge, .accessibilityExtraLarge, .accessibilityExtraExtraLarge, .accessibilityExtraExtraExtraLarge: scale = 1.5
             default: scale = 1.0
             }
-            let width = max(webView.bounds.width, 1)
+            let width = max(rawWidth, 1)
             let capped = max(1.0, min(scale, width / 360))
-            if abs(webView.pageZoom - capped) > 0.01 {
-                webView.pageZoom = capped
-                ink.webViewDidResize() // re-place the native ink surface at the new zoom
-            }
+            return capped > 1.0
+                ? "width=\(Int((width / capped).rounded(.down))), viewport-fit=cover"
+                : "width=device-width, initial-scale=1.0, viewport-fit=cover"
+        }
+
+        func applyTextSize() {
+            guard let webView = shellWebView else { return }
+            if abs(webView.pageZoom - 1) > 0.001 { webView.pageZoom = 1 }
+            // Only an integer and constant text reach this script.
+            let content = Self.viewportContent(width: webView.bounds.width, category: UIApplication.shared.preferredContentSizeCategory)
+            webView.evaluateJavaScript(
+                "(function(c){var m=document.querySelector('meta[name=viewport]');if(!m){m=document.createElement('meta');m.name='viewport';document.head.appendChild(m);}if(m.getAttribute('content')!==c)m.setAttribute('content',c);})('\(content)')",
+                completionHandler: nil)
         }
 
         func detachHost() {
