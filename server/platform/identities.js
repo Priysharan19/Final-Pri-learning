@@ -4,6 +4,8 @@ import { createSession, id, rateLimit, requireSession } from './security.js';
 import { verifyIdentityToken } from './oidc.js';
 import { consumeOidcNonce, issueOidcNonce } from './oidcNonce.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
+import { hasAgeDeclaration, learnerIsChild, recordConsentRequest, validateGuardian } from './guardianConsent.js';
+import { queueAccountToken } from './accounts.js';
 
 async function requireIssuedNonce(db, req, res) {
   const nonce = req.body?.nonce == null ? '' : String(req.body.nonce);
@@ -69,17 +71,35 @@ export function createIdentityRouter(db) {
         // Sign in using the existing method first, then use the authenticated link endpoint.
         return res.status(409).json({ error: { code: 'IDENTITY_LINK_REQUIRED', message: 'An account already uses this email. Sign in to that account first, then link this provider.' } });
       }
+      // A new account carries the same age declaration as the email form
+      // (isAdult / year, plus a guardian for a child). Without one it would be
+      // created with no age on record and pass the DPDP guardian gate.
+      const declaration = { isAdult: req.body?.isAdult, year: req.body?.year };
+      if (!hasAgeDeclaration(declaration)) {
+        return res.status(400).json({ error: { code: 'AGE_DECLARATION_REQUIRED', message: 'Say whether you are 18 or older, or which class you are in.' } });
+      }
+      const child = learnerIsChild(declaration);
+      let guardian = null;
+      if (child) {
+        const checked = validateGuardian(req.body || {});
+        if (!checked.ok) return res.status(400).json({ error: { code: checked.code, message: checked.message } });
+        guardian = checked;
+      }
       const now = Date.now();
       const accountId = id('acct');
       const name = identity.name || identity.email.split('@')[0].slice(0, 80) || 'Pri Learning Student';
       try {
         await db.transaction(async () => {
-          await db.run(`INSERT INTO accounts(id,email,name,password_hash,email_verified_at,role,created_at,updated_at)
-            VALUES (?,?,?,NULL,?,'student',?,?)`, [accountId, identity.email, name, now, now, now]);
+          await db.run(`INSERT INTO accounts(id,email,name,password_hash,email_verified_at,role,age_basis,created_at,updated_at)
+            VALUES (?,?,?,NULL,?,'student',?,?,?)`, [accountId, identity.email, name, now, child ? 'child' : 'adult', now, now]);
           await db.run(`INSERT INTO account_identities(provider,provider_subject,account_id,email_at_link,linked_at)
             VALUES (?,?,?,?,?)`, [provider, identity.subject, accountId, identity.email, now]);
           await db.run(`INSERT INTO entitlement_snapshots(account_id,plan,status,provider,source_version,updated_at)
             VALUES (?,'free','free','none',0,?)`, [accountId, now]);
+          if (guardian) {
+            const tokenId = await queueAccountToken(db, accountId, guardian.email, 'guardian-consent', now);
+            await recordConsentRequest(db, { accountId, name: guardian.name, email: guardian.email, tokenHash: tokenId, now });
+          }
         });
       } catch (err) {
         if (!isUniqueViolation(err)) throw err;

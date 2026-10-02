@@ -84,7 +84,7 @@ function ensureDeliveryTable(db) {
   );`);
 }
 
-async function queueAccountToken(db, accountId, destination, purpose, now = Date.now()) {
+export async function queueAccountToken(db, accountId, destination, purpose, now = Date.now()) {
   // Only a one-way token hash is used for verification. The delivery worker gets
   // an AES-GCM envelope bound to this token id; raw tokens are never persisted.
   const raw = opaqueToken(32);
@@ -197,8 +197,8 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
       try {
         await db.transaction(async () => {
-          await db.run(`INSERT INTO accounts(id,email,name,password_hash,role,created_at,updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`, [accountId, em, name, passwordHash, role, now, now]);
+          await db.run(`INSERT INTO accounts(id,email,name,password_hash,role,age_basis,created_at,updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [accountId, em, name, passwordHash, role, child ? 'child' : 'adult', now, now]);
           await db.run(`INSERT INTO account_identities(provider,provider_subject,account_id,email_at_link,linked_at)
             VALUES ('password', ?, ?, ?, ?)`, [em, accountId, em, now]);
           await db.run(`INSERT INTO entitlement_snapshots(account_id,plan,status,provider,source_version,updated_at)

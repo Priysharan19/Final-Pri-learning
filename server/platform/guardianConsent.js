@@ -101,7 +101,16 @@ export async function recordConsentRequest(db, { accountId, name, email, tokenHa
 export async function consentState(db, accountId) {
   db = asStore(db);
   const row = await db.get('SELECT * FROM guardian_consents WHERE account_id = ?', [accountId]);
-  if (!row) return { required: false, state: 'not-required' };
+  if (!row) {
+    // No consent row is only "not required" for an account whose creation
+    // recorded an adult (or that predates the record, backfilled 'legacy').
+    // An account with no recorded age decision — or a child whose request row
+    // is somehow missing — fails closed.
+    const account = await db.get('SELECT age_basis FROM accounts WHERE id = ?', [accountId]);
+    const basis = account?.age_basis;
+    if (basis === 'adult' || basis === 'legacy') return { required: false, state: 'not-required' };
+    return { required: true, state: 'undeclared', row: null };
+  }
   if (row.withdrawn_at) return { required: true, state: 'withdrawn', row };
   if (row.confirmed_at) return { required: true, state: 'given', row };
   return { required: true, state: 'pending', row };
@@ -134,9 +143,9 @@ export async function withdrawConsent(db, accountId, now = Date.now()) {
  * Gate anything that sends a child's data to or from this server.
  *
  * Fail-closed: an account whose consent is pending or withdrawn is refused, and
- * so is one whose row cannot be read. An account with no row at all is an adult
- * or a pre-existing account and passes — the row is written at registration
- * precisely so that "no row" is unambiguous.
+ * so is one whose row cannot be read. An account with no row passes only if
+ * its creation recorded an adult (accounts.age_basis 'adult', or 'legacy' for
+ * accounts that predate the record); no recorded decision is refused.
  */
 export function requireGuardianConsent(db) {
   db = asStore(db);
@@ -167,6 +176,10 @@ export function requireGuardianConsent(db) {
       return refuse(res, 'GUARDIAN_CONSENT_UNAVAILABLE', 'This account cannot sync right now.');
     }
     if (!state.required || state.state === 'given') return next();
+    if (state.state === 'undeclared') {
+      return refuse(res, 'AGE_DECLARATION_REQUIRED',
+        'This account has no age on record, so it cannot sync until one is given. Your work stays on this device.');
+    }
     if (state.state === 'pending') {
       return refuse(res, 'GUARDIAN_CONSENT_PENDING',
         'A parent or guardian has been emailed to confirm this account. Until they do, your work stays on this device — nothing is lost.');

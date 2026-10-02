@@ -59,16 +59,20 @@ eq([good.ok, good.name, good.email], [true, 'Meera Rao', 'meera@example.test'], 
 // ── 3 · The state machine ────────────────────────────────────────────────────
 const db = createPlatformDb(':memory:');
 const now = Date.now();
-const mk = (id, email) => db.prepare('INSERT INTO accounts(id,email,name,role,created_at,updated_at,email_verified_at) VALUES (?,?,?,?,?,?,?)')
-  .run(id, email, 'S', 'student', now, now, now);
-mk('acct-child', 'child@example.test');
-mk('acct-adult', 'adult@example.test');
-for (const id of ['acct-child', 'acct-adult']) {
+const mk = (id, email, basis) => db.prepare('INSERT INTO accounts(id,email,name,role,age_basis,created_at,updated_at,email_verified_at) VALUES (?,?,?,?,?,?,?,?)')
+  .run(id, email, 'S', 'student', basis, now, now, now);
+mk('acct-child', 'child@example.test', 'child');
+mk('acct-adult', 'adult@example.test', 'adult');
+mk('acct-legacy', 'legacy@example.test', 'legacy');
+mk('acct-silent', 'silent@example.test', null);
+for (const id of ['acct-child', 'acct-adult', 'acct-legacy', 'acct-silent']) {
   db.prepare(`INSERT INTO account_sessions(id,account_id,token_hash,device_id,user_agent_hash,created_at,last_seen_at,expires_at)
     VALUES (?,?,?,?,?,?,?,?)`).run(`ses-${id}`, id, sha256(`raw-${id}`), 'ipad', null, now, now, now + 86400000);
 }
 
-eq((await consentState(db, 'acct-adult')).state, 'not-required', 'an account with no consent row needs none — that is what "no row" means');
+eq((await consentState(db, 'acct-adult')).state, 'not-required', 'an account created as an adult, with no consent row, needs none');
+eq((await consentState(db, 'acct-legacy')).state, 'not-required', 'nor does one that predates the age record (backfilled legacy)');
+eq((await consentState(db, 'acct-silent')).state, 'undeclared', 'regression: an account with no recorded age decision and no consent row is NOT "not required" — it fails closed');
 await recordConsentRequest(db, { accountId: 'acct-child', name: 'Meera Rao', email: 'meera@example.test', tokenHash: 'tok', now });
 eq((await consentState(db, 'acct-child')).state, 'pending', 'a child starts pending');
 eq((await consentState(db, 'acct-child')).row.notice_version, CONSENT_NOTICE_VERSION, 'and records which notice was agreed to');
@@ -94,6 +98,9 @@ const call = (who) => fetch(`${base}/guarded`, { headers: { cookie: `${SESSION_C
 try {
   const adult = await call('acct-adult');
   eq(adult.status, 200, 'an account that needs no consent passes');
+  eq((await call('acct-legacy')).status, 200, 'and so does a pre-existing (legacy) account');
+  const silent = await call('acct-silent');
+  eq([silent.status, silent.json?.error?.code], [403, 'AGE_DECLARATION_REQUIRED'], 'an account with no age on record is refused by the gate');
 
   const withdrawn = await call('acct-child');
   eq([withdrawn.status, withdrawn.json?.error?.code], [403, 'GUARDIAN_CONSENT_WITHDRAWN'], 'a withdrawn account is refused');
@@ -177,6 +184,7 @@ const carried = migrated.prepare('SELECT * FROM auth_delivery_outbox').get();
 eq([carried.token_ciphertext, carried.destination], ['CIPHER', 'a@x.test'], 'with its envelope and destination intact');
 ok(migrated.prepare("SELECT sql FROM sqlite_master WHERE name='auth_delivery_outbox'").get().sql.includes('guardian-consent'),
   'and the widened constraint now admits a guardian email');
+eq(migrated.prepare("SELECT age_basis FROM accounts WHERE id='acct-1'").get().age_basis, 'legacy', 'the v9 migration backfills a pre-existing account as legacy, so nobody is locked out');
 eq(migrated.pragma('foreign_keys', { simple: true }), 1, 'and foreign keys are switched back on afterwards');
 migrated.close();
 try { unlinkSync(dbFile); } catch { /* already gone */ }

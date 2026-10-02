@@ -127,7 +127,37 @@ try {
   c.ok(nonceRow && nonceRow.consumed_at === null, 'nonce stored as a hash, unconsumed');
   c.ok(!Object.values(nonceRow).includes(issued.nonce), 'the raw nonce is not stored');
 
-  const created = await signIn('google', { idToken: mintToken({ claims: { nonce: issued.nonce } }), nonce: issued.nonce, deviceId: 'ipad-social' });
+  // Regression: provider sign-up used to create an account with no age on
+  // record, which the guardian gate read as "no consent needed".
+  const silentNonce = await issueNonce();
+  const silent = await signIn('google', { idToken: mintToken({ claims: { nonce: silentNonce.nonce } }), nonce: silentNonce.nonce, deviceId: 'ipad-social' });
+  c.eq(silent.status, 400, 'a provider sign-up with no age declaration is refused');
+  c.eq(silent.data.error.code, 'AGE_DECLARATION_REQUIRED', 'named AGE_DECLARATION_REQUIRED');
+  c.eq((await db.get('SELECT COUNT(*) AS n FROM accounts')).n, 0, 'and creates no account');
+  const stringly = await issueNonce();
+  c.eq((await signIn('google', { idToken: mintToken({ claims: { nonce: stringly.nonce } }), nonce: stringly.nonce, isAdult: 'true' })).data.error.code,
+    'AGE_DECLARATION_REQUIRED', 'a non-boolean isAdult is not a declaration');
+  const childNoGuardian = await issueNonce();
+  c.eq((await signIn('google', { idToken: mintToken({ claims: { nonce: childNoGuardian.nonce } }), nonce: childNoGuardian.nonce, isAdult: false, year: '9' })).data.error.code,
+    'GUARDIAN_NAME_REQUIRED', 'a child provider sign-up must name a guardian');
+  c.eq((await db.get('SELECT COUNT(*) AS n FROM accounts')).n, 0, 'still no account');
+
+  const childNonce = await issueNonce();
+  const child = await signIn('google', {
+    idToken: mintToken({ claims: { nonce: childNonce.nonce, sub: 'google-child', email: 'child.social@example.test' } }), nonce: childNonce.nonce,
+    deviceId: 'ipad-child', isAdult: false, year: '9', guardianName: 'Social Guardian', guardianEmail: 'social.guardian@example.test'
+  });
+  c.eq(child.status, 201, 'a child provider sign-up with a guardian creates the account');
+  c.eq((await db.get('SELECT age_basis FROM accounts WHERE id=?', [child.data.account.id])).age_basis, 'child', 'recorded as a child');
+  const childConsent = await db.get('SELECT * FROM guardian_consents WHERE account_id=?', [child.data.account.id]);
+  c.ok(childConsent && !childConsent.confirmed_at && childConsent.guardian_email === 'social.guardian@example.test', 'with a pending guardian request');
+  c.ok(await db.get("SELECT 1 AS x FROM auth_delivery_outbox WHERE account_id=? AND kind='guardian-consent'", [child.data.account.id]), 'and the guardian email queued');
+  const childGated = await h.request('/v1/telemetry', { method: 'POST', jar: child.jar, body: { events: [] } });
+  c.eq(childGated.data?.error?.code, 'GUARDIAN_CONSENT_PENDING', 'a gated route refuses the child until a guardian confirms');
+
+  const created = await signIn('google', { idToken: mintToken({ claims: { nonce: issued.nonce } }), nonce: issued.nonce, deviceId: 'ipad-social', isAdult: true });
+  c.eq((await db.get('SELECT age_basis FROM accounts WHERE id=?', [created.data?.account?.id])).age_basis, 'adult', 'an adult provider account records its age decision');
+  c.ok(!(await db.get('SELECT 1 AS x FROM guardian_consents WHERE account_id=?', [created.data.account.id])), 'and opens no guardian request');
   c.eq(created.status, 201, 'sign-in with the issued nonce creates an account');
   c.eq(created.data.created, true, 'reported as created');
   c.eq(created.data.account.emailVerified, true, 'provider-vouched email counts as verified');
@@ -155,7 +185,7 @@ try {
   c.eq(badSig.data.error.code, 'OIDC_TOKEN_INVALID', 'with the token-invalid code');
 
   const appleNonce = await issueNonce();
-  const apple = await signIn('apple', { idToken: mintToken({ provider: 'apple', claims: { nonce: sha256hex(appleNonce.nonce), sub: 'apple-subject-1' } }), nonce: appleNonce.nonce, deviceId: 'ipad-apple' });
+  const apple = await signIn('apple', { idToken: mintToken({ provider: 'apple', claims: { nonce: sha256hex(appleNonce.nonce), sub: 'apple-subject-1' } }), nonce: appleNonce.nonce, deviceId: 'ipad-apple', isAdult: true });
   c.eq(apple.status, 201, 'Apple sign-in with the hashed nonce form creates an account');
   c.eq(apple.data.account.email, 'apple.student@example.test', 'Apple email recorded');
 
