@@ -185,7 +185,14 @@ export const flow = {
         // Phone → tablet roughly doubles the sheet's width: the widening case.
         await page.setViewportSize({ width: 820, height: 1180 });
         await page.waitForTimeout(400);
-        const rotated = await inkBox();
+        // The sheet re-fits after the resize settles; measure once it has.
+        let rotated = await inkBox();
+        for (let i = 0; i < 15; i++) {
+          await page.waitForTimeout(200);
+          const again = await inkBox();
+          if (JSON.stringify(again) === JSON.stringify(rotated)) break;
+          rotated = again;
+        }
         // Ink scaled past the foot is simply not painted, so "still visible" is
         // the test: the lowest stroke (drawn at 90% height) must still show
         // near the foot of the wider sheet.
@@ -197,13 +204,17 @@ export const flow = {
         await check(`${tag}: widening to a tablet keeps every stroke on the sheet`,
           !!rotated && !rotated.empty && rotated.maxY >= rotated.h * 0.5 && rotated.maxY <= rotated.h - 4 && rotated.maxX < rotated.w - 1,
           JSON.stringify(rotated));
-        // And it was scaled, not merely left in place: the ink's right edge
-        // keeps its share of the sheet's width (unscaled ink would halve it).
+        // And it was scaled, not merely left in place. Ink left at its phone
+        // size would keep its pixel extent, so its share of the wider sheet
+        // would shrink by the width ratio; a fit that keeps the handwriting's
+        // proportions may use less than the full width, but never more.
         const shareBefore = beforeWiden && !beforeWiden.empty ? beforeWiden.maxX / beforeWiden.w : null;
         const shareAfter = rotated && !rotated.empty ? rotated.maxX / rotated.w : null;
-        await check(`${tag}: widening scales the ink with the sheet`,
-          shareBefore != null && shareAfter != null && Math.abs(shareAfter - shareBefore) <= 0.08,
-          JSON.stringify({ shareBefore, shareAfter }));
+        const unscaledShare = shareBefore != null && rotated ? shareBefore * beforeWiden.w / rotated.w : null;
+        await check(`${tag}: widening scales the ink with the sheet, never stretching it`,
+          shareBefore != null && shareAfter != null && unscaledShare != null
+            && shareAfter >= unscaledShare * 1.3 && shareAfter <= shareBefore + 0.05,
+          JSON.stringify({ shareBefore, shareAfter, unscaledShare }));
         // (Ink pushed past the foot is painted up to the very edge and cut off;
         //  the clamp leaves the lowest point 8px above it.)
         await page.setViewportSize({ width: 360, height: 640 });

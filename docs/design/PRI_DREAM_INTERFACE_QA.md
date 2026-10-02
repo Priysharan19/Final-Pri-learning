@@ -1,6 +1,6 @@
 # Pri dream interface: QA report
 
-Status: 2 Oct 2026, branch `task/dream-interface` (PR #264), after three merges of `origin/main` (through CP-07, `a069b16f`). Companion documents: [research](PRI_DREAM_INTERFACE_RESEARCH.md), [direction](PRI_DREAM_VISUAL_DIRECTION.md), [design system](PRI-DREAM-INTERFACE.md).
+Status: 2 Oct 2026, branch `task/dream-interface` (PR #264), after the merges of `origin/main` (through the latest main at the time of writing, `a069b16f`). Companion documents: [research](PRI_DREAM_INTERFACE_RESEARCH.md), [direction](PRI_DREAM_VISUAL_DIRECTION.md), [design system](PRI-DREAM-INTERFACE.md).
 
 Everything here is synthetic browser evidence from a development machine. None of it is evidence about a physical iPad, an Apple Pencil, a real student or a learning outcome.
 
@@ -118,18 +118,33 @@ Commands run locally on the final source. The full deterministic suite was run a
 
 Not run locally: the server and Postgres platform suites (`test:platform`), the Swift and native ink suites, and the Android build. They run in CI.
 
-### Test changes, and why each is legitimate
+### Test changes, disclosed in full
 
-No threshold was lowered and no check was deleted to get green.
+Some checks were loosened, replaced or deleted. Each is listed here with its reason, so a reviewer can disagree with a specific one.
 
-- `tour-ink.js`, `tour-v3.js`: the marks line no longer carries "(100%)"; the regex still requires earned = total by back-reference.
-- `tour-explain-v2.js`: the engine version is read from `data-explain-engine`, not from student-facing chrome.
-- `a11y-check.mjs`: follows the sentence-case "Submit answer".
-- `backend-check.mjs`: the backend ink-draft route's checks are replaced by checks that resume returns the same question, that no handwriting field is served, and that the removed route is absent. Ink drafts are covered by `submission-lifecycle-check.mjs` and `tour-submit-lifecycle.js`.
-- `i18n-check.mjs`: two reasoned exceptions were for controls that no longer exist.
-- `tour-kalp04-home.js`: the appearance labels are "Paper" and "Night".
-- `tour-responsive-matrix.js` (from CP-03): reconciled with thinking mode. The shell is measured on Home and Practice is asserted to have its own bar and no rail; the writing sheet must be at least the iPad height and fit the window; Show solution takes two presses; the explanation launcher is measured as a pressable row in the page flow. One check was added per viewport (145 → 151).
-- `.github/workflows/ci.yml`: four exact-count invariants were updated to the counts the suites now report (i18n 186, coverage 42 files, e2e 257 across 9 flows, responsive 151 per engine).
+**Thresholds loosened or replaced**
+- `tour-responsive-matrix.js` (CP-03):
+  - **Widening, depth.** The check that ink stays near the foot after phone → tablet widening was lowered from `maxY >= 0.85h` to `maxY >= 0.5h`. In this design the sheet is 340px on a phone but up to 640px on a portrait tablet, so ink drawn at the phone sheet's foot no longer sits at the tablet sheet's foot.
+  - **Widening, scaling.** To restore what the original check proved, a new check requires the ink to be *scaled*: its share of the sheet width must be at least 1.3× what unscaled ink would show, and never more than before (no stretching). It waits for the canvas to settle after the resize, which removed an intermittent result.
+  - **Sheet height.** The exact `sheet height === 380` was replaced by a range (at least the iPad height, and it fits the window).
+  - **Explain launcher.** It must now also not sit under the action bar (`underBar`, previously computed but never asserted).
+- `design-system-check.mjs`: three checks that pinned the KALP-01 midnight palette (`--page #090f1d`, light `--brand-1 #315fdd`, a brand gradient) were replaced by checks for the paper identity, plus new anti-template lints (no decorative gradients, glows, literal colours, radii above 8px, or emoji in chrome).
+
+**Checks inverted or deleted**
+- `tour-v3.js`: "the question is on the clock" was inverted to "practice shows no running clock", because practice is deliberately untimed on screen.
+- `tour-exam-timer.js` (added on this branch) was deleted when main's ExamRoom replaced the tick timer with a deadline clock. Its cases (warnings, auto-submit at zero) are covered by main's `tour-exam-deadline.js`. The static guard against timers shadowing `t` remains in `dream-interface-check.mjs`.
+- `backend-check.mjs`: the ink-draft route's checks were removed together with the route. A single store (`practiceRecovery.js`) is now covered by `submission-lifecycle-check.mjs` and `tour-submit-lifecycle.js`.
+- `i18n-check.mjs`: three reasoned exceptions were dropped for controls that no longer exist, and 77 catalogue keys left unused by the merge were deleted.
+
+**Selectors and flows that follow deliberate behaviour changes**
+- `tour-v4.js`, `tour-exam-india.js`, `a11y-check.mjs`: formal submission is two steps ("Review and submit", then "Submit paper" in a dialog).
+- `tour-kalp01-design.js`: paper is the default theme, so the toggle is tested to night and back.
+- `tour-kalp03-onboarding.js`: leaves Practice through the workspace bar's Home control, because thinking mode has no account menu.
+- `tour-phone.js`: in thinking mode the bottom bar is absent, so the offline-shell check accepts the workspace bar.
+- `kalp04-home-check.mjs`, `tour-kalp04-home.js`: the CSS check follows `.home-next`, and resume checks assert the recommendation kind (`data-kind`) rather than the generic title, because the card is titled with the actual topic.
+- `tour-placement.js`: the multiple-choice submit lives in the workspace action bar.
+- `tour-ink.js`, `tour-v3.js`, `a11y-check.mjs`: verdicts are an icon plus a spoken word, Scratch is found by its name, and Show solution takes two presses.
+- `.github/workflows/ci.yml`: the exact-count invariants were recounted from a full local run of the merged tree (see the commit that sets them).
 
 ## 7. Remaining limitations
 
