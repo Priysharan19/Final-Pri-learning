@@ -42,6 +42,9 @@ const requireOperatorToken = tagPolicy((req, res, next) => {
 }, { operatorToken: true });
 
 const SERVER_WEBHOOK = /^\/billing\/webhook\/(?:apple|google|web)$/;
+// Sign in with Apple form-posts its answer from appleid.apple.com, so it can
+// never carry this origin; the route only relays it to the callback page.
+const PROVIDER_CALLBACK = /^\/account\/identity\/apple\/callback$/;
 
 export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {} } = {}) {
   assertPlatformConfig();
@@ -144,10 +147,11 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   });
 
   // Browser mutations must come from the configured product origin. Provider
-  // webhooks are the one narrow exception: they are server-to-server requests
-  // and authenticate with provider signatures instead of a browser Origin.
+  // webhooks are one narrow exception: they are server-to-server requests
+  // and authenticate with provider signatures instead of a browser Origin. The
+  // Apple sign-in callback is the other: it changes nothing server-side.
   router.use((req, res, next) => {
-    if (req.method === 'POST' && SERVER_WEBHOOK.test(req.path)) return next();
+    if (req.method === 'POST' && (SERVER_WEBHOOK.test(req.path) || PROVIDER_CALLBACK.test(req.path))) return next();
     return originGuard(req, res, next);
   });
   router.use(csrfGuard);

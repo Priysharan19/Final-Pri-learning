@@ -1,9 +1,13 @@
+import express from 'express';
 import { asyncRouter } from './asyncRouter.js';
 import { asStore, isUniqueViolation } from './store.js';
 import { createSession, id, rateLimit, requireSession } from './security.js';
 import { verifyIdentityToken } from './oidc.js';
 import { consumeOidcNonce, issueOidcNonce } from './oidcNonce.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
+import { learnerIsChild, recordConsentRequest, validateGuardian } from './guardianConsent.js';
+import { queueAccountToken } from './accounts.js';
+import { clipText } from './text.js';
 
 async function requireIssuedNonce(db, req, res) {
   const nonce = req.body?.nonce == null ? '' : String(req.body.nonce);
@@ -26,6 +30,63 @@ function providerOk(value) {
   return value === 'google' || value === 'apple';
 }
 
+// The client id a browser puts in the provider's authorize URL. It is public
+// (it appears in that URL), but it is named explicitly rather than guessed from
+// PRI_*_CLIENT_IDS, which also holds the native apps' ids, and it is offered
+// only when the token verifier would accept it as an audience.
+const WEB_CLIENT_ENV = Object.freeze({
+  google: ['PRI_GOOGLE_WEB_CLIENT_ID', 'PRI_GOOGLE_CLIENT_IDS'],
+  apple: ['PRI_APPLE_WEB_CLIENT_ID', 'PRI_APPLE_CLIENT_IDS']
+});
+
+export function webClientId(provider, env = process.env) {
+  const [webEnv, audiencesEnv] = WEB_CLIENT_ENV[provider] || [];
+  if (!webEnv) return null;
+  const clientId = String(env[webEnv] || '').trim();
+  const audiences = String(env[audiencesEnv] || '').split(',').map(x => x.trim()).filter(Boolean);
+  return clientId && audiences.includes(clientId) ? clientId : null;
+}
+
+// What Sign in with Apple form-posts back (response_mode=form_post) is answered
+// with the same small page Google's redirect lands on, carrying the validated
+// fields in a meta tag for /auth/callback.js. It is a page, not a redirect: no
+// /v1 route redirects anywhere. Nothing is verified or stored here: the relayed
+// token is worth nothing without the single-use nonce, and sign-in verifies it.
+const RELAY_STATE = /^[A-Za-z0-9_-]{16,128}$/;
+const RELAY_TOKEN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+const RELAY_ERROR = /^[a-z_]{1,64}$/;
+export function appleCallbackParams(body = {}) {
+  const state = String(body.state || '');
+  const idToken = String(body.id_token || '');
+  const error = String(body.error || '');
+  const fragment = new URLSearchParams({ provider: 'apple' });
+  if (RELAY_STATE.test(state)) fragment.set('state', state);
+  if (fragment.has('state') && !error && idToken.length <= 8192 && RELAY_TOKEN.test(idToken)) fragment.set('id_token', idToken);
+  else fragment.set('error', RELAY_ERROR.test(error) ? error : 'invalid_response');
+  return fragment.toString();
+}
+
+// Every value in `params` passed the patterns above ([A-Za-z0-9_.-] and the
+// URLSearchParams encoding of them), so it is safe inside an attribute.
+export function appleCallbackPage(body = {}) {
+  const params = appleCallbackParams(body);
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="pri-oidc-callback" content="${params}">
+<title>Pri Learning · signing in</title>
+</head>
+<body>
+<p>Signing you in to Pri Learning. You can close this window.</p>
+<script src="/auth/callback.js"></script>
+</body>
+</html>
+`;
+}
+
 export function createIdentityRouter(db) {
   db = asStore(db);
   const router = asyncRouter();
@@ -38,6 +99,22 @@ export function createIdentityRouter(db) {
     res.json({ providers: rows.map(row => ({ provider: row.provider, linkedAt: row.linked_at })) });
   });
 
+  // Which providers a browser can start, and with which public client id.
+  router.get('/providers', async (req, res) => {
+    const entry = provider => {
+      const clientId = webClientId(provider);
+      return clientId ? { clientId } : null;
+    };
+    res.json({ providers: { google: entry('google'), apple: entry('apple') } });
+  });
+
+  router.post('/apple/callback',
+    rateLimit(db, 'oidc-callback', { limit: 60, windowMs: 15 * 60 * 1000 }),
+    express.urlencoded({ extended: false, limit: '16kb', parameterLimit: 8 }),
+    async (req, res) => {
+      res.status(200).type('html').send(appleCallbackPage(req.body || {}));
+    });
+
   // The nonce a provider token must carry is issued here, stored only as a
   // hash, accepted once and expires after ten minutes.
   router.post('/nonce', rateLimit(db, 'oidc-nonce', { limit: 30, windowMs: 15 * 60 * 1000 }), async (req, res) => {
@@ -48,6 +125,20 @@ export function createIdentityRouter(db) {
     try {
       const provider = String(req.params.provider || '');
       if (!providerOk(provider)) return res.status(404).json({ error: { code: 'OIDC_PROVIDER_UNSUPPORTED', message: 'Identity provider is not supported.' } });
+      // `createAccount: false` is a returning student pressing "Sign in": a
+      // subject with no account is reported, never silently given a new one
+      // (that student has not seen the age question or the privacy notice).
+      const mayCreate = req.body?.createAccount !== false;
+      // A new account made here is held to the same age rule as /register: a
+      // child's account needs a guardian to ask, or it would sync with no
+      // consent ever requested. Checked before the nonce is spent.
+      const child = learnerIsChild({ isAdult: req.body?.isAdult, year: req.body?.year });
+      let guardian = null;
+      if (mayCreate && child) {
+        const checked = validateGuardian(req.body || {});
+        if (!checked.ok) return res.status(400).json({ error: { code: checked.code, message: checked.message } });
+        guardian = checked;
+      }
       const nonce = await requireIssuedNonce(db, req, res);
       if (!nonce) return;
       const identity = await verifyIdentityToken(provider, req.body?.idToken, { nonce });
@@ -60,6 +151,9 @@ export function createIdentityRouter(db) {
       };
       const linked = await findLinked();
       if (linked) return signInLinked(linked);
+      if (!mayCreate) {
+        return res.status(404).json({ error: { code: 'IDENTITY_NOT_REGISTERED', message: 'No Pri Learning account uses this sign-in yet. Choose Create account to make one.' } });
+      }
       if (!identity.email || !identity.emailVerified) {
         return res.status(409).json({ error: { code: 'OIDC_EMAIL_REQUIRED', message: 'This identity provider did not supply a verified email address for a new Pri Learning account.' } });
       }
@@ -71,7 +165,8 @@ export function createIdentityRouter(db) {
       }
       const now = Date.now();
       const accountId = id('acct');
-      const name = identity.name || identity.email.split('@')[0].slice(0, 80) || 'Pri Learning Student';
+      // Apple sends no name in its token; the name the student typed is next.
+      const name = identity.name || clipText(String(req.body?.name || '').trim(), 80) || identity.email.split('@')[0].slice(0, 80) || 'Pri Learning Student';
       try {
         await db.transaction(async () => {
           await db.run(`INSERT INTO accounts(id,email,name,password_hash,email_verified_at,role,created_at,updated_at)
@@ -80,6 +175,10 @@ export function createIdentityRouter(db) {
             VALUES (?,?,?,?,?)`, [provider, identity.subject, accountId, identity.email, now]);
           await db.run(`INSERT INTO entitlement_snapshots(account_id,plan,status,provider,source_version,updated_at)
             VALUES (?,'free','free','none',0,?)`, [accountId, now]);
+          if (guardian) {
+            const tokenId = await queueAccountToken(db, accountId, guardian.email, 'guardian-consent', now);
+            await recordConsentRequest(db, { accountId, name: guardian.name, email: guardian.email, tokenHash: tokenId, now });
+          }
         });
       } catch (err) {
         if (!isUniqueViolation(err)) throw err;
