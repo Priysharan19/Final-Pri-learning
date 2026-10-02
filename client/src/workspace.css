@@ -10,7 +10,6 @@
 .your-answer { border: 1px solid var(--hairline); padding: 16px 20px; margin-top: 20px; }
 .your-answer .sc-label { margin-bottom: 10px; }
 .ya-line { font-size: 16px; line-height: 2.1; }
-.eval-head .logo-bb { font-size: 19px; }
 .eval-marks small { font-size: 13px; }
 .eval-disclaimer { border-bottom: 1px solid var(--hairline); }
 .eval-body ol { margin: 10px 0 0; padding-left: 22px; display: grid; gap: 8px; }
