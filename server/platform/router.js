@@ -18,7 +18,25 @@ import { createTelemetryRouter } from './telemetry.js';
 import { assertPlatformConfig, platformConfigStatus } from './config.js';
 import { csrfGuard, originGuard } from './security.js';
 import { housekeepingStatus } from './housekeeping.js';
-import { serverReleaseIdentity } from './releaseIdentity.js';
+import { cachedServerReleaseIdentity, releaseShaForLogs } from './releaseIdentity.js';
+import { readinessReport } from './readiness.js';
+import { tagPolicy } from './routePolicy.js';
+import { metrics, metricsAccess, recordDatabaseError } from './metrics.js';
+import { logEvent, routeTemplate, safeCode } from './observability.js';
+
+/** /v1/health's own bound on its database reads (liveness must answer fast). */
+export const HEALTH_DB_TIMEOUT_MS = 1_500;
+
+/**
+ * The operator-token gate in front of /v1/metrics (metrics.js metricsAccess),
+ * tagged so the route inventory (routePolicy.js) sees it as `operator-token`.
+ */
+const requireOperatorToken = tagPolicy((req, res, next) => {
+  const access = metricsAccess(req);
+  if (access.ok) return next();
+  if (access.status === 401) res.set('WWW-Authenticate', 'Bearer realm="pri-metrics"');
+  return res.status(access.status).json({ error: { code: access.code, message: access.code === 'METRICS_NOT_CONFIGURED' ? 'Metrics are not configured on this deployment.' : 'An operator metrics token is required.' } });
+}, { operatorToken: true });
 
 const SERVER_WEBHOOK = /^\/billing\/webhook\/(?:apple|google|web)$/;
 
@@ -26,6 +44,9 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   assertPlatformConfig();
   db = asStore(db);
   const router = asyncRouter();
+  // Resolve the release identity once, at boot (it may spawn git). A failure is
+  // kept and re-thrown by /v1/health, which fails closed exactly as before.
+  releaseShaForLogs();
 
   router.use((req, res, next) => {
     res.set('X-Content-Type-Options', 'nosniff');
@@ -35,17 +56,47 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     next();
   });
 
+  // LIVENESS. Cheap, and up while the process is: a database outage is
+  // reported here as a field, never as a failure of this endpoint, so an
+  // orchestrator does not restart a healthy process in a loop. Readiness —
+  // whether this replica can actually serve — is /v1/ready.
   router.get('/health', async (req, res) => {
     const config = platformConfigStatus();
+    const releaseIdentity = cachedServerReleaseIdentity();
+    let schemaVersion = null;
+    let billingSchemaVersion = null;
+    let reachable = true;
+    let housekeeping = null;
+    // Bounded well inside the container HEALTHCHECK's 5 s: a silently
+    // partitioned database (packets dropped, no RST) must not make liveness
+    // itself time out and get a healthy process restarted.
+    let timer;
+    try {
+      await Promise.race([
+        (async () => {
+          schemaVersion = (await db.get("SELECT value FROM platform_meta WHERE key='schema_version'"))?.value || null;
+          billingSchemaVersion = (await db.get("SELECT value FROM platform_meta WHERE key='billing_schema_version'"))?.value || null;
+          housekeeping = await housekeepingStatus(db);
+        })(),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('health probe timeout')), HEALTH_DB_TIMEOUT_MS); })
+      ]);
+    } catch {
+      reachable = false;
+      schemaVersion = null;
+      billingSchemaVersion = null;
+      housekeeping = null;
+    } finally {
+      clearTimeout(timer);
+    }
     res.json({
       ok: true,
       service: 'pri-learning-platform',
-      releaseIdentity: serverReleaseIdentity(),
-      schemaVersion: (await db.get("SELECT value FROM platform_meta WHERE key='schema_version'"))?.value || null,
-      billingSchemaVersion: (await db.get("SELECT value FROM platform_meta WHERE key='billing_schema_version'"))?.value || null,
+      releaseIdentity,
+      schemaVersion,
+      billingSchemaVersion,
       storage: { persistentDatabase: config.persistentDatabaseConfigured },
       // Which driver serves /v1 — never the URL, host, user or file path.
-      database: { engine: db.dialect },
+      database: { engine: db.dialect, reachable },
       identityProviders: { google: config.googleConfigured, apple: config.appleConfigured },
       authDelivery: { email: config.authEmailProviderConfigured },
       billingProviders: {
@@ -53,8 +104,31 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
         apple: config.appleBillingProviderConfigured,
         google: false
       },
-      housekeeping: await housekeepingStatus(db),
+      housekeeping,
       checkedAt: Date.now()
+    });
+  });
+
+  // READINESS. Every dependency as a coded state (platform/readiness.js);
+  // 503 + Retry-After while this replica cannot serve.
+  router.get('/ready', async (req, res) => {
+    const report = await readinessReport(db, { releaseSha: releaseShaForLogs() });
+    if (!report.ready) {
+      res.set('Retry-After', '5');
+      res.locals.errorCode = safeCode(report.failing[0], 'NOT_READY');
+      return res.status(503).json({ ...report, requestId: req.requestId });
+    }
+    res.json(report);
+  });
+
+  // OPERATIONAL SIGNALS. Counters, latency and evaluated alert rules for an
+  // operator holding PRI_METRICS_TOKEN; closed in production without one.
+  router.get('/metrics', requireOperatorToken, (req, res) => {
+    res.json({
+      service: 'pri-learning-platform',
+      releaseSha: releaseShaForLogs(),
+      database: { engine: db.dialect },
+      ...metrics.snapshot()
     });
   });
 
@@ -112,8 +186,9 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
 
   router.use((req, res) => res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } }));
   router.use((err, req, res, next) => {
-    // No request bodies, tokens, handwriting or provider payloads are logged.
-    const requestId = req.get('x-pri-request-id') || null;
+    // No request bodies, tokens, handwriting or provider payloads are logged:
+    // the line is built from allowlisted, shape-checked fields (observability.js).
+    const requestId = req.requestId || null;
     const declaredStatus = Number.isInteger(err?.status) && err.status >= 400 && err.status <= 599;
     const status = declaredStatus ? err.status : 500;
     // An error code is a contract: the client branches on it. Only an error that
@@ -125,7 +200,18 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     // nothing to do and tells everyone else about the schema. The real code is
     // still logged for whoever has to fix it.
     const code = declaredStatus ? (err?.code || 'INTERNAL') : 'INTERNAL';
-    console.error('platform_error', { requestId, path: req.path, method: req.method, code: err?.code || 'INTERNAL', status });
+    // The real code, for whoever has to fix it — unless it is not a code.
+    const loggedCode = err?.code === undefined || err?.code === null ? 'INTERNAL' : safeCode(err.code, 'UNSAFE_CODE');
+    res.locals.errorCode = safeCode(code);
+    recordDatabaseError(code);
+    logEvent(status >= 500 ? 'error' : 'warn', 'platform_error', {
+      requestId: requestId || undefined,
+      method: req.method,
+      route: routeTemplate(req),
+      code: loggedCode,
+      dbCode: err?.dbCode ? safeCode(err.dbCode) : undefined,
+      status
+    });
     if (res.headersSent) return next(err);
     // Database overload (store.js databaseOverload) is the one 5xx the client
     // should simply resend: say so, and say when.
