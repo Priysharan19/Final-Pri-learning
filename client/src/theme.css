@@ -422,8 +422,6 @@ select.input {
 /* ── Home ──────────────────────────────────────────────────────────────── */
 .home-wrap { flex-direction: column; }
 
-.type-caret { display: inline-block; width: 1px; height: 1.05em; background: var(--ink-2); vertical-align: -0.18em; margin-left: 1px; animation: caretBlink 1s steps(1) infinite; }
-@keyframes caretBlink { 50% { opacity: 0; } }
 
 /* Percentages of the content column, not vw: robust under any page scaling
    (the iOS shell's Dynamic Type) and never wider than the main column. */
@@ -556,7 +554,6 @@ select.input {
   display: flex; gap: 12px; align-items: center; padding: 12px 18px; font-size: 14px;
   max-width: 380px}
 
-@keyframes toastIn { from { transform: translateY(-12px); opacity: 0; } to { transform: none; opacity: 1; } }
 .badge-ico { font-size: 24px; }
 .badge-name { font-weight: 700; font-size: 14px; }
 .badge-desc { font-size: 12.5px; color: var(--ink-2); margin-top: 1px; }
@@ -800,7 +797,6 @@ select.input {
 
 @keyframes pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
 .fade-in { animation: fadeIn 0.25s ease; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .divider { height: 1px; background: var(--hairline); margin: 16px 0; border: none; }
 
 .goalbar { height: 6px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
@@ -926,11 +922,8 @@ body { overscroll-behavior-y: none; }
 /* ═══ v6 · Daily goal ring + streak + weekly strip (Home) ═══ */
 .goal-card { display: flex; gap: 20px; align-items: center; }
 
-.goal-ring-num { position: absolute; inset: 0; display: grid; place-items: center; font-size: 20px; }
-.goal-ring-num small { display: block; font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.08em; }
 .goal-copy { flex: 1; min-width: 0; }
 
-.streak-flame { color: var(--gold); }
 
 .week-day { flex: 1; text-align: center; }
 .week-dot { max-width: 26px; aspect-ratio: 1; margin: 0 auto}
@@ -949,7 +942,6 @@ body { overscroll-behavior-y: none; }
 .profile-tile, .gen-opt, .pathway-pick, .avatar-pick, .pill-opt, .seg-tab { transition: border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease, color 0.14s ease; }
 .skeleton { animation: shimmer 1.3s infinite linear; min-height: 14px}
 @keyframes shimmer { to { background-position: -200% 0; } }
-.empty-state { text-align: center; padding: 34px 18px; }
 
 @media (prefers-reduced-motion: reduce) {
   .slide-up, .content.fade-in, .acct-menu { animation: none; }
@@ -1387,12 +1379,6 @@ h3 { font-size: 16.5px; line-height: 1.3; }
   color: var(--ink);
 }
 [data-theme="light"] .error-box { color: var(--ink); }
-.empty-state {
-  border: 1px dashed var(--hairline-strong);
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--ink-2);
-}
 .skeleton {
   background: linear-gradient(100deg, var(--surface-2) 38%, var(--surface-3) 50%, var(--surface-2) 62%);
   background-size: 220% 100%;
@@ -1844,7 +1830,6 @@ html.theme-switching, html.theme-switching * {
 .drawer { background: color-mix(in srgb, var(--ink) 30%, transparent); backdrop-filter: none; }
 
 @keyframes slideIn { from { transform: translateX(16px); opacity: 0; } to { transform: none; opacity: 1; } }
-.xp-pop { color: var(--ink-2); font-weight: 600; }
 
 .pri-explain-backdrop { background: color-mix(in srgb, var(--ink) 34%, transparent); backdrop-filter: none; }
 .pri-explain-dialog { background: var(--surface); border-color: var(--hairline-strong); box-shadow: var(--shadow); }
