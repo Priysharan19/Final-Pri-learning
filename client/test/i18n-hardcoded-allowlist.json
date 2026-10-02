@@ -5,13 +5,12 @@
   },
   "literals": {
     "Pri Learning": "the product's name, written the same in every language",
-    "ri Learning": "the wordmark, split around the drop-cap P",
-    "ri Learning.": "the wordmark, split around the drop-cap P and its full stop",
+    "Pri Learning.": "the product's name with the wordmark's full stop, written the same in every language",
     "XP": "the app's own unit, written XP in every language",
     "CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD": "examination boards, printed in Latin on the Hindi admit card too",
     "Extension 1": "the proper name of an NSW course, shown only on the Australian branch",
     "Extension 2": "the proper name of an NSW course, shown only on the Australian branch",
-    "P": "the drop-cap of the wordmark; with \"ri Learning\" it spells the product name",
+    "P": "the letter on the brand tile beside the full \"Pri Learning\" wordmark; decorative and hidden from assistive technology",
     "Standard": "the proper name of an NSW course, shown only on the Australian branch",
     "Advanced": "the proper name of an NSW course, shown only on the Australian branch"
   }

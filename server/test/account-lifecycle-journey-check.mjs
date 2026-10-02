@@ -250,9 +250,16 @@ try {
   check(secondMail.tokenId !== firstMail.tokenId, 'resend issues a new link');
   const stale = await call('/account/email/verify', { method: 'POST', body: { token: firstMail.token } });
   check(stale.status === 400 && code(stale) === 'TOKEN_INVALID', 'the superseded (stale) link is refused with TOKEN_INVALID');
-  check((await call('/account/email/verify', { method: 'POST', body: { token: secondMail.token } })).status === 200, 'the current link verifies');
+  const firstUse = await call('/account/email/verify', { method: 'POST', body: { token: secondMail.token } });
+  check(firstUse.status === 200 && firstUse.data.alreadyVerified === false, 'the current link verifies');
+  // A mail scanner (Safe Links) opening the link first is routine: the person's
+  // own click on the spent link must read as verified, not as an error.
   const replay = await call('/account/email/verify', { method: 'POST', body: { token: secondMail.token } });
-  check(replay.status === 400 && code(replay) === 'TOKEN_INVALID', 'replaying a used verification link is refused with TOKEN_INVALID');
+  check(replay.status === 200 && replay.data.ok === true && replay.data.alreadyVerified === true, 'replaying a consumed link of a verified account answers alreadyVerified, not an error');
+  const staleAfter = await call('/account/email/verify', { method: 'POST', body: { token: firstMail.token } });
+  check(staleAfter.status === 200 && staleAfter.data.alreadyVerified === true, 'a superseded link of the now-verified account also reads as verified');
+  const randomAfter = await call('/account/email/verify', { method: 'POST', body: { token: 'not-a-real-token-' + 'x'.repeat(24) } });
+  check(randomAfter.status === 400 && code(randomAfter) === 'TOKEN_INVALID' && randomAfter.data.alreadyVerified === undefined, 'a random token is still TOKEN_INVALID, revealing nothing');
   check((await call('/account/me', { jar: jars.a1 })).data.account.emailVerified === true, 'ACTIVE: /me reports the verified account');
   check(!(await db.get("SELECT 1 FROM auth_delivery_outbox WHERE account_id=? AND kind='verify-email'", [A])), 'no verification envelope outlives the verification');
 

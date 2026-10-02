@@ -286,7 +286,22 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     const now = Date.now();
     const token = raw ? await db.get(`SELECT * FROM account_tokens
       WHERE token_hash = ? AND purpose = 'verify-email' AND consumed_at IS NULL AND expires_at > ?`, [sha256(raw), now]) : null;
-    if (!token) return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'Verification link is invalid or expired.' } });
+    // A spent link whose own account is verified answers "already verified",
+    // not "invalid". Mail scanners (e.g. Microsoft Safe Links) routinely open
+    // the link before the person does, so the person's click finds the token
+    // consumed and the account verified. Only the holder of a real, consumed
+    // verify-email token for a live, verified account gets this answer; a
+    // random, expired-unused, wrong-purpose or deleted-account token still
+    // gets the one TOKEN_INVALID, so it reveals nothing about other accounts.
+    const alreadyVerified = async () => raw ? !!(await db.get(`SELECT 1 FROM account_tokens t
+      JOIN accounts a ON a.id = t.account_id
+      WHERE t.token_hash = ? AND t.purpose = 'verify-email' AND t.consumed_at IS NOT NULL
+        AND a.email_verified_at IS NOT NULL AND a.deleted_at IS NULL`, [sha256(raw)])) : false;
+    const invalid = () => res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'Verification link is invalid or expired.' } });
+    if (!token) {
+      if (await alreadyVerified()) return res.json({ ok: true, alreadyVerified: true });
+      return invalid();
+    }
     try {
       await db.transaction(async () => {
         await spendToken(db, token.id, now);
@@ -294,11 +309,14 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
         await db.run('DELETE FROM auth_delivery_outbox WHERE token_id = ?', [token.id]);
       });
     } catch (err) {
-      if (err?.code === 'TOKEN_ALREADY_USED') return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'Verification link is invalid or expired.' } });
+      if (err?.code === 'TOKEN_ALREADY_USED') {
+        if (await alreadyVerified()) return res.json({ ok: true, alreadyVerified: true });
+        return invalid();
+      }
       throw err;
     }
     await maybeBootstrapAdmin(db, token.account_id, now);
-    res.json({ ok: true });
+    res.json({ ok: true, alreadyVerified: false });
   });
 
   // Guardian confirmation and withdrawal intentionally have different authority
