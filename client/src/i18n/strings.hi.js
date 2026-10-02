@@ -503,7 +503,9 @@ export default {
   'verdict.thisLooksLikeTitle': 'यह ऐसा लगता है: {title}',
   'verdict.readingWork': 'आपकी लिखावट पढ़ी जा रही है…',
   'verdict.readOnServer': 'सर्वर पर पढ़ा गया',
-  'ink.hintEachLine': 'हर चरण अलग पंक्ति में लिखें · स्टाइलस या उंगली से',
+  'ink.hintEachLine': 'हर चरण अलग पंक्ति में लिखें · स्टाइलस या उँगली से',
+  'ink.fingerToggleTitle': 'उँगली से लिखें (बंद होने पर उँगली पेज स्क्रॉल करती है और सिर्फ़ स्टाइलस लिखता है)',
+  'ink.fingerToggleAria': 'उँगली से लिखें',
 
   // ── हैंडराइटिंग लिखने की जगह (ink/InkAnswer, InkCanvas, NativeInkCanvas) ──
   // Apple Pencil is the product's name and stays Latin; "Pencil" alone in the
@@ -519,9 +521,7 @@ export default {
   'ink.moreSpace': 'और जगह',
   'ink.moreSpaceAria': 'लिखने के लिए और जगह जोड़ें',
   'ink.spaceShort': 'जगह',
-  'ink.finger': 'उंगली',
-  'ink.fingerTitle': 'उंगली से भी लिखें (वरना पेंसिल दिखने के बाद उंगली से पेज स्क्रॉल होता है)',
-  'ink.fingerAria': 'पेंसिल के साथ उंगली से भी लिखें',
+  'ink.finger': 'उँगली',
   'ink.answerSpaceAria': 'हैंडराइटिंग में उत्तर लिखने की जगह',
   'ink.writingSpace': 'लिखने की जगह',
   'ink.lineChecksOut': 'यह पंक्ति सही है',
@@ -548,7 +548,7 @@ export default {
   // ── हैंडराइटिंग सिखाना (ink/Calibrate) ─────────────────────────────────────
   // "Template" is नमूना, as settings.templatesLearned already calls it.
   'calibrate.title': 'अपनी हैंडराइटिंग सिखाएँ',
-  'calibrate.instruction': 'यह चिह्न वैसे ही लिखिए जैसे आप लिखते हैं, फिर सहेजिए:',
+  'calibrate.instruction': 'यह चिह्न ठीक वैसे ही लिखिए जैसे आप ख़ुद लिखते हैं, फिर सहेजिए:',
   'calibrate.symbolOf': '— {total} में से चिह्न {n}',
   'calibrate.writeAria': '{symbol} लिखें',
   'calibrate.decimalPoint': '· (दशमलव बिंदु)',
@@ -719,8 +719,8 @@ export default {
   'settings.passwordNote': 'कम से कम {min} अक्षर। इसे इसी डिवाइस के स्टोरेज में सॉल्ट लगे PBKDF2 हैश के रूप में रखा जाता है — यह आपकी प्रोफ़ाइल को इसी डिवाइस पर बंद रखता है, और कहीं भी अपलोड नहीं होता।',
 
   'settings.handwriting': '✒ हैंडराइटिंग',
-  'settings.handwritingNative': 'यह ऐप डिवाइस की अपनी लेखन सतह से आपकी लिखावट लेता है — स्टाइलस से या उंगली से। Pri इसे इसी डिवाइस पर पढ़ता है (जब तक आप नीचे सर्वर पर पढ़ना चालू न करें), आपके सुधारों से सीखता है, और वे सुधार इसी डिवाइस पर रहते हैं।',
-  'settings.handwritingBrowser': 'उंगली, स्टाइलस या माउस से लिखें। Pri आपकी लिखावट इसी डिवाइस पर पढ़ता है (जब तक आप नीचे सर्वर पर पढ़ना चालू न करें), और आपके सुधार उसे आपकी लिखावट सीखने में मदद करते हैं। आपके सुधार इसी डिवाइस पर रहते हैं।',
+  'settings.handwritingNative': 'यह ऐप डिवाइस की अपनी लेखन सतह से आपकी लिखावट लेता है — स्टाइलस से या उँगली से। Pri इसे इसी डिवाइस पर पढ़ता है (जब तक आप नीचे सर्वर पर पढ़ना चालू न करें), आपके सुधारों से सीखता है, और वे सुधार इसी डिवाइस पर रहते हैं।',
+  'settings.handwritingBrowser': 'उँगली, स्टाइलस या माउस से लिखें। Pri आपकी लिखावट इसी डिवाइस पर पढ़ता है (जब तक आप नीचे सर्वर पर पढ़ना चालू न करें), और आपके सुधार उसे आपकी लिखावट सीखने में मदद करते हैं। आपके सुधार इसी डिवाइस पर रहते हैं।',
   'settings.templatesLearned': 'सीखे गए निजी नमूने',
   'settings.templatesNone': 'अभी कोई नहीं',
   'settings.templatesCount': '{symbols} चिह्नों में कुल {total}',

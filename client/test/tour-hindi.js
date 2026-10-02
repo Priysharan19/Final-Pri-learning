@@ -149,7 +149,7 @@ export const flow = {
       }
       const titles = await toolbar.locator('button').evaluateAll(els => els.map(el => [el.getAttribute('title'), el.getAttribute('aria-label')]));
       for (const [titleKey, ariaKey] of [['ink.undo', 'ink.undoAria'], ['ink.redo', 'ink.redoAria'], ['ink.clear', 'ink.clearAria'],
-        ['ink.moreSpace', 'ink.moreSpaceAria'], ['ink.fingerTitle', 'ink.fingerAria']]) {
+        ['ink.moreSpace', 'ink.moreSpaceAria'], ['ink.fingerToggleTitle', 'ink.fingerToggleAria']]) {
         await check(`Handwriting: the ${titleKey} control is titled and labelled in Hindi`,
           titles.some(([title, aria]) => title === hi[titleKey] && aria === hi[ariaKey]), JSON.stringify(titles));
       }

@@ -130,20 +130,44 @@ final class InkBridge: NSObject, InkSurfaceDelegate {
         reportedOffset = CGPoint(x: Self.number(message["scrollX"]), y: Self.number(message["scrollY"]))
     }
 
+    /// Where the native surface goes. The page reports CSS pixels; UIKit works
+    /// in points, and the two differ by the web view's page zoom (Dynamic Type,
+    /// CP-04). The surface keeps CSS-pixel bounds and is scaled by the zoom, so
+    /// strokes, readings and restored strokes never change units, and touches
+    /// map through the transform. At zoom 1 this is exactly the old layout.
+    struct Placement: Equatable {
+        let clipFrame: CGRect
+        let surfaceBounds: CGRect
+        let surfaceCenter: CGPoint
+        let scale: CGFloat
+    }
+
+    static func placement(frame: CGRect, clip: CGRect, reportedOffset: CGPoint,
+                          contentOffset: CGPoint, zoom rawZoom: CGFloat, viewBounds: CGRect) -> Placement {
+        let z = rawZoom > 0 ? rawZoom : 1
+        let delta = CGPoint(x: contentOffset.x - reportedOffset.x * z, y: contentOffset.y - reportedOffset.y * z)
+        let clipPts = clip.isEmpty ? viewBounds : CGRect(x: clip.minX * z, y: clip.minY * z, width: clip.width * z, height: clip.height * z)
+        let originX = frame.minX * z - delta.x - clipPts.minX
+        let originY = frame.minY * z - delta.y - clipPts.minY
+        return Placement(
+            clipFrame: clipPts,
+            surfaceBounds: CGRect(x: 0, y: 0, width: frame.width, height: frame.height),
+            surfaceCenter: CGPoint(x: originX + frame.width * z / 2, y: originY + frame.height * z / 2),
+            scale: z
+        )
+    }
+
     private func applyLayout() {
         guard isMounted, let webView else { return }
-        let delta = CGPoint(
-            x: webView.scrollView.contentOffset.x - reportedOffset.x,
-            y: webView.scrollView.contentOffset.y - reportedOffset.y
-        )
-        let clip = reportedClip.isEmpty ? webView.bounds : reportedClip
-        clipView.frame = clip
-        surface.frame = CGRect(
-            x: reportedFrame.minX - delta.x - clip.minX,
-            y: reportedFrame.minY - delta.y - clip.minY,
-            width: reportedFrame.width,
-            height: reportedFrame.height
-        )
+        let p = Self.placement(frame: reportedFrame, clip: reportedClip, reportedOffset: reportedOffset,
+                               contentOffset: webView.scrollView.contentOffset, zoom: webView.pageZoom,
+                               viewBounds: webView.bounds)
+        clipView.frame = p.clipFrame
+        // bounds + center (not frame) because the view carries a transform.
+        surface.transform = .identity
+        surface.bounds = p.surfaceBounds
+        surface.center = p.surfaceCenter
+        surface.transform = p.scale == 1 ? .identity : CGAffineTransform(scaleX: p.scale, y: p.scale)
     }
 
     private func applyAppearance(_ message: [String: Any]) {

@@ -437,6 +437,8 @@ export default {
   'verdict.readingWork': 'Reading your handwriting…',
   'verdict.readOnServer': 'Read on the server',
   'ink.hintEachLine': 'Write each step on its own line · stylus or finger',
+  'ink.fingerToggleTitle': 'Write with your finger (when off, a finger scrolls the page and only a stylus writes)',
+  'ink.fingerToggleAria': 'Write with a finger',
 
   // ── Handwriting workspace (ink/InkAnswer, InkCanvas, NativeInkCanvas) ──────
   'ink.pen': 'Pen',
@@ -451,8 +453,6 @@ export default {
   'ink.moreSpaceAria': 'Add more writing space',
   'ink.spaceShort': 'space',
   'ink.finger': 'Finger',
-  'ink.fingerTitle': 'Draw with a finger too (otherwise fingers scroll once a Pencil is seen)',
-  'ink.fingerAria': 'Draw with a finger as well as a Pencil',
   'ink.answerSpaceAria': 'Handwriting answer space',
   'ink.writingSpace': 'Writing space',
   'ink.lineChecksOut': 'This line checks out',
