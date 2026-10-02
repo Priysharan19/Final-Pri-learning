@@ -129,8 +129,10 @@ export const flow = {
     await check('the map is called an evidence map, not a mastery map', /Evidence map/i.test(body) && !/Mastery map/i.test(body));
     await check('the legend can show practice and the check disagreeing', /Practised well · missed in the check/.test(await page.locator('.pm-legend').innerText()));
     await check('the result says it reorders smart practice', /reorder smart practice/.test(body));
+    // Always one check, so the flow's count does not depend on the answers.
     const cut = page.locator('[data-stopped-by]');
-    if (await cut.count()) await check('a trace cut short says why it stopped', /question limit|12-question limit/.test(await cut.first().innerText()));
+    const cutText = (await cut.count()) ? await cut.first().innerText() : null;
+    await check('a trace cut short says why it stopped', cutText === null || /question limit|12-question limit/.test(cutText), cutText || '');
     const headers = await page.locator('.pm-map thead th').allInnerTexts();
     await check('the map runs Class 7 → 12 and then JEE', headers.join('|').includes('Class 7') && headers.join('|').includes('Class 12') && /JEE/.test(headers.at(-1) || ''), headers.join('|'));
     await check('the map has a row per strand', await page.locator('.pm-map tbody tr').count() === 7);
