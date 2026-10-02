@@ -252,19 +252,16 @@ async function run() {
     const hero = login.slice(heroStart, splitStart);
     ok('the Login hero source carries no HSC or NSW copy', heroStart > 0 && splitStart > heroStart && !/HSC|NSW|NESA/.test(hero));
     ok('the sign-up form opens on the India course', /course: 'in'/.test(login) && /STUDY_DEFAULT/.test(login));
-    // Australia remains an explicit secondary path off the India-first course
-    // step. KALP-03 made the link role-aware, so prove the full student/teacher
-    // translation contract rather than requiring the removed student-only call.
-    const enStrings = readFileSync(`${CLIENT}src/i18n/strings.en.js`, 'utf8');
-    const hiStrings = readFileSync(`${CLIENT}src/i18n/strings.hi.js`, 'utf8');
-    ok('the Australian option is a secondary, collapsed control',
-      /createStep === 1 && !australia && \(/.test(login)
-      && /t\(form\.role === 'teacher' \? 'login\.teachingInAustralia' : 'login\.studyingInAustralia'\)/.test(login)
-      && /createStep === 1 && australia && \(/.test(login)
-      && /'login\.studyingInAustralia': 'Studying in Australia\?/.test(enStrings)
-      && /'login\.teachingInAustralia': 'Teaching in Australia\?/.test(enStrings)
-      && /'login\.studyingInAustralia':/.test(hiStrings)
-      && /'login\.teachingInAustralia':/.test(hiStrings));
+    // Frozen public V1 is India-only. Legacy Australian implementation may remain
+    // elsewhere in the repository, but Login must expose no ordinary Australian
+    // selector or copy and must not carry an Olympiad launch choice.
+    ok('public onboarding exposes no Australian curriculum entry point',
+      !/AU_COURSES/.test(login)
+      && !/signup-course/.test(login)
+      && !/Studying in Australia|Teaching in Australia/.test(login));
+    ok('public onboarding exposes no Olympiad launch track',
+      !/key:\s*['"]olympiad['"]/.test(login)
+      && !/OLYMPIAD/.test(login));
     ok('the cloud sign-in routes to the cloud account panel', /CLOUD_ACCOUNT_ROUTE = '\/settings#cloud-account-title'/.test(login));
 
     for (const page of ['Home.jsx', 'History.jsx', 'Favorites.jsx', 'Progress.jsx']) {

@@ -467,9 +467,7 @@ async function signInToDemo(page, base) {
   await page.getByRole('button', { name: 'Student', exact: true }).click();
   await click(page, '.auth-card .btn-primary');
   await page.waitForSelector('[data-onboarding-step="2"]');
-  await page.getByRole('button', { name: /Studying in Australia/ }).click();
-  await page.locator('#signup-course').selectOption('nsw');
-  await page.locator('#signup-year').selectOption('10');
+  await page.locator('#signup-track').selectOption('10');
   await click(page, '.auth-card .btn-primary');
   await page.waitForSelector('[data-onboarding-step="3"]');
   await page.locator('#signup-name').fill('Accessibility Student');

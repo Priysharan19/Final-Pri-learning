@@ -299,7 +299,7 @@ function helpers(page, base, flowId) {
    */
   const createLegacyProfile = async ({
     name = 'E2E Legacy Student', year = 9, course = 'nsw', pathway = 'advanced',
-    avatar = '🙂', language = 'en'
+    role = 'student', indiaTrack = null, avatar = '🙂', language = 'en'
   } = {}) => {
     const id = `e2e-legacy-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     await page.evaluate(async profile => {
@@ -314,7 +314,7 @@ function helpers(page, base, flowId) {
         name: profile.name,
         year: profile.year,
         course: profile.course,
-        role: 'student',
+        role: profile.role,
         avatar: profile.avatar,
         theme: 'dark',
         dailyGoal: 10,
@@ -322,7 +322,7 @@ function helpers(page, base, flowId) {
         language: profile.language,
         mathsGloss: false,
         pathway: profile.course === 'nsw' ? profile.pathway : null,
-        indiaTrack: null,
+        indiaTrack: profile.course === 'in' ? (profile.indiaTrack || 'cbse') : null,
         timezone: profile.course === 'nsw' ? 'Australia/Sydney' : 'Asia/Kolkata',
         createdAt: now,
         lastActiveAt: now
@@ -336,9 +336,14 @@ function helpers(page, base, flowId) {
       });
       db.close();
       localStorage.setItem('pri-current-profile', profile.id);
-    }, { id, name, year, course, pathway, avatar, language });
+    }, { id, name, year, course, pathway, role, indiaTrack, avatar, language });
     await page.goto(base + '/', { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.home-greet', { timeout: 30000 });
+    if (role === 'teacher') {
+      await page.waitForURL(/\/teach(?:#.*)?$/, { timeout: 30000 });
+      await page.waitForSelector('.teacher-workspace-head', { timeout: 30000 });
+    } else {
+      await page.waitForSelector('.home-greet', { timeout: 30000 });
+    }
     return id;
   };
 
