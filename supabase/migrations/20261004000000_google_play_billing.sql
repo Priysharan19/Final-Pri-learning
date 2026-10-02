@@ -68,6 +68,6 @@ begin
   end loop;
 end $$;
 
-update pri.platform_meta set value = '4' where key = 'billing_schema_version';
+update pri.platform_meta set value = '5' where key = 'billing_schema_version';
 
 commit;

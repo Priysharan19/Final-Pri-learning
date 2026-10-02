@@ -12,6 +12,9 @@
 //    (supabase/migrations/20261002010000_tutor_cache.sql). SQLite creates the
 //    same table in tutor.js, as it does every lazily built table.
 export const SCHEMA_VERSION = 8;
-// Billing 4: Google Play tables (billing_google_accounts, billing_google_purchases,
-//    billing_google_notifications) — supabase/migrations/20261003000000.
-export const BILLING_SCHEMA_VERSION = 4;
+// Billing 4: billing_payments keeps its row when the account is deleted
+//    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
+//    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).
+// Billing 5: Google Play tables (billing_google_accounts, billing_google_purchases,
+//    billing_google_notifications) — supabase/migrations/20261004000000.
+export const BILLING_SCHEMA_VERSION = 5;
