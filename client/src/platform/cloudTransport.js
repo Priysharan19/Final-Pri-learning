@@ -308,6 +308,10 @@ export const cloud = Object.freeze({
   // a body that carries one.
   checkWorking: (prompt, lines, { signal = null, timeoutMs = 35000 } = {}) =>
     cloudRequest('/v1/working/check', { method: 'POST', body: { prompt, lines }, signal, timeoutMs }),
+  // "Practise this": one photo of a printed question, nothing else. The reply
+  // proposes a chapter and skill; it never carries a mark or an answer.
+  identifyQuestionPhoto: (image, { signal = null, timeoutMs = 25000 } = {}) =>
+    cloudRequest('/v1/question-photo/identify', { method: 'POST', body: { image }, signal, timeoutMs }),
   // The AI tutor is sent the verified solution it must stay grounded in — it
   // is not a reader, and /v1/handwriting never receives one. Exam rows never
   // reach here: the local backend refuses them first.

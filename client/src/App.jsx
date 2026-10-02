@@ -42,6 +42,9 @@ const Placement = React.lazy(() => import('./pages/Placement.jsx'));
 const Notes = React.lazy(() => import('./pages/Notes.jsx'));
 // Outside the frozen V1 scope: the route exists only where the build flag is on.
 const PLACEMENT_ON = featureEnabled('placement');
+// "Practise this": an on-demand chunk (ON_DEMAND in vite.config.js) — it needs
+// a connection to do anything, so it is never part of the install.
+const PractisePhoto = React.lazy(() => import('./pages/PractisePhoto.jsx'));
 
 const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);
@@ -387,6 +390,7 @@ export default function App() {
                   <Routes>
                     <Route path="/" element={user.role === 'teacher' ? <Navigate to="/teach" replace /> : <Home />} />
                     <Route path="/practice" element={studentOnly(<Practice />)} />
+                    <Route path="/practise-photo" element={studentOnly(<PractisePhoto />)} />
                     <Route path="/progress" element={studentOnly(<Progress />, '/teach#teacher-analytics')} />
                     {PLACEMENT_ON && <Route path="/placement" element={studentOnly(<Placement />)} />}
                     <Route path="/map" element={<Navigate to="/progress?tab=map" replace />} />

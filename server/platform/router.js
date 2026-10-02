@@ -14,6 +14,7 @@ import { createReportRouter } from './reports.js';
 import { createSyncRouter } from './sync.js';
 import { createHandwritingRouter } from './handwriting.js';
 import { createWorkingRouter } from './working.js';
+import { createQuestionPhotoRouter } from './questionPhoto.js';
 import { createTutorRouter } from './tutor.js';
 import { requireGuardianConsent } from './guardianConsent.js';
 import { createTelemetryRouter } from './telemetry.js';
@@ -195,6 +196,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   router.use('/reports', requireGuardianConsent(db), createReportRouter(db));
   router.use('/handwriting', requireGuardianConsent(db), createHandwritingRouter(db));
   router.use('/working', requireGuardianConsent(db), createWorkingRouter(db));
+  router.use('/question-photo', requireGuardianConsent(db), createQuestionPhotoRouter(db));
   // The tutor sends a student's own work lines to the model provider, so it
   // sits behind the same guardian gate as the working check.
   router.use('/tutor', requireGuardianConsent(db), createTutorRouter(db, tutor));
