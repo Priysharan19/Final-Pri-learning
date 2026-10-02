@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · E2E flow — the app opens as an Indian product.
 //
-// Every other flow in this suite makes an Australian profile, so until this
-// one existed not a single browser check ran as the student the product is
-// now built for. This flow walks the India path the way a Class 10 student
+// This flow is the explicit India public-V1 truth check. The generic profile
+// helper now also defaults to India, so the broader browser suite shares the
+// same launch boundary rather than silently creating Australian profiles. This flow walks the India path the way a Class 10 student
 // meets it: the landing copy, the first control on the sign-up form, the
 // labels on Home and in the profile picker, the account-less demo, the
 // History page, and the way from the landing screen to the cloud account.
@@ -75,13 +75,13 @@ export const flow = {
     await check('the first curriculum control is the class / track picker', (await first.getAttribute('id')) === 'signup-track',
       `first select is #${await first.getAttribute('id')}`);
     const options = await first.locator('option').allInnerTexts();
-    await check('it offers Classes 7–12, JEE Main, JEE Advanced and Olympiad',
-      options.includes('Class 7') && options.includes('Class 12') && options.includes('JEE Main') && options.includes('JEE Advanced') && options.some(o => /^Olympiad/.test(o)),
+    await check('it offers Classes 7–12, JEE Main and JEE Advanced only',
+      options.includes('Class 7') && options.includes('Class 12') && options.includes('JEE Main') && options.includes('JEE Advanced') && !options.some(o => /Olympiad|HSC|VCE|QCE|WACE|SACE|IB/.test(o)),
       `options are ${JSON.stringify(options)}`);
     await check('no class or track is silently assumed', (await first.inputValue()) === '',
       `initial choice is ${JSON.stringify(await first.inputValue())}`);
-    await check('the Australian syllabuses are folded away behind one link',
-      await page.locator('#signup-course').count() === 0 && await page.getByRole('button', { name: /Studying in Australia/ }).count() === 1);
+    await check('Australian curricula have no public V1 onboarding entry point',
+      await page.locator('#signup-course').count() === 0 && await page.getByRole('button', { name: /Australia/ }).count() === 0);
     const formText = await page.locator('.auth-card').innerText();
     await check('the India selection step never says Year or HSC', !/\bYear\b/.test(formText) && !HSC.test(formText),
       `form reads ${JSON.stringify(formText.slice(0, 200))}`);
