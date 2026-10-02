@@ -17,7 +17,7 @@ Repository evidence supports the WebView direction:
 | `minSdk` | **26** (Android 8.0) | Updatable WebView since Android 7, Keystore AES-GCM reliable, adaptive icons. Covers the vast majority of active Play devices in India (re-check the Play Console distribution at CP-12). |
 | `targetSdk` / `compileSdk` | **36** | Play's target-API requirement for new apps and updates from 2026-08-31. Re-verify at CP-12. Edge-to-edge is enforced from API 35. |
 | WebView floor | Chromium **≥ 91** at runtime | Matches the `chrome91` build target. The shell checks `WebViewCompat.getCurrentWebViewPackage()` and shows a native "Update Android System WebView" screen (Play link) below the floor, instead of a blank page. |
-| Language/build | Kotlin, Gradle Kotlin DSL, version catalog, AGP current stable, JDK 17 | Standard. |
+| Language/build | Kotlin 2.1.20, Gradle Kotlin DSL, version catalog, AGP 8.12.3, Gradle 9.3.1 (wrapper with pinned `distributionSha256Sum`), JDK 17. AndroidX WebKit 1.17.1 (where `addDocumentStartJavaScript` / `DOCUMENT_START_SCRIPT` are public API), Activity 1.13.0. | Built and verified in CP-06. |
 | Form factors | Phones and tablets, one APK/AAB; `resizeableActivity=true` (multi-window, foldables) | Layout comes from CSS form factors ([FORM_FACTOR_SPEC.md](FORM_FACTOR_SPEC.md)). |
 | Application id | `com.prilearning.app` (matches the Apple bundle id) | Must be confirmed available in Play Console. That is an external owner action. |
 
@@ -49,7 +49,7 @@ android/                                 # NEW (CP-06); fleet rule android/** �
       bridge/lifecycle/LifecycleBridge.kt
       release/ReleaseIdentity.kt         # reads assets/web/release.json
     src/test/…                           # JVM: envelope schema, path allowlist, cookie jar, error mapping
-    src/androidTest/…                    # instrumented: boot, handshake, IndexedDB survives relaunch, bridge round-trips
+    src/androidTest/…                    # instrumented: floor screen, boot, handshake, journey, Back, links; relaunch after process death
 scripts/sync-android.mjs                 # NEW (CP-06): mirror of scripts/sync-ios.mjs (--check parity mode)
 ```
 
@@ -96,7 +96,7 @@ WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
 | `print` | `PrintManager` + `webView.createPrintDocumentAdapter` via `share.print`. | Today `window.print()` would silently do nothing in WebView. |
 | `billing` | Play Billing Library, current major version. See section 6. | |
 | `lifecycle` | `onPause`/`onResume`/`onStop`/`onTrimMemory`, sent as a `lifecycle.state` event; `webView.onPause()`/`onResume()`. | JS flushes drafts on `background`. |
-| Back | `OnBackPressedDispatcher` sends a `lifecycle.backRequested` **native→JS request** (with an envelope id; see [CROSS_PLATFORM_ARCHITECTURE.md](CROSS_PLATFORM_ARCHITECTURE.md) §4.3). JS replies `{handled}` within 300 ms; no reply means unhandled. If not handled and `webView.canGoBack()`, go back; otherwise `finish()`. Predictive back enabled (`enableOnBackInvokedCallback`). | JS must close sheets and dialogs first and must never lose an in-progress attempt. |
+| Back | **As implemented (CP-06):** the page declares whether it wants Back (`lifecycle.setBackHandled`): `true` while a sheet/dialog is visibly open or while it has in-app history (`history.state.idx > 0`, stamped by the router; the role landing — `/` or `/teach` — is the first entry). The activity's `OnBackPressedCallback` is enabled exactly while that is true. Enabled: a `lifecycle.back` event follows; the page closes the open sheet/dialog (that press never also navigates) or calls `history.back()`. Disabled: the system default runs — predictive back-to-home, and the task moves to the background. There is no timeout race and no `canGoBack()` fallback. The declared state resets on the first message from a new document's reply proxy. | JS must close sheets and dialogs first and must never lose an in-progress attempt. |
 | `ink` | **No native ink in v1.** The shared `client/src/ink/InkCanvas.jsx` handles finger and stylus via PointerEvents (`pointerType: 'pen'` for S Pen/USI, pressure, tilt; palm rejection once a pen is seen). `__PRI_HOST__.capabilities.ink` is **absent**, so `client/src/ink/InkAnswer.jsx` picks the canvas automatically. | A low-latency `androidx.ink` front-buffer surface is CP-09 scope **only** if latency is measured unacceptable on target tablets. It would capture strokes only; recognition stays shared. |
 | `device` | Reports `stylusSeen` (any `InputDevice` with `SOURCE_STYLUS`) and `safeAreaApplied`; `lifecycle.backButton: true`. | No OS or model sniffing exposed for layout. |
 | Release identity | Read `assets/web/release.json` and expose it as `__PRI_NATIVE_RELEASE_IDENTITY__` and `__PRI_HOST__.release`, matching `ios/PriLearning.swiftpm/ReleaseIdentity.swift`. | `versionCode` comes from the CI build number. |

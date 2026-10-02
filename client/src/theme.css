@@ -486,7 +486,9 @@ select.input {
 .type-caret { display: inline-block; width: 1px; height: 1.05em; background: var(--ink-2); vertical-align: -0.18em; margin-left: 1px; animation: caretBlink 1s steps(1) infinite; }
 @keyframes caretBlink { 50% { opacity: 0; } }
 
-.genbar { width: min(690px, 94vw); margin-top: 9vh; position: relative; z-index: 20; }
+/* Percentages of the content column, not vw: robust under any page scaling
+   (the iOS shell's Dynamic Type) and never wider than the main column. */
+.genbar { width: min(690px, 94%); margin-top: 9vh; position: relative; z-index: 20; }
 .genbar-head {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px;
   background: var(--surface); border: 1px solid var(--hairline-strong); border-radius: 5px;
@@ -523,7 +525,7 @@ select.input {
 .gen-opt small { color: var(--ink-3); }
 .gen-sub-head { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); margin: 4px 0 10px; }
 
-.home-cards { display: flex; gap: 0; width: min(990px, 94vw); margin-top: 7vh; border: 1px solid var(--hairline); border-radius: var(--radius); overflow: hidden; }
+.home-cards { display: flex; gap: 0; width: min(990px, 94%); margin-top: 7vh; border: 1px solid var(--hairline); border-radius: var(--radius); overflow: hidden; }
 .home-card { padding: 18px 22px; flex: 1; background: var(--surface); position: relative; }
 .home-card + .home-card { border-left: 1px solid var(--hairline); background: var(--surface-2); }
 
@@ -813,7 +815,7 @@ select.input {
 .node-code { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 2px; font-size: 10px; letter-spacing: 0.04em; color: var(--ink-3); background: var(--surface-2); border: 1px solid var(--hairline); vertical-align: middle; }
 .drawer { position: fixed; inset: 0; background: rgba(2, 2, 1, 0.6); z-index: 90; display: flex; justify-content: flex-end; backdrop-filter: blur(2px); }
 .drawer-panel {
-  width: 440px; max-width: 92vw; background: var(--surface); height: 100%;
+  width: 440px; max-width: 92%; background: var(--surface); height: 100%;
   border-left: 1px solid var(--hairline-strong); padding: 26px; overflow-y: auto;
   animation: slideIn 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
