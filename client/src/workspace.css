@@ -46,10 +46,7 @@
 @media (max-width: 760px) {
 .hintbox { overflow-wrap: anywhere; }
 }
-.eval-card {
-  border-color: var(--hairline);
-  border-radius: var(--radius);
-}
+.eval-card { border-color: var(--hairline); }
 .sheet-scrim {
   position: fixed; inset: 0; z-index: 140; border: 0; padding: 0;
   background: color-mix(in srgb, var(--ink) 28%, transparent);
@@ -72,7 +69,6 @@
 .sym-key { border-radius: var(--radius-xs); background: var(--surface); }
 .sym-key:hover { border-color: var(--accent-line); color: var(--ink); }
 .hintbox, .ya-line { font-family: var(--font-prose-math); }
-.hintbox { font-size: 16.5px; }
 .mcq-opt .mcq-mark { margin-left: auto; font-size: 13px; color: var(--ink-2); display: inline-flex; gap: 6px; align-items: center; }
 .mcq-opt.right .mcq-mark { color: var(--good); }
 .mcq-opt.wrong .mcq-mark { color: var(--correction); }
@@ -134,12 +130,9 @@
 .session-done p { color: var(--ink-2); }
 .session-done-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
 .exam-page { min-height: 100vh; background: var(--page); }
-.exam-head {
-  position: sticky; top: 0; z-index: 60; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+.exam-head { position: sticky; top: 0; z-index: 60; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   padding: calc(8px + env(safe-area-inset-top)) 16px 8px 10px; border-bottom: 1px solid var(--hairline);
-  background: color-mix(in srgb, var(--page) 95%, transparent); backdrop-filter: blur(10px);
-  border-radius: 0; margin: 0;
-}
+  border-radius: 0; margin: 0; }
 .exam-head-title { min-width: 0; flex: 1; display: grid; line-height: 1.25; }
 .exam-head-title b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .exam-timer {
