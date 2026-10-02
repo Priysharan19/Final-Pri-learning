@@ -159,9 +159,27 @@ export function clearDraft(scope, id) {
   if (ls) { try { ls.removeItem(key); } catch { } }
 }
 
+// Records a screen keeps for its own recovery rather than for the student to
+// pick up by hand: a submission that was in flight and the ink of the question
+// on screen (practiceRecovery.js). The crash card lists what a student can go
+// back to; these come back by themselves, so they are not listed twice.
+const SELF_RECOVERING = new Set(['submit', 'ink']);
+
+/** Ids of this profile's live drafts in one scope, newest first. */
+export function draftIdsIn(scope) {
+  const want = String(scope);
+  const prefix = `${PREFIX}${pid()}.${want}.`;
+  const held = [...pending.entries()].filter(([k, r]) => k.startsWith(prefix) && r.scope === want).map(([, r]) => r);
+  const onDisk = scan(prefix).filter(r => r.scope === want);
+  const seen = new Map();
+  for (const r of [...onDisk, ...held]) seen.set(r.id, Math.max(seen.get(r.id) || 0, r.savedAt || 0));
+  return [...seen.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+}
+
 /** Metadata for this profile's drafts, newest first. Payloads stay on disk. */
 export function listDrafts() {
   return scan(`${PREFIX}${pid()}.`)
+    .filter(r => !SELF_RECOVERING.has(r.scope))
     .map(r => ({ scope: r.scope, id: r.id, label: r.label, note: r.note, path: r.path, savedAt: r.savedAt }))
     .sort((a, b) => b.savedAt - a.savedAt);
 }

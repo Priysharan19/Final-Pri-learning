@@ -1,0 +1,18 @@
+{
+  "files": {
+    "src/components/StaffOperationsPanel.jsx": "staff-only support/admin console, rendered only for cloud accounts with the support or admin role; it is operator tooling, not student or teacher interface",
+    "src/components/InkPhysicalEvidenceSession.jsx": "hidden physical-device handwriting study harness reached only by ?inkEvidence=1, run by the research operator with an English protocol; not in navigation and not student interface"
+  },
+  "literals": {
+    "Pri Learning": "the product's name, written the same in every language",
+    "ri Learning": "the wordmark, split around the drop-cap P",
+    "ri Learning.": "the wordmark, split around the drop-cap P and its full stop",
+    "XP": "the app's own unit, written XP in every language",
+    "CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD": "examination boards, printed in Latin on the Hindi admit card too",
+    "Extension 1": "the proper name of an NSW course, shown only on the Australian branch",
+    "Extension 2": "the proper name of an NSW course, shown only on the Australian branch",
+    "P": "the drop-cap of the wordmark; with \"ri Learning\" it spells the product name",
+    "Standard": "the proper name of an NSW course, shown only on the Australian branch",
+    "Advanced": "the proper name of an NSW course, shown only on the Australian branch"
+  }
+}

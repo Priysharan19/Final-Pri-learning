@@ -63,7 +63,8 @@ enum BridgeSelfCheck {
                     if !ok { failures += 1 }
                     NSLog("PRIBRIDGE %@ %@", ok ? "ok" : "FAIL", key)
                 }
-                // Native ink placement under page zoom (Dynamic Type): zoom 1 must
+                // Native ink placement math under a page scale (Dynamic Type through the
+                // viewport, or pinch; zoom = pageZoom × scrollView.zoomScale): zoom 1 must
                 // equal the pre-zoom layout; zoom 1.5 must scale every coordinate.
                 let frame = CGRect(x: 100, y: 200, width: 300, height: 150)
                 let clip = CGRect(x: 0, y: 50, width: 800, height: 600)
