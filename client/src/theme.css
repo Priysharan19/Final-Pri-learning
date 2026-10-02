@@ -2135,9 +2135,7 @@ html.theme-switching, html.theme-switching * {
 /* Page and list reveals: a screen's blocks arrive in reading order. */
 .home-wrap > * { animation: pri-rise var(--motion-reveal) var(--ease-emphasized) both; }
 .home-wrap > *:nth-child(2) { animation-delay: calc(var(--stagger) * 1); }
-.home-wrap > *:nth-child(3) { animation-delay: calc(var(--stagger) * 2); }
-.home-wrap > *:nth-child(4) { animation-delay: calc(var(--stagger) * 3); }
-.home-wrap > *:nth-child(n+5) { animation-delay: calc(var(--stagger) * 4); }
+.home-wrap > *:nth-child(n+3) { animation-delay: calc(var(--stagger) * 2); }
 
 /* Press physics: a short, firm give under the finger, released on a spring. */
 .btn:active:not(:disabled) { transform: scale(0.97); }
