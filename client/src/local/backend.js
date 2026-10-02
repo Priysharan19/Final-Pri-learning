@@ -55,7 +55,7 @@ import {
 } from './examSession.js';
 import {
   assertExamAllowed, assertPracticeAllowed, examAllowance, practiceAllowance,
-  planView, recordExamSimulation, recordPracticeServed, requireCapability, usageView
+  planView, profileCloudLinked, recordExamSimulation, recordPracticeServed, requireCapability, usageView
 } from './entitlementGate.js';
 import { ENTITLEMENTS } from '../platform/entitlements.js';
 import { featureEnabled } from '../platform/features.js';
@@ -794,8 +794,12 @@ async function publicUser(p, nowMs = Date.now()) {
     streak: await streakFor(p.id, nowMs, tz),
     today: { questions: today.questions, correct: today.correct, xp: today.xp },
     isDemo: !!p.isDemo, handwriting: p.handwriting !== false,
-    // Default false, and false for every profile that predates the setting.
-    cloudHandwriting: p.cloudHandwriting === true,
+    // Tri-state: true / false when the student chose in Settings, null when
+    // they never did. A null profile gets server reading by default only while
+    // it is linked to a cloud account and the server says reading is usable
+    // (ink/cloudReader.js cloudReadingWanted; ADR-0001 online-first).
+    cloudHandwriting: p.cloudHandwriting === true ? true : p.cloudHandwriting === false ? false : null,
+    cloudLinked: await profileCloudLinked(p.id),
     cloudMarking: p.cloudMarking === true,
     // Plan and free-tier usage are read from device rows: the entitlement is the
     // server-issued snapshot (or 'free'), the usage is the local counter.

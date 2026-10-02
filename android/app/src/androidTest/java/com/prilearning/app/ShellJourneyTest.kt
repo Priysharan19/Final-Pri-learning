@@ -189,19 +189,24 @@ class ShellJourneyTest {
             pressBack()
             waitFor(s, "location.pathname === '/' && document.querySelector('.home-greet')")
 
-            Log.i("PRITEST", "SPA routing through the bundled origin, and history Back")
-            val landingDepth = eval(s, "(history.state && history.state.idx) || 0")
-            click(s, "[].slice.call(document.querySelectorAll('a[href=\"/practice\"]')).find(function(a){return a.offsetParent;})")
-            waitFor(s, "document.querySelector('.q-prompt') && location.pathname === '/practice'")
-            awaitBackWanted(s, true)
-
+            // Practice is thinking mode (#264): its own top bar, no bottom bar and
+            // no sheet. The sheet that Back must close first lives on Home.
             Log.i("PRITEST", "Back closes an open sheet before it navigates")
             if (eval(s, "document.documentElement.dataset.ff === 'compact'") == "true") {
                 click(s, "document.querySelector('.mobilenav button[aria-expanded]')")
                 waitFor(s, "document.querySelector('.mnav-sheet')")
+                awaitBackWanted(s, true)
                 pressBack()
-                waitFor(s, "!document.querySelector('.mnav-sheet') && location.pathname === '/practice'")
+                waitFor(s, "!document.querySelector('.mnav-sheet') && location.pathname === '/' && !!document.querySelector('.home-greet')")
             }
+
+            Log.i("PRITEST", "SPA routing through the bundled origin, and history Back")
+            val landingDepth = eval(s, "(history.state && history.state.idx) || 0")
+            click(s, "[].slice.call(document.querySelectorAll('a[href=\"/practice\"]')).find(function(a){return a.offsetParent;})")
+            waitFor(s, "document.querySelector('.q-prompt') && location.pathname === '/practice'")
+            assertEquals("Practice shows its own bar, not the bottom navigation", "true",
+                eval(s, "!!document.querySelector('.ws-bar') && !(function(n){return n && n.offsetParent;})(document.querySelector('.mobilenav'))"))
+            awaitBackWanted(s, true)
             pressBack()
             // The router must have rendered Home, not just the URL changed: a Link
             // tapped while React still shows the old page is treated as a same-page

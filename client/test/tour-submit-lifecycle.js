@@ -161,6 +161,14 @@ export const flow = {
     await handwrite(page, box, '1');
     await page.waitForFunction(() => document.querySelectorAll('.ink-line').length === 1, null, { timeout: 15000 }).catch(() => null);
     const before = await page.locator('.ink-line').count();
+    // Readable mouse strokes produce an answer line, and an answer line is
+    // what enables Submit — never a silently dead button under legible ink.
+    const submitOn = await page.waitForFunction(() => {
+      const b = document.querySelector('.ws-actions .btn-primary');
+      return !!b && !b.disabled;
+    }, null, { timeout: 15000 }).then(() => true, () => false);
+    await check('readable handwriting enables Submit', submitOn,
+      `status: ${await page.locator('.ws-actions .status-line').innerText().catch(() => '?')}`);
     // Question ids are opaque [A-Za-z0-9-] tokens, safe inside a pattern.
     const kept = await draftWritten(page, new RegExp(`\\.ink\\.${inkId}$`));
     await check('the handwriting is kept in storage before the reload', kept, 'no ink draft was written');
