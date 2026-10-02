@@ -316,6 +316,16 @@ const storage = Object.freeze({
   durable: () => capOf('storage')?.durable === true,
 });
 
+// Local reminders (notifications v1). The page asks permission only from the
+// Settings toggle, sends generic copy (never a question or a mark) and the
+// shell replaces its pending set each time; see client/src/reminders/.
+const notifications = Object.freeze({
+  available: () => { const c = capOf('notifications'); return !!c && c.transport !== 'legacy'; },
+  requestPermission() { if (!capOf('notifications')) return unsupported('notifications', 'requestPermission'); return viaBridge('notifications', 'requestPermission', {}, { timeoutMs: 120_000, cancellable: false }); },
+  schedule(payload) { if (!capOf('notifications')) return unsupported('notifications', 'schedule'); const items = Array.isArray(payload?.items) ? payload.items.slice(0, 64) : []; return viaBridge('notifications', 'schedule', { items }, { timeoutMs: 15_000 }); },
+  cancelAll() { if (!capOf('notifications')) return Promise.resolve({}); return viaBridge('notifications', 'cancelAll', {}, { timeoutMs: 10_000 }); },
+});
+
 const device = Object.freeze({
   /** Facts the page cannot measure itself. Never an OS or model name. */
   facts: () => {
@@ -370,7 +380,7 @@ export const priNative = Object.freeze({
   has: cap => !!capOf(cap),
   version: cap => capOf(cap)?.version || 0,
   releaseIdentity: () => hostReleaseIdentity(scopeOf()),
-  ink, photo, billing, cloud, share, files, lifecycle, storage, device, identity,
+  ink, photo, billing, cloud, share, files, lifecycle, storage, device, identity, notifications,
   /** Bridge counters for diagnostics (no user data). */
   stats: () => (runtime ? runtime.bridge.stats() : null),
   /** Cancel everything in flight (tests, explicit teardown). */

@@ -119,6 +119,41 @@ self.addEventListener('message', (e) => {
   e.waitUntil(reply.then(msg => { if (port) port.postMessage(msg); else e.source?.postMessage(msg); }));
 });
 
+// ── Reminders (display only) ─────────────────────────────────────────────────
+// The page computes when a reminder is due (client/src/reminders) and, while it
+// is open, asks the worker to show it; the worker never decides anything and
+// has no push subscription — there is no server to push from. A tap opens the
+// in-app route the reminder named, in the window that is already open where
+// there is one. Titles and bodies arrive generic by construction: counts and
+// catalogue copy, never a question or a mark.
+
+const REMINDER_ROUTE = /^\/[a-z-]*$/;
+
+self.addEventListener('message', (e) => {
+  if (e.data?.type !== 'pri-notify') return;
+  const title = String(e.data.title || '').slice(0, 120);
+  const body = String(e.data.body || '').slice(0, 200);
+  const tag = String(e.data.tag || 'pri-reminder').slice(0, 64);
+  const url = REMINDER_ROUTE.test(String(e.data.url || '')) ? e.data.url : '/';
+  if (!title) return;
+  e.waitUntil(self.registration.showNotification(title, { body, tag, data: { url }, icon: '/icons/icon-192.png' }).catch(() => {}));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = REMINDER_ROUTE.test(String(e.notification.data?.url || '')) ? e.notification.data.url : '/';
+  e.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const open = all.find(c => 'focus' in c);
+    if (open) {
+      try { await open.focus(); } catch { /* focus can be refused; navigate below */ }
+      if ('navigate' in open) { try { await open.navigate(url); } catch { /* cross-origin or detached */ } }
+      return;
+    }
+    if (self.clients.openWindow) await self.clients.openWindow(url);
+  })());
+});
+
 // ── Activate ─────────────────────────────────────────────────────────────────
 
 async function stampOf(name) {

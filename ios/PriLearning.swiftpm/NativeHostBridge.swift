@@ -58,7 +58,8 @@ final class NativeHostBridge: NSObject {
                 "device": ["versions": [1], "safeAreaApplied": true, "stylusSeen": false],
                 // Sign in with Apple is only useful against a configured Pri
                 // cloud: the token is verified there, nowhere else.
-                "identity": ["versions": [1], "transport": "bridge", "apple": cloudConfigured]
+                "identity": ["versions": [1], "transport": "bridge", "apple": cloudConfigured],
+                "notifications": ["versions": [1], "transport": "bridge"]
             ]
         ]
         if let release = NativeReleaseIdentity.object { descriptor["release"] = release }
@@ -165,6 +166,10 @@ final class NativeHostBridge: NSObject {
             appleSignIn.signIn(id, payload,
                                reply: { [weak self] result in self?.reply(id, result) },
                                fail: { [weak self] code, message in self?.fail(id, code, message) })
+        case "notifications.requestPermission", "notifications.schedule", "notifications.cancelAll":
+            NotificationBridge.shared.handle(op: op, payload: payload,
+                                             reply: { [weak self] result in self?.reply(id, result) },
+                                             fail: { [weak self] code, message in self?.fail(id, code, message) })
         default:
             fail(id, "UNSUPPORTED", "\(cap).\(op) is not supported by this app version.")
         }

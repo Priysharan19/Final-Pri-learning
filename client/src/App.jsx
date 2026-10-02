@@ -4,6 +4,7 @@ import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-r
 import { api } from './api.js';
 import { requestPersistentStorage } from './local/idb.js';
 import { installAutoSync } from './platform/cloudSyncScheduler.js';
+import { cancelRemindersOnSignOut } from './reminders/index.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
 import { setLanguage, signInLanguage, useT } from './i18n/index.js';
@@ -34,6 +35,7 @@ const Teach = React.lazy(() => import('./pages/Teach.jsx'));
 const History = React.lazy(() => import('./pages/History.jsx'));
 const Classes = React.lazy(() => import('./pages/Classes.jsx'));
 const Settings = React.lazy(() => import('./pages/Settings.jsx'));
+const PlanPage = React.lazy(() => import('./plan/PlanPage.jsx'));
 // The placement check is opened once or twice per student, so it — and the
 // prerequisite graph and engine behind it — is an on-demand chunk (see
 // ON_DEMAND in vite.config.js), not part of the install or the warm set.
@@ -60,7 +62,7 @@ const I = {
 };
 
 const STUDENT_NAV = [
-  { label: 'nav.groupLearn', items: [{ to: '/', key: 'nav.home', ico: I.home }, { to: '/practice', key: 'nav.practice', ico: I.practice }] },
+  { label: 'nav.groupLearn', items: [{ to: '/', key: 'nav.home', ico: I.home }, { to: '/practice', key: 'nav.practice', ico: I.practice }, { to: '/plan', key: 'nav.plan', ico: I.tasks }] },
   { label: 'nav.groupWork', items: [{ to: '/tasks', key: 'nav.tasks', ico: I.tasks }, { to: '/exams', key: 'nav.exams', ico: I.exams }, { to: '/classes', key: 'nav.classes', ico: I.classes }] },
   { label: 'nav.groupUnderstand', items: [{ to: '/progress', key: 'nav.progress', ico: I.progress }, { to: '/review?filter=wrong', key: 'nav.review', ico: I.review }] },
   { label: 'nav.groupPlay', items: [{ to: '/rush', key: 'nav.rush', ico: I.rush }, { to: '/match', key: 'nav.match', ico: I.match }] },
@@ -337,6 +339,7 @@ export default function App() {
   };
 
   const switchProfile = async () => {
+    try { await cancelRemindersOnSignOut(user?.id); } catch { }
     try { await api.post('/auth/logout'); } catch { }
     // A role-specific route belongs to the profile that just signed out.
     // Neutralise it before showing the picker so selecting a different role
@@ -383,6 +386,7 @@ export default function App() {
                     <Route path="/" element={user.role === 'teacher' ? <Navigate to="/teach" replace /> : <Home />} />
                     <Route path="/practice" element={studentOnly(<Practice />)} />
                     <Route path="/progress" element={studentOnly(<Progress />, '/teach#teacher-analytics')} />
+                    <Route path="/plan" element={studentOnly(<PlanPage />)} />
                     {PLACEMENT_ON && <Route path="/placement" element={studentOnly(<Placement />)} />}
                     <Route path="/map" element={<Navigate to="/progress?tab=map" replace />} />
                     <Route path="/stats" element={<Navigate to="/progress" replace />} />

@@ -569,6 +569,20 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
   priNative.dispose(); h.uninstall();
 }
 
+// ── 15 · notifications v1: local reminders through the envelope ─────────────
+{
+  const h = createFakeHost({ capabilities: { notifications: { versions: [1] } } });
+  h.on('notifications.requestPermission', () => ({ granted: true }));
+  h.on('notifications.schedule', p => ({ scheduled: p.items.length }));
+  h.on('notifications.cancelAll', () => ({}));
+  ok(priNative.notifications.available() === true, 'notifications v1 negotiates over the bridge');
+  ok((await priNative.notifications.requestPermission()).granted === true, 'permission is asked over the envelope');
+  ok((await priNative.notifications.schedule({ items: [{ id: 'a', at: Date.now() + 60000, title: 'T', body: 'B', url: '/plan' }] })).scheduled === 1, 'schedule reports what it kept');
+  h.on('notifications.schedule', () => ({ scheduled: 99 }));
+  await rejects(priNative.notifications.schedule({ items: [] }), 'INTERNAL', 'a count outside the schema never reaches product code');
+  priNative.dispose(); h.uninstall();
+}
+
 console.log(failures.length
   ? `NATIVE HOST CONTRACT: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `NATIVE HOST CONTRACT: PASS — ${pass}/${pass} checks — envelope, negotiation, timeouts, cancellation, late/duplicate/malformed replies, limits, ordered buffered events, dispose, native requests, one transport per capability, answer-blind ink, recovered late purchases and identity (Sign in with Apple) over the envelope.`);
