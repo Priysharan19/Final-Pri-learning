@@ -25,6 +25,10 @@
 //   F. Secrets: provider keys present in the environment never appear in any
 //      response body or header, /v1/health, an error body, or anything this
 //      suite's server wrote to stdout/stderr.
+//   H. AI tutor: dark 404 without PRI_FEATURE_TUTOR=1, exam context locked,
+//      non-maths / identifier-carrying / oversized bodies refused, and the
+//      reply cache keyed by content only — one account's request never reads
+//      a reply cached for different content, and no identity is stored.
 
 // Secret-shaped values are assembled at runtime so the repository secret scan
 // (tools/secret-scan.mjs) never sees one committed.
@@ -54,6 +58,10 @@ const providerUrl = `http://127.0.0.1:${provider.address().port}/v1/responses`;
 Object.assign(process.env, SECRETS, {
   PRI_HANDWRITING_ENDPOINT: providerUrl,
   PRI_WORKING_ENDPOINT: providerUrl,
+  PRI_TUTOR_ENDPOINT: providerUrl,
+  // The AI tutor ships dark; the sweeps run with it switched on so its real
+  // guards are what they meet. Section H also proves the dark 404.
+  PRI_FEATURE_TUTOR: '1',
   PRI_PAID_CALLS_PER_HOUR: '1000',
   PRI_PAID_CALLS_PER_DAY: '1000'
 });
@@ -273,9 +281,38 @@ try {
     c.eq((await h.request('/v1/account/me', { jar: second })).status, 401, 'revoked device is signed out');
     c.eq((await h.request('/v1/account/me', { jar: b.jar })).status, 200, 'revoking another device keeps this one');
 
-    // Revoke each device in turn, including the current one. (A single
-    // sign-out-everywhere endpoint, POST /v1/account/logout-all, arrives with
-    // PR #263; its negatives join this section when it merges.)
+    // Sign out everywhere: POST /v1/account/logout-all (#263).
+    {
+      const owner = await account();
+      const bystander = await account();
+      await resetLimits();
+      const phone = {};
+      c.eq((await h.request('/v1/account/login', { method: 'POST', jar: phone, body: { email: owner.email, password: owner.password, deviceId: 'phone' } })).status, 200, 'logout-all: second device signs in');
+      const ownerCopy = { ...owner.jar };
+      const noSession = await h.request('/v1/account/logout-all', { method: 'POST', jar: {}, body: {} });
+      c.deq([noSession.status, noSession.data?.error?.code], [401, 'AUTH_REQUIRED'], 'logout-all without a session is 401');
+      const noCsrf = await h.request('/v1/account/logout-all', { method: 'POST', jar: { pri_cloud_session: owner.jar.pri_cloud_session }, body: {} });
+      c.deq([noCsrf.status, noCsrf.data?.error?.code], [403, 'CSRF_REJECTED'], 'logout-all without the CSRF pair is 403');
+      const badCsrf = await h.request('/v1/account/logout-all', { method: 'POST', jar: owner.jar, headers: { 'x-pri-csrf': 'forged' }, body: {} });
+      c.deq([badCsrf.status, badCsrf.data?.error?.code], [403, 'CSRF_REJECTED'], 'logout-all with a forged CSRF token is 403');
+      const savedOrigin = process.env.PRI_PUBLIC_ORIGIN;
+      process.env.PRI_PUBLIC_ORIGIN = 'https://learn.pri.example';
+      let badOrigin;
+      try {
+        badOrigin = await h.request('/v1/account/logout-all', { method: 'POST', jar: owner.jar, headers: { Origin: 'https://evil.example' }, body: {} });
+      } finally {
+        if (savedOrigin === undefined) delete process.env.PRI_PUBLIC_ORIGIN; else process.env.PRI_PUBLIC_ORIGIN = savedOrigin;
+      }
+      c.deq([badOrigin.status, badOrigin.data?.error?.code], [403, 'ORIGIN_REJECTED'], 'logout-all from a foreign Origin is 403');
+      c.eq((await h.request('/v1/account/me', { jar: phone })).status, 200, 'refused logout-all attempts revoke nothing');
+      const all = await h.request('/v1/account/logout-all', { method: 'POST', jar: owner.jar, body: {} });
+      c.deq([all.status, all.data?.revoked], [200, 2], 'logout-all revokes both sessions');
+      c.eq((await h.request('/v1/account/me', { jar: ownerCopy })).status, 401, 'logout-all signs out the current device');
+      c.eq((await h.request('/v1/account/me', { jar: phone })).status, 401, 'logout-all signs out the other device');
+      c.eq((await h.request('/v1/account/me', { jar: bystander.jar })).status, 200, 'logout-all leaves another account signed in');
+    }
+
+    // Revoke each device in turn, including the current one.
     const everywhere = await account();
     await resetLimits();
     const tablet = {};
@@ -391,6 +428,15 @@ try {
     await db.run('INSERT INTO classes(id,teacher_account_id,name,join_code_hash,created_at) VALUES (?,?,?,?,?)', ['cls_export_alice', teacherOne.id, 'Alice Only Class', 'hash-export-alice', stamp]);
     await db.run('INSERT INTO class_members(class_id,student_account_id,joined_at) VALUES (?,?,?)', ['cls_export_bob', bob.id, stamp]);
     await db.run('INSERT INTO class_members(class_id,student_account_id,joined_at) VALUES (?,?,?)', ['cls_export_alice', alice.id, stamp]);
+    // The sections #263 added: submissions, teacher feedback, issue reports and
+    // telemetry — each seeded for both accounts.
+    for (const [who, tag] of [[bob, 'bob'], [alice, 'alice']]) {
+      await db.run('INSERT INTO assignments(id,class_id,teacher_account_id,title,specification_json,created_at) VALUES (?,?,?,?,?,?)', [`asg_export_${tag}`, `cls_export_${tag}`, teacherOne.id, `${tag} drill`, '{}', stamp]);
+      await db.run(`INSERT INTO assignment_submissions(assignment_id,student_account_id,state,summary_json,started_at,updated_at) VALUES (?,?,'started',?,?,?)`, [`asg_export_${tag}`, who.id, JSON.stringify({ note: `${tag}-submission-secret` }), stamp, stamp]);
+      await db.run('INSERT INTO assignment_feedback(assignment_id,student_account_id,teacher_account_id,feedback_json,returned_at,updated_at) VALUES (?,?,?,?,?,?)', [`asg_export_${tag}`, who.id, teacherOne.id, JSON.stringify({ note: `${tag}-feedback-secret` }), stamp, stamp]);
+      await db.run(`INSERT INTO issue_reports(id,account_id,category,context_json,note,status,created_at) VALUES (?,?,'other','{}',?,'open',?)`, [`rpt_export_${tag}`, who.id, `${tag}-report-secret`, stamp]);
+      await db.run('INSERT INTO operational_events(id,account_id,event_type,surface,metadata_json,created_at) VALUES (?,?,?,?,?,?)', [`op_export_${tag}`, who.id, 'feature-used', `${tag}-telemetry-surface`, '{}', stamp]);
+    }
 
     const exported = await h.request('/v1/account/export', { jar: alice.jar });
     c.eq(exported.status, 200, 'Alice exports');
@@ -404,7 +450,16 @@ try {
     const ownClasses = (await db.all('SELECT class_id FROM class_members WHERE student_account_id=? AND removed_at IS NULL', [alice.id])).map(row => row.class_id).sort();
     c.deq(exported.data.classes.map(row => row.id).sort(), ownClasses, 'export classes are exactly Alice\'s memberships');
     c.ok(!exported.text.includes('cls_export_bob') && !exported.text.includes('Bob Only Class'), 'Bob\'s class membership is not in Alice\'s export');
-    c.deq(Object.keys(exported.data).sort(), ['account', 'classes', 'entities', 'exportedAt', 'format', 'learningEvents'], 'the export has exactly the sections checked above');
+    c.deq(exported.data.assignmentSubmissions.map(row => row.assignment_id), ['asg_export_alice'], 'export assignmentSubmissions are exactly Alice\'s');
+    c.deq(exported.data.assignmentFeedback.map(row => row.assignment_id), ['asg_export_alice'], 'export assignmentFeedback is exactly Alice\'s');
+    c.ok(exported.data.assignmentFeedback.every(row => !('teacher_account_id' in row)) && !exported.text.includes(teacherOne.id), 'feedback carries no teacher id');
+    c.deq(exported.data.issueReports.map(row => row.id), ['rpt_export_alice'], 'export issueReports are exactly Alice\'s');
+    c.deq(exported.data.telemetry.map(row => row.surface), ['alice-telemetry-surface'], 'export telemetry is exactly Alice\'s');
+    c.ok(!/bob-(submission|feedback|report)-secret|bob-telemetry-surface/.test(exported.text), 'none of Bob\'s submissions, feedback, reports or telemetry appear');
+    c.eq(exported.data.entitlement.plan, 'free', 'export entitlement summary is Alice\'s (free)');
+    c.deq(exported.data.identities.map(row => row.provider), ['password'], 'export identities are Alice\'s sign-in methods, without subjects');
+    c.eq(exported.data.guardianConsent, null, 'an adult export has no consent section');
+    c.deq(Object.keys(exported.data).sort(), ['account', 'assignmentFeedback', 'assignmentSubmissions', 'classes', 'entities', 'entitlement', 'exportedAt', 'format', 'guardianConsent', 'identities', 'issueReports', 'learningEvents', 'telemetry'], 'the export has exactly the sections checked above');
     await db.run("DELETE FROM class_members WHERE class_id IN ('cls_export_bob','cls_export_alice')");
     await db.run("DELETE FROM classes WHERE id IN ('cls_export_bob','cls_export_alice')");
     c.eq((await h.request(`/v1/account/export?accountId=${bob.id}`, { jar: alice.jar })).data.account.id, alice.id, 'an accountId query parameter is ignored');
@@ -749,6 +804,50 @@ try {
       await billed.close();
       for (const name of Object.keys(razorpayEnv)) delete process.env[name];
     }
+  }
+
+  // ══ H. AI tutor (#251) ════════════════════════════════════════════════════
+  {
+    const { tutorCacheKey, validateTutorRequest } = await import('../platform/tutor.js');
+    const first = await account({ name: 'Tutor One' });
+    const second = await account({ name: 'Tutor Two' });
+    const Q = {
+      prompt: 'Solve $2x + 3 = 11$.',
+      steps: [{ h: 'Subtract 3 from both sides', d: '$2x = 8$' }, { h: 'Divide both sides by 2', d: '$x = 4$' }],
+      answer: '4', hints: ['Undo the addition first.']
+    };
+    const body = (over = {}) => ({ context: 'practice', level: 'nudge', locale: 'en', questionId: 'q-acceptance-1', questionVersion: '1', question: Q, studentWork: { lines: ['2x + 3 = 11'] }, ...over });
+    const help = (who, payload) => h.request('/v1/tutor/help', { method: 'POST', jar: who.jar, body: payload });
+
+    process.env.PRI_FEATURE_TUTOR = '0';
+    const dark = await help(first, body());
+    c.deq([dark.status, dark.data?.error?.code], [404, 'NOT_FOUND'], 'tutor: dark without PRI_FEATURE_TUTOR=1, even for a verified account');
+    process.env.PRI_FEATURE_TUTOR = '1';
+
+    const exam = await help(first, body({ context: 'exam' }));
+    c.deq([exam.status, exam.data?.error?.code], [403, 'TUTOR_EXAM_LOCKED'], 'tutor: an exam context is locked');
+    const essay = await help(first, body({ question: { ...Q, prompt: 'Write an essay about the French Revolution please' } }));
+    c.deq([essay.status, essay.data?.error?.code], [400, 'TUTOR_NOT_MATHS'], 'tutor: a non-maths body is not proxied to the model');
+    const named = await help(first, body({ email: first.email }));
+    c.eq(named.status, 400, 'tutor: a body carrying an identifier is refused');
+    const huge = await help(first, body({ question: { ...Q, prompt: `Solve ${'x + '.repeat(15000)}1` } }));
+    c.deq([huge.status, huge.data?.error?.code], [413, 'TUTOR_REQUEST_TOO_LARGE'], 'tutor: an oversized body is refused with a code');
+
+    // Cache isolation: a reply cached for one request's exact content.
+    const key = tutorCacheKey(validateTutorRequest(body()).request);
+    const now = Date.now();
+    await db.run('INSERT INTO tutor_cache(cache_key,response_json,created_at,expires_at) VALUES (?,?,?,?)',
+      [key, JSON.stringify({ level: 'nudge', message: 'Seeded tutor reply.', referencesStepIndex: 0, source: 'model' }), now, now + 86400000]);
+    const before = providerCalls;
+    const different = await help(second, body({ question: { ...Q, answer: '5' } }));
+    c.ok(different.status >= 500 && different.data?.error?.code && !different.text.includes('Seeded tutor reply'),
+      `tutor: different content never reads another request's cached reply (${different.status} ${different.data?.error?.code})`);
+    c.ok(providerCalls > before, 'tutor: a cache miss really goes to the (hostile) provider, whose echo is not relayed');
+    const identical = await help(second, body());
+    c.deq([identical.status, identical.data?.tutor?.cached], [200, true], 'tutor: identical content is answered from the content-keyed cache');
+    const rows = await db.all('SELECT cache_key, response_json FROM tutor_cache');
+    const stored = JSON.stringify(rows);
+    c.ok(![first.id, second.id, first.email, second.email].some(value => stored.includes(value)), 'tutor: the cache stores no account id or email');
   }
 } finally {
   await h.close();

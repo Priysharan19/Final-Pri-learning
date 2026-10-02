@@ -1,7 +1,7 @@
 import { asyncRouter } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { applyVerifiedEntitlement } from './entitlements.js';
-import { rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
+import { declaredNativeClient, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 import { recordWebhook } from './metrics.js';
 
 const PROVIDERS = new Set(['apple', 'google', 'web']);
@@ -87,7 +87,13 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   db = asStore(db);
   const router = asyncRouter();
 
-  router.get('/config', (req, res) => res.json(commercialConfig()));
+  // A native shell is told web checkout does not exist: on the iPad the App
+  // Store is the only purchase path V1 permits (PRI_V1_RELEASE_SCOPE §12).
+  router.get('/config', (req, res) => {
+    const config = commercialConfig();
+    if (!declaredNativeClient(req)) return res.json(config);
+    res.json({ ...config, webCheckout: { ...config.webCheckout, configured: false, refusedForNativeClient: true } });
+  });
 
   // Where a student manages each provider's subscription. Apple subscriptions
   // are managed only through the App Store; web subscriptions cancel here.
@@ -144,10 +150,49 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
     const verify = native.apple?.transaction;
     if (typeof verify !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'App Store transaction verification is not configured on this deployment.' } });
     try {
-      const result = validateVerifiedResult(await verify({ accountId: req.platformSession.account_id, body: req.body || {}, request: req }), 'apple');
-      if (result.accountId !== req.platformSession.account_id) throw new Error('Apple transaction account binding mismatch');
-      const applied = await applyVerifiedEntitlement(db, result);
+      // Verification (which binds the subscription and writes the signed-data
+      // ledger row) and application are one transaction, as for the webhook:
+      // a failed apply leaves no orphan ledger row or binding behind. The Apple
+      // verifier only does crypto and database work (the webhook's contract).
+      const applied = await db.transaction(async () => {
+        const result = validateVerifiedResult(await verify({ accountId: req.platformSession.account_id, body: req.body || {}, request: req }), 'apple');
+        if (result.accountId !== req.platformSession.account_id) throw new Error('Apple transaction account binding mismatch');
+        return applyVerifiedEntitlement(db, result);
+      });
       res.json({ accepted: true, ...applied });
+    } catch (err) { next(err); }
+  });
+
+  // Google Play: the server issues an opaque obfuscatedAccountId per account;
+  // the Android shell passes it to Play Billing, and Google echoes it back in
+  // the purchase the server re-fetches. Nothing the device says is trusted.
+  router.get('/google/bootstrap', requireSession(db), rateLimit(db, 'billing-google-bootstrap', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+    const bootstrap = native.google?.bootstrap;
+    if (typeof bootstrap !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'Google Play billing is not configured on this deployment.' } });
+    try {
+      res.json({ google: await bootstrap({ accountId: req.platformSession.account_id, request: req }) });
+    } catch (err) { next(err); }
+  });
+
+  // The device reports a purchase token. The server re-fetches the purchase from
+  // the Play Developer API (never inside a transaction), checks package,
+  // product, obfuscatedAccountId and one-account token binding, applies Google's
+  // answer, then acknowledges it. A pending purchase changes nothing.
+  router.post('/google/purchase', requireSession(db), rateLimit(db, 'billing-google-purchase', { limit: 30, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+    const verify = native.google?.purchase;
+    if (typeof verify !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'Google Play purchase verification is not configured on this deployment.' } });
+    try {
+      const result = await verify({ accountId: req.platformSession.account_id, body: req.body || {}, request: req });
+      if (result.superseded) return res.json({ accepted: false, superseded: true });
+      if (result.shadowed) return res.json({ accepted: false, shadowed: true });
+      if (result.pending || !result.normalized) return res.status(202).json({ accepted: false, pending: true });
+      const event = validateVerifiedResult(result.normalized, 'google');
+      if (event.accountId !== req.platformSession.account_id) throw new Error('Google purchase account binding mismatch');
+      const applied = await applyVerifiedEntitlement(db, event);
+      // An acknowledgement failure does not undo a verified purchase: the next
+      // report, a restore or the notification worker acknowledges it again.
+      const acknowledged = await result.acknowledge().catch(() => false);
+      res.json({ accepted: true, acknowledged, ...applied });
     } catch (err) { next(err); }
   });
 
@@ -156,6 +201,12 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   // Premium still unlocks only after a verified webhook/restore updates the
   // server entitlement snapshot.
   router.post('/checkout/web', requireSession(db), requireVerifiedEmail, rateLimit(db, 'billing-checkout-web', { limit: 8, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+    // Web (Razorpay) checkout is never reachable from a native app. The
+    // client hides it there too; this is the server half of the same rule, so
+    // an old or modified bundle cannot open a web purchase inside the iPad app.
+    if (declaredNativeClient(req)) {
+      return res.status(403).json({ error: { code: 'BILLING_WEB_CHECKOUT_NATIVE_REFUSED', message: 'Purchases in the app use the App Store. Web checkout is not available here.' } });
+    }
     const create = checkout.web?.create;
     if (typeof create !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: 'Web subscription checkout is not configured on this deployment.' } });
     try {
@@ -173,9 +224,15 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
     const verifier = verifiers[provider]?.restore;
     if (typeof verifier !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: `${provider} restore verification is not configured on this deployment.` } });
     try {
-      const result = validateVerifiedResult(await verifier({ accountId: req.platformSession.account_id, body: req.body || {}, request: req }), provider);
-      if (result.accountId !== req.platformSession.account_id) throw new Error('Billing restore account binding mismatch');
-      const applied = await applyVerifiedEntitlement(db, { ...result, payloadDigest: result.payloadDigest || sha256(JSON.stringify(req.body || {})) });
+      const verifyAndApply = async () => {
+        const result = validateVerifiedResult(await verifier({ accountId: req.platformSession.account_id, body: req.body || {}, request: req }), provider);
+        if (result.accountId !== req.platformSession.account_id) throw new Error('Billing restore account binding mismatch');
+        return applyVerifiedEntitlement(db, { ...result, payloadDigest: result.payloadDigest || sha256(JSON.stringify(req.body || {})) });
+      };
+      // Apple restore verifies signed data locally (no network), so its ledger
+      // rows and the entitlement change commit together. The web restore asks
+      // Razorpay over the network and must stay outside a transaction.
+      const applied = provider === 'apple' ? await db.transaction(verifyAndApply) : await verifyAndApply();
       res.json(applied);
     } catch (err) { next(err); }
   });
@@ -195,6 +252,10 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
     if (typeof verifier !== 'function') recordWebhook(provider, 'rejected', 'BILLING_PROVIDER_NOT_CONFIGURED');
     if (typeof verifier !== 'function') return res.status(503).json({ error: { code: 'BILLING_PROVIDER_NOT_CONFIGURED', message: `${provider} webhook verification is not configured on this deployment.` } });
     try {
+      // A provider whose push authentication needs network I/O (Google's
+      // Pub/Sub OIDC keys) authenticates first, outside the transaction below.
+      const authenticate = verifiers[provider]?.authenticate;
+      if (typeof authenticate === 'function') await authenticate({ headers: req.headers, request: req });
       // A webhook verifier only checks a signature and reads/writes this
       // database (no provider call), so verification and application share one
       // transaction: two deliveries of one event id apply, ledger and audit it
@@ -228,8 +289,12 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
       // event) — counted, never paged on, since anyone can send one. A 5xx is
       // a delivery it failed to apply, which the provider will retry and an
       // operator must hear about (WEBHOOK_FAILURES, docs/operations/alerts.md).
+      // A provider this deployment has not configured (a verifier that is
+      // installed but finds no config, e.g. Google RTDN) is a rejection like the
+      // missing-verifier case above: it must not be able to page an operator.
       const status = Number.isInteger(err?.status) ? err.status : 500;
-      recordWebhook(provider, status >= 500 ? 'failed' : 'rejected', err?.code);
+      const unconfigured = err?.code === 'BILLING_PROVIDER_NOT_CONFIGURED';
+      recordWebhook(provider, status >= 500 && !unconfigured ? 'failed' : 'rejected', err?.code);
       next(err);
     }
   });

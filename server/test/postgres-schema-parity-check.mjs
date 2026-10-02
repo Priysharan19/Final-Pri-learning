@@ -55,6 +55,24 @@ for (const m of sql.matchAll(/create table pri\.(\w+) \(([\s\S]*?)\n\);/gi)) {
   tablePk.forEach((name, i) => { const c = cols.get(name); if (c) { c.pk = i + 1; c.notNull = true; } });
   pg.set(table, cols);
 }
+// A later migration may add a column to an existing table. It counts exactly as
+// if it had been declared in the create table (and is a failure if the table
+// it names was never created).
+for (const m of sql.matchAll(/alter table pri\.(\w+) add column (\w+) ([^;]*);/gi)) {
+  const [, table, name, rest] = m;
+  const cols = pg.get(table);
+  if (!cols) { pg.set(`${table} (altered before created)`, new Map()); continue; }
+  cols.set(name, { notNull: /\bnot null\b/i.test(rest) || /\bprimary key\b/i.test(rest), pk: 0 });
+}
+
+// Later migrations change nullability with ALTER TABLE; apply them in file
+// order so the parsed schema is the one a fully migrated database has. (The
+// live suite proves the same against a real database.)
+for (const m of sql.matchAll(/alter table pri\.(\w+) alter column (\w+) (drop|set) not null/gi)) {
+  const column = pg.get(m[1])?.get(m[2]);
+  assert.ok(column, `migration alters unknown column pri.${m[1]}.${m[2]}`);
+  column.notNull = m[3].toLowerCase() === 'set';
+}
 
 let checks = 0;
 const failures = [];

@@ -14,6 +14,12 @@ export function nativeBillingAvailable() {
   return priNative.billing.available();
 }
 
+/** Which store sheet the shell presents: 'app-store', 'google-play' or null.
+ * It selects the purchase flow and copy only — never entitlement. */
+export function nativeBillingStore() {
+  return priNative.billing.available() ? priNative.billing.store() : null;
+}
+
 function request(action, body = {}, timeoutMs = 30_000) {
   return priNative.billing.request(action, body, { timeoutMs });
 }
@@ -54,6 +60,16 @@ export function purchaseNativeProduct(productId, appAccountToken) {
   }, 5 * 60_000);
 }
 
+/** Google Play: the server-issued obfuscatedAccountId travels with the purchase
+ * and comes back inside Google's record, which is how the server binds it. */
+export function purchaseGoogleSubscription({ productId, basePlanId, obfuscatedAccountId }) {
+  return request('purchase', {
+    productId: String(productId || ''),
+    basePlanId: String(basePlanId || ''),
+    obfuscatedAccountId: String(obfuscatedAccountId || '')
+  }, 5 * 60_000);
+}
+
 export async function unfinishedNativeTransactions(productIds) {
   const result = await request('unfinished', { productIds: ids(productIds) }, 60_000);
   return Array.isArray(result.transactions) ? result.transactions : [];
@@ -79,4 +95,22 @@ export function onNativeBillingUpdate(listener) {
   localListeners.add(listener);
   const off = priNative.billing.onTransactionUpdate(listener);
   return () => { localListeners.delete(listener); off(); };
+}
+
+/**
+ * Submit each restored store transaction for server verification, one at a
+ * time. One Apple ID can hold a purchase bound to another Pri account on this
+ * iPad (the server refuses it with APPLE_ACCOUNT_TOKEN_MISMATCH); that refusal
+ * must not stop this account's own transactions from being restored.
+ * Returns how many were accepted and the last refusal, if any.
+ */
+export async function acceptEachTransaction(transactions, accept) {
+  let accepted = 0;
+  let lastError = null;
+  for (const transaction of Array.isArray(transactions) ? transactions : []) {
+    try {
+      if (await accept(transaction)) accepted++;
+    } catch (error) { lastError = error; }
+  }
+  return { accepted, lastError };
 }

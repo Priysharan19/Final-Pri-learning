@@ -14,11 +14,16 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { installReleaseIdentityDiagnostics } from './platform/releaseIdentity.js';
 import { priNative } from './platform/native/index.js';
 import { installFormFactorAttributes } from './platform/formFactor.js';
+import { installBackNavigation } from './platform/backNavigation.js';
+import { featureSnapshot } from './platform/features.js';
 
 // Listen for the native shell (if any) before anything else can emit events.
 priNative.start();
 // data-ff / data-short / data-pointer on <html>: semantic form factor (CP-03).
 installFormFactorAttributes(window);
+// Android Back asks the page first: open sheets/dialogs close (CP-06).
+// (after first paint the body exists for the dialog observer)
+queueMicrotask(() => installBackNavigation(window));
 installReleaseIdentityDiagnostics(window);
 
 // Account verification/password-reset links carry their secret only in the URL
@@ -43,6 +48,9 @@ if (ACCOUNT_ACTION_MODE) {
 const query = new URLSearchParams(window.location.search);
 const LAN_DEV = window.location.port === '4196' || query.get('priLanDev') === '1';
 if (LAN_DEV) window.__PRI_LAN_DEV__ = true;
+// Which flagged features this build resolved, for the browser tours and for
+// support. Read-only information; it switches nothing.
+window.__PRI_BUILD_FEATURES__ = featureSnapshot();
 
 if (LAN_DEV) {
   void (async () => {

@@ -118,6 +118,22 @@ export function csrfGuard(req, res, next) {
 }
 tagPolicy(csrfGuard, { csrf: true });
 
+// The native shells' own HTTP stacks (URLSession on Apple, the Android shell's
+// HTTPS client) send these exact identities; any other value is a browser.
+// CP-07 added Android under the identical rule — it never impersonates iOS.
+const NATIVE_CLIENTS = new Set(['ios-native-v1', 'android-native-v1']);
+
+/**
+ * The client declares itself one of the native shells (iPad/iPhone or
+ * Android). Self-declared, so it can only ever REMOVE an option for the
+ * caller — billing uses it to refuse web checkout to the native apps, where
+ * the storefront's own billing is the only permitted purchase path — never
+ * grant one.
+ */
+export function declaredNativeClient(req) {
+  return NATIVE_CLIENTS.has(String(req?.get?.('x-pri-client') || ''));
+}
+
 function nativeNonBrowserRequest(req) {
   // URLSession does not have a browser Origin or Fetch Metadata context. A web
   // page cannot suppress Origin on a cross-origin mutation, and the custom
@@ -125,7 +141,7 @@ function nativeNonBrowserRequest(req) {
   // sends no permissive CORS policy, so this exception cannot be used as a web
   // CSRF bypass. Authenticated native mutations still pass csrfGuard below using
   // the server-issued cookie pair held by the native cookie jar.
-  return req.get('x-pri-client') === 'ios-native-v1' &&
+  return NATIVE_CLIENTS.has(req.get('x-pri-client')) &&
     !req.get('origin') &&
     !req.get('sec-fetch-site') &&
     !req.get('sec-fetch-mode');

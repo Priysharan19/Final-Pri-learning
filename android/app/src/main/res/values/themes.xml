@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark first-paint background matching the web app; the page owns its theme. -->
+    <style name="Theme.Pri" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/pri_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>

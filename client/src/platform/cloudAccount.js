@@ -7,7 +7,7 @@
 // into IndexedDB by this module.
 
 import { get, put, del, uuid } from '../local/idb.js';
-import { cloud, cloudAvailable } from './cloudTransport.js';
+import { cloud, cloudAvailable, forgetNativeCloudSession } from './cloudTransport.js';
 import { announceCloudSessionChange, announceEntitlementChange } from './cloudSession.js';
 import { normalizeEntitlementSnapshot } from './entitlements.js';
 import { resetProfileOutboxForRelink } from './profileOutbox.js';
@@ -136,6 +136,16 @@ export async function refreshCloudEntitlement(pid) {
   const id = linkRowId(pid);
   const prior = await get('device', id).catch(() => null);
   if (!prior?.accountId) throw new Error('This local profile is not linked to a cloud account');
+  // The cloud session is device-wide, the link is per local profile. When the
+  // session belongs to another account (a second profile on this iPad signed
+  // in since), its entitlement must never be filed under this profile's
+  // account. A Premium answer that does not say whose it is is refused too.
+  const answeredFor = result?.accountId == null ? null : String(result.accountId);
+  if ((answeredFor && answeredFor !== String(prior.accountId)) || (!answeredFor && entitlement.billingPlan === 'premium')) {
+    const error = new Error('The signed-in Pri Learning account is not the one linked to this profile. Sign in again to refresh Premium.');
+    error.code = 'CLOUD_ACCOUNT_MISMATCH';
+    throw error;
+  }
   await put('device', { ...prior, entitlement: { ...result.entitlement }, lastVerifiedAt: Date.now() });
   announceEntitlementChange({ localProfileId: String(pid), plan: entitlement.plan, status: entitlement.status, active: entitlement.active });
   return entitlement;
@@ -150,6 +160,9 @@ export async function markCloudSynced(pid, at = Date.now()) {
 
 export async function disconnectCloudAccount(pid) {
   try { if (cloudAvailable()) await cloud.logout(); } catch { /* local unlink must remain possible during a cloud outage */ }
+  // Offline, the logout above cannot reach the server; the device must still
+  // stop holding the session (the native shells keep it outside the page).
+  await forgetNativeCloudSession();
 
   // Fail closed locally: first remove account-specific replica metadata and put
   // the profile outbox back into its mandatory full-rescan state. Only after

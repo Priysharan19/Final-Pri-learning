@@ -268,18 +268,25 @@ export function resolveIndiaTarget(chapter, {
   const covers = ordinal == null ? (chapter.covers || []) : coversForDotpoint(chapter, ordinal);
   const choices = [];
   const below = [];
+  const above = [];
   for (const cell of archiveCells) (cell.windowed ? choices : below).push(cell);
   for (const cover of covers) {
     for (const d of cover.diff || []) {
       if (d >= floor && d <= ceiling) choices.push({ generator: cover.gen, difficulty: d, dotpointIndex: ordinal, pyq: false, pyqArchive: null, windowed: true });
       else if (d >= 1 && d < floor) below.push({ generator: cover.gen, difficulty: d, dotpointIndex: ordinal, pyq: false, pyqArchive: null, windowed: false });
+      else if (d > ceiling && d <= 4) above.push({ generator: cover.gen, difficulty: d, dotpointIndex: ordinal, pyq: false, pyqArchive: null, windowed: false });
     }
   }
   // Every chapter has an authored form inside its track's window, but a single
   // dot point may not: a student who explicitly asks for one is served the
   // nearest form below the floor rather than refused, and the reply says so
-  // (`windowed: false`) instead of pretending the rung was honoured.
-  const pool = choices.length ? choices : below;
+  // (`windowed: false`) instead of pretending the rung was honoured. A dot point
+  // whose only authored form sits ABOVE the ceiling (a CBSE outcome authored
+  // only at D4) is served that form on the same disclosed terms: the curriculum
+  // response advertises it as generated, and refusing it turned an advertised,
+  // selectable dot point into an INDIA_TARGET_UNCOVERED dead end (content
+  // certification, doc §06).
+  const pool = choices.length ? choices : below.length ? below : above;
   if (!pool.length) return null;
   const gap = Math.min(...pool.map(c => Math.abs(c.difficulty - want)));
   return drawFrom(pool.filter(c => Math.abs(c.difficulty - want) === gap), random);
