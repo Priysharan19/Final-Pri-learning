@@ -107,6 +107,7 @@ const REPLY_SCHEMAS = Object.freeze({
   'billing.unfinished': { transactions: arrayOf(v => isPlainObject(v), 100) },
   'billing.restore': { transactions: arrayOf(v => isPlainObject(v), 100) },
   'billing.finish': {},
+  'cloud.forgetSession': {},
   'cloud.request': { status: v => Number.isInteger(v) && v >= 100 && v <= 599, body: optional(str(2 * 1024 * 1024)) },
   'photo.recognize': { text: optional(str(20000)), answer: optional(str(2000)), confidence: optional(v => typeof v === 'number') },
 });
