@@ -28,7 +28,7 @@ CSS px = viewport in CSS pixels. The form-factor class follows [FORM_FACTOR_SPEC
 | D3 | Android | Large phone (Pro XL / Ultra class) | 448×998 | COMPACT | required (CP-03) | emulator (CP-10) | required (CP-10) |
 | D4 | Android | Tablet portrait (10–11″) | 800×1280 | EXPANDED (MEDIUM < 840) | required (CP-03) | tablet emulator (CP-10) | required (CP-10) |
 | D5 | Android | Tablet landscape | 1280×800 | EXPANDED | required (CP-03) | tablet emulator (CP-10) | required (CP-10) |
-| D6 | Android | Foldable inner display | ≈ 673×841 | MEDIUM | required (CP-03) | foldable emulator (CP-10) | optional |
+| D6 | Android | Foldable inner display | ≈ 673×841 | MEDIUM | required (CP-03) | not automated (no foldable profile in the CI emulator tooling) | optional |
 | D7 | Android | Stylus tablet (S Pen / USI) | 800×1280 | EXPANDED | ➖ | emulator stylus is synthetic only | required for any stylus claim (CP-09) |
 
 **Status (CP-03):** the S1 browser matrix exists as `client/test/tour-responsive-matrix.js` and runs in Chromium and WebKit in the required browser job. It covers A1-class (360×640), A2 (390×844), A3-class (430×932), tablet portrait (820×1180), tablet landscape (1180×820) and short (844×390). The original note follows: the S1 browser matrix is a single Playwright helper (CP-03) that iterates these viewports with `hasTouch` and `isMobile` set correctly. Today `client/test/e2e.mjs` creates a context at 1440×900 with `hasTouch: true` and **no `isMobile`**, so a coarse pointer is not emulated faithfully. The helper should also run **WebKit** for the Apple rows, because WKWebView-specific regressions are invisible to Chromium.
@@ -85,7 +85,7 @@ Every CP task from CP-02 onward must keep these green, unchanged: `npm test`, `n
 
 ## 5. Android automated certification status (CP-10)
 
-`android/scripts/run-instrumented.sh` (CI: `android-shell.yml`) runs on API 33 phone, API 36 phone, API 36 tablet and API 36 foldable (`pixel_fold`). API 26 asserts the fail-closed WebView-floor screen. The cloud steps run against the **real Pri server** (`scripts/cloud-fixture-server.mjs`). Real process death (`am force-stop`) happens between runs. Evidence is SYNTHETIC / EMULATOR.
+`android/scripts/run-instrumented.sh` (CI: `android-shell.yml`) runs on API 33 phone, API 36 phone and API 36 tablet (a foldable profile is not available to the CI emulator tooling: `pixel_fold` is not a device the runner's avdmanager knows). API 26 asserts the fail-closed WebView-floor screen. The cloud steps run against the **real Pri server** (`scripts/cloud-fixture-server.mjs`). Real process death (`am force-stop`) happens between runs. Evidence is SYNTHETIC / EMULATOR.
 
 | Spec item | Automated (S2) | Where |
 |---|---|---|
@@ -100,6 +100,6 @@ Every CP task from CP-02 onward must keep these green, unchanged: `npm test`, `n
 | Billing | ✅ **Fail-closed check without a Play Store:** the request reaches Play Billing and fails with a `PLAY_*` provider code. The **test double** is server-side: `google-billing-check` (100 checks against a fake Play Developer API). | `CloudJourneyTest`, `server/test` |
 | Accessibility | 🟡 A DOM-level smoke check in the real WebView on four screens, each audited once its landmark renders. At system font scale 1.3 the same text is measurably larger than at 1.0. The Android Accessibility Test Framework does not inspect WebView DOM content. **TalkBack is a physical/manual gate.** | `WebViewAccessibilityTest` |
 | Low memory / process death | 🟡 real process death between runs; renderer-crash recovery is rate-limited (CP-06). Real low-memory killing on low-end hardware is **physical**. | runner, `MainActivity` |
-| Foldable / multi-window | 🟡 the `pixel_fold` profile is in the CI matrix (pending its first green run); posture changes and multi-window resizing are not automated | matrix |
+| Foldable / multi-window | ❌ not automated: the CI emulator tooling has no foldable profile (`pixel_fold` was tried and refused); posture changes and multi-window resizing are not automated | matrix |
 
 **Not claimed (physical, DEFERRED):** real camera, S Pen / USI quality, a TalkBack walkthrough, a real Play purchase, low-end phone performance, OEM WebView variants.
