@@ -127,6 +127,11 @@ jobs:
           # were not being run anywhere in CI.
           node client/test/restore-durability-check.mjs
           node client/test/cloud-sync-worker-check.mjs
+          # Cloud sync end to end: restore on a fresh device, automatic
+          # triggers, and 409 entity-conflict recovery.
+          node client/test/cloud-restore-fidelity-check.mjs
+          node client/test/auto-sync-scheduler-check.mjs
+          node client/test/sync-conflict-recovery-check.mjs
           node client/test/cloud-session-refresh-check.mjs
           node client/test/account-action-boundary-check.mjs
           node client/test/india-exam-blueprint-check.mjs

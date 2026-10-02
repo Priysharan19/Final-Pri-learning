@@ -71,7 +71,7 @@ Initial audit baseline `main` @ `421f1ff1` (2026-10-01 UTC); revalidated against
 | Cloud transport | ✅ code path idiom-agnostic; ❓ untested on iPhone |
 | StoreKit | ✅ code path; ❓ untested on iPhone |
 | Account lifecycle | ✅ code path; ❓ untested on iPhone |
-| Sync | ✅ shared JS (manual sync) |
+| Sync | ✅ shared JS; automatic (start, reconnect, foreground/`lifecycle.active`, after practice, 15-min while visible) and manual; a pull restores remote practice/exam/Rush/Match events into the local engine stores; 409 entity conflicts recover in place (`client/test/cloud-restore-fidelity-check.mjs`, `auto-sync-scheduler-check.mjs`, `sync-conflict-recovery-check.mjs`); ❓ untested on iPhone |
 | Typed answer | ✅ works; 🟡 no `inputMode` |
 | Finger writing | ❌ native default is Pencil-only |
 | Photo-working flow | 🟡 untested on iPhone |

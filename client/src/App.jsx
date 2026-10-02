@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState, useCall
 import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { api } from './api.js';
 import { requestPersistentStorage } from './local/idb.js';
+import { installAutoSync } from './platform/cloudSyncScheduler.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
 import { setLanguage, signInLanguage, useT } from './i18n/index.js';
@@ -162,6 +163,17 @@ export default function App() {
 
   // Guard months of practice from storage eviction — ask the browser once per boot.
   useEffect(() => { requestPersistentStorage(); }, []);
+
+  // Cloud sync without a button: on start, on reconnect, on return to the
+  // foreground, shortly after an answer and every 15 minutes while visible —
+  // for the signed-in profile only, and a no-op offline or unlinked. When a
+  // pull restored work done on another device, the screens reading it refresh.
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    return installAutoSync(user.id, {
+      onSynced: result => { if (result?.restoredEvents > 0) { refreshUser(); refreshDue(); refreshRecent(); } }
+    });
+  }, [user?.id, refreshUser, refreshDue, refreshRecent]);
 
   // The interface follows the profile's own language. Before a profile is
   // chosen there is nothing to follow, so the sign-in screen falls back to the
