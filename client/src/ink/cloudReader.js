@@ -7,7 +7,12 @@
 //
 // Four rules hold it in place:
 //
-//   1. Off by default. Nothing leaves the device until the student says so.
+//   1. On by default only where it can work and may lawfully run: a signed-in
+//      account on a deployment whose /v1/handwriting/status says it is usable
+//      (online-first ADR-0001). The server refuses that status to a minor
+//      without a confirmed guardian (requireGuardianConsent), so such an account
+//      stays off. An explicit "off" in Settings is always respected; a profile
+//      that never chose is the only one the default applies to.
 //   2. It never replaces a reading the student has corrected by hand. A tap to
 //      fix a glyph is the most reliable signal on the page.
 //   3. It only supersedes when the server says it is confident. An unconfident
@@ -107,13 +112,32 @@ function recordCloudDiagnostics({
   return publishDiagnostics();
 }
 
+/** 'on' / 'off' when the student chose in Settings, 'default' when they never did. */
+export function cloudReadingChoice(user) {
+  if (user?.cloudHandwriting === true) return 'on';
+  if (user?.cloudHandwriting === false) return 'off';
+  return 'default';
+}
+
 /**
- * Two separate conditions, kept separate on purpose: the student opted in, and
+ * Whether this profile wants server reading. An explicit choice wins either
+ * way; a profile that never chose gets it only when it is signed in to a cloud
+ * account (and is not the demo profile). Whether the deployment can actually
+ * serve it — including the guardian-consent refusal — is the readiness check.
+ */
+export function cloudReadingWanted(user) {
+  const choice = cloudReadingChoice(user);
+  if (choice !== 'default') return choice === 'on';
+  return user?.cloudLinked === true && user?.isDemo !== true;
+}
+
+/**
+ * Two separate conditions, kept separate on purpose: the student wants it, and
  * this deployment actually has somewhere to send it. `available` is injectable
  * so the contract can be tested without a configured origin.
  */
 export function cloudReadingEnabled(user, { available = cloudAvailable, readiness = null } = {}) {
-  if (user?.cloudHandwriting !== true) return false;
+  if (!cloudReadingWanted(user)) return false;
   try {
     if (available() !== true) return false;
     return readiness == null ? true : readiness?.usable === true;
@@ -128,7 +152,7 @@ export async function cloudHandwritingReadiness({
   now = Date.now(),
   cache = true
 } = {}) {
-  if (user?.cloudHandwriting !== true) {
+  if (!cloudReadingWanted(user)) {
     return { usable: false, state: 'disabled', lastFailureCode: null, releaseSha: null };
   }
   try {
@@ -385,4 +409,43 @@ export async function readPhotoWithCloud(dataUrl, {
     if (code === ALLOWANCE_CODE) return { reason: 'allowance', until: allowanceExhaustedUntil, readiness: ready, diagnostics: handwritingDiagnostics() };
     return { error: { code, message: error?.message || '' }, readiness: ready, diagnostics: handwritingDiagnostics() };
   }
+}
+
+const browserOnline = () => typeof navigator === 'undefined' || navigator.onLine !== false;
+
+/**
+ * The plain-language reason a photo could not be read by the server, as an
+ * i18n key. Points at Settings only when Settings is genuinely the fix (the
+ * student turned server reading off); otherwise it names the real cause.
+ * There is no offline photo queue, so offline means "type it for now".
+ */
+export function photoReadingBlockedKey(user, { outcome = null, online = browserOnline, available = cloudAvailable } = {}) {
+  if (cloudReadingChoice(user) === 'off') return 'verdict.photoReadingTurnedOff';
+  let configured = false;
+  try { configured = available() === true; } catch { configured = false; }
+  if (!configured) return 'verdict.photoReadingNotOnThisInstall';
+  let isOnline = true;
+  try { isOnline = online() !== false; } catch { isOnline = true; }
+  if (!isOnline) return 'verdict.photoReadingOffline';
+  if (user?.cloudLinked !== true) return 'verdict.photoReadingSignIn';
+  const code = String(outcome?.error?.code || outcome?.readiness?.lastFailureCode || '');
+  if (code === 'AUTH_REQUIRED') return 'verdict.photoReadingSignIn';
+  if (code.startsWith('GUARDIAN_CONSENT')) return 'verdict.photoReadingGuardian';
+  if (code === 'EMAIL_UNVERIFIED') return 'verdict.photoReadingVerifyEmail';
+  return 'verdict.photoReadingServiceDown';
+}
+
+const NOTICE_KEY = 'pri-cloud-reading-notice-v1';
+/**
+ * True exactly once per device: the first time a photo is read by the server
+ * for a student who never chose either way, so the default is never silent.
+ * Storage that throws (private window) shows the notice rather than hiding it.
+ */
+export function takeCloudReadingNotice(user, storage = globalThis.localStorage) {
+  if (cloudReadingChoice(user) !== 'default') return false;
+  try {
+    if (storage?.getItem(NOTICE_KEY)) return false;
+    storage?.setItem(NOTICE_KEY, String(Date.now()));
+  } catch { /* show it; better twice than never */ }
+  return true;
 }
