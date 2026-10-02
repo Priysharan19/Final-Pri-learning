@@ -125,7 +125,7 @@ export default function History() {
           </p>
         )}
         {data && data.items.map(item => (
-          <div key={item.id} className="hist-row">
+          <div key={item.id} className="hist-row" data-question-id={item.id}>
             <button className={`hist-star ${item.bookmarked ? 'on' : ''}`} title={t(item.bookmarked ? 'history.removeBookmark' : 'history.addBookmark')}
               aria-label={t(item.bookmarked ? 'history.removeBookmarkOn' : 'history.addBookmarkOn', { topic: item.subtopicName })}
               aria-pressed={!!item.bookmarked}

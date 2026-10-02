@@ -33,6 +33,7 @@ export const ENGINE_SUITES = [
   'platform-startup-check.mjs',
   'platform-http-journeys-check.mjs',
   'sync-idempotency-contract-check.mjs',
+  'practice-attempt-sync-check.mjs',
   'account-lifecycle-contract-check.mjs',
   'account-lifecycle-journey-check.mjs',
   'account-deletion-reauth-check.mjs',

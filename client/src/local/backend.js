@@ -52,6 +52,7 @@ import {
   planView, recordExamSimulation, recordPracticeServed, requireCapability, usageView
 } from './entitlementGate.js';
 import { ENTITLEMENTS } from '../platform/entitlements.js';
+import { stageAttemptProgress } from '../platform/profileOutbox.js';
 import { requestTutorHelp } from './tutorBridge.js';
 import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
@@ -1682,9 +1683,31 @@ function solutionOf(q) {
  * recorded, never from marking again: an engine that changed between the
  * first delivery and the replay cannot move a mark that already stands.
  */
+/** The explanation a submission was answered with, as stored with its record. */
+function replayRecord({ feedback, stepReport, partial, diagnosis }) {
+  return {
+    feedback: feedback ?? null,
+    stepReport: stepReport ?? null,
+    partial: partial ?? null,
+    diagnosis: diagnosis ?? null
+  };
+}
+
+function storedReplay(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  return {
+    feedback: raw.feedback ?? null,
+    stepReport: raw.stepReport ?? null,
+    partial: raw.partial ?? null,
+    diagnosis: raw.diagnosis ?? null
+  };
+}
+
 async function replaySubmission(p, row, q, submissionId, requestDigest, answer, steps) {
   const recorded = row.answered ? row.resolution : null;
-  const tried = !row.answered ? row.lastTry : null;
+  // A question skipped after its first try has no try left to report: the
+  // replay falls through to the skipped refusal instead of reopening it.
+  const tried = !row.answered && !row.discardedAt ? row.lastTry : null;
   const match = recorded?.submissionId === submissionId ? recorded
     : tried?.submissionId === submissionId ? tried : null;
   if (!match) return null;
@@ -1693,12 +1716,18 @@ async function replaySubmission(p, row, q, submissionId, requestDigest, answer, 
     throw Object.assign(new Error('This submission id already answered a different answer.'), { status: 409, code: 'SUBMISSION_ID_REUSED' });
   }
   const owner = evidenceKeyOf(row, q);
-  const { feedback, stepReport, partial } = markSubmission(q, answer, steps);
+  // The explanation the student was given is the one stored with the record.
+  // Only a record written before explanations were stored is explained again.
+  const stored = storedReplay(match.replay);
+  const { feedback, stepReport, partial, diagnosis } = stored || (() => {
+    const m = markSubmission(q, answer, steps);
+    return { ...m, diagnosis: m.stepReport?.diagnosis || null };
+  })();
   if (match === tried) {
     return {
       correct: false, resolved: false, triesLeft: 1,
       feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial,
-      diagnosis: stepReport?.diagnosis || null,
+      diagnosis: diagnosis || null,
       misconception: await namedTrap(p.id, owner, tried.trapHit || null),
       submissionId, replayed: true
     };
@@ -1708,7 +1737,7 @@ async function replaySubmission(p, row, q, submissionId, requestDigest, answer, 
   const correct = !!recorded.correct;
   return {
     correct, resolved: true, feedback, stepReport, partial: correct ? null : partial,
-    diagnosis: stepReport?.diagnosis || null,
+    diagnosis: diagnosis || null,
     misconception: await namedTrap(p.id, owner, recorded.trapHit || null),
     solution: solutionOf(q),
     xp: recorded.xp ?? 0, totalXp: recorded.totalXp ?? p.xp ?? 0, level: recorded.level ?? levelFromXp(p.xp || 0),
@@ -1842,22 +1871,33 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
       ...(submission ? {
         submissionId: submission.submissionId,
         requestDigest: submission.requestDigest,
-        trapHit: submission.trapHit || null
+        trapHit: submission.trapHit || null,
+        // What the student was told, as it was told: a replay hands this back
+        // rather than asking whatever engine is installed by then (§09).
+        ...(submission.replay ? { replay: submission.replay } : {})
       } : {})
     }
   };
 
+  const learningOps = [
+    // `add`, not `put`: collision means another delivery already won.
+    { type: 'add', store: 'attempts', value: attempt },
+    ...(ratingNext ? [{ type: 'put', store: 'ratings', value: ratingNext }] : []),
+    ...(reviewNext ? [{ type: 'put', store: 'reviews', value: reviewNext }] : []),
+    { type: 'put', store: 'profiles', value: profileNext },
+    { type: 'put', store: 'activity', value: activityNext },
+    { type: 'put', store: 'questions', value: questionNext },
+    ...(taskProgressNext ? [{ type: 'put', store: 'taskProgress', value: taskProgressNext }] : [])
+  ];
   try {
-    await atomicBatch([
-      // `add`, not `put`: collision means another delivery already won.
-      { type: 'add', store: 'attempts', value: attempt },
-      ...(ratingNext ? [{ type: 'put', store: 'ratings', value: ratingNext }] : []),
-      ...(reviewNext ? [{ type: 'put', store: 'reviews', value: reviewNext }] : []),
-      { type: 'put', store: 'profiles', value: profileNext },
-      { type: 'put', store: 'activity', value: activityNext },
-      { type: 'put', store: 'questions', value: questionNext },
-      ...(taskProgressNext ? [{ type: 'put', store: 'taskProgress', value: taskProgressNext }] : [])
-    ]);
+    // A practice attempt and its cloud queue entry are one write (§22): an app
+    // killed after the commit can no longer leave an attempt the cloud never
+    // hears about.
+    if (resolution?.syncQueue === true) {
+      await stageAttemptProgress(pid, row.id, attempt.id, queueOp => atomicBatch([...learningOps, queueOp]));
+    } else {
+      await atomicBatch(learningOps);
+    }
   } catch (err) {
     // The attempt key is the authoritative exactly-once claim. A collision on
     // that key means another delivery already committed this same resolution;
@@ -3113,7 +3153,10 @@ const routes = {
     if (!result.correct && !result.invalid && !isFast && (row.tries || 0) < 1) {
       row.tries = (row.tries || 0) + 1;
       // The spent try remembers which submission spent it, in the same write.
-      row.lastTry = submissionId ? { submissionId, digest: requestDigest, trapHit: trapHit || null } : null;
+      row.lastTry = submissionId ? {
+        submissionId, digest: requestDigest, trapHit: trapHit || null,
+        replay: replayRecord({ feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial, diagnosis: stepReport?.diagnosis || null })
+      } : null;
       await put('questions', row);
       return { correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial, diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit), ...(submissionId ? { submissionId } : {}) };
     }
@@ -3121,7 +3164,11 @@ const routes = {
       return { correct: false, resolved: false, triesLeft: Math.max(0, 1 - (row.tries || 0)), invalid: true, feedback, stepReport };
     }
     const meta = await resolve(p, row, q, result.correct, answer, ms, row.mode, !!viaInk, {
-      submission: submissionId ? { submissionId, requestDigest, trapHit: trapHit || null } : null
+      submission: submissionId ? {
+        submissionId, requestDigest, trapHit: trapHit || null,
+        replay: replayRecord({ feedback, stepReport, partial, diagnosis: stepReport?.diagnosis || null })
+      } : null,
+      syncQueue: true
     });
     return {
       correct: result.correct, resolved: true, feedback, stepReport, partial,
@@ -3129,6 +3176,7 @@ const routes = {
       misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit),
       solution: solutionOf(q),
       ...meta,
+      syncQueued: true,
       ...(submissionId ? { submissionId } : {})
     };
   },
@@ -3141,8 +3189,8 @@ const routes = {
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
     if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
     const q = row.payload;
-    const meta = await resolve(p, row, q, false, 'revealed', body?.ms || 0, row.mode);
-    return { correct: false, resolved: true, revealed: true, solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText }, ...meta };
+    const meta = await resolve(p, row, q, false, 'revealed', body?.ms || 0, row.mode, false, { syncQueue: true });
+    return { correct: false, resolved: true, revealed: true, solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText }, ...meta, syncQueued: true };
   },
 
   // ---- reviews ----
@@ -4173,7 +4221,11 @@ function resumedQuestionResponse(row) {
   return {
     question: sanitize(row.payload, row),
     reason: 'resume',
-    why: 'Continuing your unfinished question.',
+    // A pending submission's question can come back already answered (§09):
+    // it is shown to give the student its verdict, not to be answered again.
+    why: row.answered
+      ? 'Showing the result of the answer you submitted before the app closed.'
+      : 'Continuing your unfinished question.',
     resumed: true
   };
 }
