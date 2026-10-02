@@ -146,9 +146,12 @@ engines.
 
 What is true in the code today:
 
-- **Off by default, per profile.** `cloudHandwriting` and the working-check setting are opt-in
-  switches in Settings; both need a signed-in, verified cloud account, and for an under-18 account
-  a confirmed guardian (`/handwriting` and `/working` are behind `requireGuardianConsent`).
+- **Handwriting/photo reading is on by default for a signed-in account; the working check is
+  opt-in.** A profile that never chose (`cloudHandwriting` unset) gets server reading only when it
+  is linked to a cloud account and `/v1/handwriting/status` is usable (ADR-0001, online-first);
+  an explicit off in Settings is always respected. `/transcribe` needs a verified email, and for
+  an under-18 account a confirmed guardian (`/handwriting` and `/working` are behind
+  `requireGuardianConsent`, so status is refused and reading stays off).
 - **What is sent.** For ink, a PNG rasterised on the device from the student's own stroke
   coordinates (`client/src/ink/cloudRaster.js`) — no question, expected answer, name or profile;
   the server refuses any body carrying those fields (`HANDWRITING_NOT_ANSWER_BLIND`). For a photo

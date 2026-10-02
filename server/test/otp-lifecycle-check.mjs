@@ -81,16 +81,16 @@ try {
   c.eq(r.data?.status, 'profile-required', 'a new address with a right code asks for a profile');
   const ticket = r.data.signupTicket;
   c.ok(ticket && ticket !== firstChallenge, 'and hands back a fresh sign-up ticket');
-  r = await post('/verify', { channel: 'email', destination: 'new.student@example.test', challengeId: firstChallenge, code: code1, profile: { name: 'A' } });
+  r = await post('/verify', { channel: 'email', destination: 'new.student@example.test', challengeId: firstChallenge, code: code1, profile: { name: 'A', isAdult: true } });
   c.eq(r.data?.error?.code, 'OTP_INVALID', 'the original challenge id cannot be replayed');
 
   const studentJar = {};
-  r = await post('/verify', { channel: 'email', destination: 'new.student@example.test', signupTicket: ticket, profile: { name: 'Asha', year: '9' } }, studentJar);
+  r = await post('/verify', { channel: 'email', destination: 'new.student@example.test', signupTicket: ticket, profile: { name: 'Asha', year: '9', isAdult: false } }, studentJar);
   c.eq(r.status, 201, 'ticket + profile creates the account');
   c.eq(r.data.account.email, 'new.student@example.test', 'with the proved email');
   c.ok(r.data.account.emailVerified, 'already verified: the code proved it');
   c.deq(r.data.guardianConsent, { required: true, state: 'pending' }, 'a Class 9 learner starts with consent pending');
-  r = await post('/verify', { channel: 'email', destination: 'new.student@example.test', signupTicket: ticket, profile: { name: 'Asha', year: '9' } });
+  r = await post('/verify', { channel: 'email', destination: 'new.student@example.test', signupTicket: ticket, profile: { name: 'Asha', year: '9', isAdult: false } });
   c.eq(r.data?.error?.code, 'OTP_INVALID', 'a sign-up ticket is single use');
 
   // The child is limited until approved.
@@ -169,7 +169,7 @@ try {
   resetLimits();
   const kidJar = {};
   r = await post('/request', { channel: 'sms', destination: '9123456780' });
-  r = await post('/verify', { channel: 'sms', destination: '9123456780', challengeId: r.data.challengeId, code: lastCode('+919123456780'), profile: { name: 'Ravi', year: '8' } }, kidJar);
+  r = await post('/verify', { channel: 'sms', destination: '9123456780', challengeId: r.data.challengeId, code: lastCode('+919123456780'), profile: { name: 'Ravi', year: '8', isAdult: false } }, kidJar);
   c.eq(r.status, 201, 'phone sign-up with a profile creates the account in one step');
   c.eq(r.data.account.email, null, 'a phone account shows no email');
   c.match(r.data.account.phone, /^\+91 ••••• 780$/, 'and a masked phone');
@@ -214,6 +214,13 @@ try {
   c.deq(r.data.guardianConsent, { required: false, state: 'not-required' }, 'an adult needs no parent');
   r = await post('/guardian/request', { guardianName: 'X', channel: 'sms', destination: '9988776650' }, adultJar);
   c.eq(r.status, 409, 'and cannot start a consent request');
+
+  // A claimed role or a missing age never makes an adult: only isAdult === true.
+  resetLimits();
+  r = await post('/request', { channel: 'email', destination: 'claims.parent@example.test' });
+  r = await post('/verify', { channel: 'email', destination: 'claims.parent@example.test', challengeId: r.data.challengeId, code: lastCode('claims.parent@example.test'), profile: { name: 'Claim', role: 'parent' } });
+  c.eq(r.data?.error?.code, 'AGE_DECLARATION_REQUIRED', 'no explicit age declaration creates no account (fail closed)');
+  c.eq(raw.prepare("SELECT COUNT(*) n FROM accounts WHERE email='claims.parent@example.test'").get().n, 0, 'and nothing was written');
 
   // ── deleting a passwordless account needs a fresh code ──────────────────
   r = await h.request('/v1/account', { method: 'DELETE', headers: { Origin: 'http://localhost:5173' }, jar: kidJar, body: {} });

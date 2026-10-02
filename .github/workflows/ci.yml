@@ -41,8 +41,8 @@ jobs:
           grep -Fq '✔ INDIA SUITE PASSED — 1832/1832 checks' suites.log
           grep -Fq '44000 questions from 440 declared (generator, difficulty) pairs × 100 draws — 44000 marked correct by their own marker, 44000 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
-          grep -Fq 'NCERT ANSWER FORMS: PASS — 373/373 checks' suites.log
-          grep -Fq 'METHOD MARKS: PASS — 37/37 checks' suites.log
+          grep -Fq 'NCERT ANSWER FORMS: PASS — 419/419 checks' suites.log
+          grep -Fq 'METHOD MARKS: PASS — 53/53 checks' suites.log
           grep -Fq 'WORKING BRANCHES: PASS — 29/29 checks' suites.log
           grep -Fq 'Pri Reason V1 precision gate: PASS' suites.log
           grep -Fq 'Pri Reason V2 safety gate: PASS' suites.log
@@ -50,7 +50,7 @@ jobs:
           grep -Fq 'Pri Reason V4 regression gate: PASS' suites.log
           grep -Fq 'Pri Reason V2 curriculum integration gate: PASS' suites.log
           grep -Fq 'INDIA NATIVE BANKS: PASS — 313/313 checks — 19 chapters rewired onto 20 NCERT-native generators' suites.log
-          grep -Fq 'NCERT ANSWER FORMS: PASS — 373/373 checks' suites.log
+          grep -Fq 'NCERT ANSWER FORMS: PASS — 419/419 checks' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 129/129 checks' suites.log
           grep -Fq 'EXAM SESSION: PASS — 88/88 checks' suites.log
           grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
@@ -60,21 +60,24 @@ jobs:
           grep -Fq 'ADAPTIVE SIMULATION: PASS — 77/77 checks' suites.log
           grep -Fq 'PROGRESS TRUTH: PASS — 74/74 checks' suites.log
           grep -Fq 'PLACEMENT: PASS — 268/268 checks' suites.log
-          grep -Fq 'IOS BUNDLE FEATURES: PASS — 16/16 checks' suites.log
+          grep -Fq 'IOS BUNDLE FEATURES: PASS — 20/20 checks' suites.log
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
           grep -Fq 'LEGAL PAGES: PASS — 233/233 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 62/62 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 94/94 checks' suites.log
+          grep -Fq 'BROWSER RUN FIXES: PASS — 23/23 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
-          grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log
+          grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
           grep -Fq 'I18N: PASS — 189/189 checks' suites.log
-          grep -Fq 'I18N COVERAGE: PASS — 88/88 checks — 49 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 88/88 checks — 51 files scanned, 0 hard-coded strings' suites.log
+          # Chapter notes: every curriculum chapter, every worked answer engine-verified.
+          grep -Fq 'NOTES CONTENT CHECK PASSED — 77/77 chapters' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
           grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 62/62 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 94/94 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
-          grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log
+          grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
           grep -Fq 'MARK PREDICTOR: PASS — 39/39 checks' suites.log
           grep -Fq 'PDF WORKING: PASS — 25/25 checks' suites.log
           grep -Fq 'MCQ DISTINCTNESS: PASS — 14/14 checks' suites.log
@@ -89,13 +92,13 @@ jobs:
           grep -Fq 'BAD INPUT: PASS — 38/38 checks' suites.log
           grep -Fq 'CLOUD SYNC ACK: PASS — 44/44 checks' suites.log
           grep -Fq 'PASS — §09 submission lifecycle: 13 groups' suites.log
-          grep -Fq 'PASS — §22 submission sync durability: 6 groups' suites.log
+          grep -Fq 'PASS — §22 submission sync durability: 13 groups' suites.log
           grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
           grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
           # §06 content runtime certification: every V1 launch path (CBSE/NCERT
           # 7–12, JEE Main, JEE Advanced) served, validated, versioned and
           # end-to-end through the local backend; the path count may only grow.
-          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 135/135 checks' suites.log
+          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 142/142 checks' suites.log
           grep -Fq 'CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — ' suites.log
           grep -Fq '8/8 exam selections' suites.log
           paths=$(grep -Eo 'CONTENT CERTIFICATION [(]fast, 4/path/difficulty[)]: PASS — [0-9]+' suites.log | grep -Eo '[0-9]+$')
@@ -194,6 +197,7 @@ jobs:
         run: |
           node server/test/handwriting-transcription-check.mjs
           node server/test/working-check-check.mjs
+          node server/test/question-photo-check.mjs
           node server/test/tutor-help-check.mjs
           node server/test/spend-ceiling-check.mjs
           node server/test/guardian-consent-check.mjs
@@ -336,7 +340,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*341/341.*12 flows' browser.log
+          grep -Eq 'E2E SUITE.*355/355.*13 flows' browser.log
           grep -Fq 'Submission · interruption recovery and one attempt' browser.log
           grep -Fq 'Cloud · late results never rewrite an attempt' browser.log
           grep -Fq 'India exam · JEE Main handwritten, reloaded, analysed' browser.log
@@ -354,7 +358,7 @@ jobs:
           grep -Fq 'AI tutor · three levels, in order, with fallback' browser.log
           grep -Eq 'E2E SUITE.*32/32.*2 flows' browser.log
           grep -Fq 'Hindi · Practice, handwriting, Exams, exam room, Progress, Explain' browser.log
-          grep -Eq 'E2E SUITE.*57/57.*1 flows' browser.log
+          grep -Eq 'E2E SUITE.*54/54.*1 flows' browser.log
           grep -Fq 'Progress truth · rendered numbers = attempt ledger' browser.log
           grep -Eq 'E2E SUITE.*20/20.*1 flows' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log

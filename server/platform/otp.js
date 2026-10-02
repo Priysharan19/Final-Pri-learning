@@ -59,7 +59,11 @@ function profileFrom(body) {
   if (!profile) return null;
   const name = clipText(String(profile.name || '').trim(), 80);
   if (!name) return { error: 'PROFILE_NAME_REQUIRED' };
-  const isAdult = profile.isAdult === true ? true : profile.isAdult === false ? false : undefined;
+  // Fail closed: a new account must carry an explicit age declaration.
+  // Without one the server cannot tell an adult from a child, so it refuses
+  // rather than guess (the same stance PR #322 takes for /register).
+  if (profile.isAdult !== true && profile.isAdult !== false) return { error: 'AGE_DECLARATION_REQUIRED' };
+  const isAdult = profile.isAdult;
   const year = profile.year == null ? '' : String(profile.year).trim().slice(0, 4);
   const role = profile.role === 'parent' ? 'parent' : 'student';
   return { name, isAdult, year, role };
@@ -150,6 +154,7 @@ export function createOtpRouter(db, {
         : await db.get(`SELECT a.* FROM account_phones p JOIN accounts a ON a.id = p.account_id
             WHERE p.phone_e164 = ? AND a.deleted_at IS NULL`, [destination]);
       const profile = existing ? null : profileFrom(req.body);
+      if (profile?.error === 'AGE_DECLARATION_REQUIRED') return bad(res, profile.error, 'Tell us whether you are under 18.');
       if (profile?.error) return bad(res, profile.error, 'Tell us your name.');
 
       if (!existing && !profile) {
@@ -197,7 +202,9 @@ export function createOtpRouter(db, {
       }
 
       const accountId = id('acct');
-      const child = profile.role !== 'parent' && learnerIsChild({ isAdult: profile.isAdult, year: profile.year });
+      // Same rule as /register and provider sign-up: only an explicit isAdult === true
+      // is an adult; anything else (including a claimed parent role) is a child.
+      const child = learnerIsChild({ isAdult: profile.isAdult, year: profile.year });
       const accountEmail = channel === 'email' ? destination : `${accountId}@${PHONE_ACCOUNT_EMAIL_DOMAIN}`;
       try {
         await db.transaction(async () => {

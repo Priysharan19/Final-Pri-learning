@@ -92,7 +92,9 @@ const TESTS = [
   },
   {
     id: 'mounted-app', modes: ['fast', 'deep'], subsystem: 'Actual mounted student flows', severity: 'P0', blocking: true,
-    command: ['node', ['client/test/e2e.mjs', '--no-build']], timeoutMs: 900000,
+    // e2e.mjs makes its own test build (non-V1 flows such as the Australian
+    // syllabuses switched on); the shipped bundle was already checked above.
+    command: ['node', ['client/test/e2e.mjs']], timeoutMs: 900000,
     fixArea: 'rendered login, Home, Practice, handwriting and exam flows',
     action: 'Use the named failing flow/assertion and its screenshot. Repair the student-visible behaviour, then rerun the complete mounted suite.'
   },

@@ -684,11 +684,15 @@ export default function Login() {
                       </div>
                     )}
                   </div>
-                  <div className="field" style={{ marginTop: -4 }}>
-                    <button type="button" className="linklike" onClick={openAustralia}>
-                      {t(form.role === 'teacher' ? 'login.teachingInAustralia' : 'login.studyingInAustralia')}
-                    </button>
-                  </div>
+                  {/* V1 is India-only (frozen scope): the Australian syllabuses are
+                      offered only in a build with PRI_FEATURE_AUSTRALIA=1. */}
+                  {featureEnabled('australia') && (
+                    <div className="field" style={{ marginTop: -4 }}>
+                      <button type="button" className="linklike" onClick={openAustralia}>
+                        {t(form.role === 'teacher' ? 'login.teachingInAustralia' : 'login.studyingInAustralia')}
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
 

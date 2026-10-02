@@ -308,13 +308,19 @@ export const cloud = Object.freeze({
   // a picture and nothing else: no question, no expected answer, no profile.
   handwritingStatus: ({ signal = null, timeoutMs = 7000 } = {}) =>
     cloudRequest('/v1/handwriting/status', { signal, timeoutMs }),
-  transcribeHandwriting: (image, { signal = null, timeoutMs = 25000 } = {}) =>
+  // Longer than the server's own reading budget (PRI_HANDWRITING_TIMEOUT_MS,
+  // 45 s by default) so the server answers before the client gives up.
+  transcribeHandwriting: (image, { signal = null, timeoutMs = 55000 } = {}) =>
     cloudRequest('/v1/handwriting/transcribe', { method: 'POST', body: { image }, signal, timeoutMs }),
   workingStatus: () => cloudRequest('/v1/working/status'),
   // The question is sent; the expected answer never is, and the route refuses
   // a body that carries one.
   checkWorking: (prompt, lines, { signal = null, timeoutMs = 35000 } = {}) =>
     cloudRequest('/v1/working/check', { method: 'POST', body: { prompt, lines }, signal, timeoutMs }),
+  // "Practise this": one photo of a printed question, nothing else. The reply
+  // proposes a chapter and skill; it never carries a mark or an answer.
+  identifyQuestionPhoto: (image, { signal = null, timeoutMs = 25000 } = {}) =>
+    cloudRequest('/v1/question-photo/identify', { method: 'POST', body: { image }, signal, timeoutMs }),
   // The AI tutor is sent the verified solution it must stay grounded in — it
   // is not a reader, and /v1/handwriting never receives one. Exam rows never
   // reach here: the local backend refuses them first.
