@@ -29,7 +29,8 @@
 // remain, so an unfinished notice can never be published as a finished one.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import Link from '../components/AppLink.jsx';
 import { LANGUAGES, useLanguage, useTx } from '../i18n/index.js';
 import privacy from '../../../docs/legal/privacy.md?raw';
 import terms from '../../../docs/legal/terms.md?raw';

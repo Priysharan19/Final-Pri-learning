@@ -11,7 +11,7 @@
 // configuration, and where none is configured it simply does not mention one.
 // ─────────────────────────────────────────────────────────────────────────────
 import React from 'react';
-import { Link } from 'react-router-dom';
+import Link from './AppLink.jsx';
 import { useT, useTx } from '../i18n/index.js';
 
 function whenItResets(resetsAt, timeZone) {

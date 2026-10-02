@@ -1,6 +1,7 @@
 import { featureEnabled } from './platform/features.js';
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import Link from './components/AppLink.jsx';
 import { api } from './api.js';
 import { requestPersistentStorage } from './local/idb.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';

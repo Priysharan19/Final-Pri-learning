@@ -29,6 +29,18 @@ export function historyDepth(hist = globalThis.history) {
   return Number.isInteger(idx) && idx > 0 ? idx : 0;
 }
 
+/** Should a link to `target` replace the current entry instead of pushing?
+ * Only when the entry the browser is showing *now* already is `target`. The
+ * router's own Link answers from the location it last rendered, which lags a
+ * Back press: the popstate has moved the entry to `/` but the transition that
+ * re-renders has not committed, so a quick tap on Practice would replace `/`
+ * (idx 0) with `/practice` and the next Back would leave the app. */
+export function linkReplacesEntry(target, live = globalThis.location) {
+  if (!target || !live) return false;
+  const path = p => `${p.pathname || '/'}${p.search || ''}${p.hash || ''}`;
+  return path(target) === path(live);
+}
+
 /** Does the page want the next Back press? */
 export function wantsBack({ doc = globalThis.document, hist = globalThis.history } = {}) {
   return !!openDialog(doc) || historyDepth(hist) > 0;
