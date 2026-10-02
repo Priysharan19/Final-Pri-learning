@@ -63,7 +63,7 @@ jobs:
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log
           grep -Fq 'I18N: PASS — 188/188 checks' suites.log
-          grep -Fq 'I18N COVERAGE: PASS — 88/88 checks — 43 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 88/88 checks — 47 files scanned, 0 hard-coded strings' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
           grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 58/58 checks' suites.log
@@ -318,8 +318,8 @@ jobs:
           grep -Fq 'AI tutor · dark by default in a production build' browser.log
           grep -Fq 'AI tutor · three levels, in order, with fallback' browser.log
           grep -Eq 'E2E SUITE.*32/32.*2 flows' browser.log
-          grep -Fq 'Hindi · Practice, Exams, exam room, Progress, Explain' browser.log
-          grep -Eq 'E2E SUITE.*36/36.*1 flows' browser.log
+          grep -Fq 'Hindi · Practice, handwriting, Exams, exam room, Progress, Explain' browser.log
+          grep -Eq 'E2E SUITE.*57/57.*1 flows' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
