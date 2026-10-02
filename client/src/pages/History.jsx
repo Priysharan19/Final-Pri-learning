@@ -87,7 +87,7 @@ export default function History() {
           }
         }
       });
-    } catch (e) { toast(<span>⚠️ {e.message}</span>); }
+    } catch (e) { toast(<span>{e.message}</span>); }
   }
 
   async function openDetail(id) {
