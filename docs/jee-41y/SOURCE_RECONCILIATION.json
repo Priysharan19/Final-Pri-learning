@@ -1,0 +1,5478 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "title": "41 Years IIT JEE Mathematics",
+    "edition": "2019-1979",
+    "publisher": "Arihant",
+    "pdfPages": 625,
+    "sha256": "5e3cc002a44d1848886be07cc4fbd40165ed3e6a780665db5ca8b23cb190de3b"
+  },
+  "rights": {
+    "sourceProvidedByProjectOwner": true,
+    "redistributionRightsVerified": false,
+    "rawSourceCommitted": false,
+    "rawExtractedCorpusCommitted": false
+  },
+  "summary": {
+    "pagesAccountedFor": 625,
+    "unaccountedPages": [],
+    "pageClasses": {
+      "answer-key+solutions": 6,
+      "appendix-questions": 6,
+      "appendix-questions+solutions": 1,
+      "appendix-solutions": 11,
+      "front-matter": 9,
+      "questions": 141,
+      "questions+answer-key": 12,
+      "questions+answer-key+solutions": 8,
+      "solutions": 431
+    },
+    "chapters": 26,
+    "chapterQuestionOccurrences": 2206,
+    "appendixQuestionOccurrences": 36,
+    "sourceQuestionOccurrences": 2242,
+    "draftRecords": 2206,
+    "approvedRecords": 0,
+    "recordsWithAnswers": 0,
+    "recordsWithWorkedSteps": 0,
+    "tracks": {
+      "jee-main": 632,
+      "jee-advanced": 1378,
+      "unresolved": 196
+    },
+    "answerTypes": {
+      "selfcheck": 2206
+    }
+  },
+  "chapters": [
+    {
+      "number": 1,
+      "title": "Complex Numbers",
+      "questionPdfPages": [
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "questionPageCount": 7,
+      "answerBookPage": 8,
+      "solutionBookPageStart": 8,
+      "extractedDraftRecords": 110,
+      "extractedTopics": 5,
+      "structuralQuestionCounts": {
+        "1": 10,
+        "2": 48,
+        "3": 12,
+        "4": 19,
+        "5": 21
+      },
+      "reconciledQuestionCounts": {
+        "1": 10,
+        "2": 48,
+        "3": 12,
+        "4": 19,
+        "5": 21
+      },
+      "expectedQuestionOccurrences": 110,
+      "countOverrides": [],
+      "candidateQuestionPages": [
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 2,
+      "title": "Theory of Equations",
+      "questionPdfPages": [
+        36,
+        37,
+        38,
+        39,
+        40,
+        41
+      ],
+      "questionPageCount": 6,
+      "answerBookPage": 32,
+      "solutionBookPageStart": 33,
+      "extractedDraftRecords": 95,
+      "extractedTopics": 5,
+      "structuralQuestionCounts": {
+        "1": 58,
+        "2": 5,
+        "3": 3,
+        "4": 12,
+        "5": 18
+      },
+      "reconciledQuestionCounts": {
+        "1": 58,
+        "2": 5,
+        "3": 2,
+        "4": 12,
+        "5": 18
+      },
+      "expectedQuestionOccurrences": 95,
+      "countOverrides": [
+        {
+          "chapter": 2,
+          "topic": 3,
+          "count": 2,
+          "evidence": "source PDF page 39 shows Topic 3 questions 1-2 only; answer key PDF page 41 confirms 1-2"
+        }
+      ],
+      "candidateQuestionPages": [
+        36,
+        37,
+        38,
+        39,
+        40,
+        41
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 3,
+      "title": "Sequences and Series",
+      "questionPdfPages": [
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63
+      ],
+      "questionPageCount": 7,
+      "answerBookPage": 54,
+      "solutionBookPageStart": 54,
+      "extractedDraftRecords": 104,
+      "extractedTopics": 6,
+      "structuralQuestionCounts": {
+        "1": 7,
+        "2": 24,
+        "3": 16,
+        "4": 14,
+        "5": 9,
+        "6": 34
+      },
+      "reconciledQuestionCounts": {
+        "1": 7,
+        "2": 24,
+        "3": 16,
+        "4": 14,
+        "5": 9,
+        "6": 34
+      },
+      "expectedQuestionOccurrences": 104,
+      "countOverrides": [
+        {
+          "chapter": 3,
+          "topic": 5,
+          "count": 9,
+          "evidence": "source PDF pages 60-61 show Topic 5 questions 1-9 before Topic 6 begins; prior answer-key-based count 12 was a layout misread"
+        }
+      ],
+      "candidateQuestionPages": [
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 4,
+      "title": "Permutations and Combinations",
+      "questionPdfPages": [
+        81,
+        82,
+        83,
+        84,
+        85
+      ],
+      "questionPageCount": 5,
+      "answerBookPage": 76,
+      "solutionBookPageStart": 76,
+      "extractedDraftRecords": 60,
+      "extractedTopics": 5,
+      "structuralQuestionCounts": {
+        "1": 7,
+        "2": 25,
+        "3": 14,
+        "4": 7,
+        "5": 2
+      },
+      "reconciledQuestionCounts": {
+        "1": 12,
+        "2": 25,
+        "3": 14,
+        "4": 7,
+        "5": 2
+      },
+      "expectedQuestionOccurrences": 60,
+      "countOverrides": [
+        {
+          "chapter": 4,
+          "topic": 1,
+          "count": 12,
+          "evidence": "answer key on PDF page 85 explicitly reaches question 12"
+        }
+      ],
+      "candidateQuestionPages": [
+        81,
+        82,
+        83,
+        84,
+        85
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 5,
+      "title": "Binomial Theorem",
+      "questionPdfPages": [
+        93,
+        94,
+        95
+      ],
+      "questionPageCount": 3,
+      "answerBookPage": 87,
+      "solutionBookPageStart": 87,
+      "extractedDraftRecords": 58,
+      "extractedTopics": 2,
+      "structuralQuestionCounts": {
+        "1": 38,
+        "2": 20
+      },
+      "reconciledQuestionCounts": {
+        "1": 38,
+        "2": 20
+      },
+      "expectedQuestionOccurrences": 58,
+      "countOverrides": [],
+      "candidateQuestionPages": [
+        93,
+        94,
+        95
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 6,
+      "title": "Probability",
+      "questionPdfPages": [
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115
+      ],
+      "questionPageCount": 10,
+      "answerBookPage": 106,
+      "solutionBookPageStart": 107,
+      "extractedDraftRecords": 137,
+      "extractedTopics": 5,
+      "structuralQuestionCounts": {
+        "1": 29,
+        "2": 17,
+        "3": 47,
+        "4": 26,
+        "5": 18
+      },
+      "reconciledQuestionCounts": {
+        "1": 29,
+        "2": 17,
+        "3": 47,
+        "4": 26,
+        "5": 18
+      },
+      "expectedQuestionOccurrences": 137,
+      "countOverrides": [],
+      "candidateQuestionPages": [
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 7,
+      "title": "Matrices and Determinants",
+      "questionPdfPages": [
+        136,
+        137,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143,
+        144
+      ],
+      "questionPageCount": 9,
+      "answerBookPage": 135,
+      "solutionBookPageStart": 136,
+      "extractedDraftRecords": 120,
+      "extractedTopics": 4,
+      "structuralQuestionCounts": {
+        "1": 21,
+        "2": 48,
+        "3": 16,
+        "4": 35
+      },
+      "reconciledQuestionCounts": {
+        "1": 21,
+        "2": 48,
+        "3": 16,
+        "4": 35
+      },
+      "expectedQuestionOccurrences": 120,
+      "countOverrides": [],
+      "candidateQuestionPages": [
+        136,
+        137,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143,
+        144
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 8,
+      "title": "Functions",
+      "questionPdfPages": [
+        169,
+        170,
+        171,
+        172,
+        173
+      ],
+      "questionPageCount": 5,
+      "answerBookPage": 165,
+      "solutionBookPageStart": 165,
+      "extractedDraftRecords": 66,
+      "extractedTopics": 4,
+      "structuralQuestionCounts": {
+        "1": 17,
+        "2": 19,
+        "3": 19,
+        "4": 11
+      },
+      "reconciledQuestionCounts": {
+        "1": 17,
+        "2": 19,
+        "3": 19,
+        "4": 11
+      },
+      "expectedQuestionOccurrences": 66,
+      "countOverrides": [],
+      "candidateQuestionPages": [
+        169,
+        170,
+        171,
+        172,
+        173
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 9,
+      "title": "Limit, Continuity and Differentiability",
+      "questionPdfPages": [
+        185,
+        186,
+        187,
+        188,
+        189,
+        190,
+        191,
+        192,
+        193,
+        194,
+        195,
+        196,
+        197
+      ],
+      "questionPageCount": 13,
+      "answerBookPage": 188,
+      "solutionBookPageStart": 189,
+      "extractedDraftRecords": 192,
+      "extractedTopics": 8,
+      "structuralQuestionCounts": {
+        "1": 36,
+        "2": 17,
+        "3": 6,
+        "4": 16,
+        "5": 11,
+        "6": 5,
+        "7": 64,
+        "8": 37
+      },
+      "reconciledQuestionCounts": {
+        "1": 36,
+        "2": 17,
+        "3": 6,
+        "4": 16,
+        "5": 11,
+        "6": 5,
+        "7": 64,
+        "8": 37
+      },
+      "expectedQuestionOccurrences": 192,
+      "countOverrides": [],
+      "candidateQuestionPages": [
+        185,
+        186,
+        187,
+        188,
+        189,
+        190,
+        191,
+        192,
+        193,
+        194,
+        195,
+        196,
+        197
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 10,
+      "title": "Application of Derivatives",
+      "questionPdfPages": [
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241
+      ],
+      "questionPageCount": 8,
+      "answerBookPage": 232,
+      "solutionBookPageStart": 233,
+      "extractedDraftRecords": 126,
+      "extractedTopics": 4,
+      "structuralQuestionCounts": {
+        "1": 22,
+        "2": 32,
+        "3": 2,
+        "4": 69
+      },
+      "reconciledQuestionCounts": {
+        "1": 22,
+        "2": 32,
+        "3": 3,
+        "4": 69
+      },
+      "expectedQuestionOccurrences": 126,
+      "countOverrides": [
+        {
+          "chapter": 10,
+          "topic": 3,
+          "count": 3,
+          "evidence": "source PDF page 237 shows Topic 3 questions 1-3; question 3 is the Analytical & Descriptive question before Topic 4"
+        }
+      ],
+      "candidateQuestionPages": [
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 11,
+      "title": "Indefinite Integration",
+      "questionPdfPages": [
+        272,
+        273,
+        274,
+        275
+      ],
+      "questionPageCount": 4,
+      "answerBookPage": 266,
+      "solutionBookPageStart": 267,
+      "extractedDraftRecords": 50,
+      "extractedTopics": 4,
+      "structuralQuestionCounts": {
+        "1": 29,
+        "2": 6,
+        "3": 11,
+        "4": 4
+      },
+      "reconciledQuestionCounts": {
+        "1": 29,
+        "2": 6,
+        "3": 11,
+        "4": 4
+      },
+      "expectedQuestionOccurrences": 50,
+      "countOverrides": [],
+      "candidateQuestionPages": [
+        272,
+        273,
+        274,
+        275
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 12,
+      "title": "Definite Integration",
+      "questionPdfPages": [
+        287,
+        288,
+        289,
+        290,
+        291,
+        292,
+        293,
+        294
+      ],
+      "questionPageCount": 8,
+      "answerBookPage": 285,
+      "solutionBookPageStart": 286,
+      "extractedDraftRecords": 125,
+      "extractedTopics": 4,
+      "structuralQuestionCounts": {
+        "1": 91,
+        "2": 6,
+        "3": 22,
+        "4": 6
+      },
+      "reconciledQuestionCounts": {
+        "1": 91,
+        "2": 6,
+        "3": 22,
+        "4": 6
+      },
+      "expectedQuestionOccurrences": 125,
+      "countOverrides": [],
+      "candidateQuestionPages": [
+        287,
+        288,
+        289,
+        290,
+        291,
+        292,
+        293,
+        294
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 13,
+      "title": "Area",
+      "questionPdfPages": [
+        320,
+        321,
+        322,
+        323
+      ],
+      "questionPageCount": 4,
+      "answerBookPage": 315,
+      "solutionBookPageStart": 315,
+      "extractedDraftRecords": 70,
+      "extractedTopics": 2,
+      "structuralQuestionCounts": {
+        "1": 10,
+        "2": 55
+      },
+      "reconciledQuestionCounts": {
+        "1": 15,
+        "2": 55
+      },
+      "expectedQuestionOccurrences": 70,
+      "countOverrides": [
+        {
+          "chapter": 13,
+          "topic": 1,
+          "count": 15,
+          "evidence": "source PDF pages 320-321 and answer key PDF page 324 explicitly reach question 15"
+        }
+      ],
+      "candidateQuestionPages": [
+        320,
+        321,
+        322,
+        323
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 14,
+      "title": "Differential Equations",
+      "questionPdfPages": [
+        344,
+        345,
+        346,
+        347,
+        348,
+        349
+      ],
+      "questionPageCount": 6,
+      "answerBookPage": 340,
+      "solutionBookPageStart": 340,
+      "extractedDraftRecords": 64,
+      "extractedTopics": 3,
+      "structuralQuestionCounts": {
+        "1": 23,
+        "2": 25,
+        "3": 16
+      },
+      "reconciledQuestionCounts": {
+        "1": 23,
+        "2": 25,
+        "3": 16
+      },
+      "expectedQuestionOccurrences": 64,
+      "countOverrides": [],
+      "candidateQuestionPages": [
+        344,
+        345,
+        346,
+        347,
+        348,
+        349
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 15,
+      "title": "Straight Line and Pair of Straight Lines",
+      "questionPdfPages": [
+        367,
+        368,
+        369,
+        370,
+        371,
+        372,
+        373
+      ],
+      "questionPageCount": 7,
+      "answerBookPage": 364,
+      "solutionBookPageStart": 364,
+      "extractedDraftRecords": 96,
+      "extractedTopics": 5,
+      "structuralQuestionCounts": {
+        "1": 70,
+        "2": 8,
+        "3": 14,
+        "4": 3,
+        "5": 3
+      },
+      "reconciledQuestionCounts": {
+        "1": 70,
+        "2": 8,
+        "3": 14,
+        "4": 3,
+        "5": 1
+      },
+      "expectedQuestionOccurrences": 96,
+      "countOverrides": [
+        {
+          "chapter": 15,
+          "topic": 5,
+          "count": 1,
+          "evidence": "source/answer boundary PDF page 373 shows Topic 5 question 1 only; answer key confirms question 1 only"
+        }
+      ],
+      "candidateQuestionPages": [
+        367,
+        368,
+        369,
+        370,
+        371,
+        372,
+        373
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 16,
+      "title": "Circle",
+      "questionPdfPages": [
+        392,
+        393,
+        394,
+        395,
+        396,
+        397,
+        398,
+        399
+      ],
+      "questionPageCount": 8,
+      "answerBookPage": 390,
+      "solutionBookPageStart": 391,
+      "extractedDraftRecords": 118,
+      "extractedTopics": 5,
+      "structuralQuestionCounts": {
+        "1": 25,
+        "2": 23,
+        "3": 23,
+        "4": 23,
+        "5": 24
+      },
+      "reconciledQuestionCounts": {
+        "1": 25,
+        "2": 23,
+        "3": 23,
+        "4": 23,
+        "5": 24
+      },
+      "expectedQuestionOccurrences": 118,
+      "countOverrides": [],
+      "candidateQuestionPages": [
+        392,
+        393,
+        394,
+        395,
+        396,
+        397,
+        398,
+        399
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 17,
+      "title": "Parabola",
+      "questionPdfPages": [
+        426,
+        427,
+        428,
+        429,
+        430
+      ],
+      "questionPageCount": 5,
+      "answerBookPage": 421,
+      "solutionBookPageStart": 421,
+      "extractedDraftRecords": 58,
+      "extractedTopics": 4,
+      "structuralQuestionCounts": {
+        "1": 14,
+        "2": 21,
+        "3": 12,
+        "4": 11
+      },
+      "reconciledQuestionCounts": {
+        "1": 14,
+        "2": 21,
+        "3": 12,
+        "4": 11
+      },
+      "expectedQuestionOccurrences": 58,
+      "countOverrides": [],
+      "candidateQuestionPages": [
+        426,
+        427,
+        428,
+        429,
+        430
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 18,
+      "title": "Ellipse",
+      "questionPdfPages": [
+        444,
+        445,
+        446,
+        447
+      ],
+      "questionPageCount": 4,
+      "answerBookPage": 438,
+      "solutionBookPageStart": 438,
+      "extractedDraftRecords": 40,
+      "extractedTopics": 3,
+      "structuralQuestionCounts": {
+        "1": 14,
+        "2": 23,
+        "3": 3
+      },
+      "reconciledQuestionCounts": {
+        "1": 14,
+        "2": 23,
+        "3": 3
+      },
+      "expectedQuestionOccurrences": 40,
+      "countOverrides": [],
+      "candidateQuestionPages": [
+        444,
+        445,
+        446,
+        447
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 19,
+      "title": "Hyperbola",
+      "questionPdfPages": [
+        459,
+        460,
+        461
+      ],
+      "questionPageCount": 3,
+      "answerBookPage": 453,
+      "solutionBookPageStart": 453,
+      "extractedDraftRecords": 36,
+      "extractedTopics": 3,
+      "structuralQuestionCounts": {
+        "1": 18,
+        "2": 15,
+        "3": 4
+      },
+      "reconciledQuestionCounts": {
+        "1": 18,
+        "2": 15,
+        "3": 3
+      },
+      "expectedQuestionOccurrences": 36,
+      "countOverrides": [
+        {
+          "chapter": 19,
+          "topic": 3,
+          "count": 3,
+          "evidence": "source PDF page 461 shows Topic 3 questions 1-3 only; answer key PDF page 462 confirms 1-3"
+        }
+      ],
+      "candidateQuestionPages": [
+        459,
+        460,
+        461
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 20,
+      "title": "Trigonometrical Ratios and Identities",
+      "questionPdfPages": [
+        470,
+        471,
+        472,
+        473
+      ],
+      "questionPageCount": 4,
+      "answerBookPage": 464,
+      "solutionBookPageStart": 464,
+      "extractedDraftRecords": 52,
+      "extractedTopics": 4,
+      "structuralQuestionCounts": {
+        "1": 29,
+        "2": 9,
+        "3": 4,
+        "4": 10
+      },
+      "reconciledQuestionCounts": {
+        "1": 29,
+        "2": 9,
+        "3": 4,
+        "4": 10
+      },
+      "expectedQuestionOccurrences": 52,
+      "countOverrides": [],
+      "candidateQuestionPages": [
+        470,
+        471,
+        472,
+        473
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 21,
+      "title": "Trigonometrical Equations",
+      "questionPdfPages": [
+        483,
+        484,
+        485,
+        486
+      ],
+      "questionPageCount": 4,
+      "answerBookPage": 477,
+      "solutionBookPageStart": 477,
+      "extractedDraftRecords": 55,
+      "extractedTopics": 3,
+      "structuralQuestionCounts": {
+        "1": 30,
+        "2": 4,
+        "3": 21
+      },
+      "reconciledQuestionCounts": {
+        "1": 30,
+        "2": 4,
+        "3": 21
+      },
+      "expectedQuestionOccurrences": 55,
+      "countOverrides": [],
+      "candidateQuestionPages": [
+        483,
+        484,
+        485,
+        486
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 22,
+      "title": "Inverse Circular Functions",
+      "questionPdfPages": [
+        497,
+        498,
+        499
+      ],
+      "questionPageCount": 3,
+      "answerBookPage": 490,
+      "solutionBookPageStart": 491,
+      "extractedDraftRecords": 29,
+      "extractedTopics": 3,
+      "structuralQuestionCounts": {
+        "1": 2,
+        "2": 15,
+        "3": 12
+      },
+      "reconciledQuestionCounts": {
+        "1": 2,
+        "2": 15,
+        "3": 12
+      },
+      "expectedQuestionOccurrences": 29,
+      "countOverrides": [],
+      "candidateQuestionPages": [
+        497,
+        498,
+        499
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 23,
+      "title": "Properties of Triangles",
+      "questionPdfPages": [
+        507,
+        508,
+        509,
+        510
+      ],
+      "questionPageCount": 4,
+      "answerBookPage": 502,
+      "solutionBookPageStart": 502,
+      "extractedDraftRecords": 61,
+      "extractedTopics": 3,
+      "structuralQuestionCounts": {
+        "1": 24,
+        "2": 17,
+        "3": 20
+      },
+      "reconciledQuestionCounts": {
+        "1": 24,
+        "2": 17,
+        "3": 20
+      },
+      "expectedQuestionOccurrences": 61,
+      "countOverrides": [],
+      "candidateQuestionPages": [
+        507,
+        508,
+        509,
+        510
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 24,
+      "title": "Vectors",
+      "questionPdfPages": [
+        528,
+        529,
+        530,
+        531,
+        532,
+        533,
+        534,
+        535,
+        536
+      ],
+      "questionPageCount": 9,
+      "answerBookPage": 527,
+      "solutionBookPageStart": 528,
+      "extractedDraftRecords": 119,
+      "extractedTopics": 5,
+      "structuralQuestionCounts": {
+        "1": 33,
+        "2": 24,
+        "3": 30,
+        "4": 16,
+        "5": 16
+      },
+      "reconciledQuestionCounts": {
+        "1": 33,
+        "2": 24,
+        "3": 30,
+        "4": 16,
+        "5": 16
+      },
+      "expectedQuestionOccurrences": 119,
+      "countOverrides": [],
+      "candidateQuestionPages": [
+        528,
+        529,
+        530,
+        531,
+        532,
+        533,
+        534,
+        535,
+        536
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 25,
+      "title": "3D Geometry",
+      "questionPdfPages": [
+        558,
+        559,
+        560,
+        561,
+        562,
+        563
+      ],
+      "questionPageCount": 6,
+      "answerBookPage": 554,
+      "solutionBookPageStart": 555,
+      "extractedDraftRecords": 77,
+      "extractedTopics": 3,
+      "structuralQuestionCounts": {
+        "1": 1,
+        "2": 5,
+        "3": 8
+      },
+      "reconciledQuestionCounts": {
+        "1": 1,
+        "2": 9,
+        "3": 67
+      },
+      "expectedQuestionOccurrences": 77,
+      "countOverrides": [
+        {
+          "chapter": 25,
+          "topic": 2,
+          "count": 9,
+          "evidence": "source PDF page 558 shows Topic 2 questions 1-9 across columns; answer key PDF page 563 confirms 1-9"
+        },
+        {
+          "chapter": 25,
+          "topic": 3,
+          "count": 67,
+          "evidence": "source PDF pages 559-563 and answer key PDF page 563 reach question 67"
+        }
+      ],
+      "candidateQuestionPages": [
+        558,
+        559,
+        560,
+        561,
+        562,
+        563
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    },
+    {
+      "number": 26,
+      "title": "Miscellaneous",
+      "questionPdfPages": [
+        582,
+        583,
+        584,
+        585,
+        586,
+        587,
+        588,
+        589,
+        590
+      ],
+      "questionPageCount": 9,
+      "answerBookPage": 581,
+      "solutionBookPageStart": 582,
+      "extractedDraftRecords": 88,
+      "extractedTopics": 1,
+      "structuralQuestionCounts": {
+        "1": 88
+      },
+      "reconciledQuestionCounts": {
+        "1": 88
+      },
+      "expectedQuestionOccurrences": 88,
+      "countOverrides": [],
+      "candidateQuestionPages": [
+        582,
+        583,
+        584,
+        585,
+        586,
+        587,
+        588,
+        589,
+        590
+      ],
+      "questionPagesWithoutCurrentCandidate": []
+    }
+  ],
+  "pages": [
+    {
+      "pdfPage": 1,
+      "class": "front-matter"
+    },
+    {
+      "pdfPage": 2,
+      "class": "front-matter"
+    },
+    {
+      "pdfPage": 3,
+      "class": "front-matter"
+    },
+    {
+      "pdfPage": 4,
+      "class": "front-matter"
+    },
+    {
+      "pdfPage": 5,
+      "class": "front-matter"
+    },
+    {
+      "pdfPage": 6,
+      "class": "front-matter"
+    },
+    {
+      "pdfPage": 7,
+      "class": "front-matter"
+    },
+    {
+      "pdfPage": 8,
+      "class": "front-matter"
+    },
+    {
+      "pdfPage": 9,
+      "class": "front-matter"
+    },
+    {
+      "pdfPage": 10,
+      "bookPage": 1,
+      "class": "questions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 11,
+      "bookPage": 2,
+      "class": "questions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 12,
+      "bookPage": 3,
+      "class": "questions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 13,
+      "bookPage": 4,
+      "class": "questions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 14,
+      "bookPage": 5,
+      "class": "questions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 15,
+      "bookPage": 6,
+      "class": "questions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 16,
+      "bookPage": 7,
+      "class": "questions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 17,
+      "bookPage": 8,
+      "class": "answer-key+solutions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 18,
+      "bookPage": 9,
+      "class": "solutions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 19,
+      "bookPage": 10,
+      "class": "solutions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 20,
+      "bookPage": 11,
+      "class": "solutions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 21,
+      "bookPage": 12,
+      "class": "solutions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 22,
+      "bookPage": 13,
+      "class": "solutions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 23,
+      "bookPage": 14,
+      "class": "solutions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 24,
+      "bookPage": 15,
+      "class": "solutions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 25,
+      "bookPage": 16,
+      "class": "solutions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 26,
+      "bookPage": 17,
+      "class": "solutions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 27,
+      "bookPage": 18,
+      "class": "solutions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 28,
+      "bookPage": 19,
+      "class": "solutions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 29,
+      "bookPage": 20,
+      "class": "solutions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 30,
+      "bookPage": 21,
+      "class": "solutions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 31,
+      "bookPage": 22,
+      "class": "solutions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 32,
+      "bookPage": 23,
+      "class": "solutions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 33,
+      "bookPage": 24,
+      "class": "solutions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 34,
+      "bookPage": 25,
+      "class": "solutions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 35,
+      "bookPage": 26,
+      "class": "solutions",
+      "sourceChapterNumber": 1,
+      "sourceChapter": "Complex Numbers"
+    },
+    {
+      "pdfPage": 36,
+      "bookPage": 27,
+      "class": "questions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 37,
+      "bookPage": 28,
+      "class": "questions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 38,
+      "bookPage": 29,
+      "class": "questions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 39,
+      "bookPage": 30,
+      "class": "questions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 40,
+      "bookPage": 31,
+      "class": "questions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 41,
+      "bookPage": 32,
+      "class": "questions+answer-key",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 42,
+      "bookPage": 33,
+      "class": "solutions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 43,
+      "bookPage": 34,
+      "class": "solutions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 44,
+      "bookPage": 35,
+      "class": "solutions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 45,
+      "bookPage": 36,
+      "class": "solutions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 46,
+      "bookPage": 37,
+      "class": "solutions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 47,
+      "bookPage": 38,
+      "class": "solutions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 48,
+      "bookPage": 39,
+      "class": "solutions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 49,
+      "bookPage": 40,
+      "class": "solutions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 50,
+      "bookPage": 41,
+      "class": "solutions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 51,
+      "bookPage": 42,
+      "class": "solutions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 52,
+      "bookPage": 43,
+      "class": "solutions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 53,
+      "bookPage": 44,
+      "class": "solutions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 54,
+      "bookPage": 45,
+      "class": "solutions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 55,
+      "bookPage": 46,
+      "class": "solutions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 56,
+      "bookPage": 47,
+      "class": "solutions",
+      "sourceChapterNumber": 2,
+      "sourceChapter": "Theory of Equations"
+    },
+    {
+      "pdfPage": 57,
+      "bookPage": 48,
+      "class": "questions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 58,
+      "bookPage": 49,
+      "class": "questions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 59,
+      "bookPage": 50,
+      "class": "questions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 60,
+      "bookPage": 51,
+      "class": "questions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 61,
+      "bookPage": 52,
+      "class": "questions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 62,
+      "bookPage": 53,
+      "class": "questions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 63,
+      "bookPage": 54,
+      "class": "questions+answer-key+solutions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 64,
+      "bookPage": 55,
+      "class": "solutions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 65,
+      "bookPage": 56,
+      "class": "solutions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 66,
+      "bookPage": 57,
+      "class": "solutions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 67,
+      "bookPage": 58,
+      "class": "solutions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 68,
+      "bookPage": 59,
+      "class": "solutions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 69,
+      "bookPage": 60,
+      "class": "solutions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 70,
+      "bookPage": 61,
+      "class": "solutions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 71,
+      "bookPage": 62,
+      "class": "solutions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 72,
+      "bookPage": 63,
+      "class": "solutions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 73,
+      "bookPage": 64,
+      "class": "solutions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 74,
+      "bookPage": 65,
+      "class": "solutions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 75,
+      "bookPage": 66,
+      "class": "solutions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 76,
+      "bookPage": 67,
+      "class": "solutions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 77,
+      "bookPage": 68,
+      "class": "solutions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 78,
+      "bookPage": 69,
+      "class": "solutions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 79,
+      "bookPage": 70,
+      "class": "solutions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 80,
+      "bookPage": 71,
+      "class": "solutions",
+      "sourceChapterNumber": 3,
+      "sourceChapter": "Sequences and Series"
+    },
+    {
+      "pdfPage": 81,
+      "bookPage": 72,
+      "class": "questions",
+      "sourceChapterNumber": 4,
+      "sourceChapter": "Permutations and Combinations"
+    },
+    {
+      "pdfPage": 82,
+      "bookPage": 73,
+      "class": "questions",
+      "sourceChapterNumber": 4,
+      "sourceChapter": "Permutations and Combinations"
+    },
+    {
+      "pdfPage": 83,
+      "bookPage": 74,
+      "class": "questions",
+      "sourceChapterNumber": 4,
+      "sourceChapter": "Permutations and Combinations"
+    },
+    {
+      "pdfPage": 84,
+      "bookPage": 75,
+      "class": "questions",
+      "sourceChapterNumber": 4,
+      "sourceChapter": "Permutations and Combinations"
+    },
+    {
+      "pdfPage": 85,
+      "bookPage": 76,
+      "class": "questions+answer-key+solutions",
+      "sourceChapterNumber": 4,
+      "sourceChapter": "Permutations and Combinations"
+    },
+    {
+      "pdfPage": 86,
+      "bookPage": 77,
+      "class": "solutions",
+      "sourceChapterNumber": 4,
+      "sourceChapter": "Permutations and Combinations"
+    },
+    {
+      "pdfPage": 87,
+      "bookPage": 78,
+      "class": "solutions",
+      "sourceChapterNumber": 4,
+      "sourceChapter": "Permutations and Combinations"
+    },
+    {
+      "pdfPage": 88,
+      "bookPage": 79,
+      "class": "solutions",
+      "sourceChapterNumber": 4,
+      "sourceChapter": "Permutations and Combinations"
+    },
+    {
+      "pdfPage": 89,
+      "bookPage": 80,
+      "class": "solutions",
+      "sourceChapterNumber": 4,
+      "sourceChapter": "Permutations and Combinations"
+    },
+    {
+      "pdfPage": 90,
+      "bookPage": 81,
+      "class": "solutions",
+      "sourceChapterNumber": 4,
+      "sourceChapter": "Permutations and Combinations"
+    },
+    {
+      "pdfPage": 91,
+      "bookPage": 82,
+      "class": "solutions",
+      "sourceChapterNumber": 4,
+      "sourceChapter": "Permutations and Combinations"
+    },
+    {
+      "pdfPage": 92,
+      "bookPage": 83,
+      "class": "solutions",
+      "sourceChapterNumber": 4,
+      "sourceChapter": "Permutations and Combinations"
+    },
+    {
+      "pdfPage": 93,
+      "bookPage": 84,
+      "class": "questions",
+      "sourceChapterNumber": 5,
+      "sourceChapter": "Binomial Theorem"
+    },
+    {
+      "pdfPage": 94,
+      "bookPage": 85,
+      "class": "questions",
+      "sourceChapterNumber": 5,
+      "sourceChapter": "Binomial Theorem"
+    },
+    {
+      "pdfPage": 95,
+      "bookPage": 86,
+      "class": "questions",
+      "sourceChapterNumber": 5,
+      "sourceChapter": "Binomial Theorem"
+    },
+    {
+      "pdfPage": 96,
+      "bookPage": 87,
+      "class": "answer-key+solutions",
+      "sourceChapterNumber": 5,
+      "sourceChapter": "Binomial Theorem"
+    },
+    {
+      "pdfPage": 97,
+      "bookPage": 88,
+      "class": "solutions",
+      "sourceChapterNumber": 5,
+      "sourceChapter": "Binomial Theorem"
+    },
+    {
+      "pdfPage": 98,
+      "bookPage": 89,
+      "class": "solutions",
+      "sourceChapterNumber": 5,
+      "sourceChapter": "Binomial Theorem"
+    },
+    {
+      "pdfPage": 99,
+      "bookPage": 90,
+      "class": "solutions",
+      "sourceChapterNumber": 5,
+      "sourceChapter": "Binomial Theorem"
+    },
+    {
+      "pdfPage": 100,
+      "bookPage": 91,
+      "class": "solutions",
+      "sourceChapterNumber": 5,
+      "sourceChapter": "Binomial Theorem"
+    },
+    {
+      "pdfPage": 101,
+      "bookPage": 92,
+      "class": "solutions",
+      "sourceChapterNumber": 5,
+      "sourceChapter": "Binomial Theorem"
+    },
+    {
+      "pdfPage": 102,
+      "bookPage": 93,
+      "class": "solutions",
+      "sourceChapterNumber": 5,
+      "sourceChapter": "Binomial Theorem"
+    },
+    {
+      "pdfPage": 103,
+      "bookPage": 94,
+      "class": "solutions",
+      "sourceChapterNumber": 5,
+      "sourceChapter": "Binomial Theorem"
+    },
+    {
+      "pdfPage": 104,
+      "bookPage": 95,
+      "class": "solutions",
+      "sourceChapterNumber": 5,
+      "sourceChapter": "Binomial Theorem"
+    },
+    {
+      "pdfPage": 105,
+      "bookPage": 96,
+      "class": "solutions",
+      "sourceChapterNumber": 5,
+      "sourceChapter": "Binomial Theorem"
+    },
+    {
+      "pdfPage": 106,
+      "bookPage": 97,
+      "class": "questions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 107,
+      "bookPage": 98,
+      "class": "questions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 108,
+      "bookPage": 99,
+      "class": "questions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 109,
+      "bookPage": 100,
+      "class": "questions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 110,
+      "bookPage": 101,
+      "class": "questions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 111,
+      "bookPage": 102,
+      "class": "questions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 112,
+      "bookPage": 103,
+      "class": "questions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 113,
+      "bookPage": 104,
+      "class": "questions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 114,
+      "bookPage": 105,
+      "class": "questions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 115,
+      "bookPage": 106,
+      "class": "questions+answer-key",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 116,
+      "bookPage": 107,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 117,
+      "bookPage": 108,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 118,
+      "bookPage": 109,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 119,
+      "bookPage": 110,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 120,
+      "bookPage": 111,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 121,
+      "bookPage": 112,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 122,
+      "bookPage": 113,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 123,
+      "bookPage": 114,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 124,
+      "bookPage": 115,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 125,
+      "bookPage": 116,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 126,
+      "bookPage": 117,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 127,
+      "bookPage": 118,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 128,
+      "bookPage": 119,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 129,
+      "bookPage": 120,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 130,
+      "bookPage": 121,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 131,
+      "bookPage": 122,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 132,
+      "bookPage": 123,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 133,
+      "bookPage": 124,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 134,
+      "bookPage": 125,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 135,
+      "bookPage": 126,
+      "class": "solutions",
+      "sourceChapterNumber": 6,
+      "sourceChapter": "Probability"
+    },
+    {
+      "pdfPage": 136,
+      "bookPage": 127,
+      "class": "questions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 137,
+      "bookPage": 128,
+      "class": "questions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 138,
+      "bookPage": 129,
+      "class": "questions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 139,
+      "bookPage": 130,
+      "class": "questions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 140,
+      "bookPage": 131,
+      "class": "questions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 141,
+      "bookPage": 132,
+      "class": "questions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 142,
+      "bookPage": 133,
+      "class": "questions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 143,
+      "bookPage": 134,
+      "class": "questions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 144,
+      "bookPage": 135,
+      "class": "questions+answer-key",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 145,
+      "bookPage": 136,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 146,
+      "bookPage": 137,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 147,
+      "bookPage": 138,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 148,
+      "bookPage": 139,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 149,
+      "bookPage": 140,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 150,
+      "bookPage": 141,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 151,
+      "bookPage": 142,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 152,
+      "bookPage": 143,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 153,
+      "bookPage": 144,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 154,
+      "bookPage": 145,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 155,
+      "bookPage": 146,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 156,
+      "bookPage": 147,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 157,
+      "bookPage": 148,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 158,
+      "bookPage": 149,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 159,
+      "bookPage": 150,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 160,
+      "bookPage": 151,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 161,
+      "bookPage": 152,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 162,
+      "bookPage": 153,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 163,
+      "bookPage": 154,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 164,
+      "bookPage": 155,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 165,
+      "bookPage": 156,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 166,
+      "bookPage": 157,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 167,
+      "bookPage": 158,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 168,
+      "bookPage": 159,
+      "class": "solutions",
+      "sourceChapterNumber": 7,
+      "sourceChapter": "Matrices and Determinants"
+    },
+    {
+      "pdfPage": 169,
+      "bookPage": 160,
+      "class": "questions",
+      "sourceChapterNumber": 8,
+      "sourceChapter": "Functions"
+    },
+    {
+      "pdfPage": 170,
+      "bookPage": 161,
+      "class": "questions",
+      "sourceChapterNumber": 8,
+      "sourceChapter": "Functions"
+    },
+    {
+      "pdfPage": 171,
+      "bookPage": 162,
+      "class": "questions",
+      "sourceChapterNumber": 8,
+      "sourceChapter": "Functions"
+    },
+    {
+      "pdfPage": 172,
+      "bookPage": 163,
+      "class": "questions",
+      "sourceChapterNumber": 8,
+      "sourceChapter": "Functions"
+    },
+    {
+      "pdfPage": 173,
+      "bookPage": 164,
+      "class": "questions",
+      "sourceChapterNumber": 8,
+      "sourceChapter": "Functions"
+    },
+    {
+      "pdfPage": 174,
+      "bookPage": 165,
+      "class": "answer-key+solutions",
+      "sourceChapterNumber": 8,
+      "sourceChapter": "Functions"
+    },
+    {
+      "pdfPage": 175,
+      "bookPage": 166,
+      "class": "solutions",
+      "sourceChapterNumber": 8,
+      "sourceChapter": "Functions"
+    },
+    {
+      "pdfPage": 176,
+      "bookPage": 167,
+      "class": "solutions",
+      "sourceChapterNumber": 8,
+      "sourceChapter": "Functions"
+    },
+    {
+      "pdfPage": 177,
+      "bookPage": 168,
+      "class": "solutions",
+      "sourceChapterNumber": 8,
+      "sourceChapter": "Functions"
+    },
+    {
+      "pdfPage": 178,
+      "bookPage": 169,
+      "class": "solutions",
+      "sourceChapterNumber": 8,
+      "sourceChapter": "Functions"
+    },
+    {
+      "pdfPage": 179,
+      "bookPage": 170,
+      "class": "solutions",
+      "sourceChapterNumber": 8,
+      "sourceChapter": "Functions"
+    },
+    {
+      "pdfPage": 180,
+      "bookPage": 171,
+      "class": "solutions",
+      "sourceChapterNumber": 8,
+      "sourceChapter": "Functions"
+    },
+    {
+      "pdfPage": 181,
+      "bookPage": 172,
+      "class": "solutions",
+      "sourceChapterNumber": 8,
+      "sourceChapter": "Functions"
+    },
+    {
+      "pdfPage": 182,
+      "bookPage": 173,
+      "class": "solutions",
+      "sourceChapterNumber": 8,
+      "sourceChapter": "Functions"
+    },
+    {
+      "pdfPage": 183,
+      "bookPage": 174,
+      "class": "solutions",
+      "sourceChapterNumber": 8,
+      "sourceChapter": "Functions"
+    },
+    {
+      "pdfPage": 184,
+      "bookPage": 175,
+      "class": "solutions",
+      "sourceChapterNumber": 8,
+      "sourceChapter": "Functions"
+    },
+    {
+      "pdfPage": 185,
+      "bookPage": 176,
+      "class": "questions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 186,
+      "bookPage": 177,
+      "class": "questions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 187,
+      "bookPage": 178,
+      "class": "questions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 188,
+      "bookPage": 179,
+      "class": "questions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 189,
+      "bookPage": 180,
+      "class": "questions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 190,
+      "bookPage": 181,
+      "class": "questions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 191,
+      "bookPage": 182,
+      "class": "questions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 192,
+      "bookPage": 183,
+      "class": "questions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 193,
+      "bookPage": 184,
+      "class": "questions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 194,
+      "bookPage": 185,
+      "class": "questions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 195,
+      "bookPage": 186,
+      "class": "questions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 196,
+      "bookPage": 187,
+      "class": "questions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 197,
+      "bookPage": 188,
+      "class": "questions+answer-key",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 198,
+      "bookPage": 189,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 199,
+      "bookPage": 190,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 200,
+      "bookPage": 191,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 201,
+      "bookPage": 192,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 202,
+      "bookPage": 193,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 203,
+      "bookPage": 194,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 204,
+      "bookPage": 195,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 205,
+      "bookPage": 196,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 206,
+      "bookPage": 197,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 207,
+      "bookPage": 198,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 208,
+      "bookPage": 199,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 209,
+      "bookPage": 200,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 210,
+      "bookPage": 201,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 211,
+      "bookPage": 202,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 212,
+      "bookPage": 203,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 213,
+      "bookPage": 204,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 214,
+      "bookPage": 205,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 215,
+      "bookPage": 206,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 216,
+      "bookPage": 207,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 217,
+      "bookPage": 208,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 218,
+      "bookPage": 209,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 219,
+      "bookPage": 210,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 220,
+      "bookPage": 211,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 221,
+      "bookPage": 212,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 222,
+      "bookPage": 213,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 223,
+      "bookPage": 214,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 224,
+      "bookPage": 215,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 225,
+      "bookPage": 216,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 226,
+      "bookPage": 217,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 227,
+      "bookPage": 218,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 228,
+      "bookPage": 219,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 229,
+      "bookPage": 220,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 230,
+      "bookPage": 221,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 231,
+      "bookPage": 222,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 232,
+      "bookPage": 223,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 233,
+      "bookPage": 224,
+      "class": "solutions",
+      "sourceChapterNumber": 9,
+      "sourceChapter": "Limit, Continuity and Differentiability"
+    },
+    {
+      "pdfPage": 234,
+      "bookPage": 225,
+      "class": "questions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 235,
+      "bookPage": 226,
+      "class": "questions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 236,
+      "bookPage": 227,
+      "class": "questions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 237,
+      "bookPage": 228,
+      "class": "questions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 238,
+      "bookPage": 229,
+      "class": "questions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 239,
+      "bookPage": 230,
+      "class": "questions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 240,
+      "bookPage": 231,
+      "class": "questions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 241,
+      "bookPage": 232,
+      "class": "questions+answer-key",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 242,
+      "bookPage": 233,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 243,
+      "bookPage": 234,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 244,
+      "bookPage": 235,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 245,
+      "bookPage": 236,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 246,
+      "bookPage": 237,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 247,
+      "bookPage": 238,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 248,
+      "bookPage": 239,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 249,
+      "bookPage": 240,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 250,
+      "bookPage": 241,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 251,
+      "bookPage": 242,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 252,
+      "bookPage": 243,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 253,
+      "bookPage": 244,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 254,
+      "bookPage": 245,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 255,
+      "bookPage": 246,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 256,
+      "bookPage": 247,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 257,
+      "bookPage": 248,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 258,
+      "bookPage": 249,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 259,
+      "bookPage": 250,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 260,
+      "bookPage": 251,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 261,
+      "bookPage": 252,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 262,
+      "bookPage": 253,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 263,
+      "bookPage": 254,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 264,
+      "bookPage": 255,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 265,
+      "bookPage": 256,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 266,
+      "bookPage": 257,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 267,
+      "bookPage": 258,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 268,
+      "bookPage": 259,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 269,
+      "bookPage": 260,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 270,
+      "bookPage": 261,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 271,
+      "bookPage": 262,
+      "class": "solutions",
+      "sourceChapterNumber": 10,
+      "sourceChapter": "Application of Derivatives"
+    },
+    {
+      "pdfPage": 272,
+      "bookPage": 263,
+      "class": "questions",
+      "sourceChapterNumber": 11,
+      "sourceChapter": "Indefinite Integration"
+    },
+    {
+      "pdfPage": 273,
+      "bookPage": 264,
+      "class": "questions",
+      "sourceChapterNumber": 11,
+      "sourceChapter": "Indefinite Integration"
+    },
+    {
+      "pdfPage": 274,
+      "bookPage": 265,
+      "class": "questions",
+      "sourceChapterNumber": 11,
+      "sourceChapter": "Indefinite Integration"
+    },
+    {
+      "pdfPage": 275,
+      "bookPage": 266,
+      "class": "questions+answer-key",
+      "sourceChapterNumber": 11,
+      "sourceChapter": "Indefinite Integration"
+    },
+    {
+      "pdfPage": 276,
+      "bookPage": 267,
+      "class": "solutions",
+      "sourceChapterNumber": 11,
+      "sourceChapter": "Indefinite Integration"
+    },
+    {
+      "pdfPage": 277,
+      "bookPage": 268,
+      "class": "solutions",
+      "sourceChapterNumber": 11,
+      "sourceChapter": "Indefinite Integration"
+    },
+    {
+      "pdfPage": 278,
+      "bookPage": 269,
+      "class": "solutions",
+      "sourceChapterNumber": 11,
+      "sourceChapter": "Indefinite Integration"
+    },
+    {
+      "pdfPage": 279,
+      "bookPage": 270,
+      "class": "solutions",
+      "sourceChapterNumber": 11,
+      "sourceChapter": "Indefinite Integration"
+    },
+    {
+      "pdfPage": 280,
+      "bookPage": 271,
+      "class": "solutions",
+      "sourceChapterNumber": 11,
+      "sourceChapter": "Indefinite Integration"
+    },
+    {
+      "pdfPage": 281,
+      "bookPage": 272,
+      "class": "solutions",
+      "sourceChapterNumber": 11,
+      "sourceChapter": "Indefinite Integration"
+    },
+    {
+      "pdfPage": 282,
+      "bookPage": 273,
+      "class": "solutions",
+      "sourceChapterNumber": 11,
+      "sourceChapter": "Indefinite Integration"
+    },
+    {
+      "pdfPage": 283,
+      "bookPage": 274,
+      "class": "solutions",
+      "sourceChapterNumber": 11,
+      "sourceChapter": "Indefinite Integration"
+    },
+    {
+      "pdfPage": 284,
+      "bookPage": 275,
+      "class": "solutions",
+      "sourceChapterNumber": 11,
+      "sourceChapter": "Indefinite Integration"
+    },
+    {
+      "pdfPage": 285,
+      "bookPage": 276,
+      "class": "solutions",
+      "sourceChapterNumber": 11,
+      "sourceChapter": "Indefinite Integration"
+    },
+    {
+      "pdfPage": 286,
+      "bookPage": 277,
+      "class": "solutions",
+      "sourceChapterNumber": 11,
+      "sourceChapter": "Indefinite Integration"
+    },
+    {
+      "pdfPage": 287,
+      "bookPage": 278,
+      "class": "questions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 288,
+      "bookPage": 279,
+      "class": "questions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 289,
+      "bookPage": 280,
+      "class": "questions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 290,
+      "bookPage": 281,
+      "class": "questions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 291,
+      "bookPage": 282,
+      "class": "questions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 292,
+      "bookPage": 283,
+      "class": "questions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 293,
+      "bookPage": 284,
+      "class": "questions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 294,
+      "bookPage": 285,
+      "class": "questions+answer-key",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 295,
+      "bookPage": 286,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 296,
+      "bookPage": 287,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 297,
+      "bookPage": 288,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 298,
+      "bookPage": 289,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 299,
+      "bookPage": 290,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 300,
+      "bookPage": 291,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 301,
+      "bookPage": 292,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 302,
+      "bookPage": 293,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 303,
+      "bookPage": 294,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 304,
+      "bookPage": 295,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 305,
+      "bookPage": 296,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 306,
+      "bookPage": 297,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 307,
+      "bookPage": 298,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 308,
+      "bookPage": 299,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 309,
+      "bookPage": 300,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 310,
+      "bookPage": 301,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 311,
+      "bookPage": 302,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 312,
+      "bookPage": 303,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 313,
+      "bookPage": 304,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 314,
+      "bookPage": 305,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 315,
+      "bookPage": 306,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 316,
+      "bookPage": 307,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 317,
+      "bookPage": 308,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 318,
+      "bookPage": 309,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 319,
+      "bookPage": 310,
+      "class": "solutions",
+      "sourceChapterNumber": 12,
+      "sourceChapter": "Definite Integration"
+    },
+    {
+      "pdfPage": 320,
+      "bookPage": 311,
+      "class": "questions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 321,
+      "bookPage": 312,
+      "class": "questions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 322,
+      "bookPage": 313,
+      "class": "questions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 323,
+      "bookPage": 314,
+      "class": "questions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 324,
+      "bookPage": 315,
+      "class": "answer-key+solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 325,
+      "bookPage": 316,
+      "class": "solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 326,
+      "bookPage": 317,
+      "class": "solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 327,
+      "bookPage": 318,
+      "class": "solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 328,
+      "bookPage": 319,
+      "class": "solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 329,
+      "bookPage": 320,
+      "class": "solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 330,
+      "bookPage": 321,
+      "class": "solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 331,
+      "bookPage": 322,
+      "class": "solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 332,
+      "bookPage": 323,
+      "class": "solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 333,
+      "bookPage": 324,
+      "class": "solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 334,
+      "bookPage": 325,
+      "class": "solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 335,
+      "bookPage": 326,
+      "class": "solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 336,
+      "bookPage": 327,
+      "class": "solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 337,
+      "bookPage": 328,
+      "class": "solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 338,
+      "bookPage": 329,
+      "class": "solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 339,
+      "bookPage": 330,
+      "class": "solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 340,
+      "bookPage": 331,
+      "class": "solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 341,
+      "bookPage": 332,
+      "class": "solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 342,
+      "bookPage": 333,
+      "class": "solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 343,
+      "bookPage": 334,
+      "class": "solutions",
+      "sourceChapterNumber": 13,
+      "sourceChapter": "Area"
+    },
+    {
+      "pdfPage": 344,
+      "bookPage": 335,
+      "class": "questions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 345,
+      "bookPage": 336,
+      "class": "questions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 346,
+      "bookPage": 337,
+      "class": "questions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 347,
+      "bookPage": 338,
+      "class": "questions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 348,
+      "bookPage": 339,
+      "class": "questions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 349,
+      "bookPage": 340,
+      "class": "questions+answer-key+solutions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 350,
+      "bookPage": 341,
+      "class": "solutions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 351,
+      "bookPage": 342,
+      "class": "solutions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 352,
+      "bookPage": 343,
+      "class": "solutions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 353,
+      "bookPage": 344,
+      "class": "solutions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 354,
+      "bookPage": 345,
+      "class": "solutions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 355,
+      "bookPage": 346,
+      "class": "solutions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 356,
+      "bookPage": 347,
+      "class": "solutions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 357,
+      "bookPage": 348,
+      "class": "solutions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 358,
+      "bookPage": 349,
+      "class": "solutions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 359,
+      "bookPage": 350,
+      "class": "solutions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 360,
+      "bookPage": 351,
+      "class": "solutions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 361,
+      "bookPage": 352,
+      "class": "solutions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 362,
+      "bookPage": 353,
+      "class": "solutions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 363,
+      "bookPage": 354,
+      "class": "solutions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 364,
+      "bookPage": 355,
+      "class": "solutions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 365,
+      "bookPage": 356,
+      "class": "solutions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 366,
+      "bookPage": 357,
+      "class": "solutions",
+      "sourceChapterNumber": 14,
+      "sourceChapter": "Differential Equations"
+    },
+    {
+      "pdfPage": 367,
+      "bookPage": 358,
+      "class": "questions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 368,
+      "bookPage": 359,
+      "class": "questions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 369,
+      "bookPage": 360,
+      "class": "questions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 370,
+      "bookPage": 361,
+      "class": "questions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 371,
+      "bookPage": 362,
+      "class": "questions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 372,
+      "bookPage": 363,
+      "class": "questions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 373,
+      "bookPage": 364,
+      "class": "questions+answer-key+solutions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 374,
+      "bookPage": 365,
+      "class": "solutions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 375,
+      "bookPage": 366,
+      "class": "solutions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 376,
+      "bookPage": 367,
+      "class": "solutions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 377,
+      "bookPage": 368,
+      "class": "solutions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 378,
+      "bookPage": 369,
+      "class": "solutions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 379,
+      "bookPage": 370,
+      "class": "solutions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 380,
+      "bookPage": 371,
+      "class": "solutions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 381,
+      "bookPage": 372,
+      "class": "solutions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 382,
+      "bookPage": 373,
+      "class": "solutions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 383,
+      "bookPage": 374,
+      "class": "solutions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 384,
+      "bookPage": 375,
+      "class": "solutions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 385,
+      "bookPage": 376,
+      "class": "solutions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 386,
+      "bookPage": 377,
+      "class": "solutions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 387,
+      "bookPage": 378,
+      "class": "solutions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 388,
+      "bookPage": 379,
+      "class": "solutions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 389,
+      "bookPage": 380,
+      "class": "solutions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 390,
+      "bookPage": 381,
+      "class": "solutions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 391,
+      "bookPage": 382,
+      "class": "solutions",
+      "sourceChapterNumber": 15,
+      "sourceChapter": "Straight Line and Pair of Straight Lines"
+    },
+    {
+      "pdfPage": 392,
+      "bookPage": 383,
+      "class": "questions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 393,
+      "bookPage": 384,
+      "class": "questions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 394,
+      "bookPage": 385,
+      "class": "questions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 395,
+      "bookPage": 386,
+      "class": "questions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 396,
+      "bookPage": 387,
+      "class": "questions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 397,
+      "bookPage": 388,
+      "class": "questions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 398,
+      "bookPage": 389,
+      "class": "questions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 399,
+      "bookPage": 390,
+      "class": "questions+answer-key",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 400,
+      "bookPage": 391,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 401,
+      "bookPage": 392,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 402,
+      "bookPage": 393,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 403,
+      "bookPage": 394,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 404,
+      "bookPage": 395,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 405,
+      "bookPage": 396,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 406,
+      "bookPage": 397,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 407,
+      "bookPage": 398,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 408,
+      "bookPage": 399,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 409,
+      "bookPage": 400,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 410,
+      "bookPage": 401,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 411,
+      "bookPage": 402,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 412,
+      "bookPage": 403,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 413,
+      "bookPage": 404,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 414,
+      "bookPage": 405,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 415,
+      "bookPage": 406,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 416,
+      "bookPage": 407,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 417,
+      "bookPage": 408,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 418,
+      "bookPage": 409,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 419,
+      "bookPage": 410,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 420,
+      "bookPage": 411,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 421,
+      "bookPage": 412,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 422,
+      "bookPage": 413,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 423,
+      "bookPage": 414,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 424,
+      "bookPage": 415,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 425,
+      "bookPage": 416,
+      "class": "solutions",
+      "sourceChapterNumber": 16,
+      "sourceChapter": "Circle"
+    },
+    {
+      "pdfPage": 426,
+      "bookPage": 417,
+      "class": "questions",
+      "sourceChapterNumber": 17,
+      "sourceChapter": "Parabola"
+    },
+    {
+      "pdfPage": 427,
+      "bookPage": 418,
+      "class": "questions",
+      "sourceChapterNumber": 17,
+      "sourceChapter": "Parabola"
+    },
+    {
+      "pdfPage": 428,
+      "bookPage": 419,
+      "class": "questions",
+      "sourceChapterNumber": 17,
+      "sourceChapter": "Parabola"
+    },
+    {
+      "pdfPage": 429,
+      "bookPage": 420,
+      "class": "questions",
+      "sourceChapterNumber": 17,
+      "sourceChapter": "Parabola"
+    },
+    {
+      "pdfPage": 430,
+      "bookPage": 421,
+      "class": "questions+answer-key+solutions",
+      "sourceChapterNumber": 17,
+      "sourceChapter": "Parabola"
+    },
+    {
+      "pdfPage": 431,
+      "bookPage": 422,
+      "class": "solutions",
+      "sourceChapterNumber": 17,
+      "sourceChapter": "Parabola"
+    },
+    {
+      "pdfPage": 432,
+      "bookPage": 423,
+      "class": "solutions",
+      "sourceChapterNumber": 17,
+      "sourceChapter": "Parabola"
+    },
+    {
+      "pdfPage": 433,
+      "bookPage": 424,
+      "class": "solutions",
+      "sourceChapterNumber": 17,
+      "sourceChapter": "Parabola"
+    },
+    {
+      "pdfPage": 434,
+      "bookPage": 425,
+      "class": "solutions",
+      "sourceChapterNumber": 17,
+      "sourceChapter": "Parabola"
+    },
+    {
+      "pdfPage": 435,
+      "bookPage": 426,
+      "class": "solutions",
+      "sourceChapterNumber": 17,
+      "sourceChapter": "Parabola"
+    },
+    {
+      "pdfPage": 436,
+      "bookPage": 427,
+      "class": "solutions",
+      "sourceChapterNumber": 17,
+      "sourceChapter": "Parabola"
+    },
+    {
+      "pdfPage": 437,
+      "bookPage": 428,
+      "class": "solutions",
+      "sourceChapterNumber": 17,
+      "sourceChapter": "Parabola"
+    },
+    {
+      "pdfPage": 438,
+      "bookPage": 429,
+      "class": "solutions",
+      "sourceChapterNumber": 17,
+      "sourceChapter": "Parabola"
+    },
+    {
+      "pdfPage": 439,
+      "bookPage": 430,
+      "class": "solutions",
+      "sourceChapterNumber": 17,
+      "sourceChapter": "Parabola"
+    },
+    {
+      "pdfPage": 440,
+      "bookPage": 431,
+      "class": "solutions",
+      "sourceChapterNumber": 17,
+      "sourceChapter": "Parabola"
+    },
+    {
+      "pdfPage": 441,
+      "bookPage": 432,
+      "class": "solutions",
+      "sourceChapterNumber": 17,
+      "sourceChapter": "Parabola"
+    },
+    {
+      "pdfPage": 442,
+      "bookPage": 433,
+      "class": "solutions",
+      "sourceChapterNumber": 17,
+      "sourceChapter": "Parabola"
+    },
+    {
+      "pdfPage": 443,
+      "bookPage": 434,
+      "class": "solutions",
+      "sourceChapterNumber": 17,
+      "sourceChapter": "Parabola"
+    },
+    {
+      "pdfPage": 444,
+      "bookPage": 435,
+      "class": "questions",
+      "sourceChapterNumber": 18,
+      "sourceChapter": "Ellipse"
+    },
+    {
+      "pdfPage": 445,
+      "bookPage": 436,
+      "class": "questions",
+      "sourceChapterNumber": 18,
+      "sourceChapter": "Ellipse"
+    },
+    {
+      "pdfPage": 446,
+      "bookPage": 437,
+      "class": "questions",
+      "sourceChapterNumber": 18,
+      "sourceChapter": "Ellipse"
+    },
+    {
+      "pdfPage": 447,
+      "bookPage": 438,
+      "class": "questions+answer-key+solutions",
+      "sourceChapterNumber": 18,
+      "sourceChapter": "Ellipse"
+    },
+    {
+      "pdfPage": 448,
+      "bookPage": 439,
+      "class": "solutions",
+      "sourceChapterNumber": 18,
+      "sourceChapter": "Ellipse"
+    },
+    {
+      "pdfPage": 449,
+      "bookPage": 440,
+      "class": "solutions",
+      "sourceChapterNumber": 18,
+      "sourceChapter": "Ellipse"
+    },
+    {
+      "pdfPage": 450,
+      "bookPage": 441,
+      "class": "solutions",
+      "sourceChapterNumber": 18,
+      "sourceChapter": "Ellipse"
+    },
+    {
+      "pdfPage": 451,
+      "bookPage": 442,
+      "class": "solutions",
+      "sourceChapterNumber": 18,
+      "sourceChapter": "Ellipse"
+    },
+    {
+      "pdfPage": 452,
+      "bookPage": 443,
+      "class": "solutions",
+      "sourceChapterNumber": 18,
+      "sourceChapter": "Ellipse"
+    },
+    {
+      "pdfPage": 453,
+      "bookPage": 444,
+      "class": "solutions",
+      "sourceChapterNumber": 18,
+      "sourceChapter": "Ellipse"
+    },
+    {
+      "pdfPage": 454,
+      "bookPage": 445,
+      "class": "solutions",
+      "sourceChapterNumber": 18,
+      "sourceChapter": "Ellipse"
+    },
+    {
+      "pdfPage": 455,
+      "bookPage": 446,
+      "class": "solutions",
+      "sourceChapterNumber": 18,
+      "sourceChapter": "Ellipse"
+    },
+    {
+      "pdfPage": 456,
+      "bookPage": 447,
+      "class": "solutions",
+      "sourceChapterNumber": 18,
+      "sourceChapter": "Ellipse"
+    },
+    {
+      "pdfPage": 457,
+      "bookPage": 448,
+      "class": "solutions",
+      "sourceChapterNumber": 18,
+      "sourceChapter": "Ellipse"
+    },
+    {
+      "pdfPage": 458,
+      "bookPage": 449,
+      "class": "solutions",
+      "sourceChapterNumber": 18,
+      "sourceChapter": "Ellipse"
+    },
+    {
+      "pdfPage": 459,
+      "bookPage": 450,
+      "class": "questions",
+      "sourceChapterNumber": 19,
+      "sourceChapter": "Hyperbola"
+    },
+    {
+      "pdfPage": 460,
+      "bookPage": 451,
+      "class": "questions",
+      "sourceChapterNumber": 19,
+      "sourceChapter": "Hyperbola"
+    },
+    {
+      "pdfPage": 461,
+      "bookPage": 452,
+      "class": "questions",
+      "sourceChapterNumber": 19,
+      "sourceChapter": "Hyperbola"
+    },
+    {
+      "pdfPage": 462,
+      "bookPage": 453,
+      "class": "answer-key+solutions",
+      "sourceChapterNumber": 19,
+      "sourceChapter": "Hyperbola"
+    },
+    {
+      "pdfPage": 463,
+      "bookPage": 454,
+      "class": "solutions",
+      "sourceChapterNumber": 19,
+      "sourceChapter": "Hyperbola"
+    },
+    {
+      "pdfPage": 464,
+      "bookPage": 455,
+      "class": "solutions",
+      "sourceChapterNumber": 19,
+      "sourceChapter": "Hyperbola"
+    },
+    {
+      "pdfPage": 465,
+      "bookPage": 456,
+      "class": "solutions",
+      "sourceChapterNumber": 19,
+      "sourceChapter": "Hyperbola"
+    },
+    {
+      "pdfPage": 466,
+      "bookPage": 457,
+      "class": "solutions",
+      "sourceChapterNumber": 19,
+      "sourceChapter": "Hyperbola"
+    },
+    {
+      "pdfPage": 467,
+      "bookPage": 458,
+      "class": "solutions",
+      "sourceChapterNumber": 19,
+      "sourceChapter": "Hyperbola"
+    },
+    {
+      "pdfPage": 468,
+      "bookPage": 459,
+      "class": "solutions",
+      "sourceChapterNumber": 19,
+      "sourceChapter": "Hyperbola"
+    },
+    {
+      "pdfPage": 469,
+      "bookPage": 460,
+      "class": "solutions",
+      "sourceChapterNumber": 19,
+      "sourceChapter": "Hyperbola"
+    },
+    {
+      "pdfPage": 470,
+      "bookPage": 461,
+      "class": "questions",
+      "sourceChapterNumber": 20,
+      "sourceChapter": "Trigonometrical Ratios and Identities"
+    },
+    {
+      "pdfPage": 471,
+      "bookPage": 462,
+      "class": "questions",
+      "sourceChapterNumber": 20,
+      "sourceChapter": "Trigonometrical Ratios and Identities"
+    },
+    {
+      "pdfPage": 472,
+      "bookPage": 463,
+      "class": "questions",
+      "sourceChapterNumber": 20,
+      "sourceChapter": "Trigonometrical Ratios and Identities"
+    },
+    {
+      "pdfPage": 473,
+      "bookPage": 464,
+      "class": "questions+answer-key+solutions",
+      "sourceChapterNumber": 20,
+      "sourceChapter": "Trigonometrical Ratios and Identities"
+    },
+    {
+      "pdfPage": 474,
+      "bookPage": 465,
+      "class": "solutions",
+      "sourceChapterNumber": 20,
+      "sourceChapter": "Trigonometrical Ratios and Identities"
+    },
+    {
+      "pdfPage": 475,
+      "bookPage": 466,
+      "class": "solutions",
+      "sourceChapterNumber": 20,
+      "sourceChapter": "Trigonometrical Ratios and Identities"
+    },
+    {
+      "pdfPage": 476,
+      "bookPage": 467,
+      "class": "solutions",
+      "sourceChapterNumber": 20,
+      "sourceChapter": "Trigonometrical Ratios and Identities"
+    },
+    {
+      "pdfPage": 477,
+      "bookPage": 468,
+      "class": "solutions",
+      "sourceChapterNumber": 20,
+      "sourceChapter": "Trigonometrical Ratios and Identities"
+    },
+    {
+      "pdfPage": 478,
+      "bookPage": 469,
+      "class": "solutions",
+      "sourceChapterNumber": 20,
+      "sourceChapter": "Trigonometrical Ratios and Identities"
+    },
+    {
+      "pdfPage": 479,
+      "bookPage": 470,
+      "class": "solutions",
+      "sourceChapterNumber": 20,
+      "sourceChapter": "Trigonometrical Ratios and Identities"
+    },
+    {
+      "pdfPage": 480,
+      "bookPage": 471,
+      "class": "solutions",
+      "sourceChapterNumber": 20,
+      "sourceChapter": "Trigonometrical Ratios and Identities"
+    },
+    {
+      "pdfPage": 481,
+      "bookPage": 472,
+      "class": "solutions",
+      "sourceChapterNumber": 20,
+      "sourceChapter": "Trigonometrical Ratios and Identities"
+    },
+    {
+      "pdfPage": 482,
+      "bookPage": 473,
+      "class": "solutions",
+      "sourceChapterNumber": 20,
+      "sourceChapter": "Trigonometrical Ratios and Identities"
+    },
+    {
+      "pdfPage": 483,
+      "bookPage": 474,
+      "class": "questions",
+      "sourceChapterNumber": 21,
+      "sourceChapter": "Trigonometrical Equations"
+    },
+    {
+      "pdfPage": 484,
+      "bookPage": 475,
+      "class": "questions",
+      "sourceChapterNumber": 21,
+      "sourceChapter": "Trigonometrical Equations"
+    },
+    {
+      "pdfPage": 485,
+      "bookPage": 476,
+      "class": "questions",
+      "sourceChapterNumber": 21,
+      "sourceChapter": "Trigonometrical Equations"
+    },
+    {
+      "pdfPage": 486,
+      "bookPage": 477,
+      "class": "questions+answer-key+solutions",
+      "sourceChapterNumber": 21,
+      "sourceChapter": "Trigonometrical Equations"
+    },
+    {
+      "pdfPage": 487,
+      "bookPage": 478,
+      "class": "solutions",
+      "sourceChapterNumber": 21,
+      "sourceChapter": "Trigonometrical Equations"
+    },
+    {
+      "pdfPage": 488,
+      "bookPage": 479,
+      "class": "solutions",
+      "sourceChapterNumber": 21,
+      "sourceChapter": "Trigonometrical Equations"
+    },
+    {
+      "pdfPage": 489,
+      "bookPage": 480,
+      "class": "solutions",
+      "sourceChapterNumber": 21,
+      "sourceChapter": "Trigonometrical Equations"
+    },
+    {
+      "pdfPage": 490,
+      "bookPage": 481,
+      "class": "solutions",
+      "sourceChapterNumber": 21,
+      "sourceChapter": "Trigonometrical Equations"
+    },
+    {
+      "pdfPage": 491,
+      "bookPage": 482,
+      "class": "solutions",
+      "sourceChapterNumber": 21,
+      "sourceChapter": "Trigonometrical Equations"
+    },
+    {
+      "pdfPage": 492,
+      "bookPage": 483,
+      "class": "solutions",
+      "sourceChapterNumber": 21,
+      "sourceChapter": "Trigonometrical Equations"
+    },
+    {
+      "pdfPage": 493,
+      "bookPage": 484,
+      "class": "solutions",
+      "sourceChapterNumber": 21,
+      "sourceChapter": "Trigonometrical Equations"
+    },
+    {
+      "pdfPage": 494,
+      "bookPage": 485,
+      "class": "solutions",
+      "sourceChapterNumber": 21,
+      "sourceChapter": "Trigonometrical Equations"
+    },
+    {
+      "pdfPage": 495,
+      "bookPage": 486,
+      "class": "solutions",
+      "sourceChapterNumber": 21,
+      "sourceChapter": "Trigonometrical Equations"
+    },
+    {
+      "pdfPage": 496,
+      "bookPage": 487,
+      "class": "solutions",
+      "sourceChapterNumber": 21,
+      "sourceChapter": "Trigonometrical Equations"
+    },
+    {
+      "pdfPage": 497,
+      "bookPage": 488,
+      "class": "questions",
+      "sourceChapterNumber": 22,
+      "sourceChapter": "Inverse Circular Functions"
+    },
+    {
+      "pdfPage": 498,
+      "bookPage": 489,
+      "class": "questions",
+      "sourceChapterNumber": 22,
+      "sourceChapter": "Inverse Circular Functions"
+    },
+    {
+      "pdfPage": 499,
+      "bookPage": 490,
+      "class": "questions+answer-key",
+      "sourceChapterNumber": 22,
+      "sourceChapter": "Inverse Circular Functions"
+    },
+    {
+      "pdfPage": 500,
+      "bookPage": 491,
+      "class": "solutions",
+      "sourceChapterNumber": 22,
+      "sourceChapter": "Inverse Circular Functions"
+    },
+    {
+      "pdfPage": 501,
+      "bookPage": 492,
+      "class": "solutions",
+      "sourceChapterNumber": 22,
+      "sourceChapter": "Inverse Circular Functions"
+    },
+    {
+      "pdfPage": 502,
+      "bookPage": 493,
+      "class": "solutions",
+      "sourceChapterNumber": 22,
+      "sourceChapter": "Inverse Circular Functions"
+    },
+    {
+      "pdfPage": 503,
+      "bookPage": 494,
+      "class": "solutions",
+      "sourceChapterNumber": 22,
+      "sourceChapter": "Inverse Circular Functions"
+    },
+    {
+      "pdfPage": 504,
+      "bookPage": 495,
+      "class": "solutions",
+      "sourceChapterNumber": 22,
+      "sourceChapter": "Inverse Circular Functions"
+    },
+    {
+      "pdfPage": 505,
+      "bookPage": 496,
+      "class": "solutions",
+      "sourceChapterNumber": 22,
+      "sourceChapter": "Inverse Circular Functions"
+    },
+    {
+      "pdfPage": 506,
+      "bookPage": 497,
+      "class": "solutions",
+      "sourceChapterNumber": 22,
+      "sourceChapter": "Inverse Circular Functions"
+    },
+    {
+      "pdfPage": 507,
+      "bookPage": 498,
+      "class": "questions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 508,
+      "bookPage": 499,
+      "class": "questions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 509,
+      "bookPage": 500,
+      "class": "questions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 510,
+      "bookPage": 501,
+      "class": "questions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 511,
+      "bookPage": 502,
+      "class": "answer-key+solutions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 512,
+      "bookPage": 503,
+      "class": "solutions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 513,
+      "bookPage": 504,
+      "class": "solutions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 514,
+      "bookPage": 505,
+      "class": "solutions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 515,
+      "bookPage": 506,
+      "class": "solutions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 516,
+      "bookPage": 507,
+      "class": "solutions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 517,
+      "bookPage": 508,
+      "class": "solutions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 518,
+      "bookPage": 509,
+      "class": "solutions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 519,
+      "bookPage": 510,
+      "class": "solutions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 520,
+      "bookPage": 511,
+      "class": "solutions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 521,
+      "bookPage": 512,
+      "class": "solutions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 522,
+      "bookPage": 513,
+      "class": "solutions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 523,
+      "bookPage": 514,
+      "class": "solutions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 524,
+      "bookPage": 515,
+      "class": "solutions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 525,
+      "bookPage": 516,
+      "class": "solutions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 526,
+      "bookPage": 517,
+      "class": "solutions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 527,
+      "bookPage": 518,
+      "class": "solutions",
+      "sourceChapterNumber": 23,
+      "sourceChapter": "Properties of Triangles"
+    },
+    {
+      "pdfPage": 528,
+      "bookPage": 519,
+      "class": "questions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 529,
+      "bookPage": 520,
+      "class": "questions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 530,
+      "bookPage": 521,
+      "class": "questions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 531,
+      "bookPage": 522,
+      "class": "questions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 532,
+      "bookPage": 523,
+      "class": "questions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 533,
+      "bookPage": 524,
+      "class": "questions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 534,
+      "bookPage": 525,
+      "class": "questions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 535,
+      "bookPage": 526,
+      "class": "questions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 536,
+      "bookPage": 527,
+      "class": "questions+answer-key",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 537,
+      "bookPage": 528,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 538,
+      "bookPage": 529,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 539,
+      "bookPage": 530,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 540,
+      "bookPage": 531,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 541,
+      "bookPage": 532,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 542,
+      "bookPage": 533,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 543,
+      "bookPage": 534,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 544,
+      "bookPage": 535,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 545,
+      "bookPage": 536,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 546,
+      "bookPage": 537,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 547,
+      "bookPage": 538,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 548,
+      "bookPage": 539,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 549,
+      "bookPage": 540,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 550,
+      "bookPage": 541,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 551,
+      "bookPage": 542,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 552,
+      "bookPage": 543,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 553,
+      "bookPage": 544,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 554,
+      "bookPage": 545,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 555,
+      "bookPage": 546,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 556,
+      "bookPage": 547,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 557,
+      "bookPage": 548,
+      "class": "solutions",
+      "sourceChapterNumber": 24,
+      "sourceChapter": "Vectors"
+    },
+    {
+      "pdfPage": 558,
+      "bookPage": 549,
+      "class": "questions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 559,
+      "bookPage": 550,
+      "class": "questions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 560,
+      "bookPage": 551,
+      "class": "questions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 561,
+      "bookPage": 552,
+      "class": "questions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 562,
+      "bookPage": 553,
+      "class": "questions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 563,
+      "bookPage": 554,
+      "class": "questions+answer-key",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 564,
+      "bookPage": 555,
+      "class": "solutions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 565,
+      "bookPage": 556,
+      "class": "solutions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 566,
+      "bookPage": 557,
+      "class": "solutions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 567,
+      "bookPage": 558,
+      "class": "solutions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 568,
+      "bookPage": 559,
+      "class": "solutions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 569,
+      "bookPage": 560,
+      "class": "solutions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 570,
+      "bookPage": 561,
+      "class": "solutions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 571,
+      "bookPage": 562,
+      "class": "solutions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 572,
+      "bookPage": 563,
+      "class": "solutions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 573,
+      "bookPage": 564,
+      "class": "solutions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 574,
+      "bookPage": 565,
+      "class": "solutions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 575,
+      "bookPage": 566,
+      "class": "solutions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 576,
+      "bookPage": 567,
+      "class": "solutions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 577,
+      "bookPage": 568,
+      "class": "solutions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 578,
+      "bookPage": 569,
+      "class": "solutions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 579,
+      "bookPage": 570,
+      "class": "solutions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 580,
+      "bookPage": 571,
+      "class": "solutions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 581,
+      "bookPage": 572,
+      "class": "solutions",
+      "sourceChapterNumber": 25,
+      "sourceChapter": "3D Geometry"
+    },
+    {
+      "pdfPage": 582,
+      "bookPage": 573,
+      "class": "questions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 583,
+      "bookPage": 574,
+      "class": "questions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 584,
+      "bookPage": 575,
+      "class": "questions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 585,
+      "bookPage": 576,
+      "class": "questions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 586,
+      "bookPage": 577,
+      "class": "questions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 587,
+      "bookPage": 578,
+      "class": "questions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 588,
+      "bookPage": 579,
+      "class": "questions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 589,
+      "bookPage": 580,
+      "class": "questions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 590,
+      "bookPage": 581,
+      "class": "questions+answer-key",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 591,
+      "bookPage": 582,
+      "class": "solutions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 592,
+      "bookPage": 583,
+      "class": "solutions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 593,
+      "bookPage": 584,
+      "class": "solutions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 594,
+      "bookPage": 585,
+      "class": "solutions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 595,
+      "bookPage": 586,
+      "class": "solutions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 596,
+      "bookPage": 587,
+      "class": "solutions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 597,
+      "bookPage": 588,
+      "class": "solutions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 598,
+      "bookPage": 589,
+      "class": "solutions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 599,
+      "bookPage": 590,
+      "class": "solutions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 600,
+      "bookPage": 591,
+      "class": "solutions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 601,
+      "bookPage": 592,
+      "class": "solutions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 602,
+      "bookPage": 593,
+      "class": "solutions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 603,
+      "bookPage": 594,
+      "class": "solutions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 604,
+      "bookPage": 595,
+      "class": "solutions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 605,
+      "bookPage": 596,
+      "class": "solutions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 606,
+      "bookPage": 597,
+      "class": "solutions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 607,
+      "bookPage": 598,
+      "class": "solutions",
+      "sourceChapterNumber": 26,
+      "sourceChapter": "Miscellaneous"
+    },
+    {
+      "pdfPage": 608,
+      "class": "appendix-questions",
+      "appendix": "jee-advanced-2019-solved-paper"
+    },
+    {
+      "pdfPage": 609,
+      "class": "appendix-questions",
+      "appendix": "jee-advanced-2019-solved-paper"
+    },
+    {
+      "pdfPage": 610,
+      "class": "appendix-questions",
+      "appendix": "jee-advanced-2019-solved-paper"
+    },
+    {
+      "pdfPage": 611,
+      "class": "appendix-questions",
+      "appendix": "jee-advanced-2019-solved-paper"
+    },
+    {
+      "pdfPage": 612,
+      "class": "appendix-questions",
+      "appendix": "jee-advanced-2019-solved-paper"
+    },
+    {
+      "pdfPage": 613,
+      "class": "appendix-questions",
+      "appendix": "jee-advanced-2019-solved-paper"
+    },
+    {
+      "pdfPage": 614,
+      "class": "appendix-questions+solutions",
+      "appendix": "jee-advanced-2019-solved-paper"
+    },
+    {
+      "pdfPage": 615,
+      "class": "appendix-solutions",
+      "appendix": "jee-advanced-2019-solved-paper"
+    },
+    {
+      "pdfPage": 616,
+      "class": "appendix-solutions",
+      "appendix": "jee-advanced-2019-solved-paper"
+    },
+    {
+      "pdfPage": 617,
+      "class": "appendix-solutions",
+      "appendix": "jee-advanced-2019-solved-paper"
+    },
+    {
+      "pdfPage": 618,
+      "class": "appendix-solutions",
+      "appendix": "jee-advanced-2019-solved-paper"
+    },
+    {
+      "pdfPage": 619,
+      "class": "appendix-solutions",
+      "appendix": "jee-advanced-2019-solved-paper"
+    },
+    {
+      "pdfPage": 620,
+      "class": "appendix-solutions",
+      "appendix": "jee-advanced-2019-solved-paper"
+    },
+    {
+      "pdfPage": 621,
+      "class": "appendix-solutions",
+      "appendix": "jee-advanced-2019-solved-paper"
+    },
+    {
+      "pdfPage": 622,
+      "class": "appendix-solutions",
+      "appendix": "jee-advanced-2019-solved-paper"
+    },
+    {
+      "pdfPage": 623,
+      "class": "appendix-solutions",
+      "appendix": "jee-advanced-2019-solved-paper"
+    },
+    {
+      "pdfPage": 624,
+      "class": "appendix-solutions",
+      "appendix": "jee-advanced-2019-solved-paper"
+    },
+    {
+      "pdfPage": 625,
+      "class": "appendix-solutions",
+      "appendix": "jee-advanced-2019-solved-paper"
+    }
+  ],
+  "queue": {
+    "path": "tools/jee-question-department/work/question-inventory-final.jsonl",
+    "sha256": "351271cb135ff22e1998657921a409f176815f5ca012a3ab4219fa1d60fe359b",
+    "note": "Queue path is local/ignored; report contains metadata only."
+  }
+}

@@ -45,6 +45,15 @@ def line_groups(words):
     return grouped
 
 
+def answer_heading_y(page):
+    """Return the y-coordinate of the exact Answers heading, if present."""
+    for words in line_groups(page.get_text("words")).values():
+        text = " ".join(str(w[4]) for w in words).strip().lower()
+        if text == "answers":
+            return min(float(w[1]) for w in words)
+    return None
+
+
 def topic_events(page, source_page: int):
     events = []
     groups = line_groups(page.get_text("words"))
@@ -67,6 +76,7 @@ def question_candidates(page, source_page: int):
     promoted into the app.
     """
     width = float(page.rect.width)
+    height = float(page.rect.height)
     left_anchor, right_anchor = width * 0.110, width * 0.525
     left_band = (width * 0.095, width * 0.126)
     right_band = (width * 0.510, width * 0.548)
@@ -79,6 +89,10 @@ def question_candidates(page, source_page: int):
             if not match:
                 continue
             x, y = float(word[0]), float(word[1])
+            # Printed book/page headers sit in the same horizontal gutters as
+            # question numbers. Reject the header band before scoring markers.
+            if y < height * 0.10:
+                continue
             side = "left" if left_band[0] <= x <= left_band[1] else "right" if right_band[0] <= x <= right_band[1] else None
             if not side:
                 continue
@@ -120,14 +134,15 @@ def assign_topic(events, source_page: int, y: float, fallback: dict | None):
     return fallback or {"number": 1, "title": ""}
 
 
-def crop_text(page, marker, next_marker):
+def crop_text(page, marker, next_marker, y_limit=None):
     width, height = float(page.rect.width), float(page.rect.height)
     if marker["side"] == "left":
         x0, x1 = width * 0.085, width * 0.505
     else:
         x0, x1 = width * 0.505, width * 0.94
     y0 = max(0.0, marker["y"] - 2.5)
-    y1 = min(height, (next_marker["y"] - 2.0) if next_marker and next_marker["side"] == marker["side"] else height * 0.91)
+    natural_y1 = (next_marker["y"] - 2.0) if next_marker and next_marker["side"] == marker["side"] else height * 0.91
+    y1 = min(height, natural_y1, float(y_limit) - 2.0 if y_limit is not None else height)
     text = page.get_text("text", clip=fitz.Rect(x0, y0, x1, y1), sort=True)
     text = re.sub(r"[ \t]+\n", "\n", text)
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
@@ -159,18 +174,27 @@ def extract_chapter(pdf, manifest: dict, chapter: dict, min_score: int):
     offset = int(manifest["source"]["bookPageOffset"])
     start, answer = int(chapter["bookPageStart"]), int(chapter["answerPage"])
     topic_events_all = []
-    for source_page in range(start, answer):
-        topic_events_all.extend(topic_events(pdf[source_page + offset - 1], source_page))
+    for source_page in range(start, answer + 1):
+        page = pdf[source_page + offset - 1]
+        cutoff = answer_heading_y(page) if source_page == answer else None
+        events = topic_events(page, source_page)
+        if cutoff is not None:
+            events = [event for event in events if event["y"] < cutoff]
+        topic_events_all.extend(events)
     topic_events_all.sort(key=lambda e: (e["sourcePage"], e["y"]))
     fallback = {"number": 1, "title": chapter["title"]} if not topic_events_all else None
 
     rows = []
     seen = set()
     target, target_reasons = target_for(chapter)
-    for source_page in range(start, answer):
+    for source_page in range(start, answer + 1):
         page = pdf[source_page + offset - 1]
+        cutoff = answer_heading_y(page) if source_page == answer else None
         all_candidates = question_candidates(page, source_page)
-        candidates = [c for c in all_candidates if c["score"] >= min_score]
+        candidates = [
+            c for c in all_candidates
+            if c["score"] >= min_score and (cutoff is None or c["y"] < cutoff - 2.0)
+        ]
         by_side = {"left": [], "right": []}
         for c in candidates:
             by_side[c["side"]].append(c)
@@ -187,7 +211,7 @@ def extract_chapter(pdf, manifest: dict, chapter: dict, min_score: int):
             pos = same_side.index(marker)
             if pos + 1 < len(same_side):
                 next_same = same_side[pos + 1]
-            raw_text, crop = crop_text(page, marker, next_same)
+            raw_text, crop = crop_text(page, marker, next_same, y_limit=cutoff)
             year, track, track_evidence = infer_exam(raw_text)
             review_reasons = list(target_reasons)
             if marker["score"] < 6:
