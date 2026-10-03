@@ -848,6 +848,12 @@ async function run() {
       await wait(page, 700);
     });
 
+    await step('plan · this week, the week grid and settings', '/plan', async () => {
+      await goTo(page, BASE, '/plan');
+      await page.waitForSelector('[data-plan-day]', { timeout: 20000 });
+      await wait(page, 800);
+    });
+
     await step('notes · index and chapter map', '/notes', async () => {
       await goTo(page, BASE, '/notes?class=10');
       await page.waitForSelector('.nt-map-node', { timeout: 20000 });
