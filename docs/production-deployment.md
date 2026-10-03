@@ -23,6 +23,22 @@ npm run verify:deployment -- --origin https://<production origin> --sha <40-hex 
 
 `tools/verify-deployment.mjs` sends three unauthenticated GETs and changes nothing. It prints `DEPLOYMENT VERIFIED: PASS` only when the server and the web bundle both report that SHA, storage is persistent, the database is reachable at the schema versions the checkout expects, verification email is configured and `/v1/ready` says the replica can serve. Use `--engine sqlite` while the service still runs on the volume.
 
+## Observed Railway state (2026-10-03, live re-check)
+
+Read-only Railway API inspection at the time this reconciliation branch was prepared found project
+`profound-spontaneity`. Staging service `pri-learning-staging` is sourced from `main` and its
+latest successful deployment is `28b68f20cbd6b3190738dc619dc91adc40abfa20`. It has
+`PRI_DATABASE_URL`, `PRI_DATABASE_SSL_ROOT_CERT` and `PRI_METRICS_TOKEN` configured.
+
+Production service `Final-Pri-learning` is still sourced from
+`task/pri-03-handwriting-production-wiring` with Railway check suites disabled. Its latest
+successful deployment is `4e3e61eed57246a188f70d604fc13907f1ec72cd` from 2026-10-01,
+it still mounts the `pri-learning-data` volume at `/data` and has `PRI_PLATFORM_DB` rather
+than the Postgres variables. Railway currently reports the builder as `RAILPACK` and no deploy
+healthcheck/restart settings in the service config, so the production service has not yet adopted
+this branch's `railway.json` contract. Production cutover must therefore be performed only after
+a nominated green release SHA and the database/data-migration decision in the release checklist.
+
 `docs/architecture/authoritative-architecture.md` governs where this document and it disagree.
 
 ## 1. Runtime topology
