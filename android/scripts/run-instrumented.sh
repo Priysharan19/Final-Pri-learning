@@ -45,7 +45,11 @@ run() {
     # print the crash buffer so it is in the CI log even without the artifact.
     adb logcat -d -b crash > "$OUT/logcat-crash.txt" 2>/dev/null || true
     adb logcat -d -b main,system,crash '*:W' | tail -n 400 > "$OUT/logcat-warnings.txt" 2>/dev/null || true
+    adb logcat -d -b all > "$OUT/logcat-all.txt" 2>/dev/null || true
+    # Why the app process ended (API 30+): LMK, signal, crash, ANR, user request.
+    adb shell dumpsys activity exit-info com.prilearning.app > "$OUT/exit-info.txt" 2>/dev/null || true
     sed -n '1,80p' "$OUT/logcat-crash.txt" >&2 || true
+    grep -m 12 -E "reason=|description=|status=|importance=" "$OUT/exit-info.txt" >&2 || true
     exit 1
   fi
 }
