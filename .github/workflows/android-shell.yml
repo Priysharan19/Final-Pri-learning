@@ -123,6 +123,12 @@ jobs:
           arch: x86_64
           profile: ${{ matrix.profile }}
           disable-animations: true
+          # The guest's low-memory killer took the app (with Play services) mid-suite
+          # at the image default RAM; give the guest room and the host's cores.
+          ram-size: 4096M
+          heap-size: 576M
+          cores: 4
+          disk-size: 6000M
           # GPU: swangle_indirect (SwiftShader behind ANGLE). With swiftshader_indirect
           # (the legacy GLES translator) the phone images' emulator process died
           # mid-journey (#278: adb exit 255, then "could not connect to TCP port
