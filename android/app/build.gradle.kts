@@ -62,6 +62,9 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // The only production cloud origin source (HTTPS); empty fails closed.
         buildConfigField("String", "PRI_CLOUD_ORIGIN", "\"$cloudOrigin\"")
+        // App Links (account-action) are declared for the cloud host only. With no
+        // cloud origin the filter names the reserved, never-resolving .invalid TLD.
+        manifestPlaceholders["priCloudHost"] = cloudOrigin.removePrefix("https://").substringBefore(":").ifEmpty { "cloud.invalid" }
     }
 
     buildFeatures { buildConfig = true }

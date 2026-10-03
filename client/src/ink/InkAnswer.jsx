@@ -1,48 +1,42 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Write-to-answer surface
-// Ink canvas + toolbar + live on-device recognition with per-symbol
-// tap-to-correct. The recognised lines feed Step Check; the final line is
-// submitted as the answer, together with how sure the engine is that it read
-// that line right — see "How sure the reading is" below.
+//
+// Ink canvas + toolbar. Handwriting is read ONLY by Pri's server reader — the
+// owner's product decision: "Pri Learning does not have the feature to mark
+// handwriting or photo when not online, since the local engine is just not
+// good enough." The on-device recogniser is therefore not in this path at all:
+// nothing it produces is shown under "I'm reading:" and nothing it produces is
+// ever marked.
+//
+// What still holds:
+//   · The model reads; it never marks. The transcription goes back to the
+//     caller, and the deterministic engine decides the mark from it.
+//   · Answer-blind: the request is a picture of the student's own strokes and
+//     nothing else (cloudReader.js / cloudRaster.js).
+//   · The ink is the student's and survives everything: it is handed to the
+//     caller the moment the pen lifts (onStrokes) whatever happens to reading.
+//   · When the server cannot be reached the student is told why in plain words,
+//     the working stays on the page, and it is read automatically as soon as
+//     the reason goes away (back online, signed in). Typing still works offline.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import InkCanvas from './InkCanvas.jsx';
 import NativeInkCanvas from './NativeInkCanvas.jsx';
-import { nativeInk, nativeInkAvailable, inferredNotationContext } from './native.js';
-import { chooseNativeConsensus, hasReading, normalizedReadingText } from './nativeConsensus.js';
-import { recognizeWithStructuralDev } from '../../dev/devStructural.js';
-import { recognize, exprToLatex } from './recognizer.js';
-import { cloudReadingEnabled, readWithCloud, recordLocalHandwritingDiagnostics, shouldSupersede, toReading } from './cloudReader.js';
+import { nativeInkAvailable } from './native.js';
+import { exprToLatex } from './inkLatex.js';
+import { cloudReadingEnabled, inkReadingBlockedKey, retryDelayMs, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
 import { useApp } from '../App.jsx';
-import { recognizeWithoutDetachedSideWork } from './runtimeSpatial.js';
 import { feedbackGeometry } from './feedbackGeometry.js';
-import { ALPHABET } from './templates.js';
-import { classOfSymbol } from './classes.js';
-import { ensurePersonalLoaded, addPersonal } from './personal.js';
+import { plausibleLineMatch, segmentInkLines } from './inkLines.js';
 import { MathText } from '../lib/latex.jsx';
 import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
+import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { inkCanvasHeight, useFormFactor } from '../platform/formFactor.js';
 import { useT } from '../i18n/index.js';
 import { priNative } from '../platform/native/index.js';
 
-const NICE = { pi: 'π', theta: 'θ', sqrt: '√', percent: '%' };
-const showSym = s => NICE[s] || s;
-
-// ── Which surface, which engine ──────────────────────────────────────────────
-// PencilKit is the native capture surface. Recognition on iPad is an evidence
-// problem, not a fallback ladder: Foundation and JS form two independent
-// opinions, and any disagreement MUST ask the native Vision/geometry reader
-// for a third vote. A legacy JS reading can never become authoritative merely
-// because its synthetic confidence is high on real Apple Pencil handwriting.
-// Browser/LAN builds normally begin at stage 2. `serve:lan:v4` adds a strictly
-// development-only first opinion from the local Structural V4 PyTorch worker on
-// the developer Mac, so physical iPad testing can exercise the actual research
-// model without pretending it is a production/offline asset.
-// The surface is chosen per mount, not at import: a shell's capability can be
-// known only after this module first evaluates (CP-02).
-
-// Engine names and fallback warnings are for developers and evaluators, not
-// students: shown in dev builds, LAN research mode, or with ?inkdiag=1.
+// Engine names are for developers and evaluators, not students: shown in dev
+// builds, LAN research mode, or with ?inkdiag=1.
 const inkDiagnosticsVisible = () => {
   if (import.meta.env?.DEV) return true;
   if (typeof window === 'undefined') return false;
@@ -50,120 +44,51 @@ const inkDiagnosticsVisible = () => {
   try { return new URLSearchParams(window.location.search).has('inkdiag'); } catch { return false; }
 };
 /** How long the page must be still before it is worth sending. */
-const CLOUD_SETTLE_MS = 1800;
+const SETTLE_MS = 1100;
+// How long a server read runs before the note changes to "still reading".
+export const STILL_READING_MS = 5000;
+/** A reader that did not answer is tried again on its own, a few times. */
+// A focus or a return to the tab also tries again at once (see below).
 
-const EMPTY_READING = { lines: [], text: '', symbols: [], minConf: 1, margin: 1, weakest: null };
-const structuralLanExpected = () => !nativeInkAvailable() && typeof window !== 'undefined' && window.__PRI_LAN_DEV__ === true;
-
-/**
- * Native rescue reads lines. If it leaves a short line unread (a lone "x", a
- * bare "3"), heal that line with Pri's JS engine so a written step cannot
- * silently disappear.
- */
-function readUnreadLines(reading, strokes, overrides, ctx = null) {
-  let healed = false;
-  const lines = reading.lines.map((line, li) => {
-    if (!line.unread || !line.strokeIdxs?.length) return line;
-    const own = line.strokeIdxs.map(i => strokes[i]).filter(Boolean);
-    if (!own.length) return line;
-    let fallback;
-    try { fallback = recognize(own, overrides, ctx); } catch { return line; }
-    const first = fallback.lines[0];
-    if (!first || !first.text) return line;
-    healed = true;
-    return {
-      ...line,
-      text: first.text,
-      box: first.box,
-      symbols: first.symbols.map(sym => ({
-        ...sym,
-        id: `w${li}_${sym.id}`,
-        strokeIdxs: (sym.strokeIdxs || [])
-          .map(i => line.strokeIdxs[i])
-          .filter(i => i !== undefined)
-      }))
-    };
-  });
-  if (!healed) return reading;
-  return { ...reading, lines, text: lines.map(l => l.text).join('\n') };
-}
-
-// ── How sure the reading is ──────────────────────────────────────────────────
-const rivalOf = (s) => {
-  const cls = classOfSymbol(s.sym);
-  return (s.alts || []).find(a => a.sym !== s.sym && classOfSymbol(a.sym) !== cls) || null;
-};
-
-function readingConfidence(result) {
-  const syms = result.lines.flatMap(l => l.symbols || []);
-  let minConf = 1, margin = 1, weakest = null;
-  syms.forEach((s, index) => {
-    const conf = typeof s.conf === 'number' ? s.conf : 1;
-    const rival = rivalOf(s);
-    const gap = Math.max(0, Math.min(1, conf - (rival ? rival.conf : 0)));
-    if (conf < minConf) minConf = conf;
-    if (gap < margin) margin = gap;
-    if (!weakest || conf < weakest.conf) {
-      weakest = { id: s.id, index, sym: s.sym, conf, alts: s.alts || [], rival };
-    }
-  });
-  const named = result.weakest ? syms[result.weakest.index] : null;
-  return {
-    minConf: typeof result.minConf === 'number' ? result.minConf : minConf,
-    margin: typeof result.margin === 'number' ? result.margin : margin,
-    weakest: result.weakest
-      ? { ...result.weakest, id: named?.id ?? weakest?.id ?? null, rival: named ? rivalOf(named) : null }
-      : weakest
-  };
-}
+const EMPTY_READING = { lines: [], text: '' };
+const strokeSignature = strokes => `${strokes.length}:${strokes.reduce((n, st) => n + (st?.points?.length || 0), 0)}`;
 
 /**
- * lineVerdicts: optional array aligned with recognised lines, e.g.
- * [{status:'ok'}, {status:'break', note:'…'}] — drawn as a teacher-style
- * ✓/✗ overlay on the ink itself and as badges in the reading panel.
- * focusSymbol: id of a glyph the caller wants checked.
- * recognitionContext: optional safe question context consumed by recognize().
+ * lineVerdicts: optional array aligned with the read lines, e.g.
+ * [{status:'ok'}, {status:'break', note:'…'}] — drawn as ✓/✗ badges in the
+ * reading panel (and on the ink where line geometry is known).
+ * focusSymbol and recognitionContext are accepted for API compatibility; the
+ * server reader is answer-blind and receives no question context.
  */
+// eslint-disable-next-line no-unused-vars
 export default function InkAnswer({ onRecognized, onStrokes = null, initialStrokes = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
-  // EXPANDED (the iPad baseline) keeps the requested height; smaller windows get
-  // a writing area that fits the screen (CP-03, FORM_FACTOR_SPEC.md §3).
   const t = useT();
   const formFactor = useFormFactor();
   const fittedHeight = inkCanvasHeight(height, formFactor);
   const canvasRef = useRef(null);
-  // The signed-in profile carries the server-reading opt-in, which is off
-  // unless the student turned it on.
   const { user } = useApp();
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
   const [tool, setTool] = useState('pen');
-  // Where the host has no stylus (iPhone), finger writing is the default; the
-  // toolbar toggle still switches it either way (CP-04).
   const [finger, setFinger] = useState(() => priNative.ink.facts()?.fingerDefault === true);
-  const [rec, setRec] = useState({ lines: [], text: '' });
-  const [overrides, setOverrides] = useState({});
-  const [picker, setPicker] = useState(null);
+  const [rec, setRec] = useState(EMPTY_READING);
   const [extraHeight, setExtraHeight] = useState(0);
-  const timerRef = useRef(null);
+  // null | { kind: 'reading' } | { kind: 'waiting', key } | { kind: 'empty' } | { kind: 'allowance' }
+  const [status, setStatus] = useState(null);
+  const settleRef = useRef(null);
+  const retryRef = useRef(null);
+  const retriesRef = useRef(0);
   const readSeqRef = useRef(0);
-  const cloudAbortRef = useRef(null);
-  const cloudSettleRef = useRef(null);
-  const cloudSentRef = useRef(null);
-  const [cloudState, setCloudState] = useState(null);   // null | 'reading' | 'confirm' | 'failed'
-  // An unconfident server reading is kept here and offered, never applied. The
-  // student decides, because they are the only one who knows what they wrote.
-  const [cloudOffer, setCloudOffer] = useState(null);
-  // Read inside the async cloud pass, where the `overrides` of the render that
-  // started it would be stale by the time the server answers.
-  const overridesRef = useRef({});
+  const abortRef = useRef(null);
+  const sentRef = useRef(null);
   const strokesRef = useRef([]);
-  const pickerRef = useRef(null);
-  const focusedRef = useRef(null);
-
-  useEffect(() => { overridesRef.current = overrides; }, [overrides]);
-  // Read inside async reading passes: a pass that settles after the card was
-  // locked for marking belongs to writing that is no longer the answer.
+  // The page waited for the reader (offline, signed out, reader down). The
+  // reading that eventually arrives is handed on as such, so the card can mark
+  // it without a second tap — once.
+  const queuedRef = useRef(false);
   const disabledRef = useRef(!!disabled);
   const onStrokesRef = useRef(onStrokes);
   useEffect(() => { onStrokesRef.current = onStrokes; }, [onStrokes]);
@@ -174,277 +99,205 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
     });
   }, []);
 
-  const publishedRef = useRef(false);
-  const publish = useCallback((r, strokes) => {
-    publishedRef.current = true;
-    recordLocalHandwritingDiagnostics({ engine: r?.engine || null });
+  const publish = useCallback((r, strokes, { afterWait = false } = {}) => {
     setRec(r);
-    // A server reading has no per-glyph symbols, so readingConfidence would
-    // find an empty list and report a perfect 1/1 — which walked straight past
-    // the confirmation gate that exists to catch an unsure reading. Its own
-    // confidence is the number that means something here.
-    const sure = r.cloud === true
-      ? { minConf: Number(r.confidence ?? 0), margin: Number(r.confidence ?? 0), weakest: null }
-      : readingConfidence(r);
+    if (r.engine) recordLocalHandwritingDiagnostics({ engine: r.engine });
+    // The server's own confidence is the number that means something here; it
+    // feeds the caller's confirmation gate exactly as before.
+    const sure = Number(r.confidence ?? (r.lines.length ? 0 : 1));
     onRecognized?.({
       lines: r.lines.map(l => l.text),
       lineBoxes: r.lines.map(l => l.box),
       text: r.text,
       answerLine: r.lines.length ? r.lines[r.lines.length - 1].text : '',
-      minConf: sure.minConf,
-      margin: sure.margin,
-      weakest: sure.weakest,
+      minConf: sure,
+      margin: sure,
+      weakest: null,
       engine: r.engine || null,
-      researchOnly: r.researchOnly === true,
-      productionReady: r.productionReady === true,
+      researchOnly: false,
+      productionReady: r.cloud === true,
+      afterWait: afterWait && r.lines.length > 0,
+      readKey: r.lines.length ? `${strokeSignature(strokes)}|${r.text}` : null,
       strokes
     });
   }, [onRecognized]);
 
-  /**
-   * Ask the server to read the same strokes, after the local reading is already
-   * on screen. Supersedes only a reading the student has not corrected, and only
-   * when the server says it is confident; otherwise the local reading stands and
-   * the student is offered the alternative.
-   */
-  const sendCloudPass = useCallback((strokes, seq, localReading) => {
-    if (!cloudReadingEnabled(user) || disabledRef.current) return;
-    cloudAbortRef.current?.abort?.();
-    const controller = typeof AbortController === 'function' ? new AbortController() : null;
-    cloudAbortRef.current = controller;
-    setCloudState('reading');
+  const clearRetry = () => { if (retryRef.current) { clearTimeout(retryRef.current); retryRef.current = null; } };
 
-    readWithCloud(strokes, { user, signal: controller?.signal }).then(outcome => {
-      // Newer writing has already replaced this read, or the page was submitted
-      // while the server was reading it (§09: a late reading never rewrites
-      // the reading a mark was given for).
-      if (seq !== readSeqRef.current || disabledRef.current) return;
-      if (outcome?.reason === 'allowance') { setCloudState('allowance'); setCloudOffer(null); return; }
-      if (!outcome || outcome.reason) { setCloudState(null); setCloudOffer(null); return; }
-      if (outcome.error) { setCloudState('failed'); setCloudOffer(null); return; }
+  const scheduleRetry = (seq) => {
+    clearRetry();
+    const delay = retryDelayMs(retriesRef.current);
+    retriesRef.current += 1;
+    retryRef.current = setTimeout(() => {
+      if (seq === readSeqRef.current && !disabledRef.current) sendToReaderRef.current?.(strokesRef.current, seq);
+    }, delay);
+  };
+  const sendToReaderRef = useRef(null);
 
-      const reading = toReading(outcome.transcription, localReading);
-      if (!reading) { setCloudState(null); setCloudOffer(null); return; }
-      const corrected = Object.keys(overridesRef.current || {}).length > 0;
-      if (shouldSupersede(reading, localReading, { hasManualCorrections: corrected })) {
-        publish(reading, strokes);
-        setCloudState(null);
-        setCloudOffer(null);
-        return;
-      }
-      // Not applied. Offer it only when it actually says something different —
-      // and never over a correction the student made by hand.
-      const differs = reading.text.trim() && reading.text.trim() !== (localReading?.text || '').trim();
-      if (differs && !corrected) {
-        setCloudOffer({ reading, strokes });
-        setCloudState('confirm');
-      } else {
-        setCloudOffer(null);
-        setCloudState(null);
-      }
-    }).catch(() => { if (seq === readSeqRef.current && !disabledRef.current) { setCloudState('failed'); setCloudOffer(null); } });
-  }, [user, publish]);
-
-  const runCloudPass = useCallback((strokes, seq, localReading) => {
-    if (!cloudReadingEnabled(user) || disabledRef.current) return;
-    // A student writing five lines of working pauses past the browser's 240 ms
-    // quiet window dozens of times, and each pause used to send the whole page
-    // again. The previous request was aborted, but usually only after it had
-    // gone. Settle properly first, and never send the same strokes twice.
-    const signature = `${strokes.length}:${strokes.reduce((n, st) => n + (st?.points?.length || 0), 0)}`;
-    if (cloudSentRef.current === signature) return;
-    if (cloudSettleRef.current) clearTimeout(cloudSettleRef.current);
-    cloudSettleRef.current = setTimeout(() => {
-      cloudSentRef.current = signature;
-      sendCloudPass(strokes, seq, localReading);
-    }, CLOUD_SETTLE_MS);
-  }, [user, sendCloudPass]);
-
-
-  const runRecognition = useCallback((strokes, ovr) => {
-    const seq = ++readSeqRef.current;
-    const effectiveContext = inferredNotationContext(recognitionContext);
-
-    const readWithJS = () => {
-      try { return recognizeWithoutDetachedSideWork(strokes, ovr, effectiveContext, recognize); }
-      catch { return null; }
-    };
-
-    // Browser/dev: prefer the explicit Structural V4 LAN research bridge when
-    // the server exposes it. A normal build answers 404 once, the client caches
-    // that absence, and the mature JS recogniser remains the local fallback.
-    // On the dedicated V4 LAN origin, however, a V4 miss is now named in the
-    // engine label instead of looking like an ordinary V3 result. That prevents
-    // a physical-iPad research session from accidentally judging V4 by legacy
-    // fallback output.
-    if (!NATIVE_INK) {
-      recognizeWithStructuralDev(strokes).then(v4 => {
-        if (seq !== readSeqRef.current) return;
-        if (v4?.lines?.some(line => line.text)) {
-          publish(v4, strokes);
-          return;
-        }
-        const local = readWithJS();
-        if (seq !== readSeqRef.current) return;
-        const engine = structuralLanExpected() ? 'pri-js-v3-v4-unavailable' : 'pri-js-v3';
-        const published = local ? { ...local, engine } : { ...EMPTY_READING, engine };
-        publish(published, strokes);
-        runCloudPass(strokes, seq, published);
-      });
+  /** Send the page to the server reader. Its reading is the only reading. */
+  const sendToReader = useCallback((strokes, seq) => {
+    if (disabledRef.current) return;
+    const who = userRef.current;
+    // Offline is known before anything is sent: no doomed request, just the
+    // honest note, and the 'online' listener below reads the page later.
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    if (offline || !cloudReadingEnabled(who)) {
+      queuedRef.current = true;
+      setStatus({ kind: 'waiting', key: inkReadingBlockedKey(who) });
       return;
     }
-
-    // Native iPad: Foundation and JS are opinions, not fallbacks. The previous
-    // implementation allowed a lone JS V3 reading to short-circuit this path
-    // when JS reported high confidence. Real Pencil evidence showed that those
-    // confidences are not calibrated outside the synthetic/template domain.
-    // Therefore only exact two-engine agreement may finish early. Every other
-    // case asks the native Vision/geometry reader for a third answer-blind vote.
-    nativeInk.foundationRecognize(ovr, effectiveContext).then(foundation => {
-      if (seq !== readSeqRef.current) return;
-      const localRaw = readWithJS();
-      const local = localRaw ? { ...localRaw, engine: 'pri-js-v3' } : null;
-
-      if (hasReading(foundation) && hasReading(local)
-          && normalizedReadingText(foundation) === normalizedReadingText(local)) {
-        const agreed = chooseNativeConsensus([foundation, local], effectiveContext);
-        const published = agreed || { ...EMPTY_READING, engine: 'pri-native-no-reading' };
-        publish(published, strokes);
-        runCloudPass(strokes, seq, published);
+    abortRef.current?.abort?.();
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    abortRef.current = controller;
+    sentRef.current = strokeSignature(strokes);
+    setStatus({ kind: 'reading' });
+    readWithCloud(strokes, { user: who, signal: controller?.signal }).then(outcome => {
+      // Newer writing replaced this read, or the page was submitted while the
+      // server was reading it (§09: a late reading never rewrites the reading
+      // a mark was given for).
+      if (seq !== readSeqRef.current || disabledRef.current) return;
+      if (outcome?.reason === 'cancelled') return;
+      if (outcome?.reason === 'allowance') { sentRef.current = null; setStatus({ kind: 'allowance' }); return; }
+      // Line geometry comes from the strokes themselves (no recognition), so
+      // the ✓/✗ can be drawn on the student's own lines when the counts agree.
+      let geometry = null;
+      try { geometry = { lines: segmentInkLines(strokes) }; } catch { geometry = null; }
+      // Only placed on the ink when each read line plausibly IS that written
+      // line; otherwise the ✓/✗ stay in the panel, never on a guessed line.
+      if (geometry && !plausibleLineMatch(outcome?.transcription?.lines, geometry.lines)) geometry = null;
+      const reading = outcome?.transcription ? toReading(outcome.transcription, geometry) : null;
+      if (reading) {
+        retriesRef.current = 0;
+        const afterWait = queuedRef.current;
+        queuedRef.current = false;
+        publish(reading, strokes, { afterWait });
+        setStatus(null);
         return;
       }
-
-      nativeInk.recognize(ovr, effectiveContext).then(nativeRaw => {
-        if (seq !== readSeqRef.current) return;
-        const nativeReading = nativeRaw
-          ? readUnreadLines(nativeRaw, strokes, ovr, effectiveContext)
-          : null;
-        const chosen = chooseNativeConsensus([foundation, local, nativeReading], effectiveContext);
-        const published = chosen || { ...EMPTY_READING, engine: 'pri-native-no-reading' };
-        publish(published, strokes);
-        // The three on-device readers disagreed often enough to need a fourth
-        // opinion; this is where a server read earns its cost.
-        runCloudPass(strokes, seq, published);
-      });
+      if (outcome?.reason === 'empty') { setStatus({ kind: 'empty' }); return; }
+      // Not read: say why, keep the ink, and try again by itself.
+      sentRef.current = null;
+      queuedRef.current = true;
+      setStatus({ kind: 'waiting', key: inkReadingBlockedKey(who, { outcome }) });
+      scheduleRetry(seq);
+    }).catch(() => {
+      if (seq !== readSeqRef.current || disabledRef.current) return;
+      sentRef.current = null;
+      queuedRef.current = true;
+      setStatus({ kind: 'waiting', key: inkReadingBlockedKey(who) });
+      scheduleRetry(seq);
     });
-  }, [publish, recognitionContext, runCloudPass]);
+  }, [publish]);
+  sendToReaderRef.current = sendToReader;
+
+  const scheduleRead = useCallback((strokes, { immediate = false } = {}) => {
+    const seq = ++readSeqRef.current;
+    clearRetry();
+    if (settleRef.current) { clearTimeout(settleRef.current); settleRef.current = null; }
+    abortRef.current?.abort?.();
+    // Writing changed: whatever was read before is no longer this page.
+    if (rec.lines.length) publish(EMPTY_READING, strokes);
+    if (!strokes.length) { sentRef.current = null; setStatus(null); return; }
+    const go = () => sendToReader(strokes, seq);
+    if (immediate) go(); else settleRef.current = setTimeout(go, SETTLE_MS);
+  }, [publish, rec.lines.length, sendToReader]);
 
   const onStrokesChange = useCallback((strokes) => {
     strokesRef.current = strokes;
     // Kept the moment the pen lifts, before any reading: a page written in the
     // second before the app went away is still the student's page.
     try { onStrokesRef.current?.(strokes); } catch { /* keeping ink is best-effort */ }
-    if (timerRef.current) clearTimeout(timerRef.current);
-    // Native whole-page recognition is intentionally a quiet-window operation.
-    // A 240 ms debounce caused a recognition job after normal pauses between
-    // symbols/lines; those jobs then queued behind Core ML/Vision and the newest
-    // page timed out. Browser JS remains cheap enough for the old live cadence.
-    const quietMs = NATIVE_INK ? (strokes.length > 24 ? 1600 : 1000) : 240;
-    timerRef.current = setTimeout(() => runRecognition(strokes, overrides), quietMs);
-  }, [overrides, runRecognition]);
+    if (sentRef.current && sentRef.current === strokeSignature(strokes)) return;
+    retriesRef.current = 0;
+    scheduleRead(strokes);
+  }, [scheduleRead]);
 
-  useEffect(() => { ensurePersonalLoaded(); }, []);
+  // The working waits on the page; the moment the reason goes away it is read.
+  useEffect(() => {
+    const retry = () => {
+      if (disabledRef.current || !strokesRef.current.length) return;
+      if (status?.kind !== 'waiting' && status?.kind !== 'allowance') return;
+      retriesRef.current = 0;
+      scheduleRead(strokesRef.current, { immediate: true });
+    };
+    const stopSession = onCloudSessionChange(retry);
+    const onOnline = () => retry();
+    const onVisible = () => { if (typeof document === 'undefined' || document.visibilityState !== 'hidden') retry(); };
+    if (typeof window !== 'undefined') {
+      window.addEventListener?.('online', onOnline);
+      window.addEventListener?.('focus', onVisible);
+    }
+    if (typeof document !== 'undefined') document.addEventListener?.('visibilitychange', onVisible);
+    return () => {
+      try { stopSession(); } catch { /* gone */ }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener?.('online', onOnline);
+        window.removeEventListener?.('focus', onVisible);
+      }
+      if (typeof document !== 'undefined') document.removeEventListener?.('visibilitychange', onVisible);
+    };
+  }, [status, scheduleRead]);
 
-  // Handwriting kept from before a reload comes back onto the page, and is read
-  // again the ordinary on-device way.
+  // A profile that just became able to read (signed in elsewhere) re-reads.
+  useEffect(() => {
+    if (status?.kind === 'waiting' && strokesRef.current.length && cloudReadingEnabled(user)) {
+      scheduleRead(strokesRef.current, { immediate: true });
+    }
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Handwriting kept from before a reload comes back onto the page and is read.
   useEffect(() => {
     if (!Array.isArray(initialStrokes) || !initialStrokes.length) return;
     canvasRef.current?.setStrokes?.(initialStrokes);
-    // The native surface draws them without reporting back; the browser canvas
-    // reports through the same callback, and the debounce makes twice once.
     onStrokesChange(initialStrokes);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Locking the page for marking invalidates every reading still in flight —
-  // local or server — so none of them can land after the submit (§09).
+  // Locking the page for marking invalidates every reading still in flight.
   useEffect(() => {
     const was = disabledRef.current;
     disabledRef.current = !!disabled;
     if (!disabled || was) return;
-    // A page restored from before a reload has not been read yet; that first
-    // on-device reading is still owed, and it reads the very strokes submitted.
-    if (publishedRef.current) {
-      readSeqRef.current += 1;
-      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
-    }
-    if (cloudSettleRef.current) { clearTimeout(cloudSettleRef.current); cloudSettleRef.current = null; }
-    cloudAbortRef.current?.abort?.();
-    cloudSentRef.current = null;
-    setCloudState(null);
-    setCloudOffer(null);
+    readSeqRef.current += 1;
+    if (settleRef.current) { clearTimeout(settleRef.current); settleRef.current = null; }
+    clearRetry();
+    abortRef.current?.abort?.();
+    setStatus(null);
   }, [disabled]);
   useEffect(() => () => {
     readSeqRef.current += 1;
-    if (timerRef.current) clearTimeout(timerRef.current);
-    // A student who leaves the question mid-read was still uploading their ink.
-    if (cloudSettleRef.current) clearTimeout(cloudSettleRef.current);
-    cloudAbortRef.current?.abort?.();
+    if (settleRef.current) clearTimeout(settleRef.current);
+    clearRetry();
+    abortRef.current?.abort?.();
   }, []);
 
+  // A server read can take a while. Past STILL_READING_MS the note says so
+  // calmly instead of looking stuck; nothing about the read itself changes.
+  const [slowRead, setSlowRead] = useState(false);
   useEffect(() => {
-    if (!focusSymbol) { focusedRef.current = null; return; }
-    if (focusedRef.current === focusSymbol) return;
-    const sym = rec.lines.flatMap(l => l.symbols || []).find(s => s.id === focusSymbol);
-    if (!sym) return;
-    focusedRef.current = focusSymbol;
-    setPicker({ id: sym.id, alts: sym.alts || [] });
-  }, [focusSymbol, rec]);
+    setSlowRead(false);
+    if (status?.kind !== 'reading') return undefined;
+    const timer = setTimeout(() => setSlowRead(true), STILL_READING_MS);
+    return () => clearTimeout(timer);
+  }, [status]);
 
-  useEffect(() => {
-    if (picker && picker.id === focusSymbol) pickerRef.current?.querySelector('button')?.focus();
-  }, [picker, focusSymbol]);
+  const act = (fn) => () => { canvasRef.current?.[fn](); };
 
-  const applyOverride = (id, sym) => {
-    const next = { ...overrides, [id]: sym };
-    setOverrides(next);
-    setPicker(null);
-    // Corrections remain local training evidence regardless of which Pri model
-    // produced the original reading. Approximate ownership is never learned.
-    const symbol = rec.lines.flatMap(l => l.symbols || []).find(s => s.id === id);
-    if (symbol?.strokeIdxs?.length && !symbol.approx) {
-      const strokes = symbol.strokeIdxs.map(i => strokesRef.current[i]).filter(Boolean);
-      if (strokes.length) addPersonal(sym, strokes, 'correction');
-    }
-    runRecognition(strokesRef.current, next);
-  };
-
-  const act = (fn) => () => {
-    setOverrides({});
-    setPicker(null);
-    canvasRef.current?.[fn]();
-  };
-
-  // i18n-exempt-start: engine identifiers and fallback warnings for developers and evaluators, drawn only when inkDiagnosticsVisible() (dev build, LAN research mode or ?inkdiag=1); a production student never sees them — the one student-facing note, read on the server, is t('verdict.readOnServer') below
-  // Which engine actually produced what is on screen. A server reading was
-  // previously labelled "Native recognition path" on iPad and given no label at
-  // all in the browser — cloudReader tags a reading `cloud` precisely so that
-  // History and the student can tell the two apart.
-  const engineNote = rec.cloud === true
-    ? `Read on the server · ${rec.engine || 'cloud'}`
-    : rec.engine === 'pri-structural-v4-dev-lan'
-      ? 'Structural V4 research · Mac LAN · not production'
-      : rec.engine === 'pri-js-v3-v4-unavailable'
-        ? 'Structural V4 returned no reading · showing JS V3 fallback'
-        : rec.engine === 'pri-js-v3'
-          ? 'Legacy JS V3 fallback · not native PencilKit/Core ML'
-          : rec.disagreement
-            ? `Native engines disagree · confirmation required · ${rec.engine}`
-            : NATIVE_INK && rec.engine
-              ? `Native recognition path · ${rec.engine}`
-              : null;
-  // Students always learn when their writing was read on the server (privacy);
-  // engine identifiers and fallback labels are diagnostics only.
-  const diagnosticBanner = !NATIVE_INK && diagnostics ? (
-    <div role="note" style={{ padding: '9px 12px', marginBottom: 8, border: '1px solid var(--warn)', borderRadius: 10, fontSize: 12.5 }}>
-      Browser handwriting = legacy JS fallback. For handwriting quality testing, run the native iPad package with PencilKit; this web fallback is not the production acceptance path.
-    </div>
-  ) : null;
+  // i18n-exempt-start: engine identifier for developers and evaluators, drawn only when inkDiagnosticsVisible(); students see t('verdict.readOnServer')
+  const engineNote = rec.cloud === true ? `Read on the server · ${rec.engine || 'cloud'}` : null;
   // i18n-exempt-end
   const shownEngineNote = diagnostics ? engineNote : (rec.cloud === true ? t('verdict.readOnServer') : null);
+  const statusLine = status?.kind === 'reading'
+    ? t(slowRead ? 'ink.serverStillReading' : 'ink.serverReading')
+    : status?.kind === 'empty'
+      ? t('ink.serverEmpty')
+      : status?.kind === 'allowance'
+        ? t('ink.cloudAllowanceUsed')
+        : status?.kind === 'waiting'
+          ? t(status.key)
+          : null;
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`}>
-      {diagnosticBanner}
       <div className="ink-toolbar">
         <button type="button" className={`ink-tool ${tool === 'pen' ? 'on' : ''}`} aria-pressed={tool === 'pen'} onClick={() => setTool('pen')} title={t('ink.pen')}>✒️ {t('ink.pen')}</button>
         <button type="button" className={`ink-tool ${tool === 'eraser' ? 'on' : ''}`} aria-pressed={tool === 'eraser'} onClick={() => setTool('eraser')} title={t('ink.eraser')}>◻️ {t('ink.eraser')}</button>
@@ -474,7 +327,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
           onStrokesChange={onStrokesChange}
           ariaLabel={t('ink.answerSpaceAria')}
         />
-        {lineVerdicts && rec.lines.length > 0 && (
+        {lineVerdicts && rec.lines.some(l => l.box) && (
           <div className="ink-verdict-layer" aria-hidden="true">
             {(() => {
               let noted = false;
@@ -492,23 +345,15 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
                 return (
                   <React.Fragment key={li}>
                     {boxes.map((gb, gi) => (
-                      <span
-                        key={`box-${gi}`}
-                        className={`ink-linebox ${good ? 'good' : 'bad'}`}
-                        style={{ left: gb.x - 5, top: gb.y - 5, width: gb.w + 10, height: gb.h + 10 }}
-                      />
+                      <span key={`box-${gi}`} className={`ink-linebox ${good ? 'good' : 'bad'}`}
+                        style={{ left: gb.x - 5, top: gb.y - 5, width: gb.w + 10, height: gb.h + 10 }} />
                     ))}
-                    <span
-                      className={`ink-verdict ${good ? 'good' : 'bad'}`}
+                    <span className={`ink-verdict ${good ? 'good' : 'bad'}`}
                       style={{ top: b.y + b.h / 2 - 14, left: b.x + b.w + 16 }}
-                      title={v.note || (good ? t('ink.lineChecksOut') : t('ink.lineBreaks'))}
-                    >{good ? '✓' : '✗'}</span>
+                      title={v.note || (good ? t('ink.lineChecksOut') : t('ink.lineBreaks'))}>{good ? '✓' : '✗'}</span>
                     {bad && boxes.map((gb, gi) => (
-                      <span
-                        key={`underline-${gi}`}
-                        className="ink-underline"
-                        style={{ left: gb.x - 3, top: gb.y + gb.h + 4, width: gb.w + 6 }}
-                      />
+                      <span key={`underline-${gi}`} className="ink-underline"
+                        style={{ left: gb.x - 3, top: gb.y + gb.h + 4, width: gb.w + 6 }} />
                     ))}
                     {showNote && (
                       <span className="ink-note" style={{ left: Math.max(4, b.x - 2), top: b.y + b.h + 16 }}>
@@ -523,48 +368,19 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
         )}
       </div>
 
+      {statusLine && !disabled && (
+        <div className="ink-status muted" role="status" aria-live="polite" style={{ margin: '8px 2px 0', fontSize: 12.5 }}>
+          {statusLine}
+        </div>
+      )}
+
       {rec.lines.length > 0 && (
         <div className="ink-preview">
           <div className="ink-preview-title" id="ink-reading">
             {t('ink.reading')}{shownEngineNote && <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>{shownEngineNote}</span>}
-            {cloudState === 'reading' && (
-              <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>{t('ink.checkingReading')}</span>
-            )}
-            {cloudState === 'allowance' && (
-              <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>· {t('ink.cloudAllowanceUsed')}</span>
-            )}
-            {cloudState === 'failed' && (
-              <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>{t('ink.readerUnreachable')}</span>
-            )}
           </div>
-          {cloudOffer && (
-            <div className="ink-cloud-offer" style={{ margin: '6px 14px 2px', fontSize: 12.5 }}>
-              <div className="muted" style={{ marginBottom: 4 }}>{t('ink.cloudOffer')}</div>
-              <div className="row" style={{ alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span className="ink-line-math"><MathText text={`$${exprToLatex(cloudOffer.reading.text) || '\\;'}$`} /></span>
-                <button type="button" className="btn btn-quiet btn-sm"
-                  onClick={() => { publish(cloudOffer.reading, cloudOffer.strokes); setCloudOffer(null); setCloudState(null); }}>
-                  {t('ink.useThisReading')}
-                </button>
-                <button type="button" className="btn btn-quiet btn-sm"
-                  onClick={() => { setCloudOffer(null); setCloudState(null); }}>
-                  {t('ink.keepMine')}
-                </button>
-              </div>
-            </div>
-          )}
-          {rec.disagreement && Array.isArray(rec.candidateReadings) && rec.candidateReadings.length > 1 && (
-            <details style={{ margin: '8px 14px 2px', fontSize: 11.5 }} className="muted">
-              <summary style={{ cursor: 'pointer' }}>{t('ink.recognitionEvidence')}</summary>
-              {rec.candidateReadings.map((candidate, index) => (
-                <div key={`${candidate.engine}-${index}`} style={{ marginTop: 5, overflowWrap: 'anywhere' }}>
-                  <b>{candidate.engine}</b> → {candidate.text || candidate.failure || t('ink.noReading')}
-                </div>
-              ))}
-            </details>
-          )}
           {rec.lines.map((line, li) => (
-            <div className="ink-line" key={li}>
+            <div className="ink-line" key={li} data-text={line.text}>
               <span className="ink-line-n" aria-hidden="true">{li + 1}</span>
               {lineVerdicts && lineVerdicts[li] && ['ok', 'break', 'wrong'].includes(lineVerdicts[li].status) && (
                 <span className={`ink-line-verdict ${lineVerdicts[li].status === 'ok' ? 'good' : 'bad'}`}>
@@ -576,43 +392,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
               {lineVerdicts && lineVerdicts[li] && ['break', 'wrong'].includes(lineVerdicts[li].status) && lineVerdicts[li].note && (
                 <span className="sc-note" style={{ fontSize: 12.5 }}>— {lineVerdicts[li].note}</span>
               )}
-              <span className="ink-syms">
-                {(line.symbols || []).map(s => (
-                  <button
-                    type="button"
-                    key={s.id}
-                    className={`ink-sym ${s.conf < 0.45 ? 'shaky' : ''}`}
-                    style={s.id === focusSymbol
-                      ? { outline: '2px solid var(--brand-1)', outlineOffset: 2, borderRadius: 4 }
-                      : undefined}
-                    title={s.id === focusSymbol ? t('ink.checkThisOne') : t('ink.tapToCorrect')}
-                    aria-label={t(s.conf < 0.45 ? 'ink.symbolAriaShaky' : 'ink.symbolAria', { n: li + 1, symbol: showSym(s.sym) })}
-                    aria-expanded={picker?.id === s.id}
-                    onClick={() => setPicker(picker?.id === s.id ? null : { id: s.id, alts: s.alts || [] })}
-                  >{showSym(s.sym)}</button>
-                ))}
-              </span>
             </div>
           ))}
-          {picker && (
-            <div className="ink-picker" ref={pickerRef} role="group" aria-label={t('ink.changeSymbol')}>
-              <div className="ink-picker-row">
-                {(picker.alts || []).map(a => (
-                  <button type="button" key={a.sym} className="ink-pick"
-                    aria-label={t('ink.changeToSure', { symbol: showSym(a.sym), percent: Math.round(a.conf * 100) })}
-                    onClick={() => applyOverride(picker.id, a.sym)}>
-                    {showSym(a.sym)} <small>{Math.round(a.conf * 100)}%</small>
-                  </button>
-                ))}
-              </div>
-              <div className="ink-picker-all">
-                {ALPHABET.map(s => (
-                  <button type="button" key={s} className="ink-pick tiny" aria-label={t('ink.changeTo', { symbol: showSym(s) })}
-                    onClick={() => applyOverride(picker.id, s)}>{showSym(s)}</button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>

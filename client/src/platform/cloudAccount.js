@@ -114,6 +114,39 @@ export async function loginCloudAccount(pid, { email, password }) {
   return link;
 }
 
+/**
+ * Sign in (or, with `createAccount`, sign up) with a Google or Apple identity
+ * token from socialSignIn.js. A new account carries the same age declaration
+ * as registerCloudAccount; "Sign in" sends none and never creates an account.
+ */
+export async function signInWithProvider(pid, provider, {
+  idToken, nonce, createAccount = false, name, year, isAdult, guardianName, guardianEmail
+}) {
+  if (!cloudAvailable()) throw Object.assign(new Error('Cloud accounts are not configured on this build.'), { code: 'CLOUD_DISABLED' });
+  const deviceId = await cloudDeviceId();
+  const body = { idToken, nonce, deviceId, createAccount: !!createAccount };
+  if (createAccount) Object.assign(body, { name, year, isAdult, guardianName, guardianEmail });
+  const result = await cloud.socialSignIn(provider, body);
+  await saveAccount(pid, result.account);
+  await refreshCloudEntitlement(pid).catch(() => {});
+  const link = await cloudAccountLink(pid);
+  announceLink(pid, link, true);
+  return { link, created: !!result.created };
+}
+
+/**
+ * Link a local profile to an account the onboarding flow already signed in to
+ * (one-time code, Google or Apple). The session cookie is device-wide; this
+ * records which local profile it belongs to.
+ */
+export async function linkSignedInAccount(pid, account) {
+  await saveAccount(pid, account);
+  await refreshCloudEntitlement(pid).catch(() => {});
+  const link = await cloudAccountLink(pid);
+  announceLink(pid, link, true);
+  return link;
+}
+
 export async function verifyCloudSession(pid) {
   if (!cloudAvailable()) return { connected: false, reason: 'cloud-disabled', link: await cloudAccountLink(pid) };
   try {
