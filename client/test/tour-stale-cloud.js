@@ -6,10 +6,11 @@
 // answers back for as long as each case needs, and the real card is driven
 // through the moment where a late answer could do damage:
 //
-//   1. control — a server reading that arrives BEFORE Submit replaces the
-//      on-device reading (so the stub path is really live);
-//   2. a server reading that arrives AFTER Submit changes neither the reading
-//      on the page nor what was submitted and marked;
+//   1. control — the server reading is the reading the card shows and will
+//      mark (handwriting is read only by the server: owner decision);
+//   2. while a server reading is still out, nothing can be submitted — the
+//      page carries no reading at all — so no reading can land after a Submit
+//      and rewrite what was marked;
 //   3. control — a working check that arrives while its question is on screen
 //      is shown under that question's working;
 //   4. a working check for question A that arrives after the student moved on
@@ -72,7 +73,7 @@ export const flow = {
 
   async run({ page, ctx, base, check, goto, createLegacyProfile, settle }) {
     const stub = {
-      transcribeDelay: 0, transcribed: 0, transcribeAnswered: 0,
+      transcribeDelay: 0, transcribed: 0, transcribeAnswered: 0, text: '7',
       lastSentAt: 0, submittedAt: 0, answeredAfterSubmit: 0,
       checkDelay: 0, checkDelays: {}, checked: 0, checkAnswered: 0, answeredChecks: []
     };
@@ -95,7 +96,7 @@ export const flow = {
         if (stub.submittedAt && Date.now() > stub.submittedAt) stub.answeredAfterSubmit++;
         return json(route, 200, { transcription: {
           engine: 'stub-reader', confidence: 0.99, needsConfirmation: false,
-          lines: [{ text: '7', confidence: 0.99 }]
+          lines: String(stub.text).split('\n').filter(Boolean).map(text => ({ text, confidence: 0.99 }))
         } });
       }
       if (url.pathname === '/v1/working/check' && method === 'POST') {
@@ -118,7 +119,7 @@ export const flow = {
     // Both server features are opt-in, so they are switched on the way a
     // student does: in Settings.
     await page.goto(`${base}/settings`, { waitUntil: 'domcontentloaded' });
-    for (const label of ['Also read my handwriting on the server', 'Tell me which line my working went wrong on']) {
+    for (const label of ['Read my handwriting and photos on the server', 'Tell me which line my working went wrong on']) {
       const row = page.locator('.set-row').filter({ hasText: label });
       const button = row.locator('button[aria-pressed]');
       await button.waitFor({ timeout: 20000 });
@@ -156,60 +157,51 @@ export const flow = {
       if (await confirm.count()) await confirm.click();
     };
 
-    // ── 1 · control: an early server reading is applied ──────────────────────
+    // ── 1 · control: the server reading is the reading ───────────────────────
     let box = await openWriting();
     stub.transcribeDelay = 100;
+    stub.text = '7';
     await handwrite(page, box, '1');
     await readsAs(page, '7');
     const early = await reading(page);
-    if (!await check('control: a server reading that arrives before Submit replaces the on-device one',
+    if (!await check('control: the server reading is what the card shows and will submit',
       early.lines[0] === '7' && early.foot === '7', `read ${JSON.stringify(early)} after ${stub.transcribeAnswered} server readings`)) return;
 
-    // ── 2 · a server reading that lands after Submit ─────────────────────────
-    // Written, the slow server read sent, then submitted while it is still out.
-    // A first wrong try reopens the page for a second try (where a new reading
-    // is legitimate), so the case is the submit that settles the question.
+    // ── 2 · nothing can be submitted while a reading is still out ────────────
     stub.transcribeDelay = 3500;
-    let lastStrokeAt = 0;
-    const writeAndSubmitWhileReading = async (glyph) => {
+    await page.locator('.ink-tool[title="Clear"]').click();
+    await settle();
+    let glyph = '4';
+    stub.text = glyph;
+    const sentBefore = stub.transcribed;
+    await handwrite(page, box, glyph);
+    const until = Date.now() + 15000;
+    while (stub.transcribed === sentBefore && Date.now() < until) await page.waitForTimeout(50);
+    const inFlight = await reading(page);
+    const submitDisabled = await page.locator('.editor-foot button.btn').last().isDisabled();
+    await check('the slow server reading was requested', stub.transcribed > sentBefore, JSON.stringify(stub));
+    await check('while it is out, the page shows no reading and Submit is unavailable',
+      inFlight.lines.length === 0 && submitDisabled, `read ${JSON.stringify(inFlight)}, submit disabled ${submitDisabled}`);
+    await readsAs(page, glyph);
+    stub.submittedAt = Date.now();
+    await submitInk();
+    await page.waitForSelector('.verdict-bad, .eval-card', { timeout: 20000 });
+    if (!await page.locator('.eval-card').count()) {
       await page.locator('.ink-tool[title="Clear"]').click();
       await settle();
-      const sentBefore = stub.transcribed;
-      await handwrite(page, box, glyph);
-      lastStrokeAt = Date.now();
-      await readsAs(page, glyph);
-      // The read for the finished page goes out after a settle window; wait for
-      // it, and for quiet, so nothing is still queued to send.
-      const until = Date.now() + 15000;
-      while ((stub.lastSentAt < lastStrokeAt || Date.now() - stub.lastSentAt < 1000 || stub.transcribed === sentBefore) && Date.now() < until) {
-        await page.waitForTimeout(50);
-      }
-      stub.submittedAt = Date.now();
-      stub.answeredAfterSubmit = 0;
-      await submitInk();
-      await page.waitForSelector('.verdict-bad, .eval-card', { timeout: 20000 });
-      return stub.transcribed > sentBefore;
-    };
-    let glyph = '4';
-    let sent = await writeAndSubmitWhileReading(glyph);
-    if (!await page.locator('.eval-card').count()) {
       glyph = '9';
-      sent = await writeAndSubmitWhileReading(glyph);
+      stub.text = glyph;
+      await handwrite(page, box, glyph);
+      await readsAs(page, glyph);
+      await submitInk();
     }
     await page.waitForSelector('.eval-card', { timeout: 20000 });
-    await check('the slow server reading was requested before the settling Submit', sent, JSON.stringify(stub));
     const verdictBefore = (await page.locator('.eval-card').innerText()).replace(/\s+/g, ' ');
-    const settled = Date.now() + 12000;
-    while ((stub.transcribeAnswered < stub.transcribed || !stub.answeredAfterSubmit) && Date.now() < settled) await page.waitForTimeout(100);
-    // Negative checks below: give the page's own event loop a beat to apply
-    // whatever it was going to apply once the response was delivered.
     await page.waitForTimeout(800);
-    await check('the late server reading did arrive after Submit (the case really happened)',
-      stub.answeredAfterSubmit > 0 && stub.transcribeAnswered === stub.transcribed && stub.lastSentAt < stub.submittedAt, JSON.stringify(stub));
     const late = await reading(page);
-    await check('a server reading that lands after Submit does not rewrite the reading panel',
+    await check('after Submit the reading panel still shows what was marked',
       JSON.stringify(late.lines) === JSON.stringify([glyph]), `read ${JSON.stringify(late)}`);
-    await check('nor the answer the card holds for the attempt', late.foot === glyph, `read ${JSON.stringify(late)}`);
+    await check('nor does the answer the card holds for the attempt change', late.foot === glyph, `read ${JSON.stringify(late)}`);
     const verdictAfter = (await page.locator('.eval-card').innerText()).replace(/\s+/g, ' ');
     await check('nor the verdict on the answer that was submitted', verdictAfter === verdictBefore,
       `before ${JSON.stringify(verdictBefore.slice(0, 120))} after ${JSON.stringify(verdictAfter.slice(0, 120))}`);
@@ -219,7 +211,8 @@ export const flow = {
     // checker cannot place, which is when the server is asked.
     // Two lines on the question on screen, submitted until it resolves.
     const writeTwoLinesAndResolve = async () => {
-      stub.transcribeDelay = 60000;   // keep the on-device reading on the page
+      stub.transcribeDelay = 100;
+      stub.text = '1\n2';
       if (await page.getByRole('button', { name: 'Answer by handwriting' }).count()) {
         await page.getByRole('button', { name: 'Answer by handwriting' }).click();
       }

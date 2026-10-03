@@ -13,6 +13,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensureBillingSchema } from './platform/billingSchema.js';
 import { createAppleBilling } from './platform/appleBilling.js';
+import { createGoogleBilling } from './platform/googleBilling.js';
 import { createRazorpayBilling } from './platform/razorpay.js';
 import { createPlatformRouter } from './platform/router.js';
 import { trustedProxyHops } from './platform/config.js';
@@ -117,10 +118,11 @@ export async function createServerApp(db, {
   ensureBillingSchema(db);
   const webBilling = createRazorpayBilling(db);
   const appleBilling = createAppleBilling(db);
+  const googleBilling = createGoogleBilling(db);
   app.use('/v1', createPlatformRouter(db, {
-    billingVerifiers: { ...webBilling.verifiers, ...appleBilling.verifiers },
+    billingVerifiers: { ...webBilling.verifiers, ...appleBilling.verifiers, ...googleBilling.verifiers },
     billingCheckout: webBilling.checkout,
-    billingNative: appleBilling.native,
+    billingNative: { ...appleBilling.native, ...googleBilling.native },
     billingLifecycle: webBilling.lifecycle
   }));
 

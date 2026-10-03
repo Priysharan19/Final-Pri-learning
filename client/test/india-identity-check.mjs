@@ -252,13 +252,16 @@ async function run() {
     const hero = login.slice(heroStart, splitStart);
     ok('the Login hero source carries no HSC or NSW copy', heroStart > 0 && splitStart > heroStart && !/HSC|NSW|NESA/.test(hero));
     ok('the sign-up form opens on the India course', /course: 'in'/.test(login) && /STUDY_DEFAULT/.test(login));
-    // Frozen public V1 is India-only. Legacy Australian implementation may remain
-    // elsewhere in the repository, but Login must expose no ordinary Australian
-    // selector or copy and must not carry an Olympiad launch choice.
-    ok('public onboarding exposes no Australian curriculum entry point',
-      !/AU_COURSES/.test(login)
-      && !/signup-course/.test(login)
-      && !/Studying in Australia|Teaching in Australia/.test(login));
+    // Frozen public V1 is India-only. The Australian syllabuses stay in the
+    // source only behind PRI_FEATURE_AUSTRALIA (false in a production build),
+    // the link is student-only (there is no public Teacher role), and Login
+    // must not carry an Olympiad launch choice.
+    ok('the Australian option exists only behind the build flag, for students',
+      /\{featureEnabled\('australia'\) && \(/.test(login)
+      && /createStep === 1 && !australia && \(/.test(login)
+      && /createStep === 1 && australia && \(/.test(login)
+      && /\{t\('login\.studyingInAustralia'\)\}/.test(login)
+      && !/login\.teachingInAustralia/.test(login));
     ok('public onboarding exposes no Olympiad launch track',
       !/key:\s*['"]olympiad['"]/.test(login)
       && !/OLYMPIAD/.test(login));

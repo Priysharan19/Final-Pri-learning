@@ -14,6 +14,12 @@ export function nativeBillingAvailable() {
   return priNative.billing.available();
 }
 
+/** Which store sheet the shell presents: 'app-store', 'google-play' or null.
+ * It selects the purchase flow and copy only — never entitlement. */
+export function nativeBillingStore() {
+  return priNative.billing.available() ? priNative.billing.store() : null;
+}
+
 function request(action, body = {}, timeoutMs = 30_000) {
   return priNative.billing.request(action, body, { timeoutMs });
 }
@@ -51,6 +57,16 @@ export function purchaseNativeProduct(productId, appAccountToken) {
   return request('purchase', {
     productId: String(productId || ''),
     appAccountToken: String(appAccountToken || '')
+  }, 5 * 60_000);
+}
+
+/** Google Play: the server-issued obfuscatedAccountId travels with the purchase
+ * and comes back inside Google's record, which is how the server binds it. */
+export function purchaseGoogleSubscription({ productId, basePlanId, obfuscatedAccountId }) {
+  return request('purchase', {
+    productId: String(productId || ''),
+    basePlanId: String(basePlanId || ''),
+    obfuscatedAccountId: String(obfuscatedAccountId || '')
   }, 5 * 60_000);
 }
 

@@ -127,7 +127,7 @@ function buildApp() {
   if (!existsSync(vite)) throw new Error(`vite is not installed at ${vite}`);
   const r = spawnSync(process.execPath, [vite, 'build', '--outDir', out, '--emptyOutDir', '--logLevel', 'error'],
     // A test build: flagged non-V1 screens are on so they are audited too.
-    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_FEATURE_PLACEMENT: '1' } });
+    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_AUSTRALIA: '1' } });
   if (r.status !== 0) throw new Error(`the build failed:\n${r.stdout || ''}${r.stderr || ''}`);
   if (!existsSync(join(out, 'index.html'))) throw new Error('the build emitted no index.html');
   return out;
@@ -781,14 +781,10 @@ async function run() {
       };
       await draw([[70, 50], [70, 105], [120, 105]]);
       await draw([[150, 50], [150, 105]]);
-      await page.waitForSelector('.ink-preview', { timeout: 20000 });
+      // Server-only reading (owner decision): with no reader in this harness
+      // the page shows the reading/waiting status rather than a local reading.
+      await page.waitForSelector('.ink-preview, .ink-status', { timeout: 20000 });
       await wait(page, 600);
-    });
-
-    await step('practice · handwriting · correcting a symbol', '/practice', async () => {
-      await click(page, '.ink-sym');
-      await page.waitForSelector('.ink-picker', { timeout: 15000 });
-      await wait(page, 400);
     });
 
     await step('practice · photo mode', '/practice', async () => {
@@ -847,6 +843,14 @@ async function run() {
       await wait(page, 500);
     });
 
+    // "Practise this": the photo picker before any photo is chosen. The read
+    // result and failure states are driven by tour-photo-practise.js.
+    await step('practise this · photo', '/practise-photo', async () => {
+      await goTo(page, BASE, '/practise-photo');
+      await page.waitForSelector('[data-photo-practise]', { timeout: 20000 });
+      await wait(page, 300);
+    });
+
     await step('tasks', '/tasks', async () => { await goTo(page, BASE, '/tasks'); });
 
     await step('tasks · new task', '/tasks', async () => {
@@ -897,6 +901,26 @@ async function run() {
       await click(page, 'button.btn-primary', { text: 'Play' });
       await page.waitForSelector('.race-track', { timeout: 40000 });
       await wait(page, 700);
+    });
+
+    await step('notes · index and chapter map', '/notes', async () => {
+      await goTo(page, BASE, '/notes?class=10');
+      await page.waitForSelector('.nt-map-node', { timeout: 20000 });
+      await wait(page, 1200);
+    });
+
+    await step('notes · a chapter read through', '/notes/:chapterId', async () => {
+      await goTo(page, BASE, '/notes/c10-quadratic-equations');
+      await page.waitForSelector('.nt-formula', { timeout: 20000 });
+      await page.evaluate(() => document.querySelectorAll('.nt-reveal').forEach(el => el.classList.add('is-in')));
+      await wait(page, 1600);
+    });
+
+    await step('notes · revision flashcards', '/notes/:chapterId', async () => {
+      await click(page, '[data-testid="notes-revise"]');
+      await page.waitForSelector('.nt-card', { timeout: 10000 });
+      await wait(page, 600);
+      await page.keyboard.press('Escape');
     });
 
     await step('review · mistakes', '/review', async () => {

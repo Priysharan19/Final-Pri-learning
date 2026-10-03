@@ -201,6 +201,17 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
   ok(!h.sent.some(e => e.op === 'cancel'), 'a committed purchase is not cancelled');
   h.reply(id, { status: 'verified', signedTransaction: 'jws.payload.sig', transactionId: 't1', productId: 'm' });
   ok(recovered.length === 1 && recovered[0].transactionId === 't1', 'the late paid transaction is re-emitted, never lost');
+  const g = b.request('billing', 'purchase', { productId: 'pri_premium' }, { timeoutMs: 20, cancellable: false });
+  const gid = h.last().id;
+  await rejects(g, 'TIMEOUT', 'a slow Google Play payment (UPI, 3-D Secure) times out for the UI');
+  h.reply(gid, { status: 'purchased', purchaseToken: 'tok-late', productId: 'pri_premium', state: 'purchased' });
+  ok(recovered.length === 2 && recovered[1].purchaseToken === 'tok-late' && recovered[1].status === 'purchased',
+    'a late Google Play purchase is re-emitted with its token, never lost');
+  const c = b.request('billing', 'purchase', { productId: 'pri_premium' }, { timeoutMs: 20, cancellable: false });
+  const cid = h.last().id;
+  await rejects(c, 'TIMEOUT', 'a slow sheet times out');
+  h.reply(cid, { status: 'cancelled' });
+  ok(recovered.length === 2, 'a late cancellation is not mistaken for a purchase');
   b.dispose();
 }
 

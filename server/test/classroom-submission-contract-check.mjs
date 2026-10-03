@@ -90,7 +90,7 @@ const http = await startApp({ db });
 try {
   const jar = {};
   const registration = await http.request('/v1/account/register', {
-    method: 'POST', jar, body: { email: 'slash.student@example.test', name: 'Slash', password: 'correct-horse-battery', deviceId: 'ipad-slash' }
+    method: 'POST', jar, body: { email: 'slash.student@example.test', name: 'Slash', password: 'correct-horse-battery', deviceId: 'ipad-slash', isAdult: true }
   });
   assert.equal(registration.status, 201);
   const studentId = registration.data.account.id;

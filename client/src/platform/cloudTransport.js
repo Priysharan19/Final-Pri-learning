@@ -219,6 +219,7 @@ export async function cloudRequest(path, {
       const err = new Error(data?.error?.message || data?.error || `Cloud request failed (${status || 'native'})`);
       err.status = status || undefined;
       err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
+      if (Number.isFinite(Number(data?.error?.resetAt))) err.resetAt = Number(data.error.resetAt);
       err.requestId = result?.requestId || rid;
       throw err;
     }
@@ -263,6 +264,7 @@ export async function cloudRequest(path, {
       const err = new Error(data?.error?.message || data?.error || `Cloud request failed (${response.status})`);
       err.status = response.status;
       err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
+      if (Number.isFinite(Number(data?.error?.resetAt))) err.resetAt = Number(data.error.resetAt);
       err.requestId = response.headers.get('x-pri-request-id') || rid;
       throw err;
     }
@@ -284,6 +286,15 @@ export const cloud = Object.freeze({
   guardianWithdraw: token => cloudRequest('/v1/account/guardian/withdraw', { method: 'POST', body: { token } }),
   guardianState: () => cloudRequest('/v1/account/guardian/state'),
   login: body => cloudRequest('/v1/account/login', { method: 'POST', body }),
+  // One-time codes (server/platform/otp.js). /request answers the same for an
+  // address with or without an account; /verify proves it.
+  otpRequest: body => cloudRequest('/v1/account/otp/request', { method: 'POST', body }),
+  otpVerify: body => cloudRequest('/v1/account/otp/verify', { method: 'POST', body }),
+  otpReauthRequest: () => cloudRequest('/v1/account/otp/reauth-request', { method: 'POST', body: {} }),
+  guardianOtpRequest: body => cloudRequest('/v1/account/otp/guardian/request', { method: 'POST', body }),
+  guardianOtpApprove: body => cloudRequest('/v1/account/otp/guardian/approve', { method: 'POST', body }),
+  guardianWithdrawRequest: body => cloudRequest('/v1/account/otp/guardian/withdraw-request', { method: 'POST', body }),
+  guardianWithdrawByPhone: body => cloudRequest('/v1/account/otp/guardian/withdraw', { method: 'POST', body }),
   logout: () => cloudRequest('/v1/account/logout', { method: 'POST', body: {} }),
   requestEmailVerification: () => cloudRequest('/v1/account/email/verification-request', { method: 'POST', body: {} }),
   requestPasswordReset: body => cloudRequest('/v1/account/password/reset-request', { method: 'POST', body }),
@@ -297,13 +308,19 @@ export const cloud = Object.freeze({
   // a picture and nothing else: no question, no expected answer, no profile.
   handwritingStatus: ({ signal = null, timeoutMs = 7000 } = {}) =>
     cloudRequest('/v1/handwriting/status', { signal, timeoutMs }),
-  transcribeHandwriting: (image, { signal = null, timeoutMs = 25000 } = {}) =>
+  // Longer than the server's own reading budget (PRI_HANDWRITING_TIMEOUT_MS,
+  // 45 s by default) so the server answers before the client gives up.
+  transcribeHandwriting: (image, { signal = null, timeoutMs = 55000 } = {}) =>
     cloudRequest('/v1/handwriting/transcribe', { method: 'POST', body: { image }, signal, timeoutMs }),
   workingStatus: () => cloudRequest('/v1/working/status'),
   // The question is sent; the expected answer never is, and the route refuses
   // a body that carries one.
   checkWorking: (prompt, lines, { signal = null, timeoutMs = 35000 } = {}) =>
     cloudRequest('/v1/working/check', { method: 'POST', body: { prompt, lines }, signal, timeoutMs }),
+  // "Practise this": one photo of a printed question, nothing else. The reply
+  // proposes a chapter and skill; it never carries a mark or an answer.
+  identifyQuestionPhoto: (image, { signal = null, timeoutMs = 25000 } = {}) =>
+    cloudRequest('/v1/question-photo/identify', { method: 'POST', body: { image }, signal, timeoutMs }),
   // The AI tutor is sent the verified solution it must stay grounded in — it
   // is not a reader, and /v1/handwriting never receives one. Exam rows never
   // reach here: the local backend refuses them first.
@@ -311,6 +328,8 @@ export const cloud = Object.freeze({
     cloudRequest('/v1/tutor/help', { method: 'POST', body, signal, timeoutMs }),
   deleteAccount: body => cloudRequest('/v1/account', { method: 'DELETE', body }),
   identities: () => cloudRequest('/v1/account/identity'),
+  identityProviders: () => cloudRequest('/v1/account/identity/providers'),
+  identityNonce: () => cloudRequest('/v1/account/identity/nonce', { method: 'POST', body: {} }),
   socialSignIn: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/sign-in`, { method: 'POST', body }),
   linkIdentity: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/link`, { method: 'POST', body }),
   syncPush: (body, idempotencyKey) => cloudRequest('/v1/sync/push', { method: 'POST', body, idempotencyKey }),
@@ -327,6 +346,10 @@ export const cloud = Object.freeze({
   appleBillingBootstrap: () => cloudRequest('/v1/billing/apple/bootstrap'),
   submitAppleTransaction: signedTransaction => cloudRequest('/v1/billing/apple/transaction', {
     method: 'POST', body: { signedTransaction: String(signedTransaction || '') }
+  }),
+  googleBillingBootstrap: () => cloudRequest('/v1/billing/google/bootstrap'),
+  submitGooglePurchase: purchaseToken => cloudRequest('/v1/billing/google/purchase', {
+    method: 'POST', body: { purchaseToken: String(purchaseToken || '') }
   }),
   restoreBilling: (provider, body = {}) => cloudRequest(`/v1/billing/restore/${pathId(provider, 'provider')}`, { method: 'POST', body }),
   // Cancel/manage contract (server: wp/server-commerce-classes). Web cancels at

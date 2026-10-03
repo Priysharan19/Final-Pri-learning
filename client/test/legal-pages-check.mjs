@@ -103,9 +103,14 @@ ok(!/stroke/i.test(syncContract) || !/upload/i.test(syncContract) || true,
 // Markdown wraps its lines, so the prose is compared with whitespace flattened.
 const privacy = readDoc('privacy', 'en').replace(/\s+/g, ' ');
 const terms = readDoc('terms', 'en').replace(/\s+/g, ' ');
-ok(/reading your writing happens on your device by default/i.test(privacy)
-  && /your strokes stay there/i.test(privacy),
-  'the notice states that reading is on-device by default and the strokes stay there');
+// Online-first (ADR-0001): server reading is on by default once signed in, so
+// the notice must say exactly that, that it can be turned off, that a minor
+// waits for a guardian, and that without an account nothing is read remotely.
+ok(/your strokes stay on your device/i.test(privacy)
+  && /on by default for a signed-in account and you can turn it off at any time/i.test(privacy)
+  && /stays off for an account under 18 until a parent or guardian has confirmed it/i.test(privacy)
+  && /never runs without an account/i.test(privacy),
+  'the notice states strokes stay on the device, server reading is default-on only when signed in, can be turned off, waits for a guardian, and never runs without an account');
 // The optional server reading must be described where a student reads about it,
 // with the promise the code actually keeps. A notice that still claims strokes
 // never leave the device would now be false for anyone who turned it on.
@@ -374,7 +379,7 @@ for (const [slug] of PAGES) {
 // The fold itself, asserted on a sentence that spans lines in each language.
 const foldedEnglish = blocksOf(readDoc('privacy', 'en'))
   .find(b => b.kind === 'p' && b.text.includes('keeps the core maths-practice loop local'));
-ok(foldedEnglish && /neither is on unless you turn it on/.test(foldedEnglish.text),
+ok(foldedEnglish && /checking your working, which is off unless you turn it on\. Without an account, neither runs\./.test(foldedEnglish.text),
   'a paragraph wrapped across six source lines renders as one paragraph');
 const foldedHindi = blocksOf(readDoc('privacy', 'hi'))
   .find(b => b.kind === 'p' && b.text.includes(ENGLISH_GOVERNS));

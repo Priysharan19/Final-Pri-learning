@@ -313,6 +313,21 @@ if (existsSync(at('android'))) {
   }
 }
 
+// ── 8b · Google Play Billing (CP-08): the device reports, the server decides ─
+const playPath = 'android/app/src/main/java/com/prilearning/app/billing/PlayBilling.kt';
+if (existsSync(at(playPath))) {
+  const play = read(playPath);
+  const androidKotlin = walk(at('android'), n => /\.kt$/.test(n)).filter(f => !/\/src\/(test|androidTest)\//.test(posix(f)))
+    .map(f => readFileSync(f, 'utf8')).join('\n');
+  ok(!/\b(acknowledgePurchase|consumeAsync|consumePurchase)\s*\(/.test(androidKotlin), 'the Android app never acknowledges or consumes a purchase (the server acknowledges after verifying)');
+  ok(/\.setObfuscatedAccountId\(obfuscated\)/.test(play), 'every Play purchase carries the server-issued obfuscatedAccountId');
+  ok(!/premium|entitle/i.test(play.replace(/\/\/.*$/gm, '')), 'the Play bridge holds no entitlement logic');
+  const gb = read('server/platform/googleBilling.js');
+  ok(/const TOKEN_URL = 'https:\/\/oauth2\.googleapis\.com\/token';/.test(gb) && /redirect: 'error'/.test(gb) && /assertNoOpenTransaction\(/.test(gb),
+    'the server\'s Play client pins the token endpoint, never follows redirects and never runs inside a transaction');
+  ok(/if \(!constantTimeEqual\(claimed, issued\)\)/.test(gb), 'a Google purchase unlocks only when Google\'s record names this account\'s opaque id');
+}
+
 // ── 9 · No shell carries a server secret ─────────────────────────────────────
 const SECRET = [
   /(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{20,}/, /OPENAI_API_KEY/, /PRI_HANDWRITING_API_KEY/, /SUPABASE_SERVICE_ROLE/i,

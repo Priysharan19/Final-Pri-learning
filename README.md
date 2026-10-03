@@ -59,10 +59,13 @@ applied.
 remains in the repository for future/private use, but none of it is part of public V1 onboarding or
 the V1 product promise.
 
-**The cloud, when you want it.** The `/v1` control plane provides account identity, cross-device
-services, guardian-consent/account operations and server-authoritative subscription state. Public
-iPad V1 purchasing is StoreKit; web/Razorpay purchasing and public teacher/classroom workflows are
-not V1 product promises.
+**The cloud, when you want it.** 71 handlers under `/v1`: accounts with verified email, Google
+and Apple sign-in on the web (the native shells still use email), cross-device sync, Razorpay and Apple subscriptions with cancellation, classes
+and assignments, a content CMS with independent review, and an admin surface. It runs as one
+container against a persistent SQLite volume and fails closed without its configuration. Of that,
+the public V1 product promise is account identity, cross-device services, guardian-consent/account
+operations and server-authoritative subscription state; public iPad V1 purchasing is StoreKit, and
+web/Razorpay purchasing and public teacher/classroom workflows are not V1 product promises.
 
 
 ## Quick start
@@ -131,9 +134,9 @@ row is something the suites or the tools can speak to; the numbers are in
 | **Exams** | Public V1: CBSE Class 10 Standard and Basic and Class 12 at 80 marks, Sections A–E with internal choice; JEE Main at +4/−1/0; JEE Advanced Paper 1 with partial marking. |
 | **Adaptation** | Elo mastery per chapter and dot point, FSRS-5 spaced review, misconception pressure, interleaving — and the reason this question came next, in words. |
 | **Progress** | Chapter mastery, priorities, activity and streaks in the student's own timezone. No invented board mark or percentile: the India product refuses to show one. |
-| **Post-V1/private code** | Teacher/classroom, Australian-curriculum and Olympiad implementations remain in the repository for future/private use; they are not public V1 entry points. |
-| **Offline** | Core local practice, on-device handwriting recognition, marking, history and progress continue with the network off; account/server and paid-entitlement operations still require their respective authority. |
-| **Cloud, optional** | Account and cross-device services plus server-authoritative entitlement state. Public iPad V1 purchase authority is StoreKit; web/Razorpay purchasing is outside V1. |
+| **Post-V1/private code** | Teacher/classroom (classes, assignments, analytics, printable reports, task packs), Australian-curriculum and Olympiad implementations remain in the repository for future/private use; they are not public V1 entry points. |
+| **Offline** | Typed practice, marking, history and progress continue with the network off, installed as a PWA or as the native iPad app; handwriting and photo reading need a connection and a signed-in account, and account/server and paid-entitlement operations still require their respective authority. |
+| **Cloud, optional** | Verified email accounts, Google and Apple sign-in on the web, cross-device sync and server-authoritative entitlement state. Public iPad V1 purchase authority is StoreKit; web/Razorpay purchasing and the content CMS are outside the V1 promise. |
 
 
 ## The handwriting engine

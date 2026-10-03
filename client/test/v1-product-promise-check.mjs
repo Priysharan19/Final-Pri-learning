@@ -5,6 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { featureStates } from '../vite.config.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = rel => readFileSync(join(ROOT, rel), 'utf8');
@@ -33,11 +34,12 @@ ok(ENTITLEMENTS.EXTRA_AI === 'additional-ai-usage', 'reserved extra-AI capabilit
 
 // Public onboarding: actual source that production Vite builds.
 ok(!/key:\s*'olympiad'/.test(login), 'public STUDY list has no Olympiad');
-ok(!/const AU_COURSES/.test(login), 'public onboarding has no Australian curriculum catalogue');
+ok(featureStates('build', {}).australia === false && /\{featureEnabled\('australia'\) && \(/.test(login),
+  'the Australian curriculum catalogue is reachable only behind PRI_FEATURE_AUSTRALIA, which a production build records off');
 ok(!/name:\s*'Teacher'|t\('login\.teacher'\)\s*<\/button>/.test(login), 'public onboarding renders no Teacher choice');
 ok(/role:\s*'student'/.test(login), 'new public profile defaults to Student');
 ok(/role:\s*'student'[^\n]*\n\s*language/.test(login), 'profile create payload forces Student');
-ok(/course:\s*'in'/.test(login), 'profile create payload forces India curriculum');
+ok(!/login\.teachingInAustralia|login\.imTeaching|login\.readyTeacher|login\.openTeacherWorkspace/.test(login), 'no teacher-facing onboarding copy survives in Login');
 ok(/\[7, 8, 9, 10, 11, 12\]/.test(login), 'Classes 7–12 remain offered');
 ok(/key:\s*'jee-main'/.test(login), 'JEE Main remains offered');
 ok(/key:\s*'jee-advanced'/.test(login), 'JEE Advanced remains offered');

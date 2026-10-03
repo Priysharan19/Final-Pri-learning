@@ -142,7 +142,10 @@ export function createBridge({ post, events: sharedEvents = null, now = () => Da
     const result = response.result || {};
     const transactions = record.key === 'billing.restore'
       ? (Array.isArray(result.transactions) ? result.transactions : [])
-      : (result.status === 'verified' ? [result] : []);
+      // A paid result from either store: StoreKit says 'verified' (a signed
+      // JWS), Google Play says 'purchased' (a purchase token). Neither grants
+      // anything — the server verifies each with its store.
+      : (result.status === 'verified' || result.status === 'purchased' ? [result] : []);
     for (const transaction of transactions) events.emit('billing.transactionUpdated', { status: 'verified', ...transaction });
     stats.lateRecovered += 1;
   }

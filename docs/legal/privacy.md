@@ -11,14 +11,16 @@ The person responsible for your data (the "data fiduciary") is
 
 ## The short version
 
-Pri Learning keeps the core maths-practice loop local. Questions, on-device
-handwriting recognition, marking, local history and local progress run on your
-own device and can continue without a network. Some capabilities need an
-account or server connection, including account and cross-device services,
-guardian-consent services where required, server verification of paid access,
-and the optional server reading/checking described below. Two optional settings
-send work off the device if you switch them on; neither is on unless you turn
-it on.
+Pri Learning keeps the core maths-practice loop local. Questions, marking of
+typed answers, local history and local progress run on your own device and can
+continue without a network. Some capabilities need an account or server
+connection, including account and cross-device services, guardian-consent
+services where required, server verification of paid access, and the server
+reading and checking described below. Two settings send work off the device,
+and both are described below: reading your handwriting and photos on a server,
+which is on by default once you sign in to an account and can be turned off,
+and checking your working, which is off unless you turn it on. Without an
+account, neither runs.
 
 A Pri cloud account is optional for core local practice. It supports account and
 cross-device services and lets the server verify subscription status. If you do
@@ -44,11 +46,13 @@ device can open a profile that has no password.
 - **Your name**, as you typed it.
 - **Learning events**: that you answered a question, which chapter it belonged
   to, whether you were right, and how long you took.
-- **A picture of your handwriting, only if you switch that on.** Reading your
-  writing happens on your device by default, and your strokes stay there. There
-  is a setting in Settings → Handwriting, off unless you turn it on, that also
-  sends your writing to be read on a server, because the on-device reader knows
-  a fixed set of symbols and some notation is beyond it.
+- **A picture of your handwriting, when you are signed in.** Your strokes stay
+  on your device. When you are signed in to a Pri Learning account, a picture of
+  your writing is also read on a server, because the on-device reader knows a
+  fixed set of symbols and some notation is beyond it. This is on by default for
+  a signed-in account and you can turn it off at any time in Settings →
+  Handwriting; it stays off for an account under 18 until a parent or guardian
+  has confirmed it, and it never runs without an account.
 
   When you write with a pencil or your finger, what is sent is an image drawn
   from your own stroke coordinates and nothing else: not the question, not the
@@ -66,7 +70,7 @@ device can open a profile that has no password.
   copy: it is not written to our database, our storage or our logs. We ask the
   reading service not to store it. Under its own terms it does not use it to
   train its models, but it may hold a copy for a limited time to watch for
-  abuse; we do not control that. Turning the setting off stops it at once.
+  abuse; we do not control that. Turning the setting off stops it at once, and it stays off.
 - **Your working and the question, only if you switch that on.** There is a
   second setting, also off unless you turn it on, that sends the lines of
   working you wrote and the text of the question when an answer is wrong and

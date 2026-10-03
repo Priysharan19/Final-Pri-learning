@@ -39,7 +39,7 @@ copy('ncert.c10ChapterCount',/offline/,'offline chapter badge');
 // NCERT must reuse Pri's mature handwriting path instead of shipping a fork.
 assert.match(question,/mode.*'type'.*'write'.*'photo'/s,'QuestionCard retains Type/Write/Photo modes');
 assert.match(question,/InkAnswer\.jsx/,'Write mode reaches Pri Ink');
-assert.match(question,/recognizePhoto/,'Photo mode reaches native photo recognition');
+assert.match(question,/readPhotoWithCloud/,'Photo mode reaches the server photo reader (owner decision: server-only reading)');
 assert.match(question,/CONFIRM_CONF|doubtOf/,'uncertain handwriting still requires confirmation');
 assert.doesNotMatch(component,/InkAnswer|recognizer\.js|PencilKit/,'NCERT UI does not create a parallel recogniser');
 

@@ -132,7 +132,7 @@ class CloudBridgeTest {
         seen += mapOf(
             "path" to target, "method" to method, "client" to headers["x-pri-client"], "origin" to headers["origin"],
             "fetchSite" to headers["sec-fetch-site"], "cookie" to headers["cookie"], "csrf" to headers["x-pri-csrf"],
-            "idem" to headers["idempotency-key"], "rid" to headers["x-pri-request-id"], "body" to String(body),
+            "idem" to headers["idempotency-key"], "rid" to headers["x-pri-request-id"], "build" to headers["x-pri-shell-build"], "body" to String(body),
         )
         when (target) {
             "/v1/account/login" -> respond(socket, 200, """{"account":{"id":"a1"}}""", listOf(
@@ -172,12 +172,13 @@ class CloudBridgeTest {
     @Test fun transportSendsTheNativeIdentityKeepsTheSessionAndCopiesCsrf() {
         val jar = CookieJar()
         val persisted = mutableListOf<String>()
-        val cloud = NativeCloud(origin(), jar, persist = { persisted += it })
+        val cloud = NativeCloud(origin(), jar, persist = { persisted += it }, shellBuild = "42")
 
         val login = call(cloud, "1", """{"path":"/v1/account/login","method":"POST","body":"{\"email\":\"a@b.c\"}","idempotencyKey":"idem-1","requestId":"rid-1"}""")
         assertEquals(NativeCloud.Outcome.Response(200, """{"account":{"id":"a1"}}""", "srv-1"), login)
         val first = seen.last()
         assertEquals("android-native-v1", first["client"])
+        assertEquals("the shell's build number travels for the compatibility floor", "42", first["build"])
         assertNull("no Origin: the server's narrow native rule", first["origin"])
         assertNull("no Fetch Metadata", first["fetchSite"])
         assertNull("no CSRF before the server issued one", first["csrf"])
@@ -271,7 +272,9 @@ class CloudBridgeTest {
         assertEquals("bridge", caps.getJSONObject("cloud").getString("transport"))
         assertTrue(caps.getJSONObject("cloud").getBoolean("configured"))
         assertTrue(caps.getJSONObject("share").getBoolean("binary") && caps.getJSONObject("share").getBoolean("print"))
-        assertFalse("no billing until CP-08", caps.has("billing"))
+        assertEquals("billing presents Google Play's sheet over the bridge (CP-08); the server decides entitlement",
+            "google-play", caps.getJSONObject("billing").getString("store"))
+        assertEquals("bridge", caps.getJSONObject("billing").getString("transport"))
         assertFalse("no ink: Android writes on the shared web canvas", caps.has("ink"))
         val off = com.prilearning.app.bridge.HostDescriptor.json(
             com.prilearning.app.bridge.HostDescriptor.Shell("4.0", "7", "com.prilearning.app"), null)
