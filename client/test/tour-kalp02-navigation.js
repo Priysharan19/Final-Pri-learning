@@ -110,6 +110,27 @@ export const flow = {
     await page.keyboard.press('Escape');
     await check('Escape closes More', await page.locator('#mobile-more').count() === 0);
     await check('Escape restores focus to More trigger', await page.evaluate(() => document.activeElement?.getAttribute('aria-controls') === 'mobile-more'));
+
+    // CP-10: Back, then a nav tap before the router has rendered Home. The
+    // router applies location in a transition, so inside the popstate handler
+    // it still reports /practice; the tap must push, keeping Home behind it.
+    await goto('/');
+    await page.locator('.mobilenav a[href="/practice"]').click();
+    await page.waitForFunction(() => location.pathname === '/practice');
+    await settle();
+    const race = await page.evaluate(() => new Promise(resolve => {
+      addEventListener('popstate', () => {
+        const before = { path: location.pathname, idx: history.state?.idx };
+        document.querySelector('.mobilenav a[href="/practice"]').click();
+        resolve({ before, path: location.pathname, idx: history.state?.idx });
+      }, { once: true });
+      history.back();
+    }));
+    await check('Back reached Home (idx 0) before the tap', race.before.path === '/' && race.before.idx === 0, JSON.stringify(race));
+    await check('a nav tap during the Back render pushes (idx > 0)', race.path === '/practice' && race.idx > 0, JSON.stringify(race));
+    await page.goBack();
+    await page.waitForTimeout(150);
+    await check('Home is still behind it: Back returns Home', (await pathState(page)) === '/' && await page.evaluate(() => history.state?.idx === 0));
     await page.setViewportSize(TABLET);
     await page.locator('#acct-menu-btn').click();
     await page.getByRole('menuitem', { name: /Switch profile/i }).click();

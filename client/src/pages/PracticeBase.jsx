@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
+import PageLink from '../components/PageLink.jsx';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
@@ -385,7 +386,7 @@ export default function Practice() {
           <h2 style={{ marginTop: 0 }}>{t('practice.emptyTitle')}</h2>
           <p className="muted">{t('practice.emptyBody')}</p>
           <div className="spread" style={{ gap: 10, justifyContent: 'flex-start' }}>
-            <Link className="btn btn-primary" to="/">{t('practice.emptyChooseTopic')}</Link>
+            <PageLink className="btn btn-primary" to="/">{t('practice.emptyChooseTopic')}</PageLink>
             {(subtopic || dotpoint != null) && !taskId && !assignmentMode && (
               <button className="btn btn-quiet" onClick={() => setParams(new URLSearchParams())}>{t('practice.emptySmart')}</button>
             )}
@@ -403,10 +404,10 @@ export default function Practice() {
               <p className="muted">{t('practice.pyqNearestTitle')}</p>
               <div className="spread" style={{ gap: 10, justifyContent: 'flex-start', flexWrap: 'wrap', marginBottom: 12 }}>
                 {pyqAlternatives.map(alt => (
-                  <Link key={alt.subtopic} className="btn btn-ghost btn-sm"
+                  <PageLink key={alt.subtopic} className="btn btn-ghost btn-sm"
                     to={practiceHref({ subtopic: alt.subtopic, track: track || null, pyq: true })}>
                     {t('practice.pyqNearestCta', { name: alt.name })}
-                  </Link>
+                  </PageLink>
                 ))}
               </div>
             </div>
