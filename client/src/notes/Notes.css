@@ -1,0 +1,279 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Pri Learning · Notes — a living notebook
+   Built on the canonical tokens (theme.css), with fallbacks so it reads the
+   same under the "quiet instrument on paper" system: paper surfaces, near-black
+   ink, one teal for interaction, copper for corrections. No gradients, no glow.
+   Motion is transform/opacity only and stops entirely under reduced motion.
+   ───────────────────────────────────────────────────────────────────────────── */
+.nt {
+  --nt-paper: var(--paper, var(--surface));
+  --nt-raised: var(--surface-raised, var(--surface));
+  --nt-ink: var(--ink);
+  --nt-ink-2: var(--ink-2, var(--ink));
+  --nt-ink-3: var(--ink-3, var(--ink-2));
+  --nt-rule: var(--hairline);
+  --nt-rule-strong: var(--hairline-strong, var(--hairline));
+  --nt-accent: var(--accent, var(--brand-1));
+  --nt-accent-soft: var(--accent-soft, var(--brand-soft));
+  --nt-copper: var(--correction, #b4683c);
+  --nt-copper-soft: var(--correction-soft, rgba(180, 104, 60, 0.09));
+  --nt-good: var(--good);
+  --nt-serif: var(--font-math, 'KaTeX_Main', Georgia, serif);
+  --nt-ease: cubic-bezier(0.2, 0.7, 0.1, 1);
+  --nt-r: var(--radius-lg, 6px);
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 8px 0 72px;
+  color: var(--nt-ink);
+}
+.nt-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.nt-quiet { color: var(--nt-ink-3); font-size: 14px; margin: 0; }
+.nt-status { color: var(--nt-ink-3); padding: 24px 0; }
+
+/* ── Masthead ── */
+.nt-head, .nt-ch-head { padding: 12px 0 20px; border-bottom: 1px solid var(--nt-rule); margin-bottom: 20px; }
+.nt-eyebrow { margin: 0 0 6px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nt-ink-3); font-variant-numeric: tabular-nums; }
+.nt-title { font-family: var(--nt-serif); font-weight: 400; font-size: clamp(30px, 3.4vw + 12px, 46px); line-height: 1.08; letter-spacing: -0.01em; margin: 0 0 12px; }
+.nt-lede { font-family: var(--nt-serif); font-size: 18px; line-height: 1.6; color: var(--nt-ink-2); max-width: 64ch; margin: 0; }
+.nt-back { display: inline-flex; align-items: center; min-height: 44px; color: var(--nt-ink-3); text-decoration: none; font-size: 14px; }
+.nt-back:hover { color: var(--nt-accent); }
+
+/* ── Toolbar: class tabs + search ── */
+.nt-toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.nt-classes { display: inline-flex; border: 1px solid var(--nt-rule-strong); border-radius: var(--nt-r); overflow: hidden; }
+.nt-classes button {
+  min-height: 44px; padding: 0 14px; border: 0; background: transparent; color: var(--nt-ink-2);
+  font: inherit; font-size: 14px; font-variant-numeric: tabular-nums; cursor: pointer;
+  border-right: 1px solid var(--nt-rule);
+}
+.nt-classes button:last-child { border-right: 0; }
+.nt-classes button.is-on { background: var(--nt-ink); color: var(--nt-paper); }
+.nt-search { position: relative; flex: 1 1 260px; max-width: 380px; }
+.nt-search svg { position: absolute; left: 12px; top: 50%; width: 18px; height: 18px; transform: translateY(-50%); fill: none; stroke: var(--nt-ink-3); stroke-width: 1.6; pointer-events: none; }
+.nt-search input {
+  width: 100%; min-height: 44px; padding: 0 12px 0 38px; font: inherit; font-size: 15px;
+  color: var(--nt-ink); background: var(--nt-raised); border: 1px solid var(--control-border, var(--nt-rule-strong)); border-radius: var(--nt-r);
+}
+
+/* ── Chapter map ── */
+.nt-map { margin-bottom: 28px; }
+.nt-map-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-bottom: 10px; }
+.nt-map-head h2, .nt-index-head h2 { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nt-ink-3); font-weight: 600; margin: 0; }
+.nt-map-frame { display: grid; grid-template-columns: minmax(84px, 128px) 1fr; gap: 8px; padding: 18px 16px 14px; background: var(--nt-paper); border: 1px solid var(--nt-rule); border-radius: var(--nt-r); }
+.nt-map-strands { list-style: none; margin: 0; padding: 0; position: relative; }
+.nt-map-strands li { position: absolute; left: 0; right: 0; transform: translateY(-50%); font-size: 11.5px; line-height: 1.2; color: var(--nt-ink-3); }
+.nt-map-canvas { position: relative; width: 100%; }
+.nt-map-canvas svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.nt-map-row { stroke: var(--nt-rule); stroke-width: 1; vector-effect: non-scaling-stroke; stroke-dasharray: 2 5; }
+.nt-map-thread { fill: none; stroke: var(--nt-rule-strong); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.nt-map-edge {
+  fill: none; stroke: var(--nt-accent); stroke-width: 1.4; vector-effect: non-scaling-stroke; opacity: 0.55;
+  stroke-dasharray: 1; stroke-dashoffset: 1;
+}
+.nt-map.is-in .nt-map-edge { stroke-dashoffset: 0; transition: stroke-dashoffset 1100ms var(--nt-ease) var(--d, 0ms), opacity 160ms; }
+.nt-map-edge.is-lit { opacity: 1; stroke-width: 2.2; }
+.nt-map-node {
+  position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; padding: 0;
+  border-radius: 50%; border: 1px solid var(--nt-ink); background: var(--nt-raised); color: var(--nt-ink);
+  font: 600 12px/1 var(--font, inherit); font-variant-numeric: tabular-nums; cursor: pointer;
+  opacity: 0; transform: scale(0.6);
+  transition: opacity 360ms var(--nt-ease) calc(var(--i) * 30ms), transform 360ms var(--nt-ease) calc(var(--i) * 30ms), background-color 140ms, color 140ms;
+}
+.nt-map-node::after { content: ''; position: absolute; inset: -8px; border-radius: 50%; } /* 46px touch target */
+.nt-map.is-in .nt-map-node { opacity: 1; transform: none; }
+.nt-map-node.is-focus, .nt-map-node:hover { background: var(--nt-ink); color: var(--nt-paper); }
+.nt-map-caption { min-height: 1.5em; margin: 8px 0 0; font-family: var(--nt-serif); font-size: 16px; color: var(--nt-ink-2); }
+
+/* ── Chapter index ── */
+.nt-index-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 6px; }
+.nt-check { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 14px; color: var(--nt-ink-2); cursor: pointer; }
+.nt-check input { width: 18px; height: 18px; accent-color: var(--nt-accent); }
+.nt-chapters { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--nt-rule); }
+.nt-chapters li { position: relative; border-bottom: 1px solid var(--nt-rule); }
+.nt-chapter {
+  display: grid; grid-template-columns: 48px 1fr auto auto; align-items: center; gap: 12px;
+  min-height: 64px; padding: 10px 56px 10px 0; color: inherit; text-decoration: none;
+}
+.nt-chapter-n { font-family: var(--nt-serif); font-size: 22px; color: var(--nt-ink-3); font-variant-numeric: tabular-nums; }
+.nt-chapter-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nt-chapter-name { font-family: var(--nt-serif); font-size: 19px; line-height: 1.3; }
+.nt-chapter-meta { font-size: 13px; color: var(--nt-ink-3); }
+.nt-chapter-go { color: var(--nt-ink-3); transition: transform 200ms var(--nt-ease); }
+.nt-chapter:hover .nt-chapter-name { color: var(--nt-accent); }
+.nt-chapter:hover .nt-chapter-go { transform: translateX(4px); color: var(--nt-accent); }
+.nt-chapter-mark { display: none; }
+.nt-mark-btn {
+  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+  width: 44px; height: 44px; border: 0; background: transparent; cursor: pointer; border-radius: var(--nt-r);
+  display: grid; place-items: center;
+}
+.nt-glyph { width: 20px; height: 20px; fill: none; stroke: var(--nt-ink-3); stroke-width: 1.6; stroke-linejoin: round; transition: transform 220ms var(--nt-ease); }
+.nt-glyph.is-on { fill: var(--nt-copper); stroke: var(--nt-copper); }
+.nt-mark-btn:active .nt-glyph, .nt-mark-toggle:active .nt-glyph { transform: scale(0.86); }
+
+.nt-failed { padding: 16px; border: 1px solid var(--nt-rule-strong); border-radius: var(--nt-r); background: var(--nt-paper); margin-bottom: 20px; }
+.nt-failed p { margin: 0 0 10px; }
+
+/* ── Chapter header actions ── */
+.nt-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 20px; }
+.nt-actions .btn, .nt-end .btn, .nt-cards .btn { min-height: 44px; }
+.nt-mark-toggle {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px;
+  border: 1px solid transparent; border-radius: var(--nt-r); background: transparent; color: var(--nt-ink-2); font: inherit; font-size: 14px; cursor: pointer;
+}
+.nt-mark-toggle:hover { border-color: var(--nt-rule-strong); }
+.nt-builds { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 16px 0 0; font-size: 14px; color: var(--nt-ink-3); }
+.nt-builds a { color: var(--nt-accent); text-decoration: none; border-bottom: 1px solid var(--accent-line, currentColor); min-height: 32px; display: inline-flex; align-items: center; }
+.nt-builds small { color: var(--nt-ink-3); margin-left: 4px; }
+
+/* ── The sheet: ruled paper with a margin line ── */
+.nt-sheet {
+  position: relative; padding: 8px 28px 28px 56px;
+  background-color: var(--nt-paper);
+  border: 1px solid var(--nt-rule); border-radius: var(--nt-r);
+}
+.nt-sheet::before { content: ''; position: absolute; top: 0; bottom: 0; left: 36px; width: 1px; background: var(--paper-margin, var(--nt-copper-soft)); }
+.nt-section { padding-top: 28px; }
+.nt-section-h {
+  font-size: 12.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--nt-accent);
+  margin: 0 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--nt-rule);
+}
+.nt-link-btn { min-height: 44px; padding: 0; border: 0; background: none; color: var(--nt-accent); font: inherit; font-size: 14px; cursor: pointer; }
+
+/* Concept cards unfold */
+.nt-concepts { display: grid; gap: 10px; }
+.nt-concept { border: 1px solid var(--nt-rule); border-radius: var(--nt-r); background: var(--nt-raised); }
+.nt-concept h3 { margin: 0; font-size: inherit; font-weight: inherit; }
+.nt-concept h3 button {
+  display: grid; grid-template-columns: 28px 1fr 20px; align-items: center; gap: 10px; width: 100%;
+  min-height: 52px; padding: 10px 14px; border: 0; background: none; color: inherit; text-align: left; cursor: pointer;
+  font-family: var(--nt-serif); font-size: 18px;
+}
+.nt-concept-n { font-size: 14px; color: var(--nt-ink-3); font-variant-numeric: tabular-nums; }
+.nt-fold { position: relative; width: 14px; height: 14px; }
+.nt-fold::before, .nt-fold::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1.5px; background: var(--nt-ink-3); transition: transform 260ms var(--nt-ease); }
+.nt-fold::after { transform: rotate(90deg); }
+.nt-concept.is-open .nt-fold::after { transform: rotate(0deg); }
+.nt-concept-body { padding: 0 16px 16px 52px; font-family: var(--nt-serif); font-size: 17px; line-height: 1.65; color: var(--nt-ink-2); transform-origin: top; animation: nt-unfold 340ms var(--nt-ease); }
+@keyframes nt-unfold { from { opacity: 0; transform: translateY(-6px) scaleY(0.96); } to { opacity: 1; transform: none; } }
+
+/* Definitions */
+.nt-defs { margin: 0; display: grid; gap: 0; }
+.nt-defs > div { display: grid; grid-template-columns: minmax(140px, 220px) 1fr; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--paper-rule, var(--nt-rule)); }
+.nt-defs dt { font-weight: 600; font-size: 15px; }
+.nt-defs dd { margin: 0; font-family: var(--nt-serif); font-size: 17px; line-height: 1.55; color: var(--nt-ink-2); }
+
+/* Formulas write themselves in */
+.nt-formulas { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.nt-formula { margin: 0; padding: 14px 16px 12px; border: 1px solid var(--nt-rule); border-radius: var(--nt-r); background: var(--nt-raised); position: relative; }
+.nt-formula figcaption { font-size: 13px; color: var(--nt-ink-3); margin-bottom: 4px; }
+.nt-ink { position: relative; overflow: hidden; }
+.nt-ink-tex { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+.nt-ink-tex .katex-display { margin: 0.4em 0; text-align: left; }
+.nt-ink-tex .katex-display > .katex { text-align: left; }
+.nt-ink-veil { position: absolute; inset: 0; background: var(--nt-raised); transform-origin: right center; transform: scaleX(1); pointer-events: none; }
+.nt-formula.is-in .nt-ink-veil { transform: scaleX(0); transition: transform 1100ms cubic-bezier(0.5, 0, 0.25, 1) calc(120ms + var(--i, 0) * 70ms); }
+.nt-ink-stroke { display: block; width: 100%; height: 10px; overflow: visible; }
+.nt-ink-stroke path { fill: none; stroke: var(--nt-accent); stroke-width: 1.4; stroke-linecap: round; vector-effect: non-scaling-stroke; stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0.7; }
+.nt-formula.is-in .nt-ink-stroke path { stroke-dashoffset: 0; transition: stroke-dashoffset 900ms var(--nt-ease) calc(700ms + var(--i, 0) * 70ms); }
+.nt-formula-note { margin-top: 6px; font-size: 14px; color: var(--nt-ink-3); line-height: 1.5; }
+
+/* Important points */
+.nt-points { list-style: none; margin: 0; padding: 0; counter-reset: pt; }
+.nt-points li { counter-increment: pt; display: grid; grid-template-columns: 32px 1fr; column-gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--paper-rule, var(--nt-rule)); }
+.nt-points li::before { content: counter(pt); grid-row: span 2; font-family: var(--nt-serif); color: var(--nt-accent); font-size: 18px; }
+.nt-point-front { font-weight: 600; font-size: 15px; }
+.nt-point-back { font-family: var(--nt-serif); font-size: 17px; line-height: 1.55; color: var(--nt-ink-2); }
+
+/* Common mistakes */
+.nt-mistakes { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.nt-mistakes li { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--nt-rule); border-radius: var(--nt-r); overflow: hidden; background: var(--nt-raised); }
+.nt-wrong, .nt-right { padding: 12px 14px; font-family: var(--nt-serif); font-size: 16.5px; line-height: 1.55; }
+.nt-wrong { background: var(--nt-copper-soft); color: var(--nt-ink-2); border-right: 1px solid var(--nt-rule); }
+.nt-tag { display: block; font-family: var(--font, inherit); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
+.nt-wrong .nt-tag { color: var(--nt-copper); }
+.nt-right .nt-tag { color: var(--nt-good); }
+
+/* Worked examples */
+.nt-example { padding: 16px 0 20px; border-bottom: 1px solid var(--nt-rule); }
+.nt-example:last-child { border-bottom: 0; }
+.nt-example-n { margin: 0 0 4px; font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nt-ink-3); }
+.nt-example-q { font-family: var(--nt-serif); font-size: 18px; line-height: 1.55; margin-bottom: 10px; }
+.nt-steps { margin: 0 0 12px; padding-left: 22px; display: grid; gap: 6px; font-family: var(--nt-serif); font-size: 17px; line-height: 1.55; color: var(--nt-ink-2); }
+.nt-step { animation: nt-step-in 380ms var(--nt-ease); }
+@keyframes nt-step-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.nt-example-more { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.nt-answer { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; padding: 12px 14px; border-left: 2px solid var(--nt-accent); background: var(--nt-accent-soft); font-family: var(--nt-serif); font-size: 18px; }
+.nt-answer .nt-tag { color: var(--nt-accent); margin: 0; }
+.nt-checked { font-family: var(--font, inherit); font-size: 12.5px; color: var(--nt-ink-3); margin-left: auto; }
+.nt-end { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 28px; }
+
+/* ── Scroll-linked reveal ── */
+.nt-reveal { opacity: 0; transform: translateY(14px); }
+.nt-reveal.is-in { opacity: 1; transform: none; transition: opacity 520ms var(--nt-ease) calc(var(--i, 0) * 45ms), transform 620ms var(--nt-ease) calc(var(--i, 0) * 45ms); }
+
+/* ── Flashcards ── */
+.nt-cards-scrim { position: fixed; inset: 0; z-index: 300; background: rgba(20, 19, 16, 0.42); display: grid; place-items: center; padding: 16px; animation: nt-fade 200ms ease; }
+@keyframes nt-fade { from { opacity: 0; } to { opacity: 1; } }
+.nt-cards {
+  width: min(640px, 100%); max-height: calc(100dvh - 32px); overflow: auto;
+  background: var(--nt-paper); color: var(--nt-ink); border: 1px solid var(--nt-rule-strong); border-radius: var(--nt-r);
+  box-shadow: var(--shadow); padding: 18px 20px 20px; animation: nt-rise 320ms var(--nt-ease);
+}
+@keyframes nt-rise { from { opacity: 0; transform: translateY(16px) scale(0.98); } to { opacity: 1; transform: none; } }
+.nt-cards-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.nt-cards-top h2 { margin: 0; font-family: var(--nt-serif); font-weight: 400; font-size: 20px; }
+.nt-close { width: 44px; height: 44px; border: 0; background: none; color: var(--nt-ink-2); font-size: 26px; line-height: 1; cursor: pointer; border-radius: var(--nt-r); }
+.nt-cards-progress { height: 2px; background: var(--nt-rule); margin: 10px 0 18px; overflow: hidden; }
+.nt-cards-progress span { display: block; height: 100%; background: var(--nt-accent); transform-origin: left; transition: transform 400ms var(--nt-ease); }
+.nt-card { display: block; width: 100%; min-height: 240px; padding: 0; border: 0; background: none; cursor: pointer; perspective: 1400px; color: inherit; font: inherit; text-align: center; }
+.nt-card-inner { position: relative; display: grid; min-height: 240px; transform-style: preserve-3d; transition: transform 620ms cubic-bezier(0.3, 0.7, 0.2, 1); }
+.nt-card.is-flipped .nt-card-inner { transform: rotateY(180deg); }
+.nt-card-face {
+  grid-area: 1 / 1; display: grid; place-items: center; padding: 28px 24px;
+  border: 1px solid var(--nt-rule-strong); border-radius: var(--nt-r); background: var(--nt-raised);
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  font-family: var(--nt-serif); line-height: 1.5;
+}
+.nt-card-front { font-size: 23px; }
+.nt-card-back { font-size: 18.5px; transform: rotateY(180deg); background: var(--nt-paper); border-color: var(--nt-accent); color: var(--nt-ink); }
+.nt-card { animation: nt-card-in 360ms var(--nt-ease); }
+@keyframes nt-card-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+.nt-cards-hint { text-align: center; margin: 10px 0 14px; }
+.nt-cards-nav { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.nt-cards-count { font-size: 13.5px; color: var(--nt-ink-3); font-variant-numeric: tabular-nums; }
+.nt-cards-done { text-align: center; padding: 28px 0 8px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.nt-cards-done p { font-family: var(--nt-serif); font-size: 20px; margin: 0 0 6px; }
+
+/* ── iPad / phone ── */
+@media (max-width: 760px) {
+  .nt-sheet { padding: 4px 16px 20px 28px; }
+  .nt-sheet::before { left: 14px; }
+  .nt-defs > div { grid-template-columns: 1fr; gap: 4px; }
+  .nt-mistakes li { grid-template-columns: 1fr; }
+  .nt-wrong { border-right: 0; border-bottom: 1px solid var(--nt-rule); }
+  .nt-map-frame { grid-template-columns: 1fr; }
+  .nt-map-strands { display: none; }
+  .nt-map-node { width: 24px; height: 24px; margin: -12px 0 0 -12px; font-size: 10.5px; }
+  .nt-concept-body { padding-left: 16px; }
+  .nt-search { max-width: none; }
+  .nt-classes { width: 100%; overflow-x: auto; }
+  .nt-classes button { flex: 1 0 auto; }
+}
+
+/* ── Reduced motion: everything is simply there ── */
+@media (prefers-reduced-motion: reduce) {
+  .nt-reveal, .nt-reveal.is-in, .nt-map-node { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .nt-ink-veil { display: none; }
+  .nt-map-edge, .nt-ink-stroke path { stroke-dashoffset: 0 !important; transition: none !important; }
+  .nt-card-inner { transition: none; }
+  .nt-card.is-flipped .nt-card-inner { transform: none; }
+  .nt-card .nt-card-back { transform: none; opacity: 0; }
+  .nt-card.is-flipped .nt-card-front { opacity: 0; }
+  .nt-card.is-flipped .nt-card-back { opacity: 1; }
+  .nt-concept-body, .nt-step, .nt-card, .nt-cards, .nt-cards-scrim { animation: none; }
+}
+@media print {
+  .nt-reveal { opacity: 1; transform: none; }
+  .nt-ink-veil, .nt-actions, .nt-toolbar, .nt-end, .nt-mark-btn { display: none; }
+}

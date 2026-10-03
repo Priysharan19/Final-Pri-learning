@@ -18,6 +18,13 @@ on:
       - 'server/app.js'
       - 'server/package-lock.json'
       - 'client/src/lib/files.js'
+      - 'client/src/components/CloudAccountPanel.jsx'
+      - 'client/src/components/CloudAccountSecurity.jsx'
+      - 'client/src/components/GooglePlayBilling.jsx'
+      - 'client/src/ink/**'
+      - 'scripts/cloud-fixture-server.mjs'
+      - 'scripts/release-matrix.mjs'
+      - 'release/metadata.json'
       - '.github/workflows/android-shell.yml'
   push:
     branches: [main]
@@ -25,6 +32,8 @@ on:
       - 'android/**'
       - 'client/src/platform/**'
       - 'scripts/sync-android.mjs'
+      - 'scripts/release-matrix.mjs'
+      - 'release/metadata.json'
       - '.github/workflows/android-shell.yml'
 
 concurrency:
@@ -57,6 +66,8 @@ jobs:
         run: ./gradlew --no-daemon assembleDebug lintDebug testDebugUnitTest
       - name: Embedded web is exactly the shared build
         run: node scripts/sync-android.mjs --check
+      - name: Cross-platform release matrix (CP-11)
+        run: node scripts/release-matrix.mjs --require-native-android
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -79,6 +90,10 @@ jobs:
           - { api: 26, profile: pixel_6, expect: floor }
           # The oldest image here whose factory WebView meets the floor runs the
           # whole product journey; then the current API on phone and tablet.
+          # Phone images: the hosted runner's headless emulator process dies (adb exit
+          # 255) right after a Back key press, on API 33 and 36 (BLOCKED_AUTOMATION,
+          # docs/cross-platform/PROGRAMME_STATUS.md). They stay in the matrix, visibly
+          # failing, until that is resolved; phone evidence is local runs.
           - { api: 33, profile: pixel_6, expect: product }
           - { api: 36, profile: pixel_6, expect: product }
           - { api: 36, profile: pixel_tablet, expect: product }
@@ -112,10 +127,10 @@ jobs:
           arch: x86_64
           profile: ${{ matrix.profile }}
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          emulator-options: -no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim
           working-directory: android
           # One line: the runner executes each script line in its own shell.
-          script: node scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && { ./scripts/run-instrumented.sh ${{ matrix.expect }}; rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null; exit $rc; }
+          script: node ../scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && { ./scripts/run-instrumented.sh ${{ matrix.expect }}; rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null; exit $rc; }
       - uses: actions/upload-artifact@v4
         if: always()
         with:

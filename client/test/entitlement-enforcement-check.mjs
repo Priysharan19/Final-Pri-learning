@@ -92,7 +92,16 @@ same('the free tier is 20 questions a day and one exam per 30 days', [gate.FREE_
 for (const capability of Object.values(ENTITLEMENTS)) {
   ok(`${capability} has a named enforcement point`, typeof gate.CAPABILITY_ENFORCEMENT[capability] === 'string' && gate.CAPABILITY_ENFORCEMENT[capability].length > 10);
 }
-ok('additional-ai-usage is declared reserved (no-op)', /reserved/.test(gate.CAPABILITY_ENFORCEMENT[ENTITLEMENTS.EXTRA_AI]));
+{
+  // SEC-COMM-01: the one capability that protects server spend is enforced on
+  // the server, from the server's own entitlement record.
+  const { readFileSync } = await import('node:fs');
+  const src = rel => readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
+  ok('additional-ai-usage is enforced on the server (aiAllowance), not on the device',
+    /^server · .*aiAllowance\.js/.test(gate.CAPABILITY_ENFORCEMENT[ENTITLEMENTS.EXTRA_AI]) &&
+    /consumeAiAllowance\(db, \{ accountId: req\.platformSession\.account_id, kind: 'handwriting'/.test(src('server/platform/handwriting.js')) &&
+    /consumeAiAllowance\(db, \{ accountId: req\.platformSession\.account_id, kind: 'working'/.test(src('server/platform/working.js')));
+}
 
 // ── B · India profile: 20 a day, reset on the Kolkata calendar ───────────────
 const asha = (await POST('/profiles', { name: 'Asha', year: 9, course: 'in' })).user;

@@ -61,7 +61,7 @@ analytics without a fabricated predicted mark, and intervention flags with the r
 out. Both offline (AirDrop task packs) and cloud classrooms.
 
 **The cloud, when you want it.** 71 handlers under `/v1`: accounts with verified email, Google
-and Apple sign-in, cross-device sync, Razorpay and Apple subscriptions with cancellation, classes
+and Apple sign-in on the web (the native shells still use email), cross-device sync, Razorpay and Apple subscriptions with cancellation, classes
 and assignments, a content CMS with independent review, and an admin surface. It runs as one
 container against a persistent SQLite volume and fails closed without its configuration.
 
@@ -134,7 +134,7 @@ row is something the suites or the tools can speak to; the numbers are in
 | **Progress** | Chapter mastery, priorities, activity and streaks in the student's own timezone. No invented board mark or percentile: the India product refuses to show one. |
 | **Teachers** | Classes and assignments targeted at a chapter, dot point and difficulty; class analytics; intervention flags with reasons; printable reports; offline task packs and cloud classrooms. |
 | **Offline** | The whole learning loop runs with the network off, installed as a PWA or as the native iPad app. |
-| **Cloud, optional** | Verified email accounts, Google and Apple sign-in, cross-device sync, Razorpay and Apple subscriptions with cancellation, a content CMS with independent review. |
+| **Cloud, optional** | Verified email accounts, Google and Apple sign-in on the web, cross-device sync, Razorpay and Apple subscriptions with cancellation, a content CMS with independent review. |
 
 
 ## The handwriting engine

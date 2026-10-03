@@ -56,6 +56,15 @@ eq(certifyQuestion(good, { generatorId: 'c10-quadratic-roots' }).length, 0, 'a r
 ok(latexProblems('Find $\\sinA$.').some(p => p.includes('KaTeX cannot render')), 'an undefined control sequence (\\sinA) fails the gate');
 ok(latexProblems('$(x+7)(x+8)').some(p => p.includes('unbalanced')), 'an unclosed $ (the Class 8 MCQ defect) fails the gate');
 eq(latexProblems('Costs \\$40 and $x^2$ is fine').length, 0, 'an escaped currency \\$ is not a delimiter');
+// Raw LaTeX outside $…$ is shown to the student as source text (MathText
+// renders only $…$). The #310 review found published options like "\frac{3}{5}".
+ok(latexProblems('\\frac{3}{5}', 'option 0').some(p => p.includes('outside $…$')), 'a bare \\frac option fails the gate');
+ok(latexProblems('Roots are -1\\pm\\sqrt{10} here').some(p => p.includes('\\pm outside')), 'a bare command inside prose fails the gate');
+ok(latexProblems('₹500\\times20/100=₹100', 'step 1').some(p => p.includes('\\times outside')), 'a bare \\times in a step fails the gate');
+eq(latexProblems('$\\frac{3}{5}$').length, 0, 'the same formula inside $…$ passes');
+ok(latexProblems('Let $$\\int_0^1 f$$ be given').some(p => p.includes('display $$')), 'display $$…$$ fails: MathText would show stray dollar signs');
+eq(latexProblems('Let $f(x)=\\sin x$ and $\\int_0^1 f$ be given').some(p => p.includes('outside')), false, 'inline math beside prose is not a bare command');
+eq(latexProblems('Costs \\$40, then $2\\pi$').length, 0, 'an escaped \\$ next to real math is not a bare command');
 {
   const bad = { ...good, mcqOptions: ['$2x', '$3x$'], answerType: 'mcq', answer: { correctIndex: 0 } };
   ok(certifyQuestion(bad, { identity: false }).some(p => p.includes('unbalanced $ delimiter in option 0')), 'an unclosed $ in an MCQ option fails the gate');

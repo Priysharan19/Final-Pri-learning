@@ -12,7 +12,10 @@ const backend = fs.readFileSync(new URL('../src/local/backend.js', import.meta.u
 assert.match(question, /compactInkStrokes\(inkResult\.strokes\)/, 'submit must use compact ink transport');
 assert.match(question, /points: .*\.map\(p => \[/s, 'transport points must be arrays, not {x,y} objects');
 assert.match(backend, /Array\.isArray\(pt\) \? pt\[0\]/, 'backend must decode compact point tuples');
-assert.match(ink, /strokes\.length > 24 \? 1600 : 1000/, 'native real pages need a quiet recognition window');
+// Owner decision (server-only reading): the page is read once it has been
+// still for a settle window, and the same strokes are never sent twice.
+assert.match(ink, /const SETTLE_MS = \d{3,4};/, 'real pages need a quiet window before they are sent to the reader');
+assert.match(ink, /sentRef\.current === strokeSignature\(strokes\)/, 'the same page is never sent twice');
 assert.match(native, /pri-foundation.*timeout/s, 'foundation timeout must remain visible evidence');
 assert.match(native, /native-rescue.*timeout/s, 'native rescue timeout must remain visible evidence');
 assert.match(bridge, /strokeRevision/, 'native queue must invalidate stale page jobs');

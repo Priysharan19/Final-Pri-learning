@@ -7,7 +7,7 @@ function Shell({ children }) {
     <div className="auth-wrap">
       <div className="card" style={{ width: 'min(520px, calc(100% - 32px))', margin: 'auto', padding: 28 }}>
         <div className="logo logo-lg" aria-label="Pri Learning">
-          <span className="logo-bb">P</span><span className="logo-name">ri Learning<span className="logo-dot">.</span></span>
+          <span className="logo-bb" aria-hidden="true">P</span><span className="logo-name">Pri Learning<span className="logo-dot">.</span></span>
         </div>
         <div style={{ marginTop: 24 }}>{children}</div>
       </div>
@@ -37,7 +37,22 @@ export default function AccountAction({ actionData }) {
       if (!alive) return;
       setState('done');
       setMessage(tLater('accountAction.emailVerified'));
-    }).catch(error => {
+    }).catch(async error => {
+      // A spent link is answered 200 { alreadyVerified } by the server when its
+      // own account is verified (mail scanners open links first). If the link
+      // is refused anyway but this browser is signed in to a verified account,
+      // the person's email is verified: say so rather than show an error.
+      if (error?.code === 'TOKEN_INVALID') {
+        const signedInVerified = await cloud.me()
+          .then(data => data?.account?.emailVerified === true)
+          .catch(() => false);
+        if (!alive) return;
+        if (signedInVerified) {
+          setState('done');
+          setMessage(tLater('accountAction.emailVerified'));
+          return;
+        }
+      }
       if (!alive) return;
       setState('error');
       setMessage(error?.code === 'TOKEN_INVALID'
