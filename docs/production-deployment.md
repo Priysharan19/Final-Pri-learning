@@ -21,7 +21,7 @@ After every production deploy, verify the exact SHA from a checkout of that SHA:
 npm run verify:deployment -- --origin https://<production origin> --sha <40-hex main SHA> --engine postgres
 ```
 
-`tools/verify-deployment.mjs` sends three unauthenticated GETs and changes nothing. It prints `DEPLOYMENT VERIFIED: PASS` only when the server and the web bundle both report that SHA, storage is persistent, the database is reachable at the schema versions the checkout expects, verification email is configured and `/v1/ready` says the replica can serve. Use `--engine sqlite` while the service still runs on the volume.
+`tools/verify-deployment.mjs` sends three unauthenticated GETs and changes nothing. It prints `DEPLOYMENT VERIFIED: PASS` only when the server and the web bundle both report that SHA, storage is persistent, the database is reachable at the schema versions the checkout expects, verification email is configured and `/v1/ready` says the replica can serve. While the service still runs on SQLite, first verify the Railway volume is mounted at `/data`, then add `--engine sqlite --persistent-storage-proven`; the flag is an explicit assertion of that out-of-band volume check, not a substitute for it.
 
 ## Observed Railway state (2026-10-03, live re-check)
 

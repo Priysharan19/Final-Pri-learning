@@ -122,7 +122,12 @@ try {
   state.health.storage = { persistentDatabase: true }; // legacy/operator proof for transitional SQLite
   state.ready.checks.database.engine = 'sqlite';
   ok(!(await run({ engine: 'postgres' })).ok, 'fails when --engine postgres meets a SQLite deployment');
-  ok((await run()).ok, 'passes a SQLite deployment only when persistent storage is proven');
+  ok((await run()).ok, 'passes a SQLite deployment when legacy health proves persistent storage');
+
+  state = healthy();
+  state.health.database.engine = 'sqlite';
+  state.ready.checks.database.engine = 'sqlite';
+  ok((await run({ persistentStorageProven: true })).ok, 'passes SQLite when the caller supplies an out-of-band persistence proof');
 
   state = healthy();
   state.ready.state = 'degraded';
@@ -135,7 +140,8 @@ try {
   const down = await verifyDeployment({ origin: 'http://127.0.0.1:1', sha: SHA, allowHttp: true });
   ok(!down.ok && down.results.some(item => item.label === 'origin reachable'), 'an unreachable origin fails, it does not throw');
 
-  ok(parseArgs(['--origin', 'https://x.example', '--sha', SHA, '--engine', 'postgres']).engine === 'postgres', 'CLI arguments parse');
+  const parsed = parseArgs(['--origin', 'https://x.example', '--sha', SHA, '--engine', 'sqlite', '--persistent-storage-proven']);
+  ok(parsed.engine === 'sqlite' && parsed.persistentStorageProven === true, 'CLI arguments parse, including the out-of-band persistence proof');
   assert.throws(() => parseArgs(['--origin', 'https://x.example'])); count += 1;
 } finally {
   server.close();

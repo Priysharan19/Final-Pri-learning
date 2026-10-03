@@ -30,10 +30,11 @@ const SHA = /^[0-9a-f]{40}$/;
 const REQUEST_TIMEOUT_MS = 15_000;
 
 export function parseArgs(argv) {
-  const args = { origin: null, sha: null, engine: null, allowHttp: false };
+  const args = { origin: null, sha: null, engine: null, allowHttp: false, persistentStorageProven: false };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     if (flag === '--allow-http') { args.allowHttp = true; continue; }
+    if (flag === '--persistent-storage-proven') { args.persistentStorageProven = true; continue; }
     if (!['--origin', '--sha', '--engine'].includes(flag)) throw new Error(`Unknown argument: ${flag}`);
     const value = argv[i + 1];
     if (value === undefined || value.startsWith('--')) throw new Error(`${flag} needs a value`);
@@ -67,7 +68,7 @@ async function getJson(fetchImpl, url) {
  * Returns { ok, results: [{ ok, label, detail? }] }. Never throws for a failed
  * check; a network error becomes a failed check with its message.
  */
-export async function verifyDeployment({ origin, sha, engine = null, allowHttp = false, fetchImpl = globalThis.fetch }) {
+export async function verifyDeployment({ origin, sha, engine = null, allowHttp = false, persistentStorageProven = false, fetchImpl = globalThis.fetch }) {
   const results = [];
   const check = (ok, label, detail) => { results.push({ ok: !!ok, label, ...(detail ? { detail } : {}) }); return !!ok; };
 
@@ -103,9 +104,14 @@ export async function verifyDeployment({ origin, sha, engine = null, allowHttp =
   const runningSha = h.releaseIdentity?.releaseSha;
   check(runningSha === expectedSha, 'server release SHA is the nominated SHA', `running ${runningSha || 'unknown'}`);
   // Postgres is external durable storage. A transitional SQLite deployment
-  // must still expose the legacy operator storage proof; without it an
-  // unauthenticated verifier cannot establish that the file is on a volume.
-  check(databaseEngine === 'postgres' || h.storage?.persistentDatabase === true, 'storage is persistent');
+  // cannot prove its volume mount through the redacted public health surface,
+  // so the caller must supply an explicit out-of-band proof (for example the
+  // Railway volume inventory, or CI's mounted-file assertion).
+  const persistenceProven = databaseEngine === 'postgres'
+    || h.storage?.persistentDatabase === true
+    || (databaseEngine === 'sqlite' && persistentStorageProven === true);
+  check(persistenceProven, 'storage is persistent',
+    databaseEngine === 'sqlite' && !persistenceProven ? 'SQLite needs --persistent-storage-proven after an out-of-band volume check' : undefined);
   check(databaseReachable, 'database reachable');
   if (engine) check(databaseEngine === engine, `database engine is ${engine}`, `running ${databaseEngine || 'unknown'}`);
   check(String(schemaVersion) === String(SCHEMA_VERSION), `schema_version is ${SCHEMA_VERSION}`, `running ${schemaVersion}`);
@@ -124,7 +130,7 @@ export async function verifyDeployment({ origin, sha, engine = null, allowHttp =
 
 async function main() {
   let args;
-  const usage = 'Usage: node tools/verify-deployment.mjs --origin https://… --sha <40-hex> [--engine postgres|sqlite]';
+  const usage = 'Usage: node tools/verify-deployment.mjs --origin https://… --sha <40-hex> [--engine postgres|sqlite] [--persistent-storage-proven]';
   let report;
   try {
     args = parseArgs(process.argv.slice(2));
