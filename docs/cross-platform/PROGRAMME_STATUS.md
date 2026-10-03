@@ -504,6 +504,7 @@ Causes found:
   - Tried and ruled out: 4 GB RAM, `guest` GPU, Vulkan off, and skipping rotation (reverted, not kept as a weakening).
   - This is past the three-attempts-per-fingerprint ceiling, so it is returned to triage.
   - Phone jobs stay in the matrix, visibly failing. **Android phone evidence is local emulator runs only** (API 36 and API 33, full product suite).
+- **Resolved 2026-10-03 (#330):** the phone-image death was isolated with a seven-way emulator matrix (emulator 35 vs 37, AOSP vs Google APIs image, 3 GB RAM / 4 cores, pixel_5, API 34, `-gpu off`) — every variant died at the same point, while the WebView was compositing the practice page on the compact layout — and a second round of WebView flags: only `--disable-gpu-compositing` kept the emulator alive through the full product suite. `android-shell.yml` now runs the phone jobs with WebView software compositing (`/data/local/tmp/webview-command-line`) and streams logcat into the job artifact; the tablet job keeps GPU compositing. This changes the synthetic renderer, not any assertion. Phone CI evidence is still SYNTHETIC / EMULATOR.
 - **Governance finding:** #286 and #298 used `fix/…` branch names. The non-required "Autonomous fleet V2 contract" check refuses non-mission branch names on governed paths. Later programme branches use `task/…`.
 
 ## CP-11 — Cross-Platform Release Matrix and Compatibility

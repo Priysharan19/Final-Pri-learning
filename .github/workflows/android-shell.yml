@@ -87,16 +87,18 @@ jobs:
         include:
           # API 26 (minSdk) ships a factory WebView below the Chromium 91 floor:
           # the correct, asserted result there is the fail-closed update screen.
-          - { api: 26, profile: pixel_6, expect: floor }
+          - { api: 26, profile: pixel_6, expect: floor, webview: '' }
           # The oldest image here whose factory WebView meets the floor runs the
           # whole product journey; then the current API on phone and tablet.
-          # Phone images: the hosted runner's headless emulator process dies (adb exit
-          # 255) right after a Back key press, on API 33 and 36 (BLOCKED_AUTOMATION,
-          # docs/cross-platform/PROGRAMME_STATUS.md). They stay in the matrix, visibly
-          # failing, until that is resolved; phone evidence is local runs.
-          - { api: 33, profile: pixel_6, expect: product }
-          - { api: 36, profile: pixel_6, expect: product }
-          - { api: 36, profile: pixel_tablet, expect: product }
+          # Phone images: the hosted runner's headless emulator (gfxstream host renderer)
+          # died (adb exit 255) while the WebView composited the practice page on the
+          # compact layout. Diagnosed in #330: the same journey survives with WebView GPU
+          # compositing off, and no emulator build/GPU/RAM/profile variant helped. Phone
+          # jobs therefore run the WebView with software compositing; the tablet job keeps
+          # GPU compositing so that path stays exercised. Product assertions are unchanged.
+          - { api: 33, profile: pixel_6, expect: product, webview: '--disable-gpu-compositing' }
+          - { api: 36, profile: pixel_6, expect: product, webview: '--disable-gpu-compositing' }
+          - { api: 36, profile: pixel_tablet, expect: product, webview: '' }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -130,7 +132,9 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim
           working-directory: android
           # One line: the runner executes each script line in its own shell.
-          script: node ../scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && { ./scripts/run-instrumented.sh ${{ matrix.expect }}; rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null; exit $rc; }
+          # WebView flags (debuggable images read /data/local/tmp/webview-command-line);
+          # the live logcat tee keeps guest evidence even if the emulator dies.
+          script: mkdir -p app/build/outputs/pri-instrumented && { [ -n "${{ matrix.webview }}" ] && adb shell "echo '_ ${{ matrix.webview }}' > /data/local/tmp/webview-command-line && chmod 644 /data/local/tmp/webview-command-line" || true; } && (adb logcat -v threadtime > app/build/outputs/pri-instrumented/live-logcat.txt 2>&1 &) && node ../scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && { ./scripts/run-instrumented.sh ${{ matrix.expect }}; rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null; exit $rc; }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
