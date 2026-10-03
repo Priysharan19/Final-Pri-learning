@@ -87,16 +87,19 @@ jobs:
         include:
           # API 26 (minSdk) ships a factory WebView below the Chromium 91 floor:
           # the correct, asserted result there is the fail-closed update screen.
-          - { api: 26, profile: pixel_6, expect: floor, webviewFlags: "" }
+          - { api: 26, profile: pixel_6, expect: floor, target: google_apis, webviewFlags: "" }
           # The oldest image here whose factory WebView meets the floor runs the
           # whole product journey; then the current API on phone and tablet.
           # Hosted phone gfxstream/WebView compositing is unstable on both API
           # 33 and 36. The diagnostic matrix proved software compositing avoids
-          # the emulator death; the API 36 tablet stays on GPU compositing so
-          # that rendering path remains continuously exercised.
-          - { api: 33, profile: pixel_6, expect: product, webviewFlags: "--disable-gpu-compositing" }
-          - { api: 36, profile: pixel_6, expect: product, webviewFlags: "--disable-gpu-compositing" }
-          - { api: 36, profile: pixel_tablet, expect: product, webviewFlags: "" }
+          # the emulator death. API 33 deliberately uses the AOSP image: the
+          # google_apis API 33 image can restart GMSCore's FontsProvider while
+          # instrumentation is live, which makes Android kill dependent apps
+          # even though Pri has not crashed. API 36 still exercises google_apis
+          # on both phone and tablet, and the tablet keeps GPU compositing.
+          - { api: 33, profile: pixel_6, expect: product, target: default, webviewFlags: "--disable-gpu-compositing" }
+          - { api: 36, profile: pixel_6, expect: product, target: google_apis, webviewFlags: "--disable-gpu-compositing" }
+          - { api: 36, profile: pixel_tablet, expect: product, target: google_apis, webviewFlags: "" }
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -123,14 +126,14 @@ jobs:
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: ${{ matrix.api }}
-          target: google_apis
+          target: ${{ matrix.target }}
           arch: x86_64
           profile: ${{ matrix.profile }}
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim
           working-directory: android
           # One line: the runner executes each script line in its own shell.
-          script: set -e; mkdir -p app/build/outputs/pri-instrumented; WEBVIEW_FLAGS='${{ matrix.webviewFlags }}'; if [ -n "$WEBVIEW_FLAGS" ]; then adb shell "echo '_ $WEBVIEW_FLAGS' > /data/local/tmp/webview-command-line"; fi; (adb logcat -v threadtime > app/build/outputs/pri-instrumented/live-logcat.txt 2>&1 &) ; node ../scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && { ./scripts/run-instrumented.sh ${{ matrix.expect }}; rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null; exit $rc; }
+          script: set -e; mkdir -p app/build/outputs/pri-instrumented; WEBVIEW_FLAGS='${{ matrix.webviewFlags }}'; if [ -n "$WEBVIEW_FLAGS" ]; then adb shell "echo '_ $WEBVIEW_FLAGS' > /data/local/tmp/webview-command-line"; fi; (adb logcat -v threadtime > app/build/outputs/pri-instrumented/live-logcat.txt 2>&1 &) ; node ../scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && rc=0; ./scripts/run-instrumented.sh ${{ matrix.expect }} || rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null || true; exit "$rc"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
