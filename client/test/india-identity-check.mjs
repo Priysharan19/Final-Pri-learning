@@ -252,19 +252,19 @@ async function run() {
     const hero = login.slice(heroStart, splitStart);
     ok('the Login hero source carries no HSC or NSW copy', heroStart > 0 && splitStart > heroStart && !/HSC|NSW|NESA/.test(hero));
     ok('the sign-up form opens on the India course', /course: 'in'/.test(login) && /STUDY_DEFAULT/.test(login));
-    // Australia remains an explicit secondary path off the India-first course
-    // step. KALP-03 made the link role-aware, so prove the full student/teacher
-    // translation contract rather than requiring the removed student-only call.
-    const enStrings = readFileSync(`${CLIENT}src/i18n/strings.en.js`, 'utf8');
-    const hiStrings = readFileSync(`${CLIENT}src/i18n/strings.hi.js`, 'utf8');
-    ok('the Australian option is a secondary, collapsed control',
-      /createStep === 1 && !australia && \(/.test(login)
-      && /t\(form\.role === 'teacher' \? 'login\.teachingInAustralia' : 'login\.studyingInAustralia'\)/.test(login)
+    // Frozen public V1 is India-only. The Australian syllabuses stay in the
+    // source only behind PRI_FEATURE_AUSTRALIA (false in a production build),
+    // the link is student-only (there is no public Teacher role), and Login
+    // must not carry an Olympiad launch choice.
+    ok('the Australian option exists only behind the build flag, for students',
+      /\{featureEnabled\('australia'\) && \(/.test(login)
+      && /createStep === 1 && !australia && \(/.test(login)
       && /createStep === 1 && australia && \(/.test(login)
-      && /'login\.studyingInAustralia': 'Studying in Australia\?/.test(enStrings)
-      && /'login\.teachingInAustralia': 'Teaching in Australia\?/.test(enStrings)
-      && /'login\.studyingInAustralia':/.test(hiStrings)
-      && /'login\.teachingInAustralia':/.test(hiStrings));
+      && /\{t\('login\.studyingInAustralia'\)\}/.test(login)
+      && !/login\.teachingInAustralia/.test(login));
+    ok('public onboarding exposes no Olympiad launch track',
+      !/key:\s*['"]olympiad['"]/.test(login)
+      && !/OLYMPIAD/.test(login));
     ok('the cloud sign-in routes to the cloud account panel', /CLOUD_ACCOUNT_ROUTE = '\/settings#cloud-account-title'/.test(login));
 
     for (const page of ['Home.jsx', 'History.jsx', 'Favorites.jsx', 'Progress.jsx']) {

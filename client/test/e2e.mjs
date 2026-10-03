@@ -227,7 +227,7 @@ function helpers(page, base, flowId) {
   /** Load a route and wait for the app to have decided who is signed in. */
   const goto = async (path = '/') => {
     await page.goto(base + path, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.auth-wrap .hero-title, .auth-card, .shell', { timeout: 30000 });
+    await page.waitForSelector('.auth-wrap .hero-title, .auth-card, .shell, .legal-body', { timeout: 30000 });
     // Routes are lazily loaded now, so the shell paints before the page inside
     // it does and Suspense shows "Loading…" in between. Without this wait the
     // next assertion races the chunk over the network and fails on a slow CI
@@ -246,23 +246,19 @@ function helpers(page, base, flowId) {
    */
   const createProfile = async ({
     name = 'E2E Student', year = 9, email = null, password = null,
-    course = 'nsw', track = null, role = 'student', language = 'en',
+    course = 'in', track = null, role = 'student', language = 'en',
     avatar = null, cloud = false, fromPicker = false
   } = {}) => {
     await page.getByRole('button', { name: fromPicker ? 'Add another profile' : 'Get Started' }).click();
     await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
-    await page.getByRole('button', { name: role === 'teacher' ? 'Teacher' : 'Student', exact: true }).click();
+    if (role !== 'student') throw new Error('Public V1 onboarding creates Student profiles only.');
+    await page.getByRole('button', { name: 'Student', exact: true }).click();
     await page.locator('.auth-card .btn-primary').click();
 
     await page.waitForSelector('[data-onboarding-step="2"]', { timeout: 15000 });
-    if (course === 'in') {
-      await page.locator('#signup-track').selectOption(track || String(year));
-      if (track) await page.locator('#signup-year').selectOption(String(year));
-    } else {
-      await page.getByRole('button', { name: role === 'teacher' ? /Teaching in Australia/ : /Studying in Australia/ }).click();
-      await page.locator('#signup-course').selectOption(course);
-      await page.locator('#signup-year').selectOption(String(year));
-    }
+    if (course !== 'in') throw new Error(`Public V1 onboarding does not expose ${course}.`);
+    await page.locator('#signup-track').selectOption(track || String(year));
+    if (track) await page.locator('#signup-year').selectOption(String(year));
     await page.locator('.auth-card .btn-primary').click();
 
     await page.waitForSelector('[data-onboarding-step="3"]', { timeout: 15000 });
@@ -285,15 +281,73 @@ function helpers(page, base, flowId) {
     await page.locator('.auth-card .btn-primary').click();
     if (cloud) {
       await page.waitForSelector('#cloud-account-title', { timeout: 30000 });
-    } else if (role === 'teacher') {
-      await page.waitForURL(/\/teach(?:#.*)?$/, { timeout: 30000 });
-      await page.waitForSelector('.shell', { timeout: 30000 });
     } else {
       await page.waitForSelector('.home-greet', { timeout: 30000 });
     }
   };
 
-  return { shot, check, mathText, goto, createProfile, settle: () => page.waitForTimeout(SETTLE) };
+
+  /**
+   * Legacy/private implementation fixture for browser regression coverage.
+   *
+   * Public V1 deliberately has no Australian/Teacher/Olympiad onboarding entry
+   * point. A few long-standing browser flows still exercise private legacy
+   * mechanics (Australian practice/exams) that remain in the repository. Those
+   * tests must not force a public back door merely so they can create a fixture,
+   * so they seed the same local profile row directly in the isolated test DB.
+   * This helper is test code only and is never bundled into the application.
+   */
+  const createLegacyProfile = async ({
+    name = 'E2E Legacy Student', year = 9, course = 'nsw', pathway = 'advanced',
+    role = 'student', indiaTrack = null, avatar = '🙂', language = 'en'
+  } = {}) => {
+    const id = `e2e-legacy-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    await page.evaluate(async profile => {
+      const db = await new Promise((resolve, reject) => {
+        const req = indexedDB.open('pri-learning');
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+      const now = Date.now();
+      const row = {
+        id: profile.id,
+        name: profile.name,
+        year: profile.year,
+        course: profile.course,
+        role: profile.role,
+        avatar: profile.avatar,
+        theme: 'dark',
+        dailyGoal: 10,
+        xp: 0,
+        language: profile.language,
+        mathsGloss: false,
+        pathway: profile.course === 'nsw' ? profile.pathway : null,
+        indiaTrack: profile.course === 'in' ? (profile.indiaTrack || 'cbse') : null,
+        timezone: profile.course === 'nsw' ? 'Australia/Sydney' : 'Asia/Kolkata',
+        createdAt: now,
+        lastActiveAt: now
+      };
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction('profiles', 'readwrite');
+        tx.objectStore('profiles').put(row);
+        tx.oncomplete = resolve;
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error('profile seed aborted'));
+      });
+      db.close();
+      localStorage.setItem('pri-current-profile', profile.id);
+    }, { id, name, year, course, pathway, role, indiaTrack, avatar, language });
+    await page.goto(base + '/', { waitUntil: 'domcontentloaded' });
+    if (role === 'teacher') {
+      await page.waitForURL(/\/teach(?:#.*)?$/, { timeout: 30000 });
+      await page.waitForSelector('.teacher-workspace-head', { timeout: 30000 });
+    } else {
+      await page.waitForSelector('.home-greet', { timeout: 30000 });
+    }
+    return id;
+  };
+
+  return { shot, check, mathText, goto, createProfile, createLegacyProfile, settle: () => page.waitForTimeout(SETTLE) };
 }
 
 // ── Flow runner ──────────────────────────────────────────────────────────────

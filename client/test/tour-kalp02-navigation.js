@@ -20,27 +20,11 @@ async function visibleSidebarLabels(page) {
   return page.locator('.sidebar .nav-label').allTextContents();
 }
 
-async function createTeacher(page) {
-  await page.getByRole('button', { name: /Add another/i }).click();
-  await page.waitForSelector('[data-onboarding-step="1"]');
-  await page.getByRole('button', { name: 'Teacher', exact: true }).click();
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="2"]');
-  await page.locator('#signup-track').selectOption('10');
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="3"]');
-  await page.locator('#signup-name').fill('KALP02 Teacher');
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="4"]');
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="5"]');
-  await page.getByRole('button', { name: 'Open Teacher Workspace' }).click();
-}
 export const flow = {
   id: 'kalp02-navigation',
   name: 'KALP-02 · role-aware IA, deep links and navigation',
 
-  async run({ page, check, goto, settle, createProfile }) {
+  async run({ page, check, goto, settle, createProfile, createLegacyProfile }) {
     const consoleErrors = [];
     page.on('console', msg => {
       if (msg.type() === 'error') consoleErrors.push(msg.text().slice(0, 300));
@@ -114,7 +98,9 @@ export const flow = {
     await page.locator('#acct-menu-btn').click();
     await page.getByRole('menuitem', { name: /Switch profile/i }).click();
     await page.waitForSelector('.acct-list');
-    await createTeacher(page);
+    await createLegacyProfile({
+      name: 'KALP02 Private Teacher', year: 10, course: 'in', role: 'teacher', indiaTrack: 'cbse'
+    });
     await page.waitForSelector('.teacher-workspace-head', { timeout: 30000 });
     await check('teacher profile lands in Teacher Workspace', (await pathState(page)) === '/teach', await pathState(page));
 

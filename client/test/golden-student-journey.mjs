@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os';
 import { chromium } from '@playwright/test';
 import { ensureBuild, serveDist } from './e2e.mjs';
 
-const TOPIC = 'y7-equations';
-const TOPIC_NAME = 'Linear Equations';
+const TOPIC = 'c8-linear-equations';
+const TOPIC_NAME = 'Linear Equations in One Variable';
 const WRONG_A = '-987654';
 const WRONG_B = '-987655';
 const DRAFT = '12345';
@@ -36,9 +36,7 @@ async function createFreshStudent(page, origin) {
   await page.getByRole('button', { name: 'Student', exact: true }).click();
   await page.locator('.auth-card .btn-primary').click();
   await page.waitForSelector('[data-onboarding-step="2"]');
-  await page.getByRole('button', { name: /Studying in Australia/ }).click();
-  await page.locator('#signup-course').selectOption('nsw');
-  await page.locator('#signup-year').selectOption('7');
+  await page.locator('#signup-track').selectOption('8');
   await page.locator('.auth-card .btn-primary').click();
   await page.waitForSelector('[data-onboarding-step="3"]');
   await page.locator('#signup-name').fill('PRI-02 Golden Student');
@@ -60,15 +58,22 @@ async function typedQuestion(page, origin, options = {}) {
   const input = page.locator('.editor-body input.answer-input');
   const typeTab = page.getByRole('button', { name: 'Answer by typing' });
   for (let i = 0; i < 12; i++) {
-    if (await typeTab.count()) await typeTab.click();
-    await page.waitForTimeout(80);
-    if (await input.count() === 1) {
+    await page.waitForTimeout(120);
+    if (await input.count() === 1 && await input.isVisible()) {
+      return { prompt: clean(await page.locator('.q-prompt').textContent()), input };
+    }
+    if (await typeTab.count() && await typeTab.first().isVisible()) {
+      const cls = await typeTab.first().getAttribute('class') || '';
+      if (!cls.split(/\s+/).includes('on')) await typeTab.first().click();
+    }
+    await page.waitForTimeout(120);
+    if (await input.count() === 1 && await input.isVisible()) {
       return { prompt: clean(await page.locator('.q-prompt').textContent()), input };
     }
     await page.locator('.ctx-next').click();
     await page.waitForSelector('.q-prompt');
   }
-  throw new Error('No typed Linear Equations question was served within 12 explicit safe skips.');
+  throw new Error('No typed Class 8 linear-equations question was served within 12 explicit safe skips.');
 }
 
 async function resolveWrong(page, options = {}) {
@@ -116,20 +121,27 @@ async function snapshot(page, origin) {
   await page.goto(origin + '/progress', { waitUntil: 'domcontentloaded' });
   await waitApp(page);
   await page.waitForSelector('.syl-table');
-  const row = page.locator('.syl-table tbody tr').filter({ hasText: TOPIC_NAME }).first();
-  assert.equal(await row.count(), 1, 'Progress must contain the practised Linear Equations row');
+  const row = page.locator(`.syl-table tbody tr[data-chapter="${TOPIC}"]`).first();
+  assert.equal(await row.count(), 1, 'Progress must contain the practised Class 8 linear-equations row');
   const progressText = clean(await row.textContent());
-  const attemptMatch = progressText.match(/(\d+) attempt(?:s)?/i);
-  const masteryMatch = progressText.match(/(\d+)% mastery/i);
-  assert.ok(attemptMatch, 'Progress row must expose a concrete attempt count: ' + progressText);
-  assert.ok(masteryMatch, 'Progress row must expose mastery after repeated practice: ' + progressText);
+  const topicAttempts = Number(await row.getAttribute('data-attempts'));
+  const topicCorrect = Number(await row.getAttribute('data-correct'));
+  const accuracyText = clean(await row.locator('td').nth(3).textContent());
+  assert.ok(Number.isInteger(topicAttempts) && topicAttempts >= 0,
+    'Progress row must expose its evidence-backed attempt count: ' + progressText);
+  assert.ok(Number.isInteger(topicCorrect) && topicCorrect >= 0 && topicCorrect <= topicAttempts,
+    'Progress row must expose a coherent correct count: ' + progressText);
+  if (topicAttempts < 5) {
+    assert.match(accuracyText, /Too few answers/i,
+      'India Progress must withhold an accuracy percentage below its 5-attempt evidence floor');
+  } else {
+    assert.match(accuracyText, /^\d+%$/,
+      'India Progress may show accuracy only after the 5-attempt evidence floor');
+  }
+  assert.doesNotMatch(progressText, /mastery/i,
+    'public India Progress must not invent an unqualified mastery claim for this chapter row');
 
-  return {
-    history,
-    topicAttempts: Number(attemptMatch[1]),
-    mastery: Number(masteryMatch[1]),
-    progressText
-  };
+  return { history, topicAttempts, topicCorrect, accuracyText, progressText };
 }
 
 async function warmOffline(page) {
@@ -186,7 +198,7 @@ try {
   const beforeRestart = await snapshot(page, server.origin);
   assert.equal(beforeRestart.history, 3);
   assert.equal(beforeRestart.topicAttempts, 3);
-  assert.ok(beforeRestart.mastery >= 0 && beforeRestart.mastery <= 100);
+  assert.match(beforeRestart.accuracyText, /Too few answers/i);
 
   const unfinished = await typedQuestion(page, server.origin, { navigate: true });
   await unfinished.input.fill(DRAFT);
@@ -219,7 +231,7 @@ try {
 
   const restored = await snapshot(page, server.origin);
   assert.deepEqual(restored, beforeRestart,
-    'History, attempts and mastery must be exactly unchanged by process restart');
+    'History and progress evidence must be exactly unchanged by process restart');
 
   await gotoPractice(page, server.origin);
   await page.getByRole('button', { name: 'Answer by typing' }).click().catch(() => {});
@@ -270,9 +282,9 @@ try {
   const finalState = await snapshot(page, server.origin);
   assert.equal(finalState.history, 5);
   assert.equal(finalState.topicAttempts, 5);
-  assert.ok(finalState.mastery >= 0 && finalState.mastery <= 100);
+  assert.match(finalState.accuracyText, /^\d+%$/);
 
-  console.log('PASS — PRI-02 golden student journey: fresh profile → 5 real marked questions → History/Progress/mastery → restart → unfinished recovery → offline marking/next → offline restart → continue.');
+  console.log('PASS — PRI-02 golden student journey: fresh public-V1 profile → 5 real marked questions → evidence-backed History/Progress → restart → unfinished recovery → offline marking/next → offline restart → continue.');
   console.log(JSON.stringify({ beforeRestart, finalState }, null, 2));
 } finally {
   if (ctx) await ctx.close().catch(() => {});

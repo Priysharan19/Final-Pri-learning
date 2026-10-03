@@ -62,7 +62,7 @@ export const flow = {
   id: 'kalp04-home',
   name: 'KALP-04 · daily learning command centre',
 
-  async run({ page, ctx, check, goto, createProfile, settle }) {
+  async run({ page, ctx, check, goto, createProfile, createLegacyProfile, settle }) {
     await page.setViewportSize(IPAD_PORTRAIT);
     await goto('/');
     await createProfile({
@@ -209,14 +209,15 @@ export const flow = {
     await check('profile A restores its own unfinished task context',
       /Continue|task/i.test(await page.locator('#home-next-title').innerText()));
 
-    // A real teacher profile must never enter student Home.
-    await switchProfile(page);
-    await createProfile({
+    // A real teacher profile must never enter student Home. Public V1
+    // onboarding creates students only, so the teacher row is a legacy fixture
+    // seeded into the isolated test DB (see createLegacyProfile).
+    await createLegacyProfile({
       name: 'KALP04 Teacher',
       year: 10,
       course: 'in',
-      role: 'teacher',
-      fromPicker: true
+      indiaTrack: 'cbse',
+      role: 'teacher'
     });
     await check('teacher lands in Teacher Workspace',
       new URL(page.url()).pathname === '/teach');

@@ -378,7 +378,7 @@ for (const [slug] of PAGES) {
 
 // The fold itself, asserted on a sentence that spans lines in each language.
 const foldedEnglish = blocksOf(readDoc('privacy', 'en'))
-  .find(b => b.kind === 'p' && b.text.includes('built to work without sending your work anywhere'));
+  .find(b => b.kind === 'p' && b.text.includes('keeps the core maths-practice loop local'));
 ok(foldedEnglish && /checking your working, which is off unless you turn it on\. Without an account, neither runs\./.test(foldedEnglish.text),
   'a paragraph wrapped across six source lines renders as one paragraph');
 const foldedHindi = blocksOf(readDoc('privacy', 'hi'))

@@ -57,7 +57,7 @@ ok(typeof plotSpecFor === 'function', 'the plotting detector is importable');
 const MUST_NAME = [
   ['one real Apple Pencil writer', /one\*{0,2} real\s+Apple Pencil writer|holds \*\*one\*\* real/i],
   ['the empty JEE archive', /0 of 1,968|JEE previous-year archive is empty/i],
-  ['unenforced Premium', /Premium buys nothing/i],
+  ['Premium release certification', /Premium is implemented but not release-certified/i],
   ['no guardian consent', /guardian-consent|guardian consent/i],
   ['nothing deployed', /Nothing is deployed/i]
 ];

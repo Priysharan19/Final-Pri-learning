@@ -18,17 +18,13 @@ import { flushSync } from 'react-dom';
 const SignUpFlow = React.lazy(() => import('../components/SignUpFlow.jsx'));
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
-// The first thing a student chooses: what they are studying. Classes 7–12 are
-// the CBSE / NCERT track; JEE Main, JEE Advanced and olympiad are tracks of
-// their own with a class beneath them.
-// JEE Main, JEE Advanced and the olympiad names are printed in Latin on the
-// Hindi-medium admit card too, so they are the label in both languages and are
-// not catalogue entries. Only "Class {n}" is a phrase that has to translate.
+// Public V1 onboarding is intentionally narrower than the curriculum code in the repository:
+// CBSE / NCERT Classes 7–12, JEE Main and JEE Advanced only (KALP-R1, #282). The out-of-scope
+// competition ladder stays implemented elsewhere but has no ordinary shipping-V1 entry point.
 const STUDY = [
   ...[7, 8, 9, 10, 11, 12].map(y => ({ key: String(y), classOf: y, year: y, track: 'cbse' })),
-  { key: 'jee-main', label: 'JEE Main', year: 12, track: 'jee-main' },
-  { key: 'jee-advanced', label: 'JEE Advanced', year: 12, track: 'jee-advanced' },
-  { key: 'olympiad', labelKey: 'login.olympiadTrack', year: 10, track: 'olympiad' }
+  { key: 'jee-main', labelKey: 'settings.trackJeeMain', year: 12, track: 'jee-main' },
+  { key: 'jee-advanced', labelKey: 'settings.trackJeeAdvanced', year: 12, track: 'jee-advanced' }
 ];
 const STUDY_DEFAULT = STUDY.find(o => o.key === '10');
 const ONBOARDING_STEPS = 5;
@@ -37,12 +33,13 @@ const LOCAL_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function freshProfileDraft() {
   return {
     name: '', email: '', password: '', password2: '', study: '', year: STUDY_DEFAULT.year,
-    avatar: '🚀', role: '', course: 'in', pathway: 'advanced', indiaTrack: STUDY_DEFAULT.track,
+    avatar: '🚀', role: 'student', course: 'in', pathway: 'advanced', indiaTrack: STUDY_DEFAULT.track,
     protect: false
   };
 }
 
-// The Australian syllabuses stay selectable, folded away behind one link.
+// The Australian syllabuses exist only behind PRI_FEATURE_AUSTRALIA (off in a
+// production build): V1 is India-only, and the flag is the single non-public door.
 const AU_COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB']];
 // Where the cloud account UI lives. The panel is Settings' own; this screen only links to it.
 export const CLOUD_ACCOUNT_ROUTE = '/settings#cloud-account-title';
@@ -275,7 +272,7 @@ export default function Login() {
     ? (selectedStudy?.track === 'cbse'
         ? t('common.classNumber', { n: form.year })
         : selectedStudy
-          ? (selectedStudy.labelKey ? t(selectedStudy.labelKey) : selectedStudy.label) + ' · ' + t('common.classNumber', { n: form.year })
+          ? t(selectedStudy.labelKey) + ' · ' + t('common.classNumber', { n: form.year })
           : t('login.notChosen'))
     : (selectedCourse?.[1] || form.course.toUpperCase()) + ' · ' + t('common.yearNumber', { n: form.year });
 
@@ -358,11 +355,7 @@ export default function Login() {
     }
     setForm(f => ({
       ...f, study: opt.key, course: 'in', indiaTrack: opt.track,
-      year: opt.track === 'cbse'
-        ? opt.year
-        : opt.track === 'olympiad'
-          ? Math.min(12, Math.max(7, f.year || opt.year))
-          : (f.year >= 11 ? f.year : opt.year)
+      year: opt.track === 'cbse' ? opt.year : (f.year >= 11 ? f.year : opt.year)
     }));
   };
 
@@ -391,7 +384,7 @@ export default function Login() {
 
   const validateStep = (step = createStep) => {
     let message = '';
-    if (step === 0 && !['student', 'teacher'].includes(form.role)) message = t('login.roleRequired');
+    if (step === 0 && form.role !== 'student') message = t('login.roleRequired');
     if (step === 1 && !courseChoiceValid()) message = t('login.courseRequired');
     if (step === 2 && !form.name.trim()) message = t('login.nameRequired');
     if (step === 3) {
@@ -424,7 +417,7 @@ export default function Login() {
     createPendingRef.current = true;
     try {
       const created = await go('/profiles', {
-        name: form.name.trim(), year: Number(form.year), avatar: form.avatar, role: form.role,
+        name: form.name.trim(), year: Number(form.year), avatar: form.avatar, role: 'student',
         language: signInLanguage(),
         course: form.course,
         pathway: form.course === 'nsw' ? form.pathway : undefined,
@@ -434,7 +427,7 @@ export default function Login() {
       });
       // A brand-new profile must not inherit the route of whoever opened the
       // picker. Start the new identity at its role-safe product landing.
-      if (created && !cloudIntent) nav(form.role === 'teacher' ? '/teach' : '/', { replace: true });
+      if (created && !cloudIntent) nav('/', { replace: true });
     } finally {
       createPendingRef.current = false;
     }
@@ -481,7 +474,7 @@ export default function Login() {
         <MathField />
         <div className="auth-col fade-in">
           <Logo large />
-          <div className="hero-kicker">CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD</div>
+          <div className="hero-kicker">{t('login.heroKicker')}</div>
           {/* The gold word is a slot, not a tail fragment: Hindi puts the verb
               last, so "marked" cannot be the last word of the sentence there. */}
           <h1 className="hero-title">{tx('login.heroTitle', {
@@ -643,21 +636,13 @@ export default function Login() {
                   <div className="field">
                     <div className="label" id="signup-role">{t('login.iAmA')}</div>
                     <div className="pill-select" role="group" aria-labelledby="signup-role">
-                      <button type="button" className={`pill-opt ${form.role === 'student' ? 'on' : ''}`}
-                        aria-pressed={form.role === 'student'}
+                      <button type="button" className="pill-opt on" aria-pressed="true"
                         onClick={() => { setForm(f => ({ ...f, role: 'student' })); setError(''); }}>
                         {t('login.student')}
                       </button>
-                      <button type="button" className={`pill-opt ${form.role === 'teacher' ? 'on' : ''}`}
-                        aria-pressed={form.role === 'teacher'}
-                        onClick={() => { setForm(f => ({ ...f, role: 'teacher' })); setError(''); }}>
-                        {t('login.teacher')}
-                      </button>
                     </div>
                   </div>
-                  <p className="muted" style={{ fontSize: 12.5, marginTop: 12 }}>
-                    {t(form.role === 'teacher' ? 'login.teacherRoleNote' : 'login.studentRoleNote')}
-                  </p>
+                  <p className="muted" style={{ fontSize: 12.5, marginTop: 12 }}>{t('login.studentRoleNote')}</p>
                 </>
               )}
 
@@ -665,21 +650,20 @@ export default function Login() {
                 <>
                   <div className="field">
                     <label className="label" htmlFor="signup-track">
-                      {t(form.role === 'teacher' ? 'login.imTeaching' : 'login.imStudying')}
+                      {t('login.imStudying')}
                     </label>
                     <select className="input" id="signup-track" value={form.study}
                       aria-describedby={error ? 'onboarding-error' : undefined}
                       onChange={e => { chooseStudy(e.target.value); setError(''); }}>
                       <option value="">{t('login.chooseClassTrack')}</option>
-                      {STUDY.map(o => <option key={o.key} value={o.key}>{o.labelKey ? t(o.labelKey) : (o.label || t('common.classNumber', { n: o.classOf }))}</option>)}
+                      {STUDY.map(o => <option key={o.key} value={o.key}>{o.labelKey ? t(o.labelKey) : t('common.classNumber', { n: o.classOf })}</option>)}
                     </select>
                     {selectedStudy && form.indiaTrack !== 'cbse' && (
                       <div style={{ marginTop: 10 }}>
                         <label className="label" htmlFor="signup-year">{t('common.class')}</label>
                         <select className="input" id="signup-year" value={form.year}
                           onChange={e => { setForm(f => ({ ...f, year: Number(e.target.value) })); setError(''); }}>
-                          {(form.indiaTrack === 'olympiad' ? [7, 8, 9, 10, 11, 12] : [11, 12])
-                            .map(y => <option key={y} value={y}>{t('common.classNumber', { n: y })}</option>)}
+                          {[11, 12].map(y => <option key={y} value={y}>{t('common.classNumber', { n: y })}</option>)}
                         </select>
                       </div>
                     )}
@@ -689,7 +673,7 @@ export default function Login() {
                   {featureEnabled('australia') && (
                     <div className="field" style={{ marginTop: -4 }}>
                       <button type="button" className="linklike" onClick={openAustralia}>
-                        {t(form.role === 'teacher' ? 'login.teachingInAustralia' : 'login.studyingInAustralia')}
+                        {t('login.studyingInAustralia')}
                       </button>
                     </div>
                   )}
@@ -820,14 +804,14 @@ export default function Login() {
               {createStep === 4 && (
                 <>
                   <div className="card" style={{ boxShadow: 'none', padding: 16 }}>
-                    <div className="spread" style={{ gap: 12 }}><span className="muted">{t('login.summaryRole')}</span><b>{t(form.role === 'teacher' ? 'login.teacher' : 'login.student')}</b></div>
+                    <div className="spread" style={{ gap: 12 }}><span className="muted">{t('login.summaryRole')}</span><b>{t('login.student')}</b></div>
                     <div className="spread" style={{ gap: 12, marginTop: 8 }}><span className="muted">{t('login.summaryCourse')}</span><b>{studyLabel}</b></div>
                     <div className="spread" style={{ gap: 12, marginTop: 8 }}><span className="muted">{t('login.summaryLanguage')}</span><b>{selectedLanguage.label}</b></div>
                     <div className="spread" style={{ gap: 12, marginTop: 8 }}><span className="muted">{t('login.summaryProtection')}</span><b>{t(form.protect ? 'login.protectionOn' : 'login.protectionOff')}</b></div>
                     <div className="spread" style={{ gap: 12, marginTop: 8 }}><span className="muted">{t('login.summaryCloud')}</span><b>{t(cloudIntent ? 'login.cloudNext' : 'login.cloudLater')}</b></div>
                   </div>
                   <p className="sub" style={{ marginTop: 14 }}>
-                    {t(form.role === 'teacher' ? 'login.readyTeacher' : 'login.readyStudent')}
+                    {t('login.readyStudent')}
                   </p>
                   <p className="muted" style={{ fontSize: 12.5 }}>{t(featureEnabled('placement') ? 'login.placementOffer' : 'login.noFakeDiagnostic')}</p>
                 </>
@@ -845,8 +829,7 @@ export default function Login() {
                   <button className="btn btn-primary btn-lg" type="button" style={{ flex: 1 }} disabled={busy} onClick={create}>
                     {t(busy ? 'login.oneMoment'
                       : cloudIntent ? 'login.createAndOpenCloud'
-                        : form.role === 'teacher' ? 'login.openTeacherWorkspace'
-                          : 'login.startLearning')}
+                        : 'login.startLearning')}
                   </button>
                 )}
               </div>

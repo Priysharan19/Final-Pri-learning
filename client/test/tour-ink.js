@@ -64,12 +64,12 @@ export const flow = {
   id: 'ink',
   name: 'Ink · handwriting on the real canvas',
 
-  async run({ page, ctx, base, check, note, goto, createProfile, mathText, settle }) {
+  async run({ page, ctx, base, check, note, goto, createLegacyProfile, mathText, settle }) {
     // Handwriting is read only by the server reader (owner decision); this
     // flow brings a stand-in reader and scripts what it "sees".
     const reader = await useFakeServerReader(page, base);
     await goto('/');
-    await createProfile({ name: 'Ada Byron', year: 7 });
+    await createLegacyProfile({ name: 'Ada Byron', year: 7 });
     await check('server reading can be turned on for this profile', await turnOnServerReading(page, base));
 
     // ── 1 · miss twice to learn the answer, on a question worth writing ──────
