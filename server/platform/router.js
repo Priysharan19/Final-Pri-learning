@@ -1,4 +1,5 @@
 import { asyncRouter } from './asyncRouter.js';
+import { clientCompatibility, compatibilityStatus } from './clientCompatibility.js';
 import { googleNotificationBacklog } from './googleBilling.js';
 import { asStore } from './store.js';
 import { createAccountRouter } from './accounts.js';
@@ -9,10 +10,12 @@ import { createClassRouter } from './classes.js';
 import { createContentRouter } from './content.js';
 import { createEntitlementRouter } from './entitlements.js';
 import { createIdentityRouter } from './identities.js';
+import { createOtpRouter } from './otp.js';
 import { createReportRouter } from './reports.js';
 import { createSyncRouter } from './sync.js';
 import { createHandwritingRouter } from './handwriting.js';
 import { createWorkingRouter } from './working.js';
+import { createQuestionPhotoRouter } from './questionPhoto.js';
 import { createTutorRouter } from './tutor.js';
 import { requireGuardianConsent } from './guardianConsent.js';
 import { createTelemetryRouter } from './telemetry.js';
@@ -40,6 +43,9 @@ const requireOperatorToken = tagPolicy((req, res, next) => {
 }, { operatorToken: true });
 
 const SERVER_WEBHOOK = /^\/billing\/webhook\/(?:apple|google|web)$/;
+// Sign in with Apple form-posts its answer from appleid.apple.com, so it can
+// never carry this origin; the route only relays it to the callback page.
+const PROVIDER_CALLBACK = /^\/account\/identity\/apple\/callback$/;
 
 export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {} } = {}) {
   assertPlatformConfig();
@@ -56,6 +62,9 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     res.set('X-Frame-Options', 'DENY');
     next();
   });
+
+  // Old native shells get a structured upgrade answer, not odd failures (CP-11).
+  router.use(clientCompatibility());
 
   // LIVENESS. Cheap, and up while the process is: a database outage is
   // reported here as a field, never as a failure of this endpoint, so an
@@ -92,6 +101,8 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     res.json({
       ok: true,
       service: 'pri-learning-platform',
+      // The active shell floors and how many requests they turned away (CP-11).
+      clientCompatibility: compatibilityStatus(),
       releaseIdentity,
       schemaVersion,
       billingSchemaVersion,
@@ -137,10 +148,11 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   });
 
   // Browser mutations must come from the configured product origin. Provider
-  // webhooks are the one narrow exception: they are server-to-server requests
-  // and authenticate with provider signatures instead of a browser Origin.
+  // webhooks are one narrow exception: they are server-to-server requests
+  // and authenticate with provider signatures instead of a browser Origin. The
+  // Apple sign-in callback is the other: it changes nothing server-side.
   router.use((req, res, next) => {
-    if (req.method === 'POST' && SERVER_WEBHOOK.test(req.path)) return next();
+    if (req.method === 'POST' && (SERVER_WEBHOOK.test(req.path) || PROVIDER_CALLBACK.test(req.path))) return next();
     return originGuard(req, res, next);
   });
   router.use(csrfGuard);
@@ -162,6 +174,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
       : null
   }));
   router.use('/account/identity', createIdentityRouter(db));
+  router.use('/account/otp', createOtpRouter(db));
   // ── Nothing of a child's leaves or arrives without their guardian ────────
   // Every route that moves a student's own data off the device, links them to
   // another person (a class, a teacher), or takes money for it is gated. Until
@@ -185,6 +198,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   router.use('/reports', requireGuardianConsent(db), createReportRouter(db));
   router.use('/handwriting', requireGuardianConsent(db), createHandwritingRouter(db));
   router.use('/working', requireGuardianConsent(db), createWorkingRouter(db));
+  router.use('/question-photo', requireGuardianConsent(db), createQuestionPhotoRouter(db));
   // The tutor sends a student's own work lines to the model provider, so it
   // sits behind the same guardian gate as the working check.
   router.use('/tutor', requireGuardianConsent(db), createTutorRouter(db, tutor));

@@ -163,13 +163,13 @@ const generators = {
       const mp=pick(rng,[400,500,800,1000,1200,1500]), pct=pick(rng,[10,15,20,25]), discount=mp*pct/100, sale=mp-discount;
       return q(`An article is marked at ₹${mp} and discounted by $${pct}\\%$. Find the sale price.`,sale,
         ['Discount is calculated on marked price.',`Find ${pct}% of ₹${mp}.`,'Subtract the discount from marked price.'],
-        [['Discount',`₹${mp}\\times${pct}/100=₹${discount}`],['Sale price',`₹${mp}-₹${discount}=₹${sale}`],['Answer',`₹${sale}`]], {answerPrefix:'₹'});
+        [['Discount',`$\\text{₹}${mp}\\times${pct}/100=\\text{₹}${discount}$`],['Sale price',`₹${mp}-₹${discount}=₹${sale}`],['Answer',`₹${sale}`]], {answerPrefix:'₹'});
     }
     if (diff === 2) {
       const price=pick(rng,[500,800,1200,1500,2000]), tax=pick(rng,[5,12,18]), amt=price*(100+tax)/100;
       return q(`The taxable price of an item is ₹${price}. GST is $${tax}\\%$. Find the final bill amount.`,amt,
         ['GST is added to the taxable price.',`Tax = ${tax}% of ₹${price}.`,'Bill = price + tax.'],
-        [['GST',`₹${price}\\times${tax}/100=₹${price*tax/100}`],['Bill',`₹${price}+₹${price*tax/100}=₹${amt}`],['Answer',`₹${amt}`]], {answerPrefix:'₹'});
+        [['GST',`$\\text{₹}${price}\\times${tax}/100=\\text{₹}${price*tax/100}$`],['Bill',`₹${price}+₹${price*tax/100}=₹${amt}`],['Answer',`₹${amt}`]], {answerPrefix:'₹'});
     }
     if (diff === 3) {
       const p=pick(rng,[2000,4000,5000,8000,10000]), r=pick(rng,[5,10,20]), years=2, amount=Number((p*(1+r/100)**years).toFixed(2)), ci=Number((amount-p).toFixed(2));
@@ -180,7 +180,7 @@ const generators = {
     const final=pick(rng,[8100,9025,12100]), factors={8100:[10000,10],9025:[10000,5],12100:[10000,10]}, [p,r]=factors[final];
     return q(`An amount becomes ₹${final} after 2 years of annual compound change at $${r}\\%$. For this question the change is ${final<p?'depreciation':'growth'}. Find the initial amount.`,p,
       [`The two-year multiplier is $(1${final<p?'-':'+'}${r}/100)^2$.`,'Reverse a repeated percentage change by dividing by its total multiplier.','Check by applying the rate twice to your initial value.'],
-      [['Multiplier',`$(1${final<p?'-':'+'}${r}/100)^2$`],['Reverse',`Initial=₹${final}\\div${(final/p).toFixed(4)}`],['Answer',`₹${p}`]], {answerPrefix:'₹'});
+      [['Multiplier',`$(1${final<p?'-':'+'}${r}/100)^2$`],['Reverse',`Initial $=\\text{₹}${final}\\div${(final/p).toFixed(4)}$`],['Answer',`₹${p}`]], {answerPrefix:'₹'});
   },
 
   'c8-algebraic-identities-ncert-mastery': (rng, diff) => {
@@ -215,7 +215,7 @@ const generators = {
     const x=ri(rng,-4,5), a=ri(rng,2,5), b=ri(rng,1,6), value=(x+b)*(a*x-b);
     return q(`Evaluate $(x+${b})(${a}x-${b})$ at $x=${x}$.`,value,
       ['Substitute the value of x into both factors.', 'Evaluate each bracket before multiplying.', 'Check the signs carefully if x is negative.'],
-      [['First factor',`$${x}+${b}=${x+b}$`],['Second factor',`$${a}(${x})-${b}=${a*x-b}$`],['Product',`${x+b}\\times${a*x-b}=${value}`]]);
+      [['First factor',`$${x}+${b}=${x+b}$`],['Second factor',`$${a}(${x})-${b}=${a*x-b}$`],['Product',`$${x+b}\\times${a*x-b}=${value}$`]]);
   },
 
   'c8-mensuration-ncert-mastery': (rng, diff) => {
@@ -271,7 +271,7 @@ const generators = {
     const a=pick(rng,[2.5,3.2,4.5]), b=pick(rng,[1.2,2.4,5.1]), e=ri(rng,4,7), prod=Number((a*b).toFixed(2)), value=Math.round(prod*10**(2*e));
     return q(`Compute $(${a}\\times10^{${e}})(${b}\\times10^{${e}})$ and give the numerical value.`,value,
       ['Multiply coefficients and powers of ten separately.','For powers of ten with the same base, add exponents.','If needed, renormalise the coefficient before evaluating.'],
-      [['Coefficients',`$${a}\\times${b}=${prod}$`],['Powers',`$10^{${e}}\\times10^{${e}}=10^{${2*e}}$`],['Value',`${prod}\\times10^${2*e}=${value}`]]);
+      [['Coefficients',`$${a}\\times${b}=${prod}$`],['Powers',`$10^{${e}}\\times10^{${e}}=10^{${2*e}}$`],['Value',`$${prod}\\times10^{${2*e}}=${value}$`]]);
   },
 
   'c8-proportions-ncert-mastery': (rng, diff) => {
@@ -279,7 +279,7 @@ const generators = {
       const unit=ri(rng,5,30), x1=ri(rng,2,8), x2=ri(rng,9,20), y2=unit*x2;
       return q(`$${x1}$ identical items cost ₹${unit*x1}. At the same rate, what do $${x2}$ items cost?`,y2,
         ['Cost is directly proportional to number of identical items.','Find the unit cost or use equal ratios.',`Unit cost = ₹${unit}.`],
-        [['Unit rate',`₹${unit*x1}/${x1}=₹${unit}`],['Scale',`₹${unit}\\times${x2}`],['Answer',`₹${y2}`]], {answerPrefix:'₹'});
+        [['Unit rate',`₹${unit*x1}/${x1}=₹${unit}`],['Scale',`$\\text{₹}${unit}\\times${x2}$`],['Answer',`₹${y2}`]], {answerPrefix:'₹'});
     }
     if (diff === 2) {
       const workers=pick(rng,[6,8,10,12]), days=pick(rng,[6,9,12,15]), w2=pick(rng,[workers*2,workers*3]), d2=workers*days/w2;

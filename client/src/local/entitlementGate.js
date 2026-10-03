@@ -38,7 +38,7 @@ export const CAPABILITY_ENFORCEMENT = Object.freeze({
   [ENTITLEMENTS.JEE_ADVANCED]: 'local backend · every route that can serve jee-advanced content, checked on the RESOLVED track rather than the request shape: POST /practice/next smart practice, POST /practice/next against a task whose targets name the track (a student can set one themselves on the Tasks page), POST /history/:id/retry on a row whose india.track is jee-advanced, and POST /exams in the India exam module',
   [ENTITLEMENTS.ADVANCED_EXPLAIN]: 'client · PriExplainV5 adaptive teaching plan, retrieval checkpoints and follow-up (basic playback stays free)',
   [ENTITLEMENTS.ADVANCED_ANALYTICS]: 'client · Progress priorities / knowledge map tabs and the teacher progress-file export',
-  [ENTITLEMENTS.EXTRA_AI]: 'reserved · no call site consumes additional AI usage yet (no-op by design)'
+  [ENTITLEMENTS.EXTRA_AI]: 'server · POST /v1/handwriting/transcribe, /v1/working/check and /v1/question-photo/identify daily allowance (server/platform/aiAllowance.js), raised only by the server\'s own entitlement record (SEC-COMM-01)'
 });
 
 // Tests replace the clock and the connectivity probe; production never does.
@@ -84,6 +84,12 @@ export function nextDayStart(ms, timeZone) {
 
 async function linkRow(pid) {
   return get('device', cloudLinkRowId(pid)).catch(() => null);
+}
+
+/** Whether this local profile is linked to a cloud account (read-only). */
+export async function profileCloudLinked(pid) {
+  if (!pid) return false;
+  return !!(await linkRow(pid))?.accountId;
 }
 
 async function usageRow(pid) {

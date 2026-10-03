@@ -14,6 +14,11 @@
 // The canvas is a recording stub, so this runs in bare Node with no browser.
 // ─────────────────────────────────────────────────────────────────────────────
 import { inkBounds, rasterScale, paintInk, rasterizeInk, MAX_IMAGE_BYTES } from '../src/ink/cloudRaster.js';
+import { cloudAllowanceExhausted, clearCloudAllowanceExhausted, inkReadingBlockedKey } from '../src/ink/cloudReader.js';
+import { readFileSync } from 'node:fs';
+import { plausibleLineMatch, segmentInkLines } from '../src/ink/inkLines.js';
+import { retryDelayMs, RETRY_CAP_MS } from '../src/ink/cloudReader.js';
+import { announceEntitlementChange } from '../src/platform/cloudSession.js';
 import { UNAVAILABLE_READINESS_TTL_MS, cloudHandwritingReadiness, cloudReadingEnabled, handwritingDiagnostics, readWithCloud, recordLocalHandwritingDiagnostics, shouldSupersede, toReading } from '../src/ink/cloudReader.js';
 
 let pass = 0;
@@ -216,6 +221,29 @@ const cancelledOutcome = await readWithCloud(STROKES, {
 });
 eq(cancelledOutcome?.error?.code, 'HANDWRITING_CANCELLED', 'client cancellation stays distinct from provider failure');
 
+// ── 5b · The server's daily allowance (SEC-COMM-01) ──────────────────────────
+{
+  if (typeof globalThis.addEventListener !== 'function') {
+    const target = new EventTarget();
+    globalThis.addEventListener = target.addEventListener.bind(target);
+    globalThis.removeEventListener = target.removeEventListener.bind(target);
+    globalThis.dispatchEvent = target.dispatchEvent.bind(target);
+  }
+  let sent = 0;
+  const resetAt = Date.now() + 2 * 60 * 60 * 1000;
+  const exhausted = { transcribeHandwriting: async () => { sent += 1; const e = new Error('used up'); e.code = 'AI_ALLOWANCE_EXHAUSTED'; e.status = 429; e.resetAt = resetAt; throw e; } };
+  const first = await readWithCloud(STROKES, { user: { cloudHandwriting: true }, transport: exhausted, rasterize, available: there, readiness: ready });
+  ok(first?.reason === 'allowance' && first.until === resetAt && !first.error, 'an exhausted allowance is a reason (the on-device reading stays), not a failure');
+  const second = await readWithCloud(STROKES, { user: { cloudHandwriting: true }, transport: exhausted, rasterize, available: there, readiness: ready });
+  ok(second?.reason === 'allowance' && sent === 1 && cloudAllowanceExhausted(), 'no doomed request is sent again until the allowance resets');
+  announceEntitlementChange({ localProfileId: 'p1', plan: 'premium', status: 'active', active: true });
+  ok(!cloudAllowanceExhausted(), 'an entitlement change (an upgrade) clears it at once');
+  const noReset = { transcribeHandwriting: async () => { const e = new Error('used up'); e.code = 'AI_ALLOWANCE_EXHAUSTED'; e.resetAt = Date.now() + 365 * 24 * 3600e3; throw e; } };
+  const capped = await readWithCloud(STROKES, { user: { cloudHandwriting: true }, transport: noReset, rasterize, available: there, readiness: ready });
+  ok(capped.until - Date.now() <= 31 * 60 * 1000, 'an implausible reset time falls back to a 30-minute back-off');
+  clearCloudAllowanceExhausted();
+}
+
 // ── 6 · Turning a transcription into a reading ───────────────────────────────
 const local = { lines: [{ text: '-1/0/1/2)4', box: { x: 1, y: 2 } }], text: '-1/0/1/2)4' };
 const aligned = toReading({ lines: [{ text: '-1, 0, 1, 2, 4', confidence: 0.94 }], confidence: 0.94, needsConfirmation: false, engine: 'cloud-test' }, local);
@@ -244,7 +272,79 @@ ok(!shouldSupersede({ text: '-1/0/1/2)4', needsConfirmation: false, alignedToLoc
 ok(!shouldSupersede({ text: '   ', needsConfirmation: false, alignedToLocalLines: true }, local), 'an empty reading never supersedes');
 ok(!shouldSupersede(null, local), 'no reading, no change');
 
+// ── Server-only reading of ink (owner decision, 2026-10) ────────────────────
+// "Pri Learning does not have the feature to mark handwriting or photo when
+// not online, since the local engine is just not good enough." The ink surface
+// must therefore never show or publish an on-device reading.
+{
+  const src = readFileSync(new URL('../src/ink/InkAnswer.jsx', import.meta.url), 'utf8')
+    .split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
+  ok(!/from '\.\/recognizer\.js'/.test(src), 'the ink surface does not import the on-device recogniser');
+  ok(!/nativeInk\.(recognize|foundationRecognize)\(/.test(src), 'nor call the native on-device readers');
+  ok(!/recognizeWithStructuralDev|recognizeWithoutDetachedSideWork|chooseNativeConsensus/.test(src), 'nor any other local reading path');
+  ok(/readWithCloud\(/.test(src), 'it reads through the answer-blind server reader');
+  ok(/addEventListener\?\.\('online'/.test(src) && /onCloudSessionChange\(/.test(src),
+    'and kept working is read again when the connection or the sign-in comes back');
+  const there = () => true;
+  eq(inkReadingBlockedKey({ cloudLinked: true }, { online: () => false, available: there }), 'ink.waitingOffline', 'offline ink says it is saved and will be read when back online');
+  eq(inkReadingBlockedKey({ cloudHandwriting: null }, { online: () => true, available: there }), 'ink.waitingSignIn', 'signed out ink says sign in');
+  eq(inkReadingBlockedKey({ cloudLinked: true }, { online: () => true, available: there, outcome: { error: { code: 'HANDWRITING_UNAVAILABLE' } } }), 'ink.waitingServiceDown', 'a reader that is down says so');
+  eq(inkReadingBlockedKey({ cloudHandwriting: false, cloudLinked: true }, { online: () => true, available: there }), 'ink.waitingTurnedOff', 'only an explicit off points at Settings');
+
+  // Default-on ink path, answer-blind: a signed-in profile that never chose is
+  // read without visiting Settings, and the request carries the picture only.
+  let args = null;
+  const t2 = { transcribeHandwriting: async (...a) => { args = a; return { transcription: { lines: [{ text: '5+5+∫(0,5)2x dx', confidence: 0.95 }], text: '5+5+∫(0,5)2x dx', confidence: 0.95, needsConfirmation: false, engine: 'cloud-test' } }; } };
+  const readyNow = async () => ({ usable: true, available: true, state: 'ready', releaseSha: null });
+  const inkUser = { cloudHandwriting: null, cloudLinked: true, expectedAnswer: '35', solution: 'integrate 2x' };
+  const got = await readWithCloud(STROKES, { user: inkUser, transport: t2, rasterize, available: there, readiness: readyNow });
+  ok(got?.transcription?.text === '5+5+∫(0,5)2x dx', 'default-on ink is read by the server');
+  eq(args?.length, 2, 'the ink request is the picture and options only');
+  eq(Object.keys(args?.[1] || {}), ['signal'], 'whose only option is the cancel signal');
+  ok(!JSON.stringify(args).includes('integrate 2x') && !JSON.stringify(args).includes('"35"'), 'and no expected answer or solution travels with it');
+}
+
+// ── Line geometry without recognition: ✓/✗ on the student's own lines ───────
+{
+  const st = (x, y, w = 30, h = 40) => ({ points: [{ x, y }, { x: x + w, y: y + h }] });
+  const page = [st(10, 10), st(50, 14), st(90, 8), st(10, 120), st(60, 125), st(15, 230, 80, 4)];
+  const segs = segmentInkLines(page);
+  eq(segs.length, 3, 'three written lines are found from geometry alone');
+  eq(segmentInkLines([st(10, 40, 30, 1), st(50, 10, 30, 60)]).length, 1, 'a minus sign before a digit stays on the digit\'s line');
+  eq(segs.map(l => l.strokeIdxs), [[0, 1, 2], [3, 4], [5]], 'each stroke belongs to its own line, top to bottom');
+  ok(segs.every(l => !('text' in l) && !('symbols' in l)), 'segmentation names no symbol — it reads nothing');
+  const tr = { lines: [{ text: '2x+3=11' }, { text: '2x=8' }, { text: 'x=4' }], text: '2x+3=11\n2x=8\nx=4', confidence: 0.95, engine: 'cloud-t' };
+  const placed = toReading(tr, { lines: segs });
+  ok(placed.alignedToLocalLines && placed.lines.every((l, i) => l.box === segs[i].box), 'when the counts agree, server line i is drawn on ink line i');
+  const unplaced = toReading({ ...tr, lines: tr.lines.slice(0, 2), text: '2x+3=11\n2x=8' }, { lines: segs });
+  ok(!unplaced.alignedToLocalLines && unplaced.lines.every(l => !l.box), 'when they differ, no box is guessed — panel badges only');
+  const inkSrc = readFileSync(new URL('../src/ink/InkAnswer.jsx', import.meta.url), 'utf8');
+  ok(/segmentInkLines\(strokes\)/.test(inkSrc) && /ink-linebox/.test(inkSrc) && /ink\.mistakeHere/.test(inkSrc), 'the ink surface draws line boxes and the mistake note again');
+  const qc = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
+  ok(/inkResult\?\.afterWait/.test(qc) && /autoMarkedRef\.current === inkResult\.readKey/.test(qc), 'ink read after waiting is marked once, by its reading key');
+}
+
+// ── Review follow-ups: plausible placement, unbounded backoff, deferred mark ─
+{
+  const box = (w) => ({ box: { x: 0, y: 0, w, h: 40 } });
+  const L = (...t) => t.map(text => ({ text }));
+  ok(plausibleLineMatch(L('2x+3=11', '2x=8', 'x=4'), [box(280), box(160), box(120)]), 'widths in proportion to the reading: drawn on the ink');
+  ok(!plausibleLineMatch(L('2x+3=11', 'x=4'), [box(40), box(400)]), 'a short read line on the widest ink line: panel only');
+  ok(!plausibleLineMatch(L('2x+3=11', 'x=4'), [box(200)]), 'counts differ: panel only');
+  ok(!plausibleLineMatch(L('', 'x=4'), [box(100), box(100)]), 'an empty read line is never placed');
+  ok(plausibleLineMatch(L('x=4'), [box(500)]), 'a single line is its own line');
+  eq([0, 1, 2, 3].map(retryDelayMs), [20000, 40000, 80000, 160000], 'retries back off by doubling');
+  ok(retryDelayMs(4) === RETRY_CAP_MS && retryDelayMs(50) === RETRY_CAP_MS, 'and keep going at the cap rather than stopping');
+  const ink = readFileSync(new URL('../src/ink/InkAnswer.jsx', import.meta.url), 'utf8');
+  ok(!/MAX_RETRIES/.test(ink) && /scheduleRetry\(seq\)/.test(ink), 'the ink surface has no retry ceiling');
+  ok(/'visibilitychange'/.test(ink) && /'focus'/.test(ink), 'and retries on focus and on a return to the tab');
+  ok(/plausibleLineMatch\(/.test(ink), 'and only places a reading on the ink when it plausibly matches');
+  const qc = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
+  ok(/if \(busy \|\| inFlightRef\.current\) return;\s*autoMarkedRef\.current = inkResult\.readKey;/.test(qc) && /\}, \[inkResult, busy\]\)/.test(qc),
+    'a waited-for reading that lands while the card is busy is marked when it is idle, not dropped');
+}
+
 console.log(failures.length
   ? `CLOUD HANDWRITING CLIENT: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `CLOUD HANDWRITING CLIENT: PASS — ${pass}/${pass} checks — off by default, ink only, never over a hand correction, never on an unconfident read.`);
+  : `CLOUD HANDWRITING CLIENT: PASS — ${pass}/${pass} checks — on by default only for a signed-in account, server-only and answer-blind, never over a hand correction, never on an unconfident read.`);
 process.exit(failures.length ? 1 : 0);

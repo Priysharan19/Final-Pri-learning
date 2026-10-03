@@ -25,7 +25,10 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 | CP-06 Android Shell | SOFTWARE IMPLEMENTATION: COMPLETE | `247f12c2` | `353e3c2c` | [#275](https://github.com/Priysharan19/Final-Pri-learning/pull/275) | `a77f7369` | DEFERRED |
 | CP-07 Android Native Bridges | SOFTWARE IMPLEMENTATION: COMPLETE | `a77f7369` | `b7c9ba0e` | [#277](https://github.com/Priysharan19/Final-Pri-learning/pull/277) | `a069b16f` | DEFERRED |
 | CP-08 Google Play Billing | SOFTWARE IMPLEMENTATION: COMPLETE | `a069b16f` | `7ebfc88c` | [#279](https://github.com/Priysharan19/Final-Pri-learning/pull/279) | `e1236678` | DEFERRED |
-| CP-09 Android Handwriting Input | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `e1236678` | recorded by the next CP | this PR | recorded by the next CP | DEFERRED |
+| CP-09 Android Handwriting Input | SOFTWARE IMPLEMENTATION: COMPLETE | `e1236678` | `9729b8db` | [#287](https://github.com/Priysharan19/Final-Pri-learning/pull/287) | `59f62144` | DEFERRED |
+| CP-10 Android Automated Product QA | SOFTWARE IMPLEMENTATION: COMPLETE | `59f62144` | `061596f4` | [#294](https://github.com/Priysharan19/Final-Pri-learning/pull/294) | `c8835831` | DEFERRED |
+| SEC-COMM-01 Server-Enforced Premium Entitlement | SOFTWARE IMPLEMENTATION: COMPLETE | `c8835831` | `c3f8cee8` | [#297](https://github.com/Priysharan19/Final-Pri-learning/pull/297) | `4dbfbf34` | n/a (server) |
+| CP-11 Cross-Platform Release Matrix | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `4dbfbf34` | recorded by the next CP | this PR | recorded by the next CP | n/a (release tooling) |
 
 ## CP-02 — Platform Bridge Foundation
 
@@ -389,3 +392,142 @@ Causes found:
 - Independent review requested changes; all were applied: metrics hardening, an honest latency definition, pixel-band assertions and the recognition check.
 
 **Deferred (physical):** the 4-device protocol (low-end finger phone, S Pen, USI 2.0, foldable): touch-to-ink latency against 50 ms with a high-speed camera, sample continuity, palm behaviour and real recognition accuracy. **No Android handwriting-quality claim is made.**
+
+**CP-09 exact-head evidence (recorded by CP-10):**
+- Candidate `9729b8db`. All four required checks pass.
+- Android Shell (not required) on that head:
+  - API 26 floor ✅.
+  - API 36 phone ❌: the activity closed on a Back race.
+  - API 36 tablet ❌: the ink submit hit the reading-confirmation step.
+  - API 33 ❌: emulator death.
+  - The API 36 failures are test defects, diagnosed and fixed in CP-10 below.
+- Merged as `59f62144` with `--match-head-commit`.
+
+## CP-10 — Android Automated Product QA
+
+**Delivered:** the results are in [CROSS_PLATFORM_TEST_MATRIX.md](CROSS_PLATFORM_TEST_MATRIX.md) §5.
+- `android/scripts/run-instrumented.sh` runs the full product journey with real process death between runs. The cloud steps run against the **real server** (`scripts/cloud-fixture-server.mjs`, shared with iOS). There is also an offline run (`priCloudOffline`) with the server stopped, then restarted on the same database.
+- **ShellJourneyTest:**
+  - a typed attempt is resolved (a first wrong answer opens "one more go", and a changed, readable answer resolves it);
+  - Progress counts it (0 before, at least 1 after);
+  - Next renders a new question by node identity.
+- **CloudJourneyTest:**
+  - sign-up, then delete, with server-side positive and negative controls (200 before, 401 after);
+  - sign-in and sync;
+  - offline learning continues and Sync is not offered;
+  - reconnect sync pushes the offline work;
+  - the session survives process death;
+  - disconnect;
+  - billing fails closed with a `PLAY_*` provider code when no Play Store is present.
+- **WebViewAccessibilityTest:** landmarks and accessible names on four screens. At system font scale 1.3, text is measurably larger.
+- **CI matrix:** API 26 floor screen; API 33 and 36 phone; API 36 tablet; API 36 foldable (`pixel_fold`).
+
+**Evidence (S2, synthetic, 2026-10-02 local, API 36 phone emulator):** `INSTRUMENTED: PASS`. It covered:
+- journey, process death and relaunch;
+- share, picker, camera and print;
+- finger and stylus ink;
+- the accessibility smoke check;
+- sign-up + delete and sign-in + sync against the real server;
+- an offline attempt, then reconnect, with the session surviving process death;
+- disconnect.
+
+**Defects found by running the suite repeatedly on API 33, API 36 phone and API 36 tablet:**
+
+*Product, fixed here:*
+1. **Touch targets fell below 44 px on touch WebViews that report a fine pointer.** Chromium 109 on Android 13 reports `pointer: fine`, 5 touch points and `hover: none`. Every 44 px rule now also applies when the primary input cannot hover, and so do `formFactor.js` touch detection and the write-first default. Regression checks are in `form-factor-check` (31/31).
+
+*Product, root cause found, fix tracked as a separate task:*
+2. **A nav tap in the frames after Back can overwrite the Home history entry.** React Router treats a `<Link>` to the router's current, still pre-render location as a REPLACE. After Back the URL changes at once but React renders later, so tapping Practice in that window replaced `/` with `/practice` at idx 0, and the next Back left the app. The journey now waits for Home to render and asserts Practice gets its own entry (10/10 runs). The product fix (decide push or replace from the real URL) is a separate task.
+
+*Test defects, fixed in the tests (none weaken an assertion):*
+- unreadable `x+7` answers on numeric questions never resolved;
+- a synthetic `history.pushState` bypassed the router index; Progress is now reached through the nav and the journey returns with the real Back key;
+- Back was pressed before the page re-armed it;
+- "Sync now" was clicked while the panel was busy; clicks now wait until it is enabled;
+- camera URI grants were read before the monitor callback recorded them; now a thread-safe list with a bounded wait;
+- ink submit ignored the answer-blind reading-confirmation step; a doubtful reading on the tablet canvas is now confirmed, as a student must.
+
+**Full product suite, local:**
+- `INSTRUMENTED: PASS` on API 36 phone, API 36 tablet (2560×1600) and API 33 phone (Chromium 109). This is the first complete API 33 pass.
+- The API 33 CI emulator still dies on GitHub's runners (also with 4 GB RAM and `guest` GPU). No API 33 **CI** evidence is claimed.
+
+**Not automated / deferred (physical):** real camera, S Pen / USI quality, a TalkBack walkthrough, a real Play purchase (**BLOCKED_EXTERNAL**: Play Console products and license testers), low-end performance, OEM WebView variants, and foldable posture changes.
+
+**CP-10 exact-head evidence (recorded by SEC-COMM-01):**
+- Candidate `061596f4`. All four required checks pass.
+- **Android Shell on CI (not required) did not pass** on that head, even though the same suite passes locally on API 36 phone, API 36 tablet and API 33:
+  - API 36 phone: the emulator process died about 70 s into the journey (adb exit 255), the death previously seen only on API 33. The log shows a Vulkan instance being created just before. A diagnostic run without Vulkan is in progress.
+  - API 36 tablet: `FileExchangeTest` "system chooser was never opened". A freshly inserted file input was tapped before layout; the tap now retries (bounded) until the chooser is asked for.
+  - `pixel_fold`: the CI emulator tooling has no such device profile, so the job never ran. It is removed from the matrix, and the test matrix records foldables as **not automated**.
+  - API 26 floor ✅; build/lint/unit ✅.
+- The CI fixes land as a separate follow-up PR. **No Android CI product-suite pass is claimed yet**; the Android product evidence is local emulator runs only.
+- Merged as `c8835831` with `--match-head-commit`.
+
+## SEC-COMM-01 — Server-Enforced Premium Entitlement Protection
+
+**Delivered:** see [PREMIUM_ENTITLEMENT_AUTHORITY.md](../security/PREMIUM_ENTITLEMENT_AUTHORITY.md).
+- Every server-paid AI call (`/v1/handwriting`, `/v1/working`) is allowed by the **server's own entitlement record**: `entitlement_snapshots` via `serverEntitlementCapabilities`.
+- Client claims, cached flags and store receipts the server has not verified grant nothing.
+- **Per-account daily allowance** (`server/platform/aiAllowance.js`):
+  - free 120 / Premium 1200 by default, configurable, and validated in production;
+  - `429 AI_ALLOWANCE_EXHAUSTED` with `resetAt`;
+  - refunded when the request is refused for spend ceiling or configuration before any provider call.
+- **Client:**
+  - the cloud reader remembers an exhausted allowance until `resetAt` or an entitlement change, and falls back to on-device reading;
+  - ink and photo show clear copy (en + hi, kept live across a language switch);
+  - no paid call is retried in a loop.
+
+**Evidence (S0):**
+- `server/test/premium-authority-check.mjs` 44/44, covering:
+  - forged, claimed and cached Premium refused;
+  - an expired Premium falls back to the free allowance;
+  - refunds;
+  - day rollover;
+  - production config validation.
+- `client/test/cloud-handwriting-client-check.mjs` 62/62.
+- `entitlement-enforcement-check` updated.
+- Independent review findings applied, including the refund on ceiling refusal and the stale-allowance listener.
+- When merged with `main`, the observability hooks (#262) and the allowance refund were combined on both routes.
+
+**Not in scope:** provider-side billing alerts and per-deployment budgets are an owner operation (**BLOCKED_EXTERNAL**). Physical: none needed.
+
+**SEC-COMM-01 exact-head evidence (recorded by CP-11):**
+- Candidate `c3f8cee8`. All four required checks pass.
+- Merged as `4dbfbf34` with `--match-head-commit`.
+- Locally on the merged tree: `npm test` exit 0 and the CI count invariants match (premium authority 44/44, cloud handwriting client 62/62).
+
+**CP-10 follow-up (merged during SEC-COMM-01 → CP-11):** [#298](https://github.com/Priysharan19/Final-Pri-learning/pull/298) as `99b779f9`.
+- **On that PR's own CI**, Android Shell **API 36 tablet passed the full product suite**, the first CI pass of the Android product. The API 26 floor and build/lint/unit also pass.
+- The changes: emulator Vulkan off, a bounded retry on chooser taps, and `pixel_fold` removed (no such profile in the runner tooling; foldables are **not automated**).
+- **Android phone images on CI: BLOCKED_AUTOMATION.** The hosted runner's emulator process dies (adb exit 255) shortly after a Back key press, on API 33 and API 36.
+  - Host memory is fine (about 4.3/16 GB); the guest shows low-memory kills.
+  - Tried and ruled out: 4 GB RAM, `guest` GPU, Vulkan off, and skipping rotation (reverted, not kept as a weakening).
+  - This is past the three-attempts-per-fingerprint ceiling, so it is returned to triage.
+  - Phone jobs stay in the matrix, visibly failing. **Android phone evidence is local emulator runs only** (API 36 and API 33, full product suite).
+- **Governance finding:** #286 and #298 used `fix/…` branch names. The non-required "Autonomous fleet V2 contract" check refuses non-mission branch names on governed paths. Later programme branches use `task/…`.
+
+## CP-11 — Cross-Platform Release Matrix and Compatibility
+
+**Delivered** ([release-policy.md](../release/release-policy.md), "Cross-platform release matrix and compatibility"):
+- `npm run release:matrix` (`scripts/release-matrix.mjs`) checks that:
+  - the shared web build is from **this candidate**, and both Apple bundles and the Android assets embed the same release SHA;
+  - versions match `release/metadata.json`;
+  - data origins are pinned in both Apple packages and Android;
+  - the priNative protocol and native client ids agree across JS, Swift, Kotlin and the server;
+  - the compatibility floor is mounted in the router.
+  - Evidence rows are context, not checks; P evidence is never inferred.
+- **Compatibility floor** (`server/platform/clientCompatibility.js`):
+  - shells send `X-Pri-Shell-Build`;
+  - below `PRI_MIN_IOS_BUILD` / `PRI_MIN_ANDROID_BUILD`, cloud routes answer `426 CLIENT_UPGRADE_REQUIRED` with `Upgrade: pri-shell`;
+  - **every exit stays open**: health and readiness (`/v1/ready`), sign-in (password, Apple/Google, nonce), recovery, verification, session check, devices, logout, export and deletion;
+  - `/v1/health` reports the active floors and refusals;
+  - it is documented as an upgrade nudge, not a security control.
+- **Client:** a refused sync tells the student to update (en + hi), keeps the outbox and leaves export and delete available.
+
+**Evidence (S0):**
+- `server/test/client-compatibility-check.mjs` 52/52, including a **real-router journey**: an old shell signs in, gets 426 on sync, exports, deletes, and the deleted account is refused.
+- A mutation removing the login exemption fails it.
+- `client/test/client-upgrade-required-check.mjs` 8/8.
+- Merging `main` surfaced its architecture rule that only `security.js` reads `X-Pri-Client`. The floor now gets the id through `declaredNativeClientId()`.
+- The release matrix runs in `ci.yml` (Apple) and `android-shell.yml` (Android).
+- Independent review found one blocker: old shells could not sign in, so they could not reach export or delete. It is fixed, along with the major and minor findings: client 426 handling, health visibility, vacuous matrix rows, the HEAD tie, router wiring, both Apple packages, HEAD /health, case, the Upgrade header and the path filters.

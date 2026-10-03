@@ -40,7 +40,7 @@ const DEVICE = 'ipad-sync-contract';
 try {
   const jar = {};
   const registration = await app.request('/v1/account/register', {
-    method: 'POST', jar, body: { email: 'sync.student@example.test', name: 'Sync', password: 'correct-horse-battery', deviceId: DEVICE }
+    method: 'POST', jar, body: { email: 'sync.student@example.test', name: 'Sync', password: 'correct-horse-battery', deviceId: DEVICE, isAdult: true }
   });
   c.eq(registration.status, 201, 'a student account exists to push from');
   const accountId = registration.data.account.id;

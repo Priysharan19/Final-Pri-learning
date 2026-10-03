@@ -301,6 +301,8 @@ for (const [file, reason] of Object.entries(ALLOW.files || {})) {
 for (const [text, reason] of Object.entries(ALLOW.literals || {})) {
   ok(String(reason).length > 15, `the literal allowlist states a reason for “${text}”`);
 }
+ok(!Object.keys(ALLOW.literals || {}).some(text => /^ri Learning/.test(text)),
+  'the wordmark is never allow-listed as a fragment split around the tile letter');
 ok(Object.keys(ALLOW.files || {}).length <= 4, 'whole-file exemptions stay few enough to read');
 
 // The student-facing screens named in the brief may never be file-exempt.

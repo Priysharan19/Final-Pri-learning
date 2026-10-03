@@ -143,6 +143,9 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
+  // The Google/Apple sign-in popup lands here; it is its own small page, not an
+  // in-app route, and must never be answered with the app shell.
+  if (url.pathname === '/auth/callback.html' || url.pathname === '/auth/callback.js') return;
   e.respondWith(req.mode === 'navigate' ? shellFor(req) : assetFor(req, url));
 });
 

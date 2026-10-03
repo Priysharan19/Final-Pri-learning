@@ -38,6 +38,20 @@ function assignment(row, now) {
   );
 }
 
+// An unfinished paper whose clock ran out is not "in progress": its deadline
+// has passed, so nothing more can be written to it and opening it only shows
+// the marking of what was autosaved. Papers with no recorded deadline fall back
+// to created_at + duration (the backend's own conservative rule). An expired
+// paper older than EXPIRED_EXAM_WINDOW is history, not a next action.
+const EXPIRED_EXAM_WINDOW = 14 * DAY;
+function examDeadline(row) {
+  const explicit = time(row?.deadline_at ?? row?.deadlineAt);
+  if (explicit != null) return explicit;
+  const created = time(row?.created_at ?? row?.createdAt);
+  const minutes = Number(row?.duration_min ?? row?.durationMin);
+  return created == null ? null : created + Math.max(1, Number.isFinite(minutes) && minutes > 0 ? minutes : 60) * 60000;
+}
+
 function task(row, now) {
   if (!row || row.finished) return null;
   const dueAt = time(row.dueAt);
@@ -58,18 +72,31 @@ function task(row, now) {
 
 export function resolveHomeRecommendation({
   user, stats = null, dueCount = 0, tasks = [], exams = [], resume = null,
-  assignments = [], online = true, cloudReady = true, now = Date.now()
+  assignments = [], cachedAssignments = [], online = true, cloudReady = true, now = Date.now()
 } = {}) {
-  if (!user || user.role === 'teacher') return { primary: null, alternatives: [] };
+  // Only a learner gets a learning next action. Teacher, guardian, staff,
+  // support and admin profiles (and any role this build does not know) get
+  // none, rather than being handed student practice by default.
+  if (!user || (user.role || 'student') !== 'student') return { primary: null, alternatives: [] };
   const rows = [];
 
-  const exam = exams.filter(x => !x?.finished_at)
-    .sort((a, b) => (Number(b?.created_at) || 0) - (Number(a?.created_at) || 0))[0];
-  if (exam) rows.push(item('exam', 100, exam.id, { title: exam.title || 'Practice exam' }, exam.id ? '/exams/' + encodeURIComponent(exam.id) : '/exams'));
+  const unfinished = exams.filter(x => x && !x.finished_at)
+    .sort((a, b) => (Number(b?.created_at) || 0) - (Number(a?.created_at) || 0));
+  const live = unfinished.find(x => { const d = examDeadline(x); return d == null || d > now; });
+  const expired = unfinished.find(x => { const d = examDeadline(x); return d != null && d <= now && now - d <= EXPIRED_EXAM_WINDOW; });
+  const examHref = x => x.id ? '/exams/' + encodeURIComponent(x.id) : '/exams';
+  if (live) rows.push(item('exam', 100, live.id, { title: live.title || 'Practice exam' }, examHref(live), examDeadline(live)));
+  if (expired) rows.push(item('exam-expired', 81, expired.id, { title: expired.title || 'Practice exam' }, examHref(expired), examDeadline(expired)));
 
   if (online && cloudReady) for (const row of assignments) {
     const item = assignment(row, now);
     if (item) rows.push(item);
+  } else for (const row of cachedAssignments || []) {
+    // Offline (or cloud unreachable): the last list this device fetched is
+    // shown so the student knows the work exists, marked as cached and never
+    // chosen as the primary action — opening an assignment needs the cloud.
+    const cached = assignment(row, now);
+    if (cached) rows.push({ ...cached, data: { ...cached.data, cached: true }, offlineCaveat: true, requiresNetwork: true });
   }
 
   for (const row of tasks) {
@@ -100,13 +127,25 @@ export function resolveHomeRecommendation({
 
   rows.push(item('smart-practice', 50, 'smart-practice', {}, '/practice', null, !online));
   rows.sort(byPriority);
-  const primary = rows[0] || null;
-  return { primary, alternatives: rows.slice(1, 3) };
+  const primary = rows.find(r => !r.requiresNetwork) || null;
+  return { primary, alternatives: rows.filter(r => r !== primary).slice(0, 2) };
 }
 
 export const HOME_RECOMMENDATION_POLICY = {
   activeExam: 100, returnedAssignment: 96, urgentStartedAssignment: 95, urgentAssignment: 94,
   overdueClassTask: 92, startedAssignment: 90, overduePersonalTask: 89, dueClassTask: 88,
-  duePersonalTask: 86, taskOrPracticeResume: 84, dueReviews: 80, futureAssignment: 76,
+  duePersonalTask: 86, taskOrPracticeResume: 84, expiredExam: 81, dueReviews: 80, futureAssignment: 76,
   classTask: 75, partialDailyGoal: 70, personalTask: 68, adaptive: 60, firstPractice: 55, smartPractice: 50
 };
+
+/**
+ * A card that needs the cloud (a cached assignment shown while offline) can be
+ * read but not opened: the button is disabled and says why, instead of
+ * sending the student to a page that cannot load without a connection.
+ */
+export function actionOpenable(action, { online = true } = {}) {
+  if (!action) return false;
+  if (action.requiresNetwork && !online) return false;
+  if (action.data?.cached) return false;
+  return true;
+}

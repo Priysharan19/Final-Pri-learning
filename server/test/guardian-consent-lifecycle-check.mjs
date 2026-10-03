@@ -94,6 +94,28 @@ const { db, app, testStore } = await makeHarness();
 const { server, origin } = await serve(app);
 
 try {
+  // Regression: a direct API call that declared no age used to be treated as an
+  // adult and skipped the guardian gate. It is now refused outright.
+  const silent = await request(origin, '/account/register', {
+    method: 'POST', jar: {},
+    body: { name: 'Silent Caller', email: 'silent@example.test', password: 'guardian-pass-123', deviceId: 'device-silent' }
+  });
+  assert.equal(silent.status, 400, 'a sign-up with no age declaration must be refused');
+  assert.equal(silent.data?.error?.code, 'AGE_DECLARATION_REQUIRED');
+  assert.equal(await db.get("SELECT 1 AS x FROM accounts WHERE email='silent@example.test'"), undefined, 'and no account is created');
+  const classOnly = await request(origin, '/account/register', {
+    method: 'POST', jar: {},
+    body: { name: 'Class Only', email: 'classonly@example.test', password: 'guardian-pass-123', year: '10' }
+  });
+  assert.equal(classOnly.data?.error?.code, 'GUARDIAN_NAME_REQUIRED', 'a school class with no guardian is gated as a child');
+  const adultJar = {};
+  const adult = await request(origin, '/account/register', {
+    method: 'POST', jar: adultJar,
+    body: { name: 'Adult', email: 'adult@example.test', password: 'guardian-pass-123', isAdult: true }
+  });
+  assert.equal(adult.status, 201, 'an explicit adult needs no guardian');
+  assert.equal(await db.get('SELECT 1 AS x FROM guardian_consents WHERE account_id=?', [adult.data.account.id]), undefined, 'and no consent row is opened');
+
   // pending -> withdraw -> confirm must never re-grant the same ceremony.
   const first = await registerChild(origin, 'guardian-one@example.test', 'guardian1@example.test');
   const firstBearer = await guardianBearer(db, first.accountId);

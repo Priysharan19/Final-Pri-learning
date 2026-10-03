@@ -12,6 +12,10 @@ import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
 import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLanguage, useT, useTx } from '../i18n/index.js';
 import { featureEnabled } from '../platform/features.js';
+import { flushSync } from 'react-dom';
+// Lazy: the account flow is not on the offline first-run path, so it stays out
+// of the install (client/test/install-budget-check.mjs).
+const SignUpFlow = React.lazy(() => import('../components/SignUpFlow.jsx'));
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
 // The first thing a student chooses: what they are studying. Classes 7–12 are
@@ -223,7 +227,8 @@ export default function Login() {
   const t = useT();
   const tx = useTx();
   const [profiles, setProfiles] = useState(null);
-  const [stage, setStage] = useState('hero');   // hero | pick | create
+  const [stage, setStage] = useState('hero');   // hero | pick | create | account
+  const [accountMode, setAccountMode] = useState('signup');
   const [createStep, setCreateStep] = useState(0);
   const [form, setForm] = useState(freshProfileDraft);
   const [australia, setAustralia] = useState(false);
@@ -274,7 +279,7 @@ export default function Login() {
           : t('login.notChosen'))
     : (selectedCourse?.[1] || form.course.toUpperCase()) + ' · ' + t('common.yearNumber', { n: form.year });
 
-  async function go(path, body) {
+  async function go(path, body, { cloud = cloudIntent } = {}) {
     setBusy(true); setError('');
     try {
       const r = await api.post(path, body);
@@ -282,7 +287,7 @@ export default function Login() {
       // the authenticated shell. Move the cloud handoff first so the destination
       // cannot be lost during that identity transition. The local profile is
       // already authoritative here because the POST completed successfully.
-      if (cloudIntent) nav(CLOUD_ACCOUNT_ROUTE, { replace: true, flushSync: true });
+      if (cloud) nav(CLOUD_ACCOUNT_ROUTE, { replace: true, flushSync: true });
       setUser(r.user);
       refreshDue();
       return r;
@@ -313,6 +318,16 @@ export default function Login() {
     localStorage.setItem('pri-seen-hero', '1');
     if (profiles?.length) setStage('pick');
     else beginCreate(false);
+  };
+
+  /** The README's "Try the demo": one tap from the welcome screen to a seeded
+      Class 10 student, without first creating a profile of your own. */
+  const tryDemo = () => {
+    localStorage.setItem('pri-seen-hero', '1');
+    // A cloud sign-in started earlier and backed out of must not send the
+    // demo student to the account page.
+    setCloudIntent(false);
+    void go('/profiles/demo', {}, { cloud: false });
   };
 
   /** Open/select the local profile first, then hand it to the real cloud account panel. */
@@ -425,6 +440,29 @@ export default function Login() {
     }
   };
 
+  /** The account flow is done: make this device's profile, link it, and open the first question. */
+  const finishAccount = async ({ account, name, year, track }) => {
+    const r = await api.post('/profiles', {
+      name: name || account?.name || 'Pri', year: Number(year), avatar: '🚀', role: 'student',
+      language: signInLanguage(), course: 'in', indiaTrack: track || 'cbse'
+    });
+    if (account?.id) {
+      const { linkSignedInAccount } = await import('../platform/cloudAccount.js');
+      await linkSignedInAccount(r.user.id, account).catch(() => {});
+    }
+    localStorage.setItem('pri-seen-hero', '1');
+    nav('/practice', { replace: true, flushSync: true });
+    flushSync(() => setUser(r.user));
+    refreshDue();
+  };
+
+  const openAccount = (mode) => {
+    localStorage.setItem('pri-seen-hero', '1');
+    setAccountMode(mode);
+    setError('');
+    setStage('account');
+  };
+
   const cloudNote = cloudIntent && (
     <p className="muted cloud-intent" role="status" style={{ fontSize: 12.5, marginBottom: 12 }}>
       {t('login.cloudIntent')}
@@ -452,8 +490,20 @@ export default function Login() {
           })}</h1>
           <p className="hero-sub">{t('login.heroSub')}</p>
           <div className="row" style={{ marginTop: 34 }}>
-            <button className="btn btn-primary btn-lg btn-glow" onClick={enter}>{t('login.getStarted')}</button>
+            <button className="btn btn-primary btn-lg" data-testid="hero-create-account" onClick={() => openAccount('signup')}>{t('login.createAccount')}</button>
           </div>
+          <div className="row" style={{ marginTop: 10 }}>
+            <button className="btn btn-ghost btn-lg" onClick={enter}>{t('login.getStarted')}</button>
+          </div>
+          <div style={{ textAlign: 'center', marginTop: 14 }}>
+            <button className="linklike" type="button" data-testid="hero-sign-in-code" onClick={() => openAccount('signin')}>{t('login.signInWithCode')}</button>
+          </div>
+          <div style={{ textAlign: 'center', marginTop: 14 }}>
+            <button className="linklike" type="button" data-testid="hero-try-demo" disabled={busy} onClick={tryDemo}>
+              {t('login.tryDemoIndia')}
+            </button>
+          </div>
+          {error && <div className="error-box" role="alert" style={{ marginTop: 12 }}>{error}</div>}
           <p className="muted" style={{ marginTop: 26, textAlign: 'center' }}>{t('login.heroPrivacy')}</p>
           <div style={{ textAlign: 'center', marginTop: 10 }}>
             <button className="linklike" onClick={cloudSignIn}>{t('login.cloudSignIn')}</button>
@@ -465,6 +515,25 @@ export default function Login() {
             <Link to="/privacy">{t('login.privacy')}</Link> · <Link to="/terms">{t('login.terms')}</Link> ·{' '}
             <Link to="/refund-policy">{t('login.refunds')}</Link> · <Link to="/grievance">{t('login.grievances')}</Link>
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── account: phone / email / Google / Apple, then a parent if needed ── */
+  if (stage === 'account') {
+    return (
+      <div className="auth-wrap">
+        <div className="auth-col">
+          <React.Suspense fallback={<p className="muted" role="status">{t('common.loading')}</p>}>
+          <SignUpFlow
+            key={accountMode}
+            initialMode={accountMode}
+            onCancel={() => setStage('hero')}
+            onStartOffline={() => beginCreate(false)}
+            onFinish={finishAccount}
+          />
+          </React.Suspense>
         </div>
       </div>
     );
@@ -615,11 +684,15 @@ export default function Login() {
                       </div>
                     )}
                   </div>
-                  <div className="field" style={{ marginTop: -4 }}>
-                    <button type="button" className="linklike" onClick={openAustralia}>
-                      {t(form.role === 'teacher' ? 'login.teachingInAustralia' : 'login.studyingInAustralia')}
-                    </button>
-                  </div>
+                  {/* V1 is India-only (frozen scope): the Australian syllabuses are
+                      offered only in a build with PRI_FEATURE_AUSTRALIA=1. */}
+                  {featureEnabled('australia') && (
+                    <div className="field" style={{ marginTop: -4 }}>
+                      <button type="button" className="linklike" onClick={openAustralia}>
+                        {t(form.role === 'teacher' ? 'login.teachingInAustralia' : 'login.studyingInAustralia')}
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
 

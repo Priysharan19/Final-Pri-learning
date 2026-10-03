@@ -486,7 +486,7 @@ export const NCERT_CLASS8_RATIONAL_GENERATORS = {
         [
           { h: 'First order', d: `$\\frac23-\\frac54=${lhs.latex()}$` },
           { h: 'Reverse order', d: `$\\frac54-\\frac23=${rhs.latex()}$` },
-          { h: 'Compare', d: `${lhs.latex()}\\ne${rhs.latex()}` },
+          { h: 'Compare', d: `$${lhs.latex()}\\ne${rhs.latex()}$` },
           { h: 'Conclusion', d: 'Subtraction is not commutative.' }
         ]
       );
