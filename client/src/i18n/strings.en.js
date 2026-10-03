@@ -1079,6 +1079,7 @@ export default {
   'practice.leave': "Leave practice and go to Home. Your work is kept.",
   'practice.next': "Next",
   'practice.couldNotLoad': "The next question could not be opened.",
+  'practice.pyqEmptyTitle': "No past papers for this chapter yet.",
   'practice.goalReachedTitle': { one: "That is today’s goal: {n} question.", other: "That is today’s goal: {n} questions." },
   'practice.goalReachedBody': "{correct} of {answered} correct in this session. A good place to stop.",
   'practice.doneForToday': "Done for today",
