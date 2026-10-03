@@ -68,7 +68,9 @@ class ShellJourneyTest {
             Thread.sleep(250)
         }
         val where = runCatching { eval(scenario, "location.pathname+' '+JSON.stringify(history.state)") }.getOrDefault("?")
-        throw AssertionError("timed out waiting for: $js (last=$last; page at $where)")
+        // What the page actually shows, so a timeout names its cause (diagnostic only).
+        val seen = runCatching { eval(scenario, "navigator.userAgent.replace(/.*(Chrome\\/[0-9.]+).*/,'$1')+' | lang='+document.documentElement.lang+' | buttons: '+[].slice.call(document.querySelectorAll('button')).slice(0,12).map(function(b){return JSON.stringify((b.getAttribute('aria-label')||b.textContent||'').trim().slice(0,40))}).join(', ')+' | text: '+(document.body.innerText||'').slice(0,300)") }.getOrDefault("?")
+        throw AssertionError("timed out waiting for: $js (last=$last; page at $where; seen: $seen)")
     }
 
     private fun click(scenario: ActivityScenario<MainActivity>, js: String) {
