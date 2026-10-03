@@ -15,7 +15,10 @@
 //      question's own hint does;
 //   3. level 3 is the deterministic walkthrough, closes the question as Reveal
 //      does, and costs no model call;
-//   4. the tutored attempt syncs to the account with its help level on it.
+//   4. the tutored attempt syncs to the account with its help level on it;
+//   5. a connection loss — the provider down behind the server, or the device
+//      cut off from the server — shows the question's bundled hint, coded, with
+//      no model call, and the help is still counted on the row.
 // ─────────────────────────────────────────────────────────────────────────────
 import { createServer } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -75,8 +78,15 @@ globalThis.__PRI_TUTOR_OVERRIDE__ = true;
 
 const deviceJar = {};
 const realFetch = globalThis.fetch;
+// Section 5b cuts the device off from /v1/tutor: the request never leaves it.
+let deviceOffline = false;
+let tutorRequestsLeftDevice = 0;
 globalThis.fetch = async (url, options = {}) => {
   if (options.credentials !== 'include') return realFetch(url, options);
+  if (String(url).includes('/v1/tutor/')) {
+    if (deviceOffline) throw new TypeError('fetch failed');
+    tutorRequestsLeftDevice += 1;
+  }
   const headers = { ...(options.headers || {}) };
   const cookies = cookieHeader(deviceJar);
   if (cookies) headers.Cookie = cookies;
@@ -118,6 +128,23 @@ async function tutorable() {
   throw new Error('no practice question reached the tutor');
 }
 
+/** A grounded practice question whose level-1 help comes back deterministic with `code`. */
+async function fallsBackWith(code) {
+  for (let i = 0; i < 80; i++) {
+    const s = await api.post('/practice/next', { mode: 'topic', subtopic: YEAR10[turn++ % YEAR10.length], resume: false });
+    const q = (await idb.get('questions', s.question.id)).payload;
+    if (Array.isArray(q.steps) && q.steps.length && Array.isArray(q.hints) && q.hints.length) {
+      const first = await api.post(`/practice/${s.question.id}/tutor`, { level: 1, locale: 'en' });
+      if (first.source === 'tutor') throw new Error('the provider answered while it was meant to be unreachable');
+      if (first.code === code) return { id: s.question.id, q, first };
+      // Refused upstream as ungrounded before any provider call: keep looking.
+    }
+    await api.post(`/practice/${s.question.id}/discard`, {}).catch(() => {});
+  }
+  throw new Error(`no practice question fell back with ${code}`);
+}
+
+let providerClosed = false;
 try {
   const email = 'tutor.journey@example.test';
   const password = 'correct-horse-battery';
@@ -179,9 +206,36 @@ try {
   c.eq(payload.tutorLevel, 3, 'carrying the help level the student used');
   c.eq(payload.support, 'supported', 'and recorded as supported, not independent');
   c.eq(payload.correct, false, 'and not correct');
+
+  // ── 5a · the provider is down behind the server ───────────────────────────
+  await new Promise(resolve => provider.close(resolve));
+  providerClosed = true;
+  const calls5 = providerCalls.length;
+  const left5 = tutorRequestsLeftDevice;
+  const down = await fallsBackWith('TUTOR_UNREACHABLE');
+  c.eq(down.first.level, 1, 'with the provider unreachable, level 1 is still answered');
+  c.eq(down.first.source, 'deterministic', 'by the deterministic engine');
+  c.eq(down.first.code, 'TUTOR_UNREACHABLE', 'coded as the server failing to reach the provider');
+  c.eq(down.first.message, down.q.hints[0], 'showing the question\'s own first hint');
+  c.eq(providerCalls.length, calls5, 'the provider recorded no call');
+  c.ok(tutorRequestsLeftDevice > left5, 'though the device did ask the server');
+  c.eq((await idb.get('questions', down.id)).tutorLevel, 1, 'and the help is counted on the row like a hint');
+  await api.post(`/practice/${down.id}/discard`, {}).catch(() => {});
+
+  // ── 5b · the device is cut off from the server ─────────────────────────────
+  deviceOffline = true;
+  const left5b = tutorRequestsLeftDevice;
+  const off = await fallsBackWith('TUTOR_FAILED');
+  c.eq(off.first.source, 'deterministic', 'with the server unreachable, the deterministic engine answers');
+  c.eq(off.first.code, 'TUTOR_FAILED', 'coded as the transport failing');
+  c.eq(off.first.message, off.q.hints[0], 'with the question\'s own first hint');
+  c.eq(tutorRequestsLeftDevice, left5b, 'and no tutor request left the device');
+  c.eq(providerCalls.length, calls5, 'nor reached the provider');
+  c.eq((await idb.get('questions', off.id)).tutorLevel, 1, 'and the help is counted on the row');
+  deviceOffline = false;
 } finally {
   await app.close();
-  await new Promise(resolve => provider.close(resolve));
+  if (!providerClosed) await new Promise(resolve => provider.close(resolve));
   globalThis.fetch = realFetch;
   delete globalThis.__PRI_TUTOR_OVERRIDE__;
   rmSync(scratch, { recursive: true, force: true });
@@ -192,4 +246,4 @@ try {
 }
 
 console.log(`engine: ${app.engine}`);
-console.log(`TUTOR DEVICE JOURNEY — PASS — ${c.count()}/${c.count()} checks — with PRI_FEATURE_TUTOR=1 a practice question's help goes device → /v1 → provider → device, leaks are replaced, and the tutored attempt syncs with its help level.`);
+console.log(`TUTOR DEVICE JOURNEY — PASS — ${c.count()}/${c.count()} checks — with PRI_FEATURE_TUTOR=1 a practice question's help goes device → /v1 → provider → device, leaks are replaced, the tutored attempt syncs with its help level, and a connection loss at either hop shows the bundled hint.`);
