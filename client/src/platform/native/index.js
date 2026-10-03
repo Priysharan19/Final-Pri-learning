@@ -324,6 +324,22 @@ const device = Object.freeze({
   },
 });
 
+// A one-time sign-in code from SMS (Android: the SMS User Consent API, since a
+// WebView has no WebOTP). The person agrees to share one message in a system
+// sheet; only the digits come back. The server still verifies the code.
+const OTP_WAIT_MS = 5 * 60 * 1000;
+const otp = Object.freeze({
+  smsAvailable: () => { const c = capOf('otp'); return c?.transport === 'bridge' && c?.sms === true; },
+  /** Resolves with a six-digit string; rejects on cancel, timeout or refusal. */
+  async smsCode({ signal = null } = {}) {
+    if (!otp.smsAvailable()) return unsupported('otp', 'smsCode');
+    const result = await viaBridge('otp', 'smsCode', {}, { timeoutMs: OTP_WAIT_MS, signal });
+    const code = String(result?.code || '');
+    if (!/^[0-9]{6}$/.test(code)) throw new PriNativeError('BAD_REQUEST', 'The shell returned no usable code');
+    return code;
+  },
+});
+
 export const priNative = Object.freeze({
   /** Deep-frozen host descriptor: capabilities and shell/release facts, no OS. */
   host: () => { getRuntime(); return discoverHost(scopeOf()); },
@@ -334,7 +350,7 @@ export const priNative = Object.freeze({
   has: cap => !!capOf(cap),
   version: cap => capOf(cap)?.version || 0,
   releaseIdentity: () => hostReleaseIdentity(scopeOf()),
-  ink, photo, billing, cloud, share, files, lifecycle, storage, device,
+  ink, photo, billing, cloud, share, files, lifecycle, storage, device, otp,
   /** Bridge counters for diagnostics (no user data). */
   stats: () => (runtime ? runtime.bridge.stats() : null),
   /** Cancel everything in flight (tests, explicit teardown). */

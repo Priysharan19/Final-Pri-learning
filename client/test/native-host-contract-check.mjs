@@ -521,6 +521,31 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
   delete globalThis.window;
 }
 
+// ── 12d · SMS sign-in code through the shell (Android SMS User Consent) ─────
+{
+  const host = createFakeHost({ capabilities: { otp: { versions: [1], transport: 'bridge', sms: true } }, handlers: {
+    'host.ready': () => ({}), 'otp.smsCode': () => ({ code: '482913' }),
+  } });
+  priNative.dispose();
+  ok(priNative.otp.smsAvailable() === true, 'a shell that offers otp.sms is detected');
+  ok(await priNative.otp.smsCode() === '482913' && !!host.lastRequest('otp', 'smsCode'), 'the code comes back as six digits');
+  priNative.dispose();
+  host.uninstall();
+  const bad = createFakeHost({ capabilities: { otp: { versions: [1], transport: 'bridge', sms: true } }, handlers: {
+    'host.ready': () => ({}), 'otp.smsCode': () => ({ code: '12ab<script>' }),
+  } });
+  priNative.dispose();
+  await rejects(priNative.otp.smsCode(), 'BAD_REQUEST', 'anything but six digits from the shell is refused');
+  priNative.dispose();
+  bad.uninstall();
+  const none = createFakeHost({ capabilities: {}, handlers: { 'host.ready': () => ({}) } });
+  priNative.dispose();
+  ok(priNative.otp.smsAvailable() === false, 'without the capability (iOS, browsers) the page never asks');
+  await rejects(priNative.otp.smsCode(), 'UNSUPPORTED', 'and a direct call is UNSUPPORTED');
+  priNative.dispose();
+  none.uninstall();
+}
+
 console.log(failures.length
   ? `NATIVE HOST CONTRACT: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `NATIVE HOST CONTRACT: PASS — ${pass}/${pass} checks — envelope, negotiation, timeouts, cancellation, late/duplicate/malformed replies, limits, ordered buffered events, dispose, native requests, one transport per capability, answer-blind ink and recovered late purchases.`);

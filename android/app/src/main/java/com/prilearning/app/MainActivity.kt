@@ -44,6 +44,7 @@ import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import android.webkit.ValueCallback
+import com.prilearning.app.auth.SmsCode
 import com.prilearning.app.billing.PlayBilling
 import com.prilearning.app.bridge.HostDescriptor
 import com.prilearning.app.cloud.CloudConfig
@@ -75,6 +76,7 @@ class MainActivity : ComponentActivity() {
     internal var cloud: NativeCloud? = null
         private set
     private lateinit var files: FileExchange
+    private lateinit var smsCode: SmsCode
     private var billing: PlayBilling? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -84,6 +86,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Activity-result launchers must be registered before the activity starts.
         files = FileExchange(this)
+        smsCode = SmsCode(this)
         root = FrameLayout(this).apply { setBackgroundColor(Color.rgb(10, 10, 9)) }
         setContentView(root)
         // Edge-to-edge (mandatory from API 35): the WebView is letterboxed inside
@@ -120,6 +123,7 @@ class MainActivity : ComponentActivity() {
             ReleaseIdentity.read(assets),
             cloudConfigured = nativeCloud.configured,
             stylusCapable = stylusCapable,
+            smsCode = true,
         )
         // Back is enabled exactly while the page has declared it wants it (a
         // sheet is open or it has in-app history). Otherwise the system default
@@ -134,7 +138,7 @@ class MainActivity : ComponentActivity() {
         }
         val playBilling = PlayBilling(this) { event, payload -> bridge?.emitEvent(event, payload) }
         billing = playBilling
-        val priBridge = PriBridge(view, descriptor, { wanted -> backCallback.isEnabled = wanted }, nativeCloud, files, playBilling)
+        val priBridge = PriBridge(view, descriptor, { wanted -> backCallback.isEnabled = wanted }, nativeCloud, files, playBilling, smsCode)
         priBridge.stylusCapable = stylusCapable
         if (!priBridge.install()) {
             // Fail closed: without origin-scoped messaging the shell offers no
