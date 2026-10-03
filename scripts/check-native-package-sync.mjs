@@ -3,8 +3,10 @@
 //
 // ios/PriLearning.swiftpm is canonical. The tracked "PriLearning 2.swiftpm"
 // package exists because some iPad / Swift Playgrounds installs may still open
-// that copy directly. Until it is retired, every Swift source and Package.swift
-// must be byte-identical. Resources/Web is gated separately by sync-ios.mjs.
+// that copy directly. Until it is retired, every Swift source, Package.swift,
+// Info.plist, the asset catalogue and the bundled models must be byte-identical
+// (CP-04 widened this from Swift + Package.swift). Resources/Web is gated
+// separately by sync-ios.mjs.
 // ─────────────────────────────────────────────────────────────────────────────
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -23,10 +25,11 @@ function sourceFiles(base, dir = base, out = new Map()) {
   for (const name of readdirSync(dir)) {
     const full = join(dir, name);
     const rel = relative(base, full);
-    if (rel === 'Resources' || rel.startsWith(`Resources/`)) continue;
+    if (name === '.DS_Store' || rel === 'Resources/Web' || rel.startsWith('Resources/Web/')) continue;
     const stat = statSync(full);
     if (stat.isDirectory()) sourceFiles(base, full, out);
-    else if (name.endsWith('.swift') || rel === 'Package.swift') out.set(rel, readFileSync(full));
+    else if (name.endsWith('.swift') || rel === 'Package.swift' || rel === 'Info.plist' ||
+      rel.startsWith('Resources/Models/') || rel.startsWith('Assets.xcassets/')) out.set(rel, readFileSync(full));
   }
   return out;
 }

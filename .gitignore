@@ -57,3 +57,8 @@ ios/PriLearning 2.swiftpm/Resources/Web/release.json
 __pycache__/
 *.pyc
 *.pyo
+
+# Official exam-authority PDFs are fetched into a local, hash-verified cache and
+# never committed; review work-in-progress stays local too.
+tools/jee-question-department/cache/
+tools/jee-question-department/work/

@@ -7,7 +7,7 @@
 // into IndexedDB by this module.
 
 import { get, put, del, uuid } from '../local/idb.js';
-import { cloud, cloudAvailable } from './cloudTransport.js';
+import { cloud, cloudAvailable, forgetNativeCloudSession } from './cloudTransport.js';
 import { announceCloudSessionChange, announceEntitlementChange } from './cloudSession.js';
 import { normalizeEntitlementSnapshot } from './entitlements.js';
 import { resetProfileOutboxForRelink } from './profileOutbox.js';
@@ -114,6 +114,39 @@ export async function loginCloudAccount(pid, { email, password }) {
   return link;
 }
 
+/**
+ * Sign in (or, with `createAccount`, sign up) with a Google or Apple identity
+ * token from socialSignIn.js. A new account carries the same age declaration
+ * as registerCloudAccount; "Sign in" sends none and never creates an account.
+ */
+export async function signInWithProvider(pid, provider, {
+  idToken, nonce, createAccount = false, name, year, isAdult, guardianName, guardianEmail
+}) {
+  if (!cloudAvailable()) throw Object.assign(new Error('Cloud accounts are not configured on this build.'), { code: 'CLOUD_DISABLED' });
+  const deviceId = await cloudDeviceId();
+  const body = { idToken, nonce, deviceId, createAccount: !!createAccount };
+  if (createAccount) Object.assign(body, { name, year, isAdult, guardianName, guardianEmail });
+  const result = await cloud.socialSignIn(provider, body);
+  await saveAccount(pid, result.account);
+  await refreshCloudEntitlement(pid).catch(() => {});
+  const link = await cloudAccountLink(pid);
+  announceLink(pid, link, true);
+  return { link, created: !!result.created };
+}
+
+/**
+ * Link a local profile to an account the onboarding flow already signed in to
+ * (one-time code, Google or Apple). The session cookie is device-wide; this
+ * records which local profile it belongs to.
+ */
+export async function linkSignedInAccount(pid, account) {
+  await saveAccount(pid, account);
+  await refreshCloudEntitlement(pid).catch(() => {});
+  const link = await cloudAccountLink(pid);
+  announceLink(pid, link, true);
+  return link;
+}
+
 export async function verifyCloudSession(pid) {
   if (!cloudAvailable()) return { connected: false, reason: 'cloud-disabled', link: await cloudAccountLink(pid) };
   try {
@@ -136,6 +169,16 @@ export async function refreshCloudEntitlement(pid) {
   const id = linkRowId(pid);
   const prior = await get('device', id).catch(() => null);
   if (!prior?.accountId) throw new Error('This local profile is not linked to a cloud account');
+  // The cloud session is device-wide, the link is per local profile. When the
+  // session belongs to another account (a second profile on this iPad signed
+  // in since), its entitlement must never be filed under this profile's
+  // account. A Premium answer that does not say whose it is is refused too.
+  const answeredFor = result?.accountId == null ? null : String(result.accountId);
+  if ((answeredFor && answeredFor !== String(prior.accountId)) || (!answeredFor && entitlement.billingPlan === 'premium')) {
+    const error = new Error('The signed-in Pri Learning account is not the one linked to this profile. Sign in again to refresh Premium.');
+    error.code = 'CLOUD_ACCOUNT_MISMATCH';
+    throw error;
+  }
   await put('device', { ...prior, entitlement: { ...result.entitlement }, lastVerifiedAt: Date.now() });
   announceEntitlementChange({ localProfileId: String(pid), plan: entitlement.plan, status: entitlement.status, active: entitlement.active });
   return entitlement;
@@ -150,6 +193,9 @@ export async function markCloudSynced(pid, at = Date.now()) {
 
 export async function disconnectCloudAccount(pid) {
   try { if (cloudAvailable()) await cloud.logout(); } catch { /* local unlink must remain possible during a cloud outage */ }
+  // Offline, the logout above cannot reach the server; the device must still
+  // stop holding the session (the native shells keep it outside the page).
+  await forgetNativeCloudSession();
 
   // Fail closed locally: first remove account-specific replica metadata and put
   // the profile outbox back into its mandatory full-rescan state. Only after

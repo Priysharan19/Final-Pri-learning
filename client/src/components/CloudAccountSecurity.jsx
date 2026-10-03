@@ -1,26 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cloud } from '../platform/cloudTransport.js';
 import { disconnectCloudAccount } from '../platform/cloudAccount.js';
+import { requestIdentityToken, socialProviderConfig } from '../platform/socialSignIn.js';
+import { tLater, useT } from '../i18n/index.js';
+import { downloadJSON } from '../lib/files.js';
 
-function when(value) {
-  if (!value) return 'Unknown';
-  try { return new Date(value).toLocaleString(); } catch { return 'Unknown'; }
-}
-
-function downloadJson(filename, value) {
-  const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' });
-  const href = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = href;
-  anchor.download = filename;
-  anchor.rel = 'noopener';
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  setTimeout(() => URL.revokeObjectURL(href), 0);
+function when(value, t) {
+  if (!value) return t('cloud.unknown');
+  try { return new Date(value).toLocaleString(); } catch { return t('cloud.unknown'); }
 }
 
 export default function CloudAccountSecurity({ pid, account, onChanged, onDeleted }) {
+  const t = useT();
   const [devices, setDevices] = useState([]);
   const [providers, setProviders] = useState([]);
   const [password, setPassword] = useState({ current: '', next: '', confirm: '' });
@@ -33,6 +24,19 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
   const hasPassword = providers.some(row => row.provider === 'password');
   const socialProviders = providers.filter(row => row.provider === 'google' || row.provider === 'apple');
   const canDeleteWithPassword = hasPassword && deletePhrase.trim() === 'DELETE' && deletePassword.length > 0;
+  // An account made with Google or Apple has no password; deleting it takes a
+  // fresh sign-in with that provider, run here exactly as the sign-in is.
+  const [webProviders, setWebProviders] = useState({ google: null, apple: null });
+  const reauthProviders = socialProviders.filter(row => webProviders[row.provider]);
+
+  useEffect(() => {
+    let live = true;
+    if (hasPassword || !socialProviders.length) return () => { live = false; };
+    socialProviderConfig()
+      .then(config => { if (live) setWebProviders(config); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [hasPassword, socialProviders.length]);
 
   async function reload() {
     const [deviceResult, identityResult] = await Promise.all([cloud.devices(), cloud.identities()]);
@@ -62,26 +66,26 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
     start('verify');
     try {
       const result = await cloud.requestEmailVerification();
-      setMessage(result?.alreadyVerified ? 'This email is already verified.' : 'A fresh verification email has been queued. Older unused verification links were invalidated.');
+      setMessage(result?.alreadyVerified ? tLater('cloudSecurity.alreadyVerified') : tLater('cloudSecurity.verificationQueued'));
       await onChanged?.();
-    } catch (err) { setError(err.message || 'Could not request a verification email.'); }
+    } catch (err) { setError(err.message || tLater('cloudSecurity.verificationFailed')); }
     finally { setBusy(''); }
   }
 
   async function changePassword(e) {
     e.preventDefault();
     if (password.next !== password.confirm) {
-      setError('New passwords do not match.');
+      setError(tLater('cloudSecurity.passwordMismatch'));
       return;
     }
     start('password');
     try {
       await cloud.changePassword({ currentPassword: password.current, newPassword: password.next });
       setPassword({ current: '', next: '', confirm: '' });
-      setMessage('Password changed. This device received a fresh session and every other signed-in session was revoked.');
+      setMessage(tLater('cloudSecurity.passwordChanged'));
       await reload();
       await onChanged?.();
-    } catch (err) { setError(err.message || 'Password could not be changed.'); }
+    } catch (err) { setError(err.message || tLater('cloudSecurity.passwordChangeFailed')); }
     finally { setBusy(''); }
   }
 
@@ -91,13 +95,13 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
       const result = await cloud.revokeDevice(session.id);
       if (result?.current) {
         await disconnectCloudAccount(pid);
-        setMessage('This device session was revoked. Local learning data remains on this device.');
+        setMessage(tLater('cloudSecurity.currentRevoked'));
         await onDeleted?.({ cloudDeleted: false, sessionRevoked: true });
         return;
       }
-      setMessage(result?.revoked ? 'Device session revoked.' : 'That session was already inactive.');
+      setMessage(result?.revoked ? tLater('cloudSecurity.revoked') : tLater('cloudSecurity.alreadyInactive'));
       await reload();
-    } catch (err) { setError(err.message || 'Could not revoke that device session.'); }
+    } catch (err) { setError(err.message || tLater('cloudSecurity.revokeFailed')); }
     finally { setBusy(''); }
   }
 
@@ -106,10 +110,29 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
     try {
       const result = await cloud.exportAccount();
       const suffix = new Date().toISOString().slice(0, 10);
-      downloadJson(`pri-learning-account-export-${suffix}.json`, result);
-      setMessage('Cloud account export created on this device.');
-    } catch (err) { setError(err.message || 'Could not export this account.'); }
+      await downloadJSON(result, `pri-learning-account-export-${suffix}.json`);
+      setMessage(tLater('cloudSecurity.exported'));
+    } catch (err) { setError(err.message || tLater('cloudSecurity.exportFailed')); }
     finally { setBusy(''); }
+  }
+
+  // Straight from the click, so the provider window is not blocked.
+  async function deleteWithProvider(provider) {
+    if (hasPassword || deletePhrase.trim() !== 'DELETE' || !webProviders[provider] || busy) return;
+    start('delete');
+    try {
+      const token = await requestIdentityToken(provider, webProviders[provider]);
+      await cloud.deleteAccount({ provider, idToken: token.idToken, nonce: token.nonce });
+      await disconnectCloudAccount(pid);
+      setDeletePhrase('');
+      setMessage(tLater('cloudSecurity.deleted'));
+      await onDeleted?.({ cloudDeleted: true });
+    } catch (err) {
+      setError(err?.code === 'SOCIAL_CANCELLED' ? tLater('cloud.socialCancelled')
+        : err?.code === 'SOCIAL_POPUP_BLOCKED' ? tLater('cloud.socialPopupBlocked')
+          : err?.code?.startsWith?.('SOCIAL_') ? tLater('cloud.socialFailed')
+            : (err.message || tLater('cloudSecurity.deleteFailed')));
+    } finally { setBusy(''); }
   }
 
   async function deleteAccount(e) {
@@ -121,118 +144,136 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
       await disconnectCloudAccount(pid);
       setDeletePassword('');
       setDeletePhrase('');
-      setMessage('Cloud account deleted. Your separate offline profile on this device was not deleted.');
+      setMessage(tLater('cloudSecurity.deleted'));
       await onDeleted?.({ cloudDeleted: true });
-    } catch (err) { setError(err.message || 'Cloud account could not be deleted.'); }
+    } catch (err) { setError(err.message || tLater('cloudSecurity.deleteFailed')); }
     finally { setBusy(''); }
   }
 
-  const providerLabel = useMemo(() => ({ password: 'Email + password', google: 'Google', apple: 'Apple' }), []);
+  const providerLabel = useMemo(() => ({ password: t('cloudSecurity.providerPassword'), google: 'Google', apple: 'Apple' }), [t]);
 
   return (
     <div style={{ marginTop: 14 }}>
       {!account?.emailVerified && <div className="card" style={{ boxShadow: 'none', marginBottom: 14 }}>
-        <div className="sc-label">Email verification</div>
-        <div style={{ fontWeight: 650, marginTop: 4 }}>Verification is still required</div>
+        <div className="sc-label">{t('cloudSecurity.emailVerification')}</div>
+        <div style={{ fontWeight: 650, marginTop: 4 }}>{t('cloudSecurity.verificationRequired')}</div>
         <p className="muted" style={{ fontSize: 13, margin: '6px 0 10px' }}>
-          Verify the account email before relying on recovery and other identity-sensitive features.
+          {t('cloudSecurity.verifyHelp')}
         </p>
         <button className="btn btn-ghost btn-sm" type="button" onClick={resendVerification} disabled={!!busy}>
-          {busy === 'verify' ? 'Requesting…' : 'Send a fresh verification email'}
+          {busy === 'verify' ? t('cloud.requesting') : t('cloudSecurity.sendVerification')}
         </button>
       </div>}
 
       <div className="grid cols-2" style={{ gap: 14 }}>
         <div className="card" style={{ boxShadow: 'none' }}>
-          <div className="sc-label">Sign-in methods</div>
-          <div style={{ fontWeight: 650, marginTop: 4 }}>Linked providers</div>
+          <div className="sc-label">{t('cloudSecurity.signInMethods')}</div>
+          <div style={{ fontWeight: 650, marginTop: 4 }}>{t('cloudSecurity.linkedProviders')}</div>
           <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
             {providers.length ? providers.map(row => (
               <div className="spread" key={row.provider} style={{ gap: 12 }}>
                 <span>{providerLabel[row.provider] || row.provider}</span>
-                <span className="muted" style={{ fontSize: 12 }}>Linked {when(row.linkedAt)}</span>
+                <span className="muted" style={{ fontSize: 12 }}>{t('cloudSecurity.linkedAt', { when: when(row.linkedAt, t) })}</span>
               </div>
-            )) : <div className="muted" style={{ fontSize: 13 }}>Provider status unavailable.</div>}
+            )) : <div className="muted" style={{ fontSize: 13 }}>{t('cloudSecurity.providersUnavailable')}</div>}
           </div>
           {socialProviders.length === 0 && <p className="muted" style={{ fontSize: 12, margin: '10px 0 0' }}>
-            Google/Apple linking requires a fresh provider token from the production identity UI. Pri Learning never accepts a typed provider subject or unverified email as a substitute.
+            {t('cloudSecurity.socialNote')}
           </p>}
         </div>
 
         <div className="card" style={{ boxShadow: 'none' }}>
-          <div className="sc-label">Privacy</div>
-          <div style={{ fontWeight: 650, marginTop: 4 }}>Export cloud account data</div>
+          <div className="sc-label">{t('login.privacy')}</div>
+          <div style={{ fontWeight: 650, marginTop: 4 }}>{t('cloudSecurity.exportTitle')}</div>
           <p className="muted" style={{ fontSize: 13, margin: '6px 0 10px' }}>
-            Export the account record, replicated learning events/entities and class memberships held by the Pri cloud service.
+            {t('cloudSecurity.exportHelp')}
           </p>
           <button className="btn btn-ghost btn-sm" type="button" onClick={exportAccount} disabled={!!busy}>
-            {busy === 'export' ? 'Preparing…' : 'Export cloud data'}
+            {busy === 'export' ? t('cloudSecurity.preparing') : t('cloudSecurity.exportButton')}
           </button>
         </div>
       </div>
 
       <div className="card" style={{ boxShadow: 'none', marginTop: 14 }}>
-        <div className="sc-label">Active devices</div>
-        <div style={{ fontWeight: 650, marginTop: 4 }}>Signed-in sessions</div>
+        <div className="sc-label">{t('cloudSecurity.activeDevices')}</div>
+        <div style={{ fontWeight: 650, marginTop: 4 }}>{t('cloudSecurity.sessions')}</div>
         <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
           {devices.length ? devices.map(session => (
             <div className="spread" key={session.id} style={{ gap: 12, alignItems: 'center' }}>
               <div>
-                <div style={{ fontWeight: 600 }}>{session.current ? 'This device' : session.deviceId || 'Pri Learning device'}</div>
-                <div className="muted" style={{ fontSize: 12 }}>Last used {when(session.lastSeenAt)} · expires {when(session.expiresAt)}</div>
+                <div style={{ fontWeight: 600 }}>{session.current ? t('cloudSecurity.thisDevice') : session.deviceId || t('cloudSecurity.defaultDevice')}</div>
+                <div className="muted" style={{ fontSize: 12 }}>{t('cloudSecurity.lastUsed', { lastUsed: when(session.lastSeenAt, t), expires: when(session.expiresAt, t) })}</div>
               </div>
               <button className="btn btn-quiet btn-sm" type="button" onClick={() => revoke(session)} disabled={!!busy}>
-                {busy === `revoke:${session.id}` ? 'Revoking…' : session.current ? 'Sign out this device' : 'Revoke'}
+                {busy === `revoke:${session.id}` ? t('cloudSecurity.revoking') : session.current ? t('cloudSecurity.signOutDevice') : t('cloudSecurity.revoke')}
               </button>
             </div>
-          )) : <div className="muted" style={{ fontSize: 13 }}>No active sessions were returned.</div>}
+          )) : <div className="muted" style={{ fontSize: 13 }}>{t('cloudSecurity.noSessions')}</div>}
         </div>
       </div>
 
       {hasPassword && <form className="card" style={{ boxShadow: 'none', marginTop: 14 }} onSubmit={changePassword}>
-        <div className="sc-label">Password</div>
-        <div style={{ fontWeight: 650, marginTop: 4 }}>Change password</div>
+        <div className="sc-label">{t('login.password')}</div>
+        <div style={{ fontWeight: 650, marginTop: 4 }}>{t('settings.changePasswordAction')}</div>
         <div className="grid cols-3" style={{ gap: 10, marginTop: 10 }}>
           <div className="field">
-            <label className="label" htmlFor="cloud-current-password">Current password</label>
+            <label className="label" htmlFor="cloud-current-password">{t('settings.currentPassword')}</label>
             <input className="input" id="cloud-current-password" type="password" autoComplete="current-password" maxLength={200} value={password.current} onChange={e => setPassword(v => ({ ...v, current: e.target.value }))} required />
           </div>
           <div className="field">
-            <label className="label" htmlFor="cloud-new-password">New password</label>
+            <label className="label" htmlFor="cloud-new-password">{t('settings.newPassword')}</label>
             <input className="input" id="cloud-new-password" type="password" autoComplete="new-password" minLength={10} maxLength={200} value={password.next} onChange={e => setPassword(v => ({ ...v, next: e.target.value }))} required />
           </div>
           <div className="field">
-            <label className="label" htmlFor="cloud-confirm-password">Confirm new password</label>
+            <label className="label" htmlFor="cloud-confirm-password">{t('cloudSecurity.confirmNewPassword')}</label>
             <input className="input" id="cloud-confirm-password" type="password" autoComplete="new-password" minLength={10} maxLength={200} value={password.confirm} onChange={e => setPassword(v => ({ ...v, confirm: e.target.value }))} required />
           </div>
         </div>
         <button className="btn btn-ghost btn-sm" type="submit" disabled={!!busy} style={{ marginTop: 10 }}>
-          {busy === 'password' ? 'Changing…' : 'Change password'}
+          {busy === 'password' ? t('cloudSecurity.changing') : t('settings.changePasswordAction')}
         </button>
       </form>}
 
       <form className="card" style={{ boxShadow: 'none', marginTop: 14, borderColor: 'var(--bad)' }} onSubmit={deleteAccount}>
-        <div className="sc-label">Danger zone</div>
-        <div style={{ fontWeight: 650, marginTop: 4 }}>Delete cloud account</div>
+        <div className="sc-label">{t('cloudSecurity.dangerZone')}</div>
+        <div style={{ fontWeight: 650, marginTop: 4 }}>{t('cloudSecurity.deleteTitle')}</div>
         <p className="muted" style={{ fontSize: 13, margin: '6px 0 10px' }}>
-          This permanently deletes first-party cloud account data and revokes cloud sessions. It does not silently erase the separate offline profile stored on this device.
+          {t('cloudSecurity.deleteHelp')}
         </p>
         {hasPassword ? <>
           <div className="grid cols-2" style={{ gap: 10 }}>
             <div className="field">
-              <label className="label" htmlFor="cloud-delete-password">Confirm password</label>
+              <label className="label" htmlFor="cloud-delete-password">{t('cloudSecurity.confirmPassword')}</label>
               <input className="input" id="cloud-delete-password" type="password" autoComplete="current-password" maxLength={200} value={deletePassword} onChange={e => setDeletePassword(e.target.value)} required />
             </div>
             <div className="field">
-              <label className="label" htmlFor="cloud-delete-phrase">Type DELETE</label>
+              <label className="label" htmlFor="cloud-delete-phrase">{t('cloudSecurity.typeDelete')}</label>
               <input className="input" id="cloud-delete-phrase" autoComplete="off" value={deletePhrase} onChange={e => setDeletePhrase(e.target.value)} required />
             </div>
           </div>
           <button className="btn btn-quiet btn-sm" type="submit" disabled={!canDeleteWithPassword || !!busy} style={{ marginTop: 10 }}>
-            {busy === 'delete' ? 'Deleting…' : 'Permanently delete cloud account'}
+            {busy === 'delete' ? t('settings.deleting') : t('cloudSecurity.deleteButton')}
           </button>
+        </> : reauthProviders.length ? <>
+          <div className="field" style={{ maxWidth: 320 }}>
+            <label className="label" htmlFor="cloud-delete-phrase">{t('cloudSecurity.typeDelete')}</label>
+            <input className="input" id="cloud-delete-phrase" autoComplete="off" value={deletePhrase} onChange={e => setDeletePhrase(e.target.value)} />
+          </div>
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+            {reauthProviders.map(row => (
+              <button key={row.provider} className="btn btn-quiet btn-sm" type="button" data-delete-provider={row.provider}
+                disabled={deletePhrase.trim() !== 'DELETE' || !!busy} onClick={() => deleteWithProvider(row.provider)}>
+                {busy === 'delete' ? t('settings.deleting') : t('cloudSecurity.deleteWithProvider', { provider: providerLabel[row.provider] })}
+              </button>
+            ))}
+          </div>
         </> : <div className="muted" style={{ fontSize: 13 }}>
-          This account requires fresh {socialProviders.map(row => providerLabel[row.provider]).join(' or ') || 'identity-provider'} confirmation before deletion. The server refuses session-only deletion; complete provider reauthentication through the production Google/Apple identity surface when that surface is configured.
+          {t('cloudSecurity.reauthRequired', {
+            providers: socialProviders.length
+              ? socialProviders.map(row => providerLabel[row.provider])
+                .reduce((first, second) => t('cloudSecurity.providerOr', { first, second }))
+              : t('cloudSecurity.identityProvider')
+          })}
         </div>}
       </form>
 

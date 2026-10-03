@@ -4,22 +4,27 @@
 // established India product contract.
 import { IN_CURRICULUM, IN_CHAPTERS, IN_CHAPTER_BY_ID } from './curriculum-in-base.js';
 import { indiaExamFieldsFor } from './indiaExamMarks.js';
-import { NCERT_CLASS7_2026_27_CHAPTERS } from './ncert/class7-2026-27-production.js';
-import { NCERT_CLASS7_PART2_2026_27_CHAPTERS } from './ncert/class7-part2-2026-27-production.js';
+// The Class 7–9 chapter lists, dot points and coverage are read from each
+// book's syllabus layer, not from its production module. This spine is on the
+// boot path; the production modules carry the generators, topper notes and
+// worked examples, and importing them here put every class's bank in the
+// install of every student. Each production module re-exports the same values.
+import { NCERT_CLASS7_2026_27_CHAPTERS } from './ncert/class7-2026-27-syllabus.js';
+import { NCERT_CLASS7_PART2_2026_27_CHAPTERS } from './ncert/class7-part2-2026-27-syllabus.js';
 import {
   NCERT_CLASS8_RATIONAL_DOTPOINTS,
   NCERT_CLASS8_RATIONAL_COVERS
-} from './ncert/class8-rational-production.js';
+} from './ncert/class8-rational-syllabus.js';
 import {
   NCERT_CLASS8_LINEAR_DOTPOINTS,
   NCERT_CLASS8_LINEAR_COVERS
-} from './ncert/class8-linear-production.js';
+} from './ncert/class8-linear-syllabus.js';
 import {
   NCERT_CLASS8_3_13_IDS,
   NCERT_CLASS8_3_13_DOTPOINTS_BY_ID,
   NCERT_CLASS8_3_13_COVERS_BY_ID
-} from './ncert/class8-chapters-3-13-production.js';
-import { NCERT_CLASS9_CHAPTERS } from './ncert/class9-chapters-production.js';
+} from './ncert/class8-chapters-3-13-syllabus.js';
+import { NCERT_CLASS9_SYLLABUS as NCERT_CLASS9_CHAPTERS } from './ncert/class9-syllabus.js';
 import { CBSE_CLASS10_2026_27_CHAPTERS } from './ncert/class10-2026-27-production.js';
 import { INDIA_NATIVE_COVERS } from './curriculum-in-native-covers.js';
 

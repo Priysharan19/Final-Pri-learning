@@ -6,18 +6,20 @@ process.env.PRI_AUTH_DELIVERY_KEY = '11'.repeat(32);
 const [
   { default: express },
   { default: cookieParser },
-  { createPlatformDb },
+  { openTestStore },
   { createAccountRouter },
   { decryptDeliveryToken }
 ] = await Promise.all([
   import('express'),
   import('cookie-parser'),
-  import('../platform/db.js'),
+  import('./support/engine.mjs'),
   import('../platform/accounts.js'),
   import('../platform/deliveryCrypto.js')
 ]);
 
-const db = createPlatformDb(':memory:');
+// SQLite by default; `--engine=postgres` runs it on a migrated Postgres.
+const testStore = await openTestStore(undefined, { label: 'account_lifecycle' });
+const db = testStore.store;
 const app = express();
 app.use(express.json({ limit: '128kb' }));
 app.use(cookieParser());
@@ -62,8 +64,8 @@ async function request(path, { method = 'GET', body, jar = {} } = {}) {
 }
 
 function pendingDelivery(accountId, kind) {
-  return db.prepare(`SELECT * FROM auth_delivery_outbox
-    WHERE account_id=? AND kind=? AND delivered_at IS NULL ORDER BY created_at DESC`).get(accountId, kind);
+  return db.get(`SELECT * FROM auth_delivery_outbox
+    WHERE account_id=? AND kind=? AND delivered_at IS NULL ORDER BY created_at DESC`, [accountId, kind]);
 }
 
 function deliveryToken(accountId, purpose, row) {
@@ -75,7 +77,7 @@ try {
   const jarA = {};
   const registration = await request('/register', {
     method: 'POST', jar: jarA,
-    body: { name: 'Lifecycle Student', email: 'lifecycle@example.test', password: 'initial-pass-123', deviceId: 'ipad-a' }
+    body: { name: 'Lifecycle Student', email: 'lifecycle@example.test', password: 'initial-pass-123', deviceId: 'ipad-a', isAdult: true }
   });
   assert.equal(registration.status, 201);
   assert.equal(registration.data.account.emailVerified, false);
@@ -85,17 +87,17 @@ try {
 
   // Resending verification invalidates the older token rather than leaving two
   // live links that can be replayed later.
-  const firstDelivery = pendingDelivery(accountId, 'verify-email');
+  const firstDelivery = await pendingDelivery(accountId, 'verify-email');
   const firstVerification = deliveryToken(accountId, 'verify-email', firstDelivery);
   const resend = await request('/email/verification-request', { method: 'POST', jar: jarA, body: {} });
   assert.deepEqual(resend.data, { ok: true, alreadyVerified: false });
-  const secondDelivery = pendingDelivery(accountId, 'verify-email');
+  const secondDelivery = await pendingDelivery(accountId, 'verify-email');
   assert.notEqual(secondDelivery.token_id, firstDelivery.token_id);
   const secondVerification = deliveryToken(accountId, 'verify-email', secondDelivery);
   assert.equal((await request('/email/verify', { method: 'POST', body: { token: firstVerification } })).status, 400,
     'superseded verification token must be unusable');
   assert.equal((await request('/email/verify', { method: 'POST', body: { token: secondVerification } })).status, 200);
-  assert.ok(db.prepare('SELECT email_verified_at FROM accounts WHERE id=?').get(accountId).email_verified_at);
+  assert.ok((await db.get('SELECT email_verified_at FROM accounts WHERE id=?', [accountId])).email_verified_at);
   assert.deepEqual(
     (await request('/email/verification-request', { method: 'POST', jar: jarA, body: {} })).data,
     { ok: true, alreadyVerified: true }
@@ -108,7 +110,7 @@ try {
   assert.equal(knownReset.status, 200);
   assert.equal(unknownReset.status, 200);
   assert.deepEqual(knownReset.data, unknownReset.data);
-  const resetDelivery = pendingDelivery(accountId, 'reset-password');
+  const resetDelivery = await pendingDelivery(accountId, 'reset-password');
   const resetToken = deliveryToken(accountId, 'reset-password', resetDelivery);
 
   const reset = await request('/password/reset', { method: 'POST', jar: jarA, body: { token: resetToken, password: 'reset-pass-456' } });
@@ -160,11 +162,12 @@ try {
     'destructive account deletion must require fresh correct password proof');
   const deletion = await request('/', { method: 'DELETE', jar: jarD, body: { password: 'final-pass-789' } });
   assert.deepEqual(deletion.data, { deleted: true });
-  assert.equal(db.prepare('SELECT 1 FROM accounts WHERE id=?').get(accountId), undefined);
+  assert.equal((await db.get('SELECT 1 FROM accounts WHERE id=?', [accountId])), undefined);
   assert.equal((await request('/me', { jar: jarD })).status, 401);
 
+  console.log(`engine: ${testStore.engine}`);
   console.log('PASS — account registration, verification resend, reset, password rotation, device revocation, export and deletion lifecycle hold.');
 } finally {
   await new Promise(resolve => server.close(resolve));
-  db.close();
+  await testStore.close();
 }

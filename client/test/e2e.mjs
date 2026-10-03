@@ -36,7 +36,7 @@ import { spawnSync } from 'node:child_process';
 import { join, normalize, extname, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { chromium } from '@playwright/test';
+import { chromium, webkit } from '@playwright/test';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DIST = join(ROOT, 'client', 'dist');
@@ -44,11 +44,15 @@ const DIST = join(ROOT, 'client', 'dist');
 // ── Options ──────────────────────────────────────────────────────────────────
 
 function parseArgs(argv) {
-  const opts = { build: true, only: null, headed: false, bail: false };
+  const opts = { build: true, only: null, headed: false, bail: false, browser: 'chromium' };
   for (const arg of argv) {
     if (arg === '--no-build') opts.build = false;
     else if (arg === '--headed') opts.headed = true;
     else if (arg === '--bail') opts.bail = true;
+    else if (arg.startsWith('--browser=')) {
+      opts.browser = arg.slice(10);
+      if (!['chromium', 'webkit'].includes(opts.browser)) throw new Error(`unknown --browser=${opts.browser} (chromium or webkit)`);
+    }
     else if (arg.startsWith('--only=')) opts.only = arg.slice(7).split(',').map(s => s.trim() === 'v3' ? 'practice' : s.trim()).filter(Boolean);
   }
   return opts;
@@ -165,8 +169,12 @@ export function ensureBuild(build) {
     return { built: false };
   }
   const started = Date.now();
+  // A test build: flagged features outside the V1 scope are switched on so
+  // their flows are exercised. The tracked production build leaves them off,
+  // and tour-placement.js asserts that state when it meets such a build.
   const run = spawnSync('npm', ['run', 'build', '--prefix', 'client'], {
-    cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32'
+    cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32',
+    env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_AUSTRALIA: '1' }
   });
   if (run.status !== 0) {
     const tail = `${run.stdout || ''}${run.stderr || ''}`.trim().split('\n').slice(-12).join('\n      ');
@@ -290,7 +298,7 @@ function helpers(page, base, flowId) {
 
 // ── Flow runner ──────────────────────────────────────────────────────────────
 
-const FLOWS = ['./tour-login.js', './tour-india.js', './tour-phone.js', './tour-v3.js', './tour-ink.js', './tour-v4.js', './cal-smoke.mjs'];
+const FLOWS = ['./tour-login.js', './tour-india.js', './tour-phone.js', './tour-v3.js', './tour-ink.js', './tour-v4.js', './tour-exam-india.js', './tour-exam-deadline.js', './cal-smoke.mjs', './tour-submit-lifecycle.js', './tour-stale-cloud.js', './tour-placement.js', './tour-photo-practise.js'];
 
 async function loadFlows() {
   const loaded = [];
@@ -324,7 +332,7 @@ async function runFlow(flow, { browser, base, opts }) {
 
   const api = helpers(page, base, flow.id);
   try {
-    await flow.run({ page, ctx, base, note, ...api });
+    await flow.run({ page, ctx, base, note, browserName: opts.browser, ...api });
   } catch (err) {
     const path = await api.shot('FAIL-crash');
     ok('the flow ran to the end', false,
@@ -350,7 +358,11 @@ async function run(flows, opts) {
   else notes.push('--no-build: this ran against whatever was already in client/dist');
 
   const server = await serveDist();
-  const browser = await chromium.launch({ headless: !opts.headed });
+  // Chromium by default; --browser=webkit runs the same flows in WebKit, the
+  // engine behind every Apple web view (CP-03).
+  const engine = opts.browser === 'webkit' ? webkit : chromium;
+  console.log(`E2E BROWSER: ${opts.browser}`);
+  const browser = await engine.launch({ headless: !opts.headed });
   try {
     for (const flow of flows) {
       // Every flow runs even after one fails. A run that stops at the first red

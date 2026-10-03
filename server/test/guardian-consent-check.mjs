@@ -24,7 +24,7 @@ import cookieParser from 'cookie-parser';
 import { createPlatformDb } from '../platform/db.js';
 import {
   CONSENT_METHOD, CONSENT_NOTICE_VERSION, confirmConsent, consentState,
-  learnerIsChild, recordConsentRequest, requireGuardianConsent, validateGuardian, withdrawConsent
+  hasAgeDeclaration, learnerIsChild, recordConsentRequest, requireGuardianConsent, validateGuardian, withdrawConsent
 } from '../platform/guardianConsent.js';
 import { authEmailMessage, buildAuthActionUrl } from '../platform/authDelivery.js';
 import { SESSION_COOKIE, sha256 } from '../platform/security.js';
@@ -37,7 +37,15 @@ const eq = (a, b, label) => ok(JSON.stringify(a) === JSON.stringify(b), `${label
 // ── 1 · Silence means child ──────────────────────────────────────────────────
 eq(learnerIsChild({ year: 7 }), true, 'a Class 7 student is a child');
 eq(learnerIsChild({ year: 12 }), true, 'and so is a Class 12 student — the line is 18, not 13');
-eq(learnerIsChild({}), false, 'someone who names no class and claims nothing is not assumed to be a child');
+eq(learnerIsChild({}), true, 'someone who names no class and claims nothing is treated as a child — regression: this once failed open and skipped the guardian gate');
+eq(learnerIsChild({ year: '' }), true, 'an empty class is no declaration of adulthood');
+eq(learnerIsChild({ isAdult: 'true' }), true, 'only a real boolean true declares an adult, not a string');
+eq(learnerIsChild({ isAdult: true }), false, 'an explicit adult declaration is an adult');
+eq(hasAgeDeclaration({}), false, 'saying nothing is not an age declaration');
+eq(hasAgeDeclaration({ isAdult: 'yes' }), false, 'nor is a non-boolean isAdult');
+eq(hasAgeDeclaration({ isAdult: true }), true, 'isAdult true is a declaration');
+eq(hasAgeDeclaration({ isAdult: false }), true, 'so is isAdult false');
+eq(hasAgeDeclaration({ year: '9' }), true, 'and so is naming a school class');
 eq(learnerIsChild({ isAdult: false }), true, 'saying you are not an adult is taken at its word');
 eq(learnerIsChild({ isAdult: true, year: 8 }), false, 'and so is saying you are one, which is the only declaration a service can take');
 eq(learnerIsChild({ isAdult: undefined, year: 10 }), true, 'no declaration plus a school class is a child — the safe default is the protective one');
@@ -51,26 +59,30 @@ eq([good.ok, good.name, good.email], [true, 'Meera Rao', 'meera@example.test'], 
 // ── 3 · The state machine ────────────────────────────────────────────────────
 const db = createPlatformDb(':memory:');
 const now = Date.now();
-const mk = (id, email) => db.prepare('INSERT INTO accounts(id,email,name,role,created_at,updated_at,email_verified_at) VALUES (?,?,?,?,?,?,?)')
-  .run(id, email, 'S', 'student', now, now, now);
-mk('acct-child', 'child@example.test');
-mk('acct-adult', 'adult@example.test');
-for (const id of ['acct-child', 'acct-adult']) {
+const mk = (id, email, basis) => db.prepare('INSERT INTO accounts(id,email,name,role,age_basis,created_at,updated_at,email_verified_at) VALUES (?,?,?,?,?,?,?,?)')
+  .run(id, email, 'S', 'student', basis, now, now, now);
+mk('acct-child', 'child@example.test', 'child');
+mk('acct-adult', 'adult@example.test', 'adult');
+mk('acct-legacy', 'legacy@example.test', 'legacy');
+mk('acct-silent', 'silent@example.test', null);
+for (const id of ['acct-child', 'acct-adult', 'acct-legacy', 'acct-silent']) {
   db.prepare(`INSERT INTO account_sessions(id,account_id,token_hash,device_id,user_agent_hash,created_at,last_seen_at,expires_at)
     VALUES (?,?,?,?,?,?,?,?)`).run(`ses-${id}`, id, sha256(`raw-${id}`), 'ipad', null, now, now, now + 86400000);
 }
 
-eq(consentState(db, 'acct-adult').state, 'not-required', 'an account with no consent row needs none — that is what "no row" means');
-recordConsentRequest(db, { accountId: 'acct-child', name: 'Meera Rao', email: 'meera@example.test', tokenHash: 'tok', now });
-eq(consentState(db, 'acct-child').state, 'pending', 'a child starts pending');
-eq(consentState(db, 'acct-child').row.notice_version, CONSENT_NOTICE_VERSION, 'and records which notice was agreed to');
-eq(consentState(db, 'acct-child').row.method, CONSENT_METHOD, 'and how, so no later reader mistakes it for more');
-ok(confirmConsent(db, 'acct-child', now), 'a guardian confirms');
-eq(consentState(db, 'acct-child').state, 'given', 'and the account is permitted');
-ok(!confirmConsent(db, 'acct-child', now), 'confirming twice changes nothing');
-ok(withdrawConsent(db, 'acct-child', now + 1), 'a guardian withdraws');
-eq(consentState(db, 'acct-child').state, 'withdrawn', 'and the account is not permitted again');
-ok(consentState(db, 'acct-child').row.requested_at > 0 && consentState(db, 'acct-child').row.confirmed_at > 0,
+eq((await consentState(db, 'acct-adult')).state, 'not-required', 'an account created as an adult, with no consent row, needs none');
+eq((await consentState(db, 'acct-legacy')).state, 'not-required', 'nor does one that predates the age record (backfilled legacy)');
+eq((await consentState(db, 'acct-silent')).state, 'undeclared', 'regression: an account with no recorded age decision and no consent row is NOT "not required" — it fails closed');
+await recordConsentRequest(db, { accountId: 'acct-child', name: 'Meera Rao', email: 'meera@example.test', tokenHash: 'tok', now });
+eq((await consentState(db, 'acct-child')).state, 'pending', 'a child starts pending');
+eq((await consentState(db, 'acct-child')).row.notice_version, CONSENT_NOTICE_VERSION, 'and records which notice was agreed to');
+eq((await consentState(db, 'acct-child')).row.method, CONSENT_METHOD, 'and how, so no later reader mistakes it for more');
+ok(await confirmConsent(db, 'acct-child', now), 'a guardian confirms');
+eq((await consentState(db, 'acct-child')).state, 'given', 'and the account is permitted');
+ok(!(await confirmConsent(db, 'acct-child', now)), 'confirming twice changes nothing');
+ok(await withdrawConsent(db, 'acct-child', now + 1), 'a guardian withdraws');
+eq((await consentState(db, 'acct-child')).state, 'withdrawn', 'and the account is not permitted again');
+ok((await consentState(db, 'acct-child')).row.requested_at > 0 && (await consentState(db, 'acct-child')).row.confirmed_at > 0,
   'the record keeps that it was asked and given, rather than being deleted — a guardian may need that shown back');
 
 // ── 4 · The gate, over HTTP ──────────────────────────────────────────────────
@@ -86,6 +98,9 @@ const call = (who) => fetch(`${base}/guarded`, { headers: { cookie: `${SESSION_C
 try {
   const adult = await call('acct-adult');
   eq(adult.status, 200, 'an account that needs no consent passes');
+  eq((await call('acct-legacy')).status, 200, 'and so does a pre-existing (legacy) account');
+  const silent = await call('acct-silent');
+  eq([silent.status, silent.json?.error?.code], [403, 'AGE_DECLARATION_REQUIRED'], 'an account with no age on record is refused by the gate');
 
   const withdrawn = await call('acct-child');
   eq([withdrawn.status, withdrawn.json?.error?.code], [403, 'GUARDIAN_CONSENT_WITHDRAWN'], 'a withdrawn account is refused');
@@ -96,7 +111,7 @@ try {
   ok(/stays on this device/i.test(pending.json?.error?.message || ''),
     'and the student is told their work is safe, because it is — nothing has been lost, it simply has not synced');
 
-  confirmConsent(db, 'acct-child', now);
+  await confirmConsent(db, 'acct-child', now);
   eq((await call('acct-child')).status, 200, 'once confirmed, it passes');
 } finally {
   server.close();
@@ -169,6 +184,7 @@ const carried = migrated.prepare('SELECT * FROM auth_delivery_outbox').get();
 eq([carried.token_ciphertext, carried.destination], ['CIPHER', 'a@x.test'], 'with its envelope and destination intact');
 ok(migrated.prepare("SELECT sql FROM sqlite_master WHERE name='auth_delivery_outbox'").get().sql.includes('guardian-consent'),
   'and the widened constraint now admits a guardian email');
+eq(migrated.prepare("SELECT age_basis FROM accounts WHERE id='acct-1'").get().age_basis, 'legacy', 'the v9 migration backfills a pre-existing account as legacy, so nobody is locked out');
 eq(migrated.pragma('foreign_keys', { simple: true }), 1, 'and foreign keys are switched back on afterwards');
 migrated.close();
 try { unlinkSync(dbFile); } catch { /* already gone */ }

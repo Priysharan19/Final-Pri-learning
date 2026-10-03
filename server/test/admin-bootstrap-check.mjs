@@ -54,7 +54,7 @@ const role = (db, id) => db.prepare('SELECT role FROM accounts WHERE id=?').get(
     c.eq(rows[0].target_id, owner.account.id, 'audit targets the owner');
     c.eq(rows[0].actor_account_id, null, 'audit actor is the system, not a user');
     c.eq(JSON.parse(rows[0].metadata_json).source, 'PRI_BOOTSTRAP_ADMIN_EMAIL', 'audit names the source');
-    c.eq(maybeBootstrapAdmin(h.db, owner.account.id), false, 'bootstrap is idempotent');
+    c.eq(await maybeBootstrapAdmin(h.db, owner.account.id), false, 'bootstrap is idempotent');
 
     // Inert once any admin exists, even if the setting is pointed elsewhere.
     process.env.PRI_BOOTSTRAP_ADMIN_EMAIL = 'second.owner@pri.example';

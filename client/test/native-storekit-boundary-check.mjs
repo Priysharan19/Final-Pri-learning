@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 const swift = readFileSync(new URL('../../ios/PriLearning.swiftpm/StoreKitBillingBridge.swift', import.meta.url), 'utf8');
 const shell = readFileSync(new URL('../../ios/PriLearning.swiftpm/WebShell.swift', import.meta.url), 'utf8');
 const native = readFileSync(new URL('../src/platform/nativeBilling.js', import.meta.url), 'utf8');
+const legacy = readFileSync(new URL('../src/platform/native/legacyApple.js', import.meta.url), 'utf8');
 const transport = readFileSync(new URL('../src/platform/cloudTransport.js', import.meta.url), 'utf8');
 const panel = readFileSync(new URL('../src/components/CloudAccountPanel.jsx', import.meta.url), 'utf8');
 
@@ -38,9 +39,12 @@ assert.match(swift.slice(finishStart), /await transaction\.finish\(\)/,
 
 assert.equal(native.includes('fetch('), false, 'native bridge client must not create a second network boundary');
 assert.equal(native.includes('cloudRequest('), false, 'native bridge client must not call cloud directly');
-assert.match(native, /messageHandlers\?\.priBilling/, 'browser/native boundary must target only priBilling');
+assert.match(legacy, /handler\('priBilling'\)/, 'the native adapter must target only priBilling');
+assert.equal(/webkit|messageHandlers/.test(native), false, 'nativeBilling must reach StoreKit only through priNative');
 assert.match(native, /request\('unfinished'/, 'client bootstrap must sweep StoreKit unfinished transactions');
-assert.match(native, /pri:native-billing-update/, 'client must replay unfinished transactions through the normal update path');
+assert.match(legacy, /pri:native-billing-update/, 'native transaction updates must reach the normal update path');
+assert.match(legacy, /billingLate\.set\(id/, 'a late purchase/restore result must be recovered, not dropped');
+assert.equal(legacy.includes('fetch('), false, 'the native adapter must not create a second network boundary');
 
 assert.match(transport, /\/v1\/billing\/apple\/bootstrap/, 'cloud transport must expose Apple account-token bootstrap');
 assert.match(transport, /\/v1\/billing\/apple\/transaction/, 'cloud transport must expose server JWS verification');
@@ -53,8 +57,28 @@ assert.match(panel, /purchaseNativeProduct\(product\.id, appleBootstrap\.appAcco
   'Settings must purchase with the server-generated appAccountToken');
 assert.match(panel, /restoreNativePurchases\(productIds\)/,
   'Settings must use native StoreKit restore inside the iOS shell');
-assert.match(panel, /nativeShell && !nativeStoreKit/,
-  'native builds without StoreKit bridge must fail closed instead of exposing web checkout');
+assert.match(panel, /nativeShell && !nativeStore &&/,
+  'native builds without a store billing bridge must fail closed instead of exposing web checkout');
+assert.match(panel, /const canUseWebBilling = canSync && webCheckout && !nativeShell;/,
+  'web checkout is never offered inside a native shell (Apple or Android)');
+assert.match(panel, /const nativeStoreKit = nativeStore === 'app-store';/,
+  'the StoreKit flow runs only when the shell\'s store is the App Store');
+
+// CP-08 · Google Play: the server re-fetches every purchase from Google.
+const google = readFileSync(new URL('../src/components/GooglePlayBilling.jsx', import.meta.url), 'utf8');
+assert.match(panel, /nativeShell && googlePlay && <GooglePlayBilling/, 'the Google Play flow runs only when the shell\'s store is Google Play');
+assert.match(google, /purchaseGoogleSubscription\(\{ productId: plan\.id, basePlanId: plan\.basePlanId, obfuscatedAccountId: bootstrap\.obfuscatedAccountId \}\)/,
+  'a Google purchase carries the server-issued obfuscatedAccountId');
+const gAuthority = google.indexOf('await cloud.submitGooglePurchase(token)');
+const gRefresh = google.indexOf('await refreshCloudEntitlement(user.id)');
+assert.ok(gAuthority >= 0 && gRefresh > gAuthority, 'Premium is refreshed from the server only after it verified the Google purchase');
+assert.equal(/set(?:Premium|Entitlement)\s*\(|acknowledge/i.test(google.replace(/\/\/.*$/gm, '')), false,
+  'the Google flow never sets Premium and never acknowledges (the server does)');
+assert.match(transport, /\/v1\/billing\/google\/purchase/, 'cloud transport exposes server-side Google purchase verification');
+assert.match(google, /unfinishedNativeTransactions\(ids\)/, 'purchases the server never saw are swept and reported on load');
+const bridgeSrc = readFileSync(new URL('../src/platform/native/bridge.js', import.meta.url), 'utf8');
+assert.match(bridgeSrc, /result\.status === 'verified' \|\| result\.status === 'purchased'/, 'a late Google Play purchase is recovered like a late StoreKit one');
+assert.equal(/fetch\(|cloudRequest\(/.test(google), false, 'the Google flow uses only the audited cloud transport');
 assert.equal(/set(?:Premium|Entitlement)\s*\(/.test(native), false,
   'native bridge must never contain a client-side Premium mutation');
 

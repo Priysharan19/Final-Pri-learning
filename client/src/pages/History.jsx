@@ -125,7 +125,7 @@ export default function History() {
           </p>
         )}
         {data && data.items.map(item => (
-          <div key={item.id} className="hist-row">
+          <div key={item.id} className="hist-row" data-question-id={item.id}>
             <button className={`hist-star ${item.bookmarked ? 'on' : ''}`} title={t(item.bookmarked ? 'history.removeBookmark' : 'history.addBookmark')}
               aria-label={t(item.bookmarked ? 'history.removeBookmarkOn' : 'history.addBookmarkOn', { topic: item.subtopicName })}
               aria-pressed={!!item.bookmarked}
@@ -136,8 +136,8 @@ export default function History() {
                   {item.correct ? '✔' : item.correct === false ? '✖' : '·'}
                   <span className="sr-only">{item.correct ? t('app.correct') : item.correct === false ? t('app.incorrect') : t('history.notMarked')}</span>
                 </span>
-                <span className="hist-name"><TermGloss text={item.subtopicName} /></span>
-                <span className="tag">D{item.difficulty}</span>
+                <span className="hist-name" lang="en"><TermGloss text={item.subtopicName} /></span>
+                <span className="tag">{`D${item.difficulty}`}</span>
                 <span className="tag">{MODE_KEY[item.mode] ? t(MODE_KEY[item.mode]) : item.mode}</span>
                 {item.viaInk && <span className="tag" title={t('history.viaInk')}>✍️<span className="sr-only">{t('history.viaInkSpoken')}</span></span>}
                 {item.hasPhoto && <span className="tag" title={t('history.hasPhoto')}>📷<span className="sr-only">{t('history.hasPhotoSpoken')}</span></span>}

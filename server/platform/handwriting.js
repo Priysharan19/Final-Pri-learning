@@ -14,10 +14,18 @@
 // Reading is billed per request, so it is rate limited per account and requires
 // a verified email. It is never anonymous.
 // ─────────────────────────────────────────────────────────────────────────────
-import { Router } from 'express';
+import { asyncRouter } from './asyncRouter.js';
+import { asStore } from './store.js';
 import { rateLimit, requireSession, requireVerifiedEmail } from './security.js';
-import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
-import { HandwritingProviderError, providerConfig, transcribeHandwriting, validateImage } from './handwritingProvider.js';
+import { consumeAiAllowance, refundAiAllowance, refuseAiAllowance } from './aiAllowance.js';
+import { consumePaidCall, refusePaidCall, spendCeilingMissing } from './spendCeiling.js';
+import { cachedServerReleaseIdentity } from './releaseIdentity.js';
+import { recordProviderCall } from './metrics.js';
+import { logEvent } from './observability.js';
+import {
+  HandwritingProviderError, handwritingProviderDiagnostics, probeHandwritingProvider,
+  providerStaticStatus, transcribeHandwriting, validateImage
+} from './handwritingProvider.js';
 
 /** Fields that must never be sent to a transcriber. */
 export const FORBIDDEN_FIELDS = Object.freeze([
@@ -55,20 +63,98 @@ export function validateRequestBody(body) {
 
 export function createHandwritingRouter(db, {
   transcribe = transcribeHandwriting,
+  probe = probeHandwritingProvider,
+  releaseIdentity = cachedServerReleaseIdentity,
   env = process.env
 } = {}) {
-  const router = Router();
+  db = asStore(db);
+  const router = asyncRouter();
 
-  // Whether this deployment can read handwriting at all, so the app can hide
-  // the setting rather than offer something that will fail.
-  router.get('/status', requireSession(db), (req, res) => {
-    const config = providerConfig(env);
+  // One provider probe at a time per router. Concurrent /status requests share
+  // the in-flight promise rather than each spending a probe against the
+  // provider with the server's key.
+  let inFlightProbe = null;
+  const sharedProbe = () => {
+    if (!inFlightProbe) {
+      inFlightProbe = Promise.resolve()
+        .then(() => probe({ env }))
+        .finally(() => { inFlightProbe = null; });
+    }
+    return inFlightProbe;
+  };
+
+  // This is an operational readiness endpoint, not a credential-presence check.
+  // A student must never be offered cloud handwriting when the key exists but
+  // the model, endpoint, budget guard or provider is unusable.
+  router.get('/status',
+    requireSession(db),
+    rateLimit(db, 'handwriting-status', { limit: 120, windowMs: 10 * 60 * 1000 }),
+    async (req, res) => {
+    const staticStatus = providerStaticStatus(env);
+    const missingBudget = spendCeilingMissing(env);
+    let providerStatus = {
+      ...staticStatus,
+      usable: false,
+      degraded: false,
+      failureCode: !staticStatus.configured
+        ? 'HANDWRITING_NOT_CONFIGURED'
+        : !staticStatus.configValid
+          ? 'HANDWRITING_PROVIDER_CONFIG_INVALID'
+          : null,
+      latencyMs: null,
+      fallbackUsable: false
+    };
+
+    if (staticStatus.configured && staticStatus.configValid && missingBudget.length === 0) {
+      try {
+        providerStatus = await sharedProbe();
+      } catch {
+        providerStatus = {
+          ...providerStatus,
+          degraded: true,
+          failureCode: 'HANDWRITING_PROVIDER_PROBE_FAILED'
+        };
+      }
+    }
+
+    const budgetConfigured = missingBudget.length === 0;
+    const usable = budgetConfigured && providerStatus.usable === true;
+    const degraded = budgetConfigured && providerStatus.degraded === true;
+    const failureCode = !budgetConfigured
+      ? 'PAID_CAPACITY_NOT_CONFIGURED'
+      : providerStatus.failureCode || handwritingProviderDiagnostics().lastFailureCode || null;
+    const state = !staticStatus.configured || !staticStatus.configValid || !budgetConfigured
+      ? 'unavailable'
+      : usable
+        ? (degraded ? 'degraded' : 'ready')
+        : (degraded ? 'degraded' : 'unavailable');
+
+    // The same resolver /v1/health uses, so the two can never disagree (a raw
+    // PRI_RELEASE_SHA may be a stale manual-candidate value that the resolver
+    // correctly outranks with Railway's own Git SHA).
+    let releaseSha = null;
+    try {
+      const candidate = releaseIdentity()?.releaseSha;
+      if (/^[0-9a-f]{40}$/.test(String(candidate || ''))) releaseSha = candidate;
+    } catch { /* diagnostics must never make readiness itself fail */ }
+
+    res.set('Cache-Control', 'no-store');
     res.json({
-      available: config.configured,
-      model: config.configured ? config.primaryModel : null,
-      confidenceFloor: config.confidenceFloor
+      available: usable,
+      configured: staticStatus.configured,
+      usable,
+      degraded,
+      state,
+      model: staticStatus.configured ? staticStatus.primaryModel : null,
+      fallbackModel: staticStatus.configured ? staticStatus.fallbackModel : null,
+      confidenceFloor: staticStatus.confidenceFloor,
+      timeoutMs: staticStatus.timeoutMs,
+      fallbackUsable: providerStatus.fallbackUsable === true,
+      lastFailureCode: failureCode,
+      lastLatencyMs: providerStatus.latencyMs ?? handwritingProviderDiagnostics().lastLatencyMs ?? null,
+      releaseSha
     });
-  });
+    });
 
   router.post('/transcribe',
     requireSession(db),
@@ -84,14 +170,27 @@ export function createHandwritingRouter(db, {
         return res.status(error.status || 400).json({ error: { code: error.code, message: error.message } });
       }
 
+      // This account's daily allowance, from the SERVER's entitlement record
+      // only (SEC-COMM-01): Premium's additional-ai-usage raises it; nothing
+      // the device claims does.
+      const allowance = await consumeAiAllowance(db, { accountId: req.platformSession.account_id, kind: 'handwriting', env });
+      if (!allowance.allowed) return refuseAiAllowance(res, allowance);
+
       // Counted here, after the request has been shown to be a real one and
       // before anything is sent, so a malformed request cannot spend from a
       // budget shared by every student on this deployment.
-      const overBudget = consumePaidCall(db, { env });
-      if (overBudget) return refusePaidCall(res, overBudget);
+      const overBudget = await consumePaidCall(db, { env });
+      if (overBudget) { await refundAiAllowance(db, allowance); return refusePaidCall(res, overBudget); }
 
+      const started = Date.now();
       try {
-        const result = await transcribe(req.body.image, { env });
+        // The fallback model is a second paid call and is counted as one, before
+        // it is sent, so a request can never spend past the ceiling.
+        const result = await transcribe(req.body.image, {
+          env,
+          authorizeFallback: () => consumePaidCall(db, { env })
+        });
+        recordProviderCall('handwriting', { ok: true, ms: Date.now() - started });
         res.json({
           transcription: {
             engine: result.engine,
@@ -99,10 +198,21 @@ export function createHandwritingRouter(db, {
             text: result.text,
             confidence: result.confidence,
             needsConfirmation: result.needsConfirmation,
-            escalated: !!result.escalated
+            escalated: !!result.escalated,
+            fallbackAttempted: !!result.fallbackAttempted,
+            fallbackFailureCode: result.fallbackFailureCode || null,
+            latencyMs: Number.isFinite(result.latencyMs) ? result.latencyMs : null
           }
         });
       } catch (error) {
+        if (error?.paidCallVerdict) return refusePaidCall(res, error.paidCallVerdict);
+        if (/NOT_CONFIGURED|CONFIG_INVALID/.test(String(error?.code || ''))) await refundAiAllowance(db, allowance);
+        const code = error instanceof HandwritingProviderError ? error.code : 'HANDWRITING_FAILED';
+        // A cancelled request is the student's choice, not a provider failure.
+        if (code !== 'HANDWRITING_CANCELLED') {
+          recordProviderCall('handwriting', { ok: false, code, ms: Date.now() - started });
+          logEvent('warn', 'provider_call_failed', { requestId: req.requestId, provider: 'handwriting', code, latencyMs: Date.now() - started, retryable: !!error?.retryable });
+        }
         if (error instanceof HandwritingProviderError) {
           return res.status(error.status).json({ error: { code: error.code, message: error.message, retryable: !!error.retryable } });
         }

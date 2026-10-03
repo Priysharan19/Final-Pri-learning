@@ -216,7 +216,7 @@ export function checkWorking(q, workingText) {
       const cleaned = normalize(lastLine.text).replace(/^∴\s*/, '');
       if (ans.final?.kind === 'expr') {
         const cand = cleaned.includes('=') ? cleaned.split('=').pop() : cleaned;
-        reached = exprEquivalent(cand, ans.final.expr, { positiveOnly: ans.final.positiveOnly });
+        reached = exprEquivalent(cand, ans.final.expr, { positiveOnly: ans.final.positiveOnly, isolatedDomain: true, strictDomain: ans.final.strictDomain === true });
       } else if (meta.kind === 'equation') {
         const re = new RegExp(`${meta.variable}\\s*=`);
         if (re.test(cleaned)) {
@@ -907,25 +907,34 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
   if (!rep) {
     try { rep = stepCheck(meta, String(working)); } catch { return null; }
   }
-  const okLines = (rep?.lines || []).filter(l => l.status === 'ok');
+  const allLines = rep?.lines || [];
+  const okLines = allLines.filter(l => l.status === 'ok');
   if (!okLines.length) return null;
   const given = questionClaims(meta, prompt);
   const counted = [];
   let restated = 0;
-  for (const l of okLines) {
-    const claim = readClaim(l.text);
-    if (claim && given.some(c => sameWrittenClaim(claim, c))) { restated++; continue; }
-    if (claim && counted.some(c => sameWrittenClaim(claim, c))) continue;
-    counted.push(claim || { kind: 'text', text: String(l.text).trim() });
-  }
   const total = Math.max(1, Number(marks) || 1);
+  const cap = Math.max(0, total - 1);
+  // The per-line mark vector: one entry per written line, in order, saying
+  // what that line earned and why. Its marks always sum to `awarded`, so a
+  // multi-line answer can show the examiner's tick (or its absence) per line.
+  const vector = allLines.map((l, index) => {
+    const row = { index, text: String(l.text ?? ''), status: l.status, mark: 0, reason: l.status === 'ok' ? 'progress' : l.status };
+    if (l.status !== 'ok') return row;
+    const claim = readClaim(l.text);
+    if (claim && given.some(c => sameWrittenClaim(claim, c))) { restated++; row.reason = 'restated'; return row; }
+    if (claim && counted.some(c => sameWrittenClaim(claim, c))) { row.reason = 'repeat'; return row; }
+    counted.push(claim || { kind: 'text', text: String(l.text).trim() });
+    if (counted.length <= cap) row.mark = 1; else row.reason = 'cap';
+    return row;
+  });
   const progress = counted.length;
-  const awarded = Math.min(Math.max(0, total - 1), progress);
+  const awarded = Math.min(cap, progress);
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
   const note = awarded > 0
     ? `${plural(awarded, 'mark')} for correct working — the final answer was wrong, but ${plural(progress, 'line')} of your working moved the solution on.`
     : restated
       ? 'No method marks: the lines that check out only restate the question. Marks come from steps that move the solution on.'
       : 'No method marks: correct working earns marks only when it moves the solution on, and this question carries a single mark for the answer.';
-  return { okLines: okLines.length, progressLines: progress, restatedLines: restated, awarded, note, report: rep };
+  return { okLines: okLines.length, progressLines: progress, restatedLines: restated, awarded, note, lines: vector, report: rep };
 }

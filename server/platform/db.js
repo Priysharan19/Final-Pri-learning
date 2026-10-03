@@ -3,10 +3,13 @@ import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { platformDatabasePath } from './config.js';
+import { asStore, platformDatabaseUrl } from './store.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PATH = join(here, '..', 'data', 'pri-learning-platform.db');
-const SCHEMA_VERSION = 6;
+import { SCHEMA_VERSION } from './schemaVersions.js';
+
+export { SCHEMA_VERSION };
 
 
 /**
@@ -465,6 +468,20 @@ export function createPlatformDb(path = DEFAULT_PATH) {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_guardian_consents_state
     ON guardian_consents(confirmed_at, withdrawn_at);`);
 
+  // Schema v9 — the age decision an account was created under. Before this the
+  // only record was a guardian_consents row for a child, so an account created
+  // without any declaration (provider sign-in did exactly that) read as "no row,
+  // not required" and passed the guardian gate. Now every account-creating path
+  // writes 'adult' or 'child', and NULL means nothing was decided: the gate
+  // refuses it. Accounts that existed before v9 are backfilled once — a
+  // consent row means 'child', anything else 'legacy' (passes as before) — so
+  // the migration locks nobody out.
+  if (addColumnIfMissing(db, 'accounts', 'age_basis', "age_basis TEXT CHECK(age_basis IN ('adult','child','legacy'))")) {
+    db.exec(`UPDATE accounts SET age_basis = CASE
+      WHEN EXISTS (SELECT 1 FROM guardian_consents g WHERE g.account_id = accounts.id) THEN 'child'
+      ELSE 'legacy' END WHERE age_basis IS NULL`);
+  }
+
   db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('schema_version',?)").run(String(SCHEMA_VERSION));
   return db;
 }
@@ -472,32 +489,111 @@ export function createPlatformDb(path = DEFAULT_PATH) {
 /**
  * Flush the write-ahead log into the main database file. TRUNCATE leaves the
  * WAL empty so the main file alone is a complete, consistent snapshot for
- * backup tooling. Returns SQLite's checkpoint counters.
+ * backup tooling. Returns SQLite's checkpoint counters. SQLite only: on
+ * Postgres, durability and backups belong to the database service.
  */
 export function checkpointPlatformDb(db) {
-  const [row] = db.pragma('wal_checkpoint(TRUNCATE)');
+  const raw = rawSqlite(db);
+  if (!raw) return null;
+  const [row] = raw.pragma('wal_checkpoint(TRUNCATE)');
   return { busy: Number(row?.busy || 0), log: Number(row?.log || 0), checkpointed: Number(row?.checkpointed || 0) };
 }
 
 /**
  * Graceful shutdown: checkpoint, then close so the last connection removes the
  * -wal/-shm sidecars and no committed transaction is left only in the WAL.
+ * Accepts the raw SQLite handle or a SQLite store. A Postgres store is closed
+ * with closePlatformStore().
  */
 export function closePlatformDb(db) {
-  if (!db || !db.open) return { closed: false, checkpoint: null };
+  const raw = rawSqlite(db);
+  if (!raw || !raw.open) return { closed: false, checkpoint: null };
   let checkpoint = null;
-  try { checkpoint = checkpointPlatformDb(db); } finally { db.close(); }
+  try { checkpoint = checkpointPlatformDb(raw); } finally { raw.close(); }
   return { closed: true, checkpoint };
 }
 
-export function nextSyncCursor(db) {
-  return db.transaction(() => {
-    const row = db.prepare('SELECT value FROM sync_cursors WHERE id = 1').get();
-    const next = Number(row?.value || 0) + 1;
-    db.prepare('UPDATE sync_cursors SET value = ? WHERE id = 1').run(next);
-    return next;
-  })();
+/** Close either driver: SQLite checkpoints and closes; Postgres drains its pool. */
+export async function closePlatformStore(store) {
+  if (store?.dialect === 'postgres') {
+    const wasOpen = store.open;
+    await store.close();
+    return { closed: wasOpen, checkpoint: null, driver: 'postgres' };
+  }
+  return { ...closePlatformDb(store), driver: 'sqlite' };
 }
 
-const configuredPlatformPath = platformDatabasePath();
-export const platformDb = createPlatformDb(configuredPlatformPath || DEFAULT_PATH);
+function rawSqlite(db) {
+  if (!db) return null;
+  if (db.dialect === 'sqlite' && db.raw) return db.raw;
+  if (typeof db.pragma === 'function') return db;
+  return null;
+}
+
+/** The lock a sync write holds for one account (see nextSyncCursor). */
+export function syncLockKey(accountId) {
+  return `pri.sync:${String(accountId)}`;
+}
+
+/**
+ * Allocate the next sync cursor for a row of `accountId`.
+ *
+ * THE GUARANTEE pull pagination needs (sync.js syncPullPage pages one account by
+ * `server_cursor > ?`): for any one account, cursors are handed out in COMMIT
+ * order. A device that has seen cursor N for its account can never later find a
+ * newly committed row of that account below N — that row would be skipped
+ * forever.
+ *
+ * HOW. The caller must be inside a transaction that holds
+ * syncLockKey(accountId) (store.transaction(fn, { lock })); this function
+ * refuses otherwise (SYNC_CURSOR_UNLOCKED). Within one account, the lock makes
+ * writers strictly sequential — the next holder cannot allocate until the
+ * previous one has committed or rolled back — so allocation order is commit
+ * order for that account. Across accounts nothing is promised or needed: pulls
+ * never compare one account's cursors with another's.
+ *
+ *   · Postgres: nextval() on pri.sync_cursor_seq (CACHE 1, so values are
+ *     increasing across sessions, not just within one). nextval takes no row
+ *     lock and causes no serialization conflict, so pushes for different
+ *     accounts no longer contend on one hot row (the previous single-row
+ *     UPDATE made every concurrent push a SERIALIZABLE conflict, and a burst
+ *     of 120 exhausted the retry budget and answered 500). Values taken by a
+ *     transaction that rolls back are skipped; gaps are harmless.
+ *   · SQLite: the single sync_cursors row, as before. One connection already
+ *     serialises every transaction, so the lock is only recorded — but it is
+ *     still required, so a caller that forgets it fails on SQLite too.
+ */
+export async function nextSyncCursor(db, accountId) {
+  const store = asStore(db);
+  if (!accountId || store.heldLock() !== syncLockKey(accountId)) {
+    throw Object.assign(new Error('A sync cursor may only be allocated inside a transaction holding that account\'s sync lock.'), { code: 'SYNC_CURSOR_UNLOCKED' });
+  }
+  if (store.dialect === 'postgres') {
+    const row = await store.get("SELECT nextval('sync_cursor_seq') AS value");
+    return Number(row.value);
+  }
+  const row = await store.get('UPDATE sync_cursors SET value = value + 1 WHERE id = 1 RETURNING value');
+  if (!row) throw Object.assign(new Error('sync_cursors is not initialised.'), { code: 'SYNC_CURSOR_MISSING' });
+  return Number(row.value);
+}
+
+/**
+ * The highest sync cursor handed out so far, across all accounts (operators'
+ * health view only — never shown to an account). On Postgres the sequence is read
+ * without consuming a value.
+ */
+export async function currentSyncCursor(db) {
+  const store = asStore(db);
+  if (store.dialect === 'postgres') {
+    const row = await store.get('SELECT CASE WHEN is_called THEN last_value ELSE last_value - 1 END AS value FROM sync_cursor_seq');
+    return Number(row?.value || 0);
+  }
+  return Number((await store.get('SELECT value FROM sync_cursors WHERE id=1'))?.value || 0);
+}
+
+// SQLite is opened at import, exactly as before, so production still validates
+// PRI_PLATFORM_DB before a file can be created. When PRI_DATABASE_URL selects
+// Postgres no SQLite file is opened at all (see store.js openPlatformStore).
+export const platformDb = platformDatabaseUrl()
+  ? null
+  : createPlatformDb(platformDatabasePath() || DEFAULT_PATH);

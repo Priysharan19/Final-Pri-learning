@@ -1,4 +1,7 @@
 import { decryptDeliveryToken } from './deliveryCrypto.js';
+import { asStore, assertNoOpenTransaction, sqliteHandle } from './store.js';
+import { recordAuthEmail } from './metrics.js';
+import { logEvent, safeCode as logCode } from './observability.js';
 
 const MAX_ATTEMPTS = 8;
 const DEFAULT_BATCH = 20;
@@ -21,6 +24,9 @@ function addColumnIfMissing(db, name, sql) {
 }
 
 export function ensureAuthDeliverySchema(db) {
+  // SQLite builds its schema at boot; Postgres is migrated (supabase/migrations).
+  db = sqliteHandle(db);
+  if (!db) return;
   db.exec(`CREATE TABLE IF NOT EXISTS auth_delivery_outbox (
     id TEXT PRIMARY KEY,
     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
@@ -65,7 +71,9 @@ export function buildAuthActionUrl(publicOrigin, kind, rawToken) {
   if (!['verify-email', 'reset-password', 'guardian-consent'].includes(kind)) throw new Error('Unsupported auth delivery kind');
   const token = String(rawToken || '');
   if (!token || token.length > 512) throw new Error('Invalid auth delivery token');
-  const url = new URL('/account-action', cleanPublicOrigin(publicOrigin));
+  // A parent's link opens the parent's own consent page; account links open
+  // the account-action page. Both read the token from the fragment.
+  const url = new URL(kind === 'guardian-consent' ? '/guardian/consent' : '/account-action', cleanPublicOrigin(publicOrigin));
   url.hash = new URLSearchParams({ action: kind, token }).toString();
   return url.toString();
 }
@@ -114,6 +122,7 @@ export function createResendAuthEmailTransport({
   if (!key || !sender || typeof fetchImpl !== 'function') return null;
 
   return async ({ outboxId, to, kind, actionUrl }) => {
+    assertNoOpenTransaction('Sending an auth email');
     const message = authEmailMessage(kind, actionUrl);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(new Error('Auth email provider timed out')), REQUEST_TIMEOUT_MS);
@@ -176,18 +185,19 @@ export async function drainAuthDeliveryOutbox(db, {
   now = Date.now(),
   batchSize = DEFAULT_BATCH
 } = {}) {
+  db = asStore(db);
   ensureAuthDeliverySchema(db);
   if (typeof send !== 'function') return { enabled: false, sent: 0, failed: 0, purged: 0 };
 
   // Once a token is consumed or expired there is no reason to retain even a
   // delivered metadata row. This keeps destinations/provider ids bounded to the
   // lifetime of the one-hour account action.
-  const purged = db.prepare(`DELETE FROM auth_delivery_outbox
+  const purged = (await db.run(`DELETE FROM auth_delivery_outbox
     WHERE token_id IN (
       SELECT id FROM account_tokens WHERE consumed_at IS NOT NULL OR expires_at <= ?
-    )`).run(now).changes;
+    )`, [now])).changes;
 
-  const rows = db.prepare(`SELECT o.*, t.expires_at, t.consumed_at
+  const rows = await db.all(`SELECT o.*, t.expires_at, t.consumed_at
     FROM auth_delivery_outbox o
     JOIN account_tokens t ON t.id = o.token_id
     WHERE o.delivered_at IS NULL
@@ -196,21 +206,25 @@ export async function drainAuthDeliveryOutbox(db, {
       AND t.consumed_at IS NULL
       AND t.expires_at > ?
     ORDER BY o.created_at ASC
-    LIMIT ?`).all(MAX_ATTEMPTS, now, now, Math.max(1, Math.min(100, Number(batchSize) || DEFAULT_BATCH)));
+    LIMIT ?`, [MAX_ATTEMPTS, now, now, Math.max(1, Math.min(100, Number(batchSize) || DEFAULT_BATCH))]);
 
   let sent = 0;
   let failed = 0;
   for (const row of rows) {
     const attempt = Number(row.attempt_count || 0) + 1;
-    db.prepare(`UPDATE auth_delivery_outbox SET attempt_count=?, last_attempt_at=?, next_attempt_at=NULL, last_error_code=NULL
-      WHERE id=? AND delivered_at IS NULL`).run(attempt, now, row.id);
+    // Claim this attempt. The count we read is part of the condition, so when
+    // two workers (two server replicas on one Postgres) picked the same row,
+    // exactly one claims it and only that one sends.
+    const claim = await db.run(`UPDATE auth_delivery_outbox SET attempt_count=?, last_attempt_at=?, next_attempt_at=NULL, last_error_code=NULL
+      WHERE id=? AND delivered_at IS NULL AND attempt_count=?`, [attempt, now, row.id, Number(row.attempt_count || 0)]);
+    if (claim.changes !== 1) continue;
 
     let rawToken;
     try {
       rawToken = decryptDeliveryToken(row.token_ciphertext, `${row.account_id}:${row.kind}:${row.token_id}`);
     } catch {
-      db.prepare(`UPDATE auth_delivery_outbox SET attempt_count=?, last_error_code='DECRYPT_FAILED', next_attempt_at=NULL
-        WHERE id=?`).run(MAX_ATTEMPTS, row.id);
+      await db.run(`UPDATE auth_delivery_outbox SET attempt_count=?, last_error_code='DECRYPT_FAILED', next_attempt_at=NULL
+        WHERE id=?`, [MAX_ATTEMPTS, row.id]);
       failed += 1;
       continue;
     }
@@ -225,15 +239,20 @@ export async function drainAuthDeliveryOutbox(db, {
         kind: row.kind,
         actionUrl
       });
-      db.prepare(`UPDATE auth_delivery_outbox
+      await db.run(`UPDATE auth_delivery_outbox
         SET delivered_at=?, token_ciphertext='', provider_message_id=?, next_attempt_at=NULL, last_error_code=NULL
-        WHERE id=? AND delivered_at IS NULL`).run(now, String(result?.providerMessageId || '').slice(0, 160) || null, row.id);
+        WHERE id=? AND delivered_at IS NULL`, [now, String(result?.providerMessageId || '').slice(0, 160) || null, row.id]);
       sent += 1;
+      recordAuthEmail({ ok: true });
     } catch (error) {
       const terminal = attempt >= MAX_ATTEMPTS;
-      db.prepare(`UPDATE auth_delivery_outbox SET last_error_code=?, next_attempt_at=? WHERE id=? AND delivered_at IS NULL`)
-        .run(safeCode(error?.code), terminal ? null : now + retryDelay(attempt), row.id);
+      const code = safeCode(error?.code);
+      await db.run(`UPDATE auth_delivery_outbox SET last_error_code=?, next_attempt_at=? WHERE id=? AND delivered_at IS NULL`, [code, terminal ? null : now + retryDelay(attempt), row.id]);
       failed += 1;
+      recordAuthEmail({ ok: false, code: logCode(code, 'DELIVERY_FAILED') });
+      // The destination, token and action URL never reach the log: only the
+      // coded failure, the attempt number and whether retries are exhausted.
+      logEvent(terminal ? 'error' : 'warn', 'auth_email_failed', { kind: row.kind, code: logCode(code, 'DELIVERY_FAILED'), attempt, state: terminal ? 'exhausted' : 'retrying' });
     } finally {
       rawToken = null;
     }
@@ -261,9 +280,9 @@ export function startAuthDeliveryWorker(db, {
     running = true;
     try {
       const result = await drainAuthDeliveryOutbox(db, { send, publicOrigin });
-      if (result.failed) console.error('auth_delivery_failed', { count: result.failed });
+      if (result.failed) logEvent('warn', 'auth_delivery_failed', { count: result.failed });
     } catch (error) {
-      console.error('auth_delivery_worker_error', { code: safeCode(error?.code, 'WORKER_ERROR') });
+      logEvent('error', 'auth_delivery_worker_error', { code: safeCode(error?.code, 'WORKER_ERROR') });
     } finally {
       running = false;
     }

@@ -61,7 +61,7 @@ analytics without a fabricated predicted mark, and intervention flags with the r
 out. Both offline (AirDrop task packs) and cloud classrooms.
 
 **The cloud, when you want it.** 71 handlers under `/v1`: accounts with verified email, Google
-and Apple sign-in, cross-device sync, Razorpay and Apple subscriptions with cancellation, classes
+and Apple sign-in on the web (the native shells still use email), cross-device sync, Razorpay and Apple subscriptions with cancellation, classes
 and assignments, a content CMS with independent review, and an admin surface. It runs as one
 container against a persistent SQLite volume and fails closed without its configuration.
 
@@ -134,7 +134,7 @@ row is something the suites or the tools can speak to; the numbers are in
 | **Progress** | Chapter mastery, priorities, activity and streaks in the student's own timezone. No invented board mark or percentile: the India product refuses to show one. |
 | **Teachers** | Classes and assignments targeted at a chapter, dot point and difficulty; class analytics; intervention flags with reasons; printable reports; offline task packs and cloud classrooms. |
 | **Offline** | The whole learning loop runs with the network off, installed as a PWA or as the native iPad app. |
-| **Cloud, optional** | Verified email accounts, Google and Apple sign-in, cross-device sync, Razorpay and Apple subscriptions with cancellation, a content CMS with independent review. |
+| **Cloud, optional** | Verified email accounts, Google and Apple sign-in on the web, cross-device sync, Razorpay and Apple subscriptions with cancellation, a content CMS with independent review. |
 
 
 ## The handwriting engine
@@ -616,10 +616,11 @@ what a reader would reasonably assume is here and is not. None of it is hidden a
   end, but nothing in the app is gated on them: there is no free-tier cap, no paywall, and no
   configured price. Settings still tells the student everything is unlocked.
 
-- **No age or guardian-consent capture.** India's Digital Personal Data Protection Act 2023 treats
-  children's data specially. The app asks for no age band and records no guardian consent, and
-  there are no privacy, terms or refund pages in the product — all of which a subscription store
-  and a payment provider will require.
+- **Guardian consent is an email confirmation, not verification.** India's Digital Personal Data
+  Protection Act 2023 treats everyone under 18 as a child. A cloud account for someone under 18
+  stays closed to every cloud route until a parent or guardian follows an emailed link — which
+  proves mailbox access, not parenthood, so it is not the verifiable consent the Act requires from
+  May 2027. The privacy, terms and refund pages exist but are not legally reviewed.
 
 - **The iPad app has no release pipeline.** The Swift package builds and now carries a real icon
   and a release audit, but there is no signing, archive or TestFlight path in the repository, and

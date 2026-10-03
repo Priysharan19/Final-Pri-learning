@@ -23,7 +23,9 @@
 //     {x,y,w,t,p,azimuth,altitude} when the browser exposes Pencil dynamics.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useImperativeHandle, useRef, useState, forwardRef, useCallback } from 'react';
+import { strokeStarted, strokeMoved, strokeEnded, touchRejected } from './inputMetrics.js';
 import { makePenFilter } from './smooth.js';
+import { useT } from '../i18n/index.js';
 
 const BASE_W = 3.05;          // resting ink width — strong, chalk-on-board
 const MIN_W = 1.5, MAX_W = 7.5;
@@ -31,12 +33,15 @@ const RAW_UPDATE = typeof window !== 'undefined' && 'onpointerrawupdate' in wind
 
 const InkCanvas = forwardRef(function InkCanvas({
   height = 260, guides = true, tool = 'pen', fingerMode = 'auto',
-  onStrokesChange, ariaLabel = 'Writing space'
+  onStrokesChange, ariaLabel = null, disabled = false
 }, ref) {
+  const t = useT();
   const baseRef = useRef(null);        // committed ink
   const liveRef = useRef(null);        // in-progress stroke + prediction
   const wrapRef = useRef(null);
   const strokesRef = useRef([]);
+  const widthRef = useRef(0);          // CSS width the committed strokes are expressed in
+  const disabledRef = useRef(disabled);
   const redoRef = useRef([]);
   const currentRef = useRef(null);     // { points, drawnTo, filter, _cx,_cy,_t,_w }
   const predictedRef = useRef([]);
@@ -52,6 +57,7 @@ const InkCanvas = forwardRef(function InkCanvas({
   const ctxRef = useRef({ base: null, live: null });
   const [, force] = useState(0);
   toolRef.current = tool;
+  disabledRef.current = disabled;
   fingerRef.current = fingerMode;
 
   const notify = useCallback(() => { onStrokesChange?.(strokesRef.current); }, [onStrokesChange]);
@@ -194,6 +200,32 @@ const InkCanvas = forwardRef(function InkCanvas({
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
       const w = wrap.clientWidth;
+      // Rotation, split view or a resized window changes the width under ink
+      // that was written in CSS pixels. Scale it uniformly with the width so
+      // the work keeps its shape instead of being clipped (CP-03).
+      // Widening never pushes ink below the sheet: the factor is clamped so the
+      // lowest point stays inside the canvas height. Points are copied, never
+      // mutated, so snapshots held elsewhere keep their coordinates.
+      const prev = widthRef.current;
+      if (prev > 0 && w > 0 && Math.abs(w - prev) >= 1 && strokesRef.current.length) {
+        let f = w / prev;
+        if (f > 1) {
+          let maxY = 0;
+          for (const stroke of strokesRef.current) for (const pt of stroke?.points || []) maxY = Math.max(maxY, pt.y);
+          if (maxY > 0) f = Math.max(1, Math.min(f, (height - 8) / maxY));
+        }
+        if (Math.abs(f - 1) > 1e-3) {
+          const scale = list => list.map(stroke => ({
+            ...stroke, points: (stroke?.points || []).map(pt => ({ ...pt, x: pt.x * f, y: pt.y * f }))
+          }));
+          strokesRef.current = scale(strokesRef.current);
+          redoRef.current = scale(redoRef.current);
+          // A resolved (disabled) answer is never re-read: its marked reading
+          // and verdict geometry stay exactly as they were marked.
+          if (!disabledRef.current) queueMicrotask(notify);
+        }
+      }
+      if (w > 0) widthRef.current = w;
       for (const c of [baseRef.current, liveRef.current]) {
         if (!c) continue;
         c.width = Math.round(w * dpr);
@@ -209,7 +241,7 @@ const InkCanvas = forwardRef(function InkCanvas({
     const ro = new ResizeObserver(resize);
     ro.observe(wrap);
     return () => ro.disconnect();
-  }, [height, redrawBase, primeContexts]);
+  }, [height, redrawBase, primeContexts, notify]);
 
   // repaint committed ink when the theme flips (this also refreshes cached ink)
   useEffect(() => {
@@ -254,7 +286,11 @@ const InkCanvas = forwardRef(function InkCanvas({
 
     const mayDraw = (e) => {
       if (e.pointerType === 'pen') { penSeenRef.current = true; return true; }
-      if (e.pointerType === 'touch') return fingerRef.current === 'finger' || !penSeenRef.current;
+      if (e.pointerType === 'touch') {
+        const allowed = fingerRef.current === 'finger' || !penSeenRef.current;
+        if (!allowed) touchRejected();
+        return allowed;
+      }
       return true;   // mouse / trackpad
     };
 
@@ -298,6 +334,7 @@ const InkCanvas = forwardRef(function InkCanvas({
       };
       redoRef.current = [];
       predictedRef.current = [];
+      strokeStarted(e);
       clearLive();
       dirtyRef.current = true;
       scheduleFrame();
@@ -315,6 +352,7 @@ const InkCanvas = forwardRef(function InkCanvas({
       // being dropped on the floor.
       const coalesced = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
       const events = coalesced && coalesced.length ? coalesced : [e];
+      strokeMoved(e, events);
       for (const ev of events) {
         const raw = local(ev);
         const pt = cur.filter(raw.x, raw.y, ev.timeStamp || 0);
@@ -365,6 +403,8 @@ const InkCanvas = forwardRef(function InkCanvas({
           paintStroke(ctxRef.current.base, points, inkRef.current);
           notify();
         }
+        // Measured only after the stroke is safely committed.
+        strokeEnded(e, { cancelled: e.type === 'pointercancel', kept: points.length });
         clearLive();
         force(x => x + 1);
       }
@@ -421,7 +461,7 @@ const InkCanvas = forwardRef(function InkCanvas({
       className={`ink-wrap ${guides ? 'ink-ruled' : ''}`}
       style={{ height }}
       role="img"
-      aria-label={ariaLabel}
+      aria-label={ariaLabel ?? t('ink.writingSpace')}
     >
       <canvas ref={baseRef} className="ink-canvas ink-canvas-base" aria-hidden="true" />
       <canvas

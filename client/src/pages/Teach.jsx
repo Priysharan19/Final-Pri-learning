@@ -8,15 +8,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
-import { downloadJSON, readJSONFile, readTextFile, dateStamp } from '../lib/files.js';
+import { downloadJSON, readJSONFile, readTextFile, dateStamp, printPage } from '../lib/files.js';
 import { parseRoster } from '../lib/csv.js';
 import { MathText } from '../lib/latex.jsx';
 import { CURRICULUM } from '../engine/curriculum.js';
 import { assignmentSections, describeTaskTargets, sectionKeyForChapter } from '../platform/assignmentTarget.js';
 import ClassroomPanel from '../components/ClassroomPanel.jsx';
+import { tLater, translate, useT, useTx } from '../i18n/index.js';
 
-const classWord = course => (course === 'in' ? 'Class' : 'Year');
-const yearLabel = s => (s?.year ? `${classWord(s.course)} ${s.year}` : '—');
+// Resolved at render time through translate(), so it follows the current language.
+const yearLabel = s => (s?.year ? translate(s.course === 'in' ? 'common.classNumber' : 'common.yearNumber', { n: s.year }) : '—');
 const localeFor = course => (course === 'in' ? 'en-IN' : 'en-AU');
 const shortDate = (ms, course = 'in') => (ms ? new Date(ms).toLocaleDateString(localeFor(course), { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
 const pct = v => (v == null ? '—' : `${v}%`);
@@ -40,12 +41,13 @@ const sheetTd = { borderBottom: '1px solid #ddd', padding: '6px 6px', verticalAl
 
 /** A printable sheet on the app's print stylesheet: only the sheet prints. */
 function PrintSheet({ title, subtitle, onClose, children }) {
+  const t = useT();
   return (
     <div className="paper-overlay" role="dialog" aria-modal="true" aria-labelledby="teach-print-title">
       <div className="paper-sheet">
         <div className="row no-print" style={{ marginBottom: 14, gap: 8 }}>
-          <button className="btn btn-primary btn-sm" onClick={() => window.print()}>Print / save PDF</button>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>Close</button>
+          <button className="btn btn-primary btn-sm" onClick={() => { printPage().catch(() => {}); }}>{t('teach.printSavePdf')}</button>
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>{t('nav.close')}</button>
         </div>
         <h2 id="teach-print-title" style={{ margin: '0 0 4px', color: '#111' }}>{title}</h2>
         <div style={{ color: '#555', marginBottom: 16 }}>{subtitle}</div>
@@ -57,25 +59,26 @@ function PrintSheet({ title, subtitle, onClose, children }) {
 
 function ClassReport({ analytics, onClose }) {
   const india = analytics.syllabus !== 'nsw';
+  const t = useT();
   const generated = new Date(analytics.generatedAt || Date.now()).toLocaleString(india ? 'en-IN' : 'en-AU');
   return (
-    <PrintSheet title={`Class report — ${analytics.class.name}`} subtitle={`${analytics.students.length} student${analytics.students.length === 1 ? '' : 's'} · generated ${generated} · Pri Learning`} onClose={onClose}>
+    <PrintSheet title={t('teach.classReportTitle', { name: analytics.class.name })} subtitle={t('teach.classReportSubtitle', { count: analytics.students.length, n: analytics.students.length, date: generated })} onClose={onClose}>
       <table style={sheetTable}>
         <thead><tr>
-          <th style={sheetTh}>Student</th><th style={sheetTh}>Class</th>{!india && <th style={sheetTh}>Predicted</th>}
-          <th style={sheetTh}>Answered</th><th style={sheetTh}>Accuracy</th><th style={sheetTh}>Active days (28d)</th>
-          {india && <th style={sheetTh}>Chapter mastery</th>}<th style={sheetTh}>Weakest</th><th style={sheetTh}>Needs attention</th>
+          <th style={sheetTh}>{t('teach.student')}</th><th style={sheetTh}>{t('common.class')}</th>{!india && <th style={sheetTh}>{t('teach.predicted')}</th>}
+          <th style={sheetTh}>{t('teach.answered')}</th><th style={sheetTh}>{t('common.accuracy')}</th><th style={sheetTh}>{t('teach.activeDays28d')}</th>
+          {india && <th style={sheetTh}>{t('teach.chapterMastery')}</th>}<th style={sheetTh}>{t('teach.weakest')}</th><th style={sheetTh}>{t('teach.needsAttention')}</th>
         </tr></thead>
         <tbody>
           {analytics.students.map(s => (
             <tr key={s.id}>
-              <td style={sheetTd}>{s.name}{s.imported ? ' (file)' : ''}</td>
+              <td style={sheetTd}>{s.name}{s.imported ? t('teach.fileSuffix') : ''}</td>
               <td style={sheetTd}>{yearLabel(s)}</td>
               {!india && <td style={sheetTd}>{s.predicted == null ? '—' : `${s.predicted}/100`}</td>}
               <td style={sheetTd}>{s.attempts}</td>
               <td style={sheetTd}>{pct(s.accuracy)}</td>
               <td style={sheetTd}>{s.activeDays == null ? '—' : s.activeDays}</td>
-              {india && <td style={sheetTd}>{s.evidence ? `${pct(s.evidence.mastery)} · ${s.evidence.chaptersStarted}/${s.evidence.chaptersTotal} started` : '—'}</td>}
+              {india && <td style={sheetTd}>{s.evidence ? `${pct(s.evidence.mastery)} ${t('teach.startedOfTotal', { started: s.evidence.chaptersStarted, total: s.evidence.chaptersTotal })}` : '—'}</td>}
               <td style={sheetTd}>{s.weakestChapters?.length ? s.weakestChapters.map(c => c.name).join(', ') : s.weakest}</td>
               <td style={sheetTd}>{s.flags?.length ? s.flags.map(f => f.reason).join(' ') : '—'}</td>
             </tr>
@@ -84,62 +87,65 @@ function ClassReport({ analytics, onClose }) {
       </table>
       {analytics.chapters?.length > 0 && (
         <>
-          <h3 style={{ margin: '20px 0 6px', color: '#111' }}>Chapters this class finds hardest</h3>
+          <h3 style={{ margin: '20px 0 6px', color: '#111' }}>{t('teach.hardestChapters')}</h3>
           <table style={sheetTable}>
-            <thead><tr><th style={sheetTh}>Chapter</th><th style={sheetTh}>Students</th><th style={sheetTh}>Attempts</th><th style={sheetTh}>Accuracy</th><th style={sheetTh}>Mastery</th></tr></thead>
+            <thead><tr><th style={sheetTh}>{t('teach.chapter')}</th><th style={sheetTh}>{t('teach.students')}</th><th style={sheetTh}>{t('common.attempts')}</th><th style={sheetTh}>{t('common.accuracy')}</th><th style={sheetTh}>{t('teach.mastery')}</th></tr></thead>
             <tbody>{analytics.chapters.map(c => (
               <tr key={c.id}><td style={sheetTd}>{c.name}</td><td style={sheetTd}>{c.students}</td><td style={sheetTd}>{c.attempts}</td><td style={sheetTd}>{pct(c.accuracy)}</td><td style={sheetTd}>{pct(c.mastery)}</td></tr>
             ))}</tbody>
           </table>
         </>
       )}
-      {india && <p style={{ color: '#555', fontSize: 12, marginTop: 16 }}>No predicted board or JEE score is shown: Pri Learning reports demonstrated attempts, accuracy and chapter mastery only.</p>}
+      {india && <p style={{ color: '#555', fontSize: 12, marginTop: 16 }}>{t('teach.noPredictionClassReport')}</p>}
     </PrintSheet>
   );
 }
 
 function StudentReport({ analytics, student, onClose }) {
+  const t = useT();
   const india = student.course === 'in';
   const chapters = (student.chapters || []).filter(c => c.attempts > 0).sort((a, b) => a.mastery - b.mastery);
-  const tasks = (analytics.tasks || []).map(t => ({ ...t, mine: t.progress.find(p => p.pid === student.id) })).filter(t => t.mine);
+  const tasks = (analytics.tasks || []).map(task => ({ ...task, mine: task.progress.find(p => p.pid === student.id) })).filter(task => task.mine);
   return (
-    <PrintSheet title={`${student.name} — progress report`} subtitle={`${student.courseLabel || yearLabel(student)} · ${analytics.class.name} · ${shortDate(analytics.generatedAt, student.course)}`} onClose={onClose}>
+    <PrintSheet title={t('teach.studentReportTitle', { name: student.name })} subtitle={`${student.courseLabel || yearLabel(student)} · ${analytics.class.name} · ${shortDate(analytics.generatedAt, student.course)}`} onClose={onClose}>
       <table style={sheetTable}>
         <tbody>
-          <tr><td style={sheetTd}><b>Questions answered</b></td><td style={sheetTd}>{student.attempts} ({student.correct} correct · {pct(student.accuracy)})</td></tr>
-          <tr><td style={sheetTd}><b>Active days (last 28)</b></td><td style={sheetTd}>{student.activeDays == null ? 'not in the file' : student.activeDays} · streak {student.streak} day{student.streak === 1 ? '' : 's'}</td></tr>
-          {india && student.evidence && <tr><td style={sheetTd}><b>Chapters</b></td><td style={sheetTd}>{student.evidence.chaptersStarted}/{student.evidence.chaptersTotal} started · {student.evidence.chaptersPractised} practised (5+ attempts) · mastery {pct(student.evidence.mastery)}</td></tr>}
-          {!india && <tr><td style={sheetTd}><b>Predicted</b></td><td style={sheetTd}>{student.predicted == null ? '—' : `${student.predicted}/100`}</td></tr>}
-          <tr><td style={sheetTd}><b>Needs attention</b></td><td style={sheetTd}>{student.flags?.length ? student.flags.map(f => <div key={f.code}>{f.label} — {f.reason}</div>) : 'Nothing flagged.'}</td></tr>
+          <tr><td style={sheetTd}><b>{t('teach.questionsAnswered')}</b></td><td style={sheetTd}>{t('teach.attemptsCorrect', { attempts: student.attempts, correct: student.correct, accuracy: pct(student.accuracy) })}</td></tr>
+          <tr><td style={sheetTd}><b>{t('teach.activeDaysLast28')}</b></td><td style={sheetTd}>{t('teach.activeDaysStreak', { count: student.streak, n: student.streak, days: student.activeDays == null ? t('teach.notInFile') : student.activeDays })}</td></tr>
+          {india && student.evidence && <tr><td style={sheetTd}><b>{t('teach.chapters')}</b></td><td style={sheetTd}>{t('teach.chaptersEvidence', { started: student.evidence.chaptersStarted, total: student.evidence.chaptersTotal, practised: student.evidence.chaptersPractised, mastery: pct(student.evidence.mastery) })}</td></tr>}
+          {!india && <tr><td style={sheetTd}><b>{t('teach.predicted')}</b></td><td style={sheetTd}>{student.predicted == null ? '—' : `${student.predicted}/100`}</td></tr>}
+          <tr><td style={sheetTd}><b>{t('teach.needsAttention')}</b></td><td style={sheetTd}>{student.flags?.length ? student.flags.map(f => <div key={f.code}>{f.label} — {f.reason}</div>) : t('teach.nothingFlagged')}</td></tr>
         </tbody>
       </table>
       {chapters.length > 0 && (
         <>
-          <h3 style={{ margin: '20px 0 6px', color: '#111' }}>Chapters practised</h3>
+          <h3 style={{ margin: '20px 0 6px', color: '#111' }}>{t('progress.chaptersPractised')}</h3>
           <table style={sheetTable}>
-            <thead><tr><th style={sheetTh}>Chapter</th><th style={sheetTh}>Attempts</th><th style={sheetTh}>Accuracy</th><th style={sheetTh}>Mastery</th></tr></thead>
+            <thead><tr><th style={sheetTh}>{t('teach.chapter')}</th><th style={sheetTh}>{t('common.attempts')}</th><th style={sheetTh}>{t('common.accuracy')}</th><th style={sheetTh}>{t('teach.mastery')}</th></tr></thead>
             <tbody>{chapters.map(c => <tr key={c.id}><td style={sheetTd}>{c.name}</td><td style={sheetTd}>{c.attempts}</td><td style={sheetTd}>{pct(c.accuracy)}</td><td style={sheetTd}>{pct(c.mastery)} · {c.band}</td></tr>)}</tbody>
           </table>
         </>
       )}
       {student.misconceptions?.length > 0 && (
         <>
-          <h3 style={{ margin: '20px 0 6px', color: '#111' }}>Repeated mistakes</h3>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>{student.misconceptions.map(m => <li key={m.key}>{m.label} — {m.count}× in {m.subtopicName}</li>)}</ul>
+          <h3 style={{ margin: '20px 0 6px', color: '#111' }}>{t('teach.repeatedMistakes')}</h3>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>{student.misconceptions.map(m => <li key={`${m.subtopic}:${m.key}`}>{t('teach.mistakeLine', { label: m.label, count: m.count, subtopic: m.subtopicName })}</li>)}</ul>
         </>
       )}
       {tasks.length > 0 && (
         <>
-          <h3 style={{ margin: '20px 0 6px', color: '#111' }}>Tasks</h3>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>{tasks.map(t => <li key={t.id}>{t.title}: {t.mine.done}/{t.count}{t.mine.finished ? ' ✓' : t.overdue ? ' · overdue' : ''}</li>)}</ul>
+          <h3 style={{ margin: '20px 0 6px', color: '#111' }}>{t('tasks.title')}</h3>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>{tasks.map(task => <li key={task.id}>{task.title}: {task.mine.done}/{task.count}{task.mine.finished ? ' ✓' : task.overdue ? t('teach.overdueSuffix') : ''}</li>)}</ul>
         </>
       )}
-      {india && <p style={{ color: '#555', fontSize: 12, marginTop: 16 }}>No predicted board or JEE score: this report is demonstrated evidence only.</p>}
+      {india && <p style={{ color: '#555', fontSize: 12, marginTop: 16 }}>{t('teach.noPredictionStudentReport')}</p>}
     </PrintSheet>
   );
 }
 
 export default function Teach() {
+  const t = useT();
+  const tx = useTx();
   const { user } = useApp();
   const [data, setData] = useState(null);        // {classes, allProfiles}
   const [analytics, setAnalytics] = useState(null);
@@ -170,7 +176,7 @@ export default function Teach() {
   useEffect(() => { refreshAnalytics(selClass); }, [selClass]); // eslint-disable-line
 
   const cls = data?.classes.find(c => c.id === selClass);
-  const flash = t => { setMsg(t); setTimeout(() => setMsg(''), 2500); };
+  const flash = text => { setMsg(text); setTimeout(() => setMsg(''), 2500); };
 
   // The syllabus the task picker opens on: India when the teacher or any
   // student in the class is on the India product (or the class is still
@@ -218,13 +224,13 @@ export default function Teach() {
       difficulty: taskForm.difficulty
     })) : [];
     await api.post('/tasks', {
-      classId: selClass, title: taskForm.title || 'Class task',
+      classId: selClass, title: taskForm.title || t('classes.classTask'),
       subtopics: india ? [] : taskForm.subtopics, targets, customIds: taskForm.customIds,
       count: taskForm.customIds.length || taskForm.count,
       dueAt: Date.now() + taskForm.days * 86400000
     });
     setTaskForm(f => ({ ...EMPTY_TASK, syllabus: f.syllabus, sectionKey: f.sectionKey }));
-    flash('Task assigned ✓');
+    flash(t('teach.taskAssigned'));
     refreshAnalytics();
   }
 
@@ -236,9 +242,9 @@ export default function Teach() {
     setTaskForm(f => ({
       ...f, syllabus: 'in', sectionKey: sectionKeyForChapter(weakest[0].id, track) || f.sectionKey,
       chapters: weakest.map(c => c.id), dotpoint: null, subtopics: [], customIds: [],
-      title: `Weakest chapters: ${weakest.map(c => c.name).join(', ')}`.slice(0, 80)
+      title: t('teach.weakestTaskTitle', { names: weakest.map(c => c.name).join(', ') }).slice(0, 80)
     }));
-    flash('Task form filled from class analytics');
+    flash(t('teach.formFilled'));
   }
 
   async function saveCustomQ() {
@@ -253,7 +259,7 @@ export default function Teach() {
     await api.post('/custom-questions', body);
     setShowQBuilder(false);
     setQForm({ name: '', prompt: '', answerType: 'numeric', value: '', expr: '', mcqOptions: ['', '', '', ''], correctIndex: 0, solutionText: '', hint: '', difficulty: 2 });
-    flash('Question saved ✓');
+    flash(t('teach.questionSaved'));
     load();
   }
 
@@ -263,11 +269,11 @@ export default function Teach() {
     if (!f || !selClass) return;
     try {
       const rows = parseRoster(await readTextFile(f));
-      if (!rows.length) throw new Error('No names found in that file. One student per line: name, class, track.');
+      if (!rows.length) throw new Error(t('teach.rosterEmpty'));
       const r = await api.post(`/classes/${selClass}/roster`, { rows });
       await load();
       refreshAnalytics();
-      flash(`Roster imported — ${r.matched} matched, ${r.created} created, ${r.skipped} skipped`);
+      flash(t('teach.rosterImported', { matched: r.matched, created: r.created, skipped: r.skipped }));
     } catch (err) { setMsg(`⚠️ ${err.message}`); }
   }
 
@@ -278,41 +284,41 @@ export default function Teach() {
   return (
     <div className="grid" style={{ gap: 18 }}>
       <header className="teacher-workspace-head">
-        <div className="hero-kicker">Teacher workspace</div>
-        <h1>Plan, assign and understand learning</h1>
-        <p className="muted">Classes, assignments, reports and question tools in one focused workspace.</p>
+        <div className="hero-kicker">{t('nav.teacherWorkspace')}</div>
+        <h1>{t('teach.heroTitle')}</h1>
+        <p className="muted">{t('teach.heroSub')}</p>
       </header>
       {msg && <div className="card" role="status" style={{ padding: '10px 16px', color: 'var(--good)', fontWeight: 650 }}>{msg}</div>}
 
       <div id="teacher-classes" tabIndex={-1} className="grid cols-2 teacher-anchor" style={{ alignItems: 'start' }}>
         <div className="card">
-          <div className="card-title">Your classes</div>
+          <div className="card-title">{t('teach.yourClasses')}</div>
           {data?.classes.map(c => (
             <div key={c.id} className="prio-item">
-              <span className="prio-rank">{c.students.length}<span className="sr-only"> students</span></span>
+              <span className="prio-rank">{c.students.length}<span className="sr-only">{t('teach.studentsSr')}</span></span>
               <button onClick={() => setSelClass(c.id)} aria-pressed={selClass === c.id}
                 style={{ flex: 1, background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
                 <div style={{ fontWeight: 650 }}>{c.name}</div>
-                <div className="muted" style={{ fontSize: 12.5 }}>{c.students.map(s => s.name).join(', ') || 'No students yet'}</div>
+                <div className="muted" style={{ fontSize: 12.5 }}>{c.students.map(s => s.name).join(', ') || t('teach.noStudentsYet')}</div>
               </button>
-              {selClass === c.id && <span className="tag tag-brand">selected</span>}
+              {selClass === c.id && <span className="tag tag-brand">{t('teach.selected')}</span>}
             </div>
           ))}
           <div className="row" style={{ marginTop: 12 }}>
-            <input className="input" aria-label="New class name" placeholder="New class name (e.g. Class 10 A)" value={newClass}
+            <input className="input" aria-label={t('teach.newClassName')} placeholder={t('teach.newClassPlaceholder')} value={newClass}
               onChange={e => setNewClass(e.target.value)} onKeyDown={e => e.key === 'Enter' && createClass()} />
-            <button className="btn btn-primary" onClick={createClass}>Create</button>
+            <button className="btn btn-primary" onClick={createClass}>{t('teach.create')}</button>
           </div>
         </div>
 
         <div className="card">
           <div className="spread">
-            <div className="card-title" style={{ marginBottom: 0 }}>Students in {cls ? cls.name : '…'}</div>
-            {cls && <button className="btn btn-ghost btn-sm" onClick={() => rosterRef.current?.click()} title="A CSV or text file, one student per line: name, class, track">📋 Import roster (CSV)</button>}
+            <div className="card-title" style={{ marginBottom: 0 }}>{t('teach.studentsIn', { name: cls ? cls.name : '…' })}</div>
+            {cls && <button className="btn btn-ghost btn-sm" onClick={() => rosterRef.current?.click()} title={t('teach.importRosterTitle')}>{t('teach.importRoster')}</button>}
           </div>
           <input ref={rosterRef} type="file" accept=".csv,.txt,text/csv,text/plain" style={{ display: 'none' }} onChange={importRoster} />
-          {!cls && <p className="muted">Select or create a class, then add student profiles from this device or import a roster.</p>}
-          {cls && <p className="muted" style={{ fontSize: 12.5, margin: '6px 0 8px' }}>Roster files: one student per line — <code>name, class, track</code> (track: cbse, jee-main, jee-advanced, olympiad). Names already on this device join; new names get a student profile.</p>}
+          {!cls && <p className="muted">{t('teach.selectClassFirst')}</p>}
+          {cls && <p className="muted" style={{ fontSize: 12.5, margin: '6px 0 8px' }}>{tx('teach.rosterHelp', { format: <code>name, class, track</code> })}</p>}
           {cls && (data?.allProfiles || []).map(p => {
             const inClass = cls.studentPids.includes(p.id);
             return (
@@ -323,39 +329,39 @@ export default function Teach() {
                   <div className="muted" style={{ fontSize: 12 }}>{yearLabel(p)}{p.course === 'in' && p.indiaTrack && p.indiaTrack !== 'cbse' ? ` · ${p.indiaTrack}` : ''}</div>
                 </div>
                 <button className={`btn btn-sm ${inClass ? 'btn-ghost' : 'btn-primary'}`} onClick={() => toggleStudent(p.id, inClass)}>
-                  {inClass ? 'Remove' : 'Add'}
+                  {inClass ? t('teach.remove') : t('teach.add')}
                 </button>
               </div>
             );
           })}
-          {cls && !(data?.allProfiles || []).length && <p className="muted">No student profiles on this device yet — create some from the profile screen or import a roster.</p>}
+          {cls && !(data?.allProfiles || []).length && <p className="muted">{t('teach.noProfiles')}</p>}
         </div>
       </div>
 
       {!cls && (
         <div id="teacher-assignments" tabIndex={-1} className="card teacher-anchor">
-          <div className="card-title">Assignments</div>
-          <p className="muted">Select or create a class above to build and assign real practice.</p>
+          <div className="card-title">{t('nav.teacherAssignments')}</div>
+          <p className="muted">{t('teach.selectClassAssign')}</p>
         </div>
       )}
       {cls && (
         <div id="teacher-assignments" tabIndex={-1} className="card teacher-anchor">
-          <div className="card-title">Assign a task to {cls.name}</div>
+          <div className="card-title">{t('teach.assignTo', { name: cls.name })}</div>
           <div className="grid cols-2" style={{ gap: 14 }}>
             <div>
               <div className="field">
-                <label className="label" htmlFor="teach-task-title">Title</label>
-                <input className="input" id="teach-task-title" value={taskForm.title} placeholder="e.g. Quadratic equations revision"
+                <label className="label" htmlFor="teach-task-title">{t('teach.title')}</label>
+                <input className="input" id="teach-task-title" value={taskForm.title} placeholder={t('teach.titlePlaceholder')}
                   onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))} />
               </div>
               <div className="grid cols-2" style={{ gap: 10 }}>
                 <div className="field">
-                  <label className="label" htmlFor="teach-task-count">Questions — {taskForm.count}</label>
+                  <label className="label" htmlFor="teach-task-count">{t('tasks.questionCount', { n: taskForm.count })}</label>
                   <input type="range" id="teach-task-count" min="5" max="30" step="5" value={taskForm.count} style={{ width: '100%', accentColor: 'var(--brand-1)' }}
                     onChange={e => setTaskForm(f => ({ ...f, count: Number(e.target.value) }))} disabled={taskForm.customIds.length > 0} />
                 </div>
                 <div className="field">
-                  <label className="label" htmlFor="teach-task-days">Due in — {taskForm.days} days</label>
+                  <label className="label" htmlFor="teach-task-days">{t('teach.dueInDays', { count: taskForm.days, n: taskForm.days })}</label>
                   <input type="range" id="teach-task-days" min="1" max="21" value={taskForm.days} style={{ width: '100%', accentColor: 'var(--brand-1)' }}
                     onChange={e => setTaskForm(f => ({ ...f, days: Number(e.target.value) }))} />
                 </div>
@@ -363,19 +369,19 @@ export default function Teach() {
               {taskForm.syllabus === 'in' && (
                 <div className="grid cols-2" style={{ gap: 10 }}>
                   <div className="field">
-                    <div className="label" id="teach-difficulty">Difficulty</div>
+                    <div className="label" id="teach-difficulty">{t('common.difficulty')}</div>
                     <div className="pill-select" role="group" aria-labelledby="teach-difficulty">
                       {[null, ...Array.from({ length: section?.difficultyCeiling || 3 }, (_, i) => i + 1)].map(d => (
                         <button key={String(d)} className={`pill-opt ${taskForm.difficulty === d ? 'on' : ''}`} aria-pressed={taskForm.difficulty === d}
-                          onClick={() => setTaskForm(f => ({ ...f, difficulty: d }))}>{d == null ? 'Adaptive' : `D${d}`}</button>
+                          onClick={() => setTaskForm(f => ({ ...f, difficulty: d }))}>{d == null ? t('common.adaptive') : t('teach.difficultyLevel', { n: d })}</button>
                       ))}
                     </div>
                   </div>
                   {soleChapter && (
                     <div className="field">
-                      <div className="label" id="teach-dotpoint">Dot point in {soleChapter.name}</div>
+                      <div className="label" id="teach-dotpoint">{t('tasks.dotpointIn', { chapter: soleChapter.name })}</div>
                       <div className="pill-select" role="group" aria-labelledby="teach-dotpoint">
-                        <button className={`pill-opt ${taskForm.dotpoint == null ? 'on' : ''}`} aria-pressed={taskForm.dotpoint == null} onClick={() => setTaskForm(f => ({ ...f, dotpoint: null }))}>Whole chapter</button>
+                        <button className={`pill-opt ${taskForm.dotpoint == null ? 'on' : ''}`} aria-pressed={taskForm.dotpoint == null} onClick={() => setTaskForm(f => ({ ...f, dotpoint: null }))}>{t('tasks.wholeChapter')}</button>
                         {soleChapter.dotpoints.map((text, i) => (
                           <button key={i} className={`pill-opt ${taskForm.dotpoint === i ? 'on' : ''}`} aria-pressed={taskForm.dotpoint === i} title={text}
                             onClick={() => setTaskForm(f => ({ ...f, dotpoint: i }))}>{i + 1}. {text.length > 38 ? `${text.slice(0, 36)}…` : text}</button>
@@ -387,7 +393,7 @@ export default function Teach() {
               )}
               {customs.length > 0 && (
                 <div className="field">
-                  <div className="label" id="teach-customs">Or use your custom questions</div>
+                  <div className="label" id="teach-customs">{t('teach.orCustom')}</div>
                   <div className="pill-select" role="group" aria-labelledby="teach-customs">
                     {customs.map(c => (
                       <button key={c.id} className={`pill-opt ${taskForm.customIds.includes(c.id) ? 'on' : ''}`}
@@ -399,32 +405,32 @@ export default function Teach() {
                 </div>
               )}
               <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-                <button className="btn btn-primary" disabled={!canAssign} onClick={assignTask}>Assign task</button>
+                <button className="btn btn-primary" disabled={!canAssign} onClick={assignTask}>{t('teach.assignTask')}</button>
                 {analytics?.weakestChapters?.length > 0 && (
-                  <button className="btn btn-ghost" onClick={assignWeakest} title={analytics.weakestChapters.slice(0, 3).map(c => `${c.name} (${c.accuracy}% accuracy)`).join(', ')}>
-                    Assign the three weakest chapters
+                  <button className="btn btn-ghost" onClick={assignWeakest} title={analytics.weakestChapters.slice(0, 3).map(c => t('teach.weakestAccuracy', { name: c.name, n: c.accuracy })).join(', ')}>
+                    {t('teach.assignWeakest')}
                   </button>
                 )}
               </div>
             </div>
             <div>
               <div className="field">
-                <div className="label" id="teach-syllabus">Syllabus</div>
+                <div className="label" id="teach-syllabus">{t('settings.syllabus')}</div>
                 <div className="pill-select" role="group" aria-labelledby="teach-syllabus">
-                  <button className={`pill-opt ${taskForm.syllabus === 'in' ? 'on' : ''}`} aria-pressed={taskForm.syllabus === 'in'} onClick={() => setTaskForm(f => ({ ...f, syllabus: 'in' }))}>India · NCERT / JEE / Olympiad</button>
-                  <button className={`pill-opt ${taskForm.syllabus === 'nsw' ? 'on' : ''}`} aria-pressed={taskForm.syllabus === 'nsw'} onClick={() => setTaskForm(f => ({ ...f, syllabus: 'nsw' }))}>NSW · HSC</button>
+                  <button className={`pill-opt ${taskForm.syllabus === 'in' ? 'on' : ''}`} aria-pressed={taskForm.syllabus === 'in'} onClick={() => setTaskForm(f => ({ ...f, syllabus: 'in' }))}>{t('teach.syllabusIndia')}</button>
+                  <button className={`pill-opt ${taskForm.syllabus === 'nsw' ? 'on' : ''}`} aria-pressed={taskForm.syllabus === 'nsw'} onClick={() => setTaskForm(f => ({ ...f, syllabus: 'nsw' }))}>{t('teach.syllabusNsw')}</button>
                 </div>
               </div>
               {taskForm.syllabus === 'in' ? (
                 <>
                   <div className="field">
-                    <label className="label" htmlFor="teach-section">Class / track</label>
+                    <label className="label" htmlFor="teach-section">{t('tasks.classOrTrack')}</label>
                     <select className="input" id="teach-section" value={taskForm.sectionKey} onChange={e => setTaskForm(f => ({ ...f, sectionKey: e.target.value, dotpoint: null }))}>
                       {sections.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
                     </select>
                   </div>
                   <div className="field">
-                    <div className="label" id="teach-topics">Chapters ({taskForm.chapters.length} selected)</div>
+                    <div className="label" id="teach-topics">{t('tasks.chaptersSelected', { n: taskForm.chapters.length })}</div>
                     <div className="pill-select" role="group" aria-labelledby="teach-topics" style={{ maxHeight: 220, overflowY: 'auto' }}>
                       {(section?.chapters || []).map(ch => (
                         <button key={ch.id} className={`pill-opt ${taskForm.chapters.includes(ch.id) ? 'on' : ''}`} aria-pressed={taskForm.chapters.includes(ch.id)}
@@ -435,19 +441,19 @@ export default function Teach() {
                     </div>
                     {selectedChapters.length > 0 && (
                       <p className="muted" style={{ fontSize: 12.5, margin: '8px 0 0' }}>
-                        Selected: {describeTaskTargets(taskForm.chapters.map(id => ({ chapterId: id, dotpoint: soleChapter ? taskForm.dotpoint : null, track: section?.track, difficulty: taskForm.difficulty })))}
+                        {t('teach.selectedTargets', { targets: describeTaskTargets(taskForm.chapters.map(id => ({ chapterId: id, dotpoint: soleChapter ? taskForm.dotpoint : null, track: section?.track, difficulty: taskForm.difficulty }))) })}
                       </p>
                     )}
                   </div>
                 </>
               ) : (
                 <div className="field">
-                  <div className="label" id="teach-topics">Generated topics ({taskForm.subtopics.length})</div>
+                  <div className="label" id="teach-topics">{t('teach.generatedTopics', { n: taskForm.subtopics.length })}</div>
                   <div className="pill-select" role="group" aria-labelledby="teach-topics" style={{ maxHeight: 260, overflowY: 'auto' }}>
                     {allSubtopics.map(s => (
                       <button key={s.id} className={`pill-opt ${taskForm.subtopics.includes(s.id) ? 'on' : ''}`}
                         onClick={() => setTaskForm(f => ({ ...f, subtopics: f.subtopics.includes(s.id) ? f.subtopics.filter(x => x !== s.id) : [...f.subtopics, s.id] }))}>
-                        Y{s.year} · {s.name}
+                        {t('teach.yearTopic', { year: s.year, name: s.name })}
                       </button>
                     ))}
                   </div>
@@ -460,17 +466,17 @@ export default function Teach() {
 
       {!analytics && (
         <div id="teacher-analytics" tabIndex={-1} className="card teacher-anchor">
-          <div className="card-title">Analytics & reports</div>
-          <p className="muted">Select a class above to see demonstrated progress, attention flags and reports.</p>
+          <div className="card-title">{t('nav.teacherAnalytics')}</div>
+          <p className="muted">{t('teach.selectClassAnalytics')}</p>
         </div>
       )}
       {analytics && (
         <div id="teacher-analytics" tabIndex={-1} className="card teacher-anchor">
           <div className="spread" style={{ flexWrap: 'wrap', gap: 8 }}>
-            <div className="card-title" style={{ marginBottom: 0 }}>Class analytics — {analytics.class.name}</div>
+            <div className="card-title" style={{ marginBottom: 0 }}>{t('teach.classAnalytics', { name: analytics.class.name })}</div>
             <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setSheet({ kind: 'class' })} disabled={!analytics.students.length}>🖨 Print class report</button>
-              <button className="btn btn-ghost btn-sm" onClick={() => progressRef.current?.click()}>📥 Import progress file</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setSheet({ kind: 'class' })} disabled={!analytics.students.length}>{t('teach.printClassReport')}</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => progressRef.current?.click()}>{t('teach.importProgress')}</button>
             </div>
           </div>
           {/* a hidden file input behind a <label> is a control a keyboard cannot
@@ -483,18 +489,18 @@ export default function Teach() {
                   try {
                     const data = await readJSONFile(f);
                     const r = await api.post(`/classes/${selClass}/import-progress`, data);
-                    setMsg(`✅ Imported progress for ${r.student}`);
+                    setMsg(tLater('teach.importedProgressFor', { student: r.student }));
                     refreshAnalytics();
                   } catch (err) { setMsg(`⚠️ ${err.message}`); }
                 }} />
           <p className="muted" style={{ margin: '6px 0 10px' }}>
-            Students on other iPads export a progress file from Settings — import it here and they appear below alongside on-device profiles.
-            {indiaClass && ' No predicted board or JEE score is shown for Indian students: the table is demonstrated evidence — attempts, accuracy, active days and chapter mastery.'}
+            {t('teach.progressImportNote')}
+            {indiaClass && ` ${t('teach.noPredictionIndia')}`}
           </p>
 
           {analytics.attention?.length > 0 && (
             <div className="notice" style={{ marginBottom: 12 }}>
-              <strong>Needs attention</strong>
+              <strong>{t('teach.needsAttention')}</strong>
               <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
                 {analytics.attention.map(a => (
                   <li key={a.id}>{a.name}: {a.flags.map(f => f.reason).join(' ')}</li>
@@ -506,35 +512,35 @@ export default function Teach() {
           <div style={{ overflowX: 'auto' }}>
             <table className="table">
               <thead><tr>
-                <th>Student</th>{!indiaClass && <th>Predicted</th>}<th>Answered</th><th>Accuracy</th><th>Active days</th><th>Streak</th>
-                {indiaClass && <th>Chapter mastery</th>}<th>Weakest {indiaClass ? 'chapters' : 'area'}</th><th>Flags</th><th><span className="sr-only">Report</span></th>
+                <th>{t('teach.student')}</th>{!indiaClass && <th>{t('teach.predicted')}</th>}<th>{t('teach.answered')}</th><th>{t('common.accuracy')}</th><th>{t('teach.activeDays')}</th><th>{t('teach.streak')}</th>
+                {indiaClass && <th>{t('teach.chapterMastery')}</th>}<th>{indiaClass ? t('teach.weakestChapters') : t('teach.weakestArea')}</th><th>{t('teach.flags')}</th><th><span className="sr-only">{t('teach.report')}</span></th>
               </tr></thead>
               <tbody>
                 {analytics.students.map(s => (
                   <tr key={s.id}>
-                    <td>{s.avatar} {s.name} <span className="muted">{yearLabel(s)}</span>{s.imported && <span className="tag" style={{ marginLeft: 6 }} title={`Imported ${shortDate(s.importedAt, s.course)}`}>📄 file</span>}</td>
+                    <td>{s.avatar} {s.name} <span className="muted">{yearLabel(s)}</span>{s.imported && <span className="tag" style={{ marginLeft: 6 }} title={t('teach.importedOn', { date: shortDate(s.importedAt, s.course) })}>{t('teach.fileTag')}</span>}</td>
                     {!indiaClass && <td>{s.predicted == null ? <span className="muted">—</span> : <><b>{s.predicted}</b>/100</>}</td>}
                     <td>{s.attempts}</td>
                     <td>{pct(s.accuracy)}</td>
-                    <td>{s.activeDays == null ? <span className="muted" title="Not in the imported file">—</span> : `${s.activeDays}/28`}</td>
-                    <td>{s.streak}d</td>
-                    {indiaClass && <td>{s.evidence ? <>{pct(s.evidence.mastery)} <span className="muted">· {s.evidence.chaptersStarted}/{s.evidence.chaptersTotal} started</span></> : <span className="muted">—</span>}</td>}
+                    <td>{s.activeDays == null ? <span className="muted" title={t('teach.notInImportedFile')}>—</span> : `${s.activeDays}/28`}</td>
+                    <td>{t('teach.streakShort', { n: s.streak })}</td>
+                    {indiaClass && <td>{s.evidence ? <>{pct(s.evidence.mastery)} <span className="muted">{t('teach.startedOfTotal', { started: s.evidence.chaptersStarted, total: s.evidence.chaptersTotal })}</span></> : <span className="muted">—</span>}</td>}
                     <td className="muted">{s.weakestChapters?.length ? s.weakestChapters.map(c => c.name).join(', ') : s.weakest}</td>
                     <td><FlagChips flags={s.flags} /></td>
-                    <td><button className="btn btn-quiet btn-sm" onClick={() => setSheet({ kind: 'student', id: s.id })}>Report</button></td>
+                    <td><button className="btn btn-quiet btn-sm" onClick={() => setSheet({ kind: 'student', id: s.id })}>{t('teach.report')}</button></td>
                   </tr>
                 ))}
-                {!analytics.students.length && <tr><td colSpan={indiaClass ? 9 : 9} className="muted">Add students to see analytics.</td></tr>}
+                {!analytics.students.length && <tr><td colSpan={indiaClass ? 9 : 9} className="muted">{t('teach.addStudentsForAnalytics')}</td></tr>}
               </tbody>
             </table>
           </div>
 
           {analytics.chapters?.length > 0 && (
             <>
-              <div className="card-title" style={{ marginTop: 18 }}>Chapters this class finds hardest</div>
+              <div className="card-title" style={{ marginTop: 18 }}>{t('teach.hardestChapters')}</div>
               <div style={{ overflowX: 'auto' }}>
                 <table className="table">
-                  <thead><tr><th>Chapter</th><th>Students</th><th>Attempts</th><th>Accuracy</th><th>Mastery</th></tr></thead>
+                  <thead><tr><th>{t('teach.chapter')}</th><th>{t('teach.students')}</th><th>{t('common.attempts')}</th><th>{t('common.accuracy')}</th><th>{t('teach.mastery')}</th></tr></thead>
                   <tbody>
                     {analytics.chapters.slice(0, 8).map(c => (
                       <tr key={c.id}><td>{c.name} <span className="muted">· {c.strand}</span></td><td>{c.students}</td><td>{c.attempts}</td><td>{pct(c.accuracy)}</td><td>{pct(c.mastery)}</td></tr>
@@ -547,26 +553,26 @@ export default function Teach() {
 
           {analytics.tasks.length > 0 && (
             <>
-              <div className="card-title" style={{ marginTop: 18 }}>Task progress</div>
-              {analytics.tasks.map(t => (
-                <div key={t.id} className="task-row">
+              <div className="card-title" style={{ marginTop: 18 }}>{t('teach.taskProgress')}</div>
+              {analytics.tasks.map(task => (
+                <div key={task.id} className="task-row">
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 650 }}>{t.title} <span className="muted">· {t.count} questions</span>{t.overdue && <span className="tag" style={{ marginLeft: 6 }}>⏰ overdue</span>}</div>
-                    {t.targets?.length > 0 && <div className="muted" style={{ fontSize: 12.5 }}>{describeTaskTargets(t.targets)}</div>}
+                    <div style={{ fontWeight: 650 }}>{task.title} <span className="muted">· {t('common.questionsCounted', { count: task.count, n: task.count })}</span>{task.overdue && <span className="tag" style={{ marginLeft: 6 }}>{t('teach.overdueTag')}</span>}</div>
+                    {task.targets?.length > 0 && <div className="muted" style={{ fontSize: 12.5 }}>{describeTaskTargets(task.targets)}</div>}
                     <div className="muted" style={{ fontSize: 12.5 }}>
-                      {t.progress.map(p => `${p.name}: ${p.done}/${t.count}${p.finished ? ' ✓' : ''}`).join(' · ') || 'No progress yet'}
-                      {t.dueAt ? ` · due ${shortDate(t.dueAt, indiaClass ? 'in' : 'nsw')}` : ''}
+                      {task.progress.map(p => `${p.name}: ${p.done}/${task.count}${p.finished ? ' ✓' : ''}`).join(' · ') || t('teach.noProgressYet')}
+                      {task.dueAt ? t('tasks.due', { date: shortDate(task.dueAt, indiaClass ? 'in' : 'nsw') }) : ''}
                     </div>
                   </div>
-                  <button className="btn btn-quiet btn-sm" title="Export as a task-pack file — AirDrop it to student iPads"
+                  <button className="btn btn-quiet btn-sm" title={t('teach.packTitle')}
                     onClick={async () => {
                       try {
-                        const pack = await api.get(`/tasks/${t.id}/pack`);
-                        downloadJSON(pack, `pri-task-${t.title.replace(/\s+/g, '-').toLowerCase()}-${dateStamp()}.json`);
-                        setMsg('📦 Task pack exported — students import it from their Tasks page');
+                        const pack = await api.get(`/tasks/${task.id}/pack`);
+                        downloadJSON(pack, `pri-task-${task.title.replace(/\s+/g, '-').toLowerCase()}-${dateStamp()}.json`);
+                        setMsg(tLater('teach.packExported'));
                       } catch (err) { setMsg(`⚠️ ${err.message}`); }
-                    }}>📦 Pack</button>
-                  <button className="btn btn-quiet btn-sm" onClick={async () => { await api.post(`/tasks/${t.id}/delete`); refreshAnalytics(); }}>Delete</button>
+                    }}>{t('teach.pack')}</button>
+                  <button className="btn btn-quiet btn-sm" onClick={async () => { await api.post(`/tasks/${task.id}/delete`); refreshAnalytics(); }}>{t('teach.delete')}</button>
                 </div>
               ))}
             </>
@@ -576,19 +582,19 @@ export default function Teach() {
 
       <div id="teacher-questions" tabIndex={-1} className="card teacher-anchor">
         <div className="spread">
-          <div className="card-title" style={{ marginBottom: 0 }}>Custom questions ({customs.length})</div>
-          <button className="btn btn-ghost btn-sm" onClick={() => setShowQBuilder(s => !s)}>{showQBuilder ? 'Close' : '＋ Write a question'}</button>
+          <div className="card-title" style={{ marginBottom: 0 }}>{t('teach.customQuestions', { n: customs.length })}</div>
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowQBuilder(s => !s)}>{showQBuilder ? t('nav.close') : t('teach.writeQuestion')}</button>
         </div>
         {customs.length > 0 && !showQBuilder && (
           <div style={{ marginTop: 10 }}>
             {customs.map(c => (
               <div className="prio-item" key={c.id}>
-                <span className="tag">D{c.difficulty}</span>
+                <span className="tag">{t('teach.difficultyLevel', { n: c.difficulty })}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 640 }}>{c.name}</div>
                   <div className="muted" style={{ fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><MathText text={c.q.prompt} /></div>
                 </div>
-                <button className="btn btn-quiet btn-sm" onClick={async () => { await api.post(`/custom-questions/${c.id}/delete`); load(); }}>Delete</button>
+                <button className="btn btn-quiet btn-sm" onClick={async () => { await api.post(`/custom-questions/${c.id}/delete`); load(); }}>{t('teach.delete')}</button>
               </div>
             ))}
           </div>
@@ -597,58 +603,58 @@ export default function Teach() {
           <div style={{ marginTop: 14 }}>
             <div className="grid cols-2" style={{ gap: 12 }}>
               <div className="field">
-                <label className="label" htmlFor="cq-name">Name</label>
-                <input className="input" id="cq-name" value={qForm.name} onChange={e => setQForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Surds warm-up 1" />
+                <label className="label" htmlFor="cq-name">{t('settings.name')}</label>
+                <input className="input" id="cq-name" value={qForm.name} onChange={e => setQForm(f => ({ ...f, name: e.target.value }))} placeholder={t('teach.namePlaceholder')} />
               </div>
               <div className="field">
-                <label className="label" htmlFor="cq-difficulty">Difficulty</label>
+                <label className="label" htmlFor="cq-difficulty">{t('common.difficulty')}</label>
                 <select className="input" id="cq-difficulty" value={qForm.difficulty} onChange={e => setQForm(f => ({ ...f, difficulty: Number(e.target.value) }))}>
-                  {[1, 2, 3, 4].map(d => <option key={d} value={d}>D{d}</option>)}
+                  {[1, 2, 3, 4].map(d => <option key={d} value={d}>{t('teach.difficultyLevel', { n: d })}</option>)}
                 </select>
               </div>
             </div>
             <div className="field">
-              <label className="label" htmlFor="cq-prompt">Prompt (use $…$ for maths, e.g. Solve $2x + 1 = 9$)</label>
+              <label className="label" htmlFor="cq-prompt">{t('teach.promptLabel')}</label>
               <textarea className="input" id="cq-prompt" style={{ fontFamily: 'inherit' }} value={qForm.prompt} onChange={e => setQForm(f => ({ ...f, prompt: e.target.value }))} />
               {qForm.prompt && <div className="typed-preview" style={{ marginTop: 8 }}><MathText text={qForm.prompt} /></div>}
             </div>
             <div className="field">
-              <div className="label" id="cq-type">Answer type</div>
+              <div className="label" id="cq-type">{t('teach.answerType')}</div>
               <div className="pill-select" role="group" aria-labelledby="cq-type">
-                {['numeric', 'expression', 'mcq'].map(t => (
-                  <button key={t} className={`pill-opt ${qForm.answerType === t ? 'on' : ''}`} onClick={() => setQForm(f => ({ ...f, answerType: t }))}>{t}</button>
+                {[['numeric', 'teach.typeNumeric'], ['expression', 'teach.typeExpression'], ['mcq', 'teach.typeMcq']].map(([type, labelKey]) => (
+                  <button key={type} className={`pill-opt ${qForm.answerType === type ? 'on' : ''}`} onClick={() => setQForm(f => ({ ...f, answerType: type }))}>{t(labelKey)}</button>
                 ))}
               </div>
             </div>
             {qForm.answerType === 'numeric' && (
-              <div className="field"><label className="label" htmlFor="cq-value">Correct value</label>
-                <input className="input" id="cq-value" value={qForm.value} onChange={e => setQForm(f => ({ ...f, value: e.target.value }))} placeholder="e.g. 4" /></div>
+              <div className="field"><label className="label" htmlFor="cq-value">{t('teach.correctValue')}</label>
+                <input className="input" id="cq-value" value={qForm.value} onChange={e => setQForm(f => ({ ...f, value: e.target.value }))} placeholder={t('teach.valuePlaceholder')} /></div>
             )}
             {qForm.answerType === 'expression' && (
-              <div className="field"><label className="label" htmlFor="cq-expr">Correct expression</label>
-                <input className="input" id="cq-expr" value={qForm.expr} onChange={e => setQForm(f => ({ ...f, expr: e.target.value }))} placeholder="e.g. 2x + 6 (equivalent forms accepted automatically)" /></div>
+              <div className="field"><label className="label" htmlFor="cq-expr">{t('teach.correctExpression')}</label>
+                <input className="input" id="cq-expr" value={qForm.expr} onChange={e => setQForm(f => ({ ...f, expr: e.target.value }))} placeholder={t('teach.expressionPlaceholder')} /></div>
             )}
             {qForm.answerType === 'mcq' && (
               <div className="field">
-                <div className="label">Options (tap the correct one)</div>
+                <div className="label">{t('teach.optionsLabel')}</div>
                 {qForm.mcqOptions.map((o, i) => (
                   <div className="row" key={i} style={{ marginBottom: 6 }}>
-                    <button className="mcq-key" aria-label={`Mark option ${'ABCD'[i]} as the correct answer`}
+                    <button className="mcq-key" aria-label={t('teach.markOptionCorrect', { letter: 'ABCD'[i] })}
                       aria-pressed={qForm.correctIndex === i}
                       style={{ background: qForm.correctIndex === i ? 'var(--good)' : undefined, color: qForm.correctIndex === i ? '#04150c' : undefined, border: 'none', cursor: 'pointer' }}
                       onClick={() => setQForm(f => ({ ...f, correctIndex: i }))}>{'ABCD'[i]}</button>
-                    <input className="input" aria-label={`Option ${'ABCD'[i]}`} value={o} onChange={e => setQForm(f => ({ ...f, mcqOptions: f.mcqOptions.map((x, j) => j === i ? e.target.value : x) }))} />
+                    <input className="input" aria-label={t('teach.option', { letter: 'ABCD'[i] })} value={o} onChange={e => setQForm(f => ({ ...f, mcqOptions: f.mcqOptions.map((x, j) => j === i ? e.target.value : x) }))} />
                   </div>
                 ))}
               </div>
             )}
             <div className="grid cols-2" style={{ gap: 12 }}>
-              <div className="field"><label className="label" htmlFor="cq-solution">Worked solution</label>
+              <div className="field"><label className="label" htmlFor="cq-solution">{t('verdict.workedSolution')}</label>
                 <textarea className="input" id="cq-solution" style={{ fontFamily: 'inherit' }} value={qForm.solutionText} onChange={e => setQForm(f => ({ ...f, solutionText: e.target.value }))} /></div>
-              <div className="field"><label className="label" htmlFor="cq-hint">Hint (optional)</label>
+              <div className="field"><label className="label" htmlFor="cq-hint">{t('teach.hintOptional')}</label>
                 <textarea className="input" id="cq-hint" style={{ fontFamily: 'inherit' }} value={qForm.hint} onChange={e => setQForm(f => ({ ...f, hint: e.target.value }))} /></div>
             </div>
-            <button className="btn btn-primary" disabled={!qForm.prompt.trim()} onClick={saveCustomQ}>Save question</button>
+            <button className="btn btn-primary" disabled={!qForm.prompt.trim()} onClick={saveCustomQ}>{t('teach.saveQuestion')}</button>
           </div>
         )}
       </div>

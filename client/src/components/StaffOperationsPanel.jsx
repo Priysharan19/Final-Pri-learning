@@ -40,26 +40,33 @@ export default function StaffOperationsPanel() {
     if (!enabled) return;
     const me = await cloud.me();
     const nextAccount = me?.account || null;
-    setAccount(nextAccount);
     if (!['support', 'admin'].includes(nextAccount?.role)) {
+      setAccount(nextAccount);
       setRevisions([]);
       setHealth(null);
       setUsers([]);
       setAudit([]);
       return;
     }
-    const rev = await cloud.contentRevisions();
-    setRevisions(Array.isArray(rev?.revisions) ? rev.revisions : []);
-    if (nextAccount.role === 'admin') {
-      const [h, u, a] = await Promise.all([cloud.adminHealth(), cloud.adminUsers(), cloud.adminAudit()]);
-      setHealth(h || null);
-      setUsers(Array.isArray(u?.users) ? u.users : []);
-      setAudit(Array.isArray(a?.entries) ? a.entries : []);
-    } else {
-      setHealth(null);
-      setUsers([]);
-      setAudit([]);
+    // Everything the console shows is fetched before any of it is committed,
+    // so the panel appears with its data rather than as an empty shell that
+    // fills in a request later. A failure still shows the panel, so the error
+    // the caller sets is visible to the staff member it is meant for.
+    let rev, h, u, a;
+    try {
+      rev = await cloud.contentRevisions();
+      [h, u, a] = nextAccount.role === 'admin'
+        ? await Promise.all([cloud.adminHealth(), cloud.adminUsers(), cloud.adminAudit()])
+        : [null, null, null];
+    } catch (err) {
+      setAccount(nextAccount);
+      throw err;
     }
+    setAccount(nextAccount);
+    setRevisions(Array.isArray(rev?.revisions) ? rev.revisions : []);
+    setHealth(h || null);
+    setUsers(Array.isArray(u?.users) ? u.users : []);
+    setAudit(Array.isArray(a?.entries) ? a.entries : []);
   }
 
   useEffect(() => {

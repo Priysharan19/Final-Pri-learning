@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(here, '..', '..');
@@ -36,6 +36,33 @@ c.ok(userIndex > lastCopy && userIndex < cmdIndex, 'USER node is set after the C
 c.ok(runtime.some(line => /chown\s+node:node\s+\/data/.test(line)), '/data is owned by node');
 c.ok(runtime.some(line => /^HEALTHCHECK/.test(line)) && runtime.join('\n').includes('/v1/health'), 'HEALTHCHECK probes /v1/health');
 c.match(runtime[cmdIndex], /server\/index\.js/, 'CMD runs server/index.js');
+
+// ── Build-time release identity: every variable it reads is a declared ARG ──
+// Docker and Railway expose a build variable only to a stage that declares it.
+// A variable the identity code reads but the client-build stage does not
+// declare is silently empty at build time and present at run time, which bakes
+// a different SHA into client/dist/release.json from the one the server
+// reports, and /v1/health fails closed on the mismatch.
+const releaseIdentityModule = await import(pathToFileURL(join(ROOT, 'release', 'release-identity.mjs')));
+const clientBuildStart = dockerfile.findIndex(line => /^FROM\s+\S+\s+AS\s+client-build\s*$/i.test(line));
+c.ok(clientBuildStart >= 0, 'Dockerfile has a client-build stage');
+const clientBuildEnd = dockerfile.findIndex((line, index) => index > clientBuildStart && /^FROM\s/i.test(line));
+const clientBuild = dockerfile.slice(clientBuildStart + 1, clientBuildEnd);
+const declaredArgs = new Set(clientBuild.filter(line => /^ARG\s/.test(line)).map(line => line.replace(/^ARG\s+/, '').split('=')[0].trim()));
+const identitySourceEnv = new Set();
+for (const file of ['release/release-identity.mjs', 'release/docker-build-identity.mjs']) {
+  for (const match of readFileSync(join(ROOT, file), 'utf8').matchAll(/\benv\.([A-Z][A-Z0-9_]+)/g)) identitySourceEnv.add(match[1]);
+}
+c.ok(identitySourceEnv.has('RAILWAY_GIT_COMMIT_SHA') && identitySourceEnv.has('PRI_RELEASE_SHA'), `identity variables were found in the source (${[...identitySourceEnv].join(', ')})`);
+for (const name of identitySourceEnv) {
+  c.ok(releaseIdentityModule.DEPLOYMENT_IDENTITY_ENV.includes(name), `${name} is listed in DEPLOYMENT_IDENTITY_ENV`);
+}
+for (const name of releaseIdentityModule.DEPLOYMENT_IDENTITY_ENV) {
+  c.ok(declaredArgs.has(name), `the client-build stage declares ARG ${name}`);
+}
+c.ok(clientBuild.some(line => /^RUN\s+node\s+release\/docker-build-identity\.mjs\s*$/.test(line)),
+  'the client is built through the shared build-identity wrapper');
+c.ok(!clientBuild.some(line => /^RUN\b.*npm run build/.test(line)), 'no client build bypasses the shared precedence');
 
 const stage = mkdtempSync(join(tmpdir(), 'pri-runtime-image-'));
 for (const tokens of copies) {
@@ -72,6 +99,67 @@ for (const required of ['server/index.js', 'server/app.js', 'server/package.json
   c.ok(existsSync(join(stage, required)), `${required} is in the image`);
 }
 
+const dataDir = join(stage, 'data');
+mkdirSync(dataDir, { recursive: true });
+const testReleaseSha = '0123456789abcdef0123456789abcdef01234567';
+const testBuildTimestamp = '2026-09-30T00:00:00.000Z';
+const releaseJsonPath = join(stage, 'client', 'dist', 'release.json');
+const metadata = JSON.parse(readFileSync(join(ROOT, 'release', 'metadata.json'), 'utf8'));
+const builtIdentity = (releaseSha, buildTimestamp) => ({
+  schemaVersion: 1,
+  repository: metadata.repository,
+  branch: metadata.branch,
+  productVersion: metadata.productVersion,
+  curriculumVersion: metadata.curriculumVersion,
+  releaseSha,
+  buildTimestamp
+});
+
+// ── Build-time and run-time resolvers agree for the same deployment env ─────
+// Both run against the staged image copy (no .git, exactly like the image), so
+// this is the code path the container executes. "Build" is what the Docker
+// client-build stage does: docker-build-identity.mjs, then vite.config.js
+// applying the precedence again. "Run" is server/platform/releaseIdentity.js.
+const stagedRelease = await import(pathToFileURL(join(stage, 'release', 'release-identity.mjs')));
+const stagedBuild = await import(pathToFileURL(join(stage, 'release', 'docker-build-identity.mjs')));
+const stagedServer = await import(pathToFileURL(join(stage, 'server', 'platform', 'releaseIdentity.js')));
+const railwaySha = 'a'.repeat(40);
+const staleSha = 'f'.repeat(40);
+const buildNow = new Date('2026-10-01T12:34:56.789Z');
+for (const [label, deployEnv] of [
+  ['Railway Git deploy, no PRI_* variables', { RAILWAY_GIT_COMMIT_SHA: railwaySha }],
+  ['Railway Git deploy with stale manual PRI_* variables', { RAILWAY_GIT_COMMIT_SHA: railwaySha, PRI_RELEASE_SHA: staleSha, PRI_BUILD_TIMESTAMP: '2020-01-01T00:00:00.000Z' }],
+  ['Railway Git deploy with matching PRI_* variables', { RAILWAY_GIT_COMMIT_SHA: railwaySha, PRI_RELEASE_SHA: railwaySha, PRI_BUILD_TIMESTAMP: testBuildTimestamp }],
+  ['explicit PRI_* candidate, no Railway SHA', { PRI_RELEASE_SHA: testReleaseSha, PRI_BUILD_TIMESTAMP: testBuildTimestamp }]
+]) {
+  const built = stagedRelease.resolveReleaseIdentity({
+    root: stage,
+    production: true,
+    env: stagedRelease.applyDeploymentPrecedence(stagedBuild.dockerBuildIdentityEnv(deployEnv, buildNow))
+  });
+  const run = stagedServer.serverReleaseIdentity({
+    env: { ...deployEnv, NODE_ENV: 'production', RAILWAY_DEPLOYMENT_ID: 'agreement-check' },
+    readBuilt: () => ({ ...built })
+  });
+  c.eq(JSON.stringify(run), JSON.stringify(built), `build-time and run-time identity agree: ${label}`);
+  c.eq(run.releaseSha, deployEnv.RAILWAY_GIT_COMMIT_SHA || deployEnv.PRI_RELEASE_SHA, `RAILWAY_GIT_COMMIT_SHA > PRI_RELEASE_SHA: ${label}`);
+}
+// The old failure mode, pinned: a build that never saw RAILWAY_GIT_COMMIT_SHA
+// (the ARG was undeclared) must be caught as a mismatch, not served.
+const blindBuild = stagedRelease.resolveReleaseIdentity({
+  root: stage,
+  production: true,
+  env: stagedRelease.applyDeploymentPrecedence(stagedBuild.dockerBuildIdentityEnv({ PRI_RELEASE_SHA: staleSha }, buildNow))
+});
+let blindMismatch = null;
+try {
+  stagedServer.serverReleaseIdentity({
+    env: { NODE_ENV: 'production', RAILWAY_DEPLOYMENT_ID: 'agreement-check', RAILWAY_GIT_COMMIT_SHA: railwaySha, PRI_RELEASE_SHA: staleSha },
+    readBuilt: () => ({ ...blindBuild })
+  });
+} catch (error) { blindMismatch = error; }
+c.match(String(blindMismatch?.message), /mismatch for releaseSha/, 'a client built without the Railway SHA is refused as a mismatch, never served');
+
 const port = await new Promise((resolve, reject) => {
   const probe = createServer();
   probe.once('error', reject);
@@ -80,17 +168,11 @@ const port = await new Promise((resolve, reject) => {
     probe.close(() => resolve(free));
   });
 });
-const dataDir = join(stage, 'data');
-mkdirSync(dataDir, { recursive: true });
-const testReleaseSha = '0123456789abcdef0123456789abcdef01234567';
-const testBuildTimestamp = '2026-09-30T00:00:00.000Z';
-const env = {
+const baseEnv = {
   PATH: process.env.PATH,
   HOME: process.env.HOME,
   NODE_ENV: 'production',
   PORT: String(port),
-  PRI_RELEASE_SHA: testReleaseSha,
-  PRI_BUILD_TIMESTAMP: testBuildTimestamp,
   PRI_PUBLIC_ORIGIN: 'https://learn.pri.example',
   PRI_CSRF_SECRET: 'runtime-image-contract-secret',
   PRI_AUTH_DELIVERY_KEY: '33'.repeat(32),
@@ -101,41 +183,66 @@ const env = {
   PRI_RESEND_API_KEY: 'contract-key-not-real',
   PRI_AUTH_EMAIL_FROM: 'Pri Learning <noreply@pri.example>'
 };
-const child = spawn(process.execPath, ['server/index.js'], { cwd: stage, env, stdio: ['ignore', 'pipe', 'pipe'] });
-let stdout = '';
-let stderr = '';
-child.stdout.on('data', chunk => { stdout += chunk; });
-child.stderr.on('data', chunk => { stderr += chunk; });
-let exited = null;
-child.on('exit', (code, signal) => { exited = { code, signal }; });
 const origin = `http://127.0.0.1:${port}`;
 
-async function waitForHealth() {
+async function bootImage(caseEnv) {
+  const env = { ...baseEnv, ...caseEnv };
+  const child = spawn(process.execPath, ['server/index.js'], { cwd: stage, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const run = { child, env, stdout: '', stderr: '', exited: null };
+  child.stdout.on('data', chunk => { run.stdout += chunk; });
+  child.stderr.on('data', chunk => { run.stderr += chunk; });
+  child.on('exit', (code, signal) => { run.exited = { code, signal }; });
+  return run;
+}
+
+async function waitForHealth(run) {
   const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
-    if (exited) throw new Error(`server exited before becoming healthy: ${JSON.stringify(exited)}\n${stderr}`);
+    if (run.exited) throw new Error(`server exited before becoming healthy: ${JSON.stringify(run.exited)}\n${run.stderr}`);
     try {
       const r = await fetch(`${origin}/v1/health`);
       if (r.ok) return r;
     } catch { /* not listening yet */ }
     await new Promise(resolve => setTimeout(resolve, 200));
   }
-  throw new Error(`server never became healthy\nstdout: ${stdout}\nstderr: ${stderr}`);
+  throw new Error(`server never became healthy\nstdout: ${run.stdout}\nstderr: ${run.stderr}`);
 }
 
+async function stopImage(run) {
+  // Only wait for an exit that is still coming. When the child died on its own
+  // — a boot that fails closed on missing configuration, say — this await never
+  // settled, and Node exits 0 on an unsettled top-level await: the contract
+  // reported success by falling silent, which is the one thing a contract may
+  // not do.
+  if (!run.exited) {
+    run.child.kill('SIGTERM');
+    await new Promise(resolve => run.child.once('exit', resolve));
+  }
+}
+
+// ── Case 1 · Railway Git deployment with stale manual PRI_* values ──────────
+writeFileSync(releaseJsonPath, JSON.stringify(builtIdentity(testReleaseSha, testBuildTimestamp), null, 2));
+const railway = await bootImage({
+  RAILWAY_GIT_COMMIT_SHA: testReleaseSha,
+  RAILWAY_DEPLOYMENT_ID: 'runtime-image-contract',
+  // These simulate stale values from an earlier manual exact-candidate deploy.
+  // Railway's own Git SHA and the newly built client identity must outrank them.
+  PRI_RELEASE_SHA: staleSha,
+  PRI_BUILD_TIMESTAMP: '2020-01-01T00:00:00.000Z'
+});
 try {
-  const health = await waitForHealth();
+  const health = await waitForHealth(railway);
   const body = await health.json();
   c.eq(body.ok, true, 'health ok');
   c.eq(body.service, 'pri-learning-platform', 'health names the platform');
-  c.eq(body.releaseIdentity?.releaseSha, testReleaseSha, 'health reports the production release SHA');
-  c.eq(body.releaseIdentity?.buildTimestamp, testBuildTimestamp, 'health reports the production build timestamp');
+  c.eq(body.releaseIdentity?.releaseSha, testReleaseSha, 'Railway: health reports Railway\'s Git SHA over a stale PRI_RELEASE_SHA');
+  c.eq(body.releaseIdentity?.buildTimestamp, testBuildTimestamp, 'Railway: health reports the timestamp baked into the client build');
   c.eq(body.storage.persistentDatabase, true, 'persistent storage acknowledged');
   c.ok(Number.isInteger(body.housekeeping?.lastRunAt), 'housekeeping ran at startup and is reported by health');
-  c.ok(existsSync(env.PRI_PLATFORM_DB), 'database created at PRI_PLATFORM_DB');
+  c.ok(existsSync(railway.env.PRI_PLATFORM_DB), 'database created at PRI_PLATFORM_DB');
 
   for (const [method, path] of [['GET', '/api/auth/me'], ['POST', '/api/auth/login'], ['POST', '/api/auth/register'], ['GET', '/api/curriculum']]) {
-    const r = await fetch(`${origin}${path}`, { method, headers: { 'Content-Type': 'application/json', Origin: env.PRI_PUBLIC_ORIGIN }, body: method === 'POST' ? JSON.stringify({ email: 'x@y.z', password: 'abcdef' }) : undefined });
+    const r = await fetch(`${origin}${path}`, { method, headers: { 'Content-Type': 'application/json', Origin: railway.env.PRI_PUBLIC_ORIGIN }, body: method === 'POST' ? JSON.stringify({ email: 'x@y.z', password: 'abcdef' }) : undefined });
     c.eq(r.status, 410, `${method} ${path} answers 410 in the production image`);
     c.eq((await r.json()).error?.code, 'LEGACY_API_REMOVED', `${method} ${path} names the removal`);
   }
@@ -155,23 +262,35 @@ try {
   c.match(missing.headers.get('content-security-policy'), /default-src 'self'/, '404 carries the CSP');
   await fetch(`${origin}/v1/health?secret=do-not-log`);
 } finally {
-  // Only wait for an exit that is still coming. When the child died on its own
-  // — a boot that fails closed on missing configuration, say — this await never
-  // settled, and Node exits 0 on an unsettled top-level await: the contract
-  // reported success by falling silent, which is the one thing a contract may
-  // not do.
-  if (!exited) {
-    child.kill('SIGTERM');
-    await new Promise(resolve => child.once('exit', resolve));
-  }
+  await stopImage(railway);
 }
 
-const jsonLines = stdout.split('\n').map(line => { try { return JSON.parse(line); } catch { return null; } }).filter(Boolean);
-c.ok(jsonLines.some(line => line.method === 'GET' && line.path === '/v1/health' && line.status === 200 && typeof line.ms === 'number'), 'request log lines are JSON with method/path/status/ms');
-c.ok(jsonLines.some(line => line.path === '/api/auth/login' && line.status === 410), 'legacy refusals are logged');
-c.ok(!stdout.includes('do-not-log') && !stdout.includes('?'), 'query strings never reach the log');
-c.ok(!/cookie|user-agent|password/i.test(stdout), 'no cookies, user agents or credentials in the log');
-c.eq(stderr.trim(), '', `no errors on stderr during boot and requests (${stderr.trim().slice(0, 200)})`);
+const jsonLines = railway.stdout.split('\n').map(line => { try { return JSON.parse(line); } catch { return null; } }).filter(Boolean);
+c.ok(jsonLines.some(line => line.event === 'http_request' && line.method === 'GET' && line.route === '/v1/health' && line.status === 200 && typeof line.ms === 'number'), 'request log lines are JSON with method/route/status/ms');
+c.ok(jsonLines.some(line => line.event === 'http_request' && line.route === '/v1/health' && line.release === testReleaseSha && line.db === 'sqlite' && typeof line.requestId === 'string'), 'request log lines name the request id, the release SHA and the database engine');
+c.ok(jsonLines.some(line => line.route === '/api/<unmatched>' && line.status === 410 && line.code === 'LEGACY_API_REMOVED'), 'legacy refusals are logged with their code');
+c.ok(!railway.stdout.includes('do-not-log') && !railway.stdout.includes('?'), 'query strings never reach the log');
+c.ok(!/cookie|user-agent|password/i.test(railway.stdout), 'no cookies, user agents or credentials in the log');
+c.eq(railway.stderr.trim(), '', `no errors on stderr during boot and requests (${railway.stderr.trim().slice(0, 200)})`);
+
+// ── Case 2 · Plain PRI_RELEASE_SHA/PRI_BUILD_TIMESTAMP (non-Railway) ────────
+// GitHub CI's image build and any non-Railway host supply the identity
+// explicitly; no Railway variables are present at all.
+const plainSha = '89abcdef0123456789abcdef0123456789abcdef';
+const plainTimestamp = '2026-09-29T08:00:00.000Z';
+writeFileSync(releaseJsonPath, JSON.stringify(builtIdentity(plainSha, plainTimestamp), null, 2));
+const plain = await bootImage({ PRI_RELEASE_SHA: plainSha, PRI_BUILD_TIMESTAMP: plainTimestamp });
+try {
+  const body = await (await waitForHealth(plain)).json();
+  c.eq(body.ok, true, 'plain PRI_*: health ok');
+  c.eq(body.releaseIdentity?.releaseSha, plainSha, 'plain PRI_*: health reports PRI_RELEASE_SHA');
+  c.eq(body.releaseIdentity?.buildTimestamp, plainTimestamp, 'plain PRI_*: health reports PRI_BUILD_TIMESTAMP');
+  const web = await (await fetch(`${origin}/release.json`)).json();
+  c.eq(JSON.stringify(web), JSON.stringify(body.releaseIdentity), 'plain PRI_*: /release.json equals the health identity');
+} finally {
+  await stopImage(plain);
+}
+c.eq(plain.stderr.trim(), '', `plain PRI_*: no errors on stderr (${plain.stderr.trim().slice(0, 200)})`);
 rmSync(stage, { recursive: true, force: true });
 assert.ok(c.count() > 20);
 console.log(`PRODUCTION RUNTIME IMAGE — PASS — ${c.count()}/${c.count()} checks`);

@@ -33,6 +33,20 @@
 // wording that reaches the student says "board-style", never "official".
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Every sentence this module shows a student is a catalogue key (board.* in
+// i18n/strings.en.js). Rows and the summary carry the key and its variables so
+// the card renders them in the student's language; the English fields are the
+// same keys resolved against the English catalogue, so there is one copy.
+import en from '../i18n/strings.en.js';
+import { pluralCategory } from '../i18n/languages.js';
+import { unitWritten } from './units.js';
+
+const english = (key, vars = {}) => {
+  let entry = en[key];
+  if (entry && typeof entry === 'object') entry = entry[pluralCategory(vars.count, 'en')] ?? entry.other;
+  return String(entry ?? key).replace(/\{(\w+)\}/g, (whole, name) => (name in vars ? String(vars[name]) : whole));
+};
+
 /** The four things a board scheme puts marks on, in the order they are earned. */
 export const MARK_KINDS = Object.freeze({
   METHOD: 'method',
@@ -41,12 +55,13 @@ export const MARK_KINDS = Object.freeze({
   ANSWER: 'answer'
 });
 
-const LABEL = Object.freeze({
-  [MARK_KINDS.METHOD]: 'Correct formula or method',
-  [MARK_KINDS.SUBSTITUTION]: 'Correct substitution',
-  [MARK_KINDS.COMPUTATION]: 'Correct simplification',
-  [MARK_KINDS.ANSWER]: 'Final answer'
+const LABEL_KEY = Object.freeze({
+  [MARK_KINDS.METHOD]: 'board.labelMethod',
+  [MARK_KINDS.SUBSTITUTION]: 'board.labelSubstitution',
+  [MARK_KINDS.COMPUTATION]: 'board.labelComputation',
+  [MARK_KINDS.ANSWER]: 'board.labelAnswer'
 });
+const LABEL = Object.freeze(Object.fromEntries(Object.entries(LABEL_KEY).map(([kind, key]) => [kind, english(key)])));
 
 /** Headings a generator uses for work that is not a scheme point. */
 const NON_SCHEME = /^(check|note|bonus|aside|remark)/i;
@@ -101,7 +116,8 @@ export function markScheme(question) {
   const answerRow = {
     kind: MARK_KINDS.ANSWER,
     marks: 1,
-    label: requiresUnits(question) ? `${LABEL[MARK_KINDS.ANSWER]}, with units` : LABEL[MARK_KINDS.ANSWER],
+    label: requiresUnits(question) ? english('board.labelAnswerUnits') : LABEL[MARK_KINDS.ANSWER],
+    labelKey: requiresUnits(question) ? 'board.labelAnswerUnits' : LABEL_KEY[MARK_KINDS.ANSWER],
     detail: text(steps[steps.length - 1]?.d) || null,
     requiresUnits: requiresUnits(question)
   };
@@ -119,6 +135,7 @@ export function markScheme(question) {
       kind: classifyStep(s, i, steps.length),
       marks: 1,
       label: text(s.h) || LABEL[classifyStep(s, i, steps.length)],
+      labelKey: text(s.h) ? null : LABEL_KEY[classifyStep(s, i, steps.length)],
       detail: text(s.d) || null,
       requiresUnits: false
     }));
@@ -133,6 +150,7 @@ export function markScheme(question) {
         kind: classifyStep(group[0], i * per, steps.length),
         marks: 1,
         label: group.map(s => text(s.h)).filter(Boolean).join(', ') || LABEL[classifyStep(group[0], i * per, steps.length)],
+        labelKey: group.map(s => text(s.h)).filter(Boolean).length ? null : LABEL_KEY[classifyStep(group[0], i * per, steps.length)],
         detail: text(group[0].d) || null,
         requiresUnits: false
       });
@@ -147,10 +165,17 @@ export function markScheme(question) {
 export function unitsPresent(question, workingLines, answerText) {
   const suffix = text(question?.answerSuffix);
   if (!suffix) return true;
+  const texts = [...(workingLines || []), answerText].map(text);
+  // A unit this marker reads must be written as that whole unit: "cm" is not
+  // "m", and "m" is not "m²". Substring search credited "12 cm" for metres.
+  const known = unitWritten(suffix, texts);
+  // the degree sign was never demanded here (it has no letters to search for)
+  if (known === false && /^\s*°\s*$/.test(suffix)) return true;
+  if (known !== null) return known;
   const needle = suffix.toLowerCase().replace(/[^a-z0-9]/g, '');
   if (!needle) return true;
-  const hay = [...(workingLines || []), answerText].map(text).join(' ').toLowerCase().replace(/[^a-z0-9]/g, '');
-  return hay.includes(needle);
+  const hay = ` ${texts.join(' ').toLowerCase().replace(/[^a-z0-9]+/g, ' ')} `;
+  return hay.includes(` ${needle} `) || hay.replace(/ /g, '').endsWith(needle);
 }
 
 /**
@@ -196,29 +221,34 @@ export function awardStepMarks({
   for (const row of stepRows) {
     const earned = Math.min(row.marks, budget);
     budget -= earned;
+    const whyKey = earned === row.marks
+      ? null
+      : lines.length === 0 ? 'board.whyNoWorking' : 'board.whyNotReached';
     rows.push({
       kind: row.kind,
       label: row.label,
+      labelKey: row.labelKey || null,
       outOf: row.marks,
       earned,
-      why: earned === row.marks
-        ? null
-        : lines.length === 0
-          ? 'no working was shown, so this mark could not be awarded'
-          : 'the working did not reach this point'
+      why: whyKey ? english(whyKey) : null,
+      whyKey,
+      whyVars: null
     });
   }
 
   const hasUnits = unitsPresent(question, lines, answerText);
   const answerEarned = correct && hasUnits ? answerRow.marks : 0;
+  const answerWhyKey = correct && !hasUnits ? 'board.whyUnitMissing' : correct ? null : 'board.whyAnswerWrong';
+  const answerWhyVars = { unit: text(question.answerSuffix) };
   rows.push({
     kind: MARK_KINDS.ANSWER,
     label: answerRow.label,
+    labelKey: answerRow.labelKey,
     outOf: answerRow.marks,
     earned: answerEarned,
-    why: correct && !hasUnits
-      ? `the value is right but the unit (${text(question.answerSuffix)}) is missing — a board examiner withholds this mark`
-      : correct ? null : 'the final answer is not correct'
+    why: answerWhyKey ? english(answerWhyKey, answerWhyVars) : null,
+    whyKey: answerWhyKey,
+    whyVars: answerWhyVars
   });
 
   const awarded = rows.reduce((s, r) => s + r.earned, 0);
@@ -240,17 +270,24 @@ export function awardStepMarks({
   });
 }
 
-/** One sentence for the student, in the register a teacher would use. */
-export function marksSentence(award) {
+/**
+ * The one-line verdict under the marks — in the register a teacher would use —
+ * as a catalogue key and its variables, so the card renders it in the
+ * student's language. marksSentence() is the same line in English.
+ */
+export function marksSentenceKey(award) {
   if (!award) return null;
   const { awarded, total } = award;
   if (!award.showedWorking && award.lostToNoWorking > 0) {
-    return `${awarded}/${total}. You wrote only the answer, so ${award.lostToNoWorking} step ${award.lostToNoWorking === 1 ? 'mark was' : 'marks were'} not available. In a board exam those are marks you had already earned and did not claim — show the working.`;
+    return { key: 'board.sentenceNoWorking', vars: { awarded, total, count: award.lostToNoWorking, n: award.lostToNoWorking } };
   }
-  if (award.unitsMissing) {
-    return `${awarded}/${total}. The value is right; the unit is missing, and an examiner withholds that mark.`;
-  }
-  if (awarded === total) return `${awarded}/${total}. Full marks, and the working would earn them in a board exam.`;
-  if (awarded === 0) return `${awarded}/${total}. Nothing here could be credited yet — write the formula you are using as your first line, and the method mark is available even when the answer is wrong.`;
-  return `${awarded}/${total}. The answer is not right, but the method is, and a board examiner awards that.`;
+  if (award.unitsMissing) return { key: 'board.sentenceUnitsMissing', vars: { awarded, total } };
+  if (awarded === total) return { key: 'board.sentenceFull', vars: { awarded, total } };
+  if (awarded === 0) return { key: 'board.sentenceNone', vars: { awarded, total } };
+  return { key: 'board.sentenceMethod', vars: { awarded, total } };
+}
+
+export function marksSentence(award) {
+  const line = marksSentenceKey(award);
+  return line ? english(line.key, line.vars) : null;
 }

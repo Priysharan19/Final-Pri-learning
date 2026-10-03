@@ -5,27 +5,29 @@ process.env.PRI_AUTH_DELIVERY_KEY = '11'.repeat(32);
 const [
   { default: express },
   { default: cookieParser },
-  { createPlatformDb },
+  { openTestStore },
   { createAccountRouter },
   { decryptDeliveryToken },
   { requireGuardianConsent }
 ] = await Promise.all([
   import('express'),
   import('cookie-parser'),
-  import('../platform/db.js'),
+  import('./support/engine.mjs'),
   import('../platform/accounts.js'),
   import('../platform/deliveryCrypto.js'),
   import('../platform/guardianConsent.js')
 ]);
 
-function makeHarness() {
-  const db = createPlatformDb(':memory:');
+async function makeHarness() {
+  // SQLite by default; `--engine=postgres` runs it on a migrated Postgres.
+  const testStore = await openTestStore(undefined, { label: 'guardian_lifecycle' });
+  const db = testStore.store;
   const app = express();
   app.use(express.json({ limit: '128kb' }));
   app.use(cookieParser());
   app.use('/account', createAccountRouter(db));
   app.get('/protected', requireGuardianConsent(db), (req, res) => res.json({ ok: true }));
-  return { db, app };
+  return { db, app, testStore };
 }
 
 function cookieHeader(jar) {
@@ -66,11 +68,11 @@ async function request(origin, path, { method = 'GET', body, jar = {} } = {}) {
   return { status: response.status, data: text ? JSON.parse(text) : null };
 }
 
-function guardianBearer(db, accountId) {
-  const row = db.prepare(`SELECT o.token_id,o.token_ciphertext
+async function guardianBearer(db, accountId) {
+  const row = await db.get(`SELECT o.token_id,o.token_ciphertext
     FROM auth_delivery_outbox o
     WHERE o.account_id=? AND o.kind='guardian-consent'
-    ORDER BY o.created_at DESC LIMIT 1`).get(accountId);
+    ORDER BY o.created_at DESC LIMIT 1`, [accountId]);
   assert.ok(row, 'guardian delivery envelope must exist');
   return decryptDeliveryToken(row.token_ciphertext, `${accountId}:guardian-consent:${row.token_id}`);
 }
@@ -88,25 +90,47 @@ async function registerChild(origin, email, guardianEmail, jar = {}) {
   return { accountId: response.data.account.id, jar };
 }
 
-const { db, app } = makeHarness();
+const { db, app, testStore } = await makeHarness();
 const { server, origin } = await serve(app);
 
 try {
+  // Regression: a direct API call that declared no age used to be treated as an
+  // adult and skipped the guardian gate. It is now refused outright.
+  const silent = await request(origin, '/account/register', {
+    method: 'POST', jar: {},
+    body: { name: 'Silent Caller', email: 'silent@example.test', password: 'guardian-pass-123', deviceId: 'device-silent' }
+  });
+  assert.equal(silent.status, 400, 'a sign-up with no age declaration must be refused');
+  assert.equal(silent.data?.error?.code, 'AGE_DECLARATION_REQUIRED');
+  assert.equal(await db.get("SELECT 1 AS x FROM accounts WHERE email='silent@example.test'"), undefined, 'and no account is created');
+  const classOnly = await request(origin, '/account/register', {
+    method: 'POST', jar: {},
+    body: { name: 'Class Only', email: 'classonly@example.test', password: 'guardian-pass-123', year: '10' }
+  });
+  assert.equal(classOnly.data?.error?.code, 'GUARDIAN_NAME_REQUIRED', 'a school class with no guardian is gated as a child');
+  const adultJar = {};
+  const adult = await request(origin, '/account/register', {
+    method: 'POST', jar: adultJar,
+    body: { name: 'Adult', email: 'adult@example.test', password: 'guardian-pass-123', isAdult: true }
+  });
+  assert.equal(adult.status, 201, 'an explicit adult needs no guardian');
+  assert.equal(await db.get('SELECT 1 AS x FROM guardian_consents WHERE account_id=?', [adult.data.account.id]), undefined, 'and no consent row is opened');
+
   // pending -> withdraw -> confirm must never re-grant the same ceremony.
   const first = await registerChild(origin, 'guardian-one@example.test', 'guardian1@example.test');
-  const firstBearer = guardianBearer(db, first.accountId);
+  const firstBearer = await guardianBearer(db, first.accountId);
   assert.equal((await request(origin, '/protected', { jar: first.jar })).status, 403, 'pending child sync must fail closed');
   const preConfirmWithdraw = await request(origin, '/account/guardian/withdraw', { method: 'POST', body: { token: firstBearer } });
   assert.deepEqual(preConfirmWithdraw.data, { ok: true, withdrawn: true });
   const confirmAfterWithdraw = await request(origin, '/account/guardian/confirm', { method: 'POST', body: { token: firstBearer } });
   assert.equal(confirmAfterWithdraw.status, 200);
   assert.deepEqual(confirmAfterWithdraw.data, { ok: true, confirmed: false });
-  assert.equal(db.prepare('SELECT confirmed_at,withdrawn_at FROM guardian_consents WHERE account_id=?').get(first.accountId).confirmed_at, null);
+  assert.equal((await db.get('SELECT confirmed_at,withdrawn_at FROM guardian_consents WHERE account_id=?', [first.accountId])).confirmed_at, null);
   assert.equal((await request(origin, '/protected', { jar: first.jar })).data.error.code, 'GUARDIAN_CONSENT_WITHDRAWN');
 
   // confirm -> withdraw ends withdrawn, and repeated withdrawal is idempotent.
   const second = await registerChild(origin, 'guardian-two@example.test', 'guardian2@example.test');
-  const secondBearer = guardianBearer(db, second.accountId);
+  const secondBearer = await guardianBearer(db, second.accountId);
   const confirmed = await request(origin, '/account/guardian/confirm', { method: 'POST', body: { token: secondBearer } });
   assert.deepEqual(confirmed.data, { ok: true, confirmed: true });
   assert.equal((await request(origin, '/protected', { jar: second.jar })).status, 200, 'confirmed child sync should pass');
@@ -119,9 +143,9 @@ try {
   // Late withdrawal remains permission-reducing after expiry and consumption,
   // while confirmation remains bounded to the one-hour ceremony window.
   const third = await registerChild(origin, 'guardian-three@example.test', 'guardian3@example.test');
-  const thirdBearer = guardianBearer(db, third.accountId);
-  db.prepare(`UPDATE account_tokens SET created_at=?, expires_at=?, consumed_at=?
-    WHERE account_id=? AND purpose='guardian-consent'`).run(Date.now() - 2 * 60 * 60 * 1000, Date.now() - 60 * 60 * 1000, Date.now() - 90 * 60 * 1000, third.accountId);
+  const thirdBearer = await guardianBearer(db, third.accountId);
+  await db.run(`UPDATE account_tokens SET created_at=?, expires_at=?, consumed_at=?
+    WHERE account_id=? AND purpose='guardian-consent'`, [Date.now() - 2 * 60 * 60 * 1000, Date.now() - 60 * 60 * 1000, Date.now() - 90 * 60 * 1000, third.accountId]);
   assert.equal((await request(origin, '/account/guardian/confirm', { method: 'POST', body: { token: thirdBearer } })).status, 400,
     'expired/consumed guardian bearer must never elevate permission');
   assert.deepEqual((await request(origin, '/account/guardian/withdraw', { method: 'POST', body: { token: thirdBearer } })).data,
@@ -130,13 +154,13 @@ try {
   // Purpose and account isolation: unrelated action tokens cannot withdraw,
   // and one guardian bearer can affect only the account named by its token row.
   const fourth = await registerChild(origin, 'guardian-four@example.test', 'guardian4@example.test');
-  const fourthBearer = guardianBearer(db, fourth.accountId);
-  const verifyRow = db.prepare(`SELECT o.token_id,o.token_ciphertext FROM auth_delivery_outbox o
-    WHERE o.account_id=? AND o.kind='verify-email' ORDER BY o.created_at DESC LIMIT 1`).get(fourth.accountId);
+  const fourthBearer = await guardianBearer(db, fourth.accountId);
+  const verifyRow = (await db.get(`SELECT o.token_id,o.token_ciphertext FROM auth_delivery_outbox o
+    WHERE o.account_id=? AND o.kind='verify-email' ORDER BY o.created_at DESC LIMIT 1`, [fourth.accountId]));
   const verifyBearer = decryptDeliveryToken(verifyRow.token_ciphertext, `${fourth.accountId}:verify-email:${verifyRow.token_id}`);
   assert.equal((await request(origin, '/account/guardian/withdraw', { method: 'POST', body: { token: verifyBearer } })).status, 400,
     'verify-email bearer must not cross into guardian authority');
-  assert.equal(db.prepare('SELECT withdrawn_at FROM guardian_consents WHERE account_id=?').get(fourth.accountId).withdrawn_at, null);
+  assert.equal((await db.get('SELECT withdrawn_at FROM guardian_consents WHERE account_id=?', [fourth.accountId])).withdrawn_at, null);
   assert.deepEqual((await request(origin, '/account/guardian/withdraw', { method: 'POST', body: { token: fourthBearer } })).data,
     { ok: true, withdrawn: true });
 
@@ -144,12 +168,13 @@ try {
   assert.equal((await request(origin, '/account/', {
     method: 'DELETE', jar: fourth.jar, body: { password: 'guardian-pass-123' }
   })).status, 200);
-  assert.equal(db.prepare(`SELECT 1 FROM account_tokens WHERE account_id=? AND purpose='guardian-consent'`).get(fourth.accountId), undefined);
+  assert.equal((await db.get(`SELECT 1 FROM account_tokens WHERE account_id=? AND purpose='guardian-consent'`, [fourth.accountId])), undefined);
   assert.equal((await request(origin, '/account/guardian/withdraw', { method: 'POST', body: { token: fourthBearer } })).status, 400,
     'deleted account must leave no guardian bearer authority');
 
+  console.log(`engine: ${testStore.engine}`);
   console.log('PASS — guardian consent confirmation is bounded, withdrawal is monotonic/idempotent, and authority stays purpose/account scoped.');
 } finally {
   await new Promise(resolve => server.close(resolve));
-  db.close();
+  await testStore.close();
 }

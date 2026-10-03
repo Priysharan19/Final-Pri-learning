@@ -1,17 +1,16 @@
 // Pri Learning · audited cloud transport boundary
 //
 // This is the only client module permitted to open production HTTP connections.
-// In a browser it uses fetch. In the bundled iOS shell it delegates the same
-// bounded request contract to NativeCloudBridge, which owns HTTPS cookies/CSRF
-// outside the `prilearning://` WKWebView. All learning UI remains offline-first.
+// In a browser it uses fetch. Inside a native shell it delegates the same
+// bounded request contract to the shell's cloud capability through priNative
+// (CP-02) — on Apple that is NativeCloudBridge, which owns HTTPS cookies/CSRF
+// outside the `prilearning://` WKWebView. JavaScript never sees those cookies.
+import { priNative } from './native/index.js';
 
 const DEFAULT_TIMEOUT_MS = 12_000;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const PATH = /^\/v1\/[A-Za-z0-9/_-]{1,180}$/;
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,160}$/;
-const NATIVE_RESPONSE_EVENT = 'pri:native-cloud-response';
-const nativePending = new Map();
-let nativeListenerInstalled = false;
 
 // Cloud origin discovery, in order of authority:
 //   1. the origin that served this page, when it is the Pri platform server
@@ -114,14 +113,16 @@ export function normalizeCloudOrigin(raw = envOrigin()) {
   return url.origin;
 }
 
-function nativeCloudHandler() {
-  return globalThis?.webkit?.messageHandlers?.priCloud || null;
+// Fails closed: the shell advertises `cloud` only with `configured: true` when
+// its signed release metadata names an HTTPS cloud origin.
+/** Disconnect: drop the session the native shell holds (no-op in a browser,
+ * where the HttpOnly session cookie belongs to the browser and logout clears it). */
+export function forgetNativeCloudSession() {
+  return priNative.isNativeShell() ? priNative.cloud.forgetSession() : Promise.resolve(false);
 }
 
 export function nativeCloudAvailable() {
-  return globalThis.__PRI_NATIVE_CLOUD__ === true &&
-    globalThis.__PRI_NATIVE_CLOUD_CONFIGURED__ === true &&
-    typeof nativeCloudHandler()?.postMessage === 'function';
+  return priNative.cloud.available();
 }
 
 export function cloudAvailable() {
@@ -161,80 +162,35 @@ function parseJson(text) {
   }
 }
 
-function installNativeListener() {
-  if (nativeListenerInstalled || typeof window === 'undefined') return;
-  nativeListenerInstalled = true;
-  window.addEventListener(NATIVE_RESPONSE_EVENT, event => {
-    const detail = event?.detail;
-    const id = String(detail?.id || '');
-    const waiting = nativePending.get(id);
-    if (!waiting) return;
-    nativePending.delete(id);
-    clearTimeout(waiting.timer);
-    if (waiting.signal) waiting.signal.removeEventListener('abort', waiting.abort);
-    if (detail?.error) {
-      const err = new Error(detail.error.message || 'Native cloud request failed.');
-      err.code = detail.error.code || 'NATIVE_CLOUD_ERROR';
-      waiting.reject(err);
-      return;
-    }
-    waiting.resolve(detail || {});
-  });
+// Native errors arrive in the closed priNative model; keep this module's
+// long-standing contract for callers: DOMException TimeoutError/AbortError for
+// timeouts and aborts, and CLOUD_* / provider codes on everything else.
+function nativeFailure(error, signal) {
+  if (error?.code === 'TIMEOUT') return new DOMException('Timed out', 'TimeoutError');
+  if (error?.code === 'CANCELLED') return signal?.reason instanceof Error ? signal.reason : new DOMException('Aborted', 'AbortError');
+  const err = new Error(error?.message || 'Native cloud request failed.');
+  err.code = error?.code === 'UNAVAILABLE' && !error?.detail?.providerCode
+    ? 'CLOUD_DISABLED'
+    : (error?.detail?.providerCode || 'NATIVE_CLOUD_ERROR');
+  return err;
 }
 
-function nativeRequest(path, {
+async function nativeRequest(path, {
   method, payload, idempotencyKey, timeoutMs, signal, serverRequestId
 }) {
-  const bridge = nativeCloudHandler();
-  if (!nativeCloudAvailable() || !bridge) {
+  if (!nativeCloudAvailable()) {
     const err = new Error('Native Pri cloud transport is not configured. Offline learning remains available.');
     err.code = 'CLOUD_DISABLED';
-    return Promise.reject(err);
+    throw err;
   }
-  installNativeListener();
-  const id = `native-${requestId()}`.slice(0, 120);
-  return new Promise((resolve, reject) => {
-    const timeout = Math.max(1000, Math.min(60_000, Number(timeoutMs) || DEFAULT_TIMEOUT_MS));
-    const abort = () => {
-      if (!nativePending.has(id)) return;
-      nativePending.delete(id);
-      clearTimeout(timer);
-      try { bridge.postMessage({ id, action: 'cancel' }); } catch {}
-      const err = signal?.reason instanceof Error ? signal.reason : new DOMException('Aborted', 'AbortError');
-      reject(err);
-    };
-    const timer = setTimeout(() => {
-      if (!nativePending.has(id)) return;
-      nativePending.delete(id);
-      try { bridge.postMessage({ id, action: 'cancel' }); } catch {}
-      const err = new DOMException('Timed out', 'TimeoutError');
-      reject(err);
-    }, timeout);
-    nativePending.set(id, { resolve, reject, timer, signal, abort });
-    if (signal) {
-      if (signal.aborted) {
-        abort();
-        return;
-      }
-      signal.addEventListener('abort', abort, { once: true });
-    }
-    try {
-      bridge.postMessage({
-        id,
-        action: 'request',
-        path,
-        method,
-        requestId: serverRequestId,
-        ...(idempotencyKey ? { idempotencyKey: String(idempotencyKey).slice(0, 160) } : {}),
-        ...(payload === undefined ? {} : { body: payload })
-      });
-    } catch (error) {
-      nativePending.delete(id);
-      clearTimeout(timer);
-      if (signal) signal.removeEventListener('abort', abort);
-      reject(error);
-    }
-  });
+  try {
+    return await priNative.cloud.request(
+      { path, method, body: payload, requestId: serverRequestId, idempotencyKey: idempotencyKey || undefined },
+      { timeoutMs: Math.max(1000, Math.min(60_000, Number(timeoutMs) || DEFAULT_TIMEOUT_MS)), signal }
+    );
+  } catch (error) {
+    throw nativeFailure(error, signal);
+  }
 }
 
 export async function cloudRequest(path, {
@@ -263,6 +219,7 @@ export async function cloudRequest(path, {
       const err = new Error(data?.error?.message || data?.error || `Cloud request failed (${status || 'native'})`);
       err.status = status || undefined;
       err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
+      if (Number.isFinite(Number(data?.error?.resetAt))) err.resetAt = Number(data.error.resetAt);
       err.requestId = result?.requestId || rid;
       throw err;
     }
@@ -307,6 +264,7 @@ export async function cloudRequest(path, {
       const err = new Error(data?.error?.message || data?.error || `Cloud request failed (${response.status})`);
       err.status = response.status;
       err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
+      if (Number.isFinite(Number(data?.error?.resetAt))) err.resetAt = Number(data.error.resetAt);
       err.requestId = response.headers.get('x-pri-request-id') || rid;
       throw err;
     }
@@ -328,6 +286,15 @@ export const cloud = Object.freeze({
   guardianWithdraw: token => cloudRequest('/v1/account/guardian/withdraw', { method: 'POST', body: { token } }),
   guardianState: () => cloudRequest('/v1/account/guardian/state'),
   login: body => cloudRequest('/v1/account/login', { method: 'POST', body }),
+  // One-time codes (server/platform/otp.js). /request answers the same for an
+  // address with or without an account; /verify proves it.
+  otpRequest: body => cloudRequest('/v1/account/otp/request', { method: 'POST', body }),
+  otpVerify: body => cloudRequest('/v1/account/otp/verify', { method: 'POST', body }),
+  otpReauthRequest: () => cloudRequest('/v1/account/otp/reauth-request', { method: 'POST', body: {} }),
+  guardianOtpRequest: body => cloudRequest('/v1/account/otp/guardian/request', { method: 'POST', body }),
+  guardianOtpApprove: body => cloudRequest('/v1/account/otp/guardian/approve', { method: 'POST', body }),
+  guardianWithdrawRequest: body => cloudRequest('/v1/account/otp/guardian/withdraw-request', { method: 'POST', body }),
+  guardianWithdrawByPhone: body => cloudRequest('/v1/account/otp/guardian/withdraw', { method: 'POST', body }),
   logout: () => cloudRequest('/v1/account/logout', { method: 'POST', body: {} }),
   requestEmailVerification: () => cloudRequest('/v1/account/email/verification-request', { method: 'POST', body: {} }),
   requestPasswordReset: body => cloudRequest('/v1/account/password/reset-request', { method: 'POST', body }),
@@ -339,16 +306,30 @@ export const cloud = Object.freeze({
   exportAccount: () => cloudRequest('/v1/account/export'),
   // Server-side handwriting reading. The body carries the student's own ink as
   // a picture and nothing else: no question, no expected answer, no profile.
-  handwritingStatus: () => cloudRequest('/v1/handwriting/status'),
-  transcribeHandwriting: (image, { signal = null, timeoutMs = 25000 } = {}) =>
+  handwritingStatus: ({ signal = null, timeoutMs = 7000 } = {}) =>
+    cloudRequest('/v1/handwriting/status', { signal, timeoutMs }),
+  // Longer than the server's own reading budget (PRI_HANDWRITING_TIMEOUT_MS,
+  // 45 s by default) so the server answers before the client gives up.
+  transcribeHandwriting: (image, { signal = null, timeoutMs = 55000 } = {}) =>
     cloudRequest('/v1/handwriting/transcribe', { method: 'POST', body: { image }, signal, timeoutMs }),
   workingStatus: () => cloudRequest('/v1/working/status'),
   // The question is sent; the expected answer never is, and the route refuses
   // a body that carries one.
   checkWorking: (prompt, lines, { signal = null, timeoutMs = 35000 } = {}) =>
     cloudRequest('/v1/working/check', { method: 'POST', body: { prompt, lines }, signal, timeoutMs }),
+  // "Practise this": one photo of a printed question, nothing else. The reply
+  // proposes a chapter and skill; it never carries a mark or an answer.
+  identifyQuestionPhoto: (image, { signal = null, timeoutMs = 25000 } = {}) =>
+    cloudRequest('/v1/question-photo/identify', { method: 'POST', body: { image }, signal, timeoutMs }),
+  // The AI tutor is sent the verified solution it must stay grounded in — it
+  // is not a reader, and /v1/handwriting never receives one. Exam rows never
+  // reach here: the local backend refuses them first.
+  tutorHelp: (body, { signal = null, timeoutMs = 25000 } = {}) =>
+    cloudRequest('/v1/tutor/help', { method: 'POST', body, signal, timeoutMs }),
   deleteAccount: body => cloudRequest('/v1/account', { method: 'DELETE', body }),
   identities: () => cloudRequest('/v1/account/identity'),
+  identityProviders: () => cloudRequest('/v1/account/identity/providers'),
+  identityNonce: () => cloudRequest('/v1/account/identity/nonce', { method: 'POST', body: {} }),
   socialSignIn: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/sign-in`, { method: 'POST', body }),
   linkIdentity: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/link`, { method: 'POST', body }),
   syncPush: (body, idempotencyKey) => cloudRequest('/v1/sync/push', { method: 'POST', body, idempotencyKey }),
@@ -356,10 +337,19 @@ export const cloud = Object.freeze({
   entitlements: () => cloudRequest('/v1/entitlements'),
   billingConfig: () => cloudRequest('/v1/billing/config'),
   billingStatus: () => cloudRequest('/v1/billing/status'),
-  createWebBillingCheckout: cadence => cloudRequest('/v1/billing/checkout/web', { method: 'POST', body: { cadence } }),
+  // Web (Razorpay) checkout is never opened from a native shell: there the
+  // App Store is the only purchase path (PRI_V1_RELEASE_SCOPE §12). The server
+  // refuses it for native clients as well.
+  createWebBillingCheckout: cadence => (priNative.isNativeShell()
+    ? Promise.reject(Object.assign(new Error('Purchases in the app use the App Store.'), { code: 'BILLING_WEB_CHECKOUT_NATIVE_REFUSED' }))
+    : cloudRequest('/v1/billing/checkout/web', { method: 'POST', body: { cadence } })),
   appleBillingBootstrap: () => cloudRequest('/v1/billing/apple/bootstrap'),
   submitAppleTransaction: signedTransaction => cloudRequest('/v1/billing/apple/transaction', {
     method: 'POST', body: { signedTransaction: String(signedTransaction || '') }
+  }),
+  googleBillingBootstrap: () => cloudRequest('/v1/billing/google/bootstrap'),
+  submitGooglePurchase: purchaseToken => cloudRequest('/v1/billing/google/purchase', {
+    method: 'POST', body: { purchaseToken: String(purchaseToken || '') }
   }),
   restoreBilling: (provider, body = {}) => cloudRequest(`/v1/billing/restore/${pathId(provider, 'provider')}`, { method: 'POST', body }),
   // Cancel/manage contract (server: wp/server-commerce-classes). Web cancels at

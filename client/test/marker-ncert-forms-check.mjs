@@ -16,7 +16,7 @@ import {
   parseIntervalInput, parseMatrixInput, parseVectorInput,
   sameRegion, sameMatrix, sameVector, formatRegion, formatVector, formatMatrix
 } from '../src/engine/answer-forms.js';
-import { evalNumeric } from '../src/engine/expr.js';
+import { evalNumeric, exprEquivalent } from '../src/engine/expr.js';
 
 let pass = 0;
 const failures = [];
@@ -404,7 +404,254 @@ wrong(solutionSet, '= -4', 'decoration: an equals sign does not complete a parti
 const restated = checkAnswer({ answer: { type: 'numeric', value: 12 }, prompt: 'Solve 2x + 4 = 28' }, '2x + 4 = 28');
 ok(restated.correct === false, 'partial credit: restating the question is not a correct answer');
 
+
+// ── 14. Domain-aware final answers (issue #231) ──────────────────────────────
+// exprEquivalent() compared fixed sample points and skipped undefined ones, so
+// x/x passed for 1 and (x²−1)/(x−1) passed for x+1. A final answer has to be
+// defined where the answer is (`strictDomain`); a line of working does not,
+// because cancelling a common factor is a valid step that loses the hole.
+const strict = { strictDomain: true };
+const isolatedEarly = { isolatedDomain: true };
+function same(a, b, opts, label) { ok(exprEquivalent(a, b, opts) === true, `domain: ${label}: ${a} ≡ ${b} should hold`); }
+function differ(a, b, opts, label) { ok(exprEquivalent(a, b, opts) === false, `domain: ${label}: ${a} ≡ ${b} must be refused`); }
+
+// holes from the issue
+differ('x/x', '1', strict, 'hole at 0');
+differ('(x^2)/(x)', 'x', strict, 'hole at 0');
+differ('(x^2-1)/(x-1)', 'x+1', strict, 'hole at 1');
+differ('x+1', '(x^2-1)/(x-1)', strict, 'hole at 1, either order');
+differ('(x-5)/(x-5)', '1', strict, 'hole outside the sampling window');
+differ('(x^2-2)/(x^2-2)', '1', strict, 'irrational holes at ±√2');
+differ('(x*y)/y', 'x', strict, 'hole along y = 0 with two variables');
+
+// Radical, log and trigonometric restrictions
+differ('sqrt(x)^2', 'x', strict, 'square root defined only for x ≥ 0');
+differ('ln(x^2)', '2*ln(x)', strict, 'log of a square is defined for negative x');
+same('ln(x^2)', '2*ln(x)', { ...strict, positiveOnly: true }, 'positive-only question');
+same('sin(x)/cos(x)', 'tan(x)', strict, 'same poles at odd multiples of π/2');
+
+// An authored domain that excludes the hole accepts the cancelled form
+same('(x^2-1)/(x-1)', 'x+1', { ...strict, domain: [2, 5] }, 'authored domain excludes x = 1');
+
+// No false regression on ordinary equivalence
+same('(x+1)^2', 'x^2+2x+1', strict, 'polynomial expansion');
+same('2x+3y', '3y+2x', strict, 'commutativity');
+same('sin(2x)', '2sin(x)cos(x)', strict, 'double angle');
+same('1/(x^2)', 'x^(-2)', strict, 'same hole at 0, two notations');
+same('x^2/x^3', '1/x', strict, 'same hole at 0 after cancelling');
+same('(x^2-9)/(x-3)', '(x+3)(x-3)/(x-3)', strict, 'same hole kept on both sides');
+differ('x^2+1', 'x^2+2', strict, 'genuinely different values');
+
+// Without strictDomain, the cancellation convention is unchanged
+same('(x^2-1)/(x-1)', 'x+1', {}, 'working-line comparison keeps the cancellation convention');
+
+// through the real marker
+const simplify = { answerType: 'expression', answer: { expr: 'x+3' }, prompt: 'Simplify (x^2-9)/(x-3)' };
+ok(checkAnswer(simplify, 'x+3').correct === true, 'marker: the simplified answer is correct');
+ok(checkAnswer(simplify, '(x^2-9)/(x-3)').correct === false, 'marker: copying the unsimplified expression back is not the answer x+3');
+
+const reciprocal = { answerType: 'expression', answer: { expr: '1' }, prompt: 'Write x/x for x ≠ 0 in simplest form' };
+ok(checkAnswer(reciprocal, '1').correct === true, 'marker: 1 is accepted');
+ok(checkAnswer(reciprocal, 'x/x').correct === false, 'marker: x/x is not accepted as 1');
+
+// Step Check: factorise-then-cancel working must still be correct end to end.
+const working = {
+  answerType: 'working',
+  prompt: 'Simplify (x^2 - 16)/(x - 4), showing each line of your working.',
+  answer: {
+    stepMeta: { kind: 'expression', canonical: '(x^2 - 16)/(x - 4)' },
+    minLines: 2,
+    final: { kind: 'expr', expr: 'x + 4' }
+  }
+};
+const verdict = checkAnswer(working, '(x^2 - 16)/(x - 4)\n((x + 4)(x - 4))/(x - 4)\nx + 4');
+ok(verdict.correct === true, `marker: factorise-then-cancel working is correct (${verdict.feedback || ''})`);
+
+// ── 15. Domain probe review fixes (PR #243 review) ────────────────────────────
+// e is Euler's number, never a variable to search for holes over.
+same('-e^(-x)', '-1/e^x', strict, 'e is a constant: negative exponent');
+same('1/e^x', 'e^(-x)', strict, 'e is a constant: reciprocal');
+same('x*e^(-x)', 'x/e^x', strict, 'e is a constant: product and quotient');
+same('e^x/(1+e^x)', '1/(1+e^(-x))', strict, 'e is a constant: logistic forms');
+same('1/(e^x+e^(-x))', 'e^x/(e^(2x)+1)', strict, 'e is a constant: hyperbolic forms');
+differ('(x-e)/(x-e)', '1', strict, 'a hole at x = e is still a hole');
+differ('(x-pi)/(x-pi)', '1', strict, 'a hole at x = π is still a hole');
+
+// An odd-denominator power is the real odd root, as cbrt is.
+same('cbrt(x)', 'x^(1/3)', strict, 'real cube root, two notations');
+same('(1/3)x^(-2/3)', '1/(3cbrt(x^2))', strict, 'derivative of the cube root');
+same('x^(2/3)', 'cbrt(x^2)', strict, 'two-thirds power as root of the square');
+same('x^(2/3)', 'cbrt(x)^2', strict, 'two-thirds power as square of the root');
+differ('(x^2)^(1/6)', 'x^(1/3)', strict, '(x²)^(1/6) is |x|^(1/3), negative for no x');
+
+// The reviewer's must-refuse set, including holes outside the sampling window.
+differ('x/x', '1', strict, 'review: hole at 0');
+differ('(x^2-1)/(x-1)', 'x+1', strict, 'review: hole at 1');
+differ('sqrt(x^2)', 'x', strict, 'review: √(x²) is |x|');
+differ('ln(x^2)', '2ln(x)', strict, 'review: log of a square');
+differ('(x-25)/(x-25)', '1', strict, 'hole at 25, outside [-20, 20]');
+differ('(x-1000)/(x-1000)', '1', strict, 'hole at 1000');
+differ('(x-5000)/(x-5000)', '1', strict, 'hole at 5000: linear guard solved exactly');
+differ('(0.001x-5)/(0.001x-5)', '1', strict, 'hole at 5000 with a decimal coefficient');
+differ('(x^2-50)/(x^2-50)', '1', strict, 'holes at ±√50: quadratic guard solved exactly');
+differ('(x-25)^2/(x-25)^2', '1', strict, 'double root at 25');
+differ('(x^3-27)/(x^3-27)', '1', strict, 'cubic guard searched inside its root bound');
+differ('(x-1/3)/(x-1/3)', '1', strict, 'hole at a third');
+differ('sqrt(x+30)^2', 'x+30', strict, 'root guard changes sign at -30');
+differ('(sqrt(x)-5.5)/(sqrt(x)-5.5)', '1', strict, 'non-polynomial guard, hole at 30.25');
+// Far tangential holes (formerly a pinned limitation): a non-polynomial guard
+// that only touches zero beyond |x| = 20, off the whole numbers.
+differ('(cos(x/100)+1)/(cos(x/100)+1)', '1', strict, 'far tangential hole at x = 100π');
+differ('(cos(x/100)+1)/(cos(x/100)+1)', '1', isolatedEarly, 'far tangential hole at x = 100π, default policy');
+differ('(cos(x/50)-1)/(cos(x/50)-1)', '1', strict, 'far tangential hole at x = 100π (touching from below)');
+differ('(sin(x/200)+1)/(sin(x/200)+1)', '1', strict, 'far tangential hole at x = −100π');
+// …without inventing holes where the guard only comes close to zero
+same('(cos(x/100)+1.001)/(cos(x/100)+1.001)', '1', strict, 'a far near-miss is not a hole');
+same('((x-300.3)^2+1)/((x-300.3)^2+1)', '1', strict, 'a far minimum above zero is not a hole');
+
+// through the real marker
+const marks = (expr, input) => checkAnswer({ answerType: 'expression', answer: { expr }, prompt: 'Differentiate' }, input).correct;
+ok(marks('-e^(-x)', '-1/e^x') === true, 'marker: -1/e^x is accepted for -e^(-x)');
+ok(marks('x*e^(-x)', 'x/e^x') === true, 'marker: x/e^x is accepted for x e^(-x)');
+ok(marks('e^x/(1+e^x)', '1/(1+e^(-x))') === true, 'marker: logistic forms are accepted');
+ok(marks('(1/3)x^(-2/3)', '1/(3cbrt(x^2))') === true, 'marker: the cube-root derivative is accepted');
+ok(marks('x^(1/3)', 'cbrt(x)') === true, 'marker: cbrt(x) is accepted for x^(1/3)');
+ok(marks('1', '(x-25)/(x-25)') === false, 'marker: (x-25)/(x-25) is not accepted as 1');
+
+// Policy (owner decision, recorded in PR #243): 0^0 and the poles of sec/tan
+// are domain restrictions, so x^0 is not 1 and sec²x − tan²x is not 1 here.
+differ('x^0', '1', strict, 'policy: x^0 is undefined at 0');
+differ('sec(x)^2-tan(x)^2', '1', strict, 'policy: sec²x − tan²x is undefined at odd multiples of π/2');
+
+// ── 16. Second review of PR #243: touching roots and the domain policy ────────
+// The marker's default for a final answer is `isolatedDomain`: an isolated
+// removable-point difference is refused (the #231 class), an interval
+// difference is not unless the question authors `strictDomain: true`.
+const isolated = { isolatedDomain: true };
+const finalMark = (expr, input, extra = {}) =>
+  checkAnswer({ answerType: 'expression', answer: { expr, ...extra }, prompt: 'Simplify' }, input).correct;
+
+// Touching roots: one side squares the factor the other side leaves unsquared.
+// Definedness at the root must not depend on where the root-finder put it.
+const touching = [
+  ['ln(abs(sec(x)+tan(x)))', 'ln(abs(tan(pi/4+x/2)))'],
+  ['ln(abs(sec(x)+tan(x)))', '-ln(abs(sec(x)-tan(x)))'],
+  ['ln(abs(cosec(x)-cot(x)))', 'ln(abs(tan(x/2)))'],
+  ['sin(x)/(1+cos(x))', 'tan(x/2)'],
+  ['1/(x-sqrt(2))^2', '(x-sqrt(2))^(-2)'],
+  ['1/(x-1/3)^2', '(x-1/3)^(-2)'],
+  ['1/(x-sqrt(2))^2', '1/(x-sqrt(2))/(x-sqrt(2))'],
+  ['ln((x-sqrt(2))^2)', '2*ln(abs(x-sqrt(2)))']
+];
+for (const [a, b] of touching) {
+  same(a, b, isolated, 'touching root, default policy');
+  same(b, a, isolated, 'touching root, default policy, either order');
+  same(a, b, strict, 'touching root, strict domain');
+  ok(finalMark(b, a) === true, `marker: ${a} is accepted for ${b}`);
+}
+
+// Interval differences behave as on main by default (NCERT's implied positivity)…
+const intervals = [
+  ['ln(x)+ln(y)', 'ln(x*y)'],
+  ['ln(x^2)', '2*ln(x)'],
+  ['sqrt(x)*sqrt(x)', 'x'],
+  ['ln(x)', 'ln(abs(x))'],
+  ['sqrt(x)^2', 'x']
+];
+for (const [a, b] of intervals) {
+  same(a, b, isolated, 'interval difference accepted by default');
+  ok(finalMark(b, a) === true, `marker: ${a} is accepted for ${b} by default`);
+  // …and are refused where the question authors a strict domain.
+  differ(a, b, strict, 'interval difference refused under strictDomain');
+  ok(finalMark(b, a, { strictDomain: true }) === false, `marker: ${a} is refused for ${b} when the question sets strictDomain`);
+}
+
+// The #231 class, isolated removable points, is refused by default.
+const holes = [
+  ['x/x', '1'], ['(x^2-1)/(x-1)', 'x+1'], ['(x*y)/y', 'x'], ['x^0', '1'],
+  ['sec(x)^2-tan(x)^2', '1'], ['(x-25)/(x-25)', '1'], ['(e^x-1)/(e^x-1)', '1']
+];
+for (const [a, b] of holes) {
+  differ(a, b, isolated, 'isolated hole refused by default');
+  ok(finalMark(b, a) === false, `marker: ${a} is refused for ${b}`);
+}
+
+// Trigonometric identities that differ only at scattered points among poles of
+// both sides are accepted by default and refused under strictDomain.
+for (const [a, b] of [['tan(2x)', '2tan(x)/(1-tan(x)^2)'], ['(1-cos(x))/sin(x)', 'tan(x/2)']]) {
+  same(a, b, isolated, 'trigonometric identity among poles, default policy');
+  ok(finalMark(a, b) === true, `marker: ${b} is accepted for ${a}`);
+  differ(a, b, strict, 'trigonometric identity refused under strictDomain');
+}
+
+// The odd-root reading also compares values: (−x)^(1/3) is −x^(1/3).
+same('(-x)^(1/3)', '-x^(1/3)', isolated, 'odd root of a negated variable');
+same('(-x)^(1/3)', '-x^(1/3)', strict, 'odd root of a negated variable, strict');
+
+// A repeated (key, answer) pair is answered from the cache with the same verdict.
+ok(exprEquivalent('x/x', '1', isolated) === false && exprEquivalent('x/x', '1', isolated) === false, 'domain: cached verdict is stable');
+ok(exprEquivalent('tan(2x)', '2tan(x)/(1-tan(x)^2)', isolated) === true, 'domain: cached acceptance is stable');
+
+// ── 17. Endpoints of an interval domain (third review of PR #243) ─────────────
+// Sides that differ only at an endpoint of their common domain — both undefined
+// just beyond it — are an interval difference: accepted by default, refused
+// where the question authors strictDomain. (sin⁻¹ is written asin/arcsin: the
+// parser reads sin⁻¹x as (sin x)⁻¹, and has no inverse cotangent.)
+const endpoints = [
+  ['x/sqrt(x)', 'sqrt(x)'],
+  ['asin(x)', 'atan(x/sqrt(1-x^2))'],
+  ['arcsin(x)', 'arctan(x/sqrt(1-x^2))']
+];
+for (const [a, b] of endpoints) {
+  same(a, b, isolated, 'endpoint difference accepted by default');
+  same(b, a, isolated, 'endpoint difference accepted by default, either order');
+  ok(finalMark(b, a) === true, `marker: ${a} is accepted for ${b} by default`);
+  differ(a, b, strict, 'endpoint difference refused under strictDomain');
+  ok(finalMark(b, a, { strictDomain: true }) === false, `marker: ${a} is refused for ${b} when the question sets strictDomain`);
+}
+// A hole inside the common domain is still isolated, and still refused.
+differ('(x+1)/(x^2-1)', '1/(x-1)', isolated, 'interior hole at -1 refused by default');
+ok(finalMark('1/(x-1)', '(x+1)/(x^2-1)') === false, 'marker: (x+1)/(x²−1) is refused for 1/(x−1)');
+
+// Endpoint review fixes: an endpoint is one of the natural domain, judged on
+// the real line at every scale — not an authored bound, and not a hole that
+// merely sits close to a natural boundary.
+const authored = (expr, domain, input) => checkAnswer({ answerType: 'expression', answer: { expr, domain }, prompt: 'Simplify' }, input).correct;
+ok(authored('1', [0, 5], 'x/x') === false, 'marker: x/x is refused for 1 when the authored domain is [0, 5] (hole at the bound)');
+ok(authored('1', [-5, 0], 'x/x') === false, 'marker: x/x is refused for 1 when the authored domain is [-5, 0] (hole at the bound)');
+ok(authored('x+1', [1, 5], '(x^2-1)/(x-1)') === false, 'marker: (x²−1)/(x−1) is refused for x+1 when the authored domain is [1, 5]');
+differ('sqrt(x)*(x-0.00005)/(x-0.00005)', 'sqrt(x)', isolated, 'hole at 0.00005 beside √x\'s boundary is still a hole');
+differ('sqrt(x)*(x-0.0000001)/(x-0.0000001)', 'sqrt(x)', isolated, 'hole at 10⁻⁷ beside √x\'s boundary is still a hole');
+differ('sqrt(x)*(x-0.0002)/(x-0.0002)', 'sqrt(x)', isolated, 'hole at 0.0002 beside √x\'s boundary is still a hole');
+same('x/sqrt(x)', 'sqrt(x)', isolated, 'natural endpoint at 0 still accepted');
+same('asin(x)', 'atan(x/sqrt(1-x^2))', isolated, 'natural endpoints at ±1 still accepted');
+
+// ── ln(eˣ) and e as Euler's number (§10 grading authority) ───────────────────
+// e was sampled as a variable, so ln(eˣ) vs x — even ln(e⁵) vs 5 — was marked
+// wrong. e is always Euler's number now; base-10 log of eˣ must still differ.
+for (const opts of [{}, isolatedEarly, strict]) {
+  same('ln(e^x)', 'x', opts, 'ln(eˣ) = x');
+  same('x', 'ln(e^x)', opts, 'x = ln(eˣ)');
+  same('ln(e^(2x))', '2x', opts, 'ln(e²ˣ) = 2x');
+  same('ln(e^(x+1))', 'x+1', opts, 'ln(eˣ⁺¹) = x + 1');
+  same('ln(e^(-x^2))', '-x^2', opts, 'ln(e^(−x²)) = −x², no underflow plateau taken for a hole');
+  same('ln(exp(x))', 'x', opts, 'ln(exp x) = x');
+  same('ln(e^5)', '5', opts, 'ln(e⁵) = 5');
+  same('e^x/e^x', '1', opts, 'eˣ/eˣ = 1');
+  differ('log(e^x)', 'x', opts, 'log₁₀(eˣ) is not x');
+  differ('ln(e^x)', 'x+1', opts, 'ln(eˣ) is not x + 1');
+  differ('ln(e^x)', '2x', opts, 'ln(eˣ) is not 2x');
+}
+differ('e^(ln(x))', 'x', strict, 'e^(ln x) is only x for x > 0');
+ok(marks('x', 'ln(e^x)') === true, 'marker: ln(e^x) is accepted for x');
+ok(marks('2x', 'ln(e^(2x))') === true, 'marker: ln(e^(2x)) is accepted for 2x');
+ok(marks('5', 'ln(e^5)') === true, 'marker: ln(e^5) is accepted for 5');
+ok(marks('x', 'log(e^x)') === false, 'marker: log(e^x) is not accepted for x');
+ok(marks('x', 'ln(e^(x+1))') === false, 'marker: ln(e^(x+1)) is not accepted for x');
+ok(marks('e*x', 'x*e') === true, 'marker: e·x commutes');
+ok(marks('e^2', '7.39') === false, 'marker: a rounded decimal is not e²');
+
 console.log(failures.length
   ? `NCERT ANSWER FORMS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `NCERT ANSWER FORMS: PASS — ${pass}/${pass} checks — solution sets, inequality/interval equivalence, matrices, vectors, the n!/nCr/nPr/sec/cosec/cot vocabulary, rupees and paise, fraction form only where the question asks for it, blank answers, exact integers, the percent sign and unit-named variables.`);
+  : `NCERT ANSWER FORMS: PASS — ${pass}/${pass} checks — solution sets, inequality/interval equivalence, matrices, vectors, the n!/nCr/nPr/sec/cosec/cot vocabulary, rupees and paise, fraction form only where the question asks for it, blank answers, exact integers, the percent sign, unit-named variables and domain-aware final answers.`);
 process.exit(failures.length ? 1 : 0);

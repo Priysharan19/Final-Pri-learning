@@ -1,14 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { printPage } from '../lib/files.js';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { LineChart, HBars, Calendar, StatTile, Sparkline, MASTERY_FILLS } from '../components/Charts.jsx';
+import { useT, useTx } from '../i18n/index.js';
 
-const BAND_LABEL = { unseen: 'Unseen', emerging: 'Emerging', developing: 'Developing', strong: 'Strong', mastered: 'Mastered' };
+// Mastery band names, as catalogue keys resolved with t() at render time.
+const BAND_KEY = { unseen: 'progressAu.bandUnseen', emerging: 'progressAu.bandEmerging', developing: 'progressAu.bandDeveloping', strong: 'progressAu.bandStrong', mastered: 'progressAu.bandMastered' };
+const DIFFICULTY_KEY = ['difficulty.1', 'difficulty.2', 'difficulty.3', 'difficulty.4'];
+const TABS = [['overview', 'progressAu.tabOverview'], ['priorities', 'progressAu.tabPriorities'], ['map', 'progressAu.tabMap']];
 const RAMP = ['var(--m1)', 'var(--m2)', 'var(--m3)', 'var(--m4)', 'var(--m5)'];
 const rampFor = m => RAMP[Math.min(4, Math.floor((m || 0) / 20))];
 
 export default function Progress() {
+  const t = useT();
   const { user } = useApp();
   const nav = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -26,25 +32,25 @@ export default function Progress() {
 
   const sections = useMemo(() => {
     if (!curriculum) return [];
-    const core = curriculum.years.map(y => ({ key: `y${y.year}`, label: `Year ${y.year}${y.year === user.year ? ' · yours' : ''}`, ...y }));
+    const core = curriculum.years.map(y => ({ key: `y${y.year}`, label: y.year === user.year ? t('progressAu.yearYours', { n: y.year }) : t('common.yearNumber', { n: y.year }), ...y }));
     const streams = (curriculum.streams || []).map(g => ({ key: g.key, label: g.title, ...g }));
     return [...core, ...streams];
-  }, [curriculum, user.year]);
+  }, [curriculum, user.year, t]);
 
   const section = useMemo(() => sections.find(s => s.key === sectionKey) || sections[0], [sections, sectionKey]);
 
-  const setTab = t => setParams(t === 'overview' ? {} : { tab: t });
+  const setTab = k => setParams(k === 'overview' ? {} : { tab: k });
 
-  const tabName = { overview: 'Overview', priorities: 'Priorities', map: 'Knowledge map' }[tab] || 'Overview';
+  const tabName = t((TABS.find(([k]) => k === tab) || TABS[0])[1]);
 
   return (
     <div>
       {/* The page draws no title of its own — the tab strip is the title bar —
           so the heading a screen reader needs is spoken rather than drawn. */}
-      <h1 className="sr-only">Progress — {tabName}</h1>
+      <h1 className="sr-only">{t('progressAu.srHeading', { tab: tabName })}</h1>
       <div className="page-tabs no-print">
-        {[['overview', 'Overview'], ['priorities', 'Priorities'], ['map', 'Knowledge map']].map(([k, label]) => (
-          <button key={k} className={`page-tab ${tab === k ? 'on' : ''}`} aria-pressed={tab === k} onClick={() => setTab(k)}>{label}</button>
+        {TABS.map(([k, labelKey]) => (
+          <button key={k} className={`page-tab ${tab === k ? 'on' : ''}`} aria-pressed={tab === k} onClick={() => setTab(k)}>{t(labelKey)}</button>
         ))}
       </div>
 
@@ -58,6 +64,8 @@ export default function Progress() {
 /* ───────────────────────────── Overview ───────────────────────────── */
 
 function Overview({ stats, curriculum, section, sections, sectionKey, setSectionKey, badges, range, setRange, user, nav }) {
+  const t = useT();
+  const tx = useTx();
   if (!stats) return <div className="skeleton" style={{ height: 400 }} />;
   const acc = stats.totals.attempts ? Math.round(100 * stats.totals.correct / stats.totals.attempts) : 0;
   const scopeSubs = section?.subtopics || [];
@@ -70,7 +78,7 @@ function Overview({ stats, curriculum, section, sections, sectionKey, setSection
   return (
     <div className="grid" style={{ gap: 18 }}>
       <div className="row no-print" style={{ flexWrap: 'wrap' }}>
-        <label className="sr-only" htmlFor="progress-scope">Year or course to show</label>
+        <label className="sr-only" htmlFor="progress-scope">{t('progressAu.scopeLabel')}</label>
         <select className="input" id="progress-scope" style={{ width: 260 }} value={sectionKey} onChange={e => setSectionKey(e.target.value)}>
           {sections.map(sc => <option key={sc.key} value={sc.key}>{sc.label}</option>)}
         </select>
@@ -78,72 +86,74 @@ function Overview({ stats, curriculum, section, sections, sectionKey, setSection
 
       <div className="card card-flush band-card">
         <div className="band-left">
-          <div className="sc-label" style={{ margin: 0 }}>Band <span style={{ textTransform: 'none', letterSpacing: 0 }}>(predicted)</span></div>
+          <div className="sc-label" style={{ margin: 0 }}>{tx('progressAu.bandPredicted', { predicted: <span style={{ textTransform: 'none', letterSpacing: 0 }}>{t('progressAu.predictedParen')}</span> })}</div>
           <div className="band-big">{band ? (band.scale === 'grade' ? band.label : band.label.replace(/^Band\s*/, 'B')) : '—'}</div>
           {band && <div className="muted">{band.desc || ''}</div>}
 
           <div className="stat-line">
-            <span>{stats.totals.correct} / {stats.totals.attempts} correct</span>
-            <span className="sc-label"><span className="big" style={{ color: 'var(--ink)' }}>{acc}%</span> accuracy</span>
+            <span>{t('progressAu.correctOf', { correct: stats.totals.correct, total: stats.totals.attempts })}</span>
+            <span className="sc-label">{tx('progressAu.accuracyLabel', { pct: <span className="big" style={{ color: 'var(--ink)' }}>{acc}%</span> })}</span>
           </div>
           <div className="meter"><i style={{ width: `${acc}%` }} /></div>
-          <div className="muted" style={{ marginTop: 6 }}>{stats.totals.attempts} attempts | {attempted.length} topics touched</div>
+          <div className="muted" style={{ marginTop: 6 }}>{t('progressAu.attemptsTopics', { count: stats.totals.attempts, n: stats.totals.attempts, topics: attempted.length })}</div>
 
           <div className="stat-line" style={{ marginTop: 20 }}>
-            <span>{outcomesCovered} / {outcomes} outcomes</span>
-            <span className="sc-label"><span className="big" style={{ color: 'var(--ink)' }}>{outcomes ? Math.round(100 * outcomesCovered / outcomes) : 0}%</span> covered</span>
+            <span>{t('progressAu.outcomesOf', { covered: outcomesCovered, total: outcomes })}</span>
+            <span className="sc-label">{tx('progressAu.coveredLabel', { pct: <span className="big" style={{ color: 'var(--ink)' }}>{outcomes ? Math.round(100 * outcomesCovered / outcomes) : 0}%</span> })}</span>
           </div>
           <div className="meter gold"><i style={{ width: `${Math.min(100, outcomes ? 100 * outcomesCovered / outcomes : 0)}%` }} /></div>
         </div>
         <div style={{ padding: '18px 22px' }}>
           <div className="spread">
-            <h3>Demonstrated Mark History</h3>
-            <label className="sr-only" htmlFor="progress-range">Range of mark history to show</label>
+            <h3>{t('progressAu.markHistory')}</h3>
+            <label className="sr-only" htmlFor="progress-range">{t('progressAu.rangeLabel')}</label>
             <select className="input" id="progress-range" style={{ width: 130, padding: '5px 10px', fontSize: 13.5 }} value={range} onChange={e => setRange(e.target.value)}>
-              <option value="all">All time</option>
-              <option value="60">60 days</option>
-              <option value="30">30 days</option>
+              <option value="all">{t('progressAu.allTime')}</option>
+              <option value="60">{t('progressAu.lastDays', { count: 60, n: 60 })}</option>
+              <option value="30">{t('progressAu.lastDays', { count: 30, n: 30 })}</option>
             </select>
           </div>
           <div style={{ marginTop: 10 }}>
             {traj.length >= 2
-              ? <LineChart data={traj.map(t => ({ label: t.date.slice(5), value: t.predicted }))} band={{ low: stats.predicted.low, high: stats.predicted.high }} height={190} />
-              : <div className="muted" style={{ padding: '48px 0', textAlign: 'center' }}>Not enough demonstrated-mark history yet.</div>}
+              ? <LineChart data={traj.map(p => ({ label: p.date.slice(5), value: p.predicted }))} band={{ low: stats.predicted.low, high: stats.predicted.high }} height={190} />
+              : <div className="muted" style={{ padding: '48px 0', textAlign: 'center' }}>{t('progressAu.notEnoughHistory')}</div>}
           </div>
         </div>
       </div>
 
       <div className="card">
         <div className="spread">
-          <h3>Syllabus performance <span className="muted" style={{ fontSize: 14 }}>| {section?.label}</span></h3>
-          <span className="sc-label" style={{ margin: 0 }}>{scopeSubs.length} topics</span>
+          <h3>{tx('progressAu.syllabusPerformance', { scope: <span className="muted" style={{ fontSize: 14 }}>| {section?.label}</span> })}</h3>
+          <span className="sc-label" style={{ margin: 0 }}>{t('progressAu.topicsCount', { count: scopeSubs.length, n: scopeSubs.length })}</span>
         </div>
         <SyllabusBoard subs={scopeSubs} nav={nav} />
       </div>
 
       <div className="grid cols-4">
-        <StatTile label="Predicted mark" value={stats.predicted.mark} suffix="/100"
-          delta={band ? `${band.scale === 'grade' ? `Grade ${band.label}` : band.label} · range ${stats.predicted.low}–${stats.predicted.high}` : `range ${stats.predicted.low}–${stats.predicted.high}`} deltaGood />
-        <StatTile label="Day streak" value={stats.streak} suffix={stats.streak === 1 ? 'day' : 'days'}
-          delta={stats.streak > 0 ? 'Keep it alive today' : 'Answer 1 question to start'} deltaGood={stats.streak > 0} />
-        <StatTile label="Questions answered" value={stats.totals.attempts.toLocaleString()}
+        <StatTile label={t('progressAu.predictedMark')} value={stats.predicted.mark} suffix="/100"
+          delta={band
+            ? t('progressAu.bandRange', { band: band.scale === 'grade' ? t('progressAu.gradeLabel', { label: band.label }) : band.label, low: stats.predicted.low, high: stats.predicted.high })
+            : t('progressAu.range', { low: stats.predicted.low, high: stats.predicted.high })} deltaGood />
+        <StatTile label={t('app.dayStreak')} value={stats.streak} suffix={t('progressAu.daysUnit', { count: stats.streak })}
+          delta={stats.streak > 0 ? t('progressAu.keepAlive') : t('progressAu.answerToStart')} deltaGood={stats.streak > 0} />
+        <StatTile label={t('progress.questionsAnswered')} value={stats.totals.attempts.toLocaleString()}
           spark={stats.activity.slice(-12).map(a => a.questions)} />
-        <StatTile label="Time practising" value={`${Math.round((stats.totals.ms || 0) / 3600000 * 10) / 10}h`}
-          delta={stats.examCount ? `${stats.examCount} exam${stats.examCount === 1 ? '' : 's'} sat` : 'No exams yet'} deltaGood />
+        <StatTile label={t('progressAu.timePractising')} value={t('progressAu.hours', { n: Math.round((stats.totals.ms || 0) / 3600000 * 10) / 10 })}
+          delta={stats.examCount ? t('progressAu.examsSat', { count: stats.examCount, n: stats.examCount }) : t('progressAu.noExams')} deltaGood />
       </div>
 
       <div className="grid cols-2">
         <div className="card">
-          <div className="card-title">Accuracy by difficulty</div>
+          <div className="card-title">{t('progressAu.accuracyByDifficulty')}</div>
           <HBars data={[1, 2, 3, 4].map(d => {
             const row = stats.byDiff.find(x => x.difficulty === d);
             const pct = row && row.n ? Math.round(100 * row.c / row.n) : 0;
-            return { label: `D${d} ${['Foundation', 'Intermediate', 'Advanced', 'Extension'][d - 1]}`, value: pct };
+            return { label: `D${d} ${t(DIFFICULTY_KEY[d - 1])}`, value: pct };
           })} />
-          <p className="muted" style={{ marginTop: 8 }}>The engine keeps you near 70% — the zone where learning is fastest.</p>
+          <p className="muted" style={{ marginTop: 8 }}>{t('progressAu.engineNear70')}</p>
         </div>
         <div className="card">
-          <div className="card-title">Practice calendar</div>
+          <div className="card-title">{t('progressAu.practiceCalendar')}</div>
           <Calendar days={stats.activity} />
         </div>
       </div>
@@ -151,7 +161,7 @@ function Overview({ stats, curriculum, section, sections, sectionKey, setSection
       {badges && (
         <div className="card">
           <div className="spread">
-            <div className="card-title" style={{ margin: 0 }}>Achievements</div>
+            <div className="card-title" style={{ margin: 0 }}>{t('progressAu.achievements')}</div>
             <span className="muted">{badges.earnedCount} / {badges.total}</span>
           </div>
           <div className="badge-grid" style={{ marginTop: 12 }}>
@@ -174,6 +184,7 @@ function Overview({ stats, curriculum, section, sections, sectionKey, setSection
 }
 
 function SyllabusBoard({ subs, nav }) {
+  const t = useT();
   const byStrand = useMemo(() => {
     const m = new Map();
     for (const s of subs) { if (!m.has(s.strand)) m.set(s.strand, []); m.get(s.strand).push(s); }
@@ -183,9 +194,9 @@ function SyllabusBoard({ subs, nav }) {
     <table className="syl-table" style={{ marginTop: 8 }}>
       <thead>
         <tr className="syl-head-row">
-          <th style={{ textAlign: 'right', paddingRight: 16 }}><span className="sr-only">Topic</span></th>
+          <th style={{ textAlign: 'right', paddingRight: 16 }}><span className="sr-only">{t('common.topic')}</span></th>
           {['B1', 'B2', 'B3', 'B4', 'B5', 'B6'].map(b => <th key={b} style={{ width: 64 }}>{b}</th>)}
-          <th style={{ paddingLeft: 14 }}>Dot points</th>
+          <th style={{ paddingLeft: 14 }}>{t('progressAu.dotPoints')}</th>
         </tr>
       </thead>
       <tbody>
@@ -198,10 +209,10 @@ function SyllabusBoard({ subs, nav }) {
                   {/* the row used to navigate from an onClick on the <tr> itself,
                       which no keyboard could reach. The cell's own text is the
                       control now, drawn with no chrome so the table is unchanged. */}
-                  <button onClick={() => nav(`/practice?subtopic=${s.id}`)} title="Practise this topic"
+                  <button onClick={() => nav(`/practice?subtopic=${s.id}`)} title={t('progressAu.practiseThisTopic')}
                     style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textAlign: 'inherit', width: '100%' }}>
-                    {s.name}{s.due && <span style={{ color: 'var(--warn)' }}> ●<span className="sr-only"> review due</span></span>}
-                    <span className="sr-only"> — practise this topic</span>
+                    {s.name}{s.due && <span style={{ color: 'var(--warn)' }}> ●<span className="sr-only"> {t('progressAu.reviewDue')}</span></span>}
+                    <span className="sr-only"> — {t('progressAu.practiseThisTopicLower')}</span>
                   </button>
                 </td>
                 <td colSpan={6} className="syl-band-cell">
@@ -211,10 +222,10 @@ function SyllabusBoard({ subs, nav }) {
                     <span className="dotline" />
                     {s.attempts >= 3
                       ? <span className="syl-bandbar" style={{ left: `${Math.max(2, s.mastery * 0.94)}%`, width: 26, background: rampFor(s.mastery) }} />
-                      : <span className="syl-nopred">No prediction</span>}
+                      : <span className="syl-nopred">{t('progressAu.noPrediction')}</span>}
                   </div>
                   <span className="sr-only">
-                    {s.attempts >= 3 ? `${s.mastery}% mastery` : 'not enough attempts yet to predict a band'}
+                    {s.attempts >= 3 ? t('progressAu.masteryPct', { n: s.mastery }) : t('progressAu.notEnoughToPredict')}
                   </span>
                 </td>
                 <td>
@@ -225,8 +236,8 @@ function SyllabusBoard({ subs, nav }) {
                     ))}
                   </div>
                   <span className="sr-only">
-                    {(s.dotpoints || []).length} dot point{(s.dotpoints || []).length === 1 ? '' : 's'}
-                    {s.attempts > 0 ? ` · ${s.attempts} attempt${s.attempts === 1 ? '' : 's'}` : ' · not started'}
+                    {t('progressAu.dotPointsCount', { count: (s.dotpoints || []).length, n: (s.dotpoints || []).length })}
+                    {' · '}{s.attempts > 0 ? t('progressAu.attemptsCount', { count: s.attempts, n: s.attempts }) : t('progressAu.notStartedLower')}
                   </span>
                 </td>
               </tr>
@@ -239,22 +250,22 @@ function SyllabusBoard({ subs, nav }) {
 }
 
 function ReportCard({ user }) {
+  const t = useT();
   const [report, setReport] = useState(null);
   useEffect(() => { api.get('/report').then(setReport).catch(() => { }); }, []);
   if (!report) return null;
   return (
     <div className="card">
       <div className="spread no-print">
-        <div className="card-title" style={{ marginBottom: 0 }}>Progress report — {report.student.course || `Year ${report.student.year}`}</div>
-        <button className="btn btn-ghost btn-sm" onClick={() => window.print()}>Print / save PDF</button>
+        <div className="card-title" style={{ marginBottom: 0 }}>{t('progressAu.reportTitle', { course: report.student.course || t('common.yearNumber', { n: report.student.year }) })}</div>
+        <button className="btn btn-ghost btn-sm" onClick={() => { printPage().catch(() => {}); }}>{t('progressAu.printPdf')}</button>
       </div>
       <p className="sub" style={{ margin: '10px 0 4px' }}>
-        {report.student.name} · Year {report.student.year} · predicted {report.predicted.mark}/100 ·
-        streak {report.streak} days · {report.totals.attempts} questions ({report.totals.correct} correct)
+        {t('progressAu.reportLine', { name: report.student.name, year: report.student.year, mark: report.predicted.mark, streak: report.streak, attempts: report.totals.attempts, correct: report.totals.correct })}
       </p>
       <table className="table" style={{ marginTop: 10 }}>
         <thead>
-          <tr><th>Subtopic</th><th>Strand</th><th>Mastery</th><th>Attempts</th><th>Correct</th><th>Band</th></tr>
+          <tr><th>{t('progressAu.colSubtopic')}</th><th>{t('progressAu.colStrand')}</th><th>{t('progressAu.colMastery')}</th><th>{t('common.attempts')}</th><th>{t('progress.colCorrect')}</th><th>{t('progressAu.colBand')}</th></tr>
         </thead>
         <tbody>
           {report.subtopics.map(s => (
@@ -264,7 +275,7 @@ function ReportCard({ user }) {
               <td><b>{s.mastery}%</b></td>
               <td>{s.attempts}</td>
               <td>{s.correct}</td>
-              <td style={{ textTransform: 'capitalize' }}>{s.band}</td>
+              <td style={{ textTransform: 'capitalize' }}>{BAND_KEY[s.band] ? t(BAND_KEY[s.band]) : s.band}</td>
             </tr>
           ))}
         </tbody>
@@ -276,50 +287,51 @@ function ReportCard({ user }) {
 /* ───────────────────────────── Priorities ─────────────────────────── */
 
 function Priorities({ stats, nav, curriculum, user }) {
+  const t = useT();
   if (!stats) return <div className="skeleton" style={{ height: 400 }} />;
-  const spark = stats.trajectory.slice(-20).map(t => t.predicted);
+  const spark = stats.trajectory.slice(-20).map(p => p.predicted);
   return (
     <div className="grid" style={{ gridTemplateColumns: '1fr 330px', alignItems: 'start' }}>
       <div className="card">
         <div className="spread">
-          <div className="card-title" style={{ margin: 0 }}>Ranked by likely mark improvement</div>
-          <button className="btn btn-ghost btn-sm" onClick={() => nav('/practice')}>Update progress</button>
+          <div className="card-title" style={{ margin: 0 }}>{t('progressAu.rankedByImprovement')}</div>
+          <button className="btn btn-ghost btn-sm" onClick={() => nav('/practice')}>{t('progressAu.updateProgress')}</button>
         </div>
         <div style={{ marginTop: 6 }}>
           {stats.priorities.map((p, i) => (
             <div className="prio-item" key={p.subtopic}>
               <span className="prio-rank">{i + 1}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15 }}>{p.name} {p.year ? <span className="muted">· Yr {p.year}</span> : null}</div>
+                <div style={{ fontSize: 15 }}>{p.name} {p.year ? <span className="muted">· {t('progressAu.yearShort', { n: p.year })}</span> : null}</div>
                 <div className="muted" style={{ fontSize: 12.5 }}>{p.reason}</div>
               </div>
               <span className="tag">{p.mastery}%</span>
-              <button className="btn btn-ghost btn-sm" onClick={() => nav(`/practice?subtopic=${p.subtopic}`)}>Practise</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => nav(`/practice?subtopic=${p.subtopic}`)}>{t('progress.practise')}</button>
             </div>
           ))}
-          {!stats.priorities.length && <p className="muted" style={{ padding: '20px 0' }}>Answer a few questions and your personalised priorities appear here.</p>}
+          {!stats.priorities.length && <p className="muted" style={{ padding: '20px 0' }}>{t('progressAu.emptyPriorities')}</p>}
         </div>
       </div>
 
       <div className="card">
-        <div className="sc-label">◆ Scores summary</div>
-        <div className="sc-label" style={{ marginTop: 14 }}>Predicted scaled mark</div>
+        <div className="sc-label">◆ {t('progressAu.scoresSummary')}</div>
+        <div className="sc-label" style={{ marginTop: 14 }}>{t('progressAu.predictedScaled')}</div>
         {stats.totals.attempts
           ? <div className="hero-num" style={{ fontSize: 40 }}>{stats.predicted.mark}<span style={{ fontSize: 17, color: 'var(--ink-3)' }}>/100</span></div>
-          : <div className="muted">No prediction yet — marks appear as you practise.</div>}
-        {stats.predicted.band && <div className="band-chip">{stats.predicted.band.scale === 'grade' ? `Grade ${stats.predicted.band.label}` : stats.predicted.band.label}</div>}
+          : <div className="muted">{t('progressAu.noPredictionYet')}</div>}
+        {stats.predicted.band && <div className="band-chip">{stats.predicted.band.scale === 'grade' ? t('progressAu.gradeLabel', { label: stats.predicted.band.label }) : stats.predicted.band.label}</div>}
 
-        <div className="sc-label" style={{ marginTop: 20 }}>Prediction history</div>
+        <div className="sc-label" style={{ marginTop: 20 }}>{t('progressAu.predictionHistory')}</div>
         {spark.length >= 2
           ? <Sparkline points={spark} width={270} height={54} />
-          : <div className="muted">Not enough demonstrated-mark history yet.</div>}
+          : <div className="muted">{t('progressAu.notEnoughHistory')}</div>}
 
-        <div className="sc-label" style={{ marginTop: 20 }}>Outcome coverage</div>
+        <div className="sc-label" style={{ marginTop: 20 }}>{t('progressAu.outcomeCoverage')}</div>
         <div className="row">
           <div className="meter gold" style={{ flex: 1 }}><i style={{ width: `${stats.predicted.coverage}%` }} /></div>
           <span className="muted">{stats.predicted.coverage}%</span>
         </div>
-        <p className="muted" style={{ marginTop: 8, fontSize: 12.5 }}>Outcomes your attempts have built evidence on.</p>
+        <p className="muted" style={{ marginTop: 8, fontSize: 12.5 }}>{t('progressAu.outcomesEvidence')}</p>
       </div>
     </div>
   );
@@ -334,6 +346,8 @@ function hash01(str) {
 }
 
 function KnowledgeMap({ curriculum, user, nav }) {
+  const t = useT();
+  const tx = useTx();
   const canvasRef = useRef(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [welcome, setWelcome] = useState(() => localStorage.getItem('pri-kmap-hello') !== 'off');
@@ -344,7 +358,7 @@ function KnowledgeMap({ curriculum, user, nav }) {
 
   const model = useMemo(() => {
     if (!curriculum) return null;
-    const sections = [...curriculum.years.map(y => ({ key: `y${y.year}`, label: `Year ${y.year}`, subs: y.subtopics })),
+    const sections = [...curriculum.years.map(y => ({ key: `y${y.year}`, label: t('common.yearNumber', { n: y.year }), subs: y.subtopics })),
     ...(curriculum.streams || []).map(g => ({ key: g.key, label: g.title, subs: g.subtopics }))];
     const nodes = [], links = [];
     const W = 1600, H = 1000, cx = W / 2, cy = H / 2;
@@ -375,7 +389,7 @@ function KnowledgeMap({ curriculum, user, nav }) {
       });
     });
     return { nodes, links, W, H };
-  }, [curriculum]);
+  }, [curriculum, t]);
 
   // draw
   useEffect(() => {
@@ -473,7 +487,7 @@ function KnowledgeMap({ curriculum, user, nav }) {
       <canvas
         ref={canvasRef} className="kmap-canvas"
         role="img"
-        aria-label={`Knowledge map — ${totalIdeas} syllabus ideas from Years 7 to 12, drawn as dots that brighten with mastery. Open “Curriculum” below for the same topics as a list.`}
+        aria-label={t('progressAu.mapAria', { count: totalIdeas, n: totalIdeas })}
         onMouseMove={onMove}
         onMouseDown={e => {
           const rect = canvasRef.current.getBoundingClientRect();
@@ -492,8 +506,8 @@ function KnowledgeMap({ curriculum, user, nav }) {
       {panelOpen && model && (
         <div className="kmap-panel">
           <div className="spread">
-            <div className="card-title" style={{ margin: 0 }}>Curriculum</div>
-            <button className="btn btn-quiet btn-sm" aria-label="Close the curriculum list" onClick={() => setPanelOpen(false)}>✕</button>
+            <div className="card-title" style={{ margin: 0 }}>{t('progressAu.curriculum')}</div>
+            <button className="btn btn-quiet btn-sm" aria-label={t('progressAu.closeCurriculum')} onClick={() => setPanelOpen(false)}>✕</button>
           </div>
           <CurriculumList curriculum={curriculum} focusSub={focusSub} setFocusSub={setFocusSub} nav={nav} />
         </div>
@@ -502,23 +516,22 @@ function KnowledgeMap({ curriculum, user, nav }) {
       {welcome && (
         <div className="card kmap-welcome">
           <div className="spread">
-            <h3>Your Knowledge Space</h3>
-            <button className="btn btn-quiet btn-sm" aria-label="Dismiss this introduction"
+            <h3>{t('progressAu.welcomeTitle')}</h3>
+            <button className="btn btn-quiet btn-sm" aria-label={t('progressAu.dismissIntro')}
               onClick={() => { setWelcome(false); localStorage.setItem('pri-kmap-hello', 'off'); }}>✕</button>
           </div>
           <p className="sub" style={{ marginTop: 8 }}>
-            Every dot is one syllabus idea from Years 7–12. Ideas you’ve practised glow — colour shows strength.
-            Drag to explore, scroll to zoom, click a dot to practise it.
+            {t('progressAu.welcomeBody')}
           </p>
-          <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }} onClick={() => { setWelcome(false); localStorage.setItem('pri-kmap-hello', 'off'); }}>Got it</button>
+          <button className="btn btn-primary btn-sm" style={{ marginTop: 12 }} onClick={() => { setWelcome(false); localStorage.setItem('pri-kmap-hello', 'off'); }}>{t('progressAu.gotIt')}</button>
         </div>
       )}
 
       <div className="kmap-foot">
-        <button className="btn btn-ghost btn-sm" aria-expanded={panelOpen} onClick={() => setPanelOpen(o => !o)}>☰ Curriculum</button>
-        <span className="kmap-legend">Needs work <span className="kmap-grad" /> Strong</span>
+        <button className="btn btn-ghost btn-sm" aria-expanded={panelOpen} onClick={() => setPanelOpen(o => !o)}>☰ {t('progressAu.curriculum')}</button>
+        <span className="kmap-legend">{tx('progressAu.legend', { grad: <span className="kmap-grad" /> })}</span>
       </div>
-      <div className="kmap-count">{totalIdeas.toLocaleString()} ideas</div>
+      <div className="kmap-count">{t('progressAu.ideasCount', { count: totalIdeas, n: totalIdeas.toLocaleString() })}</div>
 
       {tip && (
         <div className="kmap-tip" aria-hidden="true" style={{ left: tip.x, top: tip.y }}>
@@ -526,7 +539,9 @@ function KnowledgeMap({ curriculum, user, nav }) {
           <div style={{ marginTop: 2 }}><b>{tip.n.sub.name}</b></div>
           <div style={{ marginTop: 2 }}>{tip.n.dpText}</div>
           <div style={{ marginTop: 4, color: 'var(--ink-2)' }}>
-            {tip.n.sub.attempts > 0 ? `${BAND_LABEL[tip.n.sub.band]} · ${tip.n.sub.mastery}% mastery` : 'Not started'}
+            {tip.n.sub.attempts > 0
+              ? t('progressAu.bandMastery', { band: BAND_KEY[tip.n.sub.band] ? t(BAND_KEY[tip.n.sub.band]) : tip.n.sub.band, n: tip.n.sub.mastery })
+              : t('progressAu.notStarted')}
           </div>
         </div>
       )}
@@ -535,11 +550,12 @@ function KnowledgeMap({ curriculum, user, nav }) {
 }
 
 function CurriculumList({ curriculum, focusSub, setFocusSub, nav }) {
+  const t = useT();
   const sections = useMemo(() => {
     if (!curriculum) return [];
-    return [...curriculum.years.map(y => ({ key: `y${y.year}`, label: `Year ${y.year}`, subs: y.subtopics })),
+    return [...curriculum.years.map(y => ({ key: `y${y.year}`, label: t('common.yearNumber', { n: y.year }), subs: y.subtopics })),
     ...(curriculum.streams || []).map(g => ({ key: g.key, label: g.title, subs: g.subtopics }))];
-  }, [curriculum]);
+  }, [curriculum, t]);
   const [openKey, setOpenKey] = useState(null);
   return (
     <div style={{ marginTop: 10 }}>
@@ -557,7 +573,7 @@ function CurriculumList({ curriculum, focusSub, setFocusSub, nav }) {
                 <span className="lg-dot" aria-hidden="true" style={{ background: s.attempts > 0 ? rampFor(s.mastery) : 'var(--surface-3)', marginRight: 0 }} />
                 <span style={{ flex: 1, fontSize: 13 }}>{s.name}</span>
               </button>
-              <button className="btn btn-ghost btn-sm" aria-label={`Practise ${s.name}`} onClick={() => nav(`/practice?subtopic=${s.id}`)}>▸</button>
+              <button className="btn btn-ghost btn-sm" aria-label={t('progressAu.practiseName', { name: s.name })} onClick={() => nav(`/practice?subtopic=${s.id}`)}>▸</button>
             </div>
           ))}
         </div>

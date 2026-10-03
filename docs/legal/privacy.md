@@ -14,8 +14,10 @@ The person responsible for your data (the "data fiduciary") is
 Pri Learning is built to work without sending your work anywhere. Questions,
 handwriting recognition, marking and your progress all run on your own device.
 You can use the whole app without an account and without a network. Two
-optional settings send work off the device if you switch them on, and both are
-described below; neither is on unless you turn it on.
+optional settings send work off the device, and both are described below: reading your
+handwriting and photos on a server, which is on by default once you sign in to
+an account and can be turned off, and checking your working, which is off
+unless you turn it on. Without an account, neither runs.
 
 A Pri cloud account is optional. It exists so your progress can follow you to a
 second device, so a teacher can set work, and so a subscription can be verified.
@@ -39,11 +41,13 @@ device can open a profile that has no password.
 - **Your name**, as you typed it.
 - **Learning events**: that you answered a question, which chapter it belonged
   to, whether you were right, and how long you took.
-- **A picture of your handwriting, only if you switch that on.** Reading your
-  writing happens on your device by default, and your strokes stay there. There
-  is a setting in Settings → Handwriting, off unless you turn it on, that also
-  sends your writing to be read on a server, because the on-device reader knows
-  a fixed set of symbols and some notation is beyond it.
+- **A picture of your handwriting, when you are signed in.** Your strokes stay
+  on your device. When you are signed in to a Pri Learning account, a picture of
+  your writing is also read on a server, because the on-device reader knows a
+  fixed set of symbols and some notation is beyond it. This is on by default for
+  a signed-in account and you can turn it off at any time in Settings →
+  Handwriting; it stays off for an account under 18 until a parent or guardian
+  has confirmed it, and it never runs without an account.
 
   When you write with a pencil or your finger, what is sent is an image drawn
   from your own stroke coordinates and nothing else: not the question, not the
@@ -57,15 +61,22 @@ device can open a profile that has no password.
   Keep out of shot whatever you would not want sent, or type your working
   instead.
 
-  Either way it is used to return the reading and is not kept after that, not
-  used to train anyone's model, and turning the setting off stops it at once.
+  Either way, our server passes it to an outside reading service and keeps no
+  copy: it is not written to our database, our storage or our logs. We ask the
+  reading service not to store it. Under its own terms it does not use it to
+  train its models, but it may hold a copy for a limited time to watch for
+  abuse; we do not control that. Turning the setting off stops it at once, and it stays off.
 - **Your working and the question, only if you switch that on.** There is a
   second setting, also off unless you turn it on, that sends the lines of
   working you wrote and the text of the question when an answer is wrong and
   the app cannot tell you which line went wrong. It is used to tell you where
-  the mistake is and is not kept afterwards. The expected answer is never sent
+  the mistake is. Our server keeps no copy; the checking service handles it as
+  the reading service above does. The expected answer is never sent
   with it, and your name and profile are never sent with it. Your mark is
   decided on your device either way.
+- **A parent or guardian's name and email address**, only for an account of
+  someone under 18, so we can send them the confirmation link described under
+  Children and show you, partly hidden, where it went.
 - **Device information** needed to keep you signed in: a random device
   identifier this app generates (it is not your device's own id and not
   anything you typed), a one-way hash of your browser's user-agent string, and
@@ -78,10 +89,21 @@ Pri Learning is used by children. Under the DPDP Act, a child is anyone under
 18, and a child's data may only be processed with verifiable consent from a
 parent or guardian.
 
-**What the app does today, plainly: it does not ask for your age, and it does
-not ask for or record a parent's consent.** It asks which class you are in,
-which tells it what maths to set you, and nothing else about how old you are.
-No guardian is contacted, and there is no consent record.
+**What the app does today, plainly: it does not ask for your age or date of
+birth.** It asks which class you are in, which tells it what maths to set you.
+When you create a cloud account it asks whether you are 18 or older, and unless
+you say you are, the account is treated as a child's. It then asks for a parent
+or guardian's name and email address and emails them a link to confirm the
+account. Until they confirm, the account can sign in, show and export what it
+holds, and be deleted, and nothing else: it does not sync, join a class, send a
+report, subscribe, or use either server setting. The same email lets them
+withdraw at any time, which stops all of that at once.
+
+**What that confirmation proves, and what it does not.** It shows that someone
+who can read that email inbox followed the link. It does not show that they are
+an adult, or that they are your parent or guardian, so it is not the verifiable
+parental consent the DPDP Act will require. Our record of it says which method
+was used, so nobody can mistake it for more than it is.
 
 If you are under 18, please set this up with a parent or guardian and show them
 this notice, particularly the section on what a cloud account sends. Everything
@@ -89,9 +111,9 @@ works without an account, and without an account nothing leaves the device.
 
 The DPDP Act's substantive obligations — including verifiable parental consent
 for anyone under 18 — commence on 14 May 2027. Before then, and before this app
-is offered to children at scale, a guardian consent flow has to be built and
-this section rewritten to describe it. Until it says otherwise, it does not
-exist.
+is offered to children at scale, the email confirmation has to be replaced by a
+method that does verify the parent or guardian, and this section rewritten to
+describe it.
 
 We do not use children's data for advertising, we do not track children across
 other services, and we do not build behavioural profiles for anything other than
@@ -118,8 +140,20 @@ We do not sell your data. We do not share it for advertising.
 
 - Data on your device stays until you delete the profile or the app.
 - Learning events on our server are kept while your account is open.
-- When you delete your account, we delete your data. Operational logs that
-  contain no personal data may persist.
+- When you delete your account it is deleted at once — there is no waiting
+  period. That removes your profile, your sign-in details and every session,
+  your synced work, your class memberships and submissions, your subscription
+  link, your telemetry and any guardian's details. Your email address can then
+  be used to create a new, empty account.
+- Three things are kept after deletion, with nothing in them that identifies
+  you: the record of any payment you made (amount, currency, date and the
+  payment provider's own reference), which tax and accounting law requires us
+  to keep; any problem report you sent about a question, with everything you
+  typed into it removed; and a log entry saying that an account was deleted,
+  with no name or email.
+- Backups of our database made before you deleted your account still contain
+  it until they are replaced. Operational logs that contain no personal data
+  may persist.
 - Telemetry is limited to an allow-list of fields and is deleted after 90 days.
 
 ## Your rights

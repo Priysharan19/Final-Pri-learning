@@ -103,9 +103,14 @@ ok(!/stroke/i.test(syncContract) || !/upload/i.test(syncContract) || true,
 // Markdown wraps its lines, so the prose is compared with whitespace flattened.
 const privacy = readDoc('privacy', 'en').replace(/\s+/g, ' ');
 const terms = readDoc('terms', 'en').replace(/\s+/g, ' ');
-ok(/reading your writing happens on your device by default/i.test(privacy)
-  && /your strokes stay there/i.test(privacy),
-  'the notice states that reading is on-device by default and the strokes stay there');
+// Online-first (ADR-0001): server reading is on by default once signed in, so
+// the notice must say exactly that, that it can be turned off, that a minor
+// waits for a guardian, and that without an account nothing is read remotely.
+ok(/your strokes stay on your device/i.test(privacy)
+  && /on by default for a signed-in account and you can turn it off at any time/i.test(privacy)
+  && /stays off for an account under 18 until a parent or guardian has confirmed it/i.test(privacy)
+  && /never runs without an account/i.test(privacy),
+  'the notice states strokes stay on the device, server reading is default-on only when signed in, can be turned off, waits for a guardian, and never runs without an account');
 // The optional server reading must be described where a student reads about it,
 // with the promise the code actually keeps. A notice that still claims strokes
 // never leave the device would now be false for anyone who turned it on.
@@ -136,11 +141,19 @@ ok(!/आपके डिवाइस\s*\n?\s*का एक पहचानकर
 // there — and a refund policy is exactly the document a regulator reads.
 const refunds = readDoc('refund-policy', 'en').replace(/\s+/g, ' ');
 const panel = readFileSync(join(ROOT, 'client/src/components/CloudAccountPanel.jsx'), 'utf8');
+// The panel's copy is in the i18n catalogue; read the English of every key the
+// panel names, which is what a student sees.
+const cloudCatalogue = en;
+const panelCopy = [...panel.matchAll(/\b(?:tx?|tLater)\(\s*'([a-z][A-Za-z]*\.[A-Za-z0-9]+)'/g)]
+  .map(m => cloudCatalogue[m[1]]).filter(v => typeof v === 'string').join('\n');
 if (/cancel a website subscription at any time from/i.test(refunds)) {
   ok(/cloud\.cancelWebBilling\(/.test(panel),
     'the app has the cancel control the refund policy promises');
-  ok(/Cancel subscription/.test(panel), 'and a student can find it by that name');
-  ok(/end of the period you have already paid for/i.test(panel),
+  ok(/^Cancel subscription$/m.test(panelCopy), 'and a student can find it by that name');
+  ok(/onClick=\{cancelWebSubscription\}>\s*\{busy === 'cancel-web' \? t\('cloud\.cancelling'\) : t\('cloud\.cancelSubscription'\)\}/.test(panel)
+    && /async function cancelWebSubscription\(\)[\s\S]{0,600}cloud\.cancelWebBilling\(\)/.test(panel),
+    'and that name is rendered by the panel that calls the cancel endpoint');
+  ok(/end of the period you have already paid for/i.test(panelCopy),
     'and is told when it takes effect, which is what the policy says');
 }
 
@@ -172,27 +185,36 @@ ok(/does not predict a percentile, a rank or an admission/i.test(terms),
 ok(/parts of a paper you\s+have actually practised/i.test(terms),
   'and describing the estimate it genuinely gives');
 
-// ── The notice may never run ahead of the code ──────────────────────────────
-// It described a guardian-consent flow in detail — a name and contact captured
-// at profile creation, a confirmation email before a cloud account could sync —
-// and none of it existed. A privacy notice that misdescribes the processing is
-// worse than a thin one: a parent reads it and believes a protection is there.
-// README.md said the opposite in the same repository.
-const guardianClaims = [
-  [/asks for a parent or guardian's name/i, 'claims it collects a guardian name'],
-  [/records their consent/i, 'claims it records guardian consent'],
-  [/email the guardian a link/i, 'claims it emails a guardian for confirmation']
-];
-for (const [pattern, what] of guardianClaims) {
-  ok(!pattern.test(privacy), `the notice no longer ${what} — nothing in client/src or server/ implements it`);
-}
+// ── The notice may never run ahead of the code — or fall behind it ─────────
+// It once described a guardian-consent flow that did not exist; #210 then
+// built one (server/platform/guardianConsent.js) and the notice went on saying
+// no consent was recorded, while the server collected a guardian's name and
+// email it did not disclose. Both directions mislead a parent. The notice now
+// has to describe what the code does, and exactly as much as it proves.
+const consentCode = readFileSync(join(ROOT, 'server/platform/guardianConsent.js'), 'utf8');
+ok(/CONSENT_METHOD = 'guardian-email-confirmation'/.test(consentCode),
+  'the server records guardian consent as an email confirmation (the fact the notice must state)');
 ok(/it does not ask for your age/i.test(privacy),
-  'and says plainly that no age is collected');
-ok(/does not ask for or record a parent's consent/i.test(privacy),
-  'and that no parental consent is recorded');
+  'the notice says plainly that no age is collected');
+ok(/asks for a parent\s+or guardian's name and email address/i.test(privacy),
+  'the notice discloses that a guardian name and email are collected for an under-18 account');
+ok(/parent or guardian's name and email address\*\*, only for an account of\s+someone under 18/i.test(privacy),
+  'and lists them among what the server receives');
+ok(/does not show that they are\s+an adult, or that they are your parent or guardian/i.test(privacy),
+  'and says what the confirmation does not prove');
+ok(/not the verifiable\s+parental consent/i.test(privacy) && !/we (obtain|have) verifiable parental consent/i.test(privacy),
+  'and never calls it verifiable parental consent');
+ok(!/does not ask for or record a parent's consent/i.test(privacy),
+  'the notice no longer denies the consent record the server keeps');
 
 ok(!/handwriting strokes are not uploaded/i.test(privacy),
   'and no longer makes the unconditional claim the optional setting would break');
+// store:false is not zero retention at the provider; the notice may not say
+// the picture "is not kept" without saying who might keep it.
+ok(!/is not kept after that/i.test(privacy) && /may hold a copy for a limited time/i.test(privacy),
+  'the notice does not promise the reading service keeps nothing');
+ok(/deleted at once/i.test(privacy) && /record of any payment you made/i.test(privacy),
+  'the notice states immediate deletion and the one financial record that survives it');
 // The second optional setting sends different data and gets its own paragraph.
 ok(/sends the lines of\s+working you wrote/i.test(privacy),
   'the notice describes the optional working check and what it sends');
@@ -357,7 +379,7 @@ for (const [slug] of PAGES) {
 // The fold itself, asserted on a sentence that spans lines in each language.
 const foldedEnglish = blocksOf(readDoc('privacy', 'en'))
   .find(b => b.kind === 'p' && b.text.includes('built to work without sending your work anywhere'));
-ok(foldedEnglish && /neither is on unless you turn it on/.test(foldedEnglish.text),
+ok(foldedEnglish && /checking your working, which is off unless you turn it on\. Without an account, neither runs\./.test(foldedEnglish.text),
   'a paragraph wrapped across six source lines renders as one paragraph');
 const foldedHindi = blocksOf(readDoc('privacy', 'hi'))
   .find(b => b.kind === 'p' && b.text.includes(ENGLISH_GOVERNS));

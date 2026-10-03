@@ -16,9 +16,13 @@
 //
 // Reasoning costs more than transcription, so the hourly allowance is lower.
 // ─────────────────────────────────────────────────────────────────────────────
-import { Router } from 'express';
+import { asyncRouter } from './asyncRouter.js';
+import { asStore } from './store.js';
 import { rateLimit, requireSession, requireVerifiedEmail } from './security.js';
+import { consumeAiAllowance, refundAiAllowance, refuseAiAllowance } from './aiAllowance.js';
 import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
+import { recordProviderCall } from './metrics.js';
+import { logEvent } from './observability.js';
 import {
   MAX_LINES,
   WorkingProviderError,
@@ -70,9 +74,10 @@ export function createWorkingRouter(db, {
   check = checkWorkingWithModel,
   env = process.env
 } = {}) {
-  const router = Router();
+  db = asStore(db);
+  const router = asyncRouter();
 
-  router.get('/status', requireSession(db), (req, res) => {
+  router.get('/status', requireSession(db), async (req, res) => {
     const config = providerConfig(env);
     res.json({
       available: config.configured,
@@ -97,25 +102,38 @@ export function createWorkingRouter(db, {
         return res.status(error.status || 400).json({ error: { code: error.code, message: error.message } });
       }
 
+      // This account's daily allowance, from the SERVER's entitlement record
+      // only (SEC-COMM-01): Premium's additional-ai-usage raises it; nothing
+      // the device claims does.
+      const allowance = await consumeAiAllowance(db, { accountId: req.platformSession.account_id, kind: 'working', env });
+      if (!allowance.allowed) return refuseAiAllowance(res, allowance);
+
       // Counted here, after the request has been shown to be a real one and
       // before anything is sent, so a malformed request cannot spend from a
       // budget shared by every student on this deployment.
-      const overBudget = consumePaidCall(db, { env });
-      if (overBudget) return refusePaidCall(res, overBudget);
+      const overBudget = await consumePaidCall(db, { env });
+      if (overBudget) { await refundAiAllowance(db, allowance); return refusePaidCall(res, overBudget); }
 
+      const started = Date.now();
       try {
         const result = await check(req.body.prompt || '', lines, { env });
+        recordProviderCall('working', { ok: true, ms: Date.now() - started });
         res.json({
           check: {
             engine: result.engine,
             lines: result.lines,
             firstBreak: result.firstBreak,
             hint: result.hint,
+            misconceptionId: result.misconceptionId ?? null,
             confidence: result.confidence,
             needsConfirmation: result.needsConfirmation
           }
         });
       } catch (error) {
+        if (/NOT_CONFIGURED|CONFIG_INVALID/.test(String(error?.code || ''))) await refundAiAllowance(db, allowance);
+        const code = error instanceof WorkingProviderError ? error.code : 'WORKING_FAILED';
+        recordProviderCall('working', { ok: false, code, ms: Date.now() - started });
+        logEvent('warn', 'provider_call_failed', { requestId: req.requestId, provider: 'working', code, latencyMs: Date.now() - started, retryable: !!error?.retryable });
         if (error instanceof WorkingProviderError) {
           return res.status(error.status).json({ error: { code: error.code, message: error.message, retryable: !!error.retryable } });
         }

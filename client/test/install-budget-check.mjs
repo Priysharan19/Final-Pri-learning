@@ -43,18 +43,24 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DIST = join(ROOT, 'client', 'dist');
 
 // ── The budget ───────────────────────────────────────────────────────────────
-// Measured on the build these numbers were set against: 1,159 kB raw / 509 kB
-// gzipped in the install, 1,948 kB / 761 kB by the time the warm pass has
-// finished. Before this work the install alone was 3,792 kB raw / 1,776 kB
-// gzipped. The ceilings sit roughly 10% above what was measured — enough that
-// an honest feature can land, tight enough that the boot path rejoining the
-// install cannot. Raising one is a decision, and it should read like one in the
-// diff.
+// Measured on the build these numbers were first set against: 1,159 kB raw /
+// 509 kB gzipped in the install, 1,948 kB / 761 kB by the time the warm pass has
+// finished. Before that work the install alone was 3,792 kB raw / 1,776 kB
+// gzipped.
+//
+// Raised 2026-10-02 by owner decision, quoted verbatim: "i dont care if the app
+// is 10gb just make it properly end to end". The old 1,300,000-byte install
+// ceiling had come within ~150 bytes of the build and was blocking features.
+// The ceilings are still ceilings: the banned-from-install list, render-from-
+// install, and full offline coverage below are unchanged, and the warm-pass
+// ceiling (which includes the install) moved by the same amount the install
+// ceiling did — nothing else got looser. Raising one is a decision, and it
+// should read like one in the diff.
 
-const INSTALL_RAW_CEILING = 1_300_000;
-const INSTALL_GZIP_CEILING = 560_000;
-const FIRST_VISIT_RAW_CEILING = 2_150_000;
-const FIRST_VISIT_GZIP_CEILING = 850_000;
+const INSTALL_RAW_CEILING = 2_500_000;
+const INSTALL_GZIP_CEILING = 1_000_000;
+const FIRST_VISIT_RAW_CEILING = 3_350_000;
+const FIRST_VISIT_GZIP_CEILING = 1_290_000;
 
 // Things that must never be in the install again, and what each one costs.
 const BANNED_FROM_INSTALL = [
@@ -64,6 +70,10 @@ const BANNED_FROM_INSTALL = [
   [/(^|\/)year(7|8|9|10|11|12)-/, 'a whole year of question bank'],
   [/(^|\/)streams-(standard|ext)-/, 'a senior stream question bank'],
   [/(^|\/)india-(algebra|calculus|class10|coordinate|foundation|junior-overlay|olympiad|senior)-/, 'an Indian question bank'],
+  // These rode in every install for as long as the curriculum spine read its
+  // chapter list out of the same modules as the generators: 228 kB of Class 7–9
+  // bank paid by a Class 12 student. The spine now reads the syllabus layers.
+  [/(^|\/)class(7|8|9)-[a-z0-9-]+-production-/, 'an NCERT Class 7–9 production bank'],
   [/(^|\/)inter-(cyrillic|greek|vietnamese)/, 'an Inter subset for a script this app never paints'],
   [/(^|\/)KaTeX_(Fraktur|Script|Caligraphic|Typewriter|SansSerif)-/, 'a KaTeX face no generator here emits']
 ];
@@ -153,6 +163,17 @@ for (const [pattern, what] of BANNED_FROM_INSTALL) {
 ok(OPTIONAL.some(url => /ink-model-/.test(url)), 'the handwriting model is in the optional tier, not simply dropped');
 ok(OPTIONAL.some(url => /ink-engine-/.test(url)), 'and so is the recogniser that reads it');
 ok(!OPTIONAL.some(url => /(^|\/)pdf/.test(url)), 'the PDF renderer stays fully on demand — nothing warms 2.7 MB speculatively');
+
+// Staff-only screens and a second language's legal notices are fetched by the
+// people who open them. Warming them would charge every student for a teacher
+// workspace, an admin console and Hindi notices the student never reads.
+const staffOrHindi = firstVisit.filter(url => /(^|\/)(Teach|StaffOperationsPanel|legalHindi)-/.test(url));
+eq(staffOrHindi.length, 0, `staff-only screens and the Hindi notices are neither installed nor warmed (${JSON.stringify(staffOrHindi)})`);
+
+// The curriculum spine still has the chapter lists it renders from: the
+// syllabus layer the banks were split away from is in the install itself.
+ok(PRECACHE.some(url => /(^|\/)ncert-syllabus-/.test(url)),
+  'the NCERT syllabus layer the curriculum spine reads at boot is installed');
 
 // ── 3 · The install can still paint the app ──────────────────────────────────
 // A student whose link dies right after install must get a working first
