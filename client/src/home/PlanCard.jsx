@@ -64,7 +64,7 @@ export default function PlanCard({ user, stats }) {
 
       <div className="week-strip" aria-hidden="true" style={{ marginTop: 12 }}>
         {days.map(d => (
-          <div key={d.date} className="week-day" title={d.date}>
+          <div key={d.date} className="plan-week-day" title={d.date}>
             <div className={`week-dot ${d.minutes > 0 && d.date < plan.today.date ? 'hit' : ''} ${d.date === plan.today.date ? 'today' : ''}`}
               style={{ fontSize: 10, opacity: d.rest ? 0.45 : 1 }}>
               {d.rest ? '·' : d.minutes}

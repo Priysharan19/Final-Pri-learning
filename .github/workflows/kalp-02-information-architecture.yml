@@ -24,6 +24,7 @@ permissions:
 # flag-off (client/test/ios-bundle-features-check.mjs).
 env:
   PRI_FEATURE_AUSTRALIA: '1'
+  PRI_FEATURE_EXTENDED_TRACKS: '1'
 
 jobs:
   verify:
