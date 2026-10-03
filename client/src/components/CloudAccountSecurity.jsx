@@ -4,6 +4,7 @@ import { disconnectCloudAccount } from '../platform/cloudAccount.js';
 import { requestIdentityToken, socialProviderConfig } from '../platform/socialSignIn.js';
 import { tLater, useT } from '../i18n/index.js';
 import { downloadJSON } from '../lib/files.js';
+import OtpInput, { OTP_LENGTH } from './OtpInput.jsx';
 
 function when(value, t) {
   if (!value) return t('cloud.unknown');
@@ -28,6 +29,15 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
   // fresh sign-in with that provider, run here exactly as the sign-in is.
   const [webProviders, setWebProviders] = useState({ google: null, apple: null });
   const reauthProviders = socialProviders.filter(row => webProviders[row.provider]);
+  // Every passwordless account — made with a one-time code, or with Google or
+  // Apple — can also prove itself with a fresh code sent to its own email
+  // address or mobile number (POST /v1/account/otp/reauth-request; the server
+  // picks the destination, the client never names it). This is what makes
+  // in-app deletion reachable for every sign-in method (Apple 5.1.1(v), Play).
+  const [codeChallenge, setCodeChallenge] = useState(null);
+  const [code, setCode] = useState('');
+  const [codeInvalid, setCodeInvalid] = useState(false);
+  const canDeleteWithCode = !hasPassword && !!codeChallenge && code.length === OTP_LENGTH && deletePhrase.trim() === 'DELETE';
 
   useEffect(() => {
     let live = true;
@@ -135,6 +145,37 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
     } finally { setBusy(''); }
   }
 
+  async function requestDeleteCode() {
+    if (hasPassword || busy) return;
+    start('code');
+    try {
+      const sent = await cloud.otpReauthRequest();
+      setCodeChallenge(sent?.challengeId || null);
+      setCode('');
+      setCodeInvalid(false);
+      setMessage(tLater('cloudSecurity.codeSent'));
+    } catch (err) { setError(err.message || tLater('cloudSecurity.deleteFailed')); }
+    finally { setBusy(''); }
+  }
+
+  async function deleteWithCode() {
+    if (!canDeleteWithCode || busy) return;
+    start('delete');
+    try {
+      await cloud.deleteAccount({ otpChallengeId: codeChallenge, otpCode: code });
+      setCode('');
+      setCodeChallenge(null);
+      setDeletePhrase('');
+      setMessage(tLater('cloudSecurity.deleted'));
+      await onDeleted?.({ cloudDeleted: true });
+    } catch (err) {
+      const wrongCode = err?.code === 'OTP_REAUTH_FAILED';
+      setCodeInvalid(wrongCode);
+      setCode('');
+      setError(wrongCode ? tLater('cloudSecurity.codeInvalid') : (err.message || tLater('cloudSecurity.deleteFailed')));
+    } finally { setBusy(''); }
+  }
+
   async function deleteAccount(e) {
     e.preventDefault();
     if (!canDeleteWithPassword) return;
@@ -238,7 +279,7 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
         <div className="sc-label">{t('cloudSecurity.dangerZone')}</div>
         <div style={{ fontWeight: 650, marginTop: 4 }}>{t('cloudSecurity.deleteTitle')}</div>
         <p className="muted" style={{ fontSize: 13, margin: '6px 0 10px' }}>
-          {t('cloudSecurity.deleteHelp')}
+          {t('cloudSecurity.deleteHelp')} {t('cloudSecurity.appleSubscriptionNote')}
         </p>
         {hasPassword ? <>
           <div className="grid cols-2" style={{ gap: 10 }}>
@@ -254,27 +295,38 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
           <button className="btn btn-quiet btn-sm" type="submit" disabled={!canDeleteWithPassword || !!busy} style={{ marginTop: 10 }}>
             {busy === 'delete' ? t('settings.deleting') : t('cloudSecurity.deleteButton')}
           </button>
-        </> : reauthProviders.length ? <>
+        </> : <>
           <div className="field" style={{ maxWidth: 320 }}>
             <label className="label" htmlFor="cloud-delete-phrase">{t('cloudSecurity.typeDelete')}</label>
             <input className="input" id="cloud-delete-phrase" autoComplete="off" value={deletePhrase} onChange={e => setDeletePhrase(e.target.value)} />
           </div>
-          <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+          {reauthProviders.length > 0 && <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
             {reauthProviders.map(row => (
               <button key={row.provider} className="btn btn-quiet btn-sm" type="button" data-delete-provider={row.provider}
                 disabled={deletePhrase.trim() !== 'DELETE' || !!busy} onClick={() => deleteWithProvider(row.provider)}>
                 {busy === 'delete' ? t('settings.deleting') : t('cloudSecurity.deleteWithProvider', { provider: providerLabel[row.provider] })}
               </button>
             ))}
-          </div>
-        </> : <div className="muted" style={{ fontSize: 13 }}>
-          {t('cloudSecurity.reauthRequired', {
-            providers: socialProviders.length
-              ? socialProviders.map(row => providerLabel[row.provider])
-                .reduce((first, second) => t('cloudSecurity.providerOr', { first, second }))
-              : t('cloudSecurity.identityProvider')
-          })}
-        </div>}
+          </div>}
+          <p className="muted" style={{ fontSize: 13, margin: '10px 0 8px' }}>
+            {reauthProviders.length ? t('cloudSecurity.orWithCode') : t('cloudSecurity.codeDeleteHelp')}
+          </p>
+          {codeChallenge ? <>
+            <p className="label" id="cloud-delete-code-label" style={{ margin: '0 0 6px' }}>{t('cloudSecurity.codeLabel')}</p>
+            <OtpInput value={code} onChange={value => { setCode(value); setCodeInvalid(false); setError(''); }} autoFocus={false}
+              disabled={!!busy} invalid={codeInvalid} idPrefix="cloud-delete-code" labelledBy="cloud-delete-code-label" />
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+              <button className="btn btn-quiet btn-sm" type="button" data-testid="cloud-delete-with-code" disabled={!canDeleteWithCode || !!busy} onClick={deleteWithCode}>
+                {busy === 'delete' ? t('settings.deleting') : t('cloudSecurity.deleteWithCode')}
+              </button>
+              <button className="btn btn-ghost btn-sm" type="button" disabled={!!busy} onClick={requestDeleteCode}>
+                {busy === 'code' ? t('cloudSecurity.sendingCode') : t('cloudSecurity.sendCode')}
+              </button>
+            </div>
+          </> : <button className="btn btn-ghost btn-sm" type="button" data-testid="cloud-delete-send-code" disabled={!!busy} onClick={requestDeleteCode}>
+            {busy === 'code' ? t('cloudSecurity.sendingCode') : t('cloudSecurity.sendCode')}
+          </button>}
+        </>}
       </form>
 
       {message && <div role="status" style={{ marginTop: 12, color: 'var(--good)' }}>{message}</div>}
