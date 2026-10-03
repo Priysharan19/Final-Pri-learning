@@ -352,6 +352,12 @@ export async function runOne(flow, argv = process.argv.slice(2)) {
   return run([flow], opts);
 }
 
+/** Run a tour file's several flows in one browser, one report. */
+export async function runFlows(flows, argv = process.argv.slice(2)) {
+  const opts = parseArgs(argv);
+  return run(flows, opts);
+}
+
 async function run(flows, opts) {
   const build = ensureBuild(opts.build);
   if (build.built) built = build.ms;
