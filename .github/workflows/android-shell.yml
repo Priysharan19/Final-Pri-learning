@@ -68,7 +68,7 @@ jobs:
         run: node scripts/sync-android.mjs --check
       - name: Cross-platform release matrix (CP-11)
         run: node scripts/release-matrix.mjs --require-native-android
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: android-reports
@@ -134,7 +134,7 @@ jobs:
           working-directory: android
           # One line: the runner executes each script line in its own shell.
           script: set -e; mkdir -p app/build/outputs/pri-instrumented; WEBVIEW_FLAGS='${{ matrix.webviewFlags }}'; if [ -n "$WEBVIEW_FLAGS" ]; then adb shell "echo '_ $WEBVIEW_FLAGS' > /data/local/tmp/webview-command-line"; fi; (adb logcat -v threadtime > app/build/outputs/pri-instrumented/live-logcat.txt 2>&1 &) ; node ../scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && rc=0; ./scripts/run-instrumented.sh ${{ matrix.expect }} || rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null || true; exit "$rc"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: android-emulator-${{ matrix.api }}-${{ matrix.profile }}
