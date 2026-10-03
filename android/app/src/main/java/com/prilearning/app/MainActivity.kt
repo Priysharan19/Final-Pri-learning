@@ -55,6 +55,7 @@ import com.prilearning.app.io.FileExchange
 import com.prilearning.app.bridge.PriBridge
 import com.prilearning.app.release.ReleaseIdentity
 import com.prilearning.app.shell.AssetOrigin
+import com.prilearning.app.shell.DeepLink
 import com.prilearning.app.shell.NavigationPolicy
 import com.prilearning.app.shell.WebViewFloor
 
@@ -78,6 +79,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var files: FileExchange
     private lateinit var smsCode: SmsCode
     private var billing: PlayBilling? = null
+    private var cloudOrigin: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // The shell paints a fixed dark background behind the bars, so the bar
@@ -114,6 +116,7 @@ class MainActivity : ComponentActivity() {
             if (BuildConfig.DEBUG) CloudConfig.debugOverride ?: BuildConfig.PRI_CLOUD_ORIGIN else BuildConfig.PRI_CLOUD_ORIGIN,
             debug = BuildConfig.DEBUG,
         )
+        cloudOrigin = origin
         val store = SecureStore(this)
         val jar = CookieJar().apply { load(store.read()) }
         val nativeCloud = NativeCloud(origin, jar, persist = { store.write(it) }, shellBuild = BuildConfig.VERSION_CODE.toString())
@@ -155,9 +158,19 @@ class MainActivity : ComponentActivity() {
         // After a renderer crash the saved state may be what crashed it: start fresh.
         val restore = savedInstanceState != null && !recoveringFromCrash
         recoveringFromCrash = false
-        if (!restore || !view.restoreStateSafely(savedInstanceState!!)) {
+        val linked = DeepLink.accountActionTarget(intent?.dataString, origin)
+        if (linked != null) view.loadUrl(linked)
+        else if (!restore || !view.restoreStateSafely(savedInstanceState!!)) {
             view.loadUrl(AssetOrigin.START_URL)
         }
+    }
+
+    /** singleTask: an App Link opened while the app is running arrives here. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val target = DeepLink.accountActionTarget(intent.dataString, cloudOrigin) ?: return
+        webView?.loadUrl(target)
     }
 
     @SuppressLint("SetJavaScriptEnabled")

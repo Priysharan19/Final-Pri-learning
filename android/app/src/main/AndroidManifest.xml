@@ -29,8 +29,8 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
         android:enableOnBackInvokedCallback="true"
-        android:icon="@drawable/ic_launcher"
-        android:roundIcon="@drawable/ic_launcher"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.Pri"
@@ -40,11 +40,21 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
+            android:resizeableActivity="true"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- App Links: account actions (verify email, reset password) on the
+                 signed cloud host open in the app, the same rule as iPad's
+                 onOpenURL. Only /account-action; DeepLink.kt re-checks host and shape. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="${priCloudHost}" android:path="/account-action" />
             </intent-filter>
         </activity>
 
