@@ -40,6 +40,12 @@ run() {
      { [ "$EXPECT" != "floor" ] && grep -q "INSTRUMENTATION_STATUS_CODE: -4" "$log"; }; then
     echo "INSTRUMENTED: FAIL in $method" >&2
     adb logcat -d -s PRITEST PriBridge AndroidRuntime chromium > "$OUT/logcat.txt" || true
+    # A "Process crashed." result names no cause: keep the crash buffer and the
+    # warnings/errors around it (native crashes, LMK kills, renderer deaths), and
+    # print the crash buffer so it is in the CI log even without the artifact.
+    adb logcat -d -b crash > "$OUT/logcat-crash.txt" 2>/dev/null || true
+    adb logcat -d -b main,system,crash '*:W' | tail -n 400 > "$OUT/logcat-warnings.txt" 2>/dev/null || true
+    sed -n '1,80p' "$OUT/logcat-crash.txt" >&2 || true
     exit 1
   fi
 }
