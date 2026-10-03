@@ -87,16 +87,15 @@ jobs:
         include:
           # API 26 (minSdk) ships a factory WebView below the Chromium 91 floor:
           # the correct, asserted result there is the fail-closed update screen.
-          - { api: 26, profile: pixel_6, expect: floor }
+          - { api: 26, profile: pixel_6, expect: floor, webviewFlags: "" }
           # The oldest image here whose factory WebView meets the floor runs the
           # whole product journey; then the current API on phone and tablet.
-          # Phone images: the hosted runner's headless emulator process dies (adb exit
-          # 255) right after a Back key press, on API 33 and 36 (BLOCKED_AUTOMATION,
-          # docs/cross-platform/PROGRAMME_STATUS.md). They stay in the matrix, visibly
-          # failing, until that is resolved; phone evidence is local runs.
-          - { api: 33, profile: pixel_6, expect: product }
-          - { api: 36, profile: pixel_6, expect: product }
-          - { api: 36, profile: pixel_tablet, expect: product }
+          # API 33's hosted gfxstream/WebView combination crashes during GPU
+          # compositing. The diagnostic matrix proved software compositing avoids
+          # that renderer/emulator failure; API 36 runs without the override.
+          - { api: 33, profile: pixel_6, expect: product, webviewFlags: "--disable-gpu-compositing" }
+          - { api: 36, profile: pixel_6, expect: product, webviewFlags: "" }
+          - { api: 36, profile: pixel_tablet, expect: product, webviewFlags: "" }
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -130,7 +129,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim
           working-directory: android
           # One line: the runner executes each script line in its own shell.
-          script: node ../scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && { ./scripts/run-instrumented.sh ${{ matrix.expect }}; rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null; exit $rc; }
+          script: set -e; WEBVIEW_FLAGS='${{ matrix.webviewFlags }}'; if [ -n "$WEBVIEW_FLAGS" ]; then adb shell "echo '_ $WEBVIEW_FLAGS' > /data/local/tmp/webview-command-line"; fi; node ../scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && { ./scripts/run-instrumented.sh ${{ matrix.expect }}; rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null; exit $rc; }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
