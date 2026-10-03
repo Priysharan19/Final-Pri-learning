@@ -13,7 +13,7 @@ import FreeCapNotice from '../components/FreeCapNotice.jsx';
 import { clearInkDraft, clearPendingSubmission, pendingSubmissionQuestionId, readPendingSubmission } from '../components/practiceRecovery.js';
 import { tLater, useT } from '../i18n/index.js';
 import { isContentEmpty, servable, contentEmptySignal } from '../lib/contentServe.js';
-import { practiceRequestFromQuery } from '../lib/practiceLinks.js';
+import { practiceHref, practiceRequestFromQuery } from '../lib/practiceLinks.js';
 import { queueTelemetry } from '../platform/telemetry.js';
 
 const EMPTY_SESSION = Object.freeze({ answered: 0, correct: 0, xp: 0 });
@@ -46,6 +46,7 @@ export default function Practice() {
   const handedRef = useRef(location.state?.serve || null);   // a retry handed over from History
   const [error, setError] = useState('');
   const [errorCode, setErrorCode] = useState('');
+  const [pyqAlternatives, setPyqAlternatives] = useState([]);
   const [capped, setCapped] = useState(null);
   const [session, setSession] = useState({ ...EMPTY_SESSION });
   const sessionRef = useRef({ ...EMPTY_SESSION });
@@ -150,6 +151,7 @@ export default function Practice() {
     loading.current = true;
     setError('');
     setErrorCode('');
+    setPyqAlternatives([]);
     setCapped(null);
     try {
       // Reload/restart resumes unfinished work. Pressing the explicit Next
@@ -200,6 +202,7 @@ export default function Practice() {
       else {
         if (isContentEmpty(e?.code)) noteEmpty(e.code);
         setError(e.message); setErrorCode(e?.code || '');
+        setPyqAlternatives(e?.code === 'INDIA_PYQ_UNAVAILABLE' && Array.isArray(e?.detail?.alternatives) ? e.detail.alternatives : []);
       }
     }
     finally { loading.current = false; }
@@ -394,8 +397,23 @@ export default function Practice() {
       {error && !capped && !isContentEmpty(errorCode) && (
         <div className="qpage">
           <p className="error-box">{error}</p>
+          {errorCode === 'INDIA_PYQ_UNAVAILABLE' && pyqAlternatives.length > 0 && (
+            // The nearest chapters whose archive does hold past papers. Each is
+            // a past-papers-only link, so the filter's claim stays true.
+            <div data-pyq-alternatives>
+              <p className="muted">{t('practice.pyqNearestTitle')}</p>
+              <div className="spread" style={{ gap: 10, justifyContent: 'flex-start', flexWrap: 'wrap', marginBottom: 12 }}>
+                {pyqAlternatives.map(alt => (
+                  <PageLink key={alt.subtopic} className="btn btn-ghost btn-sm"
+                    to={practiceHref({ subtopic: alt.subtopic, track: track || null, pyq: true })}>
+                    {t('practice.pyqNearestCta', { name: alt.name })}
+                  </PageLink>
+                ))}
+              </div>
+            </div>
+          )}
           {errorCode === 'INDIA_PYQ_UNAVAILABLE'
-            ? <button className="btn btn-primary" onClick={() => setPyqOnly(false)}>{t('practice.pyqFilterOff')}</button>
+            ? <button className={`btn ${pyqAlternatives.length ? 'btn-quiet' : 'btn-primary'}`} onClick={() => setPyqOnly(false)}>{t('practice.pyqFilterOff')}</button>
             : <button className="btn btn-primary" onClick={load}>{t('common.tryAgain')}</button>}
         </div>
       )}

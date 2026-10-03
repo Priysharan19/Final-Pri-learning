@@ -1,4 +1,13 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto';
+
+/**
+ * The key one-time codes are HMAC'd under. Derived from the delivery key, so
+ * production needs no second secret and a database dump alone cannot be used
+ * to brute-force a stored 6-digit code offline.
+ */
+export function otpHmacKey() {
+  return createHmac('sha256', deliveryKey()).update('pri-otp-code-v1').digest();
+}
 
 function decodeConfiguredKey(raw) {
   const value = String(raw || '').trim();

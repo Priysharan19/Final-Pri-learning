@@ -71,7 +71,9 @@ export function buildAuthActionUrl(publicOrigin, kind, rawToken) {
   if (!['verify-email', 'reset-password', 'guardian-consent'].includes(kind)) throw new Error('Unsupported auth delivery kind');
   const token = String(rawToken || '');
   if (!token || token.length > 512) throw new Error('Invalid auth delivery token');
-  const url = new URL('/account-action', cleanPublicOrigin(publicOrigin));
+  // A parent's link opens the parent's own consent page; account links open
+  // the account-action page. Both read the token from the fragment.
+  const url = new URL(kind === 'guardian-consent' ? '/guardian/consent' : '/account-action', cleanPublicOrigin(publicOrigin));
   url.hash = new URLSearchParams({ action: kind, token }).toString();
   return url.toString();
 }

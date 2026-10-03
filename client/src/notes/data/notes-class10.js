@@ -1,0 +1,609 @@
+// i18n note: mathematics content, English by design.
+export default {
+  'c10-real-numbers': {
+    summary: 'Every whole number greater than 1 is built from primes in exactly one way. That single fact powers HCF and LCM calculations and lets us prove that numbers such as $\\sqrt{2}$ can never be written as a fraction.',
+    prereqs: ['c9-number-systems'],
+    concepts: [
+      { title: 'Unique prime factorisation', body: 'The Fundamental Theorem of Arithmetic says each composite number can be written as a product of primes, and this product is unique apart from the order of the factors. For example $360 = 2^3 \\times 3^2 \\times 5$ and no other set of primes works.' },
+      { title: 'HCF and LCM from primes', body: 'Factorise each number. The HCF takes every common prime with its smallest power; the LCM takes every prime that appears anywhere with its largest power.' },
+      { title: 'The product rule for two numbers', body: 'For two positive integers $a$ and $b$, $\\text{HCF} \\times \\text{LCM} = a \\times b$. This rule is only guaranteed for two numbers; for three or more it generally fails.' },
+      { title: 'Proof by contradiction', body: 'To show $\\sqrt{2}$ is irrational, assume $\\sqrt{2} = \\dfrac{p}{q}$ in lowest terms. Squaring gives $p^2 = 2q^2$, so $2$ divides $p$; writing $p = 2r$ then forces $2$ to divide $q$ as well. Both sharing the factor $2$ contradicts lowest terms.' },
+      { title: 'A key lemma', body: 'If a prime $p$ divides $a^2$, then $p$ divides $a$. This is what makes the irrationality proofs for $\\sqrt{2}$, $\\sqrt{3}$ and $\\sqrt{5}$ work.' },
+      { title: 'Rational plus irrational', body: 'The sum or difference of a rational and an irrational number is irrational, and so is the product of a non-zero rational and an irrational. This proves results such as $5 - \\sqrt{3}$ being irrational.' }
+    ],
+    definitions: [
+      { term: 'Prime number', meaning: 'A natural number greater than 1 whose only factors are 1 and itself.' },
+      { term: 'Composite number', meaning: 'A natural number greater than 1 that has a factor other than 1 and itself.' },
+      { term: 'HCF', meaning: 'The highest common factor: the largest number dividing each of the given numbers exactly.' },
+      { term: 'LCM', meaning: 'The lowest common multiple: the smallest positive number that each given number divides exactly.' },
+      { term: 'Irrational number', meaning: 'A real number that cannot be expressed as $\\dfrac{p}{q}$ with integers $p, q$ and $q \\ne 0$.' }
+    ],
+    formulas: [
+      { label: 'HCF and LCM of two numbers', tex: '\\text{HCF}(a, b) \\times \\text{LCM}(a, b) = a \\times b', note: 'Valid for exactly two positive integers.' },
+      { label: 'Prime factor form', tex: 'n = p_1^{a_1} p_2^{a_2} \\cdots p_k^{a_k}', note: 'Unique apart from order.' },
+      { label: 'Prime divides a square', tex: 'p \\mid a^2 \\Rightarrow p \\mid a', note: 'For $p$ prime and $a$ a positive integer.' }
+    ],
+    points: [
+      { front: 'HCF rule from prime factors', back: 'Common primes only, each with its smallest power.' },
+      { front: 'LCM rule from prime factors', back: 'All primes that appear, each with its largest power.' },
+      { front: 'Can $6^n$ end in the digit 0?', back: 'No. Ending in 0 needs the prime 5 in the factorisation, but $6^n = 2^n 3^n$ has no 5. Write this reason in full in the board exam.' },
+      { front: 'Opening line of an irrationality proof', back: 'Assume the opposite: the number is rational, $\\dfrac{p}{q}$ with $p, q$ co-prime and $q \\ne 0$.' },
+      { front: 'Does HCF × LCM = product work for three numbers?', back: 'Not in general. Use it only for two numbers.' },
+      { front: 'Quick check on an HCF/LCM answer', back: 'The HCF must divide the LCM exactly.' },
+      { front: 'Board tip on factorisation', back: 'Show the factor tree or division ladder and the final power form; method marks depend on it.' }
+    ],
+    mistakes: [
+      { wrong: 'Taking the HCF of $12 = 2^2 \\cdot 3$ and $18 = 2 \\cdot 3^2$ as $2^2 \\cdot 3^2 = 36$.', right: 'HCF uses the smallest powers: $2 \\cdot 3 = 6$. The largest powers give the LCM, $36$.' },
+      { wrong: 'Using $\\text{HCF} \\times \\text{LCM} = $ product for three numbers.', right: 'The rule is only for two numbers; find the LCM of three numbers from prime factors.' },
+      { wrong: 'In the proof for $\\sqrt{2}$, forgetting to state that $p$ and $q$ are co-prime.', right: 'Co-prime is the assumption the contradiction breaks, so it must be stated.' },
+      { wrong: 'Calling $1$ a prime number.', right: '$1$ has only one factor, so it is neither prime nor composite.' }
+    ],
+    examples: [
+      { question: 'Find the HCF and LCM of $96$ and $404$ by prime factorisation, and check the product rule.', steps: ['$96 = 2^5 \\times 3$ and $404 = 2^2 \\times 101$.', 'HCF $= 2^2 = 4$.', 'LCM $= 2^5 \\times 3 \\times 101 = 9696$.', 'Check: $4 \\times 9696 = 38784 = 96 \\times 404$.'], answer: 'HCF $= 4$, LCM $= 9696$', verify: { kind: 'values', pairs: [['2^2', '4'], ['2^5*3*101', '9696'], ['96*404/4', '9696']] } },
+      { question: 'Find the HCF and LCM of $6$, $72$ and $120$.', steps: ['$6 = 2 \\times 3$, $72 = 2^3 \\times 3^2$, $120 = 2^3 \\times 3 \\times 5$.', 'HCF: smallest powers of common primes, $2 \\times 3 = 6$.', 'LCM: largest powers of all primes, $2^3 \\times 3^2 \\times 5 = 360$.'], answer: 'HCF $= 6$, LCM $= 360$', verify: { kind: 'values', pairs: [['2*3', '6'], ['2^3*3^2*5', '360']] } }
+    ]
+  },
+
+  'c10-polynomials': {
+    summary: 'A zero of a polynomial is an input that makes its value 0. On a graph the zeroes are where the curve meets the $x$-axis, and for a quadratic the two zeroes are tied to the coefficients by simple sum and product rules.',
+    prereqs: ['c9-linear-polynomials', 'c9-algebraic-identities'],
+    concepts: [
+      { title: 'Zeroes on a graph', body: 'The zeroes of $p(x)$ are the $x$-coordinates of the points where $y = p(x)$ cuts or touches the $x$-axis. Count the meeting points to count the real zeroes.' },
+      { title: 'How many zeroes?', body: 'A polynomial of degree $n$ has at most $n$ zeroes. A quadratic graph is a parabola and can meet the $x$-axis in two points, one point, or not at all.' },
+      { title: 'Opening of the parabola', body: 'For $ax^2 + bx + c$, the parabola opens upward when $a > 0$ and downward when $a < 0$.' },
+      { title: 'Zeroes and coefficients', body: 'If $\\alpha$ and $\\beta$ are the zeroes of $ax^2 + bx + c$, then $\\alpha + \\beta = -\\dfrac{b}{a}$ and $\\alpha\\beta = \\dfrac{c}{a}$. These let you check zeroes or build a polynomial from them.' },
+      { title: 'Building a quadratic', body: 'A quadratic with zero sum $S$ and product $P$ is $k(x^2 - Sx + P)$ for any non-zero constant $k$.' }
+    ],
+    definitions: [
+      { term: 'Polynomial', meaning: 'An expression made of terms $a x^n$ with whole-number powers $n$ and real coefficients.' },
+      { term: 'Degree', meaning: 'The highest power of the variable with a non-zero coefficient.' },
+      { term: 'Zero of a polynomial', meaning: 'A number $k$ with $p(k) = 0$.' },
+      { term: 'Quadratic polynomial', meaning: 'A polynomial of degree 2, $ax^2 + bx + c$ with $a \\ne 0$.' },
+      { term: 'Cubic polynomial', meaning: 'A polynomial of degree 3.' }
+    ],
+    formulas: [
+      { label: 'Sum of zeroes', tex: '\\alpha + \\beta = -\\dfrac{b}{a}' },
+      { label: 'Product of zeroes', tex: '\\alpha\\beta = \\dfrac{c}{a}' },
+      { label: 'Quadratic from its zeroes', tex: 'p(x) = k\\left[x^2 - (\\alpha + \\beta)x + \\alpha\\beta\\right]', note: '$k \\ne 0$.' },
+      { label: 'Zero of a linear polynomial', tex: 'ax + b = 0 \\Rightarrow x = -\\dfrac{b}{a}' },
+      { label: 'Cubic relations', tex: '\\alpha+\\beta+\\gamma = -\\dfrac{b}{a},\\ \\alpha\\beta+\\beta\\gamma+\\gamma\\alpha = \\dfrac{c}{a},\\ \\alpha\\beta\\gamma = -\\dfrac{d}{a}', note: 'For $ax^3 + bx^2 + cx + d$; useful for checking, not a core dotpoint.' }
+    ],
+    points: [
+      { front: 'Reading zeroes from a graph', back: 'Count the points where the curve meets the $x$-axis; their $x$-values are the zeroes.' },
+      { front: 'Sign in the sum of zeroes', back: 'Sum is $-b/a$: the minus sign is the most common slip.' },
+      { front: 'Graph touching the axis at one point', back: 'The quadratic has two equal zeroes there.' },
+      { front: 'Parabola entirely above the $x$-axis', back: 'No real zeroes.' },
+      { front: 'Maximum number of zeroes of a cubic', back: 'Three.' },
+      { front: 'Board tip: verify the relations', back: 'After finding zeroes, show both sum and product match $-b/a$ and $c/a$; questions often award a mark for this check.' }
+    ],
+    mistakes: [
+      { wrong: 'For $x^2 - 5x + 6$, writing the sum of zeroes as $-5$.', right: 'Sum $= -b/a = -(-5)/1 = 5$.', misconception: 'sign-flipped' },
+      { wrong: 'Factor $(x + 2)$ gives the zero $2$.', right: '$x + 2 = 0$ gives $x = -2$.', misconception: 'root-sign-from-factor' },
+      { wrong: 'Saying every quadratic has exactly two zeroes.', right: 'It has at most two real zeroes; it may have one repeated zero or none.' },
+      { wrong: 'Forgetting to divide by $a$ when $a \\ne 1$.', right: 'Always use $-b/a$ and $c/a$, not $-b$ and $c$.' }
+    ],
+    examples: [
+      { question: 'Find the zeroes of $x^2 - 2x - 8$ and verify the relations with the coefficients.', steps: ['Split the middle term: $x^2 - 4x + 2x - 8 = (x - 4)(x + 2)$.', 'Zeroes: $4$ and $-2$.', 'Sum $= 2 = -(-2)/1$. Product $= -8 = -8/1$.'], answer: '$4$ and $-2$', verify: { kind: 'roots', f: 'x^2-2x-8', answers: ['4', '-2'], degree: 2 } },
+      { question: 'Find a quadratic polynomial whose zeroes have sum $-3$ and product $2$, and find its zeroes.', steps: ['Use $x^2 - Sx + P$ with $S = -3$, $P = 2$.', 'Polynomial: $x^2 + 3x + 2 = (x + 1)(x + 2)$.', 'Zeroes: $-1$ and $-2$.'], answer: '$x^2 + 3x + 2$, zeroes $-1$ and $-2$', verify: { kind: 'roots', f: 'x^2+3x+2', answers: ['-1', '-2'], degree: 2 } }
+    ]
+  },
+
+  'c10-pair-linear-equations': {
+    summary: 'Two linear equations in $x$ and $y$ are two straight lines. Where they meet gives the solution; the ratios of their coefficients tell in advance whether there is one solution, none, or infinitely many.',
+    prereqs: ['c9-linear-polynomials', 'c8-linear-equations'],
+    concepts: [
+      { title: 'Three possible pictures', body: 'Two lines can intersect at one point (a unique solution), be parallel (no solution), or lie on top of each other (infinitely many solutions).' },
+      { title: 'Ratio test', body: 'For $a_1x + b_1y + c_1 = 0$ and $a_2x + b_2y + c_2 = 0$, compare $\\dfrac{a_1}{a_2}$, $\\dfrac{b_1}{b_2}$ and $\\dfrac{c_1}{c_2}$. Unequal first two ratios mean intersecting lines; equal first two but a different third mean parallel lines; all three equal mean coincident lines.' },
+      { title: 'Substitution', body: 'Make one variable the subject of one equation and put that expression into the other equation, leaving one equation in one unknown.' },
+      { title: 'Elimination', body: 'Multiply the equations so one variable has equal (or opposite) coefficients, then subtract (or add) to remove it.' },
+      { title: 'Word problems', body: 'Name the two unknowns clearly, write one equation per condition, solve, and check the answer against the original wording.' }
+    ],
+    definitions: [
+      { term: 'Consistent pair', meaning: 'A pair with at least one solution (intersecting or coincident lines).' },
+      { term: 'Inconsistent pair', meaning: 'A pair with no solution (parallel lines).' },
+      { term: 'Dependent pair', meaning: 'A consistent pair with infinitely many solutions (coincident lines).' },
+      { term: 'Solution of the pair', meaning: 'Values of $x$ and $y$ that satisfy both equations at the same time.' }
+    ],
+    formulas: [
+      { label: 'Unique solution', tex: '\\dfrac{a_1}{a_2} \\ne \\dfrac{b_1}{b_2}', note: 'Intersecting lines; consistent.' },
+      { label: 'No solution', tex: '\\dfrac{a_1}{a_2} = \\dfrac{b_1}{b_2} \\ne \\dfrac{c_1}{c_2}', note: 'Parallel lines; inconsistent.' },
+      { label: 'Infinitely many solutions', tex: '\\dfrac{a_1}{a_2} = \\dfrac{b_1}{b_2} = \\dfrac{c_1}{c_2}', note: 'Coincident lines; dependent and consistent.' }
+    ],
+    points: [
+      { front: 'Parallel lines mean...', back: 'No solution: the pair is inconsistent.' },
+      { front: 'Coincident lines mean...', back: 'Infinitely many solutions.' },
+      { front: 'Ratios to compare first', back: '$a_1/a_2$ against $b_1/b_2$. If they differ, the solution is unique and you need not look at $c$.' },
+      { front: 'When is elimination quicker?', back: 'When coefficients are already equal or easy multiples, as in $x + y$ and $x - y$.' },
+      { front: 'Graphical method tip', back: 'Plot at least three points per line from a table, label each line, and mark the intersection with its coordinates.' },
+      { front: 'Board tip for word problems', back: 'State what $x$ and $y$ stand for, with units, and write a final sentence answering the question.' }
+    ],
+    mistakes: [
+      { wrong: 'Subtracting $x - y = 4$ from $x + y = 14$ and getting $0 = 10$ by dropping $y$ terms.', right: '$(x + y) - (x - y) = 2y$, so $2y = 10$ and $y = 5$.', misconception: 'distribute-sign' },
+      { wrong: 'Deciding "no solution" because $a_1/a_2 = b_1/b_2$ without checking $c_1/c_2$.', right: 'If $c_1/c_2$ is also equal the lines coincide and there are infinitely many solutions.' },
+      { wrong: 'Multiplying only one side of an equation before eliminating.', right: 'Multiply every term on both sides by the same number.', misconception: 'one-side-only' },
+      { wrong: 'Stopping after finding $x$.', right: 'Substitute back to find $y$ as well; the solution is the pair.' }
+    ],
+    examples: [
+      { question: 'Solve $x + y = 14$ and $x - y = 4$.', steps: ['Add: $2x = 18$, so $x = 9$.', 'Then $y = 14 - 9 = 5$.', 'Check: $9 - 5 = 4$.'], answer: '$x = 9$, $y = 5$', verify: { kind: 'system', equations: ['x+y=14', 'x-y=4'], solution: { x: '9', y: '5' } } },
+      { question: 'Five pencils and seven pens cost ₹50; seven pencils and five pens cost ₹46. Find the cost of one pencil and one pen.', steps: ['Let a pencil cost $x$ and a pen cost $y$: $5x + 7y = 50$ and $7x + 5y = 46$.', 'Adding: $12x + 12y = 96$, so $x + y = 8$.', 'Subtracting the first from the second: $2x - 2y = -4$, so $x - y = -2$.', 'Hence $x = 3$, $y = 5$.'], answer: 'Pencil ₹3, pen ₹5', verify: { kind: 'system', equations: ['5x+7y=50', '7x+5y=46'], solution: { x: '3', y: '5' } } }
+    ]
+  },
+
+  'c10-quadratic-equations': {
+    summary: 'A quadratic equation $ax^2 + bx + c = 0$ can be solved by splitting into factors or by the quadratic formula. Its discriminant $b^2 - 4ac$ reveals, before solving, whether the roots are distinct, equal or not real.',
+    prereqs: ['c10-polynomials', 'c8-factorisation'],
+    concepts: [
+      { title: 'Standard form', body: 'Rearrange so that one side is $0$: $ax^2 + bx + c = 0$ with $a \\ne 0$. Only then read off $a$, $b$ and $c$.' },
+      { title: 'Factorisation by splitting', body: 'Find two numbers whose product is $ac$ and whose sum is $b$. Split $bx$ using them, group, and factor. Each factor set to zero gives a root.' },
+      { title: 'Quadratic formula', body: 'Completing the square on $ax^2 + bx + c = 0$ leads to $x = \\dfrac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$, which works for every quadratic with real roots.' },
+      { title: 'Nature of roots', body: 'The discriminant $D = b^2 - 4ac$ decides: $D > 0$ gives two distinct real roots, $D = 0$ gives two equal real roots, $D < 0$ gives no real roots.' },
+      { title: 'Situational problems', body: 'Translate the story into one equation in one unknown, solve, then reject roots that make no sense, such as a negative length or age.' }
+    ],
+    definitions: [
+      { term: 'Quadratic equation', meaning: 'An equation that can be written as $ax^2 + bx + c = 0$ with real $a, b, c$ and $a \\ne 0$.' },
+      { term: 'Root', meaning: 'A value of $x$ that makes the equation true.' },
+      { term: 'Discriminant', meaning: 'The number $D = b^2 - 4ac$.' },
+      { term: 'Equal roots', meaning: 'The case $D = 0$, where both roots equal $-\\dfrac{b}{2a}$.' }
+    ],
+    formulas: [
+      { label: 'Quadratic formula', tex: 'x = \\dfrac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}', note: 'Use when $b^2 - 4ac \\ge 0$.' },
+      { label: 'Discriminant', tex: 'D = b^2 - 4ac' },
+      { label: 'Two distinct real roots', tex: 'D > 0' },
+      { label: 'Two equal real roots', tex: 'D = 0 \\Rightarrow x = -\\dfrac{b}{2a}' },
+      { label: 'No real roots', tex: 'D < 0' }
+    ],
+    points: [
+      { front: 'First step before any method', back: 'Bring every term to one side so the equation equals $0$.' },
+      { front: 'Splitting rule', back: 'Two numbers with product $ac$ and sum $b$.' },
+      { front: '$D = 0$ means...', back: 'Two equal real roots, each $-b/(2a)$.' },
+      { front: 'For which $k$ are roots equal?', back: 'Set $b^2 - 4ac = 0$ and solve for $k$.' },
+      { front: 'Never divide both sides by $x$', back: 'It throws away the root $x = 0$. Factor $x$ out instead.' },
+      { front: 'Board tip: rejecting a root', back: 'Write a reason, for example "speed cannot be negative", when discarding a root.' }
+    ],
+    mistakes: [
+      { wrong: 'Solving $x^2 = 5x$ by dividing by $x$ to get only $x = 5$.', right: '$x^2 - 5x = 0 \\Rightarrow x(x - 5) = 0$, so $x = 0$ or $x = 5$.', misconception: 'divided-by-variable' },
+      { wrong: 'From $(x - 3)(2x - 1) = 0$, writing roots $-3$ and $-\\tfrac{1}{2}$.', right: 'Set each factor to $0$: $x = 3$ and $x = \\tfrac{1}{2}$.', misconception: 'root-sign-from-factor' },
+      { wrong: 'Writing the formula with $2$ instead of $2a$ in the denominator.', right: 'The whole numerator is divided by $2a$.' },
+      { wrong: 'Taking $\\sqrt{b^2 - 4ac}$ as $b - 2\\sqrt{ac}$.', right: 'A square root does not split over subtraction; evaluate $b^2 - 4ac$ first.', misconception: 'function-of-sum' }
+    ],
+    examples: [
+      { question: 'Solve $2x^2 - 7x + 3 = 0$ by factorisation.', steps: ['$ac = 6$; numbers with product $6$ and sum $-7$ are $-6$ and $-1$.', '$2x^2 - 6x - x + 3 = 2x(x - 3) - 1(x - 3) = (2x - 1)(x - 3)$.', 'So $x = \\tfrac{1}{2}$ or $x = 3$.'], answer: '$x = 3$ or $x = \\tfrac{1}{2}$', verify: { kind: 'roots', f: '2x^2-7x+3', answers: ['3', '1/2'], degree: 2 } },
+      { question: 'Find the nature of the roots of $x^2 - 4x + 1 = 0$ and solve it.', steps: ['$D = (-4)^2 - 4(1)(1) = 12 > 0$, so two distinct real roots.', '$x = \\dfrac{4 \\pm \\sqrt{12}}{2} = \\dfrac{4 \\pm 2\\sqrt{3}}{2}$.', '$x = 2 + \\sqrt{3}$ or $2 - \\sqrt{3}$.'], answer: '$x = 2 \\pm \\sqrt{3}$', verify: { kind: 'roots', f: 'x^2-4x+1', answers: ['2+sqrt(3)', '2-sqrt(3)'], degree: 2 } }
+    ]
+  },
+
+  'c10-arithmetic-progressions': {
+    summary: 'An arithmetic progression adds the same fixed amount at every step. Two formulas, one for the $n$th term and one for the sum of $n$ terms, answer almost every question about savings, instalments, seating rows and similar patterns.',
+    prereqs: ['c9-sequences-progressions'],
+    concepts: [
+      { title: 'Common difference', body: 'A list $a, a + d, a + 2d, \\ldots$ is an AP with first term $a$ and common difference $d$. Test a list by checking that every consecutive difference is the same.' },
+      { title: 'The nth term', body: 'To reach term $n$ from the first term you add $d$ exactly $n - 1$ times, so $a_n = a + (n - 1)d$.' },
+      { title: 'nth term from the end', body: 'If the last term is $l$, the $n$th term counted from the end is $l - (n - 1)d$.' },
+      { title: 'Sum by pairing', body: 'Writing the sum forwards and backwards and adding pairs each to $a + l$. With $n$ pairs, $S_n = \\dfrac{n}{2}(a + l) = \\dfrac{n}{2}[2a + (n - 1)d]$.' },
+      { title: 'Recovering a term from sums', body: 'Since $S_n$ is the sum up to term $n$, the $n$th term is $a_n = S_n - S_{n-1}$.' }
+    ],
+    definitions: [
+      { term: 'Arithmetic progression', meaning: 'A sequence in which each term after the first is obtained by adding a fixed number to the previous term.' },
+      { term: 'Common difference', meaning: 'The fixed number $d = a_{k+1} - a_k$; it may be positive, negative or zero.' },
+      { term: 'Finite AP', meaning: 'An AP with a last term.' },
+      { term: 'General term', meaning: 'The formula $a_n$ that gives any term from its position $n$.' }
+    ],
+    formulas: [
+      { label: 'nth term', tex: 'a_n = a + (n - 1)d' },
+      { label: 'Sum of n terms', tex: 'S_n = \\dfrac{n}{2}\\left[2a + (n - 1)d\\right]' },
+      { label: 'Sum using the last term', tex: 'S_n = \\dfrac{n}{2}(a + l)' },
+      { label: 'Term from the sums', tex: 'a_n = S_n - S_{n-1}' },
+      { label: 'Sum of first n natural numbers', tex: '1 + 2 + \\cdots + n = \\dfrac{n(n + 1)}{2}' },
+      { label: 'Three terms in AP', tex: 'a - d,\\ a,\\ a + d', note: 'Convenient choice when the sum is given.' }
+    ],
+    points: [
+      { front: 'Is $d$ always positive?', back: 'No. $10, 7, 4, \\ldots$ has $d = -3$.' },
+      { front: 'Why $n - 1$ and not $n$?', back: 'The first term needs no added $d$; term $n$ has $n - 1$ steps.' },
+      { front: 'Which term is 0 or a given value?', back: 'Set $a + (n - 1)d$ equal to it and solve; $n$ must come out a positive integer.' },
+      { front: 'Middle term of an AP with odd number of terms $n$', back: 'Term number $\\dfrac{n + 1}{2}$.' },
+      { front: '$b$ is the arithmetic mean of $a$ and $c$ when...', back: '$2b = a + c$.' },
+      { front: 'Board tip', back: 'Write $a$, $d$ and $n$ explicitly before substituting; the formula line usually earns a mark.' }
+    ],
+    mistakes: [
+      { wrong: 'For $3, 7, 11, \\ldots$ writing $a_{10} = 3 + 10 \\times 4$.', right: '$a_{10} = 3 + 9 \\times 4 = 39$.' },
+      { wrong: 'Taking $d = 3 - 7$ for $3, 7, 11, \\ldots$', right: '$d$ is a later term minus the earlier one: $7 - 3 = 4$.', misconception: 'sign-flipped' },
+      { wrong: 'Accepting $n = 7.5$ as a term number.', right: 'A non-integer $n$ means the value is not a term of the AP.' },
+      { wrong: 'Using $S_n$ when the question asks for the $n$th term.', right: 'Read carefully: "term" needs $a_n$, "sum" needs $S_n$.' }
+    ],
+    examples: [
+      { question: 'Find the sum of the first $20$ terms of $3, 7, 11, \\ldots$', steps: ['$a = 3$, $d = 4$, $n = 20$.', '$S_{20} = \\dfrac{20}{2}[2(3) + 19(4)] = 10 \\times 82$.'], answer: '$820$', verify: { kind: 'value', expr: '(20/2)*(2*3+(20-1)*4)', answer: '820' } },
+      { question: 'A person saves ₹2 in week 1, ₹7 in week 2, ₹12 in week 3, and so on. How much is saved in week 10?', steps: ['Weekly savings form an AP with $a = 2$, $d = 5$.', '$a_{10} = 2 + 9 \\times 5 = 47$.'], answer: '₹47', verify: { kind: 'value', expr: '2+(10-1)*5', answer: '47' } }
+    ]
+  },
+
+  'c10-triangles': {
+    summary: 'Similar triangles have the same shape but possibly different sizes, so their corresponding sides are in a fixed ratio. A line parallel to one side of a triangle creates such proportional pieces, which is the Basic Proportionality Theorem.',
+    prereqs: ['c7-triangles-current', 'c8-proportions'],
+    concepts: [
+      { title: 'Similar figures', body: 'Two polygons with the same number of sides are similar when matching angles are equal and matching sides are in the same ratio. All congruent figures are similar, but not the other way round.' },
+      { title: 'Basic Proportionality Theorem', body: 'If a line parallel to one side of a triangle cuts the other two sides at distinct points, it divides those two sides in the same ratio: in $\\triangle ABC$ with $DE \\parallel BC$, $\\dfrac{AD}{DB} = \\dfrac{AE}{EC}$. The proof compares areas of triangles with equal heights.' },
+      { title: 'Converse of BPT', body: 'If a line divides two sides of a triangle in the same ratio, then it is parallel to the third side.' },
+      { title: 'Similarity criteria', body: 'AAA (or AA): matching angles equal. SSS: all three side ratios equal. SAS: one angle equal and the sides including it in the same ratio. Any one is enough to conclude similarity.' },
+      { title: 'Correspondence matters', body: 'Writing $\\triangle ABC \\sim \\triangle PQR$ means $A \\leftrightarrow P$, $B \\leftrightarrow Q$, $C \\leftrightarrow R$, so $\\dfrac{AB}{PQ} = \\dfrac{BC}{QR} = \\dfrac{CA}{RP}$.' }
+    ],
+    definitions: [
+      { term: 'Similar triangles', meaning: 'Triangles whose corresponding angles are equal and corresponding sides are proportional.' },
+      { term: 'Scale factor', meaning: 'The common ratio of corresponding sides of two similar figures.' },
+      { term: 'Corresponding sides', meaning: 'Sides opposite equal angles in two similar triangles.' },
+      { term: 'Congruent figures', meaning: 'Figures with the same shape and the same size; similar with scale factor $1$.' }
+    ],
+    formulas: [
+      { label: 'Basic Proportionality Theorem', tex: 'DE \\parallel BC \\Rightarrow \\dfrac{AD}{DB} = \\dfrac{AE}{EC}' },
+      { label: 'Equivalent BPT form', tex: '\\dfrac{AD}{AB} = \\dfrac{AE}{AC}' },
+      { label: 'Converse of BPT', tex: '\\dfrac{AD}{DB} = \\dfrac{AE}{EC} \\Rightarrow DE \\parallel BC' },
+      { label: 'Sides of similar triangles', tex: '\\triangle ABC \\sim \\triangle PQR \\Rightarrow \\dfrac{AB}{PQ} = \\dfrac{BC}{QR} = \\dfrac{CA}{RP}' },
+      { label: 'AA criterion', tex: '\\angle A = \\angle P,\\ \\angle B = \\angle Q \\Rightarrow \\triangle ABC \\sim \\triangle PQR' }
+    ],
+    points: [
+      { front: 'Why is AA enough?', back: 'Two equal angles force the third to be equal, since each triangle’s angles sum to $180^\\circ$.' },
+      { front: 'Are all squares similar?', back: 'Yes. All circles and all equilateral triangles are similar too.' },
+      { front: 'Are all rectangles similar?', back: 'No. Angles match but side ratios can differ.' },
+      { front: 'Shadow problems', back: 'Sun rays are parallel, so a pole and its shadow form a triangle similar to a tower and its shadow at the same time.' },
+      { front: 'Board tip on proofs', back: 'State each pair of equal angles with its reason, name the criterion, and write the correspondence in the right order.' },
+      { front: 'SAS similarity needs...', back: 'The equal angle to be the one included between the two proportional sides.' }
+    ],
+    mistakes: [
+      { wrong: 'Writing $\\dfrac{AD}{DB} = \\dfrac{AE}{AC}$ for $DE \\parallel BC$.', right: 'Keep matching parts: $\\dfrac{AD}{DB} = \\dfrac{AE}{EC}$ or $\\dfrac{AD}{AB} = \\dfrac{AE}{AC}$.', misconception: 'sides-mismatched' },
+      { wrong: 'Writing $\\triangle ABC \\sim \\triangle QRP$ when $\\angle A = \\angle P$.', right: 'Vertex order must match the equal angles: $\\triangle ABC \\sim \\triangle PQR$.', misconception: 'variable-swapped' },
+      { wrong: 'Using SSA to claim similarity.', right: 'The angle must be included between the two proportional sides (SAS).' },
+      { wrong: 'Treating similar triangles as congruent and equating side lengths.', right: 'Similar means equal ratios, not equal lengths.' }
+    ],
+    examples: [
+      { question: 'In $\\triangle ABC$, $DE \\parallel BC$ with $D$ on $AB$ and $E$ on $AC$. If $AD = 1.5$ cm, $DB = 3$ cm and $AE = 1$ cm, find $EC$.', steps: ['By BPT, $\\dfrac{AD}{DB} = \\dfrac{AE}{EC}$.', '$\\dfrac{1.5}{3} = \\dfrac{1}{EC}$, so $EC = \\dfrac{3 \\times 1}{1.5}$.'], answer: '$EC = 2$ cm', verify: { kind: 'value', expr: '3*1/1.5', answer: '2' } },
+      { question: 'A $6$ m pole casts a $4$ m shadow. At the same time a tower casts a $28$ m shadow. Find the height of the tower.', steps: ['The two triangles are similar by AA (right angle and equal angle of the sun).', '$\\dfrac{h}{6} = \\dfrac{28}{4}$, so $h = \\dfrac{6 \\times 28}{4}$.'], answer: '$42$ m', verify: { kind: 'value', expr: '6*28/4', answer: '42' } }
+    ]
+  },
+
+  'c10-coordinate-geometry': {
+    summary: 'With coordinates, lengths come from the distance formula and the point dividing a segment in a given ratio comes from the section formula. Together they let you test shapes and locate points without drawing.',
+    prereqs: ['c9-coordinate-geometry'],
+    concepts: [
+      { title: 'Distance formula', body: 'The horizontal and vertical gaps between $(x_1, y_1)$ and $(x_2, y_2)$ form a right triangle, so the distance is $\\sqrt{(x_2 - x_1)^2 + (y_2 - y_1)^2}$.' },
+      { title: 'Testing shapes', body: 'Compute all sides (and diagonals if needed). Equal sides and equal diagonals give a square; three collinear points have the two shorter distances adding to the longest.' },
+      { title: 'Section formula', body: 'The point dividing the join of $A(x_1, y_1)$ and $B(x_2, y_2)$ internally in ratio $m_1 : m_2$ is $\\left(\\dfrac{m_1x_2 + m_2x_1}{m_1 + m_2}, \\dfrac{m_1y_2 + m_2y_1}{m_1 + m_2}\\right)$. The ratio weight $m_1$ goes with the far point $B$.' },
+      { title: 'Midpoint as a special case', body: 'With ratio $1 : 1$ the section formula gives the midpoint, the average of the coordinates.' },
+      { title: 'Finding an unknown ratio', body: 'Take the ratio as $k : 1$, apply the section formula, and match one coordinate with the given point to solve for $k$.' }
+    ],
+    definitions: [
+      { term: 'Distance', meaning: 'The length of the straight segment joining two points.' },
+      { term: 'Internal division', meaning: 'A point $P$ on segment $AB$ between $A$ and $B$ with $AP : PB = m_1 : m_2$.' },
+      { term: 'Midpoint', meaning: 'The point dividing a segment in ratio $1 : 1$.' },
+      { term: 'Collinear points', meaning: 'Points that lie on one straight line.' },
+      { term: 'Points of trisection', meaning: 'The two points dividing a segment into three equal parts, in ratios $1 : 2$ and $2 : 1$.' }
+    ],
+    formulas: [
+      { label: 'Distance formula', tex: 'AB = \\sqrt{(x_2 - x_1)^2 + (y_2 - y_1)^2}' },
+      { label: 'Distance from the origin', tex: 'OP = \\sqrt{x^2 + y^2}' },
+      { label: 'Section formula (internal)', tex: 'P = \\left(\\dfrac{m_1x_2 + m_2x_1}{m_1 + m_2},\\ \\dfrac{m_1y_2 + m_2y_1}{m_1 + m_2}\\right)' },
+      { label: 'Midpoint', tex: 'M = \\left(\\dfrac{x_1 + x_2}{2},\\ \\dfrac{y_1 + y_2}{2}\\right)' }
+    ],
+    points: [
+      { front: 'Order of subtraction in the distance formula', back: 'Does not matter; each difference is squared.' },
+      { front: 'In $m_1 : m_2$, which point does $m_1$ multiply?', back: 'The second point $B$, the end farther from the part measured by $m_1$.' },
+      { front: 'Point on the $x$-axis dividing a segment', back: 'Its $y$-coordinate is $0$; use that to find the ratio.' },
+      { front: 'Parallelogram check', back: 'Diagonals bisect each other, so both diagonals share the same midpoint.' },
+      { front: 'Equidistant point problems', back: 'Set squared distances equal; this avoids square roots.' },
+      { front: 'Board tip', back: 'Write the formula, then the substitution with signs in brackets, then simplify.' }
+    ],
+    mistakes: [
+      { wrong: 'Distance from $(2, 3)$ to $(10, -3)$ as $\\sqrt{8^2 + 0^2} = 8$.', right: '$-3 - 3 = -6$, so the distance is $\\sqrt{64 + 36} = 10$.', misconception: 'sign-flipped' },
+      { wrong: 'Section formula as $\\dfrac{m_1x_1 + m_2x_2}{m_1 + m_2}$.', right: 'Cross over: $m_1$ multiplies $x_2$ and $m_2$ multiplies $x_1$.', misconception: 'variable-swapped' },
+      { wrong: 'Writing $\\sqrt{a^2 + b^2} = a + b$.', right: 'The root of a sum is not the sum of roots.', misconception: 'function-of-sum' },
+      { wrong: 'Forgetting to divide by $m_1 + m_2$.', right: 'Both coordinates are weighted averages: divide by the total of the ratio.' }
+    ],
+    examples: [
+      { question: 'Find the distance between $(2, 3)$ and $(10, -3)$.', steps: ['$x$-gap: $10 - 2 = 8$; $y$-gap: $-3 - 3 = -6$.', 'Distance $= \\sqrt{64 + 36} = \\sqrt{100}$.'], answer: '$10$ units', verify: { kind: 'value', expr: 'sqrt((10-2)^2+(-3-3)^2)', answer: '10' } },
+      { question: 'Find the point dividing the join of $A(-1, 7)$ and $B(4, -3)$ internally in the ratio $2 : 3$.', steps: ['$m_1 = 2$, $m_2 = 3$.', '$x = \\dfrac{2(4) + 3(-1)}{5} = \\dfrac{5}{5} = 1$.', '$y = \\dfrac{2(-3) + 3(7)}{5} = \\dfrac{15}{5} = 3$.'], answer: '$(1, 3)$', verify: { kind: 'values', pairs: [['(2*4+3*(-1))/5', '1'], ['(2*(-3)+3*7)/5', '3']] } }
+    ]
+  },
+
+  'c10-trigonometry': {
+    summary: 'In a right triangle, the ratios of sides depend only on the size of an acute angle, not on how big the triangle is. These six trigonometric ratios have exact values at standard angles and are linked by the identity $\\sin^2 A + \\cos^2 A = 1$.',
+    prereqs: ['c10-triangles', 'c8-squares-roots'],
+    concepts: [
+      { title: 'Naming the sides', body: 'For an acute angle $A$ in a right triangle, the hypotenuse is opposite the right angle, the opposite side faces $A$, and the adjacent side is the other side touching $A$.' },
+      { title: 'The six ratios', body: '$\\sin A = \\dfrac{\\text{opp}}{\\text{hyp}}$, $\\cos A = \\dfrac{\\text{adj}}{\\text{hyp}}$, $\\tan A = \\dfrac{\\text{opp}}{\\text{adj}}$, and their reciprocals $\\operatorname{cosec} A$, $\\sec A$, $\\cot A$.' },
+      { title: 'Standard angles', body: 'Half of an equilateral triangle gives the values at $30^\\circ$ and $60^\\circ$; an isosceles right triangle gives $45^\\circ$. At $0^\\circ$ the opposite side shrinks to $0$; at $90^\\circ$ the adjacent side does.' },
+      { title: 'Complementary angles', body: 'In a right triangle the two acute angles add to $90^\\circ$, so $\\sin(90^\\circ - A) = \\cos A$, $\\tan(90^\\circ - A) = \\cot A$ and $\\sec(90^\\circ - A) = \\operatorname{cosec} A$.' },
+      { title: 'Identities', body: 'Dividing $\\text{opp}^2 + \\text{adj}^2 = \\text{hyp}^2$ by $\\text{hyp}^2$ gives $\\sin^2 A + \\cos^2 A = 1$. Dividing by $\\text{adj}^2$ or $\\text{opp}^2$ gives the other two.' }
+    ],
+    definitions: [
+      { term: 'Trigonometric ratio', meaning: 'A ratio of two sides of a right triangle, expressed as a function of an acute angle.' },
+      { term: 'Identity', meaning: 'An equation that holds for every angle for which both sides are defined.' },
+      { term: 'Reciprocal ratios', meaning: '$\\operatorname{cosec} A = 1/\\sin A$, $\\sec A = 1/\\cos A$, $\\cot A = 1/\\tan A$.' },
+      { term: 'Complementary angles', meaning: 'Two angles whose sum is $90^\\circ$.' }
+    ],
+    formulas: [
+      { label: 'Tangent as a quotient', tex: '\\tan A = \\dfrac{\\sin A}{\\cos A},\\quad \\cot A = \\dfrac{\\cos A}{\\sin A}' },
+      { label: 'Pythagorean identity', tex: '\\sin^2 A + \\cos^2 A = 1' },
+      { label: 'Secant identity', tex: '1 + \\tan^2 A = \\sec^2 A', note: '$0^\\circ \\le A < 90^\\circ$.' },
+      { label: 'Cosecant identity', tex: '1 + \\cot^2 A = \\operatorname{cosec}^2 A', note: '$0^\\circ < A \\le 90^\\circ$.' },
+      { label: 'Values of sine', tex: '\\sin 0^\\circ = 0,\\ \\sin 30^\\circ = \\tfrac{1}{2},\\ \\sin 45^\\circ = \\tfrac{1}{\\sqrt{2}},\\ \\sin 60^\\circ = \\tfrac{\\sqrt{3}}{2},\\ \\sin 90^\\circ = 1' },
+      { label: 'Values of cosine', tex: '\\cos 0^\\circ = 1,\\ \\cos 30^\\circ = \\tfrac{\\sqrt{3}}{2},\\ \\cos 45^\\circ = \\tfrac{1}{\\sqrt{2}},\\ \\cos 60^\\circ = \\tfrac{1}{2},\\ \\cos 90^\\circ = 0' },
+      { label: 'Values of tangent', tex: '\\tan 0^\\circ = 0,\\ \\tan 30^\\circ = \\tfrac{1}{\\sqrt{3}},\\ \\tan 45^\\circ = 1,\\ \\tan 60^\\circ = \\sqrt{3}', note: '$\\tan 90^\\circ$ is not defined.' },
+      { label: 'Complementary angles', tex: '\\sin(90^\\circ - A) = \\cos A,\\ \\tan(90^\\circ - A) = \\cot A' }
+    ],
+    points: [
+      { front: 'Memory pattern for sine at $0^\\circ, 30^\\circ, 45^\\circ, 60^\\circ, 90^\\circ$', back: '$\\sqrt{0}/2, \\sqrt{1}/2, \\sqrt{2}/2, \\sqrt{3}/2, \\sqrt{4}/2$. Cosine is the same list reversed.' },
+      { front: 'Which ratios are undefined at $90^\\circ$?', back: '$\\tan 90^\\circ$ and $\\sec 90^\\circ$. At $0^\\circ$, $\\cot$ and $\\operatorname{cosec}$ are undefined.' },
+      { front: 'Can $\\sin A$ exceed 1?', back: 'No. The hypotenuse is the longest side, so $0 \\le \\sin A, \\cos A \\le 1$.' },
+      { front: 'Given one ratio, find the rest', back: 'Draw a right triangle with those two sides, find the third by Pythagoras, then read off every ratio.' },
+      { front: 'Strategy for proving identities', back: 'Start from the more complicated side, convert to $\\sin$ and $\\cos$, and use $\\sin^2 A + \\cos^2 A = 1$.' },
+      { front: 'Board tip', back: 'Do not work on both sides at once in a proof; transform one side into the other and write LHS = ... = RHS.' }
+    ],
+    mistakes: [
+      { wrong: 'Treating $\\sin A$ as $\\sin \\times A$ and cancelling: $\\dfrac{\\sin A}{A} = \\sin$.', right: '$\\sin A$ is a single value depending on $A$; it cannot be split.' },
+      { wrong: '$\\sin(A + B) = \\sin A + \\sin B$, e.g. $\\sin 90^\\circ = \\sin 30^\\circ + \\sin 60^\\circ$.', right: '$\\tfrac{1}{2} + \\tfrac{\\sqrt{3}}{2} \\ne 1$; sine does not distribute over a sum.', misconception: 'function-of-sum' },
+      { wrong: 'Writing $\\sin^2 A$ as $\\sin A^2$ (sine of $A^2$).', right: '$\\sin^2 A$ means $(\\sin A)^2$.' },
+      { wrong: 'Swapping $\\cos 30^\\circ$ and $\\cos 60^\\circ$.', right: '$\\cos 30^\\circ = \\tfrac{\\sqrt{3}}{2}$, $\\cos 60^\\circ = \\tfrac{1}{2}$; cosine decreases as the angle grows.' }
+    ],
+    examples: [
+      { question: 'If $\\sin A = \\tfrac{3}{5}$ for acute $A$, find $\\cos A$ and $\\tan A$.', steps: ['Take opposite $= 3$, hypotenuse $= 5$.', 'Adjacent $= \\sqrt{25 - 9} = 4$.', '$\\cos A = \\tfrac{4}{5}$, $\\tan A = \\tfrac{3}{4}$.'], answer: '$\\cos A = \\tfrac{4}{5}$, $\\tan A = \\tfrac{3}{4}$', verify: { kind: 'values', pairs: [['sqrt(5^2-3^2)/5', '4/5'], ['3/sqrt(5^2-3^2)', '3/4']] } },
+      { question: 'Evaluate $2\\tan^2 45^\\circ + \\cos^2 30^\\circ - \\sin^2 60^\\circ$.', steps: ['$\\tan 45^\\circ = 1$, so $2\\tan^2 45^\\circ = 2$.', '$\\cos^2 30^\\circ = \\tfrac{3}{4}$ and $\\sin^2 60^\\circ = \\tfrac{3}{4}$.', 'Total $= 2 + \\tfrac{3}{4} - \\tfrac{3}{4}$.'], answer: '$2$', verify: { kind: 'value', expr: '2*(tan(pi/4))^2+(cos(pi/6))^2-(sin(pi/3))^2', answer: '2' } }
+    ]
+  },
+
+  'c10-trig-applications': {
+    summary: 'Heights and distances that cannot be measured directly can be found from an angle and one known length. Each problem reduces to one or two right triangles using the exact values at $30^\\circ$, $45^\\circ$ and $60^\\circ$.',
+    prereqs: ['c10-trigonometry'],
+    concepts: [
+      { title: 'Line of sight', body: 'The line from the observer’s eye to the object. The angle it makes with the horizontal is what the question gives you.' },
+      { title: 'Elevation and depression', body: 'Looking up at an object gives an angle of elevation; looking down gives an angle of depression. Both are measured from the horizontal, never from the vertical.' },
+      { title: 'Alternate angles', body: 'The angle of depression from a high point equals the angle of elevation of that point seen from below, because the two horizontals are parallel.' },
+      { title: 'Choosing the ratio', body: 'Most problems relate a height and a horizontal distance, so $\\tan$ is the usual choice. Use $\\sin$ or $\\cos$ only when a slant length (like a ladder or string) is involved.' },
+      { title: 'Two triangles', body: 'When two angles are given, write one equation per right triangle sharing a common side, then eliminate the unknown distance.' }
+    ],
+    definitions: [
+      { term: 'Angle of elevation', meaning: 'The angle between the horizontal and the line of sight to an object above eye level.' },
+      { term: 'Angle of depression', meaning: 'The angle between the horizontal and the line of sight to an object below eye level.' },
+      { term: 'Line of sight', meaning: 'The straight line from the eye of the observer to the object viewed.' },
+      { term: 'Horizontal level', meaning: 'The line through the observer’s eye parallel to the ground.' }
+    ],
+    formulas: [
+      { label: 'Height from distance', tex: 'h = d \\tan\\theta', note: '$d$ horizontal distance, $\\theta$ angle of elevation.' },
+      { label: 'Distance from height', tex: 'd = \\dfrac{h}{\\tan\\theta} = h\\cot\\theta' },
+      { label: 'Slant length', tex: 'h = L\\sin\\theta,\\quad d = L\\cos\\theta', note: 'For a ladder, string or ramp of length $L$.' },
+      { label: 'Useful values', tex: '\\tan 30^\\circ = \\tfrac{1}{\\sqrt{3}},\\ \\tan 45^\\circ = 1,\\ \\tan 60^\\circ = \\sqrt{3}' }
+    ],
+    points: [
+      { front: 'First thing to do', back: 'Draw a neat labelled figure with the horizontal, the angle and the right angle marked.' },
+      { front: 'Angle of depression in the figure', back: 'It sits at the observer, between the horizontal and the line down; transfer it to the ground point using alternate angles.' },
+      { front: 'Observer’s height', back: 'If the eye is above the ground, add it to the computed height (or subtract from the object height first).' },
+      { front: 'Angle of elevation increases as you walk closer?', back: 'Yes, for a fixed object; a longer shadow means a smaller sun elevation.' },
+      { front: '$\\sqrt{3} \\approx$ ?', back: '$1.732$; use it only at the final step if a decimal is asked.' },
+      { front: 'Board tip', back: 'Keep answers in surd form like $10\\sqrt{3}$ m unless told to approximate, and always write units.' }
+    ],
+    mistakes: [
+      { wrong: 'Measuring the angle of depression from the vertical.', right: 'Both elevation and depression are measured from the horizontal.' },
+      { wrong: 'Using $\\sin\\theta = \\dfrac{h}{d}$ for height and ground distance.', right: 'Height over horizontal distance is $\\tan\\theta$.' },
+      { wrong: 'Ignoring the observer’s eye height when it is given.', right: 'Add it to the height computed from the triangle.', misconception: 'term-dropped' },
+      { wrong: 'Taking $\\tan 30^\\circ = \\sqrt{3}$.', right: '$\\tan 30^\\circ = \\tfrac{1}{\\sqrt{3}}$; $\\tan 60^\\circ = \\sqrt{3}$.' }
+    ],
+    examples: [
+      { question: 'From a point $30$ m from the foot of a tower on level ground, the angle of elevation of its top is $30^\\circ$. Find the height of the tower.', steps: ['$\\tan 30^\\circ = \\dfrac{h}{30}$.', '$h = 30 \\times \\dfrac{1}{\\sqrt{3}} = \\dfrac{30}{\\sqrt{3}} = 10\\sqrt{3}$.'], answer: '$10\\sqrt{3}$ m', verify: { kind: 'value', expr: '30*tan(pi/6)', answer: '10*sqrt(3)' } },
+      { question: 'From the top of a $75$ m lighthouse, the angles of depression of two ships on the same side, in line with its base, are $30^\\circ$ and $45^\\circ$. Find the distance between the ships.', steps: ['Nearer ship ($45^\\circ$): distance $= \\dfrac{75}{\\tan 45^\\circ} = 75$ m.', 'Farther ship ($30^\\circ$): distance $= \\dfrac{75}{\\tan 30^\\circ} = 75\\sqrt{3}$ m.', 'Gap $= 75\\sqrt{3} - 75 = 75(\\sqrt{3} - 1)$.'], answer: '$75(\\sqrt{3} - 1)$ m', verify: { kind: 'value', expr: '75/tan(pi/6)-75/tan(pi/4)', answer: '75*(sqrt(3)-1)' } }
+    ]
+  },
+
+  'c10-circles': {
+    summary: 'A tangent touches a circle at exactly one point. Two facts drive this chapter: the tangent is perpendicular to the radius at the point of contact, and the two tangents from an outside point are equal in length.',
+    prereqs: ['c9-circles'],
+    concepts: [
+      { title: 'Line and circle', body: 'A line can miss a circle, cut it at two points (a secant) or touch it at exactly one point (a tangent).' },
+      { title: 'Number of tangents from a point', body: 'From a point inside the circle there are none, from a point on the circle exactly one, and from a point outside exactly two.' },
+      { title: 'Tangent ⟂ radius', body: 'Of all points on the tangent, the point of contact is the closest to the centre, since every other point lies outside the circle. The shortest segment from a point to a line is perpendicular, so $OP \\perp$ tangent.' },
+      { title: 'Equal tangents', body: 'If $PA$ and $PB$ are tangents from external point $P$, triangles $OAP$ and $OBP$ are congruent by RHS, so $PA = PB$ and $OP$ bisects $\\angle APB$.' },
+      { title: 'Angle between tangents', body: 'In quadrilateral $OAPB$ the angles at $A$ and $B$ are $90^\\circ$, so $\\angle APB + \\angle AOB = 180^\\circ$.' }
+    ],
+    definitions: [
+      { term: 'Tangent', meaning: 'A line that meets a circle at exactly one point.' },
+      { term: 'Point of contact', meaning: 'The single common point of a tangent and the circle.' },
+      { term: 'Secant', meaning: 'A line that meets a circle at two distinct points.' },
+      { term: 'Length of a tangent', meaning: 'The length of the segment from an external point to the point of contact.' }
+    ],
+    formulas: [
+      { label: 'Tangent perpendicular to radius', tex: 'OA \\perp PA' },
+      { label: 'Length of a tangent', tex: 'PA = \\sqrt{OP^2 - r^2}' },
+      { label: 'Equal tangents', tex: 'PA = PB' },
+      { label: 'Angle between tangents', tex: '\\angle APB + \\angle AOB = 180^\\circ' }
+    ],
+    points: [
+      { front: 'Tangents at the ends of a diameter', back: 'They are parallel, since both are perpendicular to the same diameter.' },
+      { front: 'Quadrilateral circumscribing a circle', back: 'Opposite sides have equal sums: $AB + CD = AD + BC$ (from equal tangents).' },
+      { front: 'Triangle with an incircle', back: 'Tangent lengths from each vertex are equal; use them to split each side.' },
+      { front: 'Chord of a larger circle tangent to a smaller concentric circle', back: 'It is bisected at the point of contact.' },
+      { front: 'Board tip for the two theorems', back: 'Both proofs are frequently asked: give the figure, given, to prove, construction and reasoned steps.' }
+    ],
+    mistakes: [
+      { wrong: 'Tangent length $= OP - r$.', right: 'Use Pythagoras in the right triangle: $\\sqrt{OP^2 - r^2}$.' },
+      { wrong: 'Saying two tangents can be drawn from a point on the circle.', right: 'Exactly one tangent passes through a point on the circle.' },
+      { wrong: 'Taking $\\angle AOB = \\angle APB$.', right: 'They are supplementary: their sum is $180^\\circ$.' },
+      { wrong: 'Using $OP^2 = PA^2 - r^2$.', right: '$OP$ is the hypotenuse: $OP^2 = PA^2 + r^2$.', misconception: 'sides-mismatched' }
+    ],
+    examples: [
+      { question: 'A point $P$ is $5$ cm from the centre of a circle of radius $3$ cm. Find the length of the tangent from $P$.', steps: ['The radius to the point of contact is perpendicular to the tangent.', 'Tangent length $= \\sqrt{5^2 - 3^2} = \\sqrt{16}$.'], answer: '$4$ cm', verify: { kind: 'value', expr: 'sqrt(5^2-3^2)', answer: '4' } },
+      { question: 'Two tangents $PA$ and $PB$ to a circle with centre $O$ are inclined at $70^\\circ$. Find $\\angle AOB$.', steps: ['$\\angle OAP = \\angle OBP = 90^\\circ$.', 'Angles of quadrilateral $OAPB$ sum to $360^\\circ$, so $\\angle AOB = 180^\\circ - 70^\\circ$.'], answer: '$110^\\circ$', verify: { kind: 'value', expr: '360-90-90-70', answer: '110' } }
+    ]
+  },
+
+  'c10-areas-circles': {
+    summary: 'A sector is a slice of a circle cut by two radii, and a segment is the part cut off by a chord. Both are found as a fraction $\\dfrac{\\theta}{360^\\circ}$ of the whole circle, with the triangle subtracted for a segment.',
+    prereqs: ['c9-circles', 'c9-perimeter-area'],
+    concepts: [
+      { title: 'Sector as a fraction', body: 'A central angle $\\theta$ takes $\\dfrac{\\theta}{360}$ of the full turn, so the sector has that fraction of the circle’s area and its arc has that fraction of the circumference.' },
+      { title: 'Minor and major', body: 'The smaller sector (angle $\\theta$) is the minor sector; the rest of the circle (angle $360^\\circ - \\theta$) is the major sector. The same idea applies to segments.' },
+      { title: 'Segment = sector − triangle', body: 'The minor segment is the minor sector minus the triangle formed by the two radii and the chord.' },
+      { title: 'Triangle areas for standard angles', body: 'At $60^\\circ$ the triangle is equilateral with area $\\dfrac{\\sqrt{3}}{4}r^2$. At $90^\\circ$ it is a right isosceles triangle with area $\\dfrac{1}{2}r^2$. At $120^\\circ$ its area is $\\dfrac{\\sqrt{3}}{4}r^2$ as well, using $\\dfrac{1}{2}r^2\\sin 120^\\circ$.' },
+      { title: 'Perimeter of a sector', body: 'The boundary is two radii plus the arc: $2r + \\dfrac{\\theta}{360} \\times 2\\pi r$.' }
+    ],
+    definitions: [
+      { term: 'Sector', meaning: 'The region between two radii and the arc joining their ends.' },
+      { term: 'Segment', meaning: 'The region between a chord and the arc it cuts off.' },
+      { term: 'Arc', meaning: 'A connected piece of the circumference.' },
+      { term: 'Central angle', meaning: 'The angle at the centre between the two radii of a sector.' }
+    ],
+    formulas: [
+      { label: 'Area of a sector', tex: 'A = \\dfrac{\\theta}{360^\\circ} \\times \\pi r^2' },
+      { label: 'Length of an arc', tex: 'l = \\dfrac{\\theta}{360^\\circ} \\times 2\\pi r' },
+      { label: 'Perimeter of a sector', tex: 'P = 2r + \\dfrac{\\theta}{360^\\circ} \\times 2\\pi r' },
+      { label: 'Area of a minor segment', tex: '\\text{Segment} = \\dfrac{\\theta}{360^\\circ}\\pi r^2 - \\text{area of }\\triangle OAB' },
+      { label: 'Triangle for 60° or 120°', tex: '\\triangle OAB = \\dfrac{\\sqrt{3}}{4} r^2' },
+      { label: 'Triangle for 90°', tex: '\\triangle OAB = \\dfrac{1}{2} r^2' },
+      { label: 'Major segment', tex: '\\pi r^2 - \\text{minor segment}' }
+    ],
+    points: [
+      { front: 'Minute hand sweep in 5 minutes', back: '$30^\\circ$, since the hand turns $6^\\circ$ each minute.' },
+      { front: 'Area swept by a wiper or a grazing animal', back: 'A sector area with the given angle and length as radius.' },
+      { front: 'Which value of $\\pi$?', back: 'Use the value the question states ($\\tfrac{22}{7}$ or $3.14$); otherwise keep $\\pi$ in the answer.' },
+      { front: 'Major sector area', back: '$\\pi r^2$ minus the minor sector, or use angle $360^\\circ - \\theta$.' },
+      { front: 'Board tip', back: 'Write the fraction $\\theta/360$ explicitly; units of area are square units.' }
+    ],
+    mistakes: [
+      { wrong: 'Using $\\dfrac{\\theta}{180}$ instead of $\\dfrac{\\theta}{360}$.', right: 'A full circle is $360^\\circ$, so the fraction is $\\theta/360$.' },
+      { wrong: 'Taking the segment area equal to the sector area.', right: 'Subtract the triangle formed by the radii and the chord.', misconception: 'term-dropped' },
+      { wrong: 'Perimeter of a sector = arc length only.', right: 'Add the two radii: $2r + l$.', misconception: 'term-dropped' },
+      { wrong: 'Using the diameter as $r$.', right: 'Halve the diameter before squaring.' }
+    ],
+    examples: [
+      { question: 'Find the area of a sector of radius $21$ cm with central angle $60^\\circ$. Use $\\pi = \\tfrac{22}{7}$.', steps: ['$A = \\dfrac{60}{360} \\times \\dfrac{22}{7} \\times 21^2$.', '$= \\dfrac{1}{6} \\times 1386$.'], answer: '$231$ cm$^2$', verify: { kind: 'value', expr: '(60/360)*(22/7)*21^2', answer: '231' } },
+      { question: 'A chord of a circle of radius $10$ cm subtends a right angle at the centre. Find the area of the minor segment. Use $\\pi = 3.14$.', steps: ['Sector: $\\dfrac{90}{360} \\times 3.14 \\times 100 = 78.5$ cm$^2$.', 'Triangle: $\\dfrac{1}{2} \\times 10 \\times 10 = 50$ cm$^2$.', 'Segment $= 78.5 - 50$.'], answer: '$28.5$ cm$^2$', verify: { kind: 'value', expr: '(90/360)*3.14*10^2-(1/2)*10*10', answer: '28.5' } }
+    ]
+  },
+
+  'c10-surface-volume': {
+    summary: 'Many real objects are two simple solids joined together, such as a cone on a hemisphere or a cylinder topped by a hemisphere. Volumes simply add; surface areas add only the parts that stay exposed.',
+    prereqs: ['c8-mensuration', 'c9-perimeter-area'],
+    concepts: [
+      { title: 'Building blocks', body: 'The solids used are the cuboid, cube, cylinder, cone, sphere and hemisphere. Know each one’s curved surface area, total surface area and volume.' },
+      { title: 'Surface area of a combination', body: 'Add only the faces you can touch from outside. Where two solids are joined, the joining face is hidden and is not counted.' },
+      { title: 'Volume of a combination', body: 'The total volume is the sum of the volumes of the parts. If a part is scooped out, subtract its volume.' },
+      { title: 'Shared measurements', body: 'Joined solids usually share a radius. Find each part’s own height carefully, for example cone height = total height − hemisphere radius.' },
+      { title: 'Slant height', body: 'For a cone, the slant height is $l = \\sqrt{r^2 + h^2}$; it is needed for the curved surface area.' }
+    ],
+    definitions: [
+      { term: 'Curved surface area', meaning: 'The area of only the curved part of a solid.' },
+      { term: 'Total surface area', meaning: 'The area of all the outer surfaces of a solid.' },
+      { term: 'Slant height', meaning: 'The distance from the apex of a cone to any point on the edge of its base.' },
+      { term: 'Hemisphere', meaning: 'Half of a sphere cut by a plane through its centre.' }
+    ],
+    formulas: [
+      { label: 'Cylinder', tex: '\\text{CSA} = 2\\pi rh,\\ \\text{TSA} = 2\\pi r(r + h),\\ V = \\pi r^2 h' },
+      { label: 'Cone', tex: '\\text{CSA} = \\pi r l,\\ \\text{TSA} = \\pi r(l + r),\\ V = \\tfrac{1}{3}\\pi r^2 h' },
+      { label: 'Slant height', tex: 'l = \\sqrt{r^2 + h^2}' },
+      { label: 'Sphere', tex: 'S = 4\\pi r^2,\\ V = \\tfrac{4}{3}\\pi r^3' },
+      { label: 'Hemisphere', tex: '\\text{CSA} = 2\\pi r^2,\\ \\text{TSA} = 3\\pi r^2,\\ V = \\tfrac{2}{3}\\pi r^3' },
+      { label: 'Cuboid and cube', tex: '\\text{TSA} = 2(lb + bh + hl),\\ V = lbh;\\quad \\text{cube: } 6a^2,\\ a^3' }
+    ],
+    points: [
+      { front: 'Cone on a hemisphere: surface area', back: 'CSA of cone + CSA of hemisphere; the circle where they meet is hidden.' },
+      { front: 'Hemisphere TSA vs CSA', back: 'TSA $= 3\\pi r^2$ includes the flat circle; use CSA $= 2\\pi r^2$ when that face is joined.' },
+      { front: 'Two equal cubes joined face to face', back: 'The cuboid has surface area $10a^2$, not $12a^2$.' },
+      { front: 'Volume of joined solids', back: 'Always the sum of the parts.' },
+      { front: 'Units', back: 'Surface area in square units, volume in cubic units; $1$ litre $= 1000$ cm$^3$.' },
+      { front: 'Board tip', back: 'Write the formula for each part separately before combining, and simplify with $\\tfrac{22}{7}$ late.' }
+    ],
+    mistakes: [
+      { wrong: 'Adding the TSAs of both parts for a joined solid.', right: 'Add only curved or exposed surfaces; the joining faces are hidden.' },
+      { wrong: 'Using the vertical height $h$ in $\\pi r l$.', right: 'Curved area of a cone uses slant height $l = \\sqrt{r^2 + h^2}$.' },
+      { wrong: 'Using the whole object height as the cone height.', right: 'Subtract the hemisphere radius from the total height.' },
+      { wrong: 'Forgetting the $\\tfrac{1}{3}$ in the cone volume.', right: '$V = \\tfrac{1}{3}\\pi r^2 h$.', misconception: 'term-dropped' }
+    ],
+    examples: [
+      { question: 'A toy is a cone of radius $3.5$ cm mounted on a hemisphere of the same radius. The total height is $15.5$ cm. Find its total surface area. Use $\\pi = \\tfrac{22}{7}$.', steps: ['Cone height $= 15.5 - 3.5 = 12$ cm; slant height $l = \\sqrt{12^2 + 3.5^2} = 12.5$ cm.', 'Exposed area $= 2\\pi r^2 + \\pi r l = \\pi r(2r + l)$.', '$= \\dfrac{22}{7} \\times 3.5 \\times (7 + 12.5) = 11 \\times 19.5$.'], answer: '$214.5$ cm$^2$', verify: { kind: 'value', expr: '(22/7)*3.5*(2*3.5+sqrt(12^2+3.5^2))', answer: '214.5' } },
+      { question: 'A solid is a cylinder of radius $21$ cm and height $10$ cm topped by a hemisphere of the same radius. Find its volume. Use $\\pi = \\tfrac{22}{7}$.', steps: ['Cylinder: $\\dfrac{22}{7} \\times 21^2 \\times 10 = 13860$ cm$^3$.', 'Hemisphere: $\\dfrac{2}{3} \\times \\dfrac{22}{7} \\times 21^3 = 19404$ cm$^3$.', 'Total $= 13860 + 19404$.'], answer: '$33264$ cm$^3$', verify: { kind: 'value', expr: '(22/7)*21^2*10+(2/3)*(22/7)*21^3', answer: '33264' } }
+    ]
+  },
+
+  'c10-statistics': {
+    summary: 'When data is grouped into classes, the mean, median and mode are estimated with formulas that treat each class through its mid-point or its position. The three methods for the mean all give the same answer; they just make the arithmetic easier.',
+    prereqs: ['c8-data-handling'],
+    concepts: [
+      { title: 'Class mark', body: 'Inside a class, every value is assumed to sit at the mid-point $x_i = \\dfrac{\\text{lower} + \\text{upper}}{2}$.' },
+      { title: 'Three ways to the mean', body: 'Direct: $\\bar{x} = \\dfrac{\\sum f_i x_i}{\\sum f_i}$. Assumed mean: pick $a$, use $d_i = x_i - a$. Step deviation: also divide by the class width, $u_i = \\dfrac{x_i - a}{h}$. All three give the same mean.' },
+      { title: 'Mode of grouped data', body: 'The modal class has the highest frequency. The mode is estimated inside it using the frequencies of the classes just before and after.' },
+      { title: 'Median of grouped data', body: 'Build cumulative frequencies, find $\\dfrac{n}{2}$, and locate the first class whose cumulative frequency reaches it. Interpolate inside that median class.' },
+      { title: 'Continuous classes', body: 'The median and mode formulas need classes without gaps. Convert classes like $10$–$19$, $20$–$29$ to $9.5$–$19.5$, $19.5$–$29.5$ first.' }
+    ],
+    definitions: [
+      { term: 'Class mark', meaning: 'The mid-point of a class interval.' },
+      { term: 'Modal class', meaning: 'The class with the highest frequency.' },
+      { term: 'Cumulative frequency', meaning: 'The running total of frequencies up to and including a class.' },
+      { term: 'Median class', meaning: 'The class whose cumulative frequency first reaches or passes $\\dfrac{n}{2}$.' },
+      { term: 'Class size', meaning: 'The width $h$ of a class: upper limit minus lower limit.' }
+    ],
+    formulas: [
+      { label: 'Mean (direct)', tex: '\\bar{x} = \\dfrac{\\sum f_i x_i}{\\sum f_i}' },
+      { label: 'Mean (assumed mean)', tex: '\\bar{x} = a + \\dfrac{\\sum f_i d_i}{\\sum f_i},\\quad d_i = x_i - a' },
+      { label: 'Mean (step deviation)', tex: '\\bar{x} = a + h\\cdot\\dfrac{\\sum f_i u_i}{\\sum f_i},\\quad u_i = \\dfrac{x_i - a}{h}' },
+      { label: 'Mode', tex: '\\text{Mode} = l + \\left(\\dfrac{f_1 - f_0}{2f_1 - f_0 - f_2}\\right) h', note: '$l$ lower limit of modal class, $f_1$ its frequency, $f_0$ and $f_2$ the frequencies before and after.' },
+      { label: 'Median', tex: '\\text{Median} = l + \\left(\\dfrac{\\tfrac{n}{2} - cf}{f}\\right) h', note: '$l$ lower limit of median class, $cf$ cumulative frequency of the class before it, $f$ frequency of the median class.' },
+      { label: 'Empirical relation', tex: '3\\,\\text{Median} = \\text{Mode} + 2\\,\\text{Mean}', note: 'Approximate, for moderately skewed data.' }
+    ],
+    points: [
+      { front: 'In the median formula, $cf$ is...', back: 'The cumulative frequency of the class before the median class, not of the median class itself.' },
+      { front: 'In the mode formula, $f_0$ and $f_2$ are...', back: 'Frequencies of the classes just before and just after the modal class.' },
+      { front: 'Which mean method for large mid-points?', back: 'Step deviation: the numbers become small integers.' },
+      { front: 'Median class is chosen using...', back: '$n/2$ against the cumulative frequency column.' },
+      { front: 'Do the three mean methods agree?', back: 'Yes, exactly; a mismatch signals an arithmetic slip.' },
+      { front: 'Board tip', back: 'Draw the full table with $x_i$, $f_ix_i$ (or $u_i$) and $cf$ columns; the table carries marks.' }
+    ],
+    mistakes: [
+      { wrong: 'Using the median class’s own cumulative frequency as $cf$.', right: 'Use the cumulative frequency of the preceding class.' },
+      { wrong: 'Choosing the class with the largest class mark as the modal class.', right: 'The modal class has the largest frequency.' },
+      { wrong: 'Dividing $\\sum f_i x_i$ by the number of classes.', right: 'Divide by $\\sum f_i$, the total frequency.' },
+      { wrong: 'In step deviation, forgetting to multiply by $h$.', right: '$\\bar{x} = a + h \\times \\dfrac{\\sum f_i u_i}{\\sum f_i}$.', misconception: 'term-dropped' }
+    ],
+    examples: [
+      { question: 'Find the mean of the data: classes $0$–$10$, $10$–$20$, $20$–$30$, $30$–$40$, $40$–$50$ with frequencies $5, 8, 15, 16, 6$.', steps: ['Class marks: $5, 15, 25, 35, 45$; $\\sum f_i = 50$.', '$\\sum f_i x_i = 25 + 120 + 375 + 560 + 270 = 1350$.', '$\\bar{x} = \\dfrac{1350}{50}$.'], answer: '$27$', verify: { kind: 'value', expr: '(5*5+8*15+15*25+16*35+6*45)/50', answer: '27' } },
+      { question: 'For the same data, find the median and the mode.', steps: ['Cumulative frequencies: $5, 13, 28, 44, 50$; $\\dfrac{n}{2} = 25$, so the median class is $20$–$30$ with $cf = 13$, $f = 15$.', 'Median $= 20 + \\dfrac{25 - 13}{15} \\times 10 = 28$.', 'Modal class $30$–$40$: $f_1 = 16$, $f_0 = 15$, $f_2 = 6$.', 'Mode $= 30 + \\dfrac{16 - 15}{32 - 15 - 6} \\times 10 = 30 + \\dfrac{10}{11} = \\dfrac{340}{11} \\approx 30.91$.'], answer: 'Median $= 28$, mode $= \\dfrac{340}{11} \\approx 30.91$', verify: { kind: 'values', pairs: [['20+(25-13)/15*10', '28'], ['30+(16-15)/(2*16-15-6)*10', '340/11']] } }
+    ]
+  },
+
+  'c10-probability': {
+    summary: 'When every outcome of an experiment is equally likely, the probability of an event is the number of favourable outcomes divided by the total number of outcomes. Careful listing of the sample space is the whole skill.',
+    prereqs: ['c9-probability'],
+    concepts: [
+      { title: 'Theoretical probability', body: 'For equally likely outcomes, $P(E) = \\dfrac{\\text{favourable outcomes}}{\\text{total outcomes}}$. This is reasoned in advance, unlike experimental probability, which comes from repeated trials.' },
+      { title: 'Range of probability', body: 'For any event, $0 \\le P(E) \\le 1$. An impossible event has probability $0$ and a sure event has probability $1$.' },
+      { title: 'Complementary events', body: 'The event "not $E$" contains every outcome outside $E$, so $P(E) + P(\\text{not } E) = 1$.' },
+      { title: 'Listing sample spaces', body: 'For two coins list $HH, HT, TH, TT$ (4 outcomes). For two dice use a $6 \\times 6$ grid (36 outcomes). Ordered pairs keep $(1, 2)$ and $(2, 1)$ separate.' },
+      { title: 'A pack of cards', body: '$52$ cards, $4$ suits of $13$; $26$ red and $26$ black; $12$ face cards (king, queen, jack in each suit); $4$ aces.' }
+    ],
+    definitions: [
+      { term: 'Experiment', meaning: 'An action with well-defined possible results, such as tossing a coin.' },
+      { term: 'Outcome', meaning: 'One possible result of an experiment.' },
+      { term: 'Event', meaning: 'A collection of outcomes.' },
+      { term: 'Elementary event', meaning: 'An event with exactly one outcome; the probabilities of all elementary events add to $1$.' },
+      { term: 'Equally likely outcomes', meaning: 'Outcomes none of which is expected in preference to another.' }
+    ],
+    formulas: [
+      { label: 'Classical probability', tex: 'P(E) = \\dfrac{\\text{number of outcomes favourable to } E}{\\text{total number of outcomes}}' },
+      { label: 'Complement', tex: 'P(\\bar{E}) = 1 - P(E)' },
+      { label: 'Range', tex: '0 \\le P(E) \\le 1' },
+      { label: 'Sample space sizes', tex: '\\text{one die: } 6,\\ \\text{two dice: } 36,\\ \\text{two coins: } 4,\\ \\text{three coins: } 8' }
+    ],
+    points: [
+      { front: 'Can a probability be $1.2$ or $-0.1$?', back: 'No. It always lies between $0$ and $1$ inclusive.' },
+      { front: 'Most common sum with two dice', back: '$7$, with $6$ of the $36$ outcomes.' },
+      { front: 'Number of primes on a die', back: 'Three: $2, 3, 5$. Note $1$ is not prime.' },
+      { front: '"At least one" questions', back: 'Often easiest as $1 - P(\\text{none})$.' },
+      { front: 'Is $\\{H, T\\}$ with two coins enough?', back: 'No. Two coins give 4 equally likely outcomes; "one head, one tail" happens 2 ways.' },
+      { front: 'Board tip', back: 'Write the total and favourable counts separately, then simplify the fraction fully.' }
+    ],
+    mistakes: [
+      { wrong: 'For two coins, saying $P(\\text{one head}) = \\tfrac{1}{3}$ from outcomes $\\{0, 1, 2\\}$ heads.', right: 'Those are not equally likely. With $HH, HT, TH, TT$, $P = \\tfrac{2}{4} = \\tfrac{1}{2}$.', misconception: 'probability-wrong-total' },
+      { wrong: 'Counting face cards as $16$ by including aces.', right: 'Face cards are kings, queens and jacks: $12$.' },
+      { wrong: 'Taking $11$ outcomes for the sum of two dice.', right: 'There are $36$ equally likely ordered outcomes; the $11$ sums are not equally likely.', misconception: 'probability-wrong-total' },
+      { wrong: 'Writing $P(\\text{not } E) = P(E) - 1$.', right: '$P(\\text{not } E) = 1 - P(E)$.', misconception: 'sign-flipped' }
+    ],
+    examples: [
+      { question: 'One card is drawn from a well-shuffled pack of $52$. Find the probability that it is a king.', steps: ['Total outcomes $= 52$; kings $= 4$.', '$P = \\dfrac{4}{52} = \\dfrac{1}{13}$.'], answer: '$\\dfrac{1}{13}$', verify: { kind: 'value', expr: '4/52', answer: '1/13' } },
+      { question: 'Two dice are thrown together. Find the probability that the sum is $8$.', steps: ['Total outcomes $= 36$.', 'Sum $8$: $(2,6), (3,5), (4,4), (5,3), (6,2)$, which is $5$ outcomes.', '$P = \\dfrac{5}{36}$.'], answer: '$\\dfrac{5}{36}$', verify: { kind: 'value', expr: '5/(6*6)', answer: '5/36' } }
+    ]
+  }
+};

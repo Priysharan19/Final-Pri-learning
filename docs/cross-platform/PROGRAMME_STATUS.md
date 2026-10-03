@@ -27,7 +27,8 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 | CP-08 Google Play Billing | SOFTWARE IMPLEMENTATION: COMPLETE | `a069b16f` | `7ebfc88c` | [#279](https://github.com/Priysharan19/Final-Pri-learning/pull/279) | `e1236678` | DEFERRED |
 | CP-09 Android Handwriting Input | SOFTWARE IMPLEMENTATION: COMPLETE | `e1236678` | `9729b8db` | [#287](https://github.com/Priysharan19/Final-Pri-learning/pull/287) | `59f62144` | DEFERRED |
 | CP-10 Android Automated Product QA | SOFTWARE IMPLEMENTATION: COMPLETE | `59f62144` | `061596f4` | [#294](https://github.com/Priysharan19/Final-Pri-learning/pull/294) | `c8835831` | DEFERRED |
-| SEC-COMM-01 Server-Enforced Premium Entitlement | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `c8835831` | recorded by the next CP | this PR | recorded by the next CP | n/a (server) |
+| SEC-COMM-01 Server-Enforced Premium Entitlement | SOFTWARE IMPLEMENTATION: COMPLETE | `c8835831` | `c3f8cee8` | [#297](https://github.com/Priysharan19/Final-Pri-learning/pull/297) | `4dbfbf34` | n/a (server) |
+| CP-11 Cross-Platform Release Matrix | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `4dbfbf34` | recorded by the next CP | this PR | recorded by the next CP | n/a (release tooling) |
 
 ## CP-02 — Platform Bridge Foundation
 
@@ -489,3 +490,44 @@ Causes found:
 - When merged with `main`, the observability hooks (#262) and the allowance refund were combined on both routes.
 
 **Not in scope:** provider-side billing alerts and per-deployment budgets are an owner operation (**BLOCKED_EXTERNAL**). Physical: none needed.
+
+**SEC-COMM-01 exact-head evidence (recorded by CP-11):**
+- Candidate `c3f8cee8`. All four required checks pass.
+- Merged as `4dbfbf34` with `--match-head-commit`.
+- Locally on the merged tree: `npm test` exit 0 and the CI count invariants match (premium authority 44/44, cloud handwriting client 62/62).
+
+**CP-10 follow-up (merged during SEC-COMM-01 → CP-11):** [#298](https://github.com/Priysharan19/Final-Pri-learning/pull/298) as `99b779f9`.
+- **On that PR's own CI**, Android Shell **API 36 tablet passed the full product suite**, the first CI pass of the Android product. The API 26 floor and build/lint/unit also pass.
+- The changes: emulator Vulkan off, a bounded retry on chooser taps, and `pixel_fold` removed (no such profile in the runner tooling; foldables are **not automated**).
+- **Android phone images on CI: BLOCKED_AUTOMATION.** The hosted runner's emulator process dies (adb exit 255) shortly after a Back key press, on API 33 and API 36.
+  - Host memory is fine (about 4.3/16 GB); the guest shows low-memory kills.
+  - Tried and ruled out: 4 GB RAM, `guest` GPU, Vulkan off, and skipping rotation (reverted, not kept as a weakening).
+  - This is past the three-attempts-per-fingerprint ceiling, so it is returned to triage.
+  - Phone jobs stay in the matrix, visibly failing. **Android phone evidence is local emulator runs only** (API 36 and API 33, full product suite).
+- **Governance finding:** #286 and #298 used `fix/…` branch names. The non-required "Autonomous fleet V2 contract" check refuses non-mission branch names on governed paths. Later programme branches use `task/…`.
+
+## CP-11 — Cross-Platform Release Matrix and Compatibility
+
+**Delivered** ([release-policy.md](../release/release-policy.md), "Cross-platform release matrix and compatibility"):
+- `npm run release:matrix` (`scripts/release-matrix.mjs`) checks that:
+  - the shared web build is from **this candidate**, and both Apple bundles and the Android assets embed the same release SHA;
+  - versions match `release/metadata.json`;
+  - data origins are pinned in both Apple packages and Android;
+  - the priNative protocol and native client ids agree across JS, Swift, Kotlin and the server;
+  - the compatibility floor is mounted in the router.
+  - Evidence rows are context, not checks; P evidence is never inferred.
+- **Compatibility floor** (`server/platform/clientCompatibility.js`):
+  - shells send `X-Pri-Shell-Build`;
+  - below `PRI_MIN_IOS_BUILD` / `PRI_MIN_ANDROID_BUILD`, cloud routes answer `426 CLIENT_UPGRADE_REQUIRED` with `Upgrade: pri-shell`;
+  - **every exit stays open**: health and readiness (`/v1/ready`), sign-in (password, Apple/Google, nonce), recovery, verification, session check, devices, logout, export and deletion;
+  - `/v1/health` reports the active floors and refusals;
+  - it is documented as an upgrade nudge, not a security control.
+- **Client:** a refused sync tells the student to update (en + hi), keeps the outbox and leaves export and delete available.
+
+**Evidence (S0):**
+- `server/test/client-compatibility-check.mjs` 52/52, including a **real-router journey**: an old shell signs in, gets 426 on sync, exports, deletes, and the deleted account is refused.
+- A mutation removing the login exemption fails it.
+- `client/test/client-upgrade-required-check.mjs` 8/8.
+- Merging `main` surfaced its architecture rule that only `security.js` reads `X-Pri-Client`. The floor now gets the id through `declaredNativeClientId()`.
+- The release matrix runs in `ci.yml` (Apple) and `android-shell.yml` (Android).
+- Independent review found one blocker: old shells could not sign in, so they could not reach export or delete. It is fixed, along with the major and minor findings: client 426 handling, health visibility, vacuous matrix rows, the HEAD tie, router wiring, both Apple packages, HEAD /health, case, the Upgrade header and the path filters.

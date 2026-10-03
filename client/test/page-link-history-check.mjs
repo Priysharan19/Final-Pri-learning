@@ -143,7 +143,7 @@ console.log('— search and hash are part of the page —');
 console.log('— it stays a normal link —');
 {
   const calls = [];
-  const navigate = (to, opts) => calls.push([to, opts.replace]);
+  const navigate = (to, opts) => calls.push([to, opts.replace, opts.state]);
   const win = { location: { pathname: '/', search: '', hash: '' } };
   for (const mod of ['metaKey', 'ctrlKey', 'shiftKey', 'altKey']) {
     const ev = click(pageLinkClick({ to: '/practice', navigate, win }), { [mod]: true });
@@ -160,6 +160,8 @@ console.log('— it stays a normal link —');
   check('an onClick that prevents default stops navigation', calls.length === before);
   click(pageLinkClick({ to: '/exams', navigate, win, replace: true }));
   check('an explicit replace prop is honoured', calls.at(-1)?.[1] === true);
+  click(pageLinkClick({ to: '/exams', navigate, win, state: { from: 'home' } }));
+  check('link state reaches navigate', calls.at(-1)?.[2]?.from === 'home');
 }
 
 console.log('— every in-app page link uses it —');
@@ -173,7 +175,7 @@ console.log('— every in-app page link uses it —');
   check('sidebar, mobile nav and More sheet are PageLinks', (app.match(/<PageLink key=\{item\.to\}/g) || []).length === 3);
   check('the logo decides from the real URL too', app.includes("nav('/', { replace: isCurrentUrl('/') })"));
   const comp = read('client/src/components/PageLink.jsx');
-  check('PageLink routes every click through pageLinkClick', comp.includes('onClick={pageLinkClick({ to, navigate, onClick, target, replace })}'));
+  check('PageLink routes every click through pageLinkClick', comp.includes('onClick={pageLinkClick({ to, navigate, onClick, target, replace, state })}'));
 }
 
 const total = pass + fail;

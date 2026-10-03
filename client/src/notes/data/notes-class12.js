@@ -1,0 +1,544 @@
+// i18n note: mathematics content, English by design.
+export default {
+  'c12-relations-functions': {
+    summary: 'A relation on a set pairs some elements with others; we classify it by three tests (reflexive, symmetric, transitive), and when all three hold it splits the set into equivalence classes. A function is studied by whether it is one-one, onto or both, how two functions compose, and when an inverse exists.',
+    prereqs: ['c11-sets', 'c11-relations-functions'],
+    concepts: [
+      { title: 'Three tests for a relation', body: 'For a relation $R$ on a set $A$: reflexive means every $a$ is related to itself; symmetric means $(a,b)\\in R$ forces $(b,a)\\in R$; transitive means $(a,b)$ and $(b,c)$ in $R$ force $(a,c)\\in R$. Each must hold for all elements, so one failing pair is enough to disprove it.' },
+      { title: 'Equivalence relations and classes', body: 'A relation that passes all three tests is an equivalence relation. It breaks $A$ into disjoint classes: two elements share a class exactly when they are related. Congruence modulo $n$ on the integers is the standard example.' },
+      { title: 'One-one and onto', body: 'A function $f:A\\to B$ is one-one (injective) if different inputs give different outputs, that is $f(x_1)=f(x_2)\\Rightarrow x_1=x_2$. It is onto (surjective) if every element of $B$ is an output, so the range equals the codomain. Both together make it a bijection.' },
+      { title: 'Composition and inverse', body: 'For $f:A\\to B$ and $g:B\\to C$, the composite $g\\circ f$ sends $x$ to $g(f(x))$; apply $f$ first. A function has an inverse exactly when it is a bijection, and then $f^{-1}(y)$ is the unique $x$ with $f(x)=y$.' }
+    ],
+    definitions: [
+      { term: 'Empty and universal relation', meaning: 'The empty relation relates nothing; the universal relation $A\\times A$ relates every pair. Both are called trivial relations.' },
+      { term: 'Equivalence class', meaning: 'For an equivalence relation, $[a]$ is the set of all elements related to $a$.' },
+      { term: 'Bijection', meaning: 'A function that is both one-one and onto.' },
+      { term: 'Invertible function', meaning: '$f:A\\to B$ is invertible if some $g:B\\to A$ satisfies $g\\circ f=I_A$ and $f\\circ g=I_B$.' }
+    ],
+    formulas: [
+      { label: 'Composite', tex: '(g\\circ f)(x)=g\\big(f(x)\\big)' },
+      { label: 'Inverse of a composite', tex: '(g\\circ f)^{-1}=f^{-1}\\circ g^{-1}', note: 'Both $f$ and $g$ must be invertible.' },
+      { label: 'Number of relations on a set of n elements', tex: '2^{n^2}' },
+      { label: 'Number of functions from m elements to n elements', tex: 'n^m' },
+      { label: 'Number of one-one functions (m \\le n)', tex: '\\dfrac{n!}{(n-m)!}' },
+      { label: 'Number of bijections on n elements', tex: 'n!' }
+    ],
+    points: [
+      { front: 'How to disprove a property of a relation?', back: 'Give one concrete counterexample pair; a single failure is enough.' },
+      { front: 'Is composition commutative?', back: 'No. In general $g\\circ f\\ne f\\circ g$, and one may exist without the other.' },
+      { front: 'Finite set, $f:A\\to A$', back: 'On a finite set, one-one and onto are equivalent: either property gives the other.' },
+      { front: 'Checking onto', back: 'Solve $y=f(x)$ for $x$ and check the $x$ lies in the domain for every $y$ in the codomain.' },
+      { front: 'Codomain matters', back: '$f(x)=x^2$ is not onto from $\\mathbb R$ to $\\mathbb R$, but is onto from $\\mathbb R$ to $[0,\\infty)$.' },
+      { front: 'JEE tip: counting', back: 'Number of onto functions from 3 elements to 2 elements is $2^3-2=6$; subtract the constant maps.' }
+    ],
+    mistakes: [
+      { wrong: 'Assuming a symmetric and transitive relation must be reflexive.', right: 'It need not be: an element related to nothing breaks reflexivity. Check every element directly.' },
+      { wrong: 'Computing $g\\circ f$ by applying $g$ first.', right: '$(g\\circ f)(x)=g(f(x))$: the function on the right acts first.' },
+      { wrong: 'Writing $(g\\circ f)^{-1}=g^{-1}\\circ f^{-1}$.', right: 'Reverse the order: $(g\\circ f)^{-1}=f^{-1}\\circ g^{-1}$.' },
+      { wrong: 'Claiming a function is onto without reference to the codomain.', right: 'Onto compares the range with the stated codomain.' }
+    ],
+    examples: [
+      { question: 'If $f(x)=2x+3$ and $g(x)=x^2$, find $(g\\circ f)(1)$ and $(f\\circ g)(1)$.', steps: ['$f(1)=5$, so $(g\\circ f)(1)=g(5)=25$.', '$g(1)=1$, so $(f\\circ g)(1)=f(1)=5$.'], answer: '$25$ and $5$', verify: { kind: 'values', pairs: [['(2*1+3)^2', '25'], ['2*1^2+3', '5']] } },
+      { question: 'Find the inverse of the bijection $f:\\mathbb R\\to\\mathbb R$, $f(x)=3x-4$, and evaluate $f^{-1}(5)$.', steps: ['Put $y=3x-4$, so $x=\\dfrac{y+4}{3}$.', 'Hence $f^{-1}(y)=\\dfrac{y+4}{3}$ and $f^{-1}(5)=3$.'], answer: '$f^{-1}(x)=\\dfrac{x+4}{3}$, $f^{-1}(5)=3$', verify: { kind: 'values', pairs: [['(5+4)/3', '3'], ['3*3-4', '5']] } }
+    ]
+  },
+
+  'c12-inverse-trigonometric': {
+    summary: 'Trigonometric functions repeat, so to invert them we restrict each to a principal branch on which it is a bijection. The inverse functions then return angles inside fixed principal value ranges, and a handful of identities let us simplify and evaluate expressions.',
+    prereqs: ['c11-trig-functions', 'c12-relations-functions'],
+    concepts: [
+      { title: 'Why restrict', body: '$\\sin x$ is not one-one on $\\mathbb R$, so we keep only $[-\\pi/2,\\pi/2]$, where it rises from $-1$ to $1$. On that piece it is a bijection onto $[-1,1]$ and has an inverse $\\sin^{-1}$.' },
+      { title: 'Principal values', body: 'Each inverse function returns exactly one angle, its principal value, from a fixed range. Always check the final angle lies in that range.' },
+      { title: 'Graphs', body: 'The graph of an inverse function is the mirror image of the restricted original in the line $y=x$.' },
+      { title: 'Using identities', body: 'Identities such as $\\sin^{-1}x+\\cos^{-1}x=\\pi/2$ and the $\\tan^{-1}$ addition formula reduce expressions; many questions are solved by substituting $x=\\tan\\theta$ or $x=\\sin\\theta$.' }
+    ],
+    definitions: [
+      { term: 'Principal value branch', meaning: 'The restricted interval of angles on which a trigonometric function is inverted.' },
+      { term: '$\\sin^{-1}x$', meaning: 'The angle in $[-\\pi/2,\\pi/2]$ whose sine is $x$; defined for $x\\in[-1,1]$. It is not $1/\\sin x$.' }
+    ],
+    formulas: [
+      { label: 'Domains and principal ranges', tex: '\\begin{array}{lll}\\sin^{-1}&[-1,1]&[-\\tfrac{\\pi}{2},\\tfrac{\\pi}{2}]\\\\ \\cos^{-1}&[-1,1]&[0,\\pi]\\\\ \\tan^{-1}&\\mathbb R&(-\\tfrac{\\pi}{2},\\tfrac{\\pi}{2})\\\\ \\cot^{-1}&\\mathbb R&(0,\\pi)\\\\ \\sec^{-1}&|x|\\ge1&[0,\\pi]-\\{\\tfrac{\\pi}{2}\\}\\\\ \\csc^{-1}&|x|\\ge1&[-\\tfrac{\\pi}{2},\\tfrac{\\pi}{2}]-\\{0\\}\\end{array}' },
+      { label: 'Negative arguments', tex: '\\sin^{-1}(-x)=-\\sin^{-1}x,\\quad \\tan^{-1}(-x)=-\\tan^{-1}x,\\quad \\cos^{-1}(-x)=\\pi-\\cos^{-1}x,\\quad \\cot^{-1}(-x)=\\pi-\\cot^{-1}x' },
+      { label: 'Reciprocal arguments', tex: '\\csc^{-1}x=\\sin^{-1}\\tfrac{1}{x},\\quad \\sec^{-1}x=\\cos^{-1}\\tfrac{1}{x}\\quad(|x|\\ge1)' },
+      { label: 'Complementary pairs', tex: '\\sin^{-1}x+\\cos^{-1}x=\\tfrac{\\pi}{2},\\quad \\tan^{-1}x+\\cot^{-1}x=\\tfrac{\\pi}{2},\\quad \\sec^{-1}x+\\csc^{-1}x=\\tfrac{\\pi}{2}' },
+      { label: 'Sum of inverse tangents', tex: '\\tan^{-1}x+\\tan^{-1}y=\\tan^{-1}\\dfrac{x+y}{1-xy}\\quad(xy<1)' },
+      { label: 'Double angle forms', tex: '2\\tan^{-1}x=\\sin^{-1}\\dfrac{2x}{1+x^2}\\ (|x|\\le1)=\\cos^{-1}\\dfrac{1-x^2}{1+x^2}\\ (x\\ge0)=\\tan^{-1}\\dfrac{2x}{1-x^2}\\ (|x|<1)' }
+    ],
+    points: [
+      { front: '$\\sin(\\sin^{-1}x)$ vs $\\sin^{-1}(\\sin x)$', back: '$\\sin(\\sin^{-1}x)=x$ for all $x\\in[-1,1]$, but $\\sin^{-1}(\\sin x)=x$ only when $x\\in[-\\pi/2,\\pi/2]$.' },
+      { front: '$\\cos^{-1}(\\cos\\tfrac{7\\pi}{6})$', back: '$\\tfrac{7\\pi}{6}$ is outside $[0,\\pi]$; $\\cos\\tfrac{7\\pi}{6}=\\cos\\tfrac{5\\pi}{6}$, so the value is $\\tfrac{5\\pi}{6}$.' },
+      { front: 'Range of $\\cos^{-1}$ vs $\\sin^{-1}$', back: '$\\cos^{-1}$ gives $[0,\\pi]$ (never negative); $\\sin^{-1}$ gives $[-\\pi/2,\\pi/2]$.' },
+      { front: '$\\tan^{-1}$ sum when $xy>1$', back: 'For $x,y>0$ with $xy>1$, add $\\pi$: $\\tan^{-1}x+\\tan^{-1}y=\\pi+\\tan^{-1}\\frac{x+y}{1-xy}$.' },
+      { front: 'JEE tip: substitution', back: 'For expressions like $\\sqrt{1-x^2}$ put $x=\\sin\\theta$; for $1+x^2$ put $x=\\tan\\theta$; then track the range of $\\theta$.' }
+    ],
+    mistakes: [
+      { wrong: 'Writing $\\sin^{-1}x=\\dfrac{1}{\\sin x}$.', right: '$\\sin^{-1}x$ is an angle; the reciprocal is $(\\sin x)^{-1}=\\csc x$.', misconception: 'negative-index-as-negative' },
+      { wrong: 'Giving $\\cos^{-1}(-\\tfrac12)=-\\tfrac{\\pi}{3}$.', right: 'Principal range is $[0,\\pi]$: $\\cos^{-1}(-\\tfrac12)=\\pi-\\tfrac{\\pi}{3}=\\tfrac{2\\pi}{3}$.' },
+      { wrong: 'Cancelling $\\sin^{-1}(\\sin\\tfrac{3\\pi}{4})=\\tfrac{3\\pi}{4}$.', right: 'Answer must be in $[-\\pi/2,\\pi/2]$: it equals $\\tfrac{\\pi}{4}$.' },
+      { wrong: 'Using the $\\tan^{-1}$ addition formula without checking $xy<1$.', right: 'Check the condition; adjust by $\\pi$ otherwise.' }
+    ],
+    examples: [
+      { question: 'Find $\\cos^{-1}\\left(-\\tfrac12\\right)+2\\sin^{-1}\\left(\\tfrac12\\right)$.', steps: ['$\\cos^{-1}(-\\tfrac12)=\\pi-\\tfrac{\\pi}{3}=\\tfrac{2\\pi}{3}$.', '$\\sin^{-1}(\\tfrac12)=\\tfrac{\\pi}{6}$, doubled is $\\tfrac{\\pi}{3}$.', 'Sum: $\\tfrac{2\\pi}{3}+\\tfrac{\\pi}{3}=\\pi$.'], answer: '$\\pi$', verify: { kind: 'value', expr: 'acos(-1/2)+2*asin(1/2)', answer: 'pi' } },
+      { question: 'Show $\\tan^{-1}\\tfrac12+\\tan^{-1}\\tfrac13=\\tfrac{\\pi}{4}$.', steps: ['$xy=\\tfrac16<1$, so the sum formula applies.', '$\\dfrac{\\frac12+\\frac13}{1-\\frac16}=\\dfrac{5/6}{5/6}=1$.', '$\\tan^{-1}1=\\tfrac{\\pi}{4}$.'], answer: '$\\dfrac{\\pi}{4}$', verify: { kind: 'value', expr: 'atan(1/2)+atan(1/3)', answer: 'pi/4' } }
+    ]
+  },
+
+  'c12-matrices': {
+    summary: 'A matrix is a rectangular array of numbers. We add matrices of the same order entry by entry, multiply rows into columns when the inner orders match, transpose by swapping rows and columns, and find inverses by elementary row operations.',
+    prereqs: [],
+    concepts: [
+      { title: 'Order and equality', body: 'An $m\\times n$ matrix has $m$ rows and $n$ columns. Two matrices are equal only if they have the same order and every corresponding entry agrees.' },
+      { title: 'Multiplication', body: '$AB$ exists when the number of columns of $A$ equals the number of rows of $B$. The $(i,j)$ entry is row $i$ of $A$ dotted with column $j$ of $B$. In general $AB\\ne BA$, and $AB=O$ does not force $A=O$ or $B=O$.' },
+      { title: 'Transpose and symmetry', body: '$A^T$ swaps rows and columns. $A$ is symmetric if $A^T=A$ and skew-symmetric if $A^T=-A$; a skew-symmetric matrix has zeros on its diagonal. Every square matrix is the sum of one of each.' },
+      { title: 'Inverse by row operations', body: 'Write $A=IA$, then apply the same row operations to $A$ on the left and to $I$ on the right until the left becomes $I$; the right side is then $A^{-1}$. If a row of zeros appears on the left, $A^{-1}$ does not exist.' }
+    ],
+    definitions: [
+      { term: 'Square, diagonal, scalar, identity', meaning: 'Square: $m=n$. Diagonal: all off-diagonal entries zero. Scalar: diagonal with equal diagonal entries. Identity $I$: scalar with entries 1.' },
+      { term: 'Zero matrix $O$', meaning: 'Every entry is 0.' },
+      { term: 'Invertible matrix', meaning: 'A square $A$ with some $B$ such that $AB=BA=I$; then $B=A^{-1}$, and it is unique.' }
+    ],
+    formulas: [
+      { label: 'Product entry', tex: '(AB)_{ij}=\\sum_{k=1}^{n}a_{ik}b_{kj}' },
+      { label: 'Transpose rules', tex: '(A^T)^T=A,\\quad (A+B)^T=A^T+B^T,\\quad (kA)^T=kA^T,\\quad (AB)^T=B^TA^T' },
+      { label: 'Symmetric plus skew split', tex: 'A=\\tfrac12(A+A^T)+\\tfrac12(A-A^T)' },
+      { label: 'Inverse of a product', tex: '(AB)^{-1}=B^{-1}A^{-1}' },
+      { label: 'Distributive and associative', tex: 'A(B+C)=AB+AC,\\quad (AB)C=A(BC)' }
+    ],
+    points: [
+      { front: 'Order of $AB$', back: 'If $A$ is $m\\times n$ and $B$ is $n\\times p$, then $AB$ is $m\\times p$.' },
+      { front: 'Diagonal of skew-symmetric', back: '$a_{ii}=-a_{ii}$ forces every diagonal entry to be 0.' },
+      { front: 'Number of matrices of order $m\\times n$ with entries from $k$ values', back: '$k^{mn}$.' },
+      { front: 'Expanding $(A+B)^2$', back: 'It is $A^2+AB+BA+B^2$; it equals $A^2+2AB+B^2$ only if $AB=BA$.' },
+      { front: 'Row operations allowed', back: 'Swap two rows, multiply a row by a non-zero number, add a multiple of one row to another.' },
+      { front: 'JEE tip', back: 'For powers, look for a pattern ($A^2=kA$ or $A^2=I$) instead of multiplying repeatedly.' }
+    ],
+    mistakes: [
+      { wrong: 'Assuming $AB=BA$.', right: 'Matrix multiplication is not commutative in general.' },
+      { wrong: 'Writing $(AB)^T=A^TB^T$.', right: 'Reverse the order: $(AB)^T=B^TA^T$.' },
+      { wrong: 'Concluding $A=O$ or $B=O$ from $AB=O$.', right: 'Non-zero matrices can have a zero product.' },
+      { wrong: 'Mixing row and column operations while finding an inverse.', right: 'Use only row operations (with $A=IA$) throughout.' }
+    ],
+    examples: [
+      { question: 'Find $AB$ for $A=\\begin{pmatrix}1&2\\\\3&4\\end{pmatrix}$, $B=\\begin{pmatrix}2&0\\\\1&3\\end{pmatrix}$.', steps: ['Row 1: $(1\\cdot2+2\\cdot1,\\ 1\\cdot0+2\\cdot3)=(4,6)$.', 'Row 2: $(3\\cdot2+4\\cdot1,\\ 3\\cdot0+4\\cdot3)=(10,12)$.'], answer: '$\\begin{pmatrix}4&6\\\\10&12\\end{pmatrix}$', verify: { kind: 'values', pairs: [['1*2+2*1', '4'], ['1*0+2*3', '6'], ['3*2+4*1', '10'], ['3*0+4*3', '12']] } },
+      { question: 'Use row operations to find the inverse of $A=\\begin{pmatrix}2&1\\\\5&3\\end{pmatrix}$.', steps: ['Start from $[A\\mid I]$. $R_1\\to\\tfrac12R_1$: $(1,\\tfrac12\\mid\\tfrac12,0)$.', '$R_2\\to R_2-5R_1$: $(0,\\tfrac12\\mid-\\tfrac52,1)$; then $R_2\\to2R_2$: $(0,1\\mid-5,2)$.', '$R_1\\to R_1-\\tfrac12R_2$: $(1,0\\mid3,-1)$.'], answer: '$A^{-1}=\\begin{pmatrix}3&-1\\\\-5&2\\end{pmatrix}$', verify: { kind: 'values', pairs: [['2*3+1*(-5)', '1'], ['2*(-1)+1*2', '0'], ['5*3+3*(-5)', '0'], ['5*(-1)+3*2', '1']] } }
+    ]
+  },
+
+  'c12-determinants': {
+    summary: 'Every square matrix has a number, its determinant, that tells whether the matrix can be inverted. We evaluate determinants by expansion and properties, build the adjoint from cofactors, compute triangle areas, and solve linear systems with $X=A^{-1}B$.',
+    prereqs: ['c12-matrices'],
+    concepts: [
+      { title: 'Evaluating', body: 'Expand along any row or column: multiply each entry by its cofactor and add. Choosing the row or column with most zeros saves work.' },
+      { title: 'Properties', body: 'Swapping two rows changes the sign; two equal (or proportional) rows give 0; multiplying a row by $k$ multiplies the determinant by $k$; adding a multiple of one row to another leaves it unchanged; $|A^T|=|A|$.' },
+      { title: 'Adjoint and inverse', body: 'The adjoint is the transpose of the cofactor matrix. Then $A\\,\\operatorname{adj}A=|A|I$, so $A^{-1}=\\frac{1}{|A|}\\operatorname{adj}A$ exactly when $|A|\\ne0$.' },
+      { title: 'Systems of equations', body: 'Write the system as $AX=B$. If $|A|\\ne0$ there is a unique solution $X=A^{-1}B$. If $|A|=0$, compute $(\\operatorname{adj}A)B$: non-zero means no solution; zero means infinitely many or none, to be checked further.' }
+    ],
+    definitions: [
+      { term: 'Minor $M_{ij}$', meaning: 'Determinant left after deleting row $i$ and column $j$.' },
+      { term: 'Cofactor $A_{ij}$', meaning: '$(-1)^{i+j}M_{ij}$.' },
+      { term: 'Singular matrix', meaning: 'A square matrix with determinant 0; it has no inverse.' },
+      { term: 'Consistent system', meaning: 'A system with at least one solution.' }
+    ],
+    formulas: [
+      { label: '2 by 2', tex: '\\begin{vmatrix}a&b\\\\c&d\\end{vmatrix}=ad-bc' },
+      { label: 'Inverse', tex: 'A^{-1}=\\dfrac{1}{|A|}\\operatorname{adj}A,\\quad |A|\\ne0' },
+      { label: 'Product and scalar', tex: '|AB|=|A||B|,\\quad |kA|=k^n|A|\\ (A\\ \\text{of order}\\ n)' },
+      { label: 'Adjoint facts', tex: '|\\operatorname{adj}A|=|A|^{n-1},\\quad |A^{-1}|=\\dfrac{1}{|A|}' },
+      { label: 'Area of a triangle', tex: '\\Delta=\\tfrac12\\left|\\begin{vmatrix}x_1&y_1&1\\\\x_2&y_2&1\\\\x_3&y_3&1\\end{vmatrix}\\right|', note: 'Area 0 means the three points are collinear.' },
+      { label: 'Matrix method', tex: 'AX=B\\ \\Rightarrow\\ X=A^{-1}B' }
+    ],
+    points: [
+      { front: 'Expanding with wrong-row cofactors', back: 'Entries of one row times cofactors of a different row sum to 0.' },
+      { front: '$|kA|$ for a $3\\times3$', back: '$k^3|A|$, not $k|A|$.' },
+      { front: 'Area sign', back: 'Take the absolute value; if area is given, solve with both $\\pm$.' },
+      { front: 'Adjoint of $2\\times2$', back: 'Swap the diagonal entries and change the sign of the other two.' },
+      { front: 'Skew-symmetric odd order', back: 'Its determinant is 0.' },
+      { front: 'JEE tip', back: 'Use $R_i\\to R_i-R_j$ to create zeros before expanding; look for common factors.' }
+    ],
+    mistakes: [
+      { wrong: 'Forgetting the sign pattern $(-1)^{i+j}$ in cofactors.', right: 'Signs alternate $+\\,-\\,+$ starting with $+$ at the top-left.' },
+      { wrong: 'Writing $|A+B|=|A|+|B|$.', right: 'Determinants multiply over products, but do not add over sums.', misconception: 'function-of-sum' },
+      { wrong: 'Using the cofactor matrix itself as the adjoint.', right: 'The adjoint is its transpose.' },
+      { wrong: 'Declaring no solution as soon as $|A|=0$.', right: 'Check $(\\operatorname{adj}A)B$: if it is zero the system may have infinitely many solutions.' }
+    ],
+    examples: [
+      { question: 'Evaluate $\\begin{vmatrix}1&2&3\\\\0&4&5\\\\1&0&6\\end{vmatrix}$.', steps: ['Expand along row 1: $1(24-0)-2(0-5)+3(0-4)$.', '$=24+10-12=22$.'], answer: '$22$', verify: { kind: 'value', expr: '1*(4*6-5*0)-2*(0*6-5*1)+3*(0*0-4*1)', answer: '22' } },
+      { question: 'Solve $2x+y=5$, $x-3y=-1$ by the matrix method.', steps: ['$A=\\begin{pmatrix}2&1\\\\1&-3\\end{pmatrix}$, $|A|=-7\\ne0$.', '$\\operatorname{adj}A=\\begin{pmatrix}-3&-1\\\\-1&2\\end{pmatrix}$, so $X=-\\tfrac17\\begin{pmatrix}-15+1\\\\-5-2\\end{pmatrix}=\\begin{pmatrix}2\\\\1\\end{pmatrix}$.'], answer: '$x=2,\\ y=1$', verify: { kind: 'system', equations: ['2*x+y=5', 'x-3*y=-1'], solution: { x: '2', y: '1' } } }
+    ]
+  },
+
+  'c12-continuity-differentiability': {
+    summary: 'A function is continuous at a point when its limit there equals its value, and differentiable when the derivative limit exists. Differentiability implies continuity but not the reverse. The chapter builds the full toolkit of differentiation: chain rule, implicit, inverse trigonometric, logarithmic, parametric and second derivatives, plus Rolle and the mean value theorem.',
+    prereqs: ['c11-limits-derivatives', 'c12-inverse-trigonometric'],
+    concepts: [
+      { title: 'Continuity test', body: '$f$ is continuous at $c$ when $\\lim_{x\\to c^-}f(x)=\\lim_{x\\to c^+}f(x)=f(c)$. Sums, products, quotients (non-zero denominator) and composites of continuous functions are continuous.' },
+      { title: 'Differentiability', body: 'Compare the left and right derivatives $\\lim_{h\\to0^\\mp}\\frac{f(c+h)-f(c)}{h}$. If they agree, $f$ is differentiable at $c$. $|x|$ is continuous but not differentiable at 0 (a corner).' },
+      { title: 'Chain, implicit and logarithmic', body: 'Chain rule: differentiate the outer function, then multiply by the derivative of the inner. For implicit curves, differentiate both sides treating $y$ as a function of $x$. For $u^v$ or long products, take $\\log$ first.' },
+      { title: 'Parametric and second order', body: 'If $x=f(t)$, $y=g(t)$, then $\\frac{dy}{dx}=\\frac{dy/dt}{dx/dt}$. The second derivative is the derivative of $\\frac{dy}{dx}$ with respect to $x$; in parametric form divide again by $dx/dt$.' },
+      { title: 'Rolle and mean value theorem', body: 'If $f$ is continuous on $[a,b]$ and differentiable on $(a,b)$, some $c$ in $(a,b)$ has $f\'(c)=\\frac{f(b)-f(a)}{b-a}$. Rolle is the special case $f(a)=f(b)$, giving $f\'(c)=0$.' }
+    ],
+    definitions: [
+      { term: 'Continuous function', meaning: 'Continuous at every point of its domain.' },
+      { term: 'Left/right hand derivative', meaning: 'The one-sided limits of the difference quotient at a point.' },
+      { term: 'Implicit function', meaning: 'A relation $F(x,y)=0$ where $y$ is not isolated.' }
+    ],
+    formulas: [
+      { label: 'Chain rule', tex: '\\dfrac{d}{dx}f(g(x))=f\'(g(x))\\,g\'(x)' },
+      { label: 'Inverse trig derivatives', tex: '\\tfrac{d}{dx}\\sin^{-1}x=\\tfrac{1}{\\sqrt{1-x^2}},\\ \\tfrac{d}{dx}\\cos^{-1}x=-\\tfrac{1}{\\sqrt{1-x^2}},\\ \\tfrac{d}{dx}\\tan^{-1}x=\\tfrac{1}{1+x^2}', note: 'The first two need $|x|<1$.' },
+      { label: 'More inverse trig', tex: '\\tfrac{d}{dx}\\cot^{-1}x=-\\tfrac{1}{1+x^2},\\ \\tfrac{d}{dx}\\sec^{-1}x=\\tfrac{1}{|x|\\sqrt{x^2-1}},\\ \\tfrac{d}{dx}\\csc^{-1}x=-\\tfrac{1}{|x|\\sqrt{x^2-1}}' },
+      { label: 'Exponential and log', tex: '\\tfrac{d}{dx}e^x=e^x,\\ \\tfrac{d}{dx}a^x=a^x\\ln a,\\ \\tfrac{d}{dx}\\ln x=\\tfrac1x\\ (x>0)' },
+      { label: 'Logarithmic differentiation', tex: 'y=u^v\\Rightarrow \\dfrac{1}{y}\\dfrac{dy}{dx}=v\'\\ln u+\\dfrac{v\\,u\'}{u}' },
+      { label: 'Parametric', tex: '\\dfrac{dy}{dx}=\\dfrac{dy/dt}{dx/dt},\\quad \\dfrac{d^2y}{dx^2}=\\dfrac{\\frac{d}{dt}\\left(\\frac{dy}{dx}\\right)}{dx/dt}' },
+      { label: 'Mean value theorem', tex: 'f\'(c)=\\dfrac{f(b)-f(a)}{b-a},\\ c\\in(a,b)' }
+    ],
+    points: [
+      { front: 'Differentiable implies?', back: 'Continuous. The converse fails, e.g. $|x|$ at 0.' },
+      { front: 'Piecewise continuity questions', back: 'Equate left limit, right limit and value at the joining point to find unknown constants.' },
+      { front: 'Second derivative in parametric form', back: 'It is not $\\frac{d^2y/dt^2}{d^2x/dt^2}$; differentiate $dy/dx$ in $t$ and divide by $dx/dt$.' },
+      { front: 'Rolle hypotheses', back: 'Continuity on the closed interval, differentiability on the open one, equal end values. If any fails, the conclusion is not guaranteed.' },
+      { front: 'Greatest integer function', back: '$[x]$ is discontinuous at every integer.' },
+      { front: 'JEE tip', back: 'Before differentiating inverse-trig expressions, simplify with a substitution like $x=\\tan\\theta$; many reduce to a multiple of $\\tan^{-1}x$.' }
+    ],
+    mistakes: [
+      { wrong: 'Differentiating $\\sin(x^2)$ as $\\cos(x^2)$.', right: 'Multiply by the inner derivative: $2x\\cos(x^2)$.', misconception: 'term-dropped' },
+      { wrong: 'Treating $\\frac{d}{dx}(x^x)$ as $x\\cdot x^{x-1}$.', right: 'Use logs: $\\frac{d}{dx}x^x=x^x(1+\\ln x)$.' },
+      { wrong: 'Forgetting $dy/dx$ when differentiating $y^2$ implicitly.', right: '$\\frac{d}{dx}y^2=2y\\frac{dy}{dx}$.' },
+      { wrong: 'Assuming continuity guarantees a derivative.', right: 'Check that left and right derivatives agree.' }
+    ],
+    examples: [
+      { question: 'Differentiate $y=x^x$ for $x>0$.', steps: ['$\\ln y=x\\ln x$.', 'Differentiate: $\\frac1y\\frac{dy}{dx}=\\ln x+1$.', 'So $\\frac{dy}{dx}=x^x(1+\\ln x)$.'], answer: '$x^x(1+\\ln x)$', verify: { kind: 'derivative', f: 'x^x', answer: 'x^x*(1+ln(x))' } },
+      { question: 'Differentiate $y=\\tan^{-1}(x^2)$.', steps: ['Outer: $\\frac{1}{1+u^2}$ with $u=x^2$.', 'Inner derivative $2x$.', '$\\frac{dy}{dx}=\\frac{2x}{1+x^4}$.'], answer: '$\\dfrac{2x}{1+x^4}$', verify: { kind: 'derivative', f: 'atan(x^2)', answer: '2*x/(1+x^4)' } }
+    ]
+  },
+
+  'c12-applications-derivatives': {
+    summary: 'The derivative measures how fast a quantity changes. We use it for related rates, small-change approximations, deciding where a function rises or falls, writing tangents and normals, and locating maxima and minima for optimisation problems.',
+    prereqs: ['c12-continuity-differentiability'],
+    concepts: [
+      { title: 'Rates of change', body: 'If $y$ depends on $x$ and both depend on time, $\\frac{dy}{dt}=\\frac{dy}{dx}\\cdot\\frac{dx}{dt}$. Write the relation between the quantities first, then differentiate with respect to $t$.' },
+      { title: 'Increasing and decreasing', body: 'On an interval, $f\'>0$ means strictly increasing and $f\'<0$ means strictly decreasing. Find where $f\'=0$ or is undefined, split the line there, and test the sign on each piece.' },
+      { title: 'Tangents and normals', body: 'The slope of the tangent at $(x_1,y_1)$ is $f\'(x_1)$; the normal is perpendicular, so its slope is $-1/f\'(x_1)$ when $f\'(x_1)\\ne0$.' },
+      { title: 'Local extrema', body: 'At a critical point, the first derivative test checks the sign change of $f\'$ (+ to − is a maximum, − to + a minimum). The second derivative test: $f\'\'(c)<0$ gives a local maximum, $f\'\'(c)>0$ a local minimum, $f\'\'(c)=0$ is inconclusive.' },
+      { title: 'Absolute extrema on a closed interval', body: 'A continuous function on $[a,b]$ attains its greatest and least values. Evaluate $f$ at all critical points inside and at both endpoints, then compare.' }
+    ],
+    definitions: [
+      { term: 'Critical point', meaning: 'A point of the domain where $f\'=0$ or $f\'$ does not exist.' },
+      { term: 'Point of inflection', meaning: 'A point where the concavity changes, such as $x=0$ on $y=x^3$, which is a critical point but not an extremum.' },
+      { term: 'Approximation', meaning: 'For a small change $\\Delta x$, $\\Delta y\\approx f\'(x)\\Delta x$.' }
+    ],
+    formulas: [
+      { label: 'Tangent line', tex: 'y-y_1=f\'(x_1)(x-x_1)' },
+      { label: 'Normal line', tex: 'y-y_1=-\\dfrac{1}{f\'(x_1)}(x-x_1)' },
+      { label: 'Approximation', tex: 'f(x+\\Delta x)\\approx f(x)+f\'(x)\\,\\Delta x' },
+      { label: 'Related rates', tex: '\\dfrac{dy}{dt}=\\dfrac{dy}{dx}\\cdot\\dfrac{dx}{dt}' },
+      { label: 'Second derivative test', tex: 'f\'(c)=0:\\ f\'\'(c)<0\\Rightarrow\\text{local max},\\ f\'\'(c)>0\\Rightarrow\\text{local min}' }
+    ],
+    points: [
+      { front: 'Horizontal tangent', back: 'Where $\\frac{dy}{dx}=0$. Vertical tangent: where $\\frac{dx}{dy}=0$.' },
+      { front: 'Rate questions sign', back: 'A decreasing quantity has a negative rate; keep the sign.' },
+      { front: 'Endpoints', back: 'For absolute extrema on $[a,b]$, always include $f(a)$ and $f(b)$.' },
+      { front: '$f\'\'(c)=0$', back: 'The test fails; return to the first derivative test.' },
+      { front: 'Optimisation recipe', back: 'Express the target in one variable using the constraint, differentiate, set to 0, confirm max/min, answer the asked quantity.' },
+      { front: 'JEE tip', back: 'Fixed perimeter rectangle has maximum area when it is a square; fixed area has minimum perimeter as a square.' }
+    ],
+    mistakes: [
+      { wrong: 'Calling every point with $f\'(c)=0$ an extremum.', right: '$x^3$ has $f\'(0)=0$ but no extremum; check the sign change.' },
+      { wrong: 'Using the tangent slope for the normal.', right: 'Normal slope is the negative reciprocal.', misconception: 'perpendicular-gradient' },
+      { wrong: 'Substituting the given instant value before differentiating.', right: 'Differentiate the general relation first, then substitute.' },
+      { wrong: 'Ignoring endpoints for absolute maxima.', right: 'Compare critical values with endpoint values.' }
+    ],
+    examples: [
+      { question: 'Find the absolute maximum and minimum of $f(x)=x^3-3x$ on $[0,2]$.', steps: ['$f\'(x)=3x^2-3=0\\Rightarrow x=1$ (in the interval).', '$f(0)=0$, $f(1)=-2$, $f(2)=2$.', 'Maximum $2$ at $x=2$; minimum $-2$ at $x=1$.'], answer: 'Maximum $2$, minimum $-2$', verify: { kind: 'values', pairs: [['0^3-3*0', '0'], ['1^3-3*1', '-2'], ['2^3-3*2', '2']] } },
+      { question: 'Use differentials to approximate $\\sqrt{25.3}$.', steps: ['Take $f(x)=\\sqrt x$, $x=25$, $\\Delta x=0.3$.', '$f\'(25)=\\frac{1}{2\\cdot5}=0.1$, so $\\Delta y\\approx0.03$.', '$\\sqrt{25.3}\\approx5.03$.'], answer: '$5.03$', verify: { kind: 'value', expr: 'sqrt(25)+0.3/(2*sqrt(25))', answer: '5.03' } }
+    ]
+  },
+
+  'c12-integrals': {
+    summary: 'Integration reverses differentiation. Indefinite integrals are found from standard results plus three main techniques: substitution, partial fractions and integration by parts. Definite integrals give a number via the fundamental theorem, and their properties often make hard integrals easy.',
+    prereqs: ['c12-continuity-differentiability'],
+    concepts: [
+      { title: 'Antiderivatives', body: 'If $F\'=f$ then $\\int f\\,dx=F+C$. Every antiderivative differs by a constant, so always add $C$ to indefinite answers. Check by differentiating.' },
+      { title: 'Substitution', body: 'If the integrand contains a function and (a multiple of) its derivative, set $t$ equal to that function. Change $dx$ to $dt$ fully; in definite integrals also change the limits.' },
+      { title: 'Partial fractions', body: 'For a proper rational function, split into simpler fractions according to the factors of the denominator: linear $\\frac{A}{x-a}$, repeated $\\frac{B}{(x-a)^2}$, irreducible quadratic $\\frac{Cx+D}{x^2+bx+c}$. If improper, divide first.' },
+      { title: 'By parts', body: '$\\int u\\,v\\,dx=u\\int v\\,dx-\\int\\big(u\'\\int v\\,dx\\big)dx$. Choose $u$ by ILATE (inverse trig, log, algebraic, trig, exponential), earliest first.' },
+      { title: 'Definite integrals', body: 'By the fundamental theorem, $\\int_a^b f\\,dx=F(b)-F(a)$. Properties such as $\\int_0^a f(x)dx=\\int_0^a f(a-x)dx$ and the odd/even rule save heavy work.' }
+    ],
+    definitions: [
+      { term: 'Integrand', meaning: 'The function being integrated.' },
+      { term: 'Constant of integration', meaning: 'The arbitrary $C$ in an indefinite integral.' },
+      { term: 'Definite integral', meaning: 'The signed area under $f$ from $a$ to $b$, a number.' }
+    ],
+    formulas: [
+      { label: 'Power rule', tex: '\\int x^n\\,dx=\\dfrac{x^{n+1}}{n+1}+C\\ (n\\ne-1),\\quad \\int\\dfrac{dx}{x}=\\ln|x|+C' },
+      { label: 'Trig basics', tex: '\\int\\tan x\\,dx=\\ln|\\sec x|+C,\\ \\int\\sec x\\,dx=\\ln|\\sec x+\\tan x|+C,\\ \\int\\csc x\\,dx=\\ln|\\csc x-\\cot x|+C' },
+      { label: 'Special integrals (1)', tex: '\\int\\dfrac{dx}{x^2-a^2}=\\dfrac{1}{2a}\\ln\\left|\\dfrac{x-a}{x+a}\\right|+C,\\quad \\int\\dfrac{dx}{a^2-x^2}=\\dfrac{1}{2a}\\ln\\left|\\dfrac{a+x}{a-x}\\right|+C' },
+      { label: 'Special integrals (2)', tex: '\\int\\dfrac{dx}{x^2+a^2}=\\dfrac1a\\tan^{-1}\\dfrac xa+C,\\quad \\int\\dfrac{dx}{\\sqrt{a^2-x^2}}=\\sin^{-1}\\dfrac xa+C' },
+      { label: 'Special integrals (3)', tex: '\\int\\dfrac{dx}{\\sqrt{x^2\\pm a^2}}=\\ln\\left|x+\\sqrt{x^2\\pm a^2}\\right|+C' },
+      { label: 'Square-root forms', tex: '\\int\\sqrt{a^2-x^2}\\,dx=\\tfrac x2\\sqrt{a^2-x^2}+\\tfrac{a^2}{2}\\sin^{-1}\\tfrac xa+C,\\quad \\int\\sqrt{x^2\\pm a^2}\\,dx=\\tfrac x2\\sqrt{x^2\\pm a^2}\\pm\\tfrac{a^2}{2}\\ln\\left|x+\\sqrt{x^2\\pm a^2}\\right|+C' },
+      { label: 'By parts', tex: '\\int u\\,v\\,dx=u\\int v\\,dx-\\int\\left(\\dfrac{du}{dx}\\int v\\,dx\\right)dx' },
+      { label: 'Exponential pattern', tex: '\\int e^x\\big(f(x)+f\'(x)\\big)dx=e^xf(x)+C' },
+      { label: 'Key definite properties', tex: '\\int_a^b f(x)dx=\\int_a^b f(a+b-x)dx,\\quad \\int_{-a}^{a}f\\,dx=\\begin{cases}2\\int_0^a f\\,dx & f\\ \\text{even}\\\\ 0 & f\\ \\text{odd}\\end{cases}' },
+      { label: 'Fundamental theorem', tex: '\\int_a^b f(x)\\,dx=F(b)-F(a),\\quad \\dfrac{d}{dx}\\int_a^x f(t)\\,dt=f(x)' }
+    ],
+    points: [
+      { front: '$\\int\\frac{f\'(x)}{f(x)}dx$', back: '$\\ln|f(x)|+C$.' },
+      { front: 'Quadratic in denominator', back: 'Complete the square, then use a special integral.' },
+      { front: '$\\int_0^a f(x)dx=\\int_0^a f(a-x)dx$ use', back: 'Add the two forms to get $2I$ of something simple, e.g. $\\int_0^{\\pi/2}\\frac{\\sin x}{\\sin x+\\cos x}dx=\\frac{\\pi}{4}$.' },
+      { front: 'Limits in substitution', back: 'Change them to the new variable; do not return to $x$.' },
+      { front: 'ILATE', back: 'Pick $u$ as the earlier type: Inverse trig, Log, Algebraic, Trig, Exponential.' },
+      { front: 'JEE tip', back: 'For $\\int\\frac{px+q}{ax^2+bx+c}dx$ write $px+q=A\\frac{d}{dx}(ax^2+bx+c)+B$.' }
+    ],
+    mistakes: [
+      { wrong: 'Omitting $+C$ in indefinite integrals.', right: 'Every indefinite integral carries an arbitrary constant.' },
+      { wrong: 'Writing $\\int\\frac{dx}{x}=\\ln x$ for all $x\\ne0$.', right: 'Use $\\ln|x|+C$.' },
+      { wrong: 'Integrating a product as the product of integrals.', right: 'Use by parts or substitution; $\\int uv\\ne\\int u\\int v$.' },
+      { wrong: 'Keeping the old limits after substituting.', right: 'Convert limits to the new variable.' }
+    ],
+    examples: [
+      { question: 'Find $\\int x\\cos x\\,dx$.', steps: ['ILATE: $u=x$, $v=\\cos x$.', '$x\\sin x-\\int\\sin x\\,dx=x\\sin x+\\cos x+C$.'], answer: '$x\\sin x+\\cos x+C$', verify: { kind: 'antiderivative', f: 'x*cos(x)', answer: 'x*sin(x)+cos(x)' } },
+      { question: 'Evaluate $\\int_0^1\\dfrac{dx}{1+x^2}$.', steps: ['Antiderivative $\\tan^{-1}x$.', '$\\tan^{-1}1-\\tan^{-1}0=\\frac{\\pi}{4}$.'], answer: '$\\dfrac{\\pi}{4}$', verify: { kind: 'integral', f: '1/(1+x^2)', a: '0', b: '1', answer: 'pi/4' } }
+    ]
+  },
+
+  'c12-applications-integrals': {
+    summary: 'A definite integral adds up thin strips, so it gives area. We find the area between a curve and an axis, between two curves, and regions bounded by a line and a circle, parabola or ellipse, always sketching first and taking areas as positive.',
+    prereqs: ['c12-integrals', 'c11-conic-sections'],
+    concepts: [
+      { title: 'Area with the x-axis', body: 'For $y=f(x)\\ge0$ between $x=a$ and $x=b$, area $=\\int_a^b y\\,dx$. If the curve dips below the axis, split at the crossings and add absolute values.' },
+      { title: 'Area with the y-axis', body: 'Using horizontal strips, area $=\\int_c^d x\\,dy$ between $y=c$ and $y=d$.' },
+      { title: 'Between two curves', body: 'If $f(x)\\ge g(x)$ on $[a,b]$, area $=\\int_a^b\\big(f(x)-g(x)\\big)dx$: top minus bottom. Find intersection points to get the limits.' },
+      { title: 'Use symmetry', body: 'Circles and ellipses are symmetric about both axes; compute one quarter and multiply by 4.' }
+    ],
+    definitions: [
+      { term: 'Elementary strip', meaning: 'A thin vertical (or horizontal) rectangle of width $dx$ (or $dy$) whose areas are summed.' },
+      { term: 'Bounded region', meaning: 'The enclosed region whose boundary is given by the curves and lines in the question.' }
+    ],
+    formulas: [
+      { label: 'Under a curve', tex: 'A=\\int_a^b y\\,dx' },
+      { label: 'Between curves', tex: 'A=\\int_a^b\\big(f(x)-g(x)\\big)dx,\\ f\\ge g' },
+      { label: 'Ellipse area', tex: '\\dfrac{x^2}{a^2}+\\dfrac{y^2}{b^2}=1\\ \\Rightarrow\\ A=\\pi ab' },
+      { label: 'Circle area by integration', tex: '4\\int_0^a\\sqrt{a^2-x^2}\\,dx=\\pi a^2' },
+      { label: 'Region between $y^2=4ax$ and $x^2=4ay$', tex: 'A=\\dfrac{16a^2}{3}' }
+    ],
+    points: [
+      { front: 'First step always', back: 'Sketch the region and mark intersection points.' },
+      { front: 'Negative integral', back: 'Area is never negative; take the absolute value of each piece.' },
+      { front: 'Which strip?', back: 'Choose vertical or horizontal strips to avoid splitting the region.' },
+      { front: 'Line and parabola', back: 'Solve them together for the limits, then integrate (line minus parabola or vice versa, whichever is on top).' },
+      { front: 'JEE tip', back: 'Area between $y=x^2$ and $y=x$ is $\\frac16$; between $y^2=x$ and $y=x$ also $\\frac16$.' }
+    ],
+    mistakes: [
+      { wrong: 'Integrating across an x-intercept and getting cancellation.', right: 'Split at the intercept and add absolute values.' },
+      { wrong: 'Subtracting the upper curve from the lower.', right: 'Use top minus bottom (or right minus left for $dy$).' },
+      { wrong: 'Using limits from the axis instead of intersection points.', right: 'Solve the equations simultaneously for the limits.' }
+    ],
+    examples: [
+      { question: 'Find the area enclosed by $y=x^2$ and $y=x$.', steps: ['Intersections: $x^2=x$, so $x=0,1$.', 'On $[0,1]$, $x\\ge x^2$.', '$\\int_0^1(x-x^2)dx=\\frac12-\\frac13=\\frac16$.'], answer: '$\\dfrac16$ square units', verify: { kind: 'integral', f: 'x-x^2', a: '0', b: '1', answer: '1/6' } },
+      { question: 'Find the area of the ellipse $\\frac{x^2}{9}+\\frac{y^2}{4}=1$.', steps: ['First quadrant: $y=\\frac23\\sqrt{9-x^2}$.', 'Quarter area $=\\frac23\\int_0^3\\sqrt{9-x^2}dx=\\frac23\\cdot\\frac{9\\pi}{4}=\\frac{3\\pi}{2}$.', 'Total $=4\\cdot\\frac{3\\pi}{2}=6\\pi$.'], answer: '$6\\pi$ square units', verify: { kind: 'values', pairs: [['4*(2/3)*(9*pi/4)', '6*pi'], ['pi*3*2', '6*pi']] } }
+    ]
+  },
+
+  'c12-differential-equations': {
+    summary: 'A differential equation links a function with its derivatives. We read off its order and degree, check proposed solutions, and solve three first-order types: variables separable, homogeneous, and linear (by an integrating factor).',
+    prereqs: ['c12-integrals'],
+    concepts: [
+      { title: 'Order and degree', body: 'The order is the highest derivative present. The degree is the power of that highest derivative once the equation is a polynomial in the derivatives; if it is not (e.g. $\\sin(y\')$), the degree is not defined.' },
+      { title: 'General and particular solutions', body: 'A general solution contains as many arbitrary constants as the order. Initial conditions fix the constants and give a particular solution.' },
+      { title: 'Variables separable', body: 'If $\\frac{dy}{dx}=g(x)h(y)$, rewrite as $\\frac{dy}{h(y)}=g(x)dx$ and integrate both sides.' },
+      { title: 'Homogeneous', body: 'If $\\frac{dy}{dx}=F\\left(\\frac yx\\right)$ (right side homogeneous of degree 0), substitute $y=vx$, so $\\frac{dy}{dx}=v+x\\frac{dv}{dx}$, and separate.' },
+      { title: 'Linear first order', body: 'Write as $\\frac{dy}{dx}+Py=Q$ with $P,Q$ functions of $x$. Multiply by the integrating factor $e^{\\int P\\,dx}$; the left side becomes the derivative of $y\\cdot\\text{IF}$.' }
+    ],
+    definitions: [
+      { term: 'Order', meaning: 'Highest order derivative appearing.' },
+      { term: 'Degree', meaning: 'Highest power of the highest-order derivative when the equation is polynomial in derivatives.' },
+      { term: 'Integrating factor', meaning: '$e^{\\int P\\,dx}$ for $y\'+Py=Q$.' }
+    ],
+    formulas: [
+      { label: 'Separable', tex: '\\int\\dfrac{dy}{h(y)}=\\int g(x)\\,dx+C' },
+      { label: 'Homogeneous substitution', tex: 'y=vx,\\quad \\dfrac{dy}{dx}=v+x\\dfrac{dv}{dx}' },
+      { label: 'Linear in y', tex: '\\dfrac{dy}{dx}+Py=Q\\ \\Rightarrow\\ y\\,e^{\\int P\\,dx}=\\int Q\\,e^{\\int P\\,dx}\\,dx+C' },
+      { label: 'Linear in x', tex: '\\dfrac{dx}{dy}+P_1x=Q_1\\ \\Rightarrow\\ x\\,e^{\\int P_1dy}=\\int Q_1e^{\\int P_1dy}dy+C' }
+    ],
+    points: [
+      { front: 'Order of family with $n$ constants', back: 'Eliminating $n$ arbitrary constants gives an equation of order $n$.' },
+      { front: 'Degree of $\\left(y\'\'\\right)^2+\\sin y\'=0$', back: 'Not defined: not polynomial in $y\'$.' },
+      { front: 'Verifying a solution', back: 'Differentiate the proposed function and substitute; both sides must agree identically.' },
+      { front: 'IF with $\\ln$', back: '$e^{\\ln x}=x$ for $x>0$; simplify the IF before using it.' },
+      { front: 'JEE tip', back: 'If $x$ and $y$ swap roles nicely, try the equation as linear in $x$.' }
+    ],
+    mistakes: [
+      { wrong: 'Adding the constant only after back-substitution or forgetting it.', right: 'Add $C$ once, at the integration step, then apply conditions.' },
+      { wrong: 'Using $P$ before making the coefficient of $\\frac{dy}{dx}$ equal to 1.', right: 'Divide through first so the form is $y\'+Py=Q$.' },
+      { wrong: 'Stating degree for an equation not polynomial in derivatives.', right: 'Degree is then undefined.' }
+    ],
+    examples: [
+      { question: 'Solve $\\frac{dy}{dx}=xy$ with $y(0)=2$.', steps: ['Separate: $\\frac{dy}{y}=x\\,dx$.', '$\\ln|y|=\\frac{x^2}{2}+C$, so $y=Ae^{x^2/2}$.', '$y(0)=2\\Rightarrow A=2$.'], answer: '$y=2e^{x^2/2}$', verify: { kind: 'antiderivative', f: 'x*2*exp(x^2/2)', answer: '2*exp(x^2/2)' } },
+      { question: 'Solve $\\frac{dy}{dx}+y=e^{x}$.', steps: ['$P=1$, IF $=e^x$.', '$\\frac{d}{dx}(ye^x)=e^{2x}$, so $ye^x=\\frac12e^{2x}+C$.', '$y=\\frac12e^x+Ce^{-x}$. Check with $C=0$: $y=\\frac12e^x$ gives $y\'+y=e^x$.'], answer: '$y=\\tfrac12e^{x}+Ce^{-x}$', verify: { kind: 'antiderivative', f: 'exp(2*x)', answer: '(1/2)*exp(2*x)' } }
+    ]
+  },
+
+  'c12-vector-algebra': {
+    summary: 'A vector has magnitude and direction. We add vectors by the triangle law, describe them in $\\hat i,\\hat j,\\hat k$ components, and use two products: the dot product (a number, giving angles and projections) and the cross product (a vector, giving perpendicular directions and areas).',
+    prereqs: ['c11-3d-introduction'],
+    concepts: [
+      { title: 'Components', body: 'A vector $\\vec a=a_1\\hat i+a_2\\hat j+a_3\\hat k$ has magnitude $\\sqrt{a_1^2+a_2^2+a_3^2}$. The vector from $P$ to $Q$ is position vector of $Q$ minus that of $P$.' },
+      { title: 'Direction cosines', body: 'If $\\vec r$ makes angles $\\alpha,\\beta,\\gamma$ with the axes, $l=\\cos\\alpha$, $m=\\cos\\beta$, $n=\\cos\\gamma$ are its direction cosines and $l^2+m^2+n^2=1$. Any multiples $a,b,c$ of them are direction ratios.' },
+      { title: 'Dot product', body: '$\\vec a\\cdot\\vec b=|\\vec a||\\vec b|\\cos\\theta=a_1b_1+a_2b_2+a_3b_3$. It is zero exactly when the (non-zero) vectors are perpendicular. The projection of $\\vec a$ on $\\vec b$ is $\\frac{\\vec a\\cdot\\vec b}{|\\vec b|}$.' },
+      { title: 'Cross product', body: '$\\vec a\\times\\vec b=|\\vec a||\\vec b|\\sin\\theta\\,\\hat n$, with $\\hat n$ perpendicular to both by the right-hand rule. It is anticommutative, zero for parallel vectors, and its magnitude is the area of the parallelogram on $\\vec a,\\vec b$.' },
+      { title: 'Section formula', body: 'The point dividing $\\vec a$ to $\\vec b$ internally in ratio $m:n$ has position vector $\\frac{m\\vec b+n\\vec a}{m+n}$.' }
+    ],
+    definitions: [
+      { term: 'Unit vector', meaning: '$\\hat a=\\vec a/|\\vec a|$, magnitude 1.' },
+      { term: 'Collinear vectors', meaning: 'Parallel to the same line; $\\vec b=\\lambda\\vec a$.' },
+      { term: 'Position vector', meaning: 'The vector from the origin to a point.' }
+    ],
+    formulas: [
+      { label: 'Magnitude', tex: '|\\vec a|=\\sqrt{a_1^2+a_2^2+a_3^2}' },
+      { label: 'Angle', tex: '\\cos\\theta=\\dfrac{\\vec a\\cdot\\vec b}{|\\vec a||\\vec b|}' },
+      { label: 'Cross product', tex: '\\vec a\\times\\vec b=\\begin{vmatrix}\\hat i&\\hat j&\\hat k\\\\a_1&a_2&a_3\\\\b_1&b_2&b_3\\end{vmatrix}' },
+      { label: 'Areas', tex: '\\text{parallelogram}=|\\vec a\\times\\vec b|,\\quad \\text{triangle}=\\tfrac12|\\vec a\\times\\vec b|', note: 'For a parallelogram with diagonals $\\vec d_1,\\vec d_2$, area $=\\tfrac12|\\vec d_1\\times\\vec d_2|$.' },
+      { label: 'Direction cosines', tex: 'l=\\dfrac{a}{\\sqrt{a^2+b^2+c^2}},\\ m=\\dfrac{b}{\\sqrt{a^2+b^2+c^2}},\\ n=\\dfrac{c}{\\sqrt{a^2+b^2+c^2}}' },
+      { label: 'Projection of a on b', tex: '\\dfrac{\\vec a\\cdot\\vec b}{|\\vec b|}' }
+    ],
+    points: [
+      { front: '$\\hat i\\cdot\\hat i$ and $\\hat i\\times\\hat j$', back: '$\\hat i\\cdot\\hat i=1$, $\\hat i\\cdot\\hat j=0$; $\\hat i\\times\\hat j=\\hat k$, $\\hat j\\times\\hat k=\\hat i$, $\\hat k\\times\\hat i=\\hat j$, and $\\hat i\\times\\hat i=\\vec0$.' },
+      { front: 'Order in cross product', back: '$\\vec b\\times\\vec a=-\\vec a\\times\\vec b$.' },
+      { front: 'Unit vector perpendicular to both', back: '$\\pm\\dfrac{\\vec a\\times\\vec b}{|\\vec a\\times\\vec b|}$.' },
+      { front: '$|\\vec a+\\vec b|^2$', back: '$|\\vec a|^2+|\\vec b|^2+2\\vec a\\cdot\\vec b$.' },
+      { front: 'Collinear points A, B, C', back: '$\\vec{AB}\\times\\vec{AC}=\\vec0$.' },
+      { front: 'JEE tip', back: 'Lagrange identity: $|\\vec a\\times\\vec b|^2+(\\vec a\\cdot\\vec b)^2=|\\vec a|^2|\\vec b|^2$.' }
+    ],
+    mistakes: [
+      { wrong: 'Treating the dot product as a vector.', right: 'It is a scalar; the cross product is the vector.' },
+      { wrong: 'Writing $|\\vec a+\\vec b|=|\\vec a|+|\\vec b|$.', right: 'Only when they point the same way; in general use the triangle inequality.', misconception: 'function-of-sum' },
+      { wrong: 'Middle term sign error in the cross product determinant.', right: 'The $\\hat j$ component is $-(a_1b_3-a_3b_1)$.', misconception: 'sign-flipped' }
+    ],
+    examples: [
+      { question: 'Find the angle between $\\vec a=\\hat i+\\hat j$ and $\\vec b=\\hat j+\\hat k$.', steps: ['$\\vec a\\cdot\\vec b=1$; $|\\vec a|=|\\vec b|=\\sqrt2$.', '$\\cos\\theta=\\frac12$, so $\\theta=\\frac{\\pi}{3}$.'], answer: '$\\dfrac{\\pi}{3}$', verify: { kind: 'value', expr: 'acos((1*0+1*1+0*1)/(sqrt(2)*sqrt(2)))', answer: 'pi/3' } },
+      { question: 'Find the area of the triangle with sides $\\vec a=\\hat i+2\\hat j+3\\hat k$ and $\\vec b=2\\hat i-\\hat j+\\hat k$.', steps: ['$\\vec a\\times\\vec b=(2\\cdot1-3\\cdot(-1))\\hat i-(1\\cdot1-3\\cdot2)\\hat j+(1\\cdot(-1)-2\\cdot2)\\hat k=5\\hat i+5\\hat j-5\\hat k$.', '$|\\vec a\\times\\vec b|=5\\sqrt3$; area $=\\frac{5\\sqrt3}{2}$.'], answer: '$\\dfrac{5\\sqrt3}{2}$', verify: { kind: 'value', expr: '(1/2)*sqrt(5^2+5^2+5^2)', answer: '5*sqrt(3)/2' } }
+    ]
+  },
+
+  'c12-3d-geometry': {
+    summary: 'Using vectors, we write lines in space as a point plus multiples of a direction, find the angle between lines and the shortest distance between skew lines, and describe planes by a normal vector, leading to angles between planes and distances from a point to a plane.',
+    prereqs: ['c12-vector-algebra', 'c11-3d-introduction'],
+    concepts: [
+      { title: 'Line', body: 'Through $\\vec a$ parallel to $\\vec b$: $\\vec r=\\vec a+\\lambda\\vec b$. In Cartesian form, $\\frac{x-x_1}{a}=\\frac{y-y_1}{b}=\\frac{z-z_1}{c}$ where $a,b,c$ are direction ratios.' },
+      { title: 'Angle between lines', body: 'It is the angle between their direction vectors; use the absolute value of the cosine to get the acute angle.' },
+      { title: 'Skew lines', body: 'Non-parallel lines that do not meet. Their shortest distance is along the common perpendicular $\\vec b_1\\times\\vec b_2$. Distance 0 means the lines intersect.' },
+      { title: 'Plane', body: 'A plane with normal $\\vec n$ through $\\vec a$: $(\\vec r-\\vec a)\\cdot\\vec n=0$, Cartesian $ax+by+cz+d=0$ with $(a,b,c)$ normal to it.' },
+      { title: 'Angles and distances with planes', body: 'Angle between planes is the angle between normals. Angle between a line and a plane uses $\\sin$, because the line direction is compared with the normal.' }
+    ],
+    definitions: [
+      { term: 'Direction ratios', meaning: 'Any three numbers proportional to the direction cosines.' },
+      { term: 'Coplanar lines', meaning: 'Lines lying in one plane; they either intersect or are parallel.' },
+      { term: 'Normal', meaning: 'A vector perpendicular to every line in the plane.' }
+    ],
+    formulas: [
+      { label: 'Angle between lines', tex: '\\cos\\theta=\\dfrac{|a_1a_2+b_1b_2+c_1c_2|}{\\sqrt{a_1^2+b_1^2+c_1^2}\\sqrt{a_2^2+b_2^2+c_2^2}}' },
+      { label: 'Shortest distance (skew)', tex: 'd=\\dfrac{\\left|(\\vec b_1\\times\\vec b_2)\\cdot(\\vec a_2-\\vec a_1)\\right|}{|\\vec b_1\\times\\vec b_2|}' },
+      { label: 'Distance between parallel lines', tex: 'd=\\dfrac{|\\vec b\\times(\\vec a_2-\\vec a_1)|}{|\\vec b|}' },
+      { label: 'Plane through a point', tex: 'a(x-x_1)+b(y-y_1)+c(z-z_1)=0' },
+      { label: 'Point to plane distance', tex: 'd=\\dfrac{|ax_1+by_1+cz_1+d|}{\\sqrt{a^2+b^2+c^2}}' },
+      { label: 'Line and plane angle', tex: '\\sin\\phi=\\dfrac{|\\vec b\\cdot\\vec n|}{|\\vec b||\\vec n|}' },
+      { label: 'Plane through three points', tex: '\\begin{vmatrix}x-x_1&y-y_1&z-z_1\\\\x_2-x_1&y_2-y_1&z_2-z_1\\\\x_3-x_1&y_3-y_1&z_3-z_1\\end{vmatrix}=0' }
+    ],
+    points: [
+      { front: 'Perpendicular lines', back: '$a_1a_2+b_1b_2+c_1c_2=0$.' },
+      { front: 'Parallel lines', back: 'Direction ratios proportional.' },
+      { front: 'Intercept form', back: '$\\frac xa+\\frac yb+\\frac zc=1$.' },
+      { front: 'Cartesian form needs coefficient 1', back: 'Rewrite e.g. $\\frac{2x-1}{3}$ as $\\frac{x-1/2}{3/2}$ before reading direction ratios.' },
+      { front: 'Distance between parallel planes', back: '$\\frac{|d_1-d_2|}{\\sqrt{a^2+b^2+c^2}}$ when written with the same $a,b,c$.' },
+      { front: 'JEE tip', back: 'Image of a point in a plane: foot of the perpendicular is the midpoint of the point and its image.' }
+    ],
+    mistakes: [
+      { wrong: 'Reading direction ratios when $x,y,z$ have coefficients other than 1.', right: 'Make each coefficient 1 first.' },
+      { wrong: 'Using $\\cos$ for the angle between a line and a plane.', right: 'Use $\\sin$, since the normal is involved.' },
+      { wrong: 'Using the skew-line formula for parallel lines.', right: 'If $\\vec b_1\\times\\vec b_2=\\vec0$, use the parallel-line formula.' }
+    ],
+    examples: [
+      { question: 'Find the distance of $(2,1,-1)$ from the plane $x-2y+2z=5$.', steps: ['$d=\\frac{|2-2-2-5|}{\\sqrt{1+4+4}}$.', '$=\\frac{7}{3}$.'], answer: '$\\dfrac73$', verify: { kind: 'value', expr: 'abs(2-2*1+2*(-1)-5)/sqrt(1+4+4)', answer: '7/3' } },
+      { question: 'Find the shortest distance between $\\vec r=(\\hat i+\\hat j)+\\lambda(2\\hat i-\\hat j+\\hat k)$ and $\\vec r=(2\\hat i+\\hat j-\\hat k)+\\mu(3\\hat i-5\\hat j+2\\hat k)$.', steps: ['$\\vec b_1\\times\\vec b_2=(-2+5)\\hat i-(4-3)\\hat j+(-10+3)\\hat k=3\\hat i-\\hat j-7\\hat k$, magnitude $\\sqrt{59}$.', '$\\vec a_2-\\vec a_1=\\hat i-\\hat k$; dot product $3+7=10$.', '$d=\\frac{10}{\\sqrt{59}}$.'], answer: '$\\dfrac{10}{\\sqrt{59}}$', verify: { kind: 'value', expr: 'abs(3*1+(-1)*0+(-7)*(-1))/sqrt(9+1+49)', answer: '10/sqrt(59)' } }
+    ]
+  },
+
+  'c12-linear-programming': {
+    summary: 'Linear programming chooses values of decision variables that make a linear objective as large or as small as possible subject to linear inequality constraints. In two variables we graph the feasible region and use the corner point method.',
+    prereqs: ['c11-linear-inequalities'],
+    concepts: [
+      { title: 'Formulation', body: 'Name the decision variables, write the objective $Z=ax+by$, list every constraint as a linear inequality, and add non-negativity $x,y\\ge0$.' },
+      { title: 'Feasible region', body: 'Graph each constraint as a line and shade the allowed side. The overlap of all of them is the feasible region; every point there is a feasible solution.' },
+      { title: 'Corner point method', body: 'If an optimum exists, it occurs at a corner (vertex) of the feasible region. Evaluate $Z$ at every corner and pick the largest or smallest.' },
+      { title: 'Unbounded regions', body: 'If the region is unbounded, a corner value may not be the optimum. For a maximum $M$ found at a corner, draw $ax+by>M$; if it shares no point with the region, $M$ is the maximum. For a minimum $m$, test $ax+by<m$ similarly.' }
+    ],
+    definitions: [
+      { term: 'Objective function', meaning: 'The linear function $Z=ax+by$ to be optimised.' },
+      { term: 'Feasible solution', meaning: 'A point satisfying all constraints.' },
+      { term: 'Optimal solution', meaning: 'A feasible point giving the best value of $Z$.' }
+    ],
+    formulas: [
+      { label: 'Standard problem', tex: '\\text{Optimise } Z=ax+by\\ \\text{subject to linear constraints},\\ x\\ge0,\\ y\\ge0' },
+      { label: 'Corner point theorem', tex: 'Z_{\\text{opt}}=\\max/\\min\\{Z(P):P\\ \\text{a corner of the bounded feasible region}\\}' }
+    ],
+    points: [
+      { front: 'Bounded region', back: 'Both maximum and minimum exist and occur at corners.' },
+      { front: 'Two corners give the same optimum', back: 'Every point on the segment joining them is also optimal.' },
+      { front: 'Empty feasible region', back: 'No solution to the problem.' },
+      { front: 'Finding corners', back: 'Solve pairs of boundary lines simultaneously; keep only intersections satisfying all constraints.' },
+      { front: 'Unbounded check', back: 'Draw the open half-plane beyond the candidate value; if it meets the region, no optimum of that kind.' }
+    ],
+    mistakes: [
+      { wrong: 'Forgetting $x,y\\ge0$.', right: 'Non-negativity restricts the region to the first quadrant.' },
+      { wrong: 'Including intersection points outside the feasible region as corners.', right: 'Check each candidate against every constraint.' },
+      { wrong: 'Declaring a maximum on an unbounded region straight from corner values.', right: 'Apply the open half-plane test.' },
+      { wrong: 'Shading the wrong side of a line.', right: 'Test a point such as the origin in each inequality.', misconception: 'inequality-not-reversed' }
+    ],
+    examples: [
+      { question: 'Maximise $Z=3x+2y$ subject to $x+y\\le4$, $x+3y\\le6$, $x,y\\ge0$.', steps: ['Corners: $(0,0)$, $(4,0)$, $(0,2)$ and the intersection of $x+y=4$, $x+3y=6$, which is $(3,1)$.', '$Z$: $0$, $12$, $4$, $11$.', 'Maximum $12$ at $(4,0)$.'], answer: '$Z_{\\max}=12$ at $(4,0)$', verify: { kind: 'values', pairs: [['3*4+2*0', '12'], ['3*3+2*1', '11'], ['3*0+2*2', '4']] } },
+      { question: 'Find the corner where $x+2y=8$ and $3x+y=9$ meet, and the value of $Z=x+y$ there.', steps: ['From the second, $y=9-3x$; then $x+18-6x=8$, so $x=2$, $y=3$.', '$Z=5$.'], answer: '$(2,3)$, $Z=5$', verify: { kind: 'system', equations: ['x+2*y=8', '3*x+y=9', 'x+y=5'], solution: { x: '2', y: '3' } } }
+    ]
+  },
+
+  'c12-probability': {
+    summary: 'Conditional probability updates chances once we know some event has happened. It leads to the multiplication rule, independence, the theorem of total probability and Bayes’ theorem. Random variables then summarise outcomes numerically, with mean and variance, and the binomial distribution models repeated independent trials.',
+    prereqs: ['c11-probability', 'c11-permutations-combinations', 'c11-binomial-theorem'],
+    concepts: [
+      { title: 'Conditional probability', body: '$P(E\\mid F)=\\frac{P(E\\cap F)}{P(F)}$ for $P(F)>0$: restrict the sample space to $F$. Rearranged, it gives the multiplication rule $P(E\\cap F)=P(F)P(E\\mid F)$.' },
+      { title: 'Independence', body: '$E$ and $F$ are independent when $P(E\\cap F)=P(E)P(F)$, i.e. knowing one does not change the other. Independent is not the same as mutually exclusive: events with non-zero probability cannot be both.' },
+      { title: 'Total probability and Bayes', body: 'If $E_1,\\dots,E_n$ partition the sample space, $P(A)=\\sum P(E_i)P(A\\mid E_i)$. Bayes reverses the condition: $P(E_i\\mid A)=\\frac{P(E_i)P(A\\mid E_i)}{\\sum_j P(E_j)P(A\\mid E_j)}$.' },
+      { title: 'Random variables', body: 'A random variable assigns a number to each outcome. Its probability distribution lists values with probabilities summing to 1. The mean is $\\sum x_ip_i$; the variance is $\\sum x_i^2p_i-\\mu^2$.' },
+      { title: 'Binomial distribution', body: 'For $n$ independent Bernoulli trials each with success probability $p$, the number of successes $X$ has $P(X=r)=\\binom nr p^r q^{n-r}$, $q=1-p$, with mean $np$ and variance $npq$.' }
+    ],
+    definitions: [
+      { term: 'Partition', meaning: 'Pairwise disjoint events with non-zero probability whose union is the whole sample space.' },
+      { term: 'Bernoulli trial', meaning: 'A trial with exactly two outcomes, success and failure, with fixed probability, repeated independently.' },
+      { term: 'Expectation', meaning: '$E(X)=\\sum x_ip_i$, the long-run average value.' }
+    ],
+    formulas: [
+      { label: 'Conditional probability', tex: 'P(E\\mid F)=\\dfrac{P(E\\cap F)}{P(F)}' },
+      { label: 'Independence', tex: 'P(E\\cap F)=P(E)\\,P(F)' },
+      { label: 'Total probability', tex: 'P(A)=\\sum_{i=1}^{n}P(E_i)\\,P(A\\mid E_i)' },
+      { label: 'Bayes’ theorem', tex: 'P(E_i\\mid A)=\\dfrac{P(E_i)P(A\\mid E_i)}{\\sum_{j}P(E_j)P(A\\mid E_j)}' },
+      { label: 'Mean and variance', tex: '\\mu=\\sum x_ip_i,\\quad \\operatorname{Var}(X)=\\sum x_i^2p_i-\\mu^2' },
+      { label: 'Binomial', tex: 'P(X=r)=\\binom{n}{r}p^rq^{n-r},\\quad \\mu=np,\\quad \\sigma^2=npq' }
+    ],
+    points: [
+      { front: '$P(E\\mid F)$ vs $P(F\\mid E)$', back: 'Usually different; Bayes connects them.' },
+      { front: 'Complement under a condition', back: '$P(E\'\\mid F)=1-P(E\\mid F)$.' },
+      { front: 'If $E,F$ independent', back: 'So are $E\'$ and $F$, $E$ and $F\'$, $E\'$ and $F\'$.' },
+      { front: '"At least one" success', back: '$1-q^n$.' },
+      { front: 'Valid distribution', back: 'Each $p_i\\ge0$ and $\\sum p_i=1$; use this to find unknown constants.' },
+      { front: 'JEE tip', back: 'In Bayes questions, draw a tree: branch on the partition first, then on the observed event.' }
+    ],
+    mistakes: [
+      { wrong: 'Treating mutually exclusive events as independent.', right: 'If $P(E),P(F)>0$ and $E\\cap F=\\varnothing$, then $P(E\\cap F)=0\\ne P(E)P(F)$.' },
+      { wrong: 'Dividing by the whole sample space in a conditional probability.', right: 'Divide by $P(F)$, the condition.', misconception: 'probability-wrong-total' },
+      { wrong: 'Taking variance of a binomial as $np$.', right: 'Variance is $npq$; $np$ is the mean.' },
+      { wrong: 'Using $\\sum x_i^2p_i$ alone as the variance.', right: 'Subtract $\\mu^2$.' }
+    ],
+    examples: [
+      { question: 'Bag I has 3 red and 2 black balls; bag II has 2 red and 4 black. A bag is chosen at random and a ball drawn is red. Find the probability it came from bag I.', steps: ['$P(R\\mid I)=\\frac35$, $P(R\\mid II)=\\frac13$, each bag $\\frac12$.', '$P(R)=\\frac12\\cdot\\frac35+\\frac12\\cdot\\frac13=\\frac{7}{15}$.', '$P(I\\mid R)=\\frac{3/10}{7/15}=\\frac{9}{14}$.'], answer: '$\\dfrac{9}{14}$', verify: { kind: 'value', expr: '(1/2*3/5)/(1/2*3/5+1/2*1/3)', answer: '9/14' } },
+      { question: 'A fair coin is tossed 6 times. Find $P(\\text{exactly 4 heads})$ and the mean and variance of the number of heads.', steps: ['$P(X=4)=\\binom64\\left(\\frac12\\right)^6=\\frac{15}{64}$.', 'Mean $np=3$; variance $npq=\\frac32$.'], answer: '$\\dfrac{15}{64}$; mean $3$, variance $\\dfrac32$', verify: { kind: 'values', pairs: [['6C4*(1/2)^6', '15/64'], ['6*(1/2)', '3'], ['6*(1/2)*(1/2)', '3/2']] } }
+    ]
+  }
+};

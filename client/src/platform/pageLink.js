@@ -36,12 +36,12 @@ const isModified = e => !!(e.metaKey || e.altKey || e.ctrlKey || e.shiftKey);
 /** The click handler a page link uses. Mirrors React Router's own guard
  * (left click, same tab, no modifier, not already handled), then navigates
  * itself so the router's possibly-stale location never decides. */
-export function pageLinkClick({ to, navigate, onClick, target, replace, win = globalThis.window }) {
+export function pageLinkClick({ to, navigate, onClick, target, replace, state, win = globalThis.window }) {
   return event => {
     onClick?.(event);
     if (event.defaultPrevented) return;
     if (event.button !== 0 || (target && target !== '_self') || isModified(event)) return;
     event.preventDefault();
-    navigate(to, { replace: replace ?? isCurrentUrl(to, win) });
+    navigate(to, { replace: replace ?? isCurrentUrl(to, win), state });
   };
 }
