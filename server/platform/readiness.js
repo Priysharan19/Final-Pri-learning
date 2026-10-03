@@ -22,6 +22,9 @@
 //                 holds readiness)                           → degrades only:
 //                 the on-device reader works without it
 //   working       configured or not                          → informational
+//   staffMfa      PRI_MFA_KEY present whenever an admin/support account exists
+//                 (production)                               → degrades: staff
+//                 cannot enrol or verify a second factor, students are unaffected
 //
 // EXPOSURE. /v1/ready is unauthenticated on purpose: an uptime checker and the
 // Railway deploy healthcheck must be able to read it without a credential. So
@@ -37,6 +40,7 @@ import { probeHandwritingProvider, providerStaticStatus } from './handwritingPro
 import { providerConfig as workingConfig } from './workingProvider.js';
 import { spendCeilingMissing } from './spendCeiling.js';
 import { platformConfigStatus } from './config.js';
+import { mfaKeyConfigured, privilegedAccountExists } from './mfa.js';
 import { metrics } from './metrics.js';
 import { safeCode } from './observability.js';
 
@@ -130,6 +134,16 @@ async function handwritingCheck(env, probe, waitMs) {
   return { state: 'unavailable', code: safeCode(result.failureCode, 'HANDWRITING_PROVIDER_UNAVAILABLE') };
 }
 
+async function staffMfaCheck(db, env, production, timeoutMs) {
+  if (mfaKeyConfigured(env)) return { state: 'ok', code: null };
+  let staff = false;
+  try { staff = await withTimeout(privilegedAccountExists(db), timeoutMs, 'PLATFORM_DB_TIMEOUT'); } catch { return { state: 'unknown', code: 'PLATFORM_DB_UNAVAILABLE' }; }
+  if (!staff) return { state: 'not_required', code: null };
+  // Outside production the development key stands in; in production a staff
+  // account exists that cannot enrol or verify until the key is configured.
+  return production ? { state: 'missing', code: 'MFA_KEY_MISSING' } : { state: 'development_key', code: null };
+}
+
 export async function readinessReport(db, {
   env = process.env,
   probe = probeHandwritingProvider,
@@ -138,9 +152,10 @@ export async function readinessReport(db, {
   releaseSha = 'unknown'
 } = {}) {
   const production = String(env.NODE_ENV || '') === 'production';
-  const [database, handwriting] = await Promise.all([
+  const [database, handwriting, staffMfa] = await Promise.all([
     databaseCheck(db, { timeoutMs: dbTimeoutMs }),
-    handwritingCheck(env, probe, probeWaitMs)
+    handwritingCheck(env, probe, probeWaitMs),
+    staffMfaCheck(db, env, production, dbTimeoutMs)
   ]);
   const checks = {
     database,
@@ -148,7 +163,8 @@ export async function readinessReport(db, {
     paidCeiling: paidCeilingCheck(env),
     billing: billingCheck(),
     handwriting,
-    working: { state: workingConfig(env).configured ? 'ok' : 'not_configured', code: null }
+    working: { state: workingConfig(env).configured ? 'ok' : 'not_configured', code: null },
+    staffMfa
   };
   const failing = [];
   if (database.state !== 'ok') failing.push(database.code);
@@ -158,6 +174,7 @@ export async function readinessReport(db, {
   const degraded = [];
   if (checks.authEmail.state === 'failing' || (!checks.authEmail.required && checks.authEmail.state === 'not_configured')) degraded.push(checks.authEmail.code);
   if (['degraded', 'unavailable', 'probing'].includes(handwriting.state)) degraded.push(handwriting.code);
+  if (staffMfa.state === 'missing') degraded.push(staffMfa.code);
   const state = failing.length ? 'not_ready' : degraded.length ? 'degraded' : 'ready';
   return {
     ready: state !== 'not_ready',

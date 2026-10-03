@@ -6,6 +6,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -16,14 +19,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: client/package-lock.json
       - name: Runner budget policy
         run: node tools/ci-runner-policy-check.mjs
+      - name: Workflow supply-chain policy (least privilege, pinned actions, no privileged PR-head execution)
+        run: node tools/ci-workflow-policy-check.mjs
+      - name: Native shells enforce the server Content-Security-Policy
+        run: node client/test/native-shell-csp-check.mjs
       - name: Install client dependencies
         run: npm ci --prefix client
       - name: Runtime dependency security floor
@@ -58,7 +65,7 @@ jobs:
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
           grep -Fq 'INDIA ADAPTIVE: PASS — 302/302 checks' suites.log
           grep -Fq 'ADAPTIVE SIMULATION: PASS — 77/77 checks' suites.log
-          grep -Fq 'PROGRESS TRUTH: PASS — 74/74 checks' suites.log
+          grep -Fq 'PROGRESS TRUTH: PASS — 86/86 checks' suites.log
           grep -Fq 'PLACEMENT: PASS — 268/268 checks' suites.log
           grep -Fq 'IOS BUNDLE FEATURES: PASS — 20/20 checks' suites.log
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
@@ -69,8 +76,13 @@ jobs:
           grep -Fq 'BROWSER RUN FIXES: PASS — 23/23 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
-          grep -Fq 'I18N: PASS — 189/189 checks' suites.log
-          grep -Fq 'I18N COVERAGE: PASS — 88/88 checks — 54 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'TUTOR UI: PASS — 71/71 checks' suites.log
+          grep -Fq 'APPLE SIGN IN: PASS — 66/66 checks' suites.log
+          grep -Fq 'ONBOARDING SCOPE: PASS — 40/40 checks' suites.log
+          grep -Fq 'STUDY PLAN: PASS — 211/211 checks' suites.log
+          grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
+          grep -Fq 'I18N: PASS — 190/190 checks' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 89/89 checks — 59 files scanned, 0 hard-coded strings' suites.log
           # Chapter notes: every curriculum chapter, every worked answer engine-verified.
           grep -Fq 'NOTES CONTENT CHECK PASSED — 77/77 chapters' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
@@ -82,7 +94,7 @@ jobs:
           grep -Fq 'PDF WORKING: PASS — 25/25 checks' suites.log
           grep -Fq 'MCQ DISTINCTNESS: PASS — 14/14 checks' suites.log
           grep -Fq 'INDIA NATIVE SURFACES: PASS — 31/31 checks' suites.log
-          grep -Eq 'INSTALL BUDGET: PASS — 47/47 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
+          grep -Eq 'INSTALL BUDGET: PASS — 48/48 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
           grep -Fq 'nothing emitted left uncovered.' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 59/59 checks' suites.log
@@ -123,17 +135,25 @@ jobs:
           # were not being run anywhere in CI.
           node client/test/restore-durability-check.mjs
           node client/test/cloud-sync-worker-check.mjs
+          # Cloud sync end to end: restore on a fresh device, automatic
+          # triggers, and 409 entity-conflict recovery.
+          node client/test/cloud-restore-fidelity-check.mjs
+          node client/test/auto-sync-scheduler-check.mjs
+          node client/test/sync-conflict-recovery-check.mjs
           node client/test/cloud-session-refresh-check.mjs
           node client/test/account-action-boundary-check.mjs
           node client/test/india-exam-blueprint-check.mjs
           node client/test/india-progress-product-check.mjs
           node tools/india-production-census.mjs
-      - name: Real ink diagnostic
+      - name: Real ink diagnostic (advisory in PR CI)
         if: always()
-        run: npm run --silent test:real || true
+        continue-on-error: true
+        run: |
+          echo '::warning title=Real ink is advisory here::test:real is a diagnostic in PR CI (|| true). The blocking floor (node client/test/inkcheck-real.mjs --strict --gate, handwriting/v17/real-ink-floor.json) runs only in release-candidate.yml.'
+          npm run --silent test:real || true
       - name: Suite log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: suites-log
           path: suites.log
@@ -161,14 +181,23 @@ jobs:
     env:
       PRI_TEST_PG_ADMIN_URL: postgres://postgres@localhost:5432/postgres
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: server/package-lock.json
       - name: Install server dependencies
         run: npm ci --prefix server
+      - name: Handwriting stays answer-blind (static, client + server route)
+        run: npm run test:ink:blind
+      - name: Cloud reader evaluation tool self-test (fake provider, no spend)
+        run: npm run test:ink:cloud-eval
+      - name: SQLite to Postgres export tool
+        run: |
+          set -o pipefail
+          node server/test/sqlite-to-postgres-export-check.mjs 2>&1 | tee pg-export.log
+          grep -Fq 'SQLITE TO POSTGRES EXPORT: PASS' pg-export.log
       - name: Server release identity
         run: node server/test/release-identity-check.mjs
       - name: Runtime dependency security floor
@@ -183,6 +212,9 @@ jobs:
           node server/test/verification-enforcement-check.mjs
           node server/test/housekeeping-check.mjs
           node server/test/production-runtime-image-check.mjs
+          node server/test/mfa-check.mjs
+          node server/test/oidc-consent-check.mjs
+          node server/test/security-hardening-check.mjs
       - name: Billing lifecycle, database operations and HTTP journeys
         run: |
           node server/test/billing-cancel-refund-check.mjs
@@ -199,6 +231,7 @@ jobs:
           node server/test/working-check-check.mjs
           node server/test/question-photo-check.mjs
           node server/test/tutor-help-check.mjs
+          node server/test/tutor-stream-check.mjs
           node server/test/spend-ceiling-check.mjs
           node server/test/guardian-consent-check.mjs
       - name: Account, origin, CMS and classroom contracts
@@ -255,13 +288,13 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 32/32 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 35/35 suites' platform-postgres.log
           grep -Fq '✓ security-acceptance-check.mjs' platform-postgres.log
           grep -Fq '✓ abuse-limits-check.mjs' platform-postgres.log
           grep -Fq '✓ google-billing-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-attempt-sync-check.mjs' platform-postgres.log
           grep -Fq 'ACCOUNT LIFECYCLE JOURNEY: PASS' platform-postgres.log
-          grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 26/26' platform-postgres.log
+          grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 29/29' platform-postgres.log
           grep -Fq 'PLATFORM SYNC BURST: PASS' platform-postgres.log
           grep -Fq '✓ failure-drills-check.mjs' platform-postgres.log
           grep -Fq '✓ storekit-entitlement-state-machine-check.mjs' platform-postgres.log
@@ -306,10 +339,18 @@ jobs:
   browser:
     name: Browser suites (end-to-end and accessibility)
     runs-on: ubuntu-latest
+    # The accessibility gate builds the client itself; give it the same flags
+    # client/test/e2e.mjs uses for its build so both walk the same app (the
+    # Teacher role and Olympiad live behind EXTENDED_TRACKS, the AU link behind
+    # AUSTRALIA). PRI_FEATURE_TUTOR stays unset: the tutor tour proves dark.
+    env:
+      PRI_FEATURE_PLACEMENT: '1'
+      PRI_FEATURE_EXTENDED_TRACKS: '1'
+      PRI_FEATURE_AUSTRALIA: '1'
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
           cache: npm
@@ -353,11 +394,11 @@ jobs:
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
-          grep -Eq 'E2E SUITE.*18/18.*1 flows' browser.log
+          grep -Eq 'E2E SUITE.*19/19.*1 flows' browser.log
           grep -Fq 'Cloud admin · CMS lifecycle and role management' browser.log
-          grep -Eq 'E2E SUITE.*17/17.*1 flows' browser.log
+          grep -Eq 'E2E SUITE.*25/25.*1 flows' browser.log
           grep -Fq 'Cloud admin · independent-review rejection' browser.log
-          grep -Eq 'E2E SUITE.*8/8.*1 flows' browser.log
+          grep -Eq 'E2E SUITE.*13/13.*1 flows' browser.log
           grep -Fq 'AI tutor · dark by default in a production build' browser.log
           grep -Fq 'AI tutor · three levels, in order, with fallback' browser.log
           grep -Eq 'E2E SUITE.*32/32.*2 flows' browser.log
@@ -368,14 +409,14 @@ jobs:
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
-          test "$(grep -Ec 'E2E SUITE PASSED — 145/145 checks across 1 flows' browser.log)" -eq 2
+          test "$(grep -Ec 'E2E SUITE PASSED — 151/151 checks across 1 flows' browser.log)" -eq 2
           if grep -Fq 'not measured:' browser.log; then
             echo 'A browser suite reported skipped coverage.' >&2
             exit 1
           fi
       - name: Browser log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: browser-log
           path: browser.log
@@ -386,8 +427,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
           cache: npm

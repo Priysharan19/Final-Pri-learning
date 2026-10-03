@@ -3,6 +3,8 @@ import { compatibilityConfigProblems } from './clientCompatibility.js';
 import { aiAllowanceConfigProblems } from './aiAllowance.js';
 import { googleBillingConfigStatus } from './googleBilling.js';
 import { spendCeilingMissing } from './spendCeiling.js';
+import { mfaKeyConfigured, mfaKeyMalformed } from './mfa.js';
+import { sessionMaxAgeMs } from './security.js';
 
 function nonEmpty(name) {
   return !!String(process.env[name] || '').trim();
@@ -238,6 +240,41 @@ function appleTrustConfigured() {
   return nonEmpty('PRI_APPLE_ROOT_CA_PEM') || nonEmpty('PRI_APPLE_ROOT_CA_FILE');
 }
 
+/** Shorter than this, PRI_CSRF_SECRET is a guessable HMAC key, not a secret. */
+export const MIN_CSRF_SECRET_LENGTH = 32;
+
+function csrfSecretProblem() {
+  const value = String(process.env.PRI_CSRF_SECRET || '').trim();
+  if (!value) return 'PRI_CSRF_SECRET';
+  if (value.length < MIN_CSRF_SECRET_LENGTH) return `PRI_CSRF_SECRET (at least ${MIN_CSRF_SECRET_LENGTH} characters)`;
+  return null;
+}
+
+// ── Per-account sync quota ─────────────────────────────────────────────────
+// One account's stored sync rows are bounded so a runaway or hostile device
+// cannot fill the database for everybody. Both are plain whole numbers; a
+// misspelt value stops a production boot rather than quietly becoming no limit.
+const SYNC_QUOTA_VARS = Object.freeze([
+  ['maxBytesPerAccount', 'PRI_SYNC_MAX_BYTES_PER_ACCOUNT', 64 * 1024 * 1024, 1024 * 1024, 64 * 1024 * 1024 * 1024],
+  ['maxEventsPerAccount', 'PRI_SYNC_MAX_EVENTS', 200_000, 1000, 100_000_000]
+]);
+
+export function syncQuota(env = process.env) {
+  return Object.freeze(Object.fromEntries(SYNC_QUOTA_VARS.map(([key, name, fallback, min, max]) => [key, boundedInteger(env, name, fallback, min, max)])));
+}
+
+function syncQuotaProblems(env) {
+  const problems = [];
+  for (const [, name, fallback, min, max] of SYNC_QUOTA_VARS) {
+    try { boundedInteger(env, name, fallback, min, max); } catch { problems.push(`${name} (whole number between ${min} and ${max})`); }
+  }
+  return problems;
+}
+
+function sessionMaxAgeProblem(env) {
+  try { sessionMaxAgeMs(env); return null; } catch { return 'PRI_SESSION_MAX_AGE_DAYS (whole number of days, 1-3650)'; }
+}
+
 function authEmailConfigured() {
   return String(process.env.PRI_AUTH_EMAIL_PROVIDER || '').trim().toLowerCase() === 'resend' &&
     nonEmpty('PRI_RESEND_API_KEY') && nonEmpty('PRI_AUTH_EMAIL_FROM');
@@ -248,8 +285,18 @@ export function platformConfigStatus() {
   const production = process.env.NODE_ENV === 'production';
   const missing = [];
   if (production && !nonEmpty('PRI_PUBLIC_ORIGIN')) missing.push('PRI_PUBLIC_ORIGIN');
-  if (production && !nonEmpty('PRI_CSRF_SECRET')) missing.push('PRI_CSRF_SECRET');
+  if (production && csrfSecretProblem()) missing.push(csrfSecretProblem());
   if (production && !nonEmpty('PRI_AUTH_DELIVERY_KEY')) missing.push('PRI_AUTH_DELIVERY_KEY');
+  // Staff second factor (mfa.js). The key encrypts every authenticator secret at
+  // rest, so a malformed one is a boot error everywhere, and in production it
+  // must exist before the first administrator can — PRI_BOOTSTRAP_ADMIN_EMAIL
+  // names one, and readiness (readiness.js) reports a deployment that already
+  // has staff accounts and no key.
+  if (mfaKeyMalformed(env)) missing.push('PRI_MFA_KEY (32-byte key as 64 hex characters or base64)');
+  if (production && nonEmpty('PRI_BOOTSTRAP_ADMIN_EMAIL') && !mfaKeyConfigured(env)) missing.push('PRI_MFA_KEY');
+  // Session lifetime and sync quota are whole numbers or absent; nothing else.
+  if (sessionMaxAgeProblem(env)) missing.push(sessionMaxAgeProblem(env));
+  missing.push(...syncQuotaProblems(env));
   if (production && !postgresSelected() && !configuredDbPath()) missing.push('PRI_PLATFORM_DB');
   // A configured provider key is a licence to spend real money on every request
   // that reaches it. Per-account limits bound one student; only these bound the
@@ -303,6 +350,7 @@ export function platformConfigStatus() {
     persistentDatabaseConfigured: postgresSelected()
       ? postgresValid()
       : (production ? productionDbPathValid() : !!configuredDbPath()),
+    mfaKeyConfigured: mfaKeyConfigured(env),
     googleConfigured: nonEmpty('PRI_GOOGLE_CLIENT_IDS'),
     appleConfigured: nonEmpty('PRI_APPLE_CLIENT_IDS'),
     authEmailProviderConfigured: authEmailConfigured(),

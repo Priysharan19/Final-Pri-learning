@@ -51,7 +51,42 @@ object AssetOrigin {
         return Resolved.Asset("$WEB_ROOT/$path", mime)
     }
 
-    fun notFound() = WebResourceResponse("text/plain", "utf-8", 404, "Not Found", emptyMap(),
+    // Mirror of server/platform/headers.js contentSecurityPolicy(): scripts are
+    // only the hashed Vite chunks served from this origin, style-src keeps
+    // 'unsafe-inline' for React style attributes, KaTeX inline layout and the
+    // ink guard's injected <style>, images/media may be data: or blob: (canvas
+    // exports, photo capture, downloads), fonts are the bundled KaTeX woff2
+    // files. connect-src stays 'self': in the native shell the web code never
+    // talks to the cloud from the WebView — every /v1 request goes through
+    // NativeCloud (priNative.cloud), which owns the session cookies outside the
+    // WebView (CP-07). client/test/native-shell-csp-check.mjs reads this list
+    // statically and refuses any directive weaker than the server policy.
+    private val CSP_DIRECTIVES = listOf(
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob:",
+        "font-src 'self' data:",
+        "connect-src 'self'",
+        "worker-src 'self'",
+        "manifest-src 'self'",
+        "media-src 'self' blob:",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "frame-ancestors 'none'"
+    )
+    val CONTENT_SECURITY_POLICY: String = CSP_DIRECTIVES.joinToString("; ")
+
+    /** Every bundled response (asset or local 404) carries the server's hardening headers. */
+    val SECURITY_HEADERS: Map<String, String> = mapOf(
+        "Cache-Control" to "no-cache",
+        "X-Content-Type-Options" to "nosniff",
+        "Content-Security-Policy" to CONTENT_SECURITY_POLICY,
+        "Referrer-Policy" to "no-referrer"
+    )
+
+    fun notFound() = WebResourceResponse("text/plain", "utf-8", 404, "Not Found", SECURITY_HEADERS,
         ByteArrayInputStream("not in the Pri bundle".toByteArray()))
 
     private class BundledWeb(private val assets: AssetManager) : WebViewAssetLoader.PathHandler {
@@ -60,7 +95,7 @@ object AssetOrigin {
                 is Resolved.Asset -> try {
                     WebResourceResponse(r.mime, if (r.mime.startsWith("text/") || r.mime.contains("json") || r.mime.contains("javascript")) "utf-8" else null,
                         assets.open(r.path)).apply {
-                        responseHeaders = mapOf("Cache-Control" to "no-cache", "X-Content-Type-Options" to "nosniff")
+                        responseHeaders = SECURITY_HEADERS
                     }
                 } catch (_: IOException) {
                     notFound()

@@ -1,6 +1,6 @@
 import { asyncRouter } from './asyncRouter.js';
 import { asStore } from './store.js';
-import { id, rateLimit, requireRole, requireSession } from './security.js';
+import { id, rateLimit, requireMfa, requireRole, requireSession } from './security.js';
 
 const KEY = /^[A-Za-z0-9._:/-]{3,200}$/;
 const CURRICULUM = /^[A-Za-z0-9._:/ -]{2,120}$/;
@@ -102,6 +102,9 @@ export function createContentRouter(db) {
 
   router.use(requireSession(db));
   router.use(requireRole('support', 'admin'));
+  // Content reaches every student: every authoring and release action needs the
+  // staff member's second factor verified on this session (mfa.js).
+  router.use(requireMfa());
 
   router.post('/drafts', rateLimit(db, 'content-draft', { limit: 120, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const contentKey = String(req.body?.contentKey || '').trim();
