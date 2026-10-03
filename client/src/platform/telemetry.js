@@ -6,7 +6,7 @@
 // messages, component stacks, strokes, handwriting images or screenshots enter
 // this module.
 
-import { cloud, cloudAvailable } from './cloudTransport.js';
+import { cloud, cloudAvailable, isGuardianConsentRefusal } from './cloudTransport.js';
 
 const TYPES = new Set([
   'client-error', 'sync-failure', 'api-failure', 'recognition-failure',
@@ -19,6 +19,11 @@ const META_KEYS = new Set([
 ]);
 let queue = [];
 let flushJob = null;
+// A child's account whose guardian has not confirmed (or has withdrawn) is
+// refused by the server. Stop asking for the rest of this page's life: the
+// events are dropped, not held for later, so nothing collected while consent
+// was missing is sent once it is given.
+let refusedByConsent = false;
 
 function scalar(value) {
   if (value == null || typeof value === 'boolean') return value;
@@ -49,7 +54,7 @@ export function telemetryEvent(type, { surface = null, metadata = {}, at = Date.
 }
 
 export function queueTelemetry(type, options = {}) {
-  if (!cloudAvailable()) return false;
+  if (refusedByConsent || !cloudAvailable()) return false;
   let event;
   try { event = telemetryEvent(type, options); } catch { return false; }
   queue.push(event);
@@ -65,7 +70,11 @@ function scheduleFlush() {
     const batch = queue.splice(0, 30);
     if (!batch.length) return;
     try { await cloud.telemetry(batch); }
-    catch {
+    catch (error) {
+      if (isGuardianConsentRefusal(error)) {
+        refusedByConsent = true;
+        queue = [];
+      }
       // Operational telemetry is best effort and must never become a durable
       // shadow copy of student behaviour. Failed events are dropped rather than
       // persisted with learning data or retried forever.
