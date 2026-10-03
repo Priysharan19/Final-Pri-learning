@@ -90,11 +90,12 @@ jobs:
           - { api: 26, profile: pixel_6, expect: floor, webviewFlags: "" }
           # The oldest image here whose factory WebView meets the floor runs the
           # whole product journey; then the current API on phone and tablet.
-          # API 33's hosted gfxstream/WebView combination crashes during GPU
-          # compositing. The diagnostic matrix proved software compositing avoids
-          # that renderer/emulator failure; API 36 runs without the override.
+          # Hosted phone gfxstream/WebView compositing is unstable on both API
+          # 33 and 36. The diagnostic matrix proved software compositing avoids
+          # the emulator death; the API 36 tablet stays on GPU compositing so
+          # that rendering path remains continuously exercised.
           - { api: 33, profile: pixel_6, expect: product, webviewFlags: "--disable-gpu-compositing" }
-          - { api: 36, profile: pixel_6, expect: product, webviewFlags: "" }
+          - { api: 36, profile: pixel_6, expect: product, webviewFlags: "--disable-gpu-compositing" }
           - { api: 36, profile: pixel_tablet, expect: product, webviewFlags: "" }
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -129,7 +130,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim
           working-directory: android
           # One line: the runner executes each script line in its own shell.
-          script: set -e; WEBVIEW_FLAGS='${{ matrix.webviewFlags }}'; if [ -n "$WEBVIEW_FLAGS" ]; then adb shell "echo '_ $WEBVIEW_FLAGS' > /data/local/tmp/webview-command-line"; fi; node ../scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && { ./scripts/run-instrumented.sh ${{ matrix.expect }}; rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null; exit $rc; }
+          script: set -e; mkdir -p app/build/outputs/pri-instrumented; WEBVIEW_FLAGS='${{ matrix.webviewFlags }}'; if [ -n "$WEBVIEW_FLAGS" ]; then adb shell "echo '_ $WEBVIEW_FLAGS' > /data/local/tmp/webview-command-line"; fi; (adb logcat -v threadtime > app/build/outputs/pri-instrumented/live-logcat.txt 2>&1 &) ; node ../scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && { ./scripts/run-instrumented.sh ${{ matrix.expect }}; rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null; exit $rc; }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
