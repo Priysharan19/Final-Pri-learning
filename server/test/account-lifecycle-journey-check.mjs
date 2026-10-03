@@ -203,7 +203,7 @@ const jars = { a1: {}, a2: {}, a3: {}, a4: {}, a5: {}, other: {}, teacher: {}, c
 
 try {
   // ── A bystander and a teacher, so "only this account" means something ───
-  const otherReg = await call('/account/register', { method: 'POST', jar: jars.other, body: { name: 'Bina Bystander', email: 'bina@example.test', password: 'bystander-pass-1', deviceId: 'ipad-other' } });
+  const otherReg = await call('/account/register', { method: 'POST', jar: jars.other, body: { name: 'Bina Bystander', email: 'bina@example.test', password: 'bystander-pass-1', deviceId: 'ipad-other', isAdult: true } });
   check(otherReg.status === 201, 'bystander registers');
   const other = otherReg.data.account;
   // An EXPIRED verification link is refused with a code, and a fresh request works.
@@ -216,7 +216,7 @@ try {
   const otherPush = await call('/sync/push', { method: 'POST', jar: jars.other, headers: { 'Idempotency-Key': 'other-1' }, body: { schemaVersion: 1, deviceId: 'ipad-other', events: [{ id: 'evt-other-1', kind: 'practice-attempt', deviceId: 'ipad-other', deviceSeq: 1, entityId: 'q9', occurredAt: now, payload: { correct: false } }], entities: [{ kind: 'profile', entityId: 'self', operation: 'upsert', baseVersion: 0, body: { name: 'Bina', grade: 9 } }] } });
   check(otherPush.status === 200, 'bystander syncs real data');
 
-  const teacherReg = await call('/account/register', { method: 'POST', jar: jars.teacher, body: { name: 'Tara Teacher', email: 'tara@example.test', password: 'teacher-pass-12', deviceId: 'mac-teacher' } });
+  const teacherReg = await call('/account/register', { method: 'POST', jar: jars.teacher, body: { name: 'Tara Teacher', email: 'tara@example.test', password: 'teacher-pass-12', deviceId: 'mac-teacher', isAdult: true } });
   const teacher = teacherReg.data.account;
   await call('/account/email/verify', { method: 'POST', body: { token: (await outboxToken(teacher.id, 'verify-email')).token } });
   await db.run("UPDATE accounts SET role='teacher' WHERE id=?", [teacher.id]); // role grants are covered by teacher-invite-check
@@ -227,10 +227,10 @@ try {
   const assignmentId = assignment.data.assignment.id;
 
   // ── 1. Signup: the UNVERIFIED state ───────────────────────────────────────
-  const reg = await call('/account/register', { method: 'POST', jar: jars.a1, body: { name: NAME, email: EMAIL, password: PASSWORD_1, deviceId: 'ipad-a1' } });
+  const reg = await call('/account/register', { method: 'POST', jar: jars.a1, body: { name: NAME, email: EMAIL, password: PASSWORD_1, deviceId: 'ipad-a1', isAdult: true } });
   check(reg.status === 201 && reg.data.verificationRequired === true && reg.data.account.emailVerified === false, 'signup answers 201 with verificationRequired and an unverified account');
   const A = reg.data.account.id;
-  check((await call('/account/register', { method: 'POST', jar: {}, body: { name: 'Dup', email: EMAIL.toUpperCase(), password: PASSWORD_1 } })).status === 409, 'the same email (any case) cannot register twice');
+  check((await call('/account/register', { method: 'POST', jar: {}, body: { name: 'Dup', email: EMAIL.toUpperCase(), password: PASSWORD_1, isAdult: true } })).status === 409, 'the same email (any case) cannot register twice');
   const unverifiedMe = await call('/account/me', { jar: jars.a1 });
   check(unverifiedMe.status === 200 && unverifiedMe.data.account.emailVerified === false, 'unverified: signed in, /me reports emailVerified=false');
   const unverifiedPush = await call('/sync/push', { method: 'POST', jar: jars.a1, headers: { 'Idempotency-Key': 'a-unverified' }, body: { schemaVersion: 1, deviceId: 'ipad-a1', events: [], entities: [] } });
@@ -250,9 +250,16 @@ try {
   check(secondMail.tokenId !== firstMail.tokenId, 'resend issues a new link');
   const stale = await call('/account/email/verify', { method: 'POST', body: { token: firstMail.token } });
   check(stale.status === 400 && code(stale) === 'TOKEN_INVALID', 'the superseded (stale) link is refused with TOKEN_INVALID');
-  check((await call('/account/email/verify', { method: 'POST', body: { token: secondMail.token } })).status === 200, 'the current link verifies');
+  const firstUse = await call('/account/email/verify', { method: 'POST', body: { token: secondMail.token } });
+  check(firstUse.status === 200 && firstUse.data.alreadyVerified === false, 'the current link verifies');
+  // A mail scanner (Safe Links) opening the link first is routine: the person's
+  // own click on the spent link must read as verified, not as an error.
   const replay = await call('/account/email/verify', { method: 'POST', body: { token: secondMail.token } });
-  check(replay.status === 400 && code(replay) === 'TOKEN_INVALID', 'replaying a used verification link is refused with TOKEN_INVALID');
+  check(replay.status === 200 && replay.data.ok === true && replay.data.alreadyVerified === true, 'replaying a consumed link of a verified account answers alreadyVerified, not an error');
+  const staleAfter = await call('/account/email/verify', { method: 'POST', body: { token: firstMail.token } });
+  check(staleAfter.status === 200 && staleAfter.data.alreadyVerified === true, 'a superseded link of the now-verified account also reads as verified');
+  const randomAfter = await call('/account/email/verify', { method: 'POST', body: { token: 'not-a-real-token-' + 'x'.repeat(24) } });
+  check(randomAfter.status === 400 && code(randomAfter) === 'TOKEN_INVALID' && randomAfter.data.alreadyVerified === undefined, 'a random token is still TOKEN_INVALID, revealing nothing');
   check((await call('/account/me', { jar: jars.a1 })).data.account.emailVerified === true, 'ACTIVE: /me reports the verified account');
   check(!(await db.get("SELECT 1 FROM auth_delivery_outbox WHERE account_id=? AND kind='verify-email'", [A])), 'no verification envelope outlives the verification');
 
@@ -384,7 +391,7 @@ try {
   // ── 9. Deletion ──────────────────────────────────────────────────────────
   const savedCookie = jar.pri_cloud_session;
   check(code(await call('/account', { method: 'DELETE', jar, body: {} })) === 'REAUTH_REQUIRED', 'deletion without fresh password proof is refused');
-  check(code(await call('/account', { method: 'DELETE', jar, body: { password: PASSWORD_1 } })) === 'REAUTH_REQUIRED', 'deletion with the OLD password is refused');
+  check(code(await call('/account', { method: 'DELETE', jar, body: { password: PASSWORD_1, isAdult: true } })) === 'REAUTH_REQUIRED', 'deletion with the OLD password is refused');
   const deleted = await call('/account', { method: 'DELETE', jar, body: { password: PASSWORD_2 } });
   check(deleted.status === 200 && deleted.data.deleted === true, 'deletion with the current password succeeds');
   check(providerRequests.some(r => r.path === `/v1/subscriptions/${subId}/cancel` && r.body.cancel_at_cycle_end === 0), 'deletion cancelled the provider subscription first, immediately');
@@ -430,7 +437,7 @@ try {
   check((await call('/sync/pull/0', { jar: { pri_cloud_session: savedCookie } })).status === 401, 'deleted: sync refuses the old token');
 
   // ── 12. Re-signup with the same address is a new, empty account ──────────
-  const again = await call('/account/register', { method: 'POST', jar: jars.again, body: { name: 'Ana Again', email: EMAIL, password: 'brand-new-pass-1', deviceId: 'ipad-new' } });
+  const again = await call('/account/register', { method: 'POST', jar: jars.again, body: { name: 'Ana Again', email: EMAIL, password: 'brand-new-pass-1', deviceId: 'ipad-new', isAdult: true } });
   check(again.status === 201 && again.data.account.id !== A && again.data.account.emailVerified === false, 'the same email registers again as a new, unverified account');
   const fresh = (await call('/account/export', { jar: jars.again })).data;
   check(fresh.learningEvents.length === 0 && fresh.entities.length === 0 && fresh.classes.length === 0 && fresh.issueReports.length === 0 && fresh.entitlement.plan === 'free',

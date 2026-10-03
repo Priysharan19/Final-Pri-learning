@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Placeholder launcher mark (store artwork is a CP-12 / owner deliverable). -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#FF5B7CFA" android:pathData="M18,18h72v72h-72z" />
-    <path android:fillColor="#FFFFFFFF"
-        android:pathData="M42,32h16c9,0 15,6 15,14s-6,14 -15,14h-8v16h-8zM50,40v12h7c4,0 7,-2.5 7,-6s-3,-6 -7,-6z" />
-</vector>

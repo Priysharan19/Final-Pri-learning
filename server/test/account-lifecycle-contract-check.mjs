@@ -77,7 +77,7 @@ try {
   const jarA = {};
   const registration = await request('/register', {
     method: 'POST', jar: jarA,
-    body: { name: 'Lifecycle Student', email: 'lifecycle@example.test', password: 'initial-pass-123', deviceId: 'ipad-a' }
+    body: { name: 'Lifecycle Student', email: 'lifecycle@example.test', password: 'initial-pass-123', deviceId: 'ipad-a', isAdult: true }
   });
   assert.equal(registration.status, 201);
   assert.equal(registration.data.account.emailVerified, false);
