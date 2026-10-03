@@ -91,6 +91,12 @@ self.addEventListener('install', (e) => {
 
 let warming = null;
 
+// A message is acted on only when it comes from a page of this origin. Service
+// worker clients are same-origin by construction, so in a browser this never
+// turns away a real page; it makes the boundary explicit and holds it if the
+// worker is ever reachable another way.
+const fromThisOrigin = (e) => !e.origin || e.origin === self.location.origin;
+
 async function warm(withOptional) {
   const wanted = withOptional ? [...WARM, ...OPTIONAL] : WARM;
   const cache = await caches.open(VERSION);
@@ -106,6 +112,7 @@ async function warm(withOptional) {
 
 self.addEventListener('message', (e) => {
   if (e.data?.type !== 'pri-warm') return;
+  if (!fromThisOrigin(e)) return;
   const optional = Boolean(e.data.optional);
   // One pass at a time. A second ask while one is in flight joins it rather
   // than doubling the requests on a link that has none to spare.
@@ -131,6 +138,7 @@ const REMINDER_ROUTE = /^\/[a-z-]*$/;
 
 self.addEventListener('message', (e) => {
   if (e.data?.type !== 'pri-notify') return;
+  if (!fromThisOrigin(e)) return;
   const title = String(e.data.title || '').slice(0, 120);
   const body = String(e.data.body || '').slice(0, 200);
   const tag = String(e.data.tag || 'pri-reminder').slice(0, 64);
