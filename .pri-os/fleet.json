@@ -110,6 +110,7 @@
     {"pattern":"scripts/**","primary":"reliability","reviewers":["security","qa-release"],"risk":"R3"},
     {"pattern":".github/workflows/**","primary":"reliability","reviewers":["security","qa-release"],"risk":"R4"},
     {"pattern":".github/dependabot.yml","primary":"reliability","reviewers":["security","qa-release"],"risk":"R4"},
+    {"pattern":".github/codeql/**","primary":"reliability","reviewers":["security","qa-release"],"risk":"R4"},
     {"pattern":"marketing/**","primary":"growth","reviewers":["security","qa-release"],"risk":"R2"},
     {"pattern":"promotions/**","primary":"growth","reviewers":["commercial","security","qa-release"],"risk":"R3"},
     {"pattern":"ad/**","primary":"growth","reviewers":["qa-release"],"risk":"R1"},
