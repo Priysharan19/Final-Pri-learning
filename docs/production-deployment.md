@@ -27,7 +27,7 @@ npm run verify:deployment -- --origin https://<production origin> --sha <40-hex 
 
 Read-only Railway API inspection at the time this reconciliation branch was prepared found project
 `profound-spontaneity`. Staging service `pri-learning-staging` is sourced from `main` and its
-latest successful deployment is `28b68f20cbd6b3190738dc619dc91adc40abfa20`. It has
+latest successful deployment is `30d1c56f5e15735aa81fc8037e1cb4bad196bd23`. It has
 `PRI_DATABASE_URL`, `PRI_DATABASE_SSL_ROOT_CERT` and `PRI_METRICS_TOKEN` configured.
 
 Production service `Final-Pri-learning` is still sourced from

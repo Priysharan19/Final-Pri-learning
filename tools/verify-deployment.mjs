@@ -6,8 +6,10 @@
 // /release.json), reads no credential and changes nothing. It exits non-zero
 // unless every one of these holds:
 //
-//   · /v1/health answers as pri-learning-platform, on persistent storage, with
-//     a reachable database at the schema versions THIS checkout expects;
+//   · /v1/health answers as pri-learning-platform and identifies the running
+//     release/database engine;
+//   · /v1/ready proves the database is reachable at the schema versions THIS
+//     checkout expects and that verification email is configured;
 //   · the server's release SHA is the one nominated (--sha);
 //   · the web client the server ships carries the identical release identity;
 //   · /v1/ready says the replica can serve (ready or degraded, never not_ready);
@@ -87,21 +89,32 @@ export async function verifyDeployment({ origin, sha, engine = null, allowHttp =
   }
 
   const h = health.body || {};
+  const r = ready.body || {};
+  const readyDb = r.checks?.database || {};
+  const readyAuth = r.checks?.authEmail || {};
+  const databaseEngine = readyDb.engine || h.database?.engine || null;
+  const databaseReachable = readyDb.state === 'ok' || h.database?.reachable === true;
+  const schemaVersion = readyDb.schemaVersion ?? h.schemaVersion;
+  const billingSchemaVersion = readyDb.billingSchemaVersion ?? h.billingSchemaVersion;
+  const authEmailConfigured = readyAuth.state === 'ok' || h.authDelivery?.email === true;
+
   check(health.status === 200 && h.ok === true, '/v1/health answers 200 ok', `status ${health.status}`);
   check(h.service === 'pri-learning-platform', 'service is pri-learning-platform', h.service);
   const runningSha = h.releaseIdentity?.releaseSha;
   check(runningSha === expectedSha, 'server release SHA is the nominated SHA', `running ${runningSha || 'unknown'}`);
-  check(h.storage?.persistentDatabase === true, 'storage is persistent');
-  check(h.database?.reachable === true, 'database reachable');
-  if (engine) check(h.database?.engine === engine, `database engine is ${engine}`, `running ${h.database?.engine || 'unknown'}`);
-  check(String(h.schemaVersion) === String(SCHEMA_VERSION), `schema_version is ${SCHEMA_VERSION}`, `running ${h.schemaVersion}`);
-  check(String(h.billingSchemaVersion) === String(BILLING_SCHEMA_VERSION), `billing_schema_version is ${BILLING_SCHEMA_VERSION}`, `running ${h.billingSchemaVersion}`);
-  check(h.authDelivery?.email === true, 'verification email provider configured');
+  // Postgres is external durable storage. A transitional SQLite deployment
+  // must still expose the legacy operator storage proof; without it an
+  // unauthenticated verifier cannot establish that the file is on a volume.
+  check(databaseEngine === 'postgres' || h.storage?.persistentDatabase === true, 'storage is persistent');
+  check(databaseReachable, 'database reachable');
+  if (engine) check(databaseEngine === engine, `database engine is ${engine}`, `running ${databaseEngine || 'unknown'}`);
+  check(String(schemaVersion) === String(SCHEMA_VERSION), `schema_version is ${SCHEMA_VERSION}`, `running ${schemaVersion}`);
+  check(String(billingSchemaVersion) === String(BILLING_SCHEMA_VERSION), `billing_schema_version is ${BILLING_SCHEMA_VERSION}`, `running ${billingSchemaVersion}`);
+  check(authEmailConfigured, 'verification email provider configured');
 
   check(web.status === 200 && isDeepStrictEqual(web.body, h.releaseIdentity), 'web client release.json equals server release identity',
     web.status === 200 ? `web ${web.body?.releaseSha || 'unknown'}` : `status ${web.status}`);
 
-  const r = ready.body || {};
   const readyDetail = [r.state, ...(r.failing || []), ...(r.degraded || []).map(code => `degraded:${code}`)].filter(Boolean).join(' ');
   check(ready.status === 200 && r.ready === true, '/v1/ready says this replica can serve', readyDetail || `status ${ready.status}`);
   check(!r.releaseSha || r.releaseSha === expectedSha, '/v1/ready reports the same SHA', r.releaseSha);

@@ -47,10 +47,24 @@ const SHA = 'a'.repeat(40);
 const identity = { releaseSha: SHA, buildTimestamp: '2026-10-02T00:00:00.000Z', version: '4.0.0' };
 function healthy() {
   return {
-    health: { ok: true, service: 'pri-learning-platform', releaseIdentity: { ...identity }, schemaVersion: String(SCHEMA_VERSION),
-      billingSchemaVersion: String(BILLING_SCHEMA_VERSION), storage: { persistentDatabase: true },
-      database: { engine: 'postgres', reachable: true }, authDelivery: { email: true } },
-    ready: { ready: true, state: 'ready', releaseSha: SHA, failing: [], degraded: [] },
+    // Current /v1/health is deliberately redacted: operator-only storage and
+    // provider configuration are absent without PRI_METRICS_TOKEN.
+    health: {
+      ok: true, service: 'pri-learning-platform', releaseIdentity: { ...identity },
+      schemaVersion: String(SCHEMA_VERSION), billingSchemaVersion: String(BILLING_SCHEMA_VERSION),
+      database: { engine: 'postgres', reachable: true }
+    },
+    ready: {
+      ready: true, state: 'ready', releaseSha: SHA, failing: [], degraded: [],
+      checks: {
+        database: {
+          state: 'ok', code: null, engine: 'postgres',
+          schemaVersion: String(SCHEMA_VERSION), billingSchemaVersion: String(BILLING_SCHEMA_VERSION),
+          expectedSchemaVersion: String(SCHEMA_VERSION), expectedBillingSchemaVersion: String(BILLING_SCHEMA_VERSION)
+        },
+        authEmail: { state: 'ok', code: null, required: true }
+      }
+    },
     readyStatus: 200,
     web: { ...identity }
   };
@@ -73,12 +87,29 @@ try {
   const drifts = [
     ['a different running SHA', s => { s.health.releaseIdentity.releaseSha = 'b'.repeat(40); s.web.releaseSha = 'b'.repeat(40); }],
     ['a web bundle from another build', s => { s.web.releaseSha = 'c'.repeat(40); }],
-    ['non-persistent storage', s => { s.health.storage.persistentDatabase = false; }],
-    ['an unreachable database', s => { s.health.database.reachable = false; }],
-    ['a database one schema version behind', s => { s.health.schemaVersion = String(SCHEMA_VERSION - 1); }],
-    ['a billing schema mismatch', s => { s.health.billingSchemaVersion = String(BILLING_SCHEMA_VERSION - 1); }],
-    ['no verification email provider', s => { s.health.authDelivery.email = false; }],
-    ['a not_ready replica', s => { s.readyStatus = 503; s.ready = { ready: false, state: 'not_ready', failing: ['AUTH_EMAIL_NOT_CONFIGURED'], degraded: [] }; }]
+    ['SQLite without persistent-volume proof', s => {
+      s.health.database.engine = 'sqlite';
+      s.ready.checks.database.engine = 'sqlite';
+    }],
+    ['an unreachable database', s => {
+      s.health.database.reachable = false;
+      s.ready.checks.database.state = 'unavailable';
+    }],
+    ['a database one schema version behind', s => {
+      s.health.schemaVersion = String(SCHEMA_VERSION - 1);
+      s.ready.checks.database.schemaVersion = String(SCHEMA_VERSION - 1);
+    }],
+    ['a billing schema mismatch', s => {
+      s.health.billingSchemaVersion = String(BILLING_SCHEMA_VERSION - 1);
+      s.ready.checks.database.billingSchemaVersion = String(BILLING_SCHEMA_VERSION - 1);
+    }],
+    ['no verification email provider', s => { s.ready.checks.authEmail.state = 'not_configured'; }],
+    ['a not_ready replica', s => {
+      s.readyStatus = 503;
+      s.ready.ready = false;
+      s.ready.state = 'not_ready';
+      s.ready.failing = ['AUTH_EMAIL_NOT_CONFIGURED'];
+    }]
   ];
   for (const [name, mutate] of drifts) {
     state = healthy();
@@ -88,11 +119,14 @@ try {
 
   state = healthy();
   state.health.database.engine = 'sqlite';
+  state.health.storage = { persistentDatabase: true }; // legacy/operator proof for transitional SQLite
+  state.ready.checks.database.engine = 'sqlite';
   ok(!(await run({ engine: 'postgres' })).ok, 'fails when --engine postgres meets a SQLite deployment');
-  ok((await run()).ok, 'passes a SQLite deployment when no engine is demanded');
+  ok((await run()).ok, 'passes a SQLite deployment only when persistent storage is proven');
 
   state = healthy();
-  state.ready = { ready: true, state: 'degraded', releaseSha: SHA, failing: [], degraded: ['HANDWRITING_PROBING'] };
+  state.ready.state = 'degraded';
+  state.ready.degraded = ['HANDWRITING_PROBE_PENDING'];
   ok((await run()).ok, 'a degraded but serving replica passes');
 
   ok(!(await verifyDeployment({ origin, sha: 'abc123', allowHttp: true })).ok, 'a short SHA is refused');

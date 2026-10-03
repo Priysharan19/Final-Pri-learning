@@ -1,6 +1,6 @@
 # Production cutover checklist: Railway + Supabase (Mumbai)
 
-Status: **checklist only. Nothing in it has been run.** Authority: ADR-0001 phase 4
+Status: **production cutover not run; staging is already on Postgres and is re-verified below.** Authority: ADR-0001 phase 4
 (`docs/architecture/adr-0001-online-first-runtime.md`) and the release policy
 (`docs/release/release-policy.md`).
 
@@ -18,78 +18,68 @@ Detailed procedures live elsewhere and are not repeated here:
 | Alerts, `/v1/metrics`, uptime monitors | `docs/operations/alerts.md` |
 | Failure drills | `docs/operations/drills.md` |
 
-## Observed state on 2026-10-03 (read-only CLI and `GET` inspection; re-check before acting)
+## Observed state on 2026-10-04 (read-only Railway, Supabase and HTTP inspection; re-check before acting)
 
-Recorded from `railway status --json`, `railway service list`, `railway domain list`,
-`railway variables --json | jq keys` (key names only), `npx supabase projects list`, and
-unauthenticated `GET /v1/health`, `/v1/ready`, `/release.json`. Nothing was deployed, set or changed.
+Nothing in this inspection changed Railway or Supabase. Railway configuration was read through the
+Railway API; Supabase project, migration and schema state was read through the Supabase API; live
+service state came from unauthenticated `GET /v1/health`, `/v1/ready` and `/release.json`.
 
-**Railway project `profound-spontaneity`** (plan `pro`), two environments:
+**Railway project `profound-spontaneity`** has separate `staging` and `production` environments:
 
-| Environment | Service | Deploys from | Live SHA | Builder | DB | Public domain |
+| Environment | Service | Source | Live SHA | Railway build state | Database | Public domain |
 |---|---|---|---|---|---|---|
-| `production` | `Final-Pri-learning` | repo `Priysharan19/Final-Pri-learning`; last deploy came from branch **`task/pri-03-handwriting-production-wiring`** | `4e3e61eed57246a188f70d604fc13907f1ec72cd` (2026-10-01) | Dockerfile | SQLite on volume `pri-learning-data` (`/data`, 37 MB / 500 MB), region `ams`, 1 replica | `https://final-pri-learning-production.up.railway.app` (Railway service domain; no custom domain) |
-| `staging` | `pri-learning-staging` | repo `Priysharan19/Final-Pri-learning`, branch **`main`** | `0fdf4fa80924d3125738fe333b44f150da6ec2a6` (= `origin/main` head at the time) | Dockerfile | Supabase Postgres, `schema_version` 10 / `billing_schema_version` 6, reachable | `https://pri-learning-staging-staging.up.railway.app` |
+| `production` | `Final-Pri-learning` | `Priysharan19/Final-Pri-learning`, branch **`task/pri-03-handwriting-production-wiring`**, check suites **off** | `4e3e61eed57246a188f70d604fc13907f1ec72cd` (2026-10-01) | `RAILPACK`; the live service has not adopted this branch's `railway.json` health/restart contract | SQLite on volume `pri-learning-data` mounted at `/data`, region `ams` | `https://final-pri-learning-production.up.railway.app` |
+| `staging` | `pri-learning-staging` | same repo, branch **`main`**, check suites **off** | `30d1c56f5e15735aa81fc8037e1cb4bad196bd23` | `RAILPACK`; latest deployment `f7f09396-be5a-48bf-8dce-f707d79350a7` is `SUCCESS` | Supabase Postgres | `https://pri-learning-staging-staging.up.railway.app` |
 
-A third service `pri-corpus-e2e-proof-temp` (repo `Pri-Learning-India`, last deploy FAILED, stopped) is
-unrelated and can be deleted by the owner.
+The unrelated `pri-corpus-e2e-proof-temp` production-environment service remains failed/stopped and
+is not part of the Pri Learning release path.
 
-The production deploy manifest predates `railway.json`: `healthcheckPath`, `healthcheckTimeout` and
-`drainingSeconds` are all `null` and `restartPolicyMaxRetries` is 10. Once this PR's `railway.json`
-is on the deployed branch those become `/v1/ready`, 120 s, 20 s and 5. The Railway CLI does not
-print the configured trigger branch; confirm it in the dashboard (Service → Settings → Source).
+**Live production:** `/v1/health` is 200 at release SHA `4e3e61ee…`, with
+`schemaVersion "7"`, `billingSchemaVersion "3"` and `database.engine "sqlite"`.
+`/v1/ready` is 404 because that old build predates the readiness route. `/release.json` reports
+the same `4e3e61ee…` SHA. This is a stale pre-cutover deployment, not the release candidate.
 
-**Production `/v1/health` (live):** `schemaVersion "7"`, `billingSchemaVersion "3"`, `database.engine
-"sqlite"`, `authDelivery.email true`, release identity branch `main` (the identity is stamped from
-`RAILWAY_GIT_COMMIT_SHA`; the SHA itself is the feature-branch merge commit above). `/v1/ready` is
-**404** on that SHA: the readiness route did not exist yet. `npm run verify:deployment -- --origin
-https://final-pri-learning-production.up.railway.app --sha 4e3e61ee… --engine sqlite` from this
-checkout therefore fails 9/13 (schema 7≠10, billing 3≠6, `/v1/ready` 404, no `database.reachable`).
-This is the expected gap between the live build and `main`, not a fault in the verifier.
+**Live staging:** `/v1/health` and `/release.json` both report
+`30d1c56f5e15735aa81fc8037e1cb4bad196bd23`; `/v1/health` reports Postgres reachable at
+schema **11** / billing schema **6**. `/v1/ready` is 200 with `ready: true`,
+expected and actual schema **11 / 6**, and no failing or degraded checks at the time of inspection.
+Auth email, paid-ceiling, handwriting and working checks are all `ok`.
 
-**Staging `/v1/health` + `/v1/ready` (live):** `ready: true`, Postgres reachable, 10 / 6 expected and
-running, auth email ok, paid ceiling ok, handwriting and working ok (`/v1/ready` reports
-`degraded:HANDWRITING_PROBE_PENDING` briefly after boot). `npm run verify:deployment -- --origin
-https://pri-learning-staging-staging.up.railway.app --sha 0fdf4fa80924d3125738fe333b44f150da6ec2a6
---engine postgres` → `DEPLOYMENT VERIFIED: PASS — 13/13`. So §3–§4 of this checklist have, in effect,
-already been exercised on staging by the owner; the 24-hour soak and the test-account journey
-remain unrecorded.
+**Railway variable names only (values were never read or copied):**
 
-**Variable keys set (names only, never values):**
+- production has `PRI_PLATFORM_DB` plus the existing auth/email/handwriting/spend variables, and
+  still has manual `PRI_RELEASE_SHA` / `PRI_BUILD_TIMESTAMP`; it does **not** have
+  `PRI_DATABASE_URL`, `PRI_DATABASE_SSL_ROOT_CERT` or `PRI_METRICS_TOKEN`;
+- staging has `PRI_DATABASE_URL`, `PRI_DATABASE_SSL_ROOT_CERT` and `PRI_METRICS_TOKEN` plus its
+  auth/email/handwriting/spend variables.
 
-- production `Final-Pri-learning`: `NODE_ENV`, `PRI_PUBLIC_ORIGIN`, `PRI_TRUSTED_PROXY_HOPS`,
-  `PRI_CSRF_SECRET`, `PRI_AUTH_DELIVERY_KEY`, `PRI_AUTH_EMAIL_PROVIDER`, `PRI_AUTH_EMAIL_FROM`,
-  `PRI_RESEND_API_KEY`, `PRI_PLATFORM_DB`, `PRI_HANDWRITING_API_KEY`, `PRI_HANDWRITING_ENDPOINT`,
-  `PRI_HANDWRITING_MODEL`, `PRI_HANDWRITING_FALLBACK_MODEL`, `PRI_HANDWRITING_TIMEOUT_MS`,
-  `PRI_HANDWRITING_CONFIDENCE_FLOOR`, `PRI_PAID_CALLS_PER_HOUR`, `PRI_PAID_CALLS_PER_DAY`,
-  `PRI_RELEASE_SHA`, `PRI_BUILD_TIMESTAMP` (plus Railway's own `RAILWAY_*`).
-  **Not set:** `PRI_DATABASE_URL`, `PRI_DATABASE_SSL_ROOT_CERT`, `PRI_METRICS_TOKEN`.
-  `PRI_RELEASE_SHA` / `PRI_BUILD_TIMESTAMP` are stale manual candidates; the Dockerfile lets
-  `RAILWAY_GIT_COMMIT_SHA` win, so they are harmless but should be removed.
-- staging `pri-learning-staging`: `PRI_PUBLIC_ORIGIN`, `PRI_TRUSTED_PROXY_HOPS`, `PRI_CSRF_SECRET`,
-  `PRI_AUTH_DELIVERY_KEY`, `PRI_AUTH_EMAIL_PROVIDER`, `PRI_AUTH_EMAIL_FROM`, `PRI_RESEND_API_KEY`,
-  `PRI_DATABASE_URL`, `PRI_DATABASE_SSL_ROOT_CERT`, `PRI_METRICS_TOKEN`, `PRI_HANDWRITING_API_KEY`,
-  `PRI_PAID_CALLS_PER_HOUR`, `PRI_PAID_CALLS_PER_DAY`.
+**Supabase:** both projects are `ACTIVE_HEALTHY`, Postgres 17.6, region `ap-south-1`.
 
-**Supabase (`npx supabase projects list`, org `eryayswaouapsebcwyiv`, both `ap-south-1`,
-Postgres 17.6, `ACTIVE_HEALTHY`):** production `pri-learning-production-india` =
-`mgmlvkesbwmipmvnzufk`; staging `pri-learning-staging` = `orudxrckgxyyraopyzmn`. Neither is linked
-from a checkout; `migration list` against them needs the database password and was not run.
+- staging `pri-learning-staging` (`orudxrckgxyyraopyzmn`) has all **nine** repository platform
+  migrations `20261001000000` through `20261007000000`; `pri.platform_meta` reads
+  `schema_version=11`, `billing_schema_version=6`, and `pri.sync_cursor_seq` exists;
+- production `pri-learning-production-india` (`mgmlvkesbwmipmvnzufk`) is healthy but does **not**
+  yet have `pri.platform_meta` or `pri.sync_cursor_seq`, and its migration history does not contain
+  the nine `20261001…20261007` platform migrations. No production migration was applied in this
+  inspection.
 
-### What is missing for a cutover from `main` — each item is **BLOCKED_EXTERNAL** (owner only)
+### What remains before production cutover
 
-1. Production service source → branch `main`, *Wait for CI* on (§1). Today it tracks a feature branch.
-2. `supabase db push` of all eight migrations to `mgmlvkesbwmipmvnzufk`, login role `pri_app_production`,
-   `verify:platform:pg-target` PASS (§5, §6).
-3. Production variables: set `PRI_DATABASE_URL` (sealed) + `PRI_DATABASE_SSL_ROOT_CERT`, set
-   `PRI_METRICS_TOKEN`, remove `PRI_PLATFORM_DB`, `PRI_RELEASE_SHA`, `PRI_BUILD_TIMESTAMP` (§5).
-4. Decision on the 37 MB production SQLite volume: migrate or start empty (ADR-0001 "Not decided
-   here"); final `server/tools/backup.mjs` backup either way (§5, §6).
-5. Backup + restore drill on the production Supabase project; PITR on (§5).
-6. Owner approval of the cutover window; then deploy the nominated `main` SHA (§6).
+1. Production Railway source must move to a nominated green `main` SHA and CI gating must be
+   enabled; today it still tracks the old handwriting feature branch.
+2. The nine repository platform migrations must be applied to production Supabase in order, the
+   production login role must be established, and `verify:platform:pg-target` must pass against
+   that exact target.
+3. Production must receive the verified Postgres connection pair and metrics token, and retire
+   `PRI_PLATFORM_DB` plus the stale manual release-identity variables after the data decision.
+4. Decide whether the existing production SQLite data is migrated or production Postgres starts
+   empty; take a final SQLite backup either way.
+5. Prove the production backup/restore path and PITR posture before real student traffic.
+6. Only then deploy and verify one nominated release SHA.
 
-Everything an agent can do without those is done: the image builds, the verifier passes against
-the image and against staging, and the ordered steps below are ready to run.
+Repository engineering can prepare and verify every command and contract. Applying production DDL,
+moving live data, changing live credentials/source authority and approving the cutover remain
+explicit production-infrastructure actions and were not performed by this recovery run.
 
 ---
 
@@ -134,7 +124,7 @@ on the Railway service, never in the repository, a file or chat.
 
 Follow `docs/operations/postgres-cutover.md` exactly, in this order:
 
-- [ ] §2 `supabase db push` to staging; `migration list` shows all eight files applied.
+- [ ] §2 `supabase db push` to staging; `migration list` shows all nine files applied.
 - [ ] §3 login role `pri_app_staging` created with `\password`; the check query shows
       not superuser, not BYPASSRLS, member of `pri_server`.
 - [ ] §4.1 `PRI_DATABASE_URL` (sealed, session pooler port 5432, `sslmode=verify-full`) and
@@ -186,10 +176,10 @@ physical-device QA. A green deploy is not a launch.
 
 | Step | Environment | SHA | Who | When (UTC) | Result / evidence |
 |---|---|---|---|---|---|
-| 0 nominate SHA | — | | | | not yet nominated; `origin/main` head on 2026-10-03 was `0fdf4fa8…` |
-| 1 Railway source = main | staging | `0fdf4fa8…` | owner (observed) | 2026-10-03 | staging already deploys `main`; production still on feature branch — BLOCKED_EXTERNAL |
+| 0 nominate SHA | — | | | | not yet nominated; current `main` is still advancing through release closure |
+| 1 Railway source = main | staging | `30d1c56f…` | observed read-only | 2026-10-04 | staging deploys `main`; production still tracks the old feature branch |
 | 3 cutover runbook §2–§4 | staging | | | | `POSTGRES TARGET: PASS` |
-| 4 verify:deployment | staging | `0fdf4fa80924d3125738fe333b44f150da6ec2a6` | agent, read-only | 2026-10-03 03:10 | `DEPLOYMENT VERIFIED: PASS — 13/13` (postgres) |
+| 4 verify:deployment | staging | `30d1c56f5e15735aa81fc8037e1cb4bad196bd23` | agent, read-only | 2026-10-04 | re-run on this reconciliation branch before merge |
 | 4 test-account journey | staging | | | | |
 | 5 backup + restore drill | production | | | | |
 | 6 verify:deployment | production | | | | |
