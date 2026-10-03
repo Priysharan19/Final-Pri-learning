@@ -286,6 +286,15 @@ export const cloud = Object.freeze({
   guardianWithdraw: token => cloudRequest('/v1/account/guardian/withdraw', { method: 'POST', body: { token } }),
   guardianState: () => cloudRequest('/v1/account/guardian/state'),
   login: body => cloudRequest('/v1/account/login', { method: 'POST', body }),
+  // One-time codes (server/platform/otp.js). /request answers the same for an
+  // address with or without an account; /verify proves it.
+  otpRequest: body => cloudRequest('/v1/account/otp/request', { method: 'POST', body }),
+  otpVerify: body => cloudRequest('/v1/account/otp/verify', { method: 'POST', body }),
+  otpReauthRequest: () => cloudRequest('/v1/account/otp/reauth-request', { method: 'POST', body: {} }),
+  guardianOtpRequest: body => cloudRequest('/v1/account/otp/guardian/request', { method: 'POST', body }),
+  guardianOtpApprove: body => cloudRequest('/v1/account/otp/guardian/approve', { method: 'POST', body }),
+  guardianWithdrawRequest: body => cloudRequest('/v1/account/otp/guardian/withdraw-request', { method: 'POST', body }),
+  guardianWithdrawByPhone: body => cloudRequest('/v1/account/otp/guardian/withdraw', { method: 'POST', body }),
   logout: () => cloudRequest('/v1/account/logout', { method: 'POST', body: {} }),
   requestEmailVerification: () => cloudRequest('/v1/account/email/verification-request', { method: 'POST', body: {} }),
   requestPasswordReset: body => cloudRequest('/v1/account/password/reset-request', { method: 'POST', body }),

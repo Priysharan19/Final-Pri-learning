@@ -1580,6 +1580,146 @@
       "csrf": "not-applicable",
       "origin": "not-applicable",
       "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/account/otp/request",
+      "auth": "none",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "ownership": "no account is read: the same 202 shape for any valid address (no enumeration); per-destination cooldown 30 s and 5 codes/h independent of account existence; code stored only as an HMAC",
+      "rateLimits": [
+        {
+          "key": "otp-request",
+          "limit": 20,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/account/otp/verify",
+      "auth": "bearer-token",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "ownership": "the submitted one-time code (HMAC, 10 min, 5 attempts, single use, constant-time compare) proves the destination; only then is an account found or created for it; a child account is created with a pending guardian consent row",
+      "rateLimits": [
+        {
+          "key": "otp-verify",
+          "limit": 30,
+          "windowMs": 900000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/account/otp/reauth-request",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "ownership": "own account only: the code goes to the session account's own phone or email; no destination is taken from the request",
+      "rateLimits": [
+        {
+          "key": "otp-reauth",
+          "limit": 5,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/account/otp/guardian/request",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "ownership": "own account only: records the guardian contact on the session account's consent row and sends the code there; refuses the student's own contact; refused (409) once a guardian has withdrawn — the child's session cannot reopen consent",
+      "rateLimits": [
+        {
+          "key": "otp-guardian-request",
+          "limit": 6,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/account/otp/guardian/approve",
+      "auth": "bearer-token",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "ownership": "no session is read: the parent names their own phone/email and the one-time code (HMAC, 10 min, 5 attempts, single use) of the newest live guardian-consent challenge for it; acts only on that challenge's account, only while its consent row still names that contact and is not withdrawn; current notice version required",
+      "rateLimits": [
+        {
+          "key": "otp-guardian-approve",
+          "limit": 20,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/account/otp/guardian/withdraw-request",
+      "auth": "none",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "ownership": "same body, status and minimum response time (900 ms floor) whether or not the number approved any account; a code is only delivered to a number on a live consent row; delivery failures are not reported",
+      "rateLimits": [
+        {
+          "key": "otp-guardian-withdraw-request",
+          "limit": 6,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/account/otp/guardian/withdraw",
+      "auth": "bearer-token",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "ownership": "the one-time code proves the guardian phone; can only withdraw (never grant) consent on rows naming that phone",
+      "rateLimits": [
+        {
+          "key": "otp-guardian-withdraw",
+          "limit": 20,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
     }
   ]
 }

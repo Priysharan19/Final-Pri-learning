@@ -72,12 +72,16 @@ export function hasAgeDeclaration({ isAdult, year } = {}) {
  * sign-up): an explicit declaration is required, and a child must name a
  * guardian. Returns { ok, basis: 'adult'|'child', guardian } or { ok:false, code, message }.
  */
-export function ageDecision(body = {}) {
+export function ageDecision(body = {}, { guardianLater = false } = {}) {
   const declaration = { isAdult: body.isAdult, year: body.year };
   if (!hasAgeDeclaration(declaration)) {
     return { ok: false, code: 'AGE_DECLARATION_REQUIRED', message: 'Say whether you are 18 or older, or which class you are in.' };
   }
   if (!learnerIsChild(declaration)) return { ok: true, basis: 'adult', guardian: null };
+  // guardianLater: the onboarding flow (otp.js) asks for the parent on the
+  // next screen. The account is created as a child with a pending consent row
+  // and no guardian yet, so the gate stays closed until a parent approves.
+  if (guardianLater) return { ok: true, basis: 'child', guardian: null, guardianLater: true };
   const checked = validateGuardian(body);
   if (!checked.ok) return { ok: false, code: checked.code, message: checked.message };
   return { ok: true, basis: 'child', guardian: checked };

@@ -5,7 +5,7 @@ import { createSession, id, rateLimit, requireSession } from './security.js';
 import { verifyIdentityToken } from './oidc.js';
 import { consumeOidcNonce, issueOidcNonce } from './oidcNonce.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
-import { ageDecision, recordConsentRequest } from './guardianConsent.js';
+import { CONSENT_NOTICE_VERSION, ageDecision, recordConsentRequest } from './guardianConsent.js';
 import { queueAccountToken } from './accounts.js';
 import { clipText } from './text.js';
 
@@ -135,7 +135,7 @@ export function createIdentityRouter(db) {
       // consent ever requested. Checked before the nonce is spent.
       let decision = null;
       if (mayCreate) {
-        decision = ageDecision(req.body || {});
+        decision = ageDecision(req.body || {}, { guardianLater: req.body?.guardianLater === true });
         if (!decision.ok) return res.status(400).json({ error: { code: decision.code, message: decision.message } });
       }
       const nonce = await requireIssuedNonce(db, req, res);
@@ -162,7 +162,7 @@ export function createIdentityRouter(db) {
         // Sign in using the existing method first, then use the authenticated link endpoint.
         return res.status(409).json({ error: { code: 'IDENTITY_LINK_REQUIRED', message: 'An account already uses this email. Sign in to that account first, then link this provider.' } });
       }
-      const { basis, guardian } = decision;
+      const { basis, guardian, guardianLater } = decision;
       const now = Date.now();
       const accountId = id('acct');
       // Apple sends no name in its token; the name the student typed is next.
@@ -178,6 +178,10 @@ export function createIdentityRouter(db) {
           if (guardian) {
             const tokenId = await queueAccountToken(db, accountId, guardian.email, 'guardian-consent', now);
             await recordConsentRequest(db, { accountId, name: guardian.name, email: guardian.email, tokenHash: tokenId, now });
+          } else if (guardianLater) {
+            await db.run(`INSERT INTO guardian_consents
+                (account_id, guardian_name, guardian_email, notice_version, requested_at, confirmed_at, withdrawn_at, method)
+              VALUES (?, '', '', ?, ?, NULL, NULL, 'awaiting-guardian-contact')`, [accountId, CONSENT_NOTICE_VERSION, now]);
           }
         });
       } catch (err) {
