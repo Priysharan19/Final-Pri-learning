@@ -87,12 +87,18 @@ jobs:
         include:
           # API 26 (minSdk) ships a factory WebView below the Chromium 91 floor:
           # the correct, asserted result there is the fail-closed update screen.
-          - { api: 26, profile: pixel_6, expect: floor }
+          - { api: 26, profile: pixel_6, expect: floor, target: google_apis }
           # The oldest image here whose factory WebView meets the floor runs the
           # whole product journey; then the current API on phone and tablet.
-          - { api: 33, profile: pixel_6, expect: product }
-          - { api: 36, profile: pixel_6, expect: product }
-          - { api: 36, profile: pixel_tablet, expect: product }
+          # Product images are AOSP (`default`, no Play services). On google_apis
+          # images Play services restarts itself mid-suite to apply module updates
+          # (ChimeraModuleLdr "forcing restart", SIG 9), and the system then kills
+          # Pri as a dependant: the WebView holds Play services' FontsProvider
+          # (exit-info: DEPENDENCY DIED). Nothing these tests exercise needs Play
+          # services (billing and SMS consent are unit/contract tested).
+          - { api: 33, profile: pixel_6, expect: product, target: default }
+          - { api: 36, profile: pixel_6, expect: product, target: default }
+          - { api: 36, profile: pixel_tablet, expect: product, target: default }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -119,15 +125,12 @@ jobs:
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
         with:
           api-level: ${{ matrix.api }}
-          target: google_apis
+          target: ${{ matrix.target }}
           arch: x86_64
           profile: ${{ matrix.profile }}
           disable-animations: true
-          # The guest's low-memory killer took the app (with Play services) mid-suite
-          # at the image default RAM; give the guest room and the host's cores.
+          # Room for the WebView renderer, the app and the test process.
           ram-size: 4096M
-          heap-size: 576M
-          cores: 4
           disk-size: 6000M
           # GPU: swangle_indirect (SwiftShader behind ANGLE). With swiftshader_indirect
           # (the legacy GLES translator) the phone images' emulator process died
