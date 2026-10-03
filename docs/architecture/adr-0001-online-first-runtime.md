@@ -37,9 +37,20 @@ The server-side OpenAI providers already exist (`server/platform/handwritingProv
    propose; the mark a student receives is decided by Pri's deterministic equivalence marker and
    Step Check. A model output can never turn a wrong answer into a right one.
 5. **Deterministic fallback stays on the client.** The deterministic engine (question generation,
-   marking, Step Check, on-device ink) remains bundled in the client. It gives an instant mark while
-   a cloud call is in flight and keeps practice usable when a mobile connection drops. It is a
+   marking, Step Check) remains bundled in the client. It gives an instant mark while a cloud call
+   is in flight and keeps typed-answer practice usable when a mobile connection drops. It is a
    resilience path, not a marketed offline mode.
+
+   **Amendment (2026-10, owner decision): handwriting and photos are read only by the server.**
+   In the owner's words: "Pri Learning does not have the feature to mark handwriting or photo when
+   not online, since the local engine is just not good enough." Handwritten ink and photographed
+   working are transcribed only by the server (OpenAI) reader, on by default for a signed-in
+   account whose `/v1/handwriting/status` is usable (an explicit off in Settings is respected; an
+   under-18 account waits for guardian consent). The on-device recogniser is not in the marking
+   path or the "I'm reading:" panel. When the server cannot read (offline, not signed in, reader
+   down) the ink stays on the page, the student is told the real reason, and it is read
+   automatically when the reason clears; typed answers still mark offline. The transcription is
+   still only a proposal — the deterministic engine decides the mark from it.
 6. **Answer-blind handwriting is unchanged.** Vision transcription receives the ink image only —
    never the question's expected answer, solution or marks.
 7. **Secrets live only on the server.** `OPENAI_API_KEY` and Supabase service-role credentials live

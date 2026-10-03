@@ -43,18 +43,24 @@ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DIST = join(ROOT, 'client', 'dist');
 
 // ── The budget ───────────────────────────────────────────────────────────────
-// Measured on the build these numbers were set against: 1,159 kB raw / 509 kB
-// gzipped in the install, 1,948 kB / 761 kB by the time the warm pass has
-// finished. Before this work the install alone was 3,792 kB raw / 1,776 kB
-// gzipped. The ceilings sit roughly 10% above what was measured — enough that
-// an honest feature can land, tight enough that the boot path rejoining the
-// install cannot. Raising one is a decision, and it should read like one in the
-// diff.
+// Measured on the build these numbers were first set against: 1,159 kB raw /
+// 509 kB gzipped in the install, 1,948 kB / 761 kB by the time the warm pass has
+// finished. Before that work the install alone was 3,792 kB raw / 1,776 kB
+// gzipped.
+//
+// Raised 2026-10-02 by owner decision, quoted verbatim: "i dont care if the app
+// is 10gb just make it properly end to end". The old 1,300,000-byte install
+// ceiling had come within ~150 bytes of the build and was blocking features.
+// The ceilings are still ceilings: the banned-from-install list, render-from-
+// install, and full offline coverage below are unchanged, and the warm-pass
+// ceiling (which includes the install) moved by the same amount the install
+// ceiling did — nothing else got looser. Raising one is a decision, and it
+// should read like one in the diff.
 
-const INSTALL_RAW_CEILING = 1_300_000;
-const INSTALL_GZIP_CEILING = 560_000;
-const FIRST_VISIT_RAW_CEILING = 2_150_000;
-const FIRST_VISIT_GZIP_CEILING = 850_000;
+const INSTALL_RAW_CEILING = 2_500_000;
+const INSTALL_GZIP_CEILING = 1_000_000;
+const FIRST_VISIT_RAW_CEILING = 3_350_000;
+const FIRST_VISIT_GZIP_CEILING = 1_290_000;
 
 // Things that must never be in the install again, and what each one costs.
 const BANNED_FROM_INSTALL = [

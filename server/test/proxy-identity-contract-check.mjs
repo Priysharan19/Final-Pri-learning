@@ -73,7 +73,7 @@ try {
     const response = await app.request('/v1/account/register', {
       method: 'POST',
       headers: { Origin: ORIGIN, 'X-Forwarded-For': `203.0.113.${i}` },
-      body: { email: `spoof-${i}@example.test`, name: 'Test', password: 'correct-horse-battery' }
+      body: { email: `spoof-${i}@example.test`, name: 'Test', password: 'correct-horse-battery', isAdult: true }
     });
     statuses.push(response.status);
   }

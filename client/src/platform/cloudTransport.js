@@ -408,6 +408,15 @@ export const cloud = Object.freeze({
   mfaConfirm: code => cloudRequest('/v1/account/mfa/totp/confirm', { method: 'POST', body: { code } }),
   mfaVerify: body => cloudRequest('/v1/account/mfa/verify', { method: 'POST', body }),
   login: body => cloudRequest('/v1/account/login', { method: 'POST', body }),
+  // One-time codes (server/platform/otp.js). /request answers the same for an
+  // address with or without an account; /verify proves it.
+  otpRequest: body => cloudRequest('/v1/account/otp/request', { method: 'POST', body }),
+  otpVerify: body => cloudRequest('/v1/account/otp/verify', { method: 'POST', body }),
+  otpReauthRequest: () => cloudRequest('/v1/account/otp/reauth-request', { method: 'POST', body: {} }),
+  guardianOtpRequest: body => cloudRequest('/v1/account/otp/guardian/request', { method: 'POST', body }),
+  guardianOtpApprove: body => cloudRequest('/v1/account/otp/guardian/approve', { method: 'POST', body }),
+  guardianWithdrawRequest: body => cloudRequest('/v1/account/otp/guardian/withdraw-request', { method: 'POST', body }),
+  guardianWithdrawByPhone: body => cloudRequest('/v1/account/otp/guardian/withdraw', { method: 'POST', body }),
   logout: () => cloudRequest('/v1/account/logout', { method: 'POST', body: {} }),
   requestEmailVerification: () => cloudRequest('/v1/account/email/verification-request', { method: 'POST', body: {} }),
   requestPasswordReset: body => cloudRequest('/v1/account/password/reset-request', { method: 'POST', body }),
@@ -421,13 +430,19 @@ export const cloud = Object.freeze({
   // a picture and nothing else: no question, no expected answer, no profile.
   handwritingStatus: ({ signal = null, timeoutMs = 7000 } = {}) =>
     cloudRequest('/v1/handwriting/status', { signal, timeoutMs }),
-  transcribeHandwriting: (image, { signal = null, timeoutMs = 25000 } = {}) =>
+  // Longer than the server's own reading budget (PRI_HANDWRITING_TIMEOUT_MS,
+  // 45 s by default) so the server answers before the client gives up.
+  transcribeHandwriting: (image, { signal = null, timeoutMs = 55000 } = {}) =>
     cloudRequest('/v1/handwriting/transcribe', { method: 'POST', body: { image }, signal, timeoutMs }),
   workingStatus: () => cloudRequest('/v1/working/status'),
   // The question is sent; the expected answer never is, and the route refuses
   // a body that carries one.
   checkWorking: (prompt, lines, { signal = null, timeoutMs = 35000 } = {}) =>
     cloudRequest('/v1/working/check', { method: 'POST', body: { prompt, lines }, signal, timeoutMs }),
+  // "Practise this": one photo of a printed question, nothing else. The reply
+  // proposes a chapter and skill; it never carries a mark or an answer.
+  identifyQuestionPhoto: (image, { signal = null, timeoutMs = 25000 } = {}) =>
+    cloudRequest('/v1/question-photo/identify', { method: 'POST', body: { image }, signal, timeoutMs }),
   // The AI tutor is sent the verified solution it must stay grounded in — it
   // is not a reader, and /v1/handwriting never receives one. Exam rows never
   // reach here: the local backend refuses them first.
@@ -438,10 +453,13 @@ export const cloud = Object.freeze({
     cloudStreamRequest('/v1/tutor/stream', { body, onEvent, signal, timeoutMs }),
   deleteAccount: body => cloudRequest('/v1/account', { method: 'DELETE', body }),
   identities: () => cloudRequest('/v1/account/identity'),
-  // Provider sign-in (Sign in with Apple through the native shell, see
-  // platform/native/appleSignIn.js). The server issues the nonce the provider
-  // token must carry back; it is stored hashed, accepted once and expires.
-  oidcNonce: () => cloudRequest('/v1/account/identity/nonce', { method: 'POST', body: {} }),
+  // Provider sign-in: Google/Apple in the browser (platform/socialSignIn.js)
+  // and Sign in with Apple through the native shell (platform/native/
+  // appleSignIn.js). The server says which providers this deployment offers,
+  // and issues the nonce the provider token must carry back; it is stored
+  // hashed, accepted once and expires.
+  identityProviders: () => cloudRequest('/v1/account/identity/providers'),
+  identityNonce: () => cloudRequest('/v1/account/identity/nonce', { method: 'POST', body: {} }),
   socialSignIn: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/sign-in`, { method: 'POST', body }),
   linkIdentity: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/link`, { method: 'POST', body }),
   syncPush: (body, idempotencyKey) => cloudRequest('/v1/sync/push', { method: 'POST', body, idempotencyKey }),

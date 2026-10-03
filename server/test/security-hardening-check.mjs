@@ -59,7 +59,7 @@ async function account({ role = 'student', body = {} } = {}) {
   const email = `hardening.${serial}@example.test`;
   const password = `hardening-pw-${serial}-horse`;
   const jar = {};
-  const r = await h.request('/v1/account/register', { method: 'POST', jar, body: { name: 'Hardening User', email, password, deviceId: `ipad-h-${serial}`, ...body } });
+  const r = await h.request('/v1/account/register', { method: 'POST', jar, body: { name: 'Hardening User', email, password, deviceId: `ipad-h-${serial}`, isAdult: true, ...body } });
   if (r.status !== 201) throw new Error(`register: ${r.status} ${r.text}`);
   await verifyEmail(h, r.data.account.id);
   if (role !== 'student') await db.run('UPDATE accounts SET role=? WHERE id=?', [role, r.data.account.id]);
@@ -74,7 +74,7 @@ const outboxToken = async (accountId, kind) => {
 try {
   // ══ H2 · the guardian's withdrawal link ═══════════════════════════════════
   {
-    const child = await account({ body: { year: '8', guardianName: 'Guardian H2', guardianEmail: 'guardian.h2@example.test' } });
+    const child = await account({ body: { isAdult: false, year: '8', guardianName: 'Guardian H2', guardianEmail: 'guardian.h2@example.test' } });
     const confirmToken = await outboxToken(child.id, 'guardian-consent');
     c.ok(confirmToken, 'a confirmation link is queued');
     c.eq(await outboxToken(child.id, 'guardian-withdraw'), null, 'no withdrawal link exists before confirmation');
@@ -138,9 +138,9 @@ try {
     c.eq(passwordProblem('Password2026!')?.code, 'PASSWORD_TOO_COMMON', 'a common password is refused however long');
     c.eq(MAX_PASSWORD_BYTES, 72, 'the limit is bcrypt\'s');
     await resetLimits();
-    const long = await h.request('/v1/account/register', { method: 'POST', body: { name: 'Long', email: 'long.pw@example.test', password: 'b'.repeat(80), deviceId: 'x' } });
+    const long = await h.request('/v1/account/register', { method: 'POST', body: { name: 'Long', email: 'long.pw@example.test', password: 'b'.repeat(80), deviceId: 'x', isAdult: true } });
     c.deq([long.status, code(long)], [400, 'PASSWORD_TOO_LONG'], 'registration refuses an over-long password');
-    const common = await h.request('/v1/account/register', { method: 'POST', body: { name: 'Common', email: 'common.pw@example.test', password: 'qwertyuiop123', deviceId: 'x' } });
+    const common = await h.request('/v1/account/register', { method: 'POST', body: { name: 'Common', email: 'common.pw@example.test', password: 'qwertyuiop123', deviceId: 'x', isAdult: true } });
     c.deq([common.status, code(common)], [400, 'PASSWORD_TOO_COMMON'], 'registration refuses a common password');
     const user = await account();
     const change = await h.request('/v1/account/password', { method: 'PATCH', jar: user.jar, body: { currentPassword: user.password, newPassword: 'iloveyou2026' } });
@@ -275,12 +275,12 @@ try {
     const sources = readdirSync(join(ROOT, 'server', 'platform')).filter(f => f.endsWith('.js')).map(f => readFileSync(join(ROOT, 'server', 'platform', f), 'utf8')).join('\n')
       + readdirSync(join(ROOT, 'server', 'tools')).filter(f => f.endsWith('.mjs')).map(f => readFileSync(join(ROOT, 'server', 'tools', f), 'utf8')).join('\n');
     c.ok(!/\b(UPDATE|DELETE\s+FROM)\s+audit_log\b/i.test(sources), 'no server code updates or deletes audit_log rows (append-only in code on both engines)');
-    const migration = readFileSync(join(ROOT, 'supabase', 'migrations', '20261005000000_security_hardening.sql'), 'utf8');
+    const migration = readFileSync(join(ROOT, 'supabase', 'migrations', '20261007000000_security_hardening.sql'), 'utf8');
     c.ok(/revoke update, delete on pri\.audit_log from pri_server;/.test(migration), 'the migration revokes UPDATE and DELETE on pri.audit_log from pri_server');
     for (const table of ['learning_events', 'sync_entities', 'idempotency_keys']) {
       c.ok(new RegExp(`create policy pri_account_scope on pri\\.${table} as restrictive for all to pri_server`).test(migration), `a restrictive per-account policy on pri.${table}`);
     }
-    c.ok(/update pri\.platform_meta set value = '9' where key = 'schema_version';/.test(migration), 'and moves schema_version to 9');
+    c.ok(/update pri\.platform_meta set value = '11' where key = 'schema_version';/.test(migration), 'and moves schema_version to 11');
     const a = await account();
     const b = await account();
     await resetLimits();

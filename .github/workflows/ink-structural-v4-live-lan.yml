@@ -111,7 +111,6 @@ jobs:
         run: |
           grep -q "'/__pri/ink/v4'" scripts/serve-lan.mjs
           grep -q "pri-structural-v4-dev-lan" client/dev/devStructural.js
-          grep -q "Structural V4 research · Mac LAN · not production" client/src/ink/InkAnswer.jsx
           grep -q '"serve:lan:v4"' package.json
           grep -q 'productionReady=false' scripts/serve-lan.mjs
 

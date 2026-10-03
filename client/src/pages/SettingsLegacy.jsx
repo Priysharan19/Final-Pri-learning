@@ -5,6 +5,7 @@ import { downloadJSON, readJSONFile, dateStamp } from '../lib/files.js';
 import Calibrate from '../ink/Calibrate.jsx';
 import { personalStats, clearPersonal, ensurePersonalLoaded } from '../ink/personal.js';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
+import { cloudReadingWanted } from '../ink/cloudReader.js';
 // The daily cap is read from the gate that enforces it, so the number a student
 // is shown can never drift from the number they actually hit.
 import { FREE_TIER } from '../local/entitlementGate.js';
@@ -42,11 +43,13 @@ const fmtBytes = (b) => b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b > 1e6 ? `${(b
  * The copy says exactly what is sent. "A picture of your handwriting" is the
  * whole of it, and a student is owed the plain version rather than a euphemism.
  */
-function CloudOptInRow({ field, user, setUser, toast, ask, label, copy, unavailable }) {
+function CloudOptInRow({ field, user, setUser, toast, ask, label, copy, unavailable, effective = null }) {
   const t = useT();
   const [status, setStatus] = useState(null);   // null = still asking, {available}
   const [busy, setBusy] = useState(false);
-  const on = user?.[field] === true;
+  // A setting with a default (server handwriting reading) shows what is in
+  // effect; the toggle always records an explicit choice.
+  const on = effective ? effective(user) : user?.[field] === true;
 
   useEffect(() => {
     let live = true;
@@ -228,6 +231,7 @@ function HandwritingSection({ toast }) {
           cannot be translated. */}
       <CloudOptInRow
         field="cloudHandwriting"
+        effective={cloudReadingWanted}
         user={user} setUser={setUser} toast={toast}
         ask={askHandwritingStatus}
         label={t('settings.cloudHandwritingLabel')}

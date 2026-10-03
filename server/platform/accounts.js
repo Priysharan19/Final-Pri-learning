@@ -9,7 +9,7 @@ import { encryptDeliveryToken } from './deliveryCrypto.js';
 import { verifyIdentityToken } from './oidc.js';
 import { clearLoginFailures, loginLockStatus, recordLoginFailure } from './loginLockout.js';
 import {
-  confirmConsent, consentState, learnerIsChild, recordConsentRequest, validateGuardian, withdrawConsent
+  ageDecision, confirmConsent, consentState, recordConsentRequest, withdrawConsent
 } from './guardianConsent.js';
 import { consumeTeacherInvite, findLiveTeacherInvite } from './teacherInvites.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
@@ -18,6 +18,7 @@ import { publicEntitlement } from './entitlements.js';
 import { clipText } from './text.js';
 import { createMfaRouter } from './mfa.js';
 import { isCommonPassword } from './commonPasswords.js';
+import { verifyReauthCode } from './otp.js';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_MS = 1000 * 60 * 60;
@@ -72,12 +73,15 @@ function publicAccount(row) {
   // SESSION id; only `account_id` names the account. Account rows have `id` and
   // no `account_id`. Preferring account_id keeps /v1/account/me reporting a
   // stable account identity instead of one that changes with every sign-in.
+  // An account that signed up by phone carries an undeliverable placeholder
+  // address (otp.js); it is never shown as if it were the learner's email.
+  const synthetic = String(row.email || '').endsWith('@phone.invalid');
   return {
     id: row.account_id || row.id,
-    email: row.email,
+    email: synthetic ? null : row.email,
     name: row.name,
     role: row.role,
-    emailVerified: !!row.email_verified_at
+    emailVerified: !!row.email_verified_at && !synthetic
   };
 }
 
@@ -105,7 +109,7 @@ function ensureDeliveryTable(db) {
   );`);
 }
 
-async function queueAccountToken(db, accountId, destination, purpose, now = Date.now(), { ttlMs = TOKEN_MS } = {}) {
+export async function queueAccountToken(db, accountId, destination, purpose, now = Date.now(), { ttlMs = TOKEN_MS } = {}) {
   // Only a one-way token hash is used for verification. The delivery worker gets
   // an AES-GCM envelope bound to this token id; raw tokens are never persisted.
   const raw = opaqueToken(32);
@@ -161,6 +165,13 @@ export async function authorizeAccountDeletion(db, accountId, body = {}, identit
     return { method: 'password' };
   }
 
+  // An account made with a one-time code has neither a password nor a linked
+  // provider: a fresh code sent to its own phone or email is its proof.
+  if (body?.otpChallengeId != null || body?.otpCode != null) {
+    if (await verifyReauthCode(db, accountId, { otpChallengeId: body.otpChallengeId, otpCode: body.otpCode })) return { method: 'otp' };
+    throw reauthError('OTP_REAUTH_FAILED', 'That code is not right, or it has expired. Ask for a new one.');
+  }
+
   const provider = String(body?.provider || '');
   if (!['google', 'apple'].includes(provider)) {
     throw reauthError('SOCIAL_REAUTH_REQUIRED', 'Confirm your Apple or Google identity again before deleting the account.');
@@ -199,13 +210,12 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       }
       const weak = passwordProblem(password);
       if (weak) return res.status(400).json({ error: weak });
-      const child = learnerIsChild({ isAdult: req.body?.isAdult, year: req.body?.year });
-      let guardian = null;
-      if (child) {
-        const checked = validateGuardian({ ...(req.body || {}), studentEmail: em });
-        if (!checked.ok) return res.status(400).json({ error: { code: checked.code, message: checked.message } });
-        guardian = checked;
-      }
+      // One shared age rule (guardianConsent.js ageDecision): an explicit
+      // declaration, and a child names a guardian whose address is not the
+      // student's own (GUARDIAN_EMAIL_SAME_AS_STUDENT).
+      const decision = ageDecision({ ...(req.body || {}), studentEmail: em });
+      if (!decision.ok) return res.status(400).json({ error: { code: decision.code, message: decision.message } });
+      const { basis, guardian } = decision;
 
       const now = Date.now();
       const inviteCode = req.body?.teacherInviteCode == null ? '' : String(req.body.teacherInviteCode).trim().slice(0, 64);
@@ -216,8 +226,8 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
       try {
         await db.transaction(async () => {
-          await db.run(`INSERT INTO accounts(id,email,name,password_hash,role,created_at,updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`, [accountId, em, name, passwordHash, role, now, now]);
+          await db.run(`INSERT INTO accounts(id,email,name,password_hash,role,age_basis,created_at,updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [accountId, em, name, passwordHash, role, basis, now, now]);
           await db.run(`INSERT INTO account_identities(provider,provider_subject,account_id,email_at_link,linked_at)
             VALUES ('password', ?, ?, ?, ?)`, [em, accountId, em, now]);
           await db.run(`INSERT INTO entitlement_snapshots(account_id,plan,status,provider,source_version,updated_at)
@@ -309,7 +319,22 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     const now = Date.now();
     const token = raw ? await db.get(`SELECT * FROM account_tokens
       WHERE token_hash = ? AND purpose = 'verify-email' AND consumed_at IS NULL AND expires_at > ?`, [sha256(raw), now]) : null;
-    if (!token) return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'Verification link is invalid or expired.' } });
+    // A spent link whose own account is verified answers "already verified",
+    // not "invalid". Mail scanners (e.g. Microsoft Safe Links) routinely open
+    // the link before the person does, so the person's click finds the token
+    // consumed and the account verified. Only the holder of a real, consumed
+    // verify-email token for a live, verified account gets this answer; a
+    // random, expired-unused, wrong-purpose or deleted-account token still
+    // gets the one TOKEN_INVALID, so it reveals nothing about other accounts.
+    const alreadyVerified = async () => raw ? !!(await db.get(`SELECT 1 FROM account_tokens t
+      JOIN accounts a ON a.id = t.account_id
+      WHERE t.token_hash = ? AND t.purpose = 'verify-email' AND t.consumed_at IS NOT NULL
+        AND a.email_verified_at IS NOT NULL AND a.deleted_at IS NULL`, [sha256(raw)])) : false;
+    const invalid = () => res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'Verification link is invalid or expired.' } });
+    if (!token) {
+      if (await alreadyVerified()) return res.json({ ok: true, alreadyVerified: true });
+      return invalid();
+    }
     try {
       await db.transaction(async () => {
         await spendToken(db, token.id, now);
@@ -317,11 +342,14 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
         await db.run('DELETE FROM auth_delivery_outbox WHERE token_id = ?', [token.id]);
       });
     } catch (err) {
-      if (err?.code === 'TOKEN_ALREADY_USED') return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'Verification link is invalid or expired.' } });
+      if (err?.code === 'TOKEN_ALREADY_USED') {
+        if (await alreadyVerified()) return res.json({ ok: true, alreadyVerified: true });
+        return invalid();
+      }
       throw err;
     }
     await maybeBootstrapAdmin(db, token.account_id, now);
-    res.json({ ok: true });
+    res.json({ ok: true, alreadyVerified: false });
   });
 
   // Guardian confirmation and withdrawal intentionally have different authority

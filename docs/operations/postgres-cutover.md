@@ -120,8 +120,10 @@ npx supabase@latest link --project-ref orudxrckgxyyraopyzmn
 #        20261003000000_billing_payment_retention.sql    (billing 4: payments outlive their account)
 #        20261003010000_storekit_entitlement_state.sql   (billing 5: subscription lifecycle state, Apple signed-data ledger, support grants)
 #        20261004000000_google_play_billing.sql          (billing 6: Google Play tables)
-#        20261005000000_security_hardening.sql           (schema 9: staff MFA, guardian-withdraw credential, append-only audit_log, per-account RLS)
-#      The list must end at the versions schemaVersions.js states (schema 9 / billing 6);
+#        20261005000000_account_age_basis.sql            (schema 9: accounts.age_basis, the age decision at account creation)
+#        20261006000000_otp_sign_in.sql                  (schema 10: otp_challenges, account_phones, guardian_consents.guardian_phone)
+#        20261007000000_security_hardening.sql           (schema 11: staff MFA, guardian-withdraw credential, append-only audit_log, per-account RLS)
+#      The list must end at the versions schemaVersions.js states (schema 11 / billing 6);
 #      `ls supabase/migrations/` at the deployed commit is the authority if this comment lags.
 npx supabase@latest migration list
 npx supabase@latest db push --dry-run
@@ -291,7 +293,7 @@ cutover do not exist in the SQLite file. So after real traffic:
   build disagree. Deploy the build that matches the database, or apply the missing migration —
   do not edit `platform_meta` by hand to make the error go away.
 * **Rolling back the application build** is safe only to a build with the same
-  `SCHEMA_VERSION` / `BILLING_SCHEMA_VERSION` as the database (today 9 / 6). Builds with the
+  `SCHEMA_VERSION` / `BILLING_SCHEMA_VERSION` as the database (today 11 / 6). Builds with the
   version check refuse a database at any other version. Builds from **before** that check (the #247-era driver) only
   check that a `schema_version` exists, so they **do boot** against this database — but they
   allocate sync cursors from `pri.sync_cursors`, on which `pri_server` no longer has `UPDATE`:
@@ -304,7 +306,8 @@ cutover do not exist in the SQLite file. So after real traffic:
 ### 5.2a Undoing migration `20261002010000_tutor_cache`
 
 Only for a build that predates the AI tutor, and before undoing anything older (migrations come
-off newest first: `20261005000000_security_hardening` (schema 9), `20261004000000_google_play_billing`
+off newest first: `20261007000000_security_hardening` (schema 11), `20261006000000_otp_sign_in` (schema 10),
+`20261005000000_account_age_basis` (schema 9), `20261004000000_google_play_billing`
 (billing 6) and `20261003010000_storekit_entitlement_state` (billing 5) each need their own
 owner-approved rollback written at the time, against the exact build being restored; none is
 written here because no build that predates them has ever served a Postgres database). The table holds only cached tutor replies keyed by a request digest — no

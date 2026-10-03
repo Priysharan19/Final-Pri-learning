@@ -101,7 +101,7 @@ try {
     'exportTables() lists every parent before its children (foreign-key order)');
   check(schema.get('account_sessions').references.has('accounts') && schema.get('auth_delivery_outbox').references.has('account_tokens') &&
     schema.get('billing_payments').references.has('accounts'), 'references are read from create table bodies and from alter table … foreign key');
-  check(pg.get('accounts').join(',') === 'id,email,name,password_hash,email_verified_at,role,created_at,updated_at,deleted_at', 'accounts columns parsed from the create table body');
+  check(pg.get('accounts').join(',') === 'id,email,name,password_hash,email_verified_at,role,created_at,updated_at,deleted_at,age_basis', 'accounts columns parsed from the create table body, then alter table … add column (age_basis, schema 9)');
   check(pg.get('billing_subscriptions').includes('state_plan') && pg.get('billing_subscriptions').includes('state_grace_until'), 'alter table … add column (billing v5) is included');
   check(!pg.get('learning_events').includes('unique') && !pg.get('accounts').includes('check'), 'table constraints are not mistaken for columns');
 
@@ -127,7 +127,9 @@ try {
     }
   }
   const totalRows = Object.values(seededCounts).reduce((sum, n) => sum + (n || 0), 0);
-  check(result.totals.rows === totalRows && result.totals.tablesAbsent.join(',') === 'tutor_cache', `totals: ${totalRows} rows, tutor_cache absent`);
+  // tutor_cache (tutor.js), otp_challenges and account_phones (otpCore.js) are
+  // built lazily by their routers, so a database that never served them has none.
+  check(result.totals.rows === totalRows && result.totals.tablesAbsent.join(',') === 'tutor_cache,otp_challenges,account_phones', `totals: ${totalRows} rows, tutor_cache/otp_challenges/account_phones absent`);
   check(result.seededNotExported.join(',') === 'platform_meta,sync_cursors' && !existsSync(join(outDir, 'platform_meta.csv')) && !existsSync(join(outDir, 'sync_cursors.csv')),
     'platform_meta and sync_cursors are verified, never copied');
   for (const f of result.files) check(sha(join(outDir, f.file)) === f.sha256, `${f.file}: SHA-256 in the manifest matches the file`);

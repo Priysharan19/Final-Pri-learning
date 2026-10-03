@@ -39,7 +39,9 @@ const read = rel => readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8');
   eq(parseAccountActionFragment('#action=guardian-withdraw'), null, 'a withdrawal link without a token is refused');
   eq(parseAccountActionFragment('#action=guardian-revoke&token=x'), null, 'an action the server never emails is still refused');
   const delivery = read('../server/platform/authDelivery.js');
-  ok(/'guardian-withdraw'/.test(delivery) && /new URL\('\/account-action'/.test(delivery),
+  // Guardian-consent links go to the parent's own page (/guardian/consent);
+  // every other kind, the withdrawal link included, still lands here.
+  ok(/'guardian-withdraw'/.test(delivery) && /new URL\((?:kind === 'guardian-consent' \? '\/guardian\/consent' : )?'\/account-action'/.test(delivery),
     'the server emails the withdrawal link to /account-action, where this page mounts');
   ok(/url\.hash = new URLSearchParams\(\{ action: kind, token \}\)\.toString\(\)/.test(delivery), 'the emailed fragment names the delivery kind as the action, so guardian-withdraw arrives as action=guardian-withdraw');
 }

@@ -45,7 +45,7 @@ function fakeTransport({ signIn, link } = {}) {
   let issued = 0;
   return {
     calls,
-    oidcNonce: async () => { calls.push(['nonce']); issued += 1; return { nonce: `raw-nonce-${issued}`, expiresAt: Date.now() + 600_000 }; },
+    identityNonce: async () => { calls.push(['nonce']); issued += 1; return { nonce: `raw-nonce-${issued}`, expiresAt: Date.now() + 600_000 }; },
     socialSignIn: async (provider, body) => { calls.push(['sign-in', provider, body]); return signIn(body, calls); },
     linkIdentity: async (provider, body) => { calls.push(['link', provider, body]); return link ? link(body) : { linked: true, provider }; },
   };
@@ -179,7 +179,7 @@ ok(await sha256Hex('raw-nonce-1') === sha('raw-nonce-1'), 'the nonce digest is S
 
   const h4 = installHost({}, { 'identity.appleSignIn': appleHandler() });
   const t4 = fakeTransport({ signIn: () => ({ account: { id: 'x' } }) });
-  t4.oidcNonce = async () => ({ expiresAt: 1 });
+  t4.identityNonce = async () => ({ expiresAt: 1 });
   await rejects(signInWithApple({ transport: t4 }), 'OIDC_NONCE_REQUIRED', 'no server nonce, no sheet');
   ok(h4.sent.filter(e => e.cap === 'identity').length === 0, 'the sheet is not opened without a nonce');
   cleanup(h4);

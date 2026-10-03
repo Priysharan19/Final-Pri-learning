@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cloud } from '../platform/cloudTransport.js';
 import { disconnectCloudAccount } from '../platform/cloudAccount.js';
+import { requestIdentityToken, socialProviderConfig } from '../platform/socialSignIn.js';
 import { tLater, useT } from '../i18n/index.js';
 import { downloadJSON } from '../lib/files.js';
 import { cloudErrorCopy } from '../platform/cloudErrorCopy.js';
@@ -24,6 +25,19 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
   const hasPassword = providers.some(row => row.provider === 'password');
   const socialProviders = providers.filter(row => row.provider === 'google' || row.provider === 'apple');
   const canDeleteWithPassword = hasPassword && deletePhrase.trim() === 'DELETE' && deletePassword.length > 0;
+  // An account made with Google or Apple has no password; deleting it takes a
+  // fresh sign-in with that provider, run here exactly as the sign-in is.
+  const [webProviders, setWebProviders] = useState({ google: null, apple: null });
+  const reauthProviders = socialProviders.filter(row => webProviders[row.provider]);
+
+  useEffect(() => {
+    let live = true;
+    if (hasPassword || !socialProviders.length) return () => { live = false; };
+    socialProviderConfig()
+      .then(config => { if (live) setWebProviders(config); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [hasPassword, socialProviders.length]);
 
   async function reload() {
     const [deviceResult, identityResult] = await Promise.all([cloud.devices(), cloud.identities()]);
@@ -101,6 +115,25 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
       setMessage(tLater('cloudSecurity.exported'));
     } catch (err) { setError(err.message || tLater('cloudSecurity.exportFailed')); }
     finally { setBusy(''); }
+  }
+
+  // Straight from the click, so the provider window is not blocked.
+  async function deleteWithProvider(provider) {
+    if (hasPassword || deletePhrase.trim() !== 'DELETE' || !webProviders[provider] || busy) return;
+    start('delete');
+    try {
+      const token = await requestIdentityToken(provider, webProviders[provider]);
+      await cloud.deleteAccount({ provider, idToken: token.idToken, nonce: token.nonce });
+      await disconnectCloudAccount(pid);
+      setDeletePhrase('');
+      setMessage(tLater('cloudSecurity.deleted'));
+      await onDeleted?.({ cloudDeleted: true });
+    } catch (err) {
+      setError(err?.code === 'SOCIAL_CANCELLED' ? tLater('cloud.socialCancelled')
+        : err?.code === 'SOCIAL_POPUP_BLOCKED' ? tLater('cloud.socialPopupBlocked')
+          : err?.code?.startsWith?.('SOCIAL_') ? tLater('cloud.socialFailed')
+            : (err.message || tLater('cloudSecurity.deleteFailed')));
+    } finally { setBusy(''); }
   }
 
   async function deleteAccount(e) {
@@ -222,6 +255,19 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
           <button className="btn btn-quiet btn-sm" type="submit" disabled={!canDeleteWithPassword || !!busy} style={{ marginTop: 10 }}>
             {busy === 'delete' ? t('settings.deleting') : t('cloudSecurity.deleteButton')}
           </button>
+        </> : reauthProviders.length ? <>
+          <div className="field" style={{ maxWidth: 320 }}>
+            <label className="label" htmlFor="cloud-delete-phrase">{t('cloudSecurity.typeDelete')}</label>
+            <input className="input" id="cloud-delete-phrase" autoComplete="off" value={deletePhrase} onChange={e => setDeletePhrase(e.target.value)} />
+          </div>
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+            {reauthProviders.map(row => (
+              <button key={row.provider} className="btn btn-quiet btn-sm" type="button" data-delete-provider={row.provider}
+                disabled={deletePhrase.trim() !== 'DELETE' || !!busy} onClick={() => deleteWithProvider(row.provider)}>
+                {busy === 'delete' ? t('settings.deleting') : t('cloudSecurity.deleteWithProvider', { provider: providerLabel[row.provider] })}
+              </button>
+            ))}
+          </div>
         </> : <div className="muted" style={{ fontSize: 13 }}>
           {t('cloudSecurity.reauthRequired', {
             providers: socialProviders.length

@@ -108,7 +108,7 @@ export async function registerAccount(harness, {
   teacherInviteCode
 } = {}) {
   const jar = {};
-  const body = { name, email, password, deviceId };
+  const body = { name, email, password, deviceId, isAdult: true };
   if (teacherInviteCode !== undefined) body.teacherInviteCode = teacherInviteCode;
   const response = await harness.request('/v1/account/register', { method: 'POST', jar, body });
   return { ...response, jar, account: response.data?.account || null };

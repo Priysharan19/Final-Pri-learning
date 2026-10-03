@@ -694,7 +694,7 @@ try {
     const clippedName = (await h.request('/v1/account/me', { jar: clipped.jar })).data.account.name;
     c.eq(clippedName, 'a'.repeat(79), 'clipping a long name drops a straddling emoji whole (regression: half of it was stored as U+FFFD)');
     const nulCases = [
-      ['/v1/account/register', 'POST', {}, { name: 'Nul\u0000Name', email: 'nul.one@example.test', password: 'correct-horse-battery' }],
+      ['/v1/account/register', 'POST', {}, { name: 'Nul\u0000Name', email: 'nul.one@example.test', password: 'correct-horse-battery', isAdult: true }],
       ['/v1/account/login', 'POST', {}, { email: 'nul@example.test', password: 'correct-horse-battery', deviceId: 'ipad\u0000' }],
       ['/v1/classes/', 'POST', teacherTwo.jar, { name: 'Class\u0000Name' }],
       ['/v1/reports/', 'POST', alice.jar, { category: 'other', note: 'note\u0000with nul' }],
@@ -711,7 +711,7 @@ try {
     c.eq(await db.get("SELECT 1 AS x FROM accounts WHERE email='nul.one@example.test'"), undefined, 'the NUL name was not stored');
     // A lone surrogate cannot crash either engine; both store U+FFFD in its place.
     await resetLimits();
-    const lone = await bare('/v1/account/register', { method: 'POST', rawBody: '{"name":"Lone \\ud83e end","email":"lone@example.test","password":"correct-horse-battery"}' });
+    const lone = await bare('/v1/account/register', { method: 'POST', rawBody: '{"name":"Lone \\ud83e end","email":"lone@example.test","password":"correct-horse-battery","isAdult":true}' });
     c.eq(lone.status, 201, `a lone surrogate in a name is not a server error (got ${lone.status})`);
     const stored = (await db.get("SELECT name FROM accounts WHERE email='lone@example.test'")).name;
     c.eq(stored, 'Lone \uFFFD end', 'and is stored as U+FFFD on this engine, never as invalid UTF-16');

@@ -14,6 +14,10 @@ import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLang
 import { featureEnabled } from '../platform/features.js';
 import { cloudAvailable } from '../platform/cloudTransport.js';
 import { appleSignInAvailable, rememberAppleSignInIntent } from '../platform/native/appleSignIn.js';
+import { flushSync } from 'react-dom';
+// Lazy: the account flow is not on the offline first-run path, so it stays out
+// of the install (client/test/install-budget-check.mjs).
+const SignUpFlow = React.lazy(() => import('../components/SignUpFlow.jsx'));
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
 // The first thing a student chooses: what they are studying. Classes 7–12 are
@@ -25,10 +29,11 @@ const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧',
 //
 // Only cbse, jee-main and jee-advanced are launch-certified
 // (docs/content/certification-report.md; PRI_V1_RELEASE_SCOPE §6). The
-// Olympiad track, the Australian syllabuses and the Teacher role are offered
-// for NEW profiles only in a build made with PRI_FEATURE_EXTENDED_TRACKS=1
-// (development, test builds). Existing profiles that already hold one keep
-// working: the picker, the backend and the summary never read the flag.
+// Olympiad track and the Teacher role are offered for NEW profiles only in a
+// build made with PRI_FEATURE_EXTENDED_TRACKS=1, the Australian syllabuses
+// only in one made with PRI_FEATURE_AUSTRALIA=1 (development, test builds).
+// Existing profiles that already hold one keep working: the picker, the
+// backend and the summary never read a flag.
 const STUDY = [
   ...[7, 8, 9, 10, 11, 12].map(y => ({ key: String(y), classOf: y, year: y, track: 'cbse' })),
   { key: 'jee-main', label: 'JEE Main', year: 12, track: 'jee-main' },
@@ -286,7 +291,8 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
   const roles = useMemo(() => roleOptions(extended), [extended]);
   const appleOffered = appleSignInOffered();
   const [profiles, setProfiles] = useState(null);
-  const [stage, setStage] = useState(initialStage);   // hero | pick | create
+  const [stage, setStage] = useState(initialStage);   // hero | pick | create | account
+  const [accountMode, setAccountMode] = useState('signup');
   const [createStep, setCreateStep] = useState(initialStep);
   const [form, setForm] = useState(freshProfileDraft);
   const [australia, setAustralia] = useState(false);
@@ -507,6 +513,29 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     }
   };
 
+  /** The account flow is done: make this device's profile, link it, and open the first question. */
+  const finishAccount = async ({ account, name, year, track }) => {
+    const r = await api.post('/profiles', {
+      name: name || account?.name || 'Pri', year: Number(year), avatar: '🚀', role: 'student',
+      language: signInLanguage(), course: 'in', indiaTrack: track || 'cbse'
+    });
+    if (account?.id) {
+      const { linkSignedInAccount } = await import('../platform/cloudAccount.js');
+      await linkSignedInAccount(r.user.id, account).catch(() => {});
+    }
+    localStorage.setItem('pri-seen-hero', '1');
+    nav('/practice', { replace: true, flushSync: true });
+    flushSync(() => setUser(r.user));
+    refreshDue();
+  };
+
+  const openAccount = (mode) => {
+    localStorage.setItem('pri-seen-hero', '1');
+    setAccountMode(mode);
+    setError('');
+    setStage('account');
+  };
+
   const cloudNote = cloudIntent && (
     <p className="muted cloud-intent" role="status" style={{ fontSize: 12.5, marginBottom: 12 }}>
       {t('login.cloudIntent')}
@@ -540,7 +569,13 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
           })}</h1>
           <p className="hero-sub">{t('login.heroSub')}</p>
           <div className="row" style={{ marginTop: 34 }}>
-            <button className="btn btn-primary btn-lg btn-glow" onClick={enter}>{t('login.getStarted')}</button>
+            <button className="btn btn-primary btn-lg" data-testid="hero-create-account" onClick={() => openAccount('signup')}>{t('login.createAccount')}</button>
+          </div>
+          <div className="row" style={{ marginTop: 10 }}>
+            <button className="btn btn-ghost btn-lg" onClick={enter}>{t('login.getStarted')}</button>
+          </div>
+          <div style={{ textAlign: 'center', marginTop: 14 }}>
+            <button className="linklike" type="button" data-testid="hero-sign-in-code" onClick={() => openAccount('signin')}>{t('login.signInWithCode')}</button>
           </div>
           <div style={{ textAlign: 'center', marginTop: 14 }}>
             <button className="linklike" type="button" data-testid="hero-try-demo" disabled={busy} onClick={tryDemo}>
@@ -560,6 +595,25 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
             <Link to="/privacy">{t('login.privacy')}</Link> · <Link to="/terms">{t('login.terms')}</Link> ·{' '}
             <Link to="/refund-policy">{t('login.refunds')}</Link> · <Link to="/grievance">{t('login.grievances')}</Link>
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── account: phone / email / Google / Apple, then a parent if needed ── */
+  if (stage === 'account') {
+    return (
+      <div className="auth-wrap">
+        <div className="auth-col">
+          <React.Suspense fallback={<p className="muted" role="status">{t('common.loading')}</p>}>
+          <SignUpFlow
+            key={accountMode}
+            initialMode={accountMode}
+            onCancel={() => setStage('hero')}
+            onStartOffline={() => beginCreate(false)}
+            onFinish={finishAccount}
+          />
+          </React.Suspense>
         </div>
       </div>
     );
@@ -713,7 +767,9 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                       </div>
                     )}
                   </div>
-                  {extended && (
+                  {/* V1 is India-only (frozen scope): the Australian syllabuses are
+                      offered only in a build with PRI_FEATURE_AUSTRALIA=1. */}
+                  {featureEnabled('australia') && (
                     <div className="field" style={{ marginTop: -4 }}>
                       <button type="button" className="linklike" onClick={openAustralia}>
                         {t(form.role === 'teacher' ? 'login.teachingInAustralia' : 'login.studyingInAustralia')}

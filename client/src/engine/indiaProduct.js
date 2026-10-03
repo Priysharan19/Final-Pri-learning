@@ -13,7 +13,7 @@ import {
   coversForDotpoint
 } from './curriculum-in.js';
 import { attachIndiaProductionStatus, indiaProductionStatus } from './indiaProductionMeta.js';
-import { hasJeePyqGenerator } from './generators/jee-pyq-runtime.js';
+import { hasJeePyqGenerator, hasJeePyqDifficulty } from './generators/jee-pyq-runtime.js';
 import { hasPyqGenerator, pyqCoverageOf, pyqGeneratorId } from './pyq/pyqCoverage.js';
 
 export const INDIA_COURSE = 'in';
@@ -246,7 +246,7 @@ export function resolveIndiaTarget(chapter, {
 
   if (ordinal == null && (track.id === 'jee-main' || track.id === 'jee-advanced')) {
     const pyqGenerator = `${track.id}-${chapter.id}`;
-    if (hasJeePyqGenerator(pyqGenerator)) {
+    if (hasJeePyqGenerator(pyqGenerator) && hasJeePyqDifficulty(pyqGenerator, want)) {
       return { generator: pyqGenerator, difficulty: want, dotpointIndex: null, pyq: true, pyqArchive: 'jee-question-department', windowed: true };
     }
   }
@@ -290,6 +290,31 @@ export function resolveIndiaTarget(chapter, {
   if (!pool.length) return null;
   const gap = Math.min(...pool.map(c => Math.abs(c.difficulty - want)));
   return drawFrom(pool.filter(c => Math.abs(c.difficulty - want) === gap), random);
+}
+
+/**
+ * Chapters near `chapter` whose previous-year archive can actually serve a
+ * "past papers only" request for this track and class — what the empty state
+ * offers instead of a dead end. Only chapters the student's own practice scope
+ * reaches are offered, nearest in syllabus order first (same class before
+ * another), and each one is proved servable with resolveIndiaTarget's own
+ * pyqOnly path, so a suggestion can never turn into a second refusal or into
+ * an authored question shown under the "real exam" filter.
+ */
+export function indiaPyqAlternatives(chapter, { track: rawTrack = 'cbse', grade = 12, limit = 3 } = {}) {
+  const track = indiaTrack(rawTrack, grade);
+  const { own, ahead } = indiaPracticeScope(track.id, grade);
+  const scope = [...own, ...ahead];
+  const order = new Map(scope.map((c, i) => [c.id, i]));
+  const home = chapter && order.has(chapter.id) ? order.get(chapter.id) : 0;
+  const homeGrade = Number(indiaChapterGrade(chapter)) || Number(grade);
+  return scope
+    .filter(c => !chapter || c.id !== chapter.id)
+    .filter(c => resolveIndiaTarget(c, { track: track.id, grade, pyqOnly: true, random: () => 0 }))
+    .map(c => ({ c, gradeGap: Math.abs((Number(indiaChapterGrade(c)) || homeGrade) - homeGrade), gap: Math.abs(order.get(c.id) - home) }))
+    .sort((a, b) => a.gradeGap - b.gradeGap || a.gap - b.gap || order.get(a.c.id) - order.get(b.c.id))
+    .slice(0, Math.max(0, limit))
+    .map(({ c }) => ({ subtopic: c.id, name: c.name, year: indiaChapterGrade(c), track: track.id }));
 }
 
 function productionSummary(chapters, grade) {

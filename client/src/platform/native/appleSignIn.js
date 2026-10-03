@@ -17,7 +17,9 @@
 //      never decide who the person is.
 //
 // A new account must carry the same age/guardian declaration as password
-// sign-up. When the server answers CONSENT_DECLARATION_REQUIRED the caller shows
+// sign-up. When the server answers CONSENT_DECLARATION_REQUIRED (or the
+// register route's AGE_DECLARATION_REQUIRED, the same rule checked by the
+// shared ageDecision in server/platform/guardianConsent.js) the caller shows
 // the consent step and calls again with `declaration`; the nonce was consumed
 // by the first attempt, so the retry issues a new one and opens the sheet again
 // (Apple only re-confirms with Face ID / Touch ID for an app it already knows).
@@ -29,6 +31,8 @@ import { priNative } from './index.js';
 import { cloud } from '../cloudTransport.js';
 
 export const CONSENT_DECLARATION_REQUIRED = 'CONSENT_DECLARATION_REQUIRED';
+/** Every code the server uses to ask for the age/guardian declaration. */
+export const DECLARATION_REQUIRED_CODES = Object.freeze([CONSENT_DECLARATION_REQUIRED, 'AGE_DECLARATION_REQUIRED']);
 /** The declaration fields the password sign-up route already takes. */
 export const DECLARATION_KEYS = Object.freeze(['year', 'isAdult', 'guardianName', 'guardianEmail']);
 export const APPLE_SIGN_IN_STATUSES = Object.freeze(['signed-in', 'linked', 'cancelled', 'consent-required']);
@@ -103,7 +107,7 @@ export async function signInWithApple({
   if (mode !== 'sign-in' && mode !== 'link') throw failure('BAD_REQUEST', `unknown Sign in with Apple mode ${mode}`);
   if (!appleSignInAvailable(native)) throw failure('IDENTITY_UNSUPPORTED', 'Sign in with Apple is not available on this device.');
 
-  const issued = await transport.oidcNonce();
+  const issued = await transport.identityNonce();
   const nonce = String(issued?.nonce || '');
   if (!nonce || nonce.length > 128) throw failure('OIDC_NONCE_REQUIRED', 'The server did not issue a sign-in nonce.');
   const nonceHash = await digest(nonce);
@@ -131,7 +135,7 @@ export async function signInWithApple({
     const result = await transport.socialSignIn('apple', body);
     return { status: 'signed-in', account: result?.account || null, created: result?.created === true, guardianConsentRequired: result?.guardianConsentRequired === true };
   } catch (error) {
-    if (error?.code === CONSENT_DECLARATION_REQUIRED) return { status: 'consent-required', error };
+    if (DECLARATION_REQUIRED_CODES.includes(error?.code)) return { status: 'consent-required', error };
     throw error;
   }
 }

@@ -25,7 +25,7 @@ deletion is a hard `DELETE` in one transaction, effective immediately.
 | --- | --- | --- | --- |
 | **Unverified** | `POST /v1/account/register` (201, `verificationRequired: true`) | Signed in. `/me` reports `emailVerified: false`. `POST /sync/push`, `POST /classes`, `POST /classes/join`, `POST /billing/checkout/web`, `POST /handwriting/transcribe`, `POST /working/check` answer **403 `EMAIL_UNVERIFIED`**. Export, devices, logout, logout-all, password change, deletion and resend all work. | Cloud panel shows the verification prompt; practice, marking and on-device handwriting are unaffected. |
 | **Active** | The one-time link from the `verify-email` outbox row is spent (`POST /email/verify`) | Every route the role allows. | Normal. |
-| **Guardian consent required** (under 18) | Registration with `isAdult` not `true` and a guardian name + email (the shipped client sends `isAdult: false` unless the student ticks "I am 18 or older") | Sign-in, `/me`, verification, `/guardian/state`, export, devices, logout(-all), password change and deletion work. **Every other cloud route fails closed with 403 `GUARDIAN_CONSENT_PENDING`** (or `_WITHDRAWN`, or `_UNAVAILABLE` if the consent row cannot be read): `/sync`, `/classes`, `/assignments`, `/reports`, `/telemetry`, `/billing`, `/handwriting`, `/working`, `/tutor`. Confirmation (`POST /guardian/confirm`, one-time, 1 h) opens them; withdrawal (`POST /guardian/withdraw`) closes them again, permanently for that ceremony. | Cloud panel shows "waiting for a parent or guardian" with the masked address; the app is fully usable offline. |
+| **Guardian consent required** (under 18) | Registration with `isAdult` not `true` and a guardian name + email (the shipped client sends `isAdult: false` unless the student ticks "I am 18 or older"); a registration that sends neither a boolean `isAdult` nor a school class is refused with 400 `AGE_DECLARATION_REQUIRED` — and the same holds for a new account made by Google/Apple sign-in. Every account records its age decision (`accounts.age_basis`: adult / child, or legacy for accounts that predate it); an account with none recorded is refused by the gate with 403 `AGE_DECLARATION_REQUIRED` | Sign-in, `/me`, verification, `/guardian/state`, export, devices, logout(-all), password change and deletion work. **Every other cloud route fails closed with 403 `GUARDIAN_CONSENT_PENDING`** (or `_WITHDRAWN`, or `_UNAVAILABLE` if the consent row cannot be read): `/sync`, `/classes`, `/assignments`, `/reports`, `/telemetry`, `/billing`, `/handwriting`, `/working`, `/tutor`. Confirmation (`POST /guardian/confirm`, one-time, 1 h) opens them; withdrawal (`POST /guardian/withdraw`) closes them again, permanently for that ceremony. | Cloud panel shows "waiting for a parent or guardian" with the masked address; the app is fully usable offline. |
 | **Deleted** | `DELETE /v1/account` with fresh proof (current password, or a fresh Apple/Google identity token + server nonce) | Every session token is dead (401 `AUTH_REQUIRED`); login answers 401 `BAD_CREDENTIALS` exactly as for a wrong password; every outstanding verification/reset/guardian link answers 400 `TOKEN_INVALID`. The address is free: registering it again creates a new, empty, unverified account with a new id. | Signed out; local profiles on the device are untouched (they were never the server's). |
 
 A web subscription is cancelled at the provider (immediately, not at cycle end) **before** the rows
@@ -158,9 +158,12 @@ engines.
 
 What is true in the code today:
 
-- **Off by default, per profile.** `cloudHandwriting` and the working-check setting are opt-in
-  switches in Settings; both need a signed-in, verified cloud account, and for an under-18 account
-  a confirmed guardian (`/handwriting` and `/working` are behind `requireGuardianConsent`).
+- **Handwriting/photo reading is on by default for a signed-in account; the working check is
+  opt-in.** A profile that never chose (`cloudHandwriting` unset) gets server reading only when it
+  is linked to a cloud account and `/v1/handwriting/status` is usable (ADR-0001, online-first);
+  an explicit off in Settings is always respected. `/transcribe` needs a verified email, and for
+  an under-18 account a confirmed guardian (`/handwriting` and `/working` are behind
+  `requireGuardianConsent`, so status is refused and reading stays off).
 - **What is sent.** For ink, a PNG rasterised on the device from the student's own stroke
   coordinates (`client/src/ink/cloudRaster.js`) — no question, expected answer, name or profile;
   the server refuses any body carrying those fields (`HANDWRITING_NOT_ANSWER_BLIND`). For a photo

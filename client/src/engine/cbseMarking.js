@@ -39,6 +39,7 @@
 // same keys resolved against the English catalogue, so there is one copy.
 import en from '../i18n/strings.en.js';
 import { pluralCategory } from '../i18n/languages.js';
+import { unitWritten } from './units.js';
 
 const english = (key, vars = {}) => {
   let entry = en[key];
@@ -164,10 +165,17 @@ export function markScheme(question) {
 export function unitsPresent(question, workingLines, answerText) {
   const suffix = text(question?.answerSuffix);
   if (!suffix) return true;
+  const texts = [...(workingLines || []), answerText].map(text);
+  // A unit this marker reads must be written as that whole unit: "cm" is not
+  // "m", and "m" is not "m²". Substring search credited "12 cm" for metres.
+  const known = unitWritten(suffix, texts);
+  // the degree sign was never demanded here (it has no letters to search for)
+  if (known === false && /^\s*°\s*$/.test(suffix)) return true;
+  if (known !== null) return known;
   const needle = suffix.toLowerCase().replace(/[^a-z0-9]/g, '');
   if (!needle) return true;
-  const hay = [...(workingLines || []), answerText].map(text).join(' ').toLowerCase().replace(/[^a-z0-9]/g, '');
-  return hay.includes(needle);
+  const hay = ` ${texts.join(' ').toLowerCase().replace(/[^a-z0-9]+/g, ' ')} `;
+  return hay.includes(` ${needle} `) || hay.replace(/ /g, '').endsWith(needle);
 }
 
 /**

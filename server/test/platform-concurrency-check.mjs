@@ -82,8 +82,11 @@ try {
   c.eq(verifying.status, 201, 'a student registers');
   const verifyToken = await deliveryToken(verifying.account.id, 'verify-email');
   const verifyResults = await at(ATTEMPTS, () => h.request('/v1/account/email/verify', { method: 'POST', body: { token: verifyToken } }));
-  c.eq(verifyResults.filter(r => r.status === 200).length, 1, `exactly one of ${ATTEMPTS} concurrent verifications succeeds`);
-  c.ok(verifyResults.filter(r => r.status !== 200).every(r => r.status === 400 && r.data?.error?.code === 'TOKEN_INVALID'), 'every other one is told the link is spent');
+  const spending = verifyResults.filter(r => r.status === 200 && r.data?.alreadyVerified === false);
+  c.eq(spending.length, 1, `exactly one of ${ATTEMPTS} concurrent verifications spends the token`);
+  c.ok(verifyResults.filter(r => !spending.includes(r)).every(r =>
+    (r.status === 200 && r.data?.alreadyVerified === true) || (r.status === 400 && r.data?.error?.code === 'TOKEN_INVALID')),
+  'every other one is told the account is already verified (or, mid-commit, that the link is spent)');
   c.eq(await count(`SELECT COUNT(*) AS n FROM account_tokens WHERE account_id=? AND purpose='verify-email' AND consumed_at IS NOT NULL`, [verifying.account.id]), 1, 'the token is consumed once');
   c.ok(!!(await db.get('SELECT email_verified_at FROM accounts WHERE id=?', [verifying.account.id])).email_verified_at, 'and the mailbox is verified');
 

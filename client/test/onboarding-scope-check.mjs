@@ -46,6 +46,10 @@ export async function bundleLogin({ extended, tag = 'scope' }) {
   // bundle; both are stubbed to inert values. Everything else is the real code.
   writeFileSync(join(dir, 'app-stub.jsx'), "import React from 'react';\nexport const useApp = () => ({ setUser() {}, refreshDue() {} });\nexport function Logo() { return <b>Pri</b>; }\n");
   writeFileSync(join(dir, 'api-stub.js'), 'export const api = { get: () => new Promise(() => {}), post: () => new Promise(() => {}) };\n');
+  // The account sign-up flow (one-time codes, Google/Apple in the browser) is a
+  // lazy chunk of its own with a stylesheet the bundler will not take; it is
+  // not what these checks render, so it is stubbed too.
+  writeFileSync(join(dir, 'signup-stub.jsx'), "import React from 'react';\nexport default function SignUpFlow() { return null; }\n");
   writeFileSync(join(dir, 'entry.jsx'), [
     "import React from 'react';",
     "import { renderToStaticMarkup } from 'react-dom/server';",
@@ -62,6 +66,9 @@ export async function bundleLogin({ extended, tag = 'scope' }) {
     transform: {
       define: {
         __PRI_FEATURE_EXTENDED_TRACKS__: String(extended),
+        // The Australian link is its own flag (PRI_FEATURE_AUSTRALIA); a
+        // production build has both off, a development build both on.
+        __PRI_FEATURE_AUSTRALIA__: String(extended),
         __PRI_FEATURE_PLACEMENT__: 'false',
         __PRI_FEATURE_TUTOR__: 'false',
         __PRI_PRODUCTION_BUILD__: 'true',
@@ -72,12 +79,15 @@ export async function bundleLogin({ extended, tag = 'scope' }) {
     },
     resolve: {
       modules: [join(CLIENT, 'node_modules')],
-      alias: { '../App.jsx': join(dir, 'app-stub.jsx'), '../api.js': join(dir, 'api-stub.js') }
+      alias: { '../App.jsx': join(dir, 'app-stub.jsx'), '../api.js': join(dir, 'api-stub.js'), '../components/SignUpFlow.jsx': join(dir, 'signup-stub.jsx') }
     }
   });
   const { output } = await bundle.generate({ format: 'esm' });
   const file = join(dir, 'login.mjs');
   writeFileSync(file, output[0].code);
+  // The screen's own lazy imports (React.lazy) become chunks beside the entry;
+  // write them so the split import() resolves when the page is rendered.
+  for (const chunk of output.slice(1)) if (chunk.type === 'chunk') writeFileSync(join(dir, chunk.fileName), chunk.code);
   const mod = await import(`${pathToFileURL(file).href}?t=${Date.now()}`);
   return mod.render;
 }

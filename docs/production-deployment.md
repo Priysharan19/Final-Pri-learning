@@ -175,6 +175,20 @@ App Health workflow's `PRI_APP_URL` variable so live-origin health joins release
 
 ## 8. Operational evidence still required
 
+The web client shows **Continue with Google** and **Continue with Apple** only when the server names a web client id for that provider (`GET /v1/account/identity/providers`), and only when the page is served from the cloud origin itself:
+
+- `PRI_GOOGLE_CLIENT_IDS` / `PRI_APPLE_CLIENT_IDS` list every audience the token verifier accepts. `PRI_GOOGLE_WEB_CLIENT_ID` (a Google OAuth web client) and `PRI_APPLE_WEB_CLIENT_ID` (an Apple Services ID) name the one the browser uses; each must also appear in its list.
+- Google: add `https://<origin>/auth/callback.html` as an authorised redirect URI and `https://<origin>` as an authorised JavaScript origin. The popup uses the OpenID Connect implicit flow (`response_type=id_token`); no client secret is involved.
+- Apple: register `<origin>` as a domain and `https://<origin>/v1/account/identity/apple/callback` as a return URL on the Services ID. Apple form-posts its answer there and the server answers with the callback page carrying it, verifying and storing nothing (no redirect).
+- Every sign-in uses a server-issued single-use nonce. A new account made with a provider carries the same age declaration as the email form, so a child's account still waits for a guardian before it syncs; **Sign in** never creates an account.
+- The iPad, iPhone and Android shells do not show these buttons yet. Their sign-in belongs to the OS sheets (AuthenticationServices, Credential Manager), which are not wired. If Google sign-in is ever offered in the iOS app, App Store guideline 4.8 also requires Sign in with Apple there.
+
+## Operational evidence still required
+
+A green container build proves deployability, not that the commercial environment is live. Launch evidence still requires a real persistent volume, public HTTPS/domain, live Resend delivery, live Razorpay webhook/payment validation, App Store/StoreKit sandbox validation, backup/restore exercises, and physical-device QA.
+
+After the public deployment exists, configure the GitHub App Health workflow's `PRI_APP_URL` secret so live-origin health is included in release evidence.
+
 A green container build proves deployability, not that the environment is live. Launch evidence
 still needs, each recorded by the owner as it is obtained (`docs/release/LAUNCH-RUNBOOK.md`):
 Railway service sourced from `main`; the Postgres cutover (`postgres-cutover.md` §7 log);

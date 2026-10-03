@@ -174,7 +174,7 @@ export function ensureBuild(build) {
   // and tour-placement.js asserts that state when it meets such a build.
   const run = spawnSync('npm', ['run', 'build', '--prefix', 'client'], {
     cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32',
-    env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1' }
+    env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1' }
   });
   if (run.status !== 0) {
     const tail = `${run.stdout || ''}${run.stderr || ''}`.trim().split('\n').slice(-12).join('\n      ');
@@ -298,7 +298,7 @@ function helpers(page, base, flowId) {
 
 // ── Flow runner ──────────────────────────────────────────────────────────────
 
-const FLOWS = ['./tour-login.js', './tour-india.js', './tour-phone.js', './tour-v3.js', './tour-ink.js', './tour-v4.js', './tour-exam-india.js', './tour-exam-deadline.js', './cal-smoke.mjs', './tour-submit-lifecycle.js', './tour-stale-cloud.js', './tour-placement.js'];
+const FLOWS = ['./tour-login.js', './tour-india.js', './tour-phone.js', './tour-v3.js', './tour-ink.js', './tour-v4.js', './tour-exam-india.js', './tour-exam-deadline.js', './cal-smoke.mjs', './tour-submit-lifecycle.js', './tour-stale-cloud.js', './tour-placement.js', './tour-photo-practise.js'];
 
 async function loadFlows() {
   const loaded = [];

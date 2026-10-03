@@ -118,7 +118,7 @@ compromised or malicious paid AI provider; a script holding a stolen session coo
 
 The handlers' own `WHERE account_id = ?` filters remain the primary control on every table and
 every engine (`security-acceptance-check` C proves them). The RESTRICTIVE policies added in
-`supabase/migrations/20261005000000_security_hardening.sql` are defence in depth with a precise
+`supabase/migrations/20261007000000_security_hardening.sql` are defence in depth with a precise
 scope:
 
 - **Covered:** `learning_events`, `sync_entities` and `idempotency_keys` **inside a transaction

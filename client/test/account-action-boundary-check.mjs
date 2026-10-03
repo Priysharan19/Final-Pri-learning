@@ -33,6 +33,17 @@ assert.ok(main.includes('Deliberately outside StrictMode'),
 
 assert.ok(page.includes('cloud.verifyEmail({ token })'));
 assert.ok(page.includes('cloud.resetPassword({ token, password })'));
+// A spent verify link (mail scanners open it first) must not read as an error
+// when the signed-in account is verified; only then is the error replaced.
+assert.ok(/cloud\.me\(\)[\s\S]{0,120}emailVerified === true/.test(page),
+  'a refused verify link falls back to the signed-in account\'s verified state');
+// The brand on standalone link pages reads "Pri Learning", never "P ri Learning".
+assert.ok(page.includes('<span className="logo-name">Pri Learning<'), 'the wordmark spells the full product name');
+assert.ok(page.includes('<span className="logo-bb" aria-hidden="true">P</span>'), 'the brand tile letter is decorative');
+for (const file of ['../src/pages/AccountAction.jsx', '../src/App.jsx', '../src/components/QuestionCard.jsx']) {
+  assert.ok(!/>ri Learning/.test(readFileSync(new URL(file, import.meta.url), 'utf8')),
+    `${file}: no wordmark relies on the tile letter to complete the name`);
+}
 assert.ok(!/localStorage|indexedDB|sessionStorage/.test(page), 'account action tokens/passwords must never enter browser persistence');
 assert.ok(page.includes('autoComplete="new-password"'));
 assert.ok(page.includes('password.length < 10'));

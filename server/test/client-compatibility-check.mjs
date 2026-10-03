@@ -118,10 +118,10 @@ ok(compatibilityConfigProblems({ PRI_MIN_IOS_BUILD: 'v2' }).length === 1 && comp
   try {
     const email = 'old-shell@example.test';
     const password = 'old-shell-pass-123';
-    const blockedSignup = await send('POST', '/account/register', { body: { name: 'Old Shell', email, password, deviceId: 'old-ipad' } });
+    const blockedSignup = await send('POST', '/account/register', { body: { name: 'Old Shell', email, password, deviceId: 'old-ipad', isAdult: true } });
     ok(blockedSignup.status === 426 && blockedSignup.data?.error?.code === 'CLIENT_UPGRADE_REQUIRED', 'real router: a new account cannot be created from a shell below the floor');
     // The account already exists (made before the floor was raised, on the web).
-    const made = await send('POST', '/account/register', { body: { name: 'Old Shell', email, password, deviceId: 'web' }, shell: null });
+    const made = await send('POST', '/account/register', { body: { name: 'Old Shell', email, password, deviceId: 'web', isAdult: true }, shell: null });
     ok(made.status === 201, 'real router: the account exists');
     await db.run('UPDATE accounts SET email_verified_at=? WHERE id=?', [Date.now(), made.data.account.id]);
     for (const k of Object.keys(jar)) delete jar[k];
@@ -139,7 +139,7 @@ ok(compatibilityConfigProblems({ PRI_MIN_IOS_BUILD: 'v2' }).length === 1 && comp
     ok(deleted.status === 200 && deleted.data?.deleted === true, 'real router: the old shell can delete the account');
     for (const k of Object.keys(jar)) delete jar[k];
     ok((await send('POST', '/account/login', { body: { email, password, deviceId: 'old-ipad' } })).status === 401, 'real router: the deleted account cannot sign in again');
-    const current = await send('POST', '/account/register', { body: { name: 'Current', email: 'current@example.test', password, deviceId: 'new-ipad' }, shell: '50' });
+    const current = await send('POST', '/account/register', { body: { name: 'Current', email: 'current@example.test', password, deviceId: 'new-ipad', isAdult: true }, shell: '50' });
     ok(current.status === 201, 'real router: a shell at the floor is served normally');
   } finally {
     await new Promise(r => srv.close(r));
