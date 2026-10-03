@@ -291,6 +291,8 @@ jobs:
         run: node server/test/client-compatibility-check.mjs
       - name: Server-paid operations obey the server's entitlement (SEC-COMM-01)
         run: node server/test/premium-authority-check.mjs
+      - name: Store-facing configuration (CP-12)
+        run: node scripts/store-readiness-check.mjs
       - name: Google Play billing verification
         run: node server/test/google-billing-check.mjs
       # §19 / V1 blocker #7 (code side): the StoreKit entitlement state machine
