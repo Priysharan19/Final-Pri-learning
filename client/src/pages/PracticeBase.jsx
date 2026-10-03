@@ -449,10 +449,10 @@ export default function Practice() {
         )}
 
         {error && !capped && !isContentEmpty(errorCode) && (
-          <div className="verdict verdict-technical" role="alert">
+          <div className="verdict verdict-technical" role="alert" data-practice-error={errorCode || 'error'}>
             <span className="verdict-ico"><Icon name="alert" /></span>
             <div>
-              <div className="verdict-title">{t('practice.couldNotLoad')}</div>
+              <div className="verdict-title">{errorCode === 'INDIA_PYQ_UNAVAILABLE' ? t('practice.pyqEmptyTitle') : t('practice.couldNotLoad')}</div>
               <div className="verdict-body">{error}</div>
               {errorCode === 'INDIA_PYQ_UNAVAILABLE' && pyqAlternatives.length > 0 && (
                 // The nearest chapters whose archive does hold past papers. Each is

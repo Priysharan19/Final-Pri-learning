@@ -1143,6 +1143,7 @@ export default {
   'practice.leave': "अभ्यास छोड़कर Home पर जाएँ। आपका काम सुरक्षित रहेगा।",
   'practice.next': "अगला",
   'practice.couldNotLoad': "अगला प्रश्न नहीं खुल सका।",
+  'practice.pyqEmptyTitle': "इस अध्याय के लिए अभी कोई पिछले वर्ष का प्रश्नपत्र नहीं है।",
   'practice.goalReachedTitle': { one: "आज का लक्ष्य पूरा: {n} प्रश्न।", other: "आज का लक्ष्य पूरा: {n} प्रश्न।" },
   'practice.goalReachedBody': "इस सत्र में {answered} में से {correct} सही। रुकने की अच्छी जगह।",
   'practice.doneForToday': "आज के लिए बस",
