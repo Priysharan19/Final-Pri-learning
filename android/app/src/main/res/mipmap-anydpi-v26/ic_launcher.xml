@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Pri Learning launcher: P-prime adaptive icon (minSdk 26), themed layer on Android 13+. -->
+<!-- Adaptive launcher icon: OEM masks (circle, squircle), parallax and
+     Android 13+ themed icons (monochrome) all work from these layers. -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/pri_icon_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
