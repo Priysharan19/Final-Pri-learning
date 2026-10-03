@@ -3,8 +3,9 @@ import { useApp } from '../App.jsx';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import {
   cloudAccountLink, disconnectCloudAccount, loginCloudAccount,
-  refreshCloudEntitlement, registerCloudAccount, verifyCloudSession
+  refreshCloudEntitlement, registerCloudAccount, signInWithProvider, verifyCloudSession
 } from '../platform/cloudAccount.js';
+import { requestIdentityToken, socialProviderConfig } from '../platform/socialSignIn.js';
 import { cloudSyncStatus, syncNow } from '../platform/syncWorker.js';
 import { normalizeCommercialDisplay } from '../platform/entitlements.js';
 import {
@@ -36,7 +37,9 @@ function pricingText(config, t) {
   if (!config) return t('cloud.pricingOffline');
   const monthly = price(config.monthly, config.currency);
   const annual = price(config.annual, config.currency);
-  if (!monthly && !annual) return t('cloud.pricingUnset');
+  // Unconfigured pricing is an operator fact, not something a student can act
+  // on, so nothing is shown rather than a deployment note.
+  if (!monthly && !annual) return null;
   const prices = monthly && annual
     ? t('cloud.priceBoth', { monthly, annual })
     : monthly ? t('cloud.priceMonthly', { price: monthly }) : t('cloud.priceAnnual', { price: annual });
@@ -80,6 +83,9 @@ export default function CloudAccountPanel() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const appleInFlight = useRef(new Set());
+  // Google / Apple sign-in, offered only when this deployment configures it.
+  const [providers, setProviders] = useState({ google: null, apple: null });
+  const socialAbort = useRef(null);
 
   const entitlement = link?.entitlement;
   const premium = !!entitlement?.active;
@@ -147,6 +153,15 @@ export default function CloudAccountPanel() {
       });
     return () => { live = false; };
   }, [enabled]);
+
+  useEffect(() => {
+    let live = true;
+    if (!enabled || link?.accountId) return () => { live = false; };
+    socialProviderConfig()
+      .then(config => { if (live) setProviders(config); })
+      .catch(() => { if (live) setProviders({ google: null, apple: null }); });
+    return () => { live = false; };
+  }, [enabled, link?.accountId]);
 
   // The server mints the opaque appAccountToken and decides which product ids
   // this deployment sells. StoreKit then supplies localized storefront names and
@@ -241,6 +256,46 @@ export default function CloudAccountPanel() {
       await reload();
     } catch (err) { setError(err.message || tLater('cloud.connectFailed')); }
     finally { setBusy(''); }
+  }
+
+  // Runs straight from the click: requestIdentityToken opens its popup before
+  // anything awaits, or the browser would block it.
+  async function startSocial(provider) {
+    if (!enabled || !providers[provider] || busy) return;
+    const creating = mode === 'register';
+    // A new account asks the same questions as the email form, before the
+    // provider is ever opened: the server will not make a child's account
+    // without a guardian to ask.
+    if (creating && !agreed) { setError(tLater('cloud.socialAgreeFirst')); return; }
+    if (creating && !form.isAdult && (!form.guardianName.trim() || !form.guardianEmail.trim())) {
+      setError(tLater('cloud.socialGuardianFirst'));
+      return;
+    }
+    const controller = new AbortController();
+    socialAbort.current = controller;
+    setBusy(`social-${provider}`);
+    setError('');
+    setMessage('');
+    try {
+      const token = await requestIdentityToken(provider, providers[provider], { signal: controller.signal });
+      await signInWithProvider(user.id, provider, {
+        ...token,
+        createAccount: creating,
+        name: form.name || user.name, year: user?.year, isAdult: form.isAdult,
+        guardianName: form.guardianName, guardianEmail: form.guardianEmail
+      });
+      setMessage(tLater(creating ? 'cloud.created' : 'cloud.connected'));
+      await reload();
+    } catch (err) {
+      if (err?.code === 'SOCIAL_CANCELLED') setMessage(tLater('cloud.socialCancelled'));
+      else if (err?.code === 'SOCIAL_POPUP_BLOCKED') setError(tLater('cloud.socialPopupBlocked'));
+      else if (err?.code === 'SOCIAL_TIMEOUT') setError(tLater('cloud.socialTimedOut'));
+      else if (err?.code === 'SOCIAL_PROVIDER_ERROR') setError(tLater('cloud.socialFailed'));
+      else setError(err.message || tLater('cloud.socialFailed'));
+    } finally {
+      socialAbort.current = null;
+      setBusy('');
+    }
   }
 
   async function requestReset() {
@@ -471,7 +526,10 @@ export default function CloudAccountPanel() {
         <div className="grid cols-2" style={{ gap: 12 }}>
           {mode === 'register' && <div className="field">
             <label className="label" htmlFor="cloud-name">{t('cloud.yourName')}</label>
-            <input className="input" id="cloud-name" autoComplete="name" maxLength={80} value={form.name} onChange={e => setForm(v => ({ ...v, name: e.target.value }))} required />
+            <input className="input" id="cloud-name" autoComplete="name" maxLength={80} value={form.name} onChange={e => setForm(v => ({ ...v, name: e.target.value }))}
+              // Prefilled from the profile: focusing selects it, so typing a
+              // name replaces it instead of being appended to it.
+              onFocus={e => { if (e.target.value && e.target.value === (user?.name || '')) e.target.select(); }} required />
           </div>}
           <div className="field">
             <label className="label" htmlFor="cloud-email">{t('cloud.yourEmail')}</label>
@@ -536,6 +594,22 @@ export default function CloudAccountPanel() {
             {busy === 'reset' ? t('cloud.requesting') : t('cloud.forgotPassword')}
           </button>}
         </div>
+        {(providers.google || providers.apple) && <div data-social-sign-in style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line, rgba(128,128,128,.22))' }}>
+          <div className="muted" style={{ fontSize: 12.5, marginBottom: 8 }}>
+            {mode === 'register' ? t('cloud.socialCreateNote') : t('cloud.socialSignInNote')}
+          </div>
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            {providers.google && <button className="btn btn-ghost" type="button" data-provider="google" disabled={!!busy} onClick={() => startSocial('google')}>
+              {busy === 'social-google' ? t('cloud.socialWaiting') : t('cloud.continueGoogle')}
+            </button>}
+            {providers.apple && <button className="btn btn-ghost" type="button" data-provider="apple" disabled={!!busy} onClick={() => startSocial('apple')}>
+              {busy === 'social-apple' ? t('cloud.socialWaiting') : t('cloud.continueApple')}
+            </button>}
+            {busy.startsWith('social-') && <button className="btn btn-quiet" type="button" onClick={() => socialAbort.current?.abort()}>
+              {t('cloud.socialCancel')}
+            </button>}
+          </div>
+        </div>}
       </form>}
 
       {link?.accountId && <div className="grid cols-2" style={{ gap: 14, marginTop: 16 }}>
@@ -625,11 +699,12 @@ export default function CloudAccountPanel() {
         onDeleted={securityDisconnected}
       />}
 
-      <div className="muted" style={{ marginTop: 14, fontSize: 12.5 }}>
-        {nativeStoreKit && appleProducts.length
+      {(() => {
+        const note = nativeStoreKit && appleProducts.length
           ? t('cloud.appleAuthorityNote')
-          : pricingText(pricing, t)}
-      </div>
+          : pricingText(pricing, t);
+        return note ? <div className="muted" style={{ marginTop: 14, fontSize: 12.5 }}>{note}</div> : null;
+      })()}
 
       {message && <div role="status" style={{ marginTop: 12, color: 'var(--good)' }}>{message}</div>}
       {error && <div role="alert" style={{ marginTop: 12, color: 'var(--bad)' }}>{error}</div>}

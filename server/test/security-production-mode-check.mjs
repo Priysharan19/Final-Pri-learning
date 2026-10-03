@@ -89,6 +89,7 @@ try {
       const rejected = r.status === 403 && r.data?.error?.code === 'ORIGIN_REJECTED';
       if (route.origin === 'enforced' && !rejected) failures.push(`${label}: ${route.method} ${route.path} → ${r.status} ${r.data?.error?.code || ''}`);
       if (route.origin === 'exempt-provider-webhook' && label === 'foreign Origin' && r.data?.error?.code === 'ORIGIN_REJECTED') failures.push(`webhook ${route.path} should be exempt`);
+      if (route.origin === 'exempt-provider-callback' && label === 'foreign Origin' && r.data?.error?.code === 'ORIGIN_REJECTED') failures.push(`provider callback ${route.path} should be exempt`);
     }
   }
   c.deq(failures, [], `all ${mutations.length} browser mutations refuse foreign, look-alike, downgraded, null and missing Origins`);

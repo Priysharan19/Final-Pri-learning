@@ -36,4 +36,6 @@ Production builds fail release verification if the SHA or timestamp is missing/m
 
 ## Historical documentation
 
+Handwriting and photo answers are read only by the server reader (ADR-0001 amendment, 2026-10): `client/src/ink/InkAnswer.jsx` sends the student's strokes, answer-blind, through `client/src/ink/cloudReader.js`; the on-device recogniser is not in the marking path. Without a usable server the ink is kept and read when the reason clears, and typed answers mark offline with the deterministic engine.
+
 Detailed older release, handwriting and project documents remain valid only for the subsystem and date they explicitly describe. Where they conflict with this document, this document and the current code on `main` govern production architecture.
