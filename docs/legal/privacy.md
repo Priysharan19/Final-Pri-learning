@@ -16,8 +16,8 @@ typed answers, local history and local progress run on your own device and can
 continue without a network. Some capabilities need an account or server
 connection, including account and cross-device services, guardian-consent
 services where required, server verification of paid access, and the server
-reading and checking described below. Two settings send work off the device,
-and both are described below: reading your handwriting and photos on a server,
+reading and checking described below. Two optional settings send work off the
+device, and both are described below: reading your handwriting and photos on a server,
 which is on by default once you sign in to an account and can be turned off,
 and checking your working, which is off unless you turn it on. Without an
 account, neither runs.
