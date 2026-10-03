@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ system splash: the app's dark first paint and its own mark
+         instead of a default flash, then straight into the page (no extra delay). -->
+    <style name="Theme.Pri" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/pri_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowSplashScreenBackground">@color/pri_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/pri_icon_background</item>
+    </style>
+</resources>
