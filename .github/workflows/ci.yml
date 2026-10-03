@@ -339,6 +339,14 @@ jobs:
   browser:
     name: Browser suites (end-to-end and accessibility)
     runs-on: ubuntu-latest
+    # The accessibility gate builds the client itself; give it the same flags
+    # client/test/e2e.mjs uses for its build so both walk the same app (the
+    # Teacher role and Olympiad live behind EXTENDED_TRACKS, the AU link behind
+    # AUSTRALIA). PRI_FEATURE_TUTOR stays unset: the tutor tour proves dark.
+    env:
+      PRI_FEATURE_PLACEMENT: '1'
+      PRI_FEATURE_EXTENDED_TRACKS: '1'
+      PRI_FEATURE_AUSTRALIA: '1'
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
