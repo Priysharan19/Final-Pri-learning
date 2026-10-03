@@ -80,8 +80,10 @@ export const flow = {
       `options are ${JSON.stringify(options)}`);
     await check('no class or track is silently assumed', (await first.inputValue()) === '',
       `initial choice is ${JSON.stringify(await first.inputValue())}`);
-    await check('Australian curricula have no public V1 onboarding entry point',
-      await page.locator('#signup-course').count() === 0 && await page.getByRole('button', { name: /Australia/ }).count() === 0);
+    await check('Australian curricula are reachable only through the flagged, folded student link (off in a production build)',
+      await page.locator('#signup-course').count() === 0
+      && await page.getByRole('button', { name: /Studying in Australia/ }).count() === 1
+      && await page.getByRole('button', { name: /Teaching in Australia/ }).count() === 0);
     const formText = await page.locator('.auth-card').innerText();
     await check('the India selection step never says Year or HSC', !/\bYear\b/.test(formText) && !HSC.test(formText),
       `form reads ${JSON.stringify(formText.slice(0, 200))}`);

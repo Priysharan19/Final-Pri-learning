@@ -52,8 +52,14 @@ export const flow = {
     await check('public onboarding exposes exactly Classes 7–12 plus JEE Main/Advanced',
       ['Class 7','Class 8','Class 9','Class 10','Class 11','Class 12','JEE Main','JEE Advanced'].every(x => publicTracks.includes(x))
       && !publicTracks.some(x => /Olympiad|HSC|VCE|QCE|WACE|SACE|IB/.test(x)));
-    await check('public onboarding has no Australian curriculum entry point',
-      await page.getByRole('button', { name: /Australia/i }).count() === 0 && await page.locator('#signup-course').count() === 0);
+    // The browser build runs with PRI_FEATURE_AUSTRALIA=1 (a production build
+    // has it off: browser-run-fixes-check). Behind that flag the only door is a
+    // folded student link; no course selector is shown until it is opened and
+    // there is no teacher variant of it.
+    await check('the Australian syllabuses sit behind one folded student-only link, no course selector in the public step',
+      await page.getByRole('button', { name: /Studying in Australia/ }).count() === 1
+      && await page.getByRole('button', { name: /Teaching in Australia/ }).count() === 0
+      && await page.locator('#signup-course').count() === 0);
     await goto('/');
     await createProfile(STUDENT);
     const greet = await page.locator('.home-greet').innerText();
