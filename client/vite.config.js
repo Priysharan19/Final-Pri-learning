@@ -139,7 +139,8 @@ export const ON_DEMAND = [
   // QuestionCard names the first-use-offline case rather than blaming the
   // device. offlineWarm.js pulls it in the background on an unmetered link, so
   // in practice a stylus user has it before they ask.
-  [/(^|\/)(ink-model|ink-engine|ink-personal|model-data|recognizer|InkAnswer|NativeInkCanvas|feedbackGeometry|InkPhysicalEvidenceSession)-[^/]*\.js$/, 'handwriting recogniser'],
+  [/(^|\/)(ink-model|ink-engine|ink-personal|model-data|recognizer|InkAnswer|NativeInkCanvas|feedbackGeometry|InkPhysicalEvidenceSession)-[^/]*\.(js|css)$/, 'handwriting recogniser'],
+  // (the .css is the handwriting surface's own styles, split from theme.css)
 
   // Inter ships one file per script. Latin is the only one an Indian student
   // reading English maths paints from; the browser fetches a subset only when a

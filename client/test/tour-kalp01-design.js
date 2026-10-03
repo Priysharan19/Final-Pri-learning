@@ -195,11 +195,19 @@ export const flow = {
     if (await toggle.count()) {
       await toggle.click();
       await page.waitForTimeout(250);
-      const isLight = await page.evaluate(() => document.documentElement.dataset.theme === 'light');
-      await check('light theme activates through the real account preference', isLight);
+      // Paper is the default identity; the toggle moves the account to the
+      // same notebook at night, and both must read.
+      const isDark = await page.evaluate(() => document.documentElement.dataset.theme === 'dark');
+      await check('night theme activates through the real account preference', isDark);
       const ratio = await contrast(page);
-      await check('light theme body text has readable contrast', ratio === null || ratio >= 4.5, `ratio=${ratio}`);
-      await snap(page, '07-home-desktop-light');
+      await check('night theme body text has readable contrast', ratio === null || ratio >= 4.5, `ratio=${ratio}`);
+      await snap(page, '07-home-desktop-night');
+      await toggle.click();
+      await page.waitForTimeout(250);
+      await check('paper theme restores through the same preference',
+        await page.evaluate(() => document.documentElement.dataset.theme === 'light'));
+      const paperRatio = await contrast(page);
+      await check('paper theme body text has readable contrast', paperRatio === null || paperRatio >= 4.5, `ratio=${paperRatio}`);
     }
 
     await page.keyboard.press('Tab');

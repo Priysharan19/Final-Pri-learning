@@ -541,7 +541,7 @@ export default function CloudAccountPanel() {
           </div>
         </div>
         {mode === 'register' && (
-          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line, rgba(128,128,128,.22))' }}>
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--hairline)' }}>
             {/* Asked before the account exists, not after. Under the DPDP Act a
                 child is anyone under 18, so this is nearly every student here,
                 and the server will not sync a child's account until a guardian

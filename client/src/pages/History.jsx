@@ -11,6 +11,7 @@ import { formatDate, formatNumber } from '../lib/locale.js';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import TermGloss from '../components/TermGloss.jsx';
+import Icon from '../components/Icon.jsx';
 
 const FILTERS = [
   ['all', 'history.filterAll'],
@@ -86,7 +87,7 @@ export default function History() {
           }
         }
       });
-    } catch (e) { toast(<span>⚠️ {e.message}</span>); }
+    } catch (e) { toast(<span>{e.message}</span>); }
   }
 
   async function openDetail(id) {
@@ -129,18 +130,18 @@ export default function History() {
             <button className={`hist-star ${item.bookmarked ? 'on' : ''}`} title={t(item.bookmarked ? 'history.removeBookmark' : 'history.addBookmark')}
               aria-label={t(item.bookmarked ? 'history.removeBookmarkOn' : 'history.addBookmarkOn', { topic: item.subtopicName })}
               aria-pressed={!!item.bookmarked}
-              onClick={() => toggleBookmark(item.id)}>{item.bookmarked ? '★' : '☆'}</button>
+              onClick={() => toggleBookmark(item.id)}><Icon name="bookmark" size={17} /></button>
             <button className="hist-main" onClick={() => openDetail(item.id)}>
               <div className="hist-top">
                 <span className={`hist-verdict ${item.correct ? 'good' : item.correct === false ? 'bad' : ''}`}>
-                  {item.correct ? '✔' : item.correct === false ? '✖' : '·'}
+                  {item.correct ? <Icon name="check" size={15} /> : item.correct === false ? <Icon name="correction" size={15} /> : '·'}
                   <span className="sr-only">{item.correct ? t('app.correct') : item.correct === false ? t('app.incorrect') : t('history.notMarked')}</span>
                 </span>
                 <span className="hist-name" lang="en"><TermGloss text={item.subtopicName} /></span>
                 <span className="tag">{`D${item.difficulty}`}</span>
                 <span className="tag">{MODE_KEY[item.mode] ? t(MODE_KEY[item.mode]) : item.mode}</span>
-                {item.viaInk && <span className="tag" title={t('history.viaInk')}>✍️<span className="sr-only">{t('history.viaInkSpoken')}</span></span>}
-                {item.hasPhoto && <span className="tag" title={t('history.hasPhoto')}>📷<span className="sr-only">{t('history.hasPhotoSpoken')}</span></span>}
+                {item.viaInk && <span className="tag" title={t('history.viaInk')}><Icon name="pen" size={13} /><span className="sr-only">{t('history.viaInkSpoken')}</span></span>}
+                {item.hasPhoto && <span className="tag" title={t('history.hasPhoto')}><Icon name="photo" size={13} /><span className="sr-only">{t('history.hasPhotoSpoken')}</span></span>}
                 <span className="muted" style={{ marginLeft: 'auto', fontSize: 12, whiteSpace: 'nowrap' }}>
                   {formatDate(item.answeredAt, user)}
                 </span>
