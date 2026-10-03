@@ -1,5 +1,5 @@
 {
-  "placement": true,
+  "placement": false,
   "tutor": false,
-  "australia": true
+  "australia": false
 }
