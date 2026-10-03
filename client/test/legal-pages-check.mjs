@@ -270,7 +270,8 @@ const LATIN_IN_HINDI = new Map([
   ['Apple', 'the company’s name, as it is written on the Hindi App Store too'],
   ['iPad', 'the product’s name, as it is written on the Hindi App Store too'],
   ['HTTPS', 'a protocol, written HTTPS in every language'],
-  ['bcrypt', 'the name of an algorithm']
+  ['bcrypt', 'the name of an algorithm'],
+  ['OpenAI', 'the company’s name — the notice names the reading provider, and a name is not translated']
 ]);
 
 for (const [slug] of PAGES) {

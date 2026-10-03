@@ -25,7 +25,7 @@ import {
 import { createSmsProviderFromEnv } from './smsProvider.js';
 import { createOtpEmailSenderFromEnv } from './otpEmail.js';
 import { CONSENT_NOTICE_VERSION, ageDecision, confirmConsent, consentState, withdrawConsent } from './guardianConsent.js';
-import { queueAccountToken } from './accounts.js';
+import { deleteAccountRows, queueAccountToken } from './accounts.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
 import { clipText } from './text.js';
 import { logEvent, safeCode } from './observability.js';
@@ -73,6 +73,7 @@ function profileFrom(body) {
 export function createOtpRouter(db, {
   smsProvider = undefined,
   emailSender = undefined,
+  beforeDelete = null,
   env = process.env
 } = {}) {
   db = asStore(db);
@@ -265,6 +266,63 @@ export function createOtpRouter(db, {
       const sent = await deliver({ channel, destination, purpose: 'reauth', accountId });
       res.status(202).json({ ok: true, channel, ...sent });
     } catch (error) { return sendError(res, error); }
+  });
+
+  // ── deletion from the public web page, with no session ──────────────────
+  // Apple 5.1.1(v) and Play's "Delete account" requirement want a way for a
+  // person who can no longer open the app to have the account deleted, at a
+  // public URL (client /account/delete-request). Proof is a code sent to the
+  // address the account was made with — the same channel a password reset
+  // uses, and the same proof DELETE /v1/account takes for a code-only account.
+  //
+  // NO ENUMERATION. /delete-request answers the same shape, status and work for
+  // an address with an account and one without: a challenge is created and a
+  // code sent either way (as /request does). Only someone who proves they hold
+  // the mailbox learns, at /delete-confirm, whether an account was there.
+  //
+  // Phone-only accounts (synthetic @phone.invalid email) cannot be reached by
+  // email; they delete in-app with a code to their phone (/reauth-request).
+  const accountByEmail = (destination) => db.get(
+    'SELECT id FROM accounts WHERE email = ? AND deleted_at IS NULL', [destination]
+  );
+
+  router.post('/delete-request', rateLimit(db, 'otp-delete-request', { limit: 10, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    const destination = normalizeEmail(req.body?.email);
+    if (!destination || destination.endsWith(`@${PHONE_ACCOUNT_EMAIL_DOMAIN}`)) {
+      return bad(res, 'OTP_DESTINATION_INVALID', 'Enter a valid email address.');
+    }
+    const limit = await destinationAllowed('email', destination, 'reauth');
+    if (!limit.allowed) {
+      res.set('Retry-After', String(Math.ceil(limit.retryAfterMs / 1000)));
+      return bad(res, 'OTP_RATE_LIMITED', 'Wait a moment before asking for another code.', 429);
+    }
+    try {
+      const account = await accountByEmail(destination);
+      const sent = await deliver({ channel: 'email', destination, purpose: 'reauth', accountId: account?.id || null });
+      res.status(202).json({ ok: true, channel: 'email', ...sent });
+    } catch (error) { return sendError(res, error); }
+  });
+
+  router.post('/delete-confirm', rateLimit(db, 'otp-delete-confirm', { limit: 30, windowMs: 15 * 60 * 1000 }), async (req, res, next) => {
+    try {
+      const destination = normalizeEmail(req.body?.email);
+      if (!destination) return bad(res, 'OTP_DESTINATION_INVALID', 'Enter a valid email address.');
+      const account = await accountByEmail(destination);
+      // The challenge was bound to the account that held the address when the
+      // code was sent (or to none). A code sent before the account existed, or
+      // for a different account at the same address, does not match.
+      const check = await verifyChallenge(db, {
+        challengeId: String(req.body?.challengeId || ''), channel: 'email', purpose: 'reauth',
+        destination, code: req.body?.code, accountId: account?.id || null
+      });
+      if (!check.ok) return invalidCode(res);
+      if (!account) return res.json({ deleted: false, accountFound: false });
+      await deleteAccountRows(db, account.id, { beforeDelete, request: req });
+      res.json({ deleted: true, accountFound: true });
+    } catch (error) {
+      if (error?.status) return bad(res, error.code || 'ACCOUNT_DELETE_FAILED', error.message, error.status);
+      next(error);
+    }
   });
 
   // ── a parent's approval ───────────────────────────────────────────────────

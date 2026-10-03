@@ -101,7 +101,9 @@ function renderInline(text, key) {
     if (match[1]) nodes.push(<b key={`${key}-b${i}`}>{match[1]}</b>);
     else if (match[2]) {
       const href = match[3];
-      nodes.push(href.startsWith('/')
+      // /account/… pages (delete-request) render outside the router, so they
+      // are reached by a full navigation rather than a client-side Link.
+      nodes.push(href.startsWith('/') && !href.startsWith('/account/')
         ? <Link key={`${key}-l${i}`} to={href}>{match[2]}</Link>
         : <a key={`${key}-a${i}`} href={href} rel="noreferrer noopener" target="_blank">{match[2]}</a>);
     } else if (match[4]) nodes.push(<code key={`${key}-c${i}`}>{match[4]}</code>);

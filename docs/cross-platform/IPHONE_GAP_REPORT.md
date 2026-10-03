@@ -54,7 +54,7 @@ Initial audit baseline `main` @ `421f1ff1` (2026-10-01 UTC); revalidated against
 ### 2.4 Commerce and account
 
 20. **StoreKit on iPhone:** code is idiom-agnostic. Products, purchase, restore, refund and revocation have **not** been exercised on any device or in StoreKit Testing for iPhone. The paywall at compact width is unverified in WKWebView.
-21. **Account deletion** is password-only in the client UI (the server also accepts Apple/Google id-token re-auth). App Store Review Guideline 5.1.1(v) requires in-app deletion, which is present, but it is unverified on iPhone.
+21. **Account deletion** in the client UI now covers every sign-in method: password, Apple/Google re-auth where the web provider is configured, and a fresh one-time code to the account's own email/phone for any passwordless account (`CloudAccountSecurity.jsx`); a public signed-out path exists at `/account/delete-request`. App Store Review Guideline 5.1.1(v) requires in-app deletion, which is present (browser-verified in `tour-account-deletion.js`), but it is unverified on iPhone.
 
 ## 3. Audit checklist (current answer)
 
