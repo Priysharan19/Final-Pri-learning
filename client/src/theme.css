@@ -662,6 +662,54 @@ select.input {
 .syl-sq { width: 15px; height: 15px; border-radius: 2px; border: 1px solid var(--hairline); background: var(--m0); }
 .syl-head-row th { font-size: 10.5px; letter-spacing: 0.14em; color: var(--ink-3); font-weight: 500; text-transform: uppercase; padding: 8px; text-align: left; }
 
+/* India syllabus board (components/IndiaSyllabusBoard.jsx). One square per
+   dot point, coloured by that dot point's own mastery band on the --m ramp.
+   "Too few answers" is a hollow dashed square so it can never be read as a
+   colour; "not started" is the empty --m0 well. */
+.sb-dot { display: inline-block; width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; border: 1px solid transparent; background: var(--m0); }
+.sb-unseen { background: var(--m0); border-color: var(--hairline); }
+.sb-thin { background: transparent; border: 1.5px dashed var(--ink-3); }
+.sb-emerging { background: var(--m1); }
+.sb-developing { background: var(--m2); }
+.sb-strong { background: var(--m4); }
+.sb-mastered { background: var(--m5); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.28); }
+.sb-summary { text-align: right; }
+.sb-strip { display: flex; height: 8px; border-radius: 999px; overflow: hidden; margin: 14px 0 10px; background: var(--m0); gap: 2px; }
+.sb-strip > span { display: block; min-width: 4px; border-radius: 0; border: none; }
+.sb-strip > .sb-thin { background: repeating-linear-gradient(90deg, var(--ink-3) 0 3px, transparent 3px 6px); border: none; }
+.sb-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 6px; padding: 0; font-size: 12px; color: var(--ink-2); }
+.sb-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.sb-due-mark { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); margin-left: 6px; flex-shrink: 0; }
+.sb-legend .sb-due-mark { margin-left: 0; }
+.sb-strand { margin-top: 16px; }
+.sb-strand-name { margin: 0 0 4px; font-size: 10.5px; }
+.sb-chapters { list-style: none; margin: 0; padding: 0; }
+.sb-chapter { border-bottom: 1px solid var(--hairline-faint); }
+.sb-row { display: grid; grid-template-columns: minmax(180px, 280px) 1fr auto auto; align-items: center; gap: 12px; padding: 6px 0; }
+.sb-name { display: flex; align-items: center; gap: 6px; background: none; border: none; padding: 4px 0; font: inherit; font-size: 14px; color: var(--ink); cursor: pointer; text-align: left; min-width: 0; }
+.sb-caret { color: var(--ink-3); width: 12px; flex-shrink: 0; }
+.sb-dots { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.sb-count { font-size: 12px; font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
+.sb-dp-list { list-style: none; margin: 0 0 10px; padding: 4px 0 4px 18px; display: grid; gap: 2px; }
+.sb-dp-list li { display: grid; grid-template-columns: 14px 1fr auto auto; gap: 10px; align-items: center; padding: 5px 0; font-size: 13px; }
+.sb-dp-text { color: var(--ink-2); }
+.sb-dp-meta { font-size: 12px; white-space: nowrap; }
+.sb-prio { list-style: none; margin: 8px 0 0; padding: 0; }
+.sb-prio-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 15px; }
+.sb-prio-why { font-size: 12.5px; margin-top: 2px; }
+.sb-prio-dp { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-2); margin-top: 6px; }
+.sb-tag-review-due { border-color: var(--warn); color: var(--warn); }
+.sb-tag-misconception { border-color: var(--bad); color: var(--bad); }
+.sb-tag-new-ground { border-color: var(--info); color: var(--info); }
+@media (max-width: 760px) {
+  .sb-row { grid-template-columns: 1fr auto; row-gap: 4px; }
+  .sb-dots { grid-column: 1 / -1; grid-row: 2; padding-left: 18px; }
+  .sb-count { display: none; }
+  .sb-dp-list li { grid-template-columns: 14px 1fr; }
+  .sb-dp-list li .sb-dp-meta, .sb-dp-list li .btn { grid-column: 2; justify-self: start; }
+  .sb-summary { text-align: left; }
+}
+
 .prio-item { display: flex; gap: 12px; align-items: center; padding: 12px 2px; border-bottom: 1px solid var(--hairline); }
 .prio-item:last-child { border-bottom: none; }
 .prio-rank {
