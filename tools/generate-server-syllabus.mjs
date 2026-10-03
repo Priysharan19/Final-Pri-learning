@@ -37,6 +37,17 @@ export function renderSyllabusSnapshot() {
     name: IN_TRACKS[id].name,
     difficultyCeiling: IN_TRACKS[id].difficultyCeiling
   }));
+  // The practice skills each chapter generates, as generator ids with the first
+  // dot point each one exercises. /v1/question-photo constrains a vision
+  // model's chapter/skill guess to exactly these ids, and validates the pair.
+  const skills = Object.keys(IN_CHAPTER_BY_ID).sort().map(id => {
+    const seen = new Map();
+    for (const cover of IN_CHAPTER_BY_ID[id].covers || []) {
+      if (typeof cover?.gen !== 'string' || seen.has(cover.gen)) continue;
+      seen.set(cover.gen, Number.isInteger(cover.dp?.[0]) ? cover.dp[0] : null);
+    }
+    return { id, skills: [...seen].map(([gen, dotpoint]) => ({ gen, dotpoint })) };
+  });
   const lines = [
     '// GENERATED FILE — do not edit by hand.',
     '//',
@@ -52,6 +63,10 @@ export function renderSyllabusSnapshot() {
     '',
     'export const IN_CHAPTER_BY_ID = Object.freeze({',
     ...chapters.map(c => `  ${JSON.stringify(c.id)}: Object.freeze(${JSON.stringify(c)}),`),
+    '});',
+    '',
+    'export const IN_CHAPTER_SKILLS = Object.freeze({',
+    ...skills.map(c => `  ${JSON.stringify(c.id)}: Object.freeze(${JSON.stringify(c.skills)}.map(Object.freeze)),`),
     '});',
     ''
   ];

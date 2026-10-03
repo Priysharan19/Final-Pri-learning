@@ -90,6 +90,20 @@ export function latexProblems(text, where = 'text') {
   const count = (bare.match(/\$/g) || []).length;
   if (count % 2 === 1) out.push(`unbalanced $ delimiter in ${where}: ${s.slice(0, 100)}`);
   const parts = s.split(MATH_SPLIT);
+  // A LaTeX command outside $…$ is shown to the student as raw source
+  // ("\frac{1}{2}" instead of ½). Only the text segments are checked; an
+  // escaped dollar (\$) is a literal rupee/dollar sign, not a command.
+  // MathText (client/src/lib/latex.jsx) splits on single $…$ only, so a
+  // display block $$…$$ renders with a stray "$" on each side.
+  if (/(?<!\\)\$\$/.test(s)) out.push(`display $$…$$ is not rendered by MathText in ${where}: ${s.slice(0, 100)}`);
+  if (count % 2 === 0) {
+    // Display math ($$…$$) first, then inline $…$; whatever is left is text.
+    const text = s.replace(/\\\$/g, '').replace(/\$\$[\s\S]*?\$\$/g, ' ').replace(/\$[^$]*\$/g, ' ');
+    for (const piece of [text]) {
+      const cmd = piece.match(/\\[A-Za-z]+/);
+      if (cmd) { out.push(`LaTeX command ${cmd[0]} outside $…$ in ${where}: ${s.slice(0, 100)}`); break; }
+    }
+  }
   // KaTeX warns on the console about glyphs it has no metrics for (₹ in text
   // mode). The browser renders those from the fallback font, so they are not
   // render failures; only a thrown ParseError is.

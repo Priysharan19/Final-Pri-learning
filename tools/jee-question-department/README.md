@@ -11,7 +11,7 @@ There are four stages, and only the last one creates app assets:
 1. **Extract** — `extract.py` finds likely printed question markers and creates `work/review-queue.jsonl`. Every row is `status: "draft"`; extraction can never publish.
 2. **Review** — a reviewer checks the source crop/PDF page, repairs maths text, chooses the exact Pri chapter when the source chapter is ambiguous, confirms JEE Main vs Advanced/historical IIT-JEE, sets D1–D4, enters the answer, and writes the worked steps. The reviewer then sets `status: "approved"`, `review.reviewedBy`, and `review.reviewedAt`.
 3. **Audit** — `audit.py --publish` rejects duplicate ids, out-of-range source pages, ambiguous routing, missing reviewer evidence, invalid answer contracts, missing worked steps, and placeholder solutions.
-4. **Pack** — `pack.py` runs the same strict publish audit again, gzip/base64 packs only approved rows, and generates `client/src/engine/generators/jee-pyq-data/catalog.js`. The generated catalog uses lazy local Vite `?raw` imports, so archive shards stay demand-loaded without introducing `fetch`, XHR, telemetry, or another network path. The student runtime reads only that generated catalog.
+4. **Pack** — `pack.py` runs the same strict publish audit again, gzip/base64 packs only approved rows, and generates `client/src/engine/generators/jee-pyq-data/catalog.js`. The generated catalog lazily imports small local ES-module shards (each exports its base64 text), so archive shards stay demand-loaded without introducing `fetch`, XHR, telemetry, or another network path. The student runtime reads only that generated catalog.
 
 That boundary is deliberate: an OCR/PDF extraction error must become a review item, never a wrong maths question shown to a student.
 
@@ -79,4 +79,8 @@ The committed `catalog.js` may be empty. Empty means exactly what it says: **zer
 
 ## Ownership
 
-Do not hand-edit generated `.b64` shards or generated catalog metadata. Fix the reviewed source row, rerun the audit, and repack. Keep `work/` local; it contains extraction artefacts and reviewer work-in-progress rather than production assets.
+Do not hand-edit generated `<part>-NN.js` shards or generated catalog metadata. Fix the reviewed source row, rerun the audit, and repack. Keep `work/` local; it contains extraction artefacts and reviewer work-in-progress rather than production assets.
+
+## Official exam-authority sources
+
+Official JEE Main / JEE Advanced / CBSE / NCERT intake (manifest, hash-verified fetch, key pairing, engine re-check, human and automated review tiers) is documented in `docs/content/official-pyq-intake.md`.

@@ -210,21 +210,14 @@ class InkInputTest {
             val bandErased = bandPixels(s, 0.42f, 0.48f)
             assertTrue("the stylus eraser end removes that stroke ($bandErased px left, was $bandInked)", bandErased <= bandEmpty + 5)
 
-            // ── the shared recognizer reads it and the attempt is marked ─────
-            val lines = waitFor(s, "document.querySelectorAll('.ink-preview .ink-line').length || false", 30_000)
-            assertTrue("the shared recognizer produced a reading of the strokes ($lines line(s))", (lines.toIntOrNull() ?: 0) >= 1)
-            // Submit as a student would. When the shared recognizer doubts its own
-            // reading (it may, for synthetic strokes on a large tablet canvas), the
-            // submit control turns into "Check this reading first" and the student
-            // confirms it ("That's what I wrote") — the answer-blind confirmation step
-            // cannot be walked around, so the test goes through it too.
-            waitFor(s, "(function(){var b=[].slice.call(document.querySelectorAll('.editor-foot button.btn')).find(function(x){return x.offsetParent&&!x.disabled});if(!b)return false;b.click();return true;})()")
-            Thread.sleep(600)
-            eval(s, "(function(){var v=document.querySelector('.editor-body[role=status] .btn-primary');if(v&&!v.disabled)v.click();return !!v;})()")
-            // The injected strokes are not a real answer: correct, incorrect or
-            // unreadable are all honest outcomes; what matters is that it is marked.
-            val marked = waitFor(s, "(function(){var v=document.querySelector('.verdict')||document.querySelector('.your-answer');return v?(v.innerText||'marked').slice(0,80):false;})()", 60_000)
-            assertTrue("the submitted handwriting was marked: $marked", marked.length > 2)
+            // ── reading is the server's job (owner decision: server-only) ────
+            // The emulator has no Pri server, so the strokes must NOT be read or
+            // marked on the device; the student is told why and the ink is kept.
+            val status = waitFor(s, "(function(){var e=document.querySelector('.ink-status');return e&&e.innerText.trim()?e.innerText.trim().slice(0,160):false;})()", 30_000)
+            assertTrue("the student is told why the handwriting is not read yet: $status", status.length > 10)
+            assertEquals("no on-device reading is shown or offered for marking", "0",
+                eval(s, "String(document.querySelectorAll('.ink-preview .ink-line').length)").trim('"'))
+            assertTrue("the ink is kept on the page while it waits", inkPixels(s) > 0)
 
             m = metrics(s)
             Log.i("PRITEST", "ink metrics (SYNTHETIC / EMULATOR): " + m.toString())
