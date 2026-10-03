@@ -21,13 +21,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { label: baseline-33-pixel6,        api: 33, profile: pixel_6, target: google_apis, build: '',          ram: '',     heap: '',    cores: 2, opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim' }
-          - { label: emulator35-33-pixel6,      api: 33, profile: pixel_6, target: google_apis, build: '12414864',  ram: '',     heap: '',    cores: 2, opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim' }
-          - { label: aosp-33-pixel6,            api: 33, profile: pixel_6, target: default,     build: '',          ram: '',     heap: '',    cores: 2, opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim' }
-          - { label: bigger-33-pixel6,          api: 33, profile: pixel_6, target: google_apis, build: '',          ram: '3072M', heap: '576M', cores: 4, opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim -no-metrics' }
-          - { label: pixel5-33,                 api: 33, profile: pixel_5, target: google_apis, build: '',          ram: '',     heap: '',    cores: 2, opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim' }
-          - { label: api34-pixel6,              api: 34, profile: pixel_6, target: google_apis, build: '',          ram: '',     heap: '',    cores: 2, opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim' }
-          - { label: nogpu-33-pixel6,           api: 33, profile: pixel_6, target: google_apis, build: '',          ram: '',     heap: '',    cores: 2, opts: '-no-window -gpu off -feature -Vulkan -no-snapshot -noaudio -no-boot-anim' }
+          - { label: verbose-33-pixel6,   api: 33, profile: pixel_6, target: google_apis, build: '', ram: '', heap: '', cores: 2, webview: '', opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim -verbose -show-kernel' }
+          - { label: wv-nogpucomp-33,     api: 33, profile: pixel_6, target: google_apis, build: '', ram: '', heap: '', cores: 2, webview: '--disable-gpu-compositing', opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim' }
+          - { label: wv-nogpu-33,         api: 33, profile: pixel_6, target: google_apis, build: '', ram: '', heap: '', cores: 2, webview: '--disable-gpu', opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim' }
+          - { label: wv-no2dcanvas-33,    api: 33, profile: pixel_6, target: google_apis, build: '', ram: '', heap: '', cores: 2, webview: '--disable-accelerated-2d-canvas', opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim' }
+          - { label: nodirectmem-33,      api: 33, profile: pixel_6, target: google_apis, build: '', ram: '', heap: '', cores: 2, webview: '', opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan,-GLDirectMem,-GLAsyncSwap -no-snapshot -noaudio -no-boot-anim' }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -63,7 +61,7 @@ jobs:
           disable-animations: true
           emulator-options: ${{ matrix.opts }}
           working-directory: android
-          script: mkdir -p app/build/outputs/pri-instrumented && (adb logcat -v threadtime > app/build/outputs/pri-instrumented/live-logcat.txt 2>&1 &) && node ../scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && { ./scripts/run-instrumented.sh product; rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null; exit $rc; }
+          script: mkdir -p app/build/outputs/pri-instrumented && { [ -n "${{ matrix.webview }}" ] && adb shell "echo '_ ${{ matrix.webview }}' > /data/local/tmp/webview-command-line && chmod 644 /data/local/tmp/webview-command-line" || true; } && (adb logcat -v threadtime > app/build/outputs/pri-instrumented/live-logcat.txt 2>&1 &) && node ../scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && { ./scripts/run-instrumented.sh product; rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null; exit $rc; }
       - name: Collect emulator crash data
         if: always()
         run: |
