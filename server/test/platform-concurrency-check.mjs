@@ -43,7 +43,7 @@ process.env.PRI_RAZORPAY_MONTHLY_PLAN_ID = 'plan_Concurrent1234';
 process.env.PRI_RAZORPAY_MONTHLY_TOTAL_COUNT = '12';
 delete process.env.PRI_DISPLAY_TRIAL_DAYS;
 
-const { startApp, registerAccount, verifyEmail, checks, promoteRole } = await import('./support/app-harness.mjs');
+const { startApp, registerAccount, checks, promoteRole } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
 const { decryptDeliveryToken } = await import('../platform/deliveryCrypto.js');
 const { consumeOidcNonce, issueOidcNonce } = await import('../platform/oidcNonce.js');

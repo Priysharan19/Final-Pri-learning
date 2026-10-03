@@ -80,7 +80,7 @@ jobs:
           grep -Fq 'APPLE SIGN IN: PASS — 66/66 checks' suites.log
           grep -Fq 'ONBOARDING SCOPE: PASS — 40/40 checks' suites.log
           grep -Fq 'STUDY PLAN: PASS — 211/211 checks' suites.log
-          grep -Fq 'REMINDERS: PASS — 182/182 checks' suites.log
+          grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
           grep -Fq 'I18N: PASS — 190/190 checks' suites.log
           grep -Fq 'I18N COVERAGE: PASS — 89/89 checks — 59 files scanned, 0 hard-coded strings' suites.log
           # Chapter notes: every curriculum chapter, every worked answer engine-verified.

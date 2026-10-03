@@ -24,7 +24,7 @@
 // rendered with react-dom/server, so these are behaviours of the real component,
 // not grep hits. Usage: node client/test/onboarding-scope-check.mjs
 // ─────────────────────────────────────────────────────────────────────────────
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -39,8 +39,9 @@ const read = rel => readFileSync(join(CLIENT, rel), 'utf8');
  */
 export async function bundleLogin({ extended, tag = 'scope' }) {
   const { rolldown } = await import(pathToFileURL(join(CLIENT, 'node_modules/rolldown/dist/index.mjs')).href);
-  const dir = join(tmpdir(), `pri-onboarding-scope-${process.pid}-${tag}-${extended ? 'on' : 'off'}`);
-  mkdirSync(dir, { recursive: true });
+  // A private directory of its own (mkdtemp: unpredictable name, mode 0700), so
+  // nothing else on a shared machine can pre-plant or swap the files bundled here.
+  const dir = mkdtempSync(join(tmpdir(), `pri-onboarding-scope-${tag}-${extended ? 'on' : 'off'}-`));
   // The app shell and the local API are the only neighbours the screen needs
   // that would drag the whole product (IndexedDB, the question banks) into the
   // bundle; both are stubbed to inert values. Everything else is the real code.

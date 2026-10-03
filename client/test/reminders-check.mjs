@@ -31,7 +31,6 @@ const read = rel => readFileSync(join(ROOT, rel), 'utf8');
 const TZ = 'Asia/Kolkata';
 const TODAY = '2026-10-02';
 const NOW = zonedMs(TODAY, 9, TZ);          // 09:00 IST on a Friday
-const dateOf = ms => new Date(ms).toISOString().slice(0, 10);
 
 const t = (key, vars) => {
   const e = en[key];
@@ -286,6 +285,7 @@ function memScope(extra = {}) {
   ok(sw.includes("addEventListener('notificationclick'"), 'and opens the app on a tap');
   ok(!/pushManager|addEventListener\('push'/.test(sw), 'the worker has no push subscription — there is no push server');
   ok(/slice\(0, 120\)/.test(sw) && /slice\(0, 200\)/.test(sw), 'title and body are bounded again in the worker');
+  ok((sw.match(/if \(!fromThisOrigin\(e\)\) return;/g) || []).length === 2 && /e\.origin === self\.location\.origin/.test(sw), 'both message handlers act only on a message from a page of this origin');
 }
 
 // ── 9 · Permission is asked from Settings only ───────────────────────────────

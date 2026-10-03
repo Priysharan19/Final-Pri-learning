@@ -50,7 +50,7 @@ async function audit(db, actor, action, targetKind, targetId, metadata = {}, now
 
 function email(value) {
   const normalized = String(value || '').trim().toLowerCase();
-  if (!EMAIL.test(normalized) || normalized.length > 254) return null;
+  if (normalized.length > 254 || !EMAIL.test(normalized)) return null;
   return normalized;
 }
 

@@ -63,7 +63,10 @@ export function validateTeacherFeedback(input) {
       case 'note': case 'nextSteps': {
         const text = boundedString(raw, key === 'note' ? FEEDBACK_MAX_NOTE : 2000, key === 'note' ? 'Feedback note' : 'Next steps');
         if (!text.ok) return invalid(text.message);
-        if (text.value) out[key] = text.value;
+        if (text.value) {
+          if (key === 'note') out.note = text.value;
+          else out.nextSteps = text.value;
+        }
         break;
       }
       case 'grade': {

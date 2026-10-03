@@ -150,7 +150,7 @@ ok(swiftSources[0] === swiftSources[1], 'LocalSchemeHandler.swift is byte-identi
 function inlineScriptFree(rel) {
   if (!existsSync(at(rel))) return;
   const html = read(rel);
-  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
+  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi)];
   const inline = scripts.filter(m => !/\bsrc\s*=/.test(m[1]) || m[2].trim().length > 0);
   ok(inline.length === 0, `${rel}: no inline <script> (found ${inline.length})`);
   ok(!/\son[a-z]+\s*=\s*["']/i.test(html), `${rel}: no inline event handler attributes`);

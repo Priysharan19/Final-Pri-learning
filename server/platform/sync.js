@@ -1,7 +1,7 @@
 import { asyncRouter } from './asyncRouter.js';
 import { asStore, isDatabaseOverload } from './store.js';
 import { nextSyncCursor, syncLockKey } from './db.js';
-import { id, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
+import { rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 import { syncQuota } from './config.js';
 
 const SCHEMA = 1;

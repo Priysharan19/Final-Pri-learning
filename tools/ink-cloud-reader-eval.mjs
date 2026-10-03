@@ -31,7 +31,7 @@
 //   node tools/ink-cloud-reader-eval.mjs --dry-run --out /tmp/eval
 // Exit: 0 measured (or dry-run complete) · 2 NOT MEASURED · 1 error/refused.
 // ─────────────────────────────────────────────────────────────────────────────
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, relative, isAbsolute } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -284,7 +284,10 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   const limit = Number(argAfter(argv, '--limit', '0')) || 0;
   const corpusDir = resolve(argAfter(argv, '--corpus', DEFAULT_CORPUS_DIR));
   const date = argAfter(argv, '--date', new Date().toISOString().slice(0, 10));
-  let outDir = argAfter(argv, '--out', dryRun ? join(tmpdir(), 'pri-cloud-reader-eval-dry-run') : DEFAULT_OUT_DIR);
+  // A dry run with no --out lands in a private directory of its own (mkdtemp:
+  // unpredictable name, mode 0700) rather than a fixed name in the shared tmp dir.
+  let outDir = argAfter(argv, '--out', null);
+  if (!outDir) outDir = dryRun ? mkdtempSync(join(tmpdir(), 'pri-cloud-reader-eval-dry-run-')) : DEFAULT_OUT_DIR;
   outDir = resolve(outDir);
 
   if (dryRun) {

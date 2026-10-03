@@ -24,7 +24,6 @@ const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
 const eq = (a, b, label) => ok(JSON.stringify(a) === JSON.stringify(b), `${label} — expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`);
 
 const TODAY = '2026-10-02';            // a Friday
-const DAY = 86_400_000;
 const ms = date => Date.parse(`${date}T06:00:00Z`);
 const allSessions = plan => plan.weeks.flatMap(w => w.days).flatMap(d => d.sessions);
 const strip = plan => JSON.stringify(plan);

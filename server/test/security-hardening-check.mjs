@@ -34,7 +34,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 process.env.PRI_SYNC_MAX_BYTES_PER_ACCOUNT = String(1024 * 1024);
 process.env.PRI_METRICS_TOKEN = 'hardening-operator-token-of-32-characters-x';
 
-const { startApp, registerAccount, verifyEmail, checks, enrolMfa } = await import('./support/app-harness.mjs');
+const { startApp, verifyEmail, checks, enrolMfa } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
 const { decryptDeliveryToken } = await import('../platform/deliveryCrypto.js');
 const { runHousekeeping } = await import('../platform/housekeeping.js');
@@ -131,6 +131,7 @@ try {
     c.eq(new Set(COMMON_PASSWORDS).size, 1000, 'all distinct');
     c.ok(isCommonPassword('password123') && isCommonPassword('Password123!') && isCommonPassword('sunshine2026') && isCommonPassword('iloveyou12'), 'common passwords and their digit/punctuation variants are recognised');
     c.ok(!isCommonPassword('correct-horse-battery') && !isCommonPassword('hardening-pw-9-horse'), 'ordinary passphrases are not');
+    c.ok(isCommonPassword('qwerty' + '!'.repeat(60)) && !isCommonPassword('!'.repeat(60)) && !isCommonPassword('abc' + '1'.repeat(40)), 'the trailing digit/punctuation run is stripped in one linear pass: a long run is no slower, and a stem under four characters is not consulted');
     c.deq(passwordProblem('short'), { code: 'WEAK_PASSWORD', message: 'Password must be at least 10 characters.' }, 'too short is WEAK_PASSWORD');
     c.eq(passwordProblem('a'.repeat(72)), null, '72 bytes is accepted');
     c.eq(passwordProblem('a'.repeat(73))?.code, 'PASSWORD_TOO_LONG', '73 bytes is refused (bcrypt reads 72)');

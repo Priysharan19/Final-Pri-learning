@@ -1016,13 +1016,20 @@ export const COMMON_PASSWORDS = Object.freeze([
 ]);
 
 const COMMON = new Set(COMMON_PASSWORDS);
-const TRAILING = /[0-9!@#$%^&*._\-+=?]+$/;
+const TRAILING = new Set('0123456789!@#$%^&*._-+=?');
+
+/** The password without its trailing run of digits/punctuation: one pass from the end, linear in the length. */
+function stemOf(lower) {
+  let end = lower.length;
+  while (end > 0 && TRAILING.has(lower[end - 1])) end--;
+  return lower.slice(0, end);
+}
 
 /** True when the password, or its stem without a trailing digit/punctuation run, is on the list. */
 export function isCommonPassword(password) {
   const lower = String(password || '').toLowerCase().trim();
   if (!lower) return false;
   if (COMMON.has(lower)) return true;
-  const stem = lower.replace(TRAILING, '');
+  const stem = stemOf(lower);
   return stem.length >= 4 && stem !== lower && COMMON.has(stem);
 }

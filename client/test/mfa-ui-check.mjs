@@ -135,7 +135,7 @@ try {
     eq((enrol.match(new RegExp(`aria-label="${en['mfa.copySecret']}"`, 'g')) || []).length, 1, 'a copy button for the secret');
     eq((enrol.match(new RegExp(`aria-label="${en['mfa.copyUri']}"`, 'g')) || []).length, 1, 'and one for the URI');
     ok(/autocomplete="one-time-code"[^>]*pattern="\[0-9\]\{6\}"[^>]*maxlength="6"/i.test(enrol) || /maxlength="6"/i.test(enrol) && /one-time-code/.test(enrol), 'the confirm field takes exactly six digits as a one-time code');
-    ok(enrol.includes(en['mfa.pasteIntoApp'].replace(/“/g, '“')), 'the instruction says to paste the key into an authenticator app');
+    ok(enrol.includes(en['mfa.pasteIntoApp']), 'the instruction says to paste the key into an authenticator app');
     ok(!/<svg|<canvas|qrcode/i.test(enrol), 'no QR renderer: no new dependency, no drawn secret');
 
     const recovery = render({ initial: { step: 'recovery', recoveryCodes: RECOVERY } });
