@@ -98,7 +98,10 @@ jobs:
           const web = JSON.parse(readFileSync('release.json', 'utf8'));
           assert.equal(health.ok, true);
           assert.equal(health.service, 'pri-learning-platform');
-          assert.equal(health.storage?.persistentDatabase, true);
+          // Anonymous /v1/health no longer carries operator storage detail; the
+          // persistent database is proven by the file test below and the engine here.
+          assert.equal(health.database?.engine, 'sqlite');
+          assert.equal(health.database?.reachable, true);
           assert.equal(health.releaseIdentity?.releaseSha, process.env.GITHUB_SHA);
           assert.deepEqual(web, health.releaseIdentity);
           NODE
