@@ -14,7 +14,10 @@
 // 9: accounts.age_basis — the age decision made at account creation
 //    ('adult' | 'child' | 'legacy'); NULL means none was recorded and the
 //    guardian gate fails closed (supabase/migrations/20261005000000).
-export const SCHEMA_VERSION = 9;
+// 10: one-time-code sign-in — otp_challenges, account_phones and
+//    guardian_consents.guardian_phone (supabase/migrations/20261006000000).
+//    SQLite creates the same tables lazily in otpCore.js.
+export const SCHEMA_VERSION = 10;
 // Billing 4: billing_payments keeps its row when the account is deleted
 //    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
 //    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).

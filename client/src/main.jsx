@@ -31,6 +31,16 @@ installReleaseIdentityDiagnostics(window);
 // navigation code can observe it. The link itself is minted by PRI_PUBLIC_ORIGIN,
 // so its cloud authority is the same origin that served this page.
 const ACCOUNT_ACTION_MODE = window.location.pathname === '/account-action';
+// The parent's own consent page: no profile, no child session. A link from
+// the guardian email carries its token in the fragment, stripped the same way.
+const GUARDIAN_MODE = window.location.pathname === '/guardian/consent';
+let guardianToken = null;
+if (GUARDIAN_MODE) {
+  const data = parseAccountActionFragment(window.location.hash);
+  guardianToken = data?.action === 'guardian-consent' ? data.token : null;
+  window.history.replaceState(null, '', accountActionCleanUrl(window.location));
+  if (!window.__PRI_CLOUD_ORIGIN__) window.__PRI_CLOUD_ORIGIN__ = window.location.origin;
+}
 let accountActionData = null;
 if (ACCOUNT_ACTION_MODE) {
   accountActionData = parseAccountActionFragment(window.location.hash);
@@ -71,7 +81,17 @@ if (LAN_DEV) {
 }
 
 const root = createRoot(document.getElementById('root'));
-if (ACCOUNT_ACTION_MODE) {
+if (GUARDIAN_MODE) {
+  // Outside StrictMode for the same reason as account actions: one-time codes.
+  const GuardianConsent = React.lazy(() => import('./pages/GuardianConsent.jsx'));
+  root.render(
+    <ErrorBoundary scope="guardian consent">
+      <React.Suspense fallback={null}>
+        <GuardianConsent linkToken={guardianToken} />
+      </React.Suspense>
+    </ErrorBoundary>
+  );
+} else if (ACCOUNT_ACTION_MODE) {
   // Deliberately outside StrictMode: verification is a one-time token-consuming
   // mutation and development StrictMode replays mount effects.
   root.render(
