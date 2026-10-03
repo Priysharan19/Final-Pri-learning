@@ -11,10 +11,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  suites:
-    name: Suites, coverage and accuracy gates
+  deterministic:
+    name: Deterministic shard — ${{ matrix.shard }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - holdout3-india-pyq
+          - holdout2-india-adaptive
+          - ink-engine-india-exams
+          - holdout-lines-backend
+          - context-hard-golden
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,16 +31,98 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: client/package-lock.json
-      - name: Runner budget policy
-        run: node tools/ci-runner-policy-check.mjs
+      - name: Deterministic shard mapping contract
+        run: node tools/ci-deterministic-shards.mjs --check
       - name: Install client dependencies
         run: npm ci --prefix client
+      - name: Install Chromium for golden journey
+        if: matrix.shard == 'context-hard-golden'
+        working-directory: client
+        run: npx playwright install --with-deps chromium
       - name: Runtime dependency security floor
+        if: matrix.shard == 'ink-engine-india-exams'
         run: node tools/runtime-audit-floor.mjs client
-      - name: Every deterministic suite
+      - name: Run deterministic shard
         run: |
           set -o pipefail
-          npm test 2>&1 | tee suites.log
+          node tools/ci-deterministic-shards.mjs --run '${{ matrix.shard }}' 2>&1 | tee 'shard-${{ matrix.shard }}.log'
+      - name: Person 2 India + commercial contracts
+        if: matrix.shard == 'holdout-lines-backend'
+        run: |
+          set -o pipefail
+          {
+            set -euo pipefail
+            node client/test/india-production-meta-check.mjs
+            node client/test/india-class7-current-source-check.mjs
+            node client/test/india-class10-current-source-check.mjs
+            node client/test/india-class10-production-gap-check.mjs
+            node client/test/ncert-class10-full-book-check.mjs
+            node client/test/class10-ncert-product-check.mjs
+            node client/test/india-practice-availability-check.mjs
+            node client/test/entitlement-check.mjs
+            node client/test/sync-contract-check.mjs
+            node client/test/restore-durability-check.mjs
+            node client/test/cloud-sync-worker-check.mjs
+            node client/test/cloud-session-refresh-check.mjs
+            node client/test/account-action-boundary-check.mjs
+            node client/test/india-exam-blueprint-check.mjs
+            node client/test/india-progress-product-check.mjs
+            node tools/india-production-census.mjs
+          } 2>&1 | tee -a 'shard-${{ matrix.shard }}.log'
+      - name: Shard log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deterministic-log-${{ matrix.shard }}
+          path: shard-${{ matrix.shard }}.log
+          if-no-files-found: error
+          retention-days: 7
+
+  suites:
+    name: Suites, coverage and accuracy gates
+    if: ${{ always() }}
+    needs: deterministic
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Runner budget policy
+        run: node tools/ci-runner-policy-check.mjs
+      - name: Deterministic shard mapping contract
+        run: node tools/ci-deterministic-shards.mjs --check
+      - uses: actions/download-artifact@v4
+        with:
+          name: deterministic-log-holdout3-india-pyq
+          path: shard-logs/holdout3-india-pyq
+      - uses: actions/download-artifact@v4
+        with:
+          name: deterministic-log-holdout2-india-adaptive
+          path: shard-logs/holdout2-india-adaptive
+      - uses: actions/download-artifact@v4
+        with:
+          name: deterministic-log-ink-engine-india-exams
+          path: shard-logs/ink-engine-india-exams
+      - uses: actions/download-artifact@v4
+        with:
+          name: deterministic-log-holdout-lines-backend
+          path: shard-logs/holdout-lines-backend
+      - uses: actions/download-artifact@v4
+        with:
+          name: deterministic-log-context-hard-golden
+          path: shard-logs/context-hard-golden
+      - name: Combine deterministic logs
+        run: |
+          set -euo pipefail
+          : > suites.log
+          for shard in holdout3-india-pyq holdout2-india-adaptive ink-engine-india-exams holdout-lines-backend context-hard-golden; do
+            log="shard-logs/$shard/shard-$shard.log"
+            test -s "$log" || { echo "Missing deterministic shard log: $log" >&2; exit 1; }
+            cat "$log" >> suites.log
+          done
+          node tools/ci-deterministic-shards.mjs --verify-log suites.log
       - name: Exact coverage invariants
         run: |
           set -euo pipefail
@@ -107,37 +198,22 @@ jobs:
             echo 'A deterministic suite reported skipped coverage.' >&2
             exit 1
           fi
-      - name: Person 2 India + commercial contracts
+      - name: Require all deterministic shards
+        if: always()
         run: |
           set -euo pipefail
-          node client/test/india-production-meta-check.mjs
-          node client/test/india-class7-current-source-check.mjs
-          node client/test/india-class10-current-source-check.mjs
-          node client/test/india-class10-production-gap-check.mjs
-          node client/test/ncert-class10-full-book-check.mjs
-          node client/test/class10-ncert-product-check.mjs
-          node client/test/india-practice-availability-check.mjs
-          node client/test/entitlement-check.mjs
-          node client/test/sync-contract-check.mjs
-          # Both of these guard the offline-first backup and cloud-sync paths and
-          # were not being run anywhere in CI.
-          node client/test/restore-durability-check.mjs
-          node client/test/cloud-sync-worker-check.mjs
-          node client/test/cloud-session-refresh-check.mjs
-          node client/test/account-action-boundary-check.mjs
-          node client/test/india-exam-blueprint-check.mjs
-          node client/test/india-progress-product-check.mjs
-          node tools/india-production-census.mjs
-      - name: Real ink diagnostic
-        if: always()
-        run: npm run --silent test:real || true
-      - name: Suite log
+          test '${{ needs.deterministic.result }}' = 'success' || {
+            echo 'At least one deterministic shard failed or was cancelled.' >&2
+            exit 1
+          }
+      - name: Combined suite log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: suites-log
           path: suites.log
           if-no-files-found: error
+          retention-days: 7
 
   platform:
     name: Production account, sync and commercial schema

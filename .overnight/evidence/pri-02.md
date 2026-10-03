@@ -291,3 +291,80 @@ The executable candidate is therefore verified without relaxing the 30-minute
 CI budget or any product/test acceptance gate. This evidence update is
 documentation-only; the PR's final evidence commit is expected to receive the
 same protected exact-head checks before merge.
+
+## CI deterministic-gate parallelisation — 2026-09-30
+
+### Previous serial architecture
+
+The protected Suites, coverage and accuracy gates job executed the entire
+69-script npm test chain serially on one runner, then applied exact log
+coverage assertions. On the last successful exact-head CI evidence, that
+deterministic step took 15m 54s. Per-script timestamps from workflow run
+36712083817, job 109876040064, showed the wall-clock concentration in
+test:holdout2 (~184s), test:holdout3 (~186s), test:ink (~140s),
+test:holdout (~115s), test:context (~87s), test:hard (~80s) and
+test:lines (~69s). India exam flow is no longer the old artificial
+bottleneck after the fake-IndexedDB journal repair (test:india:exams was
+~5s in the measured CI run), so the split uses current evidence rather than
+preserving an obsolete bottleneck assumption.
+
+### New shard architecture
+
+.github/ci/deterministic-shards.json is the machine-readable authority.
+The 69 scripts from package.json npm test, plus the three mandatory PRI-02
+regressions (test:golden-journey, test:practice:state,
+test:idb:lifecycle), are mapped exactly once across five measured shards:
+
+- holdout3-india-pyq
+- holdout2-india-adaptive
+- ink-engine-india-exams
+- holdout-lines-backend
+- context-hard-golden
+
+The split was produced from the successful CI timestamps and targets roughly
+192 seconds of measured deterministic work per shard. India PYQ, India exam
+flow, adaptive/native/identity coverage are deliberately distributed across
+different workers rather than concentrated into one India bottleneck.
+
+tools/ci-deterministic-shards.mjs fails if npm test changes without an
+updated mapping, if a script is omitted or duplicated, or if a mapped script
+is undefined. Its current contract result is:
+
+PASS — 69/69 npm test scripts + 3/3 required PRI-02 regressions mapped exactly once across 5 shards.
+
+Each shard uses set -o pipefail, runs real npm run commands, emits a pass
+sentinel only after a zero exit status, and uploads its deterministic log.
+The existing Person 2 India/commercial contracts and client runtime audit
+remain mandatory inside the sharded protected path. The golden-journey shard
+installs Chromium explicitly rather than relying on ambient runner state.
+
+### Protected aggregator
+
+The lightweight aggregator retains the exact display name:
+
+Suites, coverage and accuracy gates
+
+It has needs: deterministic with if: always(), downloads all five named
+log artifacts, fails on a missing artifact, concatenates them into
+suites.log, requires exactly one successful sentinel for every expected
+script, and then executes the unchanged exact coverage assertions. This
+retains the explicit INDIA EXAM FLOW: PASS — 129/129 checks,
+INDIA PYQ: PASS — 1079/1079 checks, all prior quantitative invariants and
+the not measured: rejection. It finally rejects any failed or cancelled
+matrix shard, so the stable protected context cannot pass on incomplete work.
+
+### Local validation
+
+- YAML parser: PASS.
+- git diff --check: PASS.
+- CI runner policy checker: PASS.
+- shard-mapping contract: PASS, 69/69 + 3/3 exactly once.
+- PRI-02 mandatory regressions: golden journey PASS (~6.9s locally), practice
+  state PASS, IndexedDB lifecycle PASS.
+- representative ink-engine-india-exams shard: PASS, 16/16 script sentinels;
+  included 1,704,000/1,704,000 engine self-checks, 21,000/21,000 multipart
+  part-checks and India exam flow 129/129.
+
+No product/runtime behaviour, assertion threshold, sample count, India exam
+coverage, India PYQ coverage, branch protection rule or required-check name
+was weakened.
