@@ -1,0 +1,77 @@
+# Diagnostic only (workflow_dispatch): which emulator configuration keeps the hosted
+# runner's headless phone emulator alive through the Android shell journey?
+# Issue #278 / #327. SYNTHETIC / EMULATOR evidence only. Not a release gate.
+name: Android Emulator Diagnostic
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { label: baseline-33-pixel6,        api: 33, profile: pixel_6, target: google_apis, build: '',          ram: '',     heap: '',    cores: 2, opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim' }
+          - { label: emulator35-33-pixel6,      api: 33, profile: pixel_6, target: google_apis, build: '12414864',  ram: '',     heap: '',    cores: 2, opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim' }
+          - { label: aosp-33-pixel6,            api: 33, profile: pixel_6, target: default,     build: '',          ram: '',     heap: '',    cores: 2, opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim' }
+          - { label: bigger-33-pixel6,          api: 33, profile: pixel_6, target: google_apis, build: '',          ram: '3072M', heap: '576M', cores: 4, opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim -no-metrics' }
+          - { label: pixel5-33,                 api: 33, profile: pixel_5, target: google_apis, build: '',          ram: '',     heap: '',    cores: 2, opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim' }
+          - { label: api34-pixel6,              api: 34, profile: pixel_6, target: google_apis, build: '',          ram: '',     heap: '',    cores: 2, opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim' }
+          - { label: nogpu-33-pixel6,           api: 33, profile: pixel_6, target: google_apis, build: '',          ram: '',     heap: '',    cores: 2, opts: '-no-window -gpu off -feature -Vulkan -no-snapshot -noaudio -no-boot-anim' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build the shared web product and install the server
+        run: npm ci --prefix client && npm run build && npm ci --prefix server
+      - name: Build the app and the instrumented tests
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Journey with a live logcat tee
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: ${{ matrix.api }}
+          target: ${{ matrix.target }}
+          arch: x86_64
+          profile: ${{ matrix.profile }}
+          cores: ${{ matrix.cores }}
+          ram-size: ${{ matrix.ram }}
+          heap-size: ${{ matrix.heap }}
+          emulator-build: ${{ matrix.build }}
+          disable-animations: true
+          emulator-options: ${{ matrix.opts }}
+          working-directory: android
+          script: mkdir -p app/build/outputs/pri-instrumented && (adb logcat -v threadtime > app/build/outputs/pri-instrumented/live-logcat.txt 2>&1 &) && node ../scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && { ./scripts/run-instrumented.sh product; rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null; exit $rc; }
+      - name: Collect emulator crash data
+        if: always()
+        run: |
+          mkdir -p android/app/build/outputs/pri-instrumented/host
+          ls -la /tmp/android-runner 2>/dev/null || true
+          cp -r /tmp/android-runner android/app/build/outputs/pri-instrumented/host/ 2>/dev/null || true
+          dmesg 2>/dev/null | tail -200 > android/app/build/outputs/pri-instrumented/host/dmesg.txt || true
+          free -m > android/app/build/outputs/pri-instrumented/host/free.txt || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: diag-${{ matrix.label }}
+          path: android/app/build/outputs/pri-instrumented
+          if-no-files-found: warn
