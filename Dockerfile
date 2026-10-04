@@ -1,4 +1,4 @@
-FROM node:24-bookworm-slim AS client-build
+FROM node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS client-build
 # Every variable release/release-identity.mjs (DEPLOYMENT_IDENTITY_ENV) reads
 # must be declared here: Docker and Railway expose a build-time variable only
 # to a stage that declares it as an ARG. Without RAILWAY_GIT_COMMIT_SHA the
@@ -10,6 +10,14 @@ ARG GITHUB_SHA
 ARG VERCEL_GIT_COMMIT_SHA
 ARG PRI_BUILD_TIMESTAMP
 ARG SOURCE_DATE_EPOCH
+# Build-time product flags (client/src/platform/features.js). Unset = OFF.
+# Set a Railway build variable to "1" to ship the surface in production.
+ARG PRI_FEATURE_PLACEMENT
+ARG PRI_FEATURE_TUTOR
+ARG PRI_FEATURE_EXTENDED_TRACKS
+ENV PRI_FEATURE_PLACEMENT=${PRI_FEATURE_PLACEMENT} \
+    PRI_FEATURE_TUTOR=${PRI_FEATURE_TUTOR} \
+    PRI_FEATURE_EXTENDED_TRACKS=${PRI_FEATURE_EXTENDED_TRACKS}
 WORKDIR /app
 COPY client/package.json client/package-lock.json ./client/
 RUN npm ci --prefix client
@@ -23,7 +31,7 @@ COPY docs/legal ./docs/legal
 # applied in one place, shared with the server's run-time resolver.
 RUN node release/docker-build-identity.mjs
 
-FROM node:24-bookworm-slim AS server-deps
+FROM node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS server-deps
 WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends python3 make g++ \
@@ -31,7 +39,7 @@ RUN apt-get update \
 COPY server/package.json server/package-lock.json ./server/
 RUN npm ci --prefix server --omit=dev
 
-FROM node:24-bookworm-slim AS runtime
+FROM node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS runtime
 ARG PRI_RELEASE_SHA
 ARG PRI_BUILD_TIMESTAMP
 ENV NODE_ENV=production \

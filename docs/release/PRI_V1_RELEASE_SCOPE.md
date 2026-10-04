@@ -374,6 +374,36 @@ The hard release blockers at this freeze are:
 
 Code existence, open PRs, simulator evidence or passing automated tests do not by themselves close these blockers.
 
+### 18.1 Status notes — 2026-10-02 (append-only; the list above is the frozen record)
+
+Status vocabulary: **software-complete** — the repository side is done and gated by a named test;
+**BLOCKED_EXTERNAL** — only a human with real authority, hardware or accounts can close it, and the
+exact action is named. No blocker below is marked closed. The ordered owner path is
+`docs/release/LAUNCH-RUNBOOK.md`.
+
+| # | Status 2026-10-02 | Exact remaining human action | Gate / evidence file |
+|---|---|---|---|
+| 1 iPad-only | **software-complete**: both `Package.swift` declare `supportedDeviceFamilies: [.pad]`; `scripts/apple-shipping-target.mjs` guards it | none on the repository; the store listing's device family is confirmed at submission (#6) | `npm run release:matrix`; `node scripts/check-native-package-sync.mjs` |
+| 2 release SHA nominated | **BLOCKED_EXTERNAL** (owner decision) | owner names one exact `main` SHA in the release record (`ios/PriLearning.swiftpm/RELEASE.md` §11) | `node tools/verify-release-identity.mjs --require-native`; `/v1/health releaseIdentity` |
+| 3 Railway sourced from `main` | **BLOCKED_EXTERNAL** (Railway dashboard) | owner changes the production service's source branch from `task/pri-03-handwriting-production-wiring` to `main` and redeploys the nominated SHA | `GET /v1/health` → `releaseIdentity.releaseSha` equals the nominated SHA; recorded in the launch record |
+| 4 Postgres cutover | **software-complete** (migrations to schema 9 / billing 6, driver, `verify:platform:pg-target`, `test:platform:pg` 32/32, SQLite export tool + `test:platform:export`); **BLOCKED_EXTERNAL** for every hosted step | owner runs `docs/operations/postgres-cutover.md` §2–§6a on staging, then production, and decides migrate-vs-empty (§6a) | cutover log §7 filled; `POSTGRES TARGET: PASS`; `/v1/health database.engine = "postgres"` |
+| 5 physical iPad + Pencil certification | **BLOCKED_EXTERNAL** (hardware, people) | run the physical study on the exact candidate per `handwriting/v12/PHYSICAL_STUDY_PLAN.json` (24 test writers, 2 device classes) and the critical-case list in `RELEASE.md` §7 | `node scripts/ink-physical-study-status.mjs` (today: `collected writers: 0 … NOT MEASURED`); `handwriting/v12/evidence/physical/*.json` with `physicalHardware: true` |
+| 6 archive / signing / TestFlight / App Store | **BLOCKED_EXTERNAL** (Apple Developer account, Mac/Xcode) | owner follows `RELEASE.md` §6–§8 on the nominated SHA after `npm run build && npm run sync:ios` | `npm run verify:release:native`; TestFlight build id and physical-device results in the release record |
+| 7 StoreKit production configuration | **software-complete** for the server/client state machine (`docs/billing/storekit-certification.md`, synthetic evidence); **BLOCKED_EXTERNAL** items 1–7 of that document | account holder creates products and notification URLs, operator sets the Apple trust variables, QA runs sandbox scenarios on a physical iPad | `GET /v1/health` operator view (`PRI_METRICS_TOKEN`) → `billingProviders.apple: true`; `node server/tools/billing-reconcile.mjs` exit 0 with the device results recorded |
+| 8 PR #243 / expression-domain grading | **software-complete**: #243 merged to `main` (`c3755476e84c0f385e23049cd4d365f45042f294`, 2026-10-01); regression block in `client/test/marker-ncert-forms-check.mjs` (`373/373` on `main` 2026-10-02); one documented KNOWN LIMITATION (far tangential hole of a non-polynomial guard) | release governor records whether that known limitation is release-severity — a decision, not code | `node client/test/marker-ncert-forms-check.mjs`; disposition text in `PRI_R1_SCOPE_EVIDENCE.md` addendum |
+| 9 legal artifacts | **BLOCKED_EXTERNAL** (legal entity, counsel) | owner and counsel complete the eight-row checklist in `docs/legal/README.md` | `node tools/legal-status.mjs` → 0 placeholders (today 7 across 8 documents); `npm run test:legal` with the banner gone |
+| 10 privacy wording vs cloud handwriting path | **software-complete** in text: `docs/legal/privacy.md` describes the opt-in handwriting image / photo / working-check path and the processor's retention; `ios/PriLearning.swiftpm/Resources/PrivacyInfo.xcprivacy` declares the same data types; **BLOCKED_EXTERNAL** for counsel's confirmation | counsel confirms the wording at the release SHA (`docs/legal/README.md` checklist row 6) | `npm run test:legal`; written confirmation in the launch record |
+| 11 native accessibility acceptance | **BLOCKED_EXTERNAL** (physical device, people) | VoiceOver, Dynamic Type and Pencil/touch acceptance on a physical iPad on the candidate build; browser a11y suite is not a substitute | results recorded in the release record; browser suite stays as the automated floor |
+| 12 account deletion/recovery evidence | **software-complete** synthetic: `server/test/account-lifecycle-journey-check.mjs`, `account-lifecycle-contract-check.mjs`; **BLOCKED_EXTERNAL** production evidence | operator deletes and recovers **test accounts only** on the production deployment after #3/#4 and records it | cutover log §4.4 step 4; `docs/privacy/data-retention.md` §2 survivors confirmed |
+| 13 production email / account recovery | **BLOCKED_EXTERNAL** (email provider account, DNS) | operator configures the auth-email provider variables and verifies a real verification and reset mail on a test account | `GET /v1/ready` → `authEmail` ready; `/v1/health` operator view → `authDelivery.email: true`; the received mails recorded (test accounts) |
+| 14 final security acceptance | **software-complete** automated (`docs/security/acceptance.md`: `npm run test:platform:acceptance`, Postgres runner, secret scan, audit floor); **BLOCKED_EXTERNAL** for the owner decisions in `docs/security/accepted-risks.md` | owner signs R-1 (registration reveals account existence), R-11 (hosted configuration verified on staging) and schedules R-12 (external penetration test) | `accepted-risks.md` status line changed from "proposed" by the owner; test results at the release SHA |
+| 15 failure / recovery drills | **software-complete** procedures and in-process checks (`server/test/failure-drills-check.mjs`); **BLOCKED_EXTERNAL** staging drills | operator runs the six drills of `docs/operations/drills.md` on staging and fills §4 | `drills.md` §4 rows filled with alert id, detect and recover times |
+| 16 observability / alert routing | **software-complete** (`/v1/metrics alerts.firing`, `server/test/observability-check.mjs`); **BLOCKED_EXTERNAL** routing | operator configures each of the seven alerts of `docs/operations/alerts.md` in the monitoring tool, pages a real route, and sees it fire in a drill | `alerts.md` §5 rows filled |
+| 17 zero unresolved P0/P1 defects | **not assessable from the repository** | release governor reviews the issue ledger at the nominated SHA and records the count | release record |
+
+Nothing in this table closes a blocker. A row changes only by appending a dated note when a human
+has produced the evidence named in its last column.
+
 ## 19. Non-blocking open work
 
 An open PR is never automatically part of V1.

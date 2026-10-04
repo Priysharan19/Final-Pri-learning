@@ -1,4 +1,6 @@
-const ACTIONS = new Set(['verify-email', 'reset-password', 'guardian-consent']);
+// 'guardian-withdraw' is the long-lived link a guardian receives after confirming
+// (server/platform/accounts.js): it can only ever withdraw consent.
+const ACTIONS = new Set(['verify-email', 'reset-password', 'guardian-consent', 'guardian-withdraw']);
 
 export function parseAccountActionFragment(fragment = '') {
   const raw = String(fragment || '').replace(/^#/, '');

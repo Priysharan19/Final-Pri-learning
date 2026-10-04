@@ -6,6 +6,7 @@ import { purgeStaleLoginAttempts } from './loginLockout.js';
 import { purgeOidcNonces } from './oidcNonce.js';
 import { asStore } from './store.js';
 import { logEvent, safeCode } from './observability.js';
+import { encryptJoinCode, isLegacyPlainJoinCode } from './classes.js';
 
 export const HOUSEKEEPING_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const REVOKED_SESSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -17,16 +18,39 @@ export async function runHousekeeping(db, now = Date.now()) {
   const startedAt = Date.now();
   const summary = await db.transaction(async () => ({
     sessions: (await db.run('DELETE FROM account_sessions WHERE expires_at < ? OR (revoked_at IS NOT NULL AND revoked_at < ?)', [now, now - REVOKED_SESSION_RETENTION_MS])).changes,
-    tokens: (await db.run('DELETE FROM account_tokens WHERE expires_at < ? OR (consumed_at IS NOT NULL AND consumed_at < ?)', [now, now - CONSUMED_TOKEN_RETENTION_MS])).changes,
+    // A guardian's withdrawal credential ('guardian-withdraw') is long-lived
+    // by design and must survive every pass while it is unspent: a parent who
+    // kept the email for a year must still be able to use it. Once spent it
+    // ages out with every other consumed token.
+    tokens: (await db.run(`DELETE FROM account_tokens
+      WHERE (expires_at < ? AND purpose != 'guardian-withdraw') OR (consumed_at IS NOT NULL AND consumed_at < ?)`, [now, now - CONSUMED_TOKEN_RETENTION_MS])).changes,
     idempotencyKeys: (await db.run('DELETE FROM idempotency_keys WHERE expires_at < ?', [now])).changes,
     rateBuckets: (await db.run('DELETE FROM rate_limits WHERE window_start < ?', [now - RATE_BUCKET_MAX_WINDOW_MS])).changes,
     oidcNonces: await purgeOidcNonces(db, now),
-    loginAttempts: await purgeStaleLoginAttempts(db, now)
+    loginAttempts: await purgeStaleLoginAttempts(db, now),
+    joinCodesEncrypted: await encryptLegacyJoinCodes(db)
   }));
   const record = { ranAt: now, durationMs: Date.now() - startedAt, ...summary };
   await db.run(`INSERT INTO platform_meta(key, value) VALUES ('housekeeping_last_run', ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value`, [JSON.stringify(record)]);
   return record;
+}
+
+/**
+ * Class join codes written before schema v9 were stored in clear beside their
+ * hash. They are now kept encrypted at rest (classes.js); any legacy clear
+ * value found here is encrypted in place so the teacher's reveal keeps
+ * working and no plain code remains in the database.
+ */
+async function encryptLegacyJoinCodes(db) {
+  const rows = await db.all('SELECT id, join_code FROM classes WHERE join_code IS NOT NULL');
+  let changed = 0;
+  for (const row of rows) {
+    if (!isLegacyPlainJoinCode(row.join_code)) continue;
+    const info = await db.run('UPDATE classes SET join_code = ? WHERE id = ? AND join_code = ?', [encryptJoinCode(row.join_code, row.id), row.id, row.join_code]);
+    changed += info.changes;
+  }
+  return changed;
 }
 
 export async function housekeepingStatus(db) {
