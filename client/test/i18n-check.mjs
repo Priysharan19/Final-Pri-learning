@@ -790,26 +790,30 @@ for (let i = 0; i < 6; i++) {
   while (!result.resolved) result = await POST(`/practice/${served.question.id}/submit`, { answer: '42', ms: 5200 });
 }
 
-// The stored evidence, which is what a student would actually lose. /stats also
-// carries examPrediction, and that is recomputed on every read — its standard
-// deviations differ in their last few digits between two consecutive calls with
-// nothing written in between. The control below proves that, so excluding the
-// prediction here is a statement about the predictor's arithmetic and not a
-// place for a language-caused change to hide.
-const evidenceOf = s => ({
-  totals: s.totals, activity: s.activity, chapters: s.chapters,
-  strands: s.strands, recent: s.recent, byDiff: s.byDiff, streak: s.streak,
-  priorities: s.priorities, misconceptions: s.misconceptions
-});
+// /stats is a function of the stored evidence AND of the moment it is read:
+// every request takes its own Date.now(), and the mark predictor discounts
+// evidence by its age (markPredictor.freshness), so its unrounded standard
+// deviations move in their last digits from one millisecond to the next. That
+// is intended forgetting, not noise — but it means two reads on a live clock
+// differ only when they straddle a millisecond, which made any assertion about
+// them a race. So the clock is held still for the comparison, and the whole of
+// /stats, the prediction included, has to come back unchanged.
+const realNow = Date.now;
+const frozenAt = realNow();
+Date.now = () => frozenAt;
 const controlA = await GET('/stats');
 const controlB = await GET('/stats');
-ok(JSON.stringify(controlA) !== JSON.stringify(controlB),
-  'two consecutive /stats reads already differ — the mark predictor is not bit-reproducible, which is why the comparison below is over stored evidence');
-eq(evidenceOf(controlA), evidenceOf(controlB), 'but the stored evidence inside them is identical, so that is the thing worth comparing');
+ok(controlA.examPrediction?.units?.some(u => u.covered),
+  'the control has a live mark prediction to compare, not a null that would trivially match');
+eq(controlB, controlA, 'two /stats reads at the same instant are identical, mark prediction included — nothing in it is random or order-dependent');
+Date.now = () => frozenAt + 1;
+ok(JSON.stringify((await GET('/stats')).examPrediction) !== JSON.stringify(controlA.examPrediction),
+  'and one millisecond later the prediction moves — the clock is its only moving input, which is why it is held still here');
+Date.now = () => frozenAt;
 
 const before = {
   history: await POST('/history/list', { pageSize: 100 }),
-  stats: evidenceOf(await GET('/stats')),
+  stats: await GET('/stats'),
   user: (await GET('/me')).user
 };
 ok(before.history.items.length === 6, `the student has work to lose (${before.history.items.length} answered questions)`);
@@ -820,12 +824,12 @@ eq(switched.language, 'hi', 'the switch is stored on the profile');
 
 const after = {
   history: await POST('/history/list', { pageSize: 100 }),
-  stats: evidenceOf(await GET('/stats')),
+  stats: await GET('/stats'),
   user: (await GET('/me')).user
 };
 
 eq(after.history, before.history, 'every answered question survives the switch, unchanged');
-eq(after.stats, before.stats, 'and so does every rating, streak and total');
+eq(after.stats, before.stats, 'and so does every rating, streak, total and the predicted mark');
 const changed = Object.keys(after.user).filter(k => JSON.stringify(after.user[k]) !== JSON.stringify(before.user[k]));
 eq(changed, ['language'], 'and the only field on the profile that moved is the language itself');
 
@@ -841,7 +845,8 @@ const bridged = (await PATCH('/me', { mathsGloss: true })).user;
 eq(bridged.mathsGloss, true, 'turning it on is stored on the profile');
 eq(bridged.language, 'en', 'and it does not drag the interface language with it — the two are independent');
 eq(await POST('/history/list', { pageSize: 100 }), before.history, 'turning it on loses no work either');
-eq(evidenceOf(await GET('/stats')), before.stats, 'and no progress');
+eq(await GET('/stats'), before.stats, 'and no progress');
+Date.now = realNow;
 eq((await PATCH('/me', { mathsGloss: false })).user.mathsGloss, false, 'and it can be turned back off');
 
 // A bad value cannot reach storage through the profile route.
