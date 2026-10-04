@@ -77,7 +77,20 @@ On supported iPad hardware:
 
 ## CI enforcement
 
-Changes under `handwriting/v12/` intentionally trigger both the native-iPad gate and the Ink Foundation model-tooling gate. A release-standard change therefore exercises the Swift package/build/bridge/native benchmark and a real one-epoch neural training smoke test on the same PR head. General application CI separately gates the deterministic recogniser suites, collector ground-truth/provenance contract, browser flows, build and iOS web-bundle synchronization.
+What actually runs, and where (verified against the workflow files, not inferred):
+
+| Gate | PR CI (`ci.yml` and path-filtered ink workflows) | Release candidate (`release-candidate.yml`) |
+|---|---|---|
+| Gate A native pipeline | `native-ink.yml` (macOS), path-filtered to `ios/**`, `client/src/ink/**`, `client/src/platform/native/**` and its own harness scripts. Edits under `handwriting/v12/` no longer trigger it: this folder is policy and evidence, not native code. | not re-run; the candidate SHA must already carry a green Native Ink run where its paths changed |
+| Gate B locked synthetic | deterministic recogniser suites in `ci.yml`; Ink Foundation tooling in `ink-foundation.yml` | not re-run |
+| Gate C real-writer corpus (`client/test/ink-release-evidence-gate.mjs`) | **not run** | blocking |
+| Gate C/D physical Apple Pencil (`ink-physical-release-evidence.mjs --strict`) | `ink-physical-evidence.yml` runs the validator **non-strict** (schema/leakage only) | blocking, test split and locked final holdout |
+| Real-ink regression floor (`inkcheck-real.mjs --gate`, `handwriting/v17/real-ink-floor.json`) | `ci.yml` runs `test:real` as a diagnostic with `\|\| true` | blocking (`--strict --gate`) |
+| Answer-blind invariant (`ink-answer-blind-static-check.mjs`) | `test:ink:blind` | blocking |
+| Cloud reader accuracy (`tools/ink-cloud-reader-eval.mjs`) | tool self-test with a fake provider only | NOT MEASURED unless dispatched with a provider key; result is an artifact, never a commit |
+| V17 writer-generalisation data readiness | `ink-writer-generalization.yml` audits and prints readiness | blocking |
+
+`release-candidate.yml` runs on `workflow_dispatch` (input `release_sha`) and on `v*` tags. It is expected to be red until the evidence above exists; its job summary lists every gate, including NOT MEASURED rows. A red release-candidate run is the honest state of the product, not a reason to edit a threshold.
 
 No gate may be lowered to obtain a green build. If a model or recogniser regresses, fix the system or collect better evidence.
 
@@ -87,4 +100,6 @@ Every failed real-Pencil case must be assigned a primary cause: line segmentatio
 
 ## Current evidence boundary
 
-The committed real-ink corpus currently contains no scored writer sessions. Therefore no real-handwriting accuracy percentage is currently evidenced by the repository. Synthetic and simulator results are regression evidence only.
+The committed real-ink corpus (`client/test/ink-corpus/`) contains **one** writer (`P0001`), 50 Apple Pencil expressions, assigned deterministically to the **train** split. On that data the shipped JS recogniser measures 32/50 exact lines (64.0%), 87.0% characters (run: `node client/test/inkcheck-real.mjs`, ~35 s). That number is a train-split diagnostic from one writer and is recorded as a regression floor only (`handwriting/v17/real-ink-floor.json`); it is not a product accuracy claim and must not be quoted as one.
+
+There are **no** physical-iPad result files under `handwriting/v12/evidence/physical/`, so Gate C/D, auto-mark precision and p95 latency are NOT MEASURED. The server-side cloud reader's accuracy has **never** been measured; `tools/ink-cloud-reader-eval.mjs` exists to measure it and exits "NOT MEASURED" without a provider key. Synthetic, simulator and dry-run results are regression evidence only.

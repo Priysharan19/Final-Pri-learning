@@ -83,3 +83,18 @@ Each item below needs real-world authority or hardware. None of them can be fake
 7. **App Review and legal.** Subscription terms, refund policy and privacy disclosures accepted by App Store review. Owner: legal and account holder.
 
 Until items 1–5 are recorded as physical evidence, blocker #7 remains **open**.
+
+### Status annotations (2026-10-02; append-only)
+
+| Item | Status on 2026-10-02 | Exact human action still needed | Evidence file / command that closes it |
+|---|---|---|---|
+| Code (tables above) | **software-complete**: `npm run test:platform:commerce` and the Postgres runner (`PLATFORM ON POSTGRES: PASS — 35/35 suites`) pass on `main`; billing schema version 6 (`server/platform/schemaVersions.js`) | none | CI job *Production account, sync and commercial schema* |
+| 1 App Store Connect products | `BLOCKED_EXTERNAL` | account holder creates the subscription group, monthly and annual products, grace period, review metadata; hands the final product ids to the operator | Railway variables `PRI_APPLE_MONTHLY_PRODUCT_ID`, `PRI_APPLE_ANNUAL_PRODUCT_ID` set; `GET /v1/health` operator view (`PRI_METRICS_TOKEN`) → `billingProviders.apple: true` |
+| 2 Production trust | `BLOCKED_EXTERNAL` | operator downloads Apple Root CA G3 from apple.com/certificateauthority and sets `PRI_APPLE_ROOT_CA_PEM` (or `_FILE`), `PRI_APPLE_APP_ID`, `PRI_APPLE_BUNDLE_ID`, `PRI_APPLE_ENVIRONMENTS=Production`; leaves `PRI_APPLE_ALLOW_SANDBOX` unset in production | production boot no longer lists `PRI_APPLE_ROOT_CA_PEM or PRI_APPLE_ROOT_CA_FILE` / `PRI_APPLE_APP_ID` as missing (`platformConfigStatus`); `GET /v1/ready` → `billing` ready |
+| 3 Server Notifications v2 URLs | `BLOCKED_EXTERNAL` | account holder registers `https://<origin>/v1/billing/webhook/apple` (production and sandbox) and presses *Request a Test Notification* | server log line for the test notification and its `billing_events` row (`server/tools/billing-reconcile.mjs --evidence`) |
+| 4 Sandbox transactions on a physical iPad | `BLOCKED_EXTERNAL` | QA with a real iPad, a Sandbox Apple ID and a TestFlight build against a deployment with Sandbox explicitly allowed runs the eight scenarios listed above | per-scenario device result + `/v1/entitlements` snapshot + clean `node server/tools/billing-reconcile.mjs` exit 0, recorded in the release record (`ios/PriLearning.swiftpm/RELEASE.md` §11) |
+| 5 Final production transaction | `BLOCKED_EXTERNAL` | release governor, after App Review approval, on a physical iPad | same record |
+| 6 In-App Purchase key | `BLOCKED_EXTERNAL` | account holder keeps it outside the repository and the server | the reconciliation runbook's history call succeeds; the key appears nowhere in `npm run test:secrets` |
+| 7 App Review and legal | `BLOCKED_EXTERNAL` | account holder submits; counsel signs off (`docs/legal/README.md` launch checklist) | App Store Connect review state in the release record |
+
+The ordered owner path for all of these is `docs/release/LAUNCH-RUNBOOK.md` §5.

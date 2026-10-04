@@ -1,13 +1,20 @@
 import express from 'express';
 import { asyncRouter } from './asyncRouter.js';
 import { asStore, isUniqueViolation } from './store.js';
-import { createSession, id, rateLimit, requireSession } from './security.js';
+import { createSession, id, rateLimit, requireSession, sha256 } from './security.js';
 import { verifyIdentityToken } from './oidc.js';
 import { consumeOidcNonce, issueOidcNonce } from './oidcNonce.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
 import { CONSENT_NOTICE_VERSION, ageDecision, recordConsentRequest } from './guardianConsent.js';
 import { queueAccountToken } from './accounts.js';
-import { clipText } from './text.js';
+import { storableText } from './text.js';
+
+/** Was this nonce issued by the server and is it still live? Does not spend it. */
+async function nonceIsLive(db, nonce, now = Date.now()) {
+  const value = String(nonce || '');
+  if (!value || value.length > 128) return false;
+  return !!(await db.get('SELECT 1 FROM oidc_nonces WHERE nonce_hash = ? AND consumed_at IS NULL AND expires_at > ?', [sha256(value), now]));
+}
 
 async function requireIssuedNonce(db, req, res) {
   const nonce = req.body?.nonce == null ? '' : String(req.body.nonce);
@@ -129,18 +136,22 @@ export function createIdentityRouter(db) {
       // subject with no account is reported, never silently given a new one
       // (that student has not seen the age question or the privacy notice).
       const mayCreate = req.body?.createAccount !== false;
-      // A new account made here is held to the same age rule as /register
-      // (one shared function): an explicit declaration is required, and a
-      // child's account needs a guardian to ask, or it would sync with no
-      // consent ever requested. Checked before the nonce is spent.
-      let decision = null;
-      if (mayCreate) {
-        decision = ageDecision(req.body || {}, { guardianLater: req.body?.guardianLater === true });
-        if (!decision.ok) return res.status(400).json({ error: { code: decision.code, message: decision.message } });
-      }
-      const nonce = await requireIssuedNonce(db, req, res);
-      if (!nonce) return;
+      // The nonce is checked before the token is verified and SPENT only once
+      // the request is going to create or sign in to an account. A new account
+      // that still owes its age declaration (or a guardian) is refused without
+      // spending it, so the client can ask the student and retry with the same
+      // provider token.
+      const nonce = req.body?.nonce == null ? '' : String(req.body.nonce);
+      if (!nonce) return res.status(400).json({ error: { code: 'OIDC_NONCE_REQUIRED', message: 'Request a sign-in nonce from the server before signing in with a provider.' } });
+      if (!(await nonceIsLive(db, nonce))) return res.status(401).json({ error: { code: 'OIDC_NONCE_INVALID', message: 'The sign-in nonce is unknown, expired or already used.' } });
       const identity = await verifyIdentityToken(provider, req.body?.idToken, { nonce });
+      const spendNonce = async () => {
+        if (!(await consumeOidcNonce(db, nonce))) {
+          res.status(401).json({ error: { code: 'OIDC_NONCE_INVALID', message: 'The sign-in nonce is unknown, expired or already used.' } });
+          return false;
+        }
+        return true;
+      };
       const findLinked = () => db.get(`SELECT a.* FROM account_identities i JOIN accounts a ON a.id=i.account_id
         WHERE i.provider=? AND i.provider_subject=? AND a.deleted_at IS NULL`, [provider, identity.subject]);
       const signInLinked = async linked => {
@@ -149,7 +160,10 @@ export function createIdentityRouter(db) {
         return res.json({ account: publicAccount(await db.get('SELECT * FROM accounts WHERE id=?', [linked.id])), created: false });
       };
       const linked = await findLinked();
-      if (linked) return signInLinked(linked);
+      if (linked) {
+        if (!(await spendNonce())) return;
+        return signInLinked(linked);
+      }
       if (!mayCreate) {
         return res.status(404).json({ error: { code: 'IDENTITY_NOT_REGISTERED', message: 'No Pri Learning account uses this sign-in yet. Choose Create account to make one.' } });
       }
@@ -162,11 +176,29 @@ export function createIdentityRouter(db) {
         // Sign in using the existing method first, then use the authenticated link endpoint.
         return res.status(409).json({ error: { code: 'IDENTITY_LINK_REQUIRED', message: 'An account already uses this email. Sign in to that account first, then link this provider.' } });
       }
+      // A NEW account is held to the same age rule as /register (one shared
+      // function, guardianConsent.js ageDecision): an explicit declaration is
+      // required, and a child's account needs a guardian to ask — whose address
+      // is not the student's own — or it would sync with no consent ever
+      // requested. Under the DPDP Act every Class 7-12 student is a child, and a
+      // provider vouching for a mailbox says nothing about age. A missing
+      // declaration is answered 428 CONSENT_DECLARATION_REQUIRED, the code the
+      // provider sign-in clients act on by asking the student and retrying with
+      // the same token; the nonce is left intact for that retry.
+      const decision = ageDecision({ ...(req.body || {}), studentEmail: identity.email }, { guardianLater: req.body?.guardianLater === true });
+      if (!decision.ok) {
+        if (decision.code === 'AGE_DECLARATION_REQUIRED') {
+          return res.status(428).json({ error: { code: 'CONSENT_DECLARATION_REQUIRED', message: 'Tell us whether the learner is 18 or older (isAdult), or their class (year) with a parent or guardian’s name and email, then sign in again.' } });
+        }
+        return res.status(400).json({ error: { code: decision.code, message: decision.message } });
+      }
       const { basis, guardian, guardianLater } = decision;
+      if (!(await spendNonce())) return;
       const now = Date.now();
       const accountId = id('acct');
       // Apple sends no name in its token; the name the student typed is next.
-      const name = identity.name || clipText(String(req.body?.name || '').trim(), 80) || identity.email.split('@')[0].slice(0, 80) || 'Pri Learning Student';
+      const name = storableText(identity.name, 80) || storableText(req.body?.name, 80)
+        || storableText(identity.email.split('@')[0], 80) || 'Pri Learning Student';
       try {
         await db.transaction(async () => {
           await db.run(`INSERT INTO accounts(id,email,name,password_hash,email_verified_at,role,age_basis,created_at,updated_at)
@@ -197,7 +229,7 @@ export function createIdentityRouter(db) {
       await maybeBootstrapAdmin(db, accountId, now);
       await createSession(db, res, accountId, String(req.body?.deviceId || 'web').slice(0, 160), req.get('user-agent') || '', now);
       const row = await db.get('SELECT * FROM accounts WHERE id=?', [accountId]);
-      res.status(201).json({ account: publicAccount(row), created: true });
+      res.status(201).json({ account: publicAccount(row), created: true, guardianConsentRequired: !!(guardian || guardianLater) });
     } catch (err) {
       if (err?.code?.startsWith('OIDC_')) return res.status(err.code === 'OIDC_PROVIDER_NOT_CONFIGURED' ? 503 : 401).json({ error: { code: err.code, message: err.message } });
       next(err);

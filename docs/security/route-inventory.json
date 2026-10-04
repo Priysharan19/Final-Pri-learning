@@ -10,7 +10,8 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
-      "ownership": "public: booleans, versions and engine name only; no identifiers or secrets",
+      "mfa": false,
+      "ownership": "public: ok flag, release identity, schema versions, engine name, database reachability and the two sync-quota limits only; provider configuration flags, backlog counts and housekeeping detail are answered only to the holder of PRI_METRICS_TOKEN (Bearer) and on /v1/admin/health",
       "rateLimits": [],
       "csrf": "not-applicable",
       "origin": "not-applicable",
@@ -23,6 +24,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "public by design for uptime checks and the Railway deploy healthcheck: one state and one code per dependency, schema versions and release SHA; no counts, configuration values, identifiers or secrets",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -36,6 +38,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "operator only: Bearer PRI_METRICS_TOKEN (constant-time compare; closed with 503 in production when unset or shorter than 32 chars; loopback-only outside production when unset); aggregate counters with fixed-alphabet labels, no identifiers or paths",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -49,7 +52,8 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
-      "ownership": "creates a new account; role is student unless a live single-use teacher invite is redeemed",
+      "mfa": false,
+      "ownership": "creates a new account; role is student unless a live single-use teacher invite is redeemed; password: 10+ characters, at most 72 bytes (PASSWORD_TOO_LONG), not on the bundled common list (PASSWORD_TOO_COMMON); a guardian email equal to the student email is refused (GUARDIAN_EMAIL_SAME_AS_STUDENT)",
       "rateLimits": [
         {
           "key": "register",
@@ -69,6 +73,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "credentials select the account; failures count per submitted email (login lockout) and per IP",
       "rateLimits": [
         {
@@ -89,6 +94,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -102,6 +108,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "revokes only the session whose cookie is presented",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -115,6 +122,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "own account only: revokes every unrevoked session whose account id is the session account id, including the caller's; no id is taken from the request; another account's sessions are never touched",
       "rateLimits": [
         {
@@ -135,6 +143,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request",
       "rateLimits": [
         {
@@ -155,6 +164,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "single-use verify-email token (purpose-bound, 1 h); acts only on the token's account",
       "rateLimits": [
         {
@@ -175,6 +185,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "single-use guardian-consent token (purpose-bound, 1 h); acts only on the token's account",
       "rateLimits": [
         {
@@ -195,7 +206,8 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
-      "ownership": "guardian-consent token; permission-reducing only; acts only on the token's account",
+      "mfa": false,
+      "ownership": "guardian-consent token; permission-reducing only; acts only on the token's account; accepts the one-hour confirmation bearer in any state or the long-lived guardian-withdraw bearer, which withdrawal revokes",
       "rateLimits": [
         {
           "key": "guardian-withdraw",
@@ -215,6 +227,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; guardian email is masked",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -228,6 +241,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "answers ok for every address (no enumeration); at most 3 reset emails per account per hour (reset-mailbox bucket) on top of the per-IP limit",
       "rateLimits": [
         {
@@ -248,6 +262,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "single-use reset-password token (purpose-bound, 1 h); revokes every session of the token's account",
       "rateLimits": [
         {
@@ -268,6 +283,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; requires the current password; revokes every session and issues a new one",
       "rateLimits": [
         {
@@ -288,6 +304,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -301,6 +318,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "UPDATE is scoped by session id AND session account id; another account's session id is a no-op",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -314,6 +332,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request",
       "rateLimits": [
         {
@@ -334,6 +353,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; requires fresh password or linked OIDC re-authentication",
       "rateLimits": [
         {
@@ -354,6 +374,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -367,6 +388,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "public: the web client ids already visible in each provider's authorize URL; no account data",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -380,6 +402,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "stateless: answers Apple's form_post with the callback page (validated fields only, no redirect); reads no session, writes nothing",
       "rateLimits": [
         {
@@ -400,6 +423,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "anonymous single-use nonce, stored hashed, 10 min",
       "rateLimits": [
         {
@@ -420,7 +444,8 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
-      "ownership": "verified provider subject selects the account; never auto-links to an existing email",
+      "mfa": false,
+      "ownership": "verified provider subject selects the account; never auto-links to an existing email; a NEW account must declare age (isAdult, or year with guardianName + guardianEmail) or is refused 428 CONSENT_DECLARATION_REQUIRED with the nonce unspent; a child account gets a guardian_consents row and consent email exactly as registration does",
       "rateLimits": [
         {
           "key": "oidc-signin",
@@ -440,6 +465,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; provider email must equal the account email; a subject linked elsewhere is refused",
       "rateLimits": [
         {
@@ -454,12 +480,99 @@
       "bodyLimit": "1mb"
     },
     {
+      "method": "GET",
+      "path": "/v1/account/mfa/status",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "own session only: whether a second factor is required for this role, enrolled, verified on this session and fresh enough for a step-up; no secret, hash or code",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/account/mfa/totp/enrol",
+      "auth": "session",
+      "roles": [
+        "admin",
+        "support"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "own account only: mints a TOTP secret stored encrypted under PRI_MFA_KEY and returns it once (base32 + otpauth URI); refused 409 once an enrolment is confirmed (reset is the operator CLI, never a route); 503 MFA_NOT_CONFIGURED in production without the key",
+      "rateLimits": [
+        {
+          "key": "mfa-enrol",
+          "limit": 10,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/account/mfa/totp/confirm",
+      "auth": "session",
+      "roles": [
+        "admin",
+        "support"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "own account only: one valid code (±1 step) confirms the pending enrolment, issues eight recovery codes once (stored hashed), marks this session mfa_verified_at and is audited (mfa.enrol)",
+      "rateLimits": [
+        {
+          "key": "mfa-confirm",
+          "limit": 10,
+          "windowMs": 900000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/account/mfa/verify",
+      "auth": "session",
+      "roles": [
+        "admin",
+        "support"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "own session only: a TOTP code (each 30-second step accepted once, last_used_counter) or an unused recovery code (spent on use, audited) sets mfa_verified_at on this session; wrong code 401 MFA_CODE_INVALID",
+      "rateLimits": [
+        {
+          "key": "mfa-verify",
+          "limit": 10,
+          "windowMs": 900000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
       "method": "POST",
       "path": "/v1/sync/push",
       "auth": "session",
       "roles": null,
       "verifiedEmail": true,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; deviceId must equal the session device; idempotency keys are scoped per account",
       "rateLimits": [
         {
@@ -481,6 +594,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; cursor only pages within the account",
       "rateLimits": [
         {
@@ -501,6 +615,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request",
       "rateLimits": [
         {
@@ -523,6 +638,9 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": {
+        "stepUpMs": 900000
+      },
       "ownership": "admin only; any account id; audited",
       "rateLimits": [
         {
@@ -543,6 +661,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "public commercial configuration (prices/plan ids); no secrets",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -556,6 +675,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -569,6 +689,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request",
       "rateLimits": [
         {
@@ -589,6 +710,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -602,6 +724,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; appAccountToken is a random UUID bound server-side",
       "rateLimits": [
         {
@@ -622,6 +745,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; verified transaction must bind to the session account",
       "rateLimits": [
         {
@@ -642,6 +766,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; obfuscatedAccountId is an opaque per-account value derived server-side",
       "rateLimits": [
         {
@@ -662,6 +787,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; the purchase token is re-fetched from Google and must carry this account's obfuscated id; a token bound to another account is refused",
       "rateLimits": [
         {
@@ -682,6 +808,7 @@
       "roles": null,
       "verifiedEmail": true,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; refused (403 BILLING_WEB_CHECKOUT_NATIVE_REFUSED) for a native-shell client (X-Pri-Client ios-native-v1 / android-native-v1): web purchase is never reachable in the iPad app",
       "rateLimits": [
         {
@@ -702,6 +829,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; verified result must bind to the session account",
       "rateLimits": [
         {
@@ -722,6 +850,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "provider signature verification; unverified events never change entitlements",
       "rateLimits": [
         {
@@ -742,6 +871,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request (teacher: classes they own; student: classes they are an active member of)",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -758,6 +888,7 @@
       ],
       "verifiedEmail": true,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "class is owned by the creating teacher",
       "rateLimits": [
         {
@@ -781,6 +912,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -797,6 +929,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [
         {
@@ -820,6 +953,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -835,6 +969,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "student's own active membership only; otherwise 404",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -850,6 +985,7 @@
       ],
       "verifiedEmail": true,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "join code selects the class; membership written for the session student",
       "rateLimits": [
         {
@@ -870,6 +1006,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "class owner, active member or admin; otherwise 404; a student sees only their own submission/feedback",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -886,6 +1023,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -902,6 +1040,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -918,6 +1057,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "class owner (teacher) or admin and assignment in that class; otherwise 404",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -935,6 +1075,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [
         {
@@ -958,6 +1099,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "active member of the class and assignment in that class; writes only the session student's row",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -975,6 +1117,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "class owner (teacher) or admin; student must be an active member; otherwise 404",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -992,6 +1135,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -1005,6 +1149,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request (student: assignments of active memberships; teacher: own classes)",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -1018,6 +1163,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "class owner (teacher) or admin; otherwise 404",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -1031,6 +1177,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "class owner, active member or admin; student sees only their own submission",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -1044,6 +1191,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "public published content; key is pattern-validated",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -1057,6 +1205,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "public published keys only (no body, no source); paged",
       "rateLimits": [
         {
@@ -1080,6 +1229,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": true,
       "ownership": "support/admin; draft owned by its author",
       "rateLimits": [
         {
@@ -1104,6 +1254,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": true,
       "ownership": "draft author or admin; otherwise 403",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -1121,6 +1272,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": true,
       "ownership": "draft author or admin; otherwise 403",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -1137,6 +1289,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": true,
       "ownership": "support/admin other than the author (independent review)",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -1152,6 +1305,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": true,
       "ownership": "admin; only independently approved revisions",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -1167,6 +1321,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": true,
       "ownership": "admin; only previously published revisions",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -1183,6 +1338,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": true,
       "ownership": "support/admin; bodies omitted",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -1196,6 +1352,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "report owned by the session account; forbidden context keys dropped",
       "rateLimits": [
         {
@@ -1217,6 +1374,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -1233,6 +1391,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": true,
       "ownership": "support/admin",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -1249,6 +1408,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": true,
       "ownership": "support/admin; audited",
       "rateLimits": [],
       "csrf": "double-submit-when-session-cookie",
@@ -1262,6 +1422,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "no per-account data; readiness only",
       "rateLimits": [
         {
@@ -1282,6 +1443,7 @@
       "roles": null,
       "verifiedEmail": true,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "stateless; image only (answer-blind); counts against the deployment paid-call ceiling",
       "rateLimits": [
         {
@@ -1303,6 +1465,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "no per-account data; readiness only",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -1316,6 +1479,7 @@
       "roles": null,
       "verifiedEmail": true,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "stateless; counts against the deployment paid-call ceiling",
       "rateLimits": [
         {
@@ -1336,6 +1500,7 @@
       "roles": null,
       "verifiedEmail": true,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "stateless; photo only (answer-blind); proposes a chapter/skill validated against the syllabus snapshot, never marks; counts against the account AI allowance and the deployment paid-call ceiling",
       "rateLimits": [
         {
@@ -1357,6 +1522,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "no per-account data; readiness only. 404 for every caller unless PRI_FEATURE_TUTOR=1 (ships dark, frozen V1 scope)",
       "rateLimits": [],
       "csrf": "not-applicable",
@@ -1370,10 +1536,32 @@
       "roles": null,
       "verifiedEmail": true,
       "guardianConsent": true,
-      "ownership": "stateless per account; replies cached by a SHA-256 of the request content only (no account id), so an account can read back only a reply to an identical request. 404 unless PRI_FEATURE_TUTOR=1; practice context only (TUTOR_EXAM_LOCKED); closed body ≤48 kB, maths-only (TUTOR_NOT_MATHS); per-account daily allowance (PRI_TUTOR_CALLS_PER_ACCOUNT_DAY, plan-aware) and one unit of the deployment paid-call ceiling per model call",
+      "mfa": false,
+      "ownership": "stateless per account; ladder replies (nudge/socratic/walkthrough) cached by a SHA-256 of the request content only (no account id), so an account can read back only a reply to an identical request; a conversational turn (level ask: free-text message ≤600 chars, control characters stripped, last 6 history turns server-trimmed) is cached under a key that also takes a truncated hash of the account, so free text is never read back by another account. 404 unless PRI_FEATURE_TUTOR=1; practice context only (TUTOR_EXAM_LOCKED); closed body ≤48 kB, maths-only (TUTOR_NOT_MATHS); per-account daily allowance (PRI_TUTOR_CALLS_PER_ACCOUNT_DAY, plan-aware) and one unit of the deployment paid-call ceiling per model call",
       "rateLimits": [
         {
           "key": "tutor-help",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/tutor/stream",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "stateless per account; same body contract, exam lock, maths-only and size bounds as /v1/tutor/help, for levels nudge, socratic and ask only (walkthrough captions stay on /help). Every refusal — 404 dark, TUTOR_EXAM_LOCKED, body, TUTOR_NOT_CONFIGURED, TUTOR_DAILY_LIMIT (429), PAID_CAPACITY_REACHED — is answered as JSON before any event-stream byte and before the provider is contacted. The reply streams as text/event-stream (meta, delta, done | fallback | error); each sentence is checked against the verified solution before release and a leak ends the stream with the authored hint, uncached. Cache keyed as /help (per-account for ask). One open stream per session: a newer stream closes the older with TUTOR_STREAM_SUPERSEDED. Provider output capped per turn (STREAM_MAX_OUTPUT_TOKENS, MAX_STREAM_CHARS).",
+      "rateLimits": [
+        {
+          "key": "tutor-stream",
           "limit": 60,
           "windowMs": 3600000,
           "identity": "account"
@@ -1390,6 +1578,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": true,
+      "mfa": false,
       "ownership": "events owned by the session account; allow-listed types and metadata keys",
       "rateLimits": [
         {
@@ -1413,7 +1602,8 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": false,
-      "ownership": "admin; aggregate counts only",
+      "mfa": true,
+      "ownership": "admin; aggregate counts only; also carries the operator health detail (provider flags, backlog counts, housekeeping)",
       "rateLimits": [
         {
           "key": "admin",
@@ -1435,6 +1625,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": true,
       "ownership": "admin; parameterised LIKE search",
       "rateLimits": [
         {
@@ -1457,6 +1648,9 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": {
+        "stepUpMs": 900000
+      },
       "ownership": "admin; self-demotion blocked; audited",
       "rateLimits": [
         {
@@ -1479,6 +1673,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": true,
       "ownership": "admin; audited; code returned once",
       "rateLimits": [
         {
@@ -1501,6 +1696,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": true,
       "ownership": "admin; hashes/prefixes only",
       "rateLimits": [
         {
@@ -1523,6 +1719,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": true,
       "ownership": "admin only; returns every flag with its config",
       "rateLimits": [
         {
@@ -1545,6 +1742,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": true,
       "ownership": "admin; key pattern-validated; audited",
       "rateLimits": [
         {
@@ -1568,6 +1766,7 @@
       ],
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": true,
       "ownership": "admin only; latest 250 audit entries",
       "rateLimits": [
         {
@@ -1588,6 +1787,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "no account is read: the same 202 shape for any valid address (no enumeration); per-destination cooldown 30 s and 5 codes/h independent of account existence; code stored only as an HMAC",
       "rateLimits": [
         {
@@ -1608,6 +1808,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "the submitted one-time code (HMAC, 10 min, 5 attempts, single use, constant-time compare) proves the destination; only then is an account found or created for it; a child account is created with a pending guardian consent row",
       "rateLimits": [
         {
@@ -1628,6 +1829,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "own account only: the code goes to the session account's own phone or email; no destination is taken from the request",
       "rateLimits": [
         {
@@ -1648,6 +1850,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "own account only: records the guardian contact on the session account's consent row and sends the code there; refuses the student's own contact; refused (409) once a guardian has withdrawn — the child's session cannot reopen consent",
       "rateLimits": [
         {
@@ -1668,6 +1871,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "no session is read: the parent names their own phone/email and the one-time code (HMAC, 10 min, 5 attempts, single use) of the newest live guardian-consent challenge for it; acts only on that challenge's account, only while its consent row still names that contact and is not withdrawn; current notice version required",
       "rateLimits": [
         {
@@ -1688,6 +1892,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "same body, status and minimum response time (900 ms floor) whether or not the number approved any account; a code is only delivered to a number on a live consent row; delivery failures are not reported",
       "rateLimits": [
         {
@@ -1708,6 +1913,7 @@
       "roles": null,
       "verifiedEmail": false,
       "guardianConsent": false,
+      "mfa": false,
       "ownership": "the one-time code proves the guardian phone; can only withdraw (never grant) consent on rows naming that phone",
       "rateLimits": [
         {

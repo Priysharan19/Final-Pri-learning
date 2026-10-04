@@ -19,7 +19,7 @@ const prior = {
 const scratch = mkdtempSync(join(tmpdir(), 'pri-webhook-router-'));
 process.env.NODE_ENV = 'production';
 process.env.PRI_PUBLIC_ORIGIN = 'https://app.pri.example';
-process.env.PRI_CSRF_SECRET = 'test-csrf-secret-not-production';
+process.env.PRI_CSRF_SECRET = 'test-csrf-secret-not-production-32chars';
 process.env.PRI_AUTH_DELIVERY_KEY = '22'.repeat(32);
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
 // Requests are made straight to the router here; nothing forwards for it.

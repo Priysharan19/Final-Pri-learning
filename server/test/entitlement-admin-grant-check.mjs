@@ -38,8 +38,12 @@ async function account(id, role = 'student') {
 
 async function session(accountId) {
   const raw = opaqueToken(32);
-  await db.run(`INSERT INTO account_sessions(id,account_id,token_hash,device_id,created_at,last_seen_at,expires_at)
-    VALUES (?,?,?,?,?,?,?)`, [`ses_${accountId}`, accountId, sha256(raw), 'contract', FROZEN, FROZEN, FROZEN + 3_600_000]);
+  // A staff session that has enrolled and just verified its second factor
+  // (mfa.js): the grant route requires one inside the step-up window.
+  await db.run(`INSERT INTO account_mfa(account_id,secret_ciphertext,created_at,confirmed_at,last_used_counter,updated_at)
+    VALUES (?,?,?,?,NULL,?) ON CONFLICT(account_id) DO NOTHING`, [accountId, 'contract-ciphertext', FROZEN, FROZEN, FROZEN]);
+  await db.run(`INSERT INTO account_sessions(id,account_id,token_hash,device_id,created_at,last_seen_at,expires_at,mfa_verified_at)
+    VALUES (?,?,?,?,?,?,?,?)`, [`ses_${accountId}`, accountId, sha256(raw), 'contract', FROZEN, FROZEN, FROZEN + 3_600_000, FROZEN]);
   return { [SESSION_COOKIE]: raw, [CSRF_COOKIE]: csrfForSession(raw) };
 }
 
