@@ -174,7 +174,10 @@ const baseEnv = {
   NODE_ENV: 'production',
   PORT: String(port),
   PRI_PUBLIC_ORIGIN: 'https://learn.pri.example',
-  PRI_CSRF_SECRET: 'runtime-image-contract-secret',
+  PRI_CSRF_SECRET: 'runtime-image-contract-secret-32chars-long',
+  // The operator's view of /v1/health (storage, providers, housekeeping) is
+  // answered only to this bearer in production (operatorHealth.js).
+  PRI_METRICS_TOKEN: 'runtime-image-metrics-token-32chars-long',
   PRI_AUTH_DELIVERY_KEY: '33'.repeat(32),
   PRI_PLATFORM_DB: join(dataDir, 'pri-learning-platform.db'),
   // Nothing forwards for this child: the test talks straight to its socket.
@@ -237,8 +240,12 @@ try {
   c.eq(body.service, 'pri-learning-platform', 'health names the platform');
   c.eq(body.releaseIdentity?.releaseSha, testReleaseSha, 'Railway: health reports Railway\'s Git SHA over a stale PRI_RELEASE_SHA');
   c.eq(body.releaseIdentity?.buildTimestamp, testBuildTimestamp, 'Railway: health reports the timestamp baked into the client build');
-  c.eq(body.storage.persistentDatabase, true, 'persistent storage acknowledged');
-  c.ok(Number.isInteger(body.housekeeping?.lastRunAt), 'housekeeping ran at startup and is reported by health');
+  c.eq(body.storage, undefined, 'anonymous health does not say whether or where the database persists');
+  c.eq(body.identityProviders, undefined, 'anonymous health does not list configured identity providers');
+  c.eq(body.housekeeping, undefined, 'anonymous health carries no housekeeping counts');
+  const operatorBody = await (await fetch(`${origin}/v1/health`, { headers: { Authorization: `Bearer ${railway.env.PRI_METRICS_TOKEN}` } })).json();
+  c.eq(operatorBody.storage.persistentDatabase, true, 'persistent storage acknowledged to the operator token');
+  c.ok(Number.isInteger(operatorBody.housekeeping?.lastRunAt), 'housekeeping ran at startup and is reported by health to the operator token');
   c.ok(existsSync(railway.env.PRI_PLATFORM_DB), 'database created at PRI_PLATFORM_DB');
 
   for (const [method, path] of [['GET', '/api/auth/me'], ['POST', '/api/auth/login'], ['POST', '/api/auth/register'], ['GET', '/api/curriculum']]) {

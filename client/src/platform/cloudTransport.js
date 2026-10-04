@@ -220,6 +220,7 @@ export async function cloudRequest(path, {
       err.status = status || undefined;
       err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
       if (Number.isFinite(Number(data?.error?.resetAt))) err.resetAt = Number(data.error.resetAt);
+      if (data?.error?.quota && typeof data.error.quota === 'object') err.quota = data.error.quota;
       err.requestId = result?.requestId || rid;
       throw err;
     }
@@ -265,10 +266,125 @@ export async function cloudRequest(path, {
       err.status = response.status;
       err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
       if (Number.isFinite(Number(data?.error?.resetAt))) err.resetAt = Number(data.error.resetAt);
+      if (data?.error?.quota && typeof data.error.quota === 'object') err.quota = data.error.quota;
       err.requestId = response.headers.get('x-pri-request-id') || rid;
       throw err;
     }
     return data;
+  } finally {
+    clearTimeout(timer);
+    if (signal) signal.removeEventListener('abort', abort);
+  }
+}
+
+// ── The tutor's streamed turn ────────────────────────────────────────────────
+//
+// The one streamed request this boundary makes: POST /v1/tutor/stream answers
+// as server-sent events (text/event-stream), read here with a ReadableStream
+// reader so each guarded sentence reaches the student as the server releases
+// it. Same cookie, CSRF, origin, redirect and cache discipline as cloudRequest;
+// the response is bounded in bytes and in time like any other. Inside a native
+// shell there is no streaming channel (priNative.cloud is request/response), so
+// the caller is told to use /v1/tutor/help instead; the same code is thrown
+// when an older server answers 404, which is how the compatibility fallback
+// (docs/release/release-policy.md CP-11) is driven.
+const MAX_STREAM_BYTES = 256 * 1024;
+
+/** Split an SSE byte buffer into complete events; `state.tail` carries the rest. */
+export function parseSseChunk(text, state) {
+  const all = (state.tail || '') + text;
+  const blocks = all.split(/\r?\n\r?\n/);
+  state.tail = blocks.pop() || '';
+  const events = [];
+  for (const block of blocks) {
+    let event = 'message';
+    const data = [];
+    for (const line of block.split(/\r?\n/)) {
+      if (line.startsWith('event:')) event = line.slice(6).trim();
+      else if (line.startsWith('data:')) data.push(line.slice(5).trim());
+    }
+    if (!data.length) continue;
+    let parsed = null;
+    try { parsed = JSON.parse(data.join('\n')); } catch { continue; }
+    events.push({ event, data: parsed });
+  }
+  return events;
+}
+
+function streamUnsupported(status) {
+  const err = new Error('The streaming tutor is not available here; use the request route.');
+  err.code = 'TUTOR_STREAM_UNSUPPORTED';
+  if (status) err.status = status;
+  return err;
+}
+
+/**
+ * POST a tutor turn and read its event stream. `onEvent({ event, data })` is
+ * called for every event in order; the promise resolves when the stream ends.
+ * Throws TUTOR_STREAM_UNSUPPORTED in a native shell or when the server has no
+ * /v1/tutor/stream (404), and the ordinary coded errors for any JSON refusal.
+ */
+export async function cloudStreamRequest(path, { body, onEvent, timeoutMs = 45_000, signal = null } = {}) {
+  if (!PATH.test(String(path || '')) || String(path).includes('..')) throw new Error('Cloud path is not allowed');
+  if (nativeCloudAvailable()) throw streamUnsupported();
+  const origin = normalizeCloudOrigin();
+  if (!origin) {
+    const err = new Error('Cloud is not configured; local Pri Learning remains available offline.');
+    err.code = 'CLOUD_DISABLED';
+    throw err;
+  }
+  const payload = JSON.stringify(body ?? {});
+  if (byteLength(payload) > 1024 * 1024) throw new Error('Cloud request is too large');
+  const rid = requestId();
+  const headers = { Accept: 'text/event-stream', 'Content-Type': 'application/json', 'X-Pri-Request-Id': rid, 'X-Pri-Client': 'web-v1' };
+  const csrf = cookie('pri_csrf');
+  if (csrf) headers['X-Pri-CSRF'] = csrf;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), Math.max(1000, Math.min(120_000, Number(timeoutMs) || 45_000)));
+  const abort = () => controller.abort(signal?.reason || new DOMException('Aborted', 'AbortError'));
+  if (signal) {
+    if (signal.aborted) abort();
+    else signal.addEventListener('abort', abort, { once: true });
+  }
+  try {
+    const response = await fetch(`${origin}${path}`, {
+      method: 'POST',
+      headers,
+      body: payload,
+      credentials: 'include',
+      cache: 'no-store',
+      redirect: 'error',
+      signal: controller.signal
+    });
+    const type = response.headers.get('content-type') || '';
+    if (!/text\/event-stream/i.test(type)) {
+      const text = await response.text();
+      if (byteLength(text) > MAX_RESPONSE_BYTES) throw new Error('Cloud response exceeded safety limit');
+      const data = parseJson(text);
+      if (response.status === 404) throw streamUnsupported(404);
+      const err = new Error(data?.error?.message || data?.error || `Cloud request failed (${response.status})`);
+      err.status = response.status;
+      err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
+      if (Number.isFinite(Number(data?.error?.resetAt))) err.resetAt = Number(data.error.resetAt);
+      if (data?.error?.quota && typeof data.error.quota === 'object') err.quota = data.error.quota;
+      err.requestId = response.headers.get('x-pri-request-id') || rid;
+      throw err;
+    }
+    if (!response.body?.getReader) throw streamUnsupported();
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    const state = { tail: '' };
+    let received = 0;
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      received += value?.byteLength || 0;
+      if (received > MAX_STREAM_BYTES) { await reader.cancel().catch(() => {}); throw new Error('Cloud response exceeded safety limit'); }
+      for (const event of parseSseChunk(decoder.decode(value, { stream: true }), state)) onEvent?.(event);
+    }
+    for (const event of parseSseChunk('\n\n', state)) onEvent?.(event);
+    return { requestId: response.headers.get('x-pri-request-id') || rid };
   } finally {
     clearTimeout(timer);
     if (signal) signal.removeEventListener('abort', abort);
@@ -285,6 +401,12 @@ export const cloud = Object.freeze({
   guardianConfirm: token => cloudRequest('/v1/account/guardian/confirm', { method: 'POST', body: { token } }),
   guardianWithdraw: token => cloudRequest('/v1/account/guardian/withdraw', { method: 'POST', body: { token } }),
   guardianState: () => cloudRequest('/v1/account/guardian/state'),
+  // Staff second factor (server/platform/mfa.js). The secret and the recovery
+  // codes pass through here once, to the panel, and are never persisted.
+  mfaStatus: () => cloudRequest('/v1/account/mfa/status'),
+  mfaEnrol: () => cloudRequest('/v1/account/mfa/totp/enrol', { method: 'POST', body: {} }),
+  mfaConfirm: code => cloudRequest('/v1/account/mfa/totp/confirm', { method: 'POST', body: { code } }),
+  mfaVerify: body => cloudRequest('/v1/account/mfa/verify', { method: 'POST', body }),
   login: body => cloudRequest('/v1/account/login', { method: 'POST', body }),
   // One-time codes (server/platform/otp.js). /request answers the same for an
   // address with or without an account; /verify proves it.
@@ -326,8 +448,16 @@ export const cloud = Object.freeze({
   // reach here: the local backend refuses them first.
   tutorHelp: (body, { signal = null, timeoutMs = 25000 } = {}) =>
     cloudRequest('/v1/tutor/help', { method: 'POST', body, signal, timeoutMs }),
+  // The same body, answered as server-sent events (see cloudStreamRequest).
+  tutorStream: (body, { onEvent, signal = null, timeoutMs = 45000 } = {}) =>
+    cloudStreamRequest('/v1/tutor/stream', { body, onEvent, signal, timeoutMs }),
   deleteAccount: body => cloudRequest('/v1/account', { method: 'DELETE', body }),
   identities: () => cloudRequest('/v1/account/identity'),
+  // Provider sign-in: Google/Apple in the browser (platform/socialSignIn.js)
+  // and Sign in with Apple through the native shell (platform/native/
+  // appleSignIn.js). The server says which providers this deployment offers,
+  // and issues the nonce the provider token must carry back; it is stored
+  // hashed, accepted once and expires.
   identityProviders: () => cloudRequest('/v1/account/identity/providers'),
   identityNonce: () => cloudRequest('/v1/account/identity/nonce', { method: 'POST', body: {} }),
   socialSignIn: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/sign-in`, { method: 'POST', body }),

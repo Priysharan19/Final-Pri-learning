@@ -10,7 +10,12 @@ import { setLanguage, signInLanguage, useT } from './i18n/index.js';
 import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
-import Legal from './pages/Legal.jsx';
+// The legal notices are a route of their own: nothing on the first screen
+// reads them, and the four English documents they carry are 16 kB of text that
+// otherwise rode in the shell's preload list on every cold open. The chunk is
+// warmed in the background, so the pages still open offline; the Hindi copies
+// stay behind their own import() in Legal.jsx.
+const Legal = React.lazy(() => import('./pages/Legal.jsx'));
 
 // ── Routes nobody has opened yet ─────────────────────────────────────────────
 // Login, Home, Practice and Legal are the screens a first run reaches: the
@@ -34,6 +39,7 @@ const Teach = React.lazy(() => import('./pages/Teach.jsx'));
 const History = React.lazy(() => import('./pages/History.jsx'));
 const Classes = React.lazy(() => import('./pages/Classes.jsx'));
 const Settings = React.lazy(() => import('./pages/Settings.jsx'));
+const PlanPage = React.lazy(() => import('./plan/PlanPage.jsx'));
 // The placement check is opened once or twice per student, so it — and the
 // prerequisite graph and engine behind it — is an on-demand chunk (see
 // ON_DEMAND in vite.config.js), not part of the install or the warm set.
@@ -66,7 +72,7 @@ const I = {
 };
 
 const STUDENT_NAV = [
-  { label: 'nav.groupLearn', items: [{ to: '/', key: 'nav.home', ico: I.home }, { to: '/practice', key: 'nav.practice', ico: I.practice }, { to: '/notes', key: 'nav.notes', ico: I.notes }] },
+  { label: 'nav.groupLearn', items: [{ to: '/', key: 'nav.home', ico: I.home }, { to: '/practice', key: 'nav.practice', ico: I.practice }, { to: '/plan', key: 'nav.plan', ico: I.tasks }, { to: '/notes', key: 'nav.notes', ico: I.notes }] },
   { label: 'nav.groupWork', items: [{ to: '/tasks', key: 'nav.tasks', ico: I.tasks }, { to: '/exams', key: 'nav.exams', ico: I.exams }, { to: '/classes', key: 'nav.classes', ico: I.classes }] },
   { label: 'nav.groupUnderstand', items: [{ to: '/progress', key: 'nav.progress', ico: I.progress }, { to: '/review?filter=wrong', key: 'nav.review', ico: I.review }] },
   { label: 'nav.groupPlay', items: [{ to: '/rush', key: 'nav.rush', ico: I.rush }, { to: '/match', key: 'nav.match', ico: I.match }] },
@@ -182,6 +188,33 @@ export default function App() {
 
   // Guard months of practice from storage eviction — ask the browser once per boot.
   useEffect(() => { requestPersistentStorage(); }, []);
+
+  // Cloud sync without a button: on start, on reconnect, on return to the
+  // foreground, shortly after an answer and every 15 minutes while visible —
+  // for the signed-in profile only, and a no-op offline or unlinked. When a
+  // pull restored work done on another device, the screens reading it refresh.
+  //
+  // The scheduler is reached through import() rather than named at the top of
+  // this file: it pulls the sync worker and the cloud-restore path with it, and
+  // a static import here put 53 kB of them in the shell's own preload list —
+  // paid for on every cold open, by every student, before the first screen.
+  // Nothing about sync is needed before first paint: it is network-dependent
+  // and a no-op offline, so it is installed once the module arrives. The
+  // cleanup covers both orders — the effect torn down before the module lands
+  // (nothing to uninstall, and the late arrival installs nothing) and after.
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    const pid = user.id;
+    let uninstall = null;
+    let torn = false;
+    void import('./platform/cloudSyncScheduler.js').then(({ installAutoSync }) => {
+      if (torn) return;
+      uninstall = installAutoSync(pid, {
+        onSynced: result => { if (result?.restoredEvents > 0) { refreshUser(); refreshDue(); refreshRecent(); } }
+      });
+    }).catch(() => { });
+    return () => { torn = true; if (uninstall) uninstall(); };
+  }, [user?.id, refreshUser, refreshDue, refreshRecent]);
 
   // The interface follows the profile's own language. Before a profile is
   // chosen there is nothing to follow, so the sign-in screen falls back to the
@@ -306,15 +339,17 @@ export default function App() {
   if (!user) {
     return (
       <AppCtx.Provider value={ctx}>
-        <Routes>
-          {/* A store reviewer and a payment provider open these without an
-              account, so they are reachable before the profile gate. */}
-          <Route path="/privacy" element={<Legal />} />
-          <Route path="/terms" element={<Legal />} />
-          <Route path="/refund-policy" element={<Legal />} />
-          <Route path="/grievance" element={<Legal />} />
-          <Route path="*" element={<Login />} />
-        </Routes>
+        <React.Suspense fallback={<RouteLoading />}>
+          <Routes>
+            {/* A store reviewer and a payment provider open these without an
+                account, so they are reachable before the profile gate. */}
+            <Route path="/privacy" element={<Legal />} />
+            <Route path="/terms" element={<Legal />} />
+            <Route path="/refund-policy" element={<Legal />} />
+            <Route path="/grievance" element={<Legal />} />
+            <Route path="*" element={<Login />} />
+          </Routes>
+        </React.Suspense>
         <ToastLayer toasts={toasts} />
       </AppCtx.Provider>
     );
@@ -345,6 +380,10 @@ export default function App() {
   };
 
   const switchProfile = async () => {
+    // The reminders runtime is loaded here, on the way out, rather than named
+    // at the top of this file: a static import carried the study planner it
+    // depends on into the shell's preload list for every student at every boot.
+    try { const { cancelRemindersOnSignOut } = await import('./reminders/index.js'); await cancelRemindersOnSignOut(user?.id); } catch { }
     try { await api.post('/auth/logout'); } catch { }
     // A role-specific route belongs to the profile that just signed out.
     // Neutralise it before showing the picker so selecting a different role
@@ -392,6 +431,7 @@ export default function App() {
                     <Route path="/practice" element={studentOnly(<Practice />)} />
                     <Route path="/practise-photo" element={studentOnly(<PractisePhoto />)} />
                     <Route path="/progress" element={studentOnly(<Progress />, '/teach#teacher-analytics')} />
+                    <Route path="/plan" element={studentOnly(<PlanPage />)} />
                     {PLACEMENT_ON && <Route path="/placement" element={studentOnly(<Placement />)} />}
                     <Route path="/map" element={<Navigate to="/progress?tab=map" replace />} />
                     <Route path="/stats" element={<Navigate to="/progress" replace />} />

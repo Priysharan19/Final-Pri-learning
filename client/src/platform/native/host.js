@@ -17,7 +17,7 @@ import { MAX_PROTOCOL, isPlainObject } from './envelope.js';
 /** Capability versions this build of the shared product understands. */
 export const SUPPORTED = Object.freeze({
   ink: [1], photo: [1], billing: [1], cloud: [1], share: [1],
-  files: [1], lifecycle: [1], storage: [1], device: [1], otp: [1],
+  files: [1], lifecycle: [1], storage: [1], device: [1], identity: [1], notifications: [1], otp: [1],
 });
 
 export const CAPABILITIES = Object.freeze(Object.keys(SUPPORTED));

@@ -6,6 +6,9 @@ on:
     branches: [main]
     paths:
       - 'Dockerfile'
+      - 'railway.json'
+      - 'tools/verify-deployment.mjs'
+      - 'tools/deployment-contract.test.mjs'
       - '.dockerignore'
       - '.env.production.example'
       - 'client/**'
@@ -16,6 +19,9 @@ on:
   pull_request:
     paths:
       - 'Dockerfile'
+      - 'railway.json'
+      - 'tools/verify-deployment.mjs'
+      - 'tools/deployment-contract.test.mjs'
       - '.dockerignore'
       - '.env.production.example'
       - 'client/**'
@@ -37,7 +43,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Build production image
         run: |
           set -euo pipefail
@@ -98,18 +104,24 @@ jobs:
           const web = JSON.parse(readFileSync('release.json', 'utf8'));
           assert.equal(health.ok, true);
           assert.equal(health.service, 'pri-learning-platform');
-          assert.equal(health.storage?.persistentDatabase, true);
+          // Anonymous /v1/health no longer carries operator storage detail; the
+          // persistent database is proven by the file test below and the engine here.
+          assert.equal(health.database?.engine, 'sqlite');
+          assert.equal(health.database?.reachable, true);
           assert.equal(health.releaseIdentity?.releaseSha, process.env.GITHUB_SHA);
           assert.deepEqual(web, health.releaseIdentity);
           NODE
+          # Prove the bind-mounted SQLite database exists before passing that
+          # out-of-band persistence fact to the otherwise read-only verifier.
           test -s "$RUNNER_TEMP/pri-platform-data/pri-learning-platform.db"
+          node tools/verify-deployment.mjs --origin http://127.0.0.1:4010 --sha "$GITHUB_SHA" --engine sqlite --allow-http --persistent-storage-proven
 
   railway-identity:
     name: Railway build-arg identity agrees with runtime
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Build image the way Railway does (RAILWAY_GIT_COMMIT_SHA, stale PRI_*)
         run: |
           set -euo pipefail

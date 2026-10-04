@@ -16,10 +16,22 @@ import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
 import { consumeOidcNonce } from './oidcNonce.js';
 import { publicEntitlement } from './entitlements.js';
 import { clipText } from './text.js';
+import { createMfaRouter } from './mfa.js';
+import { isCommonPassword } from './commonPasswords.js';
 import { verifyReauthCode } from './otp.js';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_MS = 1000 * 60 * 60;
+/**
+ * A guardian's withdrawal link must work for as long as the consent it ends.
+ * The one-hour confirmation token is spent and purged; this separate bearer is
+ * issued on confirmation, lives ten years (effectively the account's lifetime:
+ * it goes with the account, housekeeping leaves it alone) and is revoked by the
+ * withdrawal it performs. It can only ever reduce permission.
+ */
+export const WITHDRAW_CREDENTIAL_MS = 10 * 365 * 24 * 60 * 60 * 1000;
+/** bcrypt reads at most 72 bytes; a longer password would silently be truncated. */
+export const MAX_PASSWORD_BYTES = 72;
 /**
  * Reset emails one mailbox may receive per hour, however many addresses ask.
  * The per-IP limit on the route bounds one caller; this bounds one victim, so a
@@ -38,13 +50,22 @@ async function audit(db, actor, action, targetKind, targetId, metadata = {}, now
 
 function email(value) {
   const normalized = String(value || '').trim().toLowerCase();
-  if (!EMAIL.test(normalized) || normalized.length > 254) return null;
+  if (normalized.length > 254 || !EMAIL.test(normalized)) return null;
   return normalized;
 }
 
-function strongPassword(value) {
+/**
+ * Why a password is refused, or null. Length first (10 characters minimum,
+ * 72 bytes maximum because bcrypt reads no further — a longer password would
+ * be accepted and then silently matched on its first 72 bytes), then the
+ * bundled common-password list.
+ */
+export function passwordProblem(value) {
   const text = String(value || '');
-  return text.length >= 10 && text.length <= 200;
+  if (text.length < 10) return { code: 'WEAK_PASSWORD', message: 'Password must be at least 10 characters.' };
+  if (Buffer.byteLength(text, 'utf8') > MAX_PASSWORD_BYTES) return { code: 'PASSWORD_TOO_LONG', message: `Password must be at most ${MAX_PASSWORD_BYTES} bytes.` };
+  if (isCommonPassword(text)) return { code: 'PASSWORD_TOO_COMMON', message: 'That password is on the list of most commonly guessed passwords. Choose something less predictable.' };
+  return null;
 }
 
 function publicAccount(row) {
@@ -79,7 +100,7 @@ function ensureDeliveryTable(db) {
   raw.exec(`CREATE TABLE IF NOT EXISTS auth_delivery_outbox (
     id TEXT PRIMARY KEY,
     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    kind TEXT NOT NULL CHECK(kind IN ('verify-email','reset-password','guardian-consent')),
+    kind TEXT NOT NULL CHECK(kind IN ('verify-email','reset-password','guardian-consent','guardian-withdraw')),
     destination TEXT NOT NULL,
     token_id TEXT NOT NULL REFERENCES account_tokens(id) ON DELETE CASCADE,
     token_ciphertext TEXT NOT NULL,
@@ -88,13 +109,13 @@ function ensureDeliveryTable(db) {
   );`);
 }
 
-export async function queueAccountToken(db, accountId, destination, purpose, now = Date.now()) {
+export async function queueAccountToken(db, accountId, destination, purpose, now = Date.now(), { ttlMs = TOKEN_MS } = {}) {
   // Only a one-way token hash is used for verification. The delivery worker gets
   // an AES-GCM envelope bound to this token id; raw tokens are never persisted.
   const raw = opaqueToken(32);
   const tokenId = id('tok');
   const ciphertext = encryptDeliveryToken(raw, `${accountId}:${purpose}:${tokenId}`);
-  const expiresAt = now + TOKEN_MS;
+  const expiresAt = now + ttlMs;
   await db.run(`INSERT INTO account_tokens(id, account_id, purpose, token_hash, created_at, expires_at)
     VALUES (?, ?, ?, ?, ?, ?)`, [tokenId, accountId, purpose, sha256(raw), now, expiresAt]);
   await db.run(`INSERT INTO auth_delivery_outbox(id, account_id, kind, destination, token_id, token_ciphertext, created_at)
@@ -184,10 +205,15 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       const name = clipText(String(req.body?.name || '').trim(), 80);
       const password = String(req.body?.password || '');
       const deviceId = String(req.body?.deviceId || 'web').slice(0, 160);
-      if (!em || !name || !strongPassword(password)) {
+      if (!em || !name || String(password).length < 10) {
         return res.status(400).json({ error: { code: 'INVALID_ACCOUNT', message: 'Use a valid name, email and password of at least 10 characters.' } });
       }
-      const decision = ageDecision(req.body || {});
+      const weak = passwordProblem(password);
+      if (weak) return res.status(400).json({ error: weak });
+      // One shared age rule (guardianConsent.js ageDecision): an explicit
+      // declaration, and a child names a guardian whose address is not the
+      // student's own (GUARDIAN_EMAIL_SAME_AS_STUDENT).
+      const decision = ageDecision({ ...(req.body || {}), studentEmail: em });
       if (!decision.ok) return res.status(400).json({ error: { code: decision.code, message: decision.message } });
       const { basis, guardian } = decision;
 
@@ -328,8 +354,12 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
 
   // Guardian confirmation and withdrawal intentionally have different authority
   // windows. A confirmation can only elevate sync permission for one hour and is
-  // single-use. The same guardian-held bearer remains valid after consumption
-  // only for the fail-closed withdrawal route, which can never grant permission.
+  // single-use. Confirming issues the guardian a SEPARATE long-lived withdrawal
+  // bearer (purpose 'guardian-withdraw', emailed to the same address): the
+  // confirmation token is spent and purged within days, so it could never have
+  // honoured "withdraw at any time". The withdrawal bearer can only ever reduce
+  // permission, is revoked by the withdrawal it performs, goes with the account,
+  // and housekeeping never purges it while it is live (housekeeping.js).
   router.post('/guardian/confirm', rateLimit(db, 'guardian-confirm', { limit: 20, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const raw = String(req.body?.token || '');
     const now = Date.now();
@@ -343,6 +373,13 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
         await spendToken(db, token.id, now);
         await db.run('DELETE FROM auth_delivery_outbox WHERE token_id = ?', [token.id]);
         confirmed = await confirmConsent(db, token.account_id, now);
+        if (confirmed) {
+          const consent = await db.get('SELECT guardian_email FROM guardian_consents WHERE account_id = ?', [token.account_id]);
+          // One live withdrawal bearer per account: a re-confirmation (a new
+          // consent ceremony) replaces the previous one.
+          await invalidatePendingTokens(db, token.account_id, 'guardian-withdraw', now);
+          await queueAccountToken(db, token.account_id, consent.guardian_email, 'guardian-withdraw', now, { ttlMs: WITHDRAW_CREDENTIAL_MS });
+        }
       });
     } catch (err) {
       if (err?.code === 'TOKEN_ALREADY_USED') return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'This confirmation link is invalid or has expired.' } });
@@ -354,13 +391,25 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
   router.post('/guardian/withdraw', rateLimit(db, 'guardian-withdraw', { limit: 20, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const raw = String(req.body?.token || '');
     const now = Date.now();
-    // consumed_at is deliberately ignored: after confirmation this bearer has
-    // only permission-reducing authority. The account FK deletes it with the
-    // account, and purpose+hash prevent it crossing accounts or action types.
+    // Two bearers withdraw. The long-lived 'guardian-withdraw' credential, while
+    // unrevoked and unexpired; and the confirmation link itself, whatever its
+    // state (a parent who wants to say no to a pending request should not need a
+    // second email, and after confirmation the same link keeps its
+    // permission-reducing authority for as long as it survives housekeeping).
+    // Purpose+hash prevent either crossing accounts or action types; the
+    // account FK deletes both with the account.
     const token = raw ? await db.get(`SELECT * FROM account_tokens
-      WHERE token_hash = ? AND purpose = 'guardian-consent'`, [sha256(raw)]) : null;
+      WHERE token_hash = ? AND (purpose = 'guardian-consent'
+        OR (purpose = 'guardian-withdraw' AND consumed_at IS NULL AND expires_at > ?))`, [sha256(raw), now]) : null;
     if (!token) return res.status(400).json({ error: { code: 'TOKEN_INVALID', message: 'This withdrawal link is invalid.' } });
-    const withdrawn = await withdrawConsent(db, token.account_id, now);
+    let withdrawn = false;
+    await db.transaction(async () => {
+      withdrawn = await withdrawConsent(db, token.account_id, now);
+      // Withdrawal is terminal for the ceremony, so its credential is spent with
+      // it: the link cannot be replayed, and housekeeping may purge it.
+      await invalidatePendingTokens(db, token.account_id, 'guardian-withdraw', now);
+      await audit(db, null, 'guardian.withdraw', 'account', token.account_id, { via: token.purpose, withdrawn }, now);
+    });
     res.json({ ok: true, withdrawn });
   });
 
@@ -395,7 +444,8 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     try {
       const raw = String(req.body?.token || '');
       const password = String(req.body?.password || '');
-      if (!strongPassword(password)) return res.status(400).json({ error: { code: 'WEAK_PASSWORD', message: 'Password must be at least 10 characters.' } });
+      const weak = passwordProblem(password);
+      if (weak) return res.status(400).json({ error: weak });
       const now = Date.now();
       const token = raw ? await db.get(`SELECT * FROM account_tokens
         WHERE token_hash = ? AND purpose = 'reset-password' AND consumed_at IS NULL AND expires_at > ?`, [sha256(raw), now]) : null;
@@ -423,7 +473,8 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     try {
       const currentPassword = String(req.body?.currentPassword || '');
       const newPassword = String(req.body?.newPassword || '');
-      if (!strongPassword(newPassword)) return res.status(400).json({ error: { code: 'WEAK_PASSWORD', message: 'New password must be at least 10 characters.' } });
+      const weak = passwordProblem(newPassword);
+      if (weak) return res.status(400).json({ error: weak });
       const account = await db.get('SELECT * FROM accounts WHERE id = ? AND deleted_at IS NULL', [req.platformSession.account_id]);
       if (!account?.password_hash) return res.status(409).json({ error: { code: 'PASSWORD_NOT_CONFIGURED', message: 'This account uses a linked identity provider and has no password to change.' } });
       if (!(await bcrypt.compare(currentPassword, account.password_hash))) {
@@ -444,6 +495,9 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       res.json({ ok: true, account: publicAccount(account), sessionsRotated: true });
     } catch (err) { next(err); }
   });
+
+  // Staff second factor (mfa.js): status, enrolment, confirmation, verification.
+  router.use('/mfa', createMfaRouter(db));
 
   router.get('/devices', requireSession(db), async (req, res) => {
     const rows = await db.all(`SELECT id,device_id,created_at,last_seen_at,expires_at FROM account_sessions

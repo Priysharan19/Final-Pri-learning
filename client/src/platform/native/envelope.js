@@ -110,6 +110,22 @@ const REPLY_SCHEMAS = Object.freeze({
   'cloud.forgetSession': {},
   'cloud.request': { status: v => Number.isInteger(v) && v >= 100 && v <= 599, body: optional(str(2 * 1024 * 1024)) },
   'photo.recognize': { text: optional(str(20000)), answer: optional(str(2000)), confidence: optional(v => typeof v === 'number') },
+  // Sign in with Apple (identity v1). `nonce` echoes the SHA-256 hex digest the
+  // request carried, so the page can tell the token belongs to the nonce it
+  // asked the server for. `user` is what Apple shares on the first sign-in only.
+  'identity.appleSignIn': {
+    identityToken: v => typeof v === 'string' && /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(v) && v.length <= 8192,
+    authorizationCode: optional(str(4096)),
+    nonce: v => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v),
+    user: optional(v => isPlainObject(v) && optional(str(254))(v.email) && optional(str(160))(v.fullName)),
+  },
+  // Local notifications (notifications v1). Permission is asked only from the
+  // Settings toggle; `schedule` replaces the pending set with at most 64 items
+  // inside the next seven days and reports how many it kept; `cancelAll`
+  // clears pending and delivered reminders (sign-out, toggle off).
+  'notifications.requestPermission': { granted: bool },
+  'notifications.schedule': { scheduled: v => Number.isInteger(v) && v >= 0 && v <= 64 },
+  'notifications.cancelAll': {},
 });
 
 export function validateReply(cap, op, result) {

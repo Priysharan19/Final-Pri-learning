@@ -284,7 +284,14 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        webView?.let { root.removeView(it); it.destroy() }
+        webView?.let { view ->
+            root.removeView(view)
+            // A WebView print adapter owns native WebView state until onFinish().
+            // Destroying it earlier can abort Chromium/CheckJNI while the system
+            // print spooler is still rendering. FileExchange destroys it at the
+            // adapter's final callback when a print is active.
+            if (!::files.isInitialized || !files.deferWebViewDestroyIfPrinting(view)) view.destroy()
+        }
         webView = null
         cloud?.shutdown()
         cloud = null

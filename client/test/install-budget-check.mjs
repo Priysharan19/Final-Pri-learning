@@ -153,6 +153,8 @@ ok(PRECACHE.length < firstVisit.length,
 
 // ── 2 · What is not in it ────────────────────────────────────────────────────
 
+const emittedNames = () => readdirSync(join(DIST, 'assets'));
+
 for (const [pattern, what] of BANNED_FROM_INSTALL) {
   const found = PRECACHE.filter(url => pattern.test(url));
   eq(found.length, 0, `${what} is not in the install (${JSON.stringify(found)})`);
@@ -167,8 +169,22 @@ ok(!OPTIONAL.some(url => /(^|\/)pdf/.test(url)), 'the PDF renderer stays fully o
 // Staff-only screens and a second language's legal notices are fetched by the
 // people who open them. Warming them would charge every student for a teacher
 // workspace, an admin console and Hindi notices the student never reads.
-const staffOrHindi = firstVisit.filter(url => /(^|\/)(Teach|StaffOperationsPanel|legalHindi)-/.test(url));
+const staffOrHindi = firstVisit.filter(url => /(^|\/)(Teach|StaffOperationsPanel|MfaPanel|legalHindi)-/.test(url));
 eq(staffOrHindi.length, 0, `staff-only screens and the Hindi notices are neither installed nor warmed (${JSON.stringify(staffOrHindi)})`);
+
+// A feature the build reports off is not in the build. The AI tutor ships dark
+// (src/tutor/flag.js): QuestionCard.jsx and local/backend.js reach its panel
+// and its ask route only through an import() behind a build constant, so a
+// production build made without PRI_FEATURE_TUTOR=1 emits neither — 20 kB
+// that would otherwise be warmed onto every student's phone for a feature
+// nothing on the device can switch on. features.json is the build's own record
+// of the flag, so this holds whichever way the build was made.
+{
+  const features = JSON.parse(readFileSync(join(DIST, 'features.json'), 'utf8'));
+  const tutorFiles = emittedNames().filter(f => /(^|\/)(TutorHelp|askRoute|conversation)-[^/]*\.(js|css)$/.test(f));
+  if (features.tutor === true) ok(tutorFiles.length > 0, 'a build made with the tutor on carries its panel');
+  else eq(tutorFiles.length, 0, `a build made with the tutor off does not emit the tutor panel or its ask route (${JSON.stringify(tutorFiles)})`);
+}
 
 // The curriculum spine still has the chapter lists it renders from: the
 // syllabus layer the banks were split away from is in the install itself.
