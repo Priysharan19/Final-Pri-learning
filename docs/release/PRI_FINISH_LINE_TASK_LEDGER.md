@@ -16,7 +16,7 @@ Legend: **[DONE]** merged on main · **[PR]** open PR, needs merge · **[TODO]**
 | 0.2 | Decide Android emulator CI once: land #330 (software compositing) or demote the phone emulator job to non-blocking with an honest label. Close #278/#327. | R3 | PR #330 (conflicting) |
 | 0.3 | Rebase and merge the dream interface #264 (+ research #331). It is the identity of the product; every UI task below depends on it. Independent R4 review already returned FIXED on round 2; re-review 041c98ef only. | R4 | PR #264 (conflicting) |
 | 0.4 | Merge the Railway deploy PR #299, then switch Railway production source from `task/pri-03-handwriting-production-wiring` to `main` with wait-for-CI on. | R4 | DONE 2026-10-05 (#299 merged; production trigger now `main`, checkSuites on; first main deploy eb567e82 in progress) |
-| 0.5 | Merge the remaining green queue in order: #354 store-compliance reconcile, #299, #328 parity audit, #331, #357/#332 funding docs, #235 research context. Close superseded #336 in favour of #354. | R1–R4 | PR |
+| 0.5 | Merge the remaining green queue in order: #354 store-compliance reconcile, then the docs integration PR #358 (carries #328, #331, #332, #357, #235). Close superseded #336 in favour of #354 and the five docs originals after #358. | R1–R4 | PR |
 | 0.6 | Rebase and merge the conflicting fixes: #335 trap steering, #334 frozen-clock /stats (closes #215), #301 + #290 nav back race (keep one), #325 Android SMS code, #329 stylus eraser, #292 guardian consent suite, #285 KALP-R1 wording, #304 CP-12 store readiness, #307 tutor e2e, #300 syllabus board, #233 parallel gates. | R2–R4 | PR |
 | 0.7 | Dependabot: the fleet contract refuses `dependabot/*` branches, so the Actions bumps are re-issued as PR #359 and the minor groups (#340 #346, #344 #345 #347 in `/ad`) follow the same way. Hold React 19 (#348 #351), Express 5 (#342), better-sqlite3 13 (#343), bcryptjs 3 (#341) for a dedicated upgrade task each with full suite. | R1–R3 | PR #359 |
 | 0.8 | Close stale drafts that are out of V1 scope (#18, #37, #87, #144, #220, #222, #238) with a one-line "post-V1, tracked in ledger" comment so the queue is only live work. | R1 | DONE 2026-10-05 |
@@ -28,7 +28,7 @@ Legend: **[DONE]** merged on main · **[PR]** open PR, needs merge · **[TODO]**
 
 | # | Task | Risk | State |
 |---|---|---|---|
-| 1.1 | Railway: production service built from `main` on every merge, health endpoint, post-deploy verifier (from #299) runs automatically and fails loudly. | R4 | PR #299 |
+| 1.1 | Railway: production service built from `main` on every merge, health endpoint, post-deploy verifier (from #299) runs automatically and fails loudly. | R4 | DONE (#299 merged; production on `main` since 2026-10-05, first deploy eb567e82 healthy; readiness degraded only by unconfigured billing and a rejected handwriting provider key, which the owner must rotate) |
 | 1.2 | Railway staging environment wired to the Supabase staging project; every PR gets a preview or at least a staging deploy before merge. | R3 | TODO |
 | 1.3 | Supabase: apply the full `supabase/migrations` set to staging, run `postgres-schema-parity-check` and `postgres-schema-live-check` against it, then production. Record the migration SHA. | R4 | TODO |
 | 1.4 | Row-Level Security policies on every student-reachable table (profiles, attempts, ink drafts, submissions, favourites, tasks, consent, billing). Add a live RLS test that tries cross-profile reads with a second JWT. | R4 | TODO |
