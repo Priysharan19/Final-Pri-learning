@@ -192,44 +192,79 @@ const carriesTrap = (owner, q, trapKey) => (Array.isArray(q?.traps) ? q.traps : 
   .some(t => t && misconceptionIdForTrap(owner, t.why) === trapKey);
 
 // How often a cell (dot point × difficulty) yields a question carrying a trap,
-// measured once on fixed seeds and remembered: the bank is deterministic per
-// seed, so the figure is a property of the content, not of the sitting.
+// measured on fixed seeds and remembered: the bank is deterministic per seed,
+// so the figure is a property of the content, not of the sitting. The probe
+// runs synchronously inside the in-browser backend before the seek starts, so
+// it stops early in both directions — once enough hits have landed to know the
+// cell is rich, and once enough empty seeds have passed to know it is barren.
+// The seed order is fixed, so the same content always gives the same figure.
 const TRAP_PROBE_SEEDS = 48;
+// Hits after which the yield is extrapolated from the seeds seen so far.
+const TRAP_PROBE_SATURATE = 8;
+// Seeds without a single hit after which the cell is scored empty. A cell this
+// rare would give the bounded seek poor odds anyway, and offering the slip is
+// never worth stalling the question.
+const TRAP_PROBE_EMPTY_AT = 24;
 const trapYieldCache = new Map();
+// Probe accounting, read by the regression check that bounds the cost of a
+// first hunt. Counting the generations here, not in the generator, keeps the
+// bound about the trap probe specifically.
+const trapProbeStats = { generations: 0, cells: 0 };
+export function trapProbeStatsForTests() { return { ...trapProbeStats }; }
 function trapYield(subtopicId, dotpointId, difficulty, trapKey) {
   const k = `${subtopicId}|${dotpointId || ''}|${difficulty}|${trapKey}`;
   if (trapYieldCache.has(k)) return trapYieldCache.get(k);
   let hits = 0;
+  let probed = 0;
   for (let i = 1; i <= TRAP_PROBE_SEEDS; i++) {
+    if (hits >= TRAP_PROBE_SATURATE || (hits === 0 && i > TRAP_PROBE_EMPTY_AT)) break;
     // A missing bank propagates: nothing is written yet, and the API layer
     // loads the bank and re-runs the request.
     const q = generateQuestion(subtopicId, difficulty, i * 104729, dotpointId || undefined);
+    probed = i;
+    trapProbeStats.generations++;
     if (carriesTrap(subtopicId, q, trapKey)) hits++;
   }
-  const y = hits / TRAP_PROBE_SEEDS;
+  trapProbeStats.cells++;
+  const y = hits / probed;
   trapYieldCache.set(k, y);
   return y;
 }
+
+// Odds at which a cell is good enough that no further cell needs measuring:
+// the seek will find the slip there all but once in a hundred sittings.
+const TRAP_CELL_VIABLE = 0.99;
 
 /**
  * The cell most likely to let the bounded trap seek find `trapKey`, inside the
  * same difficulty limits chooseDotpoint keeps. Subtopic-level cells count:
  * offering the slip outranks aiming at a dot point. Null when no reachable cell
  * carries it — the caller then serves as before and honestly reports no trap.
+ *
+ * Cells are measured in a fixed order — dot points in pool order, each at the
+ * difficulty nearest the target first, then the subtopic-level cells — and the
+ * scan stops at the first cell that is clearly viable. Every measurement is
+ * cached, so a later hunt on the same pair pays nothing.
  */
 function trapCell(subtopicId, pool, { fixed, want, trapKey, nowMs }) {
   const tries = Math.max(TRAP_SEEK_TRIES, CONTENT_DEDUP_TRIES);
   const near = d => (fixed ? d === fixed : Math.abs(d - want) <= DOTPOINT_DRIFT);
+  const nearest = (a, b) => (Math.abs(a - want) - Math.abs(b - want)) || (a - b);
   const cells = [];
   for (const dp of pool) {
-    for (const d of dp.forms.filter(near)) cells.push({ dp, d });
+    for (const d of dp.forms.filter(near).sort(nearest)) cells.push({ dp, d });
   }
-  for (const d of [1, 2, 3, 4].filter(near)) cells.push({ dp: null, d });
-  const scored = cells
-    .map(c => ({ ...c, odds: 1 - (1 - trapYield(subtopicId, c.dp?.id, c.d, trapKey)) ** tries }))
-    .filter(c => c.odds > 0);
+  for (const d of [1, 2, 3, 4].filter(near).sort(nearest)) cells.push({ dp: null, d });
+  const scored = [];
+  let best = 0;
+  for (const c of cells) {
+    const odds = 1 - (1 - trapYield(subtopicId, c.dp?.id, c.d, trapKey)) ** tries;
+    if (odds <= 0) continue;
+    scored.push({ ...c, odds });
+    if (odds > best) best = odds;
+    if (best >= TRAP_CELL_VIABLE) break;
+  }
   if (!scored.length) return null;
-  const best = Math.max(...scored.map(c => c.odds));
   // Among equally good cells a dot point beats the subtopic level, the normal
   // ranking picks the dot point, and the difficulty nearest the target wins.
   const top = scored.filter(c => c.odds === best);

@@ -1143,7 +1143,21 @@ async function run() {
     await putRating(noether.id, MS, { ...msRow, traps: {} });
     await seedTrap(MS, M, 'Targeted named slip');
     eq('the seeded ontology ID is the misconception practice hunts', activeTraps((await ledger(MS)), Date.now())[0]?.key, M);
+    // The first hunt of a (subtopic, trap) pair measures every reachable cell
+    // once. That measurement runs synchronously inside the in-browser backend
+    // before the seek starts, so its cost is bounded here: a cell stops being
+    // probed once its yield has saturated, and the bound keeps the budget from
+    // creeping back towards the full 48 seeds on every cell.
+    const { trapProbeStatsForTests } = await import(`${SRC}local/backend.js`);
+    const probeBefore = trapProbeStatsForTests();
     const mapped = await servedWhere([MS], (s) => mappedProbes(s.payload).has(M), 40);
+    const probeAfter = trapProbeStatsForTests();
+    const huntCells = probeAfter.cells - probeBefore.cells;
+    const huntGenerations = probeAfter.generations - probeBefore.generations;
+    console.log(`  (first hunt of ${MS}/${M}: ${huntCells} cells, ${huntGenerations} generations)`);
+    ok('the first hunt of a misconception probed at least one cell', huntCells > 0, show(huntCells));
+    ok('the first hunt of a misconception costs at most 300 generations', huntGenerations <= 300, show(huntGenerations));
+    ok('…and stopped probing early rather than spending the full 48 seeds on every cell', huntGenerations < 48 * huntCells, show({ huntGenerations, huntCells }));
     if (ok('an active ontology-ID misconception steers practice to a question carrying it', !!mapped)) {
       ok('its repair opportunity is the ontology ID itself, not a text hash', probeKeys(mapped.payload, MS).has(M), show([...probeKeys(mapped.payload, MS)]));
       // An ontology ID no question in this subtopic carries.
