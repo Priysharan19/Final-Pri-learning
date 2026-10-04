@@ -187,6 +187,12 @@ export const flow = {
 
     const inbox = page.locator('section', { has: page.locator('#assignment-inbox-title') });
     await inbox.waitFor({ state: 'visible', timeout: 15000 });
+    // Settings mounts the staff console (and its authenticator gate) only for
+    // admin/support roles: a student makes no second-factor request at all.
+    await check('a student never meets the staff authenticator gate: no MFA status request, no panel, no console',
+      await page.locator('#mfa-title').count() === 0 && await page.locator('#staff-operations-title').count() === 0 &&
+        !requests.some(row => row.path.startsWith('/v1/account/mfa/')),
+      JSON.stringify(requests.filter(row => row.path.startsWith('/v1/account/mfa/')).map(row => `${row.method} ${row.path}`)));
     await check('assignment inbox refreshes immediately after connect without a page reload',
       new URL(page.url()).pathname === '/settings' && await inbox.isVisible());
     await check('the assigned cloud task is visible immediately',

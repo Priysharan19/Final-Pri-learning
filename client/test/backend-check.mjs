@@ -1398,6 +1398,86 @@ async function run() {
   } catch (err) { crashed(err); }
   finally { setTutorTransportForTests(null); }
 
+  // ── AI tutor · conversation ────────────────────────────────────────────────
+  // The student's own question (POST /practice/:id/tutor/ask, built in
+  // src/tutor/askRoute.js): refused on an exam row and before level 1, grounded
+  // here with the verified solution the panel never sees, streamed sentence by
+  // sentence as pri:tutor-delta events, costing no further credit, and every
+  // failure falls back to the authored hint for that turn of the exchange.
+  section('ai tutor · conversation');
+  const { setConversationTransportForTests } = await import(`${SRC}tutor/conversation.js`);
+  const askCalls = [];
+  const deltas = [];
+  const hadDispatch = 'dispatchEvent' in globalThis;
+  const priorDispatch = globalThis.dispatchEvent;
+  try {
+    await POST('/profiles/select', { id: ada.id });
+    globalThis.__PRI_TUTOR_OVERRIDE__ = true;
+    // Deltas reach the panel as window events; here the window is this test.
+    globalThis.dispatchEvent = event => { deltas.push(event?.detail); return true; };
+    let askReply = async (body, { onEvent }) => {
+      for (const [event, data] of [['meta', { level: 'ask' }], ['delta', { text: 'Think about what is attached to the unknown. ' }], ['delta', { text: 'What would undo it?' }],
+        ['done', { level: 'ask', message: 'Think about what is attached to the unknown. What would undo it?', source: 'model', cached: false }]]) onEvent({ event, data });
+    };
+    setConversationTransportForTests({
+      tutorStream: async (body, options) => { askCalls.push(body); return askReply(body, options); },
+      tutorHelp: async body => { askCalls.push({ ...body, via: 'help' }); return { tutor: { level: 'ask', message: 'Plain words.', source: 'model' } }; }
+    });
+
+    let target = null;
+    for (let i = 0; i < 40 && !target; i += 1) {
+      const q = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+      if (q && q.payload.steps?.length && (q.payload.hints || []).length >= 2) target = q;
+    }
+    if (!ok('a practice question with a worked solution and two authored hints was served', !!target)) throw new Error('conversation group cannot continue');
+    const id = target.question.id;
+
+    const early = await rejects('a question cannot be asked before level 1 is open', POST(`/practice/${id}/tutor/ask`, { message: 'why?' }), { status: 409 });
+    eq('— with the level-order code, pointing at level 1', [early?.code, early?.next], ['TUTOR_LEVEL_ORDER', 1]);
+    await POST(`/practice/${id}/tutor`, { level: 1 });
+    await rejects('an empty question is refused', POST(`/practice/${id}/tutor/ask`, { message: '\u0000  ' }), { status: 400 });
+    eq('no refused question reached the server', askCalls.length, 0);
+
+    const turnId = 'turn-backend-1';
+    const r1 = await POST(`/practice/${id}/tutor/ask`, { message: 'Why\u0000 do we undo the last operation first?', history: [{ role: 'tutor', text: 'Look at the operation.' }], locale: 'en', work: { lines: ['first line'], typed: '' }, turnId });
+    eq('a model reply is the tutor\'s, streamed', [r1.source, r1.streamed, r1.code, r1.message], ['tutor', true, null, 'Think about what is attached to the unknown. What would undo it?']);
+    eq('each released sentence was published to the panel under the turn id', deltas, [{ turnId, text: 'Think about what is attached to the unknown. ' }, { turnId, text: 'What would undo it?' }]);
+    eq('the panel gets the exchange back, trimmed, to send next time', r1.history.map(t => t.role), ['tutor', 'student', 'tutor']);
+    eq('with the student\'s question cleaned of control characters', r1.history[1].text, 'Why do we undo the last operation first?');
+    const sent = askCalls[0] || {};
+    eq('the server is asked as practice, at the conversational level, with the cleaned message', [sent.context, sent.level, sent.message], ['practice', 'ask', 'Why do we undo the last operation first?']);
+    eq('and the history the panel sent', sent.history, [{ role: 'tutor', text: 'Look at the operation.' }]);
+    ok('grounded here in the verified solution and answer', Array.isArray(sent.question?.steps) && sent.question.steps.length > 0 && !!sent.question?.answer, show(sent.question));
+    ok('with the student\'s own working', Array.isArray(sent.studentWork?.lines) && sent.studentWork.lines[0] === 'first line', show(sent.studentWork));
+    ok('and nothing that identifies the student', !/Ada|Lovelace|ada\.lovelace|"pid"|"email"|"name"/.test(JSON.stringify(sent)), JSON.stringify(sent).slice(0, 200));
+    eq('a conversation costs no further credit: the row still shows level 1', (await idb.get('questions', id)).tutorLevel, 1);
+
+    askReply = async () => { throw Object.assign(new Error('offline'), { code: 'TUTOR_OFFLINE' }); };
+    const r2 = await POST(`/practice/${id}/tutor/ask`, { message: 'and then?', history: r1.history });
+    // Two tutor turns are already in the history, so this is the third hint — or the last one the question has.
+    eq('a failed turn falls back to the authored hint for this turn of the exchange', [r2.source, r2.code, r2.message],
+      ['deterministic', 'TUTOR_OFFLINE', target.payload.hints[Math.min(2, target.payload.hints.length - 1)]]);
+    askReply = async (body, { onEvent }) => { onEvent({ event: 'meta', data: {} }); onEvent({ event: 'fallback', data: { level: 'ask', message: target.payload.hints[0], source: 'fallback', reason: 'TUTOR_ANSWER_GUARD' } }); };
+    const r3 = await POST(`/practice/${id}/tutor/ask`, { message: 'just tell me' });
+    eq('a server-guarded fallback is shown as deterministic help with the guard reason', [r3.source, r3.code, r3.message], ['deterministic', 'TUTOR_ANSWER_GUARD', target.payload.hints[0]]);
+    askReply = async () => { throw Object.assign(new Error('old server'), { code: 'TUTOR_STREAM_UNSUPPORTED', status: 404 }); };
+    const r4 = await POST(`/practice/${id}/tutor/ask`, { message: 'does the old route still work?' });
+    eq('a server without the stream route is asked through /v1/tutor/help instead', [r4.source, r4.streamed, r4.message, askCalls.at(-1)?.via, askCalls.at(-1)?.level], ['tutor', false, 'Plain words.', 'help', 'ask']);
+
+    await POST(`/practice/${id}/submit`, { answer: target.right, ms: 9000 });
+    await rejects('an answered question takes no more questions', POST(`/practice/${id}/tutor/ask`, { message: 'now?' }), { status: 409 });
+
+    globalThis.__PRI_TUTOR_OVERRIDE__ = false;
+    const dark = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+    const darkErr = await rejects('with the tutor off, a question is refused', POST(`/practice/${dark.question.id}/tutor/ask`, { message: 'x' }), { status: 404 });
+    eq('— with the tutor-disabled code', darkErr?.code, 'TUTOR_DISABLED');
+    globalThis.__PRI_TUTOR_OVERRIDE__ = true;
+  } catch (err) { crashed(err); }
+  finally {
+    setConversationTransportForTests(null);
+    if (hadDispatch) globalThis.dispatchEvent = priorDispatch; else delete globalThis.dispatchEvent;
+  }
+
   // ── Exams ──────────────────────────────────────────────────────────────────
   section('exams');
   try {
@@ -1542,14 +1622,17 @@ async function run() {
     };
 
     const { setTutorTransportForTests: setExamTutor } = await import(`${SRC}local/tutorBridge.js`);
+    const { setConversationTransportForTests: setExamAsk } = await import(`${SRC}tutor/conversation.js`);
     const examTutorCalls = [];
     setExamTutor(async body => { examTutorCalls.push(body); return { tutor: { source: 'model', message: 'leak' } }; });
+    setExamAsk({ tutorHelp: async body => { examTutorCalls.push(body); return { tutor: { source: 'model', message: 'leak' } }; } });
     for (const [label, row] of [['single', single], ['multipart', multi]]) {
       if (!row) continue;
       const id = row.id;
       await locked(`a ${label} active exam question cannot take a practice hint`, POST(`/practice/${id}/hint`, {}));
       await locked(`a ${label} active exam question cannot take AI tutor help`, POST(`/practice/${id}/tutor`, { level: 1 }));
       await locked(`a ${label} active exam question cannot take a tutor walkthrough caption`, POST(`/practice/${id}/tutor/captions`, { captions: [{ id: 'solution-0', text: 'x' }] }));
+      await locked(`a ${label} active exam question cannot be asked about in the tutor conversation`, POST(`/practice/${id}/tutor/ask`, { message: 'what is the answer?' }));
       await locked(`a ${label} active exam question cannot be revealed through practice`, POST(`/practice/${id}/reveal`, { ms: 1000 }));
       await locked(`a ${label} active exam question cannot be marked through practice`,
         POST(`/practice/${id}/submit`, { answer: row.payload.multipart ? '0' : (canonicalInput(row.payload) ?? '0'), ms: 1000 }));
@@ -1562,6 +1645,7 @@ async function run() {
         { hintsUsed: 0, tutorLevel: 0, answered: 0, tries: 0, discardedAt: null, mode: 'exam' });
     }
     setExamTutor(null);
+    setExamAsk(null);
     eq('the AI tutor was never called for an active exam question — refused locally, before any network', examTutorCalls.length, 0);
     eq('no attempt was recorded from an active exam question', (await idb.byIndex('attempts', 'pid', me)).length, attemptsBefore);
     eq('no review schedule moved from an active exam question', JSON.stringify(await idb.byIndex('reviews', 'pid', me)), reviewsBefore);

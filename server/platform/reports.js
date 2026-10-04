@@ -1,6 +1,6 @@
 import { asyncRouter } from './asyncRouter.js';
 import { asStore } from './store.js';
-import { id, rateLimit, requireRole, requireSession } from './security.js';
+import { id, rateLimit, requireMfa, requireRole, requireSession } from './security.js';
 
 const CATEGORIES = new Set([
   'wrong-answer', 'bad-solution', 'ambiguous-wording', 'incorrect-diagram',
@@ -55,7 +55,9 @@ export function createReportRouter(db) {
     res.json({ reports: rows.map(row => ({ id: row.id, category: row.category, contentId: row.content_id, questionId: row.question_id, status: row.status, createdAt: row.created_at, resolvedAt: row.resolved_at })) });
   });
 
-  router.get('/admin', requireRole('support', 'admin'), async (req, res) => {
+  // The triage queue carries reporters' names and addresses: staff only, with
+  // their second factor verified on this session.
+  router.get('/admin', requireRole('support', 'admin'), requireMfa(), async (req, res) => {
     const status = ['open', 'triaged', 'resolved', 'dismissed'].includes(req.query?.status) ? req.query.status : 'open';
     const rows = await db.all(`SELECT r.*,a.email,a.name FROM issue_reports r LEFT JOIN accounts a ON a.id=r.account_id
       WHERE r.status=? ORDER BY r.created_at ASC LIMIT 250`, [status]);
@@ -68,7 +70,7 @@ export function createReportRouter(db) {
     })) });
   });
 
-  router.patch('/admin/:reportId', requireRole('support', 'admin'), async (req, res) => {
+  router.patch('/admin/:reportId', requireRole('support', 'admin'), requireMfa(), async (req, res) => {
     const reportId = String(req.params.reportId || '');
     const status = String(req.body?.status || '');
     if (!['triaged', 'resolved', 'dismissed'].includes(status)) return res.status(400).json({ error: { code: 'REPORT_STATUS_INVALID', message: 'Report status is invalid.' } });

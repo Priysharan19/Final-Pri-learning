@@ -89,6 +89,21 @@ export function assertNoOpenTransaction(what = 'This network call') {
   }
 }
 
+/**
+ * The account a transaction is for, when it says so. On Postgres the store sets
+ * the session GUC `pri.account_id` for the transaction (SET LOCAL semantics), and
+ * the restrictive RLS policies on the sync tables (supabase/migrations/
+ * 20261005000000) then refuse any row of another account — defence in depth
+ * under the handlers' own WHERE account_id = ?. On SQLite it is recorded only.
+ */
+function accountScopeOption(options) {
+  const scope = options?.accountScope;
+  if (scope === undefined || scope === null) return null;
+  if (typeof scope !== 'string' || !scope || scope.length > 200) throw storeError('STORE_ACCOUNT_SCOPE_INVALID', 'A transaction account scope must be a non-empty string of at most 200 characters.');
+  return scope;
+}
+const SET_ACCOUNT_SCOPE = "SELECT set_config('pri.account_id', $1, true)";
+
 function lockOption(options) {
   const lock = options?.lock;
   if (lock === undefined || lock === null) return null;
@@ -115,6 +130,14 @@ function isolationOption(options, lock) {
     throw storeError('STORE_ISOLATION_REQUIRES_LOCK', "A writable 'repeatable read' transaction must hold a lock.");
   }
   return isolation;
+}
+
+function assertJoinableScope(joined, accountScope) {
+  // Like a lock, the scope is set at BEGIN; a nested transaction asking for a
+  // different account is a programming error, not something to widen.
+  if (accountScope && joined.accountScope !== accountScope) {
+    throw storeError('STORE_ACCOUNT_SCOPE_NESTED', 'A transaction account scope can only be set by the outermost transaction.');
+  }
 }
 
 function assertJoinableLock(joined, lock) {
@@ -221,11 +244,12 @@ const dialectHelpers = {
 // ── SQLite ───────────────────────────────────────────────────────────────────
 
 class SqliteTx {
-  constructor(store, depth = 0, lock = null) {
+  constructor(store, depth = 0, lock = null, accountScope = null) {
     this.store = store;
     this.dialect = 'sqlite';
     this.depth = depth;
     this.lock = lock;
+    this.accountScope = accountScope;
     this.closed = false;
   }
   #check() { if (this.closed) throw storeError('STORE_TX_FINISHED', 'This transaction has already finished.'); }
@@ -238,7 +262,7 @@ class SqliteTx {
     const name = `pri_sp_${this.depth + 1}`;
     const raw = this.store.raw;
     raw.exec(`SAVEPOINT ${name}`);
-    const nested = new SqliteTx(this.store, this.depth + 1, this.lock);
+    const nested = new SqliteTx(this.store, this.depth + 1, this.lock, this.accountScope);
     try {
       const result = await txContext.run({ store: this.store, tx: nested }, () => fn(nested));
       raw.exec(`RELEASE ${name}`);
@@ -345,12 +369,19 @@ export class SqliteStore {
     return this.#joined()?.lock ?? null;
   }
 
+  /** The account the current transaction is scoped to, or null. */
+  accountScope() {
+    return this.#joined()?.accountScope ?? null;
+  }
+
   async transaction(fn, options = {}) {
     const lock = lockOption(options);
+    const accountScope = accountScopeOption(options);
     isolationOption(options, lock); // validated on both engines; SQLite is always serial
     const joined = this.#joined();
     if (joined) {
       assertJoinableLock(joined, lock);
+      assertJoinableScope(joined, accountScope);
       return joined.transaction(fn, options);
     }
     // One connection: take the in-process lock so no other request's
@@ -360,7 +391,7 @@ export class SqliteStore {
     let release;
     this.active = { done: new Promise(resolve => { release = resolve; }) };
     this.stats.transactions++;
-    const tx = new SqliteTx(this, 0, lock);
+    const tx = new SqliteTx(this, 0, lock, accountScope);
     try {
       this.raw.exec('BEGIN');
       let result;
@@ -489,13 +520,14 @@ function runResult(result) {
 }
 
 class PostgresTx {
-  constructor(store, client, depth = 0, readOnly = false, lock = null) {
+  constructor(store, client, depth = 0, readOnly = false, lock = null, accountScope = null) {
     this.store = store;
     this.client = client;
     this.dialect = 'postgres';
     this.depth = depth;
     this.readOnly = readOnly;
     this.lock = lock;
+    this.accountScope = accountScope;
     this.closed = false;
   }
   #check() { if (this.closed) throw storeError('STORE_TX_FINISHED', 'This transaction has already finished.'); }
@@ -511,7 +543,7 @@ class PostgresTx {
     this.#check();
     const name = `pri_sp_${this.depth + 1}`;
     await this.client.query(`SAVEPOINT ${name}`);
-    const nested = new PostgresTx(this.store, this.client, this.depth + 1, this.readOnly, this.lock);
+    const nested = new PostgresTx(this.store, this.client, this.depth + 1, this.readOnly, this.lock, this.accountScope);
     try {
       const result = await txContext.run({ store: this.store, tx: nested }, () => fn(nested));
       await this.client.query(`RELEASE SAVEPOINT ${name}`);
@@ -623,6 +655,11 @@ export class PostgresStore {
     return this.#joined()?.lock ?? null;
   }
 
+  /** The account the current transaction is scoped to, or null. */
+  accountScope() {
+    return this.#joined()?.accountScope ?? null;
+  }
+
   /** The session statements every pooled connection runs before first use. */
   sessionSetup() {
     const statements = [`SET search_path TO ${this.schema}`];
@@ -710,10 +747,12 @@ export class PostgresStore {
   async transaction(fn, options = {}) {
     const { readOnly = false } = options;
     const lock = lockOption(options);
+    const accountScope = accountScopeOption(options);
     const isolation = isolationOption(options, lock);
     const joined = this.#joined();
     if (joined) {
       assertJoinableLock(joined, lock);
+      assertJoinableScope(joined, accountScope);
       return joined.transaction(fn);
     }
     for (let attempt = 1; ; attempt++) {
@@ -729,7 +768,7 @@ export class PostgresStore {
         releaseLocal?.();
         throw error;
       }
-      const tx = new PostgresTx(this, client, 0, readOnly, lock);
+      const tx = new PostgresTx(this, client, 0, readOnly, lock, accountScope);
       let broken;
       let locked = false;
       let begun = false;
@@ -751,6 +790,10 @@ export class PostgresStore {
           ? 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY'
           : isolation === 'repeatable read' ? 'BEGIN ISOLATION LEVEL REPEATABLE READ' : 'BEGIN ISOLATION LEVEL SERIALIZABLE');
         begun = true;
+        // Transaction-local (is_local = true): reverts to '' at COMMIT/ROLLBACK,
+        // so a pooled connection never carries one request's account into the
+        // next. Re-run with the transaction on every retry.
+        if (accountScope) await client.query(SET_ACCOUNT_SCOPE, [accountScope]);
         const result = await txContext.run({ store: this, tx }, () => fn(tx));
         tx.closed = true;
         await client.query('COMMIT');

@@ -60,6 +60,9 @@ export function derivePolicy(method, chain) {
     verifiedEmail: false,
     guardianConsent: false,
     operatorToken: false,
+    // false, true (a verified second factor on the session), or
+    // { stepUpMs } (one presented inside that window).
+    mfa: false,
     rateLimits: [],
     csrf: false,
     outOfOrder: []
@@ -74,6 +77,13 @@ export function derivePolicy(method, chain) {
     if (tag.verifiedEmail) policy.verifiedEmail = true;
     if (tag.guardianConsent) policy.guardianConsent = true;
     if (tag.operatorToken) policy.operatorToken = true;
+    if (tag.mfa) {
+      // Successive MFA gates tighten: a step-up window wins over a plain
+      // requirement, and the shortest window wins over a longer one.
+      const window = tag.mfa === true ? null : Number(tag.mfa.stepUpMs);
+      if (window === null) policy.mfa = policy.mfa || true;
+      else if (policy.mfa === false || policy.mfa === true || policy.mfa.stepUpMs > window) policy.mfa = { stepUpMs: window };
+    }
     if (tag.csrf && MUTATION.has(method)) policy.csrf = true;
     // rateLimit() keys on the session account when one was established before
     // it, otherwise on req.ip — so its position decides who shares a bucket.

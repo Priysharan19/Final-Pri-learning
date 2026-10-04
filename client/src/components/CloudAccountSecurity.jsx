@@ -4,6 +4,7 @@ import { disconnectCloudAccount } from '../platform/cloudAccount.js';
 import { requestIdentityToken, socialProviderConfig } from '../platform/socialSignIn.js';
 import { tLater, useT } from '../i18n/index.js';
 import { downloadJSON } from '../lib/files.js';
+import { cloudErrorCopy } from '../platform/cloudErrorCopy.js';
 
 function when(value, t) {
   if (!value) return t('cloud.unknown');
@@ -85,7 +86,7 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
       setMessage(tLater('cloudSecurity.passwordChanged'));
       await reload();
       await onChanged?.();
-    } catch (err) { setError(err.message || tLater('cloudSecurity.passwordChangeFailed')); }
+    } catch (err) { const copy = cloudErrorCopy(err); setError(copy ? tLater(copy.key, copy.vars) : (err.message || tLater('cloudSecurity.passwordChangeFailed'))); }
     finally { setBusy(''); }
   }
 
