@@ -6,6 +6,13 @@
 name: Accessibility soak (manual)
 
 on:
+  # A pull request that touches the walk or this file runs the soak as well,
+  # because a workflow_dispatch cannot be started until the file is on main.
+  pull_request:
+    paths:
+      - .github/workflows/a11y-soak.yml
+      - client/test/a11y-check.mjs
+      - client/test/a11y-gate.mjs
   workflow_dispatch:
     inputs:
       runs_per_job:
@@ -26,7 +33,7 @@ jobs:
     steps:
       - id: m
         run: |
-          n=$(( ${{ inputs.jobs }} )); [ "$n" -ge 1 ] && [ "$n" -le 8 ] || n=6
+          n=$(( ${{ inputs.jobs || 6 }} )); [ "$n" -ge 1 ] && [ "$n" -le 8 ] || n=6
           echo "matrix=$(seq -s, 1 $n | sed 's/^/[/; s/$/]/')" >> "$GITHUB_OUTPUT"
   soak:
     needs: plan
@@ -55,7 +62,7 @@ jobs:
         run: |
           set -o pipefail
           fails=0
-          for i in $(seq 1 ${{ inputs.runs_per_job }}); do
+          for i in $(seq 1 ${{ inputs.runs_per_job || 3 }}); do
             echo "::group::run $i"
             start=$(date +%s)
             if npm run test:a11y 2>&1 | tee "a11y-run-$i.log"; then r=pass; else r=FAIL; fails=$((fails+1)); fi
