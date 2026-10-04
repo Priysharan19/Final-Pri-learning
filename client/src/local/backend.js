@@ -2543,7 +2543,8 @@ function decorateDotpoint(p) {
     ...r,
     href: p.course === 'in'
       ? `/practice?subtopic=${encodeURIComponent(r.subtopic)}${Number.isInteger(r.ordinal) ? `&dotpoint=${r.ordinal}` : ''}&track=${encodeURIComponent(p.indiaTrack || 'cbse')}`
-      : `/practice?subtopic=${encodeURIComponent(r.subtopic)}${r.dotpoint ? `&dotpoint=${encodeURIComponent(r.dotpoint)}` : ''}`
+      // The practice page reads `dotpoint` as the 0-based ordinal on both spines.
+      : `/practice?subtopic=${encodeURIComponent(r.subtopic)}${Number.isInteger(r.ordinal) ? `&dotpoint=${r.ordinal}` : ''}`
   });
 }
 
