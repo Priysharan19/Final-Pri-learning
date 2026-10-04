@@ -6,7 +6,7 @@
 // the Home entry (idx 0) and leave nothing behind it — the next Back left
 // the app. This drives React Router's own browser history over a fake
 // window whose React render lags the URL, exactly as on a slow phone.
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { UNSAFE_createBrowserHistory as createBrowserHistory, createPath } from 'react-router-dom';
@@ -166,7 +166,7 @@ console.log('— it stays a normal link —');
 
 console.log('— every in-app page link uses it —');
 {
-  const files = ['client/src/App.jsx', 'client/src/components/FreeCapNotice.jsx', 'client/src/pages/PracticeBase.jsx', 'client/src/pages/Legal.jsx', 'client/src/pages/Login.jsx'];
+  const files = ['client/src/App.jsx', 'client/src/components/FreeCapNotice.jsx', 'client/src/pages/PracticeBase.jsx', 'client/src/pages/Legal.jsx', 'client/src/pages/Login.jsx', 'client/src/pages/Notes.jsx'];
   for (const f of files) {
     const src = read(f);
     check(`${f} has no raw <Link>`, !/<Link\b/.test(src) && /<PageLink\b/.test(src));
@@ -176,6 +176,23 @@ console.log('— every in-app page link uses it —');
   check('the logo decides from the real URL too', app.includes("nav('/', { replace: isCurrentUrl('/') })"));
   const comp = read('client/src/components/PageLink.jsx');
   check('PageLink routes every click through pageLinkClick', comp.includes('onClick={pageLinkClick({ to, navigate, onClick, target, replace, state })}'));
+  // Sweep the whole client: a screen added later must not reintroduce the
+  // race by importing React Router's Link directly (only PageLink may).
+  const sources = [];
+  const walk = dir => {
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name);
+      if (statSync(full).isDirectory()) walk(full);
+      else if (/\.jsx?$/.test(name)) sources.push(full);
+    }
+  };
+  walk(join(ROOT, 'client', 'src'));
+  const rawLinkImport = /import\s*\{[^}]*\bLink\b[^}]*\}\s*from\s*['"]react-router(-dom)?['"]/;
+  const offenders = sources
+    .filter(f => !f.endsWith(join('components', 'PageLink.jsx')))
+    .filter(f => rawLinkImport.test(readFileSync(f, 'utf8')))
+    .map(f => f.slice(ROOT.length + 1));
+  check('no other file under client/src imports React Router\'s Link directly', offenders.length === 0, offenders.join(', '));
 }
 
 const total = pass + fail;

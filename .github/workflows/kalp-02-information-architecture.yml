@@ -12,6 +12,7 @@ on:
       - 'client/src/pages/Legal.jsx'
       - 'client/src/pages/Login.jsx'
       - 'client/src/pages/PracticeBase.jsx'
+      - 'client/src/pages/Notes.jsx'
       - 'client/test/page-link-history-check.mjs'
       - 'client/src/i18n/**'
       - 'client/src/theme.css'
