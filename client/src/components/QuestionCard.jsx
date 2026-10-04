@@ -27,6 +27,8 @@ import TermGloss from './TermGloss.jsx';
 import { useFormFactor } from '../platform/formFactor.js';
 import Icon from './Icon.jsx';
 import { useDevicePref } from './devicePrefs.js';
+import { PRACTICE_SHORTCUTS } from './shortcuts.js';
+export { PRACTICE_SHORTCUTS };
 import '../workspace.css';
 import './QuestionCard.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
@@ -66,12 +68,6 @@ const fmtClock = (ms) => {
 // work the same whether the student typed, pasted or tapped a symbol in.
 const TYPED_HISTORY = 60;
 
-// The keyboard shortcuts on the question page (Settings → Help lists them).
-// Single letters are ignored while the student is typing in a field; ⌘Z/Ctrl+Z
-// is taken everywhere because the page's own undo is the one that matters.
-export const PRACTICE_SHORTCUTS = Object.freeze([
-  { key: 'N', action: 'next' }, { key: 'H', action: 'hint' }, { key: 'S', action: 'submit' }, { key: 'mod+Z', action: 'undo' }
-]);
 
 /**
  * The hint ladder: one rung per hint the question carries, numbered, in order.

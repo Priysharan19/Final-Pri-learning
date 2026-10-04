@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { cloud } from '../platform/cloudTransport.js';
 import { resolveHomeRecommendation, actionOpenable } from '../home/recommendation.js';
@@ -13,6 +13,8 @@ import { practiceDifficulties, practiceHref } from '../lib/practiceLinks.js';
 import { textMatches, useGlossary } from '../i18n/glossary.js';
 import TermGloss from '../components/TermGloss.jsx';
 import { featureEnabled } from '../platform/features.js';
+import GettingStarted from '../components/GettingStarted.jsx';
+import PageState from '../components/PageState.jsx';
 import './Home.css';
 
 const DIFF_KEYS = { 1: 'difficulty.1', 2: 'difficulty.2', 3: 'difficulty.3', 4: 'difficulty.4' };
@@ -42,6 +44,8 @@ export default function Home() {
   const t = useT();
   const tx = useTx();
   const [local, setLocal] = useState(null);
+  const [localFailed, setLocalFailed] = useState(false);
+  const location = useLocation();
   const [curriculum, setCurriculum] = useState(null);
   const [assignments, setAssignments] = useState(null);
   const stats = local?.stats || null;
@@ -76,6 +80,9 @@ export default function Home() {
       api.get('/exams'), api.get('/practice/resume')
     ]).then(([statsR, curriculumR, tasksR, examsR, resumeR]) => {
       if (!live) return;
+      // Every source failing at once is the app failing, not an empty page:
+      // say so, and offer the one action that helps.
+      setLocalFailed([statsR, curriculumR, tasksR, examsR, resumeR].every(r => r.status === 'rejected'));
       if (curriculumR.status === 'fulfilled') setCurriculum(curriculumR.value);
       setLocal({
         stats: statsR.status === 'fulfilled' ? statsR.value : null,
@@ -482,6 +489,18 @@ export default function Home() {
         <h2 className="home-section-title" id="home-week-title">{t('home.thisWeek')}</h2>
         <GoalCard user={user} activity={stats?.activity || []} />
       </section>
+
+      {localFailed && (
+        <PageState kind="error" title={t('home.loadFailedTitle')} body={t('home.loadFailedBody')}
+          action={{ label: t('common.tryAgain'), onClick: () => window.location.reload() }} />
+      )}
+
+      {/* Getting started: three steps, once per device for a profile with no
+          attempts yet, and whenever Settings → Help restarts it. */}
+      <GettingStarted
+        show={!!local && (location.state?.tour === true || (Number(stats?.totals?.attempts) || 0) === 0)}
+        focus={location.state?.tour === true}
+        onStart={() => nav('/practice')} />
     </div>
   );
 }

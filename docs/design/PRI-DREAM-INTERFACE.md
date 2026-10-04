@@ -20,7 +20,7 @@ Rules that follow, in priority order:
 6. **Motion explains.** It shows cause or continuity, never decorates, never repeats, and never delays a result.
 7. **Say only what is known.** Saved, offline, marked, read: each is stated only when it is true on this device.
 
-Enforced in CI by `client/test/design-system-check.mjs` (no decorative gradients, no glows, no literal colours below the token block, radii ≤ 8px, no emoji in chrome, one icon family, 3px focus ring; `pages/Home.css` and `components/QuestionCard.css` are linted with the system and may set no text under 12px) and `client/test/dream-interface-check.mjs` (workspace, feedback, exam, theme, Home rail, clock, hint ladder, shortcut and provenance contracts). The browser flow `client/test/tour-s7-parity.js` drives the rail, the clock, the ladder, the editor and the shortcuts.
+Enforced in CI by `client/test/design-system-check.mjs` (no decorative gradients, no glows, no literal colours below the token block, radii ≤ 8px, no emoji in chrome, one icon family, 3px focus ring; `pages/Home.css` and `components/QuestionCard.css` are linted with the system and may set no text under 12px) and `client/test/dream-interface-check.mjs` (workspace, feedback, exam, theme, Home rail, clock, hint ladder, shortcut and provenance contracts). The browser flows `client/test/tour-s7-parity.js` and `tour-s7-settings.js` drive the rail, the clock, the ladder, the editor, the shortcuts, Settings, the introduction, Favourites and the page states.
 
 ## 2. Authority and reconciliation
 
@@ -175,6 +175,8 @@ Each entry lists what it is for and the states it must have. A component is not 
 
 **Loading.** Skeletons (`.skeleton`) that match the shape of the content; a status line for work that takes longer than a second ("Checking your working…"). No spinners over content.
 
+**Page states.** `components/PageState.jsx` draws the five situations a page can be in so no page invents a sixth: *loading* (a skeleton), *empty* (a dashed sheet, one sentence, one action), *offline* (amber, left rule, says what still works), *error* (red, only for a failure of the app, always "Your work is still here and nothing was lost"), *slow* (teal, calm, for work that is taking longer than usual). Home, Practice, History and Favourites use it.
+
 **Empty.** One sentence saying what will appear here and one action that makes it appear.
 
 **Error.** Three different things, never confused: a wrong answer (`.verdict-bad`, copper), an unreadable answer (`.verdict-unsure`, dashed indigo), a failure of the app (`.verdict-technical`, red, "Your work is still here and nothing was lost").
@@ -200,6 +202,12 @@ Keyboard shortcuts on the question page: **N** next, **H** next hint, **S** subm
 **Explanation player (Pri Explain).** A board, not a chat: the question as typeset mathematics, a ruled note on why the explanation is shaped this way, one step per scene, a timeline rail. It says "This explanation cannot change your mark". The engine version is a `data-explain-engine` attribute, not chrome. Styled by `components/PriExplainInstrument.css`.
 
 **Home (command centre).** Greeting by time of day; one recommendation from the KALP-04 resolver on one sheet, with its reason; then the Today rows (`.home-today`): reviews due and work left unfinished, each shown once and only when it is not already the recommendation. "Choose something else" holds the alternatives and the generate rail (`.gen-rail`, `pages/Home.css`): Class/Year → Course/Track → Topics → Dot points → Difficulty → Type as one row of rungs (WAI-ARIA tabs, arrow keys move along the rail), a summary chip that reads "No filters applied" until something is chosen, and one Generate. There is no screen between the rail and the question. Type offers only what the backend serves (any question, or past papers only, India). A guest's remaining free questions are shown only when the server hands the client the count. One quiet week line.
+
+**Settings.** One index, in the order a student looks: Subscription, Profile, Account & Security, Handwriting, Language, Appearance, Courses, Data & Backup, Help & Safety, About. Premium, pricing, restoring a purchase, account export and account deletion keep their one authority — the cloud account panel and the server — and Settings points to them rather than restating them. Appearance holds the theme, the running clock and **text size**: a slider (90–130%) that moves `--text-scale` on `<html>`; the question page's reading text (stem, hints, options, steps, the answer field) follows it and the chrome keeps its measure; the slider shows the maths at the chosen size as it moves. Help & Safety lists the keyboard shortcuts the question page obeys (one table, `components/shortcuts.js`), restarts the introduction, and links the grievance page for contact. About states version, build and curriculum version and links Pricing, Contact, Terms, Privacy and the Refund policy.
+
+**Getting started.** `components/GettingStarted.jsx`: three numbered steps at the foot of Home — generate a question, write your answer, see the verdict — once per device for a profile with no attempts, restartable from Help. A sheet, not a modal: nothing is covered and nothing is blocked.
+
+**Favourites.** `/favorites`: every saved question (the bookmark is a profile record), arranged in folders kept on the device (`pages/favoriteFolders.js`; the page says so), with two actions per folder: *Practise this* (each question again, in order, by History's retry path; the workspace bar names the folder and the position) and *Print worksheet* (a numbered paper page with ruled working space, answers not printed, through the platform's print path). Reached from Review's saved filter.
 
 **Progress.** One reading column: title, the paper estimate on the page's only sheet, a ruled facts line, the syllabus table, and a note on what the page does and does not claim. Whole marks only. No percentile, rank or prediction below the evidence threshold.
 

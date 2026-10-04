@@ -76,9 +76,15 @@ export const flow = {
     await check('Forward restores later Review filter', (await pathState(page)) === '/review?filter=bookmarked');
     await snap(page, '02-student-review');
 
+    // /favorites is a page of its own since Section 7.5 (folders, practise a
+    // folder, worksheet), reached from Review's saved filter; not a nav item.
+    await goto('/favorites');
+    await page.waitForSelector('.fav, [data-page-state]', { timeout: 30000 });
+    await check('/favorites is the Favourites page, reached from Review, outside the rail',
+      (await pathState(page)) === '/favorites' && await page.locator('.fav').count() === 1
+      && !(await page.locator('.sidebar .nav-item[href="/favorites"]').count()));
     for (const [legacy, canonical] of [
       ['/history', '/review'],
-      ['/favorites', '/review?filter=bookmarked'],
       ['/mistakes', '/review?filter=wrong'],
       ['/map', '/progress?tab=map'],
       ['/stats', '/progress'],

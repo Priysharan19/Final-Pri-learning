@@ -66,3 +66,9 @@
 @media print {
   .q-timer { display: none; }
 }
+
+/* Text size (Settings → Appearance): the reading text of the question page
+   follows --text-scale on <html>; the chrome keeps its measure. */
+.ws .q-prompt { font-size: calc(var(--text-math) * var(--text-scale, 1)); }
+.ws .hintbox, .ws .mcq-opt, .ws .step-d, .ws .final-answer, .ws .eval-body { font-size: calc(1em * var(--text-scale, 1)); }
+.ws .editor-body textarea, .ws .editor-body .answer-input { font-size: calc(17px * var(--text-scale, 1)); }

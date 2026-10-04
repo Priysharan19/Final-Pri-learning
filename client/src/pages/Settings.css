@@ -1,0 +1,30 @@
+/* Settings parity (Section 7.9): the text-size preview, the shortcuts table and
+   the About links. Loaded with Settings; tokens only. */
+.set-textsize-v { display: inline-flex; align-items: center; gap: 10px; min-width: 220px; }
+.set-textsize-v input[type="range"] { flex: 1; accent-color: var(--accent); min-width: 140px; }
+.set-textsize-pct { font-variant-numeric: tabular-nums; color: var(--ink-2); font-size: 13.5px; min-width: 42px; text-align: right; }
+.set-preview {
+  margin-top: 12px; padding: 16px 18px; background: var(--paper); border: 1px solid var(--hairline); border-radius: var(--radius);
+  max-width: 100%; overflow-x: auto; min-width: 0;
+}
+.set-preview .katex-display { margin: 0.4em 0; overflow-x: auto; overflow-y: hidden; }
+.set-textsize { min-width: 0; }
+.set-shortcuts { table-layout: auto; }
+.set-shortcuts td:last-child { overflow-wrap: anywhere; }
+.set-preview-prompt { font-family: var(--font-prose-math); font-size: calc(var(--text-math) * var(--text-scale, 1)); line-height: 1.62; color: var(--ink); max-width: var(--measure); }
+.set-preview-note { margin: 10px 0 0; color: var(--ink-3); font-size: 12.5px; }
+.set-shortcuts { border-collapse: collapse; width: 100%; max-width: 460px; font-size: 14px; }
+.set-shortcuts th { text-align: left; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); padding: 6px 10px 6px 0; border-bottom: 1px solid var(--hairline); }
+.set-shortcuts td { padding: 7px 10px 7px 0; border-bottom: 1px solid var(--hairline-faint); color: var(--ink-2); }
+.set-shortcuts kbd {
+  display: inline-block; min-width: 26px; text-align: center; padding: 1px 7px; font: 500 12.5px/1.6 var(--font); white-space: nowrap;
+  color: var(--ink); background: var(--surface-raised); border: 1px solid var(--control-border); border-radius: var(--radius-xs);
+  box-shadow: 0 1px 0 var(--hairline-strong);
+}
+.set-links .btn { gap: 6px; }
+@media (max-width: 760px) {
+  .set-textsize-v { min-width: 0; width: 100%; margin-left: 0; }
+  .set-row.set-textsize-row { flex-wrap: wrap; }
+  .set-textsize-v input[type="range"] { min-width: 0; }
+  .set-links .btn { flex: 1 1 40%; }
+}

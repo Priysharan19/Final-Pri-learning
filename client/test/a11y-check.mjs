@@ -677,6 +677,12 @@ async function run() {
       });
     }
 
+    await step('favourites', '/favorites', async () => {
+      await goTo(page, BASE, '/favorites');
+      await page.waitForSelector('.fav, [data-page-state]', { timeout: 30000 });
+      await wait(page, 400);
+    });
+
     await step('account menu open', '/', async () => {
       await goTo(page, BASE, '/');
       await click(page, '.user-chip');

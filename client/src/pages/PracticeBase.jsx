@@ -15,6 +15,8 @@ import Icon from '../components/Icon.jsx';
 import { isContentEmpty, servable, contentEmptySignal } from '../lib/contentServe.js';
 import { practiceHref, practiceRequestFromQuery } from '../lib/practiceLinks.js';
 import { queueTelemetry } from '../platform/telemetry.js';
+import { readQueue, shiftQueue, writeQueue } from './favoriteFolders.js';
+import PageState from '../components/PageState.jsx';
 
 const EMPTY_SESSION = Object.freeze({ answered: 0, correct: 0, xp: 0 });
 
@@ -49,6 +51,12 @@ export default function Practice() {
   const [serve, setServe] = useState(null);
   const currentQuestionRef = useRef(null);
   const handedRef = useRef(location.state?.serve || null);   // a retry handed over from History
+  // "Practise this folder" (Favourites): the rest of the folder waits in the
+  // tab's queue and Next serves it in order; the bar says where you are.
+  const [folderQueue, setFolderQueue] = useState(() => location.state?.folderQueue || (readQueue() ? { name: readQueue().name, total: readQueue().total, remaining: readQueue().ids.length } : null));
+  const [offline, setOffline] = useState(() => typeof navigator !== 'undefined' && navigator.onLine === false);
+  const [slow, setSlow] = useState(false);
+  const slowTimer = useRef(null);
   const [error, setError] = useState('');
   const [errorCode, setErrorCode] = useState('');
   const [pyqAlternatives, setPyqAlternatives] = useState([]);
@@ -138,6 +146,18 @@ export default function Practice() {
   }, [assignmentMode, assignmentClassId, assignmentId, replaceSession]);
 
   useEffect(() => { currentQuestionRef.current = serve?.question?.id || null; }, [serve]);
+  useEffect(() => {
+    const on = () => setOffline(false), off = () => setOffline(true);
+    window.addEventListener('online', on); window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+  // A question that takes longer than a few seconds to arrive says so calmly
+  // instead of looking stuck; nothing about the request changes.
+  useEffect(() => {
+    if (serve || error || capped) { setSlow(false); if (slowTimer.current) clearTimeout(slowTimer.current); return undefined; }
+    slowTimer.current = setTimeout(() => setSlow(true), 6000);
+    return () => { if (slowTimer.current) clearTimeout(slowTimer.current); };
+  }, [serve, error, capped]);
 
   const load = useCallback(async (options = null) => {
     if (loading.current) return;
@@ -153,6 +173,22 @@ export default function Practice() {
       setServe(handed);
       return;
     }
+    // Next inside a folder: the next saved question, by the same retry path.
+    if (options?.fresh === true && !assignmentMode && !taskId && readQueue()?.ids?.length) {
+      loading.current = true;
+      setError(''); setErrorCode(''); setCapped(null);
+      try {
+        const leaving = currentQuestionRef.current;
+        if (leaving) { try { await api.post(`/practice/${leaving}/discard`, {}); } catch (e) { if (e?.status !== 409) throw e; } }
+        const next = shiftQueue();
+        const r = await api.post(`/history/${next.id}/retry`, { variant: 'same' });
+        setServe({ question: r.question, reason: 'retry', why: tLater('favorites.whyFolder', { name: next.name }) });
+        setFolderQueue({ name: next.name, total: next.total, remaining: next.remaining });
+      } catch (e) { setError(e.message); setErrorCode(e?.code || ''); }
+      finally { loading.current = false; }
+      return;
+    }
+    if (folderQueue && options?.fresh === true) { writeQueue(null); setFolderQueue(null); }
     loading.current = true;
     setError('');
     setErrorCode('');
@@ -439,6 +475,16 @@ export default function Practice() {
         )}
         {pyqOnly && <p className="muted">{t('practice.pyqOnlyNote')}</p>}
 
+        {/* Offline: practice continues on this device; the server reader waits. */}
+        {offline && !capped && (
+          <PageState kind="offline" title={t('practice.offlineTitle')} body={t('practice.offlineBody')} />
+        )}
+        {folderQueue && serve && (
+          <div className="notice" role="status" data-folder-queue={folderQueue.remaining}>
+            {t('favorites.folderProgress', { name: folderQueue.name, done: folderQueue.total - folderQueue.remaining, total: folderQueue.total })}
+          </div>
+        )}
+
         {capped && <FreeCapNotice gate={capped} onRetry={load} />}
 
         {/* No question exists for this exact selection: an empty state with a way
@@ -525,7 +571,8 @@ export default function Practice() {
             <div className="skeleton" style={{ height: 22, marginBottom: 10 }} />
             <div className="skeleton" style={{ height: 22, width: '70%' }} />
           </div>
-          <p className="muted" role="status" style={{ textAlign: 'center' }}>{t('practice.loading')}</p>
+          <p className="muted" role="status" style={{ textAlign: 'center' }}>{t(slow ? 'practice.loadingSlow' : 'practice.loading')}</p>
+          {slow && <PageState kind="slow" title={t('practice.slowTitle')} body={t(offline ? 'practice.slowOfflineBody' : 'practice.slowBody')} />}
         </div>
       )}
 

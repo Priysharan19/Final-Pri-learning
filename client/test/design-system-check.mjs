@@ -11,7 +11,11 @@ const theme = readFileSync(new URL('../src/theme.css', import.meta.url), 'utf8')
   + '\n' + readFileSync(new URL('../src/workspace.css', import.meta.url), 'utf8')
   + '\n' + readFileSync(new URL('../src/ink/InkAnswer.css', import.meta.url), 'utf8')
   + '\n' + readFileSync(new URL('../src/pages/Home.css', import.meta.url), 'utf8')
-  + '\n' + readFileSync(new URL('../src/components/QuestionCard.css', import.meta.url), 'utf8');
+  + '\n' + readFileSync(new URL('../src/components/QuestionCard.css', import.meta.url), 'utf8')
+  + '\n' + readFileSync(new URL('../src/pages/Settings.css', import.meta.url), 'utf8')
+  + '\n' + readFileSync(new URL('../src/pages/Favorites.css', import.meta.url), 'utf8')
+  + '\n' + readFileSync(new URL('../src/components/PageState.css', import.meta.url), 'utf8')
+  + '\n' + readFileSync(new URL('../src/components/GettingStarted.css', import.meta.url), 'utf8');
 const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
 
 const checks = [];
@@ -84,10 +88,17 @@ for (const selector of selectors) check(`core primitive ${selector} is adopted`,
 // The Home rail and the question page's clock, hint ladder, editor history,
 // provenance line, diagram note and footer strip exist, in the token system,
 // with no text under 12px and 44px targets on touch.
-const parity = readFileSync(new URL('../src/pages/Home.css', import.meta.url), 'utf8')
-  + '\n' + readFileSync(new URL('../src/components/QuestionCard.css', import.meta.url), 'utf8');
-for (const selector of ['.home-today', '.gen-rail', '.gen-rung', '.q-timer', '.hint-rail', '.hint-rung', '.editor-history', '.q-provenance', '.q-figure-note', '.ws-foot'])
+const parity = ['../src/pages/Home.css', '../src/components/QuestionCard.css', '../src/pages/Settings.css', '../src/pages/Favorites.css', '../src/components/PageState.css', '../src/components/GettingStarted.css']
+  .map(f => readFileSync(new URL(f, import.meta.url), 'utf8')).join('\n');
+for (const selector of ['.home-today', '.gen-rail', '.gen-rung', '.q-timer', '.hint-rail', '.hint-rung', '.editor-history', '.q-provenance', '.q-figure-note', '.ws-foot',
+  '.set-preview', '.set-shortcuts', '.fav-folders', '.fav-worksheet', '.page-state-offline', '.page-state-error', '.tutorial-dots'])
   check(`parity primitive ${selector} is styled`, parity.includes(selector), selector);
+// The five page states never share a colour: offline is amber, error is red, slow is teal, empty has none.
+check('page states carry four different meanings in four different colours',
+  /\.page-state-offline \{[^}]*var\(--warn\)/.test(parity) && /\.page-state-error \{[^}]*var\(--bad\)/.test(parity)
+  && /\.page-state-slow \.page-state-ico \{[^}]*var\(--accent\)/.test(parity) && /\.page-state-empty \{[^}]*border-style: dashed/.test(parity));
+// The printed worksheet shows only itself, in the maths face, with ruled space.
+check('the worksheet prints alone with ruled working space', /@media print \{[\s\S]*\.fav-worksheet \{ display: block;[\s\S]*\.fav-ws-space \{[^}]*repeating-linear-gradient/.test(parity));
 const small = [...parity.matchAll(/font(?:-size)?:\s*(?:\d+\s+)?(\d+(?:\.\d+)?)px/g)].map(m => Number(m[1])).filter(n => n < 12);
 check('parity furniture sets no text below 12px', small.length === 0, small.join(','));
 check('parity furniture gives touch 44px rungs and history controls',

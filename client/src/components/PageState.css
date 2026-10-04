@@ -1,0 +1,23 @@
+/* The five page states (Section 7.15). Tokens only; the four colours of the
+   system carry the four meanings and loading has none. */
+.page-state-loading { padding: 4px 0; }
+.page-state { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: start; }
+.page-state-ico { width: 22px; height: 22px; display: grid; place-items: center; margin-top: 1px; color: var(--ink-2); }
+.page-state-title { font-weight: 600; color: var(--ink); }
+.page-state-body { color: var(--ink-2); font-size: 14px; margin-top: 2px; max-width: var(--reading-width, 68ch); }
+.page-state-action { margin-top: 10px; }
+/* Empty: one sentence and one action, drawn as a dashed sheet so it reads as "nothing yet", not as a notice. */
+.page-state-empty { border-style: dashed; background: none; }
+.page-state-empty .page-state-ico { color: var(--ink-3); }
+/* Offline: amber with a left rule, says what still works. */
+.page-state-offline { border-left: 3px solid var(--warn); background: var(--warn-soft); }
+.page-state-offline .page-state-ico { color: var(--warn); }
+/* Error: the only red, and only for a failure of the app. */
+.page-state-error { border-left: 3px solid var(--bad); background: var(--bad-soft); }
+.page-state-error .page-state-ico { color: var(--bad); }
+/* Slow: calm, teal dot, nothing loops except the status pulse that already exists. */
+.page-state-slow { background: var(--surface); }
+.page-state-slow .page-state-ico { color: var(--accent); }
+@media (max-width: 760px) {
+  .page-state { gap: 4px 10px; }
+}

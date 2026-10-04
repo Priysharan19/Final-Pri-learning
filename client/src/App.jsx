@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState, useCall
 import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { api } from './api.js';
 import { applyTheme, cleanThemePref, followSystemTheme, resolveTheme, storedThemePref } from './lib/theme.js';
+import { applyTextScale } from './components/devicePrefs.js';
 import { requestPersistentStorage } from './local/idb.js';
 import { onCloudSessionChange } from './platform/cloudSession.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
@@ -35,6 +36,7 @@ const Teach = React.lazy(() => import('./pages/Teach.jsx'));
 const History = React.lazy(() => import('./pages/History.jsx'));
 const Classes = React.lazy(() => import('./pages/Classes.jsx'));
 const Settings = React.lazy(() => import('./pages/Settings.jsx'));
+const Favorites = React.lazy(() => import('./pages/Favorites.jsx'));
 const PlanPage = React.lazy(() => import('./plan/PlanPage.jsx'));
 // The placement check is opened once or twice per student, so it — and the
 // prerequisite graph and engine behind it — is an on-demand chunk (see
@@ -101,7 +103,7 @@ function isDestinationActive(location, to) {
 const TITLE_KEYS = {
   '/': 'nav.home', '/practice': 'nav.practice', '/progress': 'nav.progress', '/tasks': 'nav.tasks',
   '/exams': 'nav.exams', '/rush': 'nav.rush', '/match': 'nav.match', '/teach': 'nav.teacherWorkspace',
-  '/notes': 'nav.notes', '/review': 'nav.review', '/history': 'nav.review', '/favorites': 'nav.review', '/classes': 'nav.classes', '/settings': 'nav.settings'
+  '/notes': 'nav.notes', '/review': 'nav.review', '/history': 'nav.review', '/favorites': 'nav.favorites', '/classes': 'nav.classes', '/settings': 'nav.settings'
 };
 
 // Shown for the moment a route's own chunk is arriving. It is announced rather
@@ -179,6 +181,8 @@ export default function App() {
 
   // Guard months of practice from storage eviction — ask the browser once per boot.
   useEffect(() => { requestPersistentStorage(); }, []);
+  // The device's text size (Settings → Appearance) is painted once at boot.
+  useEffect(() => { applyTextScale(); }, []);
 
   // Cloud sync without a button: on start, on reconnect, on return to the
   // foreground, shortly after an answer and every 15 minutes while visible —
@@ -444,7 +448,7 @@ export default function App() {
                     <Route path="/match" element={studentOnly(<Match />)} />
                     <Route path="/review" element={studentOnly(<History />)} />
                     <Route path="/history" element={<Navigate to="/review" replace />} />
-                    <Route path="/favorites" element={<Navigate to="/review?filter=bookmarked" replace />} />
+                    <Route path="/favorites" element={studentOnly(<Favorites />)} />
                     <Route path="/mistakes" element={<Navigate to="/review?filter=wrong" replace />} />
                     <Route path="/classes" element={studentOnly(<Classes />, '/teach#teacher-classes')} />
                     <Route path="/privacy" element={<Legal />} />

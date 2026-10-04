@@ -1,0 +1,30 @@
+/* Getting started (Section 7.10): a sheet at the foot of Home, three numbered
+   steps, one action. Not a modal; nothing is covered. Tokens only. */
+.tutorial {
+  margin-top: 40px; padding: 20px 22px 18px; background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg); display: grid; gap: 12px;
+}
+.tutorial-head { display: flex; align-items: center; gap: 10px; }
+.tutorial-title { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin: 0; flex: 1; }
+.tutorial-title:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; border-radius: var(--radius-xs); }
+.tutorial-count { color: var(--ink-3); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.tutorial-close { width: 32px; height: 32px; color: var(--ink-3); }
+.tutorial-dots { list-style: none; margin: 0; padding: 0; display: flex; gap: 8px; }
+.tutorial-dot {
+  width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--hairline-strong); display: grid; place-items: center;
+  color: var(--ink-3); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.tutorial-dot.is-on { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.tutorial-dot.is-done { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+.tutorial-step { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: start; }
+.tutorial-ico { width: 40px; height: 40px; border-radius: var(--radius); border: 1px solid var(--hairline-strong); display: grid; place-items: center; color: var(--accent); background: var(--surface-raised); }
+.tutorial-step-title { font-size: 17px; font-weight: 600; color: var(--ink); }
+.tutorial-step-body { margin: 4px 0 0; color: var(--ink-2); font-size: 15px; max-width: 56ch; line-height: 1.55; }
+.tutorial-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+@media (pointer: coarse), (hover: none) {
+  .tutorial-close { width: 44px; height: 44px; }
+  .tutorial-actions .btn { min-height: 44px; }
+}
+@media (max-width: 760px) {
+  .tutorial { padding: 16px 16px 14px; }
+}

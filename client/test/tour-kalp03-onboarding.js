@@ -186,8 +186,10 @@ export const flow = {
     await page.waitForSelector('.home-greet', { timeout: 30000 });
     await check('real profile creation lands on student Home',
       (await page.locator('.home-greet').innerText()).includes('KALP03'));
+    // The class is the first rung of the generate rail (Section 7.2); a chip
+    // repeats it only when the request moves away from the profile's class.
     await check('Class 10 drives the real Home curriculum',
-      /Class 10/.test(await page.locator('.genbar-chips').innerText()));
+      /Class 10/.test(await page.locator('[data-gen-rail] .gen-rail').innerText()));
 
     const studentLabels = await page.locator('.sidebar .nav-label').allTextContents();
     await check('student receives KALP-02 student navigation',

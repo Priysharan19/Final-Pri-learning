@@ -88,6 +88,6 @@ export function applyTextScale(scale = readDevicePref('textScale')) {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
   const clean = clampScale(scale);
-  if (clean === 100) { root.style.removeProperty('--text-scale'); root.removeAttribute('data-text-scale'); }
-  else { root.style.setProperty('--text-scale', String(clean / 100)); root.dataset.textScale = String(clean); }
+  if (clean === 100) { root.style.removeProperty('--text-scale'); root.removeAttribute('data-text-size'); }
+  else { root.style.setProperty('--text-scale', String(clean / 100)); root.dataset.textSize = String(clean); }
 }
