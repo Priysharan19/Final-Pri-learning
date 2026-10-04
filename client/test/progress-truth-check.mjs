@@ -139,7 +139,7 @@ async function run() {
   const { loadAllBanks } = await import(`${SRC}engine/generators/index.js`);
   await loadAllBanks();
   const A = await import(`${SRC}engine/adaptive.js`);
-  const { PROGRESS_THRESHOLDS } = await import(`${SRC}engine/progressTruth.js`);
+  const { PROGRESS_THRESHOLDS, accuracyClaim } = await import(`${SRC}engine/progressTruth.js`);
   const { dispatchIndiaExam } = await import(`${SRC}local/indiaExamBackend.js`);
   const { cloudLinkRowId, loginCloudAccount } = await import(`${SRC}platform/cloudAccount.js`);
   const { syncNow, remoteLearningSummary } = await import(`${SRC}platform/syncWorker.js`);
@@ -505,19 +505,48 @@ async function run() {
   const afterSync = await GET('/stats');
   eq('sync does not change local progress', [afterSync.totals, afterSync.streak], [offline.totals, offline.streak]);
   // A second device's answers arrive in every pull — the server is replaying.
+  // Two were answered today, two yesterday (the profile's own timezone).
+  const remoteAt = i => Date.now() - i * MIN - (i >= 2 ? DAY : 0);
   remoteFeed = [0, 1, 2, 3].map(i => ({
     id: `evt-other-${i}`, deviceId: 'device-other', deviceSeq: i + 1, serverCursor: 500 + i, kind: 'practice-progress',
-    entityId: `q-other-${i}`, occurredAt: Date.now() - i * MIN,
-    payload: { subtopic: 'in-c8-rational-numbers', difficulty: 2, correct: i % 2 === 0, ms: 20000, hintsUsed: 0, tutorLevel: 0, support: 'independent', mode: 'practice', viaInk: false, ratingBefore: null, ratingAfter: null, createdAt: Date.now() - i * MIN }
+    entityId: `q-other-${i}`, occurredAt: remoteAt(i),
+    payload: { subtopic: 'in-c8-rational-numbers', difficulty: 2, correct: i % 2 === 0, ms: 20000, hintsUsed: 0, tutorLevel: 0, support: 'independent', mode: 'practice', viaInk: false, ratingBefore: null, ratingAfter: null, createdAt: remoteAt(i) }
   }));
+  const ashaBefore = rawRows().attempts.filter(a => a.pid === asha.id).length;
   await syncNow(sita.id);
   const once = await remoteLearningSummary(sita.id);
   await syncNow(sita.id);
   const twice = await remoteLearningSummary(sita.id);
   eq('another device\'s events are counted once', [once.attempts, once.correct], [4, 2]);
   eq('pulling the same events again does not double-count', [twice.attempts, twice.correct], [once.attempts, once.correct]);
+  // The other device's four answers (two correct, all independent learning
+  // evidence, 20 s each) are folded into this device's ledger exactly once —
+  // the exact totals object, built the way expectedFor builds its numbers.
+  const foldedEvidence = {
+    attempts: offline.totals.evidence.attempts + 4, correct: offline.totals.evidence.correct + 2,
+    independentCorrect: offline.totals.evidence.independentCorrect + 2, supportedCorrect: offline.totals.evidence.supportedCorrect
+  };
+  const folded = {
+    attempts: offline.totals.attempts + 4, correct: offline.totals.correct + 2, ms: offline.totals.ms + 4 * 20000,
+    evidence: foldedEvidence, accuracy: accuracyClaim(foldedEvidence.correct, foldedEvidence.attempts, PROGRESS_THRESHOLDS.overallAccuracy)
+  };
   const after2 = await GET('/stats');
-  eq('remote events are not folded into this device\'s ledger', after2.totals, offline.totals);
+  eq('another device\'s events are folded into this device\'s ledger once', after2.totals, folded);
+  const S2 = expectedFor(sita.id);
+  eq('the folded totals are what the raw attempt rows say', [after2.totals.attempts, after2.totals.correct, after2.totals.evidence], [S2.answered, S2.correct, S2.evidence]);
+  await syncNow(sita.id);
+  eq('pulling the same events a third time leaves the totals unchanged', (await GET('/stats')).totals, folded);
+  const restoredRows = rawRows().attempts.filter(a => a.pid === sita.id && typeof a.remoteEventId === 'string');
+  eq('the four restored attempt rows carry the cloud event id they came from', restoredRows.map(a => a.remoteEventId).sort(), ['evt-other-0', 'evt-other-1', 'evt-other-2', 'evt-other-3']);
+  ok('every restored row names the other device', restoredRows.every(a => a.remoteDeviceId === 'device-other'));
+  eq('no local answer was re-stamped as remote', rawRows().attempts.filter(a => a.pid === sita.id).length - restoredRows.length, S.answered);
+  eq('the streak reflects the remote days in the profile\'s timezone', after2.streak, S2.streak);
+  eq('…which is yesterday and today', [S2.streak, Object.keys(S2.days).length], [2, 2]);
+  eq('today\'s count folds in the two remote answers from today', (await GET('/me')).user.today.questions, S2.today);
+  eq('…and today is the six local answers plus two', S2.today, S.today + 2);
+  eq('the per-day activity rows equal the ledger\'s per-day counts', Object.fromEntries(rawRows().activity.filter(r => r.pid === sita.id).map(r => [r.date, r.questions])), S2.days);
+  eq('another profile on the device gains no rows from this profile\'s pull', rawRows().attempts.filter(a => a.pid === asha.id).length, ashaBefore);
+  eq('…and none of its rows is marked remote', rawRows().attempts.filter(a => a.pid === asha.id && a.remoteEventId).length, 0);
   const otherProfile = await remoteLearningSummary(asha.id);
   eq('one profile\'s pulled events are invisible to another', otherProfile.attempts, 0);
   online = false;

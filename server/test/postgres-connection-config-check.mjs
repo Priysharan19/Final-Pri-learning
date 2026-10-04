@@ -109,7 +109,7 @@ for (const [name, value] of [
   const names = ['NODE_ENV', 'PRI_DATABASE_URL', 'PRI_PUBLIC_ORIGIN', 'PRI_CSRF_SECRET', 'PRI_AUTH_DELIVERY_KEY', 'PRI_TRUSTED_PROXY_HOPS', 'PRI_PLATFORM_DB'];
   const prior = Object.fromEntries(names.map(name => [name, process.env[name]]));
   Object.assign(process.env, {
-    NODE_ENV: 'production', PRI_PUBLIC_ORIGIN: 'https://learn.pri.example', PRI_CSRF_SECRET: 'x', PRI_AUTH_DELIVERY_KEY: '55'.repeat(32),
+    NODE_ENV: 'production', PRI_PUBLIC_ORIGIN: 'https://learn.pri.example', PRI_CSRF_SECRET: 'x'.repeat(32), PRI_AUTH_DELIVERY_KEY: '55'.repeat(32),
     PRI_TRUSTED_PROXY_HOPS: '1', PRI_DATABASE_URL: BASE
   });
   delete process.env.PRI_PLATFORM_DB;

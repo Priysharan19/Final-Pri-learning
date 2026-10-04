@@ -1,15 +1,20 @@
 # Native iPad handwriting validation.
 # Canonical Swift source, duplicate-package drift, JS↔Swift transport and the
 # installed simulator app are all gated independently.
+#
+# This is the one macOS lane. It is path-filtered to the native shell, the ink
+# runtime and its own harness scripts so a docs-only or curriculum PR does not
+# queue a 60-minute macOS run; superseded heads on the same ref are cancelled.
+# When this workflow does not trigger for a PR head there is no run to wait on,
+# which Main Integrity must treat as "not pending" (docs/release/release-policy.md).
 name: Native Ink
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - 'ios/PriLearning.swiftpm/**'
-      - 'ios/PriLearning 2.swiftpm/**'
-      - 'client/src/ink/native.js'
+      - 'ios/**'
+      - 'client/src/ink/**'
       - 'client/src/platform/native/**'
       - 'client/test/native-ink-check.mjs'
       - 'scripts/native-bridge-selfcheck.mjs'
@@ -18,13 +23,11 @@ on:
       - 'scripts/apple-shipping-target.mjs'
       - 'scripts/ink-native-check.mjs'
       - 'scripts/check-native-package-sync.mjs'
-      - 'handwriting/v12/**'
       - '.github/workflows/native-ink.yml'
   pull_request:
     paths:
-      - 'ios/PriLearning.swiftpm/**'
-      - 'ios/PriLearning 2.swiftpm/**'
-      - 'client/src/ink/native.js'
+      - 'ios/**'
+      - 'client/src/ink/**'
       - 'client/src/platform/native/**'
       - 'client/test/native-ink-check.mjs'
       - 'scripts/native-bridge-selfcheck.mjs'
@@ -33,8 +36,10 @@ on:
       - 'scripts/apple-shipping-target.mjs'
       - 'scripts/ink-native-check.mjs'
       - 'scripts/check-native-package-sync.mjs'
-      - 'handwriting/v12/**'
       - '.github/workflows/native-ink.yml'
+
+permissions:
+  contents: read
 
 concurrency:
   group: native-ink-${{ github.ref }}
@@ -47,9 +52,8 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
 
@@ -116,7 +120,7 @@ jobs:
 
       - name: Simulator evidence records
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: native-simulator-evidence
           path: journey-*.json

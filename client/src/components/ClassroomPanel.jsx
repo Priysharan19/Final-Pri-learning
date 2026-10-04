@@ -3,6 +3,7 @@ import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { assignmentSubmissions } from '../platform/assignmentReview.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { tLater, useT } from '../i18n/index.js';
+import { cloudErrorCopy } from '../platform/cloudErrorCopy.js';
 
 function niceDate(t, value) {
   if (!value) return t('classroom.noDueDate');
@@ -178,7 +179,7 @@ export default function ClassroomPanel() {
       setAssignment({ title: '', instructions: '', questions: 10, due: '' });
       await loadDetail(selectedId, account?.role);
       setMessage(tLater('classroom.assignmentPublished'));
-    } catch (err) { setError(err.message || tLater('classroom.createAssignmentFailed')); }
+    } catch (err) { const copy = cloudErrorCopy(err); setError(copy ? tLater(copy.key) : (err.message || tLater('classroom.createAssignmentFailed'))); }
     finally { setBusy(''); }
   }
 
@@ -198,7 +199,7 @@ export default function ClassroomPanel() {
       await loadReview(review.assignment.id);
       await loadDetail(selectedId, account?.role);
       setMessage(tLater('classroom.returnedForRevision', { name: row.student.name || tLater('login.student') }));
-    } catch (err) { setError(err.message || tLater('classroom.returnFailed')); }
+    } catch (err) { const copy = cloudErrorCopy(err); setError(copy ? tLater(copy.key) : (err.message || tLater('classroom.returnFailed'))); }
     finally { setBusy(''); }
   }
 

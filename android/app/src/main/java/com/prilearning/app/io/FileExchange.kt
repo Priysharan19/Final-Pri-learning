@@ -18,10 +18,15 @@ import android.app.Activity
 import android.content.ClipData
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Bundle
+import android.os.CancellationSignal
 import android.os.Handler
 import android.os.Looper
+import android.os.ParcelFileDescriptor
 import android.net.Uri
+import android.print.PageRange
 import android.print.PrintAttributes
+import android.print.PrintDocumentAdapter
 import android.print.PrintManager
 import android.provider.MediaStore
 import android.util.Base64
@@ -49,6 +54,47 @@ class FileExchange(private val activity: ComponentActivity) {
     private val cameraGrants = mutableListOf<String>()
     private val io = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
+    private var activePrint: PrintSession? = null
+    private var deferredPrintDestroy: WebView? = null
+
+    /**
+     * WebView's print adapter continues to use native WebView state until
+     * PrintDocumentAdapter.onFinish(). Destroying the WebView while the system
+     * print UI is still rendering can abort the app in Chromium/CheckJNI.
+     *
+     * Wrap the platform adapter so activity teardown can defer WebView.destroy()
+     * until the printing contract's final callback.
+     */
+    private inner class PrintSession(private val delegate: PrintDocumentAdapter) : PrintDocumentAdapter() {
+        override fun onStart() = delegate.onStart()
+
+        override fun onLayout(
+            oldAttributes: PrintAttributes?,
+            newAttributes: PrintAttributes,
+            cancellationSignal: CancellationSignal?,
+            callback: LayoutResultCallback,
+            extras: Bundle?,
+        ) = delegate.onLayout(oldAttributes, newAttributes, cancellationSignal, callback, extras)
+
+        override fun onWrite(
+            pages: Array<out PageRange>,
+            destination: ParcelFileDescriptor,
+            cancellationSignal: CancellationSignal,
+            callback: WriteResultCallback,
+        ) = delegate.onWrite(pages, destination, cancellationSignal, callback)
+
+        override fun onFinish() {
+            try {
+                delegate.onFinish()
+            } finally {
+                if (activePrint === this) activePrint = null
+                deferredPrintDestroy?.let { view ->
+                    deferredPrintDestroy = null
+                    view.destroy()
+                }
+            }
+        }
+    }
 
     init {
         // Exports and photos of student work do not linger: anything older than
@@ -142,15 +188,30 @@ class FileExchange(private val activity: ComponentActivity) {
     fun print(webView: WebView, done: (Result) -> Unit) {
         val manager = activity.getSystemService(PrintManager::class.java)
             ?: return done(Result.Failed("UNAVAILABLE", "Printing is not available on this device."))
+        if (activePrint != null) return done(Result.Failed("UNAVAILABLE", "A print dialog is already open."))
         try {
             val job = "Pri Learning"
-            manager.print(job, webView.createPrintDocumentAdapter(job), PrintAttributes.Builder().build())
+            val session = PrintSession(webView.createPrintDocumentAdapter(job))
+            activePrint = session
+            manager.print(job, session, PrintAttributes.Builder().build())
             // The system print dialog is now up; Android reports the job's fate
             // to the print spooler, not to the app.
             done(Result.Done(true))
         } catch (_: Exception) {
+            activePrint = null
             done(Result.Failed("PROVIDER_ERROR", "Could not open the print dialog."))
         }
+    }
+
+    /**
+     * Called after MainActivity has detached its WebView. Returns true when
+     * destruction is intentionally deferred until the active print adapter's
+     * onFinish(), which Android guarantees is the final adapter callback.
+     */
+    fun deferWebViewDestroyIfPrinting(webView: WebView): Boolean {
+        if (activePrint == null) return false
+        deferredPrintDestroy = webView
+        return true
     }
 
     /** WebChromeClient.onShowFileChooser. Always answers the callback exactly once. */

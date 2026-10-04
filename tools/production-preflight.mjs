@@ -65,7 +65,10 @@ const REQUIRED = [
     what: 'Absolute path to the SQLite database on the persistent volume.',
     example: '/data/pri-learning-platform.db',
     generate: null,
-    note: 'Must be absolute and on a mounted volume. A path inside the image is wiped on every deploy, which silently loses every account.'
+    note: 'Must be absolute and on a mounted volume. A path inside the image is wiped on every deploy, which silently loses every account.',
+    // ADR-0001: with PRI_DATABASE_URL set the server runs on Postgres and
+    // neither requires nor reads PRI_PLATFORM_DB (server/platform/config.js).
+    onlyWithoutPostgres: true
   },
   {
     name: 'PRI_TRUSTED_PROXY_HOPS',
@@ -77,6 +80,7 @@ const REQUIRED = [
 ];
 
 const OPTIONAL = [
+  { name: 'PRI_DATABASE_URL', what: 'Runs /v1 on Supabase Postgres instead of the SQLite volume (ADR-0001). Session-mode pooler or direct host only, never port 6543, with sslmode=verify-full or sslmode=require plus PRI_DATABASE_SSL_ROOT_CERT. Mark it sealed on Railway. See docs/operations/postgres-cutover.md before setting it.' },
   { name: 'PRI_HANDWRITING_API_KEY', what: 'Turns on server-side handwriting reading and step checking. Without it both routes report themselves unavailable and the settings hide themselves.' },
   { name: 'PRI_AUTH_EMAIL_PROVIDER', what: 'Set to "resend" with PRI_RESEND_API_KEY and PRI_AUTH_EMAIL_FROM to actually send verification email. Without it accounts cannot verify, and verified email gates the reading and marking routes.' },
   { name: 'PRI_RAZORPAY_KEY_ID', what: 'Web subscriptions. Only needed once a plan id is configured; configuring a plan without these fails the boot check on purpose.' },
@@ -84,18 +88,20 @@ const OPTIONAL = [
 ];
 
 // The spend ceilings are required only once there is a key to spend against.
-const applicable = REQUIRED.filter(item => !item.onlyWithKey || has('PRI_HANDWRITING_API_KEY'));
+const applicable = REQUIRED
+  .filter(item => !item.onlyWithKey || has('PRI_HANDWRITING_API_KEY'))
+  .filter(item => !item.onlyWithoutPostgres || !has('PRI_DATABASE_URL'));
 const missing = applicable.filter(item => !has(item.name));
 const present = applicable.filter(item => has(item.name));
 
 console.log('\nPri Learning · production preflight\n' + '─'.repeat(70));
 
 if (!missing.length) {
-  console.log(`\nAll ${REQUIRED.length} required variables are set in THIS shell.`);
+  console.log(`\nAll ${applicable.length} required variables are set in THIS shell.`);
   console.log('If production still exits on boot, the variables are missing where the');
   console.log('server actually runs, not here. Set them on the Railway service.\n');
 } else {
-  console.log(`\n${missing.length} of ${REQUIRED.length} required variables are not set here.`);
+  console.log(`\n${missing.length} of ${applicable.length} required variables are not set here.`);
   console.log('The production server refuses to start without them, which is the');
   console.log('7-second exit after a successful build.\n');
 

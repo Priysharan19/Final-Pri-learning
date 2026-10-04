@@ -3,9 +3,113 @@ import { asStore, isDatabaseOverload } from './store.js';
 import { sanitizeAssignmentSummary } from './assignmentProgress.js';
 import { classAnalytics, validateAssignmentSpecification } from './assignmentTargets.js';
 import { id, opaqueToken, rateLimit, requireRole, requireSession, requireVerifiedEmail, sha256 } from './security.js';
+import { decryptDeliveryToken, encryptDeliveryToken } from './deliveryCrypto.js';
+import { clipText } from './text.js';
 
 function classCode() {
   return opaqueToken(6).replace(/[-_]/g, '').slice(0, 8).toUpperCase();
+}
+
+// ── Join codes at rest ──────────────────────────────────────────────────────
+// The hashed column is the join lookup key. The code itself is kept only so a
+// teacher who lost it can reveal it (audited) — and kept ENCRYPTED, under the
+// server's delivery key and bound to the class id, never in clear beside its
+// own hash. Rows written before schema v9 held the clear code; housekeeping
+// encrypts those in place, and the reveal route does the same on sight.
+const PLAIN_JOIN_CODE = /^[A-Z0-9]{4,12}$/;
+
+export function encryptJoinCode(code, classId) {
+  return encryptDeliveryToken(String(code), `class:${classId}:join-code`);
+}
+
+export function decryptJoinCode(stored, classId) {
+  if (!stored) return null;
+  if (isLegacyPlainJoinCode(stored)) return String(stored);
+  try { return decryptDeliveryToken(stored, `class:${classId}:join-code`); } catch { return null; }
+}
+
+/** A clear code from before v9 (the encrypted form is a dotted envelope, never this shape). */
+export function isLegacyPlainJoinCode(stored) {
+  return PLAIN_JOIN_CODE.test(String(stored || ''));
+}
+
+// ── Teacher feedback on a returned submission ──────────────────────────────
+// A closed set of keys with bounded text: feedback is addressed to a child and
+// exported to them, so it carries what a teacher writes and nothing a client
+// smuggles in under another name. Unknown keys are refused, not dropped, so a
+// teacher UI that sends a field this server does not keep learns of it.
+export const FEEDBACK_MAX_NOTE = 4000;
+const FEEDBACK_RUBRIC_MAX = 20;
+
+function boundedString(value, max, label) {
+  if (typeof value !== 'string') return { ok: false, message: `${label} must be text.` };
+  const text = clipText(value.trim(), max + 1);
+  if (text.length > max) return { ok: false, message: `${label} must be ${max} characters or fewer.` };
+  return { ok: true, value: text };
+}
+
+function boundedScore(value, label) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1000) return { ok: false, message: `${label} must be a number from 0 to 1000.` };
+  return { ok: true, value };
+}
+
+export function validateTeacherFeedback(input) {
+  const invalid = message => ({ ok: false, code: 'FEEDBACK_INVALID', message });
+  if (!plain(input)) return invalid('Teacher feedback must be an object.');
+  const out = {};
+  for (const [key, raw] of Object.entries(input)) {
+    if (raw === undefined || raw === null) continue;
+    switch (key) {
+      case 'note': case 'nextSteps': {
+        const text = boundedString(raw, key === 'note' ? FEEDBACK_MAX_NOTE : 2000, key === 'note' ? 'Feedback note' : 'Next steps');
+        if (!text.ok) return invalid(text.message);
+        if (text.value) {
+          if (key === 'note') out.note = text.value;
+          else out.nextSteps = text.value;
+        }
+        break;
+      }
+      case 'grade': {
+        const text = boundedString(raw, 40, 'Grade');
+        if (!text.ok) return invalid(text.message);
+        if (text.value) out.grade = text.value;
+        break;
+      }
+      case 'score': {
+        const score = boundedScore(raw, 'Score');
+        if (!score.ok) return invalid(score.message);
+        out.score = score.value;
+        break;
+      }
+      case 'rubric': {
+        if (!Array.isArray(raw) || raw.length > FEEDBACK_RUBRIC_MAX) return invalid(`Rubric must be a list of at most ${FEEDBACK_RUBRIC_MAX} items.`);
+        const rubric = [];
+        for (const item of raw) {
+          if (!plain(item)) return invalid('Each rubric item must be an object.');
+          const entry = {};
+          for (const [k, v] of Object.entries(item)) {
+            if (v === undefined || v === null) continue;
+            if (k === 'criterion' || k === 'comment') {
+              const text = boundedString(v, k === 'criterion' ? 120 : 1000, `Rubric ${k}`);
+              if (!text.ok) return invalid(text.message);
+              if (text.value) entry[k] = text.value;
+            } else if (k === 'score') {
+              const score = boundedScore(v, 'Rubric score');
+              if (!score.ok) return invalid(score.message);
+              entry.score = score.value;
+            } else return invalid(`Rubric item key "${clipText(k, 40)}" is not allowed.`);
+          }
+          if (!entry.criterion) return invalid('Each rubric item needs a criterion.');
+          rubric.push(entry);
+        }
+        out.rubric = rubric;
+        break;
+      }
+      default:
+        return invalid(`Feedback key "${clipText(key, 40)}" is not allowed.`);
+    }
+  }
+  return { ok: true, feedback: out };
 }
 
 function cleanTitle(value, max = 160) {
@@ -100,8 +204,11 @@ export async function returnStudentSubmission(db, {
 }) {
   db = asStore(db);
   if (!plain(feedback)) throw Object.assign(new Error('Teacher feedback is invalid.'), { status: 400, code: 'FEEDBACK_INVALID' });
+  if (Buffer.byteLength(JSON.stringify(feedback)) > 32 * 1024) throw Object.assign(new Error('Teacher feedback is too large.'), { status: 413, code: 'FEEDBACK_TOO_LARGE' });
+  const checked = validateTeacherFeedback(feedback);
+  if (!checked.ok) throw Object.assign(new Error(checked.message), { status: 400, code: checked.code });
+  feedback = checked.feedback;
   const feedbackJson = JSON.stringify(feedback);
-  if (Buffer.byteLength(feedbackJson) > 32 * 1024) throw Object.assign(new Error('Teacher feedback is too large.'), { status: 413, code: 'FEEDBACK_TOO_LARGE' });
   await db.transaction(async () => {
     const current = await db.get(`SELECT state FROM assignment_submissions
       WHERE assignment_id=? AND student_account_id=?`, [assignmentId, studentId]);
@@ -142,7 +249,7 @@ export function createClassRouter(db) {
     const { code, hash } = await issueClassCode(db);
     const classId = id('cls');
     const now = Date.now();
-    await db.run('INSERT INTO classes(id,teacher_account_id,name,join_code_hash,join_code,join_code_rotated_at,created_at) VALUES (?,?,?,?,?,?,?)', [classId, req.platformSession.account_id, name, hash, code, now, now]);
+    await db.run('INSERT INTO classes(id,teacher_account_id,name,join_code_hash,join_code,join_code_rotated_at,created_at) VALUES (?,?,?,?,?,?,?)', [classId, req.platformSession.account_id, name, hash, encryptJoinCode(code, classId), now, now]);
     await audit(db, req.platformSession.account_id, 'class.create', 'class', classId, {}, now);
     res.status(201).json({ class: { id: classId, name, createdAt: now }, joinCode: code });
   });
@@ -154,10 +261,13 @@ export function createClassRouter(db) {
     if (!(await staffOwns(db, req.platformSession, classId))) return res.status(404).json({ error: { code: 'CLASS_NOT_FOUND', message: 'Class not found.' } });
     const row = await db.get('SELECT join_code,join_code_rotated_at FROM classes WHERE id=? AND archived_at IS NULL', [classId]);
     if (!row) return res.status(404).json({ error: { code: 'CLASS_NOT_FOUND', message: 'Class not found.' } });
-    if (!row.join_code) return res.status(409).json({ error: { code: 'JOIN_CODE_UNAVAILABLE', message: 'This class predates recoverable codes. Rotate the code to issue a new one.' } });
+    const code = decryptJoinCode(row.join_code, classId);
+    if (!code) return res.status(409).json({ error: { code: 'JOIN_CODE_UNAVAILABLE', message: 'This class has no recoverable code. Rotate the code to issue a new one.' } });
+    // A clear code from before v9 is re-stored encrypted the moment it is seen.
+    if (isLegacyPlainJoinCode(row.join_code)) await db.run('UPDATE classes SET join_code=? WHERE id=? AND join_code=?', [encryptJoinCode(code, classId), classId, row.join_code]);
     await audit(db, req.platformSession.account_id, 'class.join-code.reveal', 'class', classId);
     res.set('Cache-Control', 'no-store');
-    res.json({ joinCode: row.join_code, rotatedAt: row.join_code_rotated_at });
+    res.json({ joinCode: code, rotatedAt: row.join_code_rotated_at });
   });
 
   router.post('/:classId/join-code/rotate', requireRole('teacher', 'admin'), rateLimit(db, 'class-code-rotate', { limit: 30, windowMs: 60 * 60 * 1000 }), async (req, res) => {
@@ -167,7 +277,7 @@ export function createClassRouter(db) {
     const { code, hash } = await issueClassCode(db);
     const now = Date.now();
     await db.transaction(async () => {
-      await db.run('UPDATE classes SET join_code_hash=?,join_code=?,join_code_rotated_at=? WHERE id=?', [hash, code, now, classId]);
+      await db.run('UPDATE classes SET join_code_hash=?,join_code=?,join_code_rotated_at=? WHERE id=?', [hash, encryptJoinCode(code, classId), now, classId]);
       await audit(db, req.platformSession.account_id, 'class.join-code.rotate', 'class', classId, {}, now);
     });
     res.set('Cache-Control', 'no-store');
@@ -302,8 +412,12 @@ export function createClassRouter(db) {
     }
     if (body.specification !== undefined) {
       if (!plain(body.specification)) return res.status(400).json({ error: { code: 'ASSIGNMENT_INVALID', message: 'Assignment specification must be an object.' } });
-      const encoded = JSON.stringify(body.specification);
-      if (Buffer.byteLength(encoded) > 128 * 1024) return res.status(413).json({ error: { code: 'ASSIGNMENT_TOO_LARGE', message: 'Assignment specification is too large.' } });
+      if (Buffer.byteLength(JSON.stringify(body.specification)) > 128 * 1024) return res.status(413).json({ error: { code: 'ASSIGNMENT_TOO_LARGE', message: 'Assignment specification is too large.' } });
+      // The same curriculum check creation applies: an edit cannot point an
+      // assignment at a chapter no student can reach, or carry unknown keys.
+      const checked = validateAssignmentSpecification(body.specification);
+      if (!checked.ok) return res.status(400).json({ error: { code: checked.code, message: checked.message } });
+      const encoded = JSON.stringify(checked.spec);
       if (encoded !== row.specification_json) { specificationJson = encoded; edited.push('specification'); }
     }
     if (body.dueAt !== undefined) {

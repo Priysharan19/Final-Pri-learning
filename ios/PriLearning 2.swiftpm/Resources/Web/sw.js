@@ -33,10 +33,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Build manifest, filled in by the pri-precache plugin ─────────────────────
-const VERSION = 'pri-a07849a37020';
-const PRECACHE = ["/","/assets/App-DvpgnnC2.js","/assets/KaTeX_AMS-Regular-BQhdFMY1.woff2","/assets/KaTeX_Main-Bold-Cx986IdX.woff2","/assets/KaTeX_Main-BoldItalic-DxDJ3AOS.woff2","/assets/KaTeX_Main-Italic-NWA7e6Wa.woff2","/assets/KaTeX_Main-Regular-B22Nviop.woff2","/assets/KaTeX_Math-BoldItalic-CZnvNsCZ.woff2","/assets/KaTeX_Math-Italic-t53AETM-.woff2","/assets/KaTeX_Size1-Regular-mCD8mA8B.woff2","/assets/KaTeX_Size2-Regular-Dy4dx90m.woff2","/assets/KaTeX_Size4-Regular-Dl5lxZxV.woff2","/assets/api-DY2d1hh1.js","/assets/cloudAccount-CkfvAN3J.js","/assets/cloudSession-CnTBrYKl.js","/assets/cloudTransport-BMBqgWiA.js","/assets/curriculum-in-CMuvRa7h.js","/assets/defineProperty-BbfpZ9Tg.js","/assets/formFactor-DuN6LyAl.js","/assets/generators-B3oA-3Wx.js","/assets/i18n-D4XEqaLL.js","/assets/idb-DKVve7Lj.js","/assets/index-Cryt8HtK.js","/assets/index-tyjMcbzB.css","/assets/inter-latin-wght-normal-Dx4kXJAl.woff2","/assets/native-BiZmQ5mE.js","/assets/ncert-syllabus-CKacrE7J.js","/assets/practiceLinks-C9WJYwDl.js","/assets/preload-helper-Czpn1I53.js","/assets/pyqCoverage-DgflGObi.js","/assets/qhelpers-Dq1uC5IS.js","/assets/rolldown-runtime-CbXtAM7H.js","/assets/vendor-react-B-66t_i-.js","/favicon.svg","/icons/icon-180.png","/index.html","/manifest.webmanifest"];
-const WARM = ["/assets/AssignmentInboxPanel-XqIQIoBX.js","/assets/Charts-BZBoodrC.js","/assets/Classes-BTfRq_J1.js","/assets/ClassroomPanel-BCnNqNaX.js","/assets/ExamRoom-CCkGwu5w.js","/assets/Exams-D3g97CZD.js","/assets/GuardianConsent-D61qKe7H.js","/assets/History-CUinFGF-.js","/assets/LinearEquationsTopperSectionProduction-CrsbdCLt.js","/assets/Match-BsA5fDJB.js","/assets/NcertClass8ChapterSection-D_eYMOSL.js","/assets/NcertClass9ChapterSection-DM3KG9h4.js","/assets/PracticeBase-CJMK-NFC.js","/assets/PracticeBase-D4hVBgwl.css","/assets/Progress-Cu_s3RC5.js","/assets/QuestionCard-CB_bduZf.js","/assets/RationalNumbersTopperSectionProduction-D9OXcLYc.js","/assets/Rush-BwV2akvv.js","/assets/Settings-C16wxsfy.js","/assets/SignUpFlow-ByY0_ryL.js","/assets/SignUpFlow-C7apyZXw.css","/assets/SignUpFlow-CcXsJRVk.js","/assets/Tasks-TxdOPNqm.js","/assets/TutorHelp-B2oTfD1d.css","/assets/TutorHelp-BRZ5OvXF.js","/assets/assignmentTarget-B448c7zO.js","/assets/cloudAccount-BAtShiTg.js","/assets/cloudReader-BOPEwiwP.js","/assets/demoSeed-D5s_ksvA.js","/assets/figures--_2Ot-DF.js","/assets/files-CocpU5l_.js","/assets/inkLatex-4SP97VBx.js","/assets/inkLines-DncQUWGi.js","/assets/latex-69gJrDN4.js","/assets/multipart-DEZWYKq6.js","/assets/ncertTerms-Ds6pWWUR.js","/assets/personal-B8Ii3jAt.js","/assets/photoRaster-CV5l6z5r.js","/assets/plotSpec-wTQ3gnnl.js","/assets/socialSignIn-BHzYeTeK.js","/assets/strings.hi-SraRMe2n.js","/assets/vendor-katex-BkSWQkk7.js","/assets/vendor-katex-DEcVZfaU.css","/assets/visualEngine-CxC_M6u6.js","/auth/callback.html","/auth/callback.js","/icons/icon-192.png","/icons/icon-512.png"];
-const OPTIONAL = ["/assets/InkAnswer-CJk0D6wO.js","/assets/InkAnswer-CwiwVe0r.js","/assets/InkAnswer-DFaRq9f6.js","/assets/InkAnswer-DJig4Nc9.js","/assets/InkAnswer-u4hSTeah.js","/assets/NativeInkCanvas-CGHVDvNc.js","/assets/ink-engine-CrpdsMx5.js","/assets/ink-model-D3cN_hBH.js","/assets/ink-personal-DYrlA-PZ.js","/assets/model-data-DsXS_xxz.js","/assets/recognizer-BWp60aBS.js"];
+const VERSION = 'pri-ef53336116c7';
+const PRECACHE = ["/","/assets/App-C3LW_zGu.js","/assets/KaTeX_AMS-Regular-BQhdFMY1.woff2","/assets/KaTeX_Main-Bold-Cx986IdX.woff2","/assets/KaTeX_Main-BoldItalic-DxDJ3AOS.woff2","/assets/KaTeX_Main-Italic-NWA7e6Wa.woff2","/assets/KaTeX_Main-Regular-B22Nviop.woff2","/assets/KaTeX_Math-BoldItalic-CZnvNsCZ.woff2","/assets/KaTeX_Math-Italic-t53AETM-.woff2","/assets/KaTeX_Size1-Regular-mCD8mA8B.woff2","/assets/KaTeX_Size2-Regular-Dy4dx90m.woff2","/assets/KaTeX_Size4-Regular-Dl5lxZxV.woff2","/assets/adaptive-BYs9b20J.js","/assets/cloudAccount-C0wHpYJJ.js","/assets/cloudErrorCopy-B8ogfnw1.js","/assets/cloudSession-CnTBrYKl.js","/assets/cloudTransport-R0OfoPi2.js","/assets/curriculum-in-CMuvRa7h.js","/assets/defineProperty-BbfpZ9Tg.js","/assets/formFactor-CsxMRcZ_.js","/assets/generators-UJs1-WBV.js","/assets/i18n-AYsdVFYk.js","/assets/idb-DKVve7Lj.js","/assets/index-B2b1L7Es.css","/assets/index-CLbhGApW.js","/assets/indiaProduct-CYZvfhH0.js","/assets/inter-latin-wght-normal-Dx4kXJAl.woff2","/assets/native-BUdswkuq.js","/assets/ncert-syllabus-CKacrE7J.js","/assets/practiceLinks-C9WJYwDl.js","/assets/preload-helper-Czpn1I53.js","/assets/pyqCoverage-DgflGObi.js","/assets/qhelpers-Dq1uC5IS.js","/assets/rolldown-runtime-CbXtAM7H.js","/assets/store-BHP3wXy3.js","/assets/vendor-react-B-66t_i-.js","/favicon.svg","/icons/icon-180.png","/index.html","/manifest.webmanifest"];
+const WARM = ["/assets/AssignmentInboxPanel-ZD1fepor.js","/assets/Charts-BtIA0daK.js","/assets/Classes-DR9Ht5RX.js","/assets/ClassroomPanel-BY2jWpYh.js","/assets/ExamRoom-D30BZWrt.js","/assets/Exams-DZ8Xa0wj.js","/assets/GuardianConsent-B2DyGtq3.js","/assets/History-B9FfBLvZ.js","/assets/Legal-DWeUKar6.js","/assets/LinearEquationsTopperSectionProduction-cokDCTSs.js","/assets/Match-zRAy7dga.js","/assets/NcertClass8ChapterSection-AXYtYJyn.js","/assets/NcertClass9ChapterSection-BFEAyUSP.js","/assets/PlanCard-CckN1u6C.js","/assets/PlanPage-Dq9F45iM.js","/assets/PracticeBase-BktPBr-v.js","/assets/PracticeBase-D4hVBgwl.css","/assets/Progress-BcWt9dkj.js","/assets/QuestionCard-DE-VqvDS.js","/assets/RationalNumbersTopperSectionProduction-Bejc4yMT.js","/assets/Rush-DQbx9-ml.js","/assets/Settings-B7iLF_S_.js","/assets/SignUpFlow-C7apyZXw.css","/assets/SignUpFlow-Ci0NvIIb.js","/assets/SignUpFlow-DVQn_4ku.js","/assets/Tasks-Ds5cVAy8.js","/assets/assignmentTarget-hnqvFkQh.js","/assets/cloudAccount-BdrLjOq0.js","/assets/cloudReader-B1lfhGMH.js","/assets/cloudSyncScheduler-DC_99nPH.js","/assets/cloudSyncScheduler-DuuMR3OJ.js","/assets/copy-DXEb6S8i.js","/assets/demoSeed-adW-ld8L.js","/assets/figures--_2Ot-DF.js","/assets/files-sL2jKmmu.js","/assets/inkLatex-4SP97VBx.js","/assets/inkLines-16j3H1w1.js","/assets/latex-69gJrDN4.js","/assets/ncertTerms-Ds6pWWUR.js","/assets/personal-B_BfX6xM.js","/assets/photoRaster-CV5l6z5r.js","/assets/reminders-BWRBYQok.js","/assets/reminders-CRy1HesV.js","/assets/settings-DZ47oH5K.js","/assets/socialSignIn-C9wW0tzH.js","/assets/strings.hi-C98ZyIPS.js","/assets/vendor-katex-BkSWQkk7.js","/assets/vendor-katex-DEcVZfaU.css","/auth/callback.html","/auth/callback.js","/icons/icon-192.png","/icons/icon-512.png"];
+const OPTIONAL = ["/assets/InkAnswer-C9N-iPKU.js","/assets/InkAnswer-CBnKGM8F.js","/assets/InkAnswer-Co-3jkct.js","/assets/InkAnswer-D9uMHgwr.js","/assets/InkAnswer-DSRcfJx1.js","/assets/NativeInkCanvas-sKYll5HB.js","/assets/ink-engine-CZJ5p7NP.js","/assets/ink-model-D3cN_hBH.js","/assets/ink-personal-BlRPOB6j.js","/assets/model-data-DsXS_xxz.js","/assets/recognizer-CQUFv0V1.js"];
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SHELL = '/index.html';
@@ -91,6 +91,12 @@ self.addEventListener('install', (e) => {
 
 let warming = null;
 
+// A message is acted on only when it comes from a page of this origin. Service
+// worker clients are same-origin by construction, so in a browser this never
+// turns away a real page; it makes the boundary explicit and holds it if the
+// worker is ever reachable another way.
+const fromThisOrigin = (e) => !e.origin || e.origin === self.location.origin;
+
 async function warm(withOptional) {
   const wanted = withOptional ? [...WARM, ...OPTIONAL] : WARM;
   const cache = await caches.open(VERSION);
@@ -106,6 +112,7 @@ async function warm(withOptional) {
 
 self.addEventListener('message', (e) => {
   if (e.data?.type !== 'pri-warm') return;
+  if (!fromThisOrigin(e)) return;
   const optional = Boolean(e.data.optional);
   // One pass at a time. A second ask while one is in flight joins it rather
   // than doubling the requests on a link that has none to spare.
@@ -117,6 +124,42 @@ self.addEventListener('message', (e) => {
   // A port when the caller wants an answer, the client itself when it does not.
   const port = e.ports?.[0];
   e.waitUntil(reply.then(msg => { if (port) port.postMessage(msg); else e.source?.postMessage(msg); }));
+});
+
+// ── Reminders (display only) ─────────────────────────────────────────────────
+// The page computes when a reminder is due (client/src/reminders) and, while it
+// is open, asks the worker to show it; the worker never decides anything and
+// has no push subscription — there is no server to push from. A tap opens the
+// in-app route the reminder named, in the window that is already open where
+// there is one. Titles and bodies arrive generic by construction: counts and
+// catalogue copy, never a question or a mark.
+
+const REMINDER_ROUTE = /^\/[a-z-]*$/;
+
+self.addEventListener('message', (e) => {
+  if (e.data?.type !== 'pri-notify') return;
+  if (!fromThisOrigin(e)) return;
+  const title = String(e.data.title || '').slice(0, 120);
+  const body = String(e.data.body || '').slice(0, 200);
+  const tag = String(e.data.tag || 'pri-reminder').slice(0, 64);
+  const url = REMINDER_ROUTE.test(String(e.data.url || '')) ? e.data.url : '/';
+  if (!title) return;
+  e.waitUntil(self.registration.showNotification(title, { body, tag, data: { url }, icon: '/icons/icon-192.png' }).catch(() => {}));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = REMINDER_ROUTE.test(String(e.notification.data?.url || '')) ? e.notification.data.url : '/';
+  e.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const open = all.find(c => 'focus' in c);
+    if (open) {
+      try { await open.focus(); } catch { /* focus can be refused; navigate below */ }
+      if ('navigate' in open) { try { await open.navigate(url); } catch { /* cross-origin or detached */ } }
+      return;
+    }
+    if (self.clients.openWindow) await self.clients.openWindow(url);
+  })());
 });
 
 // ── Activate ─────────────────────────────────────────────────────────────────
