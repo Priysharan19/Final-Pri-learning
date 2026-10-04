@@ -1,0 +1,37 @@
+# Dependabot keeps the three npm trees and every pinned GitHub Action current.
+# Action bumps arrive as full-SHA updates with the version comment refreshed,
+# so tools/ci-workflow-policy-check.mjs keeps passing. Dependabot branches are
+# not autonomous missions: they merge only through the ordinary reviewed PR
+# lanes and required CI (docs/release/release-policy.md).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /client
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      client-minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: npm
+    directory: /server
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      server-minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: npm
+    directory: /ad
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5

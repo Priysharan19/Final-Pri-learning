@@ -11,15 +11,28 @@
 // Usage:
 //   node client/test/inkcheck-real.mjs [--strict] [--split test]
 //   node client/test/inkcheck-real.mjs --split final-holdout
+//   node client/test/inkcheck-real.mjs --gate            # fail below handwriting/v17/real-ink-floor.json
+//   node client/test/inkcheck-real.mjs --write-floor     # person-only ratchet of that floor (refused in CI)
+//   node client/test/inkcheck-real.mjs --gate --floor /path/to/floor.json
 // ─────────────────────────────────────────────────────────────────────────────
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
 import { recognize } from '../src/ink/recognizer.js';
+import {
+  DEFAULT_FLOOR_PATH, compareToFloor, ratchetFloor, readFloor, runningInCi, writeFloor
+} from './ink-real-floor.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CORPUS_DIR = join(HERE, 'ink-corpus');
 const STRICT = process.argv.includes('--strict');
+const GATE = process.argv.includes('--gate');
+const WRITE_FLOOR = process.argv.includes('--write-floor');
+const floorIndex = process.argv.indexOf('--floor');
+const FLOOR_PATH = floorIndex >= 0 && process.argv[floorIndex + 1] ? process.argv[floorIndex + 1] : DEFAULT_FLOOR_PATH;
+// An empty or unscored corpus is a red gate, never a quiet pass.
+const EMPTY_EXIT = (STRICT || GATE || WRITE_FLOOR) ? 1 : 0;
 const splitIndex = process.argv.indexOf('--split');
 const REQUESTED_SPLIT = splitIndex >= 0 ? process.argv[splitIndex + 1] : null;
 const VALID_SPLITS = new Set(['train', 'validation', 'test', 'final-holdout']);
@@ -61,7 +74,7 @@ if (!allCorpora.length) {
   console.log('Use tools/ink-collect-v2/index.html, save the JSON files into');
   console.log('client/test/ink-corpus/, then run npm run test:ink:corpus first.\n');
   console.log('REAL-INK SCORE — none (no corpus)');
-  process.exit(STRICT ? 1 : 0);
+  process.exit(EMPTY_EXIT);
 }
 
 // Prove writer separation before scoring anything.
@@ -105,7 +118,7 @@ if (chosenSplit) {
 
 if (!corpora.length) {
   console.log(`\nREAL-INK SCORE — none (no ${chosenSplit || 'legacy'} corpus files)`);
-  process.exit(STRICT ? 1 : 0);
+  process.exit(EMPTY_EXIT);
 }
 
 if (chosenSplit === 'train') {
@@ -156,7 +169,7 @@ for (const c of corpora) {
 
 if (!lines) {
   console.log('\nREAL-INK SCORE — none (selected corpus contains no strokes)');
-  process.exit(STRICT ? 1 : 0);
+  process.exit(EMPTY_EXIT);
 }
 
 const perWriter = [...writerStats.values()].map(w => ({
@@ -189,4 +202,49 @@ if (perWriter.length < 8) {
 }
 if (!v2.length) {
   console.log('\nWARNING: only legacy v1 corpora are present. Session-random ids cannot prove writer separation.');
+}
+
+// ── regression floor (ratchet) ───────────────────────────────────────────────
+if (GATE || WRITE_FLOOR) {
+  const measured = {
+    split: chosenSplit || 'legacy',
+    writers: perWriter.length,
+    lines,
+    exactLines: exact,
+    exactPct,
+    charPct,
+    worstWriterExactPct: worstExact
+  };
+  let floor = null;
+  try { floor = readFloor(FLOOR_PATH); }
+  catch (err) { console.log(`\nREAL-INK FLOOR GATE — FAIL\n  FAIL ${err.message}`); process.exit(1); }
+
+  if (WRITE_FLOOR) {
+    if (runningInCi()) {
+      console.log('\nREAL-INK FLOOR — REFUSED: the floor is never written in CI. Run --write-floor locally after a reviewed improvement.');
+      process.exit(1);
+    }
+    let commit = null;
+    try { commit = execSync('git rev-parse HEAD', { cwd: HERE, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { /* no git */ }
+    const { floor: next, lowered } = ratchetFloor(floor, measured, { commit });
+    if (lowered.length) {
+      console.log('\nREAL-INK FLOOR — REFUSED: the ratchet only turns upward');
+      for (const l of lowered) console.log(`  FAIL ${l}`);
+      process.exit(1);
+    }
+    writeFloor(next, FLOOR_PATH);
+    console.log(`\nREAL-INK FLOOR — WRITTEN ${FLOOR_PATH}`);
+    console.log(`  ${next.split} split · ${next.writers} writer(s) · ${next.lines} lines · exact ${next.exactPct}% · chars ${next.charPct}% · worst ${next.worstWriterExactPct}%`);
+  }
+
+  if (GATE) {
+    const verdict = compareToFloor(measured, floor);
+    if (!verdict.ok) {
+      console.log('\nREAL-INK FLOOR GATE — FAIL');
+      for (const f of verdict.failures) console.log(`  FAIL ${f}`);
+      console.log('  Do not lower the floor. Fix the recogniser or restore the evidence.');
+      process.exit(1);
+    }
+    console.log(`\nREAL-INK FLOOR GATE — PASS (floor ${floor.split}: exact ${floor.exactPct}%, chars ${floor.charPct}%, worst ${floor.worstWriterExactPct}% · measured exact ${exactPct.toFixed(2)}%, chars ${charPct.toFixed(2)}%, worst ${worstExact.toFixed(2)}%)`);
+  }
 }

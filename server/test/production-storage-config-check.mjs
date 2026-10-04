@@ -20,7 +20,7 @@ function clearOptionalProducts() {
 try {
   process.env.NODE_ENV = 'production';
   process.env.PRI_PUBLIC_ORIGIN = 'https://learn.pri.example';
-  process.env.PRI_CSRF_SECRET = 'csrf-production-secret';
+  process.env.PRI_CSRF_SECRET = 'csrf-production-secret-of-at-least-32-chars';
   process.env.PRI_AUTH_DELIVERY_KEY = '33'.repeat(32);
   process.env.PRI_TRUSTED_PROXY_HOPS = '1';
   clearOptionalProducts();
@@ -60,8 +60,10 @@ try {
   assert.equal(platformDatabasePath(), ':memory:', 'focused development/tests may explicitly use memory');
 
   const router = readFileSync(new URL('../platform/router.js', import.meta.url), 'utf8');
-  assert.ok(router.includes('storage: { persistentDatabase: config.persistentDatabaseConfigured }'));
-  assert.ok(!router.includes('PRI_PLATFORM_DB'), 'health must expose only readiness, never a filesystem path');
+  const operatorHealth = readFileSync(new URL('../platform/operatorHealth.js', import.meta.url), 'utf8');
+  assert.ok(operatorHealth.includes('storage: { persistentDatabase: config.persistentDatabaseConfigured }'));
+  assert.ok(!router.includes('storage:') && router.includes('operator ? await operatorHealthDetail('), 'storage readiness is operator detail, not in the anonymous health body');
+  assert.ok(!router.includes('PRI_PLATFORM_DB') && !operatorHealth.includes('PRI_PLATFORM_DB'), 'health must expose only readiness, never a filesystem path');
 
   console.log('PASS — production fails closed without an explicit absolute persistent platform DB and health exposes only storage readiness.');
 } finally {

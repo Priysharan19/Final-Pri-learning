@@ -71,6 +71,8 @@ export function hasAgeDeclaration({ isAdult, year } = {}) {
  * The one age rule every account-creating path applies (/register and provider
  * sign-up): an explicit declaration is required, and a child must name a
  * guardian. Returns { ok, basis: 'adult'|'child', guardian } or { ok:false, code, message }.
+ * The student's own address (body.studentEmail, else body.email) is passed to
+ * validateGuardian so a child cannot name their own mailbox as the guardian's.
  */
 export function ageDecision(body = {}, { guardianLater = false } = {}) {
   const declaration = { isAdult: body.isAdult, year: body.year };
@@ -82,20 +84,38 @@ export function ageDecision(body = {}, { guardianLater = false } = {}) {
   // next screen. The account is created as a child with a pending consent row
   // and no guardian yet, so the gate stays closed until a parent approves.
   if (guardianLater) return { ok: true, basis: 'child', guardian: null, guardianLater: true };
-  const checked = validateGuardian(body);
+  const checked = validateGuardian({ ...body, studentEmail: body.studentEmail ?? body.email });
   if (!checked.ok) return { ok: false, code: checked.code, message: checked.message };
   return { ok: true, basis: 'child', guardian: checked };
 }
 
-/** A guardian's details, or the reason they cannot be used. */
-export function validateGuardian({ guardianName, guardianEmail } = {}) {
+/**
+ * A guardian's details, or the reason they cannot be used. The guardian's
+ * address must be somebody else's: a child who names their own mailbox would be
+ * confirming their own account, which is no confirmation at all.
+ */
+export function validateGuardian({ guardianName, guardianEmail, studentEmail } = {}) {
   const name = clean(guardianName, 80);
   const email = clean(guardianEmail, 160).toLowerCase();
   if (!name) return { ok: false, code: 'GUARDIAN_NAME_REQUIRED', message: 'Enter a parent or guardian’s name.' };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { ok: false, code: 'GUARDIAN_EMAIL_REQUIRED', message: 'Enter a parent or guardian’s email address.' };
   }
+  if (studentEmail && email === String(studentEmail).trim().toLowerCase()) {
+    return { ok: false, code: 'GUARDIAN_EMAIL_SAME_AS_STUDENT', message: 'A parent or guardian’s email address must be different from the student’s own.' };
+  }
   return { ok: true, name, email };
+}
+
+/**
+ * Did the request say anything about the learner's age? A new account must
+ * declare it (an explicit adult, or a child with a class), so an identity
+ * provider sign-in cannot create an unconsented child account by saying
+ * nothing. Password registration asks the same question on its form. The same
+ * rule as hasAgeDeclaration (ageDecision applies it); kept as a named alias.
+ */
+export function ageDeclared(declaration = {}) {
+  return hasAgeDeclaration(declaration);
 }
 
 /**
