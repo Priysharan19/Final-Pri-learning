@@ -589,7 +589,10 @@ async function run() {
         await drive();
         await audit(view, route);
       } catch (err) {
-        skipped.push(`${view} — ${String(err.message || err).split('\n')[0].slice(0, 130)}`);
+        // The URL the browser was actually at tells a timeout apart from a crash.
+        let where = '';
+        try { where = ` (at ${page.url()})`; } catch { }
+        skipped.push(`${view} — ${String(err.message || err).split('\n')[0].slice(0, 130)}${where}`);
       }
     };
 
