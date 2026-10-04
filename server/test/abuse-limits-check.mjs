@@ -18,7 +18,7 @@ delete process.env.PRI_HANDWRITING_API_KEY;
 // The AI tutor ships dark (PRI_FEATURE_TUTOR); its declared limit is measured with it on.
 process.env.PRI_FEATURE_TUTOR = '1';
 
-const { startApp, registerAccount, verifyEmail, checks } = await import('./support/app-harness.mjs');
+const { startApp, registerAccount, verifyEmail, checks, enrolMfa } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
 const { loadInventory } = await import('./support/route-inventory.mjs');
 const { LOCKOUT_MAX_FAILURES } = await import('../platform/loginLockout.js');
@@ -39,6 +39,8 @@ async function account(role = 'student') {
   if (made.status !== 201) throw new Error(`register ${email}: ${made.status}`);
   await verifyEmail(h, made.account.id);
   if (role !== 'student') await db.run('UPDATE accounts SET role=? WHERE id=?', [role, made.account.id]);
+  // Staff actors enrol and verify their second factor so the limiter behind it is what is measured.
+  if (role === 'admin' || role === 'support') { await db.run('DELETE FROM rate_limits'); await enrolMfa(h, made.jar); }
   return { id: made.account.id, jar: made.jar, email, password: `abuse-pw-${serial}-horse` };
 }
 

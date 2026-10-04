@@ -8,7 +8,7 @@
 // Codes are stored only as a SHA-256 hash plus a display prefix, are single
 // use, and expire.
 
-const { startApp, registerAccount, verifyEmail, checks } = await import('./support/app-harness.mjs');
+const { startApp, registerAccount, verifyEmail, checks, promoteRole } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
 const { sha256 } = await import('../platform/security.js');
 const { INVITE_DEFAULT_TTL_DAYS } = await import('../platform/teacherInvites.js');
@@ -24,7 +24,7 @@ const list = jar => h.request('/v1/admin/teacher-invites', { jar });
 
 try {
   const admin = await registerAccount(h, { email: 'admin@example.test', name: 'Pri Admin' });
-  await db.run("UPDATE accounts SET role='admin' WHERE id=?", [admin.account.id]);
+  await promoteRole(h, admin.jar, admin.account.id, 'admin');
   const student = await registerAccount(h, { email: 'student@example.test' });
 
   c.eq((await h.request('/v1/admin/teacher-invites', { method: 'POST', body: {} })).status, 401, 'minting needs a session');

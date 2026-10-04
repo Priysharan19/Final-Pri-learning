@@ -180,6 +180,8 @@ const DELETED = [
   ['account_identities', 'account_id'],
   ['account_sessions', 'account_id'],
   ['account_tokens', 'account_id'],
+  ['account_mfa', 'account_id'],
+  ['account_mfa_recovery_codes', 'account_id'],
   ['auth_delivery_outbox', 'account_id'],
   ['guardian_consents', 'account_id'],
   ['learning_events', 'account_id'],
