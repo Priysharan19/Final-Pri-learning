@@ -43,10 +43,17 @@ let readinessCache = { expiresAt: 0, value: null };
 // change (an upgrade) clears it at once.
 let allowanceExhaustedUntil = 0;
 export const ALLOWANCE_CODE = 'AI_ALLOWANCE_EXHAUSTED';
+// The account's combined daily AI budget across every paid kind
+// (server/platform/aiAllowance.js): the same back-off, a different sentence —
+// the engine and the on-device reader carry on, the server's reading waits.
+export const BUDGET_CODE = 'AI_DAILY_BUDGET_EXHAUSTED';
+let allowanceReason = 'allowance';
 export function cloudAllowanceExhausted(now = Date.now()) { return now < allowanceExhaustedUntil; }
-export function clearCloudAllowanceExhausted() { allowanceExhaustedUntil = 0; }
+export function cloudAllowanceReason() { return allowanceReason; }
+export function clearCloudAllowanceExhausted() { allowanceExhaustedUntil = 0; allowanceReason = 'allowance'; }
 function noteAllowance(error, now = Date.now()) {
-  if (error?.code !== ALLOWANCE_CODE) return;
+  if (error?.code !== ALLOWANCE_CODE && error?.code !== BUDGET_CODE) return;
+  allowanceReason = error.code === BUDGET_CODE ? 'budget' : 'allowance';
   const reset = Number(error.resetAt);
   // Trust a sane reset time from the server; otherwise back off for 30 minutes.
   allowanceExhaustedUntil = Number.isFinite(reset) && reset > now && reset - now <= 25 * 60 * 60 * 1000 ? reset : now + 30 * 60 * 1000;
@@ -251,7 +258,7 @@ export async function readWithCloud(strokes, {
 } = {}) {
   if (!cloudReadingEnabled(user, { available })) return { reason: 'disabled' };
   listenForEntitlementChanges();
-  if (cloudAllowanceExhausted()) return { reason: 'allowance', until: allowanceExhaustedUntil };
+  if (cloudAllowanceExhausted()) return { reason: allowanceReason, until: allowanceExhaustedUntil };
 
   const ready = await readiness({ user, transport, available, signal });
   if (!cloudReadingEnabled(user, { available, readiness: ready })) {
@@ -311,7 +318,7 @@ export async function readWithCloud(strokes, {
         : safeFailureCode(error?.code, 'HANDWRITING_FAILED');
     noteAllowance(error);
     recordCloudDiagnostics({ available: true, latencyMs: Date.now() - started, failureCode: code, releaseSha: ready?.releaseSha });
-    if (code === ALLOWANCE_CODE) return { reason: 'allowance', until: allowanceExhaustedUntil, readiness: ready, diagnostics: handwritingDiagnostics() };
+    if (code === ALLOWANCE_CODE || code === BUDGET_CODE) return { reason: allowanceReason, until: allowanceExhaustedUntil, readiness: ready, diagnostics: handwritingDiagnostics() };
     return { error: { code, message: error?.message || '' }, readiness: ready, diagnostics: handwritingDiagnostics() };
   }
 }
@@ -359,7 +366,7 @@ export async function readPhotoWithCloud(dataUrl, {
 } = {}) {
   if (!cloudReadingEnabled(user, { available })) return { reason: 'disabled' };
   listenForEntitlementChanges();
-  if (cloudAllowanceExhausted()) return { reason: 'allowance', until: allowanceExhaustedUntil };
+  if (cloudAllowanceExhausted()) return { reason: allowanceReason, until: allowanceExhaustedUntil };
   const ready = await readiness({ user, transport, available, signal });
   if (!cloudReadingEnabled(user, { available, readiness: ready })) {
     return { reason: ready?.lastFailureCode === 'HANDWRITING_CANCELLED' ? 'cancelled' : 'unavailable', readiness: ready };
@@ -406,7 +413,7 @@ export async function readPhotoWithCloud(dataUrl, {
         : safeFailureCode(error?.code, 'HANDWRITING_FAILED');
     noteAllowance(error);
     recordCloudDiagnostics({ available: true, latencyMs: Date.now() - started, failureCode: code, releaseSha: ready?.releaseSha });
-    if (code === ALLOWANCE_CODE) return { reason: 'allowance', until: allowanceExhaustedUntil, readiness: ready, diagnostics: handwritingDiagnostics() };
+    if (code === ALLOWANCE_CODE || code === BUDGET_CODE) return { reason: allowanceReason, until: allowanceExhaustedUntil, readiness: ready, diagnostics: handwritingDiagnostics() };
     return { error: { code, message: error?.message || '' }, readiness: ready, diagnostics: handwritingDiagnostics() };
   }
 }

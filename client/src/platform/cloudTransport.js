@@ -507,5 +507,7 @@ export const cloud = Object.freeze({
   updateUserRole: (accountId, role) => cloudRequest(`/v1/admin/users/${pathId(accountId, 'account id')}/role`, { method: 'PATCH', body: { role } }),
   adminAudit: () => cloudRequest('/v1/admin/audit'),
   reportIssue: (body, idempotencyKey) => cloudRequest('/v1/reports', { method: 'POST', body, idempotencyKey }),
-  telemetry: events => cloudRequest('/v1/telemetry', { method: 'POST', body: { events } })
+  telemetry: events => cloudRequest('/v1/telemetry', { method: 'POST', body: { events } }),
+  // A coded crash report (platform/telemetry.js reportCrash): no message, stack or URL.
+  reportError: report => cloudRequest('/v1/telemetry/error', { method: 'POST', body: report, timeoutMs: 8000 })
 });

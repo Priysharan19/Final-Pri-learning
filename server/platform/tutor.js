@@ -62,6 +62,8 @@ import { asyncRouter } from './asyncRouter.js';
 import { asStore, sqliteHandle } from './store.js';
 import { consumeRateLimit, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
+import { consumeAiDailyBudget, refundAiDailyBudget, refuseAiAllowance } from './aiAllowance.js';
+import { ensureAiUsageTable, recordAiUsage, usageCollector } from './aiUsage.js';
 import { buildGuard, captionWordingOk, createReleaseGate, leakedExpressions, solutionSpans } from './tutorGuard.js';
 import {
   MAX_CAPTION_CHARS, MAX_HISTORY_TURNS, MAX_STREAM_CHARS, MAX_TURN_CHARS, TUTOR_LEVELS, TUTOR_LOCALES, TUTOR_REQUEST_LEVELS,
@@ -328,6 +330,7 @@ export function createTutorRouter(db, {
   now = () => Date.now()
 } = {}) {
   db = asStore(db);
+  ensureAiUsageTable(db);
   ensureTable(db);
   const router = asyncRouter();
   // One open stream per session (account_sessions.id → its abort controller).
@@ -364,7 +367,7 @@ export function createTutorRouter(db, {
     await db.run('DELETE FROM tutor_cache WHERE expires_at <= ?', [at]);
   }
 
-  async function help(request) {
+  async function help(request, usage = null) {
     // The typed answer counts as the student's final line only when there is no
     // working; it is never verified, so it never excuses anything.
     const guard = buildGuard(request.question, {
@@ -379,7 +382,7 @@ export function createTutorRouter(db, {
         if (attempt === 0) return { refusal: overBudget };
         break;
       }
-      const reply = await ask(request, { env });
+      const reply = await ask(request, { env, onUsage: usage });
       model = reply.model || model;
       const leaked = leakedExpressions(reply.message, guard, { prompt: request.question.prompt });
       if (reply.message && !reply.revealsAnswer && !leaked.length) {
@@ -400,10 +403,10 @@ export function createTutorRouter(db, {
     };
   }
 
-  async function walkthrough(request) {
+  async function walkthrough(request, usage = null) {
     const overBudget = await consumePaidCall(db, { env });
     if (overBudget) return { refusal: overBudget };
-    const reply = await ask(request, { env });
+    const reply = await ask(request, { env, onUsage: usage });
     const spans = solutionSpans(request.question);
     let rejected = 0;
     const captions = request.captions.map((caption, index) => {
@@ -453,13 +456,21 @@ export function createTutorRouter(db, {
         res.set('RateLimit-Reset', String(Math.ceil(daily.resetAt / 1000)));
         return res.status(429).json({ error: { code: 'TUTOR_DAILY_LIMIT', message: "You have used today's tutor help. The question's own hints still work.", retryable: true } });
       }
+      // The account's combined daily AI budget across every paid kind
+      // (aiAllowance.js, PRI_AI_DAILY_BUDGET_CALLS). Spent, the authored
+      // hints remain; the model does not answer.
+      const budget = await consumeAiDailyBudget(db, { accountId, env, now: at });
+      if (!budget.allowed) return refuseAiAllowance(res, budget);
 
+      const usage = usageCollector();
       try {
-        const outcome = request.level === 'walkthrough' ? await walkthrough(request) : await help(request);
-        if (outcome.refusal) return refusePaidCall(res, outcome.refusal);
+        const outcome = request.level === 'walkthrough' ? await walkthrough(request, usage) : await help(request, usage);
+        if (outcome.refusal) { await refundAiDailyBudget(db, budget); return refusePaidCall(res, outcome.refusal); }
+        await recordAiUsage(db, { accountId, kind: 'tutor', env, now: at, calls: Math.max(1, usage.calls()), ...usage.total() });
         await remember(key, outcome.tutor, at);
         res.json({ tutor: { ...outcome.tutor, cached: false } });
       } catch (error) {
+        if (usage.calls() > 0) await recordAiUsage(db, { accountId, kind: 'tutor', env, now: at, calls: usage.calls(), ...usage.total() });
         // Only the code is reported. No question, solution or student work is
         // logged or echoed: diagnostics stay privacy-safe.
         if (error instanceof TutorProviderError) {
@@ -506,9 +517,11 @@ export function createTutorRouter(db, {
       res.status(429).json({ error: { code: 'TUTOR_DAILY_LIMIT', message: "You have used today's tutor help. The question's own hints still work.", retryable: true } });
       return null;
     }
+    const budget = await consumeAiDailyBudget(db, { accountId, env, now: at });
+    if (!budget.allowed) { refuseAiAllowance(res, budget); return null; }
     const overBudget = await consumePaidCall(db, { env });
-    if (overBudget) { refusePaidCall(res, overBudget); return null; }
-    return { request, key, at, hit: null };
+    if (overBudget) { await refundAiDailyBudget(db, budget); refusePaidCall(res, overBudget); return null; }
+    return { request, key, at, hit: null, accountId };
   }
 
   function openStream(res) {
@@ -535,7 +548,7 @@ export function createTutorRouter(db, {
     async (req, res) => {
       const admitted = await admitStream(req, res);
       if (!admitted) return;
-      const { request, key, at, hit } = admitted;
+      const { request, key, at, hit, accountId } = admitted;
       const send = openStream(res);
 
       if (hit) {
@@ -565,9 +578,10 @@ export function createTutorRouter(db, {
         send('fallback', { level: request.level, message: deterministicHelp(request), referencesStepIndex: -1, source: 'fallback', guarded: true, reason: 'TUTOR_ANSWER_GUARD', model });
       };
 
+      const usage = usageCollector();
       try {
         let ended = false;
-        for await (const delta of stream(request, { env, signal: controller.signal })) {
+        for await (const delta of stream(request, { env, signal: controller.signal, onUsage: usage })) {
           if (controller.signal.aborted) break;
           const step = gate.push(delta);
           if (step.leaks.length) { fallback(); ended = true; break; }
@@ -603,6 +617,9 @@ export function createTutorRouter(db, {
         req.off('close', onClose);
         if (openStreams.get(sessionId) === controller) openStreams.delete(sessionId);
         res.end();
+        // After the stream has closed: one model call, with whatever usage the
+        // final event reported (a cut-off stream still cost its tokens).
+        await recordAiUsage(db, { accountId, kind: 'tutor', env, now: at, calls: Math.max(1, usage.calls()), ...usage.total() });
       }
     });
 

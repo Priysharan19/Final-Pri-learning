@@ -4,6 +4,7 @@ import { currentSyncCursor } from './db.js';
 import { MFA_STEP_UP_MS, rateLimit, requireMfa, requireRole, requireSession } from './security.js';
 import { INVITE_MAX_TTL_DAYS, inviteTtlDays, listTeacherInvites, mintTeacherInvite } from './teacherInvites.js';
 import { operatorHealthDetail } from './operatorHealth.js';
+import { aiUsageSummary } from './aiUsage.js';
 
 function ensureAdminTables(db) {
   // SQLite builds its schema at boot; Postgres is migrated (supabase/migrations).
@@ -54,6 +55,14 @@ export function createAdminRouter(db) {
       ...await operatorHealthDetail(db),
       checkedAt: Date.now()
     });
+  });
+
+  // Cost telemetry (aiUsage.js, ledger 1.9): this month's and today's model
+  // calls and tokens, by kind and by the heaviest accounts, with the rupee
+  // estimate against PRI_MONTHLY_BUDGET_INR. Admin + second factor, like
+  // every admin route; the student-facing surfaces never see it.
+  router.get('/ai-usage', async (req, res) => {
+    res.json({ aiUsage: await aiUsageSummary(db) });
   });
 
   router.get('/users', async (req, res) => {

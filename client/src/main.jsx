@@ -13,6 +13,7 @@ import { scheduleOfflineWarm } from './local/offlineWarm.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { installReleaseIdentityDiagnostics } from './platform/releaseIdentity.js';
 import { priNative } from './platform/native/index.js';
+import { installShellErrorReporting } from './platform/telemetry.js';
 import { installFormFactorAttributes } from './platform/formFactor.js';
 import { installBackNavigation } from './platform/backNavigation.js';
 import { featureSnapshot } from './platform/features.js';
@@ -25,6 +26,9 @@ installFormFactorAttributes(window);
 // (after first paint the body exists for the dialog observer)
 queueMicrotask(() => installBackNavigation(window));
 installReleaseIdentityDiagnostics(window);
+// The native shell's own failures (WebContent killed, navigation failed) are
+// reported like a render crash: coded, consent-gated, through the server.
+installShellErrorReporting();
 
 // Account verification/password-reset links carry their secret only in the URL
 // fragment. Strip it before React, analytics-like browser extensions or later

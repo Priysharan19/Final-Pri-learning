@@ -222,7 +222,7 @@ function providerRefusal(response) {
   });
 }
 
-async function callModel({ request, config, fetchImpl, signal }) {
+async function callModel({ request, config, fetchImpl, signal, onUsage = null }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.timeoutMs);
   const onAbort = () => controller.abort();
@@ -246,6 +246,7 @@ async function callModel({ request, config, fetchImpl, signal }) {
   if (!response.ok) throw providerRefusal(response);
 
   const payload = await response.json().catch(() => null);
+  if (typeof onUsage === 'function') { try { onUsage(payload?.usage || {}); } catch { /* telemetry never fails a reply */ } }
   const text = payload?.output_text
     ?? payload?.output?.flatMap(item => item?.content || []).find(part => typeof part?.text === 'string')?.text
     ?? null;
@@ -280,12 +281,12 @@ export function normalizeCaptions(parsed, { count }) {
 }
 
 /** One model call for one validated tutor request. */
-export async function askTutorModel(request, { env = process.env, fetchImpl = globalThis.fetch, signal = null } = {}) {
+export async function askTutorModel(request, { env = process.env, fetchImpl = globalThis.fetch, signal = null, onUsage = null } = {}) {
   const config = providerConfig(env);
   if (!config.configured) {
     throw new TutorProviderError('The AI tutor is not configured on this deployment.', { code: 'TUTOR_NOT_CONFIGURED', status: 503 });
   }
-  const parsed = await callModel({ request, config, fetchImpl, signal });
+  const parsed = await callModel({ request, config, fetchImpl, signal, onUsage });
   return request.level === 'walkthrough'
     ? { captions: normalizeCaptions(parsed, { count: request.captions.length }), model: config.model }
     : { ...normalizeHelp(parsed, { stepCount: request.question.steps.length }), model: config.model };
@@ -317,7 +318,7 @@ export function parseProviderEvents(chunk, state) {
  * for every failure. The whole call, first byte to last, is bounded by the
  * configured timeout, and the provider is told the output-token cap.
  */
-export async function* streamTutorModel(request, { env = process.env, fetchImpl = globalThis.fetch, signal = null } = {}) {
+export async function* streamTutorModel(request, { env = process.env, fetchImpl = globalThis.fetch, signal = null, onUsage = null } = {}) {
   const config = providerConfig(env);
   if (!config.configured) {
     throw new TutorProviderError('The AI tutor is not configured on this deployment.', { code: 'TUTOR_NOT_CONFIGURED', status: 503 });
@@ -356,6 +357,8 @@ export async function* streamTutorModel(request, { env = process.env, fetchImpl 
           } else if (event?.type === 'response.failed' || event?.type === 'error') {
             throw new TutorProviderError('The tutor stopped.', { code: 'TUTOR_UNAVAILABLE', status: 503, retryable: true });
           } else if (event?.type === 'response.completed' || event?.type === 'response.incomplete') {
+            // The final event carries the whole call's token usage.
+            if (typeof onUsage === 'function') { try { onUsage(event?.response?.usage || {}); } catch { /* telemetry never fails a stream */ } }
             finished = true;
             break;
           }

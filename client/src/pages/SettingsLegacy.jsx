@@ -13,6 +13,7 @@ import { MIN_PASSWORD, PasswordMeter, passwordVerdict } from './Login.jsx';
 import { LANGUAGES, useLanguage, useT } from '../i18n/index.js';
 import { loadGlossary } from '../i18n/glossary.js';
 import { priNative } from '../platform/native/index.js';
+import { errorReportsEnabled, setErrorReportsEnabled } from '../platform/telemetry.js';
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
 const COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB'], ['in', null, 'settings.courseIndia']];
@@ -246,6 +247,26 @@ function HandwritingSection({ toast }) {
         unavailable={t('settings.cloudMarkingUnavailable')}
         copy={t('settings.cloudMarkingCopy')}
       />
+    </div>
+  );
+}
+
+/**
+ * Crash reports (platform/telemetry.js reportCrash). On by default for a
+ * signed-in account; one tap turns it off for this device. The copy promises
+ * exactly what is sent: a code, a screen name and a fingerprint — never the
+ * message, the stack, the question or the answer.
+ */
+function CrashReportsCard({ t }) {
+  const [on, setOn] = useState(() => errorReportsEnabled());
+  return (
+    <div className="card">
+      <h2 style={{ marginBottom: 8 }}>{t('settings.crashReportsTitle')}</h2>
+      <label className="row" style={{ gap: 10, alignItems: 'flex-start', cursor: 'pointer' }}>
+        <input type="checkbox" checked={on} onChange={e => setOn(setErrorReportsEnabled(e.target.checked))} />
+        <span>{t('settings.crashReportsLabel')}</span>
+      </label>
+      <p className="muted" style={{ marginTop: 8 }}>{t('settings.crashReportsCopy')}</p>
     </div>
   );
 }
@@ -671,6 +692,9 @@ export default function Settings() {
               </div>
             )}
           </div>
+
+          {/* ── Crash reports: a device preference, shown only where a server exists to send them to ── */}
+          {cloudAvailable() && <CrashReportsCard t={t} />}
 
           {/* ── Help ── */}
           <div className="card" ref={el => secRefs.current.help = el}>

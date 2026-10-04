@@ -157,7 +157,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
       // a mark was given for).
       if (seq !== readSeqRef.current || disabledRef.current) return;
       if (outcome?.reason === 'cancelled') return;
-      if (outcome?.reason === 'allowance') { sentRef.current = null; setStatus({ kind: 'allowance' }); return; }
+      if (outcome?.reason === 'allowance' || outcome?.reason === 'budget') { sentRef.current = null; setStatus({ kind: outcome.reason }); return; }
       // Line geometry comes from the strokes themselves (no recognition), so
       // the ✓/✗ can be drawn on the student's own lines when the counts agree.
       let geometry = null;
@@ -216,7 +216,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
   useEffect(() => {
     const retry = () => {
       if (disabledRef.current || !strokesRef.current.length) return;
-      if (status?.kind !== 'waiting' && status?.kind !== 'allowance') return;
+      if (status?.kind !== 'waiting' && status?.kind !== 'allowance' && status?.kind !== 'budget') return;
       retriesRef.current = 0;
       scheduleRead(strokesRef.current, { immediate: true });
     };
@@ -292,7 +292,9 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
       ? t('ink.serverEmpty')
       : status?.kind === 'allowance'
         ? t('ink.cloudAllowanceUsed')
-        : status?.kind === 'waiting'
+        : status?.kind === 'budget'
+          ? t('ink.aiBudgetUsed')
+          : status?.kind === 'waiting'
           ? t(status.key)
           : null;
 
