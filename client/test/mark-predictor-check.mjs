@@ -116,6 +116,21 @@ ok(weakAll.show, 'and still gets a number, because they have covered the paper')
 
 eq(predictExamMark({ units: [] }, {}), null, 'a blueprint with no units predicts nothing at all');
 
+// ── · The same evidence at the same instant is the same prediction ──────────
+// GET /stats once looked "not bit-reproducible" between two reads. It was the
+// clock: each request takes its own Date.now() and freshness() discounts by
+// age, so the unrounded sd moves when two reads straddle a millisecond. Given
+// the instant, nothing else in here varies — no randomness, and the order the
+// ratings happen to be stored in does not matter.
+const reversed = Object.fromEntries(Object.entries(mixed).reverse());
+eq(predictExamMark(PAPER, mixed, { nowMs: NOW }), predictExamMark(PAPER, mixed, { nowMs: NOW }),
+  'two predictions from the same evidence at the same instant are identical to the last digit');
+eq(predictExamMark(PAPER, reversed, { nowMs: NOW }), predictExamMark(PAPER, mixed, { nowMs: NOW }),
+  'and the order the ratings are stored in changes nothing');
+const later = predictExamMark(PAPER, mixed, { nowMs: NOW + 1 });
+ok(JSON.stringify(later.units.map(u => u.sd)) !== JSON.stringify(advice.units.map(u => u.sd)),
+  'one millisecond later the spread moves — the instant is an input, so callers comparing predictions must hold it fixed');
+
 console.log(failures.length
   ? `MARK PREDICTOR: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `MARK PREDICTOR: PASS — ${pass}/${pass} checks — weighted by the real paper, shrunk toward the middle on thin evidence, silent about topics never attempted.`);
