@@ -43,10 +43,22 @@ export const flow = {
     await check('the card names the topic it came from',
       (await page.locator('.q-topmeta').innerText()).includes('Linear Equations'),
       `topmeta reads ${JSON.stringify(await page.locator('.q-topmeta').innerText())}`);
-    // Practice is deliberately untimed on screen: time on task is still
-    // recorded with the attempt, but a running clock is pressure, not help.
-    await check('practice shows no running clock',
+    // The running clock (Section 7.18): information, not a deadline. It is a
+    // device preference, on by default and switched off in Settings; the time
+    // the marker records is measured separately (dream-interface-check holds
+    // that the clock is never sent with a submission).
+    await check('practice shows a running clock by default, as a timer',
+      await page.locator('.q-timer[role="timer"]').count() === 1
+      && /^\d+:\d\d$/.test((await page.locator('.q-timer').innerText()).trim()),
+      `clock reads ${JSON.stringify(await page.locator('.q-timer').innerText().catch(() => ''))}`);
+    await page.evaluate(() => localStorage.setItem('pri-practice-timer', 'off'));
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
+    await check('switching the clock off on this device removes it from practice',
       await page.locator('.q-timer').count() === 0);
+    await page.evaluate(() => localStorage.removeItem('pri-practice-timer'));
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
 
     // ── 2 · find one that takes a typed answer ───────────────────────────────
     // The card opens in handwriting mode on a touch device, so typing is asked

@@ -14,6 +14,7 @@ import { MIN_PASSWORD, PasswordMeter, passwordVerdict } from './Login.jsx';
 import { LANGUAGES, useLanguage, useT } from '../i18n/index.js';
 import { loadGlossary } from '../i18n/glossary.js';
 import { priNative } from '../platform/native/index.js';
+import { useDevicePref } from '../components/devicePrefs.js';
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
 const COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB'], ['in', null, 'settings.courseIndia']];
@@ -247,6 +248,32 @@ function HandwritingSection({ toast }) {
         unavailable={t('settings.cloudMarkingUnavailable')}
         copy={t('settings.cloudMarkingCopy')}
       />
+    </div>
+  );
+}
+
+/**
+ * The running clock on the practice page. A device setting (devicePrefs.js):
+ * it is about this screen, not the student, so two siblings on one iPad share
+ * it and nothing about it is synced or scored.
+ */
+function PracticeTimerRow() {
+  const t = useT();
+  const [on, setOn] = useDevicePref('practiceTimer');
+  return (
+    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--hairline)' }}>
+      <div className="set-row">
+        <span className="set-k">
+          {t('settings.practiceTimer')}
+          <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 3, maxWidth: 460 }}>{t('settings.practiceTimerHelp')}</span>
+        </span>
+        <span className="set-v">
+          <button type="button" className={`btn btn-sm ${on ? 'btn-primary' : 'btn-quiet'}`} aria-pressed={on}
+            data-practice-timer-toggle onClick={() => setOn(!on)}>
+            {t(on ? 'common.on' : 'common.off')}
+          </button>
+        </span>
+      </div>
     </div>
   );
 }
@@ -619,6 +646,7 @@ export default function Settings() {
               ))}
             </div>
             <p className="muted" style={{ marginTop: 10 }}>{t(user.theme === 'system' ? 'settings.themeSystemNote' : 'settings.themeNote')}</p>
+            <PracticeTimerRow />
           </div>
 
           {/* ── Courses ── */}
