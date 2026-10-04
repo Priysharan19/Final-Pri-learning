@@ -1,0 +1,269 @@
+name: Pri Agent Derived Artifact Apply
+
+# Privileged half of the derived-mirror pipeline. It never runs on a PR event
+# and never executes candidate code: it consumes the artifact produced by
+# "Pri Agent Derived Artifact Sync" (pull_request, read-only) and re-derives
+# every authorization fact from the workflow_run payload, the GitHub API and
+# the policy scripts on the default branch. The artifact is treated as
+# untrusted bytes: its metadata must match the event, its path list must pass
+# the derived-artifact policy, the applied diff must stay inside the declared
+# iPad web mirrors as regular files, and its content hash is recorded in the
+# step summary and the commit trailer before a single force-with-lease push.
+on:
+  workflow_run:
+    workflows: ["Pri Agent Derived Artifact Sync"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pri-agent-derived-apply-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  apply-derived:
+    name: Apply validated mirrors without executing candidate code
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.repository.full_name == github.repository &&
+      startsWith(github.event.workflow_run.head_branch, 'agent/mission/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write
+      actions: read
+      issues: read
+      pull-requests: read
+    steps:
+      - name: Checkout trusted default-branch policy
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 1
+          path: trusted
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+
+      - name: Resolve the pull request behind this run from the API, not the artifact
+        id: pr
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        with:
+          script: |
+            const fs = require('fs');
+            const run = context.payload.workflow_run;
+            const headSha = run.head_sha;
+            const headRef = run.head_branch;
+            if (!/^[0-9a-f]{40}$/.test(headSha)) throw new Error(`workflow_run head_sha is not a full SHA: ${headSha}`);
+            if (!/^agent\/mission\/[a-z0-9-]+\/[a-z0-9][a-z0-9._-]*$/.test(headRef)) throw new Error(`not an autonomous mission branch: ${headRef}`);
+
+            const { data: candidates } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${headRef}`,
+              per_page: 10
+            });
+            const matching = candidates.filter(pr =>
+              pr.head.sha === headSha &&
+              pr.head.ref === headRef &&
+              pr.head.repo && pr.head.repo.full_name === `${context.repo.owner}/${context.repo.repo}` &&
+              pr.base.repo && pr.base.repo.full_name === `${context.repo.owner}/${context.repo.repo}`);
+            if (matching.length !== 1) {
+              core.info(`no single open same-repo PR at ${headRef}@${headSha} (found ${matching.length}); nothing to apply`);
+              core.setOutput('found', 'false');
+              return;
+            }
+            const pr = matching[0];
+            if (pr.draft) {
+              core.info('candidate PR is a draft; nothing to apply');
+              core.setOutput('found', 'false');
+              return;
+            }
+
+            const artifactName = `pri-derived-${pr.number}-${headSha}`;
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: run.id,
+              per_page: 100
+            });
+            const artifact = artifacts.find(a => a.name === artifactName && !a.expired);
+            if (!artifact) {
+              core.info(`run ${run.id} produced no artifact named ${artifactName}; nothing to apply`);
+              core.setOutput('found', 'false');
+              return;
+            }
+
+            fs.writeFileSync('/tmp/pri-pr-body.txt', String(pr.body || ''));
+            core.setOutput('found', 'true');
+            core.setOutput('number', String(pr.number));
+            core.setOutput('head_sha', headSha);
+            core.setOutput('head_ref', headRef);
+            core.setOutput('base_sha', pr.base.sha);
+            core.setOutput('artifact_name', artifactName);
+            core.setOutput('artifact_id', String(artifact.id));
+
+      - name: Download read-only build artifact
+        if: steps.pr.outputs.found == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ${{ steps.pr.outputs.artifact_name }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: derived-out
+
+      - name: Record artifact content hash
+        if: steps.pr.outputs.found == 'true'
+        shell: bash
+        env:
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          ARTIFACT_NAME: ${{ steps.pr.outputs.artifact_name }}
+          ARTIFACT_ID: ${{ steps.pr.outputs.artifact_id }}
+        run: |
+          set -euo pipefail
+          test -s derived-out/mirrors.patch
+          test -s derived-out/paths.json
+          test -s derived-out/metadata.json
+          (cd derived-out && sha256sum mirrors.patch paths.json metadata.json | tee /tmp/pri-derived-sha256.txt)
+          if [[ -s derived-out/SHA256SUMS ]]; then
+            (cd derived-out && sha256sum --check --strict SHA256SUMS)
+          fi
+          {
+            echo '### Derived artifact consumed'
+            echo "- run: $RUN_ID ($RUN_URL)"
+            echo "- artifact: $ARTIFACT_NAME (id $ARTIFACT_ID)"
+            echo '```'
+            cat /tmp/pri-derived-sha256.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Checkout exact candidate head for patch application only
+        if: steps.pr.outputs.found == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ steps.pr.outputs.head_sha }}
+          fetch-depth: 0
+          path: candidate
+          persist-credentials: false
+
+      - name: Snapshot current mission ledger before write
+        if: steps.pr.outputs.found == 'true'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        with:
+          script: |
+            const fs = require('fs');
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100
+            });
+            fs.writeFileSync('/tmp/pri-derived-issues-write.json', JSON.stringify(issues.filter(issue => !issue.pull_request), null, 2));
+
+      - name: Validate live lease, artifact metadata, path scope and fleet ownership
+        if: steps.pr.outputs.found == 'true'
+        shell: bash
+        env:
+          HEAD_REF: ${{ steps.pr.outputs.head_ref }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          BASE_SHA: ${{ steps.pr.outputs.base_sha }}
+          EVENT_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          EVENT_HEAD_REF: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          test "$HEAD_SHA" = "$EVENT_HEAD_SHA"
+          test "$HEAD_REF" = "$EVENT_HEAD_REF"
+          test "$(git -C candidate rev-parse HEAD)" = "$HEAD_SHA"
+
+          node trusted/scripts/pri-derived-artifact-sync.mjs validate-metadata \
+            derived-out/metadata.json "$HEAD_SHA" "$BASE_SHA" "$HEAD_REF"
+          node trusted/scripts/pri-derived-artifact-sync.mjs validate-paths derived-out/paths.json
+          test -s derived-out/mirrors.patch
+
+          parsed="$(node trusted/scripts/pri-derived-artifact-sync.mjs branch "$HEAD_REF")"
+          agent="$(printf '%s' "$parsed" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s).agent))")"
+          mission="$(printf '%s' "$parsed" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s).mission))")"
+          declared_agent="$(sed -n 's/^Pri-Agent:[[:space:]]*//p' /tmp/pri-pr-body.txt | head -1 | tr -d '\r')"
+          declared_mission="$(sed -n 's/^Pri-Mission-ID:[[:space:]]*//p' /tmp/pri-pr-body.txt | head -1 | tr -d '\r')"
+          declared_risk="$(sed -n 's/^Pri-Risk:[[:space:]]*//p' /tmp/pri-pr-body.txt | head -1 | tr -d '\r')"
+          test "$declared_agent" = "$agent"
+          test "$declared_mission" = "$mission"
+          [[ "$declared_risk" =~ ^R[1-4]$ ]]
+          node trusted/scripts/pri-mission-control.mjs validate-ledger \
+            /tmp/pri-derived-issues-write.json "$agent" "$mission" "$HEAD_REF" "$declared_risk"
+
+          git -C candidate cat-file -e "$BASE_SHA^{commit}"
+          mapfile -t source_files < <(git -C candidate diff --name-only "$BASE_SHA...$HEAD_SHA")
+          mapfile -t derived_files < <(node -e "for (const p of require('./derived-out/paths.json')) console.log(p)")
+          node trusted/scripts/pri-fleet.mjs simulate-guard "$agent" "${source_files[@]}" "${derived_files[@]}"
+
+      - name: Apply patch and prove the staged diff remains mirror-only regular files
+        if: steps.pr.outputs.found == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C candidate apply --check --index ../derived-out/mirrors.patch
+          git -C candidate apply --index ../derived-out/mirrors.patch
+
+          node <<'NODE'
+          const { execFileSync } = require('node:child_process');
+          const fs = require('node:fs');
+          const raw = execFileSync('git', ['-C', 'candidate', 'diff', '--cached', '--name-only', '-z']);
+          const paths = raw.toString('utf8').split('\0').filter(Boolean);
+          fs.writeFileSync('/tmp/pri-applied-paths.json', JSON.stringify(paths, null, 2));
+          const expected = [...require('./derived-out/paths.json')].sort();
+          const actual = [...paths].sort();
+          if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+            throw new Error(`applied patch path mismatch: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+          }
+          NODE
+          node trusted/scripts/pri-derived-artifact-sync.mjs validate-paths /tmp/pri-applied-paths.json
+
+          while IFS= read -r file; do
+            entry="$(git -C candidate ls-files -s -- "$file")"
+            if [[ -z "$entry" ]]; then
+              # A deletion has no index entry and is valid for old hashed assets.
+              continue
+            fi
+            mode="${entry%% *}"
+            if [[ "$mode" != '100644' ]]; then
+              echo "derived artifact must remain a regular non-executable file: $file has mode $mode" >&2
+              exit 1
+            fi
+          done < <(node -e "for (const p of require('/tmp/pri-applied-paths.json')) console.log(p)")
+
+      - name: Re-check head lease and push one deterministic derived commit
+        if: steps.pr.outputs.found == 'true'
+        shell: bash
+        env:
+          HEAD_REF: ${{ steps.pr.outputs.head_ref }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          # The token is scoped to this step only: no checkout persisted it.
+          PUSH_TOKEN: ${{ github.token }}
+          REMOTE_URL: ${{ github.server_url }}/${{ github.repository }}.git
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          auth_header="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 -w0)"
+          remote_sha="$(git -C candidate -c "http.extraheader=$auth_header" ls-remote "$REMOTE_URL" "refs/heads/$HEAD_REF" | awk '{print $1}')"
+          if [[ "$remote_sha" != "$HEAD_SHA" ]]; then
+            echo "candidate head moved: expected $HEAD_SHA, found $remote_sha" >&2
+            exit 1
+          fi
+
+          patch_sha256="$(awk '$2 == "mirrors.patch" {print $1}' /tmp/pri-derived-sha256.txt)"
+          test -n "$patch_sha256"
+          git -C candidate config user.name 'Pri Agent Derived Sync'
+          git -C candidate config user.email 'pri-agent-derived-sync@users.noreply.github.com'
+          git -C candidate commit \
+            -m 'chore(derived): sync iPad web mirrors' \
+            -m "Pri-Derived-Source-Run: $RUN_ID" \
+            -m "Pri-Derived-Patch-SHA256: $patch_sha256"
+          git -C candidate -c "http.extraheader=$auth_header" push "$REMOTE_URL" HEAD:"refs/heads/$HEAD_REF" \
+            --force-with-lease="refs/heads/$HEAD_REF:$HEAD_SHA"

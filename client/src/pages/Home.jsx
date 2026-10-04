@@ -17,6 +17,22 @@ import { featureEnabled } from '../platform/features.js';
 const DIFF_KEYS = { 1: 'difficulty.1', 2: 'difficulty.2', 3: 'difficulty.3', 4: 'difficulty.4' };
 
 
+// The "This week" plan card is loaded after Home has painted. The planner and
+// the reminder scheduler are not needed for the first paint, so their code
+// stays out of the install (vite.config.js budgets the entry) and arrives as
+// its own warm chunk. A chunk that fails to arrive — a first run offline before
+// the warm pass — leaves Home without the card rather than without Home: the
+// failure is caught here instead of thrown at the route's error boundary.
+function LazyPlanCard(props) {
+  const [Card, setCard] = useState(null);
+  useEffect(() => {
+    let live = true;
+    import('../home/PlanCard.jsx').then(m => { if (live) setCard(() => m.default); }).catch(() => { });
+    return () => { live = false; };
+  }, []);
+  return Card ? <Card {...props} /> : null;
+}
+
 export default function Home() {
   const { user, dueCount } = useApp();
   const nav = useNavigate();
@@ -230,6 +246,7 @@ export default function Home() {
         <h2 className="home-section-title" id="home-manual-title">{t('home.chooseElse')}</h2>
         <PlacementCard placement={placement} onGo={path => nav(path)}
           onSkip={() => { setPlacement(p => ({ ...p, status: 'skipped' })); api.post('/placement/skip', {}).catch(() => { }); }} />
+        <LazyPlanCard user={user} stats={stats} />
         {alternatives.length > 0 && (
           <ul className="home-alts">
             {alternatives.map(item => (

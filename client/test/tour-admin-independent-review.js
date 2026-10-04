@@ -5,6 +5,8 @@
 // approval into client-only success or expose Publish after the rejection.
 
 import { pathToFileURL } from 'node:url';
+import { createMfaMock } from './support/totp.mjs';
+import { enrolStaffMfaThroughPanel } from './support/staff-mfa-tour.mjs';
 
 const ADMIN = {
   id: 'acct_e2e_author_admin',
@@ -30,6 +32,9 @@ export const flow = {
   async run({ page, ctx, base, check, goto, createProfile }) {
     let authenticated = false;
     const requests = [];
+    // The staff second factor as server/platform/mfa.js + security.js behave:
+    // no staff route answers until a code from the authenticator is confirmed.
+    const mfa = createMfaMock({ email: ADMIN.email });
 
     await page.addInitScript(origin => {
       window.__PRI_CLOUD_ORIGIN__ = origin;
@@ -69,6 +74,15 @@ export const flow = {
           ? respond(route, 200, { account: ADMIN })
           : respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
       }
+
+      if (path.startsWith('/v1/account/mfa/')) {
+        if (!authenticated) return respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
+        const answer = mfa.handle(path, method, request.postData() || '');
+        return respond(route, answer.status, answer.body);
+      }
+
+      const staffRoute = path.startsWith('/v1/admin/') || path.startsWith('/v1/content/');
+      if (authenticated && staffRoute && mfa.gate()) return respond(route, mfa.gate().status, mfa.gate().body);
 
       if (path === '/v1/entitlements' && method === 'GET') {
         return authenticated
@@ -150,6 +164,9 @@ export const flow = {
     await accountPanel.getByLabel('Password').fill('admin-e2e-password-42');
     await accountPanel.getByRole('button', { name: 'Connect account' }).click();
     await accountPanel.getByText('Connected', { exact: true }).waitFor({ timeout: 15_000 });
+
+    // The authenticator gate comes first: enrol through the real panel.
+    await enrolStaffMfaThroughPanel({ page, check });
 
     const staff = page.locator('section', { has: page.locator('#staff-operations-title') });
     await staff.waitFor({ state: 'visible', timeout: 15_000 });

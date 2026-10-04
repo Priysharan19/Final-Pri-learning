@@ -136,12 +136,17 @@ try {
   // record, which the guardian gate read as "no consent needed".
   const silentNonce = await issueNonce();
   const silent = await signIn('google', { idToken: mintToken({ claims: { nonce: silentNonce.nonce } }), nonce: silentNonce.nonce, deviceId: 'ipad-social', isAdult: undefined });
-  c.eq(silent.status, 400, 'a provider sign-up with no age declaration is refused');
-  c.eq(silent.data.error.code, 'AGE_DECLARATION_REQUIRED', 'named AGE_DECLARATION_REQUIRED');
+  // The one shared age rule (guardianConsent.js ageDecision) is applied; on
+  // this route a missing declaration is answered 428 CONSENT_DECLARATION_REQUIRED,
+  // the code the provider sign-in clients act on by asking the student and
+  // retrying with the same token, so the nonce is left unspent (oidc-consent-check.mjs).
+  c.eq(silent.status, 428, 'a provider sign-up with no age declaration is refused');
+  c.eq(silent.data.error.code, 'CONSENT_DECLARATION_REQUIRED', 'named CONSENT_DECLARATION_REQUIRED');
   c.eq((await db.get('SELECT COUNT(*) AS n FROM accounts')).n, 0, 'and creates no account');
+  c.ok(!(await db.get('SELECT consumed_at FROM oidc_nonces WHERE nonce_hash=?', [sha256(silentNonce.nonce)]))?.consumed_at, 'and leaves the nonce unspent for the retry');
   const stringly = await issueNonce();
   c.eq((await signIn('google', { idToken: mintToken({ claims: { nonce: stringly.nonce } }), nonce: stringly.nonce, isAdult: 'true' })).data.error.code,
-    'AGE_DECLARATION_REQUIRED', 'a non-boolean isAdult is not a declaration');
+    'CONSENT_DECLARATION_REQUIRED', 'a non-boolean isAdult is not a declaration');
   const childNoGuardian = await issueNonce();
   c.eq((await signIn('google', { idToken: mintToken({ claims: { nonce: childNoGuardian.nonce } }), nonce: childNoGuardian.nonce, isAdult: false, year: '9' })).data.error.code,
     'GUARDIAN_NAME_REQUIRED', 'a child provider sign-up must name a guardian');
@@ -179,6 +184,13 @@ try {
   const linkedSignIn = await signIn('google', { idToken: mintToken({ claims: { nonce: again.nonce } }), nonce: again.nonce });
   c.eq(linkedSignIn.status, 200, 'a fresh nonce signs the linked subject back in');
   c.eq(linkedSignIn.data.created, false, 'not created twice');
+  // A RETURNING user owes no declaration: the native sign-in sends neither
+  // createAccount nor isAdult, and the linked-account check runs before the age
+  // rule, which applies only to a genuinely new account.
+  const returning = await issueNonce();
+  const silentReturn = await signIn('google', { idToken: mintToken({ claims: { nonce: returning.nonce } }), nonce: returning.nonce, isAdult: undefined });
+  c.eq(`${silentReturn.status}:${silentReturn.data.created}`, '200:false', 'a returning linked user signs in with no age declaration at all');
+  await db.run('DELETE FROM rate_limits'); // this extra sign-in is not charged to the per-IP budget the cases below count on
 
   const expired = await issueNonce();
   await db.run('UPDATE oidc_nonces SET expires_at=? WHERE nonce_hash=?', [Date.now() - 1, sha256(expired.nonce)]);

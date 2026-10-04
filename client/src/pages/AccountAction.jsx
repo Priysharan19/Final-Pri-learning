@@ -1,7 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { cloud } from '../platform/cloudTransport.js';
 import { Wordmark } from '../components/BrandMark.jsx';
+import { cloudErrorCopy } from '../platform/cloudErrorCopy.js';
 import { tLater, useT, useTx } from '../i18n/index.js';
+
+/**
+ * Withdraw a guardian's consent with the bearer in their link. Resolves the
+ * screen state and the catalogue key that explains it: 'done' when consent was
+ * live and is now withdrawn, 'already' when there was nothing left to withdraw
+ * (the server still answers ok, withdrawn: false — the link is spent either
+ * way), 'error' for an invalid/expired link or a failure. Exported so the flow
+ * is provable with a fake transport (client/test/account-action-guardian-withdraw-check.mjs).
+ */
+export async function performGuardianWithdraw(token, transport = cloud) {
+  try {
+    const result = await transport.guardianWithdraw(token);
+    return result?.withdrawn === false
+      ? { state: 'already', key: 'accountAction.withdrawAlready' }
+      : { state: 'done', key: 'accountAction.withdrawDone' };
+  } catch (error) {
+    return { state: 'error', key: error?.code === 'TOKEN_INVALID' ? 'accountAction.withdrawInvalid' : 'accountAction.withdrawFailed' };
+  }
+}
 
 function Shell({ children }) {
   return (
@@ -67,6 +87,37 @@ export default function AccountAction({ actionData }) {
         <h1 style={{ marginTop: 0 }}>{t('accountAction.linkUnavailable')}</h1>
         <Status kind="error">{t('accountAction.linkMissing')}</Status>
         <a className="btn primary" href="/">{t('accountAction.openApp')}</a>
+      </Shell>
+    );
+  }
+
+  // ── A guardian using the withdrawal link they were told to keep ───────────
+  // Sent after confirmation, never expires, can only reduce permission. One
+  // screen, one button: what withdrawing does is said before it is done, and
+  // the outcome (withdrawn / nothing left to withdraw / link invalid) after.
+  if (action === 'guardian-withdraw') {
+    const withdraw = async () => {
+      setState('working');
+      setMessage('');
+      const outcome = await performGuardianWithdraw(token);
+      setState(outcome.state === 'error' ? 'error' : 'done');
+      setMessage(tLater(outcome.key));
+    };
+    return (
+      <Shell>
+        <h1 style={{ marginTop: 0 }}>{t('accountAction.withdrawTitle')}</h1>
+        {state !== 'done' && <p className="muted" style={{ marginTop: 0 }}>{t('accountAction.withdrawIntro')}</p>}
+        {state === 'working' && <Status>{t('accountAction.recording')}</Status>}
+        {state === 'error' && <Status kind="error">{message}</Status>}
+        {state === 'done'
+          ? <><Status>{message}</Status><a className="btn primary" href="/">{t('accountAction.openApp')}</a></>
+          : (
+            <div className="row" style={{ gap: 10, marginTop: 16 }}>
+              <button className="btn primary" type="button" data-guardian-withdraw disabled={state === 'working'} onClick={withdraw}>
+                {t('accountAction.withdrawButton')}
+              </button>
+            </div>
+          )}
       </Shell>
     );
   }
@@ -160,10 +211,13 @@ export default function AccountAction({ actionData }) {
       setMessage(tLater('accountAction.resetDone'));
     } catch (error) {
       setState('error');
+      // WEAK_PASSWORD, PASSWORD_TOO_LONG and PASSWORD_TOO_COMMON each get their
+      // own sentence (cloudErrorCopy); a reset link that is spent or expired its own.
+      const copy = cloudErrorCopy(error);
       setMessage(error?.code === 'TOKEN_INVALID'
         ? tLater('accountAction.resetInvalid')
-        : error?.code === 'WEAK_PASSWORD'
-          ? tLater('accountAction.weakPassword')
+        : copy
+          ? tLater(copy.key, copy.vars)
           : tLater('accountAction.resetFailed'));
     }
   };

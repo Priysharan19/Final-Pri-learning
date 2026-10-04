@@ -1,6 +1,6 @@
 import { asyncRouter } from './asyncRouter.js';
 import { asStore } from './store.js';
-import { opaqueToken, rateLimit, requireRole, requireSession, sha256 } from './security.js';
+import { MFA_STEP_UP_MS, opaqueToken, rateLimit, requireMfa, requireRole, requireSession, sha256 } from './security.js';
 
 export const PAID = new Set(['trialing', 'active', 'grace']);
 const STATUS = new Set(['free', 'trialing', 'active', 'grace', 'paused', 'past_due', 'expired', 'revoked']);
@@ -269,7 +269,7 @@ export function createEntitlementRouter(db, { grantEventId = supportGrantEventId
   // Support/admin override is intentionally server-authorised and audited. This
   // is not a payment bypass: it exists for support grants/testing and is never
   // callable by a student client role.
-  router.post('/admin/grant', requireSession(db), requireRole('admin'), rateLimit(db, 'entitlement-admin', { limit: 30, windowMs: 60 * 1000 }), async (req, res) => {
+  router.post('/admin/grant', requireSession(db), requireRole('admin'), requireMfa({ stepUpMs: MFA_STEP_UP_MS }), rateLimit(db, 'entitlement-admin', { limit: 30, windowMs: 60 * 1000 }), async (req, res) => {
     const accountId = String(req.body?.accountId || '');
     const durationMs = Math.max(60_000, Math.min(365 * 24 * 60 * 60 * 1000, Number(req.body?.durationMs) || 0));
     const now = Date.now();

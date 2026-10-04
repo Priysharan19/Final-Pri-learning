@@ -218,6 +218,8 @@ class CloudJourneyTest {
             waitFor(s, "(function(){var b=($byText)('Sync now');if(!b||b.disabled)return false;b.click();return true;})()")
             val synced = waitFor(s, "(function(){var t=document.querySelector('section[aria-labelledby=\"cloud-account-title\"]').innerText;var m=t.match(/Sync complete[^\\n]*/);return m?m[0]:false;})()", 60_000)
             assertTrue("the local profile synced to the real server: $synced", synced.contains("Sync complete"))
+            // Remember what the server holds now: the offline attempt made next must add to it.
+            eventBaselineFile.writeText(serverEventCount(jarOnDisk().value(java.net.URI(origin).host, "pri_cloud_session")!!).toString())
 
             // Google Play billing on an image without the Play Store, against a
             // server with no Google configuration: it answers in the closed error
@@ -249,6 +251,34 @@ class CloudJourneyTest {
         return try { conn.responseCode } finally { conn.disconnect() }
     }
 
+    /**
+     * How many learning events the server holds for the signed-in account, read
+     * through the real pull route (GET /v1/sync/pull/:cursor) with the device's
+     * session cookie, following hasMore pages. The server is the authority on
+     * what reached it; the panel's "Sync complete" line only reports one push.
+     */
+    private fun serverEventCount(session: String): Int {
+        var cursor = 0L
+        var count = 0
+        for (page in 0 until 50) {
+            val conn = java.net.URL("$origin/v1/sync/pull/$cursor").openConnection() as java.net.HttpURLConnection
+            conn.setRequestProperty("X-Pri-Client", "android-native-v1")
+            conn.setRequestProperty("Cookie", "pri_cloud_session=$session")
+            val body = try {
+                assertEquals("the pull route answers the device session", 200, conn.responseCode)
+                conn.inputStream.bufferedReader().readText()
+            } finally { conn.disconnect() }
+            val json = org.json.JSONObject(body)
+            count += json.getJSONArray("events").length()
+            cursor = json.getLong("cursor")
+            if (!json.optBoolean("hasMore", false)) break
+        }
+        return count
+    }
+
+    /** Server-side event count recorded by cloudSignInAndSync, read back after the process was killed. */
+    private val eventBaselineFile get() = java.io.File(context.filesDir, "pri-test-events-after-signin")
+
     @Test
     fun cloudSessionSurvivesProcessDeathThenDisconnectClearsIt() {
         val host = java.net.URI(origin).host
@@ -260,9 +290,19 @@ class CloudJourneyTest {
             openSettings(s)
             waitFor(s, "$stateTag === 'Connected'")
             // Reconnected (the same server came back): the attempt made offline is pushed.
+            // Automatic sync (on start / back online / visible) may already have pushed
+            // it before Sync now is pressed, so the manual push can legitimately report
+            // 0; the server's own record is the proof that the offline work arrived.
             waitFor(s, "(function(){var b=($byText)('Sync now');if(!b||b.disabled)return false;b.click();return true;})()")
             val pushed = waitFor(s, "(function(){var t=document.querySelector('section[aria-labelledby=\"cloud-account-title\"]').innerText;var m=t.match(/Sync complete: (\\d+) learning event/);return m?m[1]:false;})()", 60_000)
-            assertTrue("work done offline reaches the server on reconnect ($pushed learning event(s) pushed)", (pushed.trim('"').toIntOrNull() ?: 0) >= 1)
+            val pushedNow = pushed.trim('"').toIntOrNull() ?: 0
+            val onServer = serverEventCount(session)
+            val baseline = eventBaselineFile.takeIf { it.exists() }?.readText()?.trim()?.toIntOrNull()
+            if (baseline != null) {
+                assertTrue("work done offline reaches the server on reconnect (server holds $onServer learning event(s), $baseline after sign-in; $pushedNow pushed by Sync now)", onServer > baseline)
+            } else {
+                assertTrue("work done offline reaches the server on reconnect (server holds $onServer learning event(s); $pushedNow pushed by Sync now)", pushedNow >= 1 || onServer >= 1)
+            }
             eval(s, "($byText)('Disconnect').click()")
             waitFor(s, "$stateTag === 'Not connected'")
             val end = System.currentTimeMillis() + 5_000

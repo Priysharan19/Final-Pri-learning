@@ -28,6 +28,12 @@ import { useFormFactor } from '../platform/formFactor.js';
 import Icon from './Icon.jsx';
 import '../workspace.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
+// True in a production build made with the tutor off (see src/tutor/flag.js).
+// A literal test of the build constants, not a helper imported from flag.js:
+// the bundler folds only what it can see in this module, and that fold is what
+// keeps TutorHelp.jsx out of a dark build entirely (install-budget-check.mjs).
+/* global __PRI_FEATURE_TUTOR__, __PRI_PRODUCTION_BUILD__ */
+const TUTOR_BUILT_OUT = typeof __PRI_PRODUCTION_BUILD__ === 'boolean' && __PRI_PRODUCTION_BUILD__ && __PRI_FEATURE_TUTOR__ !== true;
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
 // Public question metadata may constrain what a single answer glyph can be,
@@ -78,7 +84,9 @@ export const SR_ONLY = {
 // A lazy chunk of its own: most questions are answered without it, so nobody
 // pays for it at install. If the chunk cannot be fetched the boundary below
 // says so and the hint bulbs keep working.
-const TutorHelp = React.lazy(() => import('../tutor/TutorHelp.jsx'));
+// In a production build with the tutor off the panel is unreachable
+// (tutorEnabled below is false on every device), so it is not built at all.
+const TutorHelp = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/TutorHelp.jsx'));
 
 class TutorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { failed: false }; }
@@ -1514,7 +1522,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             {tutorUsed > 0 && <span className="muted" style={{ marginLeft: 8, fontSize: 13 }}>{t('tutor.helpUsed', { count: tutorUsed, n: tutorUsed })}</span>}
           </div>
         )}
-        {showTutor && !resolved && tutorEnabled && !diagnostic && (
+        {showTutor && !resolved && tutorEnabled && !diagnostic && TutorHelp && (
           <TutorBoundary fallback={t('tutor.unavailable')}>
             <React.Suspense fallback={<div className="hintbox" role="status">{t('tutor.asking')}</div>}>
               <TutorHelp

@@ -169,7 +169,15 @@ export const ON_DEMAND = [
   // they are question banks for one class each, exactly like the rest of this
   // rule. Without naming them they fell through to the warm set, so a Class 10
   // student was fetching 90 kB of Class 11 and 12 questions in the background.
-  [/(^|\/)(year(7|8|9|10|11|12)|streams-(standard|ext)|india-(algebra|calculus|class10|class11|class12|coordinate|foundation|junior-overlay|olympiad|senior|native-helpers))-[^/]*\.js$/, 'question bank for another year'],
+  // multipart is the HSC Section II bank: structured papers that only the
+  // legacy NSW exam route (`POST /exams` in local/backend.js) composes, behind
+  // the import() that route already holds, and never reached by a CBSE or JEE
+  // paper (local/indiaExamBackend.js). The NSW track sits behind the
+  // EXTENDED_TRACKS flag, so without naming it every Indian student warmed
+  // 16 kB of Australian exam questions; a profile that holds the NSW course has
+  // it from its first paper on, and backend.js already charges an unreachable
+  // fetch to that one paper rather than every paper after it.
+  [/(^|\/)(year(7|8|9|10|11|12)|streams-(standard|ext)|multipart|india-(algebra|calculus|class10|class11|class12|coordinate|foundation|junior-overlay|olympiad|senior|native-helpers))-[^/]*\.js$/, 'question bank for another year'],
 
   // The source-audited NCERT Class 7–9 production banks: each class's
   // generators, topper notes, worked examples and answer audits. They used to
@@ -222,7 +230,7 @@ export const ON_DEMAND = [
   //     Settings.jsx asks for it only once the signed-in cloud account reports
   //     a support or admin role, and the server authorises every call it makes
   //     regardless.
-  [/(^|\/)(Teach|StaffOperationsPanel)-[^/]*\.js$/, 'staff-only screen'],
+  [/(^|\/)(Teach|StaffOperationsPanel|MfaPanel)-[^/]*\.js$/, 'staff-only screen'],
 
   // The placement check: its page, the adaptive engine and the Pri-authored
   // prerequisite graph. A student opens it once after onboarding and perhaps
@@ -364,14 +372,23 @@ function releaseIdentityManifest(identity) {
 // build is OFF unless its environment says PRI_FEATURE_<NAME>=1; development
 // (`vite` serve) is ON. Test harnesses that build set the variable themselves.
 export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR', 'AUSTRALIA']);
+// Flags built and recorded in features.json like the ones above, but not yet
+// asserted off in the tracked iPad bundles (client/test/ios-bundle-features-
+// check.mjs), because those bundles predate the flag and carry no record of
+// it. Move a name into FEATURE_FLAGS with the next `npm run sync:ios`.
+//   EXTENDED_TRACKS — the Olympiad track and the Teacher role in onboarding,
+//   classroom panels for students (src/platform/features.js).
+export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS']);
+const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export function featureStates(command, env = process.env) {
   const on = name => (command === 'build' ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
-  return Object.fromEntries(FEATURE_FLAGS.map(name => [name.toLowerCase(), on(name)]));
+  return Object.fromEntries([...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].map(name => [flagKey(name), on(name)]));
 }
 export function featureDefines(command, env = process.env) {
   const states = featureStates(command, env);
   return {
     __PRI_FEATURE_PLACEMENT__: JSON.stringify(states.placement),
+    __PRI_FEATURE_EXTENDED_TRACKS__: JSON.stringify(states.extendedTracks),
     __PRI_FEATURE_AUSTRALIA__: JSON.stringify(states.australia)
   };
 }

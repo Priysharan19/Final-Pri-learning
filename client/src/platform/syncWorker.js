@@ -18,6 +18,7 @@ import {
 } from './syncContract.js';
 import { historicalSupplementalEvents } from './syncHistorical.js';
 import { remoteEventPrefix, syncStateId } from './syncReplicaState.js';
+import { applyRemoteLearningEvents, isRestoredRow } from './cloudSyncRestore.js';
 
 const MAX_REMOTE_EVENT_CACHE = 2000;
 // The profile outbox's own ceiling. Asking for fewer than it can hold would let
@@ -30,7 +31,18 @@ const HISTORIC_FALLBACK_BASE = 6_000_000_000_000_000;
 // Generic user sync deliberately stays small. Networked classes/assignments and
 // teacher-authored content use their own server-authorised APIs; copying shared
 // local task records through a student's generic replica would be a privacy bug.
+// The same boundary holds on the way back in: cloudSyncRestore applies only the
+// append-only learning kinds this worker itself publishes (practice, exam, Rush,
+// Match) and nothing shared.
 const CLIENT_ENTITY_KINDS = new Set(['profile', 'bookmark', 'favorite']);
+
+// A push the server refused because an entity's baseVersion was stale. The
+// worker recovers from it in place: pull to learn the authoritative versions,
+// rebuild the batch (the pending local edit is re-applied over the newer remote
+// record — last writer wins for profile fields, set-union for bookmarks) and
+// retry once. The outbox is untouched until the retry is acknowledged.
+const ENTITY_CONFLICT = 'SYNC_ENTITY_CONFLICT';
+const isEntityConflict = error => error?.code === ENTITY_CONFLICT || (error?.status === 409 && /Sync conflict for/.test(String(error?.message || '')));
 
 const eventCacheId = (pid, id) => `${remoteEventPrefix(pid)}${id}`;
 
@@ -278,7 +290,9 @@ function historicAttemptSeq(attempt, fallbackIndex) {
 }
 
 async function historicalAttemptEvents(pid, deviceId) {
-  const rows = await byIndex('attempts', 'pid', pid).catch(() => []);
+  // Rows restored from the cloud are the account's own events already; only
+  // what this device produced is this device's history to publish.
+  const rows = (await byIndex('attempts', 'pid', pid).catch(() => [])).filter(row => !isRestoredRow(pid, row));
   rows.sort((a, b) => {
     const ta = Number(a.createdAt || 0), tb = Number(b.createdAt || 0);
     if (ta !== tb) return ta - tb;
@@ -406,31 +420,83 @@ function unpublishedEntities(pending) {
   return key => keys.has(key);
 }
 
-async function pullAll(pid, deviceId, state, unpublished) {
-  let cursor = safeInt(state.cursor);
+/**
+ * Pull everything the account holds past this device's cursor.
+ *
+ * Events from other devices are cached AND applied to the local learning stores
+ * (cloudSyncRestore): on a fresh device that is the restore of the student's
+ * mastery, history, streak and review schedule; on an established device it is
+ * the work they did elsewhere arriving. This device's own events come back too
+ * — every push is followed by a pull — and are skipped: the local rows they
+ * describe are already here, and applying them would count each answer twice.
+ * The apply is idempotent per event id, so the cursor advancing is a
+ * convenience, not what guards against double counting.
+ *
+ * `fromCursor` restarts the walk from an earlier point (conflict recovery uses
+ * 0) without ever moving the saved cursor backwards.
+ */
+async function pullAll(pid, deviceId, state, unpublished, { fromCursor = null } = {}) {
+  const startCursor = safeInt(state.cursor);
+  let cursor = fromCursor === null ? startCursor : safeInt(fromCursor);
   let pulledEvents = 0;
   let pulledEntities = 0;
+  let restoredEvents = 0;
   for (let page = 0; page < 100; page++) {
     const raw = await cloud.syncPull(cursor);
     validatePullEnvelope(raw);
+    const foreign = [];
     for (const event of raw.events) {
       if (event.deviceId !== deviceId) {
         await cacheRemoteEvent(pid, event);
+        foreign.push(event);
         pulledEvents++;
       }
+    }
+    if (foreign.length) {
+      const restored = await applyRemoteLearningEvents(pid, foreign);
+      restoredEvents += restored.applied;
     }
     for (const entity of raw.entities) {
       await applyRemoteEntity(pid, entity, state, unpublished);
       pulledEntities++;
     }
     cursor = raw.cursor;
-    state.cursor = cursor;
+    state.cursor = Math.max(startCursor, safeInt(cursor));
     if (!raw.hasMore) break;
     if (page === 99) throw new Error('Sync pull exceeded the safety page limit');
   }
   await trimRemoteEventCache(pid);
-  return { pulledEvents, pulledEntities };
+  return { pulledEvents, pulledEntities, restoredEvents };
 }
+
+/**
+ * Learn the authoritative versions after a SYNC_ENTITY_CONFLICT.
+ *
+ * The ordinary pull from this device's cursor is usually enough: the record
+ * that moved under us has a server cursor past ours. When it is not — a push
+ * whose response was lost already advanced the cursor past the record, or a
+ * cursor that is simply ahead of what entityVersions knows — the walk restarts
+ * from 0 so the version is learned whatever the cursor says. Pending local
+ * edits are protected on the same terms as every pull (`unpublished`), which is
+ * what keeps the local intent to re-apply.
+ */
+async function learnConflictingVersions(pid, deviceId, state, unpublished, keys) {
+  const before = Object.fromEntries(keys.map(key => [key, safeInt(state.entityVersions[key])]));
+  const pulls = [await pullAll(pid, deviceId, state, unpublished)];
+  const unchanged = keys.every(key => safeInt(state.entityVersions[key]) === before[key]);
+  if (unchanged) pulls.push(await pullAll(pid, deviceId, state, unpublished, { fromCursor: 0 }));
+  return pulls.reduce((sum, pull) => ({
+    pulledEvents: sum.pulledEvents + pull.pulledEvents,
+    pulledEntities: sum.pulledEntities + pull.pulledEntities,
+    restoredEvents: sum.restoredEvents + pull.restoredEvents
+  }), { pulledEvents: 0, pulledEntities: 0, restoredEvents: 0 });
+}
+
+const sumPulls = (...pulls) => pulls.reduce((sum, pull) => ({
+  pulledEvents: sum.pulledEvents + (pull?.pulledEvents || 0),
+  pulledEntities: sum.pulledEntities + (pull?.pulledEntities || 0),
+  restoredEvents: sum.restoredEvents + (pull?.restoredEvents || 0)
+}), { pulledEvents: 0, pulledEntities: 0, restoredEvents: 0 });
 
 /**
  * A stable digest of what a push actually carries.
@@ -464,11 +530,13 @@ function rescanKey(prefix, deviceId, index, chunk) {
   return `${prefix}-${clean(deviceId)}-${index}-${chunk.length}-${clean(first)}-${clean(last)}-${contentDigest(chunk)}`.slice(0, 160);
 }
 
-async function pushFullRescan(pid, deviceId, marker, state, coveredBelow) {
-  const entities = await fullRescanEntities(pid, state);
+async function pushFullRescan(pid, deviceId, marker, state, coveredBelow, recovery) {
+  let entities = await fullRescanEntities(pid, state);
   const historical = [
     ...(await historicalAttemptEvents(pid, deviceId)),
-    ...(await historicalSupplementalEvents(pid, deviceId))
+    // Exam/Rush/Match rows restored from the cloud carry their restored id as
+    // the event's entityId; they are not this device's history either.
+    ...(await historicalSupplementalEvents(pid, deviceId)).filter(event => !isRestoredRow(pid, { id: event.entityId }))
   ].sort((a, b) => a.deviceSeq - b.deviceSeq);
   let pushedEntities = 0;
   let pushedEvents = 0;
@@ -479,10 +547,27 @@ async function pushFullRescan(pid, deviceId, marker, state, coveredBelow) {
   let complete = true;
 
   for (let offset = 0; offset < entities.length; offset += MAX_PUSH_ITEMS) {
-    const chunk = entities.slice(offset, offset + MAX_PUSH_ITEMS);
+    let chunk = entities.slice(offset, offset + MAX_PUSH_ITEMS);
     const sent = new Set(chunk.map(row => versionKey(row.kind, row.entityId)));
-    const envelope = createPushEnvelope({ deviceId, baseCursor: state.cursor, entities: chunk, fullRescan: true });
-    const result = validatePushResult(await cloud.syncPush(envelope, rescanKey('rescan-ent', deviceId, offset / MAX_PUSH_ITEMS, chunk)));
+    const push = rows => cloud.syncPush(
+      createPushEnvelope({ deviceId, baseCursor: state.cursor, entities: rows, fullRescan: true }),
+      rescanKey('rescan-ent', deviceId, offset / MAX_PUSH_ITEMS, rows)
+    );
+    let result;
+    try {
+      result = validatePushResult(await push(chunk));
+    } catch (error) {
+      if (!isEntityConflict(error)) throw error;
+      // Another device committed between the pre-pull and this push. Learn its
+      // versions, rebuild this chunk from local state at those versions (the
+      // rescan publishes local state by design) and send it once more.
+      recovery.conflicts++;
+      recovery.pulls.push(await learnConflictingVersions(pid, deviceId, state, recovery.unpublished, [...sent]));
+      entities = await fullRescanEntities(pid, state);
+      chunk = entities.filter(row => sent.has(versionKey(row.kind, row.entityId)));
+      result = validatePushResult(await push(chunk));
+      recovery.recovered++;
+    }
     for (const row of result.acceptedEntities) {
       const key = versionKey(row.kind, row.entityId);
       if (!sent.has(key)) continue;
@@ -538,9 +623,11 @@ export async function syncNow(pid) {
   try {
     const pending = await pendingProfileMutations(pid, MAX_PUSH_ITEMS);
     let push = { pushedEvents: 0, pushedEntities: 0, acknowledged: 0, blocked: [] };
-    let prePull = { pulledEvents: 0, pulledEntities: 0 };
+    let prePull = { pulledEvents: 0, pulledEntities: 0, restoredEvents: 0 };
     const rescan = pending.find(item => item.kind === 'full-rescan');
     const unpublished = unpublishedEntities(pending);
+    // What conflict recovery did, if anything, for the caller's report.
+    const recovery = { conflicts: 0, recovered: 0, pulls: [], unpublished };
 
     // On first link to an existing cloud account, learn authoritative entity
     // versions before trying to publish local state. This turns the initial
@@ -551,15 +638,36 @@ export async function syncNow(pid) {
       // mistaken for one the rescan already published.
       const coveredBelow = (await profileOutboxStats(pid)).nextSeq;
       prePull = await pullAll(pid, deviceId, state, unpublished);
-      push = await pushFullRescan(pid, deviceId, rescan, state, coveredBelow);
+      push = await pushFullRescan(pid, deviceId, rescan, state, coveredBelow, recovery);
     } else if (pending.length) {
-      const batch = await buildNormalBatch(pending, pid, deviceId, state);
+      let batch = await buildNormalBatch(pending, pid, deviceId, state);
       if (batch.events.length || batch.entities.length) {
-        const envelope = createPushEnvelope({ deviceId, baseCursor: state.cursor, events: batch.events, entities: batch.entities });
-        const first = Math.min(...batch.represented);
-        const last = Math.max(...batch.represented);
-        const key = `sync-${deviceId}-${first}-${last}-${contentDigest({ events: batch.events, entities: batch.entities })}`;
-        const result = validatePushResult(await cloud.syncPush(envelope, key));
+        const send = rows => {
+          const envelope = createPushEnvelope({ deviceId, baseCursor: state.cursor, events: rows.events, entities: rows.entities });
+          const first = Math.min(...rows.represented);
+          const last = Math.max(...rows.represented);
+          const key = `sync-${deviceId}-${first}-${last}-${contentDigest({ events: rows.events, entities: rows.entities })}`;
+          return cloud.syncPush(envelope, key);
+        };
+        let result;
+        try {
+          result = validatePushResult(await send(batch));
+        } catch (error) {
+          if (!isEntityConflict(error) || !batch.entities.length) throw error;
+          // The server refused the whole push: nothing in it was committed and
+          // nothing is acknowledged. Learn the versions that moved, rebuild the
+          // same queue entries at those versions — the pending local edit is
+          // the intent, so it goes back over the newer remote record — and
+          // retry once. A second refusal is thrown as it is; the queue keeps
+          // every entry for the next sync.
+          recovery.conflicts++;
+          const keys = batch.entities.map(entity => versionKey(entity.kind, entity.entityId));
+          recovery.pulls.push(await learnConflictingVersions(pid, deviceId, state, unpublished, keys));
+          batch = await buildNormalBatch(pending, pid, deviceId, state);
+          if (!batch.events.length && !batch.entities.length) throw error;
+          result = validatePushResult(await send(batch));
+          recovery.recovered++;
+        }
         // Acknowledge what the server COMMITTED, never what this device sent.
         // Dropping a queue entry is the one irreversible act in a sync: the
         // local rows stay, but nothing will ever look at them again, so an
@@ -603,10 +711,16 @@ export async function syncNow(pid) {
     await saveState(pid, state);
     await markCloudSynced(pid, state.lastSyncAt);
     const after = await profileOutboxStats(pid);
+    const pulled = sumPulls(prePull, postPull, ...recovery.pulls);
     return {
       ...push,
-      pulledEvents: prePull.pulledEvents + postPull.pulledEvents,
-      pulledEntities: prePull.pulledEntities + postPull.pulledEntities,
+      pulledEvents: pulled.pulledEvents,
+      pulledEntities: pulled.pulledEntities,
+      // Remote learning events written into this device's own stores this run —
+      // what tells the UI that mastery/history/reviews changed under it.
+      restoredEvents: pulled.restoredEvents,
+      conflicts: recovery.conflicts,
+      conflictsRecovered: recovery.recovered,
       cursor: state.cursor,
       pending: after.pending,
       requiresFullRescan: after.requiresFullRescan,

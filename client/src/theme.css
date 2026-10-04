@@ -933,6 +933,10 @@ body { overscroll-behavior-y: none; }
 .week-dot { max-width: 26px; aspect-ratio: 1; margin: 0 auto}
 
 .week-lbl { margin-top: 4px; letter-spacing: 0.04em; }
+/* The Plan card draws its own seven-day strip; a distinct class keeps the home tour counting one week strip. */
+.plan-week-day { flex: 1; text-align: center; }
+.week-dot.hit { background: var(--gold); border-color: var(--gold); color: #141310; }
+.week-dot.today { box-shadow: 0 0 0 1.5px var(--gold); }
 
 /* ═══ v6 · Polish: transitions, press states, skeletons ═══ */
 .slide-up { animation: slide-up 0.28s cubic-bezier(0.22, 1, 0.36, 1); }

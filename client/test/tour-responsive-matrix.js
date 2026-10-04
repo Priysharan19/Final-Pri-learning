@@ -23,7 +23,7 @@ export const VIEWPORTS = [
   { id: 'tablet-landscape', width: 1180, height: 820, ff: 'expanded' },
   { id: 'short', width: 844, height: 390, ff: 'expanded', short: true },
 ];
-const ROUTES = ['/', '/practice', '/progress', '/exams', '/tasks', '/settings', '/review'];
+const ROUTES = ['/', '/practice', '/progress', '/exams', '/tasks', '/settings', '/review', '/plan'];
 // The writing area every non-short window had before CP-03; EXPANDED keeps it.
 const BASE_INK_HEIGHT = 380;
 

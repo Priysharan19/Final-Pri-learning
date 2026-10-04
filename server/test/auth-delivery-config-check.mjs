@@ -13,7 +13,7 @@ const prior = Object.fromEntries(names.map(name => [name, process.env[name]]));
 try {
   process.env.NODE_ENV = 'production';
   process.env.PRI_PUBLIC_ORIGIN = 'https://learn.pri.example';
-  process.env.PRI_CSRF_SECRET = 'csrf-production-secret';
+  process.env.PRI_CSRF_SECRET = 'csrf-production-secret-of-at-least-32-chars';
   process.env.PRI_AUTH_DELIVERY_KEY = '22'.repeat(32);
   delete process.env.PRI_AUTH_EMAIL_PROVIDER;
   delete process.env.PRI_RESEND_API_KEY;
@@ -52,10 +52,13 @@ try {
 
   const server = readFileSync(new URL('../index.js', import.meta.url), 'utf8');
   const router = readFileSync(new URL('../platform/router.js', import.meta.url), 'utf8');
+  const operatorHealth = readFileSync(new URL('../platform/operatorHealth.js', import.meta.url), 'utf8');
   assert.ok(server.includes("import { startAuthDeliveryWorker } from './platform/authDelivery.js'"));
   assert.ok(server.includes('startAuthDeliveryWorker(platformDb);'), 'production server must actually start the auth delivery worker');
-  assert.ok(router.includes('authDelivery: { email: config.authEmailProviderConfigured }'),
+  assert.ok(operatorHealth.includes('authDelivery: { email: config.authEmailProviderConfigured }'),
     'health must expose only the auth-mail readiness boolean, never provider credentials');
+  assert.ok(!router.includes('authDelivery:') && router.includes('operator ? await operatorHealthDetail('),
+    'and only to the operator token: the anonymous /v1/health body carries no provider detail');
   assert.ok(!router.includes('PRI_RESEND_API_KEY') && !router.includes('PRI_AUTH_EMAIL_FROM'),
     'health/router source must not expose auth-email secrets or sender configuration');
 
