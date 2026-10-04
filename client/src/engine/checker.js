@@ -14,6 +14,7 @@ import {
 import { assessEvaluationLine, assessPointLine } from './reason-v3.js';
 import { assessRelationChainLine, assessModulusInequalityLine } from './reason-v4.js';
 import { cleanInput, parseNumericInput, checkAnswer as coreCheckAnswer } from './checker-core.js';
+import en from '../i18n/strings.en.js';
 
 export { cleanInput, parseNumericInput };
 
@@ -930,11 +931,88 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
   });
   const progress = counted.length;
   const awarded = Math.min(cap, progress);
+  const lost = lostMarks(vector, allLines, meta);
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
   const note = awarded > 0
     ? `${plural(awarded, 'mark')} for correct working — the final answer was wrong, but ${plural(progress, 'line')} of your working moved the solution on.`
     : restated
       ? 'No method marks: the lines that check out only restate the question. Marks come from steps that move the solution on.'
       : 'No method marks: correct working earns marks only when it moves the solution on, and this question carries a single mark for the answer.';
-  return { okLines: okLines.length, progressLines: progress, restatedLines: restated, awarded, note, lines: vector, report: rep };
+  return { okLines: okLines.length, progressLines: progress, restatedLines: restated, awarded, note, lines: vector, lost, report: rep };
+}
+
+// ── Where each lost mark went (ledger 3.6) ───────────────────────────────────
+// Every mark that was not awarded is named by the line it was lost on and the
+// rule that line broke. Each entry is a catalogue key with its variables, so
+// the card renders it in the student's language; `text` is the same sentence
+// resolved in English for records and logs. The rule is the diagnosed
+// misconception when Step Check named one (the misconception catalogue is
+// already bilingual), and the checker's own verdict otherwise.
+
+const RULE_KEY_BY_CODE = Object.freeze({
+  'sign-on-transfer': 'misconception.signOnTransfer.name',
+  'distribute-partial': 'misconception.distributePartial.name',
+  'distribute-sign': 'misconception.distributeSign.name',
+  'power-of-sum': 'misconception.powerOfSum.name',
+  'negative-squared': 'misconception.negativeSquared.name',
+  'power-of-power': 'misconception.powerOfPower.name',
+  'power-product': 'misconception.powerProduct.name',
+  'function-of-sum': 'misconception.functionOfSum.name',
+  'fraction-across': 'misconception.fractionAcross.name',
+  'cancel-over-sum': 'misconception.cancelOverSum.name',
+  'reciprocal-flip': 'misconception.reciprocalFlip.name',
+  'term-dropped': 'misconception.termDropped.name',
+  'sign-flipped': 'misconception.signFlipped.name',
+  'operator-swapped': 'misconception.operatorSwapped.name',
+  'one-side-only': 'misconception.oneSideOnly.name',
+  'sides-mismatched': 'misconception.sidesMismatched.name',
+  'arithmetic-slip': 'misconception.arithmeticSlip.name',
+  'variable-swapped': 'misconception.variableSwapped.name',
+  'lost-root': 'misconception.lostRoot.name',
+  'divided-by-variable': 'misconception.dividedByVariable.name',
+  'counterexample': 'misconception.counterexample.name',
+  'extraneous-solution': 'marks.rule.extraneousSolution'
+});
+
+/** The catalogue key naming the rule a broken line broke. */
+export function ruleKeyFor(line, meta) {
+  const code = line?.diagnosis?.code;
+  if (code && RULE_KEY_BY_CODE[code]) return RULE_KEY_BY_CODE[code];
+  if (/±/.test(String(line?.text ?? ''))) return 'marks.rule.plusMinusBranch';
+  if (meta?.kind === 'expression') return 'marks.rule.expressionBroken';
+  if (!/=/.test(String(line?.text ?? ''))) return 'marks.rule.valueWrong';
+  return 'marks.rule.equationBroken';
+}
+
+// The English sentence is the English catalogue entry — one copy, the same
+// one the card renders — never a second string kept in the engine.
+const englishOf = key => (typeof en[key] === 'string' ? en[key] : key);
+const fillEnglish = (template, vars) => String(template).replace(/\{(\w+)\}/g, (whole, name) => (name in vars ? String(vars[name]) : whole));
+
+/**
+ * One entry per lost mark: { line, key, vars, ruleKey, text }. `line` is
+ * 1-based; the answer mark carries the last line. `vars.rule` is left to the
+ * renderer, which fills it with the translated `ruleKey`.
+ */
+export function lostMarks(vector, allLines, meta) {
+  const out = [];
+  let breakLine = null;
+  (vector || []).forEach((row, i) => {
+    const src = allLines[i] || {};
+    const line = i + 1;
+    if (row.mark > 0 || row.reason === 'cap') return;
+    let key, ruleKey = null;
+    if (row.status === 'break') { key = 'marks.lost.break'; ruleKey = ruleKeyFor(src, meta); if (breakLine == null) breakLine = line; }
+    else if (row.status === 'note' && breakLine != null && /follows from the earlier slip/i.test(String(src.note || ''))) key = 'marks.lost.afterBreak';
+    else if (row.status === 'note') key = 'marks.lost.unverified';
+    else if (row.reason === 'restated') key = 'marks.lost.restated';
+    else if (row.reason === 'repeat') key = 'marks.lost.repeat';
+    else return;
+    const vars = { line, ...(key === 'marks.lost.afterBreak' ? { breakLine } : {}) };
+    const ruleText = ruleKey ? englishOf(ruleKey) : '';
+    out.push({ line, key, vars, ruleKey, text: fillEnglish(englishOf(key), { ...vars, rule: ruleText }) });
+  });
+  const last = (vector || []).length;
+  out.push({ line: last || 1, key: 'marks.lost.answer', vars: { line: last || 1 }, ruleKey: null, text: englishOf('marks.lost.answer') });
+  return out;
 }

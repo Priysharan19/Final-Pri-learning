@@ -152,8 +152,10 @@ export function normalize(raw) {
     .replace(/θ/g, 'theta')
     .replace(/√/g, 'sqrt');
   s = rewriteCounting(s);
-  s = s.replace(/²/g, '^2').replace(/³/g, '^3')
-    .replace(/⁻¹/g, '^(-1)')
+  // Superscript digits are a power: a⁷, x¹², 10⁻³. The counting notations
+  // (⁵C₂) were rewritten above, so what is left is an exponent.
+  s = s.replace(/⁻([⁰¹²³⁴⁵⁶⁷⁸⁹]+)/g, (_, d) => `^(-${[...d].map(ch => SUPER[ch]).join('')})`)
+    .replace(/([⁰¹²³⁴⁵⁶⁷⁸⁹]+)/g, (_, d) => { const n = [...d].map(ch => SUPER[ch]).join(''); return n.length === 1 ? `^${n}` : `^(${n})`; })
     .replace(/,/g, '')                             // thousands separators (points use parse pair first)
     .replace(/\$/g, '')
     .replace(/\s+/g, ' ')

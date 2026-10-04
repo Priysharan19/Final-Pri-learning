@@ -10,7 +10,7 @@
 // interchangeable, rows can be separated by ';' or a newline, and "1i−2j+3k"
 // is the same vector as "(1, −2, 3)". Everything here is deterministic.
 // ─────────────────────────────────────────────────────────────────────────────
-import { evalNumeric, numsClose } from './expr.js';
+import { evalNumeric, numsClose, parse, evaluate, variablesOf } from './expr.js';
 
 const INF = Infinity;
 
@@ -364,4 +364,114 @@ export function formatVector(components, style = 'ijk') {
     else out += ` ${v < 0 ? '−' : '+'} ${coef}${axes[idx]}`;
   });
   return out || '0';
+}
+
+// ── Complex numbers ──────────────────────────────────────────────────────────
+// Class 11 writes a complex number as a + bi and, from the Argand plane
+// onward, in polar form: r(cos θ + i sin θ), r cis θ, r∠θ, r e^{iθ}. Both are
+// the same number and both are read into one shape, { re, im }. Rectangular
+// input is read by evaluating the written expression as a function of i and
+// insisting it be linear in i: a + bi, bi + a, (a + bi), (2 + 4i)/2 are all
+// linear; anything that still has an i² in it has not been simplified and is
+// not read as a final answer. Polar input reads its modulus and argument and
+// records `polar: true`, because an argument written to two decimal places of
+// a degree is an approximation the comparator has to allow for.
+
+const DEG_WRITTEN = /(?:°|º|˚|\bdeg(?:ree)?s?)\s*$/i;
+
+function angleValue(text) {
+  let s = String(text ?? '').trim().replace(/^\(\s*/, '').replace(/\s*\)$/, '').trim();
+  if (!s) throw new Error('Empty angle');
+  const deg = DEG_WRITTEN.test(s);
+  s = s.replace(DEG_WRITTEN, '').replace(/\brad(?:ian)?s?\s*$/i, '').trim();
+  const v = evalNumeric(s);
+  if (!Number.isFinite(v)) throw new Error('Bad angle');
+  return deg ? v * Math.PI / 180 : v;
+}
+
+function modulusValue(text) {
+  const s = String(text ?? '').trim().replace(/[*×·]\s*$/, '').trim();
+  if (!s) return 1;
+  const v = evalNumeric(s);
+  if (!Number.isFinite(v)) throw new Error('Bad modulus');
+  return v;
+}
+
+function fromPolar(r, theta) {
+  return { re: r * Math.cos(theta), im: r * Math.sin(theta), polar: true };
+}
+
+/** The polar forms, or null when the text is not one of them. */
+function parsePolar(s) {
+  // r cis θ  /  r ∠ θ  /  cis θ
+  let m = s.match(/^(.*?)\s*(?:cis|∠)\s*(.+)$/i);
+  if (m) return fromPolar(modulusValue(m[1]), angleValue(m[2]));
+  // r(cos θ ± i sin θ)  /  cos θ + i sin θ
+  m = s.match(/^(.*?)\s*\(?\s*cos\s*\(?\s*([^()]+?)\s*\)?\s*([+-])\s*i\s*\*?\s*sin\s*\(?\s*([^()]+?)\s*\)?\s*\)?$/i);
+  if (m) {
+    const [, rText, a, sign, b] = m;
+    const theta = angleValue(a);
+    if (Math.abs(theta - angleValue(b)) > 1e-9) throw new Error('cos and sin take the same angle in polar form');
+    return fromPolar(modulusValue(rText.replace(/\($/, '')), sign === '-' ? -theta : theta);
+  }
+  // r e^{iθ}  /  r e^(θi)  /  e^(iπ/2)
+  m = s.match(/^(.*?)\s*e\s*\^\s*(?:\{|\()?\s*(.+?)\s*(?:\}|\))?$/i);
+  if (m && /i/.test(m[2])) {
+    const expo = m[2].trim();
+    let thetaText = null;
+    if (/^i\s*\*?\s*/.test(expo)) thetaText = expo.replace(/^i\s*\*?\s*/, '');
+    else if (/\*?\s*i$/.test(expo)) thetaText = expo.replace(/\s*\*?\s*i$/, '');
+    if (thetaText != null) return fromPolar(modulusValue(m[1]), angleValue(thetaText || '1'));
+  }
+  return null;
+}
+
+/**
+ * Read a complex number in any of the forms above into { re, im, polar }.
+ * Throws when the text is not a single complex number.
+ */
+export function parseComplexInput(raw) {
+  let s = String(raw ?? '').trim();
+  if (!s) throw new Error('Empty complex number');
+  s = s.replace(/\$/g, '')
+    .replace(/^[a-zA-Z]\s*=\s*/, '')          // "z = …"
+    .replace(/[−–—]/g, '-')
+    .replace(/[×·⋅]/g, '*')
+    .replace(/\\(?:left|right)/g, '')
+    .replace(/\\(?:cos|sin)/g, m => m.slice(1))
+    .replace(/\biota\b/gi, 'i')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const polar = parsePolar(s);
+  if (polar) return polar;
+
+  // Rectangular: the expression as a function of i must be linear in i.
+  let ast;
+  try { ast = parse(s); } catch { throw new Error('Not a complex number'); }
+  if (ast.t === 'equation') throw new Error('Not a complex number');
+  const vars = variablesOf(ast);
+  vars.delete('i');
+  if (vars.size) throw new Error('A complex number has no other variables');
+  const at = t => evaluate(ast, { i: t });
+  const f0 = at(0), f1 = at(1), f2 = at(2), f3 = at(-1);
+  if (![f0, f1, f2, f3].every(Number.isFinite)) throw new Error('Not a complex number');
+  const im = f1 - f0;
+  const scale = Math.max(1, Math.abs(f0), Math.abs(im));
+  if (Math.abs((f2 - f0) - 2 * im) > 1e-9 * scale || Math.abs((f3 - f0) + im) > 1e-9 * scale) {
+    throw new Error('Simplify to a + bi');
+  }
+  return { re: f0, im, polar: false };
+}
+
+/** Same complex number, to a tolerance; `tol` applies to each part. */
+export function sameComplex(a, b, tol) {
+  return numsClose(a.re, b.re, tol) && numsClose(a.im, b.im, tol);
+}
+
+export function formatComplex({ re, im }) {
+  const r = fmtNum(re), m = fmtNum(Math.abs(im));
+  if (Math.abs(im) < 1e-12) return r;
+  const imag = `${Math.abs(Math.abs(im) - 1) < 1e-12 ? '' : m}i`;
+  if (Math.abs(re) < 1e-12) return `${im < 0 ? '−' : ''}${imag}`;
+  return `${r} ${im < 0 ? '−' : '+'} ${imag}`;
 }

@@ -1009,7 +1009,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   return (
     // The opaque question id, so a test (or support) can tell two questions
     // apart even when a generator happens to write the same prompt twice.
-    <div className="qpage" data-question-id={question.id}>
+    <div className="qpage" data-question-id={question.id} data-answer-type={question.answerType}>
       {/* left action rail */}
       <div className="q-rail no-print">
         {!diagnostic && <button className={`q-rail-btn ${bookmarked ? 'on' : ''}`} title={t('verdict.favorite')} aria-label={t('verdict.favoriteThis')} aria-pressed={bookmarked} onClick={toggleBookmark}>☆</button>}
@@ -1386,6 +1386,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <b>{t(state.res.invalid ? 'verdict.unreadable' : 'verdict.notQuite')}</b>{' '}
             <MathText text={state.res.feedback || t('verdict.oneMoreGo')} />
             {state.res.partial && <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>◐ {state.res.partial.note}</div>}
+            {state.res.partial && <LostMarks lost={state.res.partial.lost} t={t} />}
             {state.res.stepReport && <StepReport report={state.res.stepReport} />}
           </div>
         </div>
@@ -1404,7 +1405,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             </div>
           )}
 
-          <div className="eval-card">
+          <div className="eval-card" data-verdict={verdictGood ? 'correct' : 'incorrect'}>
             <div className="eval-head">
               <span className="logo-bb" aria-hidden="true">P</span><span className="eval-title">Pri Learning. <span style={{ color: 'var(--ink-2)' }}>{t('verdict.evaluation')}</span></span>
               <span className="eval-marks">
@@ -1425,6 +1426,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               </div>
               {res.feedback && !verdictGood && <div style={{ marginTop: 6 }}><b>{t('verdict.reasoning')}</b> <MathText text={res.feedback} /></div>}
               {res.partial && !verdictGood && <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>◐ {res.partial.note}</div>}
+              {res.partial && !verdictGood && <LostMarks lost={res.partial.lost} t={t} />}
               {boardAward && (
                 <div className="board-award" style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--line, rgba(128,128,128,.22))' }}>
                   <div className="spread" style={{ alignItems: 'baseline' }}>
@@ -1438,7 +1440,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                           {row.earned === row.outOf ? '✓' : '✗'}
                         </span>
                         {row.labelKey ? t(row.labelKey) : row.label}
-                        {row.why && <span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, marginLeft: 20 }}>{row.whyKey ? t(row.whyKey, { unit: row.whyVars?.unit ?? '' }) : row.why}</span>}
+                        {row.why && <span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, marginLeft: 20 }}>{row.whyKey ? t(row.whyKey, { unit: '', ...(row.whyVars || {}), rule: row.whyVars?.ruleKey ? t(row.whyVars.ruleKey) : (row.whyVars?.rule ?? '') }) : row.why}</span>}
                       </span>
                       <span className="set-v" style={{ fontVariantNumeric: 'tabular-nums' }}>
                         <span className="sr-only">{t('verdict.rowMarks', { earned: row.earned, total: row.outOf })} </span>{row.earned}/{row.outOf}
@@ -1570,6 +1572,23 @@ function CriteriaTable({ criteria, correct, selfMarks, setSelfMarks, selfSaved, 
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Where the marks went (ledger 3.6): one line per lost mark, naming the line
+ * and the rule it broke, rendered from catalogue keys so a Hindi-medium
+ * student reads it in Hindi. The rule itself is a catalogue key too — the
+ * diagnosed misconception when Step Check named one.
+ */
+function LostMarks({ lost, t }) {
+  if (!Array.isArray(lost) || !lost.length) return null;
+  return (
+    <ul className="lost-marks muted" style={{ marginTop: 6, paddingLeft: 18, fontSize: 13 }} aria-label={t('marks.lost.heading')}>
+      {lost.map((l, i) => (
+        <li key={i} data-lost-line={l.line}>{t(l.key, { ...(l.vars || {}), rule: l.ruleKey ? t(l.ruleKey) : '' })}</li>
+      ))}
+    </ul>
   );
 }
 

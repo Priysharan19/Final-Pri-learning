@@ -97,6 +97,11 @@ jobs:
           grep -Eq 'INSTALL BUDGET: PASS — 48/48 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
           grep -Fq 'nothing emitted left uncovered.' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
+          # Ledger 3.1/3.3/3.6/3.7: offline marking contract, equivalence classes, lost-mark explanations, tolerance policy.
+          grep -Fq 'EQUIVALENCE CLASSES: PASS — 499/499 checks across 9 classes' suites.log
+          grep -Fq 'LOST MARKS: PASS — 97/97 checks' suites.log
+          grep -Fq 'TOLERANCE POLICY: PASS — 176/176 checks' suites.log
+          grep -Fq 'ENGINE OFFLINE BOUNDARY: PASS — 218/218 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 59/59 checks' suites.log
           grep -Fq 'JEE ADVANCED GATE: PASS — 27/27 checks' suites.log
           grep -Fq 'RESTORE FIDELITY: PASS — 45/45 checks' suites.log
@@ -494,3 +499,37 @@ jobs:
               exit 1
             fi
           done
+
+  engine-benchmark:
+    # Ledger 3.8: the deterministic marker's confusion table, regenerated on
+    # every merge to main and kept as a run artifact. Synthetic evidence only
+    # (the report's header says so); it asserts nothing and lowers no gate —
+    # the release gates for marking live in the suites job above.
+    name: Engine benchmark report (main only)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: Regenerate the confusion table
+        run: |
+          set -o pipefail
+          npm run engine:benchmark 2>&1 | tee engine-benchmark.log
+          test -s docs/evidence/engine-benchmark.md
+          grep -Fq 'Synthetic self-consistency evidence. Not an accuracy claim.' docs/evidence/engine-benchmark.md
+      - name: Engine benchmark report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: engine-benchmark
+          path: |
+            docs/evidence/engine-benchmark.md
+            engine-benchmark.log
+          retention-days: 90
