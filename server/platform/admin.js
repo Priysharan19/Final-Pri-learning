@@ -1,7 +1,7 @@
 import { asyncRouter } from './asyncRouter.js';
 import { asStore, sqliteHandle } from './store.js';
 import { currentSyncCursor } from './db.js';
-import { MFA_STEP_UP_MS, rateLimit, requireMfa, requireRole, requireSession } from './security.js';
+import { MFA_STEP_UP_MS, PRIVILEGED_ROLES, rateLimit, requireMfa, requireRole, requireSession } from './security.js';
 import { INVITE_MAX_TTL_DAYS, inviteTtlDays, listTeacherInvites, mintTeacherInvite } from './teacherInvites.js';
 import { operatorHealthDetail } from './operatorHealth.js';
 
@@ -79,10 +79,25 @@ export function createAdminRouter(db) {
     if (!['student', 'teacher', 'support', 'admin'].includes(role)) return res.status(400).json({ error: { code: 'ROLE_INVALID', message: 'Role is invalid.' } });
     if (accountId === req.platformSession.account_id && role !== 'admin') return res.status(409).json({ error: { code: 'SELF_DEMOTION_BLOCKED', message: 'Administrators cannot remove their own admin role.' } });
     const now = Date.now();
-    const info = await db.run('UPDATE accounts SET role=?,updated_at=? WHERE id=? AND deleted_at IS NULL', [role, now, accountId]);
-    if (!info.changes) return res.status(404).json({ error: { code: 'ACCOUNT_NOT_FOUND', message: 'Account not found.' } });
-    await audit(db, req.platformSession.account_id, 'account.role', 'account', accountId, { role }, now);
-    res.json({ accountId, role, updatedAt: now });
+    const before = await db.get('SELECT role FROM accounts WHERE id=? AND deleted_at IS NULL', [accountId]);
+    if (!before) return res.status(404).json({ error: { code: 'ACCOUNT_NOT_FOUND', message: 'Account not found.' } });
+    let sessionsRevoked = 0;
+    await db.transaction(async () => {
+      await db.run('UPDATE accounts SET role=?,updated_at=? WHERE id=? AND deleted_at IS NULL', [role, now, accountId]);
+      // Every request re-reads the role from accounts (security.js
+      // sessionFromRequest), so a promoted session sees its new role at once
+      // and a demoted one loses its gates at once. Leaving staff is the one
+      // change that also retires the account's sessions: a support or admin
+      // session was issued under the staff idle window and carries a verified
+      // second factor on its row, and none of that should outlive the role.
+      // The holder signs in again as whatever they now are. The caller's own
+      // session (an admin confirming their own admin role) is left alone.
+      if (PRIVILEGED_ROLES.has(before.role) && !PRIVILEGED_ROLES.has(role) && accountId !== req.platformSession.account_id) {
+        sessionsRevoked = (await db.run('UPDATE account_sessions SET revoked_at=? WHERE account_id=? AND revoked_at IS NULL', [now, accountId])).changes;
+      }
+      await audit(db, req.platformSession.account_id, 'account.role', 'account', accountId, { role, from: before.role, sessionsRevoked }, now);
+    });
+    res.json({ accountId, role, updatedAt: now, sessionsRevoked });
   });
 
   // Teacher onboarding: an admin mints a single-use, expiring invite code and

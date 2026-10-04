@@ -1922,3 +1922,14 @@ h3 { font-size: 17px; line-height: 1.3; }
 .pm-chip.pm-in-chain { box-shadow: 0 0 0 2px var(--bad); }
 .pm-mastery { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--brand-1); }
 .pm-chip.pm-mixed { border-color: var(--warn); border-style: dotted; color: var(--ink); }
+
+/* ── Guest strip: the free-sample count and the way to an account ─────────── */
+.guest-strip {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 8px 18px; font-size: 13px;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface-2);
+}
+.guest-strip-count { color: var(--ink-2); }
+.guest-strip-count b { color: inherit; font-weight: 650; }
+@media (max-width: 760px) { .guest-strip { padding-inline: 12px; } }

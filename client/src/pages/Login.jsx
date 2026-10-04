@@ -279,8 +279,11 @@ function LanguagePicker() {
   );
 }
 
-export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
-  const { setUser, refreshDue } = useApp();
+export default function Login({ initialStage = 'hero', initialStep = 0, guestUpgrade = false } = {}) {
+  const { user: currentUser, setUser, refreshDue } = useApp();
+  // A guest making their profile: whatever profile this screen creates, the
+  // guest's five questions are re-filed under it (once; the guest is wiped).
+  const fromGuest = guestUpgrade && !!currentUser?.guest;
   const nav = useNavigate();
   const t = useT();
   const tx = useTx();
@@ -343,10 +346,20 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
           : t('login.notChosen'))
     : (selectedCourse?.[1] || form.course.toUpperCase()) + ' · ' + t('common.yearNumber', { n: form.year });
 
+  /** Carry the guest's work into a profile this screen just made. */
+  const carryGuestWork = async (made) => {
+    if (!fromGuest || !made?.user?.id || made.user.guest) return made;
+    try {
+      const moved = await api.post('/profiles/guest/migrate', { to: made.user.id });
+      if (moved?.user) return { ...made, user: moved.user, guestMigrated: !!moved.migrated };
+    } catch { /* the profile exists either way; the guest rows stay until the next sign-in attempt */ }
+    return made;
+  };
+
   async function go(path, body, { cloud = cloudIntent } = {}) {
     setBusy(true); setError('');
     try {
-      const r = await api.post(path, body);
+      const r = await carryGuestWork(await api.post(path, body));
       // Login owns this navigation hook and unmounts as soon as setUser exposes
       // the authenticated shell. Move the cloud handoff first so the destination
       // cannot be lost during that identity transition. The local profile is
@@ -392,6 +405,21 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     // demo student to the account page.
     setCloudIntent(false);
     void go('/profiles/demo', {}, { cloud: false });
+  };
+
+  /** Five questions, no profile: a guest profile on this device, practice open. */
+  const tryAsGuest = () => {
+    localStorage.setItem('pri-seen-hero', '1');
+    setCloudIntent(false);
+    void (async () => {
+      setBusy(true); setError('');
+      try {
+        const r = await api.post('/profiles/guest', { language: signInLanguage() });
+        nav('/practice', { replace: true, flushSync: true });
+        flushSync(() => setUser(r.user));
+      } catch (e) { setError(e.message); }
+      finally { setBusy(false); }
+    })();
   };
 
   /** Open/select the local profile first, then hand it to the real cloud account panel. */
@@ -485,7 +513,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
   const previousStep = () => {
     setError('');
     if (createStep > 0) setCreateStep(step => step - 1);
-    else setStage(profiles?.length ? 'pick' : 'hero');
+    else setStage(fromGuest ? 'account' : profiles?.length ? 'pick' : 'hero');
   };
 
   const create = async () => {
@@ -515,10 +543,10 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
 
   /** The account flow is done: make this device's profile, link it, and open the first question. */
   const finishAccount = async ({ account, name, year, track }) => {
-    const r = await api.post('/profiles', {
+    const r = await carryGuestWork(await api.post('/profiles', {
       name: name || account?.name || 'Pri', year: Number(year), avatar: '🚀', role: 'student',
       language: signInLanguage(), course: 'in', indiaTrack: track || 'cbse'
-    });
+    }));
     if (account?.id) {
       const { linkSignedInAccount } = await import('../platform/cloudAccount.js');
       await linkSignedInAccount(r.user.id, account).catch(() => {});
@@ -578,6 +606,11 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
             <button className="linklike" type="button" data-testid="hero-sign-in-code" onClick={() => openAccount('signin')}>{t('login.signInWithCode')}</button>
           </div>
           <div style={{ textAlign: 'center', marginTop: 14 }}>
+            <button className="linklike" type="button" data-testid="hero-try-guest" disabled={busy} onClick={tryAsGuest}>
+              {t('guest.tryFive')}
+            </button>
+          </div>
+          <div style={{ textAlign: 'center', marginTop: 8 }}>
             <button className="linklike" type="button" data-testid="hero-try-demo" disabled={busy} onClick={tryDemo}>
               {t('login.tryDemoIndia')}
             </button>
@@ -606,10 +639,15 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
       <div className="auth-wrap">
         <div className="auth-col">
           <React.Suspense fallback={<p className="muted" role="status">{t('common.loading')}</p>}>
+          {fromGuest && (
+            <p className="muted" role="status" data-testid="guest-upgrade-note" style={{ fontSize: 12.5, marginBottom: 12, textAlign: 'center' }}>
+              {t('guest.upgradeNote', { count: currentUser.guestQuestions?.used || 0, n: currentUser.guestQuestions?.used || 0 })}
+            </p>
+          )}
           <SignUpFlow
             key={accountMode}
             initialMode={accountMode}
-            onCancel={() => setStage('hero')}
+            onCancel={() => (fromGuest ? nav('/practice', { replace: true }) : setStage('hero'))}
             onStartOffline={() => beginCreate(false)}
             onFinish={finishAccount}
           />

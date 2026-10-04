@@ -138,6 +138,27 @@
     },
     {
       "method": "POST",
+      "path": "/v1/account/reauth",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "own account only: the proof (password, own-address code or a provider identity linked to the session account) is checked against the session account id; success stamps and rotates only the presenting session; no id is taken from the request",
+      "rateLimits": [
+        {
+          "key": "reauth",
+          "limit": 10,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
       "path": "/v1/account/email/verification-request",
       "auth": "session",
       "roles": null,

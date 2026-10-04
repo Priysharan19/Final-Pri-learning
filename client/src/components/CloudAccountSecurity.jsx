@@ -21,6 +21,11 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  // The export asks the session to prove its credential again when the last
+  // proof is older than the server's window (401 REAUTH_REQUIRED). What is
+  // asked for depends on how the account signs in: its password, a code to
+  // its own phone or email, or a fresh Apple/Google identity.
+  const [reauth, setReauth] = useState(null);
 
   const hasPassword = providers.some(row => row.provider === 'password');
   const socialProviders = providers.filter(row => row.provider === 'google' || row.provider === 'apple');
@@ -112,8 +117,75 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
       const result = await cloud.exportAccount();
       const suffix = new Date().toISOString().slice(0, 10);
       await downloadJSON(result, `pri-learning-account-export-${suffix}.json`);
+      setReauth(null);
       setMessage(tLater('cloudSecurity.exported'));
-    } catch (err) { setError(err.message || tLater('cloudSecurity.exportFailed')); }
+    } catch (err) {
+      if (err?.code === 'REAUTH_REQUIRED') await askForProof(err.reauthMethods);
+      else setError(err.message || tLater('cloudSecurity.exportFailed'));
+    } finally { setBusy(''); }
+  }
+
+  /** Open the proof step for the export. A code account is sent its code now. */
+  async function askForProof(methods) {
+    const list = Array.isArray(methods) && methods.length ? methods : (hasPassword ? ['password'] : socialProviders.length ? socialProviders.map(row => row.provider) : ['otp']);
+    const next = { methods: list, password: '', code: '', challenge: null, channel: null };
+    if (list.includes('otp')) {
+      try {
+        const sent = await cloud.otpReauthRequest();
+        next.challenge = sent?.challengeId || null;
+        next.channel = sent?.channel || null;
+      } catch (err) { setError(err.message || tLater('cloudSecurity.reauthCodeFailed')); }
+    }
+    setReauth(next);
+  }
+
+  async function proveAndExport(e) {
+    e?.preventDefault?.();
+    if (!reauth || busy) return;
+    start('reauth');
+    try {
+      if (reauth.methods.includes('password')) await cloud.reauth({ password: reauth.password });
+      else if (reauth.methods.includes('otp')) await cloud.reauth({ otpChallengeId: reauth.challenge, otpCode: reauth.code.replace(/\s+/g, '') });
+      else throw Object.assign(new Error(tLater('cloudSecurity.reauthProviderOnly')), { code: 'SOCIAL_REAUTH_REQUIRED' });
+      setReauth(null);
+      setBusy('');
+      await exportAccount();
+    } catch (err) {
+      const copy = cloudErrorCopy(err);
+      setError(copy ? tLater(copy.key, copy.vars) : (err.message || tLater('cloudSecurity.reauthFailed')));
+      setBusy('');
+    }
+  }
+
+  async function proveWithProvider(provider) {
+    if (!webProviders[provider] || busy) return;
+    start('reauth');
+    try {
+      const token = await requestIdentityToken(provider, webProviders[provider]);
+      await cloud.reauth({ provider, idToken: token.idToken, nonce: token.nonce });
+      setReauth(null);
+      setBusy('');
+      await exportAccount();
+    } catch (err) {
+      setError(err?.code === 'SOCIAL_CANCELLED' ? tLater('cloud.socialCancelled')
+        : err?.code === 'SOCIAL_POPUP_BLOCKED' ? tLater('cloud.socialPopupBlocked')
+          : err?.code?.startsWith?.('SOCIAL_') ? tLater('cloud.socialFailed')
+            : (err.message || tLater('cloudSecurity.reauthFailed')));
+      setBusy('');
+    }
+  }
+
+  // Every session of this account, on every device, this one included.
+  async function signOutEverywhere() {
+    if (busy) return;
+    if (typeof window !== 'undefined' && typeof window.confirm === 'function' && !window.confirm(tLater('cloudSecurity.signOutEverywhereConfirm'))) return;
+    start('logout-all');
+    try {
+      const result = await cloud.logoutAll();
+      await disconnectCloudAccount(pid);
+      setMessage(tLater('cloudSecurity.signedOutEverywhere', { count: Number(result?.revoked) || 0, n: Number(result?.revoked) || 0 }));
+      await onDeleted?.({ cloudDeleted: false, sessionRevoked: true });
+    } catch (err) { setError(err.message || tLater('cloudSecurity.signOutEverywhereFailed')); }
     finally { setBusy(''); }
   }
 
@@ -189,9 +261,37 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
           <p className="muted" style={{ fontSize: 13, margin: '6px 0 10px' }}>
             {t('cloudSecurity.exportHelp')}
           </p>
-          <button className="btn btn-ghost btn-sm" type="button" onClick={exportAccount} disabled={!!busy}>
+          <button className="btn btn-ghost btn-sm" type="button" onClick={exportAccount} disabled={!!busy || !!reauth} data-testid="cloud-export">
             {busy === 'export' ? t('cloudSecurity.preparing') : t('cloudSecurity.exportButton')}
           </button>
+          {reauth && <form onSubmit={proveAndExport} style={{ marginTop: 12 }} data-testid="cloud-export-reauth">
+            <p className="muted" style={{ fontSize: 13, margin: '0 0 8px' }}>{t('cloudSecurity.reauthExportWhy')}</p>
+            {reauth.methods.includes('password') && <div className="field" style={{ maxWidth: 320 }}>
+              <label className="label" htmlFor="cloud-reauth-password">{t('cloudSecurity.confirmPassword')}</label>
+              <input className="input" id="cloud-reauth-password" type="password" autoComplete="current-password" maxLength={200}
+                value={reauth.password} onChange={e => setReauth(r => ({ ...r, password: e.target.value }))} required />
+            </div>}
+            {!reauth.methods.includes('password') && reauth.methods.includes('otp') && <div className="field" style={{ maxWidth: 320 }}>
+              <label className="label" htmlFor="cloud-reauth-code">
+                {t(reauth.channel === 'sms' ? 'cloudSecurity.reauthCodePhone' : 'cloudSecurity.reauthCodeEmail')}
+              </label>
+              <input className="input" id="cloud-reauth-code" inputMode="numeric" autoComplete="one-time-code" maxLength={8}
+                value={reauth.code} onChange={e => setReauth(r => ({ ...r, code: e.target.value }))} required />
+            </div>}
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+              {(reauth.methods.includes('password') || reauth.methods.includes('otp')) && (
+                <button className="btn btn-primary btn-sm" type="submit" disabled={!!busy || (reauth.methods.includes('password') ? !reauth.password : !reauth.code)}>
+                  {busy === 'reauth' ? t('cloudSecurity.confirming') : t('cloudSecurity.confirmAndExport')}
+                </button>
+              )}
+              {reauth.methods.filter(m => m === 'google' || m === 'apple').map(provider => (
+                <button key={provider} className="btn btn-primary btn-sm" type="button" disabled={!!busy || !webProviders[provider]} onClick={() => proveWithProvider(provider)}>
+                  {busy === 'reauth' ? t('cloudSecurity.confirming') : t('cloudSecurity.confirmWithProvider', { provider: providerLabel[provider] })}
+                </button>
+              ))}
+              <button className="btn btn-quiet btn-sm" type="button" disabled={!!busy} onClick={() => setReauth(null)}>{t('common.cancel')}</button>
+            </div>
+          </form>}
         </div>
       </div>
 
@@ -211,6 +311,10 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
             </div>
           )) : <div className="muted" style={{ fontSize: 13 }}>{t('cloudSecurity.noSessions')}</div>}
         </div>
+        <p className="muted" style={{ fontSize: 12.5, margin: '12px 0 8px' }}>{t('cloudSecurity.newDeviceNote')}</p>
+        <button className="btn btn-quiet btn-sm" type="button" onClick={signOutEverywhere} disabled={!!busy} data-testid="cloud-sign-out-everywhere">
+          {busy === 'logout-all' ? t('cloudSecurity.signingOutEverywhere') : t('cloudSecurity.signOutEverywhere')}
+        </button>
       </div>
 
       {hasPassword && <form className="card" style={{ boxShadow: 'none', marginTop: 14 }} onSubmit={changePassword}>

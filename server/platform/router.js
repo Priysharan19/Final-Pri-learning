@@ -27,6 +27,8 @@ import { readinessReport } from './readiness.js';
 import { tagPolicy } from './routePolicy.js';
 import { metrics, metricsAccess, recordDatabaseError } from './metrics.js';
 import { logEvent, routeTemplate, safeCode } from './observability.js';
+import { configureSessionAlerts } from './sessionAlerts.js';
+import { createSecurityEmailSenderFromEnv } from './securityEmail.js';
 
 /** /v1/health's own bound on its database reads (liveness must answer fast). */
 export const HEALTH_DB_TIMEOUT_MS = 1_500;
@@ -51,6 +53,9 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   assertPlatformConfig();
   db = asStore(db);
   const router = asyncRouter();
+  // New-device sign-in notices go through the same email provider as the
+  // one-time codes; resolved once here so a misconfiguration fails at boot.
+  configureSessionAlerts({ send: createSecurityEmailSenderFromEnv(process.env) });
   // Resolve the release identity once, at boot (it may spawn git). A failure is
   // kept and re-thrown by /v1/health, which fails closed exactly as before.
   releaseShaForLogs();

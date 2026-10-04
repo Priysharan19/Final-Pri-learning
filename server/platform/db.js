@@ -507,6 +507,12 @@ export function createPlatformDb(path = DEFAULT_PATH) {
   );`);
   addColumnIfMissing(db, 'account_sessions', 'mfa_verified_at', 'mfa_verified_at INTEGER');
 
+  // Schema v12 — when a session last proved its credential afresh (sign-in,
+  // or POST /v1/account/reauth). Sensitive reads such as the data export ask
+  // for proof inside REAUTH_FRESH_MS (security.js). NULL on rows written before
+  // v12 means "not fresh", so those sessions re-prove before exporting.
+  addColumnIfMissing(db, 'account_sessions', 'reauthenticated_at', 'reauthenticated_at INTEGER');
+
   db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('schema_version',?)").run(String(SCHEMA_VERSION));
   return db;
 }

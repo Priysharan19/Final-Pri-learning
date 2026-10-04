@@ -162,6 +162,14 @@ const BODY_RULES = [
   [/^POST \/profiles\/demo$/, body => {
     requireObject(body, 'POST /profiles/demo'); optionalString(body, 'course', 30);
   }],
+  // Guest mode: a year and a language at most; and the one profile a guest's
+  // work may be re-filed under.
+  [/^POST \/profiles\/guest$/, body => {
+    requireObject(body, 'POST /profiles/guest'); optionalNumber(body, 'year'); optionalString(body, 'language', 20);
+  }],
+  [/^POST \/profiles\/guest\/migrate$/, body => {
+    requireObject(body, 'POST /profiles/guest/migrate'); optionalId(body, 'to');
+  }],
   [/^POST \/profiles\/select$/, body => {
     requireObject(body, 'POST /profiles/select'); requiredId(body); optionalString(body, 'password', 1024);
   }],

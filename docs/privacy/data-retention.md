@@ -152,6 +152,31 @@ masked. It never contains password, token or user-agent hashes, delivery envelop
 cookie, or anything of another account (teacher, classmates, guardian in full) — asserted on both
 engines.
 
+**Fresh proof first.** The export is the right of access under the DPDP Act 2023 (s.11), and a
+session cookie alone — on a shared iPad, or copied — is not enough to pull a child's whole learning
+history. A session that signed in, or proved its credential through `POST /v1/account/reauth`
+(password, a code to the account's own phone or email, or a linked Apple/Google identity), inside
+the last 10 minutes (`REAUTH_FRESH_MS`) may export; any other answers `401 REAUTH_REQUIRED` and
+names the proof the account can offer. A successful re-authentication also rotates the session
+token, so a cookie copied before the proof does not carry it. The Settings panel asks for the
+proof inline and then downloads the JSON.
+
+**Receipted.** Every export writes an `audit_log` row (`account.export`, actor and target the
+exporting account) whose metadata is the format name and per-section row counts only — never an
+address, a name or any row content (`server/test/security-acceptance-check.mjs`, section C).
+
+## 3a. Sessions and devices
+
+`GET /v1/account/devices` lists the account's own live sessions (device label, created, last used,
+expiry, which one is this); `DELETE /v1/account/devices/:sessionId` ends one; `POST
+/v1/account/logout-all` ends every one, this device included ("Sign out everywhere" in Settings).
+Password change and reset, and demotion out of a staff role, retire every session of the account.
+A sign-in from a device the account has never used before writes an `audit_log` row
+(`session.new-device`, empty metadata) and sends a notice to the account's own email through the
+same provider as the one-time codes (`server/platform/securityEmail.js`): the notice names the
+device label and the time and the remedy, never the address, a token or a link to click. A
+phone-only account has no deliverable address and gets the audit row only.
+
 ---
 
 ## 4. Handwriting, photos and working sent to the cloud

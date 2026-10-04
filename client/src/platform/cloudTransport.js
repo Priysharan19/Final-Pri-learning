@@ -221,6 +221,9 @@ export async function cloudRequest(path, {
       err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
       if (Number.isFinite(Number(data?.error?.resetAt))) err.resetAt = Number(data.error.resetAt);
       if (data?.error?.quota && typeof data.error.quota === 'object') err.quota = data.error.quota;
+      // REAUTH_REQUIRED names the proofs the account can offer (password, otp,
+      // google, apple) so the panel asks for the right one.
+      if (Array.isArray(data?.reauth?.methods)) err.reauthMethods = data.reauth.methods.map(String).slice(0, 4);
       err.requestId = result?.requestId || rid;
       throw err;
     }
@@ -426,6 +429,10 @@ export const cloud = Object.freeze({
   devices: () => cloudRequest('/v1/account/devices'),
   revokeDevice: sessionId => cloudRequest(`/v1/account/devices/${pathId(sessionId, 'session id')}`, { method: 'DELETE' }),
   exportAccount: () => cloudRequest('/v1/account/export'),
+  // Fresh proof of the credential on this session (password, own-address
+  // code or linked provider) ahead of a sensitive read such as the export.
+  reauth: body => cloudRequest('/v1/account/reauth', { method: 'POST', body }),
+  logoutAll: () => cloudRequest('/v1/account/logout-all', { method: 'POST', body: {} }),
   // Server-side handwriting reading. The body carries the student's own ink as
   // a picture and nothing else: no question, no expected answer, no profile.
   handwritingStatus: ({ signal = null, timeoutMs = 7000 } = {}) =>

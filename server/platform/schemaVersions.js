@@ -22,7 +22,10 @@
 //    credential (account_tokens/auth_delivery_outbox admit 'guardian-withdraw'),
 //    audit_log append-only for pri_server and per-account restrictive RLS on
 //    the sync tables (supabase/migrations/20261007000000_security_hardening.sql).
-export const SCHEMA_VERSION = 11;
+// 12: account_sessions.reauthenticated_at — when a session last proved its
+//    credential afresh; the data export and other sensitive reads require it
+//    inside REAUTH_FRESH_MS (supabase/migrations/20261008000000_session_reauth.sql).
+export const SCHEMA_VERSION = 12;
 // Billing 4: billing_payments keeps its row when the account is deleted
 //    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
 //    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).
