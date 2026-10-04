@@ -45,6 +45,13 @@ export const flow = {
     const { h, sms } = await startPlatform();
     try {
       await page.addInitScript(origin => { window.__PRI_CLOUD_ORIGIN__ = origin; }, base);
+      await page.addInitScript(() => {
+        window.__navLog = [];
+        for (const fn of ['pushState', 'replaceState']) {
+          const orig = history[fn].bind(history);
+          history[fn] = (...args) => { window.__navLog.push(`${fn} ${args[2]} :: ${new Error().stack.split('\n').slice(1, 6).join(' | ')}`); return orig(...args); };
+        }
+      });
       const seen = [];
       const proxy = async route => {
         const request = route.request();
@@ -84,33 +91,58 @@ export const flow = {
       const typeTab = page.getByRole('button', { name: 'Answer by typing' });
       let answered = 0;
       let skips = 0;
+      /** Ask for the next question and wait until the card has really changed. */
+      const nextQuestion = async () => {
+        const before = await page.locator('.q-prompt').first().textContent().catch(() => null);
+        await page.locator('.ctx-next').click();
+        await page.waitForFunction(prev => {
+          if (document.querySelector('[data-guest-cap]')) return true;
+          if (document.querySelector('.eval-card')) return false;
+          const now = document.querySelector('.q-prompt')?.textContent ?? null;
+          return now !== null && now !== prev;
+        }, before, { timeout: 30000 });
+        await settle();
+      };
       while (answered < LIMIT && skips < MAX_SKIPS) {
         await page.waitForSelector('.q-prompt, [data-guest-cap]', { timeout: 30000 });
         if (await page.locator('[data-guest-cap]').count()) break;
-        if (await typeTab.count()) await typeTab.click();
-        await settle();
-        if (await answerBox.count() !== 1) {
-          skips++;
-          await page.locator('.ctx-next').click();
-          continue;
-        }
-        // Two misses resolve a question (tour-v3.js proves the marking); the
-        // count is about questions answered, right or wrong.
-        await answerBox.fill(SURELY_WRONG);
-        await page.getByRole('button', SUBMIT).click();
-        await page.waitForSelector('.verdict-bad, .eval-card', { timeout: 20000 });
-        if (!(await page.locator('.eval-card').count())) {
-          await answerBox.fill(SURELY_WRONG + '1');
+        if (!(await strip.count())) await check(`the strip is on screen before question ${answered + 1}`, false, 'the guest strip vanished');
+        const mcq = page.locator('.mcq .mcq-opt');
+        if (await mcq.count()) {
+          // Multiple choice: pick A, and B if A was not the end of it. Right or
+          // wrong, a resolved question is an answered one.
+          await mcq.nth(0).click();
           await page.getByRole('button', SUBMIT).click();
-          await page.waitForSelector('.eval-card', { timeout: 20000 });
+          await page.waitForSelector('.verdict-bad, .eval-card', { timeout: 20000 });
+          if (!(await page.locator('.eval-card').count())) {
+            await mcq.nth(1).click();
+            await page.getByRole('button', SUBMIT).click();
+            await page.waitForSelector('.eval-card', { timeout: 20000 });
+          }
+        } else {
+          if (await typeTab.count() && await typeTab.isVisible()) await typeTab.click();
+          await settle();
+          if (await answerBox.count() !== 1) {
+            skips++;
+            await nextQuestion();
+            continue;
+          }
+          // Two misses resolve a question (tour-v3.js proves the marking); the
+          // count is about questions answered, right or wrong.
+          await answerBox.fill(SURELY_WRONG);
+          await page.getByRole('button', SUBMIT).click();
+          await page.waitForSelector('.verdict-bad, .eval-card', { timeout: 20000 });
+          if (!(await page.locator('.eval-card').count())) {
+            await answerBox.fill(SURELY_WRONG + '1');
+            await page.getByRole('button', SUBMIT).click();
+            await page.waitForSelector('.eval-card', { timeout: 20000 });
+          }
         }
         answered++;
         await page.waitForFunction(n => document.querySelector('[data-guest-strip]')?.getAttribute('data-guest-used') === String(n), answered, { timeout: 15000 });
         await check(`after question ${answered} the strip reads ${answered} of 5`,
           new RegExp(`${answered} of 5 free questions`).test(await strip.innerText()), await strip.innerText());
-        if (answered < LIMIT) {
-          await page.locator('.ctx-next').click();
-        }
+        if (answered < LIMIT) await nextQuestion();
       }
       await check('five questions were answered as a guest', answered === LIMIT, `${answered} answered, ${skips} skipped`);
       await shot('guest-five');
@@ -119,7 +151,7 @@ export const flow = {
       const guestPid = guestAttempts.pid;
 
       // ── 3 · the sixth is refused, honestly ─────────────────────────────────
-      await page.locator('.ctx-next').click();
+      await nextQuestion();
       await page.waitForSelector('[data-guest-cap]', { timeout: 30000 });
       await check('the sixth question is refused with the account notice, not an error',
         await page.locator('[data-guest-cap]').isVisible() && await page.locator('.error-box').count() === 0);
@@ -151,7 +183,10 @@ export const flow = {
       await page.keyboard.type(sent.code);
       await page.waitForURL(/\/practice/, { timeout: 30000 });
       await page.waitForSelector('.shell', { timeout: 30000 });
+      const urlAtShell = page.url();
       await settle();
+      await page.waitForTimeout(1500);
+      await check(`DEBUG url stayed on practice (${urlAtShell} → ${page.url()})`, new URL(page.url()).pathname === '/practice', (await page.evaluate(() => window.__navLog.slice(-4))).join('\n      '));
       await check('the guest strip is gone once the account exists', await page.locator('[data-guest-strip]').count() === 0);
       await check('Settings is reachable now', await page.locator('a[href="/settings"]').count() >= 1);
       const after = await ledger(page, 'attempts');

@@ -478,6 +478,10 @@ export default function App() {
                     <Route path="/refund-policy" element={<Legal />} />
                     <Route path="/grievance" element={<Legal />} />
                     <Route path="/settings" element={guest ? <Navigate to="/account" replace /> : <Settings />} />
+                    {/* A profile that already exists has nothing to do on the
+                        guest's account page: straight to work. (The moment a
+                        guest becomes a profile can render once with this path.) */}
+                    <Route path="/account" element={<Navigate to={user.role === 'teacher' ? '/teach' : '/practice'} replace />} />
                     <Route path="*" element={<Navigate to={roleLanding} replace />} />
                   </Routes>
                 </React.Suspense>
