@@ -13,6 +13,7 @@ import {
   parseMatrixInput, sameMatrix, transposeMatrix,
   parseVectorInput, sameVector
 } from './answer-forms.js';
+import { unitContradicts, withoutUnit } from './units.js';
 
 const UNIT_TAIL = /(cm³|m³|mm³|cm²|m²|mm²|km²|km\/h|m\/s|cm|mm|km|kg|ml|l\b|m\b|s\b|h\b|hours?|mins?|minutes?|seconds?|degrees?|deg|°|units?²?|sq units)\s*$/i;
 
@@ -204,6 +205,13 @@ export function checkAnswer(question, rawInput) {
       }
 
       case 'numeric': {
+        // A unit the student wrote that contradicts the question's unit is a
+        // wrong answer, never stripped and ignored: 12 cm is not 12 m.
+        if (question.answerSuffix && unitContradicts(question.answerSuffix, rawInput)) {
+          return { correct: false, feedback: `Check the unit — this question asks for the answer in ${String(question.answerSuffix).trim()}.` };
+        }
+        // the question's own unit in any spelling ("12 metres", "60 km/hr") is read off first
+        if (question.answerSuffix && typeof rawInput === 'string') rawInput = withoutUnit(rawInput);
         const { value, meta } = parseNumericInput(rawInput);
         let target = ans.value;
         let ok = numsClose(value, target, ans.tol);
@@ -275,7 +283,10 @@ export function checkAnswer(question, rawInput) {
         // is a variable the student named, not a unit they appended.
         let student = cleanInput(rawInput, { stripUnits: false });
         if (ans.stripC) student = student.replace(/[+\-]\s*c\s*$/i, '').trim();
-        const opts = { domain: ans.domain, positiveOnly: ans.positiveOnly };
+        // A final answer is a function: it must not add or remove an isolated
+        // hole (x/x is not 1). Interval differences (ln x² vs 2 ln x) are only
+        // refused where the question authors `strictDomain: true`.
+        const opts = { domain: ans.domain, positiveOnly: ans.positiveOnly, isolatedDomain: true, strictDomain: ans.strictDomain === true };
         const candidates = [ans.expr, ...(ans.anyOf || [])];
         for (const cand of candidates) {
           if (exprEquivalent(student, cand, opts)) {
@@ -467,7 +478,7 @@ export function checkWorking(q, workingText) {
     const cleaned = normalize(lastLine.text).replace(/^∴\s*/, '');
     if (ans.final?.kind === 'expr') {
       const cand = cleaned.includes('=') ? cleaned.split('=').pop() : cleaned;
-      reached = exprEquivalent(cand, ans.final.expr, { positiveOnly: ans.final.positiveOnly });
+      reached = exprEquivalent(cand, ans.final.expr, { positiveOnly: ans.final.positiveOnly, isolatedDomain: true, strictDomain: ans.final.strictDomain === true });
     } else if (meta.kind === 'equation') {
       // must pin the variable to a solution: "x = 3" (or list all solutions)
       const re = new RegExp(`${meta.variable}\\s*=`);

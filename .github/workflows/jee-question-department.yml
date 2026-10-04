@@ -33,13 +33,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
           cache: npm
           cache-dependency-path: client/package-lock.json
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
       - name: Runtime + product routing contract
@@ -48,6 +48,10 @@ jobs:
         run: node client/test/india-check.mjs
       - name: Audit and pack regression
         run: python tools/jee-question-department/test_pipeline.py
+      - name: Official-source intake regression (synthetic PDFs, no network)
+        run: |
+          python -m pip install -r tools/jee-question-department/requirements.txt
+          python tools/jee-question-department/test_official_pipeline.py
       - name: Python syntax gate
         run: >-
           python -m py_compile
@@ -55,6 +59,10 @@ jobs:
           tools/jee-question-department/audit.py
           tools/jee-question-department/pack.py
           tools/jee-question-department/test_pipeline.py
+          tools/jee-question-department/fetch_official.py
+          tools/jee-question-department/extract_official.py
+          tools/jee-question-department/review_official.py
+          tools/jee-question-department/test_official_pipeline.py
       - name: Build + iOS sync guarantee
         run: |
           npm ci --prefix client

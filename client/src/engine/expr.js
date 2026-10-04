@@ -366,7 +366,28 @@ export function parse(input) {
 
 // ── Evaluator ────────────────────────────────────────────────────────────────
 
-export function evaluate(ast, env = {}) {
+/**
+ * The reduced odd denominator q of a rational exponent p/q (q ≤ 99), or 0 when
+ * r is not such a rational. 1/3 → 3, 2/3 → 3, 0.2 → 5; 1/2 and 0.7 → 0.
+ */
+function oddDenominator(r) {
+  for (let q = 1; q < 100; q++) {
+    const pq = r * q;
+    if (Math.abs(pq - Math.round(pq)) < 1e-9) return q % 2 === 1 ? q : 0;
+  }
+  return 0;
+}
+
+/**
+ * Evaluate an AST to a real number.
+ *
+ * `opts.realOddRoots` reads a negative base under a rational exponent with an
+ * odd denominator as the real odd root: (−8)^(1/3) = −2, as cbrt(−8) is. It is
+ * off by default, so every value the marker compares is unchanged; only the
+ * domain probe in exprEquivalent() turns it on, so that x^(1/3) and cbrt(x)
+ * are not judged to have different domains.
+ */
+export function evaluate(ast, env = {}, opts) {
   switch (ast.t) {
     case 'num': return ast.v;
     case 'const':
@@ -377,9 +398,9 @@ export function evaluate(ast, env = {}) {
       if (ast.v in env) return env[ast.v];
       if (ast.v === 'e') return Math.E;
       return NaN;
-    case 'group': return evaluate(ast.v, env);
-    case 'neg': return -evaluate(ast.v, env);
-    case 'fact': return factorial(evaluate(ast.v, env));
+    case 'group': return evaluate(ast.v, env, opts);
+    case 'neg': return -evaluate(ast.v, env, opts);
+    case 'fact': return factorial(evaluate(ast.v, env, opts));
     case 'call': {
       if (Array.isArray(ast.args)) {
         if (ast.fn === 'sum') {
@@ -388,32 +409,37 @@ export function evaluate(ast, env = {}) {
           const bound = ast.args[1];
           const name = bound && (bound.t === 'var' || bound.t === 'const') ? bound.v : null;
           if (!name) return NaN;
-          const lo = evaluate(ast.args[2], env), hi = evaluate(ast.args[3], env);
+          const lo = evaluate(ast.args[2], env, opts), hi = evaluate(ast.args[3], env, opts);
           if (!Number.isInteger(lo) || !Number.isInteger(hi) || hi - lo > SUM_LIMIT) return NaN;
           let total = 0;
-          for (let k = lo; k <= hi; k++) total += evaluate(ast.args[0], { ...env, [name]: k });
+          for (let k = lo; k <= hi; k++) total += evaluate(ast.args[0], { ...env, [name]: k }, opts);
           return total;
         }
         const f = MULTI_FUNCTIONS[ast.fn];
         if (!f || ast.args.length !== f.length) return NaN;
-        return f(...ast.args.map(a => evaluate(a, env)));
+        return f(...ast.args.map(a => evaluate(a, env, opts)));
       }
       if (MULTI_FUNCTIONS[ast.fn] || ast.fn === 'sum') return NaN;
-      const a = evaluate(ast.arg, env);
+      const a = evaluate(ast.arg, env, opts);
       const f = FUNCTIONS[ast.fn];
       if (!f) return NaN;
       return f(a);
     }
     case 'bin': {
-      const l = evaluate(ast.l, env);
-      const r = evaluate(ast.r, env);
+      const l = evaluate(ast.l, env, opts);
+      const r = evaluate(ast.r, env, opts);
       switch (ast.op) {
         case '+': return l + r;
         case '-': return l - r;
         case '*': return l * r;
         case '/': return r === 0 ? NaN : l / r;
         case '^': {
-          if (l < 0 && !Number.isInteger(r)) return NaN; // stay real
+          if (l < 0 && !Number.isInteger(r)) {
+            const q = opts && opts.realOddRoots && Number.isFinite(r) ? oddDenominator(r) : 0;
+            if (!q) return NaN; // stay real
+            const mag = Math.pow(-l, r);
+            return Math.round(r * q) % 2 === 0 ? mag : -mag;
+          }
           return Math.pow(l, r);
         }
       }
@@ -486,22 +512,361 @@ const SAMPLE_SETS = [
   [1.9, -0.9, 0.15, 2.8, -3.1, 1.1, -1.35, 0.55]
 ];
 
+// ── Domain probing ───────────────────────────────────────────────────────────
+//
+// Sampling at fixed points cannot see a removable hole: x/x and 1 agree at every
+// sample, but only one of them is defined at 0. A final answer is a claim about
+// a function, so the marker also asks where the two sides are defined. The
+// points that can differ are the ones where a denominator vanishes or a
+// log/root argument leaves its domain, so those "guard" subexpressions are
+// collected from both sides and their real roots located directly:
+//
+// · a guard that is a polynomial in the variable (x − 25, x² − 50, 0.001x − 5)
+//   has its coefficients recovered exactly, linear and quadratic roots are
+//   solved in closed form, and higher degrees are searched inside the Cauchy
+//   bound, so a hole is found wherever on the real line it is;
+// · any other guard (eˣ − e, cos x, √x − 5.5) is searched finely on [−20, 20]
+//   and coarsely, by whole numbers and sign changes, on [−1000, 1000].
+//
+// Definedness at a located root never depends on how exactly the root was
+// located: a guard counts as vanishing there if it changes sign within a
+// relative 10⁻⁶ of the point, or if its |value| dips to (numerically) zero
+// inside a relative 10⁻³ window. So (x − √2)² and (x − √2), located a few
+// ulps apart, are judged to vanish at the same point, and 1/(x − √2)² and
+// (x − √2)^(−2) are the same function.
+//
+// POLICY (owner-delegated default for #231). Each difference is classified:
+//
+// · ISOLATED — the sides differ only at the point itself, inside their common
+//   domain (both are defined on both sides of it): x/x vs 1, (x² − 1)/(x − 1) vs x + 1, (xy)/y vs x, x⁰ vs 1,
+//   sec²x − tan²x vs 1. This is the #231 defect class and is refused under
+//   `isolatedDomain` (the marker's default for final answers). One leniency:
+//   when the hole comes only from a trigonometric (non-polynomial) guard AND
+//   the side that is defined there has poles of its own, the two are standard
+//   trigonometric identities that differ only at scattered points among
+//   singularities — tan 2x vs 2tan x/(1 − tan²x), (1 − cos x)/sin x vs tan(x/2)
+//   — and are accepted. A hole from a polynomial guard is always refused, and
+//   so is a trigonometric hole in an expression with no poles (sec²x − tan²x
+//   vs 1).
+// · INTERVAL — one side is undefined on an open interval beside the point
+//   (ln x + ln y vs ln xy, ln x² vs 2 ln x, √x·√x vs x, ln x vs ln|x|), or the
+//   sides differ only at an ENDPOINT of their natural common domain, where
+//   both are undefined just beyond it on the real line, at every scale (x/√x
+//   vs √x at 0; sin⁻¹x vs tan⁻¹(x/√(1 − x²)) at ±1, the standard NCERT
+//   conversion). An authored domain bound is not such an endpoint. An isolated hole is one inside the
+//   common domain, with both sides defined either side of it. NCERT
+//   treats these as equal under implied positivity, and marking a correct
+//   CBSE answer wrong is worse than the leniency, so they behave as on main
+//   (values compared where both are defined) unless the question authors
+//   `answer.strictDomain: true`, which the marker passes as `strictDomain`.
+//
+// `strictDomain` refuses every difference of either kind, with no leniency.
+//
+// The probe never reads e or π as a variable (e is Euler's number here even
+// though the tokenizer spells it as a one-letter name), and it reads a negative
+// base under an odd-denominator power as the real odd root, so x^(1/3) and
+// cbrt(x) share a domain. Beyond |x| = 20 the whole-number scan also refines
+// dips that touch zero (a far tangency such as cos(x/100) + 1 at 100π) and
+// ignores exact-zero plateaus from underflow (eˣ for x < −745). Residual
+// limitation: a far tangency of a guard that oscillates faster than the
+// whole-number grid can resolve, and every root past |x| = 1000, is not seen.
+
+// short local names: this section ships in the install bundle
+const fin = Number.isFinite, abs = Math.abs;
+const LOG_FNS = new Set(['ln', 'log', 'log10', 'log2']);
+const POLE_FNS = { sec: 'cos', cosec: 'sin', csc: 'sin', cot: 'sin' };
+const DOMAIN_EVAL = { realOddRoots: true };
+const domainEval = (ast, env) => evaluate(ast, env, DOMAIN_EVAL);
+/** The sample env as the domain probe reads it: e and π are never variables. */
+// eslint-disable-next-line no-unused-vars
+const domainEnv = ({ e, pi, ...env }) => env;
+/** Do two sampled values differ beyond rounding? */
+const apart = (u, v) => abs(u - v) > 1e-6 * Math.max(1, abs(u), abs(v));
+
+// Guard kinds, one letter each because they ship in the install bundle:
+// 'z' must be nonzero (a denominator, a tan/sec/cosec/cot pole), 'p' must be
+// positive (a log argument), 'n' must be nonnegative (a square-root argument),
+// 'b' is a power's base (0 to a non-positive power is undefined).
+
+/** Subexpressions whose zeros (or sign) bound where an expression is defined. */
+function guardsOf(ast, acc = []) {
+  if (!ast || typeof ast !== 'object') return acc;
+  if (ast.t === 'bin' && ast.op === '/') acc.push({ k: 'z', g: ast.r });
+  if (ast.t === 'bin' && ast.op === '^') acc.push({ k: 'b', g: ast.l, e: ast.r });
+  if (ast.t === 'call' && !Array.isArray(ast.args)) {
+    if (LOG_FNS.has(ast.fn)) acc.push({ k: 'p', g: ast.arg });
+    if (ast.fn === 'sqrt') acc.push({ k: 'n', g: ast.arg });
+    const pole = ast.fn === 'tan' ? 'cos' : POLE_FNS[ast.fn];
+    if (pole) acc.push({ k: 'z', g: { t: 'call', fn: pole, arg: ast.arg } });
+  }
+  if (Array.isArray(ast.args)) { if (ast.fn !== 'sum') for (const a of ast.args) guardsOf(a, acc); return acc; }
+  for (const key of ['l', 'r', 'v', 'arg']) if (ast[key] && typeof ast[key] === 'object') guardsOf(ast[key], acc);
+  return acc;
+}
+
+/** A stable text for a guard, so two guard sets can be compared structurally. */
+const guardKey = ({ k, g, e }) => k + JSON.stringify([g, e]);
+
+/** x ↦ ast evaluated with `name` = x and the other variables from env (one reused env object). */
+function along(ast, env, name) {
+  const scratch = { ...env };
+  return x => { scratch[name] = x; return domainEval(ast, scratch); };
+}
+
+/**
+ * Does g vanish at p, allowing for p being a few ulps off the true root? It
+ * does if it changes sign within a relative 10⁻⁶ of p, or if |g| dips to
+ * (numerically) zero inside a relative 10⁻³ window — a double root such as
+ * (x − √2)² touches zero without crossing, and its smallest value at a
+ * slightly-off p is ~10⁻¹⁶ while a simple root's is ~10⁻⁸; neither is
+ * compared to a fixed tolerance.
+ */
+function vanishesNear(at, p) {
+  const g0 = at(p), s = Math.max(1, abs(p));
+  if (g0 === 0) return true;
+  if (!fin(g0)) return false;
+  const sl = at(p - 1e-6 * s), sr = at(p + 1e-6 * s);
+  if (fin(sl) && fin(sr) && (Math.sign(sl) !== Math.sign(g0) || Math.sign(sr) !== Math.sign(g0))) return true;
+  let a = p - 1e-3 * s, b = p + 1e-3 * s;
+  const m = Math.max(abs(at(a)), abs(at(b)));
+  if (!(abs(g0) <= 1e-3 * m)) return false;       // no dip at p (or an edge is undefined)
+  return abs(at(ternaryMin(at, a, b))) <= 1e-7 * m;
+}
+
+/** Where |f| is smallest on [a, b], by ternary search. */
+function ternaryMin(f, a, b) {
+  for (let k = 0; k < 80; k++) {
+    const m1 = a + (b - a) / 3, m2 = b - (b - a) / 3;
+    if (abs(f(m1)) < abs(f(m2))) b = m2; else a = m1;
+  }
+  return (a + b) / 2;
+}
+
+/**
+ * Is a side defined at the located root p of some guard? Decided from its
+ * guards (a vanishing denominator or log argument, 0 to a non-positive power)
+ * rather than by evaluating at p, because p carries the root-finder's error.
+ */
+function sideDefinedAt(ast, guards, env, name, p) {
+  let near = false;
+  for (const { k, g, e } of guards) {
+    const at = along(g, env, name);
+    if (vanishesNear(at, p)) {
+      near = true;
+      if (k === 'z' || k === 'p' || (k === 'b' && !(along(e, env, name)(p) > 0))) return false;
+      continue;                                       // √0 and 0^(1/3) are fine
+    }
+    const v = at(p);
+    if (!fin(v) || (k === 'p' && v <= 0) || (k === 'n' && v < 0)) return false;
+  }
+  const self = along(ast, env, name);
+  if (fin(self(p))) return true;
+  // just off a root where the side is defined (√ of −10⁻¹⁷): judge by the
+  // immediate neighbourhood instead
+  const es = 1e-6 * Math.max(1, abs(p));
+  return near && (fin(self(p - es)) || fin(self(p + es)));
+}
+
+/**
+ * If x ↦ g(x) is a polynomial of degree ≤ 6, its coefficients [c0, c1, …]
+ * (trailing zeros trimmed); otherwise null. Newton's divided differences
+ * through x = 0‥6, expanded to powers of x and confirmed at off-grid points,
+ * so √x, eˣ and 1/x are rejected.
+ */
+function polynomialOf(at) {
+  const d = [];
+  for (let i = 0; i < 7; i++) { d.push(at(i)); if (!fin(d[i])) return null; }
+  for (let k = 1; k < 7; k++) for (let i = 6; i >= k; i--) d[i] = (d[i] - d[i - 1]) / k;
+  // p(x) = d0 + x(d1 + (x − 1)(d2 + …)), expanded from the innermost term out
+  let c = [d[6]];
+  for (let k = 5; k >= 0; k--) {
+    const next = [0, ...c];
+    for (let j = 0; j < c.length; j++) next[j] -= k * c[j];
+    next[0] += d[k];
+    c = next;
+  }
+  const scale = Math.max(1, ...c.map(Math.abs));
+  c = c.map(v => abs(v - Math.round(v)) < 1e-9 * scale ? Math.round(v) : abs(v) < 1e-10 * scale ? 0 : v);
+  for (const x of [-1.37, 0.43, 2.71, -7.9, 11.3]) {
+    const v = at(x), p = c.reduce((s, ck, k) => s + ck * x ** k, 0);
+    if (!(abs(v - p) <= 1e-7 * Math.max(1, abs(v), abs(p)))) return null;
+  }
+  while (c.length > 1 && !c[c.length - 1]) c.pop();
+  return c;
+}
+
+/**
+ * Real roots of `at` on [lo, hi] by a grid of N steps: exact zeros, bisected
+ * sign changes and (with no `skip`) tangencies and zeros at whole numbers and
+ * halves. Passing `skip`, an interval already searched finely, makes it the
+ * coarse far scan, which stops after 16 roots: it exists to catch an isolated
+ * far hole, and a periodic guard is already represented on the fine grid.
+ */
+function gridRoots(at, lo, hi, N, skip) {
+  const roots = [], xs = [], ys = [], cap = skip ? 16 : Infinity;
+  const h = (hi - lo) / N;
+  for (let i = 0; i <= N; i++) { const x = lo + (i / N) * (hi - lo); xs.push(x); ys.push(at(x)); }
+  // An exact zero with an exact zero beside it is a plateau, not a root: e^x
+  // underflows to 0 for x < −745, which is not where ln(e^x) is undefined.
+  const zeroAt = x => at(x) === 0 && at(x - h) !== 0 && at(x + h) !== 0;
+  // whole numbers and halves are where authored questions put their holes
+  if (!skip && hi - lo <= 200) for (let k = Math.ceil(lo * 2); k <= hi * 2; k++) if (zeroAt(k / 2)) roots.push(k / 2);
+  for (let i = 0; i < N && roots.length < cap; i++) {
+    const y0 = ys[i], y1 = ys[i + 1];
+    if (!fin(y0) || !fin(y1) || (skip && xs[i] >= skip[0] && xs[i + 1] <= skip[1])) continue;
+    if (y0 === 0) { if (ys[i - 1] !== 0 && y1 !== 0) roots.push(xs[i]); continue; }
+    // far scan: a slowly varying guard that only touches zero between two
+    // grid points (cos(x/100) + 1 at x = 100π) shows as a dip whose parabola
+    // through the three samples bottoms out at zero; refine it and keep it
+    // only if |g| really vanishes there, relative to its neighbours
+    if (skip && i > 0 && fin(ys[i - 1]) && Math.sign(ys[i - 1]) === Math.sign(y0) && Math.sign(y1) === Math.sign(y0) &&
+        abs(y0) <= abs(ys[i - 1]) && abs(y0) <= abs(y1)) {
+      const c2 = (ys[i - 1] + y1 - 2 * y0) / 2, c1 = (y1 - ys[i - 1]) / 2, top = Math.max(abs(ys[i - 1]), abs(y1));
+      if (c2 > 0 === y0 > 0 && abs(y0 - c1 * c1 / (4 * c2)) <= 1e-3 * top) {
+        const m = ternaryMin(at, xs[i - 1], xs[i + 1]);
+        if (abs(at(m)) <= 1e-7 * top) { roots.push(m); continue; }
+      }
+    }
+    const crosses = Math.sign(y0) !== Math.sign(y1) && y1 !== 0;
+    if (crosses) {
+      let a = xs[i], b = xs[i + 1];
+      for (let k = 0; k < 64; k++) { const m = (a + b) / 2; if (Math.sign(at(m)) === Math.sign(y0)) a = m; else b = m; }
+      roots.push((a + b) / 2);
+    }
+    // a double root (x² in a denominator) touches zero without crossing; a
+    // dip beside a sign change is that simple root, already bisected
+    if (!skip && i > 0 && !crosses && !(Math.sign(ys[i - 1]) !== Math.sign(y0)) &&
+        abs(y0) < abs(ys[i - 1]) && abs(y0) <= abs(y1)) {
+      const m = ternaryMin(at, xs[i - 1], xs[i + 1]);
+      if (abs(at(m)) <= 1e-7) roots.push(m);
+    }
+  }
+  if (ys[N] === 0 && ys[N - 1] !== 0) roots.push(xs[N]);
+  return roots;
+}
+
+/**
+ * Real roots of g as a function of `name` (other variables fixed by env),
+ * within [lo, hi] — which is ±∞ when no domain was authored.
+ */
+function rootsOf(g, name, env, lo, hi) {
+  const at = along(g, env, name);
+  const coef = polynomialOf(at);
+  if (coef) {
+    const d = coef.length - 1;
+    if (d === 0) return [];
+    if (d === 1) return [-coef[0] / coef[1]].filter(x => x >= lo && x <= hi);
+    // every real root lies within the Cauchy bound
+    const B = 1 + Math.max(...coef.slice(0, -1).map(c => abs(c / coef[d])));
+    const a = Math.max(lo, -B), b = Math.min(hi, B);
+    return b > a ? gridRoots(at, a, b, Math.min(4000, Math.max(800, Math.ceil((b - a) / 0.05)))) : [];
+  }
+  const roots = [];
+  const na = Math.max(lo, -20), nb = Math.min(hi, 20);
+  if (nb > na) roots.push(...gridRoots(at, na, nb, 800));
+  const fa = Math.ceil(Math.max(lo, -1000)), fb = Math.floor(Math.min(hi, 1000));
+  if (fb > fa && (fa < na || fb > nb)) roots.push(...gridRoots(at, fa, fb, fb - fa, nb > na ? [na, nb] : [NaN]));
+  return roots;
+}
+
+/**
+ * Do a and b differ in definedness in a way the policy refuses (see Domain
+ * probing)? `range` bounds where to look (the whole real line when none is
+ * authored), so an authored domain that excludes a hole accepts the
+ * cancelled form.
+ */
+function domainDiffers(astA, astB, names, integers, baseEnvs, range, positiveOnly, strict) {
+  const guardsA = guardsOf(astA), guardsB = guardsOf(astB);
+  const keysA = new Set(guardsA.map(guardKey)), keysB = new Set(guardsB.map(guardKey));
+  // Pre-filter: the same guards on both sides restrict both sides alike.
+  if (keysA.size === keysB.size && [...keysA].every(k => keysB.has(k))) return false;
+  const unique = [...new Map([...guardsA, ...guardsB].map(gd => [guardKey(gd), gd])).values()];
+  const lo = positiveOnly ? Math.max(range[0], 1e-6) : range[0], hi = range[1];
+  if (!(hi > lo)) return false;
+
+  for (const env of baseEnvs) {
+    for (const name of names) {
+      if (integers.has(name)) continue;
+      const memo = new Map();
+      const once = (key, f) => (memo.has(key) ? memo : memo.set(key, f())).get(key);
+      const isPoly = gd => once(gd, () => polynomialOf(along(gd.g, env, name)) !== null);
+      const fA = along(astA, env, name), fB = along(astB, env, name);
+      const points = unique.flatMap(gd => rootsOf(gd.g, name, env, lo, hi)).sort((x, y) => x - y)
+        .filter((p, i, all) => i === 0 || abs(p - all[i - 1]) > 1e-9 * Math.max(1, abs(p)));
+      for (const p of points) {
+        const delta = Math.max(1e-4, abs(p) * 1e-6);
+        // interval: the sides disagree beside the point
+        if ([p - delta, p + delta].some(x => x >= lo && x <= hi && fin(fA(x)) !== fin(fB(x)))) {
+          if (strict) return true;
+          continue;
+        }
+        const a0 = sideDefinedAt(astA, guardsA, env, name, p);
+        if (a0 === sideDefinedAt(astB, guardsB, env, name, p)) continue;
+        if (strict) return true;
+        // An endpoint of the natural domain (as at 0 for x/√x vs √x, or ±1 for
+        // sin⁻¹x vs tan⁻¹(x/√(1−x²))) is an interval difference. It is judged
+        // on the real line, not the authored range, so a hole at an authored
+        // bound stays a hole; and only if both sides are undefined beyond p at
+        // every scale down to 10⁻¹² — a hole at x = 10⁻⁷ beside √x's boundary
+        // at 0 is defined on both sides once the probe is close enough.
+        const s = Math.max(1, abs(p));
+        if ([-1, 1].some(dir => [1e-4, 1e-6, 1e-8, 1e-10, 1e-12].every(d => !fin(fA(p + dir * d * s)) && !fin(fB(p + dir * d * s))))) continue;
+        // isolated: exactly one side has a hole inside the common domain
+        const [holeGuards, fullAst, fullGuards] = a0 ? [guardsB, astA, guardsA] : [guardsA, astB, guardsB];
+        const causes = holeGuards.filter(gd => vanishesNear(along(gd.g, env, name), p));
+        const trigonometric = causes.length > 0 && !causes.some(isPoly);
+        // does the defined side have poles of its own (a non-polynomial
+        // denominator vanishing where that side is undefined)?
+        const ownPoles = trigonometric && once(fullAst, () => fullGuards.some(gd => gd.k === 'z' && !isPoly(gd) &&
+          rootsOf(gd.g, name, env, lo, hi).some(r => !sideDefinedAt(fullAst, fullGuards, env, name, r))));
+        if (!ownPoles) return true;
+      }
+    }
+  }
+  return false;
+}
+
+const EQUIV_CACHE = new Map();
+
 /**
  * Are two expressions equivalent as functions of their variables?
  * Samples both over shared variable assignments and compares.
+ *
+ * Final answers add a domain comparison (see Domain probing above):
+ * `isolatedDomain` refuses an isolated removable-point difference (the #231
+ * class: x/x vs 1), and `strictDomain` refuses every definedness difference,
+ * interval ones included. Leave both off for a line of working compared with
+ * the expression the working started from: cancelling a common factor is a
+ * valid step, and the line after it is meant to lose the hole.
  */
 export function exprEquivalent(a, b, opts = {}) {
+  // final-answer verdicts are cached per (answer, key): the domain probe is the costly part
+  if (!(opts.strictDomain || opts.isolatedDomain) || typeof a + typeof b !== 'stringstring') return exprEquivalentUncached(a, b, opts);
+  const key = JSON.stringify([a, b, opts]);
+  if (!EQUIV_CACHE.has(key)) {
+    if (EQUIV_CACHE.size > 2000) EQUIV_CACHE.clear();
+    EQUIV_CACHE.set(key, exprEquivalentUncached(a, b, opts));
+  }
+  return EQUIV_CACHE.get(key);
+}
+
+function exprEquivalentUncached(a, b, opts) {
   let astA, astB;
   try { astA = typeof a === 'string' ? parse(a) : a; astB = typeof b === 'string' ? parse(b) : b; }
   catch { return false; }
   if (astA.t === 'equation' || astB.t === 'equation') return false;
 
+  const finalAnswer = Boolean(opts.strictDomain || opts.isolatedDomain);
   const vars = new Set([...variablesOf(astA), ...variablesOf(astB)]);
+  // e is Euler's number, never a sampled variable: sampling it made ln(eˣ)
+  // vs x (and even ln(e⁵) vs 5) disagree, a false negative on a correct answer
+  vars.delete('e');
   const names = [...vars];
   const integers = new Set([...integerVarsOf(astA), ...integerVarsOf(astB)]);
   const domain = opts.domain || [-3.5, 3.5];
   const needed = opts.samples || 8;
   let matches = 0, valid = 0;
+  const envs = [];
 
   for (const base of SAMPLE_SETS) {
     for (let s = 0; s < base.length && valid < needed; s++) {
@@ -510,18 +875,43 @@ export function exprEquivalent(a, b, opts = {}) {
         const raw = base[(s + idx * 3) % base.length];
         if (integers.has(n)) { env[n] = 1 + Math.floor(((raw + 3.5) / 7) * 8); return; }   // 1‥8
         env[n] = domain[0] + ((raw + 3.5) / 7) * (domain[1] - domain[0]);
-        if (opts.positiveOnly) env[n] = Math.abs(env[n]) + 0.3;
+        if (opts.positiveOnly) env[n] = abs(env[n]) + 0.3;
       });
       const va = evaluate(astA, env);
       const vb = evaluate(astB, env);
-      if (!Number.isFinite(va) || !Number.isFinite(vb)) continue;
+      let domainValid = false;
+      if (finalAnswer) {
+        // definedness is judged with e as Euler's number and odd roots real
+        const denv = domainEnv(env);
+        const da = domainEval(astA, denv), db = domainEval(astB, denv);
+        if (opts.strictDomain && fin(da) !== fin(db)) return false;
+        // where an odd root makes both sides real, they must also agree there:
+        // (x²)^(1/6) is |x|^(1/3), not x^(1/3)
+        if (fin(da) && fin(db)) {
+          if (apart(da, db)) return false;
+          domainValid = true;
+        }
+        envs.push(denv);
+      }
+      // (−x)^(1/3) and −x^(1/3) are only both real under the odd-root reading
+      if (!fin(va) || !fin(vb)) { if (domainValid) { valid++; matches++; } continue; }
       valid++;
-      const scale = Math.max(1, Math.abs(va), Math.abs(vb));
-      if (Math.abs(va - vb) > 1e-6 * scale) return false;
+      if (apart(va, vb)) return false;
       matches++;
     }
   }
-  return valid >= Math.min(3, needed) && matches === valid;
+  if (!(valid >= Math.min(3, needed) && matches === valid)) return false;
+  if (finalAnswer) {
+    // Without an authored domain, look along the whole real line: a hole at
+    // x = 25 is as real as one at x = 1.
+    const range = opts.domain || [-Infinity, Infinity];
+    // the probe never searches over e or π
+    const domainNames = names.filter(n => n !== 'e' && n !== 'pi');
+    // one base point is enough for one variable; two cover the others' values
+    const bases = envs.slice(0, domainNames.length > 1 ? 2 : 1);
+    if (domainDiffers(astA, astB, domainNames, integers, bases, range, opts.positiveOnly, Boolean(opts.strictDomain))) return false;
+  }
+  return true;
 }
 
 /**

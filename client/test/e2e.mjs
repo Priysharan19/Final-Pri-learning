@@ -36,7 +36,7 @@ import { spawnSync } from 'node:child_process';
 import { join, normalize, extname, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { chromium } from '@playwright/test';
+import { chromium, webkit } from '@playwright/test';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DIST = join(ROOT, 'client', 'dist');
@@ -44,12 +44,16 @@ const DIST = join(ROOT, 'client', 'dist');
 // ── Options ──────────────────────────────────────────────────────────────────
 
 function parseArgs(argv) {
-  const opts = { build: true, only: null, headed: false, bail: false };
+  const opts = { build: true, only: null, headed: false, bail: false, browser: 'chromium' };
   for (const arg of argv) {
     if (arg === '--no-build') opts.build = false;
     else if (arg === '--headed') opts.headed = true;
     else if (arg === '--bail') opts.bail = true;
-    else if (arg.startsWith('--only=')) opts.only = arg.slice(7).split(',').map(s => s.trim()).filter(Boolean);
+    else if (arg.startsWith('--browser=')) {
+      opts.browser = arg.slice(10);
+      if (!['chromium', 'webkit'].includes(opts.browser)) throw new Error(`unknown --browser=${opts.browser} (chromium or webkit)`);
+    }
+    else if (arg.startsWith('--only=')) opts.only = arg.slice(7).split(',').map(s => s.trim() === 'v3' ? 'practice' : s.trim()).filter(Boolean);
   }
   return opts;
 }
@@ -165,8 +169,12 @@ export function ensureBuild(build) {
     return { built: false };
   }
   const started = Date.now();
+  // A test build: flagged features outside the V1 scope are switched on so
+  // their flows are exercised. The tracked production build leaves them off,
+  // and tour-placement.js asserts that state when it meets such a build.
   const run = spawnSync('npm', ['run', 'build', '--prefix', 'client'], {
-    cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32'
+    cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32',
+    env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1' }
   });
   if (run.status !== 0) {
     const tail = `${run.stdout || ''}${run.stderr || ''}`.trim().split('\n').slice(-12).join('\n      ');
@@ -232,37 +240,57 @@ function helpers(page, base, flowId) {
   };
 
   /**
-   * Make a profile the way a student makes one — through the hero, the method
-   * stage and the create form — and land on Home. Every flow but the login flow
-   * needs a signed-in profile before it can start, and none of them should be
-   * reaching into storage to fake one.
+   * Make a real local profile through KALP-03's staged first-run flow. No test
+   * reaches into IndexedDB: the same UI and /profiles authority a learner uses
+   * must create the identity that powers the rest of the journey.
    */
-  const createProfile = async ({ name = 'E2E Student', year = 9, email = null, password = null, course = 'nsw', track = null } = {}) => {
-    await page.getByRole('button', { name: 'Get Started' }).click();
-    await page.waitForSelector('.sso-btn', { timeout: 15000 });
-    await page.getByRole('button', { name: email ? /Continue with email/ : /Continue without an email/ }).click();
-    await page.waitForSelector('.auth-card input.input', { timeout: 15000 });
-    await page.getByPlaceholder('e.g. Priysharan').fill(name);
-    if (email) await page.locator('.auth-card input[type=email]').fill(email);
+  const createProfile = async ({
+    name = 'E2E Student', year = 9, email = null, password = null,
+    course = 'nsw', track = null, role = 'student', language = 'en',
+    avatar = null, cloud = false, fromPicker = false
+  } = {}) => {
+    await page.getByRole('button', { name: fromPicker ? 'Add another profile' : 'Get Started' }).click();
+    await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
+    await page.getByRole('button', { name: role === 'teacher' ? 'Teacher' : 'Student', exact: true }).click();
+    await page.locator('.auth-card .btn-primary').click();
+
+    await page.waitForSelector('[data-onboarding-step="2"]', { timeout: 15000 });
     if (course === 'in') {
-      // The form opens on India: the first control is the class / track
-      // picker. A JEE or olympiad track puts its own class select beneath it.
       await page.locator('#signup-track').selectOption(track || String(year));
       if (track) await page.locator('#signup-year').selectOption(String(year));
     } else {
-      // The Australian syllabuses the legacy flows exercise (the NSW paper,
-      // the HSC marker) are a step away, folded up behind one link.
-      await page.getByRole('button', { name: /Studying in Australia/ }).click();
+      await page.getByRole('button', { name: role === 'teacher' ? /Teaching in Australia/ : /Studying in Australia/ }).click();
       await page.locator('#signup-course').selectOption(course);
       await page.locator('#signup-year').selectOption(String(year));
     }
+    await page.locator('.auth-card .btn-primary').click();
+
+    await page.waitForSelector('[data-onboarding-step="3"]', { timeout: 15000 });
+    await page.locator('#signup-name').fill(name);
+    if (language !== 'en') await page.locator('.auth-card button[lang="' + language + '"]').click();
+    if (avatar) await page.locator('.avatar-pick').filter({ hasText: avatar }).click();
+    await page.locator('.auth-card .btn-primary').click();
+
+    await page.waitForSelector('[data-onboarding-step="4"]', { timeout: 15000 });
+    if (email) await page.locator('#signup-email').fill(email);
     if (password) {
       await page.locator('.check-row input[type=checkbox]').check();
       await page.getByLabel('Password', { exact: true }).fill(password);
       await page.getByLabel('Repeat password').fill(password);
     }
-    await page.getByRole('button', { name: 'Start learning' }).click();
-    await page.waitForSelector('.home-greet', { timeout: 30000 });
+    if (cloud) await page.getByRole('button', { name: /Connect a Pri cloud account next/i }).click();
+    await page.locator('.auth-card .btn-primary').click();
+
+    await page.waitForSelector('[data-onboarding-step="5"]', { timeout: 15000 });
+    await page.locator('.auth-card .btn-primary').click();
+    if (cloud) {
+      await page.waitForSelector('#cloud-account-title', { timeout: 30000 });
+    } else if (role === 'teacher') {
+      await page.waitForURL(/\/teach(?:#.*)?$/, { timeout: 30000 });
+      await page.waitForSelector('.shell', { timeout: 30000 });
+    } else {
+      await page.waitForSelector('.home-greet', { timeout: 30000 });
+    }
   };
 
   return { shot, check, mathText, goto, createProfile, settle: () => page.waitForTimeout(SETTLE) };
@@ -270,7 +298,7 @@ function helpers(page, base, flowId) {
 
 // ── Flow runner ──────────────────────────────────────────────────────────────
 
-const FLOWS = ['./tour-login.js', './tour-india.js', './tour-phone.js', './tour-v3.js', './tour-ink.js', './tour-v4.js', './cal-smoke.mjs'];
+const FLOWS = ['./tour-login.js', './tour-india.js', './tour-phone.js', './tour-v3.js', './tour-ink.js', './tour-v4.js', './tour-exam-india.js', './tour-exam-deadline.js', './cal-smoke.mjs', './tour-submit-lifecycle.js', './tour-stale-cloud.js', './tour-placement.js', './tour-photo-practise.js'];
 
 async function loadFlows() {
   const loaded = [];
@@ -304,7 +332,7 @@ async function runFlow(flow, { browser, base, opts }) {
 
   const api = helpers(page, base, flow.id);
   try {
-    await flow.run({ page, ctx, base, note, ...api });
+    await flow.run({ page, ctx, base, note, browserName: opts.browser, ...api });
   } catch (err) {
     const path = await api.shot('FAIL-crash');
     ok('the flow ran to the end', false,
@@ -330,7 +358,11 @@ async function run(flows, opts) {
   else notes.push('--no-build: this ran against whatever was already in client/dist');
 
   const server = await serveDist();
-  const browser = await chromium.launch({ headless: !opts.headed });
+  // Chromium by default; --browser=webkit runs the same flows in WebKit, the
+  // engine behind every Apple web view (CP-03).
+  const engine = opts.browser === 'webkit' ? webkit : chromium;
+  console.log(`E2E BROWSER: ${opts.browser}`);
+  const browser = await engine.launch({ headless: !opts.headed });
   try {
     for (const flow of flows) {
       // Every flow runs even after one fails. A run that stops at the first red

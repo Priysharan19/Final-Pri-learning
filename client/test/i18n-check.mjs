@@ -116,7 +116,6 @@ const SAME_IN_BOTH = new Map([
   ['common.percent', 'a number and a percent sign; there is nothing in it to translate'],
   ['common.none', 'an em dash standing in for "no value"'],
   ['home.difficultyChip', 'D1–D4 is the app’s own shorthand and is read as a code, not a word'],
-  ['home.recentVerdict', 'two slots and a dash; both slots are themselves translated'],
   ['verdict.modeTypeGlyph', 'the letter drawn on the type-mode tab; ट is a different letter, not a translation'],
   ['verdict.enterKey', 'the legend printed on the physical key, which says Enter in India too'],
 ]);
@@ -179,6 +178,15 @@ for (const [key, reason] of SAME_IN_BOTH) {
   ok(key in en, `the allowlist does not name a key that no longer exists: ${key}`);
   ok(reason.length > 20, `the allowlist entry for ${key} states a reason`);
 }
+// KALP-04 Home command centre: every recommendation title/reason reaches a
+// Hindi reader in Hindi, and keeps the slots its English source fills in.
+const commandCentreKeys = enKeys.filter(k => /^home\.(next|reason)\./.test(k) || k === 'home.cloudUnavailable');
+const slots = value => [...flat(value).matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort();
+ok(commandCentreKeys.length >= 10 && commandCentreKeys.every(k => hi[k] !== undefined && DEVANAGARI.test(flat(hi[k]))),
+  `every Home command-centre string is translated into Devanagari (${commandCentreKeys.filter(k => hi[k] === undefined || !DEVANAGARI.test(flat(hi[k]))).join(', ') || commandCentreKeys.length + ' keys'})`);
+ok(commandCentreKeys.every(k => JSON.stringify(slots(en[k])) === JSON.stringify(slots(hi[k]))),
+  `every Home command-centre Hindi string keeps its English placeholders (${commandCentreKeys.filter(k => JSON.stringify(slots(en[k])) !== JSON.stringify(slots(hi[k]))).join(', ') || 'all match'})`);
+
 ok(SAME_IN_BOTH.size <= 8,
   `the allowlist stays small enough to read (${SAME_IN_BOTH.size} entries) — it is an exception list, not a backlog`);
 
@@ -211,7 +219,8 @@ const CONVERTED = [
   // wrong: the DPDP Act gives a reader the right to the notice in their own
   // language, and chrome in English over a Hindi notice takes part of that back.
   'src/pages/Legal.jsx',
-  'src/components/QuestionCard.jsx'
+  'src/components/QuestionCard.jsx',
+  'src/pages/Placement.jsx'
 ];
 
 // Attributes a person reads or hears. `className`, `style`, `role`, `id` and
@@ -227,13 +236,13 @@ const LITERAL_ALLOWLIST = new Map([
   ['Advanced', 'the proper name of an NSW course, shown only on the Australian branch'],
   ['Extension 1', 'the proper name of an NSW course, shown only on the Australian branch'],
   ['Extension 2', 'the proper name of an NSW course, shown only on the Australian branch'],
-  ['ri Learning', 'the wordmark, split around the drop-cap P and its full stop'],
-  ['ri Learning.', 'the wordmark, split around the drop-cap P'],
-  ['P', 'the drop-cap of the wordmark'],
+  ['Pri Learning.', 'the product’s name with the wordmark’s full stop'],
+  ['P', 'the letter on the brand tile, aria-hidden beside the full wordmark'],
   ['XP', 'the app’s own unit, written XP in every language'],
   ['D', 'the D1–D4 difficulty shorthand, read as a code'],
   ['Evaluation', 'inside the wordmark block, translated separately as verdict.evaluation'],
   ['CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD', 'examination boards, printed in Latin on the Hindi admit card too'],
+  ['CBSE · NCERT · JEE MAIN · JEE ADVANCED', 'examination boards (flag-off build, no Olympiad), printed in Latin on the Hindi admit card too'],
   ['you@example.com', 'an example address, not prose'],
   ['Password', 'placeholder replaced by t(); any survivor here is a failure'],
 ]);
@@ -357,6 +366,10 @@ eq(leftInEnglish, [], 'no converted screen draws a literal English string a read
 for (const [text, reason] of LITERAL_ALLOWLIST) {
   ok(reason.length > 15, `the literal allowlist states a reason for “${text}”`);
 }
+// The wordmark is one literal, "Pri Learning": a split around the brand tile
+// read as "P ri Learning." on the standalone verify-email page.
+ok(!LITERAL_ALLOWLIST.has('ri Learning') && !LITERAL_ALLOWLIST.has('ri Learning.'),
+  'the wordmark is never allow-listed as a fragment split around the tile letter');
 
 // Every t('…') in the whole of src must name a key that exists, and every key
 // must be reached from somewhere. The first stops a typo shipping as a raw key
@@ -365,8 +378,11 @@ for (const [text, reason] of LITERAL_ALLOWLIST) {
 // `tx()` counts as much as `t()`. It was missed here until the legal pages
 // used it for the one sentence with a link inside it, and a key reached only
 // through tx() looked to this suite like a dead string.
-const CALL = /\btx?\(\s*'([a-z][A-Za-z0-9.]*)'/g;
-const KEY_IN_TABLE = /'((?:nav|app|common|difficulty|home|progress|history|favorites|tasks|classes|practice|verdict|settings|login|lang|pw|time|sym|assignment|gloss)\.[A-Za-z0-9.]+)'/g;
+const CALL = /\b(?:tx?|tLater)\(\s*'([a-z][A-Za-z0-9.]*)'/g;
+// Any key-shaped literal that names a real key counts: a namespace list here
+// had to be edited every time a screen gained a namespace, and forgetting it
+// reported a live string as dead.
+const KEY_IN_TABLE = /'([a-z][A-Za-z0-9]*\.[A-Za-z0-9.]+)'/g;
 
 function sourceFiles(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
@@ -401,7 +417,7 @@ eq(badKeys, [], 'every t() call names a key the English catalogue actually has')
 // ReferenceError the moment a student pressed it. A grep for the call site
 // would have passed too — it was there. Only the missing import was not.
 const I18N_EXPORTS = [
-  'useT', 'useTx', 'useLanguage', 'setLanguage', 'signInLanguage',
+  'useT', 'useTx', 'tLater', 'useLanguage', 'setLanguage', 'signInLanguage',
   'rememberSignInLanguage', 'translate', 'LANGUAGES', 'DEFAULT_LANGUAGE',
   'cleanLanguage', 'pluralCategory'
 ];
@@ -494,8 +510,14 @@ for (const file of sourceFiles(join(ROOT, 'src'))) {
   }
 }
 eq(staticImports, [], 'nothing statically imports the Hindi catalogue — it is reached by import() alone');
-ok(/import\('\.\/strings\.hi\.js'\)/.test(read('src/i18n/index.js')),
-  'and the runtime does reach it, by a literal import() a bundler can see');
+// The literal import() lives in the registration table now, so adding a
+// language is a catalogue plus one entry; the runtime builds its loaders from
+// that table and must not grow a template-string import() of its own.
+ok(/import\('\.\/strings\.hi\.js'\)/.test(read('src/i18n/languages.js')),
+  'and the runtime does reach it, by a literal import() a bundler can see, in the registration table');
+ok(/LANGUAGES\.filter\(l => typeof l\.load === 'function'\)/.test(read('src/i18n/index.js'))
+  && !/import\(`/.test(read('src/i18n/index.js')),
+  'the runtime takes its loaders from that table and builds no import() path from a template');
 
 // The catalogue itself must import nothing, or the chunk stops being only strings.
 ok(!/^\s*import\s/m.test(read('src/i18n/strings.hi.js')),

@@ -36,3 +36,35 @@ Container builds receive `PRI_RELEASE_SHA` and `PRI_BUILD_TIMESTAMP` as build ar
 ## Version changes
 
 Product/package/native marketing versions are one release decision. Update `release/metadata.json`, JS package manifests/locks and both native `Package.swift` files in the same reviewed change. App Store `bundleVersion` remains its separate monotonically increasing build number.
+
+## Cross-platform release matrix and compatibility (CP-11)
+
+**One product, one identity.** A release candidate is one exact `main` SHA. Its shared web build carries `release.json` (`releaseSha`, product and curriculum version). `node scripts/release-matrix.mjs` (`npm run release:matrix`) verifies, and fails on any mismatch:
+- both Apple bundles (`--require-native-apple`, after `npm run sync:ios`) and the Android assets (`--require-native-android`, after the Gradle build) embed exactly that `releaseSha`;
+- the shell versions (Apple `displayVersion`, Android `versionName`) equal `release/metadata.json` `productVersion`. Build numbers (`bundleVersion`, `versionCode`) increase per store upload;
+- the data origins have not moved: Apple `prilearning://app`, Android `https://appassets.androidplatform.net`. Every student's IndexedDB and localStorage is keyed to them, so changing either orphans local data, and it fails CI (release matrix plus the architecture guard);
+- the priNative envelope protocol is the same number in JS, Swift and Kotlin, and the native client ids (`ios-native-v1`, `android-native-v1`) agree between the shells and the server.
+
+It runs in `ci.yml` (required: S0 + S1 + Apple bundle identity) and `android-shell.yml` (Android assets). S2 evidence comes from `native-ink.yml` (iOS simulator) and `android-shell.yml` (Android emulator). **P (physical) evidence is never inferred** from any of these.
+
+**Path-filtered workflows and Main Integrity.** `native-ink.yml` (the only macOS lane) is path-filtered to `ios/**`, `client/src/ink/**`, `client/src/platform/native/**` and its own harness scripts, with per-ref `concurrency` that cancels superseded heads. When a PR head touches none of those paths GitHub creates no Native Ink run for it; Main Integrity must treat that absence (and a `skipped` conclusion) as "not pending", never as missing evidence. A PR whose head *does* trigger Native Ink must not be merged while that run is still in progress.
+
+**Handwriting release gates.** The strict handwriting gates (physical Apple Pencil evidence `--strict` on test and final-holdout splits, `client/test/ink-release-evidence-gate.mjs`, `inkcheck-real.mjs --strict --gate` against `handwriting/v17/real-ink-floor.json`, the answer-blind static check and the V17 writer-diversity readiness audit) are blocking only in `.github/workflows/release-candidate.yml` (`workflow_dispatch` input `release_sha`, or a `v*` tag), together with `scripts/release-matrix.mjs --require-native-apple`. PR CI runs the physical validator non-strict and `test:real` as a diagnostic. That workflow is expected to be red until real evidence exists; its job summary lists every gate including NOT MEASURED rows, and no threshold in it may be lowered.
+
+**Compatibility policy:**
+- **Server compatibility window.** The server must keep working with every shell build at or above the floor. Server changes are backward compatible with the oldest supported shell; a breaking `/v1` change needs a new route or field, never a silent change.
+- **Floor.** `PRI_MIN_IOS_BUILD` / `PRI_MIN_ANDROID_BUILD` are unset by default. A shell below the floor gets `426 CLIENT_UPGRADE_REQUIRED {platform, minBuild, build}` (with `Upgrade: pri-shell`, never cached) on sync, billing, recognition and every other non-exit route. So does a shell that sends no build. Learning on the device is never affected.
+  - **Exit routes stay open whatever the build**, so nobody is trapped with their data:
+    - health;
+    - password and Apple/Google sign-in, including the re-auth nonce;
+    - password recovery and email verification;
+    - the session check;
+    - devices (list and revoke);
+    - logout, export and account deletion.
+  - `server/test/client-compatibility-check.mjs` proves this against the real `/v1` router: an old shell signs in, gets 426 on sync, exports, deletes, and the deleted account cannot sign in.
+  - A malformed floor stops a production boot.
+  - `/v1/health` reports the active floors and how many requests they refused (`clientCompatibility`).
+- **The floor is an upgrade nudge, not a security control.** Any non-browser client can claim any build. Never raise it in place of a server-side fix.
+- **Only shells that send `X-Pri-Shell-Build` can pass a floor.** That means shells built from CP-11 onward. A floor therefore locks out every older shell regardless of its real build, which is intended. Never set a floor above a build that is live at 100% in the store; check `/v1/health` right after changing it.
+- **Shell ↔ web protocol.** The page negotiates per-capability versions with the host descriptor. A host advertising a newer envelope protocol than the page understands is treated as a browser (fail closed), and an older one is offered only the capabilities both understand (`client/src/platform/native/host.js`).
+- **Staged rollout.** Deploy the server first. Then roll the shell out in stages (Play staged rollout, App Store phased release). Raise the floor only after the new build has reached 100% of users and been out for long enough that stragglers have updated (start with 14 days), and only for a real incompatibility (a security fix belongs on the server, not in the floor).

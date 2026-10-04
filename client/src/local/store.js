@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { get, put, byIndex, dropDataKeys } from './idb.js';
 import { dayKey, hourIn, timezoneOf, AUSTRALIA_TIMEZONE } from '../lib/locale.js';
+import { migrateRatingRow } from '../engine/misconceptions.js';
 
 // ── Day boundaries ───────────────────────────────────────────────────────────
 // A day ends when the student's day ends: Asia/Kolkata for an Indian profile,
@@ -78,13 +79,30 @@ export async function setPredictedToday(pid, predicted, nowMs = Date.now(), tz =
   await put('activity', row);
 }
 
+// ── The misconception ledger migration ───────────────────────────────────────
+// A rating row's trap ledger was once keyed by a hash of each trap's feedback
+// text (`<owner>.t<hash>`) or by a Step Check code (`<owner>.step-<code>`).
+// It is now keyed by misconception ontology ID (engine/misconceptions.js).
+// The conversion happens here, on every read, rather than once in an
+// IndexedDB upgrade, for three reasons:
+//
+//   · a password-protected profile's rows are ciphertext until its key is
+//     held, so an upgrade handler could not read them;
+//   · a backup restored, or a cloud copy pulled, after the upgrade would
+//     bring old keys back with nothing left to convert them;
+//   · a read-time transform never writes, so it cannot race a submit that is
+//     writing the same row. The canonical form reaches disk on that row's next
+//     write, which writes what was read.
+//
+// It is deterministic and idempotent — a canonical ledger passes through
+// untouched — so applying it on every read costs nothing once a row is clean.
 export async function ratingsFor(pid) {
   const rows = await byIndex('ratings', 'pid', pid);
-  return Object.fromEntries(rows.map(r => [r.subtopic, r]));
+  return Object.fromEntries(rows.map(r => [r.subtopic, migrateRatingRow(r)]));
 }
 
 export async function getRating(pid, subtopic) {
-  return get('ratings', `${pid}:${subtopic}`);
+  return migrateRatingRow(await get('ratings', `${pid}:${subtopic}`));
 }
 
 export async function putRating(pid, subtopic, data) {

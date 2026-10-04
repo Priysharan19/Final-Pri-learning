@@ -31,7 +31,7 @@ const scratch = mkdtempSync(join(tmpdir(), 'pri-proxy-identity-'));
 
 process.env.NODE_ENV = 'production';
 process.env.PRI_PUBLIC_ORIGIN = 'https://learn.pri.example';
-process.env.PRI_CSRF_SECRET = 'proxy-identity-contract-secret';
+process.env.PRI_CSRF_SECRET = 'proxy-identity-contract-secret-32chars-ok';
 process.env.PRI_AUTH_DELIVERY_KEY = '55'.repeat(32);
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
 delete process.env.PRI_TRUSTED_PROXY_HOPS;
@@ -73,7 +73,7 @@ try {
     const response = await app.request('/v1/account/register', {
       method: 'POST',
       headers: { Origin: ORIGIN, 'X-Forwarded-For': `203.0.113.${i}` },
-      body: { email: `spoof-${i}@example.test`, name: 'Test', password: 'correct-horse-battery' }
+      body: { email: `spoof-${i}@example.test`, name: 'Test', password: 'correct-horse-battery', isAdult: true }
     });
     statuses.push(response.status);
   }

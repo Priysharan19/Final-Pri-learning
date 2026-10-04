@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import '@fontsource-variable/inter';
 import './theme.css';
+import './theme-state.css';
 import './ink/interactionGuard.js';
 import App from './App.jsx';
 import AccountAction from './pages/AccountAction.jsx';
@@ -11,7 +12,18 @@ import { discoverCloudOrigin } from './platform/cloudTransport.js';
 import { scheduleOfflineWarm } from './local/offlineWarm.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { installReleaseIdentityDiagnostics } from './platform/releaseIdentity.js';
+import { priNative } from './platform/native/index.js';
+import { installFormFactorAttributes } from './platform/formFactor.js';
+import { installBackNavigation } from './platform/backNavigation.js';
+import { featureSnapshot } from './platform/features.js';
 
+// Listen for the native shell (if any) before anything else can emit events.
+priNative.start();
+// data-ff / data-short / data-pointer on <html>: semantic form factor (CP-03).
+installFormFactorAttributes(window);
+// Android Back asks the page first: open sheets/dialogs close (CP-06).
+// (after first paint the body exists for the dialog observer)
+queueMicrotask(() => installBackNavigation(window));
 installReleaseIdentityDiagnostics(window);
 
 // Account verification/password-reset links carry their secret only in the URL
@@ -19,6 +31,16 @@ installReleaseIdentityDiagnostics(window);
 // navigation code can observe it. The link itself is minted by PRI_PUBLIC_ORIGIN,
 // so its cloud authority is the same origin that served this page.
 const ACCOUNT_ACTION_MODE = window.location.pathname === '/account-action';
+// The parent's own consent page: no profile, no child session. A link from
+// the guardian email carries its token in the fragment, stripped the same way.
+const GUARDIAN_MODE = window.location.pathname === '/guardian/consent';
+let guardianToken = null;
+if (GUARDIAN_MODE) {
+  const data = parseAccountActionFragment(window.location.hash);
+  guardianToken = data?.action === 'guardian-consent' ? data.token : null;
+  window.history.replaceState(null, '', accountActionCleanUrl(window.location));
+  if (!window.__PRI_CLOUD_ORIGIN__) window.__PRI_CLOUD_ORIGIN__ = window.location.origin;
+}
 let accountActionData = null;
 if (ACCOUNT_ACTION_MODE) {
   accountActionData = parseAccountActionFragment(window.location.hash);
@@ -36,6 +58,9 @@ if (ACCOUNT_ACTION_MODE) {
 const query = new URLSearchParams(window.location.search);
 const LAN_DEV = window.location.port === '4196' || query.get('priLanDev') === '1';
 if (LAN_DEV) window.__PRI_LAN_DEV__ = true;
+// Which flagged features this build resolved, for the browser tours and for
+// support. Read-only information; it switches nothing.
+window.__PRI_BUILD_FEATURES__ = featureSnapshot();
 
 if (LAN_DEV) {
   void (async () => {
@@ -56,7 +81,17 @@ if (LAN_DEV) {
 }
 
 const root = createRoot(document.getElementById('root'));
-if (ACCOUNT_ACTION_MODE) {
+if (GUARDIAN_MODE) {
+  // Outside StrictMode for the same reason as account actions: one-time codes.
+  const GuardianConsent = React.lazy(() => import('./pages/GuardianConsent.jsx'));
+  root.render(
+    <ErrorBoundary scope="guardian consent">
+      <React.Suspense fallback={null}>
+        <GuardianConsent linkToken={guardianToken} />
+      </React.Suspense>
+    </ErrorBoundary>
+  );
+} else if (ACCOUNT_ACTION_MODE) {
   // Deliberately outside StrictMode: verification is a one-time token-consuming
   // mutation and development StrictMode replays mount effects.
   root.render(
@@ -92,7 +127,7 @@ if (ACCOUNT_ACTION_MODE) {
 // without ever becoming controlled. `ready` is observed so activation/claiming
 // is allowed to finish, but it never blocks rendering or sign-in. LAN research
 // mode is deliberately excluded so every reload measures the current bundle.
-if ('serviceWorker' in navigator && import.meta.env.PROD && !window.__PRI_NATIVE__ && !window.__PRI_LAN_DEV__) {
+if ('serviceWorker' in navigator && import.meta.env.PROD && !priNative.bundledAssets() && !window.__PRI_LAN_DEV__) {
   void (async () => {
     try {
       await navigator.serviceWorker.register('/sw.js');

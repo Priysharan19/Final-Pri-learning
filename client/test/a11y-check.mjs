@@ -126,7 +126,8 @@ function buildApp() {
   const vite = join(CLIENT, 'node_modules', 'vite', 'bin', 'vite.js');
   if (!existsSync(vite)) throw new Error(`vite is not installed at ${vite}`);
   const r = spawnSync(process.execPath, [vite, 'build', '--outDir', out, '--emptyOutDir', '--logLevel', 'error'],
-    { cwd: CLIENT, encoding: 'utf8' });
+    // A test build: flagged non-V1 screens are on so they are audited too.
+    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_AUSTRALIA: '1' } });
   if (r.status !== 0) throw new Error(`the build failed:\n${r.stdout || ''}${r.stderr || ''}`);
   if (!existsSync(join(out, 'index.html'))) throw new Error('the build emitted no index.html');
   return out;
@@ -453,27 +454,31 @@ async function click(page, selector, { text = null, timeout = 5000 } = {}) {
 
 async function signInToDemo(page, base) {
   await page.goto(base, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('.auth-wrap', { timeout: 20000 });
+  await page.waitForSelector('.auth-wrap, .shell', { timeout: 20000 });
   await wait(page, 500);
+  if (await page.locator('.shell').count()) return;
+
   const started = page.getByRole('button', { name: 'Get Started' });
-  if (await started.count()) { await started.click(); await wait(page, 400); }
-  // By the time the audit reaches here a profile may already exist, so the
-  // welcome screen opens on the profile picker rather than the sign-up
-  // methods. Step forward to the methods either way.
+  if (await started.count()) { await started.click(); await wait(page, 300); }
   const addAnother = page.getByRole('button', { name: /Add another profile/ });
-  if (await addAnother.count()) { await addAnother.click(); await wait(page, 400); }
-  // These groups audit the Australian screens — the Home generator's course,
-  // topic and dot-point pickers, and the NSW Progress board with its
-  // priorities and knowledge map. The Indian screens are driven end to end by
-  // tour-india.js; auditing their accessibility here is still to do.
-  const withoutEmail = page.getByRole('button', { name: /Continue without an email/ });
-  if (await withoutEmail.count()) { await withoutEmail.click(); await wait(page, 500); }
-  const australia = page.getByRole('button', { name: /Studying in Australia/ });
-  if (await australia.count()) { await australia.click(); await wait(page, 500); }
-  const demo = page.getByRole('button', { name: /try the (australian )?demo/i }).first();
-  await demo.waitFor({ state: 'visible', timeout: 10000 });
-  await demo.click();
-  await page.waitForSelector('.shell', { timeout: 120000 });
+  if (await addAnother.count()) { await addAnother.click(); await wait(page, 300); }
+
+  await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 10000 });
+  await page.getByRole('button', { name: 'Student', exact: true }).click();
+  await click(page, '.auth-card .btn-primary');
+  await page.waitForSelector('[data-onboarding-step="2"]');
+  await page.getByRole('button', { name: /Studying in Australia/ }).click();
+  await page.locator('#signup-course').selectOption('nsw');
+  await page.locator('#signup-year').selectOption('10');
+  await click(page, '.auth-card .btn-primary');
+  await page.waitForSelector('[data-onboarding-step="3"]');
+  await page.locator('#signup-name').fill('Accessibility Student');
+  await click(page, '.auth-card .btn-primary');
+  await page.waitForSelector('[data-onboarding-step="4"]');
+  await click(page, '.auth-card .btn-primary');
+  await page.waitForSelector('[data-onboarding-step="5"]');
+  await page.getByRole('button', { name: 'Start learning' }).click();
+  await page.waitForSelector('.shell', { timeout: 30000 });
   await wait(page, 900);
 }
 
@@ -624,19 +629,22 @@ async function run() {
       await wait(page, 500);
     });
 
-    await step('login · sign-in method', '/', async () => {
+    await step('login · onboarding role', '/', async () => {
       await click(page, 'button.btn-ghost', { text: 'Add another profile' });
     });
 
-    await step('login · create profile (with email)', '/', async () => {
-      await click(page, 'button.sso-btn', { text: 'Continue with email' });
-      await page.getByRole('checkbox').first().check();      // password fields + strength meter
-      await wait(page, SETTLE);
+    await step('login · onboarding curriculum', '/', async () => {
+      await page.getByRole('button', { name: 'Student', exact: true }).click();
+      await click(page, '.auth-card .btn-primary');
     });
 
-    await step('login · create profile (no email)', '/', async () => {
-      await click(page, 'button.btn-quiet', { text: 'Back' });
-      await click(page, 'button.sso-btn', { text: 'Continue without an email' });
+    await step('login · onboarding protection', '/', async () => {
+      await page.locator('#signup-track').selectOption('10');
+      await click(page, '.auth-card .btn-primary');
+      await page.locator('#signup-name').fill('Accessibility Draft');
+      await click(page, '.auth-card .btn-primary');
+      await page.getByRole('checkbox').first().check();
+      await wait(page, SETTLE);
     });
 
     // ── signed in ────────────────────────────────────────────────────────────
@@ -704,14 +712,10 @@ async function run() {
       };
       await draw([[70, 50], [70, 105], [120, 105]]);
       await draw([[150, 50], [150, 105]]);
-      await page.waitForSelector('.ink-preview', { timeout: 20000 });
+      // Server-only reading (owner decision): with no reader in this harness
+      // the page shows the reading/waiting status rather than a local reading.
+      await page.waitForSelector('.ink-preview, .ink-status', { timeout: 20000 });
       await wait(page, 600);
-    });
-
-    await step('practice · handwriting · correcting a symbol', '/practice', async () => {
-      await click(page, '.ink-sym');
-      await page.waitForSelector('.ink-picker', { timeout: 15000 });
-      await wait(page, 400);
     });
 
     await step('practice · photo mode', '/practice', async () => {
@@ -778,29 +782,27 @@ async function run() {
       await wait(page, 500);
     });
 
+    // This walk's profile is Australian, so the placement route renders its
+    // India-only notice; the India intro, question and map views are driven by
+    // tour-placement.js in the end-to-end suite.
+    await step('placement', '/placement', async () => {
+      await goTo(page, BASE, '/placement');
+      await page.waitForSelector('.card', { timeout: 20000 });
+      await wait(page, 400);
+    });
+
+    // "Practise this": the photo picker before any photo is chosen. The read
+    // result and failure states are driven by tour-photo-practise.js.
+    await step('practise this · photo', '/practise-photo', async () => {
+      await goTo(page, BASE, '/practise-photo');
+      await page.waitForSelector('[data-photo-practise]', { timeout: 20000 });
+      await wait(page, 300);
+    });
+
     await step('tasks', '/tasks', async () => { await goTo(page, BASE, '/tasks'); });
 
     await step('tasks · new task', '/tasks', async () => {
       await click(page, 'button.btn-primary', { text: 'Set myself a task' });
-    });
-
-    await step('teacher studio', '/teach', async () => {
-      await goTo(page, BASE, '/teach');
-      await wait(page, 700);
-    });
-
-    // a class of its own, so the roll, the analytics and the assign-a-task form
-    // are all on screen rather than behind an empty state
-    await step('teacher studio · a class with a task form', '/teach', async () => {
-      await goTo(page, BASE, '/teach');
-      await page.locator('input.input').first().fill('10MaA');
-      await click(page, 'button.btn-primary', { text: 'Create' });
-      await page.waitForSelector('.prio-item', { timeout: 20000 });
-      await wait(page, 900);
-    });
-
-    await step('teacher studio · question builder', '/teach', async () => {
-      await click(page, 'button.btn-ghost', { text: 'Write a question' });
     });
 
     await step('exams', '/exams', async () => { await goTo(page, BASE, '/exams'); });
@@ -846,10 +848,48 @@ async function run() {
       await wait(page, 700);
     });
 
-    await step('favorites · empty', '/favorites', async () => { await goTo(page, BASE, '/favorites'); });
+    await step('plan · this week, the week grid and settings', '/plan', async () => {
+      await goTo(page, BASE, '/plan');
+      await page.waitForSelector('[data-plan-day]', { timeout: 20000 });
+      await wait(page, 800);
+    });
+
+    await step('notes · index and chapter map', '/notes', async () => {
+      await goTo(page, BASE, '/notes?class=10');
+      await page.waitForSelector('.nt-map-node', { timeout: 20000 });
+      await wait(page, 1200);
+    });
+
+    await step('notes · a chapter read through', '/notes/:chapterId', async () => {
+      await goTo(page, BASE, '/notes/c10-quadratic-equations');
+      await page.waitForSelector('.nt-formula', { timeout: 20000 });
+      await page.evaluate(() => document.querySelectorAll('.nt-reveal').forEach(el => el.classList.add('is-in')));
+      await wait(page, 1600);
+    });
+
+    await step('notes · revision flashcards', '/notes/:chapterId', async () => {
+      await click(page, '[data-testid="notes-revise"]');
+      await page.waitForSelector('.nt-card', { timeout: 10000 });
+      await wait(page, 600);
+      await page.keyboard.press('Escape');
+    });
+
+    await step('review · mistakes', '/review', async () => {
+      await goTo(page, BASE, '/review?filter=wrong');
+      await page.waitForSelector('.hist-row, .muted', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
+    await step('mistakes · compatibility redirect', '/mistakes', async () => {
+      await goTo(page, BASE, '/mistakes');
+      await page.waitForSelector('.hist-row, .muted', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
+    await step('favorites · compatibility redirect', '/favorites', async () => { await goTo(page, BASE, '/favorites'); });
 
     await step('favorites · saved questions', '/favorites', async () => {
-      await goTo(page, BASE, '/history');
+      await goTo(page, BASE, '/review');
       await click(page, '.hist-star');
       await goTo(page, BASE, '/favorites');
       await page.waitForSelector('.hist-row', { timeout: 20000 });
@@ -858,7 +898,7 @@ async function run() {
 
     await step('classes', '/classes', async () => { await goTo(page, BASE, '/classes'); });
 
-    await step('history', '/history', async () => {
+    await step('history · compatibility redirect', '/history', async () => {
       await goTo(page, BASE, '/history');
       await page.waitForSelector('.hist-row, .muted', { timeout: 20000 });
       await wait(page, 600);
@@ -937,6 +977,74 @@ async function run() {
     } catch (err) {
       selfTest = { error: String(err.message || err) };
     }
+
+    // ── the India exam room: a JEE Main paper sat partly by hand ────────────
+    // The handwriting surface, the write/type switch, the multiple-choice
+    // options and the section analysis only exist on an India paper.
+    await step('india exam room · writing a numerical answer', '/exams/:id', async () => {
+      await goTo(page, BASE, '/');
+      await click(page, '.user-chip');
+      await click(page, '[role="menuitem"]', { text: 'Switch profile' });
+      await page.waitForSelector('.auth-wrap', { timeout: 15000 });
+      await click(page, 'button.btn-ghost', { text: 'Add another profile' });
+      await page.getByRole('button', { name: 'Student', exact: true }).click();
+      await click(page, '.auth-card .btn-primary');
+      await page.locator('#signup-track').selectOption('jee-main');
+      await page.locator('#signup-year').selectOption('12');
+      await click(page, '.auth-card .btn-primary');
+      await page.locator('#signup-name').fill('Accessibility JEE Student');
+      await click(page, '.auth-card .btn-primary');
+      await click(page, '.auth-card .btn-primary');
+      await page.waitForSelector('[data-onboarding-step="5"]');
+      await page.getByRole('button', { name: 'Start learning' }).click();
+      await page.waitForSelector('.shell', { timeout: 30000 });
+      await goTo(page, BASE, '/exams');
+      await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
+      await page.waitForSelector('.exam-nav', { timeout: 60000 });
+      await click(page, '.mcq .mcq-opt');
+      await page.locator('.exam-dot').nth(20).click();
+      await page.getByRole('button', { name: '✍ Write by hand' }).click();
+      await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+      await wait(page, 700);
+    });
+
+    await step('india exam room · section analysis', '/exams/:id', async () => {
+      await click(page, 'button.btn-primary', { text: 'Submit paper' });
+      await page.waitForSelector('.exam-analysis', { timeout: 60000 });
+      await wait(page, 700);
+    });
+
+    // ── teacher-only workspace, exercised under a real teacher profile ──────
+    await step('teacher studio', '/teach', async () => {
+      await goTo(page, BASE, '/');
+      await click(page, '.user-chip');
+      await click(page, '[role="menuitem"]', { text: 'Switch profile' });
+      await page.waitForSelector('.auth-wrap', { timeout: 15000 });
+      await click(page, 'button.btn-ghost', { text: 'Add another profile' });
+      await page.getByRole('button', { name: 'Teacher', exact: true }).click();
+      await click(page, '.auth-card .btn-primary');
+      await page.locator('#signup-track').selectOption('10');
+      await click(page, '.auth-card .btn-primary');
+      await page.locator('#signup-name').fill('Accessibility Teacher');
+      await click(page, '.auth-card .btn-primary');
+      await click(page, '.auth-card .btn-primary');
+      await page.waitForSelector('[data-onboarding-step="5"]');
+      await page.getByRole('button', { name: 'Open Teacher Workspace' }).click();
+      await page.waitForSelector('.teacher-workspace-head', { timeout: 30000 });
+      await wait(page, 700);
+    });
+
+    await step('teacher studio · a class with a task form', '/teach', async () => {
+      await goTo(page, BASE, '/teach');
+      await page.locator('input.input').first().fill('10MaA');
+      await click(page, 'button.btn-primary', { text: 'Create' });
+      await page.waitForSelector('.prio-item', { timeout: 20000 });
+      await wait(page, 900);
+    });
+
+    await step('teacher studio · question builder', '/teach', async () => {
+      await click(page, 'button.btn-ghost', { text: 'Write a question' });
+    });
 
     // ── verdicts ─────────────────────────────────────────────────────────────
 

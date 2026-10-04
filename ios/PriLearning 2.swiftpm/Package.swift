@@ -20,14 +20,17 @@ let package = Package(
             bundleVersion: "2",
             appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.orange),
+            // V1 ships iPad-only (docs/release/PRI_V1_RELEASE_SCOPE.md, hard
+            // blocker #1). iPhone engineering builds add .phone in a scratch
+            // copy: node scripts/apple-shipping-target.mjs --engineering-package <dir>
             supportedDeviceFamilies: [
-                .pad,
-                .phone
+                .pad
             ],
             supportedInterfaceOrientations: [
+                // iPhone is portrait-only (CP-01/CP-04 decision); iPad keeps all four.
                 .portrait,
-                .landscapeRight,
-                .landscapeLeft,
+                .landscapeRight(.when(deviceFamilies: [.pad])),
+                .landscapeLeft(.when(deviceFamilies: [.pad])),
                 .portraitUpsideDown(.when(deviceFamilies: [.pad]))
             ],
             capabilities: [
@@ -50,6 +53,8 @@ let package = Package(
             resources: [
                 .process("Assets.xcassets"),
                 .copy("Resources/Web"),
+                // Apple privacy manifest; .copy places it at the app bundle root.
+                .copy("Resources/PrivacyInfo.xcprivacy"),
                 // A validated PriInkFoundation.mlpackage is exported here. The
                 // directory exists even in development builds where no learned
                 // asset has been promoted yet, so handwriting can fall back to

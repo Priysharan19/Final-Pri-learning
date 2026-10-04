@@ -12,6 +12,9 @@ import assert from 'node:assert/strict';
 import { createServerApp } from '../../app.js';
 import { createPlatformDb } from '../../platform/db.js';
 import { decryptDeliveryToken } from '../../platform/deliveryCrypto.js';
+import { asStore } from '../../platform/store.js';
+import { base32Decode, totp } from '../../platform/mfa.js';
+import { openTestStore } from './engine.mjs';
 
 export function cookieHeader(jar) {
   return Object.entries(jar).filter(([, value]) => value !== '').map(([name, value]) => `${name}=${value}`).join('; ');
@@ -30,12 +33,22 @@ export function absorbCookies(response, jar) {
 }
 
 export async function startApp({
-  db = createPlatformDb(':memory:'),
+  db,
+  // 'sqlite' | 'postgres': run on a store from support/engine.mjs instead of a
+  // bare SQLite handle. h.db is then the async store (get/all/run), and
+  // h.adminExec runs privileged SQL (DDL) as the database owner.
+  engine = null,
   production = process.env.NODE_ENV === 'production',
   dist = null,
   legacy = false,
   log = null
 } = {}) {
+  let testStore = null;
+  if (!db && engine) {
+    testStore = await openTestStore(engine, { label: 'app' });
+    db = testStore.store;
+  }
+  if (!db) db = createPlatformDb(':memory:');
   const app = await createServerApp(db, { production, dist, legacy, requestLog: typeof log === 'function', log: log || undefined });
   const server = await new Promise((resolve, reject) => {
     const listener = app.listen(0, '127.0.0.1', () => resolve(listener));
@@ -74,9 +87,17 @@ export async function startApp({
       server.closeAllConnections?.();
       server.close(resolve);
     });
+    if (testStore) await testStore.close();
   }
 
-  return { app, db, server, origin, request, close };
+  async function adminExec(sql) {
+    if (testStore?.scratch) return testStore.scratch.client.query(sql);
+    const raw = testStore?.raw || db;
+    return raw.exec(sql);
+  }
+
+  // url: the pri_server-member connection URL on Postgres (null on SQLite).
+  return { app, db, server, origin, request, close, adminExec, engine: testStore?.engine || 'sqlite', url: testStore?.url || null };
 }
 
 export async function registerAccount(harness, {
@@ -87,23 +108,53 @@ export async function registerAccount(harness, {
   teacherInviteCode
 } = {}) {
   const jar = {};
-  const body = { name, email, password, deviceId };
+  const body = { name, email, password, deviceId, isAdult: true };
   if (teacherInviteCode !== undefined) body.teacherInviteCode = teacherInviteCode;
   const response = await harness.request('/v1/account/register', { method: 'POST', jar, body });
   return { ...response, jar, account: response.data?.account || null };
 }
 
-export function pendingVerificationToken(db, accountId) {
-  const row = db.prepare(`SELECT token_id, token_ciphertext FROM auth_delivery_outbox
-    WHERE account_id=? AND kind='verify-email' AND delivered_at IS NULL ORDER BY created_at DESC`).get(accountId);
+export async function pendingVerificationToken(db, accountId) {
+  const row = await asStore(db).get(`SELECT token_id, token_ciphertext FROM auth_delivery_outbox
+    WHERE account_id=? AND kind='verify-email' AND delivered_at IS NULL ORDER BY created_at DESC`, [accountId]);
   if (!row) return null;
   return decryptDeliveryToken(row.token_ciphertext, `${accountId}:verify-email:${row.token_id}`);
 }
 
 export async function verifyEmail(harness, accountId) {
-  const token = pendingVerificationToken(harness.db, accountId);
+  const token = await pendingVerificationToken(harness.db, accountId);
   if (!token) throw new Error(`no pending verification token for ${accountId}`);
   return harness.request('/v1/account/email/verify', { method: 'POST', body: { token } });
+}
+
+/**
+ * Enrol and verify a staff account's second factor the way the admin UI does:
+ * enrol → code from the returned secret → confirm. Returns the secret and the
+ * recovery codes so a suite can present later codes or a recovery code.
+ */
+export async function enrolMfa(harness, jar, { now = Date.now() } = {}) {
+  const enrol = await harness.request('/v1/account/mfa/totp/enrol', { method: 'POST', jar, body: {} });
+  if (enrol.status !== 201) throw new Error(`mfa enrol: ${enrol.status} ${enrol.text}`);
+  const secret = base32Decode(enrol.data.secret);
+  const confirm = await harness.request('/v1/account/mfa/totp/confirm', { method: 'POST', jar, body: { code: totp(secret, now) } });
+  if (confirm.status !== 200) throw new Error(`mfa confirm: ${confirm.status} ${confirm.text}`);
+  return { secret, secretBase32: enrol.data.secret, otpauthUri: enrol.data.otpauthUri, recoveryCodes: confirm.data.recoveryCodes };
+}
+
+/** Present the current code for `secret` on this session (sign-in or step-up). */
+export async function verifyMfa(harness, jar, secret, { now = Date.now() } = {}) {
+  return harness.request('/v1/account/mfa/verify', { method: 'POST', jar, body: { code: totp(secret, now) } });
+}
+
+/**
+ * Give an account a role directly in the database, as the bootstrap/CLI would,
+ * and — for admin and support — enrol the second factor every staff route
+ * requires. Returns the enrolment (or null for other roles).
+ */
+export async function promoteRole(harness, jar, accountId, role) {
+  await asStore(harness.db).run('UPDATE accounts SET role=? WHERE id=?', [role, accountId]);
+  if (role !== 'admin' && role !== 'support') return null;
+  return enrolMfa(harness, jar);
 }
 
 /** Counted assertions so every suite can print an honest n/n line. */

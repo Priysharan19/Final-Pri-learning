@@ -8,12 +8,14 @@
 // Codes are stored only as a SHA-256 hash plus a display prefix, are single
 // use, and expire.
 
-const { startApp, registerAccount, verifyEmail, checks } = await import('./support/app-harness.mjs');
+const { startApp, registerAccount, verifyEmail, checks, promoteRole } = await import('./support/app-harness.mjs');
+const { requestedEngine } = await import('./support/engine.mjs');
 const { sha256 } = await import('../platform/security.js');
 const { INVITE_DEFAULT_TTL_DAYS } = await import('../platform/teacherInvites.js');
 
 const c = checks();
-const h = await startApp();
+// SQLite by default; `--engine=postgres` runs it on a migrated Postgres.
+const h = await startApp({ engine: requestedEngine() });
 const db = h.db;
 const DAY = 24 * 60 * 60 * 1000;
 const CODE = /^PRI-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/;
@@ -22,7 +24,7 @@ const list = jar => h.request('/v1/admin/teacher-invites', { jar });
 
 try {
   const admin = await registerAccount(h, { email: 'admin@example.test', name: 'Pri Admin' });
-  db.prepare("UPDATE accounts SET role='admin' WHERE id=?").run(admin.account.id);
+  await promoteRole(h, admin.jar, admin.account.id, 'admin');
   const student = await registerAccount(h, { email: 'student@example.test' });
 
   c.eq((await h.request('/v1/admin/teacher-invites', { method: 'POST', body: {} })).status, 401, 'minting needs a session');
@@ -42,7 +44,7 @@ try {
   c.ok((await Promise.all([0, 91, 'abc', 1.5, -2].map(ttlDays => mint(admin.jar, { ttlDays })))).every(r => r.status === 400 && r.data?.error?.code === 'INVITE_TTL_INVALID'),
     'ttlDays outside 1..90 or non-integer is rejected');
 
-  const stored = db.prepare('SELECT * FROM teacher_invites ORDER BY created_at').all();
+  const stored = (await db.all('SELECT * FROM teacher_invites ORDER BY created_at'));
   c.eq(stored.length, 2, 'two invites stored');
   const firstRow = stored.find(row => row.code_hash === sha256(first.data.code));
   c.ok(firstRow, 'invite is stored as its SHA-256 hash');
@@ -68,23 +70,23 @@ try {
   const reuse = await registerAccount(h, { email: 'second.teacher@example.test', teacherInviteCode: first.data.code });
   c.eq(reuse.status, 400, 'a used code is refused');
   c.eq(reuse.data.error.code, 'TEACHER_INVITE_INVALID', 'with the contract code');
-  c.eq(db.prepare('SELECT 1 FROM accounts WHERE email=?').get('second.teacher@example.test'), undefined, 'no account is created on a refused invite');
+  c.eq((await db.get('SELECT 1 FROM accounts WHERE email=?', ['second.teacher@example.test'])), undefined, 'no account is created on a refused invite');
 
   const unknown = await registerAccount(h, { email: 'third.teacher@example.test', teacherInviteCode: 'PRI-AAAA-BBBB-CCCC-DDDD' });
   c.eq(unknown.data?.error?.code, 'TEACHER_INVITE_INVALID', 'an unknown well-formed code is refused');
   const garbage = await registerAccount(h, { email: 'fourth.teacher@example.test', teacherInviteCode: 'hello there' });
   c.eq(garbage.status, 400, 'garbage is refused');
-  c.eq(db.prepare("SELECT COUNT(*) AS n FROM accounts WHERE email IN ('third.teacher@example.test','fourth.teacher@example.test')").get().n, 0, 'no accounts from refused codes');
+  c.eq((await db.get("SELECT COUNT(*) AS n FROM accounts WHERE email IN ('third.teacher@example.test','fourth.teacher@example.test')")).n, 0, 'no accounts from refused codes');
 
   const blank = await registerAccount(h, { email: 'plain.student@example.test', teacherInviteCode: '' });
   c.eq(blank.status, 201, 'an empty invite field is an ordinary registration');
   c.eq(blank.account.role, 'student', 'and yields a student');
 
-  db.prepare('UPDATE teacher_invites SET expires_at=? WHERE code_hash=?').run(Date.now() - 1, sha256(short.data.code));
+  await db.run('UPDATE teacher_invites SET expires_at=? WHERE code_hash=?', [Date.now() - 1, sha256(short.data.code)]);
   const expired = await registerAccount(h, { email: 'fifth.teacher@example.test', teacherInviteCode: short.data.code });
   c.eq(expired.data?.error?.code, 'TEACHER_INVITE_INVALID', 'an expired code is refused');
 
-  const audit = db.prepare('SELECT action, actor_account_id, target_id, metadata_json FROM audit_log ORDER BY id').all();
+  const audit = (await db.all('SELECT action, actor_account_id, target_id, metadata_json FROM audit_log ORDER BY id'));
   const mints = audit.filter(row => row.action === 'teacher-invite.mint');
   c.eq(mints.length, 2, 'each mint is audited');
   c.ok(mints.every(row => row.actor_account_id === admin.account.id && !row.metadata_json.includes(first.data.code) && !row.metadata_json.includes(short.data.code)), 'mint audit names the admin and never the full code');
@@ -100,7 +102,7 @@ try {
   c.match(created.data.joinCode, /^[A-Z0-9]{4,12}$/, 'with a join code');
 } finally {
   await h.close();
-  db.close();
 }
 
+console.log(`engine: ${h.engine}`);
 console.log(`TEACHER INVITES — PASS — ${c.count()}/${c.count()} checks`);

@@ -11,15 +11,26 @@ import { useApp } from '../App.jsx';
 import InkCanvas from '../ink/InkCanvas.jsx';
 import { sanitizeFigure } from '../lib/sanitize.js';
 import { clearDraft, queueDraft, readDraft } from './drafts.js';
-import { nativePhotoAvailable, recognizePhoto } from '../native/photo.js';
-import { cloudReadingEnabled, readPhotoWithCloud } from '../ink/cloudReader.js';
+import {
+  clearInkDraft, clearPendingSubmission, newSubmissionId, readInkDraft, readPendingSubmission,
+  saveInkDraft, savePendingSubmission, submissionContentKey
+} from './practiceRecovery.js';
+import { cloudReadingEnabled, photoReadingBlockedKey, readPhotoWithCloud, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
 import { plotSpecFor } from '../engine/plotSpec.js';
-import { awardStepMarks, marksSentence } from '../engine/cbseMarking.js';
-import { checkWorkingWithCloud, mergeVerdicts, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
-import { useT, useTx } from '../i18n/index.js';
+import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
+import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
+import { misconceptionById } from '../engine/misconceptions.js';
+import { tLater, translate, useLanguage, useT, useTx } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
+import { tutorFeatureEnabled } from '../tutor/flag.js';
+// True in a production build made with the tutor off (see src/tutor/flag.js).
+// A literal test of the build constants, not a helper imported from flag.js:
+// the bundler folds only what it can see in this module, and that fold is what
+// keeps TutorHelp.jsx out of a dark build entirely (install-budget-check.mjs).
+/* global __PRI_FEATURE_TUTOR__, __PRI_PRODUCTION_BUILD__ */
+const TUTOR_BUILT_OUT = typeof __PRI_PRODUCTION_BUILD__ === 'boolean' && __PRI_PRODUCTION_BUILD__ && __PRI_FEATURE_TUTOR__ !== true;
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
 // Four ways of saying "right", picked by question id so one question always
@@ -45,7 +56,8 @@ const SYMBOLS = [
 const preferMode = () => {
   const saved = localStorage.getItem('pri-input-mode');
   if (saved) return saved;
-  return (window.matchMedia?.('(pointer: coarse)').matches ?? false) ? 'write' : 'type';
+  // Touch-first devices write by default (coarse pointer, or no hover: see formFactor.js).
+  return (window.matchMedia?.('(pointer: coarse)').matches || window.matchMedia?.('(hover: none)').matches) ? 'write' : 'type';
 };
 
 /** Off-screen but spoken — for names and announcements the page shows visually. */
@@ -69,6 +81,25 @@ export const SR_ONLY = {
 // spelled out one per line because a bundler emits a chunk only for a specifier
 // it can see; four specifiers is four real attempts, and once they are spent
 // only a reload has anything new to try.
+// ── The AI tutor panel, fetched only when a student asks for help ─────────────
+// A lazy chunk of its own: most questions are answered without it, so nobody
+// pays for it at install. If the chunk cannot be fetched the boundary below
+// says so and the hint bulbs keep working.
+// In a production build with the tutor off the panel is unreachable
+// (tutorEnabled below is false on every device), so it is not built at all.
+const TutorHelp = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/TutorHelp.jsx'));
+
+class TutorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { failed: false }; }
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch() { /* nothing about the question or the student is logged */ }
+  render() {
+    return this.state.failed
+      ? <div className="hintbox" role="status">{this.props.fallback}</div>
+      : this.props.children;
+  }
+}
+
 const INK_SOURCES = [
   () => import('../ink/InkAnswer.jsx'),
   () => import('../ink/InkAnswer.jsx?retry=1'),
@@ -212,16 +243,27 @@ const REASON_TAG_KEY = {
   'new-ground': 'verdict.newGround', interleave: 'verdict.interleaving'
 };
 
-export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, compact = false }) {
+// `diagnostic` turns the card into a placement-check item: the answer goes to
+// `diagnostic.submitPath`, it is marked once by the same deterministic marker,
+// and nothing that belongs to practice is offered — no hints, no favourite, no
+// reveal, no self-marking, no XP or mastery tags. `I don't know` records a miss.
+export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, compact = false, diagnostic = null }) {
   const { celebrate, refreshUser, refreshDue, refreshRecent, toast, user } = useApp();
   const t = useT();
   const tx = useTx();
   const [answer, setAnswer] = useState('');
   const [mcqSel, setMcqSel] = useState(null);
-  const [mode, setMode] = useState(preferMode());       // 'type' | 'write' | 'photo'
+  // Handwriting kept from before a reload brings the card back to the pen.
+  const [restoredInk] = useState(() => readInkDraft(question.id));
+  const [mode, setMode] = useState(() => (restoredInk ? 'write' : preferMode()));       // 'type' | 'write' | 'photo'
   const [inkResult, setInkResult] = useState(null);
   const [hints, setHints] = useState([]);
   const [hintsLeft, setHintsLeft] = useState(question.hintsAvailable);
+  const [showTutor, setShowTutor] = useState(false);
+  const [tutorUsed, setTutorUsed] = useState(question.tutorLevel || 0);
+  const { language } = useLanguage();
+  // Dark by default (src/tutor/flag.js): off, the card offers only the hints.
+  const tutorEnabled = useMemo(() => tutorFeatureEnabled(), []);
   const [working, setWorking] = useState('');
   const [showWorking, setShowWorking] = useState(false);
   const [showScribble, setShowScribble] = useState(false);
@@ -234,6 +276,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [selfSaved, setSelfSaved] = useState(false);
   const [photo, setPhoto] = useState(null);
   const [photoOCR, setPhotoOCR] = useState({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
+  // One quiet line, once per device, the first time a photo is read on the
+  // server for a student who never chose either way in Settings.
+  const [cloudNotice, setCloudNotice] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [inkPhase, setInkPhase] = useState(() => (inkModule ? 'ready' : 'idle'));   // idle | loading | ready | failed
   const [inkTry, setInkTry] = useState(0);
@@ -241,6 +286,24 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [checking, setChecking] = useState(false);
   const [vouched, setVouched] = useState(null);     // the exact reading the student stood behind
   const startRef = useRef(Date.now());
+  // ── One tap, one submission (§09) ──────────────────────────────────────────
+  // `busy` is React state and lands a render late, so two taps inside one frame
+  // both saw it false and both posted. The ref is set synchronously.
+  const inFlightRef = useRef(false);
+  // A submission that has not had a definitive answer: an identical retry
+  // reuses its idempotency key, so a timeout followed by a second tap is still
+  // one attempt.
+  const pendingRef = useRef(null);
+  // The submission whose verdict is on screen, and the ink lines it carried.
+  // Every late, asynchronous result (cloud working check, misconception
+  // proposal) is bound to it and dropped if it names anything else.
+  const attemptRef = useRef(null);
+  const [attempt, setAttempt] = useState(null);
+  // The reading a submission was made from is frozen while it is marked and
+  // after it is resolved: a reading that settles late cannot rewrite it.
+  const inkFrozenRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   const inputRef = useRef(null);
   const scribbleRef = useRef(null);
   const photoInputRef = useRef(null);
@@ -248,6 +311,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   useEffect(() => {
     const draft = readDraft('question', question.id);
     setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setHints([]); setHintsLeft(question.hintsAvailable);
+    setShowTutor(false); setTutorUsed(question.tutorLevel || 0);
     setWorking(draft?.working || ''); setShowWorking(!!draft?.working);
     setState({ phase: 'answering' }); setBusy(false);
     setSelfMarks({}); setSelfSaved(false); setPhoto(null); setBookmarked(false); setElapsed(0);
@@ -270,7 +334,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const isWorking = question.answerType === 'working';
   const totalMarks = question.criteria?.length || 1;
   const hintsUsed = hints.length;
-  const credit = Math.max(0.55, 1 - 0.15 * hintsUsed);
+  // Each opened tutor level is charged like a hint (backend resolve()).
+  const helpUsed = hintsUsed + tutorUsed;
+  const credit = Math.max(0.55, 1 - 0.15 * helpUsed);
   const writeMode = mode === 'write';
   const recognitionContext = useMemo(
     () => recognitionContextForQuestion(question),
@@ -278,58 +344,64 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   );
 
 
-  // A photo of paper working is read by whichever reader is actually good at
-  // it. The server reader first where the student has turned it on, because
-  // Apple Vision was built for printed text and a page of algebra is not that;
-  // then Vision, which needs no network and no account; then nothing, said
-  // plainly. Whatever reads it, the text lands in an editable box and is never
-  // submitted on the reader's word alone.
-  /**
-   * Read one image of working with whichever reader is actually good at it:
-   * the server reader where the student has switched it on, then Apple Vision,
-   * which needs no network and no account. Returns null when neither could.
-   */
+  // A photo of paper working is read only by Pri's server reader (owner
+  // decision: the on-device readers are not good enough to mark from). The
+  // text lands in an editable box and is never submitted on the reader's word
+  // alone; when the server cannot read it the student is told the real reason.
   const readOnePage = useCallback(async (dataURL) => {
     const lastLine = t => String(t || '').split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
+    let cloudOutcome = null;
     if (cloudReadingEnabled(user)) {
-      const outcome = await readPhotoWithCloud(dataURL, { user });
-      if (outcome && !outcome.error && !outcome.reason) {
-        const text = String(outcome.transcription.text || '').trim();
-        if (text) return { text, markable: lastLine(text), confidence: outcome.transcription.confidence, engine: outcome.transcription.engine };
+      cloudOutcome = await readPhotoWithCloud(dataURL, { user });
+      if (cloudOutcome?.reason === 'allowance') return { allowance: true };
+      if (cloudOutcome && !cloudOutcome.error && !cloudOutcome.reason) {
+        const text = String(cloudOutcome.transcription.text || '').trim();
+        if (text) return { text, markable: lastLine(text), confidence: cloudOutcome.transcription.confidence, engine: cloudOutcome.transcription.engine };
       }
     }
-    if (!nativePhotoAvailable()) return null;
-    try {
-      const result = await recognizePhoto(dataURL);
-      const text = String(result?.text || '').trim();
-      const markable = String(result?.answer || '').trim() || lastLine(text);
-      if (!text && !markable) return null;
-      return { text, markable, confidence: result?.confidence, engine: result?.engine || 'apple-vision-photo-v1' };
-    } catch { return null; }
+    // The photo itself was the problem: say so. Anything else is the server
+    // route being unavailable, and the student is told the actual reason.
+    if (cloudOutcome && ['unreadable', 'empty'].includes(cloudOutcome.reason)) return null;
+    return { blocked: photoReadingBlockedKey(user, { outcome: cloudOutcome }) };
   }, [user]);
 
   const decodePhoto = useCallback(async (dataURL) => {
     if (!dataURL) return;
-    if (!cloudReadingEnabled(user) && !nativePhotoAvailable()) {
+    if (!cloudReadingEnabled(user)) {
       setPhotoOCR({
         phase: 'unavailable', text: '', confidence: 0, engine: null,
-        error: 'Reading photos is not available here. Turn on server reading in Settings, or type your working instead.'
+        error: tLater(photoReadingBlockedKey(user))
       });
       return;
     }
     setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
     const page = await readOnePage(dataURL);
+    if (page?.allowance) {
+      setPhotoOCR({
+        phase: 'failed', text: '', confidence: 0, engine: null,
+        error: tLater('photo.cloudAllowanceUsed')
+      });
+      return;
+    }
+    if (page?.blocked) {
+      setPhotoOCR({
+        phase: 'unavailable', text: '', confidence: 0, engine: null,
+        error: tLater(page.blocked)
+      });
+      return;
+    }
     if (!page) {
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
-        error: 'That photo could not be read. Try a straighter, better-lit shot, or type your working.'
+        error: tLater('verdict.photoUnreadable')
       });
       return;
     }
     if (isWorking && page.text) { setWorking(page.text); setShowWorking(true); }
     if (page.markable) setAnswer(page.markable);
+    if (String(page.engine || '').startsWith('cloud') && takeCloudReadingNotice(user)) setCloudNotice(true);
     setPhotoOCR({ phase: 'done', text: page.text, confidence: Number(page.confidence || 0), error: '', engine: page.engine });
-  }, [isWorking, user, readOnePage]);
+  }, [isWorking, user, readOnePage, t]);
 
   // A scanned PDF becomes pages, and the pages become the same thing a photo
   // already is. More than one page of working is joined in order, because a
@@ -344,8 +416,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
         error: result.reason === 'renderer-unavailable'
-          ? 'Reading PDFs needs a one-off download that has not happened on this device yet. Connect to the internet once and try again, or photograph the page instead — photos work offline.'
-          : 'That PDF could not be opened. If it is password-protected or was made by a scanner that locks it, photograph the page instead.'
+          ? tLater('verdict.pdfRendererMissing')
+          : tLater('verdict.pdfUnopenable')
       });
       return;
     }
@@ -369,7 +441,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (!texts.length) {
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
-        error: 'Nothing could be read from that PDF. Try photographing the page instead.'
+        error: tLater('verdict.pdfNothingRead')
       });
       return;
     }
@@ -383,7 +455,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const last = joined.split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
     if (last) setAnswer(last);
     setPhotoOCR({ phase: 'done', text: joined, confidence: worst, error: '', engine: engine || 'cloud-pdf' });
-  }, [decodePhoto, isWorking, user]);
+  }, [decodePhoto, isWorking, user, t]);
 
   // Paste a photo straight in. On a laptop this is how a student moves a shot
   // from their phone: AirDrop or a screenshot, then ⌘V.
@@ -481,7 +553,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (resolved) return;
     if (!String(typed).trim() && !String(wk).trim()) { clearDraft('question', question.id); return; }
     queueDraft('question', question.id, { typed, working: wk }, {
-      label: question.subtopicName, note: 'Answer in progress', path: '/practice'
+      label: question.subtopicName, note: t('verdict.answerInProgress'), path: diagnostic ? '/placement' : '/practice'
     });
   };
   const editAnswer = (v) => { setAnswer(v); stash(v, working); };
@@ -505,17 +577,17 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (!doubt) return '';
     const nice = s => ({ pi: 'π', theta: 'θ', sqrt: '√', percent: '%' })[s] || s;
     if (doubt.why === 'shape') {
-      return 'That doesn’t quite come out as finished maths, so a symbol may have come through wrong. Tap any symbol below to change it.';
+      return t('verdict.checkShape');
     }
     // Name a runner-up only when it is genuinely close and genuinely different:
     // offering "1 or l?" on a number is a question with no useful answer.
     const w = doubt.weakest;
     const rival = w?.rival || w?.alts?.find(a => a.sym !== w.sym) || null;
     const contested = rival && rival.conf >= w.conf - CONFIRM_MARGIN;
-    if (w && contested) return `I read one symbol as “${nice(w.sym)}”, but “${nice(rival.sym)}” was close behind. Tap the right one below.`;
-    if (w) return `One symbol was a close call — I read it as “${nice(w.sym)}”. Tap it below if that isn’t it.`;
-    return 'One symbol was a close call. Tap it below if I read it wrong.';
-  }, [doubt]);
+    if (w && contested) return t('verdict.checkContested', { read: nice(w.sym), rival: nice(rival.sym) });
+    if (w) return t('verdict.checkCloseCall', { read: nice(w.sym) });
+    return t('verdict.checkCloseCallPlain');
+  }, [doubt, t]);
 
   const flipMode = (m) => {
     setMode(m);
@@ -543,9 +615,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // Every submit control leads here, so the confirmation step cannot be walked
   // around: a reading in doubt turns the press into the question instead.
   async function submit(vouchedNow) {
-    if (busy || resolved) return;
+    if (inFlightRef.current || busy || resolved) return;
     if (needsCheck && vouchedNow !== reading) { setChecking(true); return; }
-    let given, steps, viaInk = false, ink;
+    let given, steps, viaInk = false, ink, lines = null;
     if (isMcq) {
       given = mcqSel;
       if (given === null) return;
@@ -554,6 +626,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         if (!inkResult?.lines?.length) return;
         given = inkResult.lines.join('\n');
         viaInk = true;
+        lines = inkResult.lines.slice();
         ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null };
       } else {
         given = working;
@@ -564,32 +637,132 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       given = inkResult.answerLine;
       steps = inkResult.lines.length > 1 ? inkResult.lines.join('\n') : undefined;
       viaInk = true;
+      lines = inkResult.lines.slice();
       ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null };
     } else {
       given = answer;
       if (String(given).trim() === '') return;
       steps = (showWorking || mode === 'photo') && working.trim() ? working : undefined;
     }
+    const contentKey = submissionContentKey(given, steps);
+    const submissionId = pendingRef.current?.contentKey === contentKey
+      ? pendingRef.current.submissionId
+      : newSubmissionId();
+    pendingRef.current = { submissionId, contentKey };
+    const ms = Date.now() - startRef.current;
+    // On disk before the request leaves: a relaunch replays it under this key.
+    // A placement answer is not replayed through practice on relaunch: the
+    // placement session itself resumes at this exact question.
+    if (!diagnostic) savePendingSubmission(question.id, { submissionId, answer: String(given), steps, viaInk, ms, lines }, { label: question.subtopicName });
+    const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
+      ? compactInkStrokes(scribbleRef.current.getStrokes())
+      : undefined;
+    await deliver({ answer: String(given), ms, steps, viaInk, ink, photo, scribble: scribbleStrokes, submissionId }, { lines });
+  }
+
+  /**
+   * Send one submission and settle the card on its definitive answer. Used by
+   * a tap and by relaunch recovery alike, so both take the same path.
+   */
+  async function deliver(body, { lines = null, recovering = false } = {}) {
+    inFlightRef.current = true;
+    inkFrozenRef.current = !recovering || inkFrozenRef.current;
     setBusy(true);
     try {
-      const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
-        ? compactInkStrokes(scribbleRef.current.getStrokes())
-        : undefined;
-      const r = await api.post(`/practice/${question.id}/submit`, {
-        answer: String(given), ms: Date.now() - startRef.current, steps, viaInk, ink, photo, scribble: scribbleStrokes
-      });
+      const r = diagnostic
+        // A diagnostic keeps no ink, photo or scribble: only the reading the
+        // student submitted is marked, and only its outcome is stored.
+        ? await api.post(diagnostic.submitPath, { answer: body.answer, ms: body.ms, steps: body.steps, viaInk: body.viaInk })
+        : await api.post(`/practice/${question.id}/submit`, body);
+      pendingRef.current = null;
+      clearPendingSubmission(question.id);
+      const live = mountedRef.current;
       if (r.resolved) {
-        setState({ phase: 'resolved', res: r });
-        celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
-        toast(<div><b>{t('verdict.outcomeUpdated')}</b><div className="badge-desc">{t('verdict.outcomeBasis', { topic: question.subtopicName })}</div></div>, 4200);
+        clearInkDraft(question.id);
+        const bound = { submissionId: r.submissionId || body.submissionId, lines: Array.isArray(lines) ? lines : null };
+        attemptRef.current = bound;
+        if (live) {
+          setAttempt(bound);
+          setState({ phase: 'resolved', res: r });
+          if (!diagnostic) {
+            if (!r.replayed) celebrate(r);
+            refreshUser(); refreshDue(); refreshRecent?.();
+            toast(<div><b>{t('verdict.outcomeUpdated')}</b><div className="badge-desc">{t('verdict.outcomeBasis', { topic: question.subtopicName })}</div></div>, 4200);
+          }
+        }
+        // The attempt is recorded whether or not this card is still on screen,
+        // so the session still counts it — exactly once, because the pending
+        // record that could replay it is already gone.
         onResolved?.(r);
       } else {
-        setState({ phase: 'retry', res: r });
+        inkFrozenRef.current = false;
+        if (live) setState({ phase: 'retry', res: r });
       }
     } catch (e) {
-      setState({ phase: 'retry', res: { feedback: e.message, invalid: true } });
-    } finally { setBusy(false); }
+      // A refusal (4xx) is a definitive answer. Anything else — a fault, a
+      // timeout — is not: the pending record stays, so an identical retry or a
+      // relaunch reuses the same key and still lands as one attempt.
+      if (e?.status >= 400 && e?.status < 500) { pendingRef.current = null; clearPendingSubmission(question.id); }
+      inkFrozenRef.current = false;
+      if (recovering && e?.status === 409 && e?.code !== 'QUESTION_DISCARDED') {
+        // Answered elsewhere under another submission: nothing here to recover.
+        if (mountedRef.current) onNext?.();
+        return;
+      }
+      if (mountedRef.current) setState({ phase: 'retry', res: { feedback: e.message, invalid: true } });
+    } finally {
+      inFlightRef.current = false;
+      if (mountedRef.current) setBusy(false);
+    }
   }
+
+  // ── Relaunch recovery ──────────────────────────────────────────────────────
+  // A submission still marked in flight when this question mounts was cut off
+  // by the app going away. It is replayed under its own key: the backend hands
+  // back the verdict it already recorded, or marks it now if the first delivery
+  // never landed. One attempt either way, and the student sees which.
+  useEffect(() => {
+    if (diagnostic) return;
+    const pending = readPendingSubmission(question.id);
+    if (!pending) return;
+    pendingRef.current = { submissionId: pending.submissionId, contentKey: submissionContentKey(pending.answer, pending.steps) };
+    const kept = pending.viaInk ? readInkDraft(question.id) : null;
+    deliver({
+      answer: pending.answer, ms: pending.ms, steps: pending.steps, viaInk: pending.viaInk,
+      ink: kept ? { strokes: compactInkStrokes(kept), recognized: (pending.lines || []).join('\n') || null, engine: null } : undefined,
+      submissionId: pending.submissionId
+    }, { lines: pending.lines, recovering: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** The ink surface reports here. Frozen while marking and after the verdict. */
+  const onInkRecognized = useCallback((r) => {
+    if (inkFrozenRef.current) return;
+    setInkResult(r);
+    // Recovery: the page restored after a relaunch is read once, for display
+    // beside the verdict, and then frozen like any submitted reading.
+    if (inFlightRef.current || attemptRef.current) inkFrozenRef.current = true;
+  }, []);
+
+  // Ink that waited for the reader (offline, signed out, reader down) is
+  // marked as soon as it is read: the student already wrote their answer and
+  // was told it would be. Once per reading; the deterministic engine decides
+  // the mark exactly as for a tap on Submit, and a doubtful reading still turns
+  // into the confirmation question instead of a mark.
+  const autoMarkedRef = useRef(null);
+  useEffect(() => {
+    if (!writeMode || !inkResult?.afterWait || !inkResult.readKey) return;
+    if (autoMarkedRef.current === inkResult.readKey || resolved) return;
+    // Busy (a submit or a hint in flight): wait — the effect runs again when
+    // the card is idle, and the reading is marked then, not dropped.
+    if (busy || inFlightRef.current) return;
+    autoMarkedRef.current = inkResult.readKey;
+    submit();
+  }, [inkResult, busy]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const onInkStrokes = useCallback((strokes) => {
+    if (inFlightRef.current || attemptRef.current) return;
+    saveInkDraft(question.id, strokes, { label: question.subtopicName });
+  }, [question.id, question.subtopicName]);
 
   async function getHint() {
     if (hintsLeft <= 0 || resolved) return;
@@ -600,23 +773,51 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     } catch { }
   }
 
+  async function dontKnow() {
+    if (busy || resolved || !diagnostic) return;
+    setBusy(true);
+    try {
+      const r = await api.post(diagnostic.submitPath, { skip: true, ms: Date.now() - startRef.current });
+      setState({ phase: 'resolved', res: r });
+      onResolved?.(r);
+    } catch (e) {
+      setState({ phase: 'retry', res: { feedback: e.message, invalid: true } });
+    } finally { setBusy(false); }
+  }
+
   async function reveal() {
-    if (busy || resolved) return;
+    if (inFlightRef.current || busy || resolved) return;
+    inFlightRef.current = true;
+    inkFrozenRef.current = true;
     setBusy(true);
     try {
       const r = await api.post(`/practice/${question.id}/reveal`, { ms: Date.now() - startRef.current });
-      setState({ phase: 'resolved', res: r });
-      celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
+      // Revealing settles the question, so nothing kept for it may replay.
+      pendingRef.current = null;
+      clearPendingSubmission(question.id);
+      clearInkDraft(question.id);
+      attemptRef.current = { submissionId: null, lines: null, revealed: true };
+      if (mountedRef.current) {
+        setAttempt(attemptRef.current);
+        setState({ phase: 'resolved', res: r });
+        celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
+      }
       onResolved?.(r);
-    } finally { setBusy(false); }
+    } catch (e) {
+      inkFrozenRef.current = false;
+      throw e;
+    } finally {
+      inFlightRef.current = false;
+      if (mountedRef.current) setBusy(false);
+    }
   }
 
   async function toggleBookmark() {
     try {
       const r = await api.post(`/history/${question.id}/bookmark`, {});
       setBookmarked(r.bookmarked);
-      toast(r.bookmarked ? 'Saved to Favorites' : 'Removed from Favorites', 2200);
-    } catch { toast('Answer the question first, then favorite it from History.', 3200); }
+      toast(r.bookmarked ? t('verdict.savedToFavorites') : t('verdict.removedFromFavorites'), 2200);
+    } catch { toast(t('verdict.favoriteNeedsAnswer'), 3200); }
   }
 
   const verdictGood = resolved && res.correct;
@@ -661,37 +862,80 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   //
   // It is feedback, not marking. The mark above has already been decided by the
   // deterministic engine and does not move when this arrives.
-  const [cloudCheck, setCloudCheck] = useState(null);
+  const [cloudCheckFor, setCloudCheckFor] = useState(null);   // { submissionId, result }
   const cloudCheckRef = useRef(null);
-  useEffect(() => { setCloudCheck(null); }, [question?.id]);
+  const cloudCheckAbortRef = useRef(null);
+  useEffect(() => { setCloudCheckFor(null); }, [question?.id]);
+  // The request belongs to the attempt, not to the render that sent it, so it
+  // is cancelled only when the card goes away.
+  useEffect(() => () => { cloudCheckAbortRef.current?.abort?.(); }, []);
   useEffect(() => {
     if (!writeMode || !resolved) return;
-    const lines = inkResult?.lines || [];
+    // The lines checked are the lines that were submitted and marked — not
+    // whatever the ink surface reads now.
+    const bound = attempt;
+    const lines = bound?.lines || [];
+    if (!bound?.submissionId || !lines.length) return;
     if (!shouldCheckWorking({
       correct: res?.correct, invalid: res?.invalid, revealed: res?.revealed,
       lines, localReport: activeReport
     })) return;
 
-    const key = `${question?.id}:${lines.join('|')}`;
-    if (cloudCheckRef.current === key) return;              // already asked for this page
+    const key = `${question?.id}:${bound.submissionId}`;
+    if (cloudCheckRef.current === key) return;              // already asked for this attempt
     cloudCheckRef.current = key;
 
-    let live = true;
+    // No per-render cleanup here. Resolving refreshes the user, which re-runs
+    // this effect; a cleanup that aborted the request on that re-run, followed
+    // by the "already asked" guard above, meant the answer was thrown away and
+    // never asked for again — the working note almost never appeared.
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    cloudCheckAbortRef.current = controller;
     checkWorkingWithCloud(lines, {
       user,
       prompt: question?.prompt || '',
       signal: controller?.signal
-    }).then(result => { if (live && result && !result.error) setCloudCheck(result); })
-      .catch(() => { });
-    return () => { live = false; controller?.abort?.(); };
-  }, [writeMode, resolved, res?.correct, res?.invalid, res?.revealed, inkResult, activeReport, user, question?.id, question?.prompt]);
+    }).then(result => {
+      // Dropped unless the card is still up and still showing this attempt.
+      if (!mountedRef.current || controller?.signal?.aborted) return;
+      if (!result || result.error) return;
+      if (attemptRef.current?.submissionId !== bound.submissionId) return;
+      setCloudCheckFor({ submissionId: bound.submissionId, result });
+    }).catch(() => { });
+  }, [writeMode, resolved, res?.correct, res?.invalid, res?.revealed, attempt, activeReport, user, question?.id, question?.prompt]);
+
+  const cloudCheck = cloudCheckFor && attempt?.submissionId && cloudCheckFor.submissionId === attempt.submissionId
+    ? cloudCheckFor.result : null;
 
   const lineVerdicts = useMemo(
     () => mergeVerdicts(localLineVerdicts, cloudCheck, { lineCount: inkResult?.lines?.length || 0 }),
     [localLineVerdicts, cloudCheck, inkResult]
   );
   const cloudWorkingNote = useMemo(() => workingNote(cloudCheck), [cloudCheck]);
+
+  // The misconception the cloud check proposed, as the deterministic engine
+  // judged it: 'confirmed' (recorded in learner state) or 'possible' (shown,
+  // hedged, never recorded). The backend decides; this only displays. The
+  // proposal names the submission it came from, and the backend ignores one
+  // that is not the submission of record.
+  const [cloudMisconception, setCloudMisconception] = useState(null);
+  useEffect(() => { setCloudMisconception(null); }, [question?.id]);
+  useEffect(() => {
+    const sid = cloudCheckFor?.submissionId;
+    if (!cloudCheck || !sid || attemptRef.current?.submissionId !== sid || !question?.id) return;
+    const proposal = misconceptionProposal(cloudCheck, attemptRef.current?.lines || []);
+    if (!proposal) return;
+    let live = true;
+    api.post(`/practice/${question.id}/misconception`, { ...proposal.body, submissionId: sid })
+      .then(r => {
+        const named = r?.status ? misconceptionById(r.id) : null;
+        if (live && named && attemptRef.current?.submissionId === sid) {
+          setCloudMisconception({ status: r.status, named, line: proposal.displayLine });
+        }
+      })
+      .catch(() => { });
+    return () => { live = false; };
+  }, [cloudCheck, cloudCheckFor, question?.id]);
 
   // ── The board's own arithmetic ─────────────────────────────────────────────
   // CBSE marks per step: formula, substitution, final answer with units. A
@@ -724,14 +968,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (v.status === 'ok') {
         cards.push({
           kind: 'good', line: i + 1,
-          text: v.note || (i === 0 ? 'A valid starting point.' : 'Checks out — follows correctly from the line above.')
+          text: v.note || (i === 0 ? t('verdict.lineValidStart') : t('verdict.lineChecksOut'))
         });
       } else if (v.status === 'break' || v.status === 'wrong') {
-        cards.push({ kind: 'bad', line: i + 1, text: v.note || 'The maths breaks on this line.' });
+        cards.push({ kind: 'bad', line: i + 1, text: v.note || t('verdict.lineBreaks') });
       }
     });
     return cards.length ? cards : null;
-  }, [writeMode, lineVerdicts, inkResult]);
+  }, [writeMode, lineVerdicts, inkResult, t]);
   const canSubmit = isMcq ? mcqSel !== null : isWorking ? (writeMode ? !!inkResult?.lines?.length : !!working.trim()) : writeMode ? !!inkResult?.answerLine : !!answer.trim();
 
   const earnedMarks = resolved
@@ -763,16 +1007,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       : [...(showWorking && working ? working.split('\n').filter(Boolean) : []), answer].filter(Boolean);
 
   return (
-    <div className="qpage">
+    // The opaque question id, so a test (or support) can tell two questions
+    // apart even when a generator happens to write the same prompt twice.
+    <div className="qpage" data-question-id={question.id}>
       {/* left action rail */}
       <div className="q-rail no-print">
-        <button className={`q-rail-btn ${bookmarked ? 'on' : ''}`} title={t('verdict.favorite')} aria-label={t('verdict.favoriteThis')} aria-pressed={bookmarked} onClick={toggleBookmark}>☆</button>
+        {!diagnostic && <button className={`q-rail-btn ${bookmarked ? 'on' : ''}`} title={t('verdict.favorite')} aria-label={t('verdict.favoriteThis')} aria-pressed={bookmarked} onClick={toggleBookmark}>☆</button>}
         <button className={`q-rail-btn ${showWhy ? 'on' : ''}`} title={t('verdict.whyThis')} aria-label={t('verdict.whyThis')} aria-pressed={showWhy} onClick={() => setShowWhy(s => !s)}>ⓘ</button>
         <button className={`q-rail-btn ${showScribble ? 'on' : ''}`} title={t('verdict.scribblePad')} aria-label={t('verdict.scribblePad')} aria-pressed={showScribble} onClick={() => setShowScribble(s => !s)}>✎</button>
       </div>
 
       {/* hint bulbs */}
-      {!isMcq && question.hintsAvailable > 0 && (
+      {!diagnostic && !isMcq && question.hintsAvailable > 0 && (
         <div className="hint-rail no-print">
           {Array.from({ length: question.hintsAvailable }, (_, i) => (
             <button key={i} className={`hint-bulb ${i < hintsUsed ? 'lit' : ''}`}
@@ -789,13 +1035,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
       <div className="q-topmeta">
         <span>{t('verdict.marksAvailable', { count: totalMarks, n: totalMarks })}</span>
-        {hintsUsed > 0 && !resolved && (
+        {helpUsed > 0 && !resolved && (
           <span className="q-credit"><span className="dot">•</span> {t('verdict.creditAvailable', { percent: Math.round(credit * 100), marks: Math.round(totalMarks * credit * 10) / 10 })} <span className="dot">•</span></span>
         )}
         {/* The topic chip is where a student meets the name of what they are
             being asked, so it is the first place worth pairing. The question
             itself below is untouched: it will be in English in the exam hall. */}
-        <span className="tag"><TermGloss text={question.subtopicName} /></span>
+        <span className="tag" lang="en"><TermGloss text={question.subtopicName} /></span>
         <span className={`tag ${DIFF_CLASS[question.difficulty] || ''}`}>{question.diffLabel}</span>
         {reasonTag && REASON_TAG_KEY[reasonTag] && <span className="tag tag-brand" data-reason-tag={reasonTag}>{t(REASON_TAG_KEY[reasonTag])}</span>}
         {!reasonTag && reason === 'review' && <span className="tag tag-brand">{t('verdict.spacedReview')}</span>}
@@ -810,7 +1056,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       <MathText block className="q-prompt" text={question.prompt} />
       {figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: figure }} />}
 
-      {resolved && (
+      {resolved && !diagnostic && (
         <div className="row no-print" style={{ margin: '14px 0 2px' }}>
           <button className="redo-chip" onClick={() => onRedo ? onRedo() : onNext?.()}>{t('verdict.redoQuestion')}</button>
         </div>
@@ -881,7 +1127,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                             : <div className="photo-thumb" aria-hidden="true" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}>▤<button aria-label={t('verdict.removeAttachment')} onClick={() => setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null })}>✕</button></div>}
                           <div style={{ flex: 1 }}>
                             {photoOCR.phase === 'reading' && (
-                              <span className="muted">{cloudReadingEnabled(user) ? t('verdict.readingWork') : t('verdict.readingWithVision')}</span>
+                              <span className="muted">{t('verdict.readingWork')}</span>
                             )}
                             {photoOCR.phase === 'done' && (
                               <>
@@ -893,6 +1139,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                                 </div>
                                 <pre style={{ whiteSpace: 'pre-wrap', margin: 0, font: 'inherit', color: 'var(--ink)' }}>{photoOCR.text}</pre>
                                 <div className="muted" style={{ marginTop: 6 }}>{t('verdict.filledFromLastLine')}</div>
+                                {cloudNotice && String(photoOCR.engine || '').startsWith('cloud') && (
+                                  <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>{t('verdict.photoReadOnServerNotice')}</div>
+                                )}
                               </>
                             )}
                             {(photoOCR.phase === 'failed' || photoOCR.phase === 'unavailable') && <span style={{ color: 'var(--warn)' }}>{photoOCR.error}</span>}
@@ -926,6 +1175,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       onChange={e => editAnswer(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') submit(); }}
                       autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                      // Answers are expressions as often as numbers (x², 3/4, √2),
+                      // so a numeric keypad would block them: keep the full
+                      // keyboard and label its Enter key as the submit action.
+                      inputMode="text" enterKeyHint="go"
                     />
                     {question.answerSuffix && <span className="answer-suffix">{question.answerSuffix}</span>}
                   </div>
@@ -950,7 +1203,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 )}
               </div>
               <div className="editor-foot no-print">
-                <span className="editor-brand">{t('verdict.inkEngine')}</span>
                 <span style={{ flex: 1 }} />
                 {!resolved && (
                   <button className={`btn btn-primary ${canSubmit ? 'btn-glow' : ''}`} onClick={() => submit()} disabled={busy || !canSubmit}>
@@ -963,8 +1215,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <div className="ink-row">
               <div className="editor-shell" style={{ flex: 1, minWidth: 0 }}>
                 {InkAnswer && (
-                  <InkAnswer onRecognized={setInkResult} height={380} lineVerdicts={lineVerdicts}
-                    disabled={resolved} focusSymbol={checkFocus} recognitionContext={recognitionContext} />
+                  <InkAnswer onRecognized={onInkRecognized} onStrokes={onInkStrokes} initialStrokes={restoredInk}
+                    height={380} lineVerdicts={lineVerdicts}
+                    disabled={resolved || busy} focusSymbol={checkFocus} recognitionContext={recognitionContext} />
                 )}
                 {inkPhase === 'failed' && (
                   <div className="editor-body">
@@ -1014,7 +1267,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 )}
                 {InkAnswer && (
                   <div className="editor-foot no-print">
-                    <span className="editor-brand">{t('verdict.inkEngineOnDevice')}</span>
+                    <span className="editor-brand">{String(inkResult?.engine || '').startsWith('cloud') ? t('verdict.inkReadByServer') : t('verdict.inkReadByServerPending')}</span>
                     <span style={{ flex: 1 }} />
                     {inkResult?.answerLine && !needsCheck && (
                       <span className="muted" style={{ marginRight: 10 }}>
@@ -1049,6 +1302,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                         {t(cloudWorkingNote.tone === 'break' ? 'verdict.whereItBreaks' : cloudWorkingNote.tone === 'maybe' ? 'verdict.possibly' : 'verdict.yourAlgebra')}
                       </div>
                       {cloudWorkingNote.text}
+                      {cloudMisconception && (
+                        <div className="diagnosis-named" data-misconception={cloudMisconception.named.id} data-status={cloudMisconception.status}>
+                          <b>{t(cloudMisconception.status === 'confirmed' ? 'verdict.lineMisconception' : 'verdict.possibleMisconception',
+                            { n: cloudMisconception.line, name: t(cloudMisconception.named.name) })}</b>
+                          <div>{t(cloudMisconception.named.explain)}</div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </aside>
@@ -1071,6 +1331,41 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           </div>
           <InkCanvas ref={scribbleRef} height={200} guides={false} ariaLabel={t('verdict.scribblePad')} />
         </div>
+      )}
+
+      {/* AI tutor: three levels of help, lazy-loaded on first use */}
+      {!resolved && tutorEnabled && (
+        <div className="tutor-launch-row no-print">
+          <button type="button" className={`btn btn-ghost btn-sm tutor-launch ${showTutor ? 'on' : ''}`}
+            aria-expanded={showTutor} aria-label={t('tutor.helpLabel')} data-tutor-launch
+            onClick={() => setShowTutor(v => !v)}>
+            {t('tutor.help')}
+          </button>
+          {tutorUsed > 0 && <span className="muted" style={{ marginLeft: 8, fontSize: 13 }}>{t('tutor.helpUsed', { count: tutorUsed, n: tutorUsed })}</span>}
+        </div>
+      )}
+      {showTutor && !resolved && tutorEnabled && TutorHelp && (
+        <TutorBoundary fallback={t('tutor.unavailable')}>
+          <React.Suspense fallback={<div className="hintbox" role="status">{t('tutor.asking')}</div>}>
+            <TutorHelp
+              question={{ ...question, tutorLevel: tutorUsed }}
+              work={{
+                lines: (isWorking || showWorking) && working ? working.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 40).map(l => l.slice(0, 400)) : [],
+                typed: isMcq ? '' : String(answer || '').slice(0, 300)
+              }}
+              locale={language === 'hi' ? 'hi' : 'en'}
+              onUsed={level => setTutorUsed(u => Math.max(u, level))}
+              startedAt={startRef.current}
+              onResolved={r => {
+                // Level 3 ends the question like Reveal: same state, same refreshes.
+                setState({ phase: 'resolved', res: r });
+                celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
+                onResolved?.(r);
+              }}
+              onClose={() => setShowTutor(false)}
+            />
+          </React.Suspense>
+        </TutorBoundary>
       )}
 
       {/* hints shown */}
@@ -1111,7 +1406,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
           <div className="eval-card">
             <div className="eval-head">
-              <span className="logo-bb">P</span><span className="eval-title">ri Learning. <span style={{ color: 'var(--ink-2)' }}>{t('verdict.evaluation')}</span></span>
+              <span className="logo-bb" aria-hidden="true">P</span><span className="eval-title">Pri Learning. <span style={{ color: 'var(--ink-2)' }}>{t('verdict.evaluation')}</span></span>
               <span className="eval-marks">
                 {t('verdict.marksOutOf', { earned: verdictGood ? shownMarks : earnedMarks, total: totalMarks })}
                 {' '}<small>({verdictGood ? pct : (selfSaved ? Math.round(100 * earnedMarks / totalMarks) : 0)}%)</small>
@@ -1142,15 +1437,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                         <span aria-hidden="true" style={{ marginRight: 7, color: row.earned === row.outOf ? 'var(--good, #1a8f4c)' : 'var(--bad, #c0392b)' }}>
                           {row.earned === row.outOf ? '✓' : '✗'}
                         </span>
-                        {row.label}
-                        {row.why && <span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, marginLeft: 20 }}>{row.why}</span>}
+                        {row.labelKey ? t(row.labelKey) : row.label}
+                        {row.why && <span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, marginLeft: 20 }}>{row.whyKey ? t(row.whyKey, { unit: row.whyVars?.unit ?? '' }) : row.why}</span>}
                       </span>
                       <span className="set-v" style={{ fontVariantNumeric: 'tabular-nums' }}>
                         <span className="sr-only">{t('verdict.rowMarks', { earned: row.earned, total: row.outOf })} </span>{row.earned}/{row.outOf}
                       </span>
                     </div>
                   ))}
-                  <p style={{ marginTop: 8, fontSize: 13 }}>{marksSentence(boardAward)}</p>
+                  <p style={{ marginTop: 8, fontSize: 13 }}>{(() => {
+                    const line = marksSentenceKey(boardAward);
+                    return line ? t(line.key, { awarded: line.vars.awarded, total: line.vars.total, count: line.vars.count, n: line.vars.n }) : null;
+                  })()}</p>
                   <p className="muted" style={{ fontSize: 11.5, marginTop: 6 }}>
                     {t('verdict.boardStyleNote')}
                   </p>
@@ -1163,13 +1461,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 <div style={{ marginTop: 4 }}>{t('verdict.expected')} <b><MathText text={res.solution.answerText} /></b></div>
               )}
               {res.stepReport && <StepReport report={res.stepReport} />}
-              <div className="row" style={{ marginTop: 10, flexWrap: 'wrap', gap: 8 }}>
+              {!diagnostic && <div className="row" style={{ marginTop: 10, flexWrap: 'wrap', gap: 8 }}>
                 <span className="tag">{t('verdict.mastery', { n: res.mastery })}</span>
                 <span className="tag" style={{ color: res.ratingDelta >= 0 ? 'var(--good)' : 'var(--bad)' }}>
                   {t(res.ratingDelta >= 0 ? 'verdict.skillUp' : 'verdict.skillDown', { n: Math.abs(res.ratingDelta) })}
                 </span>
                 {res.predicted && <span className="tag">{t('verdict.predictedMark', { mark: res.predicted.mark })}</span>}
-              </div>
+              </div>}
+              {diagnostic && <p className="muted" style={{ marginTop: 10, fontSize: 12.5 }}>{t('placement.cardNote')}</p>}
             </div>
 
             {res.solution?.steps && (
@@ -1201,7 +1500,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             )}
           </div>
 
-          {res.solution?.criteria && (
+          {!diagnostic && res.solution?.criteria && (
             <CriteriaTable
               criteria={res.solution.criteria}
               correct={verdictGood}
@@ -1220,7 +1519,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               {t(busy ? 'verdict.marking' : 'verdict.submit')}
             </button>
           )}
-          <button className="btn btn-quiet" onClick={reveal} disabled={busy}>{t('verdict.showSolution')}</button>
+          {diagnostic
+            ? <button className="btn btn-quiet" onClick={dontKnow} disabled={busy}>{t('placement.dontKnow')}</button>
+            : <button className="btn btn-quiet" onClick={reveal} disabled={busy}>{t('verdict.showSolution')}</button>}
           {!writeMode && !isMcq && <span className="muted" style={{ marginLeft: 'auto' }}>{tx('verdict.pressEnter', { key: <span className="kbd">{t('verdict.enterKey')}</span> })}</span>}
         </div>
       )}
@@ -1286,7 +1587,7 @@ function StepReport({ report }) {
             {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.mistakeIsHere')}</b>}
             {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — {l.note}</span>}
           </div>
-          {l.diagnosis && <Diagnosis d={l.diagnosis} />}
+          {l.diagnosis && <Diagnosis d={l.diagnosis} line={i + 1} />}
         </React.Fragment>
       ))}
     </div>
@@ -1298,18 +1599,30 @@ function StepReport({ report }) {
  * this card says which move was made, and the rule that move breaks — so the
  * student leaves with something to change rather than something to re-read.
  */
-function Diagnosis({ d }) {
+function Diagnosis({ d, line }) {
+  // `t` was once read here without being declared, so the first diagnosis
+  // card a student earned threw a ReferenceError instead of rendering.
+  const t = useT();
   if (!d) return null;
   // A diagnosis the engine could pin to exactly one move is stated; one where
   // more than one move reproduces the line, or that rests on a counterexample
   // alone, is hedged — the student should weigh it, not obey it.
   const hedged = d.confidence !== 'high';
+  // The misconception by its stable ontology name, in the student's language:
+  // "Line 3: Sign not changed when a term crossed the =". The engine's own
+  // sentence about this line's numbers stays underneath it.
+  const named = misconceptionById(d.code);
+  const nameLine = named && named.recordable && Number.isInteger(line)
+    ? t(hedged ? 'verdict.possibleMisconception' : 'verdict.lineMisconception', { n: line, name: t(named.name) })
+    : null;
   return (
-    <div className="diagnosis-card" data-confidence={d.confidence || 'medium'}>
+    <div className="diagnosis-card" data-confidence={d.confidence || 'medium'} data-misconception={nameLine ? named.id : undefined}>
       <div className="diagnosis-label">{t(d.code === 'counterexample' ? 'verdict.whyItFails' : hedged ? 'verdict.thisLooksLike' : 'verdict.whatWentWrong')}</div>
-      <div className="diagnosis-title">{hedged && d.code !== 'counterexample' ? t('verdict.thisLooksLikeTitle', { title: d.title }) : d.title}</div>
+      {nameLine
+        ? <div className="diagnosis-title">{nameLine}</div>
+        : <div className="diagnosis-title">{hedged && d.code !== 'counterexample' ? t('verdict.thisLooksLikeTitle', { title: d.title }) : d.title}</div>}
       <div className="diagnosis-body">{d.message}</div>
-      {d.fix && <div className="diagnosis-fix">{d.fix}</div>}
+      {nameLine ? <div className="diagnosis-fix">{t(named.explain)}</div> : (d.fix && <div className="diagnosis-fix">{d.fix}</div>)}
     </div>
   );
 }
@@ -1342,7 +1655,7 @@ function attachPhoto(e, setPhoto, onReady, onPdf, onFailed) {
     URL.revokeObjectURL(url);
     // Previously a silent no-op: the student picked a file and the UI did not
     // move. A HEIC from an iPhone opened on Android lands here.
-    onFailed?.('That image could not be opened. Try photographing the page again, or save it as a JPEG first.');
+    onFailed?.(translate('verdict.imageUnopenable'));
   };
   img.src = url;
   e.target.value = '';

@@ -1,5 +1,10 @@
 import { isAbsolute } from 'node:path';
+import { compatibilityConfigProblems } from './clientCompatibility.js';
+import { aiAllowanceConfigProblems } from './aiAllowance.js';
+import { googleBillingConfigStatus } from './googleBilling.js';
 import { spendCeilingMissing } from './spendCeiling.js';
+import { mfaKeyConfigured, mfaKeyMalformed } from './mfa.js';
+import { sessionMaxAgeMs } from './security.js';
 
 function nonEmpty(name) {
   return !!String(process.env[name] || '').trim();
@@ -16,6 +21,151 @@ function productionDbPathValid() {
 }
 
 /**
+ * PRI_DATABASE_URL selects the Postgres driver (ADR-0001). When it is set it
+ * is the platform database, and PRI_PLATFORM_DB is neither required nor used.
+ */
+export function platformDatabaseUrl(env = process.env) {
+  const value = String(env.PRI_DATABASE_URL || '').trim();
+  return value || null;
+}
+
+export function validPostgresUrl(value) {
+  try {
+    const url = new URL(String(value || ''));
+    return (url.protocol === 'postgres:' || url.protocol === 'postgresql:') && !!url.hostname;
+  } catch {
+    return false;
+  }
+}
+
+function postgresSelected() {
+  return !!platformDatabaseUrl();
+}
+
+function postgresValid() {
+  const url = platformDatabaseUrl();
+  if (!validPostgresUrl(url)) return false;
+  try { postgresConnectionSettings(url); return true; } catch { return false; }
+}
+
+function configError(code, message) {
+  return Object.assign(new Error(message), { code });
+}
+
+// ── Postgres connection settings (ADR-0001 go-live) ─────────────────────────
+//
+// TLS. node-postgres reads `sslmode` out of the connection string and lets it
+// override any `ssl` option passed beside it, and its interpretation of
+// `require` has changed between releases (libpq "encrypt, don't verify" vs.
+// "verify-full"). So the URL's TLS parameters are removed here and the `ssl`
+// option is built from one explicit table, identical on every pg release:
+//
+//   sslmode       production            TLS   certificate chain + host name
+//   ─────────────  ───────────────────   ───   ─────────────────────────────
+//   verify-full   allowed               yes   verified (against the CA below
+//                                             if set, else the system store)
+//   require       allowed ONLY with     yes   verified against that CA
+//                 PRI_DATABASE_SSL_ROOT_CERT
+//   require       REFUSED without a CA  yes   NOT verified (libpq semantics:
+//                 (PLATFORM_DB_TLS_           encrypt, don't authenticate —
+//                 UNVERIFIED)                 open to an active MITM); allowed
+//                                             outside production only
+//   (absent), disable, allow, prefer
+//                 REFUSED               no    —
+//   verify-ca     refused everywhere: Node has no "chain but not host" mode.
+//
+// The CA bundle comes from PRI_DATABASE_SSL_ROOT_CERT (PEM text — Supabase's
+// "Server root certificate" from Database settings → SSL configuration) because a
+// Railway variable is text, not a file. `sslrootcert`, `sslcert`, `sslkey` and
+// `sslpassword` in the URL are refused rather than silently ignored.
+const TLS_MODES = new Set(['disable', 'allow', 'prefer', 'require', 'verify-full']);
+const PRODUCTION_TLS_MODES = new Set(['require', 'verify-full']);
+const URL_TLS_FILES = ['sslrootcert', 'sslcert', 'sslkey', 'sslpassword', 'sslcrl'];
+
+function boundedInteger(env, name, fallback, min, max) {
+  const raw = String(env[name] ?? '').trim();
+  if (!raw) return fallback;
+  if (!/^\d+$/.test(raw)) throw configError('PLATFORM_DB_CONFIG_INVALID', `${name} must be a whole number between ${min} and ${max}.`);
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < min || value > max) {
+    throw configError('PLATFORM_DB_CONFIG_INVALID', `${name} must be a whole number between ${min} and ${max}.`);
+  }
+  return value;
+}
+
+/** Per-connection limits and pool size, from the environment, validated. */
+export function postgresSessionLimits(env = process.env) {
+  return Object.freeze({
+    // A statement (including a wait for a row or advisory lock) that runs longer
+    // than this is cancelled (57014) and answered as a retryable 503.
+    statementTimeoutMs: boundedInteger(env, 'PRI_DATABASE_STATEMENT_TIMEOUT_MS', 15_000, 1_000, 600_000),
+    // A session left idle inside an open transaction (a handler stuck awaiting
+    // something that is not the database) is terminated by the server, so it
+    // cannot hold row locks and a pooled connection indefinitely.
+    idleInTransactionTimeoutMs: boundedInteger(env, 'PRI_DATABASE_IDLE_TX_TIMEOUT_MS', 30_000, 1_000, 3_600_000),
+    poolMax: boundedInteger(env, 'PRI_DATABASE_POOL_MAX', 10, 1, 50),
+    // How long a request may wait for a per-account lock (queued in process,
+    // then pg_try_advisory_lock across instances) before a retryable 503.
+    lockWaitMs: boundedInteger(env, 'PRI_DATABASE_LOCK_WAIT_MS', 5_000, 100, 60_000)
+  });
+}
+
+/**
+ * Everything the pg Pool needs from PRI_DATABASE_URL and the environment:
+ * the connection string with its TLS parameters removed, the explicit `ssl`
+ * option, and the per-session limits. Throws a coded error (never the URL) when
+ * the configuration is unsafe: in production a connection without TLS is
+ * refused with PLATFORM_DB_TLS_REQUIRED.
+ */
+export function postgresConnectionSettings(connectionString, env = process.env) {
+  if (!validPostgresUrl(connectionString)) throw configError('PLATFORM_DB_URL_INVALID', 'PRI_DATABASE_URL must be a postgres:// or postgresql:// URL with a host.');
+  const url = new URL(String(connectionString));
+  for (const name of URL_TLS_FILES) {
+    if (url.searchParams.has(name)) {
+      throw configError('PLATFORM_DB_TLS_INVALID', `PRI_DATABASE_URL must not carry ${name}; put the CA certificate in PRI_DATABASE_SSL_ROOT_CERT.`);
+    }
+  }
+  if (url.searchParams.has('ssl') || url.searchParams.has('uselibpqcompat')) {
+    throw configError('PLATFORM_DB_TLS_INVALID', 'PRI_DATABASE_URL must state TLS with sslmode= only.');
+  }
+  const modes = url.searchParams.getAll('sslmode').map(mode => mode.trim().toLowerCase());
+  if (modes.length > 1) throw configError('PLATFORM_DB_TLS_INVALID', 'PRI_DATABASE_URL states sslmode more than once.');
+  const tlsMode = modes[0] || 'disable';
+  if (!TLS_MODES.has(tlsMode)) throw configError('PLATFORM_DB_TLS_INVALID', `PRI_DATABASE_URL sslmode=${tlsMode.slice(0, 20)} is not supported; use verify-full or require.`);
+  const production = String(env.NODE_ENV || '') === 'production';
+  if (production && !PRODUCTION_TLS_MODES.has(tlsMode)) {
+    throw configError('PLATFORM_DB_TLS_REQUIRED', 'In production PRI_DATABASE_URL must use verified TLS: sslmode=verify-full, or sslmode=require with PRI_DATABASE_SSL_ROOT_CERT.');
+  }
+  url.searchParams.delete('sslmode');
+  const ca = String(env.PRI_DATABASE_SSL_ROOT_CERT || '').trim();
+  if (ca && !/-----BEGIN CERTIFICATE-----/.test(ca)) {
+    throw configError('PLATFORM_DB_TLS_INVALID', 'PRI_DATABASE_SSL_ROOT_CERT must be PEM certificate text.');
+  }
+  if (production && tlsMode === 'require' && !ca) {
+    throw configError('PLATFORM_DB_TLS_UNVERIFIED',
+      'In production sslmode=require needs PRI_DATABASE_SSL_ROOT_CERT so the server certificate is verified; otherwise use sslmode=verify-full.');
+  }
+  let ssl = false;
+  if (tlsMode === 'verify-full' || (tlsMode === 'require' && ca)) {
+    ssl = { rejectUnauthorized: true, ...(ca ? { ca } : {}) };
+  } else if (tlsMode === 'require') {
+    ssl = { rejectUnauthorized: false };
+  }
+  return Object.freeze({
+    connectionString: url.toString(),
+    ssl,
+    tlsMode,
+    certificateVerified: !!ssl && ssl.rejectUnauthorized === true,
+    ...postgresSessionLimits(env)
+  });
+}
+
+/** Persistent storage is either a valid Postgres URL or an absolute SQLite path. */
+function productionStorageValid() {
+  return postgresSelected() ? postgresValid() : productionDbPathValid();
+}
+
+/**
  * Resolve the platform database path at process startup.
  *
  * Development and focused contracts may use the repository-local default or an
@@ -27,6 +177,8 @@ function productionDbPathValid() {
 export function platformDatabasePath() {
   const path = configuredDbPath();
   if (process.env.NODE_ENV !== 'production') return path;
+  // Postgres is the platform database; no SQLite file is opened.
+  if (postgresSelected()) return null;
   if (!path) {
     throw Object.assign(new Error('PRI_PLATFORM_DB is required in production and must point to persistent storage.'), {
       code: 'PLATFORM_DB_NOT_CONFIGURED'
@@ -88,6 +240,41 @@ function appleTrustConfigured() {
   return nonEmpty('PRI_APPLE_ROOT_CA_PEM') || nonEmpty('PRI_APPLE_ROOT_CA_FILE');
 }
 
+/** Shorter than this, PRI_CSRF_SECRET is a guessable HMAC key, not a secret. */
+export const MIN_CSRF_SECRET_LENGTH = 32;
+
+function csrfSecretProblem() {
+  const value = String(process.env.PRI_CSRF_SECRET || '').trim();
+  if (!value) return 'PRI_CSRF_SECRET';
+  if (value.length < MIN_CSRF_SECRET_LENGTH) return `PRI_CSRF_SECRET (at least ${MIN_CSRF_SECRET_LENGTH} characters)`;
+  return null;
+}
+
+// ── Per-account sync quota ─────────────────────────────────────────────────
+// One account's stored sync rows are bounded so a runaway or hostile device
+// cannot fill the database for everybody. Both are plain whole numbers; a
+// misspelt value stops a production boot rather than quietly becoming no limit.
+const SYNC_QUOTA_VARS = Object.freeze([
+  ['maxBytesPerAccount', 'PRI_SYNC_MAX_BYTES_PER_ACCOUNT', 64 * 1024 * 1024, 1024 * 1024, 64 * 1024 * 1024 * 1024],
+  ['maxEventsPerAccount', 'PRI_SYNC_MAX_EVENTS', 200_000, 1000, 100_000_000]
+]);
+
+export function syncQuota(env = process.env) {
+  return Object.freeze(Object.fromEntries(SYNC_QUOTA_VARS.map(([key, name, fallback, min, max]) => [key, boundedInteger(env, name, fallback, min, max)])));
+}
+
+function syncQuotaProblems(env) {
+  const problems = [];
+  for (const [, name, fallback, min, max] of SYNC_QUOTA_VARS) {
+    try { boundedInteger(env, name, fallback, min, max); } catch { problems.push(`${name} (whole number between ${min} and ${max})`); }
+  }
+  return problems;
+}
+
+function sessionMaxAgeProblem(env) {
+  try { sessionMaxAgeMs(env); return null; } catch { return 'PRI_SESSION_MAX_AGE_DAYS (whole number of days, 1-3650)'; }
+}
+
 function authEmailConfigured() {
   return String(process.env.PRI_AUTH_EMAIL_PROVIDER || '').trim().toLowerCase() === 'resend' &&
     nonEmpty('PRI_RESEND_API_KEY') && nonEmpty('PRI_AUTH_EMAIL_FROM');
@@ -98,9 +285,19 @@ export function platformConfigStatus() {
   const production = process.env.NODE_ENV === 'production';
   const missing = [];
   if (production && !nonEmpty('PRI_PUBLIC_ORIGIN')) missing.push('PRI_PUBLIC_ORIGIN');
-  if (production && !nonEmpty('PRI_CSRF_SECRET')) missing.push('PRI_CSRF_SECRET');
+  if (production && csrfSecretProblem()) missing.push(csrfSecretProblem());
   if (production && !nonEmpty('PRI_AUTH_DELIVERY_KEY')) missing.push('PRI_AUTH_DELIVERY_KEY');
-  if (production && !configuredDbPath()) missing.push('PRI_PLATFORM_DB');
+  // Staff second factor (mfa.js). The key encrypts every authenticator secret at
+  // rest, so a malformed one is a boot error everywhere, and in production it
+  // must exist before the first administrator can — PRI_BOOTSTRAP_ADMIN_EMAIL
+  // names one, and readiness (readiness.js) reports a deployment that already
+  // has staff accounts and no key.
+  if (mfaKeyMalformed(env)) missing.push('PRI_MFA_KEY (32-byte key as 64 hex characters or base64)');
+  if (production && nonEmpty('PRI_BOOTSTRAP_ADMIN_EMAIL') && !mfaKeyConfigured(env)) missing.push('PRI_MFA_KEY');
+  // Session lifetime and sync quota are whole numbers or absent; nothing else.
+  if (sessionMaxAgeProblem(env)) missing.push(sessionMaxAgeProblem(env));
+  missing.push(...syncQuotaProblems(env));
+  if (production && !postgresSelected() && !configuredDbPath()) missing.push('PRI_PLATFORM_DB');
   // A configured provider key is a licence to spend real money on every request
   // that reaches it. Per-account limits bound one student; only these bound the
   // bill. No default: too low kills the feature quietly under load and too high
@@ -131,19 +328,37 @@ export function platformConfigStatus() {
     (!webAnnual || nonEmpty('PRI_RAZORPAY_ANNUAL_TOTAL_COUNT'));
   const appleBillingProviderConfigured = appleProducts && appleTrustConfigured() &&
     (!production || nonEmpty('PRI_APPLE_APP_ID'));
+  // Google Play: product ids alone are not a provider. It is configured only
+  // with a parseable Play Developer API service account (googleBilling.js), and
+  // in production also with real-time notifications: without them renewals,
+  // holds and refunds would never reach the server.
+  const googleBilling = googleBillingConfigStatus();
+  const googleProducts = nonEmpty('PRI_GOOGLE_MONTHLY_PRODUCT_ID') || nonEmpty('PRI_GOOGLE_ANNUAL_PRODUCT_ID');
+  if (production && googleProducts) {
+    if (!googleBilling.credentialsConfigured) missing.push('PRI_GOOGLE_SERVICE_ACCOUNT_JSON or PRI_GOOGLE_SERVICE_ACCOUNT_FILE');
+    if (!googleBilling.notificationsConfigured) missing.push('PRI_GOOGLE_RTDN_AUDIENCE and PRI_GOOGLE_RTDN_SERVICE_ACCOUNT');
+  }
+
+  if (production) missing.push(...compatibilityConfigProblems());
+  if (production) missing.push(...aiAllowanceConfigProblems());
 
   const uniqueMissing = [...new Set(missing)];
   return Object.freeze({
     production,
     missing: Object.freeze(uniqueMissing),
-    ok: uniqueMissing.length === 0 && (!production || productionDbPathValid()),
-    persistentDatabaseConfigured: production ? productionDbPathValid() : !!configuredDbPath(),
+    ok: uniqueMissing.length === 0 && (!production || productionStorageValid()),
+    persistentDatabaseConfigured: postgresSelected()
+      ? postgresValid()
+      : (production ? productionDbPathValid() : !!configuredDbPath()),
+    mfaKeyConfigured: mfaKeyConfigured(env),
     googleConfigured: nonEmpty('PRI_GOOGLE_CLIENT_IDS'),
     appleConfigured: nonEmpty('PRI_APPLE_CLIENT_IDS'),
     authEmailProviderConfigured: authEmailConfigured(),
     appleBillingProductsConfigured: appleProducts,
     appleBillingProviderConfigured,
     googleBillingProductsConfigured: nonEmpty('PRI_GOOGLE_MONTHLY_PRODUCT_ID') || nonEmpty('PRI_GOOGLE_ANNUAL_PRODUCT_ID'),
+    googleBillingProviderConfigured: googleBilling.configured && (googleBilling.notificationsConfigured || !production),
+    googleBillingNotificationsConfigured: googleBilling.configured && googleBilling.notificationsConfigured,
     webBillingProductsConfigured: webProducts,
     webBillingProviderConfigured
   });
@@ -152,7 +367,14 @@ export function platformConfigStatus() {
 export function assertPlatformConfig() {
   const status = platformConfigStatus();
   if (!status.ok) {
-    if (status.production && configuredDbPath() && !productionDbPathValid()) {
+    if (status.production && postgresSelected() && !postgresValid()) {
+      // Name the precise reason (a TLS or limit problem is not "not a URL"),
+      // never the URL itself.
+      let reason = 'PRI_DATABASE_URL must be a postgres:// URL';
+      try { postgresConnectionSettings(platformDatabaseUrl()); } catch (error) { if (validPostgresUrl(platformDatabaseUrl())) reason = error.message; }
+      throw new Error(`Pri Learning production platform configuration is incomplete: ${reason}`);
+    }
+    if (status.production && !postgresSelected() && configuredDbPath() && !productionDbPathValid()) {
       throw new Error('Pri Learning production platform configuration is incomplete: PRI_PLATFORM_DB must be an absolute persistent path');
     }
     throw new Error(`Pri Learning production platform configuration is incomplete: ${status.missing.join(', ')}`);

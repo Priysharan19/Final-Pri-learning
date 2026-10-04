@@ -13,6 +13,8 @@ import WebKit
 final class NativeCloudBridge {
     static let responseEvent = "pri:native-cloud-response"
     static var isConfigured: Bool { configuredOrigin != nil }
+    /// Host of the signed cloud origin; deep links are accepted only for it.
+    static var configuredHost: String? { configuredOrigin?.host?.lowercased() }
 
     private static let maxRequestBytes = 1 * 1024 * 1024
     private static let maxResponseBytes = 2 * 1024 * 1024
@@ -61,6 +63,10 @@ final class NativeCloudBridge {
             cancel(requestId)
             return
         }
+        if action == "forget" {
+            forgetSession()
+            return
+        }
         guard action == "request" else {
             respond(requestId, error: BridgeError.invalidRequest)
             return
@@ -93,6 +99,10 @@ final class NativeCloudBridge {
         request.httpShouldHandleCookies = true
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("ios-native-v1", forHTTPHeaderField: "X-Pri-Client")
+        // The server's compatibility floor (CP-11) compares this build number.
+        if let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, Self.safeHeader(build) {
+            request.setValue(build, forHTTPHeaderField: "X-Pri-Shell-Build")
+        }
 
         if let rid = body["requestId"] as? String, Self.safeHeader(rid) {
             request.setValue(rid, forHTTPHeaderField: "X-Pri-Request-Id")
@@ -144,6 +154,20 @@ final class NativeCloudBridge {
         }
         storeTask(task, id: requestId)
         task.resume()
+    }
+
+    /// Disconnect: drop the cloud cookies even when the server logout could not
+    /// be reached (offline). Cancels in-flight requests first so none re-adds them.
+    private func forgetSession() {
+        taskLock.lock()
+        let running = Array(tasks.values)
+        tasks.removeAll()
+        taskLock.unlock()
+        running.forEach { $0.cancel() }
+        guard let origin = Self.configuredOrigin else { return }
+        for cookie in cookieStorage.cookies(for: origin) ?? [] where cookie.name == "pri_csrf" || cookie.name == "pri_cloud_session" {
+            cookieStorage.deleteCookie(cookie)
+        }
     }
 
     private func csrfCookie(for origin: URL) -> String? {

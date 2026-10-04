@@ -61,7 +61,22 @@ export function classifyMutation(method, path, result = null, body = null) {
   if (key === 'POST /profiles/password' || key === 'POST /profiles/select' || key === 'POST /auth/logout' || key === 'POST /profiles/demo') return null;
 
   let m = key.match(/^POST \/practice\/([A-Za-z0-9._-]+)\/(submit|reveal)$/);
-  if (m) return { kind: 'practice-progress', entityId: safeId(m[1]), operation: 'upsert' };
+  if (m) {
+    // A practice-progress entry stands for a recorded attempt (§09). A first
+    // wrong try or an unreadable answer records none; queueing it made the
+    // sync worker publish a later attempt twice, or wedge an entry with no
+    // attempt behind it. A replay still marks the question dirty for this
+    // install-wide journal (coalesced, so harmless); the profile cloud queue
+    // decides separately, in profileOutbox.js, whether an attempt is already
+    // queued — it is written in the same transaction as the attempt.
+    if (result?.resolved === false) return null;
+    return { kind: 'practice-progress', entityId: safeId(m[1]), operation: 'upsert' };
+  }
+  // Tutor level 3 shows the whole verified solution and so resolves the
+  // question exactly as Reveal does; levels 1–2 change nothing that syncs until
+  // the answer is submitted.
+  m = key.match(/^POST \/practice\/([A-Za-z0-9._-]+)\/tutor$/);
+  if (m) return result?.resolved === true && result?.replayed !== true ? { kind: 'practice-progress', entityId: safeId(m[1]), operation: 'upsert' } : null;
 
   if (key === 'POST /exams') return { kind: 'exam', entityId: safeId(result?.exam?.id), operation: 'upsert' };
   m = key.match(/^POST \/exams\/([A-Za-z0-9._-]+)\/submit$/);

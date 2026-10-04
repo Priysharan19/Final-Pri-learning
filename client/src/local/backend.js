@@ -21,21 +21,26 @@ import {
   cleanIndiaTrack, indiaTrack, indiaCourseLabel, indiaScope, indiaChapter,
   indiaChapterGrade, indiaDotpointIndex, resolveIndiaTarget, indiaProductSections,
   indiaDotpointKey, indiaNameOf, indiaDifficultyWindow, clampToIndiaWindow,
-  indiaPracticeScope, indiaAheadUnlocked, indiaDotpointsInWindow
+  indiaPracticeScope, indiaAheadUnlocked, indiaDotpointsInWindow, indiaChaptersForGenerator,
+  indiaPyqAlternatives
 } from '../engine/indiaProduct.js';
 import { indiaReasonLabel } from '../engine/indiaProgress.js';
+import { attemptTotals } from '../engine/progressTruth.js';
 import { indiaExamBlueprint } from '../engine/indiaExams.js';
 import { predictExamMark } from '../engine/markPredictor.js';
 import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
 import { generateQuestion } from '../engine/generators/index.js';
+import { CONTENT_VERSION, LEGACY_CONTENT_VERSION, contentRefOf, contentHashOf, drawDistinct } from '../engine/contentIdentity.js';
 import { checkAnswer, stepCheck, methodMarks } from '../engine/checker.js';
 import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../engine/answer-forms.js';
-import { stepTrapKey } from '../engine/diagnose.js';
+import {
+  misconceptionIdForTrap, misconceptionIdForDiagnosis, misconceptionById, confirmCloudMisconception
+} from '../engine/misconceptions.js';
 import {
   START_RATING, updateRating, masteryOf, masteryBand, pickDifficulty, pickNext, pickNextAmong,
   predictMark, priorities, prioritiesAmong, xpFor, levelFromXp, bandFor,
   pickDotpoint, scheduleReview, migrateReview, gradeFor,
-  retrievability, misconceptionKey, misconceptionLabel, activeTraps, trapPressureOf,
+  retrievability, misconceptionLabel, activeTraps, trapPressureOf,
   TRAP_ACTIVE_AT, TRAP_CREDIT_FORGET
 } from '../engine/adaptive.js';
 import { BADGES, checkBadges } from './badges.js';
@@ -45,10 +50,27 @@ import {
 } from './auth.js';
 import { sanitizeFigure, sanitizeText } from '../lib/sanitize.js';
 import {
+  startExamClock, ensureExamClock, saveExamResponses, examMarkingInputs,
+  paperFingerprint, freezeExam, isReplayOf, examSessionView
+} from './examSession.js';
+import {
   assertExamAllowed, assertPracticeAllowed, examAllowance, practiceAllowance,
-  planView, recordExamSimulation, recordPracticeServed, requireCapability, usageView
+  planView, profileCloudLinked, recordExamSimulation, recordPracticeServed, requireCapability, usageView
 } from './entitlementGate.js';
 import { ENTITLEMENTS } from '../platform/entitlements.js';
+import { featureEnabled } from '../platform/features.js';
+import { stageAttemptProgress } from '../platform/profileOutbox.js';
+import { requestTutorHelp } from './tutorBridge.js';
+import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
+import { priNative } from '../platform/native/index.js';
+
+// True in a production build made with the tutor off. tutorFeatureEnabled() is
+// then false on every device, so the ask route below is dead code; written as
+// a literal test of the build constants (not a helper in flag.js) because the
+// bundler folds only what it can see in this module, and that fold is what
+// keeps askRoute.js and the conversation code out of a dark build entirely.
+/* global __PRI_FEATURE_TUTOR__, __PRI_PRODUCTION_BUILD__ */
+const TUTOR_BUILT_OUT = typeof __PRI_PRODUCTION_BUILD__ === 'boolean' && __PRI_PRODUCTION_BUILD__ && __PRI_FEATURE_TUTOR__ !== true;
 
 export const COURSES = {
   nsw: { name: 'NSW · HSC', junior: y => `Year ${y} · Stage ${y <= 8 ? 4 : 5}`, senior: y => y === 11 ? 'Year 11 · Mathematics Advanced' : 'Year 12 · Mathematics Advanced (HSC)' },
@@ -188,6 +210,24 @@ function remember(map, pid, id) {
 }
 
 const noteServed = (pid, subtopicId) => remember(servedByPid, pid, subtopicId);
+
+// The questions themselves served this sitting, by content hash, so the same
+// item is not handed back while it is still fresh — whichever seed, cell or
+// generator would have produced it. Kept like the lists above: per profile,
+// bounded, never stored. A draw that collides is retried (re-resolving the
+// target where the caller can), and a pool too small to avoid a repeat is
+// served with `repeat: true` so the card can say so instead of looping.
+const CONTENT_WINDOW = 20;
+const CONTENT_DEDUP_TRIES = 32;
+const servedContentByPid = new Map();
+const recentlyServedContent = pid => servedContentByPid.get(pid) || [];
+function noteServedContent(pid, q) {
+  const hash = q?.contentHash || (q ? contentHashOf(q) : null);
+  if (!hash) return;
+  const list = [hash, ...recentlyServedContent(pid).filter(h => h !== hash)].slice(0, CONTENT_WINDOW);
+  servedContentByPid.set(pid, list);
+  while (servedContentByPid.size > SERVED_PROFILES) servedContentByPid.delete(servedContentByPid.keys().next().value);
+}
 const noteServedDotpoint = (pid, dotpointKey) => { if (dotpointKey) remember(servedDpByPid, pid, dotpointKey); };
 
 // ── Indian evidence keys ─────────────────────────────────────────────────────
@@ -249,15 +289,33 @@ function trimTraps(traps) {
   return Object.fromEntries(keep.map(k => [k, traps[k]]));
 }
 
+/** Every designed slip a question carries: its numeric traps and its MCQ distractors. */
+const trapProbesOf = q => [
+  ...(Array.isArray(q?.traps) ? q.traps : []),
+  ...Object.values(q?.answer?.optionTraps || {}).map(why => ({ why }))
+];
+
+/**
+ * The misconception IDs a question gave the student a real chance to repeat —
+ * the only misconceptions a clean answer to it can be evidence against. Keyed
+ * by the same owner and the same rule `recordTrap` uses (the ontology ID where
+ * the trap maps to one, its derived `<owner>.t<hash>` otherwise), so the key a
+ * slip was recorded under is the key its repair opportunity carries.
+ */
+function repairOpportunitiesOf(q, owner) {
+  const keys = new Set();
+  for (const t of trapProbesOf(q)) {
+    const key = t && t.why ? misconceptionIdForTrap(owner, t.why) : null;
+    if (key) keys.add(key);
+  }
+  return keys;
+}
+
 /** The trap whose explanation the marker just handed back, if it was one. */
 function trapHitBy(q, feedback) {
   if (!feedback) return null;
   const text = String(feedback);
-  const pool = [
-    ...(Array.isArray(q?.traps) ? q.traps : []),
-    ...Object.values(q?.answer?.optionTraps || {}).map(why => ({ why }))
-  ];
-  const hit = pool.find(t => t && String(t.why) === text);
+  const hit = trapProbesOf(q).find(t => t && String(t.why) === text);
   return hit ? { why: String(hit.why) } : null;
 }
 
@@ -274,21 +332,41 @@ async function recordTrap(pid, row, q, feedback) {
   const hit = trapHitBy(q, feedback);
   if (!hit) return null;
   const owner = evidenceKeyOf(row, q);
-  const key = misconceptionKey(owner, hit.why);
+  return recordMisconception(pid, row, q, owner, misconceptionIdForTrap(owner, hit.why), misconceptionLabel(hit.why));
+}
+
+/**
+ * Write one occurrence of a misconception into the owner's ledger under its
+ * ontology ID (or derived ID), once per question. The label is display text
+ * only — the authored sentence or the diagnosis title — and never the key.
+ */
+async function recordMisconception(pid, row, q, owner, key, label) {
   if (!key) return null;
+  const st = await ratingWithOccurrence(pid, row, q, owner, key, label);
+  await putRating(pid, owner, st);
+  row.trapKey = key;
+  return key;
+}
+
+/** The owner's rating row with one more occurrence of `key` in its ledger — not yet written. */
+async function ratingWithOccurrence(pid, row, q, owner, key, label) {
   const now = Date.now();
   const st = (await getRating(pid, owner)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
   const traps = { ...(st.traps || {}) };
   const prev = traps[key] || { n: 0, credit: 0, firstAt: now };
   traps[key] = {
     n: Math.min(9, (prev.n || 0) + 1), credit: 0, firstAt: prev.firstAt || now, lastAt: now,
-    label: safeLabel(misconceptionLabel(hit.why), 140),
+    label: safeLabel(label, 140),
     dotpoint: indiaDpKeyOf(row) || (row.india ? null : q.dotpoint) || prev.dotpoint || null
   };
-  await putRating(pid, owner, { ...st, traps: trimTraps(traps) });
-  row.trapKey = key;
-  return key;
+  return { ...st, traps: trimTraps(traps) };
 }
+
+// Questions whose cloud-proposed misconception is being written right now. The
+// local backend runs in one JS context, so this closes the window between
+// reading `trapKey` and writing it: a retried or doubled request cannot count
+// the same question twice.
+const recordingMisconception = new Set();
 
 /**
  * A misstep Step Check could name is the same kind of evidence a designed
@@ -304,20 +382,7 @@ async function recordStepTrap(pid, row, q, diagnosis) {
   if (row.mode === 'rush' || row.mode === 'match') return null;
   if (diagnosis.confidence !== 'high' || diagnosis.code === 'counterexample') return null;
   const owner = evidenceKeyOf(row, q);
-  const key = stepTrapKey(owner, diagnosis.code);
-  if (!key) return null;
-  const now = Date.now();
-  const st = (await getRating(pid, owner)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
-  const traps = { ...(st.traps || {}) };
-  const prev = traps[key] || { n: 0, credit: 0, firstAt: now };
-  traps[key] = {
-    n: Math.min(9, (prev.n || 0) + 1), credit: 0, firstAt: prev.firstAt || now, lastAt: now,
-    label: safeLabel(diagnosis.title, 140),
-    dotpoint: indiaDpKeyOf(row) || (row.india ? null : q.dotpoint) || prev.dotpoint || null
-  };
-  await putRating(pid, owner, { ...st, traps: trimTraps(traps) });
-  row.trapKey = key;
-  return key;
+  return recordMisconception(pid, row, q, owner, misconceptionIdForDiagnosis(diagnosis), diagnosis.title);
 }
 
 /**
@@ -331,18 +396,29 @@ async function namedTrap(pid, subtopicId, key) {
   const st = await getRating(pid, subtopicId);
   const t = st?.traps?.[key];
   if (!t || t.n < TRAP_ACTIVE_AT) return null;
-  return { key, label: t.label, count: t.n };
+  return { key, id: misconceptionById(key)?.id || null, label: t.label, count: t.n };
 }
 
 /**
- * A clean, unaided correct answer is evidence the slip is receding, so every
- * trap in that subtopic banks a credit. Two credits stop it being surfaced or
- * steering the queue; four and it is forgotten. A hinted or second-try answer
- * banks nothing — it is not evidence the student can do it unaided.
+ * A clean, unaided correct answer is evidence a slip is receding only when the
+ * question gave the student the chance to make that slip — it carried the same
+ * designed trap or distractor. Only those traps bank a credit; every other trap
+ * in the subtopic is left exactly as it was, because getting an unrelated form
+ * right says nothing about the misconception (issue #232). Two credits stop a
+ * trap being surfaced or steering the queue; four and it is forgotten. A hinted
+ * or second-try answer banks nothing — it is not evidence the student can do it
+ * unaided. Opportunities are ontology IDs, so a misconception Step Check
+ * named in the student's working (say `distribute-sign`) is repaired by a clean
+ * answer to a question whose designed trap maps to that same ID — that
+ * question really did offer the slip. A Step Check misconception no authored
+ * trap maps to has no opportunity on any question, so no single answer
+ * repairs it; it leaves the active set through the recency window and the
+ * ledger cap instead.
  */
-function decayTraps(traps) {
+function decayTraps(traps, opportunities) {
   const out = {};
   for (const [key, t] of Object.entries(traps || {})) {
+    if (!opportunities || !opportunities.has(key)) { out[key] = t; continue; }
     const credit = (Number(t?.credit) || 0) + 1;
     if (credit < TRAP_CREDIT_FORGET) out[key] = { ...t, credit };
   }
@@ -366,7 +442,8 @@ function namedWeaknesses(ratings, nowMs = Date.now(), limit = 6, { india = false
     for (const t of activeTraps(st.traps, nowMs)) {
       const dp = named ? indiaNameOf(t.dotpoint) : dotpointOf(subtopic, t.dotpoint);
       out.push({
-        key: t.key, subtopic, subtopicName: named ? named.name : sub.name, strand: named ? named.strand : sub.strand,
+        key: t.key, id: misconceptionById(t.key)?.id || null,
+        subtopic, subtopicName: named ? named.name : sub.name, strand: named ? named.strand : sub.strand,
         year: named ? named.year : sub.year,
         label: t.label, count: t.n, lastAt: t.lastAt,
         dotpoint: named ? (dp && dp.dotpoint != null ? dp.dotpoint : null) : (dp ? dp.id : null),
@@ -725,8 +802,12 @@ async function publicUser(p, nowMs = Date.now()) {
     streak: await streakFor(p.id, nowMs, tz),
     today: { questions: today.questions, correct: today.correct, xp: today.xp },
     isDemo: !!p.isDemo, handwriting: p.handwriting !== false,
-    // Default false, and false for every profile that predates the setting.
-    cloudHandwriting: p.cloudHandwriting === true,
+    // Tri-state: true / false when the student chose in Settings, null when
+    // they never did. A null profile gets server reading by default only while
+    // it is linked to a cloud account and the server says reading is usable
+    // (ink/cloudReader.js cloudReadingWanted; ADR-0001 online-first).
+    cloudHandwriting: p.cloudHandwriting === true ? true : p.cloudHandwriting === false ? false : null,
+    cloudLinked: await profileCloudLinked(p.id),
     cloudMarking: p.cloudMarking === true,
     // Plan and free-tier usage are read from device rows: the entitlement is the
     // server-issued snapshot (or 'free'), the usage is the local counter.
@@ -819,31 +900,37 @@ function indiaDotpointStates(chapter, chapterRow, trackId, grade, ratings, now =
  * the same honesty the NSW path keeps, so a "same slip" question is one that
  * can actually spring the slip.
  */
-async function createIndiaQuestion(pid, chapter, target, mode, trackId, examId = null, taskId = null, trapKey = null) {
+async function createIndiaQuestion(pid, chapter, target, mode, trackId, examId = null, taskId = null, trapKey = null, retarget = null) {
   if (!chapter || !target) throw Object.assign(new Error('That India syllabus target has no authored question form yet.'), { status: 409, code: 'INDIA_TARGET_UNCOVERED' });
-  let q = null;
-  let delivered = null;
-  for (let i = 0; i < (trapKey ? TRAP_SEEK_TRIES : 1); i++) {
-    const cand = generateQuestion(target.generator, target.difficulty);
-    if (!q) q = cand;
-    if (!trapKey) break;
-    const probes = (Array.isArray(cand.traps) ? cand.traps : [])
-      .concat(Object.values(cand.answer?.optionTraps || {}).map(why => ({ why })));
-    if (probes.some(t => misconceptionKey(chapter.id, t.why) === trapKey)) { q = cand; delivered = trapKey; break; }
-  }
+  const springs = cand => (Array.isArray(cand.traps) ? cand.traps : [])
+    .concat(Object.values(cand.answer?.optionTraps || {}).map(why => ({ why })))
+    .some(t => misconceptionIdForTrap(chapter.id, t.why) === trapKey);
+  // Candidate 0 is the resolved target; later candidates re-resolve it when the
+  // caller can, so a chapter-level request is not stuck on one small cell.
+  const targetOf = new Map();
+  const picked = drawDistinct(k => {
+    const t = (k > 0 && typeof retarget === 'function' && retarget()) || target;
+    const cand = generateQuestion(t.generator, t.difficulty);
+    targetOf.set(cand, t);
+    return cand;
+  }, recentlyServedContent(pid), { tries: trapKey ? Math.max(TRAP_SEEK_TRIES, CONTENT_DEDUP_TRIES) : CONTENT_DEDUP_TRIES, accept: trapKey ? springs : null });
+  const q = picked.q;
+  const delivered = trapKey && picked.accepted && springs(q) ? trapKey : null;
+  const served = targetOf.get(q) || target;
   const row = {
-    id: uuid(), pid, subtopic: q.subtopic, difficulty: q.difficulty || target.difficulty, payload: q,
+    id: uuid(), pid, subtopic: q.subtopic, difficulty: q.difficulty || served.difficulty, payload: q,
     // The generator is stored alongside the subtopic because they are not
     // always the same id: a previous-year question's payload names the chapter
     // it belongs to, while the bank that produced it is the archive. Retry
     // regenerates from this, so "the same question again" really is the same
     // past-paper question rather than an authored one from the same chapter.
-    generator: target.generator,
-    india: { chapterId: chapter.id, track: trackId, dotpointIndex: target.dotpointIndex },
+    generator: served.generator,
+    india: { chapterId: chapter.id, track: trackId, dotpointIndex: served.dotpointIndex },
     mode, examId, taskId, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now()
   };
   await put('questions', row);
-  return { row, payload: q, trapKey: delivered };
+  noteServedContent(pid, q);
+  return { row, payload: q, trapKey: delivered, target: served, repeat: picked.repeat };
 }
 
 // ── Indian smart practice ────────────────────────────────────────────────────
@@ -928,7 +1015,21 @@ function indiaPool(trackId, grade, ratings, now) {
 function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint = null, difficulty = null, pyqOnly = false, rand = Math.random() } = {}) {
   const grade = p.year;
   const trackName = indiaTrack(trackId, grade).name;
-  const { pool, states, aheadIds, aheadUnlocked } = indiaPool(trackId, grade, ratings, now);
+  const scoped = indiaPool(trackId, grade, ratings, now);
+  const { states, aheadIds, aheadUnlocked } = scoped;
+  // Smart practice under "past papers only" chooses among the chapters an
+  // archive can actually serve; choosing over the whole track first refused
+  // most requests with INDIA_PYQ_UNAVAILABLE for a chapter the student never
+  // picked (content certification, §06).
+  const pool = pyqOnly && !chapter
+    ? scoped.pool.filter(c => resolveIndiaTarget(c, { track: trackId, grade, pyqOnly: true, random: () => 0 }))
+    : scoped.pool;
+  if (pyqOnly && !chapter && scoped.pool.length && !pool.length) {
+    throw Object.assign(
+      new Error(`Pri's previous-year archive has no ${trackName} past-paper question for your class yet. Turn the past-papers-only filter off to practise authored questions.`),
+      { status: 409, code: 'INDIA_PYQ_UNAVAILABLE' }
+    );
+  }
   let choice;
   if (chapter) {
     const st = states[chapter.id] || indiaState(chapter, ratings, now);
@@ -937,8 +1038,11 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
     if (!pool.length) throw Object.assign(new Error('No generated questions are available for this India track yet.'), { status: 409, code: 'INDIA_TRACK_UNCOVERED' });
     const poolIds = new Set(pool.map(c => c.id));
     const reviewsDue = reviews.filter(r => r.dueAt <= now && poolIds.has(r.subtopic)).sort((a, b) => a.dueAt - b.dueAt);
+    // A finished placement check nudges which untouched chapter comes first —
+    // a bounded prior that stops counting the moment the chapter has evidence.
+    const priors = placementPriorsOf(p);
     const picked = pickNextAmong({
-      candidates: pool.map(c => ({ id: c.id, weight: c.weight, own: !aheadIds.has(c.id) })),
+      candidates: pool.map(c => ({ id: c.id, weight: c.weight, own: !aheadIds.has(c.id), prior: priors[c.id] || 0 })),
       ratings: states, reviewsDue, rand, recent: recentlyServed(p.id), nowMs: now
     });
     const c = indiaChapter(picked.subtopic);
@@ -953,8 +1057,34 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   const chapterRow = ratings[c.id] || null;
   const asked = indiaDotpointIndex(c, dotpoint);
   let dp = null;
-  if (asked == null) {
-    const dpPool = indiaDotpointStates(c, chapterRow, trackId, grade, ratings, now);
+  // Past papers are filed by chapter, never by dot point (resolveIndiaTarget
+  // consults the archives only for a chapter-level request). Narrowing a
+  // "past papers only" request to a dot point the student never named sent
+  // every such request to the dot-point branch, so the filter refused even the
+  // chapters whose archive does hold questions (content certification, §06).
+  // A difficulty the student named on a chapter they chose (the Class X
+  // library's D1–D4 buttons, a ?difficulty= link) is held to the track window
+  // like every other request (adaptive-08) — and said so when it had to move —
+  // and the dot point is then chosen among those authored closest to it.
+  const namedDifficulty = choice.explicit && difficulty != null && difficulty !== '' && Number.isFinite(Number(difficulty));
+  const namedRung = namedDifficulty ? clampToIndiaWindow(Number(difficulty), trackId, grade) : null;
+  if (asked == null && !pyqOnly) {
+    let dpPool = indiaDotpointStates(c, chapterRow, trackId, grade, ratings, now);
+    // With a named difficulty, the dot point is chosen among those authored at
+    // that rung, so "this chapter at D3" is not answered with a D1 question
+    // because the picker landed on a dot point that has no D3 form.
+    if (namedRung != null) {
+      // Nearest authored rung per dot point; keep the dot points that get
+      // closest to the rung asked for (exactly it, when any has it).
+      const gapOf = i => Math.min(Infinity, ...(c.covers || []).filter(cv => cv.dp.includes(i)).flatMap(cv => cv.diff || []).map(r => Math.abs(r - namedRung)));
+      const gaps = c.dotpoints.map((_, i) => gapOf(i));
+      const best = Math.min(...gaps);
+      const atRung = c.dotpoints.map((_, i) => i).filter(i => Number.isFinite(best) && gaps[i] === best).map(ordinal => {
+        const key = indiaDotpointKey(c.id, ordinal);
+        return { id: key, index: ordinal, text: c.dotpoints[ordinal], ...indiaDotpointState(c, ordinal, chapterRow, ratings, now), traps: trapsForDotpoint(chapterRow?.traps, key) };
+      });
+      if (atRung.length) dpPool = atRung;
+    }
     // A misconception lives on a dot point: when one is being hunted, that dot
     // point is the place to hunt it.
     const preferred = choice.trap?.dotpoint ? dpPool.find(d => d.id === choice.trap.dotpoint) : null;
@@ -972,6 +1102,11 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
       state: { ...basis, trapPressure: trapPressureOf(st.traps, now), recentWrong: recentWrongOf(st) }, nowMs: now, rand
     });
   } else want = choice.difficulty;
+  // A chapter the placement check found a gap in, and that has no practice
+  // evidence yet, starts at the bottom of the track's window.
+  const placementPrior = placementPriorsOf(p)[c.id] || 0;
+  const diagnosticStart = !choice.explicit && !st.attempts && placementPrior > 0 && (difficulty == null || difficulty === '');
+  if (diagnosticStart) want = indiaDifficultyWindow(trackId, grade).floor;
   want = clampToIndiaWindow(want, trackId, grade);
   // "Past papers only" is a filter on what may be served, not a preference:
   // when the archive has nothing for the chapter the request is refused with a
@@ -981,7 +1116,10 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   if (!target && pyqOnly) {
     throw Object.assign(
       new Error(`Pri's previous-year archive has no ${trackName} past-paper question for ${c.name} yet. Turn the past-papers-only filter off to practise authored questions on this chapter.`),
-      { status: 409, code: 'INDIA_PYQ_UNAVAILABLE' }
+      // The nearest chapters that DO have past papers, so the empty state can
+      // offer one tap to real exam questions instead of a dead end. Nothing is
+      // substituted here: the student chooses.
+      { status: 409, code: 'INDIA_PYQ_UNAVAILABLE', detail: { chapter: c.id, alternatives: indiaPyqAlternatives(c, { track: trackId, grade }) } }
     );
   }
   if (!target) {
@@ -991,10 +1129,79 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   if (target.pyq) why += ' This one is a real previous-year question.';
   if (target.dotpointIndex != null) why += ` Dot point: ${c.dotpoints[target.dotpointIndex]}`;
   if (target.windowed === false) why += ` (Served at D${target.difficulty} — this dot point has no authored form at ${trackName} depth yet.)`;
+  if (namedDifficulty && Math.round(Number(difficulty)) !== namedRung) {
+    const { floor, ceiling } = indiaDifficultyWindow(trackId, grade);
+    why += ` (You asked for D${Math.round(Number(difficulty))}; ${trackName} practice is held to D${floor}–D${ceiling}.)`;
+  }
+  if (diagnosticStart) why += ' Your placement check suggested starting here — that was diagnostic evidence, not a mark.';
   return {
     chapter: c, target, dotpointKey: target.dotpointIndex != null ? indiaDotpointKey(c.id, target.dotpointIndex) : null,
+    retarget: sameTerms(target, () => resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly })),
     reason: choice.reason, reasonTag: choice.reasonTag, why, nextUp: choice.nextUp, trap: choice.trap,
     successTarget: choice.target, mastery: st.mastery || 0, explicit: choice.explicit, aheadUnlocked
+  };
+}
+
+/**
+ * A profile's attempt rows in the order they were answered.
+ *
+ * The attempts store is keyed by `${pid}:resolved:<digest>` — an exactly-once
+ * claim, not a sequence — so its natural order is the digest's order, which
+ * has nothing to do with time. "Recent" on Progress was the last fifteen rows
+ * in that order: fifteen answers from anywhere in the history, presented as
+ * the latest. Every consumer that means "most recent" reads through here.
+ * Ties (the parts of one exam question are resolved in the same millisecond)
+ * keep their store order, which is stable.
+ */
+async function attemptsInOrder(pid) {
+  const rows = await byIndex('attempts', 'pid', pid);
+  return rows.map((a, i) => [a, i])
+    .sort((x, y) => (Number(x[0].createdAt) || 0) - (Number(y[0].createdAt) || 0) || x[1] - y[1])
+    .map(([a]) => a);
+}
+
+/**
+ * The headline totals GET /stats serves, derived from the attempt rows and
+ * nothing else (engine/progressTruth.js; docs/product/progress-metrics.md).
+ * `attempts` and `correct` keep their old meaning — every marked answer, games
+ * included — and `evidence`/`accuracy` are the learning-evidence subset the
+ * progress page's accuracy is allowed to quote, gated below its sample floor.
+ */
+function statsTotals(attempts) {
+  const t = attemptTotals(attempts);
+  return { attempts: t.answered, correct: t.correct, ms: t.ms, evidence: t.evidence, accuracy: t.accuracy };
+}
+
+/**
+ * The India chapter a practice request names. A chapter id is taken as is. A
+ * generator id — what the Class X NCERT library's practice buttons and older
+ * bookmarks send — resolves to the chapter that draws on that generator,
+ * preferring one in the student's own track scope and class; before this,
+ * 8 of the library's 14 chapters answered INDIA_TOPIC_NOT_FOUND.
+ */
+function indiaChapterForRequest(subtopic, trackId, grade) {
+  const direct = indiaChapter(subtopic);
+  if (direct) return direct;
+  const users = indiaChaptersForGenerator(subtopic);
+  if (!users.length) return null;
+  const scope = new Set(indiaScope(trackId, grade).map(c => c.id));
+  return users.find(c => scope.has(c.id) && indiaChapterGrade(c) === Number(grade))
+    || users.find(c => scope.has(c.id))
+    || users.find(c => indiaChapterGrade(c) === Number(grade))
+    || users[0];
+}
+
+/**
+ * A re-resolver for the repeat window that only ever offers a target on the
+ * same terms as the one already explained to the student — same rung, same
+ * past-paper status, same window disclosure — so a retried draw can change
+ * which form serves the request but never what the reply said about it.
+ */
+function sameTerms(target, resolve) {
+  return () => {
+    const t = resolve();
+    return t && t.difficulty === target.difficulty && !!t.pyq === !!target.pyq
+      && (t.windowed !== false) === (target.windowed !== false) && t.dotpointIndex === target.dotpointIndex ? t : null;
   };
 }
 
@@ -1042,8 +1249,8 @@ async function indiaStats(p, ratings, now) {
     };
   } catch { recommendation = null; }
   const days = await activityFor(pid);
-  const attempts = await byIndex('attempts', 'pid', pid);
-  const totals = { attempts: attempts.length, correct: attempts.filter(a => a.correct).length, ms: attempts.reduce((s, a) => s + (a.ms || 0), 0) };
+  const attempts = await attemptsInOrder(pid);
+  const totals = statsTotals(attempts);
   const byDiff = [1, 2, 3, 4].map(d => {
     const rows = attempts.filter(a => a.difficulty === d);
     return { difficulty: d, n: rows.length, c: rows.filter(a => a.correct).length };
@@ -1392,6 +1599,7 @@ function sanitize(q, row) {
     pyqArchive: q.archive || null,
     inputHint: q.inputHint, answerPrefix: q.answerPrefix, answerSuffix: q.answerSuffix,
     hintsAvailable: (q.hints || []).length, hintsUsed: row.hintsUsed || 0,
+    tutorLevel: row.tutorLevel || 0,
     triesLeft: 2 - (row.tries || 0),
     supportsSteps: !!stepMetaFor(q),
     criteria: criteriaFor(q),
@@ -1410,39 +1618,36 @@ const TRAP_SEEK_TRIES = 12;
  * Returns the payload and an honest account of what was actually honoured, so
  * a caller never claims a focus the generator did not deliver.
  */
-function generateFocused(subtopic, difficulty, { dotpointId = null, trapKey = null } = {}) {
+function generateFocused(subtopic, difficulty, { dotpointId = null, trapKey = null, recent = [] } = {}) {
   const want = dotpointIsGeneratable(dotpointOf(subtopic, dotpointId)) ? dotpointId : null;
   // `dotpointExact` is the bank's own word for whether the question it just
   // built really exercises what was asked for. It is the only thing allowed to
   // decide that a dot point was practised.
   const delivered = q => (want && q?.dotpointExact ? want : null);
   const gen = () => generateQuestion(subtopic, difficulty, undefined, want || undefined);
-  if (!trapKey) {
-    const q = gen();
-    return { q, dotpoint: delivered(q), trapKey: null };
-  }
-  let first = null;
-  for (let i = 0; i < TRAP_SEEK_TRIES; i++) {
-    const q = gen();
-    if (!first) first = q;
-    const probes = (Array.isArray(q.traps) ? q.traps : [])
-      .concat(Object.values(q.answer?.optionTraps || {}).map(why => ({ why })));
-    if (probes.some(t => misconceptionKey(subtopic, t.why) === trapKey)) {
-      return { q, dotpoint: delivered(q), trapKey };
-    }
-  }
-  return { q: first, dotpoint: delivered(first), trapKey: null };
+  const springs = q => (Array.isArray(q.traps) ? q.traps : [])
+    .concat(Object.values(q.answer?.optionTraps || {}).map(why => ({ why })))
+    .some(t => misconceptionIdForTrap(subtopic, t.why) === trapKey);
+  // Bounded either way: a trap the bank cannot produce, or a pool too small to
+  // avoid the repeat window, ends in the best candidate rather than a spin.
+  const picked = drawDistinct(gen, recent, {
+    tries: trapKey ? Math.max(TRAP_SEEK_TRIES, CONTENT_DEDUP_TRIES) : CONTENT_DEDUP_TRIES,
+    accept: trapKey ? springs : null
+  });
+  const q = picked.q;
+  return { q, dotpoint: delivered(q), trapKey: trapKey && picked.accepted && springs(q) ? trapKey : null, repeat: picked.repeat };
 }
 
 async function createQuestion(pid, subtopic, difficulty, mode, examId = null, taskId = null, customQ = null, focus = null) {
-  const made = customQ ? null : generateFocused(subtopic, difficulty, focus || {});
+  const made = customQ ? null : generateFocused(subtopic, difficulty, { ...(focus || {}), recent: recentlyServedContent(pid) });
   const q = customQ ? { ...customQ, custom: true } : made.q;
   const row = {
     id: uuid(), pid, subtopic: q.subtopic || 'custom', difficulty: q.difficulty || 2, payload: q,
     mode, examId, taskId, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now()
   };
   await put('questions', row);
-  return { row, payload: q, dotpoint: made?.dotpoint || null, trapKey: made?.trapKey || null };
+  if (!customQ) noteServedContent(pid, q);
+  return { row, payload: q, dotpoint: made?.dotpoint || null, trapKey: made?.trapKey || null, repeat: !!made?.repeat };
 }
 
 function displayAnswer(q) {
@@ -1470,6 +1675,139 @@ function displayAnswer(q) {
   }
 }
 
+// ── Submission identity (§09) ────────────────────────────────────────────────
+// A practice submission carries a client idempotency key: one per tap of
+// Submit, reused unchanged when the same submission is retried after a timeout
+// or replayed after the app was killed mid-submit. The key is bound to the
+// content it was minted for by a digest, so a key can only ever answer the
+// request it first answered.
+
+const SUBMISSION_ID = /^[A-Za-z0-9_-]{8,80}$/;
+
+/** The request's idempotency key, or null when it carries none (or a malformed one). */
+export function submissionIdOf(body) {
+  const id = body?.submissionId;
+  return typeof id === 'string' && SUBMISSION_ID.test(id) ? id : null;
+}
+
+/** A stable digest of what a submission asked to be marked. Not a security hash. */
+export function submissionDigest(answer, steps) {
+  const text = JSON.stringify([String(answer ?? ''), steps === undefined || steps === null ? '' : String(steps)]);
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 + c, 0x85ebca6b) >>> 0;
+  }
+  return `${h1.toString(36)}${h2.toString(36)}`;
+}
+
+/**
+ * The deterministic marking of one practice answer, with no side effects. The
+ * live submit and an idempotent replay share it, so a replay explains the
+ * answer with exactly the feedback the first delivery gave.
+ */
+function markSubmission(q, answer, steps) {
+  const result = checkAnswer(q, answer);
+  let feedback = result.feedback;
+  if (!result.correct && q.answerType === 'mcq' && q.answer.optionTraps) {
+    feedback = q.answer.optionTraps[Number(answer)] || feedback;
+  }
+  let stepReport = null;
+  const meta0 = stepMetaFor(q);
+  if (steps && meta0) {
+    try { stepReport = stepCheck(meta0, steps); } catch { stepReport = null; }
+  }
+  // Working-type questions mark every submitted line — surface that report
+  if (!stepReport && result.stepReport) stepReport = result.stepReport;
+  // Method marks under the exam rule: a wrong answer with working that moves
+  // the solution on earns marks for those lines; restating the question does
+  // not. Practice and exams share methodMarks() so the two never disagree.
+  let partial = null;
+  if (!result.correct && !result.invalid && steps && String(steps).trim() && meta0) {
+    try {
+      const mm = methodMarks({ meta: meta0, working: String(steps), marks: criteriaFor(q).length, prompt: q.prompt, report: stepReport });
+      if (mm) partial = { okLines: mm.okLines, awarded: mm.awarded, note: mm.note };
+    } catch { partial = null; }
+  }
+  return { result, feedback, stepReport, partial, meta0 };
+}
+
+function solutionOf(q) {
+  return { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText };
+}
+
+/**
+ * The recorded outcome of a submission this question has already taken, or
+ * null when `submissionId` is new to it. The verdict comes from what was
+ * recorded, never from marking again: an engine that changed between the
+ * first delivery and the replay cannot move a mark that already stands.
+ */
+/** The explanation a submission was answered with, as stored with its record. */
+function replayRecord({ feedback, stepReport, partial, diagnosis }) {
+  return {
+    feedback: feedback ?? null,
+    stepReport: stepReport ?? null,
+    partial: partial ?? null,
+    diagnosis: diagnosis ?? null
+  };
+}
+
+function storedReplay(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  return {
+    feedback: raw.feedback ?? null,
+    stepReport: raw.stepReport ?? null,
+    partial: raw.partial ?? null,
+    diagnosis: raw.diagnosis ?? null
+  };
+}
+
+async function replaySubmission(p, row, q, submissionId, requestDigest, answer, steps) {
+  const recorded = row.answered ? row.resolution : null;
+  // A question skipped after its first try has no try left to report: the
+  // replay falls through to the skipped refusal instead of reopening it.
+  const tried = !row.answered && !row.discardedAt ? row.lastTry : null;
+  const match = recorded?.submissionId === submissionId ? recorded
+    : tried?.submissionId === submissionId ? tried : null;
+  if (!match) return null;
+  const digest = match === recorded ? recorded.requestDigest : tried.digest;
+  if (digest !== requestDigest) {
+    throw Object.assign(new Error('This submission id already answered a different answer.'), { status: 409, code: 'SUBMISSION_ID_REUSED' });
+  }
+  const owner = evidenceKeyOf(row, q);
+  // The explanation the student was given is the one stored with the record.
+  // Only a record written before explanations were stored is explained again.
+  const stored = storedReplay(match.replay);
+  const { feedback, stepReport, partial, diagnosis } = stored || (() => {
+    const m = markSubmission(q, answer, steps);
+    return { ...m, diagnosis: m.stepReport?.diagnosis || null };
+  })();
+  if (match === tried) {
+    return {
+      correct: false, resolved: false, triesLeft: 1,
+      feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial,
+      diagnosis: diagnosis || null,
+      misconception: await namedTrap(p.id, owner, tried.trapHit || null),
+      submissionId, replayed: true
+    };
+  }
+  let streak = 0;
+  try { streak = await streakFor(p.id, Date.now(), timezoneOf(p)); } catch { }
+  const correct = !!recorded.correct;
+  return {
+    correct, resolved: true, feedback, stepReport, partial: correct ? null : partial,
+    diagnosis: diagnosis || null,
+    misconception: await namedTrap(p.id, owner, recorded.trapHit || null),
+    solution: solutionOf(q),
+    xp: recorded.xp ?? 0, totalXp: recorded.totalXp ?? p.xp ?? 0, level: recorded.level ?? levelFromXp(p.xp || 0),
+    ratingDelta: recorded.ratingDelta ?? 0, mastery: recorded.mastery ?? 0, band: recorded.band ?? null,
+    predicted: recorded.predicted ?? null, streak, newBadges: [],
+    submissionId, replayed: true
+  };
+}
+
 async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk = false, resolution = {}) {
   const pid = profile.id;
   const now = Date.now();
@@ -1477,7 +1815,19 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   // an NSW one — never on the generator that happened to author the form.
   const owner = evidenceKeyOf(row, q);
   const st = (await getRating(pid, owner)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
-  const effHints = (row.hintsUsed || 0) + Math.max(0, (row.tries || 0) - (correct ? 1 : 0));
+  // Every level of tutor help counts as one hint: the same 15% a hint bulb
+  // costs, under the same floor (adaptive.js), so a tutored success is credited
+  // less than an independent one and never more than a hinted one.
+  const tutorLevel = Math.max(0, Math.min(3, Number(row.tutorLevel) || 0));
+  const helpUsed = (row.hintsUsed || 0) + tutorLevel;
+  // `row.tries` counts the wrong tries this question has already spent — it is
+  // only ever bumped by a first answer that was wrong (POST /practice/:id/submit).
+  // Each one is help in the same sense a hint is: the student was told the
+  // first answer was wrong. Subtracting one for a correct answer — a holdover
+  // from when `tries` counted every submission — handed a second-try success
+  // the full unaided rating gain, while the same attempt was filed as
+  // `supported` and graded Hard. One rule, one weighting (§12, #246).
+  const effHints = helpUsed + Math.max(0, row.tries || 0);
   let ratingAfter = st.rating;
   const isRush = mode === 'rush' || mode === 'match';
   const isCustom = q.custom;
@@ -1496,8 +1846,8 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
         last_at: now
       };
     }
-    const clean = correct && !(row.hintsUsed || 0) && !(row.tries || 0);
-    const traps = clean ? decayTraps(st.traps) : (st.traps || {});
+    const clean = correct && !helpUsed && !(row.tries || 0);
+    const traps = clean ? decayTraps(st.traps, repairOpportunitiesOf(q, owner)) : (st.traps || {});
     const recent = [correct ? 1 : 0, ...(Array.isArray(st.recent) ? st.recent : [])].slice(0, RECENT_WINDOW);
     ratingNext = {
       ...st, key: `${pid}:${owner}`, pid, subtopic: owner,
@@ -1512,7 +1862,7 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
     const key = `${pid}:${owner}`;
     const rev = await get('reviews', key);
     const grade = gradeFor({
-      correct, hintsUsed: row.hintsUsed || 0, tries: row.tries || 0,
+      correct, hintsUsed: helpUsed, tries: row.tries || 0,
       ms: ms || 0, difficulty: q.difficulty || 2
     });
     if (rev) reviewNext = { ...rev, subtopic: owner, ...scheduleReview(rev, grade, now) };
@@ -1520,7 +1870,11 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   }
 
   const xp = isRush ? (correct ? 6 : 0) : xpFor(q.difficulty, correct, 0, effHints);
-  const profileNext = { ...profile, xp: (profile.xp || 0) + xp };
+  // The profile row this request read may be stale by now: a placement answer,
+  // a settings change or another tab can have written it while this request
+  // awaited. XP is therefore added to the row as it is at write time below
+  // (`profileNext`), so neither side's write can roll the other back.
+  let profileNext = { ...profile, xp: (profile.xp || 0) + xp };
   const tz = timezoneOf(profile);
   const date = dayKey(now, tz);
   const activityKey = `${pid}:${date}`;
@@ -1556,8 +1910,16 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   const attempt = {
     id: `${pid}:resolved:${claim}`,
     pid, questionId: row.id, subtopic: owner, generator: q.subtopic, difficulty: q.difficulty || 2,
+    // Which item, at which content version, this attempt was made on — so it
+    // stays interpretable after the bank changes. A row from before identity
+    // existed reads as the legacy version, never as current content.
+    ...attemptContentRef(q),
     correct: correct ? 1 : 0, answerGiven: String(answerGiven ?? '').slice(0, 300),
     ms: ms || 0, hintsUsed: row.hintsUsed || 0, mode, viaInk,
+    // Learner-state evidence (§12): a success with hints, tutor help or a
+    // second try is supported evidence, never independent mastery.
+    tutorLevel,
+    support: helpUsed || (row.tries || 0) ? 'supported' : 'independent',
     evidenceKey,
     ratingBefore: st.rating, ratingAfter, createdAt: now
   };
@@ -1569,22 +1931,52 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
     ratingDelta: ratingAfter - st.rating, mastery, band: masteryBand(mastery / 100),
     predicted: profile.course === 'in' ? null : pred
   };
+  // The submission that resolved this question is recorded with the verdict,
+  // in the same transaction, so a replay of it can never find one without the
+  // other (§09).
+  const submission = resolution?.submission?.submissionId ? resolution.submission : null;
+  const { lastTry: _spentTry, ...settledRow } = row;
   const questionNext = {
-    ...row, answered: 1, resolvedAt: now,
-    resolution: { correct: !!correct, at: now, ...coreMeta }
+    ...settledRow, answered: 1, resolvedAt: now,
+    resolution: {
+      correct: !!correct, at: now, ...coreMeta,
+      ...(submission ? {
+        submissionId: submission.submissionId,
+        requestDigest: submission.requestDigest,
+        trapHit: submission.trapHit || null,
+        // What the student was told, as it was told: a replay hands this back
+        // rather than asking whatever engine is installed by then (§09).
+        ...(submission.replay ? { replay: submission.replay } : {})
+      } : {})
+    }
   };
 
+  const learningOps = [
+    // `add`, not `put`: collision means another delivery already won.
+    { type: 'add', store: 'attempts', value: attempt },
+    ...(ratingNext ? [{ type: 'put', store: 'ratings', value: ratingNext }] : []),
+    ...(reviewNext ? [{ type: 'put', store: 'reviews', value: reviewNext }] : []),
+    { type: 'put', store: 'profiles', value: profileNext },
+    { type: 'put', store: 'activity', value: activityNext },
+    { type: 'put', store: 'questions', value: questionNext },
+    ...(taskProgressNext ? [{ type: 'put', store: 'taskProgress', value: taskProgressNext }] : [])
+  ];
   try {
-    await atomicBatch([
-      // `add`, not `put`: collision means another delivery already won.
-      { type: 'add', store: 'attempts', value: attempt },
-      ...(ratingNext ? [{ type: 'put', store: 'ratings', value: ratingNext }] : []),
-      ...(reviewNext ? [{ type: 'put', store: 'reviews', value: reviewNext }] : []),
-      { type: 'put', store: 'profiles', value: profileNext },
-      { type: 'put', store: 'activity', value: activityNext },
-      { type: 'put', store: 'questions', value: questionNext },
-      ...(taskProgressNext ? [{ type: 'put', store: 'taskProgress', value: taskProgressNext }] : [])
-    ]);
+    // XP is added to the profile row as it is at write time, under the
+    // per-profile row lock, so a concurrent placement step or settings change
+    // is never rolled back by this write (and vice versa).
+    await withProfileRow(pid, async freshProfile => {
+      if (freshProfile) profileNext = { ...freshProfile, xp: (freshProfile.xp || 0) + xp };
+      const ops = learningOps.map(op => (op.store === 'profiles' ? { ...op, value: profileNext } : op));
+      // A practice attempt and its cloud queue entry are one write (§22): an app
+      // killed after the commit can no longer leave an attempt the cloud never
+      // hears about.
+      if (resolution?.syncQueue === true) {
+        await stageAttemptProgress(pid, row.id, attempt.id, queueOp => atomicBatch([...ops, queueOp]));
+      } else {
+        await atomicBatch(ops);
+      }
+    });
   } catch (err) {
     // The attempt key is the authoritative exactly-once claim. A collision on
     // that key means another delivery already committed this same resolution;
@@ -1600,6 +1992,8 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
 
   // Only now is it safe to update the object the caller is still holding.
   profile.xp = profileNext.xp;
+  coreMeta.totalXp = profileNext.xp;
+  coreMeta.level = levelFromXp(profileNext.xp);
 
   // Badges are derived, fixed-key and idempotent. They are intentionally after
   // the learning transaction: a badge may be recomputed after a crash, while
@@ -1608,7 +2002,7 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   try {
     newBadges = await checkBadges(pid, {
       type: 'attempt', difficulty: q.difficulty, correct,
-      hintsUsed: row.hintsUsed, year: profile.year, xp: profileNext.xp
+      hintsUsed: helpUsed, year: profile.year, xp: profileNext.xp
     }, now, tz);
   } catch { /* core learning result is already durable */ }
 
@@ -1625,6 +2019,16 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
 // reading a file written by a stranger.
 
 const CUSTOM_ANSWER_TYPES = new Set(['numeric', 'expression', 'mcq']);
+
+/** The content fields an attempt (or restored row) carries, migration-safe. */
+function attemptContentRef(src) {
+  const ref = contentRefOf(src);
+  const seed = Number(src?.seed);
+  return {
+    contentId: ref.contentId, contentVersion: ref.contentVersion, contentHash: ref.contentHash,
+    seed: Number.isSafeInteger(seed) && seed >= 0 ? seed : null
+  };
+}
 
 /** The one shape a custom question may take, wherever it came from. */
 function buildCustomQuestion(src, ownerPid, strict = false) {
@@ -1722,6 +2126,11 @@ function safePayload(src) {
   out.stem = sanitizeText(src.stem, 4000) || undefined;
   out.prompt = sanitizeText(src.prompt, 4000) || undefined;
   out.difficulty = safeInt(src.difficulty, 1, 4, 2);
+  // Content identity survives a restore only when well formed; a legacy row
+  // comes back without it, which contentRefOf reads as the legacy version.
+  const ref = contentRefOf(src);
+  if (ref.contentId) { out.contentId = ref.contentId; out.contentVersion = ref.contentVersion; }
+  if (ref.contentHash) out.contentHash = ref.contentHash;
   out.figure = safeFigure(src.figure);
   out.mcqOptions = src.mcqOptions === undefined ? undefined : safeOptions(src.mcqOptions);
   out.steps = safeSteps(src.steps);
@@ -1906,8 +2315,12 @@ const IMPORT_ROWS = {
     difficulty: safeInt(r.difficulty, 1, 4, 2), correct: r.correct ? 1 : 0,
     answerGiven: sanitizeText(r.answerGiven, 300), ms: safeInt(r.ms, 0, 1e9, 0),
     hintsUsed: safeInt(r.hintsUsed, 0, 20, 0), mode: sanitizeText(r.mode, 20) || 'practice',
+    tutorLevel: safeInt(r.tutorLevel, 0, 3, 0),
+    support: r.support === 'independent' ? 'independent' : (r.support === 'supported' ? 'supported' : undefined),
     viaInk: !!r.viaInk, ratingBefore: safeNum(r.ratingBefore, 0), ratingAfter: safeNum(r.ratingAfter, 0),
-    createdAt: safeTime(r.createdAt) || Date.now()
+    createdAt: safeTime(r.createdAt) || Date.now(),
+    // A backup written before content identity existed restores as legacy.
+    ...attemptContentRef(r)
   }),
   rushRuns: (r, pid) => ({
     pid, score: safeInt(r.score, 0, 100, 0), correct: safeInt(r.correct, 0, 100, 0),
@@ -1938,6 +2351,7 @@ const IMPORT_ROWS = {
       payload, mode: sanitizeText(r.mode, 20) || 'practice',
       examId: ids.exam(r.examId), taskId: safeId(r.taskId),
       answered: r.answered ? 1 : 0, tries: safeInt(r.tries, 0, 9, 0), hintsUsed: safeInt(r.hintsUsed, 0, 20, 0),
+      tutorLevel: safeInt(r.tutorLevel, 0, 3, 0),
       createdAt: safeTime(r.createdAt) || Date.now(),
       // WP india-exams: an India question is filed under its NCERT chapter and
       // marked on its section's own grid. Dropping these fields on the way back
@@ -2079,6 +2493,13 @@ function importProgress(src) {
 
 // ── Route implementations ────────────────────────────────────────────────────
 
+// The tutor conversation route, built on first use from its own module (see
+// the 'POST /practice/:id/tutor/ask' entry below). Function declarations above
+// and below this table are hoisted, so the deps are live by the time it runs.
+let tutorAskRoutePromise = null;
+const tutorAskRoute = () => (tutorAskRoutePromise ||= import('../tutor/askRoute.js')
+  .then(m => m.createTutorAskRoute({ requireProfile, get, assertPracticeRow, tutorRequest, tutorWork, displayAnswer, sanitizeText })));
+
 const routes = {
 
   // ---- profiles / accounts ----
@@ -2094,10 +2515,39 @@ const routes = {
     };
   },
   'POST /profiles': async (body) => {
+    // Profile creation is an authority boundary, not just a form handler. Reject
+    // contradictory explicit identity before anything is written rather than
+    // silently cleaning a JEE/Class mismatch into a different learner.
+    const requestedYear = body.year === undefined ? 9 : Number(body.year);
+    if (!Number.isInteger(requestedYear) || requestedYear < 7 || requestedYear > 12) {
+      throw Object.assign(new Error('Choose a supported class or year from 7 to 12.'), { status: 400 });
+    }
+    if (body.course !== undefined && !COURSES[body.course]) {
+      throw Object.assign(new Error('Choose a supported curriculum.'), { status: 400 });
+    }
+    if (body.role !== undefined && !['student', 'teacher'].includes(body.role)) {
+      throw Object.assign(new Error('Choose Student or Teacher.'), { status: 400 });
+    }
+    const requestedCourse = COURSES[body.course] ? body.course : 'nsw';
+    const explicitTrack = body.indiaTrack !== undefined && body.indiaTrack !== null && body.indiaTrack !== '';
+    const allowedIndiaTracks = new Set(['cbse', 'jee-main', 'jee-advanced', 'olympiad']);
+    if (requestedCourse === 'in' && explicitTrack && !allowedIndiaTracks.has(body.indiaTrack)) {
+      throw Object.assign(new Error('Choose a supported India maths track.'), { status: 400 });
+    }
+    if (requestedCourse === 'in' && ['jee-main', 'jee-advanced'].includes(body.indiaTrack) && requestedYear < 11) {
+      throw Object.assign(new Error('JEE Main and JEE Advanced profiles must use Class 11 or 12.'), { status: 400 });
+    }
+    if (requestedCourse !== 'in' && explicitTrack) {
+      throw Object.assign(new Error('An India maths track can only be used with the India curriculum.'), { status: 400 });
+    }
+    if (requestedCourse === 'nsw' && body.pathway === 'ext2' && requestedYear !== 12) {
+      throw Object.assign(new Error('Mathematics Extension 2 is only supported for Year 12.'), { status: 400 });
+    }
+
     const p = {
       id: uuid(), name: String(body.name || 'Student').trim().slice(0, 40) || 'Student',
-      year: Math.min(12, Math.max(7, Number(body.year) || 9)),
-      course: COURSES[body.course] ? body.course : 'nsw',
+      year: requestedYear,
+      course: requestedCourse,
       role: body.role === 'teacher' ? 'teacher' : 'student',
       avatar: body.avatar || '🙂', theme: 'dark', dailyGoal: 10, xp: 0,
       // The language the sign-up screen was being read in. Somebody who chose
@@ -2238,6 +2688,7 @@ const routes = {
   'GET /me': async () => ({ user: await publicUser(await requireProfile()) }),
   'PATCH /me': async (body) => {
     const p = await requireProfile();
+    const original = { ...p };
     if (body.name !== undefined) p.name = String(body.name).trim().slice(0, 40) || p.name;
     if (body.year !== undefined) p.year = Math.min(12, Math.max(7, Number(body.year) || p.year));
     if (body.pathway !== undefined && p.course === 'nsw') p.pathway = cleanPathway(body.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
@@ -2278,8 +2729,19 @@ const routes = {
       }
       await setProfileEmail(p, email);
     }
-    await put('profiles', p);
-    return { user: await publicUser(p) };
+    // Only the fields this request changed are written, onto the row as it is
+    // now: XP from a practice answer or a placement step that landed while this
+    // request awaited (the email check above) is kept rather than rolled back.
+    const changed = {};
+    for (const k of new Set([...Object.keys(original), ...Object.keys(p)])) {
+      if (p[k] !== original[k]) changed[k] = p[k];
+    }
+    const next = await withProfileRow(p.id, async fresh => {
+      const merged = { ...(fresh || original), ...changed };
+      await put('profiles', merged);
+      return merged;
+    });
+    return { user: await publicUser(next) };
   },
 
   // ---- curriculum ----
@@ -2384,6 +2846,37 @@ const routes = {
   },
 
   // ---- practice ----
+  // KALP-04 continuity summary: identifiers/context only — never question content.
+  'GET /practice/resume': async () => {
+    const p = await requireProfile();
+    const row = (await byIndex('questions', 'pid', p.id))
+      .filter(r => r && !r.answered && !r.discardedAt && !isExamRow(r) && r.mode !== 'rush' && r.mode !== 'match')
+      // Home's "continue" must be a promise /practice keeps: a row the current
+      // class/track no longer serves is not offered (resumeInScope). Task rows
+      // keep their own contract.
+      .filter(r => r.taskId || resumeInScope(p, r))
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0];
+    if (!row) return { resume: null };
+    const task = row.taskId ? await get('tasks', row.taskId) : null;
+    // The destination names the row's own chapter (and the past-papers filter
+    // when it is a previous-year question), so opening it resumes exactly this
+    // question even when a newer unfinished one exists under other filters.
+    const chapterId = row.india?.chapterId || null;
+    const exact = !row.taskId && chapterId
+      ? '/practice?' + new URLSearchParams({ subtopic: chapterId, ...(row.india?.track ? { track: row.india.track } : {}), ...(row.payload?.pyq ? { pyq: '1' } : {}) }).toString()
+      : null;
+    return { resume: {
+      kind: row.taskId ? 'task' : 'practice',
+      questionId: row.id,
+      taskId: row.taskId || null,
+      title: task?.title || '',
+      subtopic: row.india?.chapterId || row.payload?.subtopic || row.subtopic || null,
+      difficulty: row.difficulty || null,
+      createdAt: row.createdAt || null,
+      destination: row.taskId ? '/practice?task=' + encodeURIComponent(row.taskId) : (exact || '/practice')
+    } };
+  },
+
   'POST /practice/next': async (body) => {
     const p = await requireProfile();
     const unfinished = await resumableQuestion(p, body);
@@ -2416,9 +2909,10 @@ const routes = {
         const state = indiaState(chapter, ratings, nowMs);
         const want = target.difficulty != null ? Number(target.difficulty) : pickDifficulty(state.rating, state.attempts, { state, nowMs });
         const resolved = resolveIndiaTarget(chapter, { dotpoint: target.dotpoint, difficulty: want, track: trackId, grade });
-        const { row, payload } = await createIndiaQuestion(p.id, chapter, resolved, 'task', trackId, null, taskId);
+        const retarget = resolved ? sameTerms(resolved, () => resolveIndiaTarget(chapter, { dotpoint: target.dotpoint, difficulty: want, track: trackId, grade })) : null;
+        const { row, payload, repeat } = await createIndiaQuestion(p.id, chapter, resolved, 'task', trackId, null, taskId, null, retarget);
         return {
-          question: sanitize(payload, row), reason: 'task',
+          question: sanitize(payload, row), reason: 'task', repeat: !!repeat,
           why: `Task: ${task.title} — question ${done + 1} of ${task.count}.`,
           dotpoint: resolved.dotpointIndex, target: state.mastery, misconception: null
         };
@@ -2435,15 +2929,15 @@ const routes = {
     if (p.course === 'in' && !taskId) {
       const trackId = cleanIndiaTrack(track || p.indiaTrack, p.year);
       const ratings = await ratingsFor(p.id);
-      const chapter = subtopic ? indiaChapter(subtopic) : null;
+      const chapter = subtopic ? indiaChapterForRequest(subtopic, trackId, p.year) : null;
       if (subtopic && !chapter) throw Object.assign(new Error('That topic is not part of the India syllabus.'), { status: 404, code: 'INDIA_TOPIC_NOT_FOUND' });
       const reviews = await byIndex('reviews', 'pid', p.id);
       const pick = indiaPick(p, trackId, ratings, reviews, now, {
         chapter, dotpoint, difficulty: difficulty != null && difficulty !== '' ? difficulty : null,
         pyqOnly: !!pyqOnly, rand: Math.random()
       });
-      const { row, payload, trapKey } = await createIndiaQuestion(
-        p.id, pick.chapter, pick.target, pick.reason === 'review' ? 'review' : 'practice', trackId, null, null, pick.trap?.key || null
+      const { row, payload, trapKey, repeat } = await createIndiaQuestion(
+        p.id, pick.chapter, pick.target, pick.reason === 'review' ? 'review' : 'practice', trackId, null, null, pick.trap?.key || null, pick.retarget
       );
       // Only what the optimiser chose feeds the interleaving memory: a chapter
       // the student asked for by name is their sitting, not the picker's.
@@ -2453,7 +2947,7 @@ const routes = {
         dotpoint: pick.target.dotpointIndex, target: pick.successTarget ?? null,
         misconception: trapKey ? pick.trap?.label || null : null,
         windowed: pick.target.windowed !== false, aheadUnlocked: pick.aheadUnlocked,
-        pyq: !!pick.target.pyq
+        pyq: !!pick.target.pyq, repeat: !!repeat
       };
     }
     let choice;
@@ -2525,11 +3019,11 @@ const routes = {
       noteServed(p.id, choice.subtopic);
     }
     const focus = { dotpointId: choice.dotpoint || null, trapKey: choice.trap?.key || null };
-    const { row, payload, dotpoint: served, trapKey } = await createQuestion(
+    const { row, payload, dotpoint: served, trapKey, repeat } = await createQuestion(
       p.id, choice.subtopic, choice.difficulty, choice.reason === 'review' ? 'review' : 'practice', null, null, null, focus
     );
     return {
-      question: sanitize(payload, row), reason: choice.reason,
+      question: sanitize(payload, row), reason: choice.reason, repeat,
       why: served || !choice.dotpoint ? choice.why : choice.whyPlain,
       dotpoint: served, target: choice.target ?? null,
       misconception: trapKey ? choice.trap?.label || null : null
@@ -2540,6 +3034,7 @@ const routes = {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
     if (!row.discardedAt) {
       row.discardedAt = Date.now();
@@ -2552,6 +3047,7 @@ const routes = {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
     if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
     const q = row.payload;
     const hints = q.hints || [];
@@ -2562,37 +3058,194 @@ const routes = {
     return { hint: hints[used - 1], level: used, remaining: hints.length - used };
   },
 
+  // ---- AI tutor (vision item 3) ----
+  // Three levels, strictly in order: 1 nudge → 2 Socratic question → 3 narrated
+  // walkthrough of the verified solution. The level is recorded on the row the
+  // moment it is asked for — the help is on screen whatever answered it — and
+  // resolve() charges it like a hint. assertPracticeRow runs before anything
+  // else, so an exam question is refused here and never reaches the network.
+  'POST /practice/:id/tutor': async (body, params) => {
+    if (!tutorFeatureEnabled()) throw tutorDisabledError();
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
+    if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409, code: 'ALREADY_RESOLVED' });
+    const level = Number(body?.level);
+    if (![1, 2, 3].includes(level)) throw Object.assign(new Error('Choose help level 1, 2 or 3.'), { status: 400, code: 'TUTOR_LEVEL_INVALID' });
+    const used = Math.max(0, Math.min(3, Number(row.tutorLevel) || 0));
+    if (level > used + 1) {
+      throw Object.assign(new Error('Ask for the help levels in order.'), { status: 409, code: 'TUTOR_LEVEL_ORDER', next: used + 1 });
+    }
+    const q = row.payload;
+    if (level > used) {
+      row.tutorLevel = level;
+      await put('questions', row);
+    }
+    const tutorLevel = Math.max(used, level);
+    const solution = { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText };
+
+    if (level === 3) {
+      // The walkthrough is the deterministic Pri Explain storyboard of the
+      // verified solution — the whole solution, final answer included. Showing
+      // it therefore ends the question exactly as Reveal does: resolved, marked
+      // not correct, with the same rating, review, XP and task consequences.
+      // A student cannot watch the answer and then submit it for credit.
+      // Captions may be reworded afterwards through /tutor/captions; the
+      // mathematics never changes.
+      // The attempt and its cloud queue entry are one transaction (§22), as on Reveal.
+      const meta = await resolve(p, row, q, false, 'revealed', Math.max(0, Number(body?.ms) || 0), row.mode, false, { syncQueue: true });
+      // `level` in the reply is the XP level from resolve(), as on Reveal; the
+      // help level is `tutorLevel`.
+      return {
+        tutorLevel, source: 'deterministic',
+        correct: false, resolved: true, revealed: true,
+        walkthrough: { solution },
+        solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText },
+        ...meta, syncQueued: true
+      };
+    }
+
+    const work = tutorWork(q, body?.work);
+    const request = tutorRequest(p, row, q, solution, { level: level === 1 ? 'nudge' : 'socratic', locale: body?.locale, work });
+    const outcome = request ? await requestTutorHelp(request) : { error: { code: 'TUTOR_UNGROUNDED' } };
+    const hints = Array.isArray(q.hints) ? q.hints : [];
+    const authored = hints.length ? hints[Math.min(level - 1, hints.length - 1)] : null;
+    const fromModel = outcome?.tutor?.source === 'model' && typeof outcome.tutor.message === 'string' && outcome.tutor.message.trim();
+    return {
+      level, tutorLevel,
+      message: fromModel ? sanitizeText(outcome.tutor.message, 600) : (sanitizeText(outcome?.tutor?.message, 600) || authored),
+      source: fromModel ? 'tutor' : 'deterministic',
+      // Why the deterministic text is showing, as a code the UI can name — never
+      // the server's own message, which is not written for a student.
+      code: fromModel ? null : (outcome?.error?.code || outcome?.tutor?.reason || null)
+    };
+  },
+
+  'POST /practice/:id/tutor/captions': async (body, params) => {
+    if (!tutorFeatureEnabled()) throw tutorDisabledError();
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if ((Number(row.tutorLevel) || 0) < 3) {
+      throw Object.assign(new Error('Captions follow the walkthrough.'), { status: 409, code: 'TUTOR_LEVEL_ORDER', next: (Number(row.tutorLevel) || 0) + 1 });
+    }
+    const q = row.payload;
+    const captions = (Array.isArray(body?.captions) ? body.captions : []).slice(0, 24)
+      .map(c => ({ id: String(c?.id || '').replace(/[^a-z0-9_-]/gi, '').slice(0, 40), text: sanitizeText(c?.text, 700) }))
+      .filter(c => c.id && c.text);
+    if (!captions.length) return { captions: [], source: 'deterministic', code: 'TUTOR_NO_CAPTIONS' };
+    const solution = { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText };
+    const request = tutorRequest(p, row, q, solution, { level: 'walkthrough', locale: body?.locale, work: tutorWork(q, body?.work), captions });
+    const outcome = request ? await requestTutorHelp(request) : { error: { code: 'TUTOR_UNGROUNDED' } };
+    const returned = Array.isArray(outcome?.tutor?.captions) ? outcome.tutor.captions : [];
+    return {
+      captions: captions.map(c => {
+        const hit = returned.find(r => r?.id === c.id && r?.source === 'model' && typeof r.text === 'string');
+        return hit ? { id: c.id, text: sanitizeText(hit.text, 400), source: 'tutor' } : { ...c, source: 'deterministic' };
+      }),
+      source: returned.some(r => r?.source === 'model') ? 'tutor' : 'deterministic',
+      code: outcome?.error?.code || null
+    };
+  },
+  // The student's own question, between levels 1 and 3. Grounded and streamed
+  // here (client/src/tutor/askRoute.js); the panel never sees the solution.
+  // The route module (and the conversation and streaming code behind it) is
+  // reached through import() on the first question, and in a production build
+  // with the tutor off it is not built at all: the route then refuses with
+  // TUTOR_DISABLED exactly as the built route does when the flag is off.
+  'POST /practice/:id/tutor/ask': TUTOR_BUILT_OUT
+    ? async () => { throw tutorDisabledError(); }
+    : (body, params) => tutorAskRoute().then(route => route(body, params)),
+
+
+  // A misconception the cloud working checker PROPOSED for a wrong answer the
+  // on-device Step Check could not place. ADR-0001: the model proposes, the
+  // engine decides. It is written into learner state only when the
+  // deterministic diagnoser, run here on the same line, names the same
+  // ontology ID and no on-device break sits elsewhere; anything else comes
+  // back as 'possible' and changes nothing.
+  'POST /practice/:id/misconception': async (body, params) => {
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if (!row.answered) throw Object.assign(new Error('Answer the question first'), { status: 409 });
+    // A proposal is about one submission's working. One that names a different
+    // submission from the one that resolved this question arrived late, from
+    // working that is no longer the answer of record, and changes nothing.
+    const proposedFor = submissionIdOf(body);
+    if (proposedFor && row.resolution?.submissionId && row.resolution.submissionId !== proposedFor) {
+      return { status: null, id: null, line: null, recorded: false, misconception: null, stale: true };
+    }
+    const q = row.payload;
+    const lines = (Array.isArray(body?.lines) ? body.lines : [])
+      .slice(0, 40).map(l => sanitizeText(l, 400)).filter(Boolean);
+    const firstBreak = Number.isInteger(body?.firstBreak) ? body.firstBreak : -1;
+    const meta = stepMetaFor(q);
+    let localFirstBreak = -1;
+    if (meta && lines.length) {
+      try { localFirstBreak = stepCheck(meta, lines.join('\n'))?.firstBreak ?? -1; } catch { localFirstBreak = -1; }
+    }
+    const verdict = confirmCloudMisconception({
+      proposedId: body?.misconceptionId, firstBreak, lines, meta,
+      confident: body?.confident === true, localFirstBreak
+    });
+    if (!verdict) return { status: null, id: null, line: null, recorded: false, misconception: null };
+    const owner = evidenceKeyOf(row, q);
+    let recorded = null;
+    if (verdict.status === 'confirmed' && !recordingMisconception.has(row.id)) {
+      recordingMisconception.add(row.id);
+      try {
+        // Re-read under the guard: the check-and-set is on the stored row.
+        const fresh = await get('questions', row.id);
+        if (fresh && fresh.resolution && fresh.resolution.correct === false
+          && !fresh.trapKey && !q.custom && q.subtopic && fresh.mode !== 'rush' && fresh.mode !== 'match') {
+          const ratingNext = await ratingWithOccurrence(p.id, fresh, q, owner, verdict.id, verdict.title);
+          // The occurrence and the question's "already counted" mark land in
+          // one transaction, so neither can exist without the other.
+          await atomicBatch([
+            { type: 'put', store: 'ratings', value: { ...ratingNext, key: `${p.id}:${owner}`, pid: p.id, subtopic: owner } },
+            { type: 'put', store: 'questions', value: { ...fresh, trapKey: verdict.id } }
+          ]);
+          recorded = verdict.id;
+        }
+      } finally {
+        recordingMisconception.delete(row.id);
+      }
+    }
+    return {
+      status: verdict.status, id: verdict.id, line: verdict.line, recorded: !!recorded,
+      misconception: recorded ? await namedTrap(p.id, owner, recorded) : null
+    };
+  },
+
   'POST /practice/:id/submit': async (body, params) => {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
-    if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
-    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
+    assertPracticeRow(row);
     const q = row.payload;
     const { answer, ms, steps, viaInk, ink, photo, scribble } = body || {};
+    // One tap is one submission (§09). The card names each submission with a
+    // client idempotency key and sends that same key again when it retries
+    // after a timeout or replays after a relaunch. A key this question already
+    // answered gets that answer back, rebuilt from what was recorded — it is
+    // never marked a second time, never spends the second try, and never adds
+    // an attempt. The same key over different content is refused: replaying an
+    // old verdict for a new answer would hide the new answer.
+    const submissionId = submissionIdOf(body);
+    const requestDigest = submissionId ? submissionDigest(answer, steps) : null;
+    if (submissionId) {
+      const replay = await replaySubmission(p, row, q, submissionId, requestDigest, answer, steps);
+      if (replay) return replay;
+    }
+    if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
+    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
 
-    const result = checkAnswer(q, answer);
-    let feedback = result.feedback;
-    if (!result.correct && q.answerType === 'mcq' && q.answer.optionTraps) {
-      feedback = q.answer.optionTraps[Number(answer)] || feedback;
-    }
-    let stepReport = null;
-    const meta0 = stepMetaFor(q);
-    if (steps && meta0) {
-      try { stepReport = stepCheck(meta0, steps); } catch { stepReport = null; }
-    }
-    // Working-type questions mark every submitted line — surface that report
-    if (!stepReport && result.stepReport) stepReport = result.stepReport;
-    // Method marks under the exam rule: a wrong answer with working that moves
-    // the solution on earns marks for those lines; restating the question does
-    // not. Practice and exams share methodMarks() so the two never disagree.
-    let partial = null;
-    if (!result.correct && !result.invalid && steps && String(steps).trim() && meta0) {
-      try {
-        const mm = methodMarks({ meta: meta0, working: String(steps), marks: criteriaFor(q).length, prompt: q.prompt, report: stepReport });
-        if (mm) partial = { okLines: mm.okLines, awarded: mm.awarded, note: mm.note };
-      } catch { partial = null; }
-    }
+    const { result, feedback, stepReport, partial, meta0 } = markSubmission(q, answer, steps);
     // A wrong answer that landed on a designed distractor is not a random miss:
     // the trap names the misconception behind it. Counted here, before the
     // two-try branch below, because the first attempt is the honest evidence.
@@ -2621,19 +3274,32 @@ const routes = {
     const isFast = row.mode === 'rush' || row.mode === 'match';
     if (!result.correct && !result.invalid && !isFast && (row.tries || 0) < 1) {
       row.tries = (row.tries || 0) + 1;
+      // The spent try remembers which submission spent it, in the same write.
+      row.lastTry = submissionId ? {
+        submissionId, digest: requestDigest, trapHit: trapHit || null,
+        replay: replayRecord({ feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial, diagnosis: stepReport?.diagnosis || null })
+      } : null;
       await put('questions', row);
-      return { correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial, diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit) };
+      return { correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial, diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit), ...(submissionId ? { submissionId } : {}) };
     }
     if (result.invalid && !isFast) {
       return { correct: false, resolved: false, triesLeft: Math.max(0, 1 - (row.tries || 0)), invalid: true, feedback, stepReport };
     }
-    const meta = await resolve(p, row, q, result.correct, answer, ms, row.mode, !!viaInk);
+    const meta = await resolve(p, row, q, result.correct, answer, ms, row.mode, !!viaInk, {
+      submission: submissionId ? {
+        submissionId, requestDigest, trapHit: trapHit || null,
+        replay: replayRecord({ feedback, stepReport, partial, diagnosis: stepReport?.diagnosis || null })
+      } : null,
+      syncQueue: true
+    });
     return {
       correct: result.correct, resolved: true, feedback, stepReport, partial,
       diagnosis: stepReport?.diagnosis || null,
       misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit),
-      solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText },
-      ...meta
+      solution: solutionOf(q),
+      ...meta,
+      syncQueued: true,
+      ...(submissionId ? { submissionId } : {})
     };
   },
 
@@ -2641,11 +3307,12 @@ const routes = {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
     if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
     const q = row.payload;
-    const meta = await resolve(p, row, q, false, 'revealed', body?.ms || 0, row.mode);
-    return { correct: false, resolved: true, revealed: true, solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText }, ...meta };
+    const meta = await resolve(p, row, q, false, 'revealed', body?.ms || 0, row.mode, false, { syncQueue: true });
+    return { correct: false, resolved: true, revealed: true, solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText }, ...meta, syncQueued: true };
   },
 
   // ---- reviews ----
@@ -2714,13 +3381,17 @@ const routes = {
     const count = (await byIndex('exams', 'pid', p.id)).length;
     const pwLabel = examPw && examPw !== 'advanced' ? ` ${PATHWAYS[examPw].short}` : '';
     const exam = { id: examId, pid: p.id, year, pathway: examPw, title: `Year ${year}${pwLabel} Practice Paper ${count + 1}`, durationMin: minutes, questionIds: qids, createdAt: Date.now(), finishedAt: null, score: null, total: null, detail: null };
+    const rows = [];
+    for (const qid of qids) rows.push(await get('questions', qid));
+    exam.paperVersion = paperFingerprint(rows.filter(Boolean));
+    startExamClock(exam, exam.createdAt);
     await put('exams', exam);
     return { exam: await examFor(p.id, examId) };
   },
   'GET /exams': async () => {
     const p = await requireProfile();
     const rows = (await byIndex('exams', 'pid', p.id)).sort((a, b) => b.createdAt - a.createdAt);
-    return { exams: rows.map(e => ({ id: e.id, title: e.title, year: e.year, duration_min: e.durationMin, created_at: e.createdAt, finished_at: e.finishedAt, score: e.score, total: e.total })) };
+    return { exams: rows.map(e => ({ id: e.id, title: e.title, year: e.year, duration_min: e.durationMin, created_at: e.createdAt, finished_at: e.finishedAt, deadline_at: Number.isFinite(e.deadlineAt) ? e.deadlineAt : null, score: e.score, total: e.total })) };
   },
   'GET /exams/:id': async (body, params) => {
     const p = await requireProfile();
@@ -2732,6 +3403,9 @@ const routes = {
     const p = await requireProfile();
     const e = await get('exams', params.id);
     if (!e || e.pid !== p.id) throw Object.assign(new Error('Exam not found'), { status: 404 });
+    // A paper still being sat prints as a question paper only: answers, worked
+    // steps and marking criteria join it once the paper is submitted (#230).
+    const finished = !!e.finishedAt;
     const questions = [];
     for (const qid of e.questionIds) {
       const row = await get('questions', qid);
@@ -2747,30 +3421,49 @@ const routes = {
           subtopicName: q.title, difficulty: q.difficulty,
           parts: partsOf(q).map(pt => ({
             key: pt.key, prompt: pt.prompt, marks: pt.marks, answerType: pt.answerType, mcqOptions: pt.mcqOptions,
-            answerText: displayAnswer({ answerType: pt.answerType, answer: pt.answer, mcqOptions: pt.mcqOptions, answerPrefix: pt.answerPrefix, answerSuffix: pt.answerSuffix }),
-            steps: pt.steps
+            ...(finished ? {
+              answerText: displayAnswer({ answerType: pt.answerType, answer: pt.answer, mcqOptions: pt.mcqOptions, answerPrefix: pt.answerPrefix, answerSuffix: pt.answerSuffix }),
+              steps: pt.steps
+            } : {})
           })),
-          criteria: partsOf(q).map(pt => ({ mark: pt.marks, text: `Part (${pt.key})` }))
+          criteria: finished ? partsOf(q).map(pt => ({ mark: pt.marks, text: `Part (${pt.key})` })) : undefined
         });
         continue;
       }
+      const criteria = criteriaFor(q);
       questions.push({
         prompt: q.prompt, difficulty: q.difficulty, subtopicName: SUBTOPIC_BY_ID[q.subtopic]?.name,
         answerType: q.answerType, mcqOptions: q.mcqOptions, figure: safeFigure(q.figure),
-        answerText: displayAnswer(q), steps: q.steps, criteria: criteriaFor(q)
+        marks: criteria.reduce((n, c) => n + Number(c.mark || 1), 0),
+        ...(finished ? { answerText: displayAnswer(q), steps: q.steps, criteria } : {})
       });
     }
-    return { title: e.title, year: e.year, durationMin: e.durationMin, course: courseLabel(p.course || 'nsw', e.year, e.pathway), questions };
+    return { title: e.title, year: e.year, durationMin: e.durationMin, course: courseLabel(p.course || 'nsw', e.year, e.pathway), questions, solutionsAvailable: finished };
+  },
+  'POST /exams/:id/responses': async (body, params) => {
+    const p = await requireProfile();
+    const e = await get('exams', params.id);
+    if (!e || e.pid !== p.id) throw Object.assign(new Error('Exam not found'), { status: 404 });
+    const saved = saveExamResponses(e, body || {});
+    await put('exams', e);
+    return { saved: true, ...saved };
   },
   'POST /exams/:id/submit': async (body, params) => {
     const p = await requireProfile();
     const e = await get('exams', params.id);
     if (!e || e.pid !== p.id) throw Object.assign(new Error('Exam not found'), { status: 404 });
+    if (isReplayOf(e, body || {})) {
+      return { score: e.score, total: e.total, pct: Math.round(100 * e.score / Math.max(1, e.total)), detail: e.detail, newBadges: [], replayed: true };
+    }
     if (e.finishedAt) throw Object.assign(new Error('Exam already submitted'), { status: 409 });
-    const answers = body?.answers || {};
-    const workings = body?.workings || {};
-    const totalMs = Number(body?.ms) || 0;
     const now = Date.now();
+    // After the deadline only what was autosaved before it is marked.
+    const inputs = examMarkingInputs(e, body || {}, now);
+    const at = Number(e.latestSeenAt) || now;   // the paper's time, after any rollback correction
+    const answers = inputs.answers;
+    const workings = inputs.workings;
+    const totalMs = Number(inputs.ms) || 0;
+    const markedRows = [];
     const nQ = e.questionIds.length;
     let marksAwarded = 0, totalMarks = 0;
     const detail = [];
@@ -2780,6 +3473,7 @@ const routes = {
       // as wrong either: it contributes neither marks awarded nor marks
       // available, so the score is out of what was actually there to answer.
       if (!row?.payload) continue;
+      markedRows.push(row);
       const q = row.payload;
 
       // ── Structured multipart question: mark each part on its own marks ──
@@ -2858,7 +3552,8 @@ const routes = {
       });
     }
     const pct = Math.round(100 * marksAwarded / Math.max(1, totalMarks));
-    Object.assign(e, { finishedAt: now, score: marksAwarded, total: totalMarks, detail });
+    Object.assign(e, { finishedAt: at, score: marksAwarded, total: totalMarks, detail });
+    freezeExam(e, { inputs, paperVersion: paperFingerprint(markedRows), submissionKey: body?.submissionKey, now: at });
     await put('exams', e);
     const newBadges = await checkBadges(p.id, { type: 'exam', pct }, now, timezoneOf(p));
     return { score: marksAwarded, total: totalMarks, pct, detail, newBadges };
@@ -2889,8 +3584,10 @@ const routes = {
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
     const q = row.payload;
     const result = checkAnswer(q, body.answer);
-    await resolve(p, row, q, result.correct, body.answer, 0, row.mode);
-    return { correct: result.correct, answerText: displayAnswer(q) };
+    // Attempt and cloud queue entry in one transaction (§22): an app killed
+    // mid-Rush can no longer leave an attempt the cloud never hears about.
+    await resolve(p, row, q, result.correct, body.answer, 0, row.mode, false, { syncQueue: true });
+    return { correct: result.correct, answerText: displayAnswer(q), syncQueued: true };
   },
   'POST /rush/finish': async (body) => {
     const p = await requireProfile();
@@ -2970,8 +3667,8 @@ const routes = {
       strandAgg[s.strand].sum += m; strandAgg[s.strand].n++;
     }
     const strands = Object.entries(strandAgg).map(([name, v]) => ({ name, mastery: Math.round(100 * v.sum / v.n) }));
-    const attempts = await byIndex('attempts', 'pid', pid);
-    const totals = { attempts: attempts.length, correct: attempts.filter(a => a.correct).length, ms: attempts.reduce((s, a) => s + (a.ms || 0), 0) };
+    const attempts = await attemptsInOrder(pid);
+    const totals = statsTotals(attempts);
     const byDiff = [1, 2, 3, 4].map(d => {
       const rows = attempts.filter(a => a.difficulty === d);
       return { difficulty: d, n: rows.length, c: rows.filter(a => a.correct).length };
@@ -3226,9 +3923,9 @@ const routes = {
     const p = await requireProfile();
     const { filter = 'all', page = 0, pageSize = 20 } = body || {};
     const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered);
-    const attempts = await byIndex('attempts', 'pid', p.id);
+    const attempts = await attemptsInOrder(p.id);
     const attemptByQ = {};
-    for (const a of attempts) attemptByQ[a.questionId] = a;   // latest wins (insertion order)
+    for (const a of attempts) attemptByQ[a.questionId] = a;   // latest wins (answer order)
     const marks = await byIndex('bookmarks', 'pid', p.id);
     const marked = new Set(marks.map(b => b.key.split(':').slice(1).join(':')));
     const inkRows = await byIndex('inks', 'pid', p.id);
@@ -3283,6 +3980,7 @@ const routes = {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    await assertReviewableRow(row);
     const q = row.payload;
     if (q.custom) throw Object.assign(new Error('Custom questions can’t be regenerated'), { status: 400 });
     if (q.multipart) throw Object.assign(new Error('Structured exam questions live in exam review'), { status: 400 });
@@ -3291,7 +3989,14 @@ const routes = {
     // question that is its subtopic; for a previous-year question it is the
     // archive, whose payload names the chapter instead.
     const generator = row.generator || row.subtopic;
-    const payload = generateQuestion(generator, row.difficulty, same ? q.seed : undefined);
+    // "The same question again" regenerates from the seed only while the bank
+    // is still the version that made it. A question stamped with an older
+    // content version is re-served from its stored payload, because
+    // regenerating it would hand the student a different question. A row from
+    // before versioning (no stamp) keeps the behaviour it always had.
+    const version = contentRefOf(q).contentVersion;
+    const reproducible = version === CONTENT_VERSION || version === LEGACY_CONTENT_VERSION;
+    const payload = same && !reproducible ? { ...q } : generateQuestion(generator, row.difficulty, same ? q.seed : undefined);
     // A retried Indian question keeps its chapter, or its evidence would fall
     // onto the generator id instead of the chapter the student is working on.
     const newRow = { id: uuid(), pid: p.id, subtopic: row.subtopic, difficulty: row.difficulty, payload, generator, india: row.india || undefined, mode: 'practice', examId: null, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now() };
@@ -3303,6 +4008,7 @@ const routes = {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    await assertReviewableRow(row);
     const q = row.payload;
     const ink = await get('inks', params.id);
     return {
@@ -3317,7 +4023,7 @@ const routes = {
   // ---- data safety: backup, restore, task packs, progress files ----
   'GET /data/storage': async () => {
     const est = await storageEstimate();
-    if (typeof window !== 'undefined' && window.__PRI_NATIVE__) {
+    if (priNative.storage.durable()) {
       // Native app: data lives in the app's own sandbox — nothing can evict it.
       return { supported: true, persisted: true, native: true, usage: est?.usage || 0, quota: est?.quota || 0 };
     }
@@ -3492,19 +4198,372 @@ const routes = {
         scribble: row.scribble || null, photo: safePhoto(row.photo), createdAt: row.createdAt
       }
     };
+  },
+
+  // ---- placement diagnostic ----
+  'GET /placement': async () => {
+    const p = await requireProfile();
+    return placementView(p, await ratingsFor(p.id));
+  },
+
+  'POST /placement/start': async (body) => {
+    const p = await requireProfile();
+    requirePlacementCourse(p);
+    const pl = p.placement || null;
+    if (pl?.status === 'active' && pl.current && body?.restart !== true) {
+      return { question: placementQuestionView(pl.current), progress: placementProgress(pl), resumed: true };
+    }
+    const { placementConfig, replayPlacement } = await loadPlacementEngine();
+    const cfg = placementConfig({
+      grade: p.year, track: cleanIndiaTrack(p.indiaTrack, p.year),
+      seed: Math.floor(Math.random() * 2 ** 31)
+    });
+    const { probe } = replayPlacement(cfg, []);
+    // Generated before anything is written: a question bank that is not loaded
+    // yet throws here, the API layer fetches it and re-runs this route.
+    const current = buildPlacementQuestion(cfg, probe, 0);
+    const now = Date.now();
+    const placement = {
+      v: 1, id: uuid(), config: { ...cfg }, status: 'active', startedAt: now, finishedAt: null,
+      // A retake keeps the last finished result visible until it is replaced.
+      items: [], current, result: pl?.result || null, previous: Array.isArray(pl?.previous) ? pl.previous : []
+    };
+    await writePlacement(p.id, { placement });
+    return { question: placementQuestionView(current), progress: placementProgress(placement), resumed: false };
+  },
+
+  'POST /placement/:id/answer': async (body, params) => {
+    const p = await requireProfile();
+    requirePlacementCourse(p);
+    const pl = p.placement || null;
+    if (!pl || pl.status !== 'active' || !pl.current) {
+      throw Object.assign(new Error('There is no placement check in progress.'), { status: 409, code: 'PLACEMENT_NOT_ACTIVE' });
+    }
+    if (pl.current.id !== params.id) {
+      const answered = (pl.items || []).some(it => it.questionId === params.id);
+      throw Object.assign(new Error(answered ? 'That placement question is already answered.' : 'That is not the current placement question.'),
+        { status: 409, code: answered ? 'PLACEMENT_ALREADY_ANSWERED' : 'PLACEMENT_STALE' });
+    }
+    const cur = pl.current;
+    const q = cur.payload;
+    const skipped = body?.skip === true;
+    let correct = false;
+    let feedback = '';
+    let stepReport = null;
+    if (!skipped) {
+      // The deterministic marker decides, exactly as in practice. Nothing a
+      // model says reaches this verdict.
+      const result = checkAnswer(q, body?.answer);
+      if (result.invalid) {
+        return { correct: false, resolved: false, invalid: true, triesLeft: 1, feedback: result.feedback || 'That answer could not be read — check it and submit again.' };
+      }
+      correct = !!result.correct;
+      feedback = result.feedback || '';
+      if (!correct && q.answerType === 'mcq' && q.answer?.optionTraps) feedback = q.answer.optionTraps[Number(body?.answer)] || feedback;
+      const meta = stepMetaFor(q);
+      if (body?.steps && meta) { try { stepReport = stepCheck(meta, body.steps); } catch { stepReport = null; } }
+      if (!stepReport && result.stepReport) stepReport = result.stepReport;
+    }
+    const now = Date.now();
+    const item = {
+      questionId: cur.id, chapterId: cur.probe.chapterId, grade: cur.probe.grade, phase: cur.probe.phase,
+      requested: cur.probe.difficulty, difficulty: cur.difficulty, answerType: q.answerType || null,
+      correct, skipped, viaInk: body?.viaInk === true, ms: Math.max(0, Math.min(36e5, Number(body?.ms) || 0)),
+      given: skipped ? '' : sanitizeText(String(body?.answer ?? ''), 120), answeredAt: now
+    };
+    const items = [...(pl.items || []), item];
+    const { replayPlacement, summarisePlacement, PLACEMENT_MAX } = await loadPlacementEngine();
+    const cfg = pl.config;
+    let replay;
+    try { replay = replayPlacement(cfg, items); }
+    catch (err) {
+      if (err?.code !== 'PLACEMENT_REPLAY_MISMATCH') throw err;
+      throw Object.assign(new Error('This placement check was started by an older version of Pri. Start it again.'), { status: 409, code: 'PLACEMENT_RESTART_REQUIRED' });
+    }
+    const done = replay.done || items.length >= PLACEMENT_MAX;
+    const next = done ? null : buildPlacementQuestion(cfg, replay.probe, items.length);
+    const result = done ? { ...summarisePlacement(cfg, items), finishedAt: now } : null;
+    const placement = {
+      ...pl, items, current: next,
+      status: done ? 'finished' : 'active',
+      finishedAt: done ? now : null,
+      result: done ? result : pl.result || null,
+      previous: done ? placementHistoryOf(pl) : (pl.previous || [])
+    };
+    await writePlacement(p.id, { placement });
+    return {
+      correct, resolved: true, skipped, feedback, stepReport, diagnosis: stepReport?.diagnosis || null,
+      solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText },
+      progress: placementProgress(placement), done,
+      next: next ? placementQuestionView(next) : null,
+      result
+    };
+  },
+
+  'POST /placement/skip': async () => {
+    const p = await requireProfile();
+    requirePlacementCourse(p);
+    await writePlacement(p.id, { placementSkippedAt: Date.now() });
+    return { skipped: true };
   }
 };
+
+// ── Placement diagnostic ─────────────────────────────────────────────────────
+// About ten questions that estimate where an Indian student is working and
+// trace a miss down the Pri-authored prerequisite graph to its plausible root.
+// The adaptive process and the summary live in engine/placement.js, which is
+// fetched only when a student opens the diagnostic: none of it is on the boot
+// path. Marking is the same deterministic checkAnswer() practice uses.
+//
+// Storage. The whole session — configuration, the outcome of every answered
+// question and the one question on screen, exactly as it was generated — lives
+// on the profile row, so it is profile-isolated, sealed with the rest of a
+// protected profile, removed with the profile, and resumable on relaunch at the
+// exact question. Nothing is written to the attempts, ratings, reviews or
+// activity stores: a placement result is diagnostic evidence, not mastery, and
+// it earns no XP and counts toward no streak or free-tier allowance. The only
+// thing it feeds is a small, bounded prior on which untouched chapter smart
+// practice offers first (see indiaPick).
+
+const loadPlacementEngine = () => import('../engine/placement.js');
+
+/**
+ * Write only the placement fields onto the profile row as it is NOW. Every
+ * placement route awaits the engine import and question generation between
+ * reading the profile and writing it, and in that gap PATCH /me, a practice
+ * answer's XP or a settings change may have written the same row. Writing back
+ * the copy read at the start would silently undo them; re-reading and merging
+ * only these fields does not. Placement routes are serialised among themselves
+ * by the placement lock, so the placement fields have one writer.
+ */
+async function writePlacement(pid, fields) {
+  await withProfileRow(pid, async fresh => {
+    if (!fresh) throw Object.assign(new Error('No profile selected'), { status: 401 });
+    await put('profiles', { ...fresh, ...fields });
+  });
+}
+
+/**
+ * Read-merge-write of one profile row, serialised per profile. Every writer
+ * that merges onto the row as it is now — placement steps, the XP an answer
+ * earns, a settings change — goes through here, so two of them can never both
+ * read the same row and each write back a copy missing the other's change.
+ */
+function withProfileRow(pid, work) {
+  return withMutationLock(`profile-row:${pid}`, async () => work(await get('profiles', pid).catch(() => null)));
+}
+
+function requirePlacementCourse(p) {
+  // Outside the frozen V1 scope: a build without the flag has no placement
+  // check at all, so its routes refuse rather than half-work.
+  if (!featureEnabled('placement')) {
+    throw Object.assign(new Error('The placement check is not available in this build.'), { status: 404, code: 'FEATURE_DISABLED' });
+  }
+  if (p.course !== 'in') {
+    throw Object.assign(new Error('The placement check covers the India curriculum (NCERT Class 7–12) only.'), { status: 409, code: 'PLACEMENT_UNAVAILABLE' });
+  }
+}
+
+function seededRandom(seed) {
+  let a = (Number(seed) >>> 0) || 1;
+  return () => {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * The question for one probe, generated deterministically from the session
+ * seed and the probe's position. A handwritten answer is the point of the
+ * diagnostic and a multiple-choice item can be guessed, so a few variants are
+ * looked at and the first one with a written answer is preferred.
+ */
+function buildPlacementQuestion(cfg, probe, index) {
+  const chapter = indiaChapter(probe?.chapterId);
+  if (!chapter) throw Object.assign(new Error('The placement check asked for a chapter this app does not know.'), { status: 409, code: 'PLACEMENT_RESTART_REQUIRED' });
+  const grade = indiaChapterGrade(chapter);
+  const base = (Number(cfg.seed) + Math.imul(index + 1, 0x9E3779B1)) >>> 0;
+  const random = seededRandom(base);
+  const track = probe.difficulty >= 4 && grade >= 11 ? 'jee-main' : 'cbse';
+  const opts = { difficulty: probe.difficulty, track, grade, random };
+  // The first dot point is the chapter's core skill; a chapter-level target is
+  // the fallback when that dot point has no form near the asked difficulty.
+  const target = (chapter.dotpoints?.length ? resolveIndiaTarget(chapter, { ...opts, dotpoint: 0 }) : null)
+    || resolveIndiaTarget(chapter, opts);
+  if (!target?.generator) throw Object.assign(new Error(`${chapter.name} has no authored question form for the placement check.`), { status: 409, code: 'INDIA_TARGET_UNCOVERED' });
+  let q = null;
+  for (let k = 0; k < 6; k++) {
+    const cand = generateQuestion(target.generator, target.difficulty, (base + k * 104729) % 2147483647);
+    if (!q) q = cand;
+    if (cand.answerType !== 'mcq' && !cand.multipart) { q = cand; break; }
+  }
+  return {
+    id: uuid(), index, probe: { ...probe }, generator: target.generator,
+    difficulty: q.difficulty || target.difficulty, dotpointIndex: target.dotpointIndex ?? null,
+    payload: q, servedAt: Date.now()
+  };
+}
+
+/** What the question card is shown: the practice sanitiser, with no help on offer. */
+function placementQuestionView(cur) {
+  const row = { id: cur.id, india: { chapterId: cur.probe.chapterId, track: 'cbse', dotpointIndex: cur.dotpointIndex }, hintsUsed: 0, tries: 0 };
+  return { ...sanitize(cur.payload, row), hintsAvailable: 0, triesLeft: 1, placement: true, phase: cur.probe.phase };
+}
+
+function placementProgress(pl) {
+  return { asked: (pl?.items || []).length, target: 10, max: 12 };
+}
+
+function placementHistoryOf(pl) {
+  const prior = Array.isArray(pl?.previous) ? pl.previous : [];
+  if (!pl?.result) return prior.slice(0, 5);
+  const r = pl.result;
+  return [{
+    finishedAt: r.finishedAt || pl.finishedAt || null, grade: r.grade, track: r.track, asked: r.asked,
+    overallLevel: r.overallLevel ?? null, rootGaps: (r.rootGaps || []).map(g => g.chapterId)
+  }, ...prior].slice(0, 5);
+}
+
+/** The diagnostic's priors, read only from a finished result. */
+function placementPriorsOf(p) {
+  // No flag, no learner-state seeding — even from a result stored by a build
+  // that had it.
+  if (!featureEnabled('placement')) return {};
+  const r = p?.course === 'in' ? p?.placement?.result : null;
+  if (!r || r.kind !== 'diagnostic' || !r.priors || typeof r.priors !== 'object') return {};
+  const out = {};
+  for (const [id, v] of Object.entries(r.priors)) {
+    const n = Number(v);
+    if (IN_CHAPTER_IDS.has(id) && Number.isFinite(n)) out[id] = Math.max(-0.4, Math.min(0.4, n));
+  }
+  return out;
+}
+
+const IN_CHAPTER_IDS = new Set(IN_CHAPTERS.map(ch => ch.id));
+
+function placementView(p, ratings, now = Date.now()) {
+  if (!featureEnabled('placement')) return { available: false, status: 'disabled' };
+  if (p.course !== 'in') return { available: false, status: 'unavailable' };
+  const pl = p.placement || null;
+  const status = pl?.status === 'active' && pl.current ? 'active'
+    : pl?.result ? 'finished'
+      : p.placementSkippedAt ? 'skipped' : 'none';
+  // Practice evidence for every Class 7–12 chapter, so the map can show what
+  // was practised beside what the diagnostic found — kept as separate fields.
+  const chapters = IN_CHAPTERS.filter(ch => ch.grade >= 7 && ch.grade <= 12).map(ch => {
+    const st = indiaState(ch, ratings, now);
+    return {
+      id: ch.id, name: ch.name, grade: ch.grade, strand: ch.strand,
+      attempts: st.attempts, mastery: Math.round(100 * st.mastery),
+      band: st.attempts ? masteryBand(st.mastery) : 'unseen'
+    };
+  });
+  return {
+    available: true, status, grade: p.year, track: cleanIndiaTrack(p.indiaTrack, p.year),
+    skippedAt: p.placementSkippedAt || null,
+    progress: pl ? placementProgress(pl) : { asked: 0, target: 10, max: 12 },
+    question: status === 'active' ? placementQuestionView(pl.current) : null,
+    result: pl?.result || null,
+    previous: Array.isArray(pl?.previous) ? pl.previous : [],
+    chapters
+  };
+}
+
+// ── Assessment boundary ──────────────────────────────────────────────────────
+// Exam questions live in the same `questions` store as practice, so a route
+// that takes a question id must decide from the stored row — not from which
+// page called it — what that row may be used for. An exam row is answered only
+// through POST /exams/:id/submit; the practice help and marking routes (hints,
+// reveal, two-try submit, skip) never touch it, before or after the paper is
+// finished. Review routes (history detail, retry) may open an exam row only
+// once its paper has been submitted. Anything that cannot prove the paper is
+// finished — a missing exam record included — fails closed.
+
+const isExamRow = row => row?.mode === 'exam' || !!row?.examId;
+
+function examQuestionLocked(message) {
+  return Object.assign(new Error(message), { status: 403, code: 'EXAM_QUESTION_LOCKED' });
+}
+
+/**
+ * What the tutor may see of the student's attempt: their own lines and typed
+ * answer, bounded, plus where the deterministic checker says it broke.
+ */
+function tutorWork(q, raw) {
+  const lines = (Array.isArray(raw?.lines) ? raw.lines : [])
+    .map(l => sanitizeText(l, 400)).filter(Boolean).slice(0, 40);
+  const typedAnswer = sanitizeText(raw?.typed, 300) || '';
+  let firstBreak = -1;
+  let verifiedLines = 0;
+  let misconception;
+  const meta = stepMetaFor(q);
+  if (meta && lines.length) {
+    try {
+      const report = stepCheck(meta, lines.join('\n'));
+      const at = (report?.lines || []).findIndex(l => l?.status === 'break');
+      if (at >= 0 && at < 40) firstBreak = at;
+      // How many leading lines the deterministic checker verified. The server
+      // excuses a result only when it is the final line and ALL lines are here.
+      const judged = report?.lines || [];
+      while (verifiedLines < judged.length && verifiedLines < lines.length && judged[verifiedLines]?.status === 'ok') verifiedLines += 1;
+      const code = report?.diagnosis?.code;
+      if (typeof code === 'string' && /^[a-z0-9._:-]{1,80}$/i.test(code)) misconception = code;
+    } catch { /* the checker's silence is not an error here */ }
+  }
+  return { lines, typedAnswer, firstBreak, verifiedLines, ...(misconception ? { misconception } : {}) };
+}
+
+/** The /v1/tutor/help body for a practice row, or null when there is no verified solution to ground it. */
+function tutorRequest(p, row, q, solution, { level, locale, work, captions }) {
+  const steps = (solution.steps || []).slice(0, 24)
+    .map(s => ({ h: String(s?.h ?? '').slice(0, 300), d: String(s?.d ?? '').slice(0, 700) }))
+    .filter(s => s.h || s.d);
+  const answer = String(solution.answerText ?? '').slice(0, 300).trim();
+  if (!steps.length || !answer || !q.prompt) return null;
+  const lang = locale === 'hi' || locale === 'en' ? locale : cleanLanguage(p.language);
+  return {
+    context: 'practice',
+    level,
+    locale: lang === 'hi' ? 'hi' : 'en',
+    questionId: String(row.id).slice(0, 120),
+    questionVersion: String(q.version || q.contentVersion || 1).slice(0, 60),
+    question: {
+      prompt: String(q.prompt).slice(0, 2000),
+      steps,
+      answer,
+      hints: (Array.isArray(q.hints) ? q.hints : []).slice(0, 6).map(h => String(h).slice(0, 500))
+    },
+    studentWork: work,
+    ...(captions ? { captions } : {})
+  };
+}
+
+function assertPracticeRow(row) {
+  if (isExamRow(row)) throw examQuestionLocked('This question belongs to an exam paper — answer it in the exam room.');
+}
+
+async function assertReviewableRow(row) {
+  if (!isExamRow(row)) return;
+  const exam = row.examId ? await get('exams', row.examId).catch(() => null) : null;
+  if (!exam || exam.pid !== row.pid || !exam.finishedAt) {
+    throw examQuestionLocked('Solutions for this exam question open once the paper is submitted.');
+  }
+}
 
 async function examFor(pid, examId) {
   const e = await get('exams', examId);
   if (!e || e.pid !== pid) return null;
+  const viewedAt = Date.now();
+  if (ensureExamClock(e, viewedAt)) await put('exams', e);
   const questions = [];
   for (const qid of e.questionIds) {
     const row = await get('questions', qid);
     if (!row) continue;
     questions.push(sanitize(row.payload, row));
   }
-  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null };
+  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null, session: examSessionView(e, viewedAt) };
 }
 
 // ── Dispatcher (same contract as the old fetch layer) ────────────────────────
@@ -3522,7 +4581,8 @@ export async function recordIndiaExamEvidence(row, q, { correct, given, ms, feed
   try {
     return await resolve(
       p, row, q, !!correct, given ?? '', Math.max(0, Number(ms) || 0), 'exam', false,
-      { evidenceKey: evidenceKey || 'question' }
+      // each exam part's attempt is queued for the cloud in its own transaction (§22)
+      { evidenceKey: evidenceKey || 'question', syncQueue: true }
     );
   } catch (err) {
     // Exam submission is replayable after an ambiguous interruption. The same
@@ -3543,18 +4603,54 @@ export async function finishIndiaExamEvidence(pct) {
  * unanswered questions can still ask for fresh rows, while the student UI never
  * silently throws away the question it was already working on.
  */
+/**
+ * Whether an unfinished practice row still answers the request being made, so
+ * "resume" never hands back a question the current filters would not serve:
+ *   · an Indian profile resumes only India rows on the requested track (a
+ *     Class 12 JEE question does not reappear after the student moves to Class
+ *     10 CBSE, nor an NSW row after a course change);
+ *   · smart practice (no chapter named) resumes only chapters inside the
+ *     profile's current class scope;
+ *   · "past papers only" resumes only a previous-year question, because the
+ *     filter claims every card under it came from a real exam.
+ * A row outside the scope is left untouched (not discarded): it is still the
+ * student's work and resumes when the matching filter is chosen again.
+ */
+function resumeInScope(profile, row, { track = null, pyqOnly = false, explicit = false } = {}) {
+  if (pyqOnly && !row?.payload?.pyq) return false;
+  if ((profile?.course || 'nsw') !== 'in') return !row?.india;
+  if (!row?.india?.chapterId) return false;
+  const trackId = cleanIndiaTrack(track || profile.indiaTrack, profile.year);
+  if ((row.india.track || 'cbse') !== trackId) return false;
+  if (explicit) return true;
+  const { own, ahead } = indiaPracticeScope(trackId, profile.year);
+  return [...own, ...ahead].some(c => c.id === row.india.chapterId);
+}
+
 async function resumableQuestion(profile, body = {}) {
   if (body?.resume !== true) return null;
+  // A submission that was in flight when the app went away names its question.
+  // That question comes back first — answered or not — so the card can replay
+  // the submission under its idempotency key and show the student the one
+  // verdict it produced, rather than leaving them to wonder whether it went
+  // (§09). Only this profile's own practice rows qualify; a skipped one does not.
+  if (body.pendingQuestionId) {
+    const pending = await get('questions', String(body.pendingQuestionId)).catch(() => null);
+    if (pending && pending.pid === profile.id && !pending.discardedAt && !pending.examId && !isExamRow(pending)
+      && pending.mode !== 'rush' && pending.mode !== 'match') return pending;
+  }
   const rows = await byIndex('questions', 'pid', profile.id);
   const taskId = body.taskId ? String(body.taskId) : null;
   const subtopic = body.subtopic ? String(body.subtopic) : null;
   const difficulty = body.difficulty !== undefined && body.difficulty !== null && body.difficulty !== ''
     ? Math.min(4, Math.max(1, Number(body.difficulty))) : null;
 
+  const scope = { track: body.track, pyqOnly: body.pyqOnly === true, explicit: !!subtopic };
   const candidates = rows.filter(r => {
     if (!r || r.answered || r.discardedAt || r.examId || r.mode === 'rush' || r.mode === 'match') return false;
     if (taskId) return String(r.taskId || '') === taskId;
     if (r.taskId) return false;
+    if (!resumeInScope(profile, r, scope)) return false;
     if (!subtopic) return r.mode === 'practice' || r.mode === 'review';
     const actual = r.india?.chapterId || r.payload?.subtopic || r.subtopic;
     if (String(actual || '') !== subtopic) return false;
@@ -3569,7 +4665,11 @@ function resumedQuestionResponse(row) {
   return {
     question: sanitize(row.payload, row),
     reason: 'resume',
-    why: 'Continuing your unfinished question.',
+    // A pending submission's question can come back already answered (§09):
+    // it is shown to give the student its verdict, not to be answered again.
+    why: row.answered
+      ? 'Showing the result of the answer you submitted before the app closed.'
+      : 'Continuing your unfinished question.',
     resumed: true
   };
 }
@@ -3671,13 +4771,30 @@ async function runGated(method, pattern, handler, body, params) {
     key === 'POST /practice/:id/submit'
     || key === 'POST /practice/:id/reveal'
     || key === 'POST /practice/:id/hint'
+    || key === 'POST /practice/:id/tutor'
     || key === 'POST /practice/:id/discard'
   )) return withMutationLock(`question:${params.id}`, work);
 
   if (key === 'POST /practice/next') {
     return withMutationLock(`next:${currentPid() || 'none'}`, work);
   }
+  // One placement session per profile: start, answer and skip are serialised
+  // so a double tap cannot record one question twice or fork the session.
+  if (key.startsWith('POST /placement')) {
+    return withMutationLock(`placement:${currentPid() || 'none'}`, work);
+  }
+  // An autosave and the final submit both rewrite the paper's row; serialised,
+  // a save that read the paper before it was finalised can never write it back
+  // over the finalised copy.
+  if (params?.id && (key === 'POST /exams/:id/submit' || key === 'POST /exams/:id/responses')) {
+    return withMutationLock(`exam:${params.id}`, work);
+  }
   return work();
+}
+
+/** The same per-paper lock, for the India exam backend's own routes. */
+export function withExamLock(examId, work) {
+  return withMutationLock(`exam:${examId}`, work);
 }
 
 export async function dispatch(method, path, body) {

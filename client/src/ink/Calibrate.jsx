@@ -13,27 +13,32 @@ import InkCanvas from './InkCanvas.jsx';
 import NativeInkCanvas from './NativeInkCanvas.jsx';
 import { nativeInkAvailable } from './native.js';
 import { addPersonal, personalStats, clearPersonal, ensurePersonalLoaded } from './personal.js';
+import { useT } from '../i18n/index.js';
 
 const PROMPTS = [
   ['0', '0'], ['1', '1'], ['2', '2'], ['3', '3'], ['4', '4'],
   ['5', '5'], ['6', '6'], ['7', '7'], ['8', '8'], ['9', '9'],
   ['x', 'x'], ['y', 'y'], ['+', '+'], ['-', '−'], ['=', '='],
-  ['(', '('], [')', ')'], ['/', '/'], ['.', '· (decimal point)'], ['sqrt', '√'],
+  ['(', '('], [')', ')'], ['/', '/'], ['.', null], ['sqrt', '√'],
   ['pi', 'π'], ['theta', 'θ'], ['<', '<'], ['>', '>'],
   ['s', 's'], ['i', 'i'], ['n', 'n'], ['c', 'c'], ['o', 'o'],
   ['t', 't'], ['a', 'a'], ['e', 'e'], ['l', 'l'], ['g', 'g'],
 ];
-
-const Surface = nativeInkAvailable() ? NativeInkCanvas : InkCanvas;
+// A null label is a symbol that needs words to name it; those come from the
+// catalogue so they follow the interface language.
+const WORDED = { '.': 'calibrate.decimalPoint' };
 
 export default function Calibrate({ onDone, toast }) {
+  const [Surface] = useState(() => (nativeInkAvailable() ? NativeInkCanvas : InkCanvas));
   const canvasRef = useRef(null);
   const [idx, setIdx] = useState(0);
   const [saved, setSaved] = useState(0);
   const [finished, setFinished] = useState(false);
+  const t = useT();
   ensurePersonalLoaded();
 
-  const [sym, label] = PROMPTS[Math.min(idx, PROMPTS.length - 1)];
+  const [sym, glyph] = PROMPTS[Math.min(idx, PROMPTS.length - 1)];
+  const label = glyph ?? t(WORDED[sym]);
 
   const advance = () => {
     canvasRef.current?.clear();
@@ -53,14 +58,16 @@ export default function Calibrate({ onDone, toast }) {
     const stats = personalStats();
     return (
       <div className="card" style={{ textAlign: 'center', padding: 28 }}>
-        <h3>That's your hand learned.</h3>
+        <h3>{t('calibrate.doneTitle')}</h3>
         <p className="sub" style={{ margin: '10px auto 16px', maxWidth: 420 }}>
-          {saved} sample{saved === 1 ? '' : 's'} saved — {stats.total} personal template{stats.total === 1 ? '' : 's'} in total.
-          They now outrank the built-in shapes, and every correction you make while practising adds more.
+          {t('calibrate.doneSummary', {
+            saved: t('calibrate.samplesSaved', { count: saved, n: saved }),
+            total: t('calibrate.templatesTotal', { count: stats.total, n: stats.total })
+          })}
         </p>
         <div className="row" style={{ justifyContent: 'center' }}>
-          <button className="btn btn-primary" onClick={onDone}>Done</button>
-          <button className="btn btn-ghost" onClick={() => { setIdx(0); setFinished(false); }}>Another round</button>
+          <button className="btn btn-primary" onClick={onDone}>{t('calibrate.done')}</button>
+          <button className="btn btn-ghost" onClick={() => { setIdx(0); setFinished(false); }}>{t('calibrate.anotherRound')}</button>
         </div>
       </div>
     );
@@ -69,14 +76,14 @@ export default function Calibrate({ onDone, toast }) {
   return (
     <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
       <div className="card-head">
-        <span className="sc-label" style={{ margin: 0 }}>Teach it your handwriting</span>
+        <span className="sc-label" style={{ margin: 0 }}>{t('calibrate.title')}</span>
         <span style={{ flex: 1 }} />
         <span className="muted">{idx + 1} / {PROMPTS.length}</span>
       </div>
       <div style={{ padding: '16px 18px 6px', textAlign: 'center' }} role="status">
-        <div className="muted" style={{ fontSize: 13 }}>Write this symbol the way YOU write it, then save:</div>
+        <div className="muted" style={{ fontSize: 13 }}>{t('calibrate.instruction')}</div>
         <div style={{ fontSize: 54, lineHeight: 1.3, fontFamily: 'var(--font)' }}>
-          {label}<span className="sr-only"> — symbol {idx + 1} of {PROMPTS.length}</span>
+          {label}<span className="sr-only">{' '}{t('calibrate.symbolOf', { n: idx + 1, total: PROMPTS.length })}</span>
         </div>
       </div>
       <Surface
@@ -85,15 +92,15 @@ export default function Calibrate({ onDone, toast }) {
         guides={false}
         tool="pen"
         fingerMode="auto"
-        ariaLabel={`Write ${label}`}
+        ariaLabel={t('calibrate.writeAria', { symbol: label })}
       />
       <div className="row" style={{ padding: '10px 14px', borderTop: '1px solid var(--hairline)' }}>
-        <button className="btn btn-quiet btn-sm" onClick={() => canvasRef.current?.clear()}>Clear</button>
-        <button className="btn btn-quiet btn-sm" onClick={advance}>Skip</button>
-        <span className="sr-only" role="status">{saved} sample{saved === 1 ? '' : 's'} saved so far</span>
+        <button className="btn btn-quiet btn-sm" onClick={() => canvasRef.current?.clear()}>{t('ink.clear')}</button>
+        <button className="btn btn-quiet btn-sm" onClick={advance}>{t('calibrate.skip')}</button>
+        <span className="sr-only" role="status">{t('calibrate.savedSoFar', { count: saved, n: saved })}</span>
         <span style={{ flex: 1 }} />
-        <button className="btn btn-quiet btn-sm" onClick={onDone}>Stop</button>
-        <button className="btn btn-primary btn-sm" onClick={save}>Save & next →</button>
+        <button className="btn btn-quiet btn-sm" onClick={onDone}>{t('calibrate.stop')}</button>
+        <button className="btn btn-primary btn-sm" onClick={save}>{t('calibrate.saveNext')}</button>
       </div>
     </div>
   );

@@ -65,30 +65,29 @@ export const flow = {
       manifest.name === 'Pri Learning' && /NCERT/.test(manifest.description || '') && !/HSC|iPad/i.test(manifest.description || ''),
       `manifest reads ${JSON.stringify(manifest)}`);
 
-    // ── 2 · the sign-up form opens on India ──────────────────────────────────
+    // ── 2 · staged onboarding makes India a deliberate curriculum choice ─────
     await page.getByRole('button', { name: 'Get Started' }).click();
-    await page.waitForSelector('.sso-btn', { timeout: 15000 });
-    await page.getByRole('button', { name: /Continue without an email/ }).click();
-    await page.waitForSelector('.auth-card input.input', { timeout: 15000 });
+    await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
+    await page.getByRole('button', { name: 'Student', exact: true }).click();
+    await page.locator('.auth-card .btn-primary').click();
+    await page.waitForSelector('[data-onboarding-step="2"]', { timeout: 15000 });
     const first = page.locator('.auth-card select').first();
-    await check('the first control is the class / track picker', (await first.getAttribute('id')) === 'signup-track',
+    await check('the first curriculum control is the class / track picker', (await first.getAttribute('id')) === 'signup-track',
       `first select is #${await first.getAttribute('id')}`);
     const options = await first.locator('option').allInnerTexts();
     await check('it offers Classes 7–12, JEE Main, JEE Advanced and Olympiad',
-      options[0] === 'Class 7' && options[5] === 'Class 12' && options.includes('JEE Main') && options.includes('JEE Advanced') && options.some(o => /^Olympiad/.test(o)),
+      options.includes('Class 7') && options.includes('Class 12') && options.includes('JEE Main') && options.includes('JEE Advanced') && options.some(o => /^Olympiad/.test(o)),
       `options are ${JSON.stringify(options)}`);
-    await check('Class 10 is the default', (await first.inputValue()) === '10', `default is ${JSON.stringify(await first.inputValue())}`);
+    await check('no class or track is silently assumed', (await first.inputValue()) === '',
+      `initial choice is ${JSON.stringify(await first.inputValue())}`);
     await check('the Australian syllabuses are folded away behind one link',
       await page.locator('#signup-course').count() === 0 && await page.getByRole('button', { name: /Studying in Australia/ }).count() === 1);
     const formText = await page.locator('.auth-card').innerText();
-    await check('the India form never says Year or HSC', !/\bYear\b/.test(formText) && !HSC.test(formText),
+    await check('the India selection step never says Year or HSC', !/\bYear\b/.test(formText) && !HSC.test(formText),
       `form reads ${JSON.stringify(formText.slice(0, 200))}`);
     await page.getByRole('button', { name: 'Back', exact: true }).click();
-    await page.waitForSelector('.sso-btn', { timeout: 15000 });
-    const disclosure = await page.locator('.auth-note').innerText();
-    await check('the method stage says the cloud account is a separate, optional step',
-      /this device/i.test(disclosure) && /never sent/i.test(disclosure) && /optional/i.test(disclosure),
-      `disclosure reads ${JSON.stringify(disclosure)}`);
+    await check('Back returns to the role step without creating a partial profile',
+      await page.locator('[data-onboarding-step="1"]').count() === 1 && await page.locator('.acct-list').count() === 0);
 
     // ── 3 · a Class 10 profile lands on Home, labelled by class ──────────────
     await goto('/');

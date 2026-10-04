@@ -5,21 +5,25 @@ import { downloadJSON, readJSONFile, dateStamp } from '../lib/files.js';
 import Calibrate from '../ink/Calibrate.jsx';
 import { personalStats, clearPersonal, ensurePersonalLoaded } from '../ink/personal.js';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
+import { cloudReadingWanted } from '../ink/cloudReader.js';
 // The daily cap is read from the gate that enforces it, so the number a student
 // is shown can never drift from the number they actually hit.
 import { FREE_TIER } from '../local/entitlementGate.js';
 import { MIN_PASSWORD, PasswordMeter, passwordVerdict } from './Login.jsx';
 import { LANGUAGES, useLanguage, useT } from '../i18n/index.js';
 import { loadGlossary } from '../i18n/glossary.js';
+import { priNative } from '../platform/native/index.js';
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
-const COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB'], ['in', 'India · CBSE / JEE / Olympiad']];
-const INDIA_TRACKS = [['cbse', 'CBSE / NCERT', 'Classes 7–12 school syllabus'], ['jee-main', 'JEE Main', 'Classes 11–12 objective depth'], ['jee-advanced', 'JEE Advanced', 'Classes 11–12 multi-concept depth'], ['olympiad', 'Olympiad', 'PRMO → RMO → INMO']];
+const COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB'], ['in', null, 'settings.courseIndia']];
+// [id, name, description key, name key when the name itself is translated]
+const INDIA_TRACKS = [['cbse', 'CBSE / NCERT', 'settings.trackCbseDesc'], ['jee-main', 'JEE Main', 'settings.trackJeeMainDesc'], ['jee-advanced', 'JEE Advanced', 'settings.trackJeeAdvancedDesc'], ['olympiad', null, 'settings.trackOlympiadDesc', 'settings.trackOlympiad']];
 export const PATHWAY_OPTS = [
-  ['standard', 'Standard', 'Everyday maths — finance, measurement, networks'],
-  ['advanced', 'Advanced', 'Functions, calculus and statistics — the classic HSC course'],
-  ['ext1', 'Extension 1', 'Advanced plus vectors, induction, further calculus'],
-  ['ext2', 'Extension 2', 'Year 12 only — proof, complex numbers, mechanics']
+  // [id, proper name of the NSW course, description key]
+  ['standard', 'Standard', 'settings.pathwayStandardDesc'],
+  ['advanced', 'Advanced', 'settings.pathwayAdvancedDesc'],
+  ['ext1', 'Extension 1', 'settings.pathwayExt1Desc'],
+  ['ext2', 'Extension 2', 'settings.pathwayExt2Desc']
 ];
 
 const askHandwritingStatus = () => cloud.handwritingStatus();
@@ -39,11 +43,13 @@ const fmtBytes = (b) => b > 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b > 1e6 ? `${(b
  * The copy says exactly what is sent. "A picture of your handwriting" is the
  * whole of it, and a student is owed the plain version rather than a euphemism.
  */
-function CloudOptInRow({ field, user, setUser, toast, ask, label, copy, unavailable }) {
+function CloudOptInRow({ field, user, setUser, toast, ask, label, copy, unavailable, effective = null }) {
   const t = useT();
   const [status, setStatus] = useState(null);   // null = still asking, {available}
   const [busy, setBusy] = useState(false);
-  const on = user?.[field] === true;
+  // A setting with a default (server handwriting reading) shows what is in
+  // effect; the toggle always records an explicit choice.
+  const on = effective ? effective(user) : user?.[field] === true;
 
   useEffect(() => {
     let live = true;
@@ -201,7 +207,7 @@ function HandwritingSection({ toast }) {
     <div className="card">
       <h2 style={{ marginBottom: 8 }}>{t('settings.handwriting')}</h2>
       <p className="sub" style={{ marginBottom: 12 }}>
-        {t(window.__PRI_NATIVE__ ? 'settings.handwritingNative' : 'settings.handwritingBrowser')}
+        {t(priNative.ink.available() ? 'settings.handwritingNative' : 'settings.handwritingBrowser')}
       </p>
       <div className="set-row">
         <span className="set-k">{t('settings.templatesLearned')}</span>
@@ -225,6 +231,7 @@ function HandwritingSection({ toast }) {
           cannot be translated. */}
       <CloudOptInRow
         field="cloudHandwriting"
+        effective={cloudReadingWanted}
         user={user} setUser={setUser} toast={toast}
         ask={askHandwritingStatus}
         label={t('settings.cloudHandwritingLabel')}
@@ -543,7 +550,7 @@ export default function Settings() {
                     <div className="field">
                       <label className="label" htmlFor="set-course">{t('settings.syllabus')}</label>
                       <select className="input" id="set-course" value={form.course} onChange={e => setForm(f => ({ ...f, course: e.target.value }))}>
-                        {COURSES.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                        {COURSES.map(([k, label, labelKey]) => <option key={k} value={k}>{labelKey ? t(labelKey) : label}</option>)}
                       </select>
                     </div>
                   </div>
@@ -556,7 +563,7 @@ export default function Settings() {
                         <button key={k} type="button" className={`pathway-pick ${form.pathway === k ? 'on' : ''}`}
                           onClick={() => setForm(f => ({ ...f, pathway: k }))}>
                           <b>{name}</b>
-                          <span>{desc}</span>
+                          <span>{t(desc)}</span>
                         </button>
                       ))}
                     </div>
@@ -566,9 +573,9 @@ export default function Settings() {
                   <div className="field">
                     <div className="label" id="set-india-track">{t('settings.indiaTrack')}</div>
                     <div className="pathway-row" role="group" aria-labelledby="set-india-track">
-                      {INDIA_TRACKS.filter(([k]) => form.year >= 11 || !k.startsWith('jee-')).map(([k, name, desc]) => (
+                      {INDIA_TRACKS.filter(([k]) => form.year >= 11 || !k.startsWith('jee-')).map(([k, name, desc, nameKey]) => (
                         <button key={k} type="button" className={`pathway-pick ${form.indiaTrack === k ? 'on' : ''}`}
-                          onClick={() => setForm(f => ({ ...f, indiaTrack: k }))}><b>{name}</b><span>{desc}</span></button>
+                          onClick={() => setForm(f => ({ ...f, indiaTrack: k }))}><b>{nameKey ? t(nameKey) : name}</b><span>{t(desc)}</span></button>
                       ))}
                     </div>
                   </div>
@@ -673,7 +680,7 @@ export default function Settings() {
                   branch describes a scaled-band predictor that does not exist
                   for a CBSE or JEE student. */}
               {t(user.course === 'in' ? 'settings.helpBodyIndia' : 'settings.helpBody')}
-              {!window.__PRI_NATIVE__ && t('settings.addToHomeScreen')}
+              {!priNative.isNativeShell() && t('settings.addToHomeScreen')}
             </p>
           </div>
         </div>

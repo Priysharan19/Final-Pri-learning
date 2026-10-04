@@ -11,12 +11,29 @@ Every cycle uses:
 The canonical definitions are:
 
 - `docs/architecture/repository-authority.md` — production repository/branch authority and predecessor classification.
-- `docs/architecture/authoritative-architecture.md` — current local-first/web/server/native runtime authority.
+- `docs/architecture/authoritative-architecture.md` — current online-first web/server/native runtime authority.
+- `docs/architecture/adr-0001-online-first-runtime.md` — online-first decision (Railway, Supabase Mumbai, OpenAI) and its migration phases.
 - `docs/release/release-policy.md` — reviewed integration, required CI and release identity policy.
 - `.pri-os/fleet.json` — agents, specificity-resolved primary ownership, reviewer overlays, typed gates and risk classes.
 - `.pri-os/mission-control.json` — persistent GitHub-Issue mission ledger, state machine, writer lease, retry ceiling and deterministic priority policy.
 - `scripts/pri-fleet.mjs` — routing, ownership guard, risk classification and fleet validation.
 - `scripts/pri-mission-control.mjs` — mission ranking, mission-record validation, transitions, failure fingerprints and lease status.
+
+## Research read gate
+
+For any mission that changes learning behavior, learner-state inference, mathematical marking/diagnosis, handwriting authority, question/assessment generation, curriculum learning logic, teacher/guardian learning decisions, or model-mediated student help:
+
+1. Read `docs/research/README.md`.
+2. Read the relevant domain research file(s) linked there.
+3. Check GitHub issue #178 for the latest accepted/superseded decision state and #176 for newer research.
+4. Inspect current `main`, mission evidence and deterministic tests; current implementation evidence remains authoritative.
+5. If the implementation deliberately departs from accepted research architecture, record the new evidence and decision rationale rather than silently diverging.
+6. For R3/R4 learning-authority work involving tutoring policy, learner modelling, mathematical truth/first-break, handwriting authority, multilingual mathematical help, adaptive sequencing or experiments, read the relevant V7 deep-dive route in `docs/research/README.md`. Major cross-domain decisions must also check `V7_DEEP_RESEARCH_SYNTHESIS_AND_DECISION_ARCHITECTURE.md` and the claim/falsifier ledger.
+7. Never convert a literature result into a production threshold or efficacy claim without preserving its population, comparator, outcome, delay, independence and transportability limits.
+8. Before selecting a new research-derived learning-intelligence mission, check `docs/research/RESEARCH_TO_BUILD_V7.md` for dependency gates; do not implement late-stage causal personalization, adaptive authority or efficacy claims ahead of the measurement/experimentation prerequisites.
+9. Before using external evidence to justify a high-impact learning decision, check `docs/research/V7_EVIDENCE_CONTRADICTIONS_BOUNDARY_CONDITIONS.md` for material counterevidence or boundary conditions; do not cherry-pick a positive effect while ignoring the stronger conflicting or transportability-limiting evidence recorded there.
+
+Research is not proof that a capability exists, works, or improves learning. Never weaken deterministic safety, marking, privacy, curriculum, offline or release invariants merely to match a paper or research proposal.
 
 ## Roles
 
@@ -91,7 +108,9 @@ The diff-derived risk is authoritative. A PR may declare a higher risk, never a 
 - Never fabricate physical iPad, Apple Pencil, student, teacher, benchmark, learning-outcome, App Store, payment-provider or human-review evidence.
 - Synthetic/simulator evidence stays explicitly separate from real-human/physical evidence.
 - Handwriting recognition remains answer-blind. Never use hidden expected answers/solutions/marks to improve transcription.
-- Preserve offline-first operation and profile/data isolation.
+- AI proposes, the deterministic engine decides: a model output never sets a mark. Keep the deterministic engine bundled in the client as the instant and connection-loss fallback.
+- Preserve profile/data isolation: Row-Level Security plus server authorization on every client-reachable record.
+- Model-provider and database service credentials live only in server environment variables, never in the client, the repo or chat.
 - Security regressions are release-blocking.
 - Add a deterministic regression test for every production bug when feasible.
 - Do not make unsupported competitor-superiority, accuracy, syllabus-complete or production-ready claims.

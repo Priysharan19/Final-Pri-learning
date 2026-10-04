@@ -29,21 +29,22 @@ process.env.PRI_AUTH_DELIVERY_KEY = '66'.repeat(32);
 delete process.env.PRI_PUBLIC_ORIGIN;
 
 const { startApp, checks } = await import('./support/app-harness.mjs');
-const { createPlatformDb } = await import('../platform/db.js');
+const { requestedEngine } = await import('./support/engine.mjs');
 
 const c = checks();
-const db = createPlatformDb(':memory:');
-const app = await startApp({ db });
+// SQLite by default; `--engine=postgres` runs it on a migrated Postgres.
+const app = await startApp({ engine: requestedEngine() });
+const db = app.db;
 const DEVICE = 'ipad-sync-contract';
 
 try {
   const jar = {};
   const registration = await app.request('/v1/account/register', {
-    method: 'POST', jar, body: { email: 'sync.student@example.test', name: 'Sync', password: 'correct-horse-battery', deviceId: DEVICE }
+    method: 'POST', jar, body: { email: 'sync.student@example.test', name: 'Sync', password: 'correct-horse-battery', deviceId: DEVICE, isAdult: true }
   });
   c.eq(registration.status, 201, 'a student account exists to push from');
   const accountId = registration.data.account.id;
-  db.prepare('UPDATE accounts SET email_verified_at=? WHERE id=?').run(Date.now(), accountId);
+  await db.run('UPDATE accounts SET email_verified_at=? WHERE id=?', [Date.now(), accountId]);
 
   const push = (body, key) => app.request('/v1/sync/push', {
     method: 'POST', jar, headers: { 'Idempotency-Key': key },
@@ -60,22 +61,22 @@ try {
   const replay = await push({ entities: [settings(0, { theme: 'light' })] }, 'device-batch-1');
   c.eq(replay.status, 200, 'resending the same batch under the same key is still a replay');
   c.eq(JSON.stringify(replay.data), JSON.stringify(first.data), 'and returns the response the key acknowledged');
-  c.eq(db.prepare('SELECT COUNT(*) AS n FROM sync_entities WHERE account_id=?').get(accountId).n, 1, 'a replay writes nothing new');
+  c.eq((await db.get('SELECT COUNT(*) AS n FROM sync_entities WHERE account_id=?', [accountId])).n, 1, 'a replay writes nothing new');
 
   // The defect: the same key over different content used to answer 200 with the
   // old response while the new write was discarded.
   const reused = await push({ entities: [settings(1, { theme: 'DARK' })] }, 'device-batch-1');
   c.eq(reused.status, 409, 'the same key over a different batch is refused');
   c.eq(reused.data.error.code, 'IDEMPOTENCY_KEY_REUSED', 'and says why, so the client can re-key rather than believe it synced');
-  c.eq(JSON.parse(db.prepare("SELECT body_json FROM sync_entities WHERE account_id=? AND entity_id='settings1'").get(accountId).body_json).theme,
+  c.eq(JSON.parse((await db.get("SELECT body_json FROM sync_entities WHERE account_id=? AND entity_id='settings1'", [accountId])).body_json).theme,
     'light', 'the refused push changed nothing');
 
   const rekeyed = await push({ entities: [settings(1, { theme: 'DARK' })] }, 'device-batch-2');
   c.eq(rekeyed.status, 200, 'the same content under a new key is accepted');
-  c.eq(JSON.parse(db.prepare("SELECT body_json FROM sync_entities WHERE account_id=? AND entity_id='settings1'").get(accountId).body_json).theme,
+  c.eq(JSON.parse((await db.get("SELECT body_json FROM sync_entities WHERE account_id=? AND entity_id='settings1'", [accountId])).body_json).theme,
     'DARK', 'and the setting the student changed is what the server now holds');
 
-  const digest = db.prepare("SELECT request_digest FROM idempotency_keys WHERE account_id=? AND key='device-batch-1'").get(accountId)?.request_digest;
+  const digest = (await db.get("SELECT request_digest FROM idempotency_keys WHERE account_id=? AND key='device-batch-1'", [accountId]))?.request_digest;
   c.ok(typeof digest === 'string' && digest.length === 64, 'the key records a digest of what it acknowledged');
 
   // ── 2 · A repeated event id is a conflict, never a 500 ────────────────────
@@ -84,7 +85,7 @@ try {
   }, 'device-batch-3');
   c.eq(duplicateInBatch.status, 409, 'one id twice in one batch is a conflict');
   c.eq(duplicateInBatch.data.error.code, 'SYNC_EVENT_ID_CONFLICT', 'named so the device can drop the duplicate outbox row');
-  c.eq(db.prepare('SELECT COUNT(*) AS n FROM learning_events WHERE account_id=?').get(accountId).n, 0, 'and the batch is not half-applied');
+  c.eq((await db.get('SELECT COUNT(*) AS n FROM learning_events WHERE account_id=?', [accountId])).n, 0, 'and the batch is not half-applied');
 
   const stored = await push({ events: [event('evt-1', 10, { n: 1 })] }, 'device-batch-4');
   c.eq(stored.status, 200, 'a first event is stored');
@@ -93,21 +94,20 @@ try {
   const reusedId = await push({ events: [event('evt-1', 11, { n: 2 })] }, 'device-batch-6');
   c.eq(reusedId.status, 409, 'the same id at a new sequence is a conflict');
   c.eq(reusedId.data.error.code, 'SYNC_EVENT_ID_CONFLICT', 'and not an internal error');
-  c.eq(db.prepare('SELECT COUNT(*) AS n FROM learning_events WHERE account_id=?').get(accountId).n, 1, 'exactly one event is stored');
+  c.eq((await db.get('SELECT COUNT(*) AS n FROM learning_events WHERE account_id=?', [accountId])).n, 1, 'exactly one event is stored');
 
   // ── 3 · An unclaimed failure is INTERNAL, whatever the driver called it ───
   // Deliberate 5xx codes a client acts on (HANDWRITING_UNREACHABLE, BILLING_
   // PROVIDER_NOT_CONFIGURED) still carry their code — see
   // verification-enforcement-check.mjs. What must not survive is a code the
   // server never chose to publish.
-  db.exec('DROP TABLE learning_events');
+  await app.adminExec(app.engine === 'postgres' ? 'DROP TABLE pri.learning_events' : 'DROP TABLE learning_events');
   const broken = await push({ events: [event('evt-2', 20, { n: 3 })] }, 'device-batch-7');
   c.eq(broken.status, 500, 'a genuine server fault is a 500');
   c.eq(broken.data.error.code, 'INTERNAL', 'answered as INTERNAL rather than the driver code');
   c.ok(!/SQLITE|no such table/i.test(broken.text), `no driver internals reach the client (${broken.text.slice(0, 120)})`);
 } finally {
   await app.close();
-  db.close();
   rmSync(scratch, { recursive: true, force: true });
   for (const name of names) {
     if (prior[name] === undefined) delete process.env[name];
@@ -115,4 +115,5 @@ try {
   }
 }
 
+console.log(`engine: ${app.engine}`);
 console.log(`SYNC IDEMPOTENCY — PASS — ${c.count()}/${c.count()} checks — a key answers only the batch it acknowledged, a repeated event id is a conflict, and no server fault hands out a driver's error code.`);

@@ -3,7 +3,8 @@ import react from '@vitejs/plugin-react';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { resolveReleaseIdentity } from '../release/release-identity.mjs';
+import { applyDeploymentPrecedence, resolveReleaseIdentity } from '../release/release-identity.mjs';
+import { LANGUAGES, DEFAULT_LANGUAGE } from './src/i18n/languages.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Chunking
@@ -49,6 +50,22 @@ import { resolveReleaseIdentity } from '../release/release-identity.mjs';
 // are over it, and raising the bar past them would only hide that.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Every language other than English is a chunk of its own and stays out of
+// the install, by the argument made at the ON_DEMAND rule below. Both are
+// derived from the registration table, so adding a language is a catalogue and
+// one entry in i18n/languages.js — never a third edit here that could be
+// forgotten and quietly put a whole language back into every install.
+const TRANSLATED = LANGUAGES.filter(l => l.id !== DEFAULT_LANGUAGE);
+const TRANSLATION_CHUNKS = TRANSLATED.map(l => ({
+  name: `i18n-${l.id}`,
+  test: new RegExp(`/src/i18n/strings\\.${l.id}\\.js$`),
+  priority: 40
+}));
+const TRANSLATION_ON_DEMAND = TRANSLATED.map(l => [
+  new RegExp(`(^|/)i18n-${l.id}-[^/]*\\.js$`),
+  `${l.english} string catalogue`
+]);
+
 // Exported so client/test/i18n-check.mjs can assert against the rules the
 // build actually uses, rather than a second copy that would drift.
 export const CHUNK_GROUPS = [
@@ -62,8 +79,16 @@ export const CHUNK_GROUPS = [
   // them by name and leave them out of the install, and so the i18n contract
   // suite can assert that it did. Only the data is split — i18n/index.js stays
   // in the entry, because the runtime has to be there to decide a language.
-  { name: 'i18n-hi', test: /\/src\/i18n\/strings\.hi\.js$/, priority: 40 },
+  // One group per registered language (see TRANSLATION_CHUNKS below), so a
+  // language added to i18n/languages.js is split and named without an edit here.
+  ...TRANSLATION_CHUNKS,
   { name: 'i18n-terms', test: /\/src\/i18n\/ncertTerms\.js$/, priority: 40 },
+  // The NCERT syllabus layers — chapter lists, dot points and coverage split
+  // out of the Class 7–9 production banks so the curriculum spine can read them
+  // at boot without the generators and teaching content behind them. They are
+  // small and always wanted together, so they share one chunk rather than
+  // costing the boot path five requests.
+  { name: 'ncert-syllabus', test: /\/src\/engine\/ncert\/[a-z0-9-]+-syllabus\.js$/, priority: 40 },
   { name: 'vendor-react', test: /\/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//, priority: 30 },
   { name: 'vendor-katex', test: /\/node_modules\/katex\//, priority: 30 }
 ];
@@ -99,7 +124,7 @@ export const CHUNK_GROUPS = [
 
 // Exported so client/test/install-budget-check.mjs can hold the build to these
 // exact rules rather than to a second copy of them that would drift.
-export const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)release\.json$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
+export const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)release\.json$|(^|\/)features\.json$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
 
 export const ON_DEMAND = [
   // ~2.7 MB of renderer and worker, for the student who attaches a scanned PDF.
@@ -143,7 +168,28 @@ export const ON_DEMAND = [
   // they are question banks for one class each, exactly like the rest of this
   // rule. Without naming them they fell through to the warm set, so a Class 10
   // student was fetching 90 kB of Class 11 and 12 questions in the background.
-  [/(^|\/)(year(7|8|9|10|11|12)|streams-(standard|ext)|india-(algebra|calculus|class10|class11|class12|coordinate|foundation|junior-overlay|olympiad|senior|native-helpers))-[^/]*\.js$/, 'question bank for another year'],
+  // multipart is the HSC Section II bank: structured papers that only the
+  // legacy NSW exam route (`POST /exams` in local/backend.js) composes, behind
+  // the import() that route already holds, and never reached by a CBSE or JEE
+  // paper (local/indiaExamBackend.js). The NSW track sits behind the
+  // EXTENDED_TRACKS flag, so without naming it every Indian student warmed
+  // 16 kB of Australian exam questions; a profile that holds the NSW course has
+  // it from its first paper on, and backend.js already charges an unreachable
+  // fetch to that one paper rather than every paper after it.
+  [/(^|\/)(year(7|8|9|10|11|12)|streams-(standard|ext)|multipart|india-(algebra|calculus|class10|class11|class12|coordinate|foundation|junior-overlay|olympiad|senior|native-helpers))-[^/]*\.js$/, 'question bank for another year'],
+
+  // The source-audited NCERT Class 7–9 production banks: each class's
+  // generators, topper notes, worked examples and answer audits. They used to
+  // ride in the install because the curriculum spine imported its chapter list
+  // from the same modules; that list now lives in the small ncert-syllabus
+  // chunk, and these are reached only through the india-junior question bank
+  // and the chapter shells in Practice.jsx. That bank is exactly what api.js
+  // warmScope() loads at sign-in for a Class 7, 8 or 9 profile, and its static
+  // imports pull these in with it, so the students who practise from them are
+  // offline-ready for them; a Class 10–12 profile carries none of them.
+  // Practice.jsx mounts a chapter shell only for its own chapters and renders
+  // nothing, never a crash, if one cannot be fetched.
+  [/(^|\/)class(7|8|9)-[a-z0-9-]+-production-[^/]*\.js$/, 'NCERT Class 7–9 production bank'],
 
   // The previous-year archive is reached only by a student who asks for past
   // papers. It is behind an import() already; warming it spent 48 kB on the
@@ -159,11 +205,64 @@ export const ON_DEMAND = [
   // done it: the strings do not arrive, the app stays in English, and the
   // choice is remembered so the next connected boot lands in Hindi — which
   // i18n/index.js spells out where setLanguage swallows the failure.
-  [/(^|\/)i18n-hi-[^/]*\.js$/, 'Hindi string catalogue'],
+  ...TRANSLATION_ON_DEMAND,
 
   // The NCERT term glossary is reached only when the term bridge is switched
   // on, and is worth nothing to the install of a student who never does.
-  [/(^|\/)i18n-terms-[^/]*\.js$/, 'NCERT term glossary']
+  [/(^|\/)i18n-terms-[^/]*\.js$/, 'NCERT term glossary'],
+
+  // The Hindi legal notices, by the same argument as the Hindi catalogue: an
+  // English reader should not carry 37 kB of Devanagari they will never open.
+  // Legal.jsx reaches them by import() only when the page is read in Hindi,
+  // and if they cannot be fetched it shows the English — the text that
+  // governs — and says so, which legal-pages-check.mjs holds it to.
+  [/(^|\/)legalHindi-[^/]*\.js$/, 'Hindi legal notices'],
+
+  // Staff-only screens. ADR-0001 makes the product online-first, and these are
+  // the screens a student never opens, so nothing a student does offline
+  // depends on them and no student should pay to download them:
+  //   · Teach — the teacher workspace. App.jsx renders it only through
+  //     teacherOnly(), which redirects every other role before the lazy route
+  //     is ever rendered, and only TEACHER_NAV links to it. A teacher's first
+  //     open fetches it and the runtime rule keeps it from then on.
+  //   · StaffOperationsPanel — the content-operations and admin console.
+  //     Settings.jsx asks for it only once the signed-in cloud account reports
+  //     a support or admin role, and the server authorises every call it makes
+  //     regardless.
+  [/(^|\/)(Teach|StaffOperationsPanel|MfaPanel)-[^/]*\.js$/, 'staff-only screen'],
+
+  // The placement check: its page, the adaptive engine and the Pri-authored
+  // prerequisite graph. A student opens it once after onboarding and perhaps
+  // again for a retake, so it is fetched on that first open (the page and the
+  // engine are both behind import()) and kept by the runtime rule from then on.
+  // ADR-0001 makes the product online-first, and the one case this shows — a
+  // first open with no connection — is reported by api.js as a chapter that has
+  // not been downloaded yet; practice, which needs none of it, is unaffected.
+  [/(^|\/)(Placement|placement|prerequisites|prerequisiteSkillsHi)-[^/]*\.js$/, 'placement check'],
+
+  // Reviewed JEE past-paper shards (tools/jee-question-department/pack.py).
+  // Only a JEE student opening a chapter that has reviewed past papers ever
+  // asks for one, and only for that chapter's part; generators/index.js reaches
+  // them by import() from jee-pyq-runtime.js. Exactly the placement argument:
+  // fetched on first open, kept by the runtime rule, and a first open with no
+  // connection is reported as a chapter not yet downloaded.
+  [/(^|\/)jee-pyq-[a-z-]+-\d\d-[^/]*\.js$/, 'reviewed JEE past-paper shard'],
+
+  // Chapter notes: the Notes page and one chunk of original revision notes per
+  // class (notes/notesIndex.js), about 60 kB each. They are reached only by
+  // import() when a student opens Notes, so a student who never does pays
+  // nothing; the runtime /assets/ rule keeps whatever was opened, so a chapter
+  // read once online is there offline from then on. The one case this shows,
+  // opening Notes for the first time with no connection, Notes.jsx reports by
+  // name and offers a retry; practice, which needs none of it, is unaffected.
+  [/(^|\/)(Notes|notes-class(7|8|9|10|11|12))-[A-Za-z0-9_-]+\.(js|css)$/, 'chapter notes'],
+
+  // "Practise this": photograph a question and practise its skill. The page
+  // cannot do anything without a connection — reading the photo is a server
+  // call — so installing it would only carry code that is useless offline. A
+  // first open with no connection shows the route's ordinary chunk-load
+  // failure; practice itself needs none of it.
+  [/(^|\/)(PractisePhoto|questionPhoto)-[^/]*\.js$/, '"Practise this" photo page']
 ];
 
 // The faces the first screens genuinely paint in: the Latin Inter subset for
@@ -268,10 +367,58 @@ function releaseIdentityManifest(identity) {
   };
 }
 
-export default defineConfig(({ command }) => {
-  const releaseIdentity = resolveReleaseIdentity({ production: command === 'build' });
+// Build-time feature flags (client/src/platform/features.js). A production
+// build is OFF unless its environment says PRI_FEATURE_<NAME>=1; development
+// (`vite` serve) is ON. Test harnesses that build set the variable themselves.
+export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR', 'AUSTRALIA']);
+// Flags built and recorded in features.json like the ones above, but not yet
+// asserted off in the tracked iPad bundles (client/test/ios-bundle-features-
+// check.mjs), because those bundles predate the flag and carry no record of
+// it. Move a name into FEATURE_FLAGS with the next `npm run sync:ios`.
+//   EXTENDED_TRACKS — the Olympiad track and the Teacher role in onboarding,
+//   classroom panels for students (src/platform/features.js).
+export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS']);
+const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+export function featureStates(command, env = process.env) {
+  const on = name => (command === 'build' ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
+  return Object.fromEntries([...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].map(name => [flagKey(name), on(name)]));
+}
+export function featureDefines(command, env = process.env) {
+  const states = featureStates(command, env);
   return {
-    plugins: [react(), releaseIdentityManifest(releaseIdentity), precache()],
+    __PRI_FEATURE_PLACEMENT__: JSON.stringify(states.placement),
+    __PRI_FEATURE_EXTENDED_TRACKS__: JSON.stringify(states.extendedTracks),
+    __PRI_FEATURE_AUSTRALIA__: JSON.stringify(states.australia)
+  };
+}
+
+// The flags a build was made with, written beside it as features.json so the
+// tracked iPad bundles can be checked for a flag-on test build committed by
+// mistake (client/test/ios-bundle-features-check.mjs). Records every known
+// PRI_FEATURE_* flag, including ones whose code lives on other branches.
+function featureManifest(states) {
+  return {
+    name: 'pri-feature-manifest',
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'features.json', source: `${JSON.stringify(states, null, 2)}\n` });
+    }
+  };
+}
+
+export default defineConfig(({ command }) => {
+  const releaseIdentity = resolveReleaseIdentity({ production: command === 'build', env: applyDeploymentPrecedence(process.env) });
+  // The AI tutor ships dark: off in every production build unless it was made
+  // with PRI_FEATURE_TUTOR=1 (staging), on for the development server. See
+  // src/tutor/flag.js and the frozen V1 scope (docs/release/PRI_V1_RELEASE_SCOPE.md).
+  const tutorFlag = String(process.env.PRI_FEATURE_TUTOR || '').trim();
+  const featureTutor = tutorFlag === '1' ? true : tutorFlag === '0' ? false : command !== 'build';
+  return {
+    define: {
+      ...featureDefines(command),
+      __PRI_FEATURE_TUTOR__: JSON.stringify(featureTutor),
+      __PRI_PRODUCTION_BUILD__: JSON.stringify(command === 'build')
+    },
+    plugins: [react(), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
     server: { port: 5173 },
     build: {
       outDir: 'dist',

@@ -1,0 +1,83 @@
+name: KALP-02 information-architecture gate
+
+on:
+  pull_request:
+    paths:
+      - 'client/src/App.jsx'
+      - 'client/src/pages/History.jsx'
+      - 'client/src/pages/Teach.jsx'
+      - 'client/src/components/FreeCapNotice.jsx'
+      - 'client/src/i18n/**'
+      - 'client/src/theme.css'
+      - 'client/test/kalp02-navigation-check.mjs'
+      - 'client/test/tour-kalp02-navigation.js'
+      - 'client/test/tour-kalp01-design.js'
+      - 'docs/design/KALP-02-information-architecture.md'
+      - '.github/workflows/kalp-02-information-architecture.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# These browser gates also drive the Australian-syllabus flows, which a V1
+# build hides behind PRI_FEATURE_AUSTRALIA. The shipped iPad bundles stay
+# flag-off (client/test/ios-bundle-features-check.mjs).
+env:
+  PRI_FEATURE_AUSTRALIA: '1'
+  PRI_FEATURE_EXTENDED_TRACKS: '1'
+
+jobs:
+  verify:
+    name: Route, role, browser and responsive navigation
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Use Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install client dependencies
+        run: npm ci --prefix client
+
+      - name: KALP-02 route and role source gate
+        run: node client/test/kalp02-navigation-check.mjs
+
+      - name: KALP-01 visual-system regression gate
+        run: node client/test/design-system-check.mjs
+
+      - name: Build exact client
+        run: npm run build --prefix client
+
+      - name: Install Chromium
+        working-directory: client
+        run: npx playwright install --with-deps chromium
+      # Accessibility performs its own source build and release-identity check.
+      # Run it before screenshot-producing browser journeys create untracked
+      # evidence under artifacts/, which would correctly make the source tree
+      # dirty for a subsequent production build.
+      - name: Accessibility regression
+        run: npm run test:a11y
+
+      - name: KALP-02 real navigation journey
+        run: node client/test/tour-kalp02-navigation.js --no-build
+
+      - name: Existing browser regression
+        run: node client/test/e2e.mjs --only=login,india,phone,v3 --no-build
+
+      - name: KALP-01 tablet visual regression
+        run: node client/test/tour-kalp01-design.js --no-build
+
+      - name: Upload KALP-02 navigation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: kalp-02-navigation-evidence
+          path: artifacts/kalp-02/
+          if-no-files-found: warn
+          retention-days: 14

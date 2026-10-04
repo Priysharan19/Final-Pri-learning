@@ -6,6 +6,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -14,7 +17,7 @@ jobs:
   deterministic:
     name: Deterministic shard — ${{ matrix.shard }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -25,8 +28,8 @@ jobs:
           - holdout-lines-backend
           - context-hard-golden
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
           cache: npm
@@ -61,17 +64,30 @@ jobs:
             node client/test/india-practice-availability-check.mjs
             node client/test/entitlement-check.mjs
             node client/test/sync-contract-check.mjs
+            # Both of these guard the offline-first backup and cloud-sync paths and
+            # were not being run anywhere in CI.
             node client/test/restore-durability-check.mjs
             node client/test/cloud-sync-worker-check.mjs
+            # Cloud sync end to end: restore on a fresh device, automatic
+            # triggers, and 409 entity-conflict recovery.
+            node client/test/cloud-restore-fidelity-check.mjs
+            node client/test/auto-sync-scheduler-check.mjs
+            node client/test/sync-conflict-recovery-check.mjs
             node client/test/cloud-session-refresh-check.mjs
             node client/test/account-action-boundary-check.mjs
             node client/test/india-exam-blueprint-check.mjs
             node client/test/india-progress-product-check.mjs
             node tools/india-production-census.mjs
           } 2>&1 | tee -a 'shard-${{ matrix.shard }}.log'
+      - name: Real ink diagnostic (advisory in PR CI)
+        if: always() && matrix.shard == 'ink-engine-india-exams'
+        continue-on-error: true
+        run: |
+          echo '::warning title=Real ink is advisory here::test:real is a diagnostic in PR CI (|| true). The blocking floor (node client/test/inkcheck-real.mjs --strict --gate, handwriting/v17/real-ink-floor.json) runs only in release-candidate.yml.'
+          npm run --silent test:real || true
       - name: Shard log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: deterministic-log-${{ matrix.shard }}
           path: shard-${{ matrix.shard }}.log
@@ -85,31 +101,35 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
       - name: Runner budget policy
         run: node tools/ci-runner-policy-check.mjs
+      - name: Workflow supply-chain policy (least privilege, pinned actions, no privileged PR-head execution)
+        run: node tools/ci-workflow-policy-check.mjs
+      - name: Native shells enforce the server Content-Security-Policy
+        run: node client/test/native-shell-csp-check.mjs
       - name: Deterministic shard mapping contract
         run: node tools/ci-deterministic-shards.mjs --check
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: deterministic-log-holdout3-india-pyq
           path: shard-logs/holdout3-india-pyq
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: deterministic-log-holdout2-india-adaptive
           path: shard-logs/holdout2-india-adaptive
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: deterministic-log-ink-engine-india-exams
           path: shard-logs/ink-engine-india-exams
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: deterministic-log-holdout-lines-backend
           path: shard-logs/holdout-lines-backend
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: deterministic-log-context-hard-golden
           path: shard-logs/context-hard-golden
@@ -132,8 +152,8 @@ jobs:
           grep -Fq '✔ INDIA SUITE PASSED — 1832/1832 checks' suites.log
           grep -Fq '44000 questions from 440 declared (generator, difficulty) pairs × 100 draws — 44000 marked correct by their own marker, 44000 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
-          grep -Fq 'NCERT ANSWER FORMS: PASS — 212/212 checks' suites.log
-          grep -Fq 'METHOD MARKS: PASS — 37/37 checks' suites.log
+          grep -Fq 'NCERT ANSWER FORMS: PASS — 419/419 checks' suites.log
+          grep -Fq 'METHOD MARKS: PASS — 53/53 checks' suites.log
           grep -Fq 'WORKING BRANCHES: PASS — 29/29 checks' suites.log
           grep -Fq 'Pri Reason V1 precision gate: PASS' suites.log
           grep -Fq 'Pri Reason V2 safety gate: PASS' suites.log
@@ -141,27 +161,44 @@ jobs:
           grep -Fq 'Pri Reason V4 regression gate: PASS' suites.log
           grep -Fq 'Pri Reason V2 curriculum integration gate: PASS' suites.log
           grep -Fq 'INDIA NATIVE BANKS: PASS — 313/313 checks — 19 chapters rewired onto 20 NCERT-native generators' suites.log
-          grep -Fq 'NCERT ANSWER FORMS: PASS — 212/212 checks' suites.log
+          grep -Fq 'NCERT ANSWER FORMS: PASS — 419/419 checks' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 129/129 checks' suites.log
+          grep -Fq 'EXAM SESSION: PASS — 88/88 checks' suites.log
+          grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1079/1079 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
           grep -Fq 'INDIA ADAPTIVE: PASS — 302/302 checks' suites.log
+          grep -Fq 'ADAPTIVE SIMULATION: PASS — 77/77 checks' suites.log
+          grep -Fq 'PROGRESS TRUTH: PASS — 86/86 checks' suites.log
+          grep -Fq 'PLACEMENT: PASS — 268/268 checks' suites.log
+          grep -Fq 'IOS BUNDLE FEATURES: PASS — 20/20 checks' suites.log
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
-          grep -Fq 'LEGAL PAGES: PASS — 228/228 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 42/42 checks' suites.log
-          grep -Fq 'CLOUD WORKING CLIENT: PASS — 44/44 checks' suites.log
-          grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log
-          grep -Fq 'I18N: PASS — 187/187 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 42/42 checks' suites.log
-          grep -Fq 'CLOUD WORKING CLIENT: PASS — 44/44 checks' suites.log
-          grep -Fq 'CLOUD PHOTO CLIENT: PASS — 28/28 checks' suites.log
+          grep -Fq 'LEGAL PAGES: PASS — 233/233 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 94/94 checks' suites.log
+          grep -Fq 'BROWSER RUN FIXES: PASS — 23/23 checks' suites.log
+          grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
+          grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
+          grep -Fq 'TUTOR UI: PASS — 71/71 checks' suites.log
+          grep -Fq 'APPLE SIGN IN: PASS — 66/66 checks' suites.log
+          grep -Fq 'ONBOARDING SCOPE: PASS — 40/40 checks' suites.log
+          grep -Fq 'STUDY PLAN: PASS — 211/211 checks' suites.log
+          grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
+          grep -Fq 'I18N: PASS — 190/190 checks' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 89/89 checks — 59 files scanned, 0 hard-coded strings' suites.log
+          # Chapter notes: every curriculum chapter, every worked answer engine-verified.
+          grep -Fq 'NOTES CONTENT CHECK PASSED — 77/77 chapters' suites.log
+          grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
+          grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 94/94 checks' suites.log
+          grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
+          grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
           grep -Fq 'MARK PREDICTOR: PASS — 39/39 checks' suites.log
           grep -Fq 'PDF WORKING: PASS — 25/25 checks' suites.log
           grep -Fq 'MCQ DISTINCTNESS: PASS — 14/14 checks' suites.log
           grep -Fq 'INDIA NATIVE SURFACES: PASS — 31/31 checks' suites.log
-          grep -Eq 'INSTALL BUDGET: PASS — 44/44 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
+          grep -Eq 'INSTALL BUDGET: PASS — 48/48 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
           grep -Fq 'nothing emitted left uncovered.' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 59/59 checks' suites.log
@@ -170,8 +207,18 @@ jobs:
           grep -Fq 'STREAK CALENDAR: PASS — 19/19 checks' suites.log
           grep -Fq 'BAD INPUT: PASS — 38/38 checks' suites.log
           grep -Fq 'CLOUD SYNC ACK: PASS — 44/44 checks' suites.log
+          grep -Fq 'PASS — §09 submission lifecycle: 13 groups' suites.log
+          grep -Fq 'PASS — §22 submission sync durability: 13 groups' suites.log
           grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
           grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
+          # §06 content runtime certification: every V1 launch path (CBSE/NCERT
+          # 7–12, JEE Main, JEE Advanced) served, validated, versioned and
+          # end-to-end through the local backend; the path count may only grow.
+          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 142/142 checks' suites.log
+          grep -Fq 'CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — ' suites.log
+          grep -Fq '8/8 exam selections' suites.log
+          paths=$(grep -Eo 'CONTENT CERTIFICATION [(]fast, 4/path/difficulty[)]: PASS — [0-9]+' suites.log | grep -Eo '[0-9]+$')
+          test "${paths:-0}" -ge 793
           if grep -Fq 'not measured:' suites.log; then
             echo 'A deterministic suite reported skipped coverage.' >&2
             exit 1
@@ -186,7 +233,7 @@ jobs:
           }
       - name: Combined suite log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: suites-log
           path: suites.log
@@ -197,15 +244,41 @@ jobs:
     name: Production account, sync and commercial schema
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # A throwaway Postgres for the Supabase schema gates (ADR-0001). It lives
+    # only for this job, trusts loopback connections and holds no credential;
+    # the suites create, migrate and drop their own scratch databases in it.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PRI_TEST_PG_ADMIN_URL: postgres://postgres@localhost:5432/postgres
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: server/package-lock.json
       - name: Install server dependencies
         run: npm ci --prefix server
+      - name: Handwriting stays answer-blind (static, client + server route)
+        run: npm run test:ink:blind
+      - name: Cloud reader evaluation tool self-test (fake provider, no spend)
+        run: npm run test:ink:cloud-eval
+      - name: SQLite to Postgres export tool
+        run: |
+          set -o pipefail
+          node server/test/sqlite-to-postgres-export-check.mjs 2>&1 | tee pg-export.log
+          grep -Fq 'SQLITE TO POSTGRES EXPORT: PASS' pg-export.log
       - name: Server release identity
         run: node server/test/release-identity-check.mjs
       - name: Runtime dependency security floor
@@ -220,6 +293,9 @@ jobs:
           node server/test/verification-enforcement-check.mjs
           node server/test/housekeeping-check.mjs
           node server/test/production-runtime-image-check.mjs
+          node server/test/mfa-check.mjs
+          node server/test/oidc-consent-check.mjs
+          node server/test/security-hardening-check.mjs
       - name: Billing lifecycle, database operations and HTTP journeys
         run: |
           node server/test/billing-cancel-refund-check.mjs
@@ -234,6 +310,9 @@ jobs:
         run: |
           node server/test/handwriting-transcription-check.mjs
           node server/test/working-check-check.mjs
+          node server/test/question-photo-check.mjs
+          node server/test/tutor-help-check.mjs
+          node server/test/tutor-stream-check.mjs
           node server/test/spend-ceiling-check.mjs
           node server/test/guardian-consent-check.mjs
       - name: Account, origin, CMS and classroom contracts
@@ -248,13 +327,62 @@ jobs:
         run: |
           node server/test/proxy-identity-contract-check.mjs
           node server/test/sync-idempotency-contract-check.mjs
+          node server/test/practice-attempt-sync-check.mjs
           node server/test/entitlement-admin-grant-check.mjs
           node server/test/request-size-contract-check.mjs
           node server/test/content-index-exposure-check.mjs
+      - name: Structured logs, readiness, metrics, alert policy and failure drills (SQLite)
+        run: |
+          set -o pipefail
+          node server/test/observability-check.mjs 2>&1 | tee ops.log
+          node server/test/failure-drills-check.mjs 2>&1 | tee -a ops.log
+          grep -Fq 'OBSERVABILITY: PASS' ops.log
+          grep -Fq 'FAILURE DRILLS: PASS' ops.log
+      # V1 blocker #14: every /v1 route is in the reviewed inventory with the
+      # guards really mounted on it; every object-level route fails closed for
+      # no session, revoked sessions, wrong account, wrong role, unverified
+      # email, pending consent and bad CSRF; hostile input is a coded 4xx; every
+      # declared rate limit holds; the production browser boundary (Origin,
+      # CORS, cookie flags, HSTS/CSP, redirects) holds; no secret leaks into a
+      # response or a log. The two engine-agnostic suites also run on Postgres below.
+      - name: Security acceptance (route inventory, BOLA/authz negatives, abuse limits, production boundary)
+        run: |
+          node server/test/route-inventory-check.mjs
+          node server/test/sql-parameterisation-check.mjs
+          node server/test/security-acceptance-check.mjs
+          node server/test/abuse-limits-check.mjs
+          node server/test/security-production-mode-check.mjs
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
+      - name: Supabase migrations are self-contained transactions (supabase db push)
+        run: node server/test/migration-transaction-check.mjs
+      - name: Supabase schema parity (migration text)
+        run: node server/test/postgres-schema-parity-check.mjs
+      - name: Platform store, concurrency, sync burst, connection config and fail-closed startup (SQLite)
+        run: |
+          node server/test/platform-store-check.mjs
+          node server/test/platform-concurrency-check.mjs
+          node server/test/platform-sync-burst-check.mjs
+          node server/test/postgres-connection-config-check.mjs
+          node server/test/platform-startup-check.mjs
+      - name: Supabase migrations and every engine-agnostic platform suite on real Postgres
+        run: |
+          set -o pipefail
+          node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 35/35 suites' platform-postgres.log
+          grep -Fq '✓ security-acceptance-check.mjs' platform-postgres.log
+          grep -Fq '✓ abuse-limits-check.mjs' platform-postgres.log
+          grep -Fq '✓ google-billing-check.mjs' platform-postgres.log
+          grep -Fq '✓ practice-attempt-sync-check.mjs' platform-postgres.log
+          grep -Fq 'ACCOUNT LIFECYCLE JOURNEY: PASS' platform-postgres.log
+          grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 29/29' platform-postgres.log
+          grep -Fq 'PLATFORM SYNC BURST: PASS' platform-postgres.log
+          grep -Fq '✓ failure-drills-check.mjs' platform-postgres.log
+          grep -Fq '✓ storekit-entitlement-state-machine-check.mjs' platform-postgres.log
       - name: Platform migration contract
         run: node server/test/platform-migration-check.mjs
+      - name: Billing v3 to v4 payment-retention rebuild on a populated SQLite database
+        run: node server/test/billing-payment-retention-migration-check.mjs
       - name: Cross-account sync pagination regression
         run: node server/test/platform-sync-pagination-check.mjs
       - name: Production persistent-storage contract
@@ -263,6 +391,8 @@ jobs:
         run: node server/test/production-db-bootstrap-check.mjs
       - name: Account lifecycle and session rotation
         run: node server/test/account-lifecycle-contract-check.mjs
+      - name: Account lifecycle journey, deletion against the retention table (SQLite)
+        run: node server/test/account-lifecycle-journey-check.mjs
       - name: Encrypted verification/reset email worker
         run: node server/test/auth-delivery-worker-check.mjs
       - name: Production email delivery configuration
@@ -271,23 +401,50 @@ jobs:
         run: node server/test/razorpay-billing-check.mjs
       - name: Apple billing lifecycle
         run: node server/test/apple-billing-check.mjs
+      - name: Client compatibility floor (CP-11)
+        run: node server/test/client-compatibility-check.mjs
+      - name: Server-paid operations obey the server's entitlement (SEC-COMM-01)
+        run: node server/test/premium-authority-check.mjs
+      - name: Google Play billing verification
+        run: node server/test/google-billing-check.mjs
+      # §19 / V1 blocker #7 (code side): the StoreKit entitlement state machine
+      # across renewal, grace, cancellation, expiry, refund, upgrade, restore,
+      # account switch, duplicate/out-of-order/replayed/forged notifications,
+      # plus the operator reconciliation CLI. Also runs on Postgres above.
+      - name: StoreKit entitlement state machine and reconciliation
+        run: |
+          set -o pipefail
+          node server/test/storekit-entitlement-state-machine-check.mjs 2>&1 | tee storekit.log
+          grep -Fq 'STOREKIT ENTITLEMENT STATE MACHINE: PASS — 172/172 checks' storekit.log
 
   browser:
     name: Browser suites (end-to-end and accessibility)
     runs-on: ubuntu-latest
+    # The accessibility gate builds the client itself; give it the same flags
+    # client/test/e2e.mjs uses for its build so both walk the same app (the
+    # Teacher role and Olympiad live behind EXTENDED_TRACKS, the AU link behind
+    # AUSTRALIA). PRI_FEATURE_TUTOR stays unset: the tutor tour proves dark.
+    env:
+      PRI_FEATURE_PLACEMENT: '1'
+      PRI_FEATURE_EXTENDED_TRACKS: '1'
+      PRI_FEATURE_AUSTRALIA: '1'
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: client/package-lock.json
       - name: Install client dependencies
         run: npm ci --prefix client
-      - name: Install Chromium
+      # tour-otp-onboarding.js drives the real platform server in-process
+      # (SMS/email test adapters), so the browser job needs its dependencies.
+      - name: Install server dependencies
+        run: npm ci --prefix server
+      - name: Install Chromium and WebKit
         working-directory: client
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium webkit
       - name: End-to-end suite
         run: |
           set -o pipefail
@@ -295,6 +452,10 @@ jobs:
           node client/test/tour-cloud-platform.js --no-build 2>&1 | tee -a browser.log
           node client/test/tour-admin-cms-platform.js --no-build 2>&1 | tee -a browser.log
           node client/test/tour-admin-independent-review.js --no-build 2>&1 | tee -a browser.log
+          # CP-03: the responsive product matrix in both engines (WebKit is the
+          # engine behind every Apple web view).
+          node client/test/tour-responsive-matrix.js --no-build 2>&1 | tee -a browser.log
+          node client/test/tour-responsive-matrix.js --no-build --browser=webkit 2>&1 | tee -a browser.log
       - name: Accessibility suite
         if: always()
         run: |
@@ -305,23 +466,38 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*222/222.*7 flows' browser.log
+          grep -Eq 'E2E SUITE.*355/355.*13 flows' browser.log
+          grep -Fq 'Submission · interruption recovery and one attempt' browser.log
+          grep -Fq 'Cloud · late results never rewrite an attempt' browser.log
+          grep -Fq 'India exam · JEE Main handwritten, reloaded, analysed' browser.log
+          grep -Fq 'India exam · the clock runs out and the paper submits itself' browser.log
+          grep -Fq 'Placement · onboarding → diagnostic → evidence map' browser.log
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
-          grep -Eq 'E2E SUITE.*18/18.*1 flows' browser.log
+          grep -Eq 'E2E SUITE.*19/19.*1 flows' browser.log
           grep -Fq 'Cloud admin · CMS lifecycle and role management' browser.log
-          grep -Eq 'E2E SUITE.*17/17.*1 flows' browser.log
+          grep -Eq 'E2E SUITE.*25/25.*1 flows' browser.log
           grep -Fq 'Cloud admin · independent-review rejection' browser.log
-          grep -Eq 'E2E SUITE.*8/8.*1 flows' browser.log
+          grep -Eq 'E2E SUITE.*13/13.*1 flows' browser.log
+          grep -Fq 'AI tutor · dark by default in a production build' browser.log
+          grep -Fq 'AI tutor · three levels, in order, with fallback' browser.log
+          grep -Eq 'E2E SUITE.*32/32.*2 flows' browser.log
+          grep -Fq 'Hindi · Practice, handwriting, Exams, exam room, Progress, Explain' browser.log
+          grep -Eq 'E2E SUITE.*54/54.*1 flows' browser.log
+          grep -Fq 'Progress truth · rendered numbers = attempt ledger' browser.log
+          grep -Eq 'E2E SUITE.*20/20.*1 flows' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
+          grep -Fq 'E2E BROWSER: webkit' browser.log
+          test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
+          test "$(grep -Ec 'E2E SUITE PASSED — 151/151 checks across 1 flows' browser.log)" -eq 2
           if grep -Fq 'not measured:' browser.log; then
             echo 'A browser suite reported skipped coverage.' >&2
             exit 1
           fi
       - name: Browser log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: browser-log
           path: browser.log
@@ -332,8 +508,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
           cache: npm
@@ -352,6 +528,14 @@ jobs:
         run: npm run sync:ios
       - name: Verify exact native release identity
         run: npm run verify:release:native
+      # After the build and the iOS bundle sync, so the scan reads the bytes
+      # that ship: every tracked file (iOS bundles included) and client/dist.
+      - name: Secret scan (tracked files, iOS bundles, built client)
+        run: |
+          node tools/secret-scan.test.mjs
+          node tools/secret-scan.mjs
+      - name: Cross-platform release matrix (CP-11)
+        run: node scripts/release-matrix.mjs --require-native-apple
       - name: Built client loads no remote presentation assets
         run: |
           set -euo pipefail

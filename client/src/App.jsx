@@ -1,14 +1,21 @@
+import { featureEnabled } from './platform/features.js';
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { Routes, Route, NavLink, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import { Routes, Route, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { api } from './api.js';
 import { requestPersistentStorage } from './local/idb.js';
+import { onCloudSessionChange } from './platform/cloudSession.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
 import { setLanguage, signInLanguage, useT } from './i18n/index.js';
 import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
-import Legal from './pages/Legal.jsx';
+// The legal notices are a route of their own: nothing on the first screen
+// reads them, and the four English documents they carry are 16 kB of text that
+// otherwise rode in the shell's preload list on every cold open. The chunk is
+// warmed in the background, so the pages still open offline; the Hindi copies
+// stay behind their own import() in Legal.jsx.
+const Legal = React.lazy(() => import('./pages/Legal.jsx'));
 
 // ── Routes nobody has opened yet ─────────────────────────────────────────────
 // Login, Home, Practice and Legal are the screens a first run reaches: the
@@ -30,44 +37,79 @@ const Match = React.lazy(() => import('./pages/Match.jsx'));
 const Tasks = React.lazy(() => import('./pages/Tasks.jsx'));
 const Teach = React.lazy(() => import('./pages/Teach.jsx'));
 const History = React.lazy(() => import('./pages/History.jsx'));
-const Favorites = React.lazy(() => import('./pages/Favorites.jsx'));
 const Classes = React.lazy(() => import('./pages/Classes.jsx'));
 const Settings = React.lazy(() => import('./pages/Settings.jsx'));
+const PlanPage = React.lazy(() => import('./plan/PlanPage.jsx'));
+// The placement check is opened once or twice per student, so it — and the
+// prerequisite graph and engine behind it — is an on-demand chunk (see
+// ON_DEMAND in vite.config.js), not part of the install or the warm set.
+const Placement = React.lazy(() => import('./pages/Placement.jsx'));
+// Notes: the page and each class's notes are chunks of their own (notes/notesIndex.js).
+const Notes = React.lazy(() => import('./pages/Notes.jsx'));
+// Outside the frozen V1 scope: the route exists only where the build flag is on.
+const PLACEMENT_ON = featureEnabled('placement');
+// "Practise this": an on-demand chunk (ON_DEMAND in vite.config.js) — it needs
+// a connection to do anything, so it is never part of the install.
+const PractisePhoto = React.lazy(() => import('./pages/PractisePhoto.jsx'));
 
 const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);
 
-/* Thin-line icons, drawn to match the reference's icon rail */
+/* Pri Learning navigation marks: restrained, legible line icons for the shared app shell. */
 const I = {
   home: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3 10.5 12 3l9 7.5" /><path d="M5.5 9.5V21h13V9.5" /><path d="M9.5 21v-6h5v6" /></svg>,
   tasks: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M12 5.5C10 4 7.5 3.5 4 3.8V19c3.5-.3 6 .3 8 1.7 2-1.4 4.5-2 8-1.7V3.8c-3.5-.3-6 .2-8 1.7Z" /><path d="M12 5.5v15.2" /></svg>,
   match: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3.5 3.5h3.2L19 15.8v3.2h-3.2L3.5 6.7V3.5Z" /><path d="M20.5 3.5h-3.2L13 7.8m-2 8.4-4.3 4.3H3.5v-3.2L7.8 13" /><path d="m16 16 3 3M8 16l-3 3" /></svg>,
   progress: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="9" /><path d="m8 12.5 2.5 2.5L16 9.5" /></svg>,
-  fav: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8L12 3.6Z" /></svg>,
   exams: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="13" r="8" /><path d="M12 9v4.5l3 1.8" /><path d="M9.5 2.5h5" /></svg>,
   classes: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="m2.5 9 9.5-5 9.5 5-9.5 5-9.5-5Z" /><path d="M6.5 11.5V16c0 1.4 2.5 2.8 5.5 2.8s5.5-1.4 5.5-2.8v-4.5" /><path d="M21.5 9v5" /></svg>,
   settings: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="3.2" /><path d="M19 12a7 7 0 0 0-.15-1.4l2.1-1.6-2-3.4-2.45 1a7 7 0 0 0-2.4-1.4L13.7 2.6h-3.9l-.4 2.6a7 7 0 0 0-2.4 1.4l-2.45-1-2 3.4 2.1 1.6A7 7 0 0 0 4.5 12c0 .5.05.9.15 1.4l-2.1 1.6 2 3.4 2.45-1a7 7 0 0 0 2.4 1.4l.4 2.6h3.9l.4-2.6a7 7 0 0 0 2.4-1.4l2.45 1 2-3.4-2.1-1.6c.1-.5.15-.9.15-1.4Z" /></svg>,
+  notes: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M6 3.5h10.5L19 6v14.5H6z" /><path d="M9 8.5h7M9 12h7M9 15.5h4.5" /></svg>,
+  practice: <span aria-hidden="true">✎</span>,
+  review: <span aria-hidden="true">↺</span>,
+  rush: <span aria-hidden="true">⚡</span>,
+  teacher: <span aria-hidden="true">▣</span>,
 };
 
-// Destinations carry a catalogue key rather than a label. A label frozen into
-// a module constant is read once at import time and never again, so it would
-// still be in English on a Hindi profile — the one bug this whole seam exists
-// to make impossible.
-const NAV = [
-  { to: '/', key: 'nav.home', ico: I.home },
-  { to: '/tasks', key: 'nav.tasks', ico: I.tasks },
-  { to: '/match', key: 'nav.match', ico: I.match },
-  { to: '/progress', key: 'nav.progress', ico: I.progress },
-  { to: '/favorites', key: 'nav.favorites', ico: I.fav },
-  { to: '/exams', key: 'nav.exams', ico: I.exams },
-  { to: '/classes', key: 'nav.classes', ico: I.classes },
-  { to: '/settings', key: 'nav.settings', ico: I.settings },
+const STUDENT_NAV = [
+  { label: 'nav.groupLearn', items: [{ to: '/', key: 'nav.home', ico: I.home }, { to: '/practice', key: 'nav.practice', ico: I.practice }, { to: '/plan', key: 'nav.plan', ico: I.tasks }, { to: '/notes', key: 'nav.notes', ico: I.notes }] },
+  { label: 'nav.groupWork', items: [{ to: '/tasks', key: 'nav.tasks', ico: I.tasks }, { to: '/exams', key: 'nav.exams', ico: I.exams }, { to: '/classes', key: 'nav.classes', ico: I.classes }] },
+  { label: 'nav.groupUnderstand', items: [{ to: '/progress', key: 'nav.progress', ico: I.progress }, { to: '/review?filter=wrong', key: 'nav.review', ico: I.review }] },
+  { label: 'nav.groupPlay', items: [{ to: '/rush', key: 'nav.rush', ico: I.rush }, { to: '/match', key: 'nav.match', ico: I.match }] },
+  { label: 'nav.groupAccount', items: [{ to: '/settings', key: 'nav.settings', ico: I.settings }] },
 ];
+
+const TEACHER_NAV = [
+  { label: 'nav.groupTeach', items: [
+    { to: '/teach', key: 'nav.teacherWorkspace', ico: I.teacher },
+    { to: '/teach#teacher-classes', key: 'nav.teacherClasses', ico: I.classes },
+    { to: '/teach#teacher-assignments', key: 'nav.teacherAssignments', ico: I.tasks },
+    { to: '/teach#teacher-analytics', key: 'nav.teacherAnalytics', ico: I.progress },
+    { to: '/teach#teacher-questions', key: 'nav.teacherQuestions', ico: I.review },
+  ] },
+  { label: 'nav.groupAccount', items: [{ to: '/settings', key: 'nav.settings', ico: I.settings }] },
+];
+
+const STUDENT_MOBILE_PRIMARY = new Set(['/', '/practice', '/tasks', '/progress']);
+const TEACHER_MOBILE_PRIMARY = new Set(['/teach', '/teach#teacher-classes', '/teach#teacher-assignments', '/teach#teacher-analytics']);
+
+function targetParts(to) {
+  const u = new URL(to, 'https://pri.local');
+  return { pathname: u.pathname, hash: u.hash };
+}
+
+function isDestinationActive(location, to) {
+  const target = targetParts(to);
+  if (location.pathname !== target.pathname) return false;
+  if (target.hash) return location.hash === target.hash;
+  if (target.pathname === '/teach') return !location.hash;
+  return true;
+}
 
 const TITLE_KEYS = {
   '/': 'nav.home', '/practice': 'nav.practice', '/progress': 'nav.progress', '/tasks': 'nav.tasks',
-  '/exams': 'nav.exams', '/rush': 'nav.rush', '/match': 'nav.match', '/teach': 'nav.classes',
-  '/history': 'nav.history', '/favorites': 'nav.favorites', '/classes': 'nav.classes', '/settings': 'nav.settings'
+  '/exams': 'nav.exams', '/rush': 'nav.rush', '/match': 'nav.match', '/teach': 'nav.teacherWorkspace',
+  '/notes': 'nav.notes', '/review': 'nav.review', '/history': 'nav.review', '/favorites': 'nav.review', '/classes': 'nav.classes', '/settings': 'nav.settings'
 };
 
 // Shown for the moment a route's own chunk is arriving. It is announced rather
@@ -88,8 +130,8 @@ export function Logo({ large = false, onClick }) {
     : {};
   return (
     <Tag className={`logo ${large ? 'logo-lg' : ''}${onClick ? ' logo-btn' : ''}`} {...controlProps}>
-      <span className="logo-bb">P</span>
-      <span className="logo-name">ri Learning<span className="logo-dot">.</span></span>
+      <span className="logo-bb" aria-hidden="true">P</span>
+      <span className="logo-name">Pri Learning<span className="logo-dot">.</span></span>
     </Tag>
   );
 }
@@ -103,6 +145,8 @@ export default function App() {
   const [toasts, setToasts] = useState([]);
   const [dueCount, setDueCount] = useState(0);
   const [recent, setRecent] = useState([]);
+  const moreButtonRef = useRef(null);
+  const moreSheetRef = useRef(null);
   const loc = useLocation();
   const nav = useNavigate();
   const t = useT();
@@ -129,8 +173,48 @@ export default function App() {
     refreshUser().then(u => { if (u) { refreshDue(); refreshRecent(); } }).catch(() => { });
   }, [refreshUser, refreshDue, refreshRecent]);
 
+  // Signing in or out of a cloud account changes what the profile view reports
+  // (cloudLinked, which decides default server reading). A failed re-read here
+  // keeps the current profile rather than signing the student out.
+  useEffect(() => {
+    let stop = () => {};
+    try {
+      stop = onCloudSessionChange(() => {
+        api.get('/me').then(r => { if (r?.user) setUser(r.user); }).catch(() => { });
+      });
+    } catch { /* non-browser runtimes */ }
+    return () => { try { stop(); } catch { /* already gone */ } };
+  }, []);
+
   // Guard months of practice from storage eviction — ask the browser once per boot.
   useEffect(() => { requestPersistentStorage(); }, []);
+
+  // Cloud sync without a button: on start, on reconnect, on return to the
+  // foreground, shortly after an answer and every 15 minutes while visible —
+  // for the signed-in profile only, and a no-op offline or unlinked. When a
+  // pull restored work done on another device, the screens reading it refresh.
+  //
+  // The scheduler is reached through import() rather than named at the top of
+  // this file: it pulls the sync worker and the cloud-restore path with it, and
+  // a static import here put 53 kB of them in the shell's own preload list —
+  // paid for on every cold open, by every student, before the first screen.
+  // Nothing about sync is needed before first paint: it is network-dependent
+  // and a no-op offline, so it is installed once the module arrives. The
+  // cleanup covers both orders — the effect torn down before the module lands
+  // (nothing to uninstall, and the late arrival installs nothing) and after.
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    const pid = user.id;
+    let uninstall = null;
+    let torn = false;
+    void import('./platform/cloudSyncScheduler.js').then(({ installAutoSync }) => {
+      if (torn) return;
+      uninstall = installAutoSync(pid, {
+        onSynced: result => { if (result?.restoredEvents > 0) { refreshUser(); refreshDue(); refreshRecent(); } }
+      });
+    }).catch(() => { });
+    return () => { torn = true; if (uninstall) uninstall(); };
+  }, [user?.id, refreshUser, refreshDue, refreshRecent]);
 
   // The interface follows the profile's own language. Before a profile is
   // chosen there is nothing to follow, so the sign-in screen falls back to the
@@ -158,7 +242,7 @@ export default function App() {
   }, [user?.theme]);
 
   const pageTitle = useMemo(
-    () => (TITLE_KEYS[loc.pathname] ? t(TITLE_KEYS[loc.pathname]) : loc.pathname.startsWith('/exams') ? t('nav.exam') : null),
+    () => (TITLE_KEYS[loc.pathname] ? t(TITLE_KEYS[loc.pathname]) : loc.pathname.startsWith('/exams') ? t('nav.exam') : loc.pathname.startsWith('/notes/') ? t('nav.notes') : null),
     [loc.pathname, t]
   );
 
@@ -197,11 +281,35 @@ export default function App() {
     let tries = 0;
     const t = setInterval(() => {
       const el = document.getElementById(id);
-      if (el) { el.scrollIntoView({ block: 'start' }); clearInterval(t); }
-      else if (++tries > 20) clearInterval(t);
+      if (el) {
+        el.scrollIntoView({ block: 'start' });
+        if (el.matches('[tabindex]')) el.focus({ preventScroll: true });
+        clearInterval(t);
+      } else if (++tries > 20) clearInterval(t);
     }, 80);
     return () => clearInterval(t);
   }, [loc.pathname, loc.hash]);
+
+  const closeMore = useCallback((restoreFocus = false) => {
+    if (restoreFocus) moreButtonRef.current?.focus();
+    setMoreOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const first = moreSheetRef.current?.querySelector('a, button:not([disabled])');
+    first?.focus();
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeMore(true);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [moreOpen, closeMore]);
+
+  useEffect(() => { setMoreOpen(false); }, [loc.pathname, loc.hash]);
 
   const toast = useCallback((content, ms = 3800, kind = '') => {
     const id = Math.random().toString(36).slice(2);
@@ -231,26 +339,56 @@ export default function App() {
   if (!user) {
     return (
       <AppCtx.Provider value={ctx}>
-        <Routes>
-          {/* A store reviewer and a payment provider open these without an
-              account, so they are reachable before the profile gate. */}
-          <Route path="/privacy" element={<Legal />} />
-          <Route path="/terms" element={<Legal />} />
-          <Route path="/refund-policy" element={<Legal />} />
-          <Route path="/grievance" element={<Legal />} />
-          <Route path="*" element={<Login />} />
-        </Routes>
+        <React.Suspense fallback={<RouteLoading />}>
+          <Routes>
+            {/* A store reviewer and a payment provider open these without an
+                account, so they are reachable before the profile gate. */}
+            <Route path="/privacy" element={<Legal />} />
+            <Route path="/terms" element={<Legal />} />
+            <Route path="/refund-policy" element={<Legal />} />
+            <Route path="/grievance" element={<Legal />} />
+            <Route path="*" element={<Login />} />
+          </Routes>
+        </React.Suspense>
         <ToastLayer toasts={toasts} />
       </AppCtx.Provider>
     );
   }
 
-  const navItems = user.role === 'teacher'
-    ? NAV.map(n => n.to === '/classes' ? { ...n, to: '/teach' } : n)
-    : NAV;
+  const navSections = user.role === 'teacher' ? TEACHER_NAV : STUDENT_NAV;
+  const navItems = navSections.flatMap(section => section.items);
+  const primarySet = user.role === 'teacher' ? TEACHER_MOBILE_PRIMARY : STUDENT_MOBILE_PRIMARY;
+  const mobilePrimary = navItems.filter(item => primarySet.has(item.to));
+  const mobileMore = navItems.filter(item => !primarySet.has(item.to));
+  const roleLanding = user.role === 'teacher' ? '/teach' : '/';
+
+  const studentOnly = (element, teacherTarget = '/teach') =>
+    user.role === 'teacher' ? <Navigate to={teacherTarget} replace /> : element;
+  const teacherOnly = (element) =>
+    user.role === 'teacher' ? element : <Navigate to="/" replace />;
+
+  const destinationLink = (item, className, onClick) => {
+    const active = isDestinationActive(loc, item.to);
+    return (
+      <Link key={item.to} to={item.to} className={`${className}${active ? ' active' : ''}`}
+        aria-current={active ? 'page' : undefined} onClick={onClick}>
+        <span className="nav-ico" aria-hidden="true">{item.ico}</span>
+        <span className="nav-label">{t(item.key)}</span>
+        {item.to === '/' && dueCount > 0 && <span className="nav-badge">{t('nav.due', { count: dueCount, n: dueCount })}</span>}
+      </Link>
+    );
+  };
 
   const switchProfile = async () => {
+    // The reminders runtime is loaded here, on the way out, rather than named
+    // at the top of this file: a static import carried the study planner it
+    // depends on into the shell's preload list for every student at every boot.
+    try { const { cancelRemindersOnSignOut } = await import('./reminders/index.js'); await cancelRemindersOnSignOut(user?.id); } catch { }
     try { await api.post('/auth/logout'); } catch { }
+    // A role-specific route belongs to the profile that just signed out.
+    // Neutralise it before showing the picker so selecting a different role
+    // cannot inherit a stale /teach (or other guarded) redirect.
+    nav('/', { replace: true });
     setUser(null);
   };
 
@@ -270,15 +408,14 @@ export default function App() {
         <div className="body-row">
           <aside className="sidebar no-print">
             <div className="sidebar-inner">
-              {navItems.map(n => (
-                <NavLink key={n.to} to={n.to} end={n.to === '/'} className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
-                  <span className="nav-ico">{n.ico}</span>
-                  <span className="nav-label">{t(n.key)}</span>
-                  {n.to === '/' && dueCount > 0 && <span className="nav-badge">{t('nav.due', { count: dueCount, n: dueCount })}</span>}
-                </NavLink>
+              {navSections.map(section => (
+                <div className="nav-section" key={section.label}>
+                  <div className="nav-section-label">{t(section.label)}</div>
+                  {section.items.map(item => destinationLink(item, 'nav-item'))}
+                </div>
               ))}
               <div className="nav-spacer" />
-              <SidebarHistory recent={recent} />
+              {user.role !== 'teacher' && <SidebarHistory recent={recent} />}
             </div>
           </aside>
 
@@ -290,27 +427,34 @@ export default function App() {
                     reported as a broken route rather than blanking the shell. */}
                 <React.Suspense fallback={<RouteLoading />}>
                   <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/practice" element={<Practice />} />
-                    <Route path="/progress" element={<Progress />} />
+                    <Route path="/" element={user.role === 'teacher' ? <Navigate to="/teach" replace /> : <Home />} />
+                    <Route path="/practice" element={studentOnly(<Practice />)} />
+                    <Route path="/practise-photo" element={studentOnly(<PractisePhoto />)} />
+                    <Route path="/progress" element={studentOnly(<Progress />, '/teach#teacher-analytics')} />
+                    <Route path="/plan" element={studentOnly(<PlanPage />)} />
+                    {PLACEMENT_ON && <Route path="/placement" element={studentOnly(<Placement />)} />}
                     <Route path="/map" element={<Navigate to="/progress?tab=map" replace />} />
                     <Route path="/stats" element={<Navigate to="/progress" replace />} />
                     <Route path="/badges" element={<Navigate to="/progress" replace />} />
-                    <Route path="/tasks" element={<Tasks />} />
-                    <Route path="/teach" element={<Teach />} />
-                    <Route path="/exams" element={<Exams />} />
-                    <Route path="/exams/:id" element={<ExamRoom />} />
-                    <Route path="/rush" element={<Rush />} />
-                    <Route path="/match" element={<Match />} />
-                    <Route path="/favorites" element={<Favorites />} />
-                    <Route path="/classes" element={<Classes />} />
-                    <Route path="/history" element={<History />} />
+                    <Route path="/tasks" element={studentOnly(<Tasks />, '/teach#teacher-assignments')} />
+                    <Route path="/teach" element={teacherOnly(<Teach />)} />
+                    <Route path="/exams" element={studentOnly(<Exams />)} />
+                    <Route path="/exams/:id" element={studentOnly(<ExamRoom />)} />
+                    <Route path="/notes" element={studentOnly(<Notes />)} />
+                    <Route path="/notes/:chapterId" element={studentOnly(<Notes />)} />
+                    <Route path="/rush" element={studentOnly(<Rush />)} />
+                    <Route path="/match" element={studentOnly(<Match />)} />
+                    <Route path="/review" element={studentOnly(<History />)} />
+                    <Route path="/history" element={<Navigate to="/review" replace />} />
+                    <Route path="/favorites" element={<Navigate to="/review?filter=bookmarked" replace />} />
+                    <Route path="/mistakes" element={<Navigate to="/review?filter=wrong" replace />} />
+                    <Route path="/classes" element={studentOnly(<Classes />, '/teach#teacher-classes')} />
                     <Route path="/privacy" element={<Legal />} />
                     <Route path="/terms" element={<Legal />} />
                     <Route path="/refund-policy" element={<Legal />} />
                     <Route path="/grievance" element={<Legal />} />
                     <Route path="/settings" element={<Settings />} />
-                    <Route path="*" element={<Navigate to="/" replace />} />
+                    <Route path="*" element={<Navigate to={roleLanding} replace />} />
                   </Routes>
                 </React.Suspense>
               </ErrorBoundary>
@@ -323,17 +467,22 @@ export default function App() {
           this, Exams, Favorites and Classes had no entry point at all on a
           phone — an Indian student on a phone could not reach an exam. */}
       <nav className="mobilenav no-print" aria-label={t('nav.primary')}>
-        {[navItems[0], navItems[1], navItems[2], navItems[3]].map(n => (
-          <NavLink key={n.to} to={n.to} end={n.to === '/'} className={({ isActive }) => 'mnav-item' + (isActive ? ' active' : '')}>
-            <span className="nav-ico">{n.ico}</span><span>{t(n.key)}</span>
-          </NavLink>
-        ))}
+        {mobilePrimary.map(item => {
+          const active = isDestinationActive(loc, item.to);
+          return (
+            <Link key={item.to} to={item.to} className={`mnav-item${active ? ' active' : ''}`}
+              aria-current={active ? 'page' : undefined}>
+              <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{t(item.key)}</span>
+            </Link>
+          );
+        })}
         <button
+          ref={moreButtonRef}
           type="button"
           className={'mnav-item' + (moreOpen ? ' active' : '')}
           aria-expanded={moreOpen}
           aria-controls="mobile-more"
-          onClick={() => setMoreOpen(v => !v)}
+          onClick={() => (moreOpen ? closeMore(false) : setMoreOpen(true))}
         >
           <span className="nav-ico" aria-hidden="true">☰</span><span>{t('nav.more')}</span>
         </button>
@@ -341,16 +490,18 @@ export default function App() {
 
       {moreOpen && (
         <>
-          <button type="button" className="mnav-sheet-scrim" aria-label={t('nav.close')} onClick={() => setMoreOpen(false)} />
-          <div className="mnav-sheet" id="mobile-more" role="dialog" aria-modal="true" aria-label={t('nav.morePlaces')}>
-            {navItems.slice(4).map(n => (
-              <NavLink key={n.to} to={n.to} className="mnav-sheet-item" onClick={() => setMoreOpen(false)}>
-                <span className="nav-ico" aria-hidden="true">{n.ico}</span><span>{t(n.key)}</span>
-              </NavLink>
-            ))}
-            <NavLink to="/history" className="mnav-sheet-item" onClick={() => setMoreOpen(false)}>
-              <span className="nav-ico" aria-hidden="true">↺</span><span>{t('nav.history')}</span>
-            </NavLink>
+          <button type="button" className="mnav-sheet-scrim" aria-label={t('nav.close')} onClick={() => closeMore(true)} />
+          <div className="mnav-sheet" id="mobile-more" ref={moreSheetRef} role="dialog" aria-modal="true" aria-label={t('nav.morePlaces')}>
+            <div className="mnav-sheet-title">{user.role === 'teacher' ? t('nav.teacherWorkspace') : t('nav.morePlaces')}</div>
+            {mobileMore.map(item => {
+              const active = isDestinationActive(loc, item.to);
+              return (
+                <Link key={item.to} to={item.to} className={`mnav-sheet-item${active ? ' active' : ''}`}
+                  aria-current={active ? 'page' : undefined} onClick={() => closeMore(false)}>
+                  <span className="nav-ico" aria-hidden="true">{item.ico}</span><span>{t(item.key)}</span>
+                </Link>
+              );
+            })}
           </div>
         </>
       )}
@@ -376,7 +527,7 @@ function SidebarHistory({ recent }) {
       {recent.slice(0, 3).map(it => {
         const cls = it.correct === true ? 'g' : it.correct === false ? 'b' : 'w';
         return (
-          <button key={it.id} className="hist-mini" onClick={() => nav('/history')}>
+          <button key={it.id} className="hist-mini" onClick={() => nav('/review')}>
             <div className="hist-mini-top">
               <span className="hist-mini-name">{it.subtopicName}</span>
               <span className={`hist-mini-pct ${cls}`}
@@ -392,7 +543,7 @@ function SidebarHistory({ recent }) {
           </button>
         );
       })}
-      <button className="btn btn-quiet btn-sm" style={{ width: '100%' }} onClick={() => nav('/history')}>{t('app.viewAll')}</button>
+      <button className="btn btn-quiet btn-sm" style={{ width: '100%' }} onClick={() => nav('/review')}>{t('app.viewAll')}</button>
     </div>
   );
 }
@@ -420,11 +571,17 @@ function AccountMenu({ user, onSwitch }) {
   const btnRef = useRef(null);
   const itemRefs = useRef([]);
 
-  const items = [
-    { key: 'settings', label: t('app.accountSettings'), run: () => nav('/settings') },
-    { key: 'progress', label: t('app.myProgress'), run: () => nav('/progress') },
-    { key: 'switch', label: t('app.switchProfile'), run: onSwitch, sep: true },
-  ];
+  const items = user.role === 'teacher'
+    ? [
+        { key: 'workspace', label: t('nav.teacherWorkspace'), run: () => nav('/teach') },
+        { key: 'settings', label: t('app.accountSettings'), run: () => nav('/settings') },
+        { key: 'switch', label: t('app.switchProfile'), run: onSwitch, sep: true },
+      ]
+    : [
+        { key: 'settings', label: t('app.accountSettings'), run: () => nav('/settings') },
+        { key: 'progress', label: t('app.myProgress'), run: () => nav('/progress') },
+        { key: 'switch', label: t('app.switchProfile'), run: onSwitch, sep: true },
+      ];
   const last = items.length - 1;
 
   useEffect(() => {

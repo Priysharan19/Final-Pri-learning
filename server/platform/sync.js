@@ -1,6 +1,8 @@
-import { Router } from 'express';
-import { nextSyncCursor } from './db.js';
-import { id, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
+import { asyncRouter } from './asyncRouter.js';
+import { asStore, isDatabaseOverload } from './store.js';
+import { nextSyncCursor, syncLockKey } from './db.js';
+import { rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
+import { syncQuota } from './config.js';
 
 const SCHEMA = 1;
 const MAX_PUSH = 100;
@@ -83,6 +85,35 @@ function assertDistinctEventIds(events) {
   }
 }
 
+/**
+ * What this account already holds on the server: rows and bytes of stored
+ * JSON across learning events and sync entities. Read inside the push's own
+ * transaction (under the account lock), so two concurrent pushes cannot both
+ * squeeze under the cap.
+ */
+export async function syncUsage(db, accountId) {
+  db = asStore(db);
+  const events = await db.get('SELECT COUNT(*) AS n, COALESCE(SUM(OCTET_LENGTH(payload_json)), 0) AS b FROM learning_events WHERE account_id=?', [accountId]);
+  const entities = await db.get('SELECT COUNT(*) AS n, COALESCE(SUM(OCTET_LENGTH(body_json)), 0) AS b FROM sync_entities WHERE account_id=?', [accountId]);
+  return { rows: Number(events?.n || 0) + Number(entities?.n || 0), bytes: Number(events?.b || 0) + Number(entities?.b || 0) };
+}
+
+/**
+ * The per-account quota (config.js syncQuota) against what is stored plus what
+ * this push would add. A refusal is a 413 the device can show and act on; it
+ * carries the figures, never another account's.
+ */
+function assertWithinQuota(usage, incoming, quota) {
+  const rows = usage.rows + incoming.rows;
+  const bytes = usage.bytes + incoming.bytes;
+  if (rows > quota.maxEventsPerAccount || bytes > quota.maxBytesPerAccount) {
+    throw Object.assign(new Error('This account has reached its cloud storage quota. Free some space or contact support.'), {
+      status: 413, code: 'SYNC_QUOTA_EXCEEDED',
+      quota: { maxBytesPerAccount: quota.maxBytesPerAccount, maxEventsPerAccount: quota.maxEventsPerAccount, usedBytes: usage.bytes, usedRows: usage.rows, incomingBytes: incoming.bytes, incomingRows: incoming.rows }
+    });
+  }
+}
+
 function conflictPayload(row) {
   return row ? {
     kind: row.kind, entityId: row.entity_id, version: row.version, serverCursor: row.server_cursor,
@@ -90,13 +121,19 @@ function conflictPayload(row) {
   } : null;
 }
 
-export function syncPullPage(db, accountId, cursor = 0, limit = MAX_PULL) {
-  const startCursor = Math.max(0, Math.floor(Number(cursor) || 0));
+export async function syncPullPage(db, accountId, cursor = 0, limit = MAX_PULL) {
+  db = asStore(db);
+  // One snapshot for the page and its hasMore probe: on Postgres a push that
+  // commits between them must not appear in one and not the other.
+  return db.transaction(async () => {
+  // Clamped to the safe-integer range: a cursor of 1e20 used to reach Postgres
+  // as a bigint out of range and answer 500 (SQLite compared it happily).
+  const startCursor = Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.floor(Number(cursor) || 0)));
   const pageLimit = Math.max(1, Math.min(MAX_PULL, Math.floor(Number(limit) || MAX_PULL)));
-  const eventRows = db.prepare(`SELECT server_cursor,id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at
-    FROM learning_events WHERE account_id=? AND server_cursor>? ORDER BY server_cursor LIMIT ?`).all(accountId, startCursor, pageLimit);
-  const entityRows = db.prepare(`SELECT server_cursor,kind,entity_id,version,body_json,tombstone,updated_at
-    FROM sync_entities WHERE account_id=? AND server_cursor>? ORDER BY server_cursor LIMIT ?`).all(accountId, startCursor, pageLimit);
+  const eventRows = await db.all(`SELECT server_cursor,id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at
+    FROM learning_events WHERE account_id=? AND server_cursor>? ORDER BY server_cursor LIMIT ?`, [accountId, startCursor, pageLimit]);
+  const entityRows = await db.all(`SELECT server_cursor,kind,entity_id,version,body_json,tombstone,updated_at
+    FROM sync_entities WHERE account_id=? AND server_cursor>? ORDER BY server_cursor LIMIT ?`, [accountId, startCursor, pageLimit]);
   const merged = [
     ...eventRows.map(row => ({ type: 'event', cursor: row.server_cursor, row })),
     ...entityRows.map(row => ({ type: 'entity', cursor: row.server_cursor, row }))
@@ -114,18 +151,20 @@ export function syncPullPage(db, accountId, cursor = 0, limit = MAX_PULL) {
   // The global cursor is only an allocation mechanism. Pagination is an account-
   // scoped contract: another student's newer rows must never keep this account in
   // a permanent hasMore loop or reveal anything about another tenant's activity.
-  const hasMoreEvent = db.prepare('SELECT 1 FROM learning_events WHERE account_id=? AND server_cursor>? LIMIT 1').get(accountId, cutoff);
-  const hasMoreEntity = db.prepare('SELECT 1 FROM sync_entities WHERE account_id=? AND server_cursor>? LIMIT 1').get(accountId, cutoff);
+  const hasMoreEvent = await db.get('SELECT 1 FROM learning_events WHERE account_id=? AND server_cursor>? LIMIT 1', [accountId, cutoff]);
+  const hasMoreEntity = await db.get('SELECT 1 FROM sync_entities WHERE account_id=? AND server_cursor>? LIMIT 1', [accountId, cutoff]);
   return { schemaVersion: SCHEMA, cursor: cutoff, hasMore: !!(hasMoreEvent || hasMoreEntity), events, entities };
+  }, { readOnly: true, accountScope: String(accountId) });
 }
 
 export function createSyncRouter(db) {
-  const router = Router();
+  db = asStore(db);
+  const router = asyncRouter();
   router.use(requireSession(db));
 
   // Push needs a verified mailbox so an unverified sign-up cannot fill an
   // account it may not own; pull stays open so a device can still read back.
-  router.post('/push', requireVerifiedEmail, rateLimit(db, 'sync-push', { limit: 120, windowMs: 60 * 1000 }), (req, res) => {
+  router.post('/push', requireVerifiedEmail, rateLimit(db, 'sync-push', { limit: 120, windowMs: 60 * 1000 }), async (req, res) => {
     const body = req.body || {};
     if (body.schemaVersion !== SCHEMA) return res.status(409).json({ error: { code: 'SYNC_SCHEMA_UNSUPPORTED', message: `Expected sync schema ${SCHEMA}.` } });
     const deviceId = String(body.deviceId || '');
@@ -141,24 +180,36 @@ export function createSyncRouter(db) {
     if (!ID.test(idem)) return res.status(400).json({ error: { code: 'IDEMPOTENCY_REQUIRED', message: 'A valid Idempotency-Key is required.' } });
     const digest = pushDigest({ deviceId, events, entities, fullRescan: body.fullRescan });
 
-    const prior = db.prepare(`SELECT response_json,request_digest FROM idempotency_keys WHERE account_id=? AND scope='sync-push' AND key=? AND expires_at>?`).get(accountId, idem, Date.now());
-    if (prior) {
-      // A key that recorded its request may only answer that request again.
-      // Pre-v5 rows have no digest and stay replayable rather than failing a
-      // device that is mid-retry across the upgrade.
-      if (prior.request_digest && prior.request_digest !== digest) {
-        return res.status(409).json({ error: { code: 'IDEMPOTENCY_KEY_REUSED', message: 'This Idempotency-Key already acknowledged a different batch. Send new content under a new key.' } });
-      }
-      return res.json(parseJson(prior.response_json, { ok: true, replayed: true }));
-    }
-
     try {
-      const response = db.transaction(() => {
+      const response = await db.transaction(async () => {
+        // The key is checked inside the push's own transaction. Checked before
+        // it, two concurrent retries of one batch (a timeout and its retry)
+        // would both find no key and both write: the loser then reported a
+        // phantom entity conflict or failed on the key's primary key. Inside,
+        // the second waits for (SQLite) or is serialised after (Postgres) the
+        // first, finds its key, and replays its answer.
+        const prior = await db.get(`SELECT response_json,request_digest FROM idempotency_keys WHERE account_id=? AND scope='sync-push' AND key=? AND expires_at>?`, [accountId, idem, Date.now()]);
+        if (prior) {
+          // A key that recorded its request may only answer that request again.
+          // Pre-v5 rows have no digest and stay replayable rather than failing a
+          // device that is mid-retry across the upgrade.
+          if (prior.request_digest && prior.request_digest !== digest) {
+            throw Object.assign(new Error('This Idempotency-Key already acknowledged a different batch. Send new content under a new key.'), { status: 409, code: 'IDEMPOTENCY_KEY_REUSED' });
+          }
+          return parseJson(prior.response_json, { ok: true, replayed: true });
+        }
+        // Quota: what is stored plus everything this batch could add (a
+        // replayed event adds nothing, but it is counted; the bound is a cap,
+        // not an invoice). Checked before any write so a refused push leaves
+        // the account exactly as it was.
+        assertWithinQuota(await syncUsage(db, accountId), {
+          rows: events.length + entities.length,
+          bytes: events.reduce((sum, event) => sum + Buffer.byteLength(event.payload), 0) + entities.reduce((sum, entity) => sum + (entity.body ? Buffer.byteLength(entity.body) : 0), 0)
+        }, syncQuota());
         const acceptedEvents = [];
         const acceptedEntities = [];
         for (const event of events) {
-          const priorSeq = db.prepare('SELECT id,payload_json,kind,entity_id,occurred_at,server_cursor FROM learning_events WHERE account_id=? AND device_id=? AND device_seq=?')
-            .get(accountId, deviceId, event.deviceSeq);
+          const priorSeq = await db.get('SELECT id,payload_json,kind,entity_id,occurred_at,server_cursor FROM learning_events WHERE account_id=? AND device_id=? AND device_seq=?', [accountId, deviceId, event.deviceSeq]);
           if (priorSeq) {
             const same = priorSeq.id === event.id && priorSeq.payload_json === event.payload && priorSeq.kind === event.kind && (priorSeq.entity_id || null) === event.entityId && (priorSeq.occurred_at || null) === event.occurredAt;
             if (!same) throw Object.assign(new Error(`Device sequence ${event.deviceSeq} was already committed with different content.`), { status: 409, code: 'SYNC_SEQUENCE_CONFLICT' });
@@ -169,47 +220,65 @@ export function createSyncRouter(db) {
           // account. A device that reinstalls and replays its outbox under a
           // fresh device id lands here; it needs an answer it can act on, not
           // the constraint violation this used to raise.
-          const priorId = db.prepare('SELECT device_seq FROM learning_events WHERE account_id=? AND id=?').get(accountId, event.id);
+          const priorId = await db.get('SELECT device_seq FROM learning_events WHERE account_id=? AND id=?', [accountId, event.id]);
           if (priorId) {
             throw Object.assign(new Error(`Event id ${event.id} was already stored for this account at sequence ${priorId.device_seq}.`), { status: 409, code: 'SYNC_EVENT_ID_CONFLICT' });
           }
-          const cursor = nextSyncCursor(db);
-          db.prepare(`INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?)`).run(cursor, event.id, accountId, deviceId, event.deviceSeq, event.kind, event.entityId, event.occurredAt, event.payload, Date.now());
+          const cursor = await nextSyncCursor(db, accountId);
+          await db.run(`INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?)`, [cursor, event.id, accountId, deviceId, event.deviceSeq, event.kind, event.entityId, event.occurredAt, event.payload, Date.now()]);
           acceptedEvents.push({ id: event.id, serverCursor: cursor, replayed: false });
         }
 
         for (const entity of entities) {
-          const current = db.prepare('SELECT * FROM sync_entities WHERE account_id=? AND kind=? AND entity_id=?').get(accountId, entity.kind, entity.entityId);
+          const current = await db.get('SELECT * FROM sync_entities WHERE account_id=? AND kind=? AND entity_id=?', [accountId, entity.kind, entity.entityId]);
           const currentVersion = current?.version || 0;
           if (currentVersion !== entity.baseVersion) {
             throw Object.assign(new Error(`Sync conflict for ${entity.kind}:${entity.entityId}.`), { status: 409, code: 'SYNC_ENTITY_CONFLICT', conflict: conflictPayload(current) });
           }
-          const cursor = nextSyncCursor(db);
+          const cursor = await nextSyncCursor(db, accountId);
           const version = currentVersion + 1;
-          db.prepare(`INSERT INTO sync_entities(account_id,kind,entity_id,version,server_cursor,body_json,tombstone,updated_at)
+          await db.run(`INSERT INTO sync_entities(account_id,kind,entity_id,version,server_cursor,body_json,tombstone,updated_at)
             VALUES (?,?,?,?,?,?,?,?)
-            ON CONFLICT(account_id,kind,entity_id) DO UPDATE SET version=excluded.version,server_cursor=excluded.server_cursor,body_json=excluded.body_json,tombstone=excluded.tombstone,updated_at=excluded.updated_at`)
-            .run(accountId, entity.kind, entity.entityId, version, cursor, entity.body, entity.operation === 'delete' ? 1 : 0, Date.now());
+            ON CONFLICT(account_id,kind,entity_id) DO UPDATE SET version=excluded.version,server_cursor=excluded.server_cursor,body_json=excluded.body_json,tombstone=excluded.tombstone,updated_at=excluded.updated_at`, [accountId, entity.kind, entity.entityId, version, cursor, entity.body, entity.operation === 'delete' ? 1 : 0, Date.now()]);
           acceptedEntities.push({ kind: entity.kind, entityId: entity.entityId, version, serverCursor: cursor });
         }
 
-        const cursor = db.prepare('SELECT value FROM sync_cursors WHERE id=1').get()?.value || 0;
+        // This push's own high-water mark: the highest cursor it was given (or,
+        // for replayed events, was given before), 0 when it carried nothing. Not
+        // the global allocator — that would tell every account how much every
+        // other account is syncing. (The client does not read it; pulls page by
+        // their own cursor.)
+        const cursor = Math.max(0, ...acceptedEvents.map(row => Number(row.serverCursor) || 0), ...acceptedEntities.map(row => Number(row.serverCursor) || 0));
         const out = { schemaVersion: SCHEMA, cursor, acceptedEvents, acceptedEntities, fullRescanAccepted: !!body.fullRescan };
-        db.prepare(`INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at)
-          VALUES (?,'sync-push',?,?,?,?,?)`).run(accountId, idem, JSON.stringify(out), digest, Date.now(), Date.now() + 24 * 60 * 60 * 1000);
+        await db.run(`INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at)
+          VALUES (?,'sync-push',?,?,?,?,?)`, [accountId, idem, JSON.stringify(out), digest, Date.now(), Date.now() + 24 * 60 * 60 * 1000]);
         return out;
-      })();
+        // The account's sync lock: pushes for one account run one after another,
+        // each starting from a snapshot that includes the previous one's commit,
+        // so its cursors are allocated in commit order (see nextSyncCursor).
+        //
+        // Snapshot isolation is enough here, and SERIALIZABLE was costing ~7
+        // aborted attempts per push in a 150-push burst on a 40-connection pool: every row this
+        // transaction reads or writes — idempotency_keys, learning_events and
+        // sync_entities of THIS account — is written only by pushes for this
+        // account, which the lock already runs serially. (The only other writers
+        // are account deletion, whose cascade a concurrent insert meets as an FK
+        // conflict, never an orphan; and housekeeping, which deletes only expired
+        // keys this transaction ignores.) What SERIALIZABLE added was false
+        // conflicts between DIFFERENT accounts that share a b-tree page.
+      }, { lock: syncLockKey(accountId), isolation: 'repeatable read', accountScope: String(accountId) });
       res.json(response);
     } catch (err) {
-      if (err?.status) return res.status(err.status).json({ error: { code: err.code || 'SYNC_FAILED', message: err.message, conflict: err.conflict || undefined } });
+      if (isDatabaseOverload(err)) throw err; // 503 + Retry-After from the /v1 error handler
+      if (err?.status) return res.status(err.status).json({ error: { code: err.code || 'SYNC_FAILED', message: err.message, conflict: err.conflict || undefined, quota: err.quota || undefined } });
       throw err;
     }
   });
 
-  router.get('/pull/:cursor', rateLimit(db, 'sync-pull', { limit: 180, windowMs: 60 * 1000 }), (req, res) => {
+  router.get('/pull/:cursor', rateLimit(db, 'sync-pull', { limit: 180, windowMs: 60 * 1000 }), async (req, res) => {
     const accountId = req.platformSession.account_id;
-    const page = syncPullPage(db, accountId, req.params.cursor, MAX_PULL);
+    const page = await syncPullPage(db, accountId, req.params.cursor, MAX_PULL);
     res.set('Cache-Control', 'no-store');
     res.json(page);
   });

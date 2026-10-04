@@ -1,5 +1,6 @@
-import { Router } from 'express';
-import { id, rateLimit, requireRole, requireSession } from './security.js';
+import { asyncRouter } from './asyncRouter.js';
+import { asStore } from './store.js';
+import { id, rateLimit, requireMfa, requireRole, requireSession } from './security.js';
 
 const CATEGORIES = new Set([
   'wrong-answer', 'bad-solution', 'ambiguous-wording', 'incorrect-diagram',
@@ -25,10 +26,11 @@ function cleanContext(raw) {
 }
 
 export function createReportRouter(db) {
-  const router = Router();
+  db = asStore(db);
+  const router = asyncRouter();
   router.use(requireSession(db));
 
-  router.post('/', rateLimit(db, 'issue-report', { limit: 30, windowMs: 60 * 60 * 1000 }), (req, res) => {
+  router.post('/', rateLimit(db, 'issue-report', { limit: 30, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const category = String(req.body?.category || '');
     if (!CATEGORIES.has(category)) return res.status(400).json({ error: { code: 'REPORT_CATEGORY_INVALID', message: 'Choose a valid report category.' } });
     const note = String(req.body?.note || '').trim().slice(0, 4000) || null;
@@ -41,23 +43,24 @@ export function createReportRouter(db) {
     if (Buffer.byteLength(encoded) > 32 * 1024) return res.status(413).json({ error: { code: 'REPORT_CONTEXT_TOO_LARGE', message: 'Report context is too large.' } });
     const reportId = id('rpt');
     const now = Date.now();
-    db.prepare(`INSERT INTO issue_reports
+    await db.run(`INSERT INTO issue_reports
       (id,account_id,category,content_id,question_id,app_version,curriculum_version,context_json,note,status,created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,'open',?)`)
-      .run(reportId, req.platformSession.account_id, category, contentId, questionId, appVersion, curriculumVersion, encoded, note, now);
+      VALUES (?,?,?,?,?,?,?,?,?,'open',?)`, [reportId, req.platformSession.account_id, category, contentId, questionId, appVersion, curriculumVersion, encoded, note, now]);
     res.status(201).json({ report: { id: reportId, status: 'open', createdAt: now } });
   });
 
-  router.get('/mine', (req, res) => {
-    const rows = db.prepare(`SELECT id,category,content_id,question_id,status,created_at,resolved_at
-      FROM issue_reports WHERE account_id=? ORDER BY created_at DESC LIMIT 100`).all(req.platformSession.account_id);
+  router.get('/mine', async (req, res) => {
+    const rows = await db.all(`SELECT id,category,content_id,question_id,status,created_at,resolved_at
+      FROM issue_reports WHERE account_id=? ORDER BY created_at DESC LIMIT 100`, [req.platformSession.account_id]);
     res.json({ reports: rows.map(row => ({ id: row.id, category: row.category, contentId: row.content_id, questionId: row.question_id, status: row.status, createdAt: row.created_at, resolvedAt: row.resolved_at })) });
   });
 
-  router.get('/admin', requireRole('support', 'admin'), (req, res) => {
+  // The triage queue carries reporters' names and addresses: staff only, with
+  // their second factor verified on this session.
+  router.get('/admin', requireRole('support', 'admin'), requireMfa(), async (req, res) => {
     const status = ['open', 'triaged', 'resolved', 'dismissed'].includes(req.query?.status) ? req.query.status : 'open';
-    const rows = db.prepare(`SELECT r.*,a.email,a.name FROM issue_reports r LEFT JOIN accounts a ON a.id=r.account_id
-      WHERE r.status=? ORDER BY r.created_at ASC LIMIT 250`).all(status);
+    const rows = await db.all(`SELECT r.*,a.email,a.name FROM issue_reports r LEFT JOIN accounts a ON a.id=r.account_id
+      WHERE r.status=? ORDER BY r.created_at ASC LIMIT 250`, [status]);
     res.json({ reports: rows.map(row => ({
       id: row.id, category: row.category, contentId: row.content_id, questionId: row.question_id,
       appVersion: row.app_version, curriculumVersion: row.curriculum_version,
@@ -67,16 +70,15 @@ export function createReportRouter(db) {
     })) });
   });
 
-  router.patch('/admin/:reportId', requireRole('support', 'admin'), (req, res) => {
+  router.patch('/admin/:reportId', requireRole('support', 'admin'), requireMfa(), async (req, res) => {
     const reportId = String(req.params.reportId || '');
     const status = String(req.body?.status || '');
     if (!['triaged', 'resolved', 'dismissed'].includes(status)) return res.status(400).json({ error: { code: 'REPORT_STATUS_INVALID', message: 'Report status is invalid.' } });
     const now = Date.now();
-    const info = db.prepare(`UPDATE issue_reports SET status=?,resolved_at=CASE WHEN ? IN ('resolved','dismissed') THEN ? ELSE NULL END WHERE id=?`)
-      .run(status, status, now, reportId);
+    const resolvedAt = ['resolved', 'dismissed'].includes(status) ? now : null;
+    const info = await db.run('UPDATE issue_reports SET status=?,resolved_at=? WHERE id=?', [status, resolvedAt, reportId]);
     if (!info.changes) return res.status(404).json({ error: { code: 'REPORT_NOT_FOUND', message: 'Report not found.' } });
-    db.prepare(`INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)`)
-      .run(req.platformSession.account_id, 'report.status', 'report', reportId, JSON.stringify({ status }), now);
+    await db.run(`INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)`, [req.platformSession.account_id, 'report.status', 'report', reportId, JSON.stringify({ status }), now]);
     res.json({ id: reportId, status, updatedAt: now });
   });
 

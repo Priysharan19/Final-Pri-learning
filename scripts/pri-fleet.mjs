@@ -145,7 +145,7 @@ function validate(fleet, policy) {
     if (!RISK_ORDER.includes(rule.risk)) errors.push(`${rule.pattern}: invalid risk '${rule.risk}'`);
     for (const reviewer of rule.reviewers || []) { if (!ids.has(reviewer)) errors.push(`${rule.pattern}: unknown reviewer '${reviewer}'`); if (reviewer === rule.primary) errors.push(`${rule.pattern}: primary owner cannot review itself`); }
   }
-  for (const key of ['single_primary_writer_per_mission','bounded_writer_pool','evidence_before_claims','no_threshold_weakening','no_fabricated_human_or_hardware_evidence','offline_first','answer_blind_handwriting','pr_before_main','independent_review','persistent_mission_ledger']) if (fleet.principles?.[key] !== true) errors.push(`principle must remain true: ${key}`);
+  for (const key of ['single_primary_writer_per_mission','bounded_writer_pool','evidence_before_claims','no_threshold_weakening','no_fabricated_human_or_hardware_evidence','deterministic_marking_fallback','answer_blind_handwriting','pr_before_main','independent_review','persistent_mission_ledger']) if (fleet.principles?.[key] !== true) errors.push(`principle must remain true: ${key}`);
   if (fleet.principles?.writer_pool_authority !== '.pri-os/mission-control.json') errors.push('writer_pool_authority must remain .pri-os/mission-control.json');
   if ('single_writer' in (fleet.principles || {})) errors.push('legacy single_writer principle must not conflict with bounded writer-pool semantics');
   for (const risk of RISK_ORDER) if (!fleet.risk_classes?.[risk]) errors.push(`missing risk class ${risk}`);

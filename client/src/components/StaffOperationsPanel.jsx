@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
+import StaffMfaGate, { useMfaStepUp } from './StaffMfaGate.jsx';
 
 function parseJson(text, label) {
   let value;
@@ -15,8 +16,18 @@ function when(value) {
   try { return new Date(value).toLocaleString(); } catch { return '—'; }
 }
 
+// Every call the console makes sits behind the staff second factor
+// (server/platform/security.js requireMfa): the gate enrols/verifies first, and
+// withMfa re-prompts for a code on MFA_REQUIRED / MFA_STEP_UP_REQUIRED (role
+// change, publish) and retries the action once.
 export default function StaffOperationsPanel() {
+  if (!cloudAvailable()) return null;
+  return <StaffMfaGate><StaffOperationsConsole /></StaffMfaGate>;
+}
+
+function StaffOperationsConsole() {
   const enabled = cloudAvailable();
+  const withMfa = useMfaStepUp();
   const [account, setAccount] = useState(null);
   const [revisions, setRevisions] = useState([]);
   const [health, setHealth] = useState(null);
@@ -40,26 +51,33 @@ export default function StaffOperationsPanel() {
     if (!enabled) return;
     const me = await cloud.me();
     const nextAccount = me?.account || null;
-    setAccount(nextAccount);
     if (!['support', 'admin'].includes(nextAccount?.role)) {
+      setAccount(nextAccount);
       setRevisions([]);
       setHealth(null);
       setUsers([]);
       setAudit([]);
       return;
     }
-    const rev = await cloud.contentRevisions();
-    setRevisions(Array.isArray(rev?.revisions) ? rev.revisions : []);
-    if (nextAccount.role === 'admin') {
-      const [h, u, a] = await Promise.all([cloud.adminHealth(), cloud.adminUsers(), cloud.adminAudit()]);
-      setHealth(h || null);
-      setUsers(Array.isArray(u?.users) ? u.users : []);
-      setAudit(Array.isArray(a?.entries) ? a.entries : []);
-    } else {
-      setHealth(null);
-      setUsers([]);
-      setAudit([]);
+    // Everything the console shows is fetched before any of it is committed,
+    // so the panel appears with its data rather than as an empty shell that
+    // fills in a request later. A failure still shows the panel, so the error
+    // the caller sets is visible to the staff member it is meant for.
+    let rev, h, u, a;
+    try {
+      rev = await cloud.contentRevisions();
+      [h, u, a] = nextAccount.role === 'admin'
+        ? await Promise.all([cloud.adminHealth(), cloud.adminUsers(), cloud.adminAudit()])
+        : [null, null, null];
+    } catch (err) {
+      setAccount(nextAccount);
+      throw err;
     }
+    setAccount(nextAccount);
+    setRevisions(Array.isArray(rev?.revisions) ? rev.revisions : []);
+    setHealth(h || null);
+    setUsers(Array.isArray(u?.users) ? u.users : []);
+    setAudit(Array.isArray(a?.entries) ? a.entries : []);
   }
 
   useEffect(() => {
@@ -72,7 +90,9 @@ export default function StaffOperationsPanel() {
         if (live) setError('');
       } catch (err) {
         if (!live) return;
-        if (err?.status === 401 || err?.status === 403) {
+        // A second-factor refusal is not "not staff": leave the account in place
+        // so the message names what to do (the gate above re-prompts).
+        if ((err?.status === 401 || err?.status === 403) && !String(err?.code || '').startsWith('MFA_')) {
           setAccount(null);
           setRevisions([]);
           setHealth(null);
@@ -96,12 +116,12 @@ export default function StaffOperationsPanel() {
     try {
       const source = parseJson(draft.source, 'Source');
       const body = parseJson(draft.body, 'Content body');
-      const result = await cloud.createContentDraft({
+      const result = await withMfa(() => cloud.createContentDraft({
         contentKey: draft.contentKey.trim(),
         curriculumVersion: draft.curriculumVersion.trim(),
         source,
         body
-      });
+      }));
       setMessage(`Draft ${result?.revision?.contentKey || draft.contentKey} revision ${result?.revision?.revision || ''} created.`);
       setDraft(v => ({ ...v, contentKey: '' }));
       await reloadStaff();
@@ -112,9 +132,9 @@ export default function StaffOperationsPanel() {
   async function transition(revision, action) {
     setBusy(`${action}:${revision.id}`); setError(''); setMessage('');
     try {
-      if (action === 'review') await cloud.submitContentReview(revision.id);
-      else if (action === 'approve') await cloud.approveContent(revision.id);
-      else if (action === 'publish') await cloud.publishContent(revision.id);
+      if (action === 'review') await withMfa(() => cloud.submitContentReview(revision.id));
+      else if (action === 'approve') await withMfa(() => cloud.approveContent(revision.id));
+      else if (action === 'publish') await withMfa(() => cloud.publishContent(revision.id));
       setMessage(`Revision ${revision.revision} moved through ${action}.`);
       await reloadStaff();
     } catch (err) { setError(err.message || `Could not ${action} this revision.`); }
@@ -124,7 +144,7 @@ export default function StaffOperationsPanel() {
   async function changeRole(user, roleValue) {
     setBusy(`role:${user.id}`); setError(''); setMessage('');
     try {
-      await cloud.updateUserRole(user.id, roleValue);
+      await withMfa(() => cloud.updateUserRole(user.id, roleValue));
       setMessage(`${user.name || user.email} is now ${roleValue}.`);
       await reloadStaff();
     } catch (err) { setError(err.message || 'Could not change that account role.'); }

@@ -16,7 +16,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(here, '..', '..');
 process.env.PRI_BOOTSTRAP_ADMIN_EMAIL = 'Owner@Pri.Example';
 
-const { startApp, registerAccount, verifyEmail, checks } = await import('./support/app-harness.mjs');
+const { startApp, registerAccount, verifyEmail, checks, enrolMfa } = await import('./support/app-harness.mjs');
 const { createPlatformDb } = await import('../platform/db.js');
 const { bootstrapAdminConfigured, maybeBootstrapAdmin } = await import('../platform/bootstrapAdmin.js');
 
@@ -46,15 +46,17 @@ const role = (db, id) => db.prepare('SELECT role FROM accounts WHERE id=?').get(
     const me = await h.request('/v1/account/me', { jar: owner.jar });
     c.eq(me.data.account.role, 'admin', 'verification promotes the bootstrap email to admin');
     c.eq(me.data.account.emailVerified, true, 'and it is verified');
+    c.eq((await h.request('/v1/admin/health', { jar: owner.jar })).data?.error?.code, 'MFA_ENROLMENT_REQUIRED', 'a bootstrapped admin must enrol a second factor before any admin route answers');
+    await enrolMfa(h, owner.jar);
     const adminHealth = await h.request('/v1/admin/health', { jar: owner.jar });
-    c.eq(adminHealth.status, 200, 'admin routes open for the bootstrapped admin');
+    c.eq(adminHealth.status, 200, 'admin routes open for the bootstrapped admin once enrolled and verified');
     c.eq(adminHealth.data.ok, true, 'admin health responds');
     const rows = bootstrapRows(h.db);
     c.eq(rows.length, 1, 'exactly one bootstrap audit row');
     c.eq(rows[0].target_id, owner.account.id, 'audit targets the owner');
     c.eq(rows[0].actor_account_id, null, 'audit actor is the system, not a user');
     c.eq(JSON.parse(rows[0].metadata_json).source, 'PRI_BOOTSTRAP_ADMIN_EMAIL', 'audit names the source');
-    c.eq(maybeBootstrapAdmin(h.db, owner.account.id), false, 'bootstrap is idempotent');
+    c.eq(await maybeBootstrapAdmin(h.db, owner.account.id), false, 'bootstrap is idempotent');
 
     // Inert once any admin exists, even if the setting is pointed elsewhere.
     process.env.PRI_BOOTSTRAP_ADMIN_EMAIL = 'second.owner@pri.example';
@@ -136,7 +138,9 @@ const role = (db, id) => db.prepare('SELECT role FROM accounts WHERE id=?').get(
     const admin = cli('teacher.candidate@example.test', 'admin');
     c.eq(admin.status, 0, 'CLI can create the first admin');
     c.eq(role(h.db, teacher.account.id), 'admin', 'admin role applied');
-    c.eq((await h.request('/v1/admin/health', { jar: teacher.jar })).status, 200, 'CLI-made admin can use admin routes');
+    c.eq((await h.request('/v1/admin/health', { jar: teacher.jar })).data?.error?.code, 'MFA_ENROLMENT_REQUIRED', 'a CLI-made admin must enrol a second factor first');
+    await enrolMfa(h, teacher.jar);
+    c.eq((await h.request('/v1/admin/health', { jar: teacher.jar })).status, 200, 'CLI-made admin can use admin routes once enrolled');
 
     c.eq(cli('nobody@example.test', 'teacher').status, 3, 'unknown email exits 3');
     c.eq(cli('teacher.candidate@example.test', 'overlord').status, 2, 'invalid role exits 2');

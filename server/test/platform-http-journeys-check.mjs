@@ -36,17 +36,17 @@ delete process.env.PRI_WEB_GRACE_DAYS;
 const [
   { default: express },
   { default: cookieParser },
-  { createPlatformDb },
-  { ensureBillingSchema },
+  { openTestStore },
   { createRazorpayBilling },
-  { createPlatformRouter }
+  { createPlatformRouter },
+  { base32Decode, totp }
 ] = await Promise.all([
   import('express'),
   import('cookie-parser'),
-  import('../platform/db.js'),
-  import('../platform/billingSchema.js'),
+  import('./support/engine.mjs'),
   import('../platform/razorpay.js'),
-  import('../platform/router.js')
+  import('../platform/router.js'),
+  import('../platform/mfa.js')
 ]);
 
 let checks = 0;
@@ -99,8 +99,10 @@ const subscriptionEntity = (id, accountId, status = 'active') => ({ ...providerS
 const paymentEntity = (id, subscriptionId) => ({ id, entity: 'payment', amount: 99900, currency: 'INR', status: 'captured', created_at: sec(now), subscription_id: subscriptionId });
 
 // ── Real router in-process ─────────────────────────────────────────────────
-const db = createPlatformDb(':memory:');
-ensureBillingSchema(db);
+// SQLite by default; `--engine=postgres` runs the same journeys on a migrated
+// Postgres as the pri_server role (npm run test:platform:pg).
+const testStore = await openTestStore(undefined, { label: 'journeys' });
+const db = testStore.store;
 const web = createRazorpayBilling(db, { fetchImpl: fakeFetch });
 const app = express();
 app.disable('x-powered-by');
@@ -139,16 +141,25 @@ async function call(path, { method = 'GET', body, raw, jar = null, headers = {},
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
   return { status: response.status, data, headers: response.headers };
 }
-const auditActions = () => new Set(db.prepare('SELECT action FROM audit_log').all().map(row => row.action));
+const auditActions = async () => new Set((await db.all('SELECT action FROM audit_log')).map(row => row.action));
+// Staff accounts must enrol and verify a second factor before any staff route
+// answers (mfa.js); the journeys do what the admin UI does.
+async function enrolMfa(jar) {
+  const enrol = await call('/account/mfa/totp/enrol', { method: 'POST', jar, body: {} });
+  assert.equal(enrol.status, 201, JSON.stringify(enrol.data));
+  const confirm = await call('/account/mfa/totp/confirm', { method: 'POST', jar, body: { code: totp(base32Decode(enrol.data.secret)) } });
+  assert.equal(confirm.status, 200, JSON.stringify(confirm.data));
+  return confirm.data;
+}
 const jars = { admin: {}, teacher: {}, support: {}, s1: {}, s2: {}, s3: {} };
 async function register(jar, name, email, deviceId, { verify = true } = {}) {
-  const response = await call('/account/register', { method: 'POST', jar, body: { name, email, password: 'journey-pass-123', deviceId } });
+  const response = await call('/account/register', { method: 'POST', jar, body: { name, email, password: 'journey-pass-123', deviceId, isAdult: true } });
   assert.equal(response.status, 201, JSON.stringify(response.data));
   const account = response.data.account;
   // Sync push, class create and join and paid checkout all require a verified
   // email in production. These journeys exercise what a verified account can
   // do; the refusals themselves are covered by verification-enforcement-check.
-  if (verify) db.prepare('UPDATE accounts SET email_verified_at=? WHERE id=?').run(Date.now(), account.id);
+  if (verify) await db.run('UPDATE accounts SET email_verified_at=? WHERE id=?', [Date.now(), account.id]);
   return account;
 }
 
@@ -156,7 +167,10 @@ try {
   // ── Accounts and roles ─────────────────────────────────────────────────
   const admin = await register(jars.admin, 'Pri Admin', 'admin@example.test', 'admin-mac');
   // First-admin bootstrap is owned by wp/server-security; seed it directly here.
-  db.prepare("UPDATE accounts SET role='admin' WHERE id=?").run(admin.id);
+  await db.run("UPDATE accounts SET role='admin' WHERE id=?", [admin.id]);
+  check((await call('/admin/health', { jar: jars.admin })).data.error.code === 'MFA_ENROLMENT_REQUIRED', 'an admin without a second factor reaches no admin route');
+  const enrolled = await enrolMfa(jars.admin);
+  check(Array.isArray(enrolled.recoveryCodes) && enrolled.recoveryCodes.length === 8, 'enrolment hands over eight recovery codes once');
   const teacher = await register(jars.teacher, 'Meera Teacher', 'teacher@example.test', 'teacher-ipad');
   const support = await register(jars.support, 'Support Desk', 'support@example.test', 'support-mac');
   const s1 = await register(jars.s1, 'Asha', 's1@example.test', 'ipad-s1');
@@ -165,7 +179,7 @@ try {
 
   // ── Security floor on the real router ──────────────────────────────────
   const health = await call('/health');
-  check(health.status === 200 && health.data.ok === true && health.data.service === 'pri-learning-platform' && health.data.schemaVersion === '6', 'health reports the platform and schema version');
+  check(health.status === 200 && health.data.ok === true && health.data.service === 'pri-learning-platform' && health.data.schemaVersion === '11', 'health reports the platform and schema version');
   check(health.headers.get('x-content-type-options') === 'nosniff' && health.headers.get('cache-control') === 'no-store' && health.headers.get('x-frame-options') === 'DENY', 'security headers are applied to every /v1 response');
   check((await call('/does-not-exist')).status === 404 && (await call('/does-not-exist')).data.error.code === 'NOT_FOUND', 'unknown routes are a JSON 404');
   check((await call('/sync/pull/0')).status === 401 && (await call('/sync/pull/0')).data.error.code === 'AUTH_REQUIRED', 'session-gated routes reject anonymous callers');
@@ -173,7 +187,7 @@ try {
   check(noCsrf.status === 403 && noCsrf.data.error.code === 'CSRF_REJECTED', 'a session mutation without the CSRF header is rejected');
   const badCsrf = await call('/reports', { method: 'POST', jar: jars.s1, csrf: false, headers: { 'x-pri-csrf': 'forged' }, body: { category: 'other', note: 'x' } });
   check(badCsrf.status === 403 && badCsrf.data.error.code === 'CSRF_REJECTED', 'a forged CSRF header is rejected');
-  check(db.prepare("SELECT COUNT(*) AS n FROM issue_reports").get().n === 0, 'rejected mutations never reach storage');
+  check((await db.get("SELECT COUNT(*) AS n FROM issue_reports")).n === 0, 'rejected mutations never reach storage');
 
   // ── Admin role change ──────────────────────────────────────────────────
   const forbidden = await call(`/admin/users/${teacher.id}/role`, { method: 'PATCH', jar: jars.teacher, body: { role: 'teacher' } });
@@ -182,13 +196,15 @@ try {
   check(promoted.status === 200 && promoted.data.role === 'teacher', 'admin promotes an account to teacher');
   check((await call('/account/me', { jar: jars.teacher })).data.account.role === 'teacher', 'the promoted session sees its new role immediately');
   check((await call(`/admin/users/${support.id}/role`, { method: 'PATCH', jar: jars.admin, body: { role: 'support' } })).status === 200, 'admin promotes an account to support');
+  check((await call('/reports/admin', { jar: jars.support })).data.error.code === 'MFA_ENROLMENT_REQUIRED', 'a newly promoted support account must enrol before it sees the triage queue');
+  await enrolMfa(jars.support);
   const selfDemotion = await call(`/admin/users/${admin.id}/role`, { method: 'PATCH', jar: jars.admin, body: { role: 'student' } });
   check(selfDemotion.status === 409 && selfDemotion.data.error.code === 'SELF_DEMOTION_BLOCKED', 'an admin cannot remove their own admin role');
   check((await call(`/admin/users/${s1.id}/role`, { method: 'PATCH', jar: jars.admin, body: { role: 'owner' } })).data.error.code === 'ROLE_INVALID', 'unknown roles are rejected');
   check((await call('/admin/users/acct_missing/role', { method: 'PATCH', jar: jars.admin, body: { role: 'teacher' } })).status === 404, 'role change on an unknown account is 404');
   const users = await call('/admin/users?q=teacher@example.test', { jar: jars.admin });
   check(users.status === 200 && users.data.users.length === 1 && users.data.users[0].role === 'teacher', 'admin user search returns the promoted account');
-  const roleAudit = db.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action='account.role'").get().n;
+  const roleAudit = (await db.get("SELECT COUNT(*) AS n FROM audit_log WHERE action='account.role'")).n;
   check(roleAudit === 2, 'every role change is audited');
 
   // ── Sync push / pull ───────────────────────────────────────────────────
@@ -219,7 +235,7 @@ try {
   check(entityConflict.data.error.conflict?.version === 1 && entityConflict.data.error.conflict.body?.grade === 10, 'the conflict carries the server copy for merge');
   const entityNext = await push(pushBody([], [{ ...profileV1, baseVersion: 1, body: { name: 'Asha', grade: 11 } }]), 'push-5');
   check(entityNext.status === 200 && entityNext.data.acceptedEntities[0].version === 2, 'a push on the current version advances it');
-  check(db.prepare("SELECT COUNT(*) AS n FROM learning_events WHERE account_id=?").get(s1.id).n === 2, 'exactly two learning events are stored for the account');
+  check((await db.get("SELECT COUNT(*) AS n FROM learning_events WHERE account_id=?", [s1.id])).n === 2, 'exactly two learning events are stored for the account');
   const pull = await call('/sync/pull/0', { jar: jars.s1 });
   check(pull.status === 200 && pull.data.events.map(e => e.id).join(',') === 'evt-1,evt-2' && pull.data.hasMore === false, 'pull from cursor 0 returns the events in server order');
   check(pull.data.entities.length === 1 && pull.data.entities[0].version === 2 && pull.data.entities[0].body.grade === 11, 'pull returns the current entity version');
@@ -256,11 +272,15 @@ try {
   check((await call(`/classes/${classId}`, { method: 'PATCH', jar: jars.teacher, body: { name: '' } })).data.error.code === 'CLASS_NAME_INVALID', 'an empty name is rejected');
   check((await call(`/classes/${classId}`, { method: 'PATCH', jar: jars.teacher, body: {} })).data.changed.length === 0, 'an empty patch changes nothing');
 
-  const assignment = await call(`/classes/${classId}/assignments`, { method: 'POST', jar: jars.teacher, body: { title: 'Quadratics drill', specification: { targetQuestions: 10, strand: 'algebra' }, dueAt: now + 86_400_000 } });
-  check(assignment.status === 201, 'teacher creates an assignment');
+  const assignment = await call(`/classes/${classId}/assignments`, { method: 'POST', jar: jars.teacher, body: { title: 'Quadratics drill', specification: { questionCount: 10, strand: 'algebra' }, dueAt: now + 86_400_000 } });
+  check(assignment.status === 201 && assignment.data.assignment.specification.strand === undefined, 'teacher creates an assignment; an unknown specification key is dropped');
   const assignmentId = assignment.data.assignment.id;
-  const edited = await call(`/classes/${classId}/assignments/${assignmentId}`, { method: 'PATCH', jar: jars.teacher, body: { title: 'Quadratics drill (revised)', dueAt: now + 2 * 86_400_000, specification: { targetQuestions: 12, strand: 'algebra' } } });
-  check(edited.status === 200 && edited.data.changed.join() === 'assignment.edit' && edited.data.assignment.title === 'Quadratics drill (revised)' && edited.data.assignment.specification.targetQuestions === 12, 'teacher edits title, due date and specification');
+  // An edit goes through the same curriculum validator as creation: unknown
+  // keys are dropped, an impossible target is refused, nothing unvalidated is stored.
+  const badEdit = await call(`/classes/${classId}/assignments/${assignmentId}`, { method: 'PATCH', jar: jars.teacher, body: { specification: { questionCount: 12, subtopics: ['no-such-chapter'] } } });
+  check(badEdit.status === 400 && badEdit.data.error.code === 'ASSIGNMENT_SPEC_INVALID', 'an edit pointing at a chapter that does not exist is refused');
+  const edited = await call(`/classes/${classId}/assignments/${assignmentId}`, { method: 'PATCH', jar: jars.teacher, body: { title: 'Quadratics drill (revised)', dueAt: now + 2 * 86_400_000, specification: { questionCount: 12, strand: 'algebra' } } });
+  check(edited.status === 200 && edited.data.changed.join() === 'assignment.edit' && edited.data.assignment.title === 'Quadratics drill (revised)' && edited.data.assignment.specification.questionCount === 12 && edited.data.assignment.specification.strand === undefined, 'teacher edits title, due date and specification; the stored specification is the validated one');
   check((await call(`/classes/${classId}/assignments/${assignmentId}`, { method: 'PATCH', jar: jars.teacher, body: { dueAt: 'soon' } })).status === 400, 'an invalid due date is rejected');
   check((await call('/assignments', { jar: jars.s1 })).data.assignments.length === 1, 'student inbox shows the live assignment');
   const archivedAssignment = await call(`/classes/${classId}/assignments/${assignmentId}`, { method: 'PATCH', jar: jars.teacher, body: { archived: true } });
@@ -271,7 +291,7 @@ try {
   check((await call(`/classes/${classId}/assignments/${assignmentId}/submission`, { method: 'PATCH', jar: jars.s1, body: { state: 'started', summary: { questionsAnswered: 2, correct: 1, xp: 10, answers: ['leak'] } } })).status === 200, 'student starts the restored assignment');
   const submitted = await call(`/classes/${classId}/assignments/${assignmentId}/submission`, { method: 'PATCH', jar: jars.s1, body: { state: 'submitted', summary: { questionsAnswered: 10, correct: 8, xp: 80, ink: 'never' } } });
   check(submitted.status === 200 && submitted.data.state === 'submitted', 'student submits');
-  const storedSummary = JSON.parse(db.prepare('SELECT summary_json FROM assignment_submissions WHERE assignment_id=? AND student_account_id=?').get(assignmentId, s1.id).summary_json);
+  const storedSummary = JSON.parse((await db.get('SELECT summary_json FROM assignment_submissions WHERE assignment_id=? AND student_account_id=?', [assignmentId, s1.id])).summary_json);
   check(!('ink' in storedSummary) && !('answers' in storedSummary) && storedSummary.correct === 8, 'the privacy guard strips everything but aggregate metrics before storage');
   const returned = await call(`/classes/${classId}/assignments/${assignmentId}/submissions/${s1.id}/return`, { method: 'POST', jar: jars.teacher, body: { feedback: { note: 'Rework Q4.' } } });
   check(returned.status === 200 && returned.data.state === 'returned', 'teacher returns the submission with feedback');
@@ -303,7 +323,7 @@ try {
   check((await call(`/classes/${classId}/assignments/${assignmentId}`, { method: 'PATCH', jar: jars.s3, body: { archived: true } })).status === 404, 'another teacher cannot archive the assignment');
   check((await call(`/classes/${classId}`, { method: 'PATCH', jar: jars.admin, body: { name: 'Class 10 B' } })).status === 200, 'admin may manage any class');
   const expectedActions = ['class.create', 'class.join-code.reveal', 'class.join-code.rotate', 'class.rename', 'class.archive', 'class.restore', 'class.student.remove', 'class.leave', 'assignment.create', 'assignment.edit', 'assignment.archive', 'assignment.restore', 'assignment.return'];
-  const actions = auditActions();
+  const actions = await auditActions();
   check(expectedActions.every(action => actions.has(action)), `every classroom lifecycle action is audited (missing: ${expectedActions.filter(a => !actions.has(a)).join(', ') || 'none'})`);
   const adminAudit = await call('/admin/audit', { jar: jars.admin });
   check(adminAudit.status === 200 && adminAudit.data.entries.some(e => e.action === 'class.join-code.rotate' && e.targetId === classId), 'admin audit feed exposes the classroom actions');
@@ -340,7 +360,7 @@ try {
   check((await call('/reports', { method: 'POST', jar: jars.s1, body: { category: 'made-up' } })).data.error.code === 'REPORT_CATEGORY_INVALID', 'invalid report categories are rejected');
   const report = await call('/reports', { method: 'POST', jar: jars.s1, body: { category: 'wrong-answer', note: 'Marker rejected 2x+3', questionId: 'q-42', context: { questionType: 'linear', ink: 'strokes', token: 'nope' } } });
   check(report.status === 201 && report.data.report.status === 'open', 'student files a report');
-  const storedContext = JSON.parse(db.prepare('SELECT context_json FROM issue_reports WHERE id=?').get(report.data.report.id).context_json);
+  const storedContext = JSON.parse((await db.get('SELECT context_json FROM issue_reports WHERE id=?', [report.data.report.id])).context_json);
   check(storedContext.questionType === 'linear' && !('ink' in storedContext) && !('token' in storedContext), 'forbidden context keys are stripped from reports');
   check((await call('/reports/mine', { jar: jars.s1 })).data.reports.length === 1, 'student sees their own reports');
   check((await call('/reports/admin', { jar: jars.s1 })).status === 403, 'students cannot read the triage queue');
@@ -359,7 +379,7 @@ try {
     { type: 'sync-failure', metadata: { code: 'SYNC_ENTITY_CONFLICT' } }
   ] } });
   check(telemetry.status === 202 && telemetry.data.accepted === 2, 'telemetry batch is accepted');
-  const storedTelemetry = db.prepare("SELECT metadata_json FROM operational_events WHERE account_id=? AND event_type='feature-used'").get(s1.id);
+  const storedTelemetry = (await db.get("SELECT metadata_json FROM operational_events WHERE account_id=? AND event_type='feature-used'", [s1.id]));
   check(!!storedTelemetry && !('password' in JSON.parse(storedTelemetry.metadata_json)) && JSON.parse(storedTelemetry.metadata_json).feature === 'ink', 'telemetry keeps only allow-listed metadata');
   check((await call('/telemetry', { method: 'POST', jar: jars.s1, body: { events: [{ type: 'keystrokes' }] } })).data.error.code === 'TELEMETRY_EVENT_UNSUPPORTED', 'unknown telemetry types are rejected');
   check((await call('/telemetry', { method: 'POST', jar: jars.s1, body: { events: [] } })).data.error.code === 'TELEMETRY_BATCH_INVALID', 'empty telemetry batches are rejected');
@@ -417,24 +437,25 @@ try {
   cancelBehaviour.set(sub2, 'outage');
   const blockedDeletion = await call('/account', { method: 'DELETE', jar: jars.s2, body: { password: 'journey-pass-123' } });
   check(blockedDeletion.status === 502 && blockedDeletion.data.error.code === 'BILLING_PROVIDER_REQUEST_FAILED', 'deletion is refused while the provider cannot cancel the mandate');
-  check(!!db.prepare('SELECT 1 FROM accounts WHERE id=?').get(s2.id), 'the account still exists after the refused deletion');
+  check(!!(await db.get('SELECT 1 FROM accounts WHERE id=?', [s2.id])), 'the account still exists after the refused deletion');
   cancelBehaviour.delete(sub2);
   const deletion = await call('/account', { method: 'DELETE', jar: jars.s2, body: { password: 'journey-pass-123' } });
   check(deletion.status === 200 && deletion.data.deleted === true, 'deletion succeeds once the provider cancels');
   check(providerRequests.some(r => r.path === `/v1/subscriptions/${sub2}/cancel` && r.body.cancel_at_cycle_end === 0), 'account deletion cancels the Razorpay subscription immediately');
-  check(!db.prepare('SELECT 1 FROM accounts WHERE id=?').get(s2.id) && !db.prepare('SELECT 1 FROM billing_subscriptions WHERE account_id=?').get(s2.id), 'account rows and bindings are gone');
+  check(!(await db.get('SELECT 1 FROM accounts WHERE id=?', [s2.id])) && !(await db.get('SELECT 1 FROM billing_subscriptions WHERE account_id=?', [s2.id])), 'account rows and bindings are gone');
   check((await call('/account/me', { jar: jars.s2 })).status === 401, 'the deleted session is dead');
-  check(db.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action='billing.cancel' AND target_id=?").get(sub2).n === 1, 'the deletion cancel is audited');
+  check((await db.get("SELECT COUNT(*) AS n FROM audit_log WHERE action='billing.cancel' AND target_id=?", [sub2])).n === 1, 'the deletion cancel is audited');
 
   // ── Admin health ───────────────────────────────────────────────────────
   const adminHealth = await call('/admin/health', { jar: jars.admin });
   check(adminHealth.status === 200 && adminHealth.data.accounts === 5 && adminHealth.data.classes === 1 && adminHealth.data.publishedContent === 1, 'admin health reflects the journeys');
   check((await call('/admin/health', { jar: jars.s1 })).status === 403, 'admin health is admin-only');
 
+  console.log(`engine: ${testStore.engine}`);
   console.log(`PLATFORM HTTP JOURNEYS: PASS — ${checks}/${checks} checks — security floor, admin role change, sync replay/conflicts, classroom lifecycle, CMS publish/rollback, reports, telemetry, rate limiting and Razorpay cancel/deletion hold against the real /v1 router.`);
 } finally {
   await new Promise(resolve => server.close(resolve));
-  db.close();
+  await testStore.close();
   rmSync(scratch, { recursive: true, force: true });
   for (const name of envNames) {
     if (previous[name] === undefined) delete process.env[name];

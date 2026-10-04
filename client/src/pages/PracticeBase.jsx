@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
@@ -9,7 +9,11 @@ import {
 import QuestionCard, { SR_ONLY } from '../components/QuestionCard.jsx';
 import PriExplain from '../components/PriExplain.jsx';
 import FreeCapNotice from '../components/FreeCapNotice.jsx';
-import { useT } from '../i18n/index.js';
+import { clearInkDraft, clearPendingSubmission, pendingSubmissionQuestionId, readPendingSubmission } from '../components/practiceRecovery.js';
+import { tLater, useT } from '../i18n/index.js';
+import { isContentEmpty, servable, contentEmptySignal } from '../lib/contentServe.js';
+import { practiceHref, practiceRequestFromQuery } from '../lib/practiceLinks.js';
+import { queueTelemetry } from '../platform/telemetry.js';
 
 const EMPTY_SESSION = Object.freeze({ answered: 0, correct: 0, xp: 0 });
 
@@ -41,10 +45,24 @@ export default function Practice() {
   const handedRef = useRef(location.state?.serve || null);   // a retry handed over from History
   const [error, setError] = useState('');
   const [errorCode, setErrorCode] = useState('');
+  const [pyqAlternatives, setPyqAlternatives] = useState([]);
   const [capped, setCapped] = useState(null);
   const [session, setSession] = useState({ ...EMPTY_SESSION });
   const sessionRef = useRef({ ...EMPTY_SESSION });
   const loading = useRef(false);
+
+  // An empty path is a deliberate state, not an error to retry: it is shown
+  // once, with a way out, and reported as a low-cardinality signal.
+  // Read through a ref so the request callbacks below do not change identity
+  // (and re-request) when the language or profile label changes.
+  const emptyContext = useRef({});
+  emptyContext.current = { t, track: track || user.indiaTrack || null, grade: user.year };
+  const noteEmpty = useCallback((code) => {
+    const { track: tr, grade } = emptyContext.current;
+    const signal = contentEmptySignal({ code, track: tr, grade });
+    try { queueTelemetry(signal.type, signal.options); } catch { /* best effort */ }
+    try { console.warn('[pri-content] practice path served no question', signal.options.metadata); } catch { /* no console */ }
+  }, []);
 
   const replaceSession = useCallback((next) => {
     const value = { answered: next.answered || 0, correct: next.correct || 0, xp: next.xp || 0 };
@@ -63,7 +81,7 @@ export default function Practice() {
     replaceSession(EMPTY_SESSION);
     if (!assignmentMode) return () => { live = false; };
     if (!cloudAvailable()) {
-      setAssignmentError(t('assignment.needsCloud'));
+      setAssignmentError(tLater('assignment.needsCloud'));
       return () => { live = false; };
     }
 
@@ -108,7 +126,7 @@ export default function Practice() {
       setAssignmentContext(nextAssignment);
     })().catch(err => {
       if (!live) return;
-      setAssignmentError(err.message || t('assignment.couldNotOpen'));
+      setAssignmentError(err.message || tLater('assignment.couldNotOpen'));
     });
     return () => { live = false; };
   }, [assignmentMode, assignmentClassId, assignmentId, replaceSession]);
@@ -132,6 +150,7 @@ export default function Practice() {
     loading.current = true;
     setError('');
     setErrorCode('');
+    setPyqAlternatives([]);
     setCapped(null);
     try {
       // Reload/restart resumes unfinished work. Pressing the explicit Next
@@ -139,8 +158,12 @@ export default function Practice() {
       // discard before serving a fresh question. A resolved row returns 409
       // here and is already safe to move past.
       if (options?.fresh === true && currentQuestionRef.current && !assignmentMode) {
-        try { await api.post(`/practice/${currentQuestionRef.current}/discard`, {}); }
+        const leaving = currentQuestionRef.current;
+        // A submission still being marked is not abandoned by moving on: the
+        // card finishes it, and the discard below waits for it in the backend.
+        try { await api.post(`/practice/${leaving}/discard`, {}); }
         catch (e) { if (e?.status !== 409) throw e; }
+        if (!readPendingSubmission(leaving)) clearInkDraft(leaving);
       }
       const assignmentSpec = assignmentContext?.specification || {};
       const assignmentSubtopic = assignmentSpec.subtopic ? String(assignmentSpec.subtopic) : null;
@@ -156,22 +179,33 @@ export default function Practice() {
               mode: 'smart', track: assignmentTrack || undefined,
               difficulty: assignmentDifficulty ?? undefined
             }
-          : subtopic ? { mode: 'topic', subtopic, track: track || undefined, dotpoint: dotpoint != null ? Number(dotpoint) : undefined, difficulty: difficulty != null ? Number(difficulty) : undefined, pyqOnly: pyqOnly || undefined }
-            : { mode: 'smart', track: track || undefined, difficulty: difficulty != null ? Number(difficulty) : undefined, pyqOnly: pyqOnly || undefined };
+          : practiceRequestFromQuery(params);
       // Real local practice resumes the exact unresolved question after reload,
       // background termination or a duplicate Next request. Cloud assignments
       // manage their own session contract and are intentionally left alone.
       if (!assignmentMode || taskId) body.resume = options?.fresh !== true;
+      // A submission the app was killed in the middle of comes back first, so
+      // its card can replay it and show the one verdict it produced (§09).
+      const pendingQuestionId = body.resume === true ? pendingSubmissionQuestionId() : null;
+      if (pendingQuestionId) body.pendingQuestionId = pendingQuestionId;
       const r = await api.post('/practice/next', body);
+      // Not served back means there is nothing left to recover (skipped, or
+      // gone); a record that can never replay must not be sent forever.
+      if (pendingQuestionId && r?.question?.id !== pendingQuestionId) clearPendingSubmission(pendingQuestionId);
+      if (!servable(r)) throw Object.assign(new Error(emptyContext.current.t('practice.emptyTitle')), { code: 'CONTENT_EMPTY' });
       setServe(r);
     } catch (e) {
       // A free-tier refusal is not a fault: it is the end of today's free
       // questions, and it is explained rather than shown as an error string.
       if (e?.code === 'FREE_CAP_REACHED' || e?.code === 'FREE_EXAM_CAP_REACHED') setCapped(e);
-      else { setError(e.message); setErrorCode(e?.code || ''); }
+      else {
+        if (isContentEmpty(e?.code)) noteEmpty(e.code);
+        setError(e.message); setErrorCode(e?.code || '');
+        setPyqAlternatives(e?.code === 'INDIA_PYQ_UNAVAILABLE' && Array.isArray(e?.detail?.alternatives) ? e.detail.alternatives : []);
+      }
     }
     finally { loading.current = false; }
-  }, [subtopic, dotpoint, difficulty, taskId, track, pyqOnly, assignmentMode, assignmentContext, assignmentClassId, assignmentId]);
+  }, [subtopic, dotpoint, difficulty, taskId, track, pyqOnly, assignmentMode, assignmentContext, assignmentClassId, assignmentId, noteEmpty]);
 
   const setPyqOnly = useCallback((on) => {
     const next = new URLSearchParams(params);
@@ -220,10 +254,10 @@ export default function Practice() {
         setAssignmentError('');
       })
       .catch(err => {
-        setAssignmentError(`Your maths work is safe on this device, but assignment progress could not sync: ${err.message || 'cloud unavailable'}`);
+        setAssignmentError(tLater('practice.assignmentSyncFailed', { reason: err.message || tLater('practice.cloudUnavailable') }));
       });
     return assignmentSync.current;
-  }, [assignmentMode, assignmentContext, assignmentClassId, assignmentId, assignmentTarget]);
+  }, [assignmentMode, assignmentContext, assignmentClassId, assignmentId, assignmentTarget, t]);
 
   const onResolved = res => {
     const current = sessionRef.current;
@@ -270,10 +304,14 @@ export default function Practice() {
         track: q.indiaTrack || track || undefined,
         difficulty: q.difficulty,
       });
+      if (!servable(r)) throw Object.assign(new Error(emptyContext.current.t('practice.emptyTitle')), { code: 'CONTENT_EMPTY' });
       setServe(r);
-    } catch (e) { setError(e.message); setErrorCode(e?.code || ''); }
+    } catch (e) {
+      if (isContentEmpty(e?.code)) noteEmpty(e.code);
+      setError(e.message); setErrorCode(e?.code || '');
+    }
     finally { loading.current = false; }
-  }, [serve, track]);
+  }, [serve, track, noteEmpty]);
 
   const course = (user.courseLabel || 'Mathematics').replace(/^(?:Year|Class) \d+\s*·\s*/, '');
   const metaLine = `${t(user.course === 'in' ? 'common.classNumber' : 'common.yearNumber', { n: serve?.question?.year ?? user.year })} · ${serve?.question?.indiaTrack ? (user.indiaTrackName || course) : course}`;
@@ -342,11 +380,39 @@ export default function Practice() {
 
       {capped && <FreeCapNotice gate={capped} onRetry={load} />}
 
-      {error && !capped && (
+      {error && !capped && isContentEmpty(errorCode) && (
+        <div className="qpage" role="status">
+          <h2 style={{ marginTop: 0 }}>{t('practice.emptyTitle')}</h2>
+          <p className="muted">{t('practice.emptyBody')}</p>
+          <div className="spread" style={{ gap: 10, justifyContent: 'flex-start' }}>
+            <Link className="btn btn-primary" to="/">{t('practice.emptyChooseTopic')}</Link>
+            {(subtopic || dotpoint != null) && !taskId && !assignmentMode && (
+              <button className="btn btn-quiet" onClick={() => setParams(new URLSearchParams())}>{t('practice.emptySmart')}</button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {error && !capped && !isContentEmpty(errorCode) && (
         <div className="qpage">
           <p className="error-box">{error}</p>
+          {errorCode === 'INDIA_PYQ_UNAVAILABLE' && pyqAlternatives.length > 0 && (
+            // The nearest chapters whose archive does hold past papers. Each is
+            // a past-papers-only link, so the filter's claim stays true.
+            <div data-pyq-alternatives>
+              <p className="muted">{t('practice.pyqNearestTitle')}</p>
+              <div className="spread" style={{ gap: 10, justifyContent: 'flex-start', flexWrap: 'wrap', marginBottom: 12 }}>
+                {pyqAlternatives.map(alt => (
+                  <Link key={alt.subtopic} className="btn btn-ghost btn-sm"
+                    to={practiceHref({ subtopic: alt.subtopic, track: track || null, pyq: true })}>
+                    {t('practice.pyqNearestCta', { name: alt.name })}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
           {errorCode === 'INDIA_PYQ_UNAVAILABLE'
-            ? <button className="btn btn-primary" onClick={() => setPyqOnly(false)}>{t('practice.pyqFilterOff')}</button>
+            ? <button className={`btn ${pyqAlternatives.length ? 'btn-quiet' : 'btn-primary'}`} onClick={() => setPyqOnly(false)}>{t('practice.pyqFilterOff')}</button>
             : <button className="btn btn-primary" onClick={load}>{t('common.tryAgain')}</button>}
         </div>
       )}
@@ -361,6 +427,9 @@ export default function Practice() {
 
       {serve && !assignmentCompleteLocally && (
         <>
+          {serve.repeat && (
+            <div className="notice" role="note" style={{ marginBottom: 12 }}>{t('practice.repeatNote')}</div>
+          )}
           {serve.question.pyq && (
             <div className="notice" role="note" style={{ marginBottom: 12 }}>
               <strong>{t('practice.pyqBadge')}</strong> · {serve.question.pyqSource}

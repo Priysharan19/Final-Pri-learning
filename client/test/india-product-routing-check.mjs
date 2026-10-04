@@ -62,7 +62,18 @@ assert.doesNotMatch(indiaProgress, /your (?:predicted )?(?:percentile|rank) (?:i
   'and the page must never state a percentile or a rank as a result');
 assert.doesNotMatch(exams, /same difficulty profile as the real thing/i,
   'generic exam copy must not make an authenticity claim');
-assert.match(exams, /Mathematics section/,
+// The copy lives in the string catalogue; the page must render the JEE Main
+// intro through the key that names the Mathematics section, and the English
+// catalogue must still say exactly that.
+assert.match(exams, /tx\('exams\.jeeMainIntro',\s*\{\s*section:[^}]*t\('exams\.jeeMainSection'\)/,
   'JEE Main product must identify itself as a mathematics-section simulation');
+const enCatalogue = (await import('../src/i18n/strings.en.js')).default;
+assert.equal(enCatalogue['exams.jeeMainSection'], 'Mathematics section',
+  'the English catalogue must name the JEE Main product the Mathematics section');
+assert.match(enCatalogue['exams.jeeMainIntro'] || '', /simulation of the \{section\} of JEE Main 2026 Paper 1/,
+  'and the intro must call it a simulation of that section, not of the whole paper');
+assert.doesNotMatch(Object.entries(enCatalogue).filter(([k]) => k.startsWith('exams.')).map(([, v]) => JSON.stringify(v)).join('\n'),
+  /same difficulty profile as the real thing/i,
+  'generic exam copy in the catalogue must not make an authenticity claim either');
 
 console.log('INDIA PRODUCT ROUTING — PASS — India exams cannot reach HSC generation and India progress cannot render Australian prediction semantics.');
