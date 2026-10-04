@@ -344,6 +344,73 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
     'a waited-for reading that lands while the card is busy is marked when it is idle, not dropped');
 }
 
+// ── Doubtful lines, one-tap correction, and no second provider call (4.4) ───
+// The server reader's per-line confidence is surfaced: a line under the floor
+// is marked as doubtful and the student can say what they wrote in one tap.
+// The correction is applied to the reading on screen and marked by the
+// deterministic engine; the provider is NOT asked again.
+{
+  const { LOW_CONFIDENCE, applyLineCorrection, cleanCorrection, isLowConfidence, lowConfidenceLines } = await import('../src/ink/readingCorrection.js');
+  eq(LOW_CONFIDENCE, 0.82, 'the client floor mirrors the server default confidence floor');
+  const transcription = {
+    engine: 'cloud-test', confidence: 0.4, needsConfirmation: true,
+    lines: [{ text: '2x + 3 = 11', confidence: 0.97 }, { text: '2x = 3', confidence: 0.4 }, { text: 'x = 4', confidence: 0.9 }]
+  };
+  const reading = toReading(transcription, null);
+  eq(lowConfidenceLines(reading), [1], 'only the line under the floor is doubtful');
+  ok(reading.needsConfirmation === true, 'and the reading as a whole asks to be confirmed, so the card will not mark it silently');
+
+  let providerCalls = 0;
+  const transport = { transcribeHandwriting: async () => { providerCalls += 1; return { transcription }; } };
+  clearCloudAllowanceExhausted();
+  const first = await readWithCloud(STROKES, { user: { cloudHandwriting: true }, transport, rasterize, available: there, readiness: ready });
+  eq(providerCalls, 1, `reading the page is one provider call (${JSON.stringify(first?.reason || 'read')})`);
+  const onScreen = toReading(first.transcription, null);
+  ok(onScreen && onScreen.lines.length === 3, 'the reading reaches the screen');
+
+  const corrected = applyLineCorrection(onScreen, 1, ' 2x  = 8 ');
+  eq(providerCalls, 1, 'correcting a line is NOT a second provider call');
+  ok(corrected !== onScreen && onScreen.lines[1].text === '2x = 3', 'the correction is a new reading; the one on screen is left alone');
+  eq(corrected.lines[1], { text: '2x = 8', conf: 1, corrected: true, readText: '2x = 3' }, 'the corrected line is what the student wrote, fully confident, with the reader’s text kept beside it');
+  eq(corrected.text, '2x + 3 = 11\n2x = 8\nx = 4', 'the page text follows');
+  eq([corrected.needsConfirmation, lowConfidenceLines(corrected)], [false, []], 'nothing doubtful is left, so the engine may mark it');
+  ok(corrected.confidence >= 0.9 && corrected.corrected === true && corrected.engine === 'cloud-test', 'confidence is the worst remaining line; the engine name is unchanged — the reading is still the server’s');
+  eq(applyLineCorrection(onScreen, 1, '   '), onScreen, 'an empty correction changes nothing');
+  eq(applyLineCorrection(onScreen, 7, 'x'), onScreen, 'nor one for a line that does not exist');
+  eq(applyLineCorrection(corrected, 1, '2x = 8'), corrected, 'nor repeating the same correction');
+  eq(cleanCorrection('a'.repeat(900)).length, 400, 'a correction is bounded like a read line');
+  ok(!isLowConfidence(corrected.lines[1]) && isLowConfidence({ text: 'x', conf: 0.5 }) && !isLowConfidence({ text: 'x', conf: 0.82 }), 'doubt is strictly under the floor and never for a corrected line');
+
+  // The surface wires it the same way: the correction handler publishes and
+  // never reaches the reader.
+  const inkAnswer = readFileSync(new URL('../src/ink/InkAnswer.jsx', import.meta.url), 'utf8');
+  const handler = inkAnswer.slice(inkAnswer.indexOf('const correctLine = useCallback('), inkAnswer.indexOf('}, [rec, publish]);'));
+  ok(handler.length > 50 && /applyLineCorrection\(rec, index, text\)/.test(handler) && /publish\(next, strokesRef\.current\)/.test(handler), 'InkAnswer applies a correction to the reading on screen and publishes it');
+  ok(!/readWithCloud|sendToReader|scheduleRead|transport/.test(handler), 'and the correction handler never calls the reader');
+  ok(/needsConfirmation: r\.needsConfirmation === true/.test(inkAnswer), 'the reader’s own doubt travels with the published reading');
+  const card = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
+  ok(/if \(ink\.needsConfirmation === true\) return \{ why: 'glyph', weakest \};/.test(card), 'and the card turns that doubt into the confirmation step instead of a mark');
+  ok(/data-confidence=/.test(inkAnswer) && /ink-line-low/.test(inkAnswer) && /t\('ink\.iWrote'\)/.test(inkAnswer), 'doubtful lines are highlighted with a one-tap “I wrote…” control');
+}
+
+// ── Offline capture: saved, sealed, read when back online (4.3) ─────────────
+{
+  const en = (await import('../src/i18n/strings.en.js')).default;
+  const hi = (await import('../src/i18n/strings.hi.js')).default;
+  ok(en['ink.waitingOffline'].startsWith('Saved. It will be read when you are back online.'), 'offline, the student is told plainly: saved, read when back online');
+  ok(hi['ink.waitingOffline'].startsWith('सहेज लिया गया। ऑनलाइन होते ही इसे पढ़ा जाएगा।'), 'in Hindi too');
+  eq(inkReadingBlockedKey({ cloudLinked: true, cloudHandwriting: true }, { available: () => true, online: () => false }), 'ink.waitingOffline', 'and that is the key an offline page shows');
+  const recovery = readFileSync(new URL('../src/components/practiceRecovery.js', import.meta.url), 'utf8');
+  ok(/export \{ compactStrokes, saveInkDraft, readInkDraft, clearInkDraft \} from '\.\.\/local\/inkDrafts\.js';/.test(recovery), 'kept ink comes from the sealed IndexedDB store, not the localStorage draft store');
+  ok(!/queueDraft\(INK|readDraft\(INK/.test(recovery), 'and no ink is written to localStorage any more');
+  const idb = readFileSync(new URL('../src/local/idb.js', import.meta.url), 'utf8');
+  ok(/inkDrafts: \{ owner: 'pid', clear: \['id', 'pid'\] \}/.test(idb), 'inkDrafts is a sealed store: id and pid in the clear, strokes inside the blob');
+  ok(/\['inkDrafts', 'pid'\]/.test(idb), 'and is erased with its profile');
+  const card = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
+  ok(/InkAnswer && restoredInk !== undefined && \(/.test(card), 'the ink surface mounts only once the kept page has been looked for');
+  ok(/autoMarkedRef\.current === inkResult\.readKey/.test(card), 'a page read after waiting is marked once per reading (idempotent on the read key)');
+}
+
 console.log(failures.length
   ? `CLOUD HANDWRITING CLIENT: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `CLOUD HANDWRITING CLIENT: PASS — ${pass}/${pass} checks — on by default only for a signed-in account, server-only and answer-blind, never over a hand correction, never on an unconfident read.`);

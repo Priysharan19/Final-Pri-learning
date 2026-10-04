@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { currentPid } from '../local/store.js';
 import { priNative } from '../platform/native/index.js';
+import { setInkDraftProfile } from '../local/inkDrafts.js';
 
 const PREFIX = 'pri.draft.';
 const VERSION = 1;
@@ -101,6 +102,7 @@ function hookFlush() {
 export function setDraftProfile(id) {
   flushDrafts();
   activePid = id || null;
+  setInkDraftProfile(id);
 }
 
 /** Write now. Use for milestones (page leave, submit, question change). */
@@ -163,7 +165,7 @@ export function clearDraft(scope, id) {
 // pick up by hand: a submission that was in flight and the ink of the question
 // on screen (practiceRecovery.js). The crash card lists what a student can go
 // back to; these come back by themselves, so they are not listed twice.
-const SELF_RECOVERING = new Set(['submit', 'ink']);
+const SELF_RECOVERING = new Set(['submit']);
 
 /** Ids of this profile's live drafts in one scope, newest first. */
 export function draftIdsIn(scope) {

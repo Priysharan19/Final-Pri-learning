@@ -217,6 +217,10 @@ function doubtOf(ink) {
   if (!lines.length) return null;
   const weakest = ink.weakest || null;
   if (!lines.every(readsAsMaths)) return { why: 'shape', weakest };
+  // The server reader's own flag: a line under its confidence floor. The
+  // student corrects it in the reading panel ("I wrote…") or stands behind
+  // it; it is never marked from silently.
+  if (ink.needsConfirmation === true) return { why: 'glyph', weakest };
   if (typeof ink.minConf === 'number' && ink.minConf < CONFIRM_CONF) return { why: 'glyph', weakest };
   if (typeof ink.margin === 'number' && ink.margin < CONFIRM_MARGIN) return { why: 'rival', weakest };
   return null;
@@ -253,9 +257,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const tx = useTx();
   const [answer, setAnswer] = useState('');
   const [mcqSel, setMcqSel] = useState(null);
-  // Handwriting kept from before a reload brings the card back to the pen.
-  const [restoredInk] = useState(() => readInkDraft(question.id));
-  const [mode, setMode] = useState(() => (restoredInk ? 'write' : preferMode()));       // 'type' | 'write' | 'photo'
+  // Handwriting kept from before a reload brings the card back to the pen. It
+  // lives in the profile's sealed IndexedDB store and is looked for
+  // asynchronously: undefined while that happens, then the strokes or null.
+  // The ink surface mounts only once the answer is in, so a kept page is
+  // always the page it starts from.
+  const [restoredInk, setRestoredInk] = useState(undefined);
+  const [mode, setMode] = useState(() => preferMode());       // 'type' | 'write' | 'photo'
   const [inkResult, setInkResult] = useState(null);
   const [hints, setHints] = useState([]);
   const [hintsLeft, setHintsLeft] = useState(question.hintsAvailable);
@@ -299,6 +307,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // proposal) is bound to it and dropped if it names anything else.
   const attemptRef = useRef(null);
   const [attempt, setAttempt] = useState(null);
+  // Whether the submission on screen (being marked, retried or resolved) was
+  // handwritten: every handwritten verdict says who read it and who marked it.
+  const [attemptViaInk, setAttemptViaInk] = useState(false);
   // The reading a submission was made from is frozen while it is marked and
   // after it is resolved: a reading that settles late cannot rewrite it.
   const inkFrozenRef = useRef(false);
@@ -316,10 +327,21 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setState({ phase: 'answering' }); setBusy(false);
     setSelfMarks({}); setSelfSaved(false); setPhoto(null); setBookmarked(false); setElapsed(0);
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
-    setChecking(false); setVouched(null);
+    setChecking(false); setVouched(null); setAttemptViaInk(false);
     startRef.current = Date.now();
     if (mode === 'type') setTimeout(() => inputRef.current?.focus(), 60);
   }, [question.id]); // eslint-disable-line
+
+  // The kept page, if there is one, before the pen is offered.
+  useEffect(() => {
+    let live = true;
+    setRestoredInk(undefined);
+    readInkDraft(question.id).then(
+      kept => { if (!live) return; setRestoredInk(kept || null); if (kept) setMode('write'); },
+      () => { if (live) setRestoredInk(null); }
+    );
+    return () => { live = false; };
+  }, [question.id]);
 
   const resolved = state.phase === 'resolved';
   const res = state.res;
@@ -668,6 +690,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     inFlightRef.current = true;
     inkFrozenRef.current = !recovering || inkFrozenRef.current;
     setBusy(true);
+    setAttemptViaInk(body.viaInk === true);
     try {
       const r = diagnostic
         // A diagnostic keeps no ink, photo or scribble: only the reading the
@@ -679,7 +702,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       const live = mountedRef.current;
       if (r.resolved) {
         clearInkDraft(question.id);
-        const bound = { submissionId: r.submissionId || body.submissionId, lines: Array.isArray(lines) ? lines : null };
+        const bound = { submissionId: r.submissionId || body.submissionId, lines: Array.isArray(lines) ? lines : null, viaInk: body.viaInk === true };
         attemptRef.current = bound;
         if (live) {
           setAttempt(bound);
@@ -726,12 +749,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const pending = readPendingSubmission(question.id);
     if (!pending) return;
     pendingRef.current = { submissionId: pending.submissionId, contentKey: submissionContentKey(pending.answer, pending.steps) };
-    const kept = pending.viaInk ? readInkDraft(question.id) : null;
-    deliver({
-      answer: pending.answer, ms: pending.ms, steps: pending.steps, viaInk: pending.viaInk,
-      ink: kept ? { strokes: compactInkStrokes(kept), recognized: (pending.lines || []).join('\n') || null, engine: null } : undefined,
-      submissionId: pending.submissionId
-    }, { lines: pending.lines, recovering: true });
+    (pending.viaInk ? readInkDraft(question.id).catch(() => null) : Promise.resolve(null)).then(kept => {
+      deliver({
+        answer: pending.answer, ms: pending.ms, steps: pending.steps, viaInk: pending.viaInk,
+        ink: kept ? { strokes: compactInkStrokes(kept), recognized: (pending.lines || []).join('\n') || null, engine: null } : undefined,
+        submissionId: pending.submissionId
+      }, { lines: pending.lines, recovering: true });
+    });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** The ink surface reports here. Frozen while marking and after the verdict. */
@@ -1214,7 +1238,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           ) : (
             <div className="ink-row">
               <div className="editor-shell" style={{ flex: 1, minWidth: 0 }}>
-                {InkAnswer && (
+                {InkAnswer && restoredInk !== undefined && (
                   <InkAnswer onRecognized={onInkRecognized} onStrokes={onInkStrokes} initialStrokes={restoredInk}
                     height={380} lineVerdicts={lineVerdicts}
                     disabled={resolved || busy} focusSymbol={checkFocus} recognitionContext={recognitionContext} />
@@ -1385,6 +1409,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <div>
             <b>{t(state.res.invalid ? 'verdict.unreadable' : 'verdict.notQuite')}</b>{' '}
             <MathText text={state.res.feedback || t('verdict.oneMoreGo')} />
+            {attemptViaInk && <div className="eval-provenance" data-provenance="handwriting" style={{ padding: '6px 0 0', border: 0 }}>✒ {t('verdict.readByAiMarkedByEngine')}</div>}
             {state.res.partial && <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>◐ {state.res.partial.note}</div>}
             {state.res.stepReport && <StepReport report={state.res.stepReport} />}
           </div>
@@ -1413,6 +1438,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               </span>
             </div>
             <div className="eval-disclaimer">{t('verdict.markedOnDevice')}</div>
+            {attemptViaInk && <div className="eval-provenance" data-provenance="handwriting">✒ {t('verdict.readByAiMarkedByEngine')}</div>}
             <div className="eval-body">
               <div className="spread">
                 <b>{verdictGood

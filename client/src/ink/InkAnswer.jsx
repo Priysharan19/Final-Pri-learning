@@ -34,6 +34,7 @@ import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { inkCanvasHeight, useFormFactor } from '../platform/formFactor.js';
 import { useT } from '../i18n/index.js';
 import { priNative } from '../platform/native/index.js';
+import { applyLineCorrection, isLowConfidence, lowConfidenceLines } from './readingCorrection.js';
 
 // Engine names are for developers and evaluators, not students: shown in dev
 // builds, LAN research mode, or with ?inkdiag=1.
@@ -75,6 +76,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
   const [tool, setTool] = useState('pen');
   const [finger, setFinger] = useState(() => priNative.ink.facts()?.fingerDefault === true);
   const [rec, setRec] = useState(EMPTY_READING);
+  // { index, text } while the student is saying what they wrote on a doubtful line.
+  const [correcting, setCorrecting] = useState(null);
   const [extraHeight, setExtraHeight] = useState(0);
   // null | { kind: 'reading' } | { kind: 'waiting', key } | { kind: 'empty' } | { kind: 'allowance' }
   const [status, setStatus] = useState(null);
@@ -116,6 +119,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
       engine: r.engine || null,
       researchOnly: false,
       productionReady: r.cloud === true,
+      // The reader's own doubt and the student's own corrections travel with
+      // the reading: the card's confirmation gate honours the first, and the
+      // second is what the engine marks.
+      needsConfirmation: r.needsConfirmation === true,
+      corrected: r.corrected === true,
       afterWait: afterWait && r.lines.length > 0,
       readKey: r.lines.length ? `${strokeSignature(strokes)}|${r.text}` : null,
       strokes
@@ -202,8 +210,22 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
     if (immediate) go(); else settleRef.current = setTimeout(go, SETTLE_MS);
   }, [publish, rec.lines.length, sendToReader]);
 
+  /**
+   * One tap: the student says what they wrote on a line the reader was unsure
+   * of. Applied to the reading on screen and handed on — the reader is NOT
+   * asked again (no second provider call, nothing new leaves the device), and
+   * the deterministic engine marks the line as written.
+   */
+  const correctLine = useCallback((index, text) => {
+    setCorrecting(null);
+    const next = applyLineCorrection(rec, index, text);
+    if (next === rec) return;
+    publish(next, strokesRef.current);
+  }, [rec, publish]);
+
   const onStrokesChange = useCallback((strokes) => {
     strokesRef.current = strokes;
+    setCorrecting(null);
     // Kept the moment the pen lifts, before any reading: a page written in the
     // second before the app went away is still the student's page.
     try { onStrokesRef.current?.(strokes); } catch { /* keeping ink is best-effort */ }
@@ -380,8 +402,13 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
             {t('ink.reading')}{shownEngineNote && <span className="muted" style={{ marginLeft: 10, textTransform: 'none', letterSpacing: 0 }}>{shownEngineNote}</span>}
           </div>
           {rec.lines.map((line, li) => (
-            <div className="ink-line" key={li} data-text={line.text}>
+            <div className={`ink-line${isLowConfidence(line) ? ' ink-line-low' : ''}`} key={li} data-text={line.text}
+              data-confidence={Number.isFinite(Number(line.conf)) ? String(Math.round(Number(line.conf) * 100) / 100) : undefined}
+              data-corrected={line.corrected === true ? 'true' : undefined}>
               <span className="ink-line-n" aria-hidden="true">{li + 1}</span>
+              {isLowConfidence(line) && (
+                <span className="ink-line-doubt" title={t('ink.lowConfidenceLine', { n: li + 1 })}>?<span className="sr-only">{t('ink.lowConfidenceSr', { n: li + 1 })}{' '}</span></span>
+              )}
               {lineVerdicts && lineVerdicts[li] && ['ok', 'break', 'wrong'].includes(lineVerdicts[li].status) && (
                 <span className={`ink-line-verdict ${lineVerdicts[li].status === 'ok' ? 'good' : 'bad'}`}>
                   {lineVerdicts[li].status === 'ok' ? '✓' : '✗'}
@@ -392,8 +419,27 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
               {lineVerdicts && lineVerdicts[li] && ['break', 'wrong'].includes(lineVerdicts[li].status) && lineVerdicts[li].note && (
                 <span className="sc-note" style={{ fontSize: 12.5 }}>— {lineVerdicts[li].note}</span>
               )}
+              {line.corrected === true && (
+                <span className="ink-line-corrected" role="status">✓ {t('ink.correctedSr', { n: li + 1 })}</span>
+              )}
+              {!disabled && isLowConfidence(line) && correcting?.index !== li && (
+                <button type="button" className="ink-correct-btn" aria-label={t('ink.iWroteAria', { n: li + 1 })}
+                  onClick={() => setCorrecting({ index: li, text: line.text })}>{t('ink.iWrote')}</button>
+              )}
+              {!disabled && correcting?.index === li && (
+                <form className="ink-correct" onSubmit={e => { e.preventDefault(); correctLine(li, correcting.text); }}>
+                  <input autoFocus value={correcting.text} aria-label={t('ink.correctionAria', { n: li + 1 })}
+                    inputMode="text" autoCapitalize="off" autoCorrect="off" spellCheck={false} maxLength={400}
+                    onChange={e => setCorrecting({ index: li, text: e.target.value })} />
+                  <button type="submit" className="btn btn-primary btn-sm">{t('ink.correctionUse')}</button>
+                  <button type="button" className="btn btn-quiet btn-sm" onClick={() => setCorrecting(null)}>{t('common.cancel')}</button>
+                </form>
+              )}
             </div>
           ))}
+          {!disabled && lowConfidenceLines(rec).length > 0 && (
+            <div className="ink-doubt-note" role="status">{t('ink.lowConfidenceLine', { n: lowConfidenceLines(rec)[0] + 1 })}</div>
+          )}
         </div>
       )}
     </div>

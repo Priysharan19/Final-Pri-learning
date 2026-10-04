@@ -394,7 +394,9 @@ try {
     const row = alertDoc.split('\n').find(line => line.startsWith(`| \`${rule.id}\` |`));
     c.ok(row, `docs/operations/alerts.md has a row for ${rule.id}`);
     const t = rule.thresholds;
-    const stated = [`≥ ${t.count}`, `${t.minutes} minutes`, ...(t.ratio === undefined ? [] : [`≥ ${Math.round(t.ratio * 100)}%`])];
+    const stated = [`≥ ${t.count}`, `${t.minutes} minutes`,
+      ...(t.ratio === undefined ? [] : [`≥ ${Math.round(t.ratio * 100)}%`]),
+      ...(t.p95Ms === undefined ? [] : [`p95 ≥ ${t.p95Ms / 1000} s`])];
     for (const text of stated) c.ok(row.includes(text), `alerts.md states ${rule.id}'s threshold "${text}" exactly as the code evaluates it`);
   }
   for (const external of ['SERVER_DOWN', 'BLOCKED_EXTERNAL', 'PRI_METRICS_TOKEN', '/v1/ready', '/v1/health']) c.ok(alertDoc.includes(external), `alerts.md covers ${external}`);
