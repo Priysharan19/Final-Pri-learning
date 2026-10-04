@@ -17,28 +17,38 @@
 //   · counts the network requests that were attempted while offline and
 //     checks that none of them was needed for the verdict (they all failed).
 //
+// WHICH TYPES. The default build serves the India product (NCERT Classes
+// 7–12); a Class 10 CBSE profile is served numeric, set, point and mcq
+// answers, and the tour covers all four. The expression, ratio and working
+// answer types are served only by the Australian banks, which exist behind
+// the PRI_FEATURE_AUSTRALIA build flag and are not in this build; their
+// marking, and interval/matrix/vector/complex answers (no generator yet), is
+// pinned by the node suites (marker-equivalence-classes-check.mjs and
+// friends), which run the same bundled engine code. The answersFor() table
+// below still knows every type so the tour grows with the banks.
+//
 // THE ORACLE. The card never receives the authored answer — the local backend
 // strips it — so the tour reads the question's own row from the app's local
 // IndexedDB (store `questions`, key = the card's data-question-id) to learn
 // what the right answer is. Nothing is injected, resolved or faked: the row is
 // read, not written, and the verdict is whatever the engine says to what was
-// typed. Interval, matrix, vector and complex answers have no generator yet
-// and are covered by the node suites (marker-equivalence-classes-check.mjs).
+// typed.
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
 
 const SUBMIT = { name: 'Submit Answer' };
-const MAX_SKIPS = 40;
+// Skips cost free-tier questions (20 a day per profile), so each target is
+// aimed with the dot point and difficulty that the bank serves that answer
+// type at (sampled: 30/30 for numeric, set and mcq; 29/30 for point) and the
+// skip loop is only a short safety net.
+const MAX_SKIPS = 6;
 
-/** The subtopics that reliably serve each answer type (sampled from the banks). */
+/** Class 10 CBSE practice routes that serve each answer type. */
 const TARGETS = [
-  { type: 'numeric', subtopics: ['y10-surds', 'y10-trig', 'y9-pythagoras'] },
-  { type: 'expression', subtopics: ['y9-algebra', 'y10-quadratics'] },
-  { type: 'set', subtopics: ['y10-quadratics'] },
-  { type: 'point', subtopics: ['y10-simeq'] },
-  { type: 'ratio', subtopics: ['y7-ratio'] },
-  { type: 'mcq', subtopics: ['y10-stats', 'y10-probability'] },
-  { type: 'working', subtopics: ['y8-equations', 'y9-algebra'] }
+  { type: 'numeric', routes: ['c10-polynomials&difficulty=3', 'c10-quadratic-equations&dotpoint=3'] },
+  { type: 'set', routes: ['c10-polynomials&difficulty=1', 'c10-quadratic-equations&dotpoint=0&difficulty=1'] },
+  { type: 'mcq', routes: ['c10-quadratic-equations&dotpoint=2', 'c10-pair-linear-equations&dotpoint=0'] },
+  { type: 'point', routes: ['c10-pair-linear-equations&dotpoint=2&difficulty=3'] }
 ];
 
 const fmt = v => (Number.isInteger(v) ? String(v) : String(Number(Number(v).toPrecision(12))));
@@ -68,7 +78,7 @@ export const flow = {
 
   async run({ page, ctx, base, check, goto, createProfile, settle, note }) {
     await goto('/');
-    await createProfile({ name: 'Shakuntala Devi', year: 10 });
+    await createProfile({ name: 'Shakuntala Devi', year: 10, course: 'in' });
 
     const readRow = id => page.evaluate(qid => new Promise((resolveRow, reject) => {
       const req = indexedDB.open('pri-learning');
@@ -84,19 +94,19 @@ export const flow = {
       };
     }), id);
 
-    /** Serve a question of `type` from one of its subtopics, online. */
+    /** Serve a question of `type` from one of its routes, online. */
     const serve = async (target) => {
-      for (const sub of target.subtopics) {
+      for (const sub of target.routes) {
         await page.goto(`${base}/practice?subtopic=${sub}`, { waitUntil: 'domcontentloaded' });
         await page.waitForSelector('.qpage[data-answer-type]', { timeout: 30000 });
         for (let skips = 0; skips < MAX_SKIPS; skips++) {
-          const got = await page.locator('.qpage').getAttribute('data-answer-type');
+          const got = await page.locator('.qpage[data-question-id]').getAttribute('data-answer-type');
           if (got === target.type) return sub;
           const next = page.locator('.ctx-next');
           if (!await next.count()) break;
-          const before = await page.locator('.qpage').getAttribute('data-question-id');
+          const before = await page.locator('.qpage[data-question-id]').getAttribute('data-question-id');
           await next.click();
-          await page.waitForFunction(prev => document.querySelector('.qpage')?.getAttribute('data-question-id') !== prev, before, { timeout: 30000 });
+          await page.waitForFunction(prev => document.querySelector('.qpage[data-question-id]')?.getAttribute('data-question-id') !== prev, before, { timeout: 30000 });
         }
       }
       return null;
@@ -109,8 +119,8 @@ export const flow = {
 
     for (const target of TARGETS) {
       const sub = await serve(target);
-      if (!await check(`${target.type}: a question of this type was served (${target.subtopics.join('/')})`, !!sub)) continue;
-      const qid = await page.locator('.qpage').getAttribute('data-question-id');
+      if (!await check(`${target.type}: a question of this type was served (${target.routes.join(' | ')})`, !!sub)) continue;
+      const qid = await page.locator('.qpage[data-question-id]').getAttribute('data-question-id');
       const row = await readRow(qid);
       if (!await check(`${target.type}: the question's own row is readable from the local store`, row && row.answerType === target.type, JSON.stringify(row).slice(0, 200))) continue;
       const answers = answersFor(row);

@@ -403,6 +403,9 @@ jobs:
           grep -Fq 'Cloud admin · CMS lifecycle and role management' browser.log
           grep -Eq 'E2E SUITE.*25/25.*1 flows' browser.log
           grep -Fq 'Cloud admin · independent-review rejection' browser.log
+          # Ledger 3.1: the bundled engine marks numeric, set, mcq and point answers with context.setOffline(true).
+          grep -Fq 'Offline marking · the bundled engine marks every answer type with the network gone' browser.log
+          grep -Eq 'E2E SUITE.*41/41.*1 flows' browser.log
           grep -Eq 'E2E SUITE.*13/13.*1 flows' browser.log
           grep -Fq 'AI tutor · dark by default in a production build' browser.log
           grep -Fq 'AI tutor · three levels, in order, with fallback' browser.log
