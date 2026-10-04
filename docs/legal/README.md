@@ -83,3 +83,28 @@ on. If the code changes, the notice is wrong until it is changed too.
 - Password-protected profiles are encrypted at rest on the device; profiles
   without a password are not. Both limits are documented in
   `client/src/local/idb.js` and `client/src/local/auth.js`.
+
+## Launch checklist (status 2026-10-02 — `BLOCKED_EXTERNAL`, owner and counsel only)
+
+Engineering cannot complete any line below: each needs a real legal entity, a named person, a
+monitored mailbox or a qualified lawyer. Nothing here is filled in by code or by an agent. The
+executable path is `docs/release/LAUNCH-RUNBOOK.md` §4; the gate that consumes it is
+`client/test/legal-pages-check.mjs` (today: `LEGAL PAGES: PASS — 233/233 checks … while 38
+placeholders remain`) together with `node tools/legal-status.mjs` (today: 7 placeholders across
+4 notices in 2 languages, 8 documents).
+
+| # | Action (owner / counsel) | Where | Evidence it produces | Consumed by |
+|---|---|---|---|---|
+| 1 | Decide the legal entity that holds the data and takes the money, and its registered address | `{{OWNER_LEGAL_NAME}}`, `{{OWNER_ADDRESS}}` in all 8 documents | `node tools/legal-status.mjs` no longer lists them | `legal-pages-check.mjs` (placeholder count falls in both languages together) |
+| 2 | Appoint the grievance officer (a named person) and a monitored mailbox, as the DPDP Act requires to be published | `{{GRIEVANCE_OFFICER_NAME}}`, `{{GRIEVANCE_OFFICER_EMAIL}}` (`grievance.md`, `privacy.md`, both languages) | same | same; App Store / Play privacy contact |
+| 3 | Open the customer support mailbox for subscription questions | `{{SUPPORT_EMAIL}}` | same | same; Razorpay onboarding (web billing is out of V1) and App Store review contact |
+| 4 | Choose the jurisdiction whose courts the terms name | `{{JURISDICTION_CITY}}` (`terms.md`, `terms.hi.md`) | same | same |
+| 5 | Have the English set reviewed by a lawyer qualified in Indian law (DPDP Act 2023 and its rules, Consumer Protection (E-Commerce) Rules, IT Rules grievance requirements); have the Hindi set checked against the English | review letter / sign-off kept outside the repository | written sign-off referenced in the launch record | `PRI_V1_RELEASE_SCOPE.md` §18 blocker #9; ADR-0001 "legal sign-off remains an external authority" |
+| 6 | Confirm the privacy notice still matches the code's data path at the release SHA (cloud handwriting image and photo, working check, telemetry, deletion survivors) — the facts list above and `docs/privacy/data-retention.md` | `privacy.md` / `privacy.hi.md` | reviewer's confirmation in the launch record | blocker #10 (`PRI_V1_RELEASE_SCOPE.md` §18); `ios/PriLearning.swiftpm/Resources/PrivacyInfo.xcprivacy` must agree |
+| 7 | Set the publication date of the filled version, in both languages | `{{LAST_UPDATED}}` | `node tools/legal-status.mjs` → 0 placeholders | `legal-pages-check.mjs` then expects the "not yet reviewed" banner to be gone; its pinned count line changes and must be updated in `.github/workflows/ci.yml` in the same PR |
+| 8 | Publish the processor list named in ADR-0001 (Railway, Supabase, the model provider, the email provider) in the privacy notice's "Who else sees your data" if counsel requires named processors | `privacy.md` §"Who else sees your data" | counsel's instruction | blocker #9 |
+
+Order matters only in one place: fill the placeholders (1–4, 7) **after** the review (5–6) has
+settled the wording, so the lawyer reads the operative text once. Until every row has evidence,
+the app keeps showing the banner and blocker #9 stays open. Hindi translation of counsel's
+changes must land in the same PR as the English, or `legal-pages-check.mjs` fails on drift.

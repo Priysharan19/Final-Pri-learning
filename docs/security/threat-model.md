@@ -73,6 +73,17 @@ compromised or malicious paid AI provider; a script holding a stolen session coo
 | T19 | Clickjacking / script injection in the client | Enforced CSP (`script-src 'self'`, `frame-ancestors 'none'`, `object-src 'none'`), X-Frame-Options DENY, HSTS in production | `security-headers-check` (incl. real-browser CSP run); `security-production-mode-check` |
 | T20 | Vulnerable dependencies | `npm audit --omit=dev` floor fails CI on any runtime advisory | `tools/runtime-audit-floor.mjs` (client + server jobs) |
 | T21 | Answer leakage to the handwriting model | Transcription requests carry only the ink image (answer-blind) | `handwriting-transcription-check` |
+| T22 | Staff account compromise (phished or reused admin/support password) | TOTP second factor (RFC 6238, `node:crypto`) for `admin` and `support`: an unenrolled staff account reaches only `/me`, logout-all and the enrolment routes; a session must present a code before any staff route answers; role promotion and Premium grant need one presented within 15 minutes; secrets encrypted at rest under `PRI_MFA_KEY`, recovery codes hashed, each TOTP step accepted once; reset only by operator CLI | `mfa-check`; `route-inventory-check` (every staff-only route carries `mfa`) |
+| T23 | A long-lived or copied session kept alive by replay | Absolute lifetime `PRI_SESSION_MAX_AGE_DAYS` (default 90) on top of the 30-day slide; admin/support idle limit 12 hours; a session past either is revoked, not merely refused | `security-hardening-check` M1; `mfa-check` |
+| T24 | A child's account created by an identity provider sign-in with nobody asked | A NEW account via Google/Apple must declare age like the form (428 `CONSENT_DECLARATION_REQUIRED`, nonce unspent so the client can retry); a child must name a guardian (not their own address) and gets the same consent row and email as registration; existing accounts sign in unchanged | `oidc-consent-check` |
+| T25 | A guardian who cannot withdraw because the emailed link died | Separate long-lived `guardian-withdraw` bearer issued on confirmation, exempt from housekeeping, permission-reducing only, revoked by use; email copy states both windows accurately | `security-hardening-check` H2; `guardian-consent-lifecycle-check` |
+| T26 | Storage exhaustion by one account (runaway or hostile device) | Per-account quota on stored sync rows and bytes (`PRI_SYNC_MAX_BYTES_PER_ACCOUNT`, `PRI_SYNC_MAX_EVENTS`), checked inside the push transaction before any write; 413 `SYNC_QUOTA_EXCEEDED` with the figures | `security-hardening-check` M4 |
+| T27 | A handler bug reading or writing another account's sync rows | Defence in depth under the handlers' own filters: `transaction({ accountScope })` sets the `pri.account_id` session GUC and a RESTRICTIVE RLS policy on `learning_events`, `sync_entities` and `idempotency_keys` hides and refuses every other account's row for that transaction (see §7 for exactly what this covers) | `security-hardening-check` M5 (Postgres: cross-account read returns nothing, write is 42501); `postgres-schema-live-check` / `postgres-schema-mutation-check` (policy present and exact) |
+| T28 | Audit trail tampering through the server's database role | No server code updates or deletes `audit_log`; on Postgres `pri_server` has no UPDATE/DELETE on it | `security-hardening-check` M5; `postgres-schema-live-check` |
+| T29 | Weak or silently truncated passwords | ≥10 characters, ≤72 bytes (bcrypt truncation → `PASSWORD_TOO_LONG`), bundled top-1000 list with digit/punctuation stems (`PASSWORD_TOO_COMMON`) at registration, reset and change | `security-hardening-check` M6 |
+| T30 | Reconnaissance from the public liveness endpoint | Anonymous `/v1/health` carries ok, release identity, schema versions, engine, reachability and the two quota limits only; provider configuration flags, backlog counts and housekeeping go to `PRI_METRICS_TOKEN` holders and `/v1/admin/health` | `security-hardening-check` L3; `production-runtime-image-check` |
+| T31 | Stored assignment or feedback JSON carrying unvalidated content to children | Assignment PATCH runs the same curriculum validator as POST; teacher feedback is a closed schema (`note`, `nextSteps`, `grade`, `score`, `rubric[]`) with bounded text, unknown keys refused | `security-hardening-check` M2; `platform-http-journeys-check` |
+| T32 | Clear class join codes read out of a database copy | Join codes stored only encrypted (AES-GCM under the delivery key, bound to the class id); legacy clear codes encrypted by housekeeping and on reveal | `security-hardening-check` L1; `security-acceptance-check` C |
 
 ## 5. Findings fixed by this acceptance work
 
@@ -86,7 +97,45 @@ compromised or malicious paid AI provider; a script holding a stolen session coo
 | Password-reset mail was limited per IP only | A distributed caller could mail-bomb one student's inbox | Additional cap of 3 reset emails per mailbox per hour; caller sees an identical `ok` | `abuse-limits-check` |
 | `GET /v1/account/export` had no rate limit | A stolen session could pull the full history repeatedly; one account could monopolise the database | 10 exports per account per hour | `route-inventory-check`, `abuse-limits-check` |
 
-## 6. Out of scope here
+## 6. Findings closed by the hardening set (2026-10-02)
+
+| Finding | Severity | Fix | Regression test |
+|---|---|---|---|
+| Google/Apple sign-in created a student with no `guardian_consents` row, which the consent gate reads as an adult | High | Age declaration required for a NEW identity account; child path writes the consent row and email exactly as registration; nonce unspent on refusal | `oidc-consent-check` |
+| Guardian withdrawal link died: 1 h token, consumed, purged by housekeeping, while the email promised "at any time" | High | Separate long-lived `guardian-withdraw` credential, housekeeping-exempt, revoked on use; accurate email copy | `security-hardening-check` H2, `guardian-consent-lifecycle-check` |
+| Admin/support had no second factor or step-up | High | TOTP enrolment/verification/step-up, enrolment-gated staff access, encrypted secrets, hashed recovery codes, CLI reset | `mfa-check` |
+| No absolute session lifetime; staff sessions slid for 30 days | Medium | `PRI_SESSION_MAX_AGE_DAYS` cap; 12 h staff idle | `security-hardening-check` M1, `mfa-check` |
+| Assignment PATCH stored unvalidated JSON; feedback was any object | Medium | Validator on PATCH; feedback schema | `security-hardening-check` M2 |
+| Guardian email could equal the student's | Medium | `GUARDIAN_EMAIL_SAME_AS_STUDENT` on both registration paths | `security-hardening-check` M3, `oidc-consent-check` |
+| No per-account sync quota | Medium | Rows + bytes quota, 413 with figures | `security-hardening-check` M4 |
+| `audit_log` writable by the server role; no per-account RLS | Medium | UPDATE/DELETE revoked; restrictive account-scope policies + store plumbing | `security-hardening-check` M5, Postgres schema gates |
+| Passwords >72 bytes silently truncated by bcrypt; common passwords accepted | Medium | `PASSWORD_TOO_LONG`, `PASSWORD_TOO_COMMON` | `security-hardening-check` M6 |
+| Clear join code stored beside its hash | Low | Encrypted at rest | `security-hardening-check` L1 |
+| `PRI_CSRF_SECRET` accepted at any length | Low | ≥32 characters in production | `security-hardening-check` L2 |
+| Anonymous `/v1/health` listed configured providers and backlog counts | Low | Operator detail behind `PRI_METRICS_TOKEN` / admin health | `security-hardening-check` L3 |
+
+## 7. Per-account row-level security: exactly what is and is not covered
+
+The handlers' own `WHERE account_id = ?` filters remain the primary control on every table and
+every engine (`security-acceptance-check` C proves them). The RESTRICTIVE policies added in
+`supabase/migrations/20261007000000_security_hardening.sql` are defence in depth with a precise
+scope:
+
+- **Covered:** `learning_events`, `sync_entities` and `idempotency_keys` **inside a transaction
+  opened with `transaction({ accountScope })`** — today the sync push (`POST /v1/sync/push`) and
+  the sync pull page (`GET /v1/sync/pull/:cursor`). In such a transaction a query that names
+  another account returns no rows and an insert/update for another account fails with `42501`,
+  whatever the SQL says. The GUC is transaction-local (`set_config(…, true)`), is re-applied on
+  every serialization retry, and reverts to `''` at commit, so a pooled connection never carries
+  one request's account into the next.
+- **Not covered:** every statement that runs outside a scoped transaction (the policy is a
+  deliberate no-op while `pri.account_id` is unset or `''`), every other table (classes, reports,
+  billing, accounts — their authorization is the handlers'), SQLite (one process, one file; the
+  scope is recorded but nothing enforces it), and legitimately cross-account work (admin listings,
+  teacher rosters, housekeeping, webhooks), which runs unscoped by design. Extending the scope to
+  more handlers means opening a scoped transaction around each one; nothing else changes.
+
+## 8. Out of scope here
 
 External penetration testing; Supabase project configuration (RLS on the hosted project, network
 restrictions, backups) beyond the migration-text parity check; Railway edge/WAF configuration;

@@ -30,6 +30,12 @@ node client/test/ink-physical-release-evidence.mjs --strict --split final-holdou
 
 Do not repeatedly inspect final-holdout errors and then tune the recogniser against them.
 
+## Where the strict gate runs
+
+- Pull-request CI (`.github/workflows/ink-physical-evidence.yml`) runs the validator **without** `--strict`: it proves committed files are well formed and leak-free, and prints NOT MEASURED when there are none. A green PR check is therefore not release evidence.
+- The strict gate (test split and locked final holdout) is a **blocking** step of `.github/workflows/release-candidate.yml`, run against one exact candidate SHA (`workflow_dispatch` input `release_sha`, or a `v*` tag). With no result files committed it exits 1, and the workflow's job summary shows the row as red. That is expected until physical runs exist; nothing in the workflow may be loosened to change it.
+- Current state: no result files are committed, so the strict gate is red and every Gate C/D number is NOT MEASURED.
+
 ## Required result schema
 
 ```json

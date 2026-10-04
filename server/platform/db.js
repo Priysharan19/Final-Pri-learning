@@ -25,7 +25,8 @@ function widenAuthKinds(db) {
     const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").get(table);
     return !row?.sql || String(row.sql).includes(needle);
   };
-  if (allows('account_tokens', "'guardian-consent'") && allows('auth_delivery_outbox', "'guardian-consent'")) return;
+  // v9 widened both again for the guardian's long-lived withdrawal link.
+  if (allows('account_tokens', "'guardian-withdraw'") && allows('auth_delivery_outbox', "'guardian-withdraw'")) return;
 
   // Two details, both of which cost real data when I got them wrong here:
   //
@@ -38,34 +39,34 @@ function widenAuthKinds(db) {
   db.pragma('foreign_keys = OFF');
   try {
     db.transaction(() => {
-      if (!allows('account_tokens', "'guardian-consent'")) {
+      if (!allows('account_tokens', "'guardian-withdraw'")) {
         db.exec(`
-          CREATE TABLE account_tokens_v6 (
+          CREATE TABLE account_tokens_v9 (
             id TEXT PRIMARY KEY,
             account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-            purpose TEXT NOT NULL CHECK(purpose IN ('verify-email','reset-password','guardian-consent')),
-            token_hash TEXT NOT NULL,
+            purpose TEXT NOT NULL CHECK(purpose IN ('verify-email','reset-password','guardian-consent','guardian-withdraw')),
+            token_hash TEXT NOT NULL UNIQUE,
             created_at INTEGER NOT NULL,
             expires_at INTEGER NOT NULL,
             consumed_at INTEGER
           );
-          INSERT INTO account_tokens_v6(id,account_id,purpose,token_hash,created_at,expires_at,consumed_at)
+          INSERT INTO account_tokens_v9(id,account_id,purpose,token_hash,created_at,expires_at,consumed_at)
             SELECT id,account_id,purpose,token_hash,created_at,expires_at,consumed_at FROM account_tokens;
           DROP TABLE account_tokens;
-          ALTER TABLE account_tokens_v6 RENAME TO account_tokens;
+          ALTER TABLE account_tokens_v9 RENAME TO account_tokens;
           CREATE INDEX IF NOT EXISTS idx_account_tokens_account ON account_tokens(account_id, purpose, expires_at);
         `);
       }
-      if (!allows('auth_delivery_outbox', "'guardian-consent'")) {
+      if (!allows('auth_delivery_outbox', "'guardian-withdraw'")) {
         const columns = db.pragma('table_info(auth_delivery_outbox)').map(c => c.name);
         const extra = ['attempt_count', 'last_attempt_at', 'next_attempt_at', 'last_error_code', 'provider_message_id']
           .filter(c => columns.includes(c));
         const list = ['id', 'account_id', 'kind', 'destination', 'token_id', 'token_ciphertext', 'created_at', 'delivered_at', ...extra].join(',');
         db.exec(`
-          CREATE TABLE auth_delivery_outbox_v6 (
+          CREATE TABLE auth_delivery_outbox_v9 (
             id TEXT PRIMARY KEY,
             account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-            kind TEXT NOT NULL CHECK(kind IN ('verify-email','reset-password','guardian-consent')),
+            kind TEXT NOT NULL CHECK(kind IN ('verify-email','reset-password','guardian-consent','guardian-withdraw')),
             destination TEXT NOT NULL,
             token_id TEXT NOT NULL REFERENCES account_tokens(id) ON DELETE CASCADE,
             token_ciphertext TEXT NOT NULL,
@@ -77,9 +78,9 @@ function widenAuthKinds(db) {
             last_error_code TEXT,
             provider_message_id TEXT
           );
-          INSERT INTO auth_delivery_outbox_v6(${list}) SELECT ${list} FROM auth_delivery_outbox;
+          INSERT INTO auth_delivery_outbox_v9(${list}) SELECT ${list} FROM auth_delivery_outbox;
           DROP TABLE auth_delivery_outbox;
-          ALTER TABLE auth_delivery_outbox_v6 RENAME TO auth_delivery_outbox;
+          ALTER TABLE auth_delivery_outbox_v9 RENAME TO auth_delivery_outbox;
           CREATE INDEX IF NOT EXISTS idx_auth_delivery_pending
             ON auth_delivery_outbox(delivered_at, next_attempt_at, created_at);
         `);
@@ -202,7 +203,7 @@ export function createPlatformDb(path = DEFAULT_PATH) {
     CREATE TABLE IF NOT EXISTS account_tokens (
       id TEXT PRIMARY KEY,
       account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-      purpose TEXT NOT NULL CHECK(purpose IN ('verify-email','reset-password','guardian-consent')),
+      purpose TEXT NOT NULL CHECK(purpose IN ('verify-email','reset-password','guardian-consent','guardian-withdraw')),
       token_hash TEXT NOT NULL UNIQUE,
       created_at INTEGER NOT NULL,
       expires_at INTEGER NOT NULL,
@@ -481,6 +482,30 @@ export function createPlatformDb(path = DEFAULT_PATH) {
       WHEN EXISTS (SELECT 1 FROM guardian_consents g WHERE g.account_id = accounts.id) THEN 'child'
       ELSE 'legacy' END WHERE age_basis IS NULL`);
   }
+
+  // Schema v10 — one-time-code sign-in (otp_challenges, account_phones,
+  // guardian_consents.guardian_phone) is created lazily by otpCore.js.
+
+  // Schema v11 — a second factor for admin and support accounts (mfa.js). The
+  // secret is stored only encrypted under PRI_MFA_KEY; recovery codes only as
+  // hashes; and a session records when it last presented a code so staff
+  // routes can ask for one at sign-in and again for a step-up action.
+  db.exec(`CREATE TABLE IF NOT EXISTS account_mfa (
+    account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+    secret_ciphertext TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    confirmed_at INTEGER,
+    last_used_counter INTEGER,
+    updated_at INTEGER NOT NULL
+  );`);
+  db.exec(`CREATE TABLE IF NOT EXISTS account_mfa_recovery_codes (
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    code_hash TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    used_at INTEGER,
+    PRIMARY KEY(account_id, code_hash)
+  );`);
+  addColumnIfMissing(db, 'account_sessions', 'mfa_verified_at', 'mfa_verified_at INTEGER');
 
   db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('schema_version',?)").run(String(SCHEMA_VERSION));
   return db;

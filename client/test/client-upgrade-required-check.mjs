@@ -18,7 +18,7 @@ let n = 0;
 const ok = (c, m) => { assert.ok(c, m); n++; };
 
 const codeAssignments = transport.match(/err\.code = data\?\.error\?\.code \|\| 'CLOUD_REQUEST_FAILED';/g) || [];
-ok(codeAssignments.length === 2, 'both the native and the web transport carry the server error code (CLIENT_UPGRADE_REQUIRED) to the caller');
+ok(codeAssignments.length === 3, 'the native, web and streaming transports all carry the server error code (CLIENT_UPGRADE_REQUIRED) to the caller');
 ok(/state\.lastError = error\?\.code \|\| error\?\.message/.test(worker), 'a refused sync records the code, not a free-text message');
 const syncCatch = worker.slice(worker.lastIndexOf('} catch (error) {'));
 ok(!/acknowledgeProfileMutations/.test(syncCatch.slice(0, syncCatch.indexOf('throw error'))), 'a refused sync acknowledges nothing: the outbox keeps every change');

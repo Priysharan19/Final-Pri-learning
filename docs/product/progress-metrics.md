@@ -104,11 +104,16 @@ seven days.
 - Cloud sync publishes the ledger. Each attempt becomes one event with a stable id,
   and the server stores an event id once. Syncing again publishes nothing new.
   Sync never changes this device's numbers.
-- Another device's events are cached by event id, so pulling the same events again
-  does not double-count them (`remoteLearningSummary`). Until learning records
-  become server-authoritative (ADR-0001 phase 5), they are **not** folded into
-  this device's progress numbers. The progress pages describe this device's
-  ledger.
+- Another device's events are folded into this device's ledger once
+  (`client/src/platform/cloudSyncRestore.js`). Each pulled event becomes one
+  attempt row keyed by its event id, with `remoteEventId`/`remoteDeviceId` on
+  the row, and the rating, review schedule and per-day activity it implies are
+  re-derived by the deterministic engine from that row — never copied from the
+  other device's summary. Pulling the same events again is idempotent by event
+  id, so nothing is counted twice; a rescan never republishes a restored row.
+  The progress pages therefore describe the account's ledger as known to this
+  device: everything answered here plus everything pulled so far. Pushing never
+  changes this device's numbers.
 
 ## Known limits
 

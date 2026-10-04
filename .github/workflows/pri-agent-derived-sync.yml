@@ -1,7 +1,14 @@
 name: Pri Agent Derived Artifact Sync
 
+# Untrusted half of the derived-mirror pipeline. It runs on the ordinary
+# `pull_request` event with a read-only token: candidate code (npm ci, the
+# client build, sync:ios) executes here and nowhere else. The only thing it
+# hands on is an artifact; the privileged write happens in
+# pri-agent-derived-apply.yml (workflow_run), which re-verifies everything from
+# the event payload and the default-branch policy scripts and never trusts the
+# artifact's own claims about who produced it.
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
@@ -23,11 +30,9 @@ jobs:
       contents: read
       issues: read
       pull-requests: read
-    outputs:
-      has_patch: ${{ steps.package.outputs.has_patch }}
     steps:
       - name: Checkout trusted base policy
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
@@ -35,19 +40,19 @@ jobs:
           persist-credentials: false
 
       - name: Checkout exact candidate head read-only
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           path: candidate
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
 
       - name: Snapshot current mission ledger read-only
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
             const fs = require('fs');
@@ -120,6 +125,7 @@ jobs:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
           node trusted/scripts/pri-derived-artifact-sync.mjs package \
@@ -135,143 +141,17 @@ jobs:
             echo 'has_patch=false' >> "$GITHUB_OUTPUT"
           fi
 
+          # Content hashes travel with the artifact and are re-computed and
+          # recorded by the privileged consumer; they are a tamper-evidence
+          # aid, not an authority (this job ran candidate code).
+          (cd derived-out && sha256sum mirrors.patch paths.json metadata.json > SHA256SUMS)
+          cat derived-out/SHA256SUMS >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload deterministic mirror patch
-        if: steps.scope.outputs.needs_sync == 'true'
-        uses: actions/upload-artifact@v4
+        if: steps.scope.outputs.needs_sync == 'true' && steps.package.outputs.has_patch == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: pri-derived-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           path: derived-out
           if-no-files-found: error
           retention-days: 1
-
-  apply-derived:
-    name: Apply validated mirrors without executing candidate code
-    needs: build-derived
-    if: needs.build-derived.outputs.has_patch == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    permissions:
-      contents: write
-      issues: read
-      pull-requests: read
-    steps:
-      - name: Checkout trusted base policy
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          fetch-depth: 0
-          path: trusted
-          persist-credentials: false
-
-      - name: Checkout exact candidate head for patch application only
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-          path: candidate
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
-      - name: Download read-only build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: pri-derived-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-          path: derived-out
-
-      - name: Snapshot current mission ledger before write
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const issues = await github.paginate(github.rest.issues.listForRepo, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              per_page: 100
-            });
-            fs.writeFileSync('/tmp/pri-derived-issues-write.json', JSON.stringify(issues.filter(issue => !issue.pull_request), null, 2));
-
-      - name: Validate live lease, artifact metadata, path scope and fleet ownership
-        shell: bash
-        env:
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: |
-          set -euo pipefail
-          node trusted/scripts/pri-derived-artifact-sync.mjs validate-metadata \
-            derived-out/metadata.json "$HEAD_SHA" "$BASE_SHA" "$HEAD_REF"
-          node trusted/scripts/pri-derived-artifact-sync.mjs validate-paths derived-out/paths.json
-          test -s derived-out/mirrors.patch
-
-          parsed="$(node trusted/scripts/pri-derived-artifact-sync.mjs branch "$HEAD_REF")"
-          agent="$(printf '%s' "$parsed" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s).agent))")"
-          mission="$(printf '%s' "$parsed" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s).mission))")"
-          declared_agent="$(printf '%s\n' "$PR_BODY" | sed -n 's/^Pri-Agent:[[:space:]]*//p' | head -1)"
-          declared_mission="$(printf '%s\n' "$PR_BODY" | sed -n 's/^Pri-Mission-ID:[[:space:]]*//p' | head -1)"
-          declared_risk="$(printf '%s\n' "$PR_BODY" | sed -n 's/^Pri-Risk:[[:space:]]*//p' | head -1)"
-          test "$declared_agent" = "$agent"
-          test "$declared_mission" = "$mission"
-          [[ "$declared_risk" =~ ^R[1-4]$ ]]
-          node trusted/scripts/pri-mission-control.mjs validate-ledger \
-            /tmp/pri-derived-issues-write.json "$agent" "$mission" "$HEAD_REF" "$declared_risk"
-
-          mapfile -t source_files < <(git -C candidate diff --name-only "$BASE_SHA...$HEAD_SHA")
-          mapfile -t derived_files < <(node -e "for (const p of require('./derived-out/paths.json')) console.log(p)")
-          node trusted/scripts/pri-fleet.mjs simulate-guard "$agent" "${source_files[@]}" "${derived_files[@]}"
-
-      - name: Apply patch and prove the staged diff remains mirror-only regular files
-        shell: bash
-        run: |
-          set -euo pipefail
-          git -C candidate apply --check --index ../derived-out/mirrors.patch
-          git -C candidate apply --index ../derived-out/mirrors.patch
-
-          node <<'NODE'
-          const { execFileSync } = require('node:child_process');
-          const fs = require('node:fs');
-          const raw = execFileSync('git', ['-C', 'candidate', 'diff', '--cached', '--name-only', '-z']);
-          const paths = raw.toString('utf8').split('\0').filter(Boolean);
-          fs.writeFileSync('/tmp/pri-applied-paths.json', JSON.stringify(paths, null, 2));
-          const expected = [...require('./derived-out/paths.json')].sort();
-          const actual = [...paths].sort();
-          if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-            throw new Error(`applied patch path mismatch: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
-          }
-          NODE
-          node trusted/scripts/pri-derived-artifact-sync.mjs validate-paths /tmp/pri-applied-paths.json
-
-          while IFS= read -r file; do
-            entry="$(git -C candidate ls-files -s -- "$file")"
-            if [[ -z "$entry" ]]; then
-              # A deletion has no index entry and is valid for old hashed assets.
-              continue
-            fi
-            mode="${entry%% *}"
-            if [[ "$mode" != '100644' ]]; then
-              echo "derived artifact must remain a regular non-executable file: $file has mode $mode" >&2
-              exit 1
-            fi
-          done < <(node -e "for (const p of require('/tmp/pri-applied-paths.json')) console.log(p)")
-
-      - name: Re-check head lease and push one deterministic derived commit
-        shell: bash
-        env:
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          remote_sha="$(git -C candidate ls-remote origin "refs/heads/$HEAD_REF" | awk '{print $1}')"
-          if [[ "$remote_sha" != "$HEAD_SHA" ]]; then
-            echo "candidate head moved: expected $HEAD_SHA, found $remote_sha" >&2
-            exit 1
-          fi
-
-          git -C candidate config user.name 'Pri Agent Derived Sync'
-          git -C candidate config user.email 'pri-agent-derived-sync@users.noreply.github.com'
-          git -C candidate commit -m 'chore(derived): sync iPad web mirrors'
-          git -C candidate push origin HEAD:"refs/heads/$HEAD_REF" \
-            --force-with-lease="refs/heads/$HEAD_REF:$HEAD_SHA"

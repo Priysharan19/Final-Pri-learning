@@ -3,8 +3,11 @@ import SettingsLegacy from './SettingsLegacy.jsx';
 import CloudAccountPanel from '../components/CloudAccountPanel.jsx';
 import ClassroomPanel from '../components/ClassroomPanel.jsx';
 import AssignmentInboxPanel from '../components/AssignmentInboxPanel.jsx';
+import RemindersPanel from '../reminders/RemindersPanel.jsx';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
+import { featureEnabled } from '../platform/features.js';
+import { useApp } from '../App.jsx';
 
 // The content-operations and admin console is for support and admin accounts
 // only, and the server enforces that on every call it makes. A student never
@@ -42,12 +45,19 @@ function StaffOperations() {
 }
 
 export default function Settings() {
+  const { user } = useApp();
+  // The classroom product is outside public V1 (PRI_V1_RELEASE_SCOPE §11): a
+  // student sees the classroom and assignment panels only in a build that
+  // enables the extended tracks. A profile that is already a teacher keeps them,
+  // whatever the flag says — gating is about new exposure, not taking away.
+  const classroom = user?.role === 'teacher' || featureEnabled('extendedTracks');
   return (
     <>
       <SettingsLegacy />
       <CloudAccountPanel />
-      <AssignmentInboxPanel />
-      <ClassroomPanel />
+      <RemindersPanel />
+      {classroom && <AssignmentInboxPanel />}
+      {classroom && <ClassroomPanel />}
       <StaffOperations />
     </>
   );
