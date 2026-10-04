@@ -14,7 +14,7 @@ import { createFakeHost } from '../src/platform/native/fakeHost.js';
 import { discoverHost } from '../src/platform/native/host.js';
 import { normalizeCode, PriNativeError, CODES } from '../src/platform/native/errors.js';
 import { MAX_IN_FLIGHT_PER_CAPABILITY, MAX_BUFFERED_EVENTS } from '../src/platform/native/envelope.js';
-import { priNative } from '../src/platform/native/index.js';
+import { priNative, OTP_WAIT_MS, OTP_NATIVE_SMS_WAIT_MS } from '../src/platform/native/index.js';
 
 let pass = 0;
 const failures = [];
@@ -542,6 +542,11 @@ ok(normalizeCode('SOMETHING_NEW_FROM_A_SHELL') === 'INTERNAL', 'unknown codes be
   priNative.dispose();
   ok(priNative.otp.smsAvailable() === false, 'without the capability (iOS, browsers) the page never asks');
   await rejects(priNative.otp.smsCode(), 'UNSUPPORTED', 'and a direct call is UNSUPPORTED');
+  // Play services stops listening after five minutes; a consent sheet tapped
+  // just after that must still find the page waiting, or the code is lost.
+  ok(OTP_NATIVE_SMS_WAIT_MS === 5 * 60 * 1000, 'the native SMS User Consent window is recorded as five minutes');
+  ok(OTP_WAIT_MS > OTP_NATIVE_SMS_WAIT_MS, 'the page waits longer than the native SMS window, so a late consent tap is not cancelled');
+  ok(OTP_WAIT_MS - OTP_NATIVE_SMS_WAIT_MS >= 60 * 1000, 'with at least a minute to spare for the consent sheet');
   priNative.dispose();
   none.uninstall();
 }

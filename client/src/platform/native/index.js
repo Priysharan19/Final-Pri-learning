@@ -337,7 +337,15 @@ const device = Object.freeze({
 // A one-time sign-in code from SMS (Android: the SMS User Consent API, since a
 // WebView has no WebOTP). The person agrees to share one message in a system
 // sheet; only the digits come back. The server still verifies the code.
-const OTP_WAIT_MS = 5 * 60 * 1000;
+//
+// Play services listens for the message for a fixed five minutes
+// (SmsRetriever.startSmsUserConsent). The page's own wait MUST be longer: the
+// consent sheet can appear at 4:59 and the person may tap "Allow" after 5:00.
+// If the page gave up at the same moment it would already have sent
+// otp.cancel, and the code the person just agreed to share would be lost.
+// Two extra minutes cover the sheet; a code typed by hand still wins instantly.
+export const OTP_NATIVE_SMS_WAIT_MS = 5 * 60 * 1000;
+export const OTP_WAIT_MS = 7 * 60 * 1000;
 const otp = Object.freeze({
   smsAvailable: () => { const c = capOf('otp'); return c?.transport === 'bridge' && c?.sms === true; },
   /** Resolves with a six-digit string; rejects on cancel, timeout or refusal. */

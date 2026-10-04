@@ -7,7 +7,9 @@
 // fills that gap with Google's SMS User Consent API:
 //   · no SMS permission: the system shows the person ONE message and asks
 //     whether Pri may read it; nothing is read without that tap;
-//   · only while the page is waiting for a code (otp.smsCode), at most 5 min;
+//   · only while the page is waiting for a code (otp.smsCode); Play services
+//     listens for at most 5 min, and the page waits longer (7 min) so a
+//     consent sheet tapped just after 5:00 still finds the request open;
 //   · only the digits leave this file — never the message, sender or number;
 //   · the code is a suggestion: the page fills the boxes and the server still
 //     verifies it. Nothing here signs anyone in.
@@ -35,6 +37,10 @@ class SmsCode(private val activity: ComponentActivity) {
 
     companion object {
         const val LENGTH = 6
+        /** Play services' fixed SMS User Consent listening window. */
+        const val NATIVE_WAIT_MS = 5 * 60 * 1000L
+        /** The page's wait (client/src/platform/native/index.js OTP_WAIT_MS). Must exceed [NATIVE_WAIT_MS]. */
+        const val PAGE_WAIT_MS = 7 * 60 * 1000L
         private val CODE = Regex("(?<![0-9])[0-9]{$LENGTH}(?![0-9])")
 
         /** The first standalone six-digit run in [message], or null. Pure, unit-tested. */

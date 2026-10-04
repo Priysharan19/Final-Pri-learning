@@ -3,6 +3,7 @@ package com.prilearning.app
 import com.prilearning.app.auth.SmsCode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SmsCodeTest {
@@ -15,6 +16,12 @@ class SmsCodeTest {
         assertNull(SmsCode.extract("Call 98765432101 for help"))
         assertNull(SmsCode.extract("Code 12345"))
         assertEquals("123456", SmsCode.extract("Ref 1234567, code 123456"))
+    }
+
+    @Test fun pageWaitsLongerThanPlayServices() {
+        // A consent sheet tapped after Play services' 5-minute window must still find the page waiting.
+        assertEquals(5 * 60 * 1000L, SmsCode.NATIVE_WAIT_MS)
+        assertTrue(SmsCode.PAGE_WAIT_MS > SmsCode.NATIVE_WAIT_MS)
     }
 
     @Test fun nothingInNothingOut() {
