@@ -18,7 +18,7 @@ Pri should not optimise for the single largest cheque today. The highest-leverag
 4. **Compute subsidy:** AWS Education Equity, NVIDIA Inception, Google for Startups Cloud and Microsoft for Startups.
 5. **Proof-school pilots:** Shiv Nadar School, Heritage Xperiential and Kothari International.
 6. **Scale-school networks after evidence:** Podar, DPS, Ryan, Narayana and similar groups.
-7. **Equity after proof:** Campus Fund/gradCapital where eligible, Better Capital/Eximius first, then Elevation/Blume/GSV/Reach/Owl/Accel-level institutional rounds.
+7. **Equity after proof:** Campus Fund/gradCapital where eligible, **Better Capital first**, then Elevation/Blume/GSV/Reach/Owl/Accel-level institutional rounds. **Eximius Ventures is deprioritised** as a first-call investor because it already backs direct competitor ProLearn (see §22 and the competition-adjusted success model); approach only later, with conflict-check first.
 
 The desired fundraising story is not “AI tutor seeking money.” It is:
 
@@ -647,15 +647,15 @@ After one credible pilot and early retention/learning evidence.
 - Can lead/co-lead and help assemble the round.
 
 **Pri fit**
-Strong if Pri raises before needing a larger institutional seed.
+Stage and cheque size fit on paper, but Eximius participated in ProLearn's ₹30 crore pre-seed in 2026 (see §22). ProLearn is a closely adjacent K–12 AI tutor, so portfolio conflict is a major negative: Eximius is unlikely to back a direct competitor, and sharing Pri's method-aware grading thesis with an investor in a competitor carries information-leak risk.
 
 **Pri recommended ask**
-**US$250k–US$500k**, with a concrete use-of-funds plan tied to pilots, learning evidence and repeatable acquisition.
+Do not pitch as a first-call target. If approached later, only after Pri has differentiated evidence (pilot retention and learning-outcome data) and after an explicit portfolio-conflict check; then **US$250k–US$500k** as a participant, not lead.
 
 **Source**
 - https://eximiusvc.com/
 
-**Priority:** **HIGH early-VC fit**.
+**Priority:** **DEPRIORITISED — portfolio conflict (ProLearn investor)**. Better Capital (§8.1) is the first-call early-VC target.
 
 ---
 
@@ -1205,7 +1205,7 @@ Lead with:
 | 11 | gradCapital | US$60k part-time / US$300k full-time | Match founder status | Now if eligible | Student/founder status + terms |
 | 12 | AWS Education Equity | Up to US$10k credits | Full eligible credits | Now | Impact/eligibility |
 | 13 | NVIDIA Inception | Variable; some qualified offers up to US$100k DGX credits | Join + maximise eligible benefit | Now | Startup eligibility |
-| 14 | Eximius Ventures | Up to US$500k | US$250–500k | After pilot signal | Equity round readiness |
+| 14 | Eximius Ventures (deprioritised) | Up to US$500k | Not a first-call target; US$250–500k only if conflict cleared | Later, after differentiated evidence | Portfolio conflict: ProLearn investor (§22) |
 | 15 | Elevation Capital | US$500k–US$35M across stages | US$500k–1.5M | After evidence | PMF/traction |
 
 ---
