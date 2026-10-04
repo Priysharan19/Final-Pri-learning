@@ -946,6 +946,14 @@ async function run() {
       });
     }
 
+    // ── the public Coverage page: a table a screen reader must be able to walk ──
+    await step('coverage · public manifest page', '/coverage', async () => {
+      await goTo(page, BASE, '/coverage');
+      await wait(page, 500);
+      await page.locator('[data-coverage-class="10"]').click();
+      await wait(page, 300);
+    });
+
     // ── the redirects are routes too ──
     for (const [path, route] of [['/map', '/map'], ['/stats', '/stats'], ['/badges', '/badges'], ['/no-such-page', '*']]) {
       await step(`redirect ${path}`, route, async () => {
