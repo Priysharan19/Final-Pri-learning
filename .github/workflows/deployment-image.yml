@@ -6,6 +6,9 @@ on:
     branches: [main]
     paths:
       - 'Dockerfile'
+      - 'railway.json'
+      - 'tools/verify-deployment.mjs'
+      - 'tools/deployment-contract.test.mjs'
       - '.dockerignore'
       - '.env.production.example'
       - 'client/**'
@@ -16,6 +19,9 @@ on:
   pull_request:
     paths:
       - 'Dockerfile'
+      - 'railway.json'
+      - 'tools/verify-deployment.mjs'
+      - 'tools/deployment-contract.test.mjs'
       - '.dockerignore'
       - '.env.production.example'
       - 'client/**'
@@ -105,7 +111,10 @@ jobs:
           assert.equal(health.releaseIdentity?.releaseSha, process.env.GITHUB_SHA);
           assert.deepEqual(web, health.releaseIdentity);
           NODE
+          # Prove the bind-mounted SQLite database exists before passing that
+          # out-of-band persistence fact to the otherwise read-only verifier.
           test -s "$RUNNER_TEMP/pri-platform-data/pri-learning-platform.db"
+          node tools/verify-deployment.mjs --origin http://127.0.0.1:4010 --sha "$GITHUB_SHA" --engine sqlite --allow-http --persistent-storage-proven
 
   railway-identity:
     name: Railway build-arg identity agrees with runtime
