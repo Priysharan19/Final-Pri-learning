@@ -21,7 +21,7 @@ overrides the freeze.
 
 | Item | Where | Enforced by |
 |---|---|---|
-| Apple privacy manifest, copied to the app bundle root | `ios/PriLearning.swiftpm/PrivacyInfo.xcprivacy` (+ the `PriLearning 2` mirror), `.copy("PrivacyInfo.xcprivacy")` in both `Package.swift` | `store-readiness-check`, `check-native-package-sync` |
+| Apple privacy manifest, copied to the app bundle root | `ios/PriLearning.swiftpm/Resources/PrivacyInfo.xcprivacy` (+ the `PriLearning 2` mirror), `.copy("Resources/PrivacyInfo.xcprivacy")` in both `Package.swift` | `store-readiness-check`, `check-native-package-sync` |
 | No tracking, no tracking domains | `NSPrivacyTracking = false`, empty `NSPrivacyTrackingDomains` | `store-readiness-check` |
 | Required-reason API declared | `UserDefaults` → `CA92.1` (the app's own settings) | `store-readiness-check` |
 | Android: the app's own manifest asks for INTERNET only; no backup; cleartext refused. Libraries merge in `com.android.vending.BILLING` (Play Billing), `ACCESS_NETWORK_STATE` and the AndroidX `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | `android/app/src/main/AndroidManifest.xml`; the merged release manifest | `store-readiness-check` (source manifest, plus the merged manifest against that allow-list whenever a build exists) |

@@ -36,6 +36,18 @@ const POSTGRES_ONLY_CHECKS = new Set(['accounts.email']); // email = lower(email
 const POSTGRES_ONLY_CHECK_EXPRESSIONS = new Map([['accounts', ['email=loweremail']]]);
 // Tables the server may read but never write on Postgres.
 const SERVER_READ_ONLY = new Set(['sync_cursors']);
+// Tables the server may read and insert into but never change or delete from:
+// the audit trail is append-only (supabase/migrations/20261005000000).
+const SERVER_APPEND_ONLY = new Set(['audit_log']);
+// Account-scoped sync tables that carry, beside the permissive pri_server_all
+// policy, a RESTRICTIVE pri_account_scope policy keyed on the pri.account_id
+// session GUC (store.js transaction({ accountScope })). Compared on the
+// expression text, normalised the way canonicalScope() does.
+const ACCOUNT_SCOPED = new Set(['learning_events', 'sync_entities', 'idempotency_keys']);
+const SCOPE_EXPRESSION = "coalesce(current_setting('pri.account_id', true), '') = '' or account_id = current_setting('pri.account_id', true)";
+function canonicalScope(expression) {
+  return String(expression || '').toLowerCase().replace(/::text/g, '').replace(/[\s()]/g, '');
+}
 const POLICY_COMMANDS = { r: 'SELECT', a: 'INSERT', w: 'UPDATE', d: 'DELETE', '*': 'ALL' };
 
 // The only identity column. learning_events.server_cursor is AUTOINCREMENT on
@@ -264,7 +276,12 @@ export function compareSchemas(sqlite, postgres) {
     sameSet(expectedExprs, p.checkExprs, `${table} CHECK expressions`);
 
     check(p.rls === true, `${table}: row-level security is not enabled`);
-    check(p.policies.length === 1, `${table}: expected exactly one RLS policy, found ${p.policies.length}`);
+    const scoped = ACCOUNT_SCOPED.has(table);
+    const permissive = p.policies.filter(policy => policy.polpermissive === true);
+    const restrictive = p.policies.filter(policy => policy.polpermissive !== true);
+    check(permissive.length === 1, `${table}: expected exactly one ${scoped ? 'permissive ' : ''}RLS policy, found ${permissive.length}`);
+    if (scoped) check(restrictive.length === 1 && restrictive[0].polname === 'pri_account_scope', `${table}: expected a restrictive pri_account_scope policy, found ${restrictive.map(x => x.polname).join(',') || 'none'}`);
+    else check(restrictive.length === 0, `${table}: expected exactly one RLS policy, found ${p.policies.length}`);
     for (const policy of p.policies) {
       check(policy.roles.length === 1 && policy.roles[0] === 'pri_server', `${table}: policy ${policy.polname} applies to ${policy.roles.join(',') || 'PUBLIC'}, not only pri_server`);
       // The server reads AND writes every table: a policy narrowed to SELECT
@@ -272,8 +289,14 @@ export function compareSchemas(sqlite, postgres) {
       // or RLS errors in production.
       const command = POLICY_COMMANDS[policy.polcmd] || `unknown (${policy.polcmd})`;
       check(command === 'ALL', `${table}: policy ${policy.polname} is for ${command}, not ALL`);
-      check(policy.polpermissive === true, `${table}: policy ${policy.polname} is RESTRICTIVE, not PERMISSIVE`);
-      check(String(policy.qual) === 'true' && String(policy.withcheck) === 'true', `${table}: policy ${policy.polname} is not USING (true) WITH CHECK (true)`);
+      if (policy.polpermissive === true) {
+        check(String(policy.qual) === 'true' && String(policy.withcheck) === 'true', `${table}: policy ${policy.polname} is not USING (true) WITH CHECK (true)`);
+      } else {
+        // The scope policy must be a no-op while the GUC is unset ('' or NULL)
+        // and exactly the account filter when it is set, for reads and writes.
+        check(canonicalScope(policy.qual) === canonicalScope(SCOPE_EXPRESSION) && canonicalScope(policy.withcheck) === canonicalScope(SCOPE_EXPRESSION),
+          `${table}: policy ${policy.polname} does not scope rows to pri.account_id (USING ${policy.qual}; WITH CHECK ${policy.withcheck})`);
+      }
     }
   }
   for (const table of postgres.keys()) check(sqlite.has(table), `table ${table} exists only in Postgres`);
@@ -324,6 +347,7 @@ export async function compareAccess(client, schema = 'pri') {
         // still allocates from it must fail closed, not issue stale cursors
         // (supabase/migrations/20261002000000_sync_cursor_sequence.sql).
         if (SERVER_READ_ONLY.has(table) && privilege !== 'SELECT') check(!held, `pri_server can ${privilege} ${table}, which must be read-only to it`);
+        else if (SERVER_APPEND_ONLY.has(table) && (privilege === 'UPDATE' || privilege === 'DELETE')) check(!held, `pri_server can ${privilege} ${table}, which must be append-only to it`);
         else check(held, `pri_server lacks ${privilege} on ${table}`);
       }
       check(!(await has('SELECT has_table_privilege($1, $2, \'TRUNCATE\') AS ok', ['pri_server', `${schema}.${table}`])), `pri_server has TRUNCATE on ${table}`);

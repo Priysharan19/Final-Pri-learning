@@ -53,8 +53,8 @@ let package = Package(
             resources: [
                 .process("Assets.xcassets"),
                 .copy("Resources/Web"),
-                // App privacy manifest; lands at the app bundle root (CP-12).
-                .copy("PrivacyInfo.xcprivacy"),
+                // Apple privacy manifest (CP-12); .copy places it at the app bundle root.
+                .copy("Resources/PrivacyInfo.xcprivacy"),
                 // A validated PriInkFoundation.mlpackage is exported here. The
                 // directory exists even in development builds where no learned
                 // asset has been promoted yet, so handwriting can fall back to

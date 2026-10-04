@@ -24,7 +24,7 @@ const check = (name, ok, detail = '') => { if (ok) pass++; else fails.push(`${na
 
 // ── Apple privacy manifest ───────────────────────────────────────────────────
 const PKGS = ['ios/PriLearning.swiftpm', 'ios/PriLearning 2.swiftpm'];
-const manifests = PKGS.map(p => `${p}/PrivacyInfo.xcprivacy`);
+const manifests = PKGS.map(p => `${p}/Resources/PrivacyInfo.xcprivacy`);
 for (const m of manifests) check(`${m} exists`, existsSync(join(ROOT, m)));
 if (manifests.every(m => existsSync(join(ROOT, m)))) {
   const [a, b] = manifests.map(read);
@@ -61,7 +61,7 @@ if (manifests.every(m => existsSync(join(ROOT, m)))) {
     else check(`required-reason API ${category} is not declared without a use`, !declared[category]);
   }
   check('no unknown required-reason category is declared', Object.keys(declared).every(k => k in API), Object.keys(declared).join(', '));
-  for (const p of PKGS) check(`${p}/Package.swift copies the manifest to the bundle root`, /\.copy\("PrivacyInfo\.xcprivacy"\)/.test(read(`${p}/Package.swift`)));
+  for (const p of PKGS) check(`${p}/Package.swift copies the manifest to the bundle root`, /\.copy\("Resources\/PrivacyInfo\.xcprivacy"\)/.test(read(`${p}/Package.swift`)));
   // The legal notice and the manifest must agree that handwriting can leave the device.
   check('manifest declares user content (cloud handwriting) honestly', /NSPrivacyCollectedDataTypeOtherUserContent/.test(a));
 }

@@ -6,6 +6,10 @@ const verify = parseAccountActionFragment('#action=verify-email&token=abc_DEF-12
 assert.deepEqual(verify, { action: 'verify-email', token: 'abc_DEF-123' });
 const reset = parseAccountActionFragment('#action=reset-password&token=reset-secret');
 assert.deepEqual(reset, { action: 'reset-password', token: 'reset-secret' });
+// The long-lived withdrawal bearer a guardian keeps (server/platform/accounts.js)
+// arrives on the same page as its own action.
+const withdraw = parseAccountActionFragment('#action=guardian-withdraw&token=withdraw-bearer');
+assert.deepEqual(withdraw, { action: 'guardian-withdraw', token: 'withdraw-bearer' });
 assert.equal(parseAccountActionFragment('#action=unknown&token=secret'), null);
 assert.equal(parseAccountActionFragment('#action=verify-email'), null);
 assert.equal(parseAccountActionFragment('#token=secret'), null);
@@ -45,5 +49,7 @@ assert.ok(page.includes('autoComplete="new-password"'));
 assert.ok(page.includes('password.length < 10'));
 assert.ok(transport.includes("verifyEmail: body => cloudRequest('/v1/account/email/verify'"));
 assert.ok(transport.includes("resetPassword: body => cloudRequest('/v1/account/password/reset'"));
+assert.ok(page.includes("action === 'guardian-withdraw'"), 'the withdrawal link has its own confirm screen');
+assert.ok(transport.includes("guardianWithdraw: token => cloudRequest('/v1/account/guardian/withdraw', { method: 'POST', body: { token } })"));
 
 console.log('PASS — emailed account actions are fragment-only, stripped before render, non-persistent and routed through audited cloud verification/reset endpoints.');

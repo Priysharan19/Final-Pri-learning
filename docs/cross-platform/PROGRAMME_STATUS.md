@@ -541,7 +541,7 @@ Causes found:
 ## CP-12 — Store Readiness
 
 **Delivered:** see [STORE_READINESS.md](../release/STORE_READINESS.md).
-- **Apple privacy manifest** (`PrivacyInfo.xcprivacy`, both packages, copied to the bundle root):
+- **Apple privacy manifest** (`Resources/PrivacyInfo.xcprivacy`, both packages, copied to the bundle root):
   - no tracking and no tracking domains;
   - 11 collected data types, all linked and all mapped to code;
   - `UserDefaults` / `CA92.1`, the only required-reason API the Swift code uses.

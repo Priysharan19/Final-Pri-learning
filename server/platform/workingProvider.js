@@ -32,9 +32,12 @@
 //      of thing went wrong. A checker that hands over the answer has replaced
 //      the exercise.
 //
-// It returns judgements, not marks. Marks are computed from those judgements by
-// the app's own rules (engine/checker.js methodMarks), so marking policy stays
-// in one deterministic place and cannot drift with a model.
+// It returns per-line judgements for DISPLAY, never marks. Every mark a student
+// sees comes from the client's bundled deterministic engine
+// (client/src/engine/checker.js methodMarks), which runs on the device with or
+// without this server; a provider verdict is shown beside the working as a
+// hint and is never fed into that computation, so marking policy stays in one
+// deterministic place and cannot drift with a model.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { CLOUD_MISCONCEPTION_IDS, OTHER_MISCONCEPTION } from './misconceptionIds.js';
