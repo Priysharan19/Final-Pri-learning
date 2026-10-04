@@ -924,8 +924,11 @@ async function run() {
 
     const hinted = await POST(`/practice/${first.question.id}/hint`, {});
     ok('a hint comes back as text', typeof hinted.hint === 'string' && hinted.hint.length > 0, show(hinted.hint));
-    eq('the first hint is level 1', hinted.level, first.payload.hints?.length ? 1 : 0);
+    // The hint ladder (§6.5): rung 1 is the nudge whenever the payload has
+    // anything authored to put on a rung (hints, or solution steps).
+    eq('the first hint is rung 1 of the ladder', hinted.level, (first.payload.hints?.length || first.payload.steps?.length) ? 1 : 0);
     eq('the hint is recorded on the question', (await idb.get('questions', first.question.id)).hintsUsed, hinted.level);
+    eq('the first rung leaves 90 % of the marks', hinted.markWeight, hinted.level ? 0.9 : 1);
 
     topicId = subtopicsForYear(10)[0].id;
     const topic = await nextQuestion({ mode: 'topic', subtopic: topicId, difficulty: 3 });
@@ -1710,6 +1713,17 @@ async function run() {
     } else {
       ok('a retryable question exists in history', false, 'no history row reported canRetry');
     }
+    // §6.7 the error notebook: every wrong practice answer, filed, with a twin.
+    const notebook = await GET('/notebook');
+    ok('the notebook files the wrong answers History shows', Array.isArray(notebook.entries) && notebook.entries.reduce((a, g) => a + g.count, 0) >= 1, show(notebook.entries?.length));
+    const filed = notebook.entries.flatMap(g => g.items).find(i => i.canTwin);
+    if (ok('a filed answer offers a twin', !!filed)) {
+      const twin = await POST(`/notebook/${filed.id}/twin`, {});
+      ok('the twin is a new question row', twin.question.id && twin.question.id !== filed.id);
+      eq('the twin keeps the difficulty', twin.question.difficulty, filed.difficulty);
+      ok('the twin is a different question', twin.question.prompt !== filed.prompt || twin.twin.distinct === true);
+    }
+
     await rejects('another profile cannot read your history detail',
       (async () => {
         await POST('/profiles/select', { id: grace.id, password: 'punch-cards-9' });

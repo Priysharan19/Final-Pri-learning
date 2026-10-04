@@ -22,6 +22,7 @@ import { plotSpecFor } from '../engine/plotSpec.js';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 import { misconceptionById } from '../engine/misconceptions.js';
+import { HINT_RUNGS, markWeightAfter } from '../engine/hintLadder.js';
 import { tLater, translate, useLanguage, useT, useTx } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
@@ -31,6 +32,8 @@ import { tutorFeatureEnabled } from '../tutor/flag.js';
 // keeps TutorHelp.jsx out of a dark build entirely (install-budget-check.mjs).
 /* global __PRI_FEATURE_TUTOR__, __PRI_PRODUCTION_BUILD__ */
 const TUTOR_BUILT_OUT = typeof __PRI_PRODUCTION_BUILD__ === 'boolean' && __PRI_PRODUCTION_BUILD__ && __PRI_FEATURE_TUTOR__ !== true;
+
+const RUNG_KEY = { nudge: 'verdict.rung.nudge', method: 'verdict.rung.method', worked: 'verdict.rung.worked', solution: 'verdict.rung.solution' };
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
 // Four ways of saying "right", picked by question id so one question always
@@ -257,8 +260,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [restoredInk] = useState(() => readInkDraft(question.id));
   const [mode, setMode] = useState(() => (restoredInk ? 'write' : preferMode()));       // 'type' | 'write' | 'photo'
   const [inkResult, setInkResult] = useState(null);
+  // The hint ladder (§6.5): the rungs opened so far, each { rung, text }.
+  // `question.hintLadder` is 4 when the question offers one, 0 when it does
+  // not (exam items, custom questions with nothing authored).
   const [hints, setHints] = useState([]);
-  const [hintsLeft, setHintsLeft] = useState(question.hintsAvailable);
+  const [hintsLeft, setHintsLeft] = useState(Math.max(0, (question.hintLadder || 0) - (question.hintLevel || 0)));
   const [showTutor, setShowTutor] = useState(false);
   const [tutorUsed, setTutorUsed] = useState(question.tutorLevel || 0);
   const { language } = useLanguage();
@@ -310,7 +316,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   useEffect(() => {
     const draft = readDraft('question', question.id);
-    setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setHints([]); setHintsLeft(question.hintsAvailable);
+    setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setHints([]); setHintsLeft(Math.max(0, (question.hintLadder || 0) - (question.hintLevel || 0)));
     setShowTutor(false); setTutorUsed(question.tutorLevel || 0);
     setWorking(draft?.working || ''); setShowWorking(!!draft?.working);
     setState({ phase: 'answering' }); setBusy(false);
@@ -334,9 +340,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const isWorking = question.answerType === 'working';
   const totalMarks = question.criteria?.length || 1;
   const hintsUsed = hints.length;
+  const hintLevel = (question.hintLevel || 0) + hintsUsed;
   // Each opened tutor level is charged like a hint (backend resolve()).
   const helpUsed = hintsUsed + tutorUsed;
-  const credit = Math.max(0.55, 1 - 0.15 * helpUsed);
+  // What a correct answer is still worth: the ladder's mark weight once a rung
+  // is open (engine/hintLadder.js — the same table the backend charges), the
+  // tutor's 15 % a level otherwise.
+  const credit = hintLevel > 0 ? Math.min(markWeightAfter(hintLevel), Math.max(0.55, 1 - 0.15 * tutorUsed)) : Math.max(0.55, 1 - 0.15 * helpUsed);
   const writeMode = mode === 'write';
   const recognitionContext = useMemo(
     () => recognitionContextForQuestion(question),
@@ -765,13 +775,55 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   }, [question.id, question.subtopicName]);
 
   async function getHint() {
-    if (hintsLeft <= 0 || resolved) return;
+    if (hintsLeft <= 0 || resolved || busy || inFlightRef.current) return;
+    const nextRung = HINT_RUNGS[hintLevel] || null;
+    if (!nextRung) return;
+    if (nextRung === 'solution') {
+      // The last rung is the whole solution: it ends the question as a reveal.
+      // Same bookkeeping as reveal(), so nothing kept for the question replays.
+      inFlightRef.current = true; inkFrozenRef.current = true; setBusy(true);
+      try {
+        const r = await api.post(`/practice/${question.id}/hint`, { rung: 'solution', ms: Date.now() - startRef.current });
+        pendingRef.current = null;
+        clearPendingSubmission(question.id);
+        clearInkDraft(question.id);
+        attemptRef.current = { submissionId: null, lines: null, revealed: true };
+        if (mountedRef.current) {
+          setAttempt(attemptRef.current);
+          setHints(h => [...h, { rung: 'solution', text: null }]); setHintsLeft(0);
+          setState({ phase: 'resolved', res: r });
+          celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
+          onResolved?.(r);
+        }
+      } catch { }
+      finally { inFlightRef.current = false; if (mountedRef.current) setBusy(false); }
+      return;
+    }
     try {
-      const r = await api.post(`/practice/${question.id}/hint`, {});
-      setHints(h => [...h, r.hint]);
+      const r = await api.post(`/practice/${question.id}/hint`, { rung: nextRung });
+      if (r.endsQuestion) return;
+      setHints(h => [...h, { rung: r.rung || nextRung, text: r.hint }]);
       setHintsLeft(r.remaining);
     } catch { }
   }
+
+  // H opens the next rung — when the student is not typing into a field.
+  const getHintRef = useRef(getHint);
+  getHintRef.current = getHint;
+  useEffect(() => {
+    if (diagnostic || !(question.hintLadder > 0)) return undefined;
+    const onKey = e => {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key !== 'h' && e.key !== 'H') return;
+      const el = e.target;
+      const typing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+      if (typing) return;
+      e.preventDefault();
+      getHintRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [diagnostic, question.hintLadder, question.id]);
 
   async function dontKnow() {
     if (busy || resolved || !diagnostic) return;
@@ -1017,19 +1069,25 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         <button className={`q-rail-btn ${showScribble ? 'on' : ''}`} title={t('verdict.scribblePad')} aria-label={t('verdict.scribblePad')} aria-pressed={showScribble} onClick={() => setShowScribble(s => !s)}>✎</button>
       </div>
 
-      {/* hint bulbs */}
-      {!diagnostic && !isMcq && question.hintsAvailable > 0 && (
-        <div className="hint-rail no-print">
-          {Array.from({ length: question.hintsAvailable }, (_, i) => (
-            <button key={i} className={`hint-bulb ${i < hintsUsed ? 'lit' : ''}`}
-              disabled={resolved || i !== hintsUsed}
-              title={t('verdict.hintTitle', { n: i + 1 })}
-              aria-label={t('verdict.hintLabel', { n: i + 1, total: question.hintsAvailable })}
-              onClick={getHint}>
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M9.5 18h5M10 21h4M12 3a6 6 0 0 0-3.4 10.9c.7.5 1.1 1.2 1.2 2.1h4.4c.1-.9.5-1.6 1.2-2.1A6 6 0 0 0 12 3Z" /></svg>
-              <sup>{i + 1}</sup>
-            </button>
-          ))}
+      {/* the hint ladder: nudge → method → worked step → full solution */}
+      {!diagnostic && question.hintLadder > 0 && (
+        <div className="hint-rail no-print" role="group" aria-label={t('verdict.ladderLabel')} data-hint-ladder>
+          {HINT_RUNGS.map((rung, i) => {
+            const left = Math.round(markWeightAfter(i + 1) * 100);
+            const lit = i < hintLevel;
+            return (
+              <button key={rung} className={`hint-bulb ${lit ? 'lit' : ''} ${rung === 'solution' ? 'hint-bulb-final' : ''}`}
+                disabled={resolved || busy || i !== hintLevel}
+                data-hint-rung={rung} data-hint-rung-state={lit ? 'open' : i === hintLevel ? 'next' : 'locked'}
+                title={rung === 'solution' ? t('verdict.rungSolutionTitle') : t('verdict.rungTitle', { rung: t(RUNG_KEY[rung]), percent: left })}
+                aria-label={rung === 'solution' ? t('verdict.rungSolutionTitle') : t('verdict.rungLabel', { n: i + 1, rung: t(RUNG_KEY[rung]), percent: left })}
+                onClick={getHint}>
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M9.5 18h5M10 21h4M12 3a6 6 0 0 0-3.4 10.9c.7.5 1.1 1.2 1.2 2.1h4.4c.1-.9.5-1.6 1.2-2.1A6 6 0 0 0 12 3Z" /></svg>
+                <sup>{i + 1}</sup>
+              </button>
+            );
+          })}
+          <span className="sr-only">{t('verdict.ladderKey')}</span>
         </div>
       )}
 
@@ -1372,9 +1430,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       {hints.length > 0 && (
         <div className="hints-block">
           <div className="hints-block-title">{t('verdict.hints')}</div>
-          {hints.map((h, i) => (
-            <div className="hintbox" key={i}><span className="h-n">{t('verdict.hintNumber', { n: i + 1 })}</span><MathText text={h} /></div>
+          {hints.filter(h => h.text).map((h, i) => (
+            <div className="hintbox" key={i} data-hint-shown={h.rung}><span className="h-n">{t(RUNG_KEY[h.rung] || 'verdict.hintNumber', { n: i + 1 })}</span><MathText text={h.text} /></div>
           ))}
+          {!resolved && hintsLeft > 0 && <div className="hints-block-title" style={{ paddingBottom: 10 }}>{t('verdict.markWeightLeft', { percent: Math.round(credit * 100) })} · {t('verdict.ladderKey')}</div>}
         </div>
       )}
 

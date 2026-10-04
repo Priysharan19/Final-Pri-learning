@@ -30,6 +30,8 @@ import { indiaExamBlueprint } from '../engine/indiaExams.js';
 import { predictExamMark } from '../engine/markPredictor.js';
 import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
 import { generateQuestion } from '../engine/generators/index.js';
+import { HINT_RUNGS, ladderAvailable, buildHintLadder, rungLevelOf, nextRungAfter, markWeightAfter, ladderEvidence } from '../engine/hintLadder.js';
+import { dueDotpoints } from '../engine/reviewQueue.js';
 import { CONTENT_VERSION, LEGACY_CONTENT_VERSION, contentRefOf, contentHashOf, drawDistinct } from '../engine/contentIdentity.js';
 import { checkAnswer, stepCheck, methodMarks } from '../engine/checker.js';
 import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../engine/answer-forms.js';
@@ -1599,6 +1601,11 @@ function sanitize(q, row) {
     pyqArchive: q.archive || null,
     inputHint: q.inputHint, answerPrefix: q.answerPrefix, answerSuffix: q.answerSuffix,
     hintsAvailable: (q.hints || []).length, hintsUsed: row.hintsUsed || 0,
+    // The hint ladder (engine/hintLadder.js): four rungs, each costing mark
+    // weight; `markWeight` is what a correct answer is still worth right now.
+    hintLadder: ladderAvailable(q) ? HINT_RUNGS.length : 0,
+    hintLevel: rungLevelOf(row.hintLevel),
+    markWeight: markWeightAfter(row.hintLevel),
     tutorLevel: row.tutorLevel || 0,
     triesLeft: 2 - (row.tries || 0),
     supportsSteps: !!stepMetaFor(q),
@@ -1903,6 +1910,12 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   // opaque question id, so it is stable across tabs/restarts without linking an
   // attempts-row dump back to the clear question primary key.
   const evidenceKey = resolution?.evidenceKey ? String(resolution.evidenceKey) : null;
+  // A misconception is counted once per question, on the first wrong try; the
+  // second try that resolves the question finds it on the spent try.
+  // `row.trapKey` is where recordMisconception left the first try's slip (and
+  // where a trap-seeking question names the slip it was built to spring).
+  const trapSource = !correct ? (resolution?.trapHit || resolution?.submission?.trapHit || row.lastTry?.trapHit || row.trapKey || null) : null;
+  const trapKey = trapSource ? String(trapSource) : null;
   const claimSource = evidenceKey
     ? `india-exam-resolution:${row.examId || 'unknown'}:${row.id}:${evidenceKey}`
     : `practice-resolution:${row.id}`;
@@ -1916,6 +1929,12 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
     ...attemptContentRef(q),
     correct: correct ? 1 : 0, answerGiven: String(answerGiven ?? '').slice(0, 300),
     ms: ms || 0, hintsUsed: row.hintsUsed || 0, mode, viaInk,
+    // The hint ladder as the mastery model sees it (§6.5): rung reached, the
+    // rungs by name and the mark weight that was left.
+    ...ladderEvidence(row.hintLevel ?? 0),
+    // The misconception a wrong answer was filed under (§6.7), when the
+    // marker named one — a designed trap or a Step Check diagnosis.
+    misconception: trapKey,
     // Learner-state evidence (§12): a success with hints, tutor help or a
     // second try is supported evidence, never independent mastery.
     tutorLevel,
@@ -1940,6 +1959,8 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
     ...settledRow, answered: 1, resolvedAt: now,
     resolution: {
       correct: !!correct, at: now, ...coreMeta,
+      // Filed under its misconception whether or not the submission carried an id.
+      trapHit: trapKey,
       ...(submission ? {
         submissionId: submission.submissionId,
         requestDigest: submission.requestDigest,
@@ -2500,6 +2521,101 @@ let tutorAskRoutePromise = null;
 const tutorAskRoute = () => (tutorAskRoutePromise ||= import('../tutor/askRoute.js')
   .then(m => m.createTutorAskRoute({ requireProfile, get, assertPracticeRow, tutorRequest, tutorWork, displayAnswer, sanitizeText })));
 
+// ── Review queue and notebook helpers ────────────────────────────────────────
+
+/** (subtopicId, dotpointId) → how a dot point is named for this profile. */
+function dotpointNamer(p) {
+  return (subtopic, dotpointId) => {
+    if (p.course === 'in') {
+      const named = indiaNameOf(dotpointId, { grade: p.year }) || indiaNameOf(subtopic, { grade: p.year });
+      if (!named) return null;
+      return { chapterName: named.name, text: named.dotpointText ?? null, ordinal: named.dotpoint ?? null, grade: named.year ?? null };
+    }
+    const dp = dotpointById(dotpointId);
+    const sub = SUBTOPIC_BY_ID[subtopic];
+    return { chapterName: sub?.name ?? subtopic, text: dp?.text ?? null, ordinal: Number.isInteger(dp?.ordinal) ? dp.ordinal : null, grade: sub?.year ?? null };
+  };
+}
+
+/** Add the practice link a due dot point opens with. */
+function decorateDotpoint(p) {
+  return r => ({
+    ...r,
+    href: p.course === 'in'
+      ? `/practice?subtopic=${encodeURIComponent(r.subtopic)}${Number.isInteger(r.ordinal) ? `&dotpoint=${r.ordinal}` : ''}&track=${encodeURIComponent(p.indiaTrack || 'cbse')}`
+      : `/practice?subtopic=${encodeURIComponent(r.subtopic)}${r.dotpoint ? `&dotpoint=${encodeURIComponent(r.dotpoint)}` : ''}`
+  });
+}
+
+const NOTEBOOK_MODES = new Set(['practice', 'review', 'task']);
+
+/** Wrong answers grouped by misconception, newest first inside each group. */
+async function notebookEntries(p) {
+  const attempts = (await attemptsInOrder(p.id)).filter(a => !a.correct && NOTEBOOK_MODES.has(a.mode) && a.subtopic && a.subtopic !== 'custom');
+  if (!attempts.length) return [];
+  const rowsById = Object.fromEntries((await byIndex('questions', 'pid', p.id)).map(r => [r.id, r]));
+  const groups = new Map();
+  for (const a of attempts) {
+    const row = rowsById[a.questionId];
+    if (!row || row.payload?.custom || row.payload?.multipart) continue;
+    const q = row.payload;
+    const trapKey = a.misconception || row.resolution?.trapHit || null;
+    // One slip is enough to file under: the notebook reads the ledger entry's
+    // label directly rather than through namedTrap's two-occurrence floor.
+    const ledgerEntry = trapKey ? (await getRating(p.id, a.subtopic))?.traps?.[trapKey] : null;
+    const ontology = trapKey ? misconceptionById(trapKey) : null;
+    const named = trapKey ? { id: ontology?.id || null, label: ledgerEntry?.label || null, nameKey: ontology?.name || null } : null;
+    const chapter = p.course === 'in' ? indiaNameOf(a.subtopic, { grade: p.year }) : null;
+    const chapterName = chapter?.name || SUBTOPIC_BY_ID[a.subtopic]?.name || a.subtopic;
+    const key = trapKey ? `m:${trapKey}` : `c:${a.subtopic}`;
+    const g = groups.get(key) || (groups.set(key, {
+      key, misconception: trapKey ? { key: trapKey, id: named?.id || null, label: named?.label || null, nameKey: named?.nameKey || null } : null,
+      subtopic: a.subtopic, chapterName, count: 0, lastAt: 0, items: []
+    }), groups.get(key));
+    g.count++;
+    g.lastAt = Math.max(g.lastAt, a.createdAt || 0);
+    const dp = row.india && Number.isInteger(row.india.dotpointIndex) ? indiaChapter(row.india.chapterId)?.dotpoints?.[row.india.dotpointIndex] : (q.dotpoint ? dotpointById(q.dotpoint)?.text : null);
+    g.items.push({
+      id: row.id, prompt: q.prompt, difficulty: row.difficulty, answeredAt: a.createdAt, answerGiven: a.answerGiven || '',
+      dotpoint: indiaDpKeyOf(row) || q.dotpoint || null, dotpointText: dp || null,
+      revealed: a.answerGiven === 'revealed', canTwin: !q.custom && !q.multipart && !q.pyq
+    });
+  }
+  return [...groups.values()]
+    .map(g => ({ ...g, items: g.items.sort((a, b) => b.answeredAt - a.answeredAt).slice(0, 12) }))
+    .sort((a, b) => b.count - a.count || b.lastAt - a.lastAt);
+}
+
+const TWIN_TRIES = 32;
+
+/**
+ * A different question from the same (generator, difficulty) cell, pinned to
+ * the same dot point where the original was. Deterministic in the original's
+ * seed, so the same wrong answer always offers the same twin.
+ */
+function twinOf(q, generator, difficulty) {
+  const want = q.dotpointRequested || q.dotpoint || null;
+  const originalDots = Array.isArray(q.dotpoints) ? [...q.dotpoints].sort().join('|') : null;
+  const originalHash = contentHashOf(q);
+  let fallback = null;
+  for (let k = 0; k < TWIN_TRIES; k++) {
+    const seed = ((Number(q.seed) || 1) * 7919 + 104729 * (k + 1)) % 2147483647 || 1;
+    if (seed === q.seed) continue;
+    let cand;
+    try { cand = want ? generateQuestion(generator, difficulty, seed, want) : generateQuestion(generator, difficulty, seed); }
+    catch { continue; }
+    if (cand.difficulty !== Number(difficulty)) continue;
+    const dots = Array.isArray(cand.dotpoints) ? [...cand.dotpoints].sort().join('|') : null;
+    const sameDotpoint = want ? (cand.dotpointExact === true || (cand.dotpoints || []).includes(want)) : (originalDots == null || dots === originalDots);
+    const distinct = contentHashOf(cand) !== originalHash;
+    if (sameDotpoint && distinct) return { payload: cand, dotpoint: want || (cand.dotpoint ?? null), sameDotpoint: true, distinct: true };
+    if (!fallback && sameDotpoint) fallback = { payload: cand, dotpoint: want || (cand.dotpoint ?? null), sameDotpoint: true, distinct };
+  }
+  if (fallback) return fallback;
+  const cand = generateQuestion(generator, difficulty, ((Number(q.seed) || 1) + 1) % 2147483647 || 1);
+  return { payload: cand, dotpoint: cand.dotpoint ?? null, sameDotpoint: false, distinct: contentHashOf(cand) !== originalHash };
+}
+
 const routes = {
 
   // ---- profiles / accounts ----
@@ -3043,19 +3159,55 @@ const routes = {
     return { discarded: true, id: row.id };
   },
 
+  // ---- the hint ladder (§6.5) ----
+  // Four rungs, strictly in order: nudge → method → worked step → full
+  // solution. Each rung is recorded on the row the moment it is served (the
+  // help is on screen whatever is answered next), `hintsUsed` keeps counting
+  // rungs so every consumer of that field — resolve(), the FSRS grade, the
+  // sync payload — charges the same help it always did, and `hintLevel` names
+  // the rung for the mastery model. The solution rung ends the question as a
+  // reveal, never as a correct answer.
   'POST /practice/:id/hint': async (body, params) => {
     const p = await requireProfile();
     const row = await get('questions', params.id);
     if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
     assertPracticeRow(row);
     if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
+    if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409, code: 'ALREADY_RESOLVED' });
     const q = row.payload;
-    const hints = q.hints || [];
-    if (!hints.length) return { hint: 'No hints for this one — trust your instincts!', level: 0, remaining: 0 };
-    const used = Math.min((row.hintsUsed || 0) + 1, hints.length);
-    row.hintsUsed = used;
-    await put('questions', row);
-    return { hint: hints[used - 1], level: used, remaining: hints.length - used };
+    if (!ladderAvailable(q)) return { hint: 'No hints for this one — trust your instincts!', rung: null, level: 0, remaining: 0, markWeight: 1 };
+    const used = rungLevelOf(row.hintLevel ?? row.hintsUsed);
+    const asked = body?.rung ? String(body.rung) : nextRungAfter(used);
+    const wantLevel = HINT_RUNGS.indexOf(asked) + 1;
+    if (!wantLevel) throw Object.assign(new Error('Choose a hint rung: nudge, method, worked or solution.'), { status: 400, code: 'HINT_RUNG_INVALID' });
+    if (wantLevel > used + 1) throw Object.assign(new Error('Open the hint rungs in order.'), { status: 409, code: 'HINT_RUNG_ORDER', next: nextRungAfter(used) });
+    const level = Math.max(used, wantLevel);
+    const ladder = buildHintLadder(q);
+    const rung = ladder[level - 1];
+    if (rung.endsQuestion) {
+      // The whole solution is a reveal: resolved, marked not correct, with the
+      // same rating, review, XP and task consequences as Show solution. The
+      // rung is recorded first so the attempt row carries the full ladder.
+      row.hintLevel = level; row.hintsUsed = Math.max(row.hintsUsed || 0, HINT_RUNGS.length - 1);
+      const meta = await resolve(p, row, q, false, 'revealed', Math.max(0, Number(body?.ms) || 0), row.mode, false, { syncQueue: true });
+      return {
+        rung: rung.rung, level, remaining: 0, markWeight: 0, endsQuestion: true,
+        correct: false, resolved: true, revealed: true,
+        solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText },
+        ...meta, syncQueued: true
+      };
+    }
+    if (level > used) {
+      row.hintLevel = level;
+      row.hintsUsed = level;
+      await put('questions', row);
+    }
+    return {
+      // `hint` keeps the shape the card has always read; `rung` names it.
+      hint: rung.text || q.hints?.[Math.min(level - 1, (q.hints || []).length - 1)] || null,
+      rung: rung.rung, level, thin: rung.thin, remaining: HINT_RUNGS.length - level,
+      markWeight: rung.weightAfter, cost: rung.cost, next: nextRungAfter(level)
+    };
   },
 
   // ---- AI tutor (vision item 3) ----
@@ -3290,6 +3442,7 @@ const routes = {
         submissionId, requestDigest, trapHit: trapHit || null,
         replay: replayRecord({ feedback, stepReport, partial, diagnosis: stepReport?.diagnosis || null })
       } : null,
+      trapHit: trapHit || null,
       syncQueue: true
     });
     return {
@@ -3339,10 +3492,45 @@ const routes = {
         strand: named ? named.strand : (p.course === 'in' ? null : sub?.strand)
       };
     };
+    // The per-dot-point queue (§6.3, engine/reviewQueue.js): derived from the
+    // same rating rows and FSRS rows, named through the Indian spine or the
+    // NSW table, never through a generator id.
+    const ratings = await ratingsFor(p.id);
+    const queue = dueDotpoints({ ratings, reviews: rows, now, name: dotpointNamer(p) });
     return {
       due: rows.filter(r => r.dueAt <= now).map(decorate),
-      upcoming: rows.filter(r => r.dueAt > now && r.dueAt < now + 7 * DAY).map(decorate)
+      upcoming: rows.filter(r => r.dueAt > now && r.dueAt < now + 7 * DAY).map(decorate),
+      dotpoints: {
+        due: queue.due.map(decorateDotpoint(p)), upcoming: queue.upcoming.map(decorateDotpoint(p)),
+        dueCount: queue.dueCount, counted: queue.counted
+      }
     };
+  },
+
+  // ---- the error notebook (§6.7) ----
+  // Every wrong practice answer, filed under the misconception the marker
+  // named — or under its chapter when no designed trap or Step Check diagnosis
+  // fired — with the question it came from, so a student can retry a twin.
+  'GET /notebook': async () => {
+    const p = await requireProfile();
+    return { entries: await notebookEntries(p) };
+  },
+
+  // A twin: the same generator, the same difficulty, the same dot point, a new
+  // seed and a different question. The row keeps its India chapter and dot
+  // point so the evidence lands where the mistake was made.
+  'POST /notebook/:id/twin': async (body, params) => {
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    await assertReviewableRow(row);
+    const q = row.payload;
+    if (q.custom || q.multipart || q.pyq) throw Object.assign(new Error('This question has no generated twin'), { status: 400, code: 'NO_TWIN' });
+    const generator = row.generator || row.subtopic;
+    const twin = twinOf(q, generator, row.difficulty);
+    const newRow = { id: uuid(), pid: p.id, subtopic: row.subtopic, difficulty: row.difficulty, payload: twin.payload, generator, india: row.india || undefined, mode: 'practice', examId: null, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now() };
+    await put('questions', newRow);
+    return { question: sanitize(twin.payload, newRow), twin: { of: row.id, generator, difficulty: row.difficulty, dotpoint: twin.dotpoint, sameDotpoint: twin.sameDotpoint, distinct: twin.distinct, seed: twin.payload.seed } };
   },
 
   // ---- exams ----
