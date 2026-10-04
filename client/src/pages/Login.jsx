@@ -593,7 +593,8 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
               these, and each is required of us before the app can be sold. */}
           <p className="muted" style={{ marginTop: 22, textAlign: 'center', fontSize: 12.5 }}>
             <Link to="/privacy">{t('login.privacy')}</Link> · <Link to="/terms">{t('login.terms')}</Link> ·{' '}
-            <Link to="/refund-policy">{t('login.refunds')}</Link> · <Link to="/grievance">{t('login.grievances')}</Link>
+            <Link to="/refund-policy">{t('login.refunds')}</Link> · <Link to="/grievance">{t('login.grievances')}</Link> ·{' '}
+            <Link to="/coverage">{t('login.coverage')}</Link>
           </p>
         </div>
       </div>

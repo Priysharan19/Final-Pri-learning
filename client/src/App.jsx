@@ -16,6 +16,10 @@ import Practice from './pages/Practice.jsx';
 // warmed in the background, so the pages still open offline; the Hindi copies
 // stay behind their own import() in Legal.jsx.
 const Legal = React.lazy(() => import('./pages/Legal.jsx'));
+// The public Coverage page (docs/content/coverage-manifest.json) is reachable
+// before the gate for the same reason the notices are: it is a claim about the
+// product that a reader should be able to check without an account.
+const Coverage = React.lazy(() => import('./pages/Coverage.jsx'));
 
 // ── Routes nobody has opened yet ─────────────────────────────────────────────
 // Login, Home, Practice and Legal are the screens a first run reaches: the
@@ -347,6 +351,7 @@ export default function App() {
             <Route path="/terms" element={<Legal />} />
             <Route path="/refund-policy" element={<Legal />} />
             <Route path="/grievance" element={<Legal />} />
+            <Route path="/coverage" element={<Coverage />} />
             <Route path="*" element={<Login />} />
           </Routes>
         </React.Suspense>
@@ -453,6 +458,7 @@ export default function App() {
                     <Route path="/terms" element={<Legal />} />
                     <Route path="/refund-policy" element={<Legal />} />
                     <Route path="/grievance" element={<Legal />} />
+                    <Route path="/coverage" element={<Coverage />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="*" element={<Navigate to={roleLanding} replace />} />
                   </Routes>

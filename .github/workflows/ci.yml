@@ -113,6 +113,10 @@ jobs:
           grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 142/142 checks' suites.log
           grep -Fq 'CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — ' suites.log
           grep -Fq '8/8 exam selections' suites.log
+          # §5.1/§5.6 public Coverage manifest and provenance ledger; §5.5 per-chapter question quality gate.
+          grep -Eq 'COVERAGE MANIFEST: PASS — [0-9]+/[0-9]+ checks' suites.log
+          grep -Eq 'QUALITY GATE REGRESSIONS: PASS — [0-9]+/[0-9]+ checks' suites.log
+          grep -Eq 'QUESTION QUALITY GATE: PASS — 77/77 chapters' suites.log
           paths=$(grep -Eo 'CONTENT CERTIFICATION [(]fast, 4/path/difficulty[)]: PASS — [0-9]+' suites.log | grep -Eo '[0-9]+$')
           test "${paths:-0}" -ge 793
           if grep -Fq 'not measured:' suites.log; then

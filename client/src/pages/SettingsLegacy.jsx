@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { downloadJSON, readJSONFile, dateStamp } from '../lib/files.js';
@@ -681,6 +682,9 @@ export default function Settings() {
                   for a CBSE or JEE student. */}
               {t(user.course === 'in' ? 'settings.helpBodyIndia' : 'settings.helpBody')}
               {!priNative.isNativeShell() && t('settings.addToHomeScreen')}
+            </p>
+            <p className="sub" style={{ marginTop: 8 }}>
+              <Link to="/coverage" data-settings-coverage-link>{t('settings.coverageLink')}</Link>
             </p>
           </div>
         </div>
