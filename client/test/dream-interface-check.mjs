@@ -9,7 +9,6 @@ import { HOME_RECOMMENDATION_POLICY, resolveHomeRecommendation } from '../src/ho
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
-const read = rel => readFile(join(ROOT, rel), 'utf8');
 const now = Date.parse('2026-10-01T12:00:00+05:30');
 const student = {
   id: 'student-1', role: 'student', course: 'in', year: 10,
