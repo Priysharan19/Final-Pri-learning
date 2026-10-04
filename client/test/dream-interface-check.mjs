@@ -173,6 +173,27 @@ check('unfinished task question keeps resume priority', () => {
 // Source-level guards for the paper/instrument workspace. Each one names a
 // behaviour a student relies on, so a refactor that drops it fails here first.
 const src = rel => readFile(join(ROOT, rel), 'utf8');
+
+// Phone layout: the bar's Clear / Leave control is hidden at ≤760px and the
+// inline row stands in for it, so the row must render in every case the bar's
+// button would (task, assignment, any filter), not only for India free practice.
+{
+  const base = await src('src/pages/PracticeBase.jsx');
+  const inlineStart = base.indexOf('className="row ws-filter-inline"');
+  const before = base.slice(Math.max(0, inlineStart - 260), inlineStart);
+  const block = base.slice(inlineStart, inlineStart + 1400);
+  check('the inline filter row renders whenever a task, assignment or filter is active', () => {
+    assert.ok(inlineStart > 0, 'inline row present');
+    assert.ok(before.includes('|| subtopic || taskId || difficulty || pyqOnly || assignmentMode) && ('), before);
+  });
+  check('the inline clear button covers task and assignment and says Leave for an assignment', () => {
+    assert.ok(block.includes('(subtopic || taskId || difficulty || pyqOnly || assignmentMode) && ('));
+    assert.ok(block.includes("assignmentMode ? 'assignment.leaveShort' : 'practice.clearShort'"));
+  });
+  check('the PYQ toggle in the inline row stays India-only', () => {
+    assert.ok(block.includes("user.course === 'in' && !assignmentMode && !taskId && (\n              <button type=\"button\" className=\"icon-btn ws-filter\""));
+  });
+}
 const [backend, home, app, card, practicePage, ink, exam, en, recovery] = await Promise.all([
   'src/local/backend.js', 'src/pages/Home.jsx', 'src/App.jsx', 'src/components/QuestionCard.jsx',
   'src/pages/PracticeBase.jsx', 'src/ink/InkAnswer.jsx', 'src/pages/ExamRoom.jsx', 'src/i18n/strings.en.js',

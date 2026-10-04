@@ -418,14 +418,22 @@ export default function Practice() {
             study ritual, so the filter stays one tap away in the bar; on, every
             question served is a real question from a published paper, and a
             chapter the archive cannot serve says so. */}
-        {user.course === 'in' && !assignmentMode && !taskId && (
+        {/* On a phone the bar's filter and clear controls are hidden (theme.css
+            ≤760px) and this row stands in for them, so it must appear in every
+            case the bar's clear button would: a task, an assignment or a
+            non-India student with a subtopic filter must still be able to
+            clear or leave without going back to Home. The PYQ toggle stays
+            India-only. */}
+        {((user.course === 'in' && !assignmentMode && !taskId) || subtopic || taskId || difficulty || pyqOnly || assignmentMode) && (
           <div className="row ws-filter-inline" style={{ gap: 8 }}>
-            <button type="button" className="icon-btn ws-filter" aria-pressed={pyqOnly}
-              title={t('practice.pyqOnlyTitle')} onClick={() => setPyqOnly(!pyqOnly)}>
-              {t(pyqOnly ? 'practice.pyqOnlyLabelOn' : 'practice.pyqOnlyLabel')}
-            </button>
-            {(subtopic || difficulty || pyqOnly) && (
-              <button type="button" className="icon-btn" title={t('practice.clearFilters')} onClick={() => setParams({})}><Icon name="close" />{t('practice.clearShort')}</button>
+            {user.course === 'in' && !assignmentMode && !taskId && (
+              <button type="button" className="icon-btn ws-filter" aria-pressed={pyqOnly}
+                title={t('practice.pyqOnlyTitle')} onClick={() => setPyqOnly(!pyqOnly)}>
+                {t(pyqOnly ? 'practice.pyqOnlyLabelOn' : 'practice.pyqOnlyLabel')}
+              </button>
+            )}
+            {(subtopic || taskId || difficulty || pyqOnly || assignmentMode) && (
+              <button type="button" className="icon-btn" data-testid="ws-filter-inline-clear" title={t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearFilters')} onClick={() => setParams({})}><Icon name="close" />{t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearShort')}</button>
             )}
           </div>
         )}
