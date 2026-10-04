@@ -43,6 +43,8 @@ results are **SYNTHETIC / local build** evidence. No store has accepted either.
 progress and handwriting strokes live in the WebView's IndexedDB under the pinned
 origin. Handwriting **strokes** never leave the device, with or without an
 account. Only a rasterised **image** can be sent, and only for cloud reading.
+Separately, the "Practise this" page sends a photo of a printed question to
+`/v1/question-photo/identify`; that is the second photo route in the table.
 
 **With a cloud account (optional)** the server receives the data below. All of
 it is linked to the account, and none of it is used for tracking or advertising.
@@ -59,7 +61,8 @@ The Apple column is exactly the set in `PrivacyInfo.xcprivacy`, and
 | Learning records (attempts, marks) | `sync.js` | cross-device sync | OtherUserContent (App Functionality) | App activity → Other actions |
 | Handwriting **image** for cloud reading (rasterised; processed, not stored) | `/v1/handwriting/transcribe` | reading the written answer (answer-blind) | OtherUserContent (App Functionality) | App activity → Other user-generated content |
 | Lines of working and the question text for step checking (processed, not stored) | `/v1/working` | feedback on working steps (AI proposes, the deterministic engine decides marks) | OtherUserContent (App Functionality) | App activity → Other user-generated content |
-| Photo of written working, only with cloud reading turned on (processed, not stored) | `/v1/handwriting/transcribe` (same authenticated route as ink) | transcription of the photo | PhotosorVideos (App Functionality) | Photos and videos → Photos |
+| Photo of written working, only with cloud reading turned on (processed, not stored) | `/v1/handwriting/transcribe` (same authenticated route as ink; fires only when the learner's cloud-reading choice is on, `cloudReader.js`) | transcription of the photo | PhotosorVideos (App Functionality) | Photos and videos → Photos |
+| Photo of a textbook/worksheet question for "Practise this" (processed, not stored) | `/v1/question-photo/identify` (`PractisePhoto.jsx` → `questionPhoto.js`; fires when the signed-in, email-verified learner takes or picks a photo on that page — independent of the cloud-reading setting; the question is never marked) | reading the question and proposing a chapter/skill (answer-blind; practice is generated and marked on the device) | PhotosorVideos (App Functionality) | Photos and videos → Photos |
 | Subscription status / purchase token | `billing.js` (verified server-side; the client is never trusted) | Premium access | PurchaseHistory (App Functionality) | Financial info → Purchase history |
 | Allow-listed telemetry events (e.g. feature used, exam completed, trial started) | `telemetry.js` (90-day retention) | reliability and product analytics | ProductInteraction (App Functionality, Analytics) | App activity → App interactions (Analytics) |
 | Diagnostics / performance | `telemetry.js` | reliability | OtherDiagnosticData, PerformanceData (App Functionality) | App info and performance → Diagnostics |
@@ -74,15 +77,19 @@ declares Name and EmailAddress.
 
 Data is encrypted in transit. In-app deletion exists, and deletion can be
 requested on the web (§4). A cloud processor (OpenAI) receives handwriting
-images and lines of working only when those cloud features are used. **Do not**
+images, question photos and lines of working only when those cloud features are used. **Do not**
 declare that handwriting never leaves the device (`PRI_V1_RELEASE_SCOPE.md`
 §privacy).
 
 ## 3. Children, age rating and families — owner decision required
 
 What the code does: a cloud account for a student is gated by
-`server/platform/guardianConsent.js` (`requireGuardianConsent` in front of
-`/v1/sync`, `/v1/billing`, `/v1/handwriting` and `/v1/working`). The method is
+`server/platform/guardianConsent.js` (`requireGuardianConsent` in
+`server/platform/router.js` in front of `/v1/sync`, `/v1/billing`,
+`/v1/classes`, `/v1/assignments`, `/v1/reports`, `/v1/handwriting`,
+`/v1/working`, `/v1/question-photo`, `/v1/tutor` and `/v1/telemetry`;
+`/v1/account`, `/v1/entitlements`, `/v1/content` and `/v1/admin` are not
+behind it). The method is
 `guardian-email-confirmation`. It shows that someone with access to the
 guardian's mailbox followed a link, and **nothing more**. It is **not**
 verifiable parental consent, and the code says so. Local profiles, which never
