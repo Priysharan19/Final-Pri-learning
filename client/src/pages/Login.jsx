@@ -46,6 +46,9 @@ export const studyOptions = (extended = featureEnabled('extendedTracks')) => STU
 /** The roles this build offers a new profile. */
 export const roleOptions = (extended = featureEnabled('extendedTracks')) => (extended ? ['student', 'teacher'] : ['student']);
 const ONBOARDING_STEPS = 5;
+// The account flow's steps are headed by <h2>s (SignUpFlow); the page itself
+// is named for a screen reader here, off-screen, so every view has one <h1>.
+const SR_ONLY = Object.freeze({ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 });
 const LOCAL_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function freshProfileDraft() {
@@ -638,6 +641,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0, guestUpg
     return (
       <div className="auth-wrap">
         <div className="auth-col">
+          <h1 style={SR_ONLY}>{t(accountMode === 'signin' ? 'login.signInWithCode' : 'login.createAccount')}</h1>
           <React.Suspense fallback={<p className="muted" role="status">{t('common.loading')}</p>}>
           {fromGuest && (
             <p className="muted" role="status" data-testid="guest-upgrade-note" style={{ fontSize: 12.5, marginBottom: 12, textAlign: 'center' }}>
