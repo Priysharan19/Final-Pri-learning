@@ -406,6 +406,9 @@ jobs:
           grep -Eq 'E2E SUITE.*54/54.*1 flows' browser.log
           grep -Fq 'Progress truth · rendered numbers = attempt ledger' browser.log
           grep -Eq 'E2E SUITE.*20/20.*1 flows' browser.log
+          # Ledger 2.3: five guest questions with no server call, sign-up carries them over once.
+          grep -Fq 'Guest · 5 free questions, no server, sign-up carries them over' browser.log
+          grep -Eq 'E2E SUITE.*25/25.*1 flows' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2

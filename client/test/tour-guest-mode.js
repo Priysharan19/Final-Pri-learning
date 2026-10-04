@@ -45,13 +45,6 @@ export const flow = {
     const { h, sms } = await startPlatform();
     try {
       await page.addInitScript(origin => { window.__PRI_CLOUD_ORIGIN__ = origin; }, base);
-      await page.addInitScript(() => {
-        window.__navLog = [];
-        for (const fn of ['pushState', 'replaceState']) {
-          const orig = history[fn].bind(history);
-          history[fn] = (...args) => { window.__navLog.push(`${fn} ${args[2]} :: ${new Error().stack.split('\n').slice(1, 6).join(' | ')}`); return orig(...args); };
-        }
-      });
       const seen = [];
       const proxy = async route => {
         const request = route.request();
@@ -183,10 +176,8 @@ export const flow = {
       await page.keyboard.type(sent.code);
       await page.waitForURL(/\/practice/, { timeout: 30000 });
       await page.waitForSelector('.shell', { timeout: 30000 });
-      const urlAtShell = page.url();
       await settle();
-      await page.waitForTimeout(1500);
-      await check(`DEBUG url stayed on practice (${urlAtShell} → ${page.url()})`, new URL(page.url()).pathname === '/practice', (await page.evaluate(() => window.__navLog.slice(-4))).join('\n      '));
+      await check('the new profile stays on practice', new URL(page.url()).pathname === '/practice', page.url());
       await check('the guest strip is gone once the account exists', await page.locator('[data-guest-strip]').count() === 0);
       await check('Settings is reachable now', await page.locator('a[href="/settings"]').count() >= 1);
       const after = await ledger(page, 'attempts');
