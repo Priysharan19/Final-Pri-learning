@@ -6,6 +6,8 @@
 // review rules; this flow proves the product UI can drive those contracts.
 
 import { pathToFileURL } from 'node:url';
+import { createMfaMock } from './support/totp.mjs';
+import { answerStepUpPrompt, enrolStaffMfaThroughPanel, mfaPanelOf } from './support/staff-mfa-tour.mjs';
 
 const ADMIN = {
   id: 'acct_e2e_admin',
@@ -33,17 +35,27 @@ export const flow = {
     let revision = null;
     let audit = [];
     const requests = [];
+    const responses = [];
+    // The staff second factor exactly as server/platform/mfa.js + security.js
+    // behave: nothing staff-only answers before a code is confirmed, and a
+    // role change asks for a fresh code once the last one is older than the
+    // step-up window.
+    const mfa = createMfaMock({ email: ADMIN.email });
 
     await page.addInitScript(origin => {
       window.__PRI_CLOUD_ORIGIN__ = origin;
     }, base);
 
-    const respond = (route, status, value, headers = {}) => route.fulfill({
-      status,
-      contentType: 'application/json',
-      headers,
-      body: JSON.stringify(value)
-    });
+    const respond = (route, status, value, headers = {}) => {
+      responses.push({ path: new URL(route.request().url()).pathname, method: route.request().method(), status, code: value?.error?.code || null });
+      return route.fulfill({
+        status,
+        contentType: 'application/json',
+        headers,
+        body: JSON.stringify(value)
+      });
+    };
+    const refuse = (route, refusal) => respond(route, refusal.status, refusal.body);
 
     const addAudit = (action, targetKind, targetId) => {
       audit = [{
@@ -83,6 +95,17 @@ export const flow = {
           ? respond(route, 200, { account: ADMIN })
           : respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
       }
+
+      if (path.startsWith('/v1/account/mfa/')) {
+        if (!authenticated) return respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
+        const answer = mfa.handle(path, method, bodyText);
+        return respond(route, answer.status, answer.body);
+      }
+
+      // Every staff route sits behind the second factor (security.js): until
+      // enrolment is confirmed they answer 403 MFA_ENROLMENT_REQUIRED.
+      const staffRoute = path.startsWith('/v1/admin/') || path.startsWith('/v1/content/');
+      if (authenticated && staffRoute && mfa.gate()) return refuse(route, mfa.gate());
 
       if (path === '/v1/entitlements' && method === 'GET') {
         return authenticated
@@ -178,6 +201,8 @@ export const flow = {
       }
 
       if (path === `/v1/admin/users/${MANAGED.id}/role` && method === 'PATCH') {
+        // Role promotion is a step-up action: a code newer than the window.
+        if (mfa.stepUp()) return refuse(route, mfa.stepUp());
         const body = JSON.parse(bodyText || '{}');
         managedRole = String(body.role || managedRole);
         addAudit('account.role.update', 'account', MANAGED.id);
@@ -206,6 +231,15 @@ export const flow = {
     await accountPanel.getByLabel('Password').fill('admin-e2e-password-42');
     await accountPanel.getByRole('button', { name: 'Connect account' }).click();
     await accountPanel.getByText('Connected', { exact: true }).waitFor({ timeout: 15000 });
+
+    // The authenticator gate comes first: enrol through the real panel.
+    const { secret } = await enrolStaffMfaThroughPanel({ page, check });
+    const confirmCall = requests.find(row => row.path === '/v1/account/mfa/totp/confirm' && row.method === 'POST');
+    await check('MFA enrolment goes through the audited transport with the server-issued CSRF token, and no staff route answered before it',
+      !!confirmCall && confirmCall.headers['x-pri-client'] === 'web-v1' && confirmCall.headers['x-pri-csrf'] === 'e2e-admin-csrf' &&
+        !responses.some(row => (row.path.startsWith('/v1/admin/') || row.path.startsWith('/v1/content/')) && row.status === 200 &&
+          responses.indexOf(row) < responses.findIndex(r => r.path === '/v1/account/mfa/totp/confirm' && r.status === 200)),
+      JSON.stringify(responses.map(row => `${row.method} ${row.path} ${row.status}${row.code ? ' ' + row.code : ''}`)));
 
     const staff = page.locator('section', { has: page.locator('#staff-operations-title') });
     await staff.waitFor({ state: 'visible', timeout: 15000 });
@@ -286,16 +320,32 @@ export const flow = {
     await check('publishing refreshes platform health instead of leaving stale management counts',
       afterPublish.includes('1 published revisions'));
 
+    // Fifteen minutes later (as the server sees it) a role change needs a fresh code.
+    mfa.ageVerification();
     const roleSelect = staff.getByLabel(`Role for ${MANAGED.name}`);
     await roleSelect.selectOption('support');
+    const stepUpPanel = mfaPanelOf(page);
+    await page.locator('section[data-mfa-step="verify"]').waitFor({ state: 'visible', timeout: 15000 });
+    const rolePatchesBeforeStepUp = responses.filter(row => row.path === `/v1/admin/users/${MANAGED.id}/role` && row.method === 'PATCH');
+    await check('a stale second factor makes the role change re-prompt for a code instead of applying it',
+      rolePatchesBeforeStepUp.length === 1 && rolePatchesBeforeStepUp[0].status === 403 && rolePatchesBeforeStepUp[0].code === 'MFA_STEP_UP_REQUIRED' &&
+        managedRole === 'teacher' && await stepUpPanel.getByRole('button', { name: 'Cancel' }).isVisible(),
+      JSON.stringify(rolePatchesBeforeStepUp));
+    const { stepUpIntroShown } = await answerStepUpPrompt({ page, secret });
     await page.waitForFunction(({ name }) => {
       const select = [...document.querySelectorAll('select')].find(node => node.getAttribute('aria-label') === `Role for ${name}`);
       return select?.value === 'support';
     }, { name: MANAGED.name });
     await check('admin role changes refresh the managed account to the server-returned role',
       await roleSelect.inputValue() === 'support');
+    const rolePatches = responses.filter(row => row.path === `/v1/admin/users/${MANAGED.id}/role` && row.method === 'PATCH');
+    const verifyCalls = requests.filter(row => row.path === '/v1/account/mfa/verify' && row.method === 'POST');
+    await check('after a fresh code the role change is retried exactly once and the step-up prompt closes',
+      stepUpIntroShown && rolePatches.length === 2 && rolePatches[1].status === 200 && verifyCalls.length === 1 &&
+        JSON.parse(verifyCalls[0].body || '{}').code?.length === 6 && await stepUpPanel.count() === 0,
+      JSON.stringify({ rolePatches, verify: verifyCalls.map(row => row.body) }));
 
-    const roleCall = requests.find(row => row.path === `/v1/admin/users/${MANAGED.id}/role` && row.method === 'PATCH');
+    const roleCall = requests.filter(row => row.path === `/v1/admin/users/${MANAGED.id}/role` && row.method === 'PATCH').at(-1);
     const roleBody = roleCall ? JSON.parse(roleCall.body || '{}') : {};
     await check('role changes use PATCH with CSRF and cannot be mistaken for client-only UI state',
       !!roleCall && roleCall.headers['x-pri-csrf'] === 'e2e-admin-csrf' && roleBody.role === 'support',

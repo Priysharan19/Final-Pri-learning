@@ -37,29 +37,27 @@ function check(name, ok) {
 }
 
 check('onboarding has five steps', login.includes('ONBOARDING_STEPS = 5'));
-check('draft begins as the frozen public Student role', login.includes("role: 'student'"));
+check('draft begins without role', login.includes("role: ''"));
 check('draft begins without study', login.includes("study: ''"));
 check('draft uses one in-memory authority', login.includes('useState(freshProfileDraft)'));
 check('old method screen is removed', !login.includes("stage === 'method'"));
 check('role step exists', login.includes('login.stepRoleTitle'));
 check('course step exists', login.includes('login.stepCourseTitle'));
-check('public study list excludes Olympiad', !/key:\s*['\"]olympiad['\"]/.test(login));
-check('Australian course catalogue renders only behind the PRI_FEATURE_AUSTRALIA build flag', /\{featureEnabled\('australia'\) && \(/.test(login) && !login.includes('login.teachingInAustralia'));
 check('personal step exists', login.includes('login.stepPersonalTitle'));
 check('protect step exists', login.includes('login.stepProtectTitle'));
 check('ready step exists', login.includes('login.stepReadyTitle'));
 check('step heading receives focus', login.includes('stepHeadingRef.current?.focus'));
-check('fixed Student role exposes pressed state and no Teacher creation branch', login.includes('className="pill-opt on" aria-pressed="true"') && !login.includes("role: 'teacher'"));
+check('role controls expose pressed state', login.includes("aria-pressed={form.role === 'student'}"));
 check('avatar controls expose pressed state', login.includes('aria-pressed={form.avatar === a}'));
 check('errors use alert semantics', login.includes('id="onboarding-error" role="alert"'));
 check('email remains explicitly local', login.includes('login.localCloudHonesty'));
 check('cloud route remains canonical', login.includes("'/settings#cloud-account-title'"));
 check('final create uses real profiles API', login.includes("go('/profiles', {"));
 check('double submit is guarded', login.includes('createPendingRef.current'));
-check('new public profiles land on Student Home', login.includes("if (created && !cloudIntent) nav('/', { replace: true })"));
-check('public create payload forces Student', login.includes("role: 'student'"));
-check('public create payload forces India curriculum', login.includes("course: 'in'"));
-check('selected India track is persisted', login.includes("indiaTrack: form.course === 'in' ? form.indiaTrack : undefined"));
+check('new profiles get a role-safe landing', login.includes("nav(form.role === 'teacher' ? '/teach' : '/', { replace: true })"));
+check('role is persisted', login.includes('role: form.role'));
+check('course is persisted', login.includes('course: form.course'));
+check('India track is persisted', login.includes("indiaTrack: form.course === 'in' ? form.indiaTrack"));
 check('year is persisted as a number', login.includes('year: Number(form.year)'));
 check('language uses existing authority', login.includes('language: signInLanguage()'));
 check('avatar is persisted', login.includes('avatar: form.avatar'));
@@ -85,7 +83,7 @@ check('English has local cloud honesty copy', en.includes("'login.localCloudHone
 check('Hindi has local cloud honesty copy', hi.includes("'login.localCloudHonesty'"));
 check('browser helper uses staged first step', e2e.includes('data-onboarding-step="1"'));
 check('browser helper uses staged ready step', e2e.includes('data-onboarding-step="5"'));
-check('browser helper refuses public Teacher creation', e2e.includes("role !== 'student'") && e2e.includes('Public V1 onboarding creates Student profiles only.'));
+check('browser helper supports teacher role', e2e.includes("role === 'teacher'"));
 check('browser helper supports profile language', e2e.includes("language !== 'en'"));
 check('browser helper supports cloud handoff', e2e.includes('cloud-account-title'));
 

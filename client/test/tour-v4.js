@@ -125,9 +125,9 @@ export const flow = {
   id: 'exam',
   name: 'Exam · a paper generated, sat and marked',
 
-  async run({ page, base, check, note, goto, createLegacyProfile, mathText, settle }) {
+  async run({ page, base, check, note, goto, createProfile, mathText, settle }) {
     await goto('/');
-    await createLegacyProfile({ name: 'Emmy Noether', year: YEAR });
+    await createProfile({ name: 'Emmy Noether', year: YEAR });
 
     // ── 1 · every screen in the shell renders ────────────────────────────────
     // Cheap, and it is the difference between "the exam room broke" and "the

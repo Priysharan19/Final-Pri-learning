@@ -6,40 +6,61 @@
 // Settings: this screen only offers the way there, and never passes a local
 // profile off as a cloud sign-in.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
 import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLanguage, useT, useTx } from '../i18n/index.js';
 import { featureEnabled } from '../platform/features.js';
+import { cloudAvailable } from '../platform/cloudTransport.js';
+import { appleSignInAvailable, rememberAppleSignInIntent } from '../platform/native/appleSignIn.js';
 import { flushSync } from 'react-dom';
 // Lazy: the account flow is not on the offline first-run path, so it stays out
 // of the install (client/test/install-budget-check.mjs).
 const SignUpFlow = React.lazy(() => import('../components/SignUpFlow.jsx'));
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
-// Public V1 onboarding is intentionally narrower than the curriculum code in the repository:
-// CBSE / NCERT Classes 7–12, JEE Main and JEE Advanced only (KALP-R1, #282). The out-of-scope
-// competition ladder stays implemented elsewhere but has no ordinary shipping-V1 entry point.
+// The first thing a student chooses: what they are studying. Classes 7–12 are
+// the CBSE / NCERT track; JEE Main, JEE Advanced and olympiad are tracks of
+// their own with a class beneath them.
+// JEE Main, JEE Advanced and the olympiad names are printed in Latin on the
+// Hindi-medium admit card too, so they are the label in both languages and are
+// not catalogue entries. Only "Class {n}" is a phrase that has to translate.
+//
+// Only cbse, jee-main and jee-advanced are launch-certified
+// (docs/content/certification-report.md; PRI_V1_RELEASE_SCOPE §6). The
+// Olympiad track and the Teacher role are offered for NEW profiles only in a
+// build made with PRI_FEATURE_EXTENDED_TRACKS=1, the Australian syllabuses
+// only in one made with PRI_FEATURE_AUSTRALIA=1 (development, test builds).
+// Existing profiles that already hold one keep working: the picker, the
+// backend and the summary never read a flag.
 const STUDY = [
   ...[7, 8, 9, 10, 11, 12].map(y => ({ key: String(y), classOf: y, year: y, track: 'cbse' })),
-  { key: 'jee-main', labelKey: 'settings.trackJeeMain', year: 12, track: 'jee-main' },
-  { key: 'jee-advanced', labelKey: 'settings.trackJeeAdvanced', year: 12, track: 'jee-advanced' }
+  { key: 'jee-main', label: 'JEE Main', year: 12, track: 'jee-main' },
+  { key: 'jee-advanced', label: 'JEE Advanced', year: 12, track: 'jee-advanced' },
+  { key: 'olympiad', labelKey: 'login.olympiadTrack', year: 10, track: 'olympiad', extended: true }
 ];
 const STUDY_DEFAULT = STUDY.find(o => o.key === '10');
+/** The class/track choices this build offers a new profile. */
+export const studyOptions = (extended = featureEnabled('extendedTracks')) => STUDY.filter(o => !o.extended || extended);
+/** The roles this build offers a new profile. */
+export const roleOptions = (extended = featureEnabled('extendedTracks')) => (extended ? ['student', 'teacher'] : ['student']);
 const ONBOARDING_STEPS = 5;
 const LOCAL_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function freshProfileDraft() {
-  return {
+  const draft = {
     name: '', email: '', password: '', password2: '', study: '', year: STUDY_DEFAULT.year,
-    avatar: '🚀', role: 'student', course: 'in', pathway: 'advanced', indiaTrack: STUDY_DEFAULT.track,
+    avatar: '🚀', role: '', course: 'in', pathway: 'advanced', indiaTrack: STUDY_DEFAULT.track,
     protect: false
   };
+  // With one role on offer the step still shows it, pressed, so the student
+  // sees what they are; with two, the choice is theirs to make.
+  if (roleOptions().length === 1) draft.role = roleOptions()[0];
+  return draft;
 }
 
-// The Australian syllabuses exist only behind PRI_FEATURE_AUSTRALIA (off in a
-// production build): V1 is India-only, and the flag is the single non-public door.
+// The Australian syllabuses stay selectable, folded away behind one link.
 const AU_COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB']];
 // Where the cloud account UI lives. The panel is Settings' own; this screen only links to it.
 export const CLOUD_ACCOUNT_ROUTE = '/settings#cloud-account-title';
@@ -80,7 +101,47 @@ export function MathField({ n = 90 }) {
 const Marks = {
   device: <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="4.5" y="2.5" width="15" height="19" rx="2.2" /><path d="M9.6 5.1h4.8" /><path d="M9.9 18.6h4.2" /></svg>,
   lock: <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="5" y="10.5" width="14" height="9.5" rx="1.8" /><path d="M8 10.5V7.8a4 4 0 0 1 8 0v2.7" /></svg>,
+  // The Apple mark, drawn to the Sign in with Apple guidelines (filled glyph,
+  // the button's text colour).
+  apple: <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M16.37 12.74c.02 2.3 2.02 3.07 2.04 3.08-.02.05-.32 1.1-1.05 2.17-.63.93-1.29 1.86-2.33 1.88-1.02.02-1.35-.6-2.51-.6-1.17 0-1.53.58-2.5.62-1 .04-1.76-1-2.4-1.93-1.3-1.89-2.3-5.34-.96-7.67.66-1.16 1.85-1.89 3.14-1.91.98-.02 1.9.66 2.5.66.6 0 1.73-.82 2.91-.7.5.02 1.88.2 2.78 1.51-.07.05-1.66.97-1.62 2.89zM14.45 7.1c.53-.64.88-1.53.79-2.42-.76.03-1.69.51-2.23 1.15-.49.57-.92 1.47-.8 2.34.85.07 1.72-.43 2.24-1.07z" /></svg>,
 };
+
+// ── Sign in with Apple ───────────────────────────────────────────────────────
+// Shown only when the native shell advertises the identity capability (never on
+// plain web, where no Apple client exists). The page theme decides the button
+// colour as Apple's guidelines ask: black on a light page, white on a dark one.
+const themeSnapshot = () => (typeof document === 'undefined' ? 'dark' : (document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'));
+function subscribeTheme(onChange) {
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return () => {};
+  const mo = new MutationObserver(onChange);
+  mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  return () => mo.disconnect();
+}
+export function useDocumentTheme() {
+  return useSyncExternalStore(subscribeTheme, themeSnapshot, () => 'dark');
+}
+
+/** True when this screen may offer Sign in with Apple at all. */
+export const appleSignInOffered = () => appleSignInAvailable() && cloudAvailable();
+
+export function AppleSignInButton({ onClick, disabled = false, busy = false, label, style }) {
+  const t = useT();
+  const theme = useDocumentTheme();
+  const light = theme === 'light';
+  return (
+    <button type="button" className="btn btn-lg" data-testid="apple-sign-in" disabled={disabled || busy} onClick={onClick}
+      aria-busy={busy || undefined}
+      style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', minHeight: 44,
+        fontWeight: 600, borderRadius: 10,
+        background: light ? '#000' : '#fff', color: light ? '#fff' : '#000', border: `1px solid ${light ? '#000' : '#fff'}`,
+        ...style
+      }}>
+      {Marks.apple}
+      <span>{busy ? t('login.oneMoment') : (label || t('login.signInWithApple'))}</span>
+    </button>
+  );
+}
 
 // ── Password rules ───────────────────────────────────────────────────────────
 // The client half of the on-device gate. A profile password guards a device
@@ -218,15 +279,21 @@ function LanguagePicker() {
   );
 }
 
-export default function Login() {
+export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
   const { setUser, refreshDue } = useApp();
   const nav = useNavigate();
   const t = useT();
   const tx = useTx();
+  // Resolved per render, not at module load, so a development override of the
+  // flag (features.js) is honoured; a production build compiles it to a constant.
+  const extended = featureEnabled('extendedTracks');
+  const study = useMemo(() => studyOptions(extended), [extended]);
+  const roles = useMemo(() => roleOptions(extended), [extended]);
+  const appleOffered = appleSignInOffered();
   const [profiles, setProfiles] = useState(null);
-  const [stage, setStage] = useState('hero');   // hero | pick | create | account
+  const [stage, setStage] = useState(initialStage);   // hero | pick | create | account
   const [accountMode, setAccountMode] = useState('signup');
-  const [createStep, setCreateStep] = useState(0);
+  const [createStep, setCreateStep] = useState(initialStep);
   const [form, setForm] = useState(freshProfileDraft);
   const [australia, setAustralia] = useState(false);
   const [cloudIntent, setCloudIntent] = useState(false);
@@ -272,7 +339,7 @@ export default function Login() {
     ? (selectedStudy?.track === 'cbse'
         ? t('common.classNumber', { n: form.year })
         : selectedStudy
-          ? t(selectedStudy.labelKey) + ' · ' + t('common.classNumber', { n: form.year })
+          ? (selectedStudy.labelKey ? t(selectedStudy.labelKey) : selectedStudy.label) + ' · ' + t('common.classNumber', { n: form.year })
           : t('login.notChosen'))
     : (selectedCourse?.[1] || form.course.toUpperCase()) + ' · ' + t('common.yearNumber', { n: form.year });
 
@@ -336,6 +403,15 @@ export default function Login() {
     else beginCreate(true);
   };
 
+  /** Sign in with Apple: the same road — a local profile first — with the
+      account panel told to open the Apple sheet as soon as the profile is open.
+      The sheet itself is never shown from this screen: the identity it returns
+      has to be linked to a profile that exists. */
+  const appleSignIn = () => {
+    rememberAppleSignInIntent();
+    cloudSignIn();
+  };
+
   const pickProfile = (p) => {
     setError('');
     if (p.hasPassword) {
@@ -348,14 +424,18 @@ export default function Login() {
 
   /** What this local profile studies or teaches: an India class/track or an Australian syllabus. */
   const chooseStudy = (key) => {
-    const opt = STUDY.find(o => o.key === key);
+    const opt = study.find(o => o.key === key);
     if (!opt) {
       setForm(f => ({ ...f, study: '', course: 'in', indiaTrack: 'cbse', year: STUDY_DEFAULT.year }));
       return;
     }
     setForm(f => ({
       ...f, study: opt.key, course: 'in', indiaTrack: opt.track,
-      year: opt.track === 'cbse' ? opt.year : (f.year >= 11 ? f.year : opt.year)
+      year: opt.track === 'cbse'
+        ? opt.year
+        : opt.track === 'olympiad'
+          ? Math.min(12, Math.max(7, f.year || opt.year))
+          : (f.year >= 11 ? f.year : opt.year)
     }));
   };
 
@@ -384,7 +464,7 @@ export default function Login() {
 
   const validateStep = (step = createStep) => {
     let message = '';
-    if (step === 0 && form.role !== 'student') message = t('login.roleRequired');
+    if (step === 0 && !roles.includes(form.role)) message = t('login.roleRequired');
     if (step === 1 && !courseChoiceValid()) message = t('login.courseRequired');
     if (step === 2 && !form.name.trim()) message = t('login.nameRequired');
     if (step === 3) {
@@ -417,7 +497,7 @@ export default function Login() {
     createPendingRef.current = true;
     try {
       const created = await go('/profiles', {
-        name: form.name.trim(), year: Number(form.year), avatar: form.avatar, role: 'student',
+        name: form.name.trim(), year: Number(form.year), avatar: form.avatar, role: form.role,
         language: signInLanguage(),
         course: form.course,
         pathway: form.course === 'nsw' ? form.pathway : undefined,
@@ -427,7 +507,7 @@ export default function Login() {
       });
       // A brand-new profile must not inherit the route of whoever opened the
       // picker. Start the new identity at its role-safe product landing.
-      if (created && !cloudIntent) nav('/', { replace: true });
+      if (created && !cloudIntent) nav(form.role === 'teacher' ? '/teach' : '/', { replace: true });
     } finally {
       createPendingRef.current = false;
     }
@@ -466,6 +546,12 @@ export default function Login() {
       <button className="linklike" disabled={busy} onClick={cloudSignIn}>{t('login.cloudSignIn')}</button>
     </div>
   );
+  const appleEntry = appleOffered && !cloudIntent && (
+    <div style={{ marginTop: 12 }}>
+      <AppleSignInButton onClick={appleSignIn} disabled={busy} />
+      <p className="muted" style={{ fontSize: 12.5, marginTop: 6, textAlign: 'center' }}>{t('login.appleSignInNote')}</p>
+    </div>
+  );
 
   /* ── hero ── */
   if (stage === 'hero') {
@@ -474,7 +560,7 @@ export default function Login() {
         <MathField />
         <div className="auth-col fade-in">
           <Logo large />
-          <div className="hero-kicker">{t('login.heroKicker')}</div>
+          <div className="hero-kicker">{featureEnabled('extendedTracks') ? 'CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD' : 'CBSE · NCERT · JEE MAIN · JEE ADVANCED'}</div>
           {/* The gold word is a slot, not a tail fragment: Hindi puts the verb
               last, so "marked" cannot be the last word of the sentence there. */}
           <h1 className="hero-title">{tx('login.heroTitle', {
@@ -501,6 +587,7 @@ export default function Login() {
           <div style={{ textAlign: 'center', marginTop: 10 }}>
             <button className="linklike" onClick={cloudSignIn}>{t('login.cloudSignIn')}</button>
           </div>
+          {appleEntry}
           <LanguagePicker />
           {/* A store reviewer, a payment provider and a parent all look for
               these, and each is required of us before the app can be sold. */}
@@ -609,6 +696,7 @@ export default function Login() {
                 </button>
               </div>
               {cloudLink}
+              {appleEntry}
             </div>
           )}
 
@@ -636,13 +724,23 @@ export default function Login() {
                   <div className="field">
                     <div className="label" id="signup-role">{t('login.iAmA')}</div>
                     <div className="pill-select" role="group" aria-labelledby="signup-role">
-                      <button type="button" className="pill-opt on" aria-pressed="true"
+                      <button type="button" className={`pill-opt ${form.role === 'student' ? 'on' : ''}`}
+                        aria-pressed={form.role === 'student'}
                         onClick={() => { setForm(f => ({ ...f, role: 'student' })); setError(''); }}>
                         {t('login.student')}
                       </button>
+                      {roles.includes('teacher') && (
+                        <button type="button" className={`pill-opt ${form.role === 'teacher' ? 'on' : ''}`}
+                          aria-pressed={form.role === 'teacher'}
+                          onClick={() => { setForm(f => ({ ...f, role: 'teacher' })); setError(''); }}>
+                          {t('login.teacher')}
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <p className="muted" style={{ fontSize: 12.5, marginTop: 12 }}>{t('login.studentRoleNote')}</p>
+                  <p className="muted" style={{ fontSize: 12.5, marginTop: 12 }}>
+                    {t(form.role === 'teacher' ? 'login.teacherRoleNote' : 'login.studentRoleNote')}
+                  </p>
                 </>
               )}
 
@@ -650,20 +748,21 @@ export default function Login() {
                 <>
                   <div className="field">
                     <label className="label" htmlFor="signup-track">
-                      {t('login.imStudying')}
+                      {t(form.role === 'teacher' ? 'login.imTeaching' : 'login.imStudying')}
                     </label>
                     <select className="input" id="signup-track" value={form.study}
                       aria-describedby={error ? 'onboarding-error' : undefined}
                       onChange={e => { chooseStudy(e.target.value); setError(''); }}>
                       <option value="">{t('login.chooseClassTrack')}</option>
-                      {STUDY.map(o => <option key={o.key} value={o.key}>{o.labelKey ? t(o.labelKey) : t('common.classNumber', { n: o.classOf })}</option>)}
+                      {study.map(o => <option key={o.key} value={o.key}>{o.labelKey ? t(o.labelKey) : (o.label || t('common.classNumber', { n: o.classOf }))}</option>)}
                     </select>
                     {selectedStudy && form.indiaTrack !== 'cbse' && (
                       <div style={{ marginTop: 10 }}>
                         <label className="label" htmlFor="signup-year">{t('common.class')}</label>
                         <select className="input" id="signup-year" value={form.year}
                           onChange={e => { setForm(f => ({ ...f, year: Number(e.target.value) })); setError(''); }}>
-                          {[11, 12].map(y => <option key={y} value={y}>{t('common.classNumber', { n: y })}</option>)}
+                          {(form.indiaTrack === 'olympiad' ? [7, 8, 9, 10, 11, 12] : [11, 12])
+                            .map(y => <option key={y} value={y}>{t('common.classNumber', { n: y })}</option>)}
                         </select>
                       </div>
                     )}
@@ -673,7 +772,7 @@ export default function Login() {
                   {featureEnabled('australia') && (
                     <div className="field" style={{ marginTop: -4 }}>
                       <button type="button" className="linklike" onClick={openAustralia}>
-                        {t('login.studyingInAustralia')}
+                        {t(form.role === 'teacher' ? 'login.teachingInAustralia' : 'login.studyingInAustralia')}
                       </button>
                     </div>
                   )}
@@ -804,14 +903,14 @@ export default function Login() {
               {createStep === 4 && (
                 <>
                   <div className="card" style={{ boxShadow: 'none', padding: 16 }}>
-                    <div className="spread" style={{ gap: 12 }}><span className="muted">{t('login.summaryRole')}</span><b>{t('login.student')}</b></div>
+                    <div className="spread" style={{ gap: 12 }}><span className="muted">{t('login.summaryRole')}</span><b>{t(form.role === 'teacher' ? 'login.teacher' : 'login.student')}</b></div>
                     <div className="spread" style={{ gap: 12, marginTop: 8 }}><span className="muted">{t('login.summaryCourse')}</span><b>{studyLabel}</b></div>
                     <div className="spread" style={{ gap: 12, marginTop: 8 }}><span className="muted">{t('login.summaryLanguage')}</span><b>{selectedLanguage.label}</b></div>
                     <div className="spread" style={{ gap: 12, marginTop: 8 }}><span className="muted">{t('login.summaryProtection')}</span><b>{t(form.protect ? 'login.protectionOn' : 'login.protectionOff')}</b></div>
                     <div className="spread" style={{ gap: 12, marginTop: 8 }}><span className="muted">{t('login.summaryCloud')}</span><b>{t(cloudIntent ? 'login.cloudNext' : 'login.cloudLater')}</b></div>
                   </div>
                   <p className="sub" style={{ marginTop: 14 }}>
-                    {t('login.readyStudent')}
+                    {t(form.role === 'teacher' ? 'login.readyTeacher' : 'login.readyStudent')}
                   </p>
                   <p className="muted" style={{ fontSize: 12.5 }}>{t(featureEnabled('placement') ? 'login.placementOffer' : 'login.noFakeDiagnostic')}</p>
                 </>
@@ -829,7 +928,8 @@ export default function Login() {
                   <button className="btn btn-primary btn-lg" type="button" style={{ flex: 1 }} disabled={busy} onClick={create}>
                     {t(busy ? 'login.oneMoment'
                       : cloudIntent ? 'login.createAndOpenCloud'
-                        : 'login.startLearning')}
+                        : form.role === 'teacher' ? 'login.openTeacherWorkspace'
+                          : 'login.startLearning')}
                   </button>
                 )}
               </div>

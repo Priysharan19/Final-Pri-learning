@@ -13,10 +13,12 @@ import { MIN_PASSWORD, PasswordMeter, passwordVerdict } from './Login.jsx';
 import { LANGUAGES, useLanguage, useT } from '../i18n/index.js';
 import { loadGlossary } from '../i18n/glossary.js';
 import { priNative } from '../platform/native/index.js';
+import { featureEnabled } from '../platform/features.js';
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
+const COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB'], ['in', null, 'settings.courseIndia']];
 // [id, name, description key, name key when the name itself is translated]
-const INDIA_TRACKS = [['cbse', 'settings.trackCbse', 'settings.trackCbseDesc'], ['jee-main', 'settings.trackJeeMain', 'settings.trackJeeMainDesc'], ['jee-advanced', 'settings.trackJeeAdvanced', 'settings.trackJeeAdvancedDesc']];
+const INDIA_TRACKS = [['cbse', 'CBSE / NCERT', 'settings.trackCbseDesc'], ['jee-main', 'JEE Main', 'settings.trackJeeMainDesc'], ['jee-advanced', 'JEE Advanced', 'settings.trackJeeAdvancedDesc'], ['olympiad', null, 'settings.trackOlympiadDesc', 'settings.trackOlympiad']];
 export const PATHWAY_OPTS = [
   // [id, proper name of the NSW course, description key]
   ['standard', 'Standard', 'settings.pathwayStandardDesc'],
@@ -371,7 +373,13 @@ export default function Settings() {
   const importRef = useRef(null);
   const secRefs = useRef({});
   useEffect(() => { api.get('/data/storage').then(setStorageInfo).catch(() => { }); }, []);
-  const [form, setForm] = useState({ name: user.name, year: user.year, dailyGoal: user.dailyGoal, course: 'in', avatar: user.avatar, pathway: user.pathway || 'advanced', indiaTrack: INDIA_TRACKS.some(([id]) => id === user.indiaTrack) ? user.indiaTrack : 'cbse' });
+  const [form, setForm] = useState({ name: user.name, year: user.year, dailyGoal: user.dailyGoal, course: user.course, avatar: user.avatar, pathway: user.pathway || 'advanced', indiaTrack: user.indiaTrack || 'cbse' });
+  // Public V1 (a build with both feature flags off) offers no door out of the
+  // India catalogue or into Olympiad from Settings: the Australian syllabus
+  // selector and the Olympiad track render only in a flagged build, or for a
+  // profile that already holds one (such profiles keep working unchanged).
+  const courseChoiceOffered = featureEnabled('australia') || user.course !== 'in';
+  const olympiadOffered = featureEnabled('extendedTracks') || user.indiaTrack === 'olympiad';
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [del, setDel] = useState(null);   // { name, password, error, busy } while the wipe is being confirmed
@@ -384,7 +392,7 @@ export default function Settings() {
   async function save() {
     setBusy(true);
     try {
-      const r = await api.patch('/me', { ...form, course: 'in', pathway: undefined });
+      const r = await api.patch('/me', form);
       setUser(r.user);
       setEditing(false);
       toast(<span>{t('settings.saved')}</span>);
@@ -540,21 +548,44 @@ export default function Settings() {
                   </div>
                 </div>
                 {user.role !== 'teacher' && (
-                  <div className="field">
-                    <label className="label" htmlFor="set-year">{t('settings.schoolClass')}</label>
-                    <select className="input" id="set-year" value={form.year}
-                      onChange={e => setForm(f => ({ ...f, year: Number(e.target.value), course: 'in' }))}>
-                      {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>{t('common.classNumber', { n: y })}</option>)}
-                    </select>
+                  <div className="grid cols-2" style={{ gap: 12 }}>
+                    <div className="field">
+                      <label className="label" htmlFor="set-year">{t(form.course === 'in' ? 'settings.schoolClass' : 'settings.schoolYear')}</label>
+                      <select className="input" id="set-year" value={form.year} onChange={e => setForm(f => ({ ...f, year: Number(e.target.value) }))}>
+                        {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>{t(form.course === 'in' ? 'common.classNumber' : 'common.yearNumber', { n: y })}</option>)}
+                      </select>
+                    </div>
+                    {courseChoiceOffered && (
+                      <div className="field">
+                        <label className="label" htmlFor="set-course">{t('settings.syllabus')}</label>
+                        <select className="input" id="set-course" value={form.course} onChange={e => setForm(f => ({ ...f, course: e.target.value }))}>
+                          {COURSES.map(([k, label, labelKey]) => <option key={k} value={k}>{labelKey ? t(labelKey) : label}</option>)}
+                        </select>
+                      </div>
+                    )}
                   </div>
                 )}
-                {user.role !== 'teacher' && (
+                {user.role !== 'teacher' && form.course === 'nsw' && form.year >= 11 && (
+                  <div className="field">
+                    <div className="label" id="set-pathway">{t('settings.hscPathway')}</div>
+                    <div className="pathway-row" role="group" aria-labelledby="set-pathway">
+                      {PATHWAY_OPTS.filter(([k]) => k !== 'ext2' || form.year === 12).map(([k, name, desc]) => (
+                        <button key={k} type="button" className={`pathway-pick ${form.pathway === k ? 'on' : ''}`}
+                          onClick={() => setForm(f => ({ ...f, pathway: k }))}>
+                          <b>{name}</b>
+                          <span>{t(desc)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {user.role !== 'teacher' && form.course === 'in' && (
                   <div className="field">
                     <div className="label" id="set-india-track">{t('settings.indiaTrack')}</div>
                     <div className="pathway-row" role="group" aria-labelledby="set-india-track">
-                      {INDIA_TRACKS.filter(([k]) => form.year >= 11 || !k.startsWith('jee-')).map(([k, nameKey, desc]) => (
+                      {INDIA_TRACKS.filter(([k]) => (form.year >= 11 || !k.startsWith('jee-')) && (k !== 'olympiad' || olympiadOffered)).map(([k, name, desc, nameKey]) => (
                         <button key={k} type="button" className={`pathway-pick ${form.indiaTrack === k ? 'on' : ''}`}
-                          onClick={() => setForm(f => ({ ...f, indiaTrack: k }))}><b>{t(nameKey)}</b><span>{t(desc)}</span></button>
+                          onClick={() => setForm(f => ({ ...f, indiaTrack: k }))}><b>{nameKey ? t(nameKey) : name}</b><span>{t(desc)}</span></button>
                       ))}
                     </div>
                   </div>

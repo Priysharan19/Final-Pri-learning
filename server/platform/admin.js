@@ -1,8 +1,9 @@
 import { asyncRouter } from './asyncRouter.js';
 import { asStore, sqliteHandle } from './store.js';
 import { currentSyncCursor } from './db.js';
-import { rateLimit, requireRole, requireSession } from './security.js';
+import { MFA_STEP_UP_MS, rateLimit, requireMfa, requireRole, requireSession } from './security.js';
 import { INVITE_MAX_TTL_DAYS, inviteTtlDays, listTeacherInvites, mintTeacherInvite } from './teacherInvites.js';
+import { operatorHealthDetail } from './operatorHealth.js';
 
 function ensureAdminTables(db) {
   // SQLite builds its schema at boot; Postgres is migrated (supabase/migrations).
@@ -30,6 +31,9 @@ export function createAdminRouter(db) {
   const router = asyncRouter();
   router.use(requireSession(db));
   router.use(requireRole('admin'));
+  // Every admin route needs a second factor verified on this session (mfa.js);
+  // role changes additionally need one presented in the last 15 minutes.
+  router.use(requireMfa());
   router.use(rateLimit(db, 'admin', { limit: 300, windowMs: 60 * 1000 }));
 
   router.get('/health', async (req, res) => {
@@ -45,6 +49,9 @@ export function createAdminRouter(db) {
       publishedContent: await one("SELECT COUNT(*) AS n FROM content_revisions WHERE status='published'"),
       pendingDelivery: await one('SELECT COUNT(*) AS n FROM auth_delivery_outbox WHERE delivered_at IS NULL'),
       syncCursor: cursor,
+      // Provider configuration flags, backlog counts and the last housekeeping
+      // pass: operator detail that /v1/health no longer answers anonymously.
+      ...await operatorHealthDetail(db),
       checkedAt: Date.now()
     });
   });
@@ -66,7 +73,7 @@ export function createAdminRouter(db) {
     })) });
   });
 
-  router.patch('/users/:accountId/role', async (req, res) => {
+  router.patch('/users/:accountId/role', requireMfa({ stepUpMs: MFA_STEP_UP_MS }), async (req, res) => {
     const accountId = String(req.params.accountId || '');
     const role = String(req.body?.role || '');
     if (!['student', 'teacher', 'support', 'admin'].includes(role)) return res.status(400).json({ error: { code: 'ROLE_INVALID', message: 'Role is invalid.' } });

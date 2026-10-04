@@ -1,0 +1,248 @@
+# Pri Learning · release candidate gates
+#
+# The strict handwriting release gates, run as BLOCKING steps against one exact
+# candidate SHA. PR CI deliberately runs the physical-evidence validator
+# non-strict and the real-ink diagnostic with `|| true`, because a PR cannot
+# manufacture real Apple Pencil evidence. This workflow is where those gates
+# stop being advisory.
+#
+# It is EXPECTED to fail until real evidence exists: no physical-iPad result
+# files are committed (Gate C / Gate D), the real-ink corpus has one writer on
+# the train split, and the cloud reader has never been measured. A red run here
+# is the honest state of the product, not a flaky workflow. Nothing in this
+# file may be loosened to make it green; the only way to green is evidence.
+#
+# The job summary prints every gate with its true outcome, including NOT
+# MEASURED rows, so a release reviewer never has to infer them.
+name: Release Candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: 'Exact commit SHA of the candidate (empty = the ref this run was started from)'
+        required: false
+        default: ''
+      measure_cloud_reader:
+        description: 'Spend provider calls to measure the cloud reader on the committed real-ink corpus. Needs the PRI_HANDWRITING_API_KEY repository secret. The result is uploaded as an artifact, never committed.'
+        type: boolean
+        required: false
+        default: false
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-candidate-${{ inputs.release_sha || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  handwriting-release-gates:
+    name: Handwriting release gates (strict, blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ inputs.release_sha || github.ref }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: tools/ink-foundation/requirements.txt
+      - name: Candidate identity
+        id: candidate
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse HEAD)"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          echo "Release candidate: ${sha}"
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: Install server dependencies
+        run: npm ci --prefix server
+
+      # Every gate below records its real exit code and keeps the job going so
+      # the summary can show ALL of them. The final step turns any red into a
+      # failed job.
+
+      # Gate C/D on physical iPads (handwriting/v12/REAL_PENCIL_RELEASE_EVIDENCE.md).
+      # Exit 1 with NOT MEASURED when no result files are committed.
+      - name: 'Gate C/D · physical Apple Pencil evidence (test split, strict)'
+        id: physical
+        continue-on-error: true
+        run: node client/test/ink-physical-release-evidence.mjs --strict
+      - name: 'Gate C/D · physical Apple Pencil evidence (final holdout, strict)'
+        id: physical_holdout
+        continue-on-error: true
+        run: node client/test/ink-physical-release-evidence.mjs --strict --split final-holdout
+
+      # Gate C measurable subset on the committed stroke corpus: >= 20 test
+      # writers, >= 1,000 expressions, 98% exact, 99.5% chars, 90% worst writer.
+      - name: 'Gate C · real-writer corpus evidence gate'
+        id: gate_c
+        continue-on-error: true
+        run: node client/test/ink-release-evidence-gate.mjs
+
+      # Real-ink regression floor: the committed corpus may never score below
+      # handwriting/v17/real-ink-floor.json (ratchet, upward only).
+      - name: 'Real ink · regression floor (strict)'
+        id: real_ink
+        continue-on-error: true
+        run: node client/test/inkcheck-real.mjs --strict --gate
+
+      # Answer-blind invariant, statically enforced across client/src and the
+      # server /v1/handwriting route.
+      - name: 'Invariant · handwriting stays answer-blind (static)'
+        id: answer_blind
+        continue-on-error: true
+        run: node client/test/ink-answer-blind-static-check.mjs
+
+      # The cloud reader evaluation tool is proven with a fake provider here;
+      # the real measurement below only runs on request with a key.
+      - name: 'Cloud reader · evaluation tool self-test (fake provider)'
+        id: cloud_tool
+        continue-on-error: true
+        run: node client/test/ink-cloud-reader-eval-check.mjs
+      - name: 'Cloud reader · accuracy on the real-ink corpus'
+        id: cloud_eval
+        continue-on-error: true
+        env:
+          MEASURE: ${{ inputs.measure_cloud_reader == true && 'yes' || 'no' }}
+          PRI_HANDWRITING_API_KEY: ${{ secrets.PRI_HANDWRITING_API_KEY }}
+        run: |
+          set +e
+          if [ "$MEASURE" != "yes" ]; then
+            echo 'CLOUD READER EVAL — NOT MEASURED: not requested (set measure_cloud_reader on dispatch).'
+            echo 'code=2' >> "$GITHUB_OUTPUT"
+            exit 2
+          fi
+          node tools/ink-cloud-reader-eval.mjs --out "$RUNNER_TEMP/cloud-reader-eval"
+          code=$?
+          echo "code=${code}" >> "$GITHUB_OUTPUT"
+          exit $code
+      - name: 'Cloud reader · upload measurement (never committed by CI)'
+        if: steps.cloud_eval.outputs.code == '0'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cloud-reader-eval-${{ steps.candidate.outputs.sha }}
+          path: ${{ runner.temp }}/cloud-reader-eval/*.json
+          if-no-files-found: error
+
+      # V17 writer-generalisation readiness report (handwriting/v17/WRITER_GENERALIZATION.md).
+      # Same audit command and minimal ML dependencies as ink-writer-generalization.yml.
+      - name: 'V17 · writer-generalisation data readiness'
+        id: writer_generalisation
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet --upgrade pip
+          python -m pip install --quiet 'torch>=2.3,<3' 'numpy>=1.26,<3' 'Pillow>=10,<12'
+          python tools/ink-foundation/audit_writer_diversity.py \
+            --corpus client/test/ink-corpus \
+            --out "$RUNNER_TEMP/writer-diversity.json"
+          python - "$RUNNER_TEMP/writer-diversity.json" <<'PY'
+          import json, sys
+          p = json.load(open(sys.argv[1]))
+          print('writers:', p.get('writers'))
+          print('writers by split:', p.get('writersBySplit'))
+          print('samples by split:', p.get('samplesBySplit'))
+          print('gates:', p.get('gates'))
+          print('production data ready:', p.get('passesDataReadiness'))
+          if not p.get('passesDataReadiness'):
+              raise SystemExit('V17 writer-generalisation data readiness: NOT MET')
+          PY
+
+      - name: Release gate summary
+        if: always()
+        env:
+          SHA: ${{ steps.candidate.outputs.sha }}
+          PHYSICAL: ${{ steps.physical.outcome }}
+          PHYSICAL_HOLDOUT: ${{ steps.physical_holdout.outcome }}
+          GATE_C: ${{ steps.gate_c.outcome }}
+          REAL_INK: ${{ steps.real_ink.outcome }}
+          ANSWER_BLIND: ${{ steps.answer_blind.outcome }}
+          CLOUD_TOOL: ${{ steps.cloud_tool.outcome }}
+          CLOUD_EVAL_CODE: ${{ steps.cloud_eval.outputs.code }}
+          WRITER_GEN: ${{ steps.writer_generalisation.outcome }}
+        run: |
+          set -euo pipefail
+          label() {
+            case "$1" in
+              success) echo 'PASS' ;;
+              failure) echo 'FAIL' ;;
+              *) echo "$1" ;;
+            esac
+          }
+          cloud='FAIL'
+          case "${CLOUD_EVAL_CODE:-}" in
+            0) cloud='MEASURED (see artifact; a measurement is not a pass)' ;;
+            2) cloud='NOT MEASURED' ;;
+          esac
+          {
+            echo "## Handwriting release gates · \`${SHA}\`"
+            echo
+            echo '| Gate | Result | Meaning when red |'
+            echo '|---|---|---|'
+            echo "| Physical Apple Pencil evidence, test split (strict) | $(label "$PHYSICAL") | NOT MEASURED: no physical result files under handwriting/v12/evidence/physical/ |"
+            echo "| Physical Apple Pencil evidence, final holdout (strict) | $(label "$PHYSICAL_HOLDOUT") | NOT MEASURED: no locked final-holdout runs |"
+            echo "| Gate C real-writer corpus (>= 20 test writers, >= 1,000 expressions, 98% / 99.5% / 90%) | $(label "$GATE_C") | undersized or inaccurate test split |"
+            echo "| Real-ink regression floor (handwriting/v17/real-ink-floor.json) | $(label "$REAL_INK") | the committed corpus scored below the recorded floor |"
+            echo "| Answer-blind invariant (static, client + server route) | $(label "$ANSWER_BLIND") | a production caller leaks the answer into the recogniser |"
+            echo "| Cloud reader evaluation tool (fake provider) | $(label "$CLOUD_TOOL") | the measurement tool itself is broken |"
+            echo "| Cloud reader accuracy on real ink | ${cloud} | never measured, or the key was not provided |"
+            echo "| V17 writer-generalisation data readiness | $(label "$WRITER_GEN") | fewer real writers/expressions than the V17 floor |"
+            echo
+            echo 'Auto-mark precision (>= 99.9% over >= 1,000 native authority decisions) is only measured by the physical evidence rows above.'
+            echo 'Synthetic, simulator and dry-run results never satisfy any row here.'
+          } >> "$GITHUB_STEP_SUMMARY"
+          red=0
+          for outcome in "$PHYSICAL" "$PHYSICAL_HOLDOUT" "$GATE_C" "$REAL_INK" "$ANSWER_BLIND" "$CLOUD_TOOL" "$WRITER_GEN"; do
+            [ "$outcome" = 'success' ] || red=$((red + 1))
+          done
+          # The cloud reader row blocks only when a measurement was attempted and errored;
+          # "not measured" is reported, not hidden, and the physical rows already block.
+          case "${CLOUD_EVAL_CODE:-}" in 0|2) ;; *) red=$((red + 1)) ;; esac
+          if [ "$red" -gt 0 ]; then
+            echo "::error::${red} handwriting release gate(s) are red for ${SHA}. See the job summary. Do not lower a threshold; collect evidence."
+            exit 1
+          fi
+          echo "All handwriting release gates passed for ${SHA}."
+
+  release-identity:
+    name: Build, exact release identity and cross-platform matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ inputs.release_sha || github.ref }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - name: Install client dependencies
+        run: npm ci --prefix client
+      - name: Release authority contract
+        run: node tools/pri01-release-authority-check.mjs
+      - name: Build
+        run: npm run build
+      - name: Exact release identity
+        run: node tools/verify-release-identity.mjs
+      - name: iOS bundle matches the client build
+        run: npm run check:ios
+      - name: Materialize exact native release identity
+        run: npm run sync:ios
+      - name: Verify exact native release identity
+        run: npm run verify:release:native
+      - name: Cross-platform release matrix (CP-11)
+        run: node scripts/release-matrix.mjs --require-native-apple

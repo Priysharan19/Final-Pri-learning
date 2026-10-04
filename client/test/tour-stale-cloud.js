@@ -71,7 +71,7 @@ export const flow = {
   id: 'stale-cloud',
   name: 'Cloud · late results never rewrite an attempt',
 
-  async run({ page, ctx, base, check, goto, createLegacyProfile, settle }) {
+  async run({ page, ctx, base, check, goto, createProfile, settle }) {
     const stub = {
       transcribeDelay: 0, transcribed: 0, transcribeAnswered: 0, text: '7',
       lastSentAt: 0, submittedAt: 0, answeredAfterSubmit: 0,
@@ -114,7 +114,7 @@ export const flow = {
     });
 
     await goto('/');
-    await createLegacyProfile({ name: 'Grace Hopper', year: 7 });
+    await createProfile({ name: 'Grace Hopper', year: 7 });
 
     // Both server features are opt-in, so they are switched on the way a
     // student does: in Settings.

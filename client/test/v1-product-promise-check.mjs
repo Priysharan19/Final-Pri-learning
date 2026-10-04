@@ -32,23 +32,36 @@ same(FREE_TIER.explain, 'basic', 'Free Pri Explain remains basic');
 ok(ENTITLEMENTS.JEE_ADVANCED === 'jee-advanced-content', 'JEE Advanced remains a Premium capability');
 ok(ENTITLEMENTS.EXTRA_AI === 'additional-ai-usage', 'reserved extra-AI capability remains declared, not silently repurposed');
 
-// Public onboarding: actual source that production Vite builds.
-ok(!/key:\s*'olympiad'/.test(login), 'public STUDY list has no Olympiad');
-ok(featureStates('build', {}).australia === false && /\{featureEnabled\('australia'\) && \(/.test(login),
-  'the Australian curriculum catalogue is reachable only behind PRI_FEATURE_AUSTRALIA, which a production build records off');
-ok(!/name:\s*'Teacher'|t\('login\.teacher'\)\s*<\/button>/.test(login), 'public onboarding renders no Teacher choice');
-ok(/role:\s*'student'/.test(login), 'new public profile defaults to Student');
-ok(/role:\s*'student'[^\n]*\n\s*language/.test(login), 'profile create payload forces Student');
-ok(!/login\.teachingInAustralia|login\.imTeaching|login\.readyTeacher|login\.openTeacherWorkspace/.test(login), 'no teacher-facing onboarding copy survives in Login');
+// Public onboarding: actual source that production Vite builds. main's
+// onboarding is build-flag scoped (PRI_FEATURE_EXTENDED_TRACKS for Olympiad and
+// the Teacher role, PRI_FEATURE_AUSTRALIA for the Australian syllabuses); a
+// production build records both flags off, so the public V1 door is exactly
+// Student × Classes 7–12 / JEE Main / JEE Advanced. The code paths stay in the
+// repository for flagged builds and for profiles that already hold them.
+const production = featureStates('build', {});
+ok(production.extendedTracks === false && production.australia === false,
+  'a production build records the extended-tracks and Australia flags off');
+ok(/\{ key: 'olympiad'[^\n]*extended: true \}/.test(login), 'the Olympiad entry is marked extended, never a plain public track');
+ok(/STUDY\.filter\(o => !o\.extended \|\| extended\)/.test(login), 'the public study list filters extended tracks by the build flag');
+ok(/extended \? \['student', 'teacher'\] : \['student'\]/.test(login), 'the Teacher role is offered to new profiles only in an extended build');
+ok(/\{roles\.includes\('teacher'\) && \(/.test(login), 'the Teacher onboarding control renders only when that role is offered');
+ok(/if \(roleOptions\(\)\.length === 1\) draft\.role = roleOptions\(\)\[0\]/.test(login), 'with Student the only role the new public profile is already a Student');
+ok(/\{featureEnabled\('australia'\) && \(/.test(login), 'the Australian curriculum catalogue is reachable only behind PRI_FEATURE_AUSTRALIA');
+const kicker = login.match(/featureEnabled\('extendedTracks'\) \? '([^']*)' : '([^']*)'/);
+ok(Boolean(kicker) && !/OLYMPIAD/.test(kicker[2]) && /CBSE · NCERT · JEE MAIN · JEE ADVANCED/.test(kicker[2]), 'the public hero kicker has no Olympiad claim');
+ok(!/olympiad/i.test(en['login.heroSub'] + en['login.brandKicker'] + en['login.point1'] + hi['login.heroSub'] + hi['login.brandKicker'] + hi['login.point1']),
+  'the static hero copy (shared by every build) makes no Olympiad claim');
 ok(/\[7, 8, 9, 10, 11, 12\]/.test(login), 'Classes 7–12 remain offered');
 ok(/key:\s*'jee-main'/.test(login), 'JEE Main remains offered');
 ok(/key:\s*'jee-advanced'/.test(login), 'JEE Advanced remains offered');
-ok(!/OLYMPIAD/.test(login), 'public hero has no Olympiad claim');
 
-// Reachable Settings may not be a back door around onboarding.
-ok(!/const COURSES =/.test(settings), 'Settings has no public AU curriculum catalogue');
-ok(!/trackOlympiad/.test(settings), 'Settings has no public Olympiad track');
-ok(/api\.patch\('\/me', \{ \.\.\.form, course: 'in'/.test(settings), 'Settings save holds public profile to India');
+// Reachable Settings may not be a back door around onboarding: the syllabus
+// selector and the Olympiad track render only in a flagged build or for a
+// profile that already holds one.
+ok(/courseChoiceOffered = featureEnabled\('australia'\) \|\| user\.course !== 'in'/.test(settings) && /\{courseChoiceOffered && \(/.test(settings),
+  'Settings offers the Australian catalogue only behind the flag or to a profile already on it');
+ok(/olympiadOffered = featureEnabled\('extendedTracks'\) \|\| user\.indiaTrack === 'olympiad'/.test(settings) && /k !== 'olympiad' \|\| olympiadOffered/.test(settings),
+  'Settings offers the Olympiad track only behind the flag or to a profile already on it');
 ok(settings.includes('FREE_TIER.practicePerDay') && settings.includes('FREE_TIER.examsPerWindow') && settings.includes('FREE_TIER.examWindowDays'),
   'plan presentation reads all numeric Free limits from FREE_TIER');
 const freeCopy = en['settings.localPlanSub'];

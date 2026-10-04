@@ -593,3 +593,19 @@ KALP-R1 is **not** declared COMPLETE because two objective conditions remain out
 5. Re-audit live `main`. Only if no new contradiction remains may the status change to **KALP-R1 COMPLETE — V1 PRODUCT PROMISE FROZEN**.
 
 No KALP-R2 work is authorised by this artifact.
+
+## Reconciliation with main's build-flag onboarding (merge of 2026-10-05)
+
+`main` now scopes onboarding by build flag rather than by removing code:
+`PRI_FEATURE_EXTENDED_TRACKS` gates the Olympiad track and the Teacher role for
+new profiles, and `PRI_FEATURE_AUSTRALIA` gates the Australian syllabuses. A
+production build records both flags off (`client/vite.config.js`
+`featureStates('build')`), so the public V1 door is exactly Student × Classes
+7–12 / JEE Main / JEE Advanced, which is this document's promise. The browser
+gates in `kalp-03`/`kalp-04` run with both flags on and therefore exercise the
+flagged paths; `client/test/v1-product-promise-check.mjs` asserts the
+production (flag-off) boundary from the source and the recorded flag states,
+and `client/test/onboarding-scope-check.mjs` (main) renders both builds.
+Settings follows the same rule: the Australian syllabus selector and the
+Olympiad track render only in a flagged build or for a profile that already
+holds one, so existing profiles keep working unchanged.

@@ -24,10 +24,10 @@ async function switchProfile(page) {
   await page.waitForSelector('.acct-list', { timeout: 15000 });
 }
 
-async function beginAdditional(page) {
+async function beginAdditional(page, role = 'student') {
   await page.getByRole('button', { name: /Add another profile/i }).click();
   await page.waitForSelector('[data-onboarding-step="1"]');
-  await page.getByRole('button', { name: 'Student', exact: true }).click();
+  await page.getByRole('button', { name: role === 'teacher' ? 'Teacher' : 'Student', exact: true }).click();
   await next(page);
 }
 
@@ -109,12 +109,16 @@ export const flow = {
     await page.getByRole('button', { name: 'Get Started' }).click();
     await page.waitForSelector('[data-onboarding-step="1"]');
     await check('onboarding begins at role', await page.locator('[data-onboarding-step="1"]').count() === 1);
-    await check('Student is the fixed public V1 role with semantic selected state',
+    await check('role buttons expose semantic selected state',
+      await page.getByRole('button', { name: 'Student', exact: true }).getAttribute('aria-pressed') === 'false');
+
+    await next(page);
+    await check('missing role cannot advance', await page.locator('[data-onboarding-step="1"]').count() === 1);
+    await check('missing role is announced', await page.locator('[role="alert"]').count() === 1);
+
+    await page.getByRole('button', { name: 'Student', exact: true }).click();
+    await check('Student selection is not colour-only',
       await page.getByRole('button', { name: 'Student', exact: true }).getAttribute('aria-pressed') === 'true');
-    await check('public V1 exposes no Teacher onboarding control',
-      await page.getByRole('button', { name: 'Teacher', exact: true }).count() === 0);
-    await check('the role step explains the frozen public boundary',
-      /public V1 profiles are student learning profiles/i.test(await page.locator('.auth-card').innerText()));
     await next(page);
     await page.waitForSelector('[data-onboarding-step="2"]');
     await check('focus follows the stage heading',
@@ -125,13 +129,9 @@ export const flow = {
     await check('missing curriculum cannot advance', await page.locator('[data-onboarding-step="2"]').count() === 1);
     await page.locator('#signup-track').selectOption('10');
     const trackOptions = await page.locator('#signup-track option').allInnerTexts();
-    await check('public V1 offers Classes 7–12, JEE Main and JEE Advanced only',
-      ['Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12', 'JEE Main', 'JEE Advanced']
-        .every(x => trackOptions.includes(x))
-      && !trackOptions.some(x => /Olympiad|HSC|VCE|QCE|WACE|SACE|IB/.test(x)));
-    await check('the curriculum step has no Australian public entry point',
-      await page.locator('#signup-course').count() === 0
-      && await page.getByRole('button', { name: /Australia/i }).count() === 0);
+    await check('India offers CBSE, JEE Main, JEE Advanced and Olympiad',
+      trackOptions.includes('Class 10') && trackOptions.includes('JEE Main')
+      && trackOptions.includes('JEE Advanced') && trackOptions.some(x => /^Olympiad/.test(x)));
 
     await page.setViewportSize(PHONE);
     await check('phone onboarding has no horizontal clipping',
@@ -206,7 +206,7 @@ export const flow = {
     await check('double submit created exactly one student row',
       await page.locator('.acct-row', { hasText: 'KALP03 Class 10 Student' }).count() === 1);
 
-    await beginAdditional(page);
+    await beginAdditional(page, 'student');
     await page.waitForSelector('[data-onboarding-step="2"]');
     await page.locator('#signup-track').selectOption('jee-main');
     await check('JEE Main only offers legitimate Class 11/12 years',
@@ -260,26 +260,28 @@ export const flow = {
     await switchProfile(page);
     await page.getByRole('button', { name: /Add another profile/i }).click();
     await page.waitForSelector('[data-onboarding-step="1"]');
-    await check('additional-profile onboarding still exposes Student only',
-      await page.getByRole('button', { name: 'Student', exact: true }).count() === 1
-      && await page.getByRole('button', { name: 'Teacher', exact: true }).count() === 0);
-    await check('additional-profile Student role is already selected',
-      await page.getByRole('button', { name: 'Student', exact: true }).getAttribute('aria-pressed') === 'true');
+    await page.getByRole('button', { name: 'Teacher', exact: true }).click();
+    await check('teacher onboarding explains local UX role without privileged cloud authority',
+      /local UX role/i.test(await page.locator('.auth-card').innerText())
+      && /does not grant/i.test(await page.locator('.auth-card').innerText()));
     await next(page);
-    await page.waitForSelector('[data-onboarding-step="2"]');
-    const secondTrackOptions = await page.locator('#signup-track option').allInnerTexts();
-    await check('additional-profile curriculum cannot enter Olympiad',
-      !secondTrackOptions.some(x => /Olympiad/i.test(x)));
-    await check('additional-profile curriculum cannot enter Australia',
-      await page.locator('#signup-course').count() === 0
-      && await page.getByRole('button', { name: /Australia/i }).count() === 0);
-    await check('additional-profile curriculum keeps JEE Advanced available',
-      secondTrackOptions.includes('JEE Advanced'));
-    await page.getByRole('button', { name: 'Back', exact: true }).click();
-    await page.getByRole('button', { name: 'Back', exact: true }).click();
-    await page.waitForSelector('.acct-list');
+    await chooseIndia(page, '10');
+    await personalise(page, 'KALP03 Teacher', { avatarIndex: 2 });
+    await finishLocal(page);
+    await page.getByRole('button', { name: 'Open Teacher Workspace' }).click();
+    await page.waitForURL(/\/teach(?:#.*)?$/, { timeout: 30000 });
+    await page.waitForSelector('.teacher-workspace-head');
+    await check('teacher profile lands directly in Teacher Workspace', new URL(page.url()).pathname === '/teach');
+    const teacherLabels = await page.locator('.sidebar .nav-label').allTextContents();
+    await check('teacher gets teacher-specific navigation',
+      ['Teacher workspace', 'Classes', 'Assignments', 'Analytics & reports', 'Question tools'].every(x => teacherLabels.includes(x)));
+    await check('teacher primary navigation excludes student Practice and Exams',
+      !teacherLabels.includes('Practice') && !teacherLabels.includes('Exams'));
+    await check('teacher workspace exposes legitimate class and assignment sections',
+      await page.locator('#teacher-classes').count() === 1 && await page.locator('#teacher-assignments').count() === 1);
 
-    await beginAdditional(page);
+    await switchProfile(page);
+    await beginAdditional(page, 'student');
     await chooseIndia(page, '9');
     await personalise(page, 'KALP03 Cloud Handoff');
     await page.waitForSelector('[data-onboarding-step="4"]');
@@ -299,7 +301,7 @@ export const flow = {
         await page.locator('section[aria-labelledby="cloud-account-title"]').innerText()));
 
     await switchProfile(page);
-    await beginAdditional(page);
+    await beginAdditional(page, 'student');
     await chooseIndia(page, '8');
     await page.waitForSelector('[data-onboarding-step="3"]');
     await page.locator('#signup-name').fill('हिंदी विद्यार्थी');

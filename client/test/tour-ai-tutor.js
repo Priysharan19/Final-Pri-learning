@@ -33,7 +33,7 @@ export const flowOff = {
   id: 'tutor-off',
   name: 'AI tutor · dark by default in a production build',
 
-  async run({ page, ctx, base, check, goto, createLegacyProfile, settle }) {
+  async run({ page, ctx, base, check, goto, createProfile, settle }) {
     const tutorRequests = [];
     await page.addInitScript(origin => {
       window.__PRI_CLOUD_ORIGIN__ = origin;
@@ -49,7 +49,7 @@ export const flowOff = {
     page.on('request', r => { if (/TutorHelp-[^/]*\.js$/.test(r.url())) chunkRequests.push(r.url()); });
 
     await goto('/');
-    await createLegacyProfile({ name: 'Dark Tutor Student', year: 7 });
+    await createProfile({ name: 'Dark Tutor Student', year: 7 });
     await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
     await settle();
@@ -66,7 +66,7 @@ export const flow = {
   id: 'tutor',
   name: 'AI tutor · three levels, in order, with fallback',
 
-  async run({ page, ctx, base, check, goto, createLegacyProfile }) {
+  async run({ page, ctx, base, check, goto, createProfile }) {
     const requests = [];
 
     await page.addInitScript(origin => { window.__PRI_CLOUD_ORIGIN__ = origin; }, base);
@@ -98,7 +98,7 @@ export const flow = {
     });
 
     await goto('/');
-    await createLegacyProfile({ name: 'Tutor Student', year: 7 });
+    await createProfile({ name: 'Tutor Student', year: 7 });
     await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
 

@@ -145,6 +145,21 @@ const MUTATIONS = [
     expect: /pri_server can UPDATE sync_cursors, which must be read-only to it/
   },
   {
+    label: 'a later migration gives pri_server DELETE on the audit log',
+    migrations: laterMigration('grant delete on pri.audit_log to pri_server;'),
+    expect: /pri_server can DELETE audit_log, which must be append-only to it/
+  },
+  {
+    label: 'a later migration drops the per-account scope policy on learning_events',
+    migrations: laterMigration('drop policy pri_account_scope on pri.learning_events;'),
+    expect: /learning_events: expected a restrictive pri_account_scope policy, found none/
+  },
+  {
+    label: 'a later migration loosens the per-account scope policy on sync_entities',
+    migrations: laterMigration("drop policy pri_account_scope on pri.sync_entities;\ncreate policy pri_account_scope on pri.sync_entities as restrictive for all to pri_server using (true) with check (true);"),
+    expect: /sync_entities: policy pri_account_scope does not scope rows to pri\.account_id/
+  },
+  {
     // Always the LAST migration that moves schema_version, whichever that is,
     // so a later migration (tutor cache: 8) cannot make this mutation vacuous.
     label: `schema_version left behind by its last bump (${LAST_SCHEMA_BUMP.name})`,

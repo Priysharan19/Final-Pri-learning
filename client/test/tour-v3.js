@@ -30,9 +30,9 @@ export const flow = {
   id: 'practice',
   name: 'Practice · a question, marked both ways',
 
-  async run({ page, ctx, base, check, goto, createLegacyProfile, mathText, settle }) {
+  async run({ page, ctx, base, check, goto, createProfile, mathText, settle }) {
     await goto('/');
-    await createLegacyProfile({ name: 'Blaise Pascal', year: 7 });
+    await createProfile({ name: 'Blaise Pascal', year: 7 });
 
     // ── 1 · a question renders ───────────────────────────────────────────────
     await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });

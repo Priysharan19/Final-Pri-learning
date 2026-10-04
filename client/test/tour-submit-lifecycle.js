@@ -78,13 +78,13 @@ export const flow = {
   id: 'submit-lifecycle',
   name: 'Submission · interruption recovery and one attempt',
 
-  async run({ page, base, check, goto, createLegacyProfile, mathText, settle }) {
+  async run({ page, base, check, goto, createProfile, mathText, settle }) {
     // Handwriting is read only by the server reader (owner decision): a
     // stand-in reader reads back what this flow writes.
     const reader = await useFakeServerReader(page, base);
     reader.text = '1';
     await goto('/');
-    await createLegacyProfile({ name: 'Rosalind Franklin', year: 7 });
+    await createProfile({ name: 'Rosalind Franklin', year: 7 });
     await turnOnServerReading(page, base);
     const practice = `${base}/practice?subtopic=${TOPIC}`;
     const reopen = async () => {

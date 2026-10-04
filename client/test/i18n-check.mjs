@@ -242,6 +242,7 @@ const LITERAL_ALLOWLIST = new Map([
   ['D', 'the D1–D4 difficulty shorthand, read as a code'],
   ['Evaluation', 'inside the wordmark block, translated separately as verdict.evaluation'],
   ['CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD', 'examination boards, printed in Latin on the Hindi admit card too'],
+  ['CBSE · NCERT · JEE MAIN · JEE ADVANCED', 'examination boards (flag-off build, no Olympiad), printed in Latin on the Hindi admit card too'],
   ['you@example.com', 'an example address, not prose'],
   ['Password', 'placeholder replaced by t(); any survivor here is a failure'],
 ]);
@@ -358,7 +359,7 @@ for (const rel of CONVERTED) {
 }
 
 ok(textNodesSeen > 400, `the scan actually read the files (${textNodesSeen} JSX text nodes)`);
-ok(expressionsSeen >= 5, `and the string literals their expressions draw (${expressionsSeen})`);
+ok(expressionsSeen > 8, `and the string literals their expressions draw (${expressionsSeen})`);
 ok(attributesSeen > 40, `and their spoken attributes (${attributesSeen} aria-label/title/placeholder/alt)`);
 eq(leftInEnglish, [], 'no converted screen draws a literal English string a reader would see');
 

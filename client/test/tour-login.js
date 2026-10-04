@@ -26,8 +26,8 @@ export const flow = {
       'no .hero-title on a first visit with no profiles');
     await check('the hero offers the way into onboarding',
       await page.getByRole('button', { name: 'Get Started' }).isVisible());
-    await check('the launch hero makes no Olympiad claim', !/Olympiad/i.test(await page.locator('.auth-col').innerText()));
 
+    // KALP-R1: the signed-out privacy notice states the real local/server boundary.
     await goto('/privacy');
     await page.waitForSelector('.legal-body', { timeout: 15000 });
     const privacyCopy = await page.locator('.legal-body').innerText();
@@ -41,25 +41,14 @@ export const flow = {
 
     await page.getByRole('button', { name: 'Get Started' }).click();
     await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
-    await check('first-run exposes Student as the only public V1 role',
+    await check('first-run starts by asking for the real product role',
       await page.getByRole('button', { name: 'Student', exact: true }).count() === 1
-      && await page.getByRole('button', { name: 'Teacher', exact: true }).count() === 0);
-    await check('Student is the fixed selected public role',
-      await page.getByRole('button', { name: 'Student', exact: true }).getAttribute('aria-pressed') === 'true');
-    await advance(page);
-    await page.waitForSelector('[data-onboarding-step="2"]');
-    const publicTracks = await page.locator('#signup-track option').allInnerTexts();
-    await check('public onboarding exposes exactly Classes 7–12 plus JEE Main/Advanced',
-      ['Class 7','Class 8','Class 9','Class 10','Class 11','Class 12','JEE Main','JEE Advanced'].every(x => publicTracks.includes(x))
-      && !publicTracks.some(x => /Olympiad|HSC|VCE|QCE|WACE|SACE|IB/.test(x)));
-    // The browser build runs with PRI_FEATURE_AUSTRALIA=1 (a production build
-    // has it off: browser-run-fixes-check). Behind that flag the only door is a
-    // folded student link; no course selector is shown until it is opened and
-    // there is no teacher variant of it.
-    await check('the Australian syllabuses sit behind one folded student-only link, no course selector in the public step',
-      await page.getByRole('button', { name: /Studying in Australia/ }).count() === 1
-      && await page.getByRole('button', { name: /Teaching in Australia/ }).count() === 0
-      && await page.locator('#signup-course').count() === 0);
+      && await page.getByRole('button', { name: 'Teacher', exact: true }).count() === 1);
+    await page.getByRole('button', { name: 'Teacher', exact: true }).click();
+    await check('teacher role is described as local UX rather than cloud privilege',
+      /local UX role/i.test(await page.locator('.auth-card').innerText())
+      && /does not grant/i.test(await page.locator('.auth-card').innerText()));
+
     await goto('/');
     await createProfile(STUDENT);
     const greet = await page.locator('.home-greet').innerText();
@@ -68,6 +57,7 @@ export const flow = {
     await check('the account chip carries the new profile',
       (await page.locator('.user-chip').innerText()).includes('Ada'));
 
+    // KALP-R1: the plan summary reads the enforced Free limits and names the real Premium family.
     await goto('/settings');
     await page.waitForSelector('.settings-grid', { timeout: 30000 });
     const settingsText = await page.locator('.settings-grid').innerText();
@@ -79,17 +69,14 @@ export const flow = {
     await check('shipping plan copy keeps completed local work available', /completed local work, history and progress stay/i.test(settingsText));
     await check('shipping Settings do not advertise the old all-inclusive plan',
       !/everything else unlimited|all courses|all pathways|all features/i.test(settingsText));
-    await page.getByRole('button', { name: /Edit/i }).first().click();
-    await check('Settings cannot switch a public profile into an Australian curriculum', await page.locator('#set-course').count() === 0);
-    await check('Settings cannot switch a public profile into Olympiad', !/Olympiad/.test(await page.locator('.settings-grid').innerText()));
-    await page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
+    await goto('/');
 
     await switchProfile(page);
     const ada = page.locator('.acct-row', { hasText: STUDENT.name });
     await check('the new profile appears in the picker', await ada.count() === 1,
       `${await page.locator('.acct-row').count()} rows in the picker`);
     await check('the picker shows which year the profile is in',
-      /Class 9/.test(await ada.innerText()), `row reads ${JSON.stringify(await ada.innerText())}`);
+      /Year 9/.test(await ada.innerText()), `row reads ${JSON.stringify(await ada.innerText())}`);
     await check('an unprotected profile carries no lock',
       await ada.locator('.acct-lock').count() === 0);
 
@@ -97,7 +84,8 @@ export const flow = {
     await page.waitForSelector('[data-onboarding-step="1"]');
     await page.getByRole('button', { name: 'Student', exact: true }).click();
     await advance(page);
-    await page.locator('#signup-track').selectOption('jee-main');
+    await page.getByRole('button', { name: /Studying in Australia/ }).click();
+    await page.locator('#signup-course').selectOption('nsw');
     await page.locator('#signup-year').selectOption(String(LOCKED.year));
     await advance(page);
     await page.locator('#signup-name').fill(LOCKED.name);
