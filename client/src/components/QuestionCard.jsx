@@ -22,7 +22,7 @@ import { plotSpecFor } from '../engine/plotSpec.js';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 import { misconceptionById } from '../engine/misconceptions.js';
-import { tLater, translate, useLanguage, useT, useTx } from '../i18n/index.js';
+import { tLater, translate, useLanguage, useT } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
 import { useFormFactor } from '../platform/formFactor.js';
 import Icon from './Icon.jsx';
@@ -249,7 +249,6 @@ const REASON_TAG_KEY = {
 export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, compact = false, diagnostic = null }) {
   const { celebrate, refreshUser, refreshDue, refreshRecent, toast, user } = useApp();
   const t = useT();
-  const tx = useTx();
   const [answer, setAnswer] = useState('');
   const [mcqSel, setMcqSel] = useState(null);
   // Handwriting kept from before a reload brings the card back to the pen.
@@ -283,7 +282,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // One quiet line, once per device, the first time a photo is read on the
   // server for a student who never chose either way in Settings.
   const [cloudNotice, setCloudNotice] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
   const [inkPhase, setInkPhase] = useState(() => (inkModule ? 'ready' : 'idle'));   // idle | loading | ready | failed
   const [inkTry, setInkTry] = useState(0);
   const [toTex, setToTex] = useState(() => latexFn);
@@ -331,7 +329,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setShowTutor(false); setTutorUsed(question.tutorLevel || 0);
     setWorking(draft?.working || ''); setShowWorking(!!draft?.working);
     setState({ phase: 'answering' }); setBusy(false);
-    setSelfMarks({}); setSelfSaved(false); setSelfOpen(false); setPhoto(null); setBookmarked(false); setElapsed(0);
+    setSelfMarks({}); setSelfSaved(false); setSelfOpen(false); setPhoto(null); setBookmarked(false);
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
     setChecking(false); setVouched(null); setPdfUnread(null);
     setSaveState(draft?.typed || draft?.working || restoredInk?.length ? 'saved' : null);
@@ -343,12 +341,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   const resolved = state.phase === 'resolved';
   const res = state.res;
-
-  useEffect(() => {
-    if (resolved) return;
-    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)), 1000);
-    return () => clearInterval(timer);
-  }, [resolved, question.id]);
 
   const isMcq = question.answerType === 'mcq';
   const isWorking = question.answerType === 'working';
@@ -1911,6 +1903,3 @@ function attachPhoto(e, setPhoto, onReady, onPdf, onFailed) {
   e.target.value = '';
 }
 
-function fmtTime(s) {
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-}
