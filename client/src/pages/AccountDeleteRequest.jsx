@@ -102,7 +102,14 @@ export default function AccountDeleteRequest() {
           ) : <>
             <label className="label" htmlFor="delete-request-email">{t('deleteRequest.email')}</label>
             <input className="input" id="delete-request-email" type="email" inputMode="email" autoComplete="email" maxLength={254}
-              value={email} disabled={!!busy} onChange={e => { setEmail(e.target.value); setError(''); }} />
+              value={email} disabled={!!busy}
+              onChange={e => {
+                setEmail(e.target.value); setError('');
+                // A code is bound to the address it was sent to. Editing the
+                // address drops the pending challenge instead of letting the
+                // next code count as a failed attempt against the old one.
+                if (challengeId) { setChallengeId(null); setCode(''); setNotice(''); }
+              }} />
             {!challengeId && (
               <button type="button" className="btn btn-primary signup-next" data-testid="delete-request-send"
                 disabled={!!busy || !email.trim()} onClick={sendCode}>

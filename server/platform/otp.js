@@ -85,14 +85,14 @@ export function createOtpRouter(db, {
   const publicOrigin = env.PRI_PUBLIC_ORIGIN;
   const router = asyncRouter();
 
-  async function deliver({ channel, destination, purpose, accountId = null, now = Date.now() }) {
+  async function deliver({ channel, destination, purpose, accountId = null, intent = null, now = Date.now() }) {
     if (channel === 'sms' && !sms) throw Object.assign(new Error('Phone codes are not available yet.'), { code: 'OTP_SMS_NOT_CONFIGURED', status: 503 });
     if (channel === 'email' && !sendEmail) throw Object.assign(new Error('Email codes are not available yet.'), { code: 'OTP_EMAIL_NOT_CONFIGURED', status: 503 });
     const providerName = channel === 'sms' ? sms.name : 'email';
     const delegated = channel === 'sms' && sms.generatesCode;
     const challenge = await createChallenge(db, { channel, purpose, destination, accountId, providerName, providerGeneratesCode: delegated, now });
     try {
-      if (channel === 'email') await sendEmail({ challengeId: challenge.challengeId, to: destination, code: challenge.code, purpose });
+      if (channel === 'email') await sendEmail({ challengeId: challenge.challengeId, to: destination, code: challenge.code, purpose, intent });
       else if (delegated) await sms.start({ to: destination, purpose });
       else await sms.send({ to: destination, code: challenge.code, purpose, publicOrigin });
     } catch (error) {
@@ -298,7 +298,9 @@ export function createOtpRouter(db, {
     }
     try {
       const account = await accountByEmail(destination);
-      const sent = await deliver({ channel: 'email', destination, purpose: 'reauth', accountId: account?.id || null });
+      // intent only changes the email copy: the mail says plainly that the code
+      // deletes an account, so it cannot be passed off as a sign-in code.
+      const sent = await deliver({ channel: 'email', destination, purpose: 'reauth', accountId: account?.id || null, intent: 'account-delete' });
       res.status(202).json({ ok: true, channel: 'email', ...sent });
     } catch (error) { return sendError(res, error); }
   });

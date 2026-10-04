@@ -109,15 +109,30 @@ export const flows = [
         await check('the page does not say whether an account exists',
           await page.getByText('If there is an account for that address', { exact: false }).isVisible());
 
+        // Editing the address after a code was sent drops that challenge: the
+        // code field goes, Send comes back, and the old code is never counted
+        // against the new address.
+        await page.locator('#delete-request-email').fill('Leaver@Example.tes');
+        await check('changing the address after a code was sent clears the pending code',
+          await page.locator('#delete-request-code-0').count() === 0 && await page.getByTestId('delete-request-send').isVisible());
+        await page.locator('#delete-request-email').fill('Leaver@Example.test');
+        h.db.prepare('DELETE FROM rate_limits').run();
+        await page.getByTestId('delete-request-send').click();
+        await page.locator('#delete-request-code-0').waitFor({ timeout: 15000 });
+        const code2 = lastCode(sms, 'leaver@example.test');
+        await check('a fresh code is sent for the restored address', /^\d{6}$/.test(code2 || ''));
+        await check('the deletion email says it deletes the account, not that it is a sign-in code',
+          /permanently deletes the account/.test(sms.readTestOutbox({ to: 'leaver@example.test' }).at(-1)?.body || ''));
+
         await check('a confirm button is there for a pasted code; typing the sixth digit submits by itself',
           await page.getByTestId('delete-request-confirm').isDisabled());
-        await typeCode(page, 'delete-request-code-0', wrongCode(code));
+        await typeCode(page, 'delete-request-code-0', wrongCode(code2));
         await page.getByRole('alert').waitFor({ timeout: 10000 });
         await check('a wrong code is refused and nothing is deleted',
           !!h.db.prepare('SELECT 1 FROM accounts WHERE id=?').get(leaver.id));
         await shot('wrong-code');
 
-        await typeCode(page, 'delete-request-code-0', code);
+        await typeCode(page, 'delete-request-code-0', code2);
         await page.getByTestId('delete-request-done').waitFor({ timeout: 15000 });
         await check('the right code deletes the account and the page says so',
           await page.getByTestId('delete-request-done').getAttribute('data-outcome') === 'deleted');

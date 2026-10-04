@@ -76,6 +76,11 @@ try {
   c.deq(Object.keys(known.data).sort(), Object.keys(unknown.data).sort(), 'and the two bodies have the same shape');
   c.match(lastCode('leaver@example.test'), /^\d{6}$/, 'a code went to the account’s address');
   c.match(lastCode('nobody-here@example.test'), /^\d{6}$/, 'and one went to the unknown address, so the response reveals nothing');
+  const deletionMail = readTestOutbox({ to: 'leaver@example.test' }).at(-1);
+  c.ok(/permanently deletes the account/.test(deletionMail?.body || ''),
+    'the deletion code email says, in words, that entering the code deletes the account');
+  c.ok(!/your Pri Learning code/.test(deletionMail?.body || '') && deletionMail?.intent === 'account-delete',
+    'and it does not read like a sign-in code');
   c.eq(raw.prepare('SELECT account_id, purpose FROM otp_challenges WHERE id=?').get(known.data.challengeId)?.account_id, student.id,
     'the known address’s challenge is bound to that account');
   c.eq(raw.prepare('SELECT account_id FROM otp_challenges WHERE id=?').get(unknown.data.challengeId)?.account_id, null,
