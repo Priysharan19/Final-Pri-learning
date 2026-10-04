@@ -25,6 +25,15 @@
 //    no number word and no operation word. Anything else is replaced by the
 //    deterministic caption.
 //
+// 4. A reply may never repeat a whole verified step word for word. The solution
+//    the server is grounded in arrives from the client (tutor.js explains why),
+//    so a reply that echoes a step verbatim would hand back whatever the client
+//    sent; it is treated as a leak like any other.
+//
+// 5. A streamed reply is released sentence by sentence (createReleaseGate): the
+//    text is buffered to a sentence boundary, the cumulative text is checked, and
+//    only a clean prefix reaches the student. The first leak stops the stream.
+//
 // All of this errs towards refusal. A false alarm costs one regenerated message
 // or the authored hint; a miss costs a student the exercise.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -379,7 +388,21 @@ export function buildGuard(question, { studentLines = [], verifiedLines = 0 } = 
     .filter((r, j) => r && j !== reachedIndex && !protectedExprs.includes(r))
     .map(r => normalizeMath(r))
     .filter(s => s && !/^[a-z]$/.test(s) && !protectedStrings.has(s)));
-  return { protectedStrings: [...protectedStrings], protectedValues, otherStrings: [...otherStrings] };
+  // Whole verified steps, as prose: a reply that repeats one word for word is
+  // reciting the solution, not tutoring. Short headings ("Simplify") are not
+  // protected — they are ordinary words a hint needs.
+  const verbatimStrings = [...new Set(steps
+    .flatMap(step => [step?.h, step?.d, `${step?.h || ''} ${step?.d || ''}`])
+    .map(proseKey)
+    .filter(s => s.length >= MIN_VERBATIM_CHARS))];
+  return { protectedStrings: [...protectedStrings], protectedValues, otherStrings: [...otherStrings], verbatimStrings };
+}
+
+const MIN_VERBATIM_CHARS = 24;
+
+/** Text as a comparison key for prose: one notation for the maths, then letters and digits only. */
+export function proseKey(text) {
+  return normalizeMath(text).replace(/[^\p{L}\p{N}]/gu, '');
 }
 
 /**
@@ -398,6 +421,10 @@ export function leakedExpressions(message, guard, { prompt = '' } = {}) {
   for (const s of guard.otherStrings || []) {
     if (m.includes(s) && !p.includes(s)) leaks.push(`step:${s}`);
   }
+  if ((guard.verbatimStrings || []).length) {
+    const prose = proseKey(message);
+    for (const s of guard.verbatimStrings) if (prose.includes(s)) leaks.push(`verbatim:${s.slice(0, 24)}`);
+  }
   if ((guard.protectedValues || []).length) {
     const stated = statedValues(message);
     const ranges = statedRanges(message);
@@ -407,6 +434,96 @@ export function leakedExpressions(message, guard, { prompt = '' } = {}) {
     }
   }
   return leaks;
+}
+
+// ── Streaming: guard, then release ───────────────────────────────────────────
+
+// A sentence ends at . ! ? or the Devanagari danda, optionally followed by a
+// closing quote or bracket, and THEN whitespace — so "3.5" is never split and a
+// trailing "x = 4" is held until the stream ends. A newline is a boundary too.
+const SENTENCE_END = /[.!?।][)"'”’\]]*\s|\n/g;
+const FIRST_SENTENCE_END = /[.!?।][)"'”’\]]*\s|\n/;
+
+/** The index just past the last complete sentence in `text`, or 0 when none has ended yet. */
+export function sentenceBoundary(text) {
+  let end = 0;
+  for (const m of String(text ?? '').matchAll(SENTENCE_END)) end = m.index + m[0].length;
+  return end;
+}
+
+/** The index just past the FIRST complete sentence, or 0. */
+function firstSentenceEnd(text) {
+  const m = FIRST_SENTENCE_END.exec(String(text ?? ''));
+  return m ? m.index + m[0].length : 0;
+}
+
+/**
+ * The gate a streamed reply passes through on its way to a student.
+ *
+ *   push(delta)  — buffer the model's text; when at least one sentence has
+ *                  completed, check the CUMULATIVE text (everything released so
+ *                  far plus the new sentences) and release the new sentences only
+ *                  if it is clean. Returns { release, leaks, capped }.
+ *   finish()     — the stream ended: check and release whatever is buffered.
+ *
+ * Once a leak is found the gate is closed for good: every later push releases
+ * nothing. `maxChars` bounds the reply; text past it is dropped and `capped`
+ * is reported so the caller can end the stream.
+ */
+export function createReleaseGate(guard, { prompt = '', maxChars = 900 } = {}) {
+  let released = '';
+  let buffer = '';
+  let closed = false;
+  let capped = false;
+
+  function check(candidate) {
+    const leaks = leakedExpressions(candidate, guard, { prompt });
+    if (leaks.length) closed = true;
+    return leaks;
+  }
+
+  function release(segment) {
+    if (!segment) return { release: '', leaks: [], capped };
+    const leaks = check(released + segment);
+    if (leaks.length) return { release: '', leaks, capped };
+    released += segment;
+    buffer = buffer.slice(segment.length);
+    return { release: segment, leaks: [], capped };
+  }
+
+  // Release sentence by sentence, so a clean sentence ahead of a leaking one
+  // still reaches the student and the leaking one closes the gate.
+  function releaseSentences() {
+    let out = '';
+    for (;;) {
+      const boundary = sentenceBoundary(buffer);
+      if (!boundary) return { release: out, leaks: [], capped };
+      const step = release(buffer.slice(0, firstSentenceEnd(buffer)));
+      if (step.leaks.length) return { release: out, leaks: step.leaks, capped };
+      out += step.release;
+    }
+  }
+
+  return {
+    push(delta) {
+      if (closed) return { release: '', leaks: [], capped };
+      let text = String(delta ?? '');
+      const room = maxChars - released.length - buffer.length;
+      if (text.length > room) { text = text.slice(0, Math.max(0, room)); capped = true; }
+      buffer += text;
+      return releaseSentences();
+    },
+    finish() {
+      if (closed) return { release: '', leaks: [], capped };
+      const sentences = releaseSentences();
+      if (sentences.leaks.length) return sentences;
+      const tail = release(buffer);
+      return { release: sentences.release + tail.release, leaks: tail.leaks, capped };
+    },
+    get released() { return released; },
+    get closed() { return closed; },
+    get capped() { return capped; }
+  };
 }
 
 // ── Captions ─────────────────────────────────────────────────────────────────

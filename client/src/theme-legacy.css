@@ -1140,6 +1140,8 @@ body { overscroll-behavior-y: none; }
 .streak-flame { color: var(--gold); }
 .week-strip { display: flex; gap: 5px; margin-top: 12px; }
 .week-day { flex: 1; text-align: center; }
+/* The Plan card draws its own seven-day strip; a distinct class keeps the home tour counting one week strip. */
+.plan-week-day { flex: 1; text-align: center; }
 .week-dot {
   width: 100%; max-width: 26px; aspect-ratio: 1; border-radius: 50%; margin: 0 auto;
   border: 1px solid var(--hairline-strong); display: grid; place-items: center; font-size: 10px; color: var(--ink-3);

@@ -49,13 +49,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
           cache: npm
           cache-dependency-path: client/package-lock.json
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: '17'
@@ -68,7 +68,7 @@ jobs:
         run: node scripts/sync-android.mjs --check
       - name: Cross-platform release matrix (CP-11)
         run: node scripts/release-matrix.mjs --require-native-android
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: android-reports
@@ -87,26 +87,27 @@ jobs:
         include:
           # API 26 (minSdk) ships a factory WebView below the Chromium 91 floor:
           # the correct, asserted result there is the fail-closed update screen.
-          - { api: 26, profile: pixel_6, expect: floor, webview: '' }
+          - { api: 26, profile: pixel_6, expect: floor, target: google_apis, webviewFlags: "" }
           # The oldest image here whose factory WebView meets the floor runs the
           # whole product journey; then the current API on phone and tablet.
-          # Phone images: the hosted runner's headless emulator (gfxstream host renderer)
-          # died (adb exit 255) while the WebView composited the practice page on the
-          # compact layout. Diagnosed in #330: the same journey survives with WebView GPU
-          # compositing off, and no emulator build/GPU/RAM/profile variant helped. Phone
-          # jobs therefore run the WebView with software compositing; the tablet job keeps
-          # GPU compositing so that path stays exercised. Product assertions are unchanged.
-          - { api: 33, profile: pixel_6, expect: product, webview: '--disable-gpu-compositing' }
-          - { api: 36, profile: pixel_6, expect: product, webview: '--disable-gpu-compositing' }
-          - { api: 36, profile: pixel_tablet, expect: product, webview: '' }
+          # Hosted phone gfxstream/WebView compositing is unstable on both API
+          # 33 and 36. The diagnostic matrix proved software compositing avoids
+          # the emulator death. API 33 deliberately uses the AOSP image: the
+          # google_apis API 33 image can restart GMSCore's FontsProvider while
+          # instrumentation is live, which makes Android kill dependent apps
+          # even though Pri has not crashed. API 36 still exercises google_apis
+          # on both phone and tablet, and the tablet keeps GPU compositing.
+          - { api: 33, profile: pixel_6, expect: product, target: default, webviewFlags: "--disable-gpu-compositing" }
+          - { api: 36, profile: pixel_6, expect: product, target: google_apis, webviewFlags: "--disable-gpu-compositing" }
+          - { api: 36, profile: pixel_tablet, expect: product, target: google_apis, webviewFlags: "" }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
           cache: npm
           cache-dependency-path: client/package-lock.json
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: '17'
@@ -122,20 +123,18 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - name: Emulator journey (real process death) and cloud journey against the real Pri server
         # ReactiveCircus/android-emulator-runner v2.38.0, pinned to its commit.
-        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: ${{ matrix.api }}
-          target: google_apis
+          target: ${{ matrix.target }}
           arch: x86_64
           profile: ${{ matrix.profile }}
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim
           working-directory: android
           # One line: the runner executes each script line in its own shell.
-          # WebView flags (debuggable images read /data/local/tmp/webview-command-line);
-          # the live logcat tee keeps guest evidence even if the emulator dies.
-          script: mkdir -p app/build/outputs/pri-instrumented && { [ -n "${{ matrix.webview }}" ] && adb shell "echo '_ ${{ matrix.webview }}' > /data/local/tmp/webview-command-line && chmod 644 /data/local/tmp/webview-command-line" || true; } && (adb logcat -v threadtime > app/build/outputs/pri-instrumented/live-logcat.txt 2>&1 &) && node ../scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && { ./scripts/run-instrumented.sh ${{ matrix.expect }}; rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null; exit $rc; }
-      - uses: actions/upload-artifact@v4
+          script: set -e; mkdir -p app/build/outputs/pri-instrumented; WEBVIEW_FLAGS='${{ matrix.webviewFlags }}'; if [ -n "$WEBVIEW_FLAGS" ]; then adb shell "echo '_ $WEBVIEW_FLAGS' > /data/local/tmp/webview-command-line"; fi; (adb logcat -v threadtime > app/build/outputs/pri-instrumented/live-logcat.txt 2>&1 &) ; node ../scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && rc=0; ./scripts/run-instrumented.sh ${{ matrix.expect }} || rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null || true; exit "$rc"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: android-emulator-${{ matrix.api }}-${{ matrix.profile }}

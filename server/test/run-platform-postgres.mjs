@@ -55,7 +55,13 @@ export const ENGINE_SUITES = [
   'tutor-help-check.mjs',
   'failure-drills-check.mjs',
   'security-acceptance-check.mjs',
-  'abuse-limits-check.mjs'
+  'abuse-limits-check.mjs',
+  // Staff second factor, identity sign-in age declaration, and the hardening
+  // set (session lifetime, sync quota, per-account RLS scope, password policy,
+  // join-code encryption, guardian withdrawal credential, health exposure).
+  'mfa-check.mjs',
+  'oidc-consent-check.mjs',
+  'security-hardening-check.mjs'
 ];
 
 let failed = 0;

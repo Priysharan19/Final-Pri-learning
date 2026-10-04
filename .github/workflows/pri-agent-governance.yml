@@ -26,11 +26,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '24'
 
@@ -214,14 +214,40 @@ jobs:
           grep -Fq 'new-generated-payload' "$out/mirrors.patch"
           rm -rf "$fixture"
 
-          test -s .github/workflows/pri-agent-derived-sync.yml
-          grep -Fq 'pull_request_target:' .github/workflows/pri-agent-derived-sync.yml
-          grep -Fq 'pri-derived-artifact-sync.mjs package' .github/workflows/pri-agent-derived-sync.yml
-          apply_job="$(awk '/^  apply-derived:/{flag=1} flag{print}' .github/workflows/pri-agent-derived-sync.yml)"
+          # The untrusted build half runs candidate code on the plain
+          # pull_request event with a read-only token and only uploads an
+          # artifact; the privileged half consumes it over workflow_run.
+          sync_wf=.github/workflows/pri-agent-derived-sync.yml
+          apply_wf=.github/workflows/pri-agent-derived-apply.yml
+          test -s "$sync_wf"
+          test -s "$apply_wf"
+          grep -Eq '^  pull_request:' "$sync_wf"
+          grep -Fq 'pri-derived-artifact-sync.mjs package' "$sync_wf"
+          grep -Fq 'persist-credentials: false' "$sync_wf"
+          if grep -Fq 'pull_request_target' "$sync_wf" "$apply_wf"; then
+            echo 'derived sync must never use pull_request_target' >&2
+            exit 1
+          fi
+          if grep -Eq 'contents:[[:space:]]*write' "$sync_wf"; then
+            echo 'the candidate-executing build job must never hold write authority' >&2
+            exit 1
+          fi
+          grep -Eq '^  workflow_run:' "$apply_wf"
+          grep -Fq 'workflows: ["Pri Agent Derived Artifact Sync"]' "$apply_wf"
+          grep -Fq "head_repository.full_name == github.repository" "$apply_wf"
+          grep -Fq "startsWith(github.event.workflow_run.head_branch, 'agent/mission/')" "$apply_wf"
+          grep -Fq 'pri-derived-artifact-sync.mjs validate-metadata' "$apply_wf"
+          grep -Fq 'pri-derived-artifact-sync.mjs validate-paths' "$apply_wf"
+          grep -Fq 'sha256sum mirrors.patch paths.json metadata.json' "$apply_wf"
+          apply_job="$(awk '/^  apply-derived:/{flag=1} flag{print}' "$apply_wf")"
           printf '%s\n' "$apply_job" | grep -Fq 'contents: write'
           printf '%s\n' "$apply_job" | grep -Fq 'Apply validated mirrors without executing candidate code'
-          if printf '%s\n' "$apply_job" | grep -Eq 'npm (ci|run)|working-directory:[[:space:]]*candidate'; then
+          if printf '%s\n' "$apply_job" | grep -Eq 'npm (ci|run|install)|working-directory:[[:space:]]*candidate'; then
             echo 'write-authority job must never execute candidate npm code' >&2
+            exit 1
+          fi
+          if printf '%s\n' "$apply_job" | grep -Eq 'persist-credentials:[[:space:]]*true'; then
+            echo 'write-authority job must not persist the token into any checkout' >&2
             exit 1
           fi
 
@@ -321,7 +347,7 @@ jobs:
 
       - name: Snapshot GitHub-Issue mission ledger
         if: github.event_name == 'pull_request' && steps.meta.outputs.autonomous == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
             const fs = require('fs');

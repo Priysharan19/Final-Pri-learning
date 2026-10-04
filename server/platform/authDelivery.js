@@ -30,7 +30,7 @@ export function ensureAuthDeliverySchema(db) {
   db.exec(`CREATE TABLE IF NOT EXISTS auth_delivery_outbox (
     id TEXT PRIMARY KEY,
     account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-    kind TEXT NOT NULL CHECK(kind IN ('verify-email','reset-password','guardian-consent')),
+    kind TEXT NOT NULL CHECK(kind IN ('verify-email','reset-password','guardian-consent','guardian-withdraw')),
     destination TEXT NOT NULL,
     token_id TEXT NOT NULL REFERENCES account_tokens(id) ON DELETE CASCADE,
     token_ciphertext TEXT NOT NULL,
@@ -68,7 +68,7 @@ function cleanPublicOrigin(raw) {
  * never sent in the HTTP request line, reverse-proxy logs or Referrer headers.
  */
 export function buildAuthActionUrl(publicOrigin, kind, rawToken) {
-  if (!['verify-email', 'reset-password', 'guardian-consent'].includes(kind)) throw new Error('Unsupported auth delivery kind');
+  if (!['verify-email', 'reset-password', 'guardian-consent', 'guardian-withdraw'].includes(kind)) throw new Error('Unsupported auth delivery kind');
   const token = String(rawToken || '');
   if (!token || token.length > 512) throw new Error('Invalid auth delivery token');
   // A parent's link opens the parent's own consent page; account links open
@@ -102,11 +102,21 @@ export function authEmailMessage(kind, actionUrl) {
   }
   if (kind === 'guardian-consent') {
     // Written to a parent, not to the student, and it states the two authority
-    // windows separately: confirmation is short-lived; later withdrawal is not.
+    // windows accurately: this link confirms (or declines) for 1 hour; a
+    // separate, long-lived withdrawal link follows a confirmation.
     return {
       subject: 'Confirm your child’s Pri Learning account',
-      text: `Your child has created a Pri Learning account and asked you to confirm it.\n\nConfirm here:\n\n${url}\n\nPri Learning is a maths app. Everything in it works on their device without an account; confirming lets their progress sync between devices and be backed up. If you do nothing, nothing syncs and their work simply stays on their device.\n\nConfirmation is available for 1 hour. If you confirm, you can later use this same link to withdraw consent at any time.`,
-      html: `<p>Your child has created a Pri Learning account and asked you to confirm it.</p><p><a href="${escapeHtml(url)}">Confirm this account</a></p><p>Pri Learning is a maths app. Everything in it works on their device without an account; confirming lets their progress sync between devices and be backed up. If you do nothing, nothing syncs and their work simply stays on their device.</p><p>Confirmation is available for 1 hour. If you confirm, you can later use this same link to withdraw consent at any time.</p>`
+      text: `Your child has created a Pri Learning account and asked you to confirm it.\n\nConfirm here:\n\n${url}\n\nPri Learning is a maths app. Everything in it works on their device without an account; confirming lets their progress sync between devices and be backed up. If you do nothing, nothing syncs and their work simply stays on their device.\n\nThis link works for 1 hour, and you can also use it to say no. If you confirm, we will email you a separate link that you can keep and use to withdraw consent at any time.`,
+      html: `<p>Your child has created a Pri Learning account and asked you to confirm it.</p><p><a href="${escapeHtml(url)}">Confirm this account</a></p><p>Pri Learning is a maths app. Everything in it works on their device without an account; confirming lets their progress sync between devices and be backed up. If you do nothing, nothing syncs and their work simply stays on their device.</p><p>This link works for 1 hour, and you can also use it to say no. If you confirm, we will email you a separate link that you can keep and use to withdraw consent at any time.</p>`
+    };
+  }
+  if (kind === 'guardian-withdraw') {
+    // Sent once a guardian has confirmed. The link does not expire and can only
+    // ever withdraw; it is revoked by the withdrawal it performs.
+    return {
+      subject: 'Your child’s Pri Learning account is confirmed — keep this email',
+      text: `Thank you for confirming your child’s Pri Learning account. Their progress can now sync between their devices and be backed up.\n\nKeep this email. If you ever want to withdraw your consent, open this link:\n\n${url}\n\nIt does not expire, it can only withdraw consent (never give it), and withdrawing stops their account syncing at once. Their work stays on their device either way.`,
+      html: `<p>Thank you for confirming your child’s Pri Learning account. Their progress can now sync between their devices and be backed up.</p><p>Keep this email. If you ever want to withdraw your consent, open this link:</p><p><a href="${escapeHtml(url)}">Withdraw consent</a></p><p>It does not expire, it can only withdraw consent (never give it), and withdrawing stops their account syncing at once. Their work stays on their device either way.</p>`
     };
   }
   throw new Error('Unsupported auth delivery kind');
@@ -141,7 +151,7 @@ export function createResendAuthEmailTransport({
           subject: message.subject,
           text: message.text,
           html: message.html,
-          tags: [{ name: 'category', value: kind === 'verify-email' ? 'verify_email' : 'reset_password' }]
+          tags: [{ name: 'category', value: kind.replace(/-/g, '_') }]
         }),
         signal: controller.signal
       });
@@ -191,11 +201,13 @@ export async function drainAuthDeliveryOutbox(db, {
 
   // Once a token is consumed or expired there is no reason to retain even a
   // delivered metadata row. This keeps destinations/provider ids bounded to the
-  // lifetime of the one-hour account action.
+  // lifetime of the one-hour account action. The guardian's long-lived
+  // withdrawal link outlives that by years, so its row goes as soon as it has
+  // been delivered: the address is already in guardian_consents.
   const purged = (await db.run(`DELETE FROM auth_delivery_outbox
     WHERE token_id IN (
       SELECT id FROM account_tokens WHERE consumed_at IS NOT NULL OR expires_at <= ?
-    )`, [now])).changes;
+    ) OR (kind = 'guardian-withdraw' AND delivered_at IS NOT NULL)`, [now])).changes;
 
   const rows = await db.all(`SELECT o.*, t.expires_at, t.consumed_at
     FROM auth_delivery_outbox o

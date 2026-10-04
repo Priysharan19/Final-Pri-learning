@@ -1,0 +1,16 @@
+{
+  "format": "pri-real-ink-floor",
+  "version": 1,
+  "evidenceClass": "real-human",
+  "ratchet": "upward-only. Written by a person with `node client/test/inkcheck-real.mjs --write-floor` after a reviewed improvement; never written in CI; never lowered.",
+  "split": "train",
+  "writers": 1,
+  "lines": 50,
+  "exactLines": 32,
+  "exactPct": 64,
+  "charPct": 87.02,
+  "worstWriterExactPct": 64,
+  "measuredAt": "2026-10-02T14:27:06.477Z",
+  "commit": "b9d798345b982b00009afed6570470b170f39c40",
+  "note": "Regression floor only. One writer on the train split is diagnostic evidence, not a product accuracy claim (Gate C needs >= 20 writer-disjoint test writers and >= 1,000 expressions)."
+}

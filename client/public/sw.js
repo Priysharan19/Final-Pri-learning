@@ -91,6 +91,12 @@ self.addEventListener('install', (e) => {
 
 let warming = null;
 
+// A message is acted on only when it comes from a page of this origin. Service
+// worker clients are same-origin by construction, so in a browser this never
+// turns away a real page; it makes the boundary explicit and holds it if the
+// worker is ever reachable another way.
+const fromThisOrigin = (e) => !e.origin || e.origin === self.location.origin;
+
 async function warm(withOptional) {
   const wanted = withOptional ? [...WARM, ...OPTIONAL] : WARM;
   const cache = await caches.open(VERSION);
@@ -106,6 +112,7 @@ async function warm(withOptional) {
 
 self.addEventListener('message', (e) => {
   if (e.data?.type !== 'pri-warm') return;
+  if (!fromThisOrigin(e)) return;
   const optional = Boolean(e.data.optional);
   // One pass at a time. A second ask while one is in flight joins it rather
   // than doubling the requests on a link that has none to spare.
@@ -117,6 +124,42 @@ self.addEventListener('message', (e) => {
   // A port when the caller wants an answer, the client itself when it does not.
   const port = e.ports?.[0];
   e.waitUntil(reply.then(msg => { if (port) port.postMessage(msg); else e.source?.postMessage(msg); }));
+});
+
+// ── Reminders (display only) ─────────────────────────────────────────────────
+// The page computes when a reminder is due (client/src/reminders) and, while it
+// is open, asks the worker to show it; the worker never decides anything and
+// has no push subscription — there is no server to push from. A tap opens the
+// in-app route the reminder named, in the window that is already open where
+// there is one. Titles and bodies arrive generic by construction: counts and
+// catalogue copy, never a question or a mark.
+
+const REMINDER_ROUTE = /^\/[a-z-]*$/;
+
+self.addEventListener('message', (e) => {
+  if (e.data?.type !== 'pri-notify') return;
+  if (!fromThisOrigin(e)) return;
+  const title = String(e.data.title || '').slice(0, 120);
+  const body = String(e.data.body || '').slice(0, 200);
+  const tag = String(e.data.tag || 'pri-reminder').slice(0, 64);
+  const url = REMINDER_ROUTE.test(String(e.data.url || '')) ? e.data.url : '/';
+  if (!title) return;
+  e.waitUntil(self.registration.showNotification(title, { body, tag, data: { url }, icon: '/icons/icon-192.png' }).catch(() => {}));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = REMINDER_ROUTE.test(String(e.notification.data?.url || '')) ? e.notification.data.url : '/';
+  e.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const open = all.find(c => 'focus' in c);
+    if (open) {
+      try { await open.focus(); } catch { /* focus can be refused; navigate below */ }
+      if ('navigate' in open) { try { await open.navigate(url); } catch { /* cross-origin or detached */ } }
+      return;
+    }
+    if (self.clients.openWindow) await self.clients.openWindow(url);
+  })());
 });
 
 // ── Activate ─────────────────────────────────────────────────────────────────

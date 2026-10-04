@@ -42,6 +42,50 @@ Important open work at audit time includes:
 | #222 | OPEN | NSW Stage 6 profile cohort authority |
 | #220 | OPEN | NSW Stage 6 cohort-aware syllabus authority |
 
+> **Disposition addendum (2026-10-02, against `main` `b9d798345b982b00009afed6570470b170f39c40`, merged 2026-10-02T22:40:37+10:00).**
+> The table above is the audit-time record and is left as written. Each row's current state,
+> verified with `git log --first-parent main --grep "#<n>"` and the GitHub pull-request record:
+>
+> | PR | Disposition on current `main` | Merge commit (first-parent on `main`) | Merged (UTC) |
+> |---|---|---|---|
+> | #255 stable misconception ontology | **MERGED** | `eacc99e16b8b6240736a01c49955c6c528f04555` | 2026-10-01T21:34:04Z |
+> | #254 Hindi completion | **MERGED** | `bbc2469b73bbcbba9903baf6500195593fbeb8df` | 2026-10-01T22:54:16Z |
+> | #253 CP-02 platform-neutral native bridge | **MERGED** | `2261f03b7cf3cc624e3d69f1fa9a228b461bfa09` | 2026-10-01T19:05:08Z |
+> | #252 placement diagnostic | **MERGED** | `4526c90af43b226a0ae5ad3bf5d7afe231266a9c` | 2026-10-02T06:03:11Z |
+> | #251 three-level AI tutor/help | **MERGED** | `7f6ecd500f8851312122d1dbd8d2af1c19cd5bd6` | 2026-10-02T02:54:15Z |
+> | #243 expression-domain marking fix | **MERGED** — see hard-blocker #8 disposition below | `c3755476e84c0f385e23049cd4d365f45042f294` | 2026-10-01T19:59:12Z |
+> | #240 Home daily recommendation command centre | **MERGED** | `77ace818151b3c713036e03c7f3ee12005d45801` | 2026-10-01T20:24:03Z |
+> | #238 41-year JEE corpus crash recovery/reconciliation | still **OPEN** (GitHub state `open`, not merged) | — | — |
+> | #222 NSW Stage 6 profile cohort authority | still **OPEN** | — | — |
+> | #220 NSW Stage 6 cohort-aware syllabus authority | still **OPEN** | — | — |
+>
+> Consequences for the statements below that were written while these were open: §2.4/§2.12
+> (placement diagnostic "not on main"), §5 rows for Placement diagnostic, Home, Method/misconception,
+> Tutor/help and Next-question recommendation, §7 item 12, §8, §9 and §11 — each "OPEN / not main
+> authority" statement about #240, #243, #251, #252, #253, #254 or #255 is **superseded**: the code is
+> on `main`. That makes them IMPLEMENTED/TESTED on `main`; it does not make any of them
+> REAL-DEVICE-VALIDATED, STORE-READY or real-student-validated, and the V1 scope decision about the
+> AI tutor and the placement diagnostic (`PRI_V1_RELEASE_SCOPE.md` §15–§17) is unchanged by their merging.
+>
+> **Hard-blocker #8 (PR #243, expression-domain grading) disposition against current `main`:**
+> merged as above; `client/src/engine/expr.js` on `main` carries the domain-aware equivalence
+> (31 `domain` references) and `client/test/marker-ncert-forms-check.mjs` holds its regression block
+> (`domain:` checks, including the authored-domain case and one labelled KNOWN LIMITATION for a far
+> tangential hole of a non-polynomial guard at x = 100π). Run on this `main`:
+> `node client/test/marker-ncert-forms-check.mjs` → `NCERT ANSWER FORMS: PASS — 373/373 checks … and domain-aware final answers.`
+> The suite is pinned in `.github/workflows/ci.yml`. Independent review happened through the PR
+> path required by `docs/release/release-policy.md`. Software disposition: **integrated with regression
+> coverage; one documented known limitation**. Whether that limitation is release-severity is the
+> release governor's call, recorded in `PRI_V1_RELEASE_SCOPE.md` §18 status notes, not here.
+>
+> Also superseded since the audit: `docs/production-deployment.md` (§2.12 third bullet) was rewritten
+> on 2026-10-02 to the ADR-0001 target with SQLite as the explicit pre-cutover state; the
+> schema-version numbers in `docs/operations/postgres-cutover.md` were corrected to
+> `server/platform/schemaVersions.js`; and `server/tools/sqlite-to-postgres-export.mjs` now exists for
+> the SQLite→Postgres data migration the cutover document previously declared out of scope.
+> Nothing in this addendum changes §2.10: the live Railway service still runs SQLite from a feature
+> branch, and the cutover has not been run.
+
 Important merged work used in this audit includes:
 
 - #239 production handwriting provider/readiness wiring

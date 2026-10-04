@@ -17,7 +17,12 @@
 // 10: one-time-code sign-in — otp_challenges, account_phones and
 //    guardian_consents.guardian_phone (supabase/migrations/20261006000000).
 //    SQLite creates the same tables lazily in otpCore.js.
-export const SCHEMA_VERSION = 10;
+// 11: staff second factor (account_mfa, account_mfa_recovery_codes,
+//    account_sessions.mfa_verified_at), the long-lived guardian withdrawal
+//    credential (account_tokens/auth_delivery_outbox admit 'guardian-withdraw'),
+//    audit_log append-only for pri_server and per-account restrictive RLS on
+//    the sync tables (supabase/migrations/20261007000000_security_hardening.sql).
+export const SCHEMA_VERSION = 11;
 // Billing 4: billing_payments keeps its row when the account is deleted
 //    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
 //    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).
