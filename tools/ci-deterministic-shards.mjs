@@ -74,10 +74,12 @@ function runShard(state, shard) {
 }
 
 function verifyLog(state, path) {
-  const log = readFileSync(path, 'utf8');
+  // Match whole lines: `test:submission` is a prefix of `test:submission:sync`,
+  // so a substring count would double-count the shorter script name.
+  const lines = readFileSync(path, 'utf8').split(/\r?\n/).map(line => line.trimEnd());
   for (const script of state.expected) {
     const token = `CI_SCRIPT_PASS ${script}`;
-    const count = log.split(token).length - 1;
+    const count = lines.filter(line => line === token).length;
     assert.equal(count, 1, `expected exactly one successful log sentinel for ${script}, found ${count}`);
   }
   console.log(`CI SHARD LOG CONTRACT: PASS — ${state.expected.length}/${state.expected.length} expected script pass sentinels present exactly once.`);
