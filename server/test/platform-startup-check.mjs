@@ -20,6 +20,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { requestedEngine } from './support/engine.mjs';
+import { SCHEMA_VERSION } from '../platform/schemaVersions.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const serverRoot = join(here, '..');
@@ -138,8 +139,10 @@ try {
 
     // ── 3b · Migrated, but not to the schema this build needs ──────────────
     for (const [label, sql] of [
-      ['schema_version is older than the server', "UPDATE pri.platform_meta SET value='10' WHERE key='schema_version'"],
-      ['schema_version is newer than the server', "UPDATE pri.platform_meta SET value='12' WHERE key='schema_version'"],
+      // Derived from the build's own version, so bumping the schema does not
+      // quietly turn "newer" into "current".
+      ['schema_version is older than the server', `UPDATE pri.platform_meta SET value='${SCHEMA_VERSION - 2}' WHERE key='schema_version'`],
+      ['schema_version is newer than the server', `UPDATE pri.platform_meta SET value='${SCHEMA_VERSION + 1}' WHERE key='schema_version'`],
       ['billing_schema_version differs', "UPDATE pri.platform_meta SET value='2' WHERE key='billing_schema_version'"],
       ['billing_schema_version is missing', "DELETE FROM pri.platform_meta WHERE key='billing_schema_version'"],
       ['the sync cursor sequence migration is missing', 'DROP SEQUENCE pri.sync_cursor_seq']
