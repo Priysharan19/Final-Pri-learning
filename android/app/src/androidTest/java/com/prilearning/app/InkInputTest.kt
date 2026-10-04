@@ -111,7 +111,7 @@ class InkInputTest {
         val (l, t, w, h, dpr) = rect.trim('"').split(',').map { it.toFloat() }
         val loc = IntArray(2)
         s.onActivity { it.webView!!.getLocationOnScreen(loc) }
-        val stylus = tool == MotionEvent.TOOL_TYPE_STYLUS
+        val stylus = tool == MotionEvent.TOOL_TYPE_STYLUS || tool == MotionEvent.TOOL_TYPE_ERASER
         val props = arrayOf(MotionEvent.PointerProperties().apply { id = 0; toolType = tool })
         val source = if (stylus) InputDevice.SOURCE_STYLUS or InputDevice.SOURCE_TOUCHSCREEN else InputDevice.SOURCE_TOUCHSCREEN
         val down = SystemClock.uptimeMillis()
@@ -220,6 +220,17 @@ class InkInputTest {
             assertTrue("rotation keeps the strokes (${inkPixels(s)} px)", inkPixels(s) > beforeRotation / 3)
             s.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
             Thread.sleep(2000)
+
+            // ── the stylus's own eraser end erases (USI / Wacom; S Pen button) ─
+            // TOOL_TYPE_ERASER reaches the page as a pen with the eraser button
+            // (buttons & 32); the shared canvas erases with it, no UI tool switch.
+            val bandEmpty = bandPixels(s, 0.42f, 0.48f)
+            stroke(s, MotionEvent.TOOL_TYPE_STYLUS, 0.45f, fx0 = 0.66f, fx1 = 0.86f)
+            val bandInked = bandPixels(s, 0.42f, 0.48f)
+            assertTrue("a stylus stroke inks the band ($bandInked vs $bandEmpty px)", bandInked > bandEmpty + 20)
+            stroke(s, MotionEvent.TOOL_TYPE_ERASER, 0.45f, fx0 = 0.66f, fx1 = 0.86f)
+            val bandErased = bandPixels(s, 0.42f, 0.48f)
+            assertTrue("the stylus eraser end removes that stroke ($bandErased px left, was $bandInked)", bandErased <= bandEmpty + 5)
 
             // ── reading is the server's job (owner decision: server-only) ────
             // The emulator has no Pri server, so the strokes must NOT be read or
