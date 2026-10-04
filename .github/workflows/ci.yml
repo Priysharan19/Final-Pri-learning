@@ -347,6 +347,9 @@ jobs:
       PRI_FEATURE_PLACEMENT: '1'
       PRI_FEATURE_EXTENDED_TRACKS: '1'
       PRI_FEATURE_AUSTRALIA: '1'
+      # Where the accessibility suite writes its evidence (screenshot + page
+      # state) when a view fails to open; uploaded below next to browser.log.
+      PRI_A11Y_EVIDENCE_DIR: ${{ github.workspace }}/a11y-evidence
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -421,6 +424,13 @@ jobs:
           name: browser-log
           path: browser.log
           if-no-files-found: error
+      - name: Accessibility evidence (only written when a view failed to open)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: a11y-evidence
+          path: a11y-evidence/
+          if-no-files-found: ignore
 
   build:
     name: Client build and offline-first boundary
