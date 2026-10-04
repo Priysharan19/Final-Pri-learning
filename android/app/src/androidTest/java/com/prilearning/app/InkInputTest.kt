@@ -52,7 +52,11 @@ class InkInputTest {
                 latch.countDown()
             }
         }
-        latch.await(10, TimeUnit.SECONDS)
+        if (!latch.await(10, TimeUnit.SECONDS)) {
+            // The renderer answers evaluateJavascript only between JS tasks: a stall here
+            // is evidence in the artifact logcat, not a silent "null" (API 33 AOSP WebView 101).
+            Log.w("PRITEST", "evaluateJavascript gave no answer in 10 s: ${js.take(160)}")
+        }
         return out
     }
 
@@ -80,8 +84,26 @@ class InkInputTest {
     private fun bandPixels(s: ActivityScenario<MainActivity>, from: Float, to: Float): Int = eval(s, """(function(){var c=document.querySelector('.editor-shell .ink-canvas-base')||document.querySelector('.ink-canvas-base');
         if(!c||!c.width)return -1;var y0=Math.floor(c.height*$from),y1=Math.ceil(c.height*$to);var d=c.getContext('2d').getImageData(0,y0,c.width,y1-y0).data;var n=0;for(var i=3;i<d.length;i+=4)if(d[i]>0)n++;return n;})()""").toIntOrNull() ?: -1
 
-    private fun metrics(s: ActivityScenario<MainActivity>): JSONObject =
-        JSONObject(eval(s, "JSON.stringify(window.__PRI_INK_METRICS__||{strokes:[],rejected:{touchAfterPen:0},cancels:0})").let { JSONTokener(it).nextValue() as String })
+    /**
+     * The page's ink metrics. Polled, because evaluateJavascript cannot answer while the
+     * renderer is inside a long task: on the API 33 AOSP image (WebView 101) the first read
+     * after a stroke came back empty and the old `as String` cast turned that into a
+     * ClassCastException with no evidence. A metrics object is still required — a page
+     * that never answers fails with the reason, and nothing below is asserted more loosely.
+     */
+    private fun metrics(s: ActivityScenario<MainActivity>, timeoutMs: Long = 30_000): JSONObject {
+        val js = "JSON.stringify(window.__PRI_INK_METRICS__||{strokes:[],rejected:{touchAfterPen:0},cancels:0})"
+        val end = System.currentTimeMillis() + timeoutMs
+        var last = "null"
+        while (true) {
+            last = eval(s, js)
+            val inner = try { JSONTokener(last).nextValue() } catch (_: Exception) { null }
+            if (inner is String && inner.startsWith("{")) return JSONObject(inner)
+            if (System.currentTimeMillis() >= end) break
+            Thread.sleep(250)
+        }
+        throw AssertionError("the ink metrics never came back from the page within ${timeoutMs / 1000} s (last=$last)")
+    }
 
     /** One stroke of real MotionEvents across the canvas at height fraction fy. */
     private fun stroke(s: ActivityScenario<MainActivity>, tool: Int, fy: Float, fx0: Float = 0.2f, fx1: Float = 0.6f, steps: Int = 24) {
