@@ -25,6 +25,7 @@
 import React, { useEffect, useImperativeHandle, useRef, useState, forwardRef, useCallback } from 'react';
 import { strokeStarted, strokeMoved, strokeEnded, touchRejected } from './inputMetrics.js';
 import { makePenFilter } from './smooth.js';
+import { penWantsEraser } from './penButtons.js';
 import { useT } from '../i18n/index.js';
 
 const BASE_W = 3.05;          // resting ink width — strong, chalk-on-board
@@ -52,6 +53,7 @@ const InkCanvas = forwardRef(function InkCanvas({
   const dirtyRef = useRef(false);
   const lastEraseRef = useRef(0);
   const toolRef = useRef(tool);
+  const hwEraseRef = useRef(false);     // this stroke erases via the stylus eraser end / S Pen button
   const fingerRef = useRef(fingerMode);
   const inkRef = useRef('#efece1');    // cached --ink, refreshed on theme change
   const ctxRef = useRef({ base: null, live: null });
@@ -315,12 +317,15 @@ const InkCanvas = forwardRef(function InkCanvas({
         .map(ev => { const p = local(ev); return { x: p.x, y: p.y, w: cur._w || BASE_W }; });
     };
 
+    const erasing = () => toolRef.current === 'eraser' || hwEraseRef.current;
+
     const down = (e) => {
       if (!mayDraw(e) || activePtrRef.current !== null) return;
       activePtrRef.current = e.pointerId;
       canvas.setPointerCapture?.(e.pointerId);
+      hwEraseRef.current = penWantsEraser(e);
       e.preventDefault();
-      if (toolRef.current === 'eraser') { erase(e); return; }
+      if (erasing()) { erase(e); return; }
       const raw = local(e);
       const filter = makePenFilter();
       const pt = filter(raw.x, raw.y, e.timeStamp || 0);
@@ -343,7 +348,7 @@ const InkCanvas = forwardRef(function InkCanvas({
     /** Accumulate movement into the live stroke. */
     const consume = (e, withPrediction) => {
       if (activePtrRef.current !== e.pointerId) return;
-      if (toolRef.current === 'eraser') { erase(e); return; }
+      if (erasing()) { erase(e); return; }
       const cur = currentRef.current;
       if (!cur) return;
       // Coalescing normally hands back the 240 Hz samples between frames, but
@@ -385,7 +390,7 @@ const InkCanvas = forwardRef(function InkCanvas({
       e.preventDefault();
       const cur = currentRef.current;
       if (!cur || !cur.sawRaw) { consume(e, true); return; }
-      if (activePtrRef.current !== e.pointerId || toolRef.current === 'eraser') return;
+      if (activePtrRef.current !== e.pointerId || erasing()) return;
       takePrediction(e, cur);
       dirtyRef.current = true;
       scheduleFrame();
@@ -395,7 +400,9 @@ const InkCanvas = forwardRef(function InkCanvas({
       if (activePtrRef.current !== e.pointerId) return;
       activePtrRef.current = null;
       predictedRef.current = [];
-      if (toolRef.current !== 'eraser' && currentRef.current) {
+      const hwErased = hwEraseRef.current;
+      hwEraseRef.current = false;
+      if (!hwErased && toolRef.current !== 'eraser' && currentRef.current) {
         const { points } = currentRef.current;
         currentRef.current = null;
         if (points.length) {
