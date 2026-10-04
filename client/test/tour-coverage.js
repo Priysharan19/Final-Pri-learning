@@ -19,9 +19,11 @@ export const flow = {
   id: 'coverage',
   name: 'Coverage · public manifest page, signed out and in',
 
-  async run({ page, check, goto, createProfile, settle }) {
+  async run({ page, base, check, goto, createProfile, settle }) {
     // ── 1 · Signed out ──────────────────────────────────────────────────────
-    await goto('/coverage');
+    // The signed-out page has no shell and no auth card, so it is opened
+    // directly rather than through goto(), which waits for one of those.
+    await page.goto(base + '/coverage', { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-coverage-page]', { timeout: 30000 });
     await settle();
     await check('the page renders before the profile gate', await page.locator('[data-coverage-page] h1').count() === 1);
