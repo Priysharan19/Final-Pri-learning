@@ -276,12 +276,15 @@ export async function loadJeePyqPart(part) {
  * D3 would be served a D1 labelled as D3.
  */
 export function hasJeePyqDifficulty(generatorId, difficulty) {
-  const ds = JEE_PYQ_DIFFICULTIES?.[String(generatorId || '')];
+  const key = String(generatorId || '');
+  const ds = JEE_PYQ_DIFFICULTIES && Object.hasOwn(JEE_PYQ_DIFFICULTIES, key) ? JEE_PYQ_DIFFICULTIES[key] : undefined;
   return Array.isArray(ds) && ds.includes(Number(difficulty));
 }
 
 function coverageParts(generatorId) {
-  const raw = JEE_PYQ_COVERAGE[String(generatorId || '')];
+  // Own entries only: an id such as "constructor" names no JEE generator.
+  const key = String(generatorId || '');
+  const raw = Object.hasOwn(JEE_PYQ_COVERAGE, key) ? JEE_PYQ_COVERAGE[key] : undefined;
   return Array.isArray(raw) ? raw.filter(Boolean) : (raw ? [raw] : []);
 }
 

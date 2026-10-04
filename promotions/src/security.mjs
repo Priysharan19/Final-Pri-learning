@@ -1,15 +1,28 @@
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, randomInt, scryptSync, timingSafeEqual } from 'node:crypto';
 
-const CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+export const CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+// Each symbol is drawn with crypto.randomInt, which rejection-samples, so no
+// symbol of the alphabet is ever favoured whatever the alphabet's size.
+export function randomCodeChars(length) {
+  let chars = '';
+  for (let i = 0; i < length; i++) chars += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
+  return chars;
+}
+
+// Campaign pass codes are short (8 symbols, 40 bits) and typed by a person, so
+// a leaked table of their hashes must not be cheap to invert. They are hashed
+// with scrypt (N=2^14, r=8, p=1), keyed by a salt derived from the service
+// secret so the same code always maps to the same hash and the store can look
+// a pass up by its hash. Verification is one scrypt call per inbound message.
+const PASS_SCRYPT = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
 
 export function normalizeClaimCode(value) {
   return String(value ?? '').trim().toUpperCase().replace(/\s+/g, '').replace(/–/g, '-');
 }
 
 export function createClaimCode() {
-  const bytes = randomBytes(8);
-  let chars = '';
-  for (const byte of bytes) chars += CODE_ALPHABET[byte % CODE_ALPHABET.length];
+  const chars = randomCodeChars(8);
   return `PRI-${chars.slice(0, 4)}-${chars.slice(4, 8)}`;
 }
 
@@ -18,9 +31,7 @@ export function normalizeCampaignPassCode(value) {
 }
 
 export function createCampaignPassCode() {
-  const bytes = randomBytes(8);
-  let chars = '';
-  for (const byte of bytes) chars += CODE_ALPHABET[byte % CODE_ALPHABET.length];
+  const chars = randomCodeChars(8);
   return `A2Z-${chars.slice(0, 4)}-${chars.slice(4, 8)}`;
 }
 
@@ -29,7 +40,8 @@ export function hashClaimCode(secret, code) {
 }
 
 export function hashCampaignPassCode(secret, code) {
-  return createHmac('sha256', secret).update(`campaign-pass:${normalizeCampaignPassCode(code)}`).digest('hex');
+  const salt = createHmac('sha256', secret).update('campaign-pass-salt').digest();
+  return scryptSync(`campaign-pass:${normalizeCampaignPassCode(code)}`, salt, 32, PASS_SCRYPT).toString('hex');
 }
 
 export function safeEqualText(a, b) {

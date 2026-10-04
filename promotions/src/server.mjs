@@ -138,12 +138,17 @@ function claimByCode(code) {
 function campaignRedemptionCount(campaignId) {
   return Number(store.getStats(campaignId)?.redeemed ?? 0);
 }
+// A Map, not an object: a cookie named __proto__ or constructor is just a key.
 function parseCookies(req) {
-  const out = {};
+  const out = new Map();
   for (const pair of String(req.headers.cookie ?? '').split(';')) {
     const index = pair.indexOf('=');
     if (index <= 0) continue;
-    out[pair.slice(0, index).trim()] = decodeURIComponent(pair.slice(index + 1).trim());
+    const name = pair.slice(0, index).trim();
+    if (out.has(name)) continue;
+    let value;
+    try { value = decodeURIComponent(pair.slice(index + 1).trim()); } catch { continue; }
+    out.set(name, value);
   }
   return out;
 }
@@ -151,7 +156,7 @@ function staffUnlocked(req) {
   return verifyStaffSession({
     secret: config.claimSecret,
     staffPin: config.staffPin,
-    token: parseCookies(req)[STAFF_COOKIE],
+    token: parseCookies(req).get(STAFF_COOKIE),
   });
 }
 function setStaffCookie(res, token) {

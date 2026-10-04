@@ -52,7 +52,9 @@ for (const [subtopicId, base] of Object.entries(CLIENT_GENERATORS)) {
  * registry, and redirecting it would mean mutating it.
  */
 export function generateQuestion(subtopicId, difficulty, seed) {
-  const gen = GENERATORS[subtopicId];
+  // Own entries only: a subtopic id from a request such as "constructor" must
+  // resolve to no generator, not to an inherited Object.prototype member.
+  const gen = typeof subtopicId === 'string' && Object.hasOwn(GENERATORS, subtopicId) ? GENERATORS[subtopicId] : undefined;
   if (!gen) {
     const bank = bankOf(subtopicId);
     if (bank) throw Object.assign(new Error(`Question bank "${bank}" is not loaded`), { bankMissing: true, bank, subtopic: subtopicId });

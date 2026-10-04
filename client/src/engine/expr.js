@@ -80,6 +80,9 @@ const CONSTANTS = { pi: Math.PI, e: Math.E };
 
 const FUNC_NAMES = [...Object.keys(FUNCTIONS), ...MULTI_NAMES].sort((a, b) => b.length - a.length);
 const CONST_NAMES = ['pi', 'theta', 'alpha', 'beta'];
+// Names a bounded sum may bind: a single letter (the tokeniser's variables) or
+// one of the named constants above.
+const BINDABLE_NAME = /^(?:[A-Za-z]|pi|theta|alpha|beta)$/;
 
 const SUPER = { '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4', '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9' };
 const SUB = { '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4', '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9' };
@@ -391,11 +394,11 @@ export function evaluate(ast, env = {}, opts) {
   switch (ast.t) {
     case 'num': return ast.v;
     case 'const':
-      if (ast.v in CONSTANTS) return CONSTANTS[ast.v];
-      if (ast.v in env) return env[ast.v];
+      if (Object.hasOwn(CONSTANTS, ast.v)) return CONSTANTS[ast.v];
+      if (Object.hasOwn(env, ast.v)) return env[ast.v];
       return NaN;
     case 'var':
-      if (ast.v in env) return env[ast.v];
+      if (Object.hasOwn(env, ast.v)) return env[ast.v];
       if (ast.v === 'e') return Math.E;
       return NaN;
     case 'group': return evaluate(ast.v, env, opts);
@@ -408,20 +411,26 @@ export function evaluate(ast, env = {}, opts) {
           if (ast.args.length !== 4) return NaN;
           const bound = ast.args[1];
           const name = bound && (bound.t === 'var' || bound.t === 'const') ? bound.v : null;
-          if (!name) return NaN;
+          // The bound name is a letter or a named constant the tokeniser produced;
+          // nothing else (and never an object property name) becomes an env key.
+          if (!name || !BINDABLE_NAME.test(name)) return NaN;
           const lo = evaluate(ast.args[2], env, opts), hi = evaluate(ast.args[3], env, opts);
           if (!Number.isInteger(lo) || !Number.isInteger(hi) || hi - lo > SUM_LIMIT) return NaN;
           let total = 0;
-          for (let k = lo; k <= hi; k++) total += evaluate(ast.args[0], { ...env, [name]: k }, opts);
+          for (let k = lo; k <= hi; k++) {
+            const scope = Object.assign(Object.create(null), env);
+            scope[name] = k;
+            total += evaluate(ast.args[0], scope, opts);
+          }
           return total;
         }
-        const f = MULTI_FUNCTIONS[ast.fn];
+        const f = Object.hasOwn(MULTI_FUNCTIONS, ast.fn) ? MULTI_FUNCTIONS[ast.fn] : null;
         if (!f || ast.args.length !== f.length) return NaN;
         return f(...ast.args.map(a => evaluate(a, env, opts)));
       }
-      if (MULTI_FUNCTIONS[ast.fn] || ast.fn === 'sum') return NaN;
+      if (Object.hasOwn(MULTI_FUNCTIONS, ast.fn) || ast.fn === 'sum') return NaN;
       const a = evaluate(ast.arg, env, opts);
-      const f = FUNCTIONS[ast.fn];
+      const f = Object.hasOwn(FUNCTIONS, ast.fn) ? FUNCTIONS[ast.fn] : null;
       if (!f) return NaN;
       return f(a);
     }

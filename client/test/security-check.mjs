@@ -707,6 +707,51 @@ async function run() {
       unaccounted.map(s => `${s.file}: ${s.expr}`), []);
   } catch (err) { crashed(err); }
 
+  // ── Names from a student or a request never become property keys ──────────
+  // The expression evaluator, the vector parser, the generator registry and the
+  // local route table all look things up by a name that started life as user
+  // text. Each must resolve only its own entries: "constructor" is not a
+  // function, "__proto__" is not a bound variable, and nothing is written onto
+  // Object.prototype. (CodeQL js/remote-property-injection,
+  // js/unvalidated-dynamic-method-call.)
+  section('prototype-safe lookups');
+  try {
+    const X = await import(`${SRC}engine/expr.js`);
+    const AF = await import(`${SRC}engine/answer-forms.js`);
+    const G = await import(`${SRC}engine/generators/index.js`);
+    const pristine = JSON.stringify(Object.getOwnPropertyNames(Object.prototype).sort());
+
+    for (const name of ['constructor', '__proto__', 'hasOwnProperty', 'toString', 'valueOf']) {
+      ok(`evaluate: a variable named ${name} is NaN, not an inherited member`, Number.isNaN(X.evaluate({ t: 'var', v: name }, {})));
+      ok(`evaluate: a constant named ${name} is NaN`, Number.isNaN(X.evaluate({ t: 'const', v: name }, {})));
+      ok(`evaluate: a function named ${name} is NaN, not called`, Number.isNaN(X.evaluate({ t: 'call', fn: name, arg: { t: 'num', v: 1 } }, {})));
+      ok(`evaluate: a two-argument function named ${name} is NaN, not called`,
+        Number.isNaN(X.evaluate({ t: 'call', fn: name, args: [{ t: 'num', v: 1 }, { t: 'num', v: 1 }] }, {})));
+      ok(`evaluate: a sum bound to ${name} is NaN`,
+        Number.isNaN(X.evaluate({ t: 'call', fn: 'sum', args: [{ t: 'num', v: 1 }, { t: 'var', v: name }, { t: 'num', v: 1 }, { t: 'num', v: 3 }] }, {})));
+      ok(`evalNumeric("${name}") refuses rather than yielding a value`, (() => { try { return Number.isNaN(X.evalNumeric(name)); } catch (e) { return e instanceof Error; } })());
+      let thrown = null;
+      try { G.generateQuestion(name, 1, 1); } catch (e) { thrown = e; }
+      ok(`generateQuestion("${name}") throws rather than calling an inherited member`, thrown instanceof Error && /No generator/.test(thrown.message), show(thrown?.message));
+      let status = null;
+      try { await dispatch('GET', `/${name}`); } catch (e) { status = e.status; }
+      eq(`dispatch GET /${name} is a 404`, status, 404);
+      status = null;
+      try { await dispatch('GET', name); } catch (e) { status = e.status; }
+      eq(`dispatch GET ${name} is a 404`, status, 404);
+    }
+    ok('a bound sum still evaluates the same (Σ k for k=1..4 = 10)',
+      X.evaluate({ t: 'call', fn: 'sum', args: [{ t: 'var', v: 'k' }, { t: 'var', v: 'k' }, { t: 'num', v: 1 }, { t: 'num', v: 4 }] }, {}) === 10);
+    ok('a sum bound to a letter still shadows the outer value', X.evaluate({ t: 'call', fn: 'sum', args: [{ t: 'var', v: 'k' }, { t: 'var', v: 'k' }, { t: 'num', v: 1 }, { t: 'num', v: 2 }] }, { k: 100 }) === 3);
+    eq('a vector in i, j, k still parses', AF.parseVectorInput('2i + 3j - k').components, [2, 3, -1]);
+    eq('a vector with repeated i is still refused', (() => { try { AF.parseVectorInput('i+2i'); return 'parsed'; } catch (e) { return e.message; } })(), 'Repeated component');
+    for (const raw of ['__proto__', 'constructor', '2i+__proto__j', 'polluted=1']) {
+      ok(`parseVectorInput(${show(raw)}) throws`, (() => { try { AF.parseVectorInput(raw); return false; } catch { return true; } })());
+    }
+    eq('Object.prototype is untouched after every attempt', JSON.stringify(Object.getOwnPropertyNames(Object.prototype).sort()), pristine);
+    ok('no "polluted" key appeared on a fresh object', !('polluted' in {}) && ({}).i === undefined && ({}).k === undefined);
+  } catch (err) { crashed(err); }
+
   // ── The prompt renderer ───────────────────────────────────────────────────
   // lib/latex.jsx renders every prompt, option and working line in the app,
   // including the ones that arrived in an AirDropped pack. It is compiled and

@@ -206,7 +206,10 @@ export function bankOf(subtopicId) {
   const id = String(subtopicId ?? '');
   if (hasJeePyqGenerator(id)) return `${JEE_BANK_PREFIX}${id}`;
   if (hasPyqGenerator(id)) return `${PYQ_BANK_PREFIX}${id}`;
-  return INDIA_BANK_OF[id] || BANK_OF[id.split('-')[0]] || null;
+  // Own entries only, so "constructor" or "__proto__" names no bank.
+  if (Object.hasOwn(INDIA_BANK_OF, id)) return INDIA_BANK_OF[id];
+  const family = id.split('-')[0];
+  return Object.hasOwn(BANK_OF, family) ? BANK_OF[family] : null;
 }
 
 function bankLoader(name) {
@@ -395,7 +398,9 @@ function difficultyFor(dp, difficulty, seed) {
  * request. Nothing is written before this point in any route that calls it.
  */
 export function generateQuestion(subtopicId, difficulty, seed, dotpointId) {
-  const gen = GENERATORS[subtopicId];
+  // Own entries only: a subtopic id from a request such as "constructor" must
+  // resolve to no generator, not to an inherited Object.prototype member.
+  const gen = typeof subtopicId === 'string' && Object.hasOwn(GENERATORS, subtopicId) ? GENERATORS[subtopicId] : undefined;
   if (!gen) {
     const bank = bankOf(subtopicId);
     if (bank && !loaded.has(bank)) {

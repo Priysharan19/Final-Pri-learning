@@ -31,7 +31,8 @@ const throwsCode = (fn, code, label) => {
 };
 
 const SECRET = 'Sup3rS3cretDbPassw0rd';
-const BASE = `postgresql://pri_app.orudxrckgxyyraopyzmn:${SECRET}@aws-0-ap-south-1.pooler.supabase.com:5432/postgres`;
+const DB_HOST = 'aws-0-ap-south-1.pooler.supabase.com';
+const BASE = `postgresql://pri_app.orudxrckgxyyraopyzmn:${SECRET}@${DB_HOST}:5432/postgres`;
 const prod = (extra = {}) => ({ NODE_ENV: 'production', ...extra });
 const dev = (extra = {}) => ({ NODE_ENV: 'development', ...extra });
 const CA = '-----BEGIN CERTIFICATE-----\nMIIBszCCAVmgAwIBAgIUTEST\n-----END CERTIFICATE-----';
@@ -46,7 +47,11 @@ for (const url of [BASE, `${BASE}?sslmode=disable`, `${BASE}?sslmode=allow`, `${
   eq(settings.ssl, { rejectUnauthorized: true, ca: CA }, 'verify-full + CA: certificate chain and host name verified against the configured CA');
   eq(settings.certificateVerified, true, 'reported as verified');
   ok(!settings.connectionString.includes('sslmode'), 'sslmode is removed from the string pg parses, so pg cannot override the ssl option');
-  ok(settings.connectionString.includes(SECRET) && settings.connectionString.includes('pooler.supabase.com:5432'), 'the rest of the URL is unchanged');
+  {
+    const kept = new URL(settings.connectionString);
+    ok(decodeURIComponent(kept.password) === SECRET && kept.hostname === DB_HOST && kept.port === '5432' && kept.pathname === '/postgres',
+      'the rest of the URL (credentials, host, port, database) is unchanged');
+  }
 }
 {
   const settings = postgresConnectionSettings(`${BASE}?sslmode=verify-full`, prod());
@@ -118,7 +123,7 @@ for (const [name, value] of [
     eq(platformConfigStatus().ok, false, 'production config status is not ok with a TLS-less database URL');
     let message = '';
     try { assertPlatformConfig(); } catch (error) { message = error.message; }
-    ok(/sslmode=verify-full/.test(message) && !message.includes(SECRET) && !message.includes('supabase.com'), `assertPlatformConfig names the TLS requirement and nothing of the URL (${message.slice(0, 120)})`);
+    ok(/sslmode=verify-full/.test(message) && !message.includes(SECRET) && !message.includes(DB_HOST), `assertPlatformConfig names the TLS requirement and nothing of the URL (${message.slice(0, 120)})`);
     process.env.PRI_DATABASE_URL = `${BASE}?sslmode=verify-full`;
     eq(platformConfigStatus().ok, true, 'and is ok once the URL says sslmode=verify-full');
   } finally {

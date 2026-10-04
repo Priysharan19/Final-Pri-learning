@@ -3,7 +3,7 @@
 // hash and a short display prefix are stored, so a database read cannot
 // recover a usable code.
 
-import { randomBytes } from 'node:crypto';
+import { randomInt } from 'node:crypto';
 import { id, sha256 } from './security.js';
 import { asStore } from './store.js';
 
@@ -15,12 +15,15 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const INVITE_DEFAULT_TTL_DAYS = 14;
 export const INVITE_MAX_TTL_DAYS = 90;
 
-function randomGroup() {
-  const bytes = randomBytes(GROUP_LENGTH);
+// randomInt draws each symbol by rejection sampling, so every one of the 32
+// symbols is equally likely (a modulo over a byte would only be unbiased while
+// the alphabet's size divides 256; this does not depend on that).
+export function randomGroup() {
   let out = '';
-  for (let i = 0; i < GROUP_LENGTH; i++) out += ALPHABET[bytes[i] % ALPHABET.length];
+  for (let i = 0; i < GROUP_LENGTH; i++) out += ALPHABET[randomInt(ALPHABET.length)];
   return out;
 }
+export const INVITE_ALPHABET = ALPHABET;
 
 export function normalizeInviteCode(value) {
   const compact = String(value || '').toUpperCase().replace(/[\s-]+/g, '');
