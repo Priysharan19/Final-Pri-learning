@@ -33,10 +33,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Build manifest, filled in by the pri-precache plugin ─────────────────────
-const VERSION = 'pri-b772a38539eb';
-const PRECACHE = ["/","/assets/App-COvBow0z.js","/assets/KaTeX_AMS-Regular-BQhdFMY1.woff2","/assets/KaTeX_Main-Bold-Cx986IdX.woff2","/assets/KaTeX_Main-BoldItalic-DxDJ3AOS.woff2","/assets/KaTeX_Main-Italic-NWA7e6Wa.woff2","/assets/KaTeX_Main-Regular-B22Nviop.woff2","/assets/KaTeX_Math-BoldItalic-CZnvNsCZ.woff2","/assets/KaTeX_Math-Italic-t53AETM-.woff2","/assets/KaTeX_Size1-Regular-mCD8mA8B.woff2","/assets/KaTeX_Size2-Regular-Dy4dx90m.woff2","/assets/KaTeX_Size4-Regular-Dl5lxZxV.woff2","/assets/api-DAjUr1VN.js","/assets/cloudAccount-D4NrkYLz.js","/assets/cloudSession-CnTBrYKl.js","/assets/cloudTransport-yTnR5AC8.js","/assets/curriculum-in-CMuvRa7h.js","/assets/defineProperty-BbfpZ9Tg.js","/assets/formFactor-BQgmL_H1.js","/assets/generators-B3oA-3Wx.js","/assets/i18n-ccFZl8Kl.js","/assets/idb-DKVve7Lj.js","/assets/index-ClTM5Eut.js","/assets/index-DoCF-_qB.css","/assets/inter-latin-wght-normal-Dx4kXJAl.woff2","/assets/native-BiZmQ5mE.js","/assets/ncert-syllabus-CKacrE7J.js","/assets/practiceLinks-C9WJYwDl.js","/assets/preload-helper-Czpn1I53.js","/assets/pyqCoverage-DgflGObi.js","/assets/qhelpers-Dq1uC5IS.js","/assets/releaseIdentity-BF9dO5DZ.js","/assets/rolldown-runtime-CbXtAM7H.js","/assets/vendor-react-B-66t_i-.js","/favicon.svg","/icons/icon-180.png","/index.html","/manifest.webmanifest","/splash.svg","/theme-boot.js"];
-const WARM = ["/assets/AssignmentInboxPanel-DcJTpeoZ.js","/assets/Charts-Bq6zLpjQ.js","/assets/Classes-QAJurHCu.js","/assets/ClassroomPanel-D7Oakzdv.js","/assets/ExamRoom-BSLmRCyY.js","/assets/Exams-57Td20z6.js","/assets/GuardianConsent-BpfIsvpV.js","/assets/History-BxbLkxcM.js","/assets/Legal-DPmXn2UY.js","/assets/LinearEquationsTopperSectionProduction-CBvhrseV.js","/assets/Match-B7w95cRw.js","/assets/NcertClass8ChapterSection-Bg24n6bm.js","/assets/NcertClass9ChapterSection-FNCSmJgu.js","/assets/PracticeBase-12r9qhCW.css","/assets/PracticeBase-CDDfmZhr.js","/assets/Progress-D1GMl9sz.js","/assets/QuestionCard-DkmTRa9S.js","/assets/RationalNumbersTopperSectionProduction-CTPjDZ66.js","/assets/Rush-DecdKPp7.js","/assets/Settings-DHK1jWf7.js","/assets/SignUpFlow-BI-bTv4V.js","/assets/SignUpFlow-C7apyZXw.css","/assets/SignUpFlow-CjC9s1MV.js","/assets/Tasks-Dvnlj0yf.js","/assets/TutorHelp--Y2uJT9b.js","/assets/TutorHelp-B2oTfD1d.css","/assets/assignmentTarget-B448c7zO.js","/assets/cloudAccount-DSOUFyNH.js","/assets/cloudReader-BI_FPUz3.js","/assets/demoSeed-D5s_ksvA.js","/assets/figures--_2Ot-DF.js","/assets/files-CocpU5l_.js","/assets/inkLatex-4SP97VBx.js","/assets/latex-69gJrDN4.js","/assets/multipart-DEZWYKq6.js","/assets/ncertTerms-Ds6pWWUR.js","/assets/personal-B8Ii3jAt.js","/assets/photoRaster-CV5l6z5r.js","/assets/plotSpec-D3FOPKXh.js","/assets/socialSignIn-DnqPP6xL.js","/assets/strings.hi-DgbyzwE8.js","/assets/vendor-katex-BkSWQkk7.js","/assets/vendor-katex-DEcVZfaU.css","/assets/visualEngine-DyHqEcOx.js","/assets/workspace-m0yn0Sme.css","/auth/callback.html","/auth/callback.js","/icons/icon-192.png","/icons/icon-512.png","/icons/icon-maskable-192.png"];
-const OPTIONAL = ["/assets/InkAnswer-CtpZ6re-.js","/assets/InkAnswer-DUfdYxZM.js","/assets/InkAnswer-DdmRhdDF.js","/assets/InkAnswer-DvKBsCe3.js","/assets/InkAnswer-j9p3ACpW.js","/assets/InkAnswer-ylDNXAr3.js","/assets/NativeInkCanvas-70tC6ATo.js","/assets/ink-engine-CrpdsMx5.js","/assets/ink-model-D3cN_hBH.js","/assets/ink-personal-DYrlA-PZ.js","/assets/model-data-DsXS_xxz.js","/assets/recognizer-BWp60aBS.js"];
+const VERSION = 'pri-f9a38f94f1b9';
+const PRECACHE = ["/","/assets/App-CGFOHlpq.js","/assets/KaTeX_AMS-Regular-BQhdFMY1.woff2","/assets/KaTeX_Main-Bold-Cx986IdX.woff2","/assets/KaTeX_Main-BoldItalic-DxDJ3AOS.woff2","/assets/KaTeX_Main-Italic-NWA7e6Wa.woff2","/assets/KaTeX_Main-Regular-B22Nviop.woff2","/assets/KaTeX_Math-BoldItalic-CZnvNsCZ.woff2","/assets/KaTeX_Math-Italic-t53AETM-.woff2","/assets/KaTeX_Size1-Regular-mCD8mA8B.woff2","/assets/KaTeX_Size2-Regular-Dy4dx90m.woff2","/assets/KaTeX_Size4-Regular-Dl5lxZxV.woff2","/assets/adaptive-BYs9b20J.js","/assets/cloudAccount-C0wHpYJJ.js","/assets/cloudErrorCopy-B8ogfnw1.js","/assets/cloudSession-CnTBrYKl.js","/assets/cloudTransport-R0OfoPi2.js","/assets/curriculum-in-CMuvRa7h.js","/assets/defineProperty-BbfpZ9Tg.js","/assets/formFactor-BQgmL_H1.js","/assets/generators-UJs1-WBV.js","/assets/i18n-C0io6pKs.js","/assets/idb-DKVve7Lj.js","/assets/index-BSq5Ruz6.js","/assets/index-D4VNs8IV.css","/assets/indiaProduct-CYZvfhH0.js","/assets/inter-latin-wght-normal-Dx4kXJAl.woff2","/assets/native-BUdswkuq.js","/assets/ncert-syllabus-CKacrE7J.js","/assets/practiceLinks-C9WJYwDl.js","/assets/preload-helper-Czpn1I53.js","/assets/pyqCoverage-DgflGObi.js","/assets/qhelpers-Dq1uC5IS.js","/assets/releaseIdentity-DnrgCeCC.js","/assets/rolldown-runtime-CbXtAM7H.js","/assets/store-BHP3wXy3.js","/assets/vendor-react-B-66t_i-.js","/favicon.svg","/icons/icon-180.png","/index.html","/manifest.webmanifest","/splash.svg","/theme-boot.js"];
+const WARM = ["/assets/AssignmentInboxPanel-CiAViqdg.js","/assets/Charts-C5e7juDo.js","/assets/Classes-DVn4_n5L.js","/assets/ClassroomPanel-cannDmvx.js","/assets/ExamRoom-DWX2Z_Oq.js","/assets/Exams-C92g9zc-.js","/assets/GuardianConsent-BU_IpTqF.js","/assets/History-CMHzK4EJ.js","/assets/Legal-AFPYQzuh.js","/assets/LinearEquationsTopperSectionProduction-un0pfs6_.js","/assets/Match-DiT70N99.js","/assets/NcertClass8ChapterSection-D_007KGb.js","/assets/NcertClass9ChapterSection-BgWnRVR4.js","/assets/PlanCard-CyRv0eT8.js","/assets/PlanPage-D4D-NPrU.js","/assets/PracticeBase-12r9qhCW.css","/assets/PracticeBase-D64S5qBD.js","/assets/Progress-DGFjeSic.js","/assets/QuestionCard-CPFHoJn6.js","/assets/RationalNumbersTopperSectionProduction-Cr1L16m4.js","/assets/Rush-BoT2JleC.js","/assets/Settings-D2h3mNrf.js","/assets/SignUpFlow-0LAjYKCU.js","/assets/SignUpFlow-C7apyZXw.css","/assets/SignUpFlow-D5dJW0yh.js","/assets/Tasks-DbLDuuz2.js","/assets/assignmentTarget-hnqvFkQh.js","/assets/cloudAccount-BdrLjOq0.js","/assets/cloudReader-C7MC-jiC.js","/assets/cloudSyncScheduler-Dj05a7GI.js","/assets/cloudSyncScheduler-TEdQByTH.js","/assets/copy-BuLnctYH.js","/assets/demoSeed-adW-ld8L.js","/assets/figures--_2Ot-DF.js","/assets/files-sL2jKmmu.js","/assets/inkLatex-4SP97VBx.js","/assets/latex-69gJrDN4.js","/assets/ncertTerms-Ds6pWWUR.js","/assets/personal-B_BfX6xM.js","/assets/photoRaster-CV5l6z5r.js","/assets/reminders-DZ8a-gtV.js","/assets/reminders-qtTmyl8U.js","/assets/settings-DS6qavR-.js","/assets/socialSignIn-C9wW0tzH.js","/assets/strings.hi-Gb3YMkul.js","/assets/vendor-katex-BkSWQkk7.js","/assets/vendor-katex-DEcVZfaU.css","/assets/workspace-m0yn0Sme.css","/auth/callback.html","/auth/callback.js","/icons/icon-192.png","/icons/icon-512.png","/icons/icon-maskable-192.png"];
+const OPTIONAL = ["/assets/InkAnswer-B0beudSR.js","/assets/InkAnswer-B8N-kjec.js","/assets/InkAnswer-CQ6_QsLS.js","/assets/InkAnswer-CydKNA6O.js","/assets/InkAnswer-Cyxk0C3E.js","/assets/InkAnswer-DT7f5NWl.js","/assets/NativeInkCanvas-4ixEGcSa.js","/assets/ink-engine-CZJ5p7NP.js","/assets/ink-model-D3cN_hBH.js","/assets/ink-personal-BlRPOB6j.js","/assets/model-data-DsXS_xxz.js","/assets/recognizer-CQUFv0V1.js"];
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SHELL = '/index.html';
@@ -91,6 +91,12 @@ self.addEventListener('install', (e) => {
 
 let warming = null;
 
+// A message is acted on only when it comes from a page of this origin. Service
+// worker clients are same-origin by construction, so in a browser this never
+// turns away a real page; it makes the boundary explicit and holds it if the
+// worker is ever reachable another way.
+const fromThisOrigin = (e) => !e.origin || e.origin === self.location.origin;
+
 async function warm(withOptional) {
   const wanted = withOptional ? [...WARM, ...OPTIONAL] : WARM;
   const cache = await caches.open(VERSION);
@@ -106,6 +112,7 @@ async function warm(withOptional) {
 
 self.addEventListener('message', (e) => {
   if (e.data?.type !== 'pri-warm') return;
+  if (!fromThisOrigin(e)) return;
   const optional = Boolean(e.data.optional);
   // One pass at a time. A second ask while one is in flight joins it rather
   // than doubling the requests on a link that has none to spare.
@@ -117,6 +124,42 @@ self.addEventListener('message', (e) => {
   // A port when the caller wants an answer, the client itself when it does not.
   const port = e.ports?.[0];
   e.waitUntil(reply.then(msg => { if (port) port.postMessage(msg); else e.source?.postMessage(msg); }));
+});
+
+// ── Reminders (display only) ─────────────────────────────────────────────────
+// The page computes when a reminder is due (client/src/reminders) and, while it
+// is open, asks the worker to show it; the worker never decides anything and
+// has no push subscription — there is no server to push from. A tap opens the
+// in-app route the reminder named, in the window that is already open where
+// there is one. Titles and bodies arrive generic by construction: counts and
+// catalogue copy, never a question or a mark.
+
+const REMINDER_ROUTE = /^\/[a-z-]*$/;
+
+self.addEventListener('message', (e) => {
+  if (e.data?.type !== 'pri-notify') return;
+  if (!fromThisOrigin(e)) return;
+  const title = String(e.data.title || '').slice(0, 120);
+  const body = String(e.data.body || '').slice(0, 200);
+  const tag = String(e.data.tag || 'pri-reminder').slice(0, 64);
+  const url = REMINDER_ROUTE.test(String(e.data.url || '')) ? e.data.url : '/';
+  if (!title) return;
+  e.waitUntil(self.registration.showNotification(title, { body, tag, data: { url }, icon: '/icons/icon-192.png' }).catch(() => {}));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = REMINDER_ROUTE.test(String(e.notification.data?.url || '')) ? e.notification.data.url : '/';
+  e.waitUntil((async () => {
+    const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const open = all.find(c => 'focus' in c);
+    if (open) {
+      try { await open.focus(); } catch { /* focus can be refused; navigate below */ }
+      if ('navigate' in open) { try { await open.navigate(url); } catch { /* cross-origin or detached */ } }
+      return;
+    }
+    if (self.clients.openWindow) await self.clients.openWindow(url);
+  })());
 });
 
 // ── Activate ─────────────────────────────────────────────────────────────────
