@@ -9,6 +9,36 @@ database in a SQLite file on a persistent `/data` volume (`platform_db_open { en
 selects which. Nothing here asserts that the cutover has happened; `docs/operations/postgres-cutover.md`
 is the procedure and `docs/release/LAUNCH-RUNBOOK.md` the owner's ordered checklist.
 
+## Railway
+
+`railway.json` at the repository root is the Railway config-as-code for the `/v1` service. It builds the root `Dockerfile` (no Nixpacks, no start-command override), uses `GET /v1/ready` as the deploy healthcheck so a replica that cannot serve (database unreachable, schema mismatch, verification email unconfigured) never takes traffic, restarts only on failure, and allows 20 s of draining, longer than the server's own 10 s shutdown deadline. Railway passes `RAILWAY_GIT_COMMIT_SHA` to the build, and the Dockerfile turns that into the release identity that `/v1/health` and `/release.json` report (`.github/workflows/deployment-image.yml` proves the two agree).
+
+The production service's source must be the `main` branch of `Priysharan19/Final-Pri-learning`, with Railway's *Wait for CI* option on, so only a `main` SHA that passed its checks is built. Values in `railway.json` take precedence over the same settings in the Railway dashboard, so change them here, through a reviewed PR, not in the dashboard.
+
+After every production deploy, verify the exact SHA from a checkout of that SHA:
+
+```bash
+npm run verify:deployment -- --origin https://<production origin> --sha <40-hex main SHA> --engine postgres
+```
+
+`tools/verify-deployment.mjs` sends three unauthenticated GETs and changes nothing. It prints `DEPLOYMENT VERIFIED: PASS` only when the server and the web bundle both report that SHA, storage is persistent, the database is reachable at the schema versions the checkout expects, verification email is configured and `/v1/ready` says the replica can serve. While the service still runs on SQLite, first verify the Railway volume is mounted at `/data`, then add `--engine sqlite --persistent-storage-proven`; the flag is an explicit assertion of that out-of-band volume check, not a substitute for it.
+
+## Observed Railway state (2026-10-03, live re-check)
+
+Read-only Railway API inspection at the time this reconciliation branch was prepared found project
+`profound-spontaneity`. Staging service `pri-learning-staging` is sourced from `main` and its
+latest successful deployment is `30d1c56f5e15735aa81fc8037e1cb4bad196bd23`. It has
+`PRI_DATABASE_URL`, `PRI_DATABASE_SSL_ROOT_CERT` and `PRI_METRICS_TOKEN` configured.
+
+Production service `Final-Pri-learning` is still sourced from
+`task/pri-03-handwriting-production-wiring` with Railway check suites disabled. Its latest
+successful deployment is `4e3e61eed57246a188f70d604fc13907f1ec72cd` from 2026-10-01,
+it still mounts the `pri-learning-data` volume at `/data` and has `PRI_PLATFORM_DB` rather
+than the Postgres variables. Railway currently reports the builder as `RAILPACK` and no deploy
+healthcheck/restart settings in the service config, so the production service has not yet adopted
+this branch's `railway.json` contract. Production cutover must therefore be performed only after
+a nominated green release SHA and the database/data-migration decision in the release checklist.
+
 `docs/architecture/authoritative-architecture.md` governs where this document and it disagree.
 
 ## 1. Runtime topology
