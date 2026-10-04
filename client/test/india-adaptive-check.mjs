@@ -377,6 +377,11 @@ async function run() {
     ok('…with the dot point text', typeof named?.dotpointText === 'string' && named.dotpointText.length > 0 && Number.isInteger(named?.dotpoint), show(named));
     ok('…and a count at or above the activation threshold', (named?.count || 0) >= TRAP_ACTIVE_AT);
     ok('the priority for that chapter names the slip', stats.priorities.some(p => p.subtopic === chapter.id && /keeps repeating/.test(p.reason)), show(stats.priorities.map(p => [p.subtopic, p.reason])));
+    // The bare label rides on its own field, so India Progress can wrap it in
+    // Hindi instead of printing the English "keeps repeating" clause (PR #300).
+    const slipRow = stats.priorities.find(p => p.subtopic === chapter.id);
+    eq('the priority carries the bare slip label beside the English clause', slipRow?.misconceptionLabel, named?.label);
+    ok('the bare label is not the English clause', typeof slipRow?.misconceptionLabel === 'string' && !/keeps repeating/i.test(slipRow.misconceptionLabel), show(slipRow));
     // The queue now steers to the slip: within a handful of smart serves the
     // chapter comes back under the misconception reason, with a question that
     // can spring the same trap.

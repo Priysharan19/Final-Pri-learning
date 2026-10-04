@@ -1217,11 +1217,17 @@ async function indiaStats(p, ratings, now) {
   const reviews = await byIndex('reviews', 'pid', pid);
   const due = new Set(reviews.filter(r => r.dueAt <= now).map(r => r.subtopic));
   const misconceptions = namedWeaknesses(ratings, now, 6, { india: true, grade: p.year });
+  // The ranking reads an English clause per chapter for its `reason` line and
+  // its `misconception` field (kept as-is: older surfaces and the adaptive suite
+  // read them). The bare trap label travels on its own field too, so a
+  // translated surface can wrap it in its own language instead of printing
+  // the English clause.
+  const slipLabel = Object.fromEntries(misconceptions.map(m => [m.subtopic, m.label]));
   const notes = Object.fromEntries(misconceptions.map(m => [m.subtopic, `keeps repeating: ${m.label}`]));
   const prio = prioritiesAmong(
     pool.map(c => ({ id: c.id, name: c.name, year: indiaChapterGrade(c), strand: c.strand, weight: c.weight, rev: aheadIds.has(c.id) })),
     states, now, 5, notes
-  ).map(row => ({ ...row, due: due.has(row.subtopic) }));
+  ).map(row => ({ ...row, due: due.has(row.subtopic), misconceptionLabel: slipLabel[row.subtopic] || null }));
   const strandAgg = {};
   for (const c of pool) {
     const m = states[c.id]?.attempts ? states[c.id].mastery : 0;

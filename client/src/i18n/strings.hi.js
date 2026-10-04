@@ -319,6 +319,7 @@ export default {
   'progress.prioNotStarted': 'अभी शुरू नहीं हुआ',
   'progress.prioMastery': '{n}% दक्षता',
   'progress.prioAtStake': '{unit} में अभी {stake} अंक खुले हैं',
+  'progress.prioSlip': 'बार-बार दोहरा रही चूक: {label}',
 
   // ── इतिहास ─────────────────────────────────────────────────────────────────
   'history.title': 'समीक्षा और गलतियाँ',

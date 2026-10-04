@@ -168,6 +168,8 @@ export function practisePriorities({ queue = [], prediction = null, rows = [], l
       mastery: clamp100(row?.mastery),
       attempts: chapter ? chapter.attempts : null,
       misconception: row?.misconception || null,
+      // The bare trap label, for a surface to wrap in its own language.
+      misconceptionLabel: row?.misconceptionLabel || null,
       due: !!(row?.due || chapter?.due),
       unit: unit ? Object.freeze({
         id: unit.unitId,

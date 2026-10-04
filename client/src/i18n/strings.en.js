@@ -254,6 +254,7 @@ export default {
   'progress.prioNotStarted': 'Not started yet',
   'progress.prioMastery': '{n}% mastery',
   'progress.prioAtStake': '{stake} marks still open in {unit}',
+  'progress.prioSlip': 'Keeps repeating: {label}',
 
   // ── History ────────────────────────────────────────────────────────────────
   'history.title': 'Review and mistakes',

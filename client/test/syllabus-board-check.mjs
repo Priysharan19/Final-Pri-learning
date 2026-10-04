@@ -72,7 +72,7 @@ eq('mastered and unpractisable dot points are never the target',
 
 // ── 4 · priorities ───────────────────────────────────────────────────────────
 const queue = [
-  { subtopic: 'g1', name: 'Geo one', mastery: 20, reason: 'mastery 20%', misconception: 'keeps repeating: sign slip' },
+  { subtopic: 'g1', name: 'Geo one', mastery: 20, reason: 'mastery 20%', misconception: 'keeps repeating: sign slip', misconceptionLabel: 'sign slip' },
   { subtopic: 'a2', name: 'Alpha two', mastery: 0, reason: 'not attempted yet' },
   { subtopic: 'a1', name: 'Alpha one', mastery: 55, reason: 'mastery 55%', due: false },
   { subtopic: 'zz', name: 'Ahead chapter', mastery: 0, reason: 'not attempted yet' }
@@ -85,6 +85,8 @@ const prio = B.practisePriorities({ queue, prediction, rows });
 eq('the queue order is kept, never re-ranked', prio.map(p => p.id), ['g1', 'a2', 'a1', 'zz']);
 eq('ranks are 1-based', prio.map(p => p.rank), [1, 2, 3, 4]);
 eq('tags: slip, new ground, due, new ground', prio.map(p => p.tag), ['misconception', 'new-ground', 'review-due', 'new-ground']);
+eq('the bare slip label travels on its own field', prio.map(p => p.misconceptionLabel), ['sign slip', null, null, null]);
+eq('the English clause is still published for older readers', prio[0].misconception, 'keeps repeating: sign slip');
 eq('units join through the predictor', prio.map(p => p.unit?.id ?? null), ['geo', 'alg', 'alg', null]);
 eq('marks at stake come from the predictor', prio.map(p => p.unit?.atStake ?? null), [6, 11.5, 11.5, null]);
 eq('each chapter targets its weakest practisable dot point', prio.map(p => p.dotpoint?.index ?? null), [0, 0, 1, null]);
@@ -125,6 +127,28 @@ for (const u of units) {
 const live = B.practisePriorities({ queue: stats.priorities, prediction: stats.examPrediction, rows: chapters });
 eq('live priorities follow GET /stats order', live.map(p => p.id), (stats.priorities || []).slice(0, 5).map(p => p.subtopic));
 ok('live priorities each name a dot point to practise', live.every(p => p.dotpoint && Number.isInteger(p.dotpoint.index)), JSON.stringify(live.map(p => p.dotpoint)));
+// ── 6 · the slip line is translated, not an English fragment (PR #300 review) ─
+// The backend builds `misconception` as the English clause "keeps repeating:
+// <label>" for its reason line. The surface must never print that clause in
+// Hindi: it renders the bare label through `progress.prioSlip` instead.
+const en = (await import(`${SRC}i18n/strings.en.js`)).default;
+const hi = (await import(`${SRC}i18n/strings.hi.js`)).default;
+ok('progress.prioSlip exists in the English catalogue', typeof en['progress.prioSlip'] === 'string' && en['progress.prioSlip'].includes('{label}'));
+ok('progress.prioSlip exists in the Hindi catalogue', typeof hi['progress.prioSlip'] === 'string' && hi['progress.prioSlip'].includes('{label}'));
+ok('the Hindi slip line is Devanagari with no English clause', /[\u0900-\u097F]/.test(hi['progress.prioSlip'] || '') && !/keeps repeating/i.test(hi['progress.prioSlip'] || ''));
+const fillSlip = (tpl, label) => String(tpl).replace('{label}', label);
+for (const row of stats.priorities || []) {
+  if (!row.misconception) { ok(`${row.subtopic}: no slip means no label`, row.misconceptionLabel == null); continue; }
+  ok(`${row.subtopic}: a slip row carries its bare label`, typeof row.misconceptionLabel === 'string' && row.misconceptionLabel.length > 0, JSON.stringify(row));
+  eq(`${row.subtopic}: the English clause is the label wrapped`, row.misconception, `keeps repeating: ${row.misconceptionLabel}`);
+  ok(`${row.subtopic}: the bare label is not the English clause`, !/keeps repeating/i.test(row.misconceptionLabel));
+  ok(`${row.subtopic}: the Hindi slip line renders without 'keeps repeating'`, !/keeps repeating/i.test(fillSlip(hi['progress.prioSlip'], row.misconceptionLabel)));
+}
+for (const p of live) eq(`${p.id}: the board row carries the bare label through`, p.misconceptionLabel, (stats.priorities || []).find(r => r.subtopic === p.id)?.misconceptionLabel ?? null);
+const boardSrc = (await import('node:fs')).readFileSync(new URL('../src/components/IndiaSyllabusBoard.jsx', import.meta.url), 'utf8');
+ok('the Priorities surface renders the slip through progress.prioSlip', /t\('progress\.prioSlip', \{ label: p\.misconceptionLabel \}\)/.test(boardSrc));
+ok('the Priorities surface never prints the raw English clause', !/\{p\.misconception\}/.test(boardSrc));
+
 const liveBoard = B.syllabusBoard(chapters);
 ok('the live board colours some dot points', liveBoard.total - liveBoard.counts.unseen - liveBoard.counts.thin > 0, JSON.stringify(liveBoard.counts));
 

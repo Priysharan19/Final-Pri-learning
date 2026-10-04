@@ -157,7 +157,7 @@ export function PrioritiesList({ items, track }) {
                     {p.attempts === 0
                       ? t('progress.prioNotStarted')
                       : t('progress.prioMastery', { n: p.mastery })}
-                    {p.misconception && <> · {p.misconception}</>}
+                    {p.misconceptionLabel && <> · {t('progress.prioSlip', { label: p.misconceptionLabel })}</>}
                     {p.unit && p.unit.atStake > 0 && <> · {t('progress.prioAtStake', { stake: p.unit.atStake, unit: p.unit.name })}</>}
                   </div>
                   {p.dotpoint && (
