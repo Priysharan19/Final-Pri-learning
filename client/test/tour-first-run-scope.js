@@ -85,7 +85,9 @@ export const flow = {
     const hasAny = indiaScope('cbse', 10).some(c => resolveIndiaTarget(c, { track: 'cbse', grade: 10, pyqOnly: true, random: () => 0 }));
     if (bare && hasAny) {
       await goto(`/practice?subtopic=${encodeURIComponent(bare.id)}&track=cbse&pyq=1`);
-      await page.waitForSelector('.error-box', { timeout: 30000 });
+      await page.waitForSelector('[data-practice-error="INDIA_PYQ_UNAVAILABLE"]', { timeout: 30000 });
+      await check('the past-papers empty state is titled as such, not as a load failure',
+        /past papers/i.test(await page.locator('[data-practice-error] .verdict-title').innerText()));
       await check('a chapter with no past papers says so under the filter (no substitute question)',
         await page.locator('.q-prompt').count() === 0);
       const alternatives = page.locator('[data-pyq-alternatives] a');

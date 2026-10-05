@@ -1,9 +1,10 @@
 import { featureEnabled } from './platform/features.js';
-import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef, useSyncExternalStore } from 'react';
 import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import PageLink from './components/PageLink.jsx';
 import { isCurrentUrl } from './platform/pageLink.js';
 import { api } from './api.js';
+import { applyTheme, cleanThemePref, followSystemTheme, resolveTheme, storedThemePref } from './lib/theme.js';
 import { requestPersistentStorage } from './local/idb.js';
 import { onCloudSessionChange } from './platform/cloudSession.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
@@ -12,18 +13,13 @@ import { setLanguage, signInLanguage, useT } from './i18n/index.js';
 import Login from './pages/Login.jsx';
 import Home from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
-// The legal notices are a route of their own: nothing on the first screen
-// reads them, and the four English documents they carry are 16 kB of text that
-// otherwise rode in the shell's preload list on every cold open. The chunk is
-// warmed in the background, so the pages still open offline; the Hindi copies
-// stay behind their own import() in Legal.jsx.
-const Legal = React.lazy(() => import('./pages/Legal.jsx'));
+import Icon from './components/Icon.jsx';
+import { BrandWordmark } from './components/BrandMark.jsx';
 
 // ── Routes nobody has opened yet ─────────────────────────────────────────────
-// Login, Home, Practice and Legal are the screens a first run reaches: the
-// profile gate, the landing page behind it, the practice workspace the product
-// is for, and the policy pages a store reviewer opens without an account. Those
-// four are worth having in the shell.
+// Login, Home and Practice are the screens a first run reaches: the profile
+// gate, the landing page behind it and the practice workspace the product is
+// for. Those three are worth having in the shell (Legal: see below).
 //
 // The other eleven were too. Every student downloaded the exam room, the
 // teacher console, the classroom panels, the progress charts and the whole
@@ -47,6 +43,10 @@ const PlanPage = React.lazy(() => import('./plan/PlanPage.jsx'));
 // ON_DEMAND in vite.config.js), not part of the install or the warm set.
 const Placement = React.lazy(() => import('./pages/Placement.jsx'));
 // Notes: the page and each class's notes are chunks of their own (notes/notesIndex.js).
+// Legal carries the full policy documents (~19 kB). A reviewer who opens
+// /privacy is online, and the warm pass keeps it for offline, so it no longer
+// rides in the install every student downloads before the first screen.
+const Legal = React.lazy(() => import('./pages/Legal.jsx'));
 const Notes = React.lazy(() => import('./pages/Notes.jsx'));
 // Outside the frozen V1 scope: the route exists only where the build flag is on.
 const PLACEMENT_ON = featureEnabled('placement');
@@ -57,20 +57,12 @@ const PractisePhoto = React.lazy(() => import('./pages/PractisePhoto.jsx'));
 const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);
 
-/* Pri Learning navigation marks: restrained, legible line icons for the shared app shell. */
+/* Navigation marks come from the one Pri icon family (components/Icon.jsx). */
 const I = {
-  home: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3 10.5 12 3l9 7.5" /><path d="M5.5 9.5V21h13V9.5" /><path d="M9.5 21v-6h5v6" /></svg>,
-  tasks: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M12 5.5C10 4 7.5 3.5 4 3.8V19c3.5-.3 6 .3 8 1.7 2-1.4 4.5-2 8-1.7V3.8c-3.5-.3-6 .2-8 1.7Z" /><path d="M12 5.5v15.2" /></svg>,
-  match: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3.5 3.5h3.2L19 15.8v3.2h-3.2L3.5 6.7V3.5Z" /><path d="M20.5 3.5h-3.2L13 7.8m-2 8.4-4.3 4.3H3.5v-3.2L7.8 13" /><path d="m16 16 3 3M8 16l-3 3" /></svg>,
-  progress: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="9" /><path d="m8 12.5 2.5 2.5L16 9.5" /></svg>,
-  exams: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="13" r="8" /><path d="M12 9v4.5l3 1.8" /><path d="M9.5 2.5h5" /></svg>,
-  classes: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="m2.5 9 9.5-5 9.5 5-9.5 5-9.5-5Z" /><path d="M6.5 11.5V16c0 1.4 2.5 2.8 5.5 2.8s5.5-1.4 5.5-2.8v-4.5" /><path d="M21.5 9v5" /></svg>,
-  settings: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="3.2" /><path d="M19 12a7 7 0 0 0-.15-1.4l2.1-1.6-2-3.4-2.45 1a7 7 0 0 0-2.4-1.4L13.7 2.6h-3.9l-.4 2.6a7 7 0 0 0-2.4 1.4l-2.45-1-2 3.4 2.1 1.6A7 7 0 0 0 4.5 12c0 .5.05.9.15 1.4l-2.1 1.6 2 3.4 2.45-1a7 7 0 0 0 2.4 1.4l.4 2.6h3.9l.4-2.6a7 7 0 0 0 2.4-1.4l2.45 1 2-3.4-2.1-1.6c.1-.5.15-.9.15-1.4Z" /></svg>,
-  notes: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M6 3.5h10.5L19 6v14.5H6z" /><path d="M9 8.5h7M9 12h7M9 15.5h4.5" /></svg>,
-  practice: <span aria-hidden="true">✎</span>,
-  review: <span aria-hidden="true">↺</span>,
-  rush: <span aria-hidden="true">⚡</span>,
-  teacher: <span aria-hidden="true">▣</span>,
+  home: <Icon name="home" />, tasks: <Icon name="tasks" />, match: <Icon name="match" />,
+  progress: <Icon name="progress" />, exams: <Icon name="exams" />, classes: <Icon name="classes" />,
+  settings: <Icon name="settings" />, practice: <Icon name="practice" />, review: <Icon name="review" />,
+  rush: <Icon name="rush" />, notes: <Icon name="notes" />, teacher: <Icon name="teacher" />,
 };
 
 const STUDENT_NAV = [
@@ -132,8 +124,7 @@ export function Logo({ large = false, onClick }) {
     : {};
   return (
     <Tag className={`logo ${large ? 'logo-lg' : ''}${onClick ? ' logo-btn' : ''}`} {...controlProps}>
-      <span className="logo-bb" aria-hidden="true">P</span>
-      <span className="logo-name">Pri Learning<span className="logo-dot">.</span></span>
+      <BrandWordmark height={large ? 44 : 22} />
     </Tag>
   );
 }
@@ -239,9 +230,14 @@ export default function App() {
     setDraftProfile(id);
   }, [user?.id]);
 
+  // The profile's preference is the authority once a profile is open. Before
+  // that (sign-in, onboarding) the screen keeps whatever theme-boot.js painted
+  // from the last preference used on this device.
   useEffect(() => {
-    document.documentElement.dataset.theme = user?.theme === 'light' ? 'light' : 'dark';
-  }, [user?.theme]);
+    const pref = user ? cleanThemePref(user.theme) : (storedThemePref() || 'light');
+    applyTheme(pref);
+    return followSystemTheme(pref, () => applyTheme(pref));
+  }, [user?.id, user?.theme]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pageTitle = useMemo(
     () => (TITLE_KEYS[loc.pathname] ? t(TITLE_KEYS[loc.pathname]) : loc.pathname.startsWith('/exams') ? t('nav.exam') : loc.pathname.startsWith('/notes/') ? t('nav.notes') : null),
@@ -281,15 +277,15 @@ export default function App() {
     if (!loc.hash) return;
     const id = decodeURIComponent(loc.hash.slice(1));
     let tries = 0;
-    const t = setInterval(() => {
+    const timer = setInterval(() => {
       const el = document.getElementById(id);
       if (el) {
         el.scrollIntoView({ block: 'start' });
         if (el.matches('[tabindex]')) el.focus({ preventScroll: true });
-        clearInterval(t);
-      } else if (++tries > 20) clearInterval(t);
+        clearInterval(timer);
+      } else if (++tries > 20) clearInterval(timer);
     }, 80);
-    return () => clearInterval(t);
+    return () => clearInterval(timer);
   }, [loc.pathname, loc.hash]);
 
   const closeMore = useCallback((restoreFocus = false) => {
@@ -319,11 +315,9 @@ export default function App() {
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), ms);
   }, []);
 
-  const celebrate = useCallback((res) => {
-    for (const b of res?.newBadges || []) {
-      toast(<><span className="badge-ico">{b.icon}</span><div><div className="badge-name">{t('app.badgeUnlocked', { name: b.name })}</div><div className="badge-desc">{b.desc}</div></div></>, 5200, 'gold');
-    }
-  }, [toast, t]);
+  // Badges are still earned and kept on Progress, but they never interrupt a
+  // student mid-question: no pop-ups, no emoji, nothing between them and the maths.
+  const celebrate = useCallback(() => { }, []);
 
   const ctx = useMemo(() => ({ user, setUser, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent }),
     [user, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent]);
@@ -394,14 +388,18 @@ export default function App() {
     setUser(null);
   };
 
+  // Thinking mode: while a question or a paper is open the shell steps back —
+  // no rail, no bottom bar, no account furniture. The page keeps its own way out.
+  const focusMode = user.role !== 'teacher'
+    && (loc.pathname === '/practice' || /^\/exams\/[^/]+/.test(loc.pathname));
+
   return (
     <AppCtx.Provider value={ctx}>
-      <div className="shell">
+      <div className={`shell${focusMode ? ' is-focus' : ''}`}>
         <a className="skip-link" href="#main" onClick={skipToMain}>{t('app.skipToMain')}</a>
         <header className="topbar">
           <Logo onClick={() => nav('/', { replace: isCurrentUrl('/') })} />
           <div className="top-stats">
-            {user.streak > 0 && <span className="chip" title={t('app.dayStreak')}><span className="flame">▲</span><b>{user.streak}</b></span>}
             <ThemeToggle />
             <AccountMenu user={user} onSwitch={switchProfile} />
           </div>
@@ -486,7 +484,7 @@ export default function App() {
           aria-controls="mobile-more"
           onClick={() => (moreOpen ? closeMore(false) : setMoreOpen(true))}
         >
-          <span className="nav-ico" aria-hidden="true">☰</span><span>{t('nav.more')}</span>
+          <span className="nav-ico" aria-hidden="true"><Icon name="more" /></span><span>{t('nav.more')}</span>
         </button>
       </nav>
 
@@ -534,7 +532,7 @@ function SidebarHistory({ recent }) {
               <span className="hist-mini-name">{it.subtopicName}</span>
               <span className={`hist-mini-pct ${cls}`}
                 aria-label={it.correct === true ? t('app.correct') : it.correct === false ? t('app.incorrect') : t('app.notMarkedYet')}>
-                {it.correct === true ? '100% ✓' : it.correct === false ? '0.0% ✗' : '—'}
+                {it.correct === true ? <Icon name="check" size={14} /> : it.correct === false ? <Icon name="correction" size={14} /> : '—'}
               </span>
             </div>
             <div className="hist-mini-preview">{stripTex(it.prompt)}</div>
@@ -621,14 +619,14 @@ function AccountMenu({ user, onSwitch }) {
         aria-haspopup="menu" aria-expanded={open}
         onClick={() => (open ? shut(false) : openAt(0))} onKeyDown={onButtonKey}
         style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
-        <span className="user-avatar">{user.avatar && user.avatar !== '🙂' ? user.avatar : initials(user.name)}</span>
+        <span className="user-avatar" aria-hidden="true">{initials(user.name)}</span>
         {user.name.split(' ')[0]}
-        <span style={{ fontSize: 10, color: 'var(--ink-3)', marginLeft: 2 }}>▾</span>
+        <Icon name="chevronDown" size={14} />
       </button>
       {open && (
         <div className="acct-menu">
           <div className="acct-menu-head">
-            <span className="acct-avatar">{user.avatar || '🙂'}</span>
+            <span className="acct-avatar" aria-hidden="true">{initials(user.name)}</span>
             <span style={{ minWidth: 0 }}>
               <span className="acct-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 {user.name}
@@ -658,27 +656,39 @@ function stripTex(s = '') {
   return s.replace(/\$[^$]*\$/g, m => m.slice(1, -1).replace(/\\[a-zA-Z]+/g, '').replace(/[{}^_]/g, '')).slice(0, 80);
 }
 
+/** The theme actually on screen for a preference; re-renders when the device flips. */
+function useResolvedTheme(pref) {
+  return useSyncExternalStore(
+    notify => followSystemTheme(pref, notify),
+    () => resolveTheme(pref),
+    () => (cleanThemePref(pref) === 'dark' ? 'dark' : 'light')
+  );
+}
+
 function ThemeToggle() {
   const { user, setUser } = useApp();
   const t = useT();
+  // What is on screen decides the direction, so a profile following the device
+  // still flips to the other paper in one press (and then stops following).
+  const shown = useResolvedTheme(user.theme);
   const flip = async () => {
-    const theme = user.theme === 'light' ? 'dark' : 'light';
+    const theme = shown === 'dark' ? 'light' : 'dark';
     setUser({ ...user, theme });
     try { await api.patch('/me', { theme }); } catch { }
   };
   return (
     <button className="btn btn-quiet btn-sm" onClick={flip}
-      aria-label={user.theme === 'light' ? t('app.themeToDark') : t('app.themeToLight')}
-      style={{ padding: '6px 9px' }}>
-      <span aria-hidden="true">{user.theme === 'light' ? '☾' : '☼'}</span>
+      aria-label={shown === 'dark' ? t('app.themeToLight') : t('app.themeToDark')}
+      style={{ minWidth: 44, minHeight: 44, padding: 0 }}>
+      <Icon name={shown === 'dark' ? 'sun' : 'moon'} size={17} />
     </button>
   );
 }
 
 function ToastLayer({ toasts }) {
-  if (!toasts.length) return null;
+  // Always mounted, so a screen reader hears each toast as it arrives.
   return (
-    <div className="toast-wrap">
+    <div className="toast-wrap" role="status" aria-live="polite">
       {toasts.map(t => <div key={t.id} className={`toast ${t.kind}`}>{t.content}</div>)}
     </div>
   );

@@ -120,8 +120,19 @@ class ShellJourneyTest {
     private fun openProgress(s: ActivityScenario<MainActivity>) {
         val link = "[].slice.call(document.querySelectorAll('a[href=\"/progress\"]')).find(function(a){return a.offsetParent;})"
         if (eval(s, "!!($link)") != "true") {
-            click(s, "document.querySelector('.mobilenav button[aria-expanded]')")
-            waitFor(s, "!!($link)")
+            // Practice is thinking mode (#264): no rail and no bottom bar, so there
+            // is no Progress link to reach from it. Leave the way a student does —
+            // the bar's exit control, a PUSH of Home — and continue from Home. The
+            // bottom bar is still in the DOM there but display:none, so clicking
+            // its sheet button would open nothing visible and wait out the clock.
+            if (eval(s, "!!(document.querySelector('.ws-exit')||{}).offsetParent") == "true") {
+                click(s, "document.querySelector('.ws-exit')")
+                waitFor(s, "location.pathname === '/' && !!document.querySelector('.home-greet')")
+            }
+            if (eval(s, "!!($link)") != "true") {
+                click(s, "document.querySelector('.mobilenav button[aria-expanded]')")
+                waitFor(s, "!!($link)")
+            }
         }
         click(s, link)
         waitFor(s, "location.pathname === '/progress'")
@@ -189,19 +200,24 @@ class ShellJourneyTest {
             pressBack()
             waitFor(s, "location.pathname === '/' && document.querySelector('.home-greet')")
 
-            Log.i("PRITEST", "SPA routing through the bundled origin, and history Back")
-            val landingDepth = eval(s, "(history.state && history.state.idx) || 0")
-            click(s, "[].slice.call(document.querySelectorAll('a[href=\"/practice\"]')).find(function(a){return a.offsetParent;})")
-            waitFor(s, "document.querySelector('.q-prompt') && location.pathname === '/practice'")
-            awaitBackWanted(s, true)
-
+            // Practice is thinking mode (#264): its own top bar, no bottom bar and
+            // no sheet. The sheet that Back must close first lives on Home.
             Log.i("PRITEST", "Back closes an open sheet before it navigates")
             if (eval(s, "document.documentElement.dataset.ff === 'compact'") == "true") {
                 click(s, "document.querySelector('.mobilenav button[aria-expanded]')")
                 waitFor(s, "document.querySelector('.mnav-sheet')")
+                awaitBackWanted(s, true)
                 pressBack()
-                waitFor(s, "!document.querySelector('.mnav-sheet') && location.pathname === '/practice'")
+                waitFor(s, "!document.querySelector('.mnav-sheet') && location.pathname === '/' && !!document.querySelector('.home-greet')")
             }
+
+            Log.i("PRITEST", "SPA routing through the bundled origin, and history Back")
+            val landingDepth = eval(s, "(history.state && history.state.idx) || 0")
+            click(s, "[].slice.call(document.querySelectorAll('a[href=\"/practice\"]')).find(function(a){return a.offsetParent;})")
+            waitFor(s, "document.querySelector('.q-prompt') && location.pathname === '/practice'")
+            assertEquals("Practice shows its own bar, not the bottom navigation", "true",
+                eval(s, "!!document.querySelector('.ws-bar') && !(function(n){return n && n.offsetParent;})(document.querySelector('.mobilenav'))"))
+            awaitBackWanted(s, true)
             pressBack()
             // The router must have rendered Home, not just the URL changed: a Link
             // tapped while React still shows the old page is treated as a same-page
@@ -219,7 +235,7 @@ class ShellJourneyTest {
                 eval(s, "location.pathname + ' ' + ((history.state && history.state.idx) || 0)"))
             var typed = false
             for (i in 0 until 12) {
-                eval(s, "(function(){var t=($byLabel)('Answer by typing');if(t)t.click();return true;})()")
+                eval(s, "(function(){var t=($byLabel)('Type: answer by typing');if(t)t.click();return true;})()")
                 Thread.sleep(400)
                 if (eval(s, "!!document.querySelector('.editor-body input.answer-input')") == "true") { typed = true; break }
                 eval(s, "(function(){var n=document.querySelector('.ctx-next');if(n)n.click();return true;})()")
@@ -258,12 +274,19 @@ class ShellJourneyTest {
             openProgress(s)
             val answeredAfter = waitFor(s, ANSWERED).trim('"').toIntOrNull() ?: 0
             assertTrue("Progress counts the attempt just marked ($answeredAfter answered)", answeredAfter >= 1)
-            // The real Back key walks the app's own history: Progress → Practice → Home.
+            // The real Back key walks the app's own history. Practice has no
+            // Progress link (thinking mode), so openProgress left it through the
+            // bar's exit (a PUSH of Home): Home(0) → Practice(1) → Home(2) →
+            // Progress(3), and Back must walk Progress → Home → Practice → Home.
+            awaitBackWanted(s, true)
+            pressBack()
+            waitFor(s, "location.pathname === '/' && !!history.state && history.state.idx === 2 && !!document.querySelector('.home-greet')")
+            Thread.sleep(400)
             awaitBackWanted(s, true)
             pressBack()
             // Settle on Practice (its own history entry) before the next press, as
-            // a person's second Back comes after the first page has appeared.
-            waitFor(s, "location.pathname === '/practice' && !!history.state && history.state.idx > 0 && !!document.querySelector('.q-prompt')")
+            // a person's next Back comes after the page has appeared.
+            waitFor(s, "location.pathname === '/practice' && !!history.state && history.state.idx === 1 && !!document.querySelector('.q-prompt')")
             Thread.sleep(400)
             awaitBackWanted(s, true)
             pressBack()
