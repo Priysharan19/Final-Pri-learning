@@ -13,6 +13,10 @@ import Home from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
 import Icon from './components/Icon.jsx';
 import { BrandWordmark } from './components/BrandMark.jsx';
+// The public Coverage page (docs/content/coverage-manifest.json) is reachable
+// before the gate for the same reason the notices are: it is a claim about the
+// product that a reader should be able to check without an account.
+const Coverage = React.lazy(() => import('./pages/Coverage.jsx'));
 
 // ── Routes nobody has opened yet ─────────────────────────────────────────────
 // Login, Home and Practice are the screens a first run reaches: the profile
@@ -341,6 +345,7 @@ export default function App() {
             <Route path="/terms" element={<Legal />} />
             <Route path="/refund-policy" element={<Legal />} />
             <Route path="/grievance" element={<Legal />} />
+            <Route path="/coverage" element={<Coverage />} />
             <Route path="*" element={<Login />} />
           </Routes>
         </React.Suspense>
@@ -451,6 +456,7 @@ export default function App() {
                     <Route path="/terms" element={<Legal />} />
                     <Route path="/refund-policy" element={<Legal />} />
                     <Route path="/grievance" element={<Legal />} />
+                    <Route path="/coverage" element={<Coverage />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="*" element={<Navigate to={roleLanding} replace />} />
                   </Routes>
