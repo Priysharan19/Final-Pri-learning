@@ -76,6 +76,14 @@ const mixed = normalizeResult(
 );
 ok(mixed.confidence <= 0.41, `a page is only as confident as its worst line (${mixed.confidence})`);
 ok(mixed.needsConfirmation, 'and below the floor it asks for confirmation');
+eq([mixed.confidenceFloor, mixed.providerNeedsConfirmation], [0.82, false],
+  'normalization preserves the configured floor and distinguishes floor doubt from provider-declared ambiguity');
+const providerAmbiguous = normalizeResult(
+  { lines: [{ text: 'x = 4', confidence: 0.96 }], confidence: 0.96, needs_confirmation: true },
+  { model: 'test', confidenceFloor: 0.9 }
+);
+eq([providerAmbiguous.needsConfirmation, providerAmbiguous.providerNeedsConfirmation, providerAmbiguous.confidenceFloor], [true, true, 0.9],
+  'provider-declared ambiguity remains explicit even when all line confidences exceed the configured floor');
 const clean = normalizeResult(
   { lines: [{ text: '6 <= 2x + 8 <= 16', confidence: 0.96 }], confidence: 0.95, needs_confirmation: false },
   { model: 'test', confidenceFloor: 0.82 }
@@ -370,7 +378,7 @@ const app = express();
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 app.use('/handwriting', createHandwritingRouter(db, {
-  transcribe: async () => ({ engine: 'cloud-test', lines: [{ text: '-1, 0, 1, 2, 4', confidence: 0.95 }], text: '-1, 0, 1, 2, 4', confidence: 0.95, needsConfirmation: false, escalated: false, fallbackAttempted: false, fallbackFailureCode: null, latencyMs: 17 }),
+  transcribe: async () => ({ engine: 'cloud-test', lines: [{ text: '-1, 0, 1, 2, 4', confidence: 0.95 }], text: '-1, 0, 1, 2, 4', confidence: 0.95, confidenceFloor: 0.9, providerNeedsConfirmation: false, needsConfirmation: false, escalated: false, fallbackAttempted: false, fallbackFailureCode: null, latencyMs: 17 }),
   probe: async () => ({ ...providerStaticStatus(env), usable: true, degraded: false, failureCode: null, latencyMs: 7, fallbackUsable: true }),
   env
 }));
@@ -449,6 +457,8 @@ try {
   eq(good.json.transcription.text, '-1, 0, 1, 2, 4', 'and it is the transcription, with its commas');
   ok(typeof good.json.transcription.confidence === 'number' && 'needsConfirmation' in good.json.transcription,
     'the answer carries its confidence and whether to confirm');
+  eq([good.json.transcription.confidenceFloor, good.json.transcription.providerNeedsConfirmation], [0.9, false],
+    'the route carries the exact provider floor and ambiguity provenance to the client');
 
   const leaky = await call('acct-verified', { image: PNG, expectedAnswer: '5 integers' });
   eq([leaky.status, leaky.json?.error?.code], [400, 'HANDWRITING_NOT_ANSWER_BLIND'],

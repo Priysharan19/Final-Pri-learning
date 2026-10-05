@@ -156,7 +156,7 @@
     "test:legal": "node client/test/legal-pages-check.mjs",
     "test:i18n": "node client/test/i18n-check.mjs && node client/test/i18n-coverage-check.mjs && node client/test/i18n-voice-check.mjs",
     "legal:status": "node tools/legal-status.mjs",
-    "test:handwriting:cloud": "node client/test/cloud-handwriting-client-check.mjs",
+    "test:handwriting:cloud": "node client/test/cloud-handwriting-client-check.mjs && node client/test/reading-correction-safety-check.mjs",
     "test:platform:handwriting": "node server/test/handwriting-transcription-check.mjs && node server/test/openai-strict-schema-check.mjs",
     "test:working:cloud": "node client/test/cloud-working-client-check.mjs",
     "test:platform:working": "node server/test/working-check-check.mjs",

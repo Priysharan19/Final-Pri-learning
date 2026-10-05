@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { currentPid } from '../local/store.js';
 import { priNative } from '../platform/native/index.js';
+import { setInkDraftProfile } from '../local/inkDrafts.js';
 
 const PREFIX = 'pri.draft.';
 const VERSION = 1;
@@ -101,6 +102,16 @@ function hookFlush() {
 export function setDraftProfile(id) {
   flushDrafts();
   activePid = id || null;
+  setInkDraftProfile(id);
+
+  // Pre-sealed-store builds kept handwriting under
+  // `pri.draft.<pid>.ink.<questionId>` in plaintext localStorage. Those rows
+  // cannot stay on disk after an upgrade and must never appear on the crash
+  // card as if this build could restore them. Clean only the active profile's
+  // legacy namespace here: profile switching must never move or delete another
+  // student's work. Current builds write ink only to the sealed IndexedDB
+  // `inkDrafts` store, so this is an idempotent one-time compatibility cleanup.
+  for (const questionId of draftIdsIn('ink')) clearDraft('ink', questionId);
 }
 
 /** Write now. Use for milestones (page leave, submit, question change). */

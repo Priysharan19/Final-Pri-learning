@@ -41,7 +41,9 @@ export async function handwrite(page, box, text, { x = 40, y = 34 } = {}) {
 
 /** Install the stand-in reader on a fresh context's page. */
 export async function useFakeServerReader(page, base, ctx = page.context()) {
-  const reader = { text: '', requests: [], down: false };
+  // `confidence` scripts how sure the stand-in is of every line (default 0.97,
+  // above the floor); a flow sets it low to exercise the doubtful-line path.
+  const reader = { text: '', requests: [], down: false, confidence: null };
   await page.addInitScript(() => { globalThis.__PRI_CLOUD_ORIGIN__ = globalThis.location.origin; });
   const json = (route, status, body) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
   // Every other /v1 call is a plain "not here" (no account, no sync), so the
@@ -59,11 +61,12 @@ export async function useFakeServerReader(page, base, ctx = page.context()) {
     try { body = JSON.parse(route.request().postData() || 'null'); } catch { body = null; }
     reader.requests.push(body);
     if (reader.down) return json(route, 503, { error: { code: 'HANDWRITING_UNAVAILABLE', message: 'down' } });
-    const lines = String(reader.text).split('\n').filter(Boolean).map(text => ({ text, confidence: 0.97 }));
+    const confidence = Number.isFinite(reader.confidence) ? reader.confidence : 0.97;
+    const lines = String(reader.text).split('\n').filter(Boolean).map(text => ({ text, confidence }));
     return json(route, 200, {
       transcription: {
-        lines, text: lines.map(l => l.text).join('\n'), confidence: 0.97,
-        needsConfirmation: false, engine: 'cloud-e2e-stand-in'
+        lines, text: lines.map(l => l.text).join('\n'), confidence,
+        needsConfirmation: confidence < 0.8, engine: 'cloud-e2e-stand-in'
       }
     });
   });

@@ -10,7 +10,7 @@ import QuestionCard, { SR_ONLY } from '../components/QuestionCard.jsx';
 import PriExplain from '../components/PriExplain.jsx';
 import FreeCapNotice from '../components/FreeCapNotice.jsx';
 import { clearInkDraft, clearPendingSubmission, pendingSubmissionQuestionId, readPendingSubmission } from '../components/practiceRecovery.js';
-import { tLater, useT } from '../i18n/index.js';
+import { tLater, useT, useTx } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
 import { isContentEmpty, servable, contentEmptySignal } from '../lib/contentServe.js';
 import { practiceHref, practiceRequestFromQuery } from '../lib/practiceLinks.js';
@@ -21,6 +21,7 @@ const EMPTY_SESSION = Object.freeze({ answered: 0, correct: 0, xp: 0 });
 export default function Practice() {
   const { user } = useApp();
   const t = useT();
+  const tx = useTx();
   const navigate = useNavigate();
   // A natural stopping point: the session that carries today's count across
   // the student's own daily goal says so, once, and offers a way to finish.
@@ -366,7 +367,11 @@ export default function Practice() {
           <span className="ctx-pill-meta">
             {metaLine}
             {session.answered > 0 && t('practice.sessionScore', { correct: session.correct, answered: session.answered, xp: session.xp })}
-            {serve?.nextUp?.name && <span data-next-up={serve.nextUp.subtopic}>{t('practice.nextUp', { name: serve.nextUp.name })}</span>}
+            {serve?.nextUp?.name && (
+              <span data-next-up={serve.nextUp.subtopic}>
+                {tx('practice.nextUp', { name: <span lang="en">{serve.nextUp.name}</span> })}
+              </span>
+            )}
           </span>
         </div>
         <div className="ws-bar-end">

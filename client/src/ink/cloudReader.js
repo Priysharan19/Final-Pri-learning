@@ -28,6 +28,7 @@ import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { rasterizeInk } from './cloudRaster.js';
 import { onCloudSessionChange, onEntitlementChange } from '../platform/cloudSession.js';
 import { preparePhoto } from './photoRaster.js';
+import { confidenceFloorOf } from './readingCorrection.js';
 
 /** How the returned reading is labelled, so History and evidence can tell. */
 export const CLOUD_ENGINE_PREFIX = 'cloud';
@@ -267,12 +268,20 @@ export async function cloudHandwritingReadiness({
  * dropped rather than guessed: an annotation on the wrong line is worse than
  * none.
  */
-export function toReading(transcription, localReading) {
+export function toReading(transcription, localReading, { confidenceFloor = null } = {}) {
   const lines = (transcription?.lines || []).map(line => ({ text: String(line.text || '') }));
   if (!lines.length) return null;
 
   const localLines = localReading?.lines || [];
   const alignable = localLines.length === lines.length;
+  const floor = confidenceFloorOf(transcription?.confidenceFloor ?? confidenceFloor);
+  const serverNeedsConfirmation = transcription?.needsConfirmation !== false;
+  // New servers say whether doubt came from the provider's explicit ambiguity
+  // flag. Older servers only supplied the collapsed page-level boolean; null
+  // keeps that legacy doubt opaque and therefore conservatively uncleared.
+  const providerNeedsConfirmation = typeof transcription?.providerNeedsConfirmation === 'boolean'
+    ? transcription.providerNeedsConfirmation
+    : null;
   return {
     lines: lines.map((line, i) => ({
       text: line.text,
@@ -283,7 +292,10 @@ export function toReading(transcription, localReading) {
     engine: transcription.engine || `${CLOUD_ENGINE_PREFIX}-unknown`,
     cloud: true,
     confidence: transcription.confidence ?? 0,
-    needsConfirmation: transcription.needsConfirmation !== false,
+    confidenceFloor: floor,
+    serverNeedsConfirmation,
+    providerNeedsConfirmation,
+    needsConfirmation: serverNeedsConfirmation,
     alignedToLocalLines: alignable
   };
 }

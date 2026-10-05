@@ -37,6 +37,7 @@ import { useT } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
 import './InkAnswer.css';
 import { priNative } from '../platform/native/index.js';
+import { applyLineCorrection, confidenceFloorOf, isLowConfidence, lowConfidenceLines } from './readingCorrection.js';
 
 // Engine names are for developers and evaluators, not students: shown in dev
 // builds, LAN research mode, or with ?inkdiag=1.
@@ -83,6 +84,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   const [tool, setTool] = useState('pen');
   const [finger, setFinger] = useState(() => priNative.ink.facts()?.fingerDefault === true);
   const [rec, setRec] = useState(EMPTY_READING);
+  // { index, text } while the student is saying what they wrote on a doubtful line.
+  const [correcting, setCorrecting] = useState(null);
   // Restored work arrives with its own extent: a page that already reaches past
   // the first sheet opens with enough sheets to show all of it.
   const [pages, setPages] = useState(() => {
@@ -136,6 +139,12 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       engine: r.engine || null,
       researchOnly: false,
       productionReady: r.cloud === true,
+      // The reader's own doubt and the student's own corrections travel with
+      // the reading: the card's confirmation gate honours the first, and the
+      // second is what the engine marks.
+      needsConfirmation: r.needsConfirmation === true,
+      confidenceFloor: confidenceFloorOf(r),
+      corrected: r.corrected === true,
       afterWait: afterWait && r.lines.length > 0,
       readKey: r.lines.length ? `${strokeSignature(strokes)}|${r.text}` : null,
       strokes
@@ -193,7 +202,9 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       // Only placed on the ink when each read line plausibly IS that written
       // line; otherwise the ✓/✗ stay in the panel, never on a guessed line.
       if (geometry && !plausibleLineMatch(outcome?.transcription?.lines, geometry.lines)) geometry = null;
-      const reading = outcome?.transcription ? toReading(outcome.transcription, geometry) : null;
+      const reading = outcome?.transcription
+        ? toReading(outcome.transcription, geometry, { confidenceFloor: outcome?.readiness?.confidenceFloor })
+        : null;
       if (reading) {
         retriesRef.current = 0;
         const afterWait = queuedRef.current;
@@ -236,9 +247,23 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     if (immediate) go(); else settleRef.current = setTimeout(go, SETTLE_MS);
   }, [publish, rec.lines.length, sendToReader]);
 
+  /**
+   * One tap: the student says what they wrote on a line the reader was unsure
+   * of. Applied to the reading on screen and handed on — the reader is NOT
+   * asked again (no second provider call, nothing new leaves the device), and
+   * the deterministic engine marks the line as written.
+   */
+  const correctLine = useCallback((index, text) => {
+    setCorrecting(null);
+    const next = applyLineCorrection(rec, index, text);
+    if (next === rec) return;
+    publish(next, strokesRef.current);
+  }, [rec, publish]);
+
   const onStrokesChange = useCallback((strokes) => {
     if (strokes?.length) setCleared(null);
     strokesRef.current = strokes;
+    setCorrecting(null);
     // Kept the moment the pen lifts, before any reading: a page written in the
     // second before the app went away is still the student's page.
     try { onStrokesRef.current?.(strokes); } catch { /* keeping ink is best-effort */ }
@@ -348,6 +373,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   const engineNote = rec.cloud === true ? `Read on the server · ${rec.engine || 'cloud'}` : null;
   // i18n-exempt-end
   const shownEngineNote = diagnostics ? engineNote : (rec.cloud === true ? t('verdict.readOnServer') : null);
+  const lineConfidenceFloor = confidenceFloorOf(rec);
   const statusLine = status?.kind === 'reading'
     ? t(slowRead ? 'ink.serverStillReading' : 'ink.serverReading')
     : status?.kind === 'empty'
@@ -471,8 +497,13 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
             {shownEngineNote && <span className="ink-status muted">{shownEngineNote}</span>}
           </div>
           {rec.lines.map((line, li) => (
-            <div className="ink-line" key={li} data-text={line.text}>
+            <div className={`ink-line${isLowConfidence(line, lineConfidenceFloor) ? ' ink-line-low' : ''}`} key={li} data-text={line.text}
+              data-confidence={Number.isFinite(Number(line.conf)) ? String(Math.round(Number(line.conf) * 100) / 100) : undefined}
+              data-corrected={line.corrected === true ? 'true' : undefined}>
               <span className="ink-line-n" aria-hidden="true">{li + 1}</span>
+              {isLowConfidence(line, lineConfidenceFloor) && (
+                <span className="ink-line-doubt" title={t('ink.lowConfidenceLine', { n: li + 1 })}>?<span className="sr-only">{t('ink.lowConfidenceSr', { n: li + 1 })}{' '}</span></span>
+              )}
               {lineVerdicts && lineVerdicts[li] && ['ok', 'break', 'wrong'].includes(lineVerdicts[li].status) && (
                 <span className={`ink-line-verdict ${lineVerdicts[li].status === 'ok' ? 'good' : 'bad'}`}>
                   {lineVerdicts[li].status === 'ok' ? <Icon name="check" size={15} /> : <Icon name="correction" size={15} />}
@@ -483,8 +514,27 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
               {lineVerdicts && lineVerdicts[li] && ['break', 'wrong'].includes(lineVerdicts[li].status) && lineVerdicts[li].note && (
                 <span className="sc-note" style={{ fontSize: 12.5 }}>— {lineVerdicts[li].note}</span>
               )}
+              {line.corrected === true && (
+                <span className="ink-line-corrected" role="status"><Icon name="check" size={13} /> {t('ink.correctedSr', { n: li + 1 })}</span>
+              )}
+              {!disabled && isLowConfidence(line, lineConfidenceFloor) && correcting?.index !== li && (
+                <button type="button" className="ink-correct-btn" aria-label={t('ink.iWroteAria', { n: li + 1 })}
+                  onClick={() => setCorrecting({ index: li, text: line.text })}>{t('ink.iWrote')}</button>
+              )}
+              {!disabled && correcting?.index === li && (
+                <form className="ink-correct" onSubmit={e => { e.preventDefault(); correctLine(li, correcting.text); }}>
+                  <input autoFocus value={correcting.text} aria-label={t('ink.correctionAria', { n: li + 1 })}
+                    inputMode="text" autoCapitalize="off" autoCorrect="off" spellCheck={false} maxLength={400}
+                    onChange={e => setCorrecting({ index: li, text: e.target.value })} />
+                  <button type="submit" className="btn btn-primary btn-sm">{t('ink.correctionUse')}</button>
+                  <button type="button" className="btn btn-quiet btn-sm" onClick={() => setCorrecting(null)}>{t('common.cancel')}</button>
+                </form>
+              )}
             </div>
           ))}
+          {!disabled && lowConfidenceLines(rec).length > 0 && (
+            <div className="ink-doubt-note" role="status">{t('ink.lowConfidenceLine', { n: lowConfidenceLines(rec)[0] + 1 })}</div>
+          )}
         </div>
       )}
     </div>

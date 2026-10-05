@@ -20,7 +20,15 @@ import { safeCode } from './observability.js';
 
 const MINUTE = 60_000;
 const RING_MINUTES = 15;
+const RECENT_SAMPLES = 400;
 const LABEL = /^[A-Za-z0-9_.:-]{1,64}$/;
+
+/** The labels of a series key back out of it: `a{p=x,q=y}` → { p: 'x', q: 'y' }. */
+function labelsOf(key) {
+  const brace = key.indexOf('{');
+  if (brace < 0) return {};
+  return Object.fromEntries(key.slice(brace + 1, -1).split(',').map(pair => pair.split('=')));
+}
 
 function labelKey(name, labels) {
   const entries = Object.entries(labels || {})
@@ -63,8 +71,30 @@ export function createMetrics({ now = () => Date.now() } = {}) {
     entry.count += 1;
     entry.sumMs += ms;
     entry.maxMs = Math.max(entry.maxMs, ms);
-    entry.recent.push(ms);
-    if (entry.recent.length > 200) entry.recent.shift();
+    // Each sample keeps its minute so a window (the alert rules' 5 minutes)
+    // can be cut out of it; the ring is sized for the busiest provider.
+    entry.recent.push({ at: now(), ms });
+    if (entry.recent.length > RECENT_SAMPLES) entry.recent.shift();
+  }
+
+  /** Sorted latency samples matching `where`, since boot or over the last `minutes`. */
+  function samples(name, { minutes = null, where = {} } = {}) {
+    const since = minutes ? now() - minutes * MINUTE : -Infinity;
+    const out = [];
+    for (const [key, entry] of latency) {
+      if (key !== name && !key.startsWith(`${name}{`)) continue;
+      const labels = key === name ? {} : Object.fromEntries(key.slice(name.length + 1, -1).split(',').map(pair => pair.split('=')));
+      const ok = Object.entries(where).every(([label, value]) => labels[label] === String(value));
+      if (!ok) continue;
+      for (const sample of entry.recent) if (sample.at >= since) out.push(sample.ms);
+    }
+    return out.sort((a, b) => a - b);
+  }
+
+  /** The p95 of a latency series over a window, with how many samples it rests on. */
+  function p95(name, options = {}) {
+    const sorted = samples(name, options);
+    return { p95Ms: percentile(sorted, 0.95), count: sorted.length };
   }
 
   function windowed(entry, minutes) {
@@ -99,16 +129,18 @@ export function createMetrics({ now = () => Date.now() } = {}) {
     }
     const outLatency = {};
     for (const [key, entry] of [...latency].sort(([a], [b]) => a.localeCompare(b))) {
-      const sorted = [...entry.recent].sort((a, b) => a - b);
+      const sorted = entry.recent.map(sample => sample.ms).sort((a, b) => a - b);
+      const last5m = samples(key.includes('{') ? key.slice(0, key.indexOf('{')) : key, { minutes: 5, where: labelsOf(key) });
       outLatency[key] = {
         count: entry.count,
         meanMs: entry.count ? Math.round(entry.sumMs / entry.count) : null,
         maxMs: Math.round(entry.maxMs),
         p50Ms: percentile(sorted, 0.5),
-        p95Ms: percentile(sorted, 0.95)
+        p95Ms: percentile(sorted, 0.95),
+        last5m: { count: last5m.length, p95Ms: percentile(last5m, 0.95) }
       };
     }
-    const alerts = evaluateAlerts({ sum });
+    const alerts = evaluateAlerts({ sum, p95 });
     return {
       startedAt,
       uptimeSeconds: Math.floor((now() - startedAt) / 1000),
@@ -121,7 +153,7 @@ export function createMetrics({ now = () => Date.now() } = {}) {
 
   function reset() { counters.clear(); latency.clear(); }
 
-  return { inc, observe, sum, snapshot, reset };
+  return { inc, observe, sum, samples, p95, snapshot, reset };
 }
 
 // ── Alert rules (docs/operations/alerts.md) ────────────────────────────────
@@ -163,6 +195,19 @@ export const ALERT_RULES = Object.freeze([
       const total = sum('provider_calls_total', { minutes: t.minutes, where: { provider } });
       return failed >= t.count && total > 0 && failed / total >= t.ratio;
     })
+  },
+  {
+    // The handwriting latency budget (docs/operations/alerts.md §2a): ink
+    // submitted to mark shown under 4 s at p95. The provider read is the part
+    // of that budget this server can see, so its p95 over the window is the
+    // signal; the rule rests on at least `count` reads so one slow read in a
+    // quiet minute cannot page by itself.
+    id: 'HANDWRITING_LATENCY_P95',
+    thresholds: { count: 5, p95Ms: 4000, minutes: 5 },
+    evaluate({ p95 }, t) {
+      const window = p95('provider_latency_ms', { minutes: t.minutes, where: { provider: 'handwriting' } });
+      return window.count >= t.count && window.p95Ms !== null && window.p95Ms >= t.p95Ms;
+    }
   },
   {
     // Only deliveries this server failed to APPLY (5xx). Rejections (bad

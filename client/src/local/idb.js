@@ -8,7 +8,7 @@ import {
 } from './auth.js';
 
 const DB_NAME = 'pri-learning';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 let dbPromise = null;
 let dbHandle = null;
@@ -63,6 +63,7 @@ export function openDB() {
       mk('progressImports', { keyPath: 'id' }, [['teacherPid', 'teacherPid']]); // imported student progress files
       mk('bookmarks', { keyPath: 'key' }, [['pid', 'pid']]);                    // `${pid}:${questionId}`
       mk('device', { keyPath: 'id' });                                          // this install's own secrets
+      mk('inkDrafts', { keyPath: 'id' }, [['pid', 'pid']]);                     // `${pid}:${questionId}` — handwriting waiting to be read (local/inkDrafts.js)
     };
     req.onsuccess = () => {
       const db = req.result;
@@ -224,6 +225,7 @@ const SEALED_STORES = {
   rushRuns: { owner: 'pid', clear: ['id', 'pid'], ownKey: true },
   matchRuns: { owner: 'pid', clear: ['id', 'pid'], ownKey: true },
   inks: { owner: 'pid', clear: ['id', 'pid'] },
+  inkDrafts: { owner: 'pid', clear: ['id', 'pid'] },
   taskProgress: { owner: 'pid', clear: ['key', 'pid'], blind: 'tail' },
   bookmarks: { owner: 'pid', clear: ['key', 'pid'], blind: 'head' },
   progressImports: { owner: 'teacherPid', clear: ['id', 'teacherPid'] },
@@ -1448,7 +1450,7 @@ export async function rawByIndex(store, index, value) {
 const PROFILE_STORES = [
   ['ratings', 'pid'], ['attempts', 'pid'], ['questions', 'pid'], ['reviews', 'pid'],
   ['exams', 'pid'], ['badges', 'pid'], ['activity', 'pid'], ['rushRuns', 'pid'],
-  ['matchRuns', 'pid'], ['inks', 'pid'], ['taskProgress', 'pid'], ['bookmarks', 'pid'],
+  ['matchRuns', 'pid'], ['inks', 'pid'], ['inkDrafts', 'pid'], ['taskProgress', 'pid'], ['bookmarks', 'pid'],
   ['customQs', 'ownerPid'], ['progressImports', 'teacherPid']
 ];
 

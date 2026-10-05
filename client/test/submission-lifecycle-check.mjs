@@ -20,7 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { installBrowserEnv, resetStorage } from './backend-check.mjs';
+import { installBrowserEnv, rawRows, resetStorage } from './backend-check.mjs';
 
 installBrowserEnv(); resetStorage();
 // A complete Web Storage (the shared fake has no key()/length, which the draft
@@ -55,6 +55,7 @@ const { recordProfileMutation } = await import('../src/platform/profileOutbox.js
 const { submissionDigest, submissionIdOf } = await import('../src/local/backend.js');
 const recovery = await import('../src/components/practiceRecovery.js');
 const drafts = await import('../src/components/drafts.js');
+const inkDrafts = await import('../src/local/inkDrafts.js');
 await loadAllBanks();
 
 let passed = 0;
@@ -343,16 +344,43 @@ await check('a misconception proposal for a stale submission changes nothing; no
 
 // ── 6 · Client recovery store ───────────────────────────────────────────────
 await check('pending submissions and kept ink are profile-scoped, bounded and self-recovering', async () => {
+  // Upgrade safety: pre-sealed-store builds wrote ink drafts in plaintext
+  // localStorage. Activating a profile must remove only that profile's legacy
+  // rows, keep another profile's row untouched until that profile is selected,
+  // and never surface either row on the crash-card draft list.
+  const legacyA = 'pri.draft.pid-a.ink.q-legacy-a';
+  const legacyB = 'pri.draft.pid-b.ink.q-legacy-b';
+  const legacy = (id, x) => JSON.stringify({
+    v: 1, scope: 'ink', id, data: { strokes: [{ points: [[x, x + 1], [x + 2, x + 3]] }] },
+    label: 'Legacy handwriting', note: 'Handwriting in progress', path: '/practice', savedAt: Date.now()
+  });
+  localStorage.setItem(legacyA, legacy('q-legacy-a', 41));
+  localStorage.setItem(legacyB, legacy('q-legacy-b', 51));
+
   drafts.setDraftProfile('pid-a');
+  assert.equal(localStorage.getItem(legacyA), null, 'active profile legacy plaintext ink is removed on upgrade');
+  assert.notEqual(localStorage.getItem(legacyB), null, 'another profile legacy ink is not touched during the wrong profile switch');
+  assert.deepEqual(drafts.listDrafts().map(d => d.scope).filter(s => s === 'ink'), [], 'legacy ink is never offered on the crash card');
+  drafts.setDraftProfile('pid-b');
+  assert.equal(localStorage.getItem(legacyB), null, 'the other profile legacy row is removed only when that profile becomes active');
+  drafts.setDraftProfile('pid-a');
+
   const strokes = [{ points: [{ x: 10.4, y: 20.6, w: 3 }, { x: 11, y: 22 }] }, { points: [] }, { points: [[5, 6]] }];
   assert.equal(recovery.saveInkDraft('q-ink', strokes), true);
-  drafts.flushDrafts();
-  assert.deepEqual(recovery.readInkDraft('q-ink'), [
+  assert.deepEqual(await recovery.readInkDraft('q-ink'), [
     { points: [{ x: 10, y: 21 }, { x: 11, y: 22 }] }, { points: [{ x: 5, y: 6 }] }
-  ], 'ink survives as integer points, empty strokes dropped');
+  ], 'ink survives as integer points, empty strokes dropped — readable through the coalesced write');
+  await inkDrafts.flushInkDrafts();
+  assert.deepEqual((await recovery.readInkDraft('q-ink'))?.length, 2, 'and after the write has landed');
+  const onDisk = rawRows().inkDrafts || [];
+  assert.equal(onDisk.length, 1, 'one row in the inkDrafts IndexedDB store');
+  assert.equal(onDisk[0].pid, 'pid-a', 'owned by the profile, in the clear for the index');
+  assert.deepEqual(Object.keys(localStorage).filter(k => /\.ink\./.test(k)), [], 'nothing of it in localStorage');
+  assert.equal(JSON.stringify(localStorage).includes('"strokes"'), false, 'no strokes anywhere in web storage');
   const huge = Array.from({ length: 2000 }, () => ({ points: Array.from({ length: 40 }, (_, i) => ({ x: 1000 + i, y: 1000 + i })) }));
   assert.equal(recovery.saveInkDraft('q-huge', huge), false, 'an oversized page is not kept');
-  assert.equal(recovery.readInkDraft('q-huge'), null);
+  assert.equal(await recovery.readInkDraft('q-huge'), null);
+  assert.deepEqual((await inkDrafts.queuedInkDrafts()).map(d => d.questionId), ['q-ink'], 'the outbox view lists the page waiting to be read');
   recovery.savePendingSubmission('q-pend', { submissionId: 'sub_aaaaaaaaaaaaaaaa', answer: '7', ms: 12, viaInk: true, lines: ['x = 7'] });
   assert.equal(recovery.savePendingSubmission('q-bad', { submissionId: 'bad id', answer: '7' }), false);
   assert.equal(recovery.pendingSubmissionQuestionId(), 'q-pend');
@@ -360,15 +388,36 @@ await check('pending submissions and kept ink are profile-scoped, bounded and se
     'the crash card does not list records that recover by themselves');
   drafts.setDraftProfile('pid-b');
   assert.equal(recovery.pendingSubmissionQuestionId(), null, 'another profile sees none of it');
-  assert.equal(recovery.readInkDraft('q-ink'), null);
+  assert.equal(await recovery.readInkDraft('q-ink'), null);
+  assert.deepEqual(await inkDrafts.queuedInkDrafts(), [], 'nor its queue');
   drafts.setDraftProfile('pid-a');
   recovery.clearPendingSubmission('q-pend');
-  recovery.clearInkDraft('q-ink');
+  await recovery.clearInkDraft('q-ink');
   assert.equal(recovery.pendingSubmissionQuestionId(), null);
-  assert.equal(recovery.readInkDraft('q-ink'), null);
+  assert.equal(await recovery.readInkDraft('q-ink'), null);
+  assert.equal((rawRows().inkDrafts || []).length, 0, 'clearing removes the row');
   const a = recovery.newSubmissionId(), b = recovery.newSubmissionId();
   assert.match(a, /^[A-Za-z0-9_-]{8,80}$/); assert.notEqual(a, b);
   assert.equal(recovery.submissionContentKey('3', undefined), recovery.submissionContentKey('3', null));
+  drafts.setDraftProfile(null);
+});
+
+// ── 6b · A protected profile's kept page is ciphertext at rest ──────────────
+// The reason the ink left localStorage: a page of working is the student's
+// private work. With the profile's data key held, the row keeps only its id and
+// pid in the clear; every stroke is inside the sealed blob.
+await check('a protected profile’s kept ink is sealed on disk', async () => {
+  const sealed = (await api.post('/profiles', { name: 'Sealed Sam', year: 10, password: 'sealed-at-rest-1' })).user;
+  drafts.setDraftProfile(sealed.id);
+  const canaryX = 7351, canaryY = 9137;
+  assert.equal(recovery.saveInkDraft('q-sealed', [{ points: [{ x: canaryX, y: canaryY }, { x: canaryX + 1, y: canaryY + 1 }] }]), true);
+  await inkDrafts.flushInkDrafts();
+  const rows = (rawRows().inkDrafts || []).filter(r => r.pid === sealed.id);
+  assert.equal(rows.length, 1, 'one row for the protected profile');
+  assert.deepEqual(Object.keys(rows[0]).sort(), ['id', 'pid', 'sealed'], 'only the id and pid are in the clear; everything else is in the sealed blob');
+  assert.equal(JSON.stringify(rows[0]).includes(String(canaryX)), false, 'no coordinate is readable on disk');
+  assert.deepEqual((await recovery.readInkDraft('q-sealed'))?.[0]?.points?.[0], { x: canaryX, y: canaryY }, 'and it opens for the profile that owns it');
+  await recovery.clearInkDraft('q-sealed');
   drafts.setDraftProfile(null);
 });
 

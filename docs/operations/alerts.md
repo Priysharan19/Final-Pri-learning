@@ -43,7 +43,37 @@ states every one of its numbers (`≥ N`, `≥ P%`, `N minutes`).
 | `DB_SATURATION` | ≥ 20 requests answered `PLATFORM_DB_BUSY` or `PLATFORM_DB_TIMEOUT` in 5 minutes | warn | `db_errors_total{code=PLATFORM_DB_BUSY|PLATFORM_DB_TIMEOUT}` | Railway log alert on those codes; Supabase connection-pool usage alert. Response: check `PRI_DATABASE_POOL_MAX × replicas` against the pooler size (`postgres-cutover.md` §1) |
 | `AUTH_EMAIL_FAILURES` | ≥ 3 verification/reset/guardian-consent emails failed to send in 15 minutes | page | `auth_email_total{outcome=failed}`, `auth_email_failures_total{code=RESEND_<status>}`; `auth_email_failed` lines; `/v1/ready` `checks.authEmail.state = failing` | Railway log alert on `"event":"auth_email_failed"`; Resend dashboard webhook/alert for bounces and API errors on the sending domain |
 | `PROVIDER_FAILURE_SPIKE` | handwriting or working provider: ≥ 5 failed calls **and** ≥ 25% of that provider's calls in 5 minutes | warn | `provider_calls_total{provider,outcome}`, `provider_failures_total{provider,code}`, `provider_latency_ms`; `provider_call_failed` lines; `/v1/ready` `checks.handwriting` | Railway log alert on `"event":"provider_call_failed"`; OpenAI usage/billing alert on the project key. The on-device reader keeps working, so this never takes the service down |
+| `HANDWRITING_LATENCY_P95` | the handwriting provider's read latency is p95 ≥ 4 s over ≥ 5 reads in the last 5 minutes | warn | `provider_latency_ms{provider=handwriting}` (`latency[].last5m.p95Ms` on `/v1/metrics`); `provider_call_failed` lines with `code: HANDWRITING_TIMEOUT` | A monitor polling `/v1/metrics` for `HANDWRITING_LATENCY_P95` in `firing`; OpenAI status page. See §2a for the budget and what the student sees meanwhile |
 | `WEBHOOK_FAILURES` | ≥ 1 billing webhook failed to apply (5xx) in 15 minutes. Rejections (4xx: bad signature, malformed, a provider this deployment does not use) are counted as `webhook_total{outcome=rejected}` but never page — anyone can send one | page | `webhook_total{provider,outcome}`, `webhook_failures_total{provider,code}`; `platform_error` lines on `/v1/billing/webhook/:provider` | Railway log alert on `"route":"/v1/billing/webhook/:provider"` with status ≥ 500; Razorpay dashboard webhook failure notifications; App Store Server Notifications retry visibility |
+
+### 2a. Handwriting latency budget
+
+Target: **ink submitted → mark shown in under 4 s at p95** (release ledger task 4.7), measured
+end to end on the Mumbai deployment. The server can see one part of that path, the provider
+read, and records it per call as `provider_latency_ms{provider=handwriting}` (`recordProviderCall`
+in `server/platform/handwriting.js`; the reading's own `latencyMs` is also returned to the
+client and surfaced in `/v1/handwriting/status` as `lastLatencyMs`). `/v1/metrics` reports the
+series since boot (`count`, `meanMs`, `maxMs`, `p50Ms`, `p95Ms`) and over the last 5 minutes
+(`last5m.count`, `last5m.p95Ms`); `HANDWRITING_LATENCY_P95` fires from the windowed value.
+The raster, upload and the deterministic marking on the device are the rest of the budget and
+are not visible here; the e2e flow `client/test/tour-ink.js` is the only end-to-end timing in
+the repository, and it runs against a stand-in reader, so it is **not** evidence for the
+target. The production number is `BLOCKED_EXTERNAL` until the health agent measures it
+against the Mumbai deployment with real reads.
+
+What the budget's enforcement points are, and what the student sees at each:
+
+| Time since the page settled | Server | Student |
+|---|---|---|
+| 0 s | the read is sent; nothing but the picture of the ink | "Reading your handwriting…" (`ink.serverReading`) |
+| 5 s | — | the note changes to "Still reading your handwriting — this can take a little longer. Keep going; nothing is lost." (`ink.serverStillReading`, `STILL_READING_MS` in `client/src/ink/InkAnswer.jsx`); the ink stays on the page |
+| 27 s (60% of the 45 s budget, `PRIMARY_TIMEOUT_SHARE`) | the primary model is abandoned and the fallback model is tried once inside what is left | unchanged |
+| 45 s (`PRI_HANDWRITING_TIMEOUT_MS`, default 45 s, capped at 60 s) | `HANDWRITING_TIMEOUT` (504, retryable), counted as a failed provider call with that code | "Pri's handwriting reader isn't answering right now. Your working is saved and will be tried again shortly — or type your answer now." (`ink.waitingServiceDown`); the page is retried by itself with the back-off in `cloudReader.js` (20 s doubling to 5 minutes) |
+
+`server/test/handwriting-latency-budget-check.mjs` pins each of these: the timeout is a coded
+refusal inside the budget, the failed call carries its latency, the windowed p95 is reported
+and the rule fires at its threshold, and the client's slow-read and timed-out states resolve
+to the strings above in English and Hindi.
 
 Every alert's first diagnostic step is the same: take a `requestId` from the alert's log
 lines, search Railway logs for it, and read the `route`, `code` and `release` it carries.
@@ -76,6 +106,7 @@ lines, search Railway logs for it, and read the `route`, `code` and `release` it
 | `DB_SATURATION` | — | — | — | — |
 | `AUTH_EMAIL_FAILURES` | — | — | — | — |
 | `PROVIDER_FAILURE_SPIKE` | — | — | — | — |
+| `HANDWRITING_LATENCY_P95` | — | — | — | — |
 | `WEBHOOK_FAILURES` | — | — | — | — |
 
 An alert counts as configured only when this row is filled **and** the alert has been seen to

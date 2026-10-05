@@ -69,6 +69,20 @@ const draftWritten = (page, pattern) => page.waitForFunction(src => {
   return false;
 }, pattern.source, { timeout: 15000 }).then(() => true, () => false);
 
+// Kept handwriting lives in the sealed inkDrafts IndexedDB store, keyed
+// `${pid}:${questionId}` — never in localStorage.
+const inkKept = (page, questionId) => page.waitForFunction(qid => new Promise(ok => {
+  const r = indexedDB.open('pri-learning');
+  r.onsuccess = () => {
+    const db = r.result;
+    let req;
+    try { req = db.transaction('inkDrafts').objectStore('inkDrafts').getAllKeys(); } catch { db.close(); return ok(false); }
+    req.onsuccess = () => { db.close(); ok(req.result.some(k => String(k).endsWith(`:${qid}`))); };
+    req.onerror = () => { db.close(); ok(false); };
+  };
+  r.onerror = () => ok(false);
+}), questionId, { timeout: 15000, polling: 300 }).then(() => true, () => false);
+
 const pendingLeft = (page) => page.evaluate(() => {
   for (let i = 0; i < localStorage.length; i++) if (/\.submit\./.test(localStorage.key(i) || '')) return true;
   return false;
@@ -176,8 +190,8 @@ export const flow = {
     await check('readable handwriting enables Submit', submitOn,
       `status: ${await page.locator('.ws-actions .status-line').innerText().catch(() => '?')}`);
     // Question ids are opaque [A-Za-z0-9-] tokens, safe inside a pattern.
-    const kept = await draftWritten(page, new RegExp(`\\.ink\\.${inkId}$`));
-    await check('the handwriting is kept in storage before the reload', kept, 'no ink draft was written');
+    const kept = await inkKept(page, inkId);
+    await check('the handwriting is kept in the sealed inkDrafts store before the reload', kept, 'no ink draft row was written');
     await reopen();
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 }).catch(() => null);
     await page.waitForFunction(() => document.querySelectorAll('.ink-line').length >= 1, null, { timeout: 15000 }).catch(() => null);

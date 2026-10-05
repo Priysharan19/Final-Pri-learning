@@ -8,6 +8,10 @@ const theme = readFileSync(new URL('../src/theme.css', import.meta.url), 'utf8')
   + '\n' + readFileSync(new URL('../src/workspace.css', import.meta.url), 'utf8')
   + '\n' + readFileSync(new URL('../src/ink/InkAnswer.css', import.meta.url), 'utf8');
 const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
+const card = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
+const inkAnswer = readFileSync(new URL('../src/ink/InkAnswer.jsx', import.meta.url), 'utf8');
+const en = (await import('../src/i18n/strings.en.js')).default;
+const hi = (await import('../src/i18n/strings.hi.js')).default;
 
 const checks = [];
 const check = (name, ok, detail = '') => checks.push({ name, ok: !!ok, detail });
@@ -99,6 +103,19 @@ check('phone recomposes the action bar to the bottom safe area', /max-width:\s*7
 check('phone layout has an explicit breakpoint', /@media\s*\(max-width:\s*760px\)/.test(theme));
 check('single-column questions keep a readable measure', /\.ws-single \.ws-context, \.ws-single \.ws-work \{ width: min\(820px, 100%\)/.test(theme) && /--measure:\s*68ch/.test(theme));
 check('Pri Explain uses the same surface system', /\.pri-explain-dialog[\s\S]*background:\s*var\(--surface\)/s.test(theme));
+
+// Honesty line on every handwritten verdict (ledger 4.9): who read, who marked.
+check('the verdict provenance line has a design-system style', /\.eval-provenance\s*\{[^}]*color:\s*var\(--ink-2\)/.test(theme));
+check('the evaluation card carries the provenance line for handwritten attempts',
+  /eval-disclaimer[\s\S]{0,200}attemptViaInk && <div className="eval-provenance"[^>]*>[^<]*\{t\('verdict\.readByAiMarkedByEngine'\)\}/.test(card));
+check('the retry verdict carries it too', (card.match(/t\('verdict\.readByAiMarkedByEngine'\)/g) || []).length >= 2);
+check('the provenance line is readable text, never aria-hidden', !/eval-provenance"[^>]*aria-hidden/.test(card));
+check('the provenance line reads "Read by AI, marked by Pri’s engine"', en['verdict.readByAiMarkedByEngine'] === 'Read by AI, marked by Pri’s engine');
+check('and exists in Hindi', /[\u0900-\u097F]/.test(hi['verdict.readByAiMarkedByEngine'] || '') && /AI/.test(hi['verdict.readByAiMarkedByEngine'] || ''));
+// Doubtful lines of a reading (ledger 4.4) use the warn token, not an ad-hoc colour.
+check('a low-confidence reading line uses the warn token', /\.ink-line-low\s*\{[^}]*var\(--warn\)/.test(theme) && /\.ink-line-doubt\s*\{[^}]*var\(--warn\)/.test(theme));
+check('the one-tap correction control is a 32px-plus touch target', /\.ink-correct-btn\s*\{[^}]*min-height:\s*32px/.test(theme));
+check('the ink surface marks doubtful lines and offers "I wrote…"', /ink-line-low/.test(inkAnswer) && /t\('ink\.iWrote'\)/.test(inkAnswer));
 
 const forbidden = [
   'The exact visual language of the reference platform',

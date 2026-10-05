@@ -124,6 +124,50 @@ export const flow = {
     await check('offline, nothing is read or offered for marking, and the student is told why',
       await page.locator('.ink-preview').count() === 0 && /needs a connection/.test(offlineNote),
       `status ${JSON.stringify(offlineNote)}; ${await page.locator('.ink-line').count()} lines shown`);
+    await check('and told plainly: "Saved. It will be read when you are back online."',
+      /Saved\. It will be read when you are back online\./.test(offlineNote), JSON.stringify(offlineNote));
+    // The kept page is a row in the inkDrafts IndexedDB store (sealed when the
+    // profile has a password), and nothing of it is in localStorage.
+    await page.waitForTimeout(700);   // the store coalesces pen-lifts into one write
+    const keptRows = await page.evaluate(() => new Promise(ok => {
+      const r = indexedDB.open('pri-learning');
+      r.onsuccess = () => {
+        const db = r.result;
+        let req;
+        try { req = db.transaction('inkDrafts').objectStore('inkDrafts').getAll(); } catch (e) { db.close(); return ok({ error: String(e) }); }
+        req.onsuccess = () => { db.close(); ok(req.result.map(row => ({ id: String(row.id), strokes: Array.isArray(row.strokes) ? row.strokes.length : (row.sealed ? 'sealed' : 0) }))); };
+        req.onerror = () => { db.close(); ok({ error: 'read failed' }); };
+      };
+      r.onerror = () => ok({ error: 'open failed' });
+    }));
+    await check('the kept page is one row in the sealed inkDrafts store',
+      Array.isArray(keptRows) && keptRows.length === 1 && (keptRows[0].strokes === 'sealed' || keptRows[0].strokes > 0), JSON.stringify(keptRows));
+    const plaintextInk = await page.evaluate(() => Object.keys(localStorage).filter(k => /\.ink\./.test(k) || /"strokes"/.test(String(localStorage.getItem(k)))));
+    await check('and no handwriting sits in localStorage', plaintextInk.length === 0, JSON.stringify(plaintextInk));
+
+    // ── 3c · the app goes away mid-offline; the page comes back, still unread ─
+    // Online again, but the reader is not answering yet: the kept page must be
+    // restored from the store, offered to the reader (which proves the strokes
+    // came back), and go on waiting — no mark, nothing lost.
+    const requestsBeforeReload = reader.requests.length;
+    reader.down = true;
+    await ctx.setOffline(false);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
+    await check('after the reload the same question is back', await mathText('.q-prompt') === prompt,
+      `again: ${JSON.stringify(await mathText('.q-prompt'))}`);
+    await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+    const canvasAfter = await page.locator('.ink-canvas-live').boundingBox();
+    await check('and the card came back to the pen by itself', !!canvasAfter && canvasAfter.width > 200);
+    for (let i = 0; i < 60 && reader.requests.length === requestsBeforeReload; i++) await page.waitForTimeout(200);
+    await check('the kept strokes were restored and offered to the reader (one request, a picture, nothing else)',
+      reader.requests.length === requestsBeforeReload + 1 && JSON.stringify(Object.keys(reader.requests.at(-1) || {})) === '["image"]',
+      `${reader.requests.length - requestsBeforeReload} request(s) after the reload`);
+    await page.waitForSelector('.ink-status', { timeout: 10000 }).catch(() => {});
+    const downNote = (await page.locator('.ink-status').innerText().catch(() => '')) || '';
+    await check('with the reader down the page waits, saved, and says so', /saved/i.test(downNote) && await page.locator('.eval-card').count() === 0, JSON.stringify(downNote));
+    reader.down = false;
+    await ctx.setOffline(true);
     // The connection flaps before it settles: every return re-reads the kept
     // page, but the answer must be submitted for marking exactly once.
     const attemptCount = () => page.evaluate(() => new Promise(ok => {
@@ -178,6 +222,11 @@ export const flow = {
     const marks = (await page.locator('.eval-marks').innerText()).replace(/\s+/g, ' ').trim();
     await check('the handwritten answer is marked correct — every mark awarded',
       /^(\d+(?:\.\d)?) \/ \1 marks\b/.test(marks), `marks read ${JSON.stringify(marks)}`);
+    const provenance = (await page.locator('.eval-card .eval-provenance').innerText().catch(() => '')) || '';
+    await check('the verdict says who read it and who marked it: "Read by AI, marked by Pri’s engine"',
+      /Read by AI, marked by Pri’s engine/.test(provenance), `provenance reads ${JSON.stringify(provenance)}`);
+    await check('and that line is readable, not hidden from assistive technology',
+      await page.locator('.eval-card .eval-provenance[aria-hidden="true"]').count() === 0);
     await check('and it is not told what was expected instead',
       !/Expected:/.test(marked), `evaluation reads ${JSON.stringify(marked.slice(0, 200))}`);
     await check('the read line is ticked in the reading panel',
@@ -199,6 +248,51 @@ export const flow = {
     await check('and the reading was kept beside them',
       detail.includes(`read as \u201c${answer}\u201d`),
       `detail reads ${JSON.stringify(detail.slice(0, 200))}`);
+
+    // ── 7 · a doubtful line: highlighted, corrected in one tap, no second read ─
+    // The reader is unsure of what it read. The line is marked as doubtful, the
+    // student says what they wrote, and that goes to the engine — the reader is
+    // not asked again, and nothing is marked until the student has spoken.
+    await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
+    await settle();
+    const writeTab = page.getByRole('button', { name: 'Answer by handwriting' });
+    if (await writeTab.count()) await writeTab.click();
+    await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+    const box2 = await page.locator('.ink-canvas-live').boundingBox();
+    reader.text = '7';
+    reader.confidence = 0.4;            // under the 0.82 floor: a doubtful read
+    await handwrite(page, box2, '1');   // what the student actually wrote
+    await readingArrives(page);
+    const doubtful = page.locator('.ink-line.ink-line-low');
+    await check('a line the reader was unsure of is highlighted as doubtful',
+      await doubtful.count() === 1 && (await doubtful.first().getAttribute('data-confidence')) === '0.4',
+      `${await doubtful.count()} doubtful line(s); confidence ${await page.locator('.ink-line').first().getAttribute('data-confidence')}`);
+    await check('no mark is given from it: the card is not auto-marked and Submit asks to check the reading first',
+      await page.locator('.eval-card, .verdict-bad').count() === 0 && await page.getByRole('button', { name: 'Check this reading first' }).count() === 1);
+    const readsBeforeCorrection = reader.requests.length;
+    const iWrote = page.getByRole('button', { name: /Correct line 1/ });
+    await check('a one-tap "I wrote…" control is offered on that line', await iWrote.count() === 1);
+    await iWrote.click();
+    const field = page.getByLabel('What you wrote on line 1');
+    await field.fill('1');
+    await page.getByRole('button', { name: 'Use this' }).click();
+    await settle();
+    const correctedLine = page.locator('.ink-line[data-corrected="true"]');
+    await check('the line now reads what the student wrote and is marked as corrected by them',
+      await correctedLine.count() === 1 && (await correctedLine.getAttribute('data-text')) === '1' && await page.locator('.ink-line.ink-line-low').count() === 0,
+      `corrected ${await correctedLine.count()}, text ${JSON.stringify(await correctedLine.getAttribute('data-text'))}`);
+    await check('the correction did not go back to the reader — no second provider call', reader.requests.length === readsBeforeCorrection,
+      `${reader.requests.length - readsBeforeCorrection} extra request(s)`);
+    await check('Submit is now a plain submit: the engine marks what the student wrote',
+      await page.getByRole('button', SUBMIT).count() === 1 && await page.getByRole('button', { name: 'Check this reading first' }).count() === 0);
+    await page.getByRole('button', SUBMIT).click();
+    await page.waitForSelector('.eval-card, .verdict-bad', { timeout: 20000 });
+    await check('a verdict comes from the deterministic engine, still with no further read', reader.requests.length === readsBeforeCorrection);
+    const anyProvenance = (await page.locator('.eval-provenance').first().innerText().catch(() => '')) || '';
+    await check('and whichever way it went, the handwritten verdict carries the honesty line',
+      /Read by AI, marked by Pri’s engine/.test(anyProvenance), JSON.stringify(anyProvenance));
+    reader.confidence = null;
   }
 };
 
