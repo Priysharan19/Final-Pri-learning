@@ -330,7 +330,8 @@ export function normalizeResult(parsed, { model, confidenceFloor }) {
   // a page is only as readable as its worst line, and the marker reads them all.
   const worstLine = lines.length ? Math.min(...lines.map(l => l.confidence)) : 0;
   const confidence = lines.length ? Math.min(stated, worstLine) : 0;
-  const needsConfirmation = parsed?.needs_confirmation === true
+  const providerNeedsConfirmation = parsed?.needs_confirmation === true;
+  const needsConfirmation = providerNeedsConfirmation
     || !lines.length
     || confidence < confidenceFloor;
   return Object.freeze({
@@ -338,6 +339,8 @@ export function normalizeResult(parsed, { model, confidenceFloor }) {
     lines,
     text: lines.map(l => l.text).join('\n'),
     confidence: Math.round(confidence * 1000) / 1000,
+    confidenceFloor: Math.round(confidenceFloor * 1000) / 1000,
+    providerNeedsConfirmation,
     needsConfirmation,
     model
   });

@@ -351,9 +351,12 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
 // deterministic engine; the provider is NOT asked again.
 {
   const { LOW_CONFIDENCE, applyLineCorrection, cleanCorrection, isLowConfidence, lowConfidenceLines } = await import('../src/ink/readingCorrection.js');
-  eq(LOW_CONFIDENCE, 0.82, 'the client floor mirrors the server default confidence floor');
+  eq(LOW_CONFIDENCE, 0.82, 'the compatibility fallback matches the server default when an older reader omitted its configured floor');
   const transcription = {
-    engine: 'cloud-test', confidence: 0.4, needsConfirmation: true,
+    engine: 'cloud-test', confidence: 0.4, confidenceFloor: 0.82,
+    // This fixture's doubt is caused only by the low-confidence second line;
+    // it is not an independent provider-declared ambiguity.
+    providerNeedsConfirmation: false, needsConfirmation: true,
     lines: [{ text: '2x + 3 = 11', confidence: 0.97 }, { text: '2x = 3', confidence: 0.4 }, { text: 'x = 4', confidence: 0.9 }]
   };
   const reading = toReading(transcription, null);

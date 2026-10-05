@@ -220,7 +220,15 @@ function doubtOf(ink) {
   // student corrects it in the reading panel ("I wrote…") or stands behind
   // it; it is never marked from silently.
   if (ink.needsConfirmation === true) return { why: 'glyph', weakest };
-  if (typeof ink.minConf === 'number' && ink.minConf < CONFIRM_CONF) return { why: 'glyph', weakest };
+  // The server/provider floor is authoritative for cloud readings. Keep the
+  // older local confirmation threshold only as a fallback when no floor was
+  // supplied, so a deployment configured at 0.90 cannot be weakened to 0.82
+  // (or to this card's historical 0.55) after a line correction.
+  const configuredFloor = Number(ink.confidenceFloor);
+  const confidenceGate = Number.isFinite(configuredFloor) && configuredFloor >= 0.5 && configuredFloor <= 0.99
+    ? configuredFloor
+    : CONFIRM_CONF;
+  if (typeof ink.minConf === 'number' && ink.minConf < confidenceGate) return { why: 'glyph', weakest };
   if (typeof ink.margin === 'number' && ink.margin < CONFIRM_MARGIN) return { why: 'rival', weakest };
   return null;
 }

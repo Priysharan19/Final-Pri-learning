@@ -36,7 +36,7 @@ import { useT } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
 import './InkAnswer.css';
 import { priNative } from '../platform/native/index.js';
-import { applyLineCorrection, isLowConfidence, lowConfidenceLines } from './readingCorrection.js';
+import { applyLineCorrection, confidenceFloorOf, isLowConfidence, lowConfidenceLines } from './readingCorrection.js';
 
 // Engine names are for developers and evaluators, not students: shown in dev
 // builds, LAN research mode, or with ?inkdiag=1.
@@ -137,6 +137,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
       // the reading: the card's confirmation gate honours the first, and the
       // second is what the engine marks.
       needsConfirmation: r.needsConfirmation === true,
+      confidenceFloor: confidenceFloorOf(r),
       corrected: r.corrected === true,
       afterWait: afterWait && r.lines.length > 0,
       readKey: r.lines.length ? `${strokeSignature(strokes)}|${r.text}` : null,
@@ -187,7 +188,9 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
       // Only placed on the ink when each read line plausibly IS that written
       // line; otherwise the ✓/✗ stay in the panel, never on a guessed line.
       if (geometry && !plausibleLineMatch(outcome?.transcription?.lines, geometry.lines)) geometry = null;
-      const reading = outcome?.transcription ? toReading(outcome.transcription, geometry) : null;
+      const reading = outcome?.transcription
+        ? toReading(outcome.transcription, geometry, { confidenceFloor: outcome?.readiness?.confidenceFloor })
+        : null;
       if (reading) {
         retriesRef.current = 0;
         const afterWait = queuedRef.current;
@@ -342,6 +345,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
   const engineNote = rec.cloud === true ? `Read on the server · ${rec.engine || 'cloud'}` : null;
   // i18n-exempt-end
   const shownEngineNote = diagnostics ? engineNote : (rec.cloud === true ? t('verdict.readOnServer') : null);
+  const lineConfidenceFloor = confidenceFloorOf(rec);
   const statusLine = status?.kind === 'reading'
     ? t(slowRead ? 'ink.serverStillReading' : 'ink.serverReading')
     : status?.kind === 'empty'
@@ -453,11 +457,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
             {shownEngineNote && <span className="ink-status muted">{shownEngineNote}</span>}
           </div>
           {rec.lines.map((line, li) => (
-            <div className={`ink-line${isLowConfidence(line) ? ' ink-line-low' : ''}`} key={li} data-text={line.text}
+            <div className={`ink-line${isLowConfidence(line, lineConfidenceFloor) ? ' ink-line-low' : ''}`} key={li} data-text={line.text}
               data-confidence={Number.isFinite(Number(line.conf)) ? String(Math.round(Number(line.conf) * 100) / 100) : undefined}
               data-corrected={line.corrected === true ? 'true' : undefined}>
               <span className="ink-line-n" aria-hidden="true">{li + 1}</span>
-              {isLowConfidence(line) && (
+              {isLowConfidence(line, lineConfidenceFloor) && (
                 <span className="ink-line-doubt" title={t('ink.lowConfidenceLine', { n: li + 1 })}>?<span className="sr-only">{t('ink.lowConfidenceSr', { n: li + 1 })}{' '}</span></span>
               )}
               {lineVerdicts && lineVerdicts[li] && ['ok', 'break', 'wrong'].includes(lineVerdicts[li].status) && (
@@ -473,7 +477,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
               {line.corrected === true && (
                 <span className="ink-line-corrected" role="status"><Icon name="check" size={13} /> {t('ink.correctedSr', { n: li + 1 })}</span>
               )}
-              {!disabled && isLowConfidence(line) && correcting?.index !== li && (
+              {!disabled && isLowConfidence(line, lineConfidenceFloor) && correcting?.index !== li && (
                 <button type="button" className="ink-correct-btn" aria-label={t('ink.iWroteAria', { n: li + 1 })}
                   onClick={() => setCorrecting({ index: li, text: line.text })}>{t('ink.iWrote')}</button>
               )}

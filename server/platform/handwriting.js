@@ -197,6 +197,18 @@ export function createHandwritingRouter(db, {
             lines: result.lines,
             text: result.text,
             confidence: result.confidence,
+            confidenceFloor: Number.isFinite(Number(result.confidenceFloor))
+              ? Number(result.confidenceFloor)
+              : providerStaticStatus(env).confidenceFloor,
+            // Preserve why the server was unsure. The client can clear a pure
+            // below-floor doubt after the student corrects those lines, but an
+            // explicit provider ambiguity is page-level and must stay until no
+            // potentially responsible uncorrected line remains. `null` means an
+            // older/injected provider did not expose provenance, so the client
+            // keeps the server-level doubt conservatively.
+            providerNeedsConfirmation: typeof result.providerNeedsConfirmation === 'boolean'
+              ? result.providerNeedsConfirmation
+              : null,
             needsConfirmation: result.needsConfirmation,
             escalated: !!result.escalated,
             fallbackAttempted: !!result.fallbackAttempted,
