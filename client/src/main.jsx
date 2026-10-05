@@ -34,6 +34,10 @@ const ACCOUNT_ACTION_MODE = window.location.pathname === '/account-action';
 // The parent's own consent page: no profile, no child session. A link from
 // the guardian email carries its token in the fragment, stripped the same way.
 const GUARDIAN_MODE = window.location.pathname === '/guardian/consent';
+// The public account-deletion request page (Apple 5.1.1(v), Play "Delete
+// account"): no profile, no session, reachable by someone without the app.
+const DELETE_REQUEST_MODE = window.location.pathname === '/account/delete-request';
+if (DELETE_REQUEST_MODE && !window.__PRI_CLOUD_ORIGIN__) window.__PRI_CLOUD_ORIGIN__ = window.location.origin;
 let guardianToken = null;
 if (GUARDIAN_MODE) {
   const data = parseAccountActionFragment(window.location.hash);
@@ -88,6 +92,15 @@ if (GUARDIAN_MODE) {
     <ErrorBoundary scope="guardian consent">
       <React.Suspense fallback={null}>
         <GuardianConsent linkToken={guardianToken} />
+      </React.Suspense>
+    </ErrorBoundary>
+  );
+} else if (DELETE_REQUEST_MODE) {
+  const AccountDeleteRequest = React.lazy(() => import('./pages/AccountDeleteRequest.jsx'));
+  root.render(
+    <ErrorBoundary scope="account deletion request">
+      <React.Suspense fallback={null}>
+        <AccountDeleteRequest />
       </React.Suspense>
     </ErrorBoundary>
   );
