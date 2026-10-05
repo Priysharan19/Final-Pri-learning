@@ -12,7 +12,8 @@
 // switched off by prefers-reduced-motion (Notes.css) and the content is fully
 // present without it: the reveal classes only ever hide what is already there.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import PageLink from '../components/PageLink.jsx';
 import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
@@ -158,7 +159,7 @@ function NotesIndex() {
                   const num = (group.chapters.indexOf(c) + 1);
                   return (
                     <li key={c.id} className="nt-reveal" style={{ '--i': Math.min(num, 14) }}>
-                      <Link to={`/notes/${c.id}`} className="nt-chapter" data-testid="notes-chapter">
+                      <PageLink to={`/notes/${c.id}`} className="nt-chapter" data-testid="notes-chapter">
                         <span className="nt-chapter-n">{String(num).padStart(2, '0')}</span>
                         <span className="nt-chapter-body">
                           <span className="nt-chapter-name">{c.name}</span>
@@ -168,7 +169,7 @@ function NotesIndex() {
                         </span>
                         {marks.has(c.id) && <span className="nt-chapter-mark" aria-label={t('notes.bookmarked')}><BookmarkGlyph on /></span>}
                         <span className="nt-chapter-go" aria-hidden="true">→</span>
-                      </Link>
+                      </PageLink>
                       <button type="button" className="nt-mark-btn" aria-pressed={marks.has(c.id)}
                         aria-label={t('notes.bookmarkChapter', { chapter: c.name })} onClick={() => toggleMark(c.id)}>
                         <BookmarkGlyph on={marks.has(c.id)} />
@@ -301,14 +302,14 @@ function SearchResults({ query }) {
       <ol className="nt-chapters">
         {results.slice(0, 40).map(({ c, grade, snippet }) => (
           <li key={c.id}>
-            <Link to={`/notes/${c.id}`} className="nt-chapter">
+            <PageLink to={`/notes/${c.id}`} className="nt-chapter">
               <span className="nt-chapter-n">{grade}</span>
               <span className="nt-chapter-body">
                 <span className="nt-chapter-name">{c.name}</span>
                 {snippet && <MathText className="nt-chapter-meta" text={snippet} />}
               </span>
               <span className="nt-chapter-go" aria-hidden="true">→</span>
-            </Link>
+            </PageLink>
           </li>
         ))}
       </ol>
@@ -348,11 +349,11 @@ function ChapterNotes({ chapterId }) {
   const backTo = `/notes?class=${grade}`;
 
   if (!chapter) {
-    return <div className="nt"><p className="nt-quiet">{t('notes.notFound')}</p><Link className="nt-back" to="/notes">← {t('notes.back')}</Link></div>;
+    return <div className="nt"><p className="nt-quiet">{t('notes.notFound')}</p><PageLink className="nt-back" to="/notes">← {t('notes.back')}</PageLink></div>;
   }
   return (
     <article className="nt nt-article" ref={root} aria-labelledby="nt-ch-title">
-      <Link className="nt-back" to={backTo}>← {t('notes.back')}</Link>
+      <PageLink className="nt-back" to={backTo}>← {t('notes.back')}</PageLink>
       <header className="nt-ch-head">
         <p className="nt-eyebrow">{t('common.classNumber', { n: grade })} · {t('notes.chapterNumber', { n: number })} · {chapter.strand}</p>
         <h1 className="nt-title" id="nt-ch-title">{chapter.name}</h1>
@@ -375,7 +376,7 @@ function ChapterNotes({ chapterId }) {
           <p className="nt-builds">
             <span>{t('notes.buildsOn')}</span>
             {notes.prereqs.filter(p => IN_CHAPTER_BY_ID[p]).map(p => (
-              <Link key={p} to={`/notes/${p}`}>{IN_CHAPTER_BY_ID[p].name} <small>{t('common.classNumber', { n: gradeOfChapter(p) })}</small></Link>
+              <PageLink key={p} to={`/notes/${p}`}>{IN_CHAPTER_BY_ID[p].name} <small>{t('common.classNumber', { n: gradeOfChapter(p) })}</small></PageLink>
             ))}
           </p>
         )}

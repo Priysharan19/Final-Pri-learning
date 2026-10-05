@@ -11,7 +11,7 @@
 // configuration, and where none is configured it simply does not mention one.
 // ─────────────────────────────────────────────────────────────────────────────
 import React from 'react';
-import { Link } from 'react-router-dom';
+import PageLink from './PageLink.jsx';
 import { useT, useTx } from '../i18n/index.js';
 
 function whenItResets(resetsAt, timeZone) {
@@ -68,13 +68,13 @@ export default function FreeCapNotice({ gate, onRetry }) {
         </p>
 
         <div className="row" style={{ gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
-          <Link className="btn btn-primary" to="/settings#cloud-account-title">
+          <PageLink className="btn btn-primary" to="/settings#cloud-account-title">
             {gate.refreshRequired ? t('freeCap.reconnect') : t('freeCap.seePremium')}
-          </Link>
+          </PageLink>
           {onRetry && (
             <button className="btn btn-quiet" onClick={onRetry}>{t('common.tryAgain')}</button>
           )}
-          <Link className="btn btn-quiet" to="/review">{t('freeCap.reviewDone')}</Link>
+          <PageLink className="btn btn-quiet" to="/review">{t('freeCap.reviewDone')}</PageLink>
         </div>
       </section>
     </div>

@@ -29,7 +29,8 @@
 // remain, so an unfinished notice can never be published as a finished one.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import PageLink from '../components/PageLink.jsx';
 import { LANGUAGES, useLanguage, useTx } from '../i18n/index.js';
 import privacy from '../../../docs/legal/privacy.md?raw';
 import terms from '../../../docs/legal/terms.md?raw';
@@ -102,9 +103,9 @@ function renderInline(text, key) {
     else if (match[2]) {
       const href = match[3];
       // /account/… pages (delete-request) render outside the router, so they
-      // are reached by a full navigation rather than a client-side Link.
+      // are reached by a full navigation rather than a client-side link.
       nodes.push(href.startsWith('/') && !href.startsWith('/account/')
-        ? <Link key={`${key}-l${i}`} to={href}>{match[2]}</Link>
+        ? <PageLink key={`${key}-l${i}`} to={href}>{match[2]}</PageLink>
         : <a key={`${key}-a${i}`} href={href} rel="noreferrer noopener" target="_blank">{match[2]}</a>);
     } else if (match[4]) nodes.push(<code key={`${key}-c${i}`}>{match[4]}</code>);
     rest = rest.slice(match.index + match[0].length);
@@ -242,7 +243,7 @@ export default function Legal() {
   if (!entry) {
     const published = Object.keys(LEGAL_PAGES).map((key, i, all) => (
       <React.Fragment key={key}>
-        <Link to={`/${key}`}>{nameOf(key)}</Link>
+        <PageLink to={`/${key}`}>{nameOf(key)}</PageLink>
         {i < all.length - 1 ? ' · ' : ''}
       </React.Fragment>
     ));
@@ -303,7 +304,7 @@ export default function Legal() {
       <p className="muted" style={{ marginTop: 28 }}>
         {Object.keys(LEGAL_PAGES).filter(key => key !== page).map((key, i, all) => (
           <React.Fragment key={key}>
-            <Link to={`/${key}`}>{nameOf(key)}</Link>
+            <PageLink to={`/${key}`}>{nameOf(key)}</PageLink>
             {i < all.length - 1 ? ' · ' : ''}
           </React.Fragment>
         ))}

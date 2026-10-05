@@ -227,8 +227,12 @@ class ShellJourneyTest {
             Log.i("PRITEST", "rotation keeps an in-progress typed answer (no recreation)")
             click(s, "[].slice.call(document.querySelectorAll('a[href=\"/practice\"]')).find(function(a){return a.offsetParent;})")
             waitFor(s, "document.querySelector('.q-prompt')")
-            assertEquals("Practice is its own history entry after Home (Back returns Home)", "true",
-                eval(s, "!!history.state && history.state.idx > 0"))
+            // Tapped straight after Back: the link must PUSH over the landing entry,
+            // not replace it from the router's not-yet-committed render
+            // (client/test/page-link-history-check.mjs). Exactly landing + 1.
+            assertEquals("Practice is its own history entry after Home (Back returns Home)",
+                "\"/practice ${landingDepth.toInt() + 1}\"",
+                eval(s, "location.pathname + ' ' + ((history.state && history.state.idx) || 0)"))
             var typed = false
             for (i in 0 until 12) {
                 eval(s, "(function(){var t=($byLabel)('Type: answer by typing');if(t)t.click();return true;})()")
