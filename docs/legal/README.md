@@ -77,7 +77,16 @@ on. If the code changes, the notice is wrong until it is changed too.
   (`docs/privacy/data-retention.md` §4).
 - Account deletion is immediate; what survives it, unlinked, is listed in
   `docs/privacy/data-retention.md` §2 and enforced by
-  `server/test/account-lifecycle-journey-check.mjs`.
+  `server/test/account-lifecycle-journey-check.mjs`. It is available in-app for
+  every sign-in method (password, Apple/Google, one-time code) and, for someone
+  without the app, at the public page `/account/delete-request`
+  (`client/src/pages/AccountDeleteRequest.jsx`,
+  `server/test/account-deletion-public-check.mjs`, `client/test/tour-account-deletion.js`).
+- The reading provider is named (OpenAI, `server/platform/handwritingProvider.js`);
+  the transcription it returns never sets a mark — the deterministic engine on
+  the device does.
+- Sign-in by one-time code (email or SMS) and the parent's code-based approval
+  on `/guardian/consent` are described under Children (`docs/release/otp-sign-in.md`).
 - Telemetry is allow-listed and retained for 90 days
   (`server/platform/telemetry.js`).
 - Password-protected profiles are encrypted at rest on the device; profiles
