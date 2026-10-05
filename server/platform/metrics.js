@@ -34,6 +34,10 @@ export function createMetrics({ now = () => Date.now() } = {}) {
   const startedAt = now();
   const counters = new Map();
   const latency = new Map();
+  // Gauges: the latest value of a quantity that is not a count of events
+  // (this month's estimated AI spend as a share of the budget). Set, not
+  // incremented; the alert rules read them like any other series.
+  const gauges = new Map();
 
   function counter(key) {
     let entry = counters.get(key);
@@ -65,6 +69,16 @@ export function createMetrics({ now = () => Date.now() } = {}) {
     entry.maxMs = Math.max(entry.maxMs, ms);
     entry.recent.push(ms);
     if (entry.recent.length > 200) entry.recent.shift();
+  }
+
+  function set(name, labels, value) {
+    if (!Number.isFinite(value)) return;
+    gauges.set(labelKey(name, labels), Math.round(value * 10_000) / 10_000);
+  }
+
+  function gauge(name, labels) {
+    const value = gauges.get(labelKey(name, labels));
+    return value === undefined ? null : value;
   }
 
   function windowed(entry, minutes) {
@@ -108,20 +122,22 @@ export function createMetrics({ now = () => Date.now() } = {}) {
         p95Ms: percentile(sorted, 0.95)
       };
     }
-    const alerts = evaluateAlerts({ sum });
+    const alerts = evaluateAlerts({ sum, gauge });
+    const outGauges = Object.fromEntries([...gauges].sort(([a], [b]) => a.localeCompare(b)));
     return {
       startedAt,
       uptimeSeconds: Math.floor((now() - startedAt) / 1000),
       counters: outCounters,
+      gauges: outGauges,
       latency: outLatency,
       alerts,
       firing: alerts.filter(alert => alert.firing).map(alert => alert.id)
     };
   }
 
-  function reset() { counters.clear(); latency.clear(); }
+  function reset() { counters.clear(); latency.clear(); gauges.clear(); }
 
-  return { inc, observe, sum, snapshot, reset };
+  return { inc, observe, set, gauge, sum, snapshot, reset };
 }
 
 // ── Alert rules (docs/operations/alerts.md) ────────────────────────────────
@@ -171,6 +187,35 @@ export const ALERT_RULES = Object.freeze([
     id: 'WEBHOOK_FAILURES',
     thresholds: { count: 1, minutes: 15 },
     evaluate: ({ sum }, t) => sum('webhook_total', { minutes: t.minutes, where: { outcome: 'failed' } }) >= t.count
+  },
+  {
+    // Crash reports the web and shell error boundaries sent through
+    // POST /v1/telemetry/error (one per boundary catch, consent-gated and
+    // rate-limited per account), across every platform.
+    id: 'CLIENT_ERROR_SPIKE',
+    thresholds: { count: 20, minutes: 15 },
+    evaluate: ({ sum }, t) => sum('client_errors_total', { minutes: t.minutes }) >= t.count
+  },
+  {
+    // The error sink (PRI_SENTRY_DSN) is not accepting what the server sends:
+    // errors are still logged, but nobody is being told about them.
+    id: 'ERROR_SINK_FAILURES',
+    thresholds: { count: 5, minutes: 15 },
+    evaluate: ({ sum }, t) => sum('error_sink_total', { minutes: t.minutes, where: { outcome: 'failed' } }) >= t.count
+  },
+  {
+    // This calendar month's estimated model-provider spend (aiUsage.js, from
+    // recorded tokens and the configured INR rates) has reached 70% of
+    // PRI_MONTHLY_BUDGET_INR. A gauge, so `count` and `minutes` are the gauge's
+    // own refresh contract: it is re-read from the database at least every
+    // 5 minutes and after every recorded call, and a single reading at or
+    // over the ratio fires.
+    id: 'AI_MONTHLY_BUDGET_70PCT',
+    thresholds: { count: 1, ratio: 0.7, minutes: 5 },
+    evaluate: ({ gauge }, t) => {
+      const ratio = gauge('ai_budget_month_ratio');
+      return ratio !== null && ratio >= t.ratio;
+    }
   }
 ]);
 
@@ -213,6 +258,38 @@ export function recordProviderCall(provider, { ok, code = null, ms = null }) {
 export function recordAuthEmail({ ok, code = null }) {
   metrics.inc('auth_email_total', { outcome: ok ? 'sent' : 'failed' });
   if (!ok) metrics.inc('auth_email_failures_total', { code: safeCode(code, 'DELIVERY_FAILED') });
+}
+
+const CLIENT_PLATFORMS = new Set(['web', 'ios-shell', 'android-shell']);
+/** A crash report accepted on POST /v1/telemetry/error. */
+export function recordClientError(platform, code) {
+  metrics.inc('client_errors_total', { platform: CLIENT_PLATFORMS.has(platform) ? platform : 'other', code: safeCode(code, 'CLIENT_ERROR') });
+}
+
+/** A 5xx the server composed itself (router.js / app.js error handlers). */
+export function recordServerError(code) {
+  metrics.inc('server_errors_total', { code: safeCode(code, 'INTERNAL') });
+}
+
+/** One attempt to hand an error to the configured sink (errorSink.js). */
+export function recordErrorSink(outcome) {
+  metrics.inc('error_sink_total', { outcome: ['sent', 'failed', 'dropped', 'noop'].includes(outcome) ? outcome : 'other' });
+}
+
+const AI_KIND_LABELS = new Set(['handwriting', 'working', 'question-photo', 'tutor']);
+/** One recorded model call and its tokens (aiUsage.js), by kind, never by account. */
+export function recordAiUsageMetrics(kind, { calls = 1, inputTokens = 0, outputTokens = 0 } = {}) {
+  const label = AI_KIND_LABELS.has(kind) ? kind : 'other';
+  metrics.inc('ai_calls_total', { kind: label }, calls);
+  metrics.inc('ai_tokens_total', { kind: label, direction: 'input' }, inputTokens);
+  metrics.inc('ai_tokens_total', { kind: label, direction: 'output' }, outputTokens);
+}
+
+/** This month's estimated spend as a share of PRI_MONTHLY_BUDGET_INR (null clears it). */
+export function setAiBudgetGauge({ ratio = null, estimatedInr = null, budgetInr = null } = {}) {
+  if (ratio !== null) metrics.set('ai_budget_month_ratio', null, ratio);
+  if (estimatedInr !== null) metrics.set('ai_month_estimated_inr', null, estimatedInr);
+  if (budgetInr !== null) metrics.set('ai_budget_month_inr', null, budgetInr);
 }
 
 /** outcome: ok | rejected (4xx: signature, unknown provider) | failed (5xx). */

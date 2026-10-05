@@ -127,9 +127,10 @@ try {
     }
   }
   const totalRows = Object.values(seededCounts).reduce((sum, n) => sum + (n || 0), 0);
-  // tutor_cache (tutor.js), otp_challenges and account_phones (otpCore.js) are
-  // built lazily by their routers, so a database that never served them has none.
-  check(result.totals.rows === totalRows && result.totals.tablesAbsent.join(',') === 'tutor_cache,otp_challenges,account_phones', `totals: ${totalRows} rows, tutor_cache/otp_challenges/account_phones absent`);
+  // tutor_cache (tutor.js), otp_challenges and account_phones (otpCore.js) and
+  // ai_usage_daily (aiUsage.js) are built lazily by their routers, so a
+  // database that never served them has none.
+  check(result.totals.rows === totalRows && result.totals.tablesAbsent.join(',') === 'tutor_cache,otp_challenges,account_phones,ai_usage_daily', `totals: ${totalRows} rows, tutor_cache/otp_challenges/account_phones/ai_usage_daily absent`);
   check(result.seededNotExported.join(',') === 'platform_meta,sync_cursors' && !existsSync(join(outDir, 'platform_meta.csv')) && !existsSync(join(outDir, 'sync_cursors.csv')),
     'platform_meta and sync_cursors are verified, never copied');
   for (const f of result.files) check(sha(join(outDir, f.file)) === f.sha256, `${f.file}: SHA-256 in the manifest matches the file`);

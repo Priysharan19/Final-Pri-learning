@@ -17,6 +17,7 @@ import { asStore } from './store.js';
 import { rateLimit, requireSession, requireVerifiedEmail } from './security.js';
 import { consumeAiAllowance, refundAiAllowance, refuseAiAllowance } from './aiAllowance.js';
 import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
+import { ensureAiUsageTable, recordAiUsage, usageCollector } from './aiUsage.js';
 import { recordProviderCall } from './metrics.js';
 import { logEvent } from './observability.js';
 import { QuestionPhotoError, identifyQuestionPhoto, validateQuestionImage } from './questionPhotoProvider.js';
@@ -46,6 +47,7 @@ export function validateRequestBody(body) {
 
 export function createQuestionPhotoRouter(db, { identify = identifyQuestionPhoto, env = process.env } = {}) {
   db = asStore(db);
+  ensureAiUsageTable(db);
   const router = asyncRouter();
 
   router.post('/identify',
@@ -66,9 +68,13 @@ export function createQuestionPhotoRouter(db, { identify = identifyQuestionPhoto
       if (overBudget) { await refundAiAllowance(db, allowance); return refusePaidCall(res, overBudget); }
 
       const started = Date.now();
+      const usage = usageCollector();
+      const accountId = req.platformSession.account_id;
+      const recordUsage = () => recordAiUsage(db, { accountId, kind: 'question-photo', env, calls: Math.max(1, usage.calls()), ...usage.total() });
       try {
-        const result = await identify(req.body.image, { env });
+        const result = await identify(req.body.image, { env, onUsage: usage });
         recordProviderCall('question-photo', { ok: true, ms: Date.now() - started });
+        await recordUsage();
         res.set('Cache-Control', 'no-store');
         res.json({
           identification: {
@@ -83,6 +89,7 @@ export function createQuestionPhotoRouter(db, { identify = identifyQuestionPhoto
       } catch (error) {
         if (/NOT_CONFIGURED|CONFIG_INVALID/.test(String(error?.code || ''))) await refundAiAllowance(db, allowance);
         const code = error instanceof QuestionPhotoError ? error.code : 'QUESTION_PHOTO_FAILED';
+        if (usage.calls() > 0 || !/NOT_CONFIGURED|CONFIG_INVALID|CANCELLED/.test(code)) await recordUsage();
         if (code !== 'QUESTION_PHOTO_CANCELLED') {
           recordProviderCall('question-photo', { ok: false, code, ms: Date.now() - started });
           logEvent('warn', 'provider_call_failed', { requestId: req.requestId, provider: 'question-photo', code, latencyMs: Date.now() - started, retryable: !!error?.retryable });

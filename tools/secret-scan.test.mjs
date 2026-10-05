@@ -4,10 +4,14 @@
 // echo the secret itself. Planted values are assembled at runtime so this file
 // does not trip the scan it tests.
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { PATTERNS, scanFiles, scanText } from './secret-scan.mjs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { PATTERNS, parseArgs, scanFiles, scanText } from './secret-scan.mjs';
+
+const SCAN = join(dirname(fileURLToPath(import.meta.url)), 'secret-scan.mjs');
 
 const j = (...parts) => parts.join('');
 const alnum = n => 'aB3dE5gH7jK9mN1pQ2rS4tU6vW8xY0zC'.repeat(4).slice(0, n);
@@ -76,6 +80,43 @@ try {
   checks++;
 } finally {
   rmSync(dir, { recursive: true, force: true });
+}
+
+// The CLI against a planted BUILT BUNDLE (ledger 1.6): a fake client/dist whose
+// hashed chunk embeds a provider key the way a leaked VITE_ variable would. The
+// gate must exit 1, name the file and the pattern, and never print the key; the
+// same tree without the plant must pass; and the CI flag must refuse to pass
+// when there is no bundle to scan at all.
+const built = mkdtempSync(join(tmpdir(), 'pri-secret-scan-dist-'));
+try {
+  mkdirSync(join(built, 'dist', 'assets'), { recursive: true });
+  writeFileSync(join(built, 'dist', 'index.html'), '<!doctype html><script type="module" src="/assets/index-a1b2c3d4.js"></script>\n');
+  writeFileSync(join(built, 'dist', 'assets', 'index-a1b2c3d4.js'), `const e="${planted['openai-api-key']}";fetch("https://api.openai.com/v1/responses",{headers:{authorization:"Bearer "+e}});\n`);
+  writeFileSync(join(built, 'dist', 'assets', 'vendor-e5f6a7b8.js'), 'export const ok = 1;\n');
+  const run = args => spawnSync(process.execPath, [SCAN, ...args], { encoding: 'utf8' });
+
+  const leaked = run(['--dist-only', '--dist', join(built, 'dist')]);
+  assert.equal(leaked.status, 1, 'a bundle with a planted provider key fails the gate (exit 1)');
+  assert.match(leaked.stderr, /index-a1b2c3d4\.js:1\s+openai-api-key/, 'the finding names the bundled file and the pattern');
+  assert.match(leaked.stderr, /SECRET SCAN: FAIL — 1 secret-shaped value/, 'and the summary counts it');
+  assert.ok(!`${leaked.stdout}${leaked.stderr}`.includes(planted['openai-api-key'].slice(8)), 'the gate never prints the key it found');
+  checks += 4;
+
+  rmSync(join(built, 'dist', 'assets', 'index-a1b2c3d4.js'));
+  writeFileSync(join(built, 'dist', 'assets', 'index-a1b2c3d4.js'), 'const e=import.meta.env.VITE_NOTHING;\n');
+  const clean = run(['--dist-only', '--dist', join(built, 'dist')]);
+  assert.equal(clean.status, 0, 'the same bundle without the plant passes');
+  assert.match(clean.stdout, /SECRET SCAN: PASS — 3 files \(including the built client, 3 files\)/, 'and reports the bundle it read');
+  checks += 2;
+
+  const absent = run(['--require-dist', '--dist', join(built, 'no-such-dist')]);
+  assert.equal(absent.status, 2, '--require-dist refuses to pass when the bundle is missing (exit 2)');
+  assert.match(absent.stderr, /needs the built client/, 'and says what is missing');
+  const defaults = parseArgs([]);
+  assert.ok(defaults.dist.endsWith(join('client', 'dist')) && !defaults.requireDist && !defaults.distOnly, 'without flags the default bundle path is client/dist, optional');
+  checks += 3;
+} finally {
+  rmSync(built, { recursive: true, force: true });
 }
 
 console.log(`SECRET SCAN SELF-TEST — PASS — ${checks}/${checks} checks`);

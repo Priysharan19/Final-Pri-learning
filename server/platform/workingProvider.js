@@ -233,7 +233,7 @@ function userMessage(prompt, lines) {
   ].join('\n');
 }
 
-async function callModel({ prompt, lines, config, fetchImpl, signal }) {
+async function callModel({ prompt, lines, config, fetchImpl, signal, onUsage = null }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.timeoutMs);
   const onAbort = () => controller.abort();
@@ -282,6 +282,7 @@ async function callModel({ prompt, lines, config, fetchImpl, signal }) {
   }
 
   const payload = await response.json().catch(() => null);
+  if (typeof onUsage === 'function') { try { onUsage(payload?.usage || {}); } catch { /* telemetry never fails a check */ } }
   const text = payload?.output_text
     ?? payload?.output?.flatMap(item => item?.content || []).find(part => typeof part?.text === 'string')?.text
     ?? null;
@@ -295,7 +296,8 @@ async function callModel({ prompt, lines, config, fetchImpl, signal }) {
 export async function checkWorkingWithModel(prompt, workingLines, {
   env = process.env,
   fetchImpl = globalThis.fetch,
-  signal = null
+  signal = null,
+  onUsage = null
 } = {}) {
   const config = providerConfig(env);
   if (!config.configured) {
@@ -303,6 +305,6 @@ export async function checkWorkingWithModel(prompt, workingLines, {
   }
   const lines = validateWorking(workingLines);
   const prompt_ = String(prompt ?? '').slice(0, MAX_PROMPT_CHARS).trim();
-  const parsed = await callModel({ prompt: prompt_, lines, config, fetchImpl, signal });
+  const parsed = await callModel({ prompt: prompt_, lines, config, fetchImpl, signal, onUsage });
   return normalizeResult(parsed, { lineCount: lines.length, model: config.model, confidenceFloor: config.confidenceFloor });
 }

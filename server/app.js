@@ -20,9 +20,11 @@ import { trustedProxyHops } from './platform/config.js';
 import { securityHeaders } from './platform/headers.js';
 import { asStore } from './platform/store.js';
 import { logEvent, requestContext, routeTemplate, safeCode, safeLogFields } from './platform/observability.js';
-import { recordHttpResponse } from './platform/metrics.js';
+import { recordHttpResponse, recordServerError } from './platform/metrics.js';
 import { releaseShaForLogs } from './platform/releaseIdentity.js';
 import { rejectUnsafeText } from './platform/text.js';
+import { captureError } from './platform/errorSink.js';
+import { staticCacheHeaders } from './platform/staticCache.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_DIST = join(here, '..', 'client', 'dist');
@@ -142,9 +144,13 @@ export async function createServerApp(db, {
     const status = bodyError ? bodyError.status
       : Number.isInteger(err?.status) && err.status >= 400 && err.status <= 599 ? err.status : 500;
     const code = err?.type === 'entity.too.large' ? 'REQUEST_BODY_TOO_LARGE' : bodyError ? bodyError.code : safeCode(err?.code);
-    logEvent(status >= 500 ? 'error' : 'warn', 'server_error', {
+    const line = logEvent(status >= 500 ? 'error' : 'warn', 'server_error', {
       requestId: req.requestId, method: req.method, route: routeTemplate(req), status, code
     });
+    if (status >= 500) {
+      recordServerError(code);
+      captureError({ ...line, release: releaseShaForLogs(), source: 'app' });
+    }
     if (res.headersSent) return next(err);
     // An over-large body dies in the parser before any route sees it, so this is
     // the only place that can say so. It gets a real code: "shrink the picture
@@ -168,8 +174,15 @@ export async function createServerApp(db, {
   });
 
   if (dist && existsSync(dist)) {
-    app.use(express.static(dist));
-    app.get(/^(?!\/(?:api|v1)).*/, (req, res) => res.sendFile(join(dist, 'index.html')));
+    // Caching policy (platform/staticCache.js, ledger 1.11): hashed assets
+    // are immutable for a year, the shell, sw.js and release.json are always
+    // revalidated, everything else briefly cached. compression() above
+    // answers Brotli or gzip by Accept-Encoding, and Vary: Accept-Encoding.
+    app.use(express.static(dist, { etag: true, lastModified: true, index: 'index.html', setHeaders: staticCacheHeaders }));
+    app.get(/^(?!\/(?:api|v1)).*/, (req, res) => {
+      res.set('Cache-Control', 'no-cache');
+      res.sendFile(join(dist, 'index.html'));
+    });
   }
 
   return app;

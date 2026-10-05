@@ -100,6 +100,14 @@ final class NativeHostBridge: NSObject {
     /// A new main-frame document starts its own event sequence.
     func documentDidStart() { seq = 0 }
 
+    /// The shell's own failure (the WebContent process was killed, a
+    /// navigation failed), as a `shell.error` event the page reports through
+    /// POST /v1/telemetry/error (client/src/platform/telemetry.js). A closed
+    /// upper-case code only — never a URL, a message or anything from the page.
+    func reportShellError(_ code: String) {
+        emit("shell.error", ["code": code, "platform": "ios-shell"])
+    }
+
     private func transition(to next: String) {
         guard next != state else { return }
         state = next

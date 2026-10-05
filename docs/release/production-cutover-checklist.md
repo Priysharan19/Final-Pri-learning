@@ -57,7 +57,7 @@ Auth email, paid-ceiling, handwriting and working checks are all `ok`.
 
 - staging `pri-learning-staging` (`orudxrckgxyyraopyzmn`) has all **nine** repository platform
   migrations `20261001000000` through `20261007000000`; `pri.platform_meta` reads
-  `schema_version=11`, `billing_schema_version=6`, and `pri.sync_cursor_seq` exists;
+  `schema_version=12`, `billing_schema_version=6`, and `pri.sync_cursor_seq` exists;
 - production `pri-learning-production-india` (`mgmlvkesbwmipmvnzufk`) is healthy but does **not**
   yet have `pri.platform_meta` or `pri.sync_cursor_seq`, and its migration history does not contain
   the nine `20261001…20261007` platform migrations. No production migration was applied in this
