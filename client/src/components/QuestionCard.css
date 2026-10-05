@@ -72,3 +72,15 @@
 .ws .q-prompt { font-size: calc(var(--text-math) * var(--text-scale, 1)); }
 .ws .hintbox, .ws .mcq-opt, .ws .step-d, .ws .final-answer, .ws .eval-body { font-size: calc(1em * var(--text-scale, 1)); }
 .ws .editor-body textarea, .ws .editor-body .answer-input { font-size: calc(17px * var(--text-scale, 1)); }
+
+/* The question peek (workspace bar's recall strip) overlays the page rather
+   than pushing it, so the writing area never moves. Its text must therefore
+   never take a tap meant for what sits under it: only its button is pressable.
+   On a phone the fixed action bar is taller than the page's scroll padding when
+   its status wraps, so the controls carry their own scroll margins and land
+   clear of both bars when scrolled into view (WCAG 2.4.11), in every engine. */
+.ws-qpeek { pointer-events: none; }
+.ws-qpeek .btn { pointer-events: auto; }
+@media (max-width: 760px) {
+  .ws-tools, .mode-tab, .hint-rung, .q-rail-btn, .editor-shell, .mcq-opt { scroll-margin-top: 104px; scroll-margin-bottom: 170px; }
+}
