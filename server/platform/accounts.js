@@ -194,6 +194,30 @@ export async function authorizeAccountDeletion(db, accountId, body = {}, identit
   return { method: provider, subject: identity.subject };
 }
 
+/**
+ * The one deletion transaction, shared by DELETE /v1/account (a signed-in
+ * session with fresh proof) and the public web request (POST
+ * /v1/account/otp/delete-confirm, proof by a code sent to the account's own
+ * address). Whatever the proof, the rows go the same way: the cascade in the
+ * schema, the retained-but-unlinked rows in docs/privacy/data-retention.md §2,
+ * and one personal-data-free audit receipt. `beforeDelete` is the billing hook
+ * (cancel a charging web subscription first; refuse if the provider cannot).
+ */
+export async function deleteAccountRows(db, accountId, { beforeDelete = null, request = null } = {}) {
+  db = asStore(db);
+  if (typeof beforeDelete === 'function') await beforeDelete({ accountId, request });
+  await db.transaction(async () => {
+    // Retained rows (docs/privacy/data-retention.md) lose the account link
+    // through ON DELETE SET NULL. An issue report is kept for content
+    // quality, so the free text a student typed into it goes first: after
+    // deletion it is a category and a question id, nothing they wrote.
+    await db.run("UPDATE issue_reports SET note = NULL, context_json = '{}' WHERE account_id = ?", [accountId]);
+    await db.run('DELETE FROM accounts WHERE id = ?', [accountId]);
+    // A receipt with no personal data: an opaque id that no longer resolves.
+    await audit(db, null, 'account.delete', 'account', accountId, {}, Date.now());
+  });
+}
+
 export function createAccountRouter(db, { beforeDelete = null } = {}) {
   db = asStore(db);
   ensureDeliveryTable(db);
@@ -585,17 +609,7 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       }
       await authorizeAccountDeletion(db, req.platformSession.account_id, body);
       const accountId = req.platformSession.account_id;
-      if (typeof beforeDelete === 'function') await beforeDelete({ accountId, request: req });
-      await db.transaction(async () => {
-        // Retained rows (docs/privacy/data-retention.md) lose the account link
-        // through ON DELETE SET NULL. An issue report is kept for content
-        // quality, so the free text a student typed into it goes first: after
-        // deletion it is a category and a question id, nothing they wrote.
-        await db.run("UPDATE issue_reports SET note = NULL, context_json = '{}' WHERE account_id = ?", [accountId]);
-        await db.run('DELETE FROM accounts WHERE id = ?', [accountId]);
-        // A receipt with no personal data: an opaque id that no longer resolves.
-        await audit(db, null, 'account.delete', 'account', accountId, {}, Date.now());
-      });
+      await deleteAccountRows(db, accountId, { beforeDelete, request: req });
       clearSessionCookies(res);
       res.json({ deleted: true });
     } catch (error) {
