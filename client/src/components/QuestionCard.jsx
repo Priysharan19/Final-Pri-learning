@@ -10,7 +10,7 @@ import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import InkCanvas from '../ink/InkCanvas.jsx';
 import { sanitizeFigure } from '../lib/sanitize.js';
-import { clearDraft, queueDraft, readDraft } from './drafts.js';
+import { clearDraft, draftSavedAt, queueDraft, readDraft, saveDraft } from './drafts.js';
 import {
   clearInkDraft, clearPendingSubmission, newSubmissionId, readInkDraft, readPendingSubmission,
   saveInkDraft, savePendingSubmission, submissionContentKey
@@ -22,8 +22,11 @@ import { plotSpecFor } from '../engine/plotSpec.js';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 import { misconceptionById } from '../engine/misconceptions.js';
-import { tLater, translate, useLanguage, useT, useTx } from '../i18n/index.js';
+import { tLater, translate, useLanguage, useT } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
+import { useFormFactor } from '../platform/formFactor.js';
+import Icon from './Icon.jsx';
+import '../workspace.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
 // True in a production build made with the tutor off (see src/tutor/flag.js).
 // A literal test of the build constants, not a helper imported from flag.js:
@@ -33,10 +36,6 @@ import { tutorFeatureEnabled } from '../tutor/flag.js';
 const TUTOR_BUILT_OUT = typeof __PRI_PRODUCTION_BUILD__ === 'boolean' && __PRI_PRODUCTION_BUILD__ && __PRI_FEATURE_TUTOR__ !== true;
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
-// Four ways of saying "right", picked by question id so one question always
-// praises the same way. Keys, not literals: a Hindi profile gets four Hindi
-// ways of saying it rather than the same English one four times over.
-const PRAISE_KEYS = ['verdict.nailedIt', 'verdict.correct', 'verdict.beautifulWork', 'verdict.thatsIt'];
 // Public question metadata may constrain what a single answer glyph can be,
 // but it must never disclose or encode the expected answer. Numeric questions
 // therefore expose only the ten digit symbols to the one-glyph tie-breaker.
@@ -250,13 +249,15 @@ const REASON_TAG_KEY = {
 export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, compact = false, diagnostic = null }) {
   const { celebrate, refreshUser, refreshDue, refreshRecent, toast, user } = useApp();
   const t = useT();
-  const tx = useTx();
   const [answer, setAnswer] = useState('');
   const [mcqSel, setMcqSel] = useState(null);
   // Handwriting kept from before a reload brings the card back to the pen.
   const [restoredInk] = useState(() => readInkDraft(question.id));
   const [mode, setMode] = useState(() => (restoredInk ? 'write' : preferMode()));       // 'type' | 'write' | 'photo'
   const [inkResult, setInkResult] = useState(null);
+  // Whether the page has any ink at all: strokes with no readable answer line
+  // get an honest "couldn't read that yet" instead of a silently disabled Submit.
+  const [inkHasStrokes, setInkHasStrokes] = useState(false);
   const [hints, setHints] = useState([]);
   const [hintsLeft, setHintsLeft] = useState(question.hintsAvailable);
   const [showTutor, setShowTutor] = useState(false);
@@ -274,12 +275,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [busy, setBusy] = useState(false);
   const [selfMarks, setSelfMarks] = useState({});
   const [selfSaved, setSelfSaved] = useState(false);
+  const [selfOpen, setSelfOpen] = useState(false);
   const [photo, setPhoto] = useState(null);
+  const [pdfUnread, setPdfUnread] = useState(null);
   const [photoOCR, setPhotoOCR] = useState({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
   // One quiet line, once per device, the first time a photo is read on the
   // server for a student who never chose either way in Settings.
   const [cloudNotice, setCloudNotice] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
   const [inkPhase, setInkPhase] = useState(() => (inkModule ? 'ready' : 'idle'));   // idle | loading | ready | failed
   const [inkTry, setInkTry] = useState(0);
   const [toTex, setToTex] = useState(() => latexFn);
@@ -307,28 +309,38 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const inputRef = useRef(null);
   const scribbleRef = useRef(null);
   const photoInputRef = useRef(null);
+  const promptRef = useRef(null);
+  const peekRef = useRef(null);
+  // What the status line is allowed to say about the student's work:
+  // null (nothing to report) | 'saving' | 'saved' | 'failed'.
+  const [saveState, setSaveState] = useState(null);
+  const [offline, setOffline] = useState(() => typeof navigator !== 'undefined' && navigator.onLine === false);
+  const [peek, setPeek] = useState(false);
+  const [peekOpen, setPeekOpen] = useState(false);
+  const inkSaveTimer = useRef(null);
+  // The newest strokes on the page. Leaving write mode unmounts the canvas;
+  // coming back must restore this, never the draft the card was mounted with.
+  const latestInk = useRef(null);
+  const typedSaveTimer = useRef(null);
 
   useEffect(() => {
     const draft = readDraft('question', question.id);
-    setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setHints([]); setHintsLeft(question.hintsAvailable);
+    setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setInkHasStrokes(false); setHints([]); setHintsLeft(question.hintsAvailable);
     setShowTutor(false); setTutorUsed(question.tutorLevel || 0);
     setWorking(draft?.working || ''); setShowWorking(!!draft?.working);
     setState({ phase: 'answering' }); setBusy(false);
-    setSelfMarks({}); setSelfSaved(false); setPhoto(null); setBookmarked(false); setElapsed(0);
+    setSelfMarks({}); setSelfSaved(false); setSelfOpen(false); setPhoto(null); setBookmarked(false);
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
-    setChecking(false); setVouched(null);
+    setChecking(false); setVouched(null); setPdfUnread(null);
+    setSaveState(draft?.typed || draft?.working || restoredInk?.length ? 'saved' : null);
+    latestInk.current = null;
+    setPeekOpen(false);
     startRef.current = Date.now();
     if (mode === 'type') setTimeout(() => inputRef.current?.focus(), 60);
   }, [question.id]); // eslint-disable-line
 
   const resolved = state.phase === 'resolved';
   const res = state.res;
-
-  useEffect(() => {
-    if (resolved) return;
-    const t = setInterval(() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)), 1000);
-    return () => clearInterval(t);
-  }, [resolved, question.id]);
 
   const isMcq = question.answerType === 'mcq';
   const isWorking = question.answerType === 'working';
@@ -449,6 +461,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // Presenting two of three pages as the whole of the working would submit
       // an answer the student never wrote.
       toast(<span>{t('verdict.pdfPagesUnread', { unread, total: pages.length })}</span>);
+      setPdfUnread({ unread, total: pages.length });
     }
     const joined = texts.join('\n');
     if (isWorking) { setWorking(joined); setShowWorking(true); }
@@ -551,15 +564,100 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // Ink strokes stay out on purpose: the store is for JSON-small records.
   const stash = (typed, wk) => {
     if (resolved) return;
-    if (!String(typed).trim() && !String(wk).trim()) { clearDraft('question', question.id); return; }
-    queueDraft('question', question.id, { typed, working: wk }, {
-      label: question.subtopicName, note: t('verdict.answerInProgress'), path: diagnostic ? '/placement' : '/practice'
-    });
+    if (typedSaveTimer.current) clearTimeout(typedSaveTimer.current);
+    if (!String(typed).trim() && !String(wk).trim()) { clearDraft('question', question.id); setSaveState(null); return; }
+    const meta = { label: question.subtopicName, note: t('verdict.answerInProgress'), path: diagnostic ? '/placement' : '/practice' };
+    // queueDraft is the crash-safe path (flushed on pagehide); the timed
+    // saveDraft below is the same write made synchronously so the status line
+    // reports what the write actually returned rather than assuming it.
+    queueDraft('question', question.id, { typed, working: wk }, meta);
+    setSaveState('saving');
+    typedSaveTimer.current = setTimeout(() => {
+      typedSaveTimer.current = null;
+      // Once the answer is marked its draft has been cleared on purpose; this
+      // late write must not put it back.
+      if (attemptRef.current) return;
+      setSaveState(saveDraft('question', question.id, { typed, working: wk }, meta) ? 'saved' : 'failed');
+    }, 450);
   };
   const editAnswer = (v) => { setAnswer(v); stash(v, working); };
   const editWorking = (v) => { setWorking(v); stash(answer, v); };
 
-  useEffect(() => { if (resolved) clearDraft('question', question.id); }, [resolved, question.id]);
+  useEffect(() => {
+    if (!resolved) return;
+    if (typedSaveTimer.current) { clearTimeout(typedSaveTimer.current); typedSaveTimer.current = null; }
+    clearDraft('question', question.id);
+  }, [resolved, question.id]);
+
+  // ── Handwriting in progress ────────────────────────────────────────────────
+  // Ink is kept in the profile-scoped recovery store (practiceRecovery.js) the
+  // moment the pen lifts. The status line says "saved" only after the record
+  // has been read back from the store, never on the strength of having asked.
+  const onInkStrokes = useCallback((strokes) => {
+    if (inFlightRef.current || attemptRef.current) return;
+    latestInk.current = strokes;
+    setInkHasStrokes(Array.isArray(strokes) && strokes.length > 0);
+    if (inkSaveTimer.current) { clearTimeout(inkSaveTimer.current); inkSaveTimer.current = null; }
+    const asked = Date.now();
+    if (!saveInkDraft(question.id, strokes, { label: question.subtopicName })) { setSaveState('failed'); return; }
+    if (!Array.isArray(strokes) || !strokes.length) { setSaveState(null); return; }
+    setSaveState('saving');
+    inkSaveTimer.current = setTimeout(() => {
+      inkSaveTimer.current = null;
+      // A marked question has had its draft cleared on purpose; its absence
+      // then is not a failed save. (While a submission is only in flight the
+      // draft is still there, so the read-back goes ahead and the status never
+      // stays on "Saving".)
+      if (attemptRef.current) return;
+      const at = draftSavedAt('ink', question.id);
+      setSaveState(at && at >= asked ? 'saved' : 'failed');
+    }, 700);
+  }, [question.id, question.subtopicName]);
+  useEffect(() => () => { if (inkSaveTimer.current) clearTimeout(inkSaveTimer.current); }, []);
+  useEffect(() => () => { if (typedSaveTimer.current) clearTimeout(typedSaveTimer.current); }, []);
+
+  useEffect(() => {
+    const on = () => setOffline(false);
+    const off = () => setOffline(true);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
+
+  // ── The question, recalled while working far down the page ────────────────
+  useEffect(() => {
+    const el = promptRef.current;
+    if (!el || typeof IntersectionObserver !== 'function') return;
+    const io = new IntersectionObserver(([entry]) => setPeek(!entry.isIntersecting && entry.boundingClientRect.top < 0), { threshold: 0 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [question.id]);
+  useEffect(() => {
+    if (!peekOpen) return;
+    peekRef.current?.querySelector('button')?.focus();
+    const onKey = e => { if (e.key === 'Escape') setPeekOpen(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [peekOpen]);
+  const plainPrompt = useMemo(() => String(question.prompt || '')
+    .replace(/\$\$?([^$]*)\$\$?/g, (_, m) => m.replace(/\\[a-zA-Z]+/g, ' ').replace(/[{}^_]/g, ''))
+    .replace(/\s+/g, ' ').trim(), [question.prompt]);
+  // A page of paper sized to the device: a phone gets a shorter first sheet so
+  // the action bar and the question are never pushed off-screen.
+  const [, setViewportKey] = useState(0);
+  useEffect(() => {
+    const onResize = () => setViewportKey(k => k + 1);
+    window.addEventListener('orientationchange', onResize);
+    window.addEventListener('resize', onResize);
+    return () => { window.removeEventListener('orientationchange', onResize); window.removeEventListener('resize', onResize); };
+  }, []);
+  // One sheet of the notebook. Read from the form-factor hook, which follows
+  // the window, so the sheet is the same height however the window got to its
+  // size (it used to depend on whether something else happened to re-render).
+  const viewport = useFormFactor();
+  const inkPageHeight = !viewport.width ? 420
+    : viewport.width <= 760 ? 340
+      : viewport.height > viewport.width ? Math.min(640, Math.round(viewport.height * 0.48)) : 420;
 
   // Only handwriting is gated: typing and photo carry no reading to doubt.
   const doubt = useMemo(
@@ -687,8 +785,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           if (!diagnostic) {
             if (!r.replayed) celebrate(r);
             refreshUser(); refreshDue(); refreshRecent?.();
-            toast(<div><b>{t('verdict.outcomeUpdated')}</b><div className="badge-desc">{t('verdict.outcomeBasis', { topic: question.subtopicName })}</div></div>, 4200);
           }
+          setSaveState(null);
         }
         // The attempt is recorded whether or not this card is still on screen,
         // so the session still counts it — exactly once, because the pending
@@ -709,7 +807,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         if (mountedRef.current) onNext?.();
         return;
       }
-      if (mountedRef.current) setState({ phase: 'retry', res: { feedback: e.message, invalid: true } });
+      // Not a marking outcome: the submission itself did not go through. The
+      // work is still on screen and still in its draft. A 409 is different:
+      // the question was already finished (another tab, a skipped question),
+      // and asking the student to submit again would be untrue.
+      if (mountedRef.current) setState({ phase: 'retry', res: { feedback: e.message, invalid: true, technical: true, conflict: e?.status === 409 } });
     } finally {
       inFlightRef.current = false;
       if (mountedRef.current) setBusy(false);
@@ -759,11 +861,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     submit();
   }, [inkResult, busy]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const onInkStrokes = useCallback((strokes) => {
-    if (inFlightRef.current || attemptRef.current) return;
-    saveInkDraft(question.id, strokes, { label: question.subtopicName });
-  }, [question.id, question.subtopicName]);
-
   async function getHint() {
     if (hintsLeft <= 0 || resolved) return;
     try {
@@ -773,6 +870,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     } catch { }
   }
 
+  // Showing the solution ends the attempt with no marks, so it takes two
+  // deliberate presses: a slip of the Pencil beside Submit cannot do it.
+  const [revealArmed, setRevealArmed] = useState(false);
+  useEffect(() => {
+    if (!revealArmed) return;
+    const disarm = setTimeout(() => setRevealArmed(false), 5000);
+    return () => clearTimeout(disarm);
+  }, [revealArmed]);
+
   async function dontKnow() {
     if (busy || resolved || !diagnostic) return;
     setBusy(true);
@@ -781,12 +887,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       setState({ phase: 'resolved', res: r });
       onResolved?.(r);
     } catch (e) {
-      setState({ phase: 'retry', res: { feedback: e.message, invalid: true } });
+      setState({ phase: 'retry', res: { feedback: e.message, invalid: true, technical: true, conflict: e?.status === 409 } });
     } finally { setBusy(false); }
   }
 
   async function reveal() {
     if (inFlightRef.current || busy || resolved) return;
+    if (!revealArmed) { setRevealArmed(true); return; }
+    setRevealArmed(false);
     inFlightRef.current = true;
     inkFrozenRef.current = true;
     setBusy(true);
@@ -801,6 +909,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         setAttempt(attemptRef.current);
         setState({ phase: 'resolved', res: r });
         celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
+        setSaveState(null);
       }
       onResolved?.(r);
     } catch (e) {
@@ -863,9 +972,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // It is feedback, not marking. The mark above has already been decided by the
   // deterministic engine and does not move when this arrives.
   const [cloudCheckFor, setCloudCheckFor] = useState(null);   // { submissionId, result }
+  const [cloudPending, setCloudPending] = useState(false);
   const cloudCheckRef = useRef(null);
   const cloudCheckAbortRef = useRef(null);
-  useEffect(() => { setCloudCheckFor(null); }, [question?.id]);
+  useEffect(() => { setCloudCheckFor(null); setCloudPending(false); }, [question?.id]);
   // The request belongs to the attempt, not to the render that sent it, so it
   // is cancelled only when the card goes away.
   useEffect(() => () => { cloudCheckAbortRef.current?.abort?.(); }, []);
@@ -901,7 +1011,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (!result || result.error) return;
       if (attemptRef.current?.submissionId !== bound.submissionId) return;
       setCloudCheckFor({ submissionId: bound.submissionId, result });
-    }).catch(() => { });
+    }).catch(() => { })
+      // The status line says "Looking at your method" only while this request
+      // is genuinely in flight for the attempt on screen.
+      .finally(() => { if (mountedRef.current && attemptRef.current?.submissionId === bound.submissionId) setCloudPending(false); });
+    setCloudPending(cloudReadingEnabled(user));
   }, [writeMode, resolved, res?.correct, res?.invalid, res?.revealed, attempt, activeReport, user, question?.id, question?.prompt]);
 
   const cloudCheck = cloudCheckFor && attempt?.submissionId && cloudCheckFor.submissionId === attempt.submissionId
@@ -982,7 +1096,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     ? (verdictGood ? totalMarks : (selfSaved ? Object.values(selfMarks).filter(Boolean).length : 0))
     : 0;
   const shownMarks = Math.round(earnedMarks * credit * 10) / 10;
-  const pct = totalMarks ? Math.round(100 * shownMarks / totalMarks) : 0;
 
   // The verdict lands in the middle of a long page. Spoken as one sentence, a
   // screen reader hears whether the answer was right without hunting for it.
@@ -1006,530 +1119,641 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     : isWorking ? working.split('\n').filter(Boolean)
       : [...(showWorking && working ? working.split('\n').filter(Boolean) : []), answer].filter(Boolean);
 
-  return (
-    // The opaque question id, so a test (or support) can tell two questions
-    // apart even when a generator happens to write the same prompt twice.
-    <div className="qpage" data-question-id={question.id}>
-      {/* left action rail */}
-      <div className="q-rail no-print">
-        {!diagnostic && <button className={`q-rail-btn ${bookmarked ? 'on' : ''}`} title={t('verdict.favorite')} aria-label={t('verdict.favoriteThis')} aria-pressed={bookmarked} onClick={toggleBookmark}>☆</button>}
-        <button className={`q-rail-btn ${showWhy ? 'on' : ''}`} title={t('verdict.whyThis')} aria-label={t('verdict.whyThis')} aria-pressed={showWhy} onClick={() => setShowWhy(s => !s)}>ⓘ</button>
-        <button className={`q-rail-btn ${showScribble ? 'on' : ''}`} title={t('verdict.scribblePad')} aria-label={t('verdict.scribblePad')} aria-pressed={showScribble} onClick={() => setShowScribble(s => !s)}>✎</button>
-      </div>
+  // ── Layout: a handwriting or full-working question gets the split
+  // workspace (question beside a large page); a short answer or a choice stays
+  // one calm column, because a big empty page beside a one-line answer is
+  // furniture.
+  const split = !isMcq && (writeMode || isWorking);
+  const invalidRetry = state.phase === 'retry' && state.res?.invalid && !state.res?.technical;
+  const technicalRetry = state.phase === 'retry' && state.res?.technical;
 
-      {/* hint bulbs */}
-      {!diagnostic && !isMcq && question.hintsAvailable > 0 && (
-        <div className="hint-rail no-print">
-          {Array.from({ length: question.hintsAvailable }, (_, i) => (
-            <button key={i} className={`hint-bulb ${i < hintsUsed ? 'lit' : ''}`}
-              disabled={resolved || i !== hintsUsed}
-              title={t('verdict.hintTitle', { n: i + 1 })}
-              aria-label={t('verdict.hintLabel', { n: i + 1, total: question.hintsAvailable })}
-              onClick={getHint}>
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M9.5 18h5M10 21h4M12 3a6 6 0 0 0-3.4 10.9c.7.5 1.1 1.2 1.2 2.1h4.4c.1-.9.5-1.6 1.2-2.1A6 6 0 0 0 12 3Z" /></svg>
-              <sup>{i + 1}</sup>
-            </button>
-          ))}
+  // ── What the status line may truthfully say ────────────────────────────────
+  // It reports only what this device actually knows: a local write that
+  // returned, a check that is running, a write that failed. It never says
+  // "synced" or "uploaded", because the practice path never claims either.
+  const statusState = busy ? 'working'
+    : cloudPending ? 'working'
+      : saveState === 'failed' ? 'failed'
+        : saveState === 'saving' ? 'working'
+          : resolved ? 'saved'
+            : saveState === 'saved' ? (offline ? 'offline' : 'saved')
+              : 'idle';
+  const inkUnread = writeMode && !isMcq && inkHasStrokes && !needsCheck
+    && (isWorking ? !inkResult?.lines?.length : !inkResult?.answerLine);
+  const statusText = busy ? t('verdict.statusChecking')
+    : cloudPending ? t('verdict.statusMethod')
+      : saveState === 'failed' ? t('verdict.statusNotSaved')
+        : saveState === 'saving' ? t('verdict.statusSaving')
+          : resolved ? t('verdict.statusMarked')
+            : inkUnread ? t('verdict.statusInkUnread')
+            : saveState === 'saved' ? t(offline ? 'verdict.statusSavedOffline' : 'verdict.statusSaved')
+              : (writeMode && !isMcq ? t('verdict.statusWriteHint') : '');
+
+  // ── The one dominant next move ─────────────────────────────────────────────
+  const primary = resolved || state.res?.conflict
+    ? { label: t('practice.nextQuestion'), run: () => onNext?.(), disabled: false }
+    : needsCheck && checking
+      ? { label: t('verdict.confirmReading'), run: acceptReading, disabled: busy }
+      : needsCheck
+        ? { label: t('verdict.checkReadingFirst'), run: () => submit(), disabled: busy || !canSubmit }
+        : {
+          label: t(busy ? 'verdict.marking' : 'verdict.submit'),
+          run: () => submit(), disabled: busy || !canSubmit
+        };
+
+  const solutionBody = res?.solution?.steps ? (
+    <div className="solution-block">
+      {plotSpec && (
+        <div className="q-plot" style={{ margin: '4px 0 14px' }}>
+          <PriPlot spec={plotSpec} progress={1} reduceMotion />
         </div>
       )}
-
-      <div className="q-topmeta">
-        <span>{t('verdict.marksAvailable', { count: totalMarks, n: totalMarks })}</span>
-        {helpUsed > 0 && !resolved && (
-          <span className="q-credit"><span className="dot">•</span> {t('verdict.creditAvailable', { percent: Math.round(credit * 100), marks: Math.round(totalMarks * credit * 10) / 10 })} <span className="dot">•</span></span>
-        )}
-        {/* The topic chip is where a student meets the name of what they are
-            being asked, so it is the first place worth pairing. The question
-            itself below is untouched: it will be in English in the exam hall. */}
-        <span className="tag" lang="en"><TermGloss text={question.subtopicName} /></span>
-        <span className={`tag ${DIFF_CLASS[question.difficulty] || ''}`}>{question.diffLabel}</span>
-        {reasonTag && REASON_TAG_KEY[reasonTag] && <span className="tag tag-brand" data-reason-tag={reasonTag}>{t(REASON_TAG_KEY[reasonTag])}</span>}
-        {!reasonTag && reason === 'review' && <span className="tag tag-brand">{t('verdict.spacedReview')}</span>}
-        {!reasonTag && reason === 'weak-spot' && <span className="tag tag-brand">{t('verdict.weakSpot')}</span>}
-        {!reasonTag && reason === 'new-ground' && <span className="tag tag-brand">{t('verdict.newGround')}</span>}
-        {reason === 'task' && <span className="tag tag-brand">{t('verdict.task')}</span>}
-        <span className="q-timer">◷ {fmtTime(elapsed)}</span>
-      </div>
-
-      {showWhy && why && <p className="muted" style={{ marginBottom: 12 }}>{why}</p>}
-
-      <MathText block className="q-prompt" text={question.prompt} />
-      {figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: figure }} />}
-
-      {resolved && !diagnostic && (
-        <div className="row no-print" style={{ margin: '14px 0 2px' }}>
-          <button className="redo-chip" onClick={() => onRedo ? onRedo() : onNext?.()}>{t('verdict.redoQuestion')}</button>
-        </div>
-      )}
-
-      {/* ── answering surface ── */}
-      {isMcq ? (
-        <div className="mcq">
-          {question.mcqOptions.map((opt, i) => {
-            let cls = 'mcq-opt';
-            if (!resolved && mcqSel === i) cls += ' sel';
-            if (resolved) {
-              if (opt === res.solution?.answerText) cls += ' right';
-              else if (mcqSel === i && !res.correct) cls += ' wrong';
-            }
-            return (
-              <button key={i} className={cls} disabled={resolved} onClick={() => setMcqSel(i)}>
-                <span className="mcq-key">{'ABCD'[i]}</span>
-                <MathText text={opt} />
-              </button>
-            );
-          })}
-        </div>
-      ) : (
-        <>
-          <div className="mode-tabs no-print">
-            <button className={`mode-tab ${mode === 'type' ? 'on' : ''}`} title={t('verdict.modeTypeTitle')}
-              aria-label={t('verdict.modeTypeLabel')} onClick={() => flipMode('type')}>{t('verdict.modeTypeGlyph')}</button>
-            <button className={`mode-tab ${mode === 'write' ? 'on' : ''}`} title={t('verdict.modeWriteTitle')}
-              aria-label={t('verdict.modeWriteLabel')} onClick={() => flipMode('write')}>✎</button>
-            <button className={`mode-tab ${mode === 'photo' ? 'on' : ''}`} title={t('verdict.modePhotoTitle')}
-              aria-label={t('verdict.modePhotoLabel')} onClick={() => flipMode('photo')}>▣</button>
+      <div className="steps">
+        {res.solution.steps.map((s, i) => (
+          <div className="step" key={i}>
+            <span className="step-n">{i + 1}</span>
+            <div>
+              <div className="step-h"><MathText text={s.h} /></div>
+              <div className="step-d"><MathText text={s.d} /></div>
+            </div>
           </div>
+        ))}
+      </div>
+      {res.solution.answerText && (
+        <div className="final-answer">
+          <div className="sc-label" style={{ marginBottom: 8 }}>{t('verdict.finalAnswer')}</div>
+          <MathText text={res.solution.answerText} />
+        </div>
+      )}
+    </div>
+  ) : null;
 
-          {mode !== 'write' ? (
-            <div className={`editor-shell ${resolved ? 'ink-disabled' : ''}`}>
+  const firstBad = inkComments?.find(c => c.kind === 'bad') || null;
+  // Once submitted, the bar shows the answer the attempt was marked on; a
+  // reading that lands later can redraw the panel but never this line.
+  const boundLines = (state.phase !== 'answering' && attempt?.lines?.length) ? attempt.lines : null;
+  const shownAnswerLine = boundLines
+    ? boundLines[boundLines.length - 1]
+    : (inkResult?.answerLine ? (isWorking ? inkResult.lines[inkResult.lines.length - 1] : inkResult.answerLine) : '');
+  const otherComments = (inkComments || []).filter(c => c !== firstBad && c.kind !== 'good');
+
+  return (
+    <div className={`qpage ws ${split ? 'ws-split' : 'ws-single'}`} data-phase={state.phase} data-mode={isMcq ? 'mcq' : mode} data-question-id={question.id}>
+      {/* ── The question: the page's reference object ── */}
+      <section className="ws-context" aria-label={t('verdict.questionRegion')}>
+        <div className="q-topmeta">
+          <span className="q-marks">{t('verdict.marksAvailable', { count: totalMarks, n: totalMarks })}</span>
+          {/* The topic chip is where a student meets the name of what they are
+              being asked, so it is the first place worth pairing. The question
+              itself below is untouched: it will be in English in the exam hall. */}
+          <span className="tag" lang="en"><TermGloss text={question.subtopicName} /></span>
+          <span className={`tag ${DIFF_CLASS[question.difficulty] || ''}`}>{question.diffLabel}</span>
+          {reasonTag && REASON_TAG_KEY[reasonTag] && <span className="tag tag-brand" data-reason-tag={reasonTag}>{t(REASON_TAG_KEY[reasonTag])}</span>}
+          {!reasonTag && reason === 'review' && <span className="tag tag-brand">{t('verdict.spacedReview')}</span>}
+          {!reasonTag && reason === 'weak-spot' && <span className="tag tag-brand">{t('verdict.weakSpot')}</span>}
+          {!reasonTag && reason === 'new-ground' && <span className="tag tag-brand">{t('verdict.newGround')}</span>}
+          {reason === 'task' && <span className="tag tag-brand">{t('verdict.task')}</span>}
+          {/* Practice is untimed on screen: time on task is still measured for the
+              marker, but a running clock is pressure, not information. */}
+        </div>
+        {helpUsed > 0 && !resolved && (
+          <p className="q-credit">{t('verdict.creditAvailable', { percent: Math.round(credit * 100), marks: Math.round(totalMarks * credit * 10) / 10 })}</p>
+        )}
+
+        <div ref={promptRef}>
+          <MathText block className="q-prompt" text={question.prompt} />
+        </div>
+        {figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: figure }} />}
+        {showWhy && why && <p className="q-why">{why}</p>}
+
+        {hints.length > 0 && (
+          <div className="hints-block">
+            <div className="hints-block-title">{t('verdict.hints')}</div>
+            {hints.map((h, i) => (
+              <div className="hintbox" key={i}><span className="h-n">{t('verdict.hintNumber', { n: i + 1 })}</span><MathText text={h} /></div>
+            ))}
+          </div>
+        )}
+
+        {/* After marking, the worked method sits beside the student's own
+            working: a comparison of two methods, not a verdict sheet. A
+            correct answer keeps it folded — a different route is not a
+            correction. */}
+        {split && resolved && solutionBody && (verdictGood ? (
+          <details className="solution-panel">
+            <summary><Icon name="compare" size={16} />{t('verdict.anotherMethod')}</summary>
+            {solutionBody}
+          </details>
+        ) : (
+          <section className="solution-panel" aria-label={t('verdict.workedSolution')}>
+            <div className="solution-panel-title">{t('verdict.workedSolution')}</div>
+            {solutionBody}
+          </section>
+        ))}
+      </section>
+
+      {/* ── The student's work: the surface everything else attaches to ── */}
+      <section className="ws-work" aria-label={t('verdict.workRegion')}>
+        <div className={`ws-qpeek no-print${peek ? ' is-on' : ''}`} aria-hidden={!peek}>
+          <span className="ws-qpeek-text">{plainPrompt}</span>
+          <button type="button" className="btn btn-quiet btn-sm" tabIndex={peek ? 0 : -1} onClick={() => setPeekOpen(true)}>{t('verdict.showQuestion')}</button>
+        </div>
+
+        <div className="ws-tools no-print">
+          {!isMcq && (
+            <div className="mode-tabs seg" role="group" aria-label={t('verdict.answerModes')}>
+              <button type="button" className={`mode-tab ${mode === 'type' ? 'on' : ''}`} aria-pressed={mode === 'type'} title={t('verdict.modeTypeTitle')}
+                aria-label={t('verdict.modeTypeLabel')} onClick={() => flipMode('type')}><Icon name="type" size={16} />{t('verdict.modeType')}</button>
+              <button type="button" className={`mode-tab ${mode === 'write' ? 'on' : ''}`} aria-pressed={mode === 'write'} title={t('verdict.modeWriteTitle')}
+                aria-label={t('verdict.modeWriteLabel')} onClick={() => flipMode('write')}><Icon name="pen" size={16} />{t('verdict.modeWrite')}</button>
+              <button type="button" className={`mode-tab ${mode === 'photo' ? 'on' : ''}`} aria-pressed={mode === 'photo'} title={t('verdict.modePhotoTitle')}
+                aria-label={t('verdict.modePhotoLabel')} onClick={() => flipMode('photo')}><Icon name="photo" size={16} />{t('verdict.modePhoto')}</button>
+            </div>
+          )}
+          <div className="ws-tools-end">
+            {!diagnostic && !isMcq && question.hintsAvailable > 0 && !resolved && (
+              <button type="button" className="icon-btn hint-bulb" disabled={hintsLeft <= 0}
+                title={t('verdict.hintTitle', { n: hintsUsed + 1 })}
+                aria-label={hintsLeft > 0 ? t('verdict.hintLabel', { n: hintsUsed + 1, total: question.hintsAvailable }) : t('verdict.noHintsLeft')}
+                onClick={getHint}>
+                <Icon name="hint" /><span>{t('verdict.hint')}</span>
+                <span className="hint-left">{t('verdict.hintsLeft', { count: hintsLeft, n: hintsLeft })}</span>
+              </button>
+            )}
+            {!resolved && (
+              <button type="button" className={`icon-btn q-rail-btn ${showScribble ? 'on' : ''}`} aria-pressed={showScribble}
+                title={t('verdict.scribblePad')} aria-label={t('verdict.scribblePad')} onClick={() => setShowScribble(s => !s)}><Icon name="scratch" /></button>
+            )}
+            {why && (
+              <button type="button" className={`icon-btn q-rail-btn ${showWhy ? 'on' : ''}`} aria-pressed={showWhy}
+                title={t('verdict.whyThis')} aria-label={t('verdict.whyThis')} onClick={() => setShowWhy(s => !s)}><Icon name="info" /></button>
+            )}
+            {!diagnostic && (
+              <button type="button" className={`icon-btn q-rail-btn ${bookmarked ? 'on' : ''}`} aria-pressed={bookmarked}
+                title={t('verdict.favorite')} aria-label={t('verdict.favoriteThis')} onClick={toggleBookmark}><Icon name="bookmark" /></button>
+            )}
+          </div>
+        </div>
+
+        {/* ── answering surface ── */}
+        {isMcq ? (
+          <div className="mcq" role="group" aria-label={t('verdict.options')}>
+            {question.mcqOptions.map((opt, i) => {
+              let cls = 'mcq-opt';
+              let mark = null;
+              if (!resolved && mcqSel === i) cls += ' sel';
+              if (resolved) {
+                if (opt === res.solution?.answerText) { cls += ' right'; mark = t('verdict.correctOption'); }
+                else if (mcqSel === i && !res.correct) { cls += ' wrong'; mark = t('verdict.yourChoice'); }
+              }
+              return (
+                <button key={i} className={cls} disabled={resolved} aria-pressed={!resolved ? mcqSel === i : undefined} onClick={() => setMcqSel(i)}>
+                  <span className="mcq-key">{'ABCD'[i]}</span>
+                  <MathText text={opt} />
+                  {mark && <span className="mcq-mark">{mark}</span>}
+                </button>
+              );
+            })}
+          </div>
+        ) : mode !== 'write' ? (
+          <div className={`editor-shell ${resolved ? 'ink-disabled' : ''}`}>
+            {/* Tools for writing an answer: gone once there is nothing left to write. */}
+            {!resolved && (
               <div className="editor-toolbar">
                 <button className={`editor-tool ${showSyms ? 'on' : ''}`} title={t('verdict.symbolPalette')} aria-label={t('verdict.symbolPalette')} aria-pressed={showSyms} onClick={() => setShowSyms(s => !s)}>Σ</button>
-                <span className="editor-hint"><span className="kbd">{isWorking ? '⏎' : t('verdict.kbdType')}</span> {t(isWorking ? 'verdict.editorHintWorking' : 'verdict.editorHintType')}</span>
+                <span className="editor-hint">{t(isWorking ? 'verdict.editorHintWorking' : 'verdict.editorHintType')}</span>
                 <span style={{ flex: 1 }} />
                 {question.answerSuffix && <span className="answer-suffix">{t('verdict.answerIn', { unit: question.answerSuffix })}</span>}
               </div>
-              {showSyms && (
-                <div className="sym-palette">
-                  {SYMBOLS.map(([sym, nameKey]) => (
-                    <button key={sym} className="sym-key" aria-label={t('verdict.insertSymbol', { name: t(nameKey) })} onClick={() => insertSym(sym)}>{sym}</button>
-                  ))}
+            )}
+            {showSyms && !resolved && (
+              <div className="sym-palette">
+                {SYMBOLS.map(([sym, nameKey]) => (
+                  <button key={sym} className="sym-key" aria-label={t('verdict.insertSymbol', { name: t(nameKey) })} onClick={() => insertSym(sym)}>{sym}</button>
+                ))}
+              </div>
+            )}
+            <div className="editor-body">
+              {mode === 'photo' && (
+                <div style={{ marginBottom: 14 }}>
+                  {/* No `capture` attribute: on iOS it forces the camera open and removes
+                      the photo-library option, which is the wrong way round. A student
+                      photographs their exercise book first and picks the shot afterwards. */}
+                  <input ref={photoInputRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
+                    onChange={e => attachPhoto(e, setPhoto, decodePhoto, decodePdf, message => setPhotoOCR({ phase: 'failed', text: '', confidence: 0, engine: null, error: message }))} />
+                  {!photo && photoOCR.phase === 'idle'
+                    ? <button className="btn btn-ghost" onClick={() => photoInputRef.current?.click()}>{t('verdict.photographWorking')}<span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2, fontWeight: 400 }}>{t('verdict.photoFormats', { pages: MAX_PDF_PAGES })}</span></button>
+                    : (
+                      <div className="photo-attach">
+                        {/* A PDF sets no thumbnail until its pages render, and the whole
+                            status block used to live inside the photo branch — so every
+                            PDF failure message was unreachable and the screen simply did
+                            not move. */}
+                        {photo
+                          ? <div className="photo-thumb"><img src={photo} alt={t('history.paperWorking')} /><button aria-label={t('verdict.removePhoto')} onClick={() => { setPhoto(null); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>
+                          : <div className="photo-thumb" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}><span aria-hidden="true">▤</span><button aria-label={t('verdict.removeAttachment')} onClick={() => setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null })}>✕</button></div>}
+                        <div style={{ flex: 1 }} role="status" aria-live="polite">
+                          {photoOCR.phase === 'reading' && (
+                            <span className="muted">{t('verdict.readingWork')}</span>
+                          )}
+                          {photoOCR.phase === 'done' && (
+                            <>
+                              {/* What actually read it. Saying "on-device" over a photo that
+                                  was uploaded is the one thing this screen must never do. */}
+                              <div style={{ fontSize: 12.5, marginBottom: 6 }}>
+                                <b>{String(photoOCR.engine || '').startsWith('cloud') ? t('verdict.readOnServer') : t('verdict.decodedOnDevice')}</b>
+                                {photoOCR.confidence ? t('verdict.ocrConfidence', { percent: Math.round(photoOCR.confidence * 100) }) : ''}
+                              </div>
+                              <pre style={{ whiteSpace: 'pre-wrap', margin: 0, font: 'inherit', color: 'var(--ink)' }}>{photoOCR.text}</pre>
+                              <div className="muted" style={{ marginTop: 6 }}>{t('verdict.filledFromLastLine')}</div>
+                              {pdfUnread && <div className="verdict-body" style={{ marginTop: 6 }}>{t('verdict.pdfPagesUnread', pdfUnread)}</div>}
+                              {cloudNotice && String(photoOCR.engine || '').startsWith('cloud') && (
+                                <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>{t('verdict.photoReadOnServerNotice')}</div>
+                              )}
+                            </>
+                          )}
+                          {(photoOCR.phase === 'failed' || photoOCR.phase === 'unavailable') && <span className="verdict-body">{photoOCR.error}</span>}
+                          {photoOCR.phase === 'idle' && <span className="muted">{t('verdict.photoAttachedIdle')}</span>}
+                        </div>
+                      </div>
+                    )}
                 </div>
               )}
-              <div className="editor-body">
-                {mode === 'photo' && (
-                  <div style={{ marginBottom: 14 }}>
-                    {/* No `capture` attribute: on iOS it forces the camera open and removes
-                        the photo-library option, which is the wrong way round. A student
-                        photographs their exercise book first and picks the shot afterwards. */}
-                    <input ref={photoInputRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
-                      onChange={e => attachPhoto(e, setPhoto, decodePhoto, decodePdf, message => setPhotoOCR({ phase: 'failed', text: '', confidence: 0, engine: null, error: message }))} />
-                    {!photo && photoOCR.phase === 'idle'
-                      ? <button className="btn btn-ghost" onClick={() => photoInputRef.current?.click()}>{t('verdict.photographWorking')}<span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, fontWeight: 400 }}>{t('verdict.photoFormats', { pages: MAX_PDF_PAGES })}</span></button>
-                      : (
-                        <div className="photo-attach">
-                          {/* A PDF sets no thumbnail until its pages render, and the whole
-                              status block used to live inside the photo branch — so every
-                              PDF failure message was unreachable and the screen simply did
-                              not move. */}
-                          {photo
-                            ? <div className="photo-thumb"><img src={photo} alt={t('history.paperWorking')} /><button aria-label={t('verdict.removePhoto')} onClick={() => { setPhoto(null); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>
-                            : <div className="photo-thumb" aria-hidden="true" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}>▤<button aria-label={t('verdict.removeAttachment')} onClick={() => setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null })}>✕</button></div>}
-                          <div style={{ flex: 1 }}>
-                            {photoOCR.phase === 'reading' && (
-                              <span className="muted">{t('verdict.readingWork')}</span>
-                            )}
-                            {photoOCR.phase === 'done' && (
-                              <>
-                                {/* What actually read it. Saying "on-device" over a photo that
-                                    was uploaded is the one thing this screen must never do. */}
-                                <div style={{ fontSize: 12.5, marginBottom: 6 }}>
-                                  <b>{String(photoOCR.engine || '').startsWith('cloud') ? t('verdict.readOnServer') : t('verdict.decodedOnDevice')}</b>
-                                  {photoOCR.confidence ? t('verdict.ocrConfidence', { percent: Math.round(photoOCR.confidence * 100) }) : ''}
-                                </div>
-                                <pre style={{ whiteSpace: 'pre-wrap', margin: 0, font: 'inherit', color: 'var(--ink)' }}>{photoOCR.text}</pre>
-                                <div className="muted" style={{ marginTop: 6 }}>{t('verdict.filledFromLastLine')}</div>
-                                {cloudNotice && String(photoOCR.engine || '').startsWith('cloud') && (
-                                  <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>{t('verdict.photoReadOnServerNotice')}</div>
-                                )}
-                              </>
-                            )}
-                            {(photoOCR.phase === 'failed' || photoOCR.phase === 'unavailable') && <span style={{ color: 'var(--warn)' }}>{photoOCR.error}</span>}
-                            {photoOCR.phase === 'idle' && <span className="muted">{t('verdict.photoAttachedIdle')}</span>}
-                          </div>
-                        </div>
-                      )}
-                  </div>
-                )}
-                {isWorking ? (
-                  <textarea
+              {isWorking ? (
+                <textarea
+                  ref={inputRef}
+                  className="working-input"
+                  aria-label={t('verdict.workingAria')}
+                  style={{ background: 'none', border: 'none', color: 'var(--ink)' }}
+                  placeholder={question.inputHint || t('verdict.workingPlaceholder')}
+                  value={working} disabled={resolved}
+                  onChange={e => editWorking(e.target.value)}
+                  rows={6}
+                />
+              ) : (
+                <div className="answer-row">
+                  {question.answerPrefix && <span className="answer-prefix"><MathText text={question.answerPrefix} /></span>}
+                  <input
                     ref={inputRef}
-                    className="working-input"
-                    aria-label={t('verdict.workingAria')}
-                    style={{ background: 'none', border: 'none', outline: 'none', color: 'var(--ink)' }}
-                    placeholder={question.inputHint || t('verdict.workingPlaceholder')}
-                    value={working} disabled={resolved}
-                    onChange={e => editWorking(e.target.value)}
-                    rows={6}
+                    className="answer-input"
+                    aria-label={question.answerSuffix ? t('verdict.answerAriaWithUnit', { unit: question.answerSuffix }) : t('verdict.answerAria')}
+                    placeholder={question.inputHint || t('verdict.answerPlaceholder')}
+                    value={answer}
+                    disabled={resolved}
+                    onChange={e => editAnswer(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                    // Answers are expressions as often as numbers (x², 3/4, √2),
+                    // so a numeric keypad would block them: keep the full
+                    // keyboard and label its Enter key as the submit action.
+                    inputMode="text" enterKeyHint="go"
                   />
-                ) : (
-                  <div className="answer-row">
-                    {question.answerPrefix && <span className="answer-prefix"><MathText text={question.answerPrefix} /></span>}
-                    <input
-                      ref={inputRef}
-                      className="answer-input"
-                      aria-label={question.answerSuffix ? t('verdict.answerAriaWithUnit', { unit: question.answerSuffix }) : t('verdict.answerAria')}
-                      placeholder={question.inputHint || t('verdict.answerPlaceholder')}
-                      value={answer}
-                      disabled={resolved}
-                      onChange={e => editAnswer(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') submit(); }}
-                      autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                      // Answers are expressions as often as numbers (x², 3/4, √2),
-                      // so a numeric keypad would block them: keep the full
-                      // keyboard and label its Enter key as the submit action.
-                      inputMode="text" enterKeyHint="go"
-                    />
-                    {question.answerSuffix && <span className="answer-suffix">{question.answerSuffix}</span>}
-                  </div>
-                )}
-                {typedPreview && !resolved && !isWorking && (
-                  <div className="typed-preview">{t('verdict.readsAs')}&nbsp; <MathText text={`$${typedPreview}$`} /></div>
-                )}
-                {question.supportsSteps && !resolved && !isWorking && mode === 'type' && (
-                  <div style={{ marginTop: 14 }}>
-                    <button className="btn btn-quiet btn-sm" onClick={() => setShowWorking(s => !s)}>
-                      {showWorking ? '⌄' : '›'} {t('verdict.showWorkingToggle')}
-                    </button>
-                    {showWorking && (
-                      <textarea
-                        className="input" style={{ marginTop: 8 }}
-                        aria-label={t('verdict.workingPartialAria')}
-                        placeholder={t('verdict.workingPartialPlaceholder')}
-                        value={working} onChange={e => editWorking(e.target.value)}
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
-              <div className="editor-foot no-print">
-                <span style={{ flex: 1 }} />
-                {!resolved && (
-                  <button className={`btn btn-primary ${canSubmit ? 'btn-glow' : ''}`} onClick={() => submit()} disabled={busy || !canSubmit}>
-                    {t(busy ? 'verdict.marking' : 'verdict.submit')}
+                  {question.answerSuffix && <span className="answer-suffix">{question.answerSuffix}</span>}
+                </div>
+              )}
+              {typedPreview && !resolved && !isWorking && (
+                <div className="typed-preview">{t('verdict.readsAs')}&nbsp; <MathText text={`$${typedPreview}$`} /></div>
+              )}
+              {question.supportsSteps && !resolved && !isWorking && mode === 'type' && (
+                <div style={{ marginTop: 14 }}>
+                  <button className="btn-disclose" aria-expanded={showWorking} onClick={() => setShowWorking(s => !s)}>
+                    <Icon name="chevronDown" size={16} />{t('verdict.showWorkingToggle')}
                   </button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="ink-row">
-              <div className="editor-shell" style={{ flex: 1, minWidth: 0 }}>
-                {InkAnswer && (
-                  <InkAnswer onRecognized={onInkRecognized} onStrokes={onInkStrokes} initialStrokes={restoredInk}
-                    height={380} lineVerdicts={lineVerdicts}
-                    disabled={resolved || busy} focusSymbol={checkFocus} recognitionContext={recognitionContext} />
-                )}
-                {inkPhase === 'failed' && (
-                  <div className="editor-body">
-                    <div className="error-box" role="alert" style={{ marginBottom: 0 }}>
-                      {/* Three outcomes, not two. "You are offline and this needs one
-                          download" is a different thing from "it would not load", and
-                          only one of them is the student's to act on. */}
-                      {inkNeedsNetwork ? (
-                        <><b>{t('verdict.inkNeedsDownloadTitle')}</b>{' '}{t('verdict.inkNeedsDownloadBody')}</>
-                      ) : (
-                        <><b>{t('verdict.inkFailedTitle')}</b>{' '}{t(inkStuck ? 'verdict.inkFailedStuck' : 'verdict.inkFailedRetry')}</>
-                      )}
-                    </div>
-                    <div className="row" style={{ marginTop: 12 }}>
-                      {inkStuck
-                        ? <button className="btn btn-ghost btn-sm" onClick={() => window.location.reload()}>{t('verdict.reloadApp')}</button>
-                        : <button className="btn btn-ghost btn-sm" onClick={() => setInkTry(n => n + 1)}>{t('common.tryAgain')}</button>}
-                      <button className="btn btn-quiet btn-sm" onClick={() => flipMode('type')}>{t('verdict.typeInstead')}</button>
-                    </div>
-                  </div>
-                )}
-                {(inkPhase === 'idle' || inkPhase === 'loading') && (
-                  <div className="editor-body">
-                    <div className="skeleton" style={{ height: 380 }} />
-                    <p className="muted" role="status" style={{ marginTop: 10 }}>{t('verdict.warmingUp')}</p>
-                  </div>
-                )}
-                {needsCheck && checking && (
-                  <div className="editor-body" role="status"
-                    style={{ borderTop: '1px solid var(--hairline)', background: 'var(--brand-soft)' }}>
-                    <div className="spread" style={{ gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                      <div>
-                        <b>{t('verdict.checkReadingFirst')}</b>
-                        <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>{checkCopy}</div>
-                        <div style={{ marginTop: 6 }}>
-                          {t('verdict.readingItAs')}&nbsp;<MathText text={`$${texOf(reading)}$`} />
-                        </div>
-                      </div>
-                      <div className="row" style={{ gap: 8 }}>
-                        <button className="btn btn-primary btn-sm" onClick={acceptReading} disabled={busy}>
-                          {t('verdict.thatsWhatIWrote')}
-                        </button>
-                        <button className="btn btn-quiet btn-sm" onClick={() => setChecking(false)}>{t('verdict.keepWriting')}</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {InkAnswer && (
-                  <div className="editor-foot no-print">
-                    <span className="editor-brand">{String(inkResult?.engine || '').startsWith('cloud') ? t('verdict.inkReadByServer') : t('verdict.inkReadByServerPending')}</span>
-                    <span style={{ flex: 1 }} />
-                    {inkResult?.answerLine && !needsCheck && (
-                      <span className="muted" style={{ marginRight: 10 }}>
-                        {t('verdict.submitting')} <MathText text={`$${texOf(isWorking ? inkResult.lines[inkResult.lines.length - 1] : inkResult.answerLine)}$`} />
-                      </span>
-                    )}
-                    {!resolved && (
-                      <button
-                        className={`btn ${needsCheck ? 'btn-ghost' : `btn-primary ${canSubmit ? 'btn-glow' : ''}`}`}
-                        onClick={() => submit()} disabled={busy || !canSubmit}>
-                        {t(busy ? 'verdict.marking' : needsCheck ? 'verdict.checkReadingFirst' : 'verdict.submit')}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-              {inkComments && (
-                <aside className="ink-comments">
-                  <div className="spread">
-                    <span className="sc-label" style={{ margin: 0 }}>{t('verdict.comments')}</span>
-                    <span className="muted" style={{ fontSize: 11.5 }}>{t('verdict.commentsOnPage', { count: inkComments.length, n: inkComments.length })}</span>
-                  </div>
-                  {inkComments.map((c, i) => (
-                    <div key={i} className={`ink-comment ${c.kind}`}>
-                      <div className="ic-head">{t(c.kind === 'good' ? 'app.correct' : 'verdict.mistake')}<span className="ic-line">{t('verdict.onLine', { n: c.line })}</span></div>
-                      {c.text}
-                    </div>
-                  ))}
-                  {cloudWorkingNote && (
-                    <div className={`ink-comment ${cloudWorkingNote.tone === 'break' ? 'bad' : 'note'}`}>
-                      <div className="ic-head">
-                        {t(cloudWorkingNote.tone === 'break' ? 'verdict.whereItBreaks' : cloudWorkingNote.tone === 'maybe' ? 'verdict.possibly' : 'verdict.yourAlgebra')}
-                      </div>
-                      {cloudWorkingNote.text}
-                      {cloudMisconception && (
-                        <div className="diagnosis-named" data-misconception={cloudMisconception.named.id} data-status={cloudMisconception.status}>
-                          <b>{t(cloudMisconception.status === 'confirmed' ? 'verdict.lineMisconception' : 'verdict.possibleMisconception',
-                            { n: cloudMisconception.line, name: t(cloudMisconception.named.name) })}</b>
-                          <div>{t(cloudMisconception.named.explain)}</div>
-                        </div>
-                      )}
-                    </div>
+                  {showWorking && (
+                    <textarea
+                      className="input" style={{ marginTop: 8 }}
+                      aria-label={t('verdict.workingPartialAria')}
+                      placeholder={t('verdict.workingPartialPlaceholder')}
+                      value={working} onChange={e => editWorking(e.target.value)}
+                    />
                   )}
-                </aside>
+                </div>
               )}
             </div>
-          )}
-        </>
-      )}
-
-      <div style={SR_ONLY} role="status" aria-live="polite" aria-atomic="true">{verdictSpeech}</div>
-
-      {/* scribble pad */}
-      {showScribble && !resolved && (
-        <div className="editor-shell" style={{ marginTop: 12 }}>
-          <div className="editor-toolbar">
-            <span className="editor-hint">{t('verdict.scribbleRough')}</span>
-            <span style={{ flex: 1 }} />
-            <button className="editor-tool" aria-label={t('verdict.undoScribble')} onClick={() => scribbleRef.current?.undo()}>↩</button>
-            <button className="editor-tool" aria-label={t('verdict.clearScribble')} onClick={() => scribbleRef.current?.clear()}>🗑</button>
           </div>
-          <InkCanvas ref={scribbleRef} height={200} guides={false} ariaLabel={t('verdict.scribblePad')} />
-        </div>
-      )}
-
-      {/* AI tutor: three levels of help, lazy-loaded on first use */}
-      {!resolved && tutorEnabled && (
-        <div className="tutor-launch-row no-print">
-          <button type="button" className={`btn btn-ghost btn-sm tutor-launch ${showTutor ? 'on' : ''}`}
-            aria-expanded={showTutor} aria-label={t('tutor.helpLabel')} data-tutor-launch
-            onClick={() => setShowTutor(v => !v)}>
-            {t('tutor.help')}
-          </button>
-          {tutorUsed > 0 && <span className="muted" style={{ marginLeft: 8, fontSize: 13 }}>{t('tutor.helpUsed', { count: tutorUsed, n: tutorUsed })}</span>}
-        </div>
-      )}
-      {showTutor && !resolved && tutorEnabled && TutorHelp && (
-        <TutorBoundary fallback={t('tutor.unavailable')}>
-          <React.Suspense fallback={<div className="hintbox" role="status">{t('tutor.asking')}</div>}>
-            <TutorHelp
-              question={{ ...question, tutorLevel: tutorUsed }}
-              work={{
-                lines: (isWorking || showWorking) && working ? working.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 40).map(l => l.slice(0, 400)) : [],
-                typed: isMcq ? '' : String(answer || '').slice(0, 300)
-              }}
-              locale={language === 'hi' ? 'hi' : 'en'}
-              onUsed={level => setTutorUsed(u => Math.max(u, level))}
-              startedAt={startRef.current}
-              onResolved={r => {
-                // Level 3 ends the question like Reveal: same state, same refreshes.
-                setState({ phase: 'resolved', res: r });
-                celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
-                onResolved?.(r);
-              }}
-              onClose={() => setShowTutor(false)}
-            />
-          </React.Suspense>
-        </TutorBoundary>
-      )}
-
-      {/* hints shown */}
-      {hints.length > 0 && (
-        <div className="hints-block">
-          <div className="hints-block-title">{t('verdict.hints')}</div>
-          {hints.map((h, i) => (
-            <div className="hintbox" key={i}><span className="h-n">{t('verdict.hintNumber', { n: i + 1 })}</span><MathText text={h} /></div>
-          ))}
-        </div>
-      )}
-
-      {/* retry */}
-      {state.phase === 'retry' && (
-        <div className="verdict verdict-bad">
-          <span className="verdict-ico">{state.res.invalid ? '?' : '✗'}</span>
-          <div>
-            <b>{t(state.res.invalid ? 'verdict.unreadable' : 'verdict.notQuite')}</b>{' '}
-            <MathText text={state.res.feedback || t('verdict.oneMoreGo')} />
-            {state.res.partial && <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>◐ {state.res.partial.note}</div>}
-            {state.res.stepReport && <StepReport report={state.res.stepReport} />}
+        ) : (
+          <div className="ink-row">
+            {/* data-marked starts the reading sweep (theme.css): it appears only
+                when the deterministic engine has actually marked this page. */}
+            <div className="editor-shell" data-marked={(resolved && !res?.revealed) || (state.phase === 'retry' && !state.res?.invalid) ? 'yes' : undefined}>
+              {InkAnswer && (
+                <InkAnswer onRecognized={onInkRecognized} height={inkPageHeight} lineVerdicts={lineVerdicts}
+                  disabled={resolved || busy} focusSymbol={checkFocus} recognitionContext={recognitionContext}
+                  initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes} />
+              )}
+              {inkPhase === 'failed' && (
+                <div className="editor-body">
+                  <div className="verdict verdict-technical" role="alert">
+                    <span className="verdict-ico"><Icon name="alert" /></span>
+                    {/* Three outcomes, not two. "You are offline and this needs one
+                        download" is a different thing from "it would not load", and
+                        only one of them is the student's to act on. */}
+                    <div>
+                      {inkNeedsNetwork ? (
+                        <><div className="verdict-title">{t('verdict.inkNeedsDownloadTitle')}</div><div className="verdict-body">{t('verdict.inkNeedsDownloadBody')}</div></>
+                      ) : (
+                        <><div className="verdict-title">{t('verdict.inkFailedTitle')}</div><div className="verdict-body">{t(inkStuck ? 'verdict.inkFailedStuck' : 'verdict.inkFailedRetry')}</div></>
+                      )}
+                    </div>
+                  </div>
+                  <div className="row" style={{ marginTop: 12 }}>
+                    {inkStuck
+                      ? <button className="btn btn-ghost btn-sm" onClick={() => window.location.reload()}>{t('verdict.reloadApp')}</button>
+                      : <button className="btn btn-ghost btn-sm" onClick={() => setInkTry(n => n + 1)}>{t('common.tryAgain')}</button>}
+                    <button className="btn btn-quiet btn-sm" onClick={() => flipMode('type')}>{t('verdict.typeInstead')}</button>
+                  </div>
+                </div>
+              )}
+              {(inkPhase === 'idle' || inkPhase === 'loading') && (
+                <div className="editor-body">
+                  <div className="skeleton" style={{ height: inkPageHeight }} />
+                  <p className="muted" role="status" style={{ marginTop: 10 }}>{t('verdict.warmingUp')}</p>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ── evaluation ── */}
-      {resolved && (
-        <>
-          {answerLines.length > 0 && (
-            <div className="your-answer">
-              <div className="sc-label">{t('verdict.yourAnswer')}</div>
-              {answerLines.map((l, i) => (
-                <div className="ya-line" key={i}><MathText text={`$${texOf(l)}$`} /></div>
-              ))}
-              {photo && <div className="photo-thumb" style={{ marginTop: 8 }}><img src={photo} alt={t('verdict.attachedWorking')} /></div>}
+        {/* A reading in doubt asks about the smallest useful region — one
+            symbol — instead of asking for the whole solution again. */}
+        {needsCheck && checking && (
+          <div className="ws-check" role="status">
+            <div className="ws-check-title"><Icon name="uncertain" />{t('verdict.checkReadingFirst')}</div>
+            <div className="ws-check-body">{checkCopy}</div>
+            <div className="ws-check-reading">
+              {t('verdict.readingItAs')}&nbsp;<MathText text={`$${texOf(reading)}$`} />
             </div>
-          )}
+            <div><button className="btn btn-quiet btn-sm" onClick={() => setChecking(false)}>{t('verdict.keepWriting')}</button></div>
+          </div>
+        )}
 
-          <div className="eval-card">
-            <div className="eval-head">
-              <span className="logo-bb" aria-hidden="true">P</span><span className="eval-title">Pri Learning. <span style={{ color: 'var(--ink-2)' }}>{t('verdict.evaluation')}</span></span>
-              <span className="eval-marks">
-                {t('verdict.marksOutOf', { earned: verdictGood ? shownMarks : earnedMarks, total: totalMarks })}
-                {' '}<small>({verdictGood ? pct : (selfSaved ? Math.round(100 * earnedMarks / totalMarks) : 0)}%)</small>
-              </span>
+        {/* Scratch: rough work that is kept with the attempt but never marked. */}
+        {showScribble && !resolved && (
+          <div className="scratch">
+            <div className="scratch-head">
+              <span className="scratch-title">{t('verdict.scratch')}</span>
+              <span className="scratch-tag">{t('verdict.scratchNotMarked')}</span>
+              <span className="scratch-note">{t('verdict.scratchNote')}</span>
+              <span style={{ flex: 1 }} />
+              <button className="icon-btn" aria-label={t('verdict.undoScribble')} onClick={() => scribbleRef.current?.undo()}><Icon name="undo" /></button>
+              <button className="icon-btn" aria-label={t('verdict.clearScribble')} onClick={() => scribbleRef.current?.clear()}><Icon name="clear" /></button>
             </div>
-            <div className="eval-disclaimer">{t('verdict.markedOnDevice')}</div>
-            <div className="eval-body">
-              <div className="spread">
-                <b>{verdictGood
-                  ? t(PRAISE_KEYS[question.id.charCodeAt(0) % PRAISE_KEYS.length])
-                  : t(res.revealed ? 'verdict.revealed' : 'verdict.notThisTime')}</b>
-                <span>
-                  {res.xp > 0 && <span className="xp-pop">+{res.xp} XP</span>}
-                  {hintsUsed > 0 && <span className="muted" style={{ marginLeft: 8 }}>{t('verdict.afterHints', { count: hintsUsed, n: hintsUsed })}</span>}
-                </span>
+            <InkCanvas ref={scribbleRef} height={200} guides={false} ariaLabel={t('verdict.scribblePad')} />
+          </div>
+        )}
+
+        {/* AI tutor: three levels of help, lazy-loaded on first use. It sits with
+            the work it is about, and never during a placement check. */}
+        {!resolved && tutorEnabled && !diagnostic && (
+          <div className="tutor-launch-row no-print">
+            <button type="button" className={`btn btn-ghost btn-sm tutor-launch ${showTutor ? 'on' : ''}`}
+              aria-expanded={showTutor} aria-label={t('tutor.helpLabel')} data-tutor-launch
+              onClick={() => setShowTutor(v => !v)}>
+              {t('tutor.help')}
+            </button>
+            {tutorUsed > 0 && <span className="muted" style={{ marginLeft: 8, fontSize: 13 }}>{t('tutor.helpUsed', { count: tutorUsed, n: tutorUsed })}</span>}
+          </div>
+        )}
+        {showTutor && !resolved && tutorEnabled && !diagnostic && TutorHelp && (
+          <TutorBoundary fallback={t('tutor.unavailable')}>
+            <React.Suspense fallback={<div className="hintbox" role="status">{t('tutor.asking')}</div>}>
+              <TutorHelp
+                question={{ ...question, tutorLevel: tutorUsed }}
+                work={{
+                  lines: (isWorking || showWorking) && working ? working.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 40).map(l => l.slice(0, 400)) : [],
+                  typed: isMcq ? '' : String(answer || '').slice(0, 300)
+                }}
+                locale={language === 'hi' ? 'hi' : 'en'}
+                onUsed={level => setTutorUsed(u => Math.max(u, level))}
+                startedAt={startRef.current}
+                onResolved={r => {
+                  // Level 3 ends the question like Reveal: same state, same refreshes.
+                  setState({ phase: 'resolved', res: r });
+                  celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
+                  onResolved?.(r);
+                }}
+                onClose={() => setShowTutor(false)}
+              />
+            </React.Suspense>
+          </TutorBoundary>
+        )}
+
+        <div style={SR_ONLY} role="status" aria-live="polite" aria-atomic="true">{verdictSpeech}</div>
+
+        {/* ── Feedback, attached to the work ── */}
+        {state.phase === 'retry' && (
+          <div className={`verdict ${technicalRetry ? 'verdict-technical' : invalidRetry ? 'verdict-bad verdict-unsure' : 'verdict-bad'}`}>
+            <span className="verdict-ico"><Icon name={technicalRetry ? 'alert' : invalidRetry ? 'uncertain' : 'correction'} /></span>
+            <div>
+              <div className="verdict-title">{state.res?.conflict ? t('verdict.alreadyFinishedTitle') : t(technicalRetry ? 'verdict.notSubmittedTitle' : invalidRetry ? 'verdict.unreadable' : 'verdict.notQuite')}</div>
+              <div className="verdict-body">
+                {state.res?.conflict
+                  ? <span className="muted">{state.res.feedback}</span>
+                  : technicalRetry
+                  ? <>{t('verdict.workIsSafe')} <span className="muted">{state.res.feedback}</span></>
+                  : <MathText text={state.res.feedback || t('verdict.oneMoreGo')} />}
               </div>
-              {res.feedback && !verdictGood && <div style={{ marginTop: 6 }}><b>{t('verdict.reasoning')}</b> <MathText text={res.feedback} /></div>}
-              {res.partial && !verdictGood && <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>◐ {res.partial.note}</div>}
-              {boardAward && (
-                <div className="board-award" style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--line, rgba(128,128,128,.22))' }}>
-                  <div className="spread" style={{ alignItems: 'baseline' }}>
-                    <span className="sc-label" style={{ margin: 0 }}>{t('verdict.markedStepByStep')}</span>
-                    <b style={{ fontVariantNumeric: 'tabular-nums' }}>{boardAward.awarded} / {boardAward.total}</b>
-                  </div>
-                  {boardAward.rows.map((row, i) => (
-                    <div key={i} className="set-row" style={{ paddingTop: 5, paddingBottom: 5 }}>
-                      <span className="set-k" style={{ fontWeight: 400 }}>
-                        <span aria-hidden="true" style={{ marginRight: 7, color: row.earned === row.outOf ? 'var(--good, #1a8f4c)' : 'var(--bad, #c0392b)' }}>
-                          {row.earned === row.outOf ? '✓' : '✗'}
-                        </span>
-                        {row.labelKey ? t(row.labelKey) : row.label}
-                        {row.why && <span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2, marginLeft: 20 }}>{row.whyKey ? t(row.whyKey, { unit: row.whyVars?.unit ?? '' }) : row.why}</span>}
-                      </span>
-                      <span className="set-v" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                        <span className="sr-only">{t('verdict.rowMarks', { earned: row.earned, total: row.outOf })} </span>{row.earned}/{row.outOf}
-                      </span>
-                    </div>
-                  ))}
-                  <p style={{ marginTop: 8, fontSize: 13 }}>{(() => {
-                    const line = marksSentenceKey(boardAward);
-                    return line ? t(line.key, { awarded: line.vars.awarded, total: line.vars.total, count: line.vars.count, n: line.vars.n }) : null;
-                  })()}</p>
-                  <p className="muted" style={{ fontSize: 11.5, marginTop: 6 }}>
-                    {t('verdict.boardStyleNote')}
-                  </p>
-                </div>
-              )}
-              {verdictGood && writeMode && inkResult?.lines?.length > 1 && (
-                <div style={{ marginTop: 6 }}><b>{t('verdict.reasoning')}</b> {t('verdict.everyLineChecked', { count: inkResult.lines.length, n: inkResult.lines.length })}</div>
-              )}
-              {!verdictGood && res.solution && (
-                <div style={{ marginTop: 4 }}>{t('verdict.expected')} <b><MathText text={res.solution.answerText} /></b></div>
-              )}
-              {res.stepReport && <StepReport report={res.stepReport} />}
-              {!diagnostic && <div className="row" style={{ marginTop: 10, flexWrap: 'wrap', gap: 8 }}>
-                <span className="tag">{t('verdict.mastery', { n: res.mastery })}</span>
-                <span className="tag" style={{ color: res.ratingDelta >= 0 ? 'var(--good)' : 'var(--bad)' }}>
-                  {t(res.ratingDelta >= 0 ? 'verdict.skillUp' : 'verdict.skillDown', { n: Math.abs(res.ratingDelta) })}
-                </span>
-                {res.predicted && <span className="tag">{t('verdict.predictedMark', { mark: res.predicted.mark })}</span>}
-              </div>}
-              {diagnostic && <p className="muted" style={{ marginTop: 10, fontSize: 12.5 }}>{t('placement.cardNote')}</p>}
+              {state.res.partial && <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{state.res.partial.note}</div>}
+              {state.res.stepReport && <StepReport report={state.res.stepReport} />}
+              <div className="verdict-next">{state.res?.conflict ? t('verdict.nextAfterConflict') : t(technicalRetry ? 'verdict.nextTechnical' : invalidRetry ? 'verdict.nextUnreadable'
+                : (state.res.stepReport?.lines?.some(l => l.status === 'break') || firstBad) ? 'verdict.nextFix' : 'verdict.nextTryAgain')}</div>
             </div>
+          </div>
+        )}
 
-            {res.solution?.steps && (
-              <div className="solution-block">
-                <div className="sc-label" style={{ margin: '12px 0' }}>{t('verdict.workedSolution')}</div>
-                {plotSpec && (
-                  <div className="q-plot" style={{ margin: '4px 0 14px' }}>
-                    <PriPlot spec={plotSpec} progress={1} reduceMotion />
-                  </div>
-                )}
-                <div className="steps">
-                  {res.solution.steps.map((s, i) => (
-                    <div className="step" key={i}>
-                      <span className="step-n">{i + 1}</span>
-                      <div>
-                        <div className="step-h"><MathText text={s.h} /></div>
-                        <div className="step-d"><MathText text={s.d} /></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {res.solution.answerText && (
-                  <div className="final-answer">
-                    <div className="sc-label" style={{ marginBottom: 8 }}>{t('verdict.finalAnswer')}</div>
-                    <MathText text={res.solution.answerText} />
+        {firstBad && (
+          <div className="ink-comments">
+            <div className="ink-comment bad">
+              <div className="ic-head">{t('verdict.lookHere')}<span className="ic-line">{t('verdict.onLine', { n: firstBad.line })}</span></div>
+              {firstBad.text}
+            </div>
+            {cloudWorkingNote && (
+              <div className={`ink-comment ${cloudWorkingNote.tone === 'break' ? 'bad' : 'note'}`}>
+                <div className="ic-head">{t(cloudWorkingNote.tone === 'break' ? 'verdict.whereItBreaks' : cloudWorkingNote.tone === 'maybe' ? 'verdict.possibly' : 'verdict.yourAlgebra')}</div>
+                {cloudWorkingNote.text}
+                {cloudMisconception && (
+                  <div className="diagnosis-named" data-misconception={cloudMisconception.named.id} data-status={cloudMisconception.status}>
+                    <b>{t(cloudMisconception.status === 'confirmed' ? 'verdict.lineMisconception' : 'verdict.possibleMisconception',
+                      { n: cloudMisconception.line, name: t(cloudMisconception.named.name) })}</b>
+                    <div>{t(cloudMisconception.named.explain)}</div>
                   </div>
                 )}
               </div>
             )}
+            {otherComments.length > 0 && (
+              <details className="ink-comments-more">
+                <summary>{t('verdict.moreNotes', { count: otherComments.length, n: otherComments.length })}</summary>
+                {otherComments.map((c, i) => (
+                  <div key={i} className={`ink-comment ${c.kind}`} style={{ marginTop: 8 }}>
+                    <div className="ic-head">{t('verdict.mistake')}<span className="ic-line">{t('verdict.onLine', { n: c.line })}</span></div>
+                    {c.text}
+                  </div>
+                ))}
+              </details>
+            )}
           </div>
+        )}
+        {!firstBad && cloudWorkingNote && (
+          <div className="ink-comments">
+            <div className={`ink-comment ${cloudWorkingNote.tone === 'break' ? 'bad' : 'note'}`}>
+              <div className="ic-head">{t(cloudWorkingNote.tone === 'break' ? 'verdict.whereItBreaks' : cloudWorkingNote.tone === 'maybe' ? 'verdict.possibly' : 'verdict.yourAlgebra')}</div>
+              {cloudWorkingNote.text}
+              {cloudMisconception && (
+                <div className="diagnosis-named" data-misconception={cloudMisconception.named.id} data-status={cloudMisconception.status}>
+                  <b>{t(cloudMisconception.status === 'confirmed' ? 'verdict.lineMisconception' : 'verdict.possibleMisconception',
+                    { n: cloudMisconception.line, name: t(cloudMisconception.named.name) })}</b>
+                  <div>{t(cloudMisconception.named.explain)}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
-          {!diagnostic && res.solution?.criteria && (
-            <CriteriaTable
-              criteria={res.solution.criteria}
-              correct={verdictGood}
-              selfMarks={selfMarks} setSelfMarks={setSelfMarks}
-              selfSaved={selfSaved} setSelfSaved={setSelfSaved}
-            />
-          )}
-        </>
-      )}
+        {resolved && (
+          <>
+            {answerLines.length > 0 && mode === 'photo' && !isMcq && (
+              <div className="your-answer">
+                <div className="sc-label">{t('verdict.yourAnswer')}</div>
+                {answerLines.map((l, i) => (
+                  <div className="ya-line" key={i}><MathText text={`$${texOf(l)}$`} /></div>
+                ))}
+                {photo && <div className="photo-thumb" style={{ marginTop: 8 }}><img src={photo} alt={t('verdict.attachedWorking')} /></div>}
+              </div>
+            )}
 
-      {/* actions */}
-      {!resolved && (
-        <div className="row no-print" style={{ marginTop: 18, flexWrap: 'wrap' }}>
-          {isMcq && (
-            <button className={`btn btn-primary ${canSubmit ? 'btn-glow' : ''}`} onClick={() => submit()} disabled={busy || !canSubmit}>
-              {t(busy ? 'verdict.marking' : 'verdict.submit')}
-            </button>
-          )}
-          {diagnostic
-            ? <button className="btn btn-quiet" onClick={dontKnow} disabled={busy}>{t('placement.dontKnow')}</button>
-            : <button className="btn btn-quiet" onClick={reveal} disabled={busy}>{t('verdict.showSolution')}</button>}
-          {!writeMode && !isMcq && <span className="muted" style={{ marginLeft: 'auto' }}>{tx('verdict.pressEnter', { key: <span className="kbd">{t('verdict.enterKey')}</span> })}</span>}
+            <div className="eval-card" data-outcome={verdictGood ? 'correct' : res.revealed ? 'revealed' : 'incorrect'}>
+              <div className="eval-head">
+                <span className="eval-title">
+                  <Icon name={verdictGood ? 'check' : 'correction'} />
+                  {t(verdictGood ? 'verdict.correct' : res.revealed ? 'verdict.revealed' : 'verdict.notThisTime')}
+                </span>
+                <span className="eval-marks">
+                  {t('verdict.marksOutOf', { earned: verdictGood ? shownMarks : earnedMarks, total: totalMarks })}
+                  {helpUsed > 0 && <small> · {t('verdict.afterHints', { count: helpUsed, n: helpUsed })}</small>}
+                </span>
+              </div>
+              <div className="eval-body">
+                {res.feedback && !verdictGood && <div><MathText text={res.feedback} /></div>}
+                {res.partial && !verdictGood && <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{res.partial.note}</div>}
+                {verdictGood && writeMode && inkResult?.lines?.length > 1 && (
+                  <div>{t('verdict.everyLineChecked', { count: inkResult.lines.length, n: inkResult.lines.length })}</div>
+                )}
+                {!verdictGood && res.solution && (
+                  <div className="eval-expected">{t('verdict.expected')} <b><MathText text={res.solution.answerText} /></b></div>
+                )}
+                {res.stepReport && <StepReport report={res.stepReport} />}
+                {boardAward && (
+                  <div className="board-award" style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--hairline)' }}>
+                    {/* The header above already states the total. It is repeated here
+                        only when there is more than one step to add up. */}
+                    <div className="spread" style={{ alignItems: 'baseline' }}>
+                      <span className="sc-label" style={{ margin: 0 }}>{t('verdict.markedStepByStep')}</span>
+                      {boardAward.rows.length > 1 && <b style={{ fontVariantNumeric: 'tabular-nums' }}>{boardAward.awarded} / {boardAward.total}</b>}
+                    </div>
+                    {boardAward.rows.map((row, i) => (
+                      <div key={i} className="set-row" style={{ paddingTop: 5, paddingBottom: 5 }}>
+                        <span className="set-k" style={{ fontWeight: 400 }}>
+                          <span aria-hidden="true" style={{ marginRight: 7, color: row.earned === row.outOf ? 'var(--good)' : 'var(--correction)' }}>
+                            <Icon name={row.earned === row.outOf ? 'check' : 'correction'} size={14} />
+                          </span>
+                          {row.labelKey ? t(row.labelKey) : row.label}
+                          {row.why && <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2, marginLeft: 20 }}>{row.whyKey ? t(row.whyKey, { unit: row.whyVars?.unit ?? '' }) : row.why}</span>}
+                        </span>
+                        <span className="set-v" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                          <span className="sr-only">{t('verdict.rowMarks', { earned: row.earned, total: row.outOf })} </span>{row.earned}/{row.outOf}
+                        </span>
+                      </div>
+                    ))}
+                    <p style={{ marginTop: 8, fontSize: 13 }}>{(() => {
+                      const line = marksSentenceKey(boardAward);
+                      return line ? t(line.key, { awarded: line.vars.awarded, total: line.vars.total, count: line.vars.count, n: line.vars.n }) : null;
+                    })()}</p>
+                    <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t('verdict.boardStyleNote')}</p>
+                  </div>
+                )}
+              </div>
+              {diagnostic && <p className="muted" style={{ margin: '0 18px', fontSize: 12.5 }}>{t('placement.cardNote')}</p>}
+              <div className="eval-disclaimer" style={{ paddingBottom: 12 }}>{t('verdict.markedOnDevice')}</div>
+            </div>
+
+            {!split && solutionBody && (verdictGood ? (
+              <details className="solution-panel">
+                <summary><Icon name="compare" size={16} />{t('verdict.anotherMethod')}</summary>
+                {solutionBody}
+              </details>
+            ) : (
+              <section className="solution-panel" aria-label={t('verdict.workedSolution')}>
+                <div className="solution-panel-title">{t('verdict.workedSolution')}</div>
+                {solutionBody}
+              </section>
+            ))}
+
+            {!diagnostic && res.solution?.criteria && (
+              <div className="criteria-self">
+                <CriteriaTable
+                  criteria={res.solution.criteria}
+                  correct={verdictGood}
+                  selfMarking={!boardAward || selfOpen}
+                  selfMarks={selfMarks} setSelfMarks={setSelfMarks}
+                  selfSaved={selfSaved} setSelfSaved={setSelfSaved}
+                />
+                {boardAward && !verdictGood && !selfSaved && !selfOpen && (
+                  <button type="button" className="btn-disclose" style={{ marginTop: 8 }} onClick={() => setSelfOpen(true)}>
+                    <Icon name="chevronDown" size={16} />{t('verdict.markItYourself')}
+                  </button>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── One obvious next move; everything else stays reachable and quiet ── */}
+        <div className="ws-actions editor-foot no-print">
+          <span className="status-line" data-state={statusState} role="status" aria-live="polite">
+            {statusState !== 'idle' && <span className="dot" aria-hidden="true" />}
+            {writeMode && shownAnswerLine && !needsCheck && !cloudPending && !(resolved && !boundLines)
+              ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(shownAnswerLine)}$`} /></span>
+              : statusText}
+            {/* Handwriting is read only by the server reader (#316); say so where the work is submitted. */}
+            {writeMode && !isMcq && (
+              <span className="ws-read-by">{String(inkResult?.engine || '').startsWith('cloud') ? t('verdict.inkReadByServer') : t('verdict.inkReadByServerPending')}</span>
+            )}
+          </span>
+          <div className="ws-actions-btns">
+            {!resolved && diagnostic && (
+              <button className="btn btn-quiet" onClick={dontKnow} disabled={busy}>{t('placement.dontKnow')}</button>
+            )}
+            {!resolved && !diagnostic && (
+              <button className={`btn ${revealArmed ? 'btn-ghost' : 'btn-quiet'}`} onClick={reveal} disabled={busy} aria-live="polite">
+                {revealArmed ? t('verdict.showSolutionConfirm') : t('verdict.showSolution')}
+              </button>
+            )}
+            {resolved && !diagnostic && <button className="btn btn-quiet redo-chip" onClick={() => onRedo ? onRedo() : onNext?.()}>{t('verdict.redoQuestion')}</button>}
+            {/* A placement answer is advanced by the placement page itself. */}
+            {!(diagnostic && resolved) && (
+              <button className="btn btn-primary" onClick={primary.run} disabled={primary.disabled} aria-busy={busy || undefined}>
+                {primary.label}
+              </button>
+            )}
+          </div>
         </div>
+      </section>
+
+      {peekOpen && (
+        <>
+          <button type="button" className="sheet-scrim" aria-label={t('nav.close')} onClick={() => setPeekOpen(false)} />
+          <div className="sheet" role="dialog" aria-modal="true" aria-label={t('verdict.questionRegion')} ref={peekRef}>
+            <MathText block text={question.prompt} />
+            {figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: figure }} />}
+            <div className="sheet-actions"><button className="btn btn-primary" onClick={() => setPeekOpen(false)}>{t('verdict.backToWork')}</button></div>
+          </div>
+        </>
       )}
     </div>
   );
 }
 
-function CriteriaTable({ criteria, correct, selfMarks, setSelfMarks, selfSaved, setSelfSaved }) {
+function CriteriaTable({ criteria, correct, selfMarking = true, selfMarks, setSelfMarks, selfSaved, setSelfSaved }) {
   const t = useT();
   const marked = i => correct || !!selfMarks[i];
   const missed = i => selfSaved && !marked(i);
@@ -1544,7 +1768,7 @@ function CriteriaTable({ criteria, correct, selfMarks, setSelfMarks, selfSaved, 
           {criteria.map((c, i) => (
             <tr key={i} className={missed(i) ? 'criteria-row-missed' : earned(i) ? 'criteria-row-earned' : ''}>
               <td>
-                {!correct && !selfSaved ? (
+                {!correct && !selfSaved && selfMarking ? (
                   <label className="selfmark-row" style={{ padding: 0 }}>
                     <input type="checkbox" checked={!!selfMarks[i]}
                       onChange={e => setSelfMarks(m => ({ ...m, [i]: e.target.checked }))} />
@@ -1559,7 +1783,7 @@ function CriteriaTable({ criteria, correct, selfMarks, setSelfMarks, selfSaved, 
           ))}
         </tbody>
       </table>
-      {!correct && (
+      {!correct && (selfMarking || selfSaved) && (
         <div className="row" style={{ marginTop: 10 }}>
           {!selfSaved
             ? <>
@@ -1576,20 +1800,38 @@ function CriteriaTable({ criteria, correct, selfMarks, setSelfMarks, selfSaved, 
 function StepReport({ report }) {
   const t = useT();
   if (!report?.lines?.length) return null;
+  // The first meaningful break leads, with its diagnosis. Every other line is
+  // one tap away rather than competing with it for attention.
+  const first = report.lines.findIndex(l => l.status === 'break');
+  const line = (l, i) => (
+    <React.Fragment key={i}>
+      <div className={`stepcheck-line sc-${l.status}`}>
+        <span aria-hidden="true">{l.status === 'ok' ? '✓' : l.status === 'break' ? '✗' : '·'}</span>
+        <span>{l.text}</span>
+        {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.mistakeIsHere')}</b>}
+        {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — {l.note}</span>}
+      </div>
+      {l.diagnosis && <Diagnosis d={l.diagnosis} line={i + 1} />}
+    </React.Fragment>
+  );
+  if (first < 0) {
+    return (
+      <div className="stepcheck">
+        <div className="muted" style={{ fontSize: 12, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{t('verdict.stepCheck')}</div>
+        {report.lines.map(line)}
+      </div>
+    );
+  }
   return (
-    <div style={{ marginTop: 10, display: 'grid', gap: 3 }}>
-      <div className="muted" style={{ fontSize: 12, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{t('verdict.stepCheck')}</div>
-      {report.lines.map((l, i) => (
-        <React.Fragment key={i}>
-          <div className={`stepcheck-line sc-${l.status}`}>
-            <span>{l.status === 'ok' ? '✓' : l.status === 'break' ? '✗' : '·'}</span>
-            <span>{l.text}</span>
-            {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.mistakeIsHere')}</b>}
-            {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — {l.note}</span>}
-          </div>
-          {l.diagnosis && <Diagnosis d={l.diagnosis} line={i + 1} />}
-        </React.Fragment>
-      ))}
+    <div className="stepcheck">
+      <div className="muted" style={{ fontSize: 12, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{t('verdict.stepCheck')}</div>
+      {line(report.lines[first], first)}
+      {report.lines.length > 1 && (
+        <details className="stepcheck-more">
+          <summary>{t('verdict.showEveryLine', { count: report.lines.length, n: report.lines.length })}</summary>
+          {report.lines.map((l, i) => (i === first ? null : line(l, i)))}
+        </details>
+      )}
     </div>
   );
 }
@@ -1661,6 +1903,3 @@ function attachPhoto(e, setPhoto, onReady, onPdf, onFailed) {
   e.target.value = '';
 }
 
-function fmtTime(s) {
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-}
