@@ -72,7 +72,7 @@ jobs:
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
           grep -Fq 'LEGAL PAGES: PASS — 234/234 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 94/94 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 129/129 checks' suites.log
           grep -Fq 'BROWSER RUN FIXES: PASS — 23/23 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
@@ -87,7 +87,7 @@ jobs:
           grep -Fq 'NOTES CONTENT CHECK PASSED — 77/77 chapters' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
           grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 94/94 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 129/129 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
           grep -Fq 'MARK PREDICTOR: PASS — 42/42 checks' suites.log
