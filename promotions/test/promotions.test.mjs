@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { PromotionsStore } from '../src/store.mjs';
 import {
+  CODE_ALPHABET,
   createCampaignPassCode,
   createClaimCode,
   hashCampaignPassCode,
@@ -13,7 +14,7 @@ import {
 } from '../src/security.mjs';
 import { ensureInstagramWebhookSubscription, extractInstagramMessages, extractInstagramReferrals } from '../src/instagram.mjs';
 
-test('claim and campaign pass codes normalize and hash deterministically', () => {
+test('claim and campaign pass codes normalize and hash deterministically', async () => {
   const code = createClaimCode();
   assert.match(code, /^PRI-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/);
   assert.equal(normalizeClaimCode(`  ${code.toLowerCase()}  `), code);
@@ -22,13 +23,40 @@ test('claim and campaign pass codes normalize and hash deterministically', () =>
   const pass = createCampaignPassCode();
   assert.match(pass, /^A2Z-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/);
   assert.equal(normalizeCampaignPassCode(` ${pass.toLowerCase()} `), pass);
-  assert.equal(hashCampaignPassCode('secret', pass), hashCampaignPassCode('secret', pass.toLowerCase()));
+  assert.equal(await hashCampaignPassCode('secret', pass), await hashCampaignPassCode('secret', pass.toLowerCase()));
 });
 
-test('short-lived QR pass can be consumed once and binds one Instagram identity', () => {
+test('code symbols are drawn uniformly over the alphabet', () => {
+  // 32 000 symbols, 1 000 expected per symbol (sd ≈ 31): a ±20% band is more
+  // than six standard deviations, so this does not flake, while a modulo bias
+  // that doubled one symbol's weight would be far outside it.
+  const counts = new Map([...CODE_ALPHABET].map(ch => [ch, 0]));
+  for (let i = 0; i < 4000; i++) {
+    for (const ch of createClaimCode().slice(4).replace('-', '')) counts.set(ch, (counts.get(ch) ?? -1e9) + 1);
+    for (const ch of createCampaignPassCode().slice(4).replace('-', '')) counts.set(ch, (counts.get(ch) ?? -1e9) + 1);
+  }
+  const expected = (4000 * 16) / CODE_ALPHABET.length;
+  assert.equal(counts.size, CODE_ALPHABET.length, 'only alphabet symbols are drawn');
+  for (const [ch, n] of counts) assert.ok(n > expected * 0.8 && n < expected * 1.2, `${ch} drawn ${n} times, expected about ${expected}`);
+});
+
+test('campaign pass codes are hashed with a slow keyed derivation, not a bare HMAC', async () => {
+  const pass = 'A2Z-ABCD-2345';
+  const hash = await hashCampaignPassCode('secret', pass);
+  assert.match(hash, /^[0-9a-f]{64}$/);
+  assert.equal(hash, await hashCampaignPassCode('secret', ' a2z-abcd-2345 '), 'deterministic over normalization, so the store can look a pass up by hash');
+  assert.notEqual(hash, await hashCampaignPassCode('other-secret', pass), 'keyed by the service secret');
+  assert.notEqual(hash, createHmac('sha256', 'secret').update(`campaign-pass:${pass}`).digest('hex'), 'not the fast HMAC a leaked table could be brute-forced against');
+  const started = process.hrtime.bigint();
+  await hashCampaignPassCode('secret', pass);
+  const ms = Number(process.hrtime.bigint() - started) / 1e6;
+  assert.ok(ms >= 2, `one derivation should cost real work (took ${ms.toFixed(2)} ms)`);
+});
+
+test('short-lived QR pass can be consumed once and binds one Instagram identity', async () => {
   const store = new PromotionsStore(':memory:');
   store.seedCampaign({ id: 'a2z', keyword: 'A2Z', refCode: 'pri-a2z-qr-2026', rewardLabel: 'toffee' });
-  const passHash = hashCampaignPassCode('secret', 'A2Z-ABCD-2345');
+  const passHash = await hashCampaignPassCode('secret', 'A2Z-ABCD-2345');
   store.issueCampaignPass({ campaignId: 'a2z', passHash, ttlMs: 60_000 });
 
   const first = store.consumeCampaignPass({ passHash, instagramScopedId: 'ig-1' });
@@ -43,10 +71,10 @@ test('short-lived QR pass can be consumed once and binds one Instagram identity'
   store.close();
 });
 
-test('expired QR pass fails closed', () => {
+test('expired QR pass fails closed', async () => {
   const store = new PromotionsStore(':memory:');
   store.seedCampaign({ id: 'a2z', keyword: 'A2Z', refCode: 'pri-a2z-qr-2026', rewardLabel: 'toffee' });
-  const passHash = hashCampaignPassCode('secret', 'A2Z-ABCD-2345');
+  const passHash = await hashCampaignPassCode('secret', 'A2Z-ABCD-2345');
   store.issueCampaignPass({ campaignId: 'a2z', passHash, ttlMs: -1 });
   assert.equal(store.consumeCampaignPass({ passHash, instagramScopedId: 'ig-1' }).status, 'expired');
   store.close();

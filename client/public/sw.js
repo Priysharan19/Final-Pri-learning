@@ -42,7 +42,9 @@ const OPTIONAL = [];
 const SHELL = '/index.html';
 const STAMP = '/__pri-built';
 const KEEP = 2;
-const CACHEABLE = /^\/assets\/|\.(?:js|css|html|svg|png|webmanifest|woff2?|ttf)$/;
+// Either a hashed build asset (anything under /assets/) or a static file by
+// extension; the groups make the two anchored alternatives explicit.
+const CACHEABLE = /(?:^\/assets\/)|(?:\.(?:js|css|html|svg|png|webmanifest|woff2?|ttf)$)/;
 
 // ── Install ──────────────────────────────────────────────────────────────────
 

@@ -11,7 +11,7 @@
 const { startApp, registerAccount, verifyEmail, checks, promoteRole } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
 const { sha256 } = await import('../platform/security.js');
-const { INVITE_DEFAULT_TTL_DAYS } = await import('../platform/teacherInvites.js');
+const { INVITE_DEFAULT_TTL_DAYS, INVITE_ALPHABET, randomGroup } = await import('../platform/teacherInvites.js');
 
 const c = checks();
 // SQLite by default; `--engine=postgres` runs it on a migrated Postgres.
@@ -21,6 +21,19 @@ const DAY = 24 * 60 * 60 * 1000;
 const CODE = /^PRI-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/;
 const mint = (jar, body = {}) => h.request('/v1/admin/teacher-invites', { method: 'POST', jar, body });
 const list = jar => h.request('/v1/admin/teacher-invites', { jar });
+
+// Codes are drawn uniformly over the alphabet (CodeQL js/biased-cryptographic-random).
+// 64 000 symbols, 2 000 expected per symbol (sd ≈ 44): the ±20 % band is more
+// than nine standard deviations wide, so this cannot flake, while a biased
+// draw (one symbol at twice the weight) sits far outside it.
+{
+  const counts = new Map([...INVITE_ALPHABET].map(ch => [ch, 0]));
+  const draws = 16_000;
+  for (let i = 0; i < draws; i++) for (const ch of randomGroup()) counts.set(ch, (counts.get(ch) ?? -1e9) + 1);
+  const expected = (draws * 4) / INVITE_ALPHABET.length;
+  c.eq(counts.size, INVITE_ALPHABET.length, 'random groups only ever use the invite alphabet');
+  c.ok([...counts.values()].every(n => n > expected * 0.8 && n < expected * 1.2), `every symbol is drawn within 20% of its expected share (${[...counts.values()].join(' ')})`);
+}
 
 try {
   const admin = await registerAccount(h, { email: 'admin@example.test', name: 'Pri Admin' });

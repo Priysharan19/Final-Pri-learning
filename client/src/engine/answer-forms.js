@@ -299,6 +299,7 @@ const HATS = /[̂̃̄⃗⃖]/g;
  * "i − 2j + 3k", "î + k̂", "\hat{i} + 2\hat{j}", one component per line.
  * Returns { components } — three entries; a two-dimensional answer is padded with 0.
  */
+const VECTOR_AXES = ['i', 'j', 'k'];
 export function parseVectorInput(raw) {
   let s = String(raw ?? '').trim();
   if (!s) throw new Error('Empty vector');
@@ -316,19 +317,23 @@ export function parseVectorInput(raw) {
   if (ijk) {
     const compact = s.replace(/\s+/g, '').replace(/\*/g, '');
     const terms = compact.match(/[+-]?[^+-]+/g) || [];
-    const out = { i: 0, j: 0, k: 0 };
-    const seen = { i: false, j: false, k: false };
+    // Components are indexed by position (i=0, j=1, k=2), never by a name
+    // taken from the input, so no student text ever becomes a property key.
+    const out = [0, 0, 0];
+    const seen = [false, false, false];
     for (const term of terms) {
       const m = term.match(/^([+-]?)(.*?)([ijk])$/);
       if (!m) throw new Error('Not a component');
       const [, sign, coef, axis] = m;
-      if (seen[axis]) throw new Error('Repeated component');
-      seen[axis] = true;
+      const slot = VECTOR_AXES.indexOf(axis);
+      if (slot < 0) throw new Error('Not a component');
+      if (seen[slot]) throw new Error('Repeated component');
+      seen[slot] = true;
       const magnitude = coef === '' ? 1 : num(coef);
       if (!Number.isFinite(magnitude)) throw new Error('Bad component');
-      out[axis] = (sign === '-' ? -1 : 1) * magnitude;
+      out[slot] = (sign === '-' ? -1 : 1) * magnitude;
     }
-    comps = [out.i, out.j, out.k];
+    comps = out;
   } else {
     const inner = s.replace(/^[\(\[<⟨\{]\s*/, '').replace(/\s*[\)\]>⟩\}]$/, '');
     const parts = inner.includes(',') ? inner.split(',') : inner.split(/\n|\s{2,}|\s+/);

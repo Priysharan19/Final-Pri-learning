@@ -87,7 +87,8 @@ export function hasPyqGenerator(generatorId) {
 
 /** The coverage row for a generator id, or null. */
 export function pyqCoverageOf(generatorId) {
-  return PYQ_COVERAGE[String(generatorId || '')] || null;
+  const key = String(generatorId || '');
+  return (Object.hasOwn(PYQ_COVERAGE, key) && PYQ_COVERAGE[key]) || null;
 }
 
 /** Does the archive publish anything for this track and chapter? */

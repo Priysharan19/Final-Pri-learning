@@ -4898,10 +4898,14 @@ export function withExamLock(examId, work) {
 
 export async function dispatch(method, path, body) {
   // exact match first
-  const exact = routes[`${method} ${path}`];
+  // Own keys only: a path such as "/constructor" must never resolve to a
+  // property inherited from Object.prototype and be called as a handler.
+  const exactKey = `${method} ${path}`;
+  const exact = Object.hasOwn(routes, exactKey) && typeof routes[exactKey] === 'function' ? routes[exactKey] : null;
   if (exact) return runGated(method, path, exact, body, {});
   // parameterised match
   for (const key of Object.keys(routes)) {
+    if (typeof routes[key] !== 'function') continue;
     const [m, pattern] = key.split(' ');
     if (m !== method || !pattern.includes(':')) continue;
     const pp = pattern.split('/');
