@@ -151,12 +151,12 @@ class InkInputTest {
             // A question that offers handwriting.
             var writable = false
             for (i in 0 until 14) {
-                if (eval(s, "!!($byLabel)('Answer by handwriting')") == "true") { writable = true; break }
+                if (eval(s, "!!($byLabel)('Write: answer by handwriting')") == "true") { writable = true; break }
                 eval(s, "(function(){var n=document.querySelector('.ctx-next');if(n)n.click();return true;})()")
                 Thread.sleep(1100)
             }
             assertTrue("a question offering handwriting was found", writable)
-            eval(s, "($byLabel)('Answer by handwriting').click()")
+            eval(s, "($byLabel)('Write: answer by handwriting').click()")
             waitFor(s, "document.querySelectorAll('.ink-canvas').length > 0")
             eval(s, "[].slice.call(document.querySelectorAll('.ink-canvas')).pop().scrollIntoView({block:'center'})")
             Thread.sleep(600)

@@ -43,8 +43,10 @@ export const flow = {
     await check('the card names the topic it came from',
       (await page.locator('.q-topmeta').innerText()).includes('Linear Equations'),
       `topmeta reads ${JSON.stringify(await page.locator('.q-topmeta').innerText())}`);
-    await check('the question is on the clock',
-      /\d+:\d\d/.test(await page.locator('.q-timer').innerText()));
+    // Practice is deliberately untimed on screen: time on task is still
+    // recorded with the attempt, but a running clock is pressure, not help.
+    await check('practice shows no running clock',
+      await page.locator('.q-timer').count() === 0);
 
     // ── 2 · find one that takes a typed answer ───────────────────────────────
     // The card opens in handwriting mode on a touch device, so typing is asked
@@ -120,7 +122,7 @@ export const flow = {
     const marked = (await page.locator('.eval-card').innerText()).replace(/\s+/g, ' ');
     const marks = (await page.locator('.eval-marks').innerText()).replace(/\s+/g, ' ').trim();
     await check(`the answer the solution gave (${JSON.stringify(answer)}) is marked correct`,
-      /^(\d+(?:\.\d)?) \/ \1 marks \(100%\)/.test(marks), `marks read ${JSON.stringify(marks)}`);
+      /^(\d+(?:\.\d)?) \/ \1 marks\b/.test(marks), `marks read ${JSON.stringify(marks)}`);
     await check('a correct answer is not told what was expected instead',
       !/Expected:/.test(marked), `evaluation reads ${JSON.stringify(marked.slice(0, 160))}`);
     await check('the session counter agrees it was right',
@@ -134,7 +136,8 @@ export const flow = {
     await check('every resolved question is in History', rows === 2, `${rows} rows, expected 2`);
     const scores = await page.locator('.hist-row').allInnerTexts();
     await check('History remembers which one was right',
-      scores.some(t => t.includes('✔')) && scores.some(t => t.includes('✖')),
+      // The verdict is an icon plus its spoken word, so the words are what a row says.
+      scores.some(t => /\bCorrect\b/.test(t)) && scores.some(t => /\bIncorrect\b/.test(t)),
       `rows read ${JSON.stringify(scores.map(t => t.replace(/\s+/g, ' ').slice(0, 60)))}`);
     await check('both attempts are on the same question',
       scores.every(t => t.includes('Linear Equations')),

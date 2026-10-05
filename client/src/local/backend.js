@@ -13,6 +13,7 @@ import {
 } from './store.js';
 import { cleanTimezone, dayKey, defaultTimezone, timezoneOf, localeOf } from '../lib/locale.js';
 import { cleanLanguage } from '../i18n/languages.js';
+import { THEME_PREFS, cleanThemePref } from '../lib/theme.js';
 import {
   CURRICULUM, STREAM_CURRICULUM, PATHWAYS, streamSubtopics, SUBTOPIC_BY_ID, subtopicsForYear,
   scopeForYear, DIFF_LABELS, dotpointsFor, dotpointById, dotpointAt
@@ -876,7 +877,7 @@ async function publicUser(p, nowMs = Date.now()) {
   const tz = timezoneOf(p);
   const today = (await get('activity', `${p.id}:${dayKey(nowMs, tz)}`)) || { questions: 0, correct: 0, xp: 0 };
   return {
-    id: p.id, name: p.name, year: p.year, theme: p.theme || 'dark',
+    id: p.id, name: p.name, year: p.year, theme: cleanThemePref(p.theme),
     // The language the interface is drawn in. `locale` above is a different
     // thing and stays as it is: it decides how a date, a number and a price are
     // written for this student's region, and a Hindi-medium student in India
@@ -2173,7 +2174,7 @@ function packQuestion(cq) {
 const exportProfile = p => ({
   name: p.name, year: p.year, course: p.course || 'nsw', indiaTrack: p.indiaTrack || null, role: p.role || 'student',
   timezone: timezoneOf(p),
-  avatar: p.avatar || '🙂', theme: p.theme || 'dark', language: cleanLanguage(p.language),
+  avatar: p.avatar || '🙂', theme: cleanThemePref(p.theme), language: cleanLanguage(p.language),
   mathsGloss: p.mathsGloss === true, dailyGoal: p.dailyGoal || 10,
   xp: p.xp || 0, pathway: p.pathway ?? null, provider: p.provider || null,
   handwriting: p.handwriting !== false, isDemo: false,
@@ -2189,7 +2190,7 @@ function importProfile(src, id) {
     timezone: cleanTimezone(src.timezone) || defaultTimezone(COURSES[src.course] ? src.course : 'nsw'),
     role: src.role === 'teacher' ? 'teacher' : 'student',
     avatar: safeLabel(src.avatar, 4) || '🙂',
-    theme: src.theme === 'light' ? 'light' : 'dark',
+    theme: cleanThemePref(src.theme),
     language: cleanLanguage(src.language),
     mathsGloss: src.mathsGloss === true,
     dailyGoal: safeInt(src.dailyGoal, 3, 60, 10),
@@ -2643,7 +2644,7 @@ const routes = {
       year: requestedYear,
       course: requestedCourse,
       role: body.role === 'teacher' ? 'teacher' : 'student',
-      avatar: body.avatar || '🙂', theme: 'dark', dailyGoal: 10, xp: 0,
+      avatar: body.avatar || '🙂', theme: 'light', dailyGoal: 10, xp: 0,
       // The language the sign-up screen was being read in. Somebody who chose
       // Hindi and then filled this form in Hindi has already told us what they
       // read; making them find the setting afterwards to say it a second time
@@ -2787,7 +2788,7 @@ const routes = {
     if (body.year !== undefined) p.year = Math.min(12, Math.max(7, Number(body.year) || p.year));
     if (body.pathway !== undefined && p.course === 'nsw') p.pathway = cleanPathway(body.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
     if (body.year !== undefined && body.pathway === undefined && p.course === 'nsw') p.pathway = cleanPathway(p.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
-    if (body.theme !== undefined && ['dark', 'light'].includes(body.theme)) p.theme = body.theme;
+    if (body.theme !== undefined && THEME_PREFS.includes(body.theme)) p.theme = body.theme;
     // Language is per profile, not per device: two siblings sharing one iPad
     // each get their own. An unrecognised id is cleaned to English rather than
     // rejected — a profile restored from a backup written by a build that had a
@@ -3918,7 +3919,7 @@ const routes = {
         const course = COURSES[raw?.course] ? raw.course : rowTrack ? 'in' : defaultCourse;
         prof = {
           id: uuid(), name, year, course, role: 'student',
-          avatar: safeLabel(raw?.avatar, 4) || '🙂', theme: 'dark', dailyGoal: 10, xp: 0,
+          avatar: safeLabel(raw?.avatar, 4) || '🙂', theme: 'light', dailyGoal: 10, xp: 0,
           pathway: course === 'nsw' ? (year >= 11 ? 'advanced' : null) : null,
           indiaTrack: course === 'in' ? cleanIndiaTrack(raw?.track ?? raw?.indiaTrack, year) : null,
           rosteredBy: teacher.id, createdAt: now, lastActiveAt: now

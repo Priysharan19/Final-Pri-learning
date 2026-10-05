@@ -76,7 +76,6 @@ export default function Rush() {
     return (
       <div className="card qcard" style={{ textAlign: 'center', padding: 40 }}>
         <h1 className="sr-only">{t('nav.rush')}</h1>
-        <div style={{ fontSize: 46 }} aria-hidden="true">⚡</div>
         <h2 style={{ margin: '10px 0 6px' }}>{t('rush.lobbyTitle')}</h2>
         <p className="sub" style={{ maxWidth: 460, margin: '0 auto 20px' }}>
           {t('rush.lobbyIntro')}
