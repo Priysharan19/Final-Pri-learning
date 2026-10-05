@@ -173,6 +173,83 @@ await cloudHandwritingReadiness({ user: { cloudHandwriting: true }, transport: t
 await cloudHandwritingReadiness({ user: { cloudHandwriting: true }, transport: throwingTransport, available: there, now: T0 * 2 + 1 });
 eq(throwingCalls, 2, 'a status request that failed outright is never cached');
 
+// ── 3b · Readiness belongs to one account state ──────────────────────────────
+// Production 2026-10-05 (iPad): a student wrote signed out, registered on the
+// same page and was shown "the reader isn't answering" — nothing was asked of
+// the server again after sign-in. A readiness answer learned for one account
+// state must never be served for another, and every session change drops it.
+{
+  if (typeof globalThis.addEventListener !== 'function') {
+    const target = new EventTarget();
+    globalThis.addEventListener = target.addEventListener.bind(target);
+    globalThis.removeEventListener = target.removeEventListener.bind(target);
+    globalThis.dispatchEvent = target.dispatchEvent.bind(target);
+  }
+  const { announceCloudSessionChange } = await import('../src/platform/cloudSession.js');
+  const { clearCloudHandwritingReadiness, readinessIdentity } = await import('../src/ink/cloudReader.js');
+  clearCloudHandwritingReadiness();
+  const T1 = 8_000_000_000_000;
+  const readyBody = { available: true, configured: true, usable: true, degraded: false, state: 'ready', lastFailureCode: null, releaseSha: READY_SHA };
+  // The device's own server says who is signed in; the profile view can lag it.
+  let signedIn = false;
+  let probes = 0;
+  const gate = {
+    handwritingStatus: async () => {
+      probes += 1;
+      if (!signedIn) { const e = new Error('Sign in is required.'); e.code = 'AUTH_REQUIRED'; e.status = 401; throw e; }
+      return readyBody;
+    }
+  };
+  const signedOutProfile = { id: 'p1', cloudHandwriting: true, cloudLinked: false };
+  const signedInProfile = { id: 'p1', cloudHandwriting: null, cloudLinked: true };
+  ok(readinessIdentity(signedOutProfile) !== readinessIdentity(signedInProfile),
+    'linking the profile to an account changes the readiness identity');
+  eq(readinessIdentity({ id: 'p1', cloudLinked: true, xp: 10 }), readinessIdentity({ id: 'p1', cloudLinked: true, xp: 11 }),
+    'but an answer that only moved the XP does not');
+
+  const refused = await cloudHandwritingReadiness({ user: signedOutProfile, transport: gate, available: there, now: T1 });
+  ok(refused.usable === false && refused.lastFailureCode === 'AUTH_REQUIRED', 'signed out, the status probe is refused with the sign-in code');
+  eq(probes, 1, 'one probe while signed out');
+  signedIn = true;
+  const afterSignIn = await cloudHandwritingReadiness({ user: signedInProfile, transport: gate, available: there, now: T1 + 1 });
+  ok(afterSignIn.usable === true && probes === 2,
+    `after sign-in the server is asked again, not the cached refusal (probes ${probes}, usable ${afterSignIn.usable})`);
+  await cloudHandwritingReadiness({ user: signedInProfile, transport: gate, available: there, now: T1 + 2 });
+  eq(probes, 2, 'and the ready answer is then cached for that account as before');
+
+  // The same profile, a different account state (the cache held a READY answer
+  // for the signed-in identity; the student signs out on the same page).
+  signedIn = false;
+  const signedOutAgain = await cloudHandwritingReadiness({ user: signedOutProfile, transport: gate, available: there, now: T1 + 3 });
+  ok(signedOutAgain.usable === false && probes === 3, 'a ready answer cached for the signed-in state is not served to the signed-out one');
+
+  // A session change (register, sign in, sign out, verified, consent) drops
+  // whatever is cached even when the profile view has not caught up yet.
+  signedIn = true;
+  await cloudHandwritingReadiness({ user: signedInProfile, transport: gate, available: there, now: T1 + 4 });
+  eq(probes, 3, 'the ready answer cached for the signed-in identity is reused within its TTL (a refusal never evicts it)');
+  announceCloudSessionChange({ localProfileId: 'p1', connected: true, accountId: 'acct_1', role: 'student' });
+  await cloudHandwritingReadiness({ user: signedInProfile, transport: gate, available: there, now: T1 + 5 });
+  eq(probes, 4, 'a cloud session change clears the cached readiness: the next read asks the server');
+
+  // The first read after sign-in asks afresh regardless of the cache.
+  await cloudHandwritingReadiness({ user: signedInProfile, transport: gate, available: there, now: T1 + 6 });
+  eq(probes, 4, 'cached once more');
+  let transcribed = 0;
+  const freshTransport = { ...gate, transcribeHandwriting: async () => { transcribed += 1; return { transcription: { lines: [{ text: '7', confidence: 0.95 }], text: '7', confidence: 0.95, needsConfirmation: false, engine: 'cloud-test' } }; } };
+  const freshRead = await readWithCloud(STROKES, { user: signedInProfile, transport: freshTransport, rasterize: () => ({ dataUrl: 'data:image/png;base64,AAAA', width: 10, height: 10, bytes: 3 }), available: there, freshReadiness: true });
+  ok(freshRead?.transcription && probes === 5 && transcribed === 1, `readWithCloud({ freshReadiness: true }) re-probes before sending (probes ${probes})`);
+
+  // A 401 whose body lost its code is still "sign in", never "reader down".
+  const bare401 = { handwritingStatus: async () => { const e = new Error('Cloud request failed (401)'); e.code = 'CLOUD_REQUEST_FAILED'; e.status = 401; throw e; } };
+  const bareOutcome = await cloudHandwritingReadiness({ user: signedInProfile, transport: bare401, available: there, cache: false });
+  eq(bareOutcome.lastFailureCode, 'CLOUD_REQUEST_FAILED', 'a coded body keeps its code');
+  const noCode401 = { handwritingStatus: async () => { const e = new Error('401'); e.status = 401; throw e; } };
+  eq((await cloudHandwritingReadiness({ user: signedInProfile, transport: noCode401, available: there, cache: false })).lastFailureCode, 'AUTH_REQUIRED',
+    'a 401 without a body code is still the sign-in refusal');
+  clearCloudHandwritingReadiness();
+}
+
 recordLocalHandwritingDiagnostics({ nativeAvailable: true, engine: 'pri-foundation', releaseSha: READY_SHA });
 const localDiag = handwritingDiagnostics();
 ok(localDiag.localNativeAvailable === true && localDiag.selectedEngine === 'pri-foundation' && localDiag.releaseSha === READY_SHA,
@@ -290,6 +367,31 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   eq(inkReadingBlockedKey({ cloudHandwriting: null }, { online: () => true, available: there }), 'ink.waitingSignIn', 'signed out ink says sign in');
   eq(inkReadingBlockedKey({ cloudLinked: true }, { online: () => true, available: there, outcome: { error: { code: 'HANDWRITING_UNAVAILABLE' } } }), 'ink.waitingServiceDown', 'a reader that is down says so');
   eq(inkReadingBlockedKey({ cloudHandwriting: false, cloudLinked: true }, { online: () => true, available: there }), 'ink.waitingTurnedOff', 'only an explicit off points at Settings');
+
+  // The precise blocker after sign-in, from either half of the read: the
+  // status probe (readiness.lastFailureCode) or the transcribe route (error).
+  // /v1/handwriting/transcribe sits behind requireVerifiedEmail; the status
+  // route does not, so a freshly registered student passes the probe and is
+  // refused at transcribe — that refusal must name verification, not an outage.
+  const linked = { cloudLinked: true, cloudHandwriting: null };
+  const on = () => true;
+  eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'EMAIL_UNVERIFIED', status: 403 } } }), 'ink.waitingVerifyEmail', 'EMAIL_UNVERIFIED from transcribe → verify-email copy');
+  eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { reason: 'unavailable', readiness: { usable: false, lastFailureCode: 'EMAIL_UNVERIFIED' } } }), 'ink.waitingVerifyEmail', 'EMAIL_UNVERIFIED from the status probe → verify-email copy');
+  eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { reason: 'unavailable', readiness: { usable: false, lastFailureCode: 'AUTH_REQUIRED' } } }), 'ink.waitingSignIn', 'AUTH_REQUIRED (session expired on the server) → sign-in copy');
+  eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { status: 401 } } }), 'ink.waitingSignIn', 'a bare 401 → sign-in copy');
+  eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'GUARDIAN_CONSENT_PENDING', status: 403 } } }), 'ink.waitingGuardian', 'GUARDIAN_CONSENT_PENDING → guardian copy');
+  eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'AGE_DECLARATION_REQUIRED', status: 403 } } }), 'ink.waitingGuardian', 'AGE_DECLARATION_REQUIRED → guardian copy');
+  eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'HANDWRITING_PROVIDER_5XX', status: 503 } } }), 'ink.waitingServiceDown', 'only a true 5xx/transport failure says the reader is down');
+  eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'EMAIL_UNVERIFIED' }, readiness: { lastFailureCode: 'HANDWRITING_PROVIDER_5XX' } } }), 'ink.waitingVerifyEmail', 'the transcribe refusal wins over a stale probe code');
+  const { ACCOUNT_BLOCKED_KEYS } = await import('../src/ink/cloudReader.js');
+  ok(['ink.waitingSignIn', 'ink.waitingVerifyEmail', 'ink.waitingGuardian'].every(k => ACCOUNT_BLOCKED_KEYS.has(k)) && !ACCOUNT_BLOCKED_KEYS.has('ink.waitingServiceDown'),
+    'sign-in, verify-email and guardian blockers offer the way to Account settings; an outage does not');
+  ok(/freshReadiness: fresh/.test(src) && /scheduleRead\(strokesRef\.current, \{ immediate: true, fresh: true \}\)/.test(src),
+    'the ink surface asks the server afresh (not the cache) when the session, connection or focus comes back');
+  ok(/readinessIdentity\(user\)/.test(src) && /fresh: changed/.test(src),
+    'and when the signed-in profile changes under the kept ink');
+  ok(/ACCOUNT_BLOCKED_KEYS\.has\(status\.key\)/.test(src) && /to="\/settings"/.test(src),
+    'an account blocker renders the way to Account settings beside the notice');
 
   // Default-on ink path, answer-blind: a signed-in profile that never chose is
   // read without visiting Settings, and the request carries the picture only.

@@ -19,42 +19,13 @@
 // Run on its own:  node client/test/tour-ink.js
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
-import { TEMPLATES } from '../src/ink/templates.js';
-import { readLines, turnOnServerReading, useFakeServerReader } from './fakeServerReader.js';
+import { handwrite, readLines, turnOnServerReading, useFakeServerReader } from './fakeServerReader.js';
 
 const TOPIC = 'y7-equations';
 const SURELY_WRONG = '-987654';
 const MAX_QUESTIONS = 8;
 
-// Glyph geometry, matched to the shape the recogniser suites score against:
-// a little taller than wide, with a clear gap between neighbours so the
-// segmenter has something to cut on.
-const GLYPH_W = 58;
-const GLYPH_H = 84;
-const ADVANCE = 66;
-
 const SUBMIT = { name: 'Submit Answer' };
-
-/** Write one line of glyphs onto the canvas with the mouse, stroke by stroke. */
-async function handwrite(page, box, text, { x = 40, y = 34 } = {}) {
-  let ox = box.x + x;
-  for (const ch of text) {
-    const variant = TEMPLATES[ch]?.[0];
-    if (!variant) throw new Error(`no template for ${JSON.stringify(ch)}`);
-    for (const stroke of variant) {
-      const pts = stroke.map(([px, py]) => [
-        ox + (px / 100) * GLYPH_W,
-        box.y + y + (py / 100) * GLYPH_H
-      ]);
-      await page.mouse.move(pts[0][0], pts[0][1]);
-      await page.mouse.down();
-      for (const [px, py] of pts) await page.mouse.move(px, py);
-      await page.mouse.up();
-    }
-    ox += ADVANCE;
-  }
-  await page.waitForTimeout(600);   // the recogniser runs 240 ms after the last point
-}
 
 /** What the reading panel says it read, line by line. */
 const reading = (page) => readLines(page);
