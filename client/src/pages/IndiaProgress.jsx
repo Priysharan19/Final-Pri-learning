@@ -76,19 +76,14 @@ export default function IndiaProgress() {
   if (!curriculum || !stats) return <div className="skeleton" style={{ height: 420 }} />;
 
   return (
-    <div className="grid" style={{ gap: 18 }}>
-      <h1 className="sr-only">{t('progress.title', { track: trackName })}</h1>
-
-      <div className="card">
-        <div className="spread" style={{ gap: 16, alignItems: 'flex-start' }}>
-          <div>
-            <div className="card-title" style={{ marginBottom: 4 }}>{t('progress.title', { track: trackName })}</div>
-            <p className="sub" style={{ margin: 0 }}>{t('progress.evidenceSub')}</p>
-          </div>
-          <span className="tag tag-brand">{t('progress.noPercentile')}</span>
-        </div>
-        <p className="muted" style={{ marginTop: 12, maxWidth: 820 }}>{t('progress.honesty')}</p>
-      </div>
+    <div className="pg">
+      {/* One column, read top to bottom: what the evidence says, where the marks
+          are, then the syllabus itself. Sections are separated by space and
+          hairlines; the paper estimate is the only sheet on the page. */}
+      <header className="pg-head">
+        <h1>{t('progress.title', { track: trackName })}</h1>
+        <p className="sub">{t('progress.evidenceSub')}</p>
+      </header>
 
       {featureEnabled('placement') && <div className="card" data-placement-entry>
         <div className="spread" style={{ gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -105,10 +100,10 @@ export default function IndiaProgress() {
       {rows.length > 0 && <SyllabusBoard board={board} track={track} />}
 
       {prediction && (
-        <div className="card">
+        <section className="pg-sheet" aria-labelledby="pg-paper">
           <div className="spread" style={{ alignItems: 'flex-start', gap: 16 }}>
             <div>
-              <div className="card-title" style={{ marginBottom: 4 }}>{t('progress.ifYouSatTomorrow')}</div>
+              <h2 className="sc-label" id="pg-paper">{t('progress.ifYouSatTomorrow')}</h2>
               <p className="sub" style={{ margin: 0 }}>{prediction.label}</p>
             </div>
             {prediction.show && (
@@ -121,45 +116,46 @@ export default function IndiaProgress() {
             )}
           </div>
 
-          <p style={{ marginTop: 12, maxWidth: 820 }}>{predictionSentence(prediction)}</p>
+          <p className="pg-sentence">{predictionSentence(prediction)}</p>
 
           {/* Coverage is drawn, not just stated: the practised share of the paper
               against the whole, so an impressive number over a quarter of the
               paper cannot be mistaken for an impressive number over all of it. */}
-          <div style={{ marginTop: 10 }}>
-            <div style={{ height: 8, borderRadius: 999, background: 'var(--line, rgba(128,128,128,.2))', overflow: 'hidden' }}
+          <div className="pg-coverage">
+            <div className="pg-coverage-track"
               role="img" aria-label={t('progress.marksPractised', { covered: prediction.coveredMarks, total: prediction.totalMarks })}>
-              <div style={{ width: `${Math.round(prediction.coverage * 100)}%`, height: '100%', background: 'var(--brand, #4f7cff)' }} />
+              <div style={{ width: `${Math.round(prediction.coverage * 100)}%` }} />
             </div>
-            <div className="muted" style={{ fontSize: 12, marginTop: 5 }}>
+            <div className="muted pg-coverage-note">
               {t('progress.marksPractised', { covered: prediction.coveredMarks, total: prediction.totalMarks })}
               {prediction.unseenMarks > 0 && t('progress.marksUntouched', { n: prediction.unseenMarks })}
             </div>
           </div>
 
           {prediction.priorities.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <div className="sc-label" style={{ marginBottom: 6 }}>{t('progress.whereTheMarksAre')}</div>
+            <div className="pg-priorities">
+              <div className="sc-label">{t('progress.whereTheMarksAre')}</div>
               {prediction.priorities.slice(0, 4).map(unit => (
                 <div key={unit.unitId} className="set-row">
                   <span className="set-k">
                     {unit.name}
-                    <span className="muted" style={{ display: 'block', fontSize: 11.5, marginTop: 2 }}>
+                    <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2 }}>
                       {unit.covered
-                        ? t('progress.unitCovered', { count: unit.attempts, n: unit.attempts, expected: unit.expected, marks: unit.marks })
+                        ? t('progress.unitCovered', { count: unit.attempts, n: unit.attempts, expected: Math.round(unit.expected), marks: unit.marks })
                         : t('progress.unitUntouched', { marks: unit.marks })}
                     </span>
                   </span>
-                  <span className="set-v">+{unit.atStake}</span>
+                  {/* Whole marks: a tenth of a mark is precision the evidence does not have. */}
+                  <span className="set-v">{unit.atStake > 0 && unit.atStake < 0.5 ? '<1' : `+${Math.round(unit.atStake)}`}</span>
                 </div>
               ))}
               <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>{t('progress.rankedByMarks')}</p>
             </div>
           )}
-        </div>
+        </section>
       )}
 
-      <div className="grid cols-4">
+      <div className="grid cols-4 pg-facts">
         <div className="card" data-metric="started"><div className="sc-label">{t('progress.chaptersStarted')}</div><div className="big" data-value={started}>{started}<span className="muted">/{rows.length}</span></div></div>
         <div className="card" data-metric="practised"><div className="sc-label">{t('progress.chaptersPractised')}</div><div className="big" data-value={practiced}>{practiced}</div><div className="muted">{t('progress.fivePlusAttempts')}</div></div>
         <div className="card" data-metric="answered"><div className="sc-label">{t('progress.questionsAnswered')}</div><div className="big" data-value={Number(totals.attempts || 0)}>{Number(totals.attempts || 0).toLocaleString()}</div></div>
@@ -177,15 +173,15 @@ export default function IndiaProgress() {
         </div>
       </div>
 
-      <div className="card">
-        <div className="spread">
-          <div className="card-title" style={{ marginBottom: 0 }}>{t('progress.syllabusEvidence', { scope: scope?.title || trackName })}</div>
+      <section aria-labelledby="pg-syllabus">
+        <div className="spread pg-section-head">
+          <h2 className="sc-label" id="pg-syllabus">{t('progress.syllabusEvidence', { scope: scope?.title || trackName })}</h2>
           <span className="muted">{t('progress.rowCount', { count: rows.length, n: rows.length })}</span>
         </div>
         {!rows.length ? <p className="muted" style={{ marginTop: 16 }}>{t('progress.noRows')}</p> : (
-          <div className="table-scroll" style={{ marginTop: 12 }}>
-            <table className="syl-table">
-              <thead><tr><th style={{ textAlign: 'left' }}>{t('progress.colChapter')}</th><th>{t('common.attempts')}</th><th>{t('progress.colCorrect')}</th><th>{t('common.accuracy')}</th><th><span className="sr-only">{t('progress.colAction')}</span></th></tr></thead>
+          <div className="table-scroll">
+            <table className="syl-table pg-table">
+              <thead><tr><th scope="col">{t('progress.colChapter')}</th><th scope="col">{t('common.attempts')}</th><th scope="col">{t('progress.colCorrect')}</th><th scope="col">{t('common.accuracy')}</th><th scope="col"><span className="sr-only">{t('progress.colAction')}</span></th></tr></thead>
               <tbody>
                 {chapterEvidence.map(({ row, evidence }) => (
                   <tr key={row.id || row.name} data-chapter={row.id} data-attempts={evidence.attempts} data-correct={evidence.correct}>
@@ -193,7 +189,7 @@ export default function IndiaProgress() {
                       {/* Chapter and unit names are curriculum data and stay English by
                           design; lang="en" lets a screen reader on a Hindi page voice them
                           in English (TermGloss marks its Hindi terms lang="hi"). */}
-                      <div style={{ fontWeight: 640 }} lang="en"><TermGloss text={row.name || row.title} /></div>
+                      <div className="pg-chapter" lang="en"><TermGloss text={row.name || row.title} /></div>
                       {row.strand && <div className="muted" lang="en" style={{ fontSize: 12 }}><TermGloss text={row.strand} /></div>}
                     </td>
                     <td>{evidence.attempts}</td>
@@ -210,12 +206,15 @@ export default function IndiaProgress() {
             </table>
           </div>
         )}
-      </div>
+      </section>
 
-      <div className="card">
-        <div className="card-title">{t('progress.howToRead')}</div>
-        <p className="muted" style={{ margin: 0 }}>{t('progress.howToReadBody')}</p>
-      </div>
+      {/* What this page does and does not claim, said once, where a careful
+          reader looks for it. */}
+      <footer className="pg-notes">
+        <h2 className="sc-label">{t('progress.howToRead')}</h2>
+        <p className="muted"><b>{t('progress.noPercentile')}.</b> {t('progress.honesty')}</p>
+        <p className="muted">{t('progress.howToReadBody')}</p>
+      </footer>
     </div>
   );
 }
