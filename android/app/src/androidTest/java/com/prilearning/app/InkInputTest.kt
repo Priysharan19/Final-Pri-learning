@@ -85,11 +85,12 @@ class InkInputTest {
         if(!c||!c.width)return -1;var y0=Math.floor(c.height*$from),y1=Math.ceil(c.height*$to);var d=c.getContext('2d').getImageData(0,y0,c.width,y1-y0).data;var n=0;for(var i=3;i<d.length;i+=4)if(d[i]>0)n++;return n;})()""").toIntOrNull() ?: -1
 
     /**
-     * The page's ink metrics. Polled, because evaluateJavascript cannot answer while the
-     * renderer is inside a long task: on the API 33 AOSP image (WebView 101) the first read
-     * after a stroke came back empty and the old `as String` cast turned that into a
-     * ClassCastException with no evidence. A metrics object is still required — a page
-     * that never answers fails with the reason, and nothing below is asserted more loosely.
+     * The page's ink metrics. evaluateJavascript can transiently return JSON null while the
+     * WebView is committing an injected MotionEvent, and on the API 33 AOSP image (WebView 101)
+     * the renderer answered nothing for ~10 s after the first stroke; that image may also hand
+     * the object back with one fewer string-encoding layer than newer WebViews. So: poll
+     * (bounded), accept either encoding, and fail with the reason. A metrics object is still
+     * required and none of the stroke assertions below are loosened.
      */
     private fun metrics(s: ActivityScenario<MainActivity>, timeoutMs: Long = 30_000): JSONObject {
         val js = "JSON.stringify(window.__PRI_INK_METRICS__||{strokes:[],rejected:{touchAfterPen:0},cancels:0})"
@@ -97,12 +98,16 @@ class InkInputTest {
         var last = "null"
         while (true) {
             last = eval(s, js)
-            val inner = try { JSONTokener(last).nextValue() } catch (_: Exception) { null }
-            if (inner is String && inner.startsWith("{")) return JSONObject(inner)
+            val decoded = try { JSONTokener(last).nextValue() } catch (_: Exception) { null }
+            when (decoded) {
+                is JSONObject -> return decoded
+                is String -> if (decoded.startsWith("{")) return JSONObject(decoded)
+                else -> {}
+            }
             if (System.currentTimeMillis() >= end) break
             Thread.sleep(250)
         }
-        throw AssertionError("the ink metrics never came back from the page within ${timeoutMs / 1000} s (last=$last)")
+        throw AssertionError("the ink metrics never came back from the page as a JSON object within ${timeoutMs / 1000} s (last=$last)")
     }
 
     /** One stroke of real MotionEvents across the canvas at height fraction fy. */
