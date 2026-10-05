@@ -133,7 +133,10 @@ export const flow = {
       if (!el) return null;
       const r = el.getBoundingClientRect();
       const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-      const bar = document.querySelector('.mobilenav')?.getBoundingClientRect();
+      // In thinking mode the bottom bar is not drawn at all; a hidden bar
+      // covers nothing.
+      const navEl = document.querySelector('.mobilenav');
+      const bar = navEl && navEl.offsetParent !== null ? navEl.getBoundingClientRect() : null;
       return {
         w: Math.round(r.width), h: Math.round(r.height),
         onTop: Boolean(hit && (el === hit || el.contains(hit))),
@@ -229,7 +232,8 @@ export const flow = {
 
       await ctx.setOffline(true);
       await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => { });
-      const shell = await page.waitForSelector('.mobilenav', { timeout: 30000 }).then(() => true).catch(() => false);
+      // /practice is a thinking-mode route: its shell is the workspace bar, not the bottom nav.
+      const shell = await page.waitForSelector('.ws-bar, .mobilenav', { timeout: 30000 }).then(() => true).catch(() => false);
       await check('the app opens with the network switched off', shell, 'a reload with the network down never painted the shell');
 
       await page.goto(`${base}/practice`, { waitUntil: 'domcontentloaded' }).catch(() => { });

@@ -391,7 +391,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*355/355.*13 flows' browser.log
+          grep -Eq 'E2E SUITE.*358/358.*13 flows' browser.log
           grep -Fq 'Submission · interruption recovery and one attempt' browser.log
           grep -Fq 'Cloud · late results never rewrite an attempt' browser.log
           grep -Fq 'India exam · JEE Main handwritten, reloaded, analysed' browser.log
@@ -411,14 +411,14 @@ jobs:
           grep -Fq 'Hindi · Practice, handwriting, Exams, exam room, Progress, Explain' browser.log
           grep -Eq 'E2E SUITE.*54/54.*1 flows' browser.log
           grep -Fq 'Progress truth · rendered numbers = attempt ledger' browser.log
-          grep -Eq 'E2E SUITE.*20/20.*1 flows' browser.log
+          grep -Eq 'E2E SUITE.*22/22.*1 flows' browser.log
           # Ledger 2.3: five guest questions with no server call, sign-up carries them over once.
           grep -Fq 'Guest · 5 free questions, no server, sign-up carries them over' browser.log
           grep -Eq 'E2E SUITE.*26/26.*1 flows' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
-          test "$(grep -Ec 'E2E SUITE PASSED — 151/151 checks across 1 flows' browser.log)" -eq 2
+          test "$(grep -Ec 'E2E SUITE PASSED — 158/158 checks across 1 flows' browser.log)" -eq 2
           if grep -Fq 'not measured:' browser.log; then
             echo 'A browser suite reported skipped coverage.' >&2
             exit 1

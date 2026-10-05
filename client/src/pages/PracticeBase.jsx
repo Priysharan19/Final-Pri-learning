@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
@@ -12,6 +12,7 @@ import FreeCapNotice from '../components/FreeCapNotice.jsx';
 import GuestCapNotice from '../components/GuestCapNotice.jsx';
 import { clearInkDraft, clearPendingSubmission, pendingSubmissionQuestionId, readPendingSubmission } from '../components/practiceRecovery.js';
 import { tLater, useT } from '../i18n/index.js';
+import Icon from '../components/Icon.jsx';
 import { isContentEmpty, servable, contentEmptySignal } from '../lib/contentServe.js';
 import { practiceHref, practiceRequestFromQuery } from '../lib/practiceLinks.js';
 import { queueTelemetry } from '../platform/telemetry.js';
@@ -21,6 +22,11 @@ const EMPTY_SESSION = Object.freeze({ answered: 0, correct: 0, xp: 0 });
 export default function Practice() {
   const { user, refreshUser } = useApp();
   const t = useT();
+  const navigate = useNavigate();
+  // A natural stopping point: the session that carries today's count across
+  // the student's own daily goal says so, once, and offers a way to finish.
+  const [sessionDone, setSessionDone] = useState(null);
+  const sessionDoneShown = useRef(false);
   const [params, setParams] = useSearchParams();
   const location = useLocation();
   const subtopic = params.get('subtopic');
@@ -261,6 +267,12 @@ export default function Practice() {
   }, [assignmentMode, assignmentContext, assignmentClassId, assignmentId, assignmentTarget, t]);
 
   const onResolved = res => {
+    const goal = Math.max(1, Number(user.dailyGoal) || 10);
+    const before = Math.max(0, Number(user.today?.questions) || 0);
+    if (!assignmentMode && !sessionDoneShown.current && before < goal && before + 1 >= goal) {
+      sessionDoneShown.current = true;
+      setSessionDone({ goal });
+    }
     const current = sessionRef.current;
     const next = {
       answered: current.answered + 1,
@@ -323,131 +335,205 @@ export default function Practice() {
     || t(taskId ? 'practice.taskPractice' : subtopic ? 'practice.topicPractice' : 'practice.smartPractice');
   const assignmentCompleteLocally = !!assignmentContext && assignmentTargetReached.current;
 
+  const exitBar = (
+    <button type="button" className="icon-btn ws-exit" onClick={() => navigate('/')} aria-label={t('practice.leave')}>
+      <Icon name="back" /><span>{t('nav.home')}</span>
+    </button>
+  );
+
   if (assignmentMode && assignmentError && !assignmentContext) {
     return (
-      <div className="qpage">
-        <h1 style={SR_ONLY}>{t('assignment.title')}</h1>
-        <p className="error-box">{assignmentError}</p>
-        <button className="btn btn-ghost" onClick={() => setParams({})}>{t('assignment.leave')}</button>
+      <div className="ws-page">
+        <header className="ws-bar">{exitBar}</header>
+        <div className="ws-notices">
+          <h1 style={SR_ONLY}>{t('assignment.title')}</h1>
+          <p className="error-box">{assignmentError}</p>
+          <div><button className="btn btn-ghost" onClick={() => setParams({})}>{t('assignment.leave')}</button></div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ position: 'relative', paddingBottom: 70 }}>
+    <div className="ws-page">
       {/* the question itself is the page's visual title; this names it for a reader */}
       <h1 style={SR_ONLY}>{t('practice.heading', { name: heading })}</h1>
 
-      {assignmentContext && <div className="card" style={{ marginBottom: 14, padding: 14 }}>
-        <div className="spread" style={{ gap: 12, alignItems: 'flex-start' }}>
-          <div>
-            <strong>{assignmentContext.title}</strong>
-            <div className="muted">{assignmentContext.className} · {t('assignment.completed', { done: session.answered, total: assignmentTarget })}</div>
-            {assignmentContext.specification?.instructions && <p style={{ margin: '8px 0 0' }}>{String(assignmentContext.specification.instructions)}</p>}
-          </div>
-          <span className={`tag ${assignmentSubmitted.current ? 'tag-brand' : ''}`}>
-            {t(assignmentSubmitted.current ? 'assignment.submitted' : assignmentCompleteLocally ? 'assignment.readyToSubmit' : 'assignment.tag')}
+      <header className="ws-bar no-print">
+        {exitBar}
+        <div className="ws-bar-title">
+          <span className="ctx-pill-name">
+            {heading}
+            {dotpoint != null && <span className="muted">{t('practice.dotpointMeta', { n: Number(dotpoint) + 1 })}</span>}
+          </span>
+          <span className="ctx-pill-meta">
+            {metaLine}
+            {session.answered > 0 && t('practice.sessionScore', { correct: session.correct, answered: session.answered, xp: session.xp })}
+            {serve?.nextUp?.name && <span data-next-up={serve.nextUp.subtopic}>{t('practice.nextUp', { name: serve.nextUp.name })}</span>}
           </span>
         </div>
-        {assignmentContext.submission?.feedback && <div className="notice" style={{ marginTop: 10 }}>
-          <strong>{t('assignment.teacherFeedback')}</strong>
-          <div style={{ marginTop: 4 }}>{assignmentContext.submission.feedback.note || t('assignment.returnedForRevision')}</div>
-        </div>}
-        {assignmentError && <div className="notice error" role="alert" style={{ marginTop: 10 }}>{assignmentError}</div>}
-        {assignmentSubmitted.current && <div className="notice success" role="status" style={{ marginTop: 10 }}>
-          {t('assignment.submittedNote')}
-        </div>}
-        {assignmentCompleteLocally && !assignmentSubmitted.current && <div className="notice" role="status" style={{ marginTop: 10 }}>
-          {t('assignment.targetReached')}
-          <div style={{ marginTop: 8 }}><button className="btn btn-primary btn-sm" onClick={retryAssignmentSubmission}>{t('assignment.retrySubmission')}</button></div>
-        </div>}
-      </div>}
-
-      {/* PYQ filter. Indian students work through past papers as the central
-          study ritual, so the filter is a first-class control rather than a
-          setting: on, every question served is a real question from a published
-          paper, and a chapter the archive cannot serve says so. */}
-      {user.course === 'in' && !assignmentMode && !taskId && (
-        <div className="spread" style={{ marginBottom: 12, gap: 10, alignItems: 'center' }}>
-          <button
-            className={`btn btn-sm ${pyqOnly ? 'btn-primary' : 'btn-quiet'}`}
-            aria-pressed={pyqOnly}
-            title={t('practice.pyqOnlyTitle')}
-            onClick={() => setPyqOnly(!pyqOnly)}
-          >
-            {t(pyqOnly ? 'practice.pyqOnlyLabelOn' : 'practice.pyqOnlyLabel')}
-          </button>
-          {pyqOnly && <span className="muted">{t('practice.pyqOnlyNote')}</span>}
+        <div className="ws-bar-end">
+          {user.course === 'in' && !assignmentMode && !taskId && (
+            <button type="button" className="icon-btn ws-filter" aria-pressed={pyqOnly}
+              title={t('practice.pyqOnlyTitle')} onClick={() => setPyqOnly(!pyqOnly)}>
+              {t(pyqOnly ? 'practice.pyqOnlyLabelOn' : 'practice.pyqOnlyLabel')}
+            </button>
+          )}
+          {(subtopic || taskId || difficulty || pyqOnly || assignmentMode) && (
+            <button className="icon-btn ws-clear" title={t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearFilters')}
+              onClick={() => setParams({})}><Icon name="close" /><span>{t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearShort')}</span></button>
+          )}
+          {!assignmentCompleteLocally && (
+            <button className="ctx-next" title={t('practice.nextQuestion')} aria-label={t('practice.nextQuestion')} onClick={() => load({ fresh: true })}>
+              <span className="ctx-next-label">{t('practice.next')}</span><Icon name="next" />
+            </button>
+          )}
         </div>
-      )}
+      </header>
 
-      {capped && (capped.code === 'GUEST_CAP_REACHED' ? <GuestCapNotice gate={capped} /> : <FreeCapNotice gate={capped} onRetry={load} />)}
+      <div className="ws-notices">
+        {assignmentContext && <div className="card ws-assignment">
+          <div className="spread" style={{ gap: 12, alignItems: 'flex-start' }}>
+            <div>
+              <strong>{assignmentContext.title}</strong>
+              <div className="muted">{assignmentContext.className} · {t('assignment.completed', { done: session.answered, total: assignmentTarget })}</div>
+              {assignmentContext.specification?.instructions && <p style={{ margin: '8px 0 0' }}>{String(assignmentContext.specification.instructions)}</p>}
+            </div>
+            <span className={`tag ${assignmentSubmitted.current ? 'tag-brand' : ''}`}>
+              {t(assignmentSubmitted.current ? 'assignment.submitted' : assignmentCompleteLocally ? 'assignment.readyToSubmit' : 'assignment.tag')}
+            </span>
+          </div>
+          {assignmentContext.submission?.feedback && <div className="notice" style={{ marginTop: 10 }}>
+            <strong>{t('assignment.teacherFeedback')}</strong>
+            <div style={{ marginTop: 4 }}>{assignmentContext.submission.feedback.note || t('assignment.returnedForRevision')}</div>
+          </div>}
+          {assignmentError && <div className="notice error" role="alert" style={{ marginTop: 10 }}>{assignmentError}</div>}
+          {assignmentSubmitted.current && <div className="notice success" role="status" style={{ marginTop: 10 }}>
+            {t('assignment.submittedNote')}
+          </div>}
+          {assignmentCompleteLocally && !assignmentSubmitted.current && <div className="notice" role="status" style={{ marginTop: 10 }}>
+            {t('assignment.targetReached')}
+            <div style={{ marginTop: 8 }}><button className="btn btn-primary btn-sm" onClick={retryAssignmentSubmission}>{t('assignment.retrySubmission')}</button></div>
+          </div>}
+        </div>}
 
-      {error && !capped && isContentEmpty(errorCode) && (
-        <div className="qpage" role="status">
-          <h2 style={{ marginTop: 0 }}>{t('practice.emptyTitle')}</h2>
-          <p className="muted">{t('practice.emptyBody')}</p>
-          <div className="spread" style={{ gap: 10, justifyContent: 'flex-start' }}>
-            <Link className="btn btn-primary" to="/">{t('practice.emptyChooseTopic')}</Link>
-            {(subtopic || dotpoint != null) && !taskId && !assignmentMode && (
-              <button className="btn btn-quiet" onClick={() => setParams(new URLSearchParams())}>{t('practice.emptySmart')}</button>
+        {/* PYQ filter. Indian students work through past papers as the central
+            study ritual, so the filter stays one tap away in the bar; on, every
+            question served is a real question from a published paper, and a
+            chapter the archive cannot serve says so. */}
+        {/* On a phone the bar's filter and clear controls are hidden (theme.css
+            ≤760px) and this row stands in for them, so it must appear in every
+            case the bar's clear button would: a task, an assignment or a
+            non-India student with a subtopic filter must still be able to
+            clear or leave without going back to Home. The PYQ toggle stays
+            India-only. */}
+        {((user.course === 'in' && !assignmentMode && !taskId) || subtopic || taskId || difficulty || pyqOnly || assignmentMode) && (
+          <div className="row ws-filter-inline" style={{ gap: 8 }}>
+            {user.course === 'in' && !assignmentMode && !taskId && (
+              <button type="button" className="icon-btn ws-filter" aria-pressed={pyqOnly}
+                title={t('practice.pyqOnlyTitle')} onClick={() => setPyqOnly(!pyqOnly)}>
+                {t(pyqOnly ? 'practice.pyqOnlyLabelOn' : 'practice.pyqOnlyLabel')}
+              </button>
+            )}
+            {(subtopic || taskId || difficulty || pyqOnly || assignmentMode) && (
+              <button type="button" className="icon-btn" data-testid="ws-filter-inline-clear" title={t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearFilters')} onClick={() => setParams({})}><Icon name="close" />{t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearShort')}</button>
             )}
           </div>
-        </div>
-      )}
+        )}
+        {pyqOnly && <p className="muted">{t('practice.pyqOnlyNote')}</p>}
 
-      {error && !capped && !isContentEmpty(errorCode) && (
-        <div className="qpage">
-          <p className="error-box">{error}</p>
-          {errorCode === 'INDIA_PYQ_UNAVAILABLE' && pyqAlternatives.length > 0 && (
-            // The nearest chapters whose archive does hold past papers. Each is
-            // a past-papers-only link, so the filter's claim stays true.
-            <div data-pyq-alternatives>
-              <p className="muted">{t('practice.pyqNearestTitle')}</p>
-              <div className="spread" style={{ gap: 10, justifyContent: 'flex-start', flexWrap: 'wrap', marginBottom: 12 }}>
-                {pyqAlternatives.map(alt => (
-                  <Link key={alt.subtopic} className="btn btn-ghost btn-sm"
-                    to={practiceHref({ subtopic: alt.subtopic, track: track || null, pyq: true })}>
-                    {t('practice.pyqNearestCta', { name: alt.name })}
-                  </Link>
-                ))}
+        {capped && (capped.code === 'GUEST_CAP_REACHED' ? <GuestCapNotice gate={capped} /> : <FreeCapNotice gate={capped} onRetry={load} />)}
+
+        {/* No question exists for this exact selection: an empty state with a way
+            forward, not a failure. */}
+        {error && !capped && isContentEmpty(errorCode) && (
+          <div className="notice" role="status">
+            <strong>{t('practice.emptyTitle')}</strong>
+            <p className="muted" style={{ margin: '4px 0 10px' }}>{t('practice.emptyBody')}</p>
+            <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+              <Link className="btn btn-primary btn-sm" to="/">{t('practice.emptyChooseTopic')}</Link>
+              {(subtopic || dotpoint != null) && !taskId && !assignmentMode && (
+                <button className="btn btn-quiet btn-sm" onClick={() => setParams(new URLSearchParams())}>{t('practice.emptySmart')}</button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {error && !capped && !isContentEmpty(errorCode) && (
+          <div className="verdict verdict-technical" role="alert" data-practice-error={errorCode || 'error'}>
+            <span className="verdict-ico"><Icon name="alert" /></span>
+            <div>
+              <div className="verdict-title">{errorCode === 'INDIA_PYQ_UNAVAILABLE' ? t('practice.pyqEmptyTitle') : t('practice.couldNotLoad')}</div>
+              <div className="verdict-body">{error}</div>
+              {errorCode === 'INDIA_PYQ_UNAVAILABLE' && pyqAlternatives.length > 0 && (
+                // The nearest chapters whose archive does hold past papers. Each is
+                // a past-papers-only link, so the filter's claim stays true.
+                <div data-pyq-alternatives style={{ marginTop: 10 }}>
+                  <p className="muted" style={{ margin: '0 0 8px' }}>{t('practice.pyqNearestTitle')}</p>
+                  <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                    {pyqAlternatives.map(alt => (
+                      <Link key={alt.subtopic} className="btn btn-ghost btn-sm"
+                        to={practiceHref({ subtopic: alt.subtopic, track: track || null, pyq: true })}>
+                        {t('practice.pyqNearestCta', { name: alt.name })}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div style={{ marginTop: 10 }}>
+                {errorCode === 'INDIA_PYQ_UNAVAILABLE'
+                  ? <button className={`btn ${pyqAlternatives.length ? 'btn-quiet' : 'btn-primary'} btn-sm`} onClick={() => setPyqOnly(false)}>{t('practice.pyqFilterOff')}</button>
+                  : <button className="btn btn-primary btn-sm" onClick={load}>{t('common.tryAgain')}</button>}
               </div>
             </div>
-          )}
-          {errorCode === 'INDIA_PYQ_UNAVAILABLE'
-            ? <button className={`btn ${pyqAlternatives.length ? 'btn-quiet' : 'btn-primary'}`} onClick={() => setPyqOnly(false)}>{t('practice.pyqFilterOff')}</button>
-            : <button className="btn btn-primary" onClick={load}>{t('common.tryAgain')}</button>}
-        </div>
-      )}
+          </div>
+        )}
+
+        {serve && serve.repeat && !assignmentCompleteLocally && (
+          <div className="notice" role="note">{t('practice.repeatNote')}</div>
+        )}
+
+        {serve?.question?.pyq && !assignmentCompleteLocally && (
+          <div className="notice" role="note">
+            <strong>{t('practice.pyqBadge')}</strong> · {serve.question.pyqSource}
+            {serve.question.pyqArchive?.citations?.length > 0 && (
+              <div className="muted" style={{ marginTop: 4 }}>
+                {t('practice.pyqTranscribedFrom')} {serve.question.pyqArchive.citations.map((c, i) => (
+                  <React.Fragment key={c.id}>
+                    {i > 0 && ' · '}
+                    <a href={c.archivedAt || c.url} target="_blank" rel="noreferrer noopener">{c.title}</a>
+                  </React.Fragment>
+                ))}. {serve.question.pyqArchive.stepsAuthorship}
+              </div>
+            )}
+          </div>
+        )}
+
+        {sessionDone && (
+          <section className="session-done" aria-labelledby="session-done-title">
+            <h2 id="session-done-title">{t('practice.goalReachedTitle', { count: sessionDone.goal, n: sessionDone.goal })}</h2>
+            <p>{t('practice.goalReachedBody', { correct: session.correct, answered: session.answered })}</p>
+            <div className="session-done-actions">
+              <button className="btn btn-primary" onClick={() => navigate('/')}>{t('practice.doneForToday')}</button>
+              <button className="btn btn-ghost" onClick={() => setSessionDone(null)}>{t('practice.keepGoing')}</button>
+            </div>
+          </section>
+        )}
+      </div>
 
       {!serve && !error && !capped && !assignmentCompleteLocally && (
-        <div className="qpage">
-          <div className="skeleton" style={{ height: 18, width: 180, marginBottom: 22 }} />
-          <div className="skeleton" style={{ height: 54, marginBottom: 16 }} />
-          <div className="skeleton" style={{ height: 240 }} />
+        <div className="qpage ws ws-single" aria-busy="true">
+          <div className="ws-context">
+            <div className="skeleton" style={{ height: 14, width: 180, marginBottom: 22 }} />
+            <div className="skeleton" style={{ height: 22, marginBottom: 10 }} />
+            <div className="skeleton" style={{ height: 22, width: '70%' }} />
+          </div>
+          <p className="muted" role="status" style={{ textAlign: 'center' }}>{t('practice.loading')}</p>
         </div>
       )}
 
       {serve && !assignmentCompleteLocally && (
         <>
-          {serve.repeat && (
-            <div className="notice" role="note" style={{ marginBottom: 12 }}>{t('practice.repeatNote')}</div>
-          )}
-          {serve.question.pyq && (
-            <div className="notice" role="note" style={{ marginBottom: 12 }}>
-              <strong>{t('practice.pyqBadge')}</strong> · {serve.question.pyqSource}
-              {serve.question.pyqArchive?.citations?.length > 0 && (
-                <div className="muted" style={{ marginTop: 4 }}>
-                  {t('practice.pyqTranscribedFrom')} {serve.question.pyqArchive.citations.map((c, i) => (
-                    <React.Fragment key={c.id}>
-                      {i > 0 && ' · '}
-                      <a href={c.archivedAt || c.url} target="_blank" rel="noreferrer noopener">{c.title}</a>
-                    </React.Fragment>
-                  ))}. {serve.question.pyqArchive.stepsAuthorship}
-                </div>
-              )}
-            </div>
-          )}
           <QuestionCard
             key={serve.question.id}
             question={serve.question}
@@ -478,29 +564,6 @@ export default function Practice() {
           />
         </>
       )}
-
-      {/* bottom context pill */}
-      <div className="ctx-pill no-print">
-        <div className="ctx-pill-info">
-          <span className="genbar-toggle" style={{ padding: 0, cursor: 'default' }} aria-hidden="true">⌃</span>
-          <div>
-            <div className="ctx-pill-meta">
-              {metaLine}
-              {session.answered > 0 && t('practice.sessionScore', { correct: session.correct, answered: session.answered, xp: session.xp })}
-            </div>
-            <div className="ctx-pill-name">
-              {heading}
-              {dotpoint != null && <span className="muted">{t('practice.dotpointMeta', { n: Number(dotpoint) + 1 })}</span>}
-              {serve?.nextUp?.name && <span className="muted" data-next-up={serve.nextUp.subtopic}>{t('practice.nextUp', { name: serve.nextUp.name })}</span>}
-            </div>
-          </div>
-          {(subtopic || taskId || difficulty || pyqOnly || assignmentMode) && (
-            <button className="btn btn-quiet btn-sm" title={t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearFilters')}
-              aria-label={t(assignmentMode ? 'assignment.leaveShort' : 'practice.clearFilters')} onClick={() => setParams({})}>✕</button>
-          )}
-        </div>
-        {!assignmentCompleteLocally && <button className="ctx-next" title={t('practice.nextQuestion')} aria-label={t('practice.nextQuestion')} onClick={() => load({ fresh: true })}>›</button>}
-      </div>
     </div>
   );
 }

@@ -222,8 +222,10 @@ check('English and Hindi include command-centre copy', () => {
 });
 
 check('KALP-04 command-centre CSS has responsive and reduced-motion rules', () => {
-  assert.match(theme, /\.home-command \{/);
-  assert.match(theme, /@media \(max-width: 640px\)/);
+  // The instrument redesign recomposes the KALP-04 region as .home-next,
+  // with the phone breakpoint shared by the rest of the app.
+  assert.match(theme, /\.home-next \{/);
+  assert.match(theme, /@media \(max-width: 760px\)[\s\S]*\.home-next-cta \.btn-primary \{ width: 100%; \}/);
   assert.match(theme, /prefers-reduced-motion: reduce/);
 });
 

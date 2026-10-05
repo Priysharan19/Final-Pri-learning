@@ -1000,6 +1000,22 @@ async function run() {
     await rejects('a discarded question cannot later be submitted',
       POST(`/practice/${discardTarget.question.id}/submit`, { answer: '1' }), { status: 409 });
 
+    // Unfinished work is resumed as the same question. Handwriting in progress
+    // is kept by the profile-scoped recovery store (components/practiceRecovery.js,
+    // covered by submission-lifecycle-check and tour-submit-lifecycle), so the
+    // question row and the Home resume summary carry no ink and no content.
+    const resumeTarget = await nextQuestion({ mode: 'topic', subtopic: topicId });
+    const resumedSame = await POST('/practice/next', { mode: 'topic', subtopic: topicId, resume: true });
+    eq('resuming returns the same unfinished question', resumedSame.question.id, resumeTarget.question.id);
+    ok('a served question carries no handwriting field', !('inkDraft' in resumedSame.question), show(Object.keys(resumedSame.question)));
+    const resumeSummary = await GET('/practice/resume');
+    eq('the Home resume summary names the unfinished question', resumeSummary.resume?.questionId, resumeTarget.question.id);
+    ok('the Home resume summary carries no question content',
+      !('prompt' in (resumeSummary.resume || {})) && !('inkDraft' in (resumeSummary.resume || {})), show(resumeSummary.resume));
+    await rejects('there is no second ink store on the backend',
+      POST(`/practice/${resumeTarget.question.id}/ink-draft`, { strokes: [{ points: [[1, 1], [2, 2]] }] }), { status: 404 });
+    await POST(`/practice/${resumeTarget.question.id}/reveal`, { ms: 1000 });
+
     const strangerQ = await nextQuestion({});
     await POST('/profiles/select', { id: grace.id, password: 'punch-cards-9' });
     await rejects('another profile cannot answer your question',
