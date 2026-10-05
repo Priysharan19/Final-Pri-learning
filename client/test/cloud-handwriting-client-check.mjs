@@ -185,7 +185,7 @@ eq(throwingCalls, 2, 'a status request that failed outright is never cached');
     globalThis.removeEventListener = target.removeEventListener.bind(target);
     globalThis.dispatchEvent = target.dispatchEvent.bind(target);
   }
-  const { announceCloudSessionChange } = await import('../src/platform/cloudSession.js');
+  const { announceCloudSessionChange, announceEntitlementChange } = await import('../src/platform/cloudSession.js');
   const { clearCloudHandwritingReadiness, readinessIdentity } = await import('../src/ink/cloudReader.js');
   clearCloudHandwritingReadiness();
   const T1 = 8_000_000_000_000;
@@ -254,7 +254,55 @@ eq(throwingCalls, 2, 'a status request that failed outright is never cached');
   refreshBody = readyBody;
   const afterRefresh = await cloudHandwritingReadiness({ user: signedInProfile, transport: refreshGate, available: there, now: T1 + 22 });
   ok(afterRefresh.usable === false && afterRefresh.lastFailureCode === 'HANDWRITING_NOT_CONFIGURED' && refreshProbes === 2,
-    'the refreshed answer replaces stale readiness in cache for the next ordinary read');
+    'the refreshed unavailable answer replaces stale ready readiness for the next ordinary read');
+
+  // The production regression in the other direction: a stale unavailable
+  // answer must be replaced by a fresh ready answer and then reused normally.
+  clearCloudHandwritingReadiness();
+  let recoveryProbes = 0;
+  let recoveryBody = { ...readyBody, available: false, usable: false, state: 'unavailable', lastFailureCode: 'HANDWRITING_PROVIDER_5XX' };
+  const recoveryGate = { handwritingStatus: async () => { recoveryProbes += 1; return recoveryBody; } };
+  const cachedUnavailable = await cloudHandwritingReadiness({ user: signedInProfile, transport: recoveryGate, available: there, now: T1 + 30 });
+  ok(cachedUnavailable.usable === false && recoveryProbes === 1, 'refresh regression setup caches an unavailable answer');
+  recoveryBody = readyBody;
+  const refreshedReady = await cloudHandwritingReadiness({ user: signedInProfile, transport: recoveryGate, available: there, now: T1 + 31, refresh: true });
+  ok(refreshedReady.usable === true && recoveryProbes === 2, 'fresh readiness bypasses stale unavailable and asks the server');
+  recoveryBody = { ...readyBody, available: false, usable: false, state: 'unavailable', lastFailureCode: 'HANDWRITING_PROVIDER_5XX' };
+  const afterRecovery = await cloudHandwritingReadiness({ user: signedInProfile, transport: recoveryGate, available: there, now: T1 + 32 });
+  ok(afterRecovery.usable === true && afterRecovery.lastFailureCode === null && recoveryProbes === 2,
+    'the fresh ready answer replaces stale unavailable and the next ordinary read reuses it without another probe');
+
+  // `cache:false` remains the explicit neither-read-nor-write mode. It bypasses
+  // a cached value for the probe, but must not replace that cached value.
+  clearCloudHandwritingReadiness();
+  let uncachedProbes = 0;
+  let uncachedBody = readyBody;
+  const uncachedGate = { handwritingStatus: async () => { uncachedProbes += 1; return uncachedBody; } };
+  await cloudHandwritingReadiness({ user: signedInProfile, transport: uncachedGate, available: there, now: T1 + 40 });
+  uncachedBody = { ...readyBody, available: false, usable: false, state: 'unavailable', lastFailureCode: 'HANDWRITING_NOT_CONFIGURED' };
+  const bypassed = await cloudHandwritingReadiness({ user: signedInProfile, transport: uncachedGate, available: there, now: T1 + 41, cache: false });
+  ok(bypassed.usable === false && uncachedProbes === 2, 'cache:false bypasses the cached ready answer and probes the server');
+  const stillCached = await cloudHandwritingReadiness({ user: signedInProfile, transport: uncachedGate, available: there, now: T1 + 42 });
+  ok(stillCached.usable === true && uncachedProbes === 2, 'cache:false does not write: the prior cached value is still the next ordinary answer');
+
+  // Account switching and entitlement changes are cache invalidation events.
+  // The identity string deliberately contains no cloud account id, so these
+  // events are what prevent account A readiness from leaking into account B.
+  clearCloudHandwritingReadiness();
+  let identityProbes = 0;
+  let identityBody = readyBody;
+  const identityGate = { handwritingStatus: async () => { identityProbes += 1; return identityBody; } };
+  await cloudHandwritingReadiness({ user: signedInProfile, transport: identityGate, available: there, now: T1 + 50 });
+  identityBody = { ...readyBody, available: false, usable: false, state: 'unavailable', lastFailureCode: 'AUTH_REQUIRED' };
+  announceCloudSessionChange({ localProfileId: 'p1', connected: true, accountId: 'acct_2', role: 'student' });
+  const afterAccountSwitch = await cloudHandwritingReadiness({ user: signedInProfile, transport: identityGate, available: there, now: T1 + 51 });
+  ok(afterAccountSwitch.usable === false && identityProbes === 2,
+    'switching cloud account invalidates account A readiness before account B uses the same local profile identity');
+  identityBody = readyBody;
+  announceEntitlementChange({ localProfileId: 'p1', plan: 'premium', status: 'active', active: true });
+  const afterEntitlementChange = await cloudHandwritingReadiness({ user: signedInProfile, transport: identityGate, available: there, now: T1 + 52 });
+  ok(afterEntitlementChange.usable === true && identityProbes === 3,
+    'an entitlement/account-state change invalidates readiness exactly once and re-probes');
 
   // A 401 whose body lost its code is still "sign in", never "reader down".
   const bare401 = { handwritingStatus: async () => { const e = new Error('Cloud request failed (401)'); e.code = 'CLOUD_REQUEST_FAILED'; e.status = 401; throw e; } };
