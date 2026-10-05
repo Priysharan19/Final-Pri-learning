@@ -55,6 +55,18 @@ test('green tick requires follow, increments once, and same identity stays block
   assert.match(landingHtml, /green tick requires/i);
   assert.match(landingHtml, /href="\/privacy"/);
 
+  // The public campaign page performs an intentionally expensive scrypt before
+  // storing each short-lived pass. Twenty requests/minute per IP are allowed;
+  // the next one is rejected before another derivation is started.
+  for (let i = 1; i < 20; i += 1) {
+    const allowed = await fetch(`${baseUrl}/c/a2z`);
+    assert.equal(allowed.status, 200);
+    await allowed.arrayBuffer();
+  }
+  const limitedPass = await fetch(`${baseUrl}/c/a2z`);
+  assert.equal(limitedPass.status, 429);
+  assert.match(await limitedPass.text(), /too many campaign-pass requests/i);
+
   // First create a valid A2Z identity that is NOT following.
   const notFollowingResponse = await fetch(`${baseUrl}/dev/simulate`, {
     method: 'POST',

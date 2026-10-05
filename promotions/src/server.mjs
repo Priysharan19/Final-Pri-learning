@@ -44,6 +44,7 @@ async function readFont(name) {
 }
 
 const redemptionAttempts = new Map();
+const campaignPassAttempts = new Map();
 const MAX_BODY = 256 * 1024;
 const CAMPAIGN_PASS_TTL_MS = 15 * 60 * 1000;
 const STAFF_SESSION_TTL_MS = 12 * 60 * 60 * 1000;
@@ -98,13 +99,19 @@ function parseJsonBody(raw) {
   catch { throw Object.assign(new Error('Invalid JSON'), { statusCode: 400 }); }
 }
 function remoteKey(req) { return req.socket.remoteAddress || 'unknown'; }
-function redemptionRateLimited(req) {
+function requestRateLimited(attempts, req, { limit = 20, windowMs = 60_000 } = {}) {
   const key = remoteKey(req);
   const now = Date.now();
-  const previous = (redemptionAttempts.get(key) ?? []).filter((ts) => now - ts < 60_000);
+  const previous = (attempts.get(key) ?? []).filter((ts) => now - ts < windowMs);
   previous.push(now);
-  redemptionAttempts.set(key, previous);
-  return previous.length > 20;
+  attempts.set(key, previous);
+  return previous.length > limit;
+}
+function redemptionRateLimited(req) {
+  return requestRateLimited(redemptionAttempts, req);
+}
+function campaignPassRateLimited(req) {
+  return requestRateLimited(campaignPassAttempts, req);
 }
 function subjectRef(scopedId) { return `ig:${anonymizeId(scopedId, config.claimSecret)}`; }
 function matchesCampaignKeyword(messageText, campaignKeyword) {
@@ -245,7 +252,7 @@ async function processInstagramPayload(payload) {
     if (!attributedCampaign && passMessage) {
       const campaign = store.getCampaignByKeyword(passMessage.keyword);
       if (campaign) {
-        const passHash = hashCampaignPassCode(config.claimSecret, passMessage.passCode);
+        const passHash = await hashCampaignPassCode(config.claimSecret, passMessage.passCode);
         const passResult = store.consumeCampaignPass({ passHash, instagramScopedId: message.senderId, subjectRef: subjectRef(message.senderId) });
         if (passResult.status === 'consumed' && passResult.campaignId === campaign.id) {
           runtimeStatus.lastQrPassAt = new Date().toISOString();
@@ -349,8 +356,13 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname.startsWith('/c/')) {
       const campaign = store.getCampaign(decodeURIComponent(url.pathname.slice(3)));
       if (!campaign) return text(res, 404, 'Campaign not found.');
+      // Issuing a pass performs an intentionally expensive scrypt derivation.
+      // Rate-limit before starting that work so an unauthenticated refresh loop
+      // cannot consume the worker pool or make legitimate redemptions wait.
+      if (campaignPassRateLimited(req)) return text(res, 429, 'Too many campaign-pass requests. Try again shortly.');
       const campaignPassCode = createCampaignPassCode();
-      store.issueCampaignPass({ campaignId: campaign.id, passHash: hashCampaignPassCode(config.claimSecret, campaignPassCode), ttlMs: CAMPAIGN_PASS_TTL_MS });
+      const passHash = await hashCampaignPassCode(config.claimSecret, campaignPassCode);
+      store.issueCampaignPass({ campaignId: campaign.id, passHash, ttlMs: CAMPAIGN_PASS_TTL_MS });
       const passExpiresAt = new Date(Date.now() + CAMPAIGN_PASS_TTL_MS).toISOString();
       return html(res, 200, campaignPage({ instagramUsername: config.instagramUsername, keyword: campaign.keyword, refCode: campaign.ref_code, rewardLabel: campaign.reward_label, campaignPassCode, passExpiresAt }));
     }

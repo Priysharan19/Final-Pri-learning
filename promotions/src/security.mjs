@@ -1,4 +1,5 @@
-import { createHmac, randomBytes, randomInt, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
 
 export const CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 
@@ -16,6 +17,7 @@ export function randomCodeChars(length) {
 // secret so the same code always maps to the same hash and the store can look
 // a pass up by its hash. Verification is one scrypt call per inbound message.
 const PASS_SCRYPT = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
+const scryptAsync = promisify(scrypt);
 
 export function normalizeClaimCode(value) {
   return String(value ?? '').trim().toUpperCase().replace(/\s+/g, '').replace(/–/g, '-');
@@ -39,9 +41,10 @@ export function hashClaimCode(secret, code) {
   return createHmac('sha256', secret).update(normalizeClaimCode(code)).digest('hex');
 }
 
-export function hashCampaignPassCode(secret, code) {
+export async function hashCampaignPassCode(secret, code) {
   const salt = createHmac('sha256', secret).update('campaign-pass-salt').digest();
-  return scryptSync(`campaign-pass:${normalizeCampaignPassCode(code)}`, salt, 32, PASS_SCRYPT).toString('hex');
+  const key = await scryptAsync(`campaign-pass:${normalizeCampaignPassCode(code)}`, salt, 32, PASS_SCRYPT);
+  return key.toString('hex');
 }
 
 export function safeEqualText(a, b) {
