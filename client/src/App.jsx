@@ -411,7 +411,9 @@ export default function App() {
 
   // Thinking mode: while a question or a paper is open the shell steps back —
   // no rail, no bottom bar, no account furniture. The page keeps its own way out.
-  const focusMode = user.role !== 'teacher'
+  // A guest keeps the shell: /practice is their only room, and the strip and
+  // account menu above it are the only way to an account or out again.
+  const focusMode = !guest && user.role !== 'teacher'
     && (loc.pathname === '/practice' || /^\/exams\/[^/]+/.test(loc.pathname));
 
   return (
