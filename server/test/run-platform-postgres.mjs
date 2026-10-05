@@ -38,6 +38,7 @@ export const ENGINE_SUITES = [
   'account-lifecycle-journey-check.mjs',
   'account-deletion-reauth-check.mjs',
   'guardian-consent-lifecycle-check.mjs',
+  'guardian-consent-coverage-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',
   'login-lockout-check.mjs',

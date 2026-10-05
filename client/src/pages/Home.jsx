@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
-import { cloud } from '../platform/cloudTransport.js';
+import { cloud, isGuardianConsentRefusal } from '../platform/cloudTransport.js';
 import { resolveHomeRecommendation, actionOpenable } from '../home/recommendation.js';
 import { cacheAssignments, cachedAssignments, loadSavedFilters, saveFilters } from '../home/homeCache.js';
 import Icon from '../components/Icon.jsx';
@@ -101,7 +101,9 @@ export default function Home() {
         if (rows) cacheAssignments(user, rows);
         setAssignments(rows);
       } catch (err) {
-        if (live) setAssignments(err?.status === 401 || err?.code === 'CLOUD_DISABLED' ? null : false);
+        // Signed out, no cloud, or a guardian has not confirmed this child's
+        // account: none of those is an outage, so no "cloud unavailable" note.
+        if (live) setAssignments(err?.status === 401 || err?.code === 'CLOUD_DISABLED' || isGuardianConsentRefusal(err) ? null : false);
       }
     })();
     return () => { live = false; };

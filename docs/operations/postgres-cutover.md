@@ -226,7 +226,7 @@ role, and therefore **cannot and must not be pointed at Supabase**. Run it on th
 being deployed and keep the output:
 
 ```bash
-npm run test:platform:pg   # expect the exact line ci.yml pins: PLATFORM ON POSTGRES: PASS — 35/35 suites
+npm run test:platform:pg   # expect the exact line ci.yml pins: PLATFORM ON POSTGRES: PASS — 36/36 suites
 ```
 
 Against staging itself, the equivalent evidence is §4.2 plus §4.4.
@@ -456,7 +456,7 @@ in the cutover log; students then re-register and the SQLite backup is retained 
 | 2.4 `db push` | staging | | | | |
 | 3 login role created | staging | | | | (role name only) |
 | 4.2 target check | staging | | | | `POSTGRES TARGET: PASS — n/n` |
-| 4.3 `test:platform:pg` | local/CI | | | | `35/35 suites` |
+| 4.3 `test:platform:pg` | local/CI | | | | `36/36 suites` |
 | 4.4 smoke | staging | | | | |
 | 6 backup + restore drill | production | | | | |
 | 6a export + import + verify.sql | production (if SQLite held real data) | | | | `manifest.json` row totals; `verify.sql` all `ok`/`true` |

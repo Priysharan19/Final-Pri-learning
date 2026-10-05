@@ -277,6 +277,15 @@ export async function cloudRequest(path, {
   }
 }
 
+/**
+ * The server refused because a child's guardian has not confirmed the cloud
+ * account (or has withdrawn). Not an outage and not a sign-out: nothing on the
+ * device is affected, and retrying will not help until a guardian acts.
+ */
+export function isGuardianConsentRefusal(error) {
+  return error?.status === 403 && /^GUARDIAN_CONSENT_(PENDING|WITHDRAWN)$/.test(String(error?.code || ''));
+}
+
 // ── The tutor's streamed turn ────────────────────────────────────────────────
 //
 // The one streamed request this boundary makes: POST /v1/tutor/stream answers
