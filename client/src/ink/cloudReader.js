@@ -500,6 +500,9 @@ export function accountBlockedKey(outcome = null) {
   const status = Number(outcome?.error?.status);
   for (const code of codes) {
     if (code === 'AUTH_REQUIRED') return 'verdict.photoReadingSignIn';
+    // A failed consent-state lookup is infrastructure trouble, not evidence
+    // that this student needs a guardian. Fall through to service-unavailable.
+    if (code === 'GUARDIAN_CONSENT_UNAVAILABLE') return null;
     if (code.startsWith('GUARDIAN_CONSENT') || code === 'AGE_DECLARATION_REQUIRED') return 'verdict.photoReadingGuardian';
     if (code === 'EMAIL_UNVERIFIED') return 'verdict.photoReadingVerifyEmail';
   }
@@ -512,6 +515,36 @@ export const ACCOUNT_BLOCKED_KEYS = Object.freeze(new Set([
   'ink.waitingSignIn', 'ink.waitingVerifyEmail', 'ink.waitingGuardian',
   'verdict.photoReadingSignIn', 'verdict.photoReadingVerifyEmail', 'verdict.photoReadingGuardian'
 ]));
+
+/** Semantic reader states: blockers are not handwriting failures. */
+export const INK_READER_STATE = Object.freeze({
+  IDLE: 'IDLE',
+  READING: 'READING',
+  READ_SUCCESS: 'READ_SUCCESS',
+  READ_UNCERTAIN: 'READ_UNCERTAIN',
+  READ_FAILED: 'READ_FAILED',
+  ACCOUNT_ACTION_REQUIRED: 'ACCOUNT_ACTION_REQUIRED',
+  READER_UNAVAILABLE: 'READER_UNAVAILABLE',
+  NETWORK_ERROR: 'NETWORK_ERROR'
+});
+
+export function inkReaderUiState(status = null, reading = null) {
+  if (status?.kind === 'reading') return Object.freeze({ kind: INK_READER_STATE.READING });
+  // Only an attempted read with no usable transcription is a real read failure.
+  if (status?.kind === 'empty') return Object.freeze({ kind: INK_READER_STATE.READ_FAILED });
+  if (status?.kind === 'allowance') {
+    return Object.freeze({ kind: INK_READER_STATE.READER_UNAVAILABLE, blocker: 'ink.cloudAllowanceUsed' });
+  }
+  if (status?.kind === 'waiting') {
+    if (ACCOUNT_BLOCKED_KEYS.has(status.key)) return Object.freeze({ kind: INK_READER_STATE.ACCOUNT_ACTION_REQUIRED, blocker: status.key });
+    if (status.key === 'ink.waitingOffline') return Object.freeze({ kind: INK_READER_STATE.NETWORK_ERROR, blocker: status.key });
+    return Object.freeze({ kind: INK_READER_STATE.READER_UNAVAILABLE, blocker: status.key || null });
+  }
+  if (Array.isArray(reading?.lines) && reading.lines.length) {
+    return Object.freeze({ kind: reading.needsConfirmation === true ? INK_READER_STATE.READ_UNCERTAIN : INK_READER_STATE.READ_SUCCESS });
+  }
+  return Object.freeze({ kind: INK_READER_STATE.IDLE });
+}
 
 const NOTICE_KEY = 'pri-cloud-reading-notice-v1';
 /**

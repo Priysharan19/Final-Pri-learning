@@ -15,7 +15,7 @@ import {
   clearInkDraft, clearPendingSubmission, newSubmissionId, readInkDraft, readPendingSubmission,
   saveInkDraft, savePendingSubmission, submissionContentKey
 } from './practiceRecovery.js';
-import { cloudReadingEnabled, photoReadingBlockedKey, readPhotoWithCloud, takeCloudReadingNotice } from '../ink/cloudReader.js';
+import { cloudReadingEnabled, INK_READER_STATE, photoReadingBlockedKey, readPhotoWithCloud, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
 import { plotSpecFor } from '../engine/plotSpec.js';
@@ -255,8 +255,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [restoredInk] = useState(() => readInkDraft(question.id));
   const [mode, setMode] = useState(() => (restoredInk ? 'write' : preferMode()));       // 'type' | 'write' | 'photo'
   const [inkResult, setInkResult] = useState(null);
-  // Whether the page has any ink at all: strokes with no readable answer line
-  // get an honest "couldn't read that yet" instead of a silently disabled Submit.
+  // The ink surface owns the truth about whether recognition was attempted.
+  // A blocker before the reader runs must never be labelled bad handwriting.
+  const [inkReaderState, setInkReaderState] = useState({ kind: INK_READER_STATE.IDLE });
   const [inkHasStrokes, setInkHasStrokes] = useState(false);
   const [hints, setHints] = useState([]);
   const [hintsLeft, setHintsLeft] = useState(question.hintsAvailable);
@@ -325,7 +326,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   useEffect(() => {
     const draft = readDraft('question', question.id);
-    setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setInkHasStrokes(false); setHints([]); setHintsLeft(question.hintsAvailable);
+    setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setInkReaderState({ kind: INK_READER_STATE.IDLE }); setInkHasStrokes(false); setHints([]); setHintsLeft(question.hintsAvailable);
     setShowTutor(false); setTutorUsed(question.tutorLevel || 0);
     setWorking(draft?.working || ''); setShowWorking(!!draft?.working);
     setState({ phase: 'answering' }); setBusy(false);
@@ -1138,7 +1139,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           : resolved ? 'saved'
             : saveState === 'saved' ? (offline ? 'offline' : 'saved')
               : 'idle';
+  // Only a genuine completed read with no usable transcription may ask the
+  // student to rewrite. Account/network/readiness blocks are explained above.
   const inkUnread = writeMode && !isMcq && inkHasStrokes && !needsCheck
+    && inkReaderState?.kind === INK_READER_STATE.READ_FAILED
     && (isWorking ? !inkResult?.lines?.length : !inkResult?.answerLine);
   const statusText = busy ? t('verdict.statusChecking')
     : cloudPending ? t('verdict.statusMethod')
@@ -1437,7 +1441,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 when the deterministic engine has actually marked this page. */}
             <div className="editor-shell" data-marked={(resolved && !res?.revealed) || (state.phase === 'retry' && !state.res?.invalid) ? 'yes' : undefined}>
               {InkAnswer && (
-                <InkAnswer onRecognized={onInkRecognized} height={inkPageHeight} lineVerdicts={lineVerdicts}
+                <InkAnswer onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
                   disabled={resolved || busy} focusSymbol={checkFocus} recognitionContext={recognitionContext}
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes} />
               )}

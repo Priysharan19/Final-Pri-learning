@@ -24,7 +24,7 @@ import InkCanvas from './InkCanvas.jsx';
 import NativeInkCanvas from './NativeInkCanvas.jsx';
 import { nativeInkAvailable } from './native.js';
 import { exprToLatex } from './inkLatex.js';
-import { ACCOUNT_BLOCKED_KEYS, cloudReadingEnabled, inkReadingBlockedKey, readinessIdentity, retryDelayMs, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
+import { ACCOUNT_BLOCKED_KEYS, cloudReadingEnabled, inkReaderUiState, inkReadingBlockedKey, readinessIdentity, retryDelayMs, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
 import { Link, useInRouterContext } from 'react-router-dom';
 import { useApp } from '../App.jsx';
 import { feedbackGeometry } from './feedbackGeometry.js';
@@ -68,7 +68,7 @@ const strokeSignature = strokes => `${strokes.length}:${strokes.reduce((n, st) =
  *  strokes and History replay all keep one coordinate space. */
 const MAX_PAGES = 4;
 
-export default function InkAnswer({ onRecognized, onStrokes = null, initialStrokes = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -94,6 +94,10 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
   const [cleared, setCleared] = useState(null);
   // null | { kind: 'reading' } | { kind: 'waiting', key } | { kind: 'empty' } | { kind: 'allowance' }
   const [status, setStatus] = useState(null);
+  useEffect(() => {
+    if (typeof onReaderState !== 'function') return;
+    try { onReaderState(inkReaderUiState(status, rec)); } catch { /* reporting must never break writing */ }
+  }, [status, rec, onReaderState]);
   const settleRef = useRef(null);
   const retryRef = useRef(null);
   const retriesRef = useRef(0);
@@ -222,8 +226,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
     clearRetry();
     if (settleRef.current) { clearTimeout(settleRef.current); settleRef.current = null; }
     abortRef.current?.abort?.();
-    // Writing changed: whatever was read before is no longer this page.
+    // Writing changed: whatever was read before is no longer this page. A
+    // genuine prior READ_FAILED must disappear immediately while the student
+    // rewrites; account/network/service blockers remain truthful until retried.
     if (rec.lines.length) publish(EMPTY_READING, strokes);
+    setStatus(prev => prev?.kind === 'empty' ? null : prev);
     if (!strokes.length) { sentRef.current = null; setStatus(null); return; }
     const go = () => sendToReader(strokes, seq, { fresh });
     if (immediate) go(); else settleRef.current = setTimeout(go, SETTLE_MS);
