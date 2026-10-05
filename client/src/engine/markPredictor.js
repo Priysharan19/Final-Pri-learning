@@ -95,7 +95,7 @@ export function predictUnit(unit, ratings, { difficultyRating, nowMs = Date.now(
   const marks = Math.max(0, finite(unit?.marks));
   const evidence = unitEvidence(unit, ratings, { evidenceFor });
   if (!evidence.attempts) {
-    return { unitId: unit?.id || null, name: unit?.name || '', marks, covered: false, attempts: 0, p: null, expected: null, sd: null };
+    return { unitId: unit?.id || null, name: unit?.name || '', chapters: [...(unit?.chapters || [])], marks, covered: false, attempts: 0, p: null, expected: null, sd: null };
   }
 
   const skill = expectedScore(evidence.rating ?? START_RATING, difficultyRating);
@@ -111,6 +111,9 @@ export function predictUnit(unit, ratings, { difficultyRating, nowMs = Date.now(
   return {
     unitId: unit?.id || null,
     name: unit?.name || '',
+    // The chapters the unit pools, so a surface can say which unit — and so
+    // which marks — a chapter belongs to without a second copy of the blueprint.
+    chapters: [...(unit?.chapters || [])],
     marks,
     covered: true,
     attempts: n,

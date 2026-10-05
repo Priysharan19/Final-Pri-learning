@@ -8,6 +8,8 @@ import TermGloss from '../components/TermGloss.jsx';
 import { PROGRESS_THRESHOLDS, accuracyClaim } from '../engine/progressTruth.js';
 import { indiaProgressPracticeHref } from '../lib/practiceLinks.js';
 import { featureEnabled } from '../platform/features.js';
+import { practisePriorities, syllabusBoard } from '../engine/syllabusBoard.js';
+import { PrioritiesList, SyllabusBoard } from '../components/IndiaSyllabusBoard.jsx';
 
 function scopeFor(curriculum, user) {
   if (!curriculum) return null;
@@ -53,6 +55,12 @@ export default function IndiaProgress() {
   const practiced = chapterEvidence.filter(x => x.evidence.attempts >= PROGRESS_THRESHOLDS.chapterPractised).length;
   const totals = stats?.totals || {};
   const prediction = stats?.examPrediction || null;
+  const board = useMemo(() => syllabusBoard(rows), [rows]);
+  const priorities = useMemo(
+    () => practisePriorities({ queue: stats?.priorities || [], prediction: stats?.examPrediction || null, rows }),
+    [stats, rows]
+  );
+  const track = user.indiaTrack || 'cbse';
   // Accuracy is over learning evidence only (games excluded), and withheld
   // below the sample floor — the server computes it from the attempt rows.
   const accuracy = totals.accuracy || accuracyClaim(totals.evidence?.correct, totals.evidence?.attempts, PROGRESS_THRESHOLDS.overallAccuracy);
@@ -86,6 +94,10 @@ export default function IndiaProgress() {
           <button className="btn btn-ghost" onClick={() => nav('/placement')}>{t('placement.seeResult')}</button>
         </div>
       </div>}
+
+      <PrioritiesList items={priorities} track={track} />
+
+      {rows.length > 0 && <SyllabusBoard board={board} track={track} />}
 
       {prediction && (
         <section className="pg-sheet" aria-labelledby="pg-paper">
