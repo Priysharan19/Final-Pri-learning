@@ -1,8 +1,8 @@
-:root {
-  --warn: #ef9461;
-  --warn-soft: rgba(239, 148, 97, 0.13);
-}
-[data-theme="light"] {
-  --warn: #9c531e;
-  --warn-soft: rgba(156, 83, 30, 0.10);
-}
+/* Semantic-state companion. The state tokens are defined once in theme.css;
+   this file keeps the one cross-cutting rule that belongs to all of them:
+   a state is never carried by colour alone. Every state surface pairs its
+   colour with a shape — a solid rule (correction), a dashed rule (uncertain),
+   a heavier rule plus an icon (technical failure). */
+.state-correction { border-left: 2px solid var(--correction); }
+.state-uncertain { outline: 1.5px dashed var(--uncertain-line); outline-offset: 2px; }
+.state-technical { border-left: 3px solid var(--bad); }

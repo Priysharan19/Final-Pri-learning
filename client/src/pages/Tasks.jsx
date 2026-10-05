@@ -50,7 +50,7 @@ export default function Tasks() {
         ? t('tasks.importedFrom', { title: r.task.title, teacher: data.teacher })
         : t('tasks.imported', { title: r.task.title })}</span>);
       load();
-    } catch (err) { toast?.(<span>⚠️ {err.message}</span>); }
+    } catch (err) { toast?.(<span>{err.message}</span>); }
   }
 
   async function create() {
