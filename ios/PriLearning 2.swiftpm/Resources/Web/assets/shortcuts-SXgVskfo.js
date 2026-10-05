@@ -1,1 +1,0 @@
-var e=Object.freeze([{key:`N`,action:`next`},{key:`H`,action:`hint`},{key:`S`,action:`submit`},{key:`mod+Z`,action:`undo`}]);export{e as t};
