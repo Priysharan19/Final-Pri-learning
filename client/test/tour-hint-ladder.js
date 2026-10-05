@@ -59,7 +59,7 @@ export const flow = {
     await page.locator('[data-hint-rung="worked"]').click();
     await page.waitForSelector('[data-hint-shown="worked"]', { timeout: 15000 });
     await check('the worked step opens by click, 40 % remain', /40%/.test(await page.locator('.hints-block').innerText()));
-    await check('the credit chip shows the same 40 %', /40%/.test(await page.locator('.q-topmeta').innerText()));
+    await check('the credit chip shows the same 40 %', /40%/.test(await page.locator('.q-credit').innerText()));
 
     // ── 3 · the fourth rung is a reveal ─────────────────────────────────────
     await page.locator('.q-prompt').click();
@@ -109,7 +109,7 @@ export const flow = {
     await page.waitForSelector('[data-review-queue-card]', { timeout: 30000 }).catch(() => { });
     await check('Home shows the due-today card', await page.locator('[data-review-queue-card]').count() === 1);
     await check('it is the first card under the command card',
-      await page.locator('.home-support-grid > *').first().evaluate(el => el.hasAttribute('data-review-queue-card')));
+      await page.locator('[data-home-primary]').evaluate(el => { let n = el.nextElementSibling; while (n && n.classList.contains('home-cloud-note')) n = n.nextElementSibling; return !!n && n.hasAttribute('data-review-queue-card'); }));
     await check('it lists the due dot point with its recall estimate', await page.locator('[data-review-dotpoint]').count() >= 1
       && /recall \d+%/i.test(await page.locator('[data-review-queue-card]').innerText()));
     await goto('/plan');
