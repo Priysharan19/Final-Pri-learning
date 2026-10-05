@@ -18,9 +18,21 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 }
 
-export function otpEmailMessage(code, purpose, origin = process.env.PRI_PUBLIC_ORIGIN) {
+export function otpEmailMessage(code, purpose, origin = process.env.PRI_PUBLIC_ORIGIN, { intent = null } = {}) {
   const digits = escapeHtml(String(code));
   const big = `<p style="font-size:28px;letter-spacing:6px;font-family:monospace">${digits}</p>`;
+  // A deletion code must never read like a sign-in code: the public
+  // /account/delete-request page can be asked for by anyone who knows the
+  // address, so the mail itself has to say what entering the code does.
+  if (intent === 'account-delete') {
+    const body = 'Someone asked to DELETE the Pri Learning account for this address. Entering this code on the account deletion page permanently deletes the account and its data. Never share it or read it out to anyone.';
+    const tail = 'If you did not ask for this, ignore this email: your account stays exactly as it is. The code is valid for 10 minutes.';
+    return {
+      subject: `${code} is the code to delete your Pri Learning account`,
+      text: `${code}\n\n${body}\n\n${tail}`,
+      html: `${big}<p>${body}</p><p>${tail}</p>`
+    };
+  }
   if (purpose === 'guardian-consent') {
     const body = `Your child is setting up Pri Learning and has asked you to approve their account. Open ${escapeHtml(consentPage(origin))} yourself, read what you are agreeing to, and enter this code there.`;
     const tail = 'The code is valid for 10 minutes. If you did not expect this, ignore this email and nothing will sync.';
@@ -39,8 +51,8 @@ export function createResendOtpEmailSender({ apiKey, from, fetchImpl = globalThi
   const key = trim(apiKey);
   const sender = trim(from);
   if (!key || !sender || typeof fetchImpl !== 'function') return null;
-  return async ({ challengeId, to, code, purpose }) => {
-    const message = otpEmailMessage(code, purpose);
+  return async ({ challengeId, to, code, purpose, intent = null }) => {
+    const message = otpEmailMessage(code, purpose, undefined, { intent });
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(new Error('Auth email provider timed out')), REQUEST_TIMEOUT_MS);
     try {
@@ -78,8 +90,8 @@ export function createOtpEmailSenderFromEnv(env = process.env, { fetchImpl } = {
     if (!testModeAllowed(env)) {
       throw Object.assign(new Error('PRI_AUTH_EMAIL_PROVIDER=test cannot run with NODE_ENV=production unless PRI_SMS_TEST_MODE_ALLOW_STAGING=1 is set for a staging deployment.'), { code: 'EMAIL_TEST_MODE_FORBIDDEN', status: 500 });
     }
-    return async ({ to, code, purpose }) => {
-      recordTestMessage({ channel: 'email', to, code, purpose, body: otpEmailMessage(code, purpose).text });
+    return async ({ to, code, purpose, intent = null }) => {
+      recordTestMessage({ channel: 'email', to, code, purpose, intent, body: otpEmailMessage(code, purpose, undefined, { intent }).text });
       return { providerMessageId: null };
     };
   };

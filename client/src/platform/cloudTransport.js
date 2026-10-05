@@ -416,6 +416,10 @@ export const cloud = Object.freeze({
   otpRequest: body => cloudRequest('/v1/account/otp/request', { method: 'POST', body }),
   otpVerify: body => cloudRequest('/v1/account/otp/verify', { method: 'POST', body }),
   otpReauthRequest: () => cloudRequest('/v1/account/otp/reauth-request', { method: 'POST', body: {} }),
+  // Deletion from the public page (/account/delete-request), no session: a code
+  // to the account's own email, then the same deletion as DELETE /v1/account.
+  deleteRequestCode: body => cloudRequest('/v1/account/otp/delete-request', { method: 'POST', body }),
+  deleteConfirmCode: body => cloudRequest('/v1/account/otp/delete-confirm', { method: 'POST', body }),
   guardianOtpRequest: body => cloudRequest('/v1/account/otp/guardian/request', { method: 'POST', body }),
   guardianOtpApprove: body => cloudRequest('/v1/account/otp/guardian/approve', { method: 'POST', body }),
   guardianWithdrawRequest: body => cloudRequest('/v1/account/otp/guardian/withdraw-request', { method: 'POST', body }),

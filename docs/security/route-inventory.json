@@ -1910,6 +1910,46 @@
     },
     {
       "method": "POST",
+      "path": "/v1/account/otp/delete-request",
+      "auth": "none",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "ownership": "public account-deletion request from the web page /account/delete-request: no account is revealed — the same 202 shape and a code sent for any valid email, account or not (no enumeration); the challenge is bound to the account holding that address at send time (or to none); per-destination cooldown 30 s and 5 codes/h; synthetic phone-account addresses are refused",
+      "rateLimits": [
+        {
+          "key": "otp-delete-request",
+          "limit": 10,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/account/otp/delete-confirm",
+      "auth": "none",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "ownership": "deletes only the account whose address received the code: the code is verified against the challenge bound to that account id (5 attempts, 10 min, single use); then the same billing hook and deletion transaction as DELETE /v1/account (deleteAccountRows); a valid code for an address with no account answers deleted:false",
+      "rateLimits": [
+        {
+          "key": "otp-delete-confirm",
+          "limit": 30,
+          "windowMs": 900000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
       "path": "/v1/account/otp/guardian/request",
       "auth": "session",
       "roles": null,
