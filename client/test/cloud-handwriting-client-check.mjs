@@ -448,9 +448,27 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'GUARDIAN_CONSENT_UNAVAILABLE', status: 403 } } }), 'ink.waitingServiceDown', 'a consent-state lookup outage is a service problem, not a guardian accusation');
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'HANDWRITING_PROVIDER_5XX', status: 503 } } }), 'ink.waitingServiceDown', 'only a true 5xx/transport failure says the reader is down');
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'EMAIL_UNVERIFIED' }, readiness: { lastFailureCode: 'HANDWRITING_PROVIDER_5XX' } } }), 'ink.waitingVerifyEmail', 'the transcribe refusal wins over a stale probe code');
-  const { ACCOUNT_BLOCKED_KEYS } = await import('../src/ink/cloudReader.js');
+  const { ACCOUNT_BLOCKED_KEYS, INK_READER_STATE, inkReaderUiState } = await import('../src/ink/cloudReader.js');
   ok(['ink.waitingSignIn', 'ink.waitingVerifyEmail', 'ink.waitingGuardian'].every(k => ACCOUNT_BLOCKED_KEYS.has(k)) && !ACCOUNT_BLOCKED_KEYS.has('ink.waitingServiceDown'),
     'sign-in, verify-email and guardian blockers offer the way to Account settings; an outage does not');
+
+  eq(inkReaderUiState({ kind: 'reading' }), { kind: INK_READER_STATE.READING }, 'in-flight recognition is READING');
+  eq(inkReaderUiState({ kind: 'waiting', key: 'ink.waitingGuardian' }),
+    { kind: INK_READER_STATE.ACCOUNT_ACTION_REQUIRED, blocker: 'ink.waitingGuardian' },
+    'guardian pending is ACCOUNT_ACTION_REQUIRED, never handwriting failure');
+  eq(inkReaderUiState({ kind: 'waiting', key: 'ink.waitingVerifyEmail' }),
+    { kind: INK_READER_STATE.ACCOUNT_ACTION_REQUIRED, blocker: 'ink.waitingVerifyEmail' },
+    'email verification is ACCOUNT_ACTION_REQUIRED');
+  eq(inkReaderUiState({ kind: 'waiting', key: 'ink.waitingOffline' }),
+    { kind: INK_READER_STATE.NETWORK_ERROR, blocker: 'ink.waitingOffline' }, 'offline is NETWORK_ERROR');
+  eq(inkReaderUiState({ kind: 'waiting', key: 'ink.waitingServiceDown' }),
+    { kind: INK_READER_STATE.READER_UNAVAILABLE, blocker: 'ink.waitingServiceDown' }, 'service outage is READER_UNAVAILABLE');
+  eq(inkReaderUiState({ kind: 'empty' }), { kind: INK_READER_STATE.READ_FAILED }, 'only an attempted empty read is READ_FAILED');
+  eq(inkReaderUiState(null, { lines: [{ text: 'x=4' }], needsConfirmation: true }),
+    { kind: INK_READER_STATE.READ_UNCERTAIN }, 'low-confidence usable transcription is READ_UNCERTAIN');
+  eq(inkReaderUiState(null, { lines: [{ text: 'x=4' }], needsConfirmation: false }),
+    { kind: INK_READER_STATE.READ_SUCCESS }, 'confident usable transcription is READ_SUCCESS');
+  eq(inkReaderUiState(null, null), { kind: INK_READER_STATE.IDLE }, 'no current read state is IDLE');
   ok(/freshReadiness: fresh/.test(src) && /scheduleRead\(strokesRef\.current, \{ immediate: true, fresh: true \}\)/.test(src),
     'the ink surface asks the server afresh (not the cache) when the session, connection or focus comes back');
   ok(/readinessIdentity\(user\)/.test(src) && /fresh: changed/.test(src),
@@ -489,8 +507,10 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   ok(/segmentInkLines\(strokes\)/.test(inkSrc) && /ink-linebox/.test(inkSrc) && /ink\.mistakeHere/.test(inkSrc), 'the ink surface draws line boxes and the mistake note again');
   const qc = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
   ok(/inkResult\?\.afterWait/.test(qc) && /autoMarkedRef\.current === inkResult\.readKey/.test(qc), 'ink read after waiting is marked once, by its reading key');
-  ok(/onReaderState=\{setInkReaderState\}/.test(qc) && /inkReaderState\?\.state === 'READ_FAILED'/.test(qc),
+  ok(/onReaderState=\{setInkReaderState\}/.test(qc) && /inkReaderState\?\.kind === INK_READER_STATE\.READ_FAILED/.test(qc),
     'the question-level “could not read” copy is driven by a genuine reader failure, never strokes-without-text alone');
+  ok(/setStatus\(prev => prev\?\.kind === 'empty' \? null : prev\)/.test(inkSrc),
+    'changing ink clears a stale genuine READ_FAILED before the next read settles');
 }
 
 // ── Review follow-ups: plausible placement, unbounded backoff, deferred mark ─

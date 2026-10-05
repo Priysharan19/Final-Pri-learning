@@ -192,6 +192,10 @@ export const flow = {
     await check('signed out, the kept ink waits for a Pri account — the student is told that, not "the reader is down"',
       /needs a Pri account/.test(signedOutNote) && await page.locator('.ink-preview').count() === 0,
       `status ${JSON.stringify(signedOutNote)}`);
+    const signedOutActionStatus = (await page.locator('.status-line').innerText().catch(() => '')) || '';
+    await check('signed out, the action bar does not blame handwriting when recognition was never attempted',
+      !/couldn.?t read|rewrite your last line more clearly/i.test(signedOutActionStatus),
+      `action status ${JSON.stringify(signedOutActionStatus)}`);
     await check('nothing is sent to the reader while signed out',
       handwritingRequests().length === 0 && reader.requests.length === 0,
       JSON.stringify(handwritingRequests().map(r => `${r.method} ${r.path}`)));
@@ -315,6 +319,10 @@ export const flow = {
     await check('the real blocker is shown — verify the email — not "the reader is not answering"',
       /Verify your email address/.test(verifyNote) && !/isn’t answering/.test(verifyNote),
       `status ${JSON.stringify(verifyNote)}`);
+    const verifyActionStatus = (await page.locator('.status-line').innerText().catch(() => '')) || '';
+    await check('email verification pending is not rendered as unreadable handwriting in the action bar',
+      !/couldn.?t read|rewrite your last line more clearly/i.test(verifyActionStatus),
+      `action status ${JSON.stringify(verifyActionStatus)}`);
     await check('with the way to Account settings, where a fresh verification email is sent from',
       await inkLink.count() === 1 && (await inkLink.getAttribute('data-ink-blocker')) === 'ink.waitingVerifyEmail');
     await check('the ink that was sent is the picture and nothing else — answer-blind, before and after sign-in',

@@ -24,7 +24,7 @@ import InkCanvas from './InkCanvas.jsx';
 import NativeInkCanvas from './NativeInkCanvas.jsx';
 import { nativeInkAvailable } from './native.js';
 import { exprToLatex } from './inkLatex.js';
-import { ACCOUNT_BLOCKED_KEYS, cloudReadingEnabled, inkReadingBlockedKey, readinessIdentity, retryDelayMs, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
+import { ACCOUNT_BLOCKED_KEYS, cloudReadingEnabled, inkReaderUiState, inkReadingBlockedKey, readinessIdentity, retryDelayMs, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
 import { Link, useInRouterContext } from 'react-router-dom';
 import { useApp } from '../App.jsx';
 import { feedbackGeometry } from './feedbackGeometry.js';
@@ -55,26 +55,6 @@ export const STILL_READING_MS = 5000;
 
 const EMPTY_READING = { lines: [], text: '' };
 const strokeSignature = strokes => `${strokes.length}:${strokes.reduce((n, st) => n + (st?.points?.length || 0), 0)}`;
-
-/**
- * Semantic reader state for the parent question UI. The ink surface knows
- * whether recognition was attempted, blocked, offline, or genuinely returned
- * no transcription; the parent must never infer that from strokes alone.
- */
-export function inkReaderState(status, reading = EMPTY_READING) {
-  if (status?.kind === 'reading') return { state: 'READING', key: null };
-  if (status?.kind === 'empty') return { state: 'READ_FAILED', key: 'ink.serverEmpty' };
-  if (status?.kind === 'allowance') return { state: 'READER_UNAVAILABLE', key: 'ink.cloudAllowanceUsed' };
-  if (status?.kind === 'waiting') {
-    if (ACCOUNT_BLOCKED_KEYS.has(status.key)) return { state: 'ACCOUNT_ACTION_REQUIRED', key: status.key };
-    if (status.key === 'ink.waitingOffline') return { state: 'NETWORK_ERROR', key: status.key };
-    return { state: 'READER_UNAVAILABLE', key: status.key || null };
-  }
-  if (reading?.lines?.length) {
-    return { state: reading.needsConfirmation === true ? 'READ_UNCERTAIN' : 'READ_SUCCESS', key: null };
-  }
-  return { state: 'IDLE', key: null };
-}
 
 /**
  * lineVerdicts: optional array aligned with the read lines, e.g.
@@ -116,7 +96,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   const [status, setStatus] = useState(null);
   useEffect(() => {
     if (typeof onReaderState !== 'function') return;
-    try { onReaderState(inkReaderState(status, rec)); } catch { /* reporting must never break writing */ }
+    try { onReaderState(inkReaderUiState(status, rec)); } catch { /* reporting must never break writing */ }
   }, [status, rec, onReaderState]);
   const settleRef = useRef(null);
   const retryRef = useRef(null);
@@ -246,8 +226,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     clearRetry();
     if (settleRef.current) { clearTimeout(settleRef.current); settleRef.current = null; }
     abortRef.current?.abort?.();
-    // Writing changed: whatever was read before is no longer this page.
+    // Writing changed: whatever was read before is no longer this page. A
+    // genuine prior READ_FAILED must disappear immediately while the student
+    // rewrites; account/network/service blockers remain truthful until retried.
     if (rec.lines.length) publish(EMPTY_READING, strokes);
+    setStatus(prev => prev?.kind === 'empty' ? null : prev);
     if (!strokes.length) { sentRef.current = null; setStatus(null); return; }
     const go = () => sendToReader(strokes, seq, { fresh });
     if (immediate) go(); else settleRef.current = setTimeout(go, SETTLE_MS);
