@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Adaptive-icon foreground (also the themed monochrome layer): the "P" mark,
-     inside the 66dp safe zone. Store artwork is a CP-12 / owner deliverable. -->
+<!-- Adaptive foreground: P-prime mark (scratchpad brand kit, android/); 0.52 scale inside the 66dp safe circle. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#FFFFFFFF"
-        android:pathData="M42,32h16c9,0 15,6 15,14s-6,14 -15,14h-8v16h-8zM50,40v12h7c4,0 7,-2.5 7,-6s-3,-6 -7,-6z" />
+    <group android:translateX="25.92" android:translateY="29.82" android:scaleX="0.52" android:scaleY="0.52">
+        <path android:fillColor="@color/pri_icon_ink" android:pathData="M15.5 88V13H47Q58.81 13 67.15 21.35Q75.5 29.69 75.5 41.5Q75.5 53.31 67.15 61.65Q58.81 70 47 70H32.5V88ZM32.5 27V56H47Q53.01 56 57.25 51.75Q61.5 47.51 61.5 41.5Q61.5 35.49 57.25 31.25Q53.01 27 47 27Z" />
+        <path android:fillColor="@color/pri_icon_prime" android:pathData="M82 5 92.5 7.2 83.5 30 77 28.4 82 5Z" />
+    </group>
 </vector>

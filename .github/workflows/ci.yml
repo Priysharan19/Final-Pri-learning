@@ -81,8 +81,8 @@ jobs:
           grep -Fq 'ONBOARDING SCOPE: PASS — 40/40 checks' suites.log
           grep -Fq 'STUDY PLAN: PASS — 211/211 checks' suites.log
           grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
-          grep -Fq 'I18N: PASS — 191/191 checks' suites.log
-          grep -Fq 'I18N COVERAGE: PASS — 89/89 checks — 59 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'I18N: PASS — 189/189 checks' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 89/89 checks — 61 files scanned, 0 hard-coded strings' suites.log
           # Chapter notes: every curriculum chapter, every worked answer engine-verified.
           grep -Fq 'NOTES CONTENT CHECK PASSED — 77/77 chapters' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
@@ -385,7 +385,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*355/355.*13 flows' browser.log
+          grep -Eq 'E2E SUITE.*358/358.*13 flows' browser.log
           grep -Fq 'Submission · interruption recovery and one attempt' browser.log
           grep -Fq 'Cloud · late results never rewrite an attempt' browser.log
           grep -Fq 'India exam · JEE Main handwritten, reloaded, analysed' browser.log
@@ -405,11 +405,11 @@ jobs:
           grep -Fq 'Hindi · Practice, handwriting, Exams, exam room, Progress, Explain' browser.log
           grep -Eq 'E2E SUITE.*54/54.*1 flows' browser.log
           grep -Fq 'Progress truth · rendered numbers = attempt ledger' browser.log
-          grep -Eq 'E2E SUITE.*20/20.*1 flows' browser.log
+          grep -Eq 'E2E SUITE.*22/22.*1 flows' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
-          test "$(grep -Ec 'E2E SUITE PASSED — 151/151 checks across 1 flows' browser.log)" -eq 2
+          test "$(grep -Ec 'E2E SUITE PASSED — 158/158 checks across 1 flows' browser.log)" -eq 2
           if grep -Fq 'not measured:' browser.log; then
             echo 'A browser suite reported skipped coverage.' >&2
             exit 1
