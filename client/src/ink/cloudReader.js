@@ -195,7 +195,10 @@ export async function cloudHandwritingReadiness({
   available = cloudAvailable,
   signal = null,
   now = Date.now(),
-  cache = true
+  cache = true,
+  // A refresh bypasses only the cache read. Its server answer still replaces
+  // the cached value for this identity so the next normal stroke sees it too.
+  refresh = false
 } = {}) {
   if (!cloudReadingWanted(user)) {
     return { usable: false, state: 'disabled', lastFailureCode: null, releaseSha: null };
@@ -212,7 +215,7 @@ export async function cloudHandwritingReadiness({
 
   listenForAccountChanges();
   const identity = readinessIdentity(user);
-  if (cache && readinessCache.value && readinessCache.identity === identity && readinessCache.expiresAt > now) {
+  if (cache && !refresh && readinessCache.value && readinessCache.identity === identity && readinessCache.expiresAt > now) {
     return readinessCache.value;
   }
   if (typeof transport?.handwritingStatus !== 'function') {
@@ -305,7 +308,7 @@ export async function readWithCloud(strokes, {
   listenForAccountChanges();
   if (cloudAllowanceExhausted()) return { reason: 'allowance', until: allowanceExhaustedUntil };
 
-  const ready = await readiness({ user, transport, available, signal, cache: freshReadiness !== true });
+  const ready = await readiness({ user, transport, available, signal, refresh: freshReadiness === true });
   if (!cloudReadingEnabled(user, { available, readiness: ready })) {
     return { reason: ready?.lastFailureCode === 'HANDWRITING_CANCELLED' ? 'cancelled' : 'unavailable', readiness: ready };
   }

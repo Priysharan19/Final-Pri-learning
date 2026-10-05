@@ -240,6 +240,22 @@ eq(throwingCalls, 2, 'a status request that failed outright is never cached');
   const freshRead = await readWithCloud(STROKES, { user: signedInProfile, transport: freshTransport, rasterize: () => ({ dataUrl: 'data:image/png;base64,AAAA', width: 10, height: 10, bytes: 3 }), available: there, freshReadiness: true });
   ok(freshRead?.transcription && probes === 5 && transcribed === 1, `readWithCloud({ freshReadiness: true }) re-probes before sending (probes ${probes})`);
 
+  // A refresh must replace, not merely bypass, the previous cached answer.
+  // Otherwise the next ordinary stroke can immediately resurrect stale state.
+  clearCloudHandwritingReadiness();
+  let refreshProbes = 0;
+  let refreshBody = readyBody;
+  const refreshGate = { handwritingStatus: async () => { refreshProbes += 1; return refreshBody; } };
+  const cachedReady = await cloudHandwritingReadiness({ user: signedInProfile, transport: refreshGate, available: there, now: T1 + 20 });
+  ok(cachedReady.usable === true && refreshProbes === 1, 'refresh regression setup caches a ready answer');
+  refreshBody = { ...readyBody, available: false, usable: false, state: 'unavailable', lastFailureCode: 'HANDWRITING_NOT_CONFIGURED' };
+  const refreshedUnavailable = await cloudHandwritingReadiness({ user: signedInProfile, transport: refreshGate, available: there, now: T1 + 21, refresh: true });
+  ok(refreshedUnavailable.usable === false && refreshProbes === 2, 'refresh bypasses the stale cache and asks the server');
+  refreshBody = readyBody;
+  const afterRefresh = await cloudHandwritingReadiness({ user: signedInProfile, transport: refreshGate, available: there, now: T1 + 22 });
+  ok(afterRefresh.usable === false && afterRefresh.lastFailureCode === 'HANDWRITING_NOT_CONFIGURED' && refreshProbes === 2,
+    'the refreshed answer replaces stale readiness in cache for the next ordinary read');
+
   // A 401 whose body lost its code is still "sign in", never "reader down".
   const bare401 = { handwritingStatus: async () => { const e = new Error('Cloud request failed (401)'); e.code = 'CLOUD_REQUEST_FAILED'; e.status = 401; throw e; } };
   const bareOutcome = await cloudHandwritingReadiness({ user: signedInProfile, transport: bare401, available: there, cache: false });
