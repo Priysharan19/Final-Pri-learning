@@ -37,7 +37,7 @@ export const ALLOWED_CONTEXT_KEYS = Object.freeze(['answerType', 'singleGlyphAlp
 export const ALLOWED_MEMBERS = Object.freeze(['answerType']);
 /** Props InkAnswer accepts. A new prop is a new channel into the engine: review it here. */
 export const INK_ANSWER_PROPS = Object.freeze([
-  'key', 'onRecognized', 'onStrokes', 'initialStrokes', 'height', 'disabled',
+  'key', 'onRecognized', 'onReaderState', 'onStrokes', 'initialStrokes', 'height', 'disabled',
   'lineVerdicts', 'focusSymbol', 'recognitionContext'
 ]);
 /** Identifiers that must never appear inside a recognition-context expression. */

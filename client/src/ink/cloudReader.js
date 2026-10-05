@@ -26,7 +26,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { rasterizeInk } from './cloudRaster.js';
-import { onEntitlementChange } from '../platform/cloudSession.js';
+import { onCloudSessionChange, onEntitlementChange } from '../platform/cloudSession.js';
 import { preparePhoto } from './photoRaster.js';
 import { confidenceFloorOf } from './readingCorrection.js';
 
@@ -38,7 +38,33 @@ const READINESS_TTL_MS = 60_000;
 // or a 429 must not keep cloud reading off for a full minute (or longer) after
 // the deployment has recovered. Errors are never cached at all.
 export const UNAVAILABLE_READINESS_TTL_MS = 15_000;
-let readinessCache = { expiresAt: 0, value: null };
+// The cached answer belongs to one account state. A status learned while the
+// student was signed out (or before their email was verified) must never be
+// served after they sign in on the same page: the cache is keyed by the
+// readiness identity below and dropped outright on every session change.
+// Production 2026-10-05 (iPad): a student wrote signed out, registered on the
+// same device and was told the reader "isn't answering" — no status or
+// transcribe request ever left the device after sign-in.
+let readinessCache = { expiresAt: 0, value: null, identity: null };
+
+/**
+ * Who a readiness answer is for: the local profile, whether it is linked to a
+ * cloud account, and the explicit Settings choice. Any change in these is a
+ * change in what the server would answer, so a cached answer no longer holds.
+ */
+export function readinessIdentity(user) {
+  return [
+    String(user?.id ?? ''),
+    user?.cloudLinked === true ? 'linked' : 'unlinked',
+    user?.isDemo === true ? 'demo' : 'real',
+    cloudReadingChoice(user)
+  ].join('|');
+}
+
+/** Forget any cached readiness; the next read asks the server again. */
+export function clearCloudHandwritingReadiness() {
+  readinessCache = { expiresAt: 0, value: null, identity: null };
+}
 // The server said this account's daily cloud-reading allowance is used up
 // (SEC-COMM-01). Until it resets, no doomed request is sent; an entitlement
 // change (an upgrade) clears it at once.
@@ -53,9 +79,16 @@ function noteAllowance(error, now = Date.now()) {
   allowanceExhaustedUntil = Number.isFinite(reset) && reset > now && reset - now <= 25 * 60 * 60 * 1000 ? reset : now + 30 * 60 * 1000;
 }
 let listening = false;
-function listenForEntitlementChanges() {
+function listenForAccountChanges() {
   if (listening) return;
-  try { onEntitlementChange(() => clearCloudAllowanceExhausted()); listening = typeof globalThis.addEventListener === 'function'; } catch { /* non-browser runtimes */ }
+  try {
+    // An upgrade clears the allowance back-off; signing in, out, registering,
+    // switching account or a verification/consent change (all announced as a
+    // session change) clears the readiness answer, which was for someone else.
+    onEntitlementChange(() => { clearCloudAllowanceExhausted(); clearCloudHandwritingReadiness(); });
+    onCloudSessionChange(() => clearCloudHandwritingReadiness());
+    listening = typeof globalThis.addEventListener === 'function';
+  } catch { /* non-browser runtimes */ }
 }
 const diagnosticState = {
   localNativeAvailable: null,
@@ -70,6 +103,18 @@ const diagnosticState = {
 function safeFailureCode(value, fallback = null) {
   const code = String(value || '');
   return /^[A-Z0-9_:-]{1,96}$/.test(code) ? code : fallback;
+}
+
+/**
+ * A refusal whose body carried no code is still a refusal of a known kind:
+ * 401 is "sign in", 403 is "this account may not". Only an unknown failure is
+ * the transport fallback.
+ */
+function statusFailureCode(error, fallback) {
+  const status = Number(error?.status);
+  if (status === 401) return 'AUTH_REQUIRED';
+  if (status === 403) return 'FORBIDDEN';
+  return fallback;
 }
 
 function safeReleaseSha(value) {
@@ -151,7 +196,10 @@ export async function cloudHandwritingReadiness({
   available = cloudAvailable,
   signal = null,
   now = Date.now(),
-  cache = true
+  cache = true,
+  // A refresh bypasses only the cache read. Its server answer still replaces
+  // the cached value for this identity so the next normal stroke sees it too.
+  refresh = false
 } = {}) {
   if (!cloudReadingWanted(user)) {
     return { usable: false, state: 'disabled', lastFailureCode: null, releaseSha: null };
@@ -166,7 +214,11 @@ export async function cloudHandwritingReadiness({
     return { usable: false, state: 'unavailable', lastFailureCode: 'CLOUD_DISABLED', releaseSha: null };
   }
 
-  if (cache && readinessCache.value && readinessCache.expiresAt > now) return readinessCache.value;
+  listenForAccountChanges();
+  const identity = readinessIdentity(user);
+  if (cache && !refresh && readinessCache.value && readinessCache.identity === identity && readinessCache.expiresAt > now) {
+    return readinessCache.value;
+  }
   if (typeof transport?.handwritingStatus !== 'function') {
     const value = Object.freeze({ usable: false, state: 'unavailable', lastFailureCode: 'HANDWRITING_STATUS_UNAVAILABLE', releaseSha: null });
     recordCloudDiagnostics({ available: false, failureCode: value.lastFailureCode });
@@ -192,7 +244,7 @@ export async function cloudHandwritingReadiness({
     recordCloudDiagnostics({ available: value.usable, latencyMs: value.lastLatencyMs, failureCode: value.lastFailureCode, releaseSha: value.releaseSha });
     if (cache) {
       const ttl = value.usable && value.state === 'ready' ? READINESS_TTL_MS : UNAVAILABLE_READINESS_TTL_MS;
-      readinessCache = { expiresAt: now + ttl, value };
+      readinessCache = { expiresAt: now + ttl, value, identity };
     }
     return value;
   } catch (error) {
@@ -200,7 +252,7 @@ export async function cloudHandwritingReadiness({
       ? 'HANDWRITING_CANCELLED'
       : error?.name === 'TimeoutError'
         ? 'HANDWRITING_STATUS_TIMEOUT'
-        : safeFailureCode(error?.code, 'HANDWRITING_STATUS_UNREACHABLE');
+        : safeFailureCode(error?.code, statusFailureCode(error, 'HANDWRITING_STATUS_UNREACHABLE'));
     const value = Object.freeze({ usable: false, state: 'unavailable', lastFailureCode: code, releaseSha: null });
     recordCloudDiagnostics({ available: false, failureCode: code });
     return value;
@@ -259,13 +311,16 @@ export async function readWithCloud(strokes, {
   transport = cloud,
   rasterize = rasterizeInk,
   available = cloudAvailable,
-  readiness = cloudHandwritingReadiness
+  readiness = cloudHandwritingReadiness,
+  // True on the first read after the account changed (signed in, verified,
+  // consented): the server is asked again however fresh the cached answer is.
+  freshReadiness = false
 } = {}) {
   if (!cloudReadingEnabled(user, { available })) return { reason: 'disabled' };
-  listenForEntitlementChanges();
+  listenForAccountChanges();
   if (cloudAllowanceExhausted()) return { reason: 'allowance', until: allowanceExhaustedUntil };
 
-  const ready = await readiness({ user, transport, available, signal });
+  const ready = await readiness({ user, transport, available, signal, refresh: freshReadiness === true });
   if (!cloudReadingEnabled(user, { available, readiness: ready })) {
     return { reason: ready?.lastFailureCode === 'HANDWRITING_CANCELLED' ? 'cancelled' : 'unavailable', readiness: ready };
   }
@@ -320,11 +375,12 @@ export async function readWithCloud(strokes, {
       ? 'HANDWRITING_CANCELLED'
       : error?.name === 'TimeoutError'
         ? 'HANDWRITING_TIMEOUT'
-        : safeFailureCode(error?.code, 'HANDWRITING_FAILED');
+        : safeFailureCode(error?.code, statusFailureCode(error, 'HANDWRITING_FAILED'));
     noteAllowance(error);
     recordCloudDiagnostics({ available: true, latencyMs: Date.now() - started, failureCode: code, releaseSha: ready?.releaseSha });
     if (code === ALLOWANCE_CODE) return { reason: 'allowance', until: allowanceExhaustedUntil, readiness: ready, diagnostics: handwritingDiagnostics() };
-    return { error: { code, message: error?.message || '' }, readiness: ready, diagnostics: handwritingDiagnostics() };
+    const status = Number.isInteger(Number(error?.status)) && Number(error.status) > 0 ? Number(error.status) : undefined;
+    return { error: { code, status, message: error?.message || '' }, readiness: ready, diagnostics: handwritingDiagnostics() };
   }
 }
 
@@ -370,7 +426,7 @@ export async function readPhotoWithCloud(dataUrl, {
   readiness = cloudHandwritingReadiness
 } = {}) {
   if (!cloudReadingEnabled(user, { available })) return { reason: 'disabled' };
-  listenForEntitlementChanges();
+  listenForAccountChanges();
   if (cloudAllowanceExhausted()) return { reason: 'allowance', until: allowanceExhaustedUntil };
   const ready = await readiness({ user, transport, available, signal });
   if (!cloudReadingEnabled(user, { available, readiness: ready })) {
@@ -415,11 +471,12 @@ export async function readPhotoWithCloud(dataUrl, {
       ? 'HANDWRITING_CANCELLED'
       : error?.name === 'TimeoutError'
         ? 'HANDWRITING_TIMEOUT'
-        : safeFailureCode(error?.code, 'HANDWRITING_FAILED');
+        : safeFailureCode(error?.code, statusFailureCode(error, 'HANDWRITING_FAILED'));
     noteAllowance(error);
     recordCloudDiagnostics({ available: true, latencyMs: Date.now() - started, failureCode: code, releaseSha: ready?.releaseSha });
     if (code === ALLOWANCE_CODE) return { reason: 'allowance', until: allowanceExhaustedUntil, readiness: ready, diagnostics: handwritingDiagnostics() };
-    return { error: { code, message: error?.message || '' }, readiness: ready, diagnostics: handwritingDiagnostics() };
+    const status = Number.isInteger(Number(error?.status)) && Number(error.status) > 0 ? Number(error.status) : undefined;
+    return { error: { code, status, message: error?.message || '' }, readiness: ready, diagnostics: handwritingDiagnostics() };
   }
 }
 
@@ -440,11 +497,65 @@ export function photoReadingBlockedKey(user, { outcome = null, online = browserO
   try { isOnline = online() !== false; } catch { isOnline = true; }
   if (!isOnline) return 'verdict.photoReadingOffline';
   if (user?.cloudLinked !== true) return 'verdict.photoReadingSignIn';
-  const code = String(outcome?.error?.code || outcome?.readiness?.lastFailureCode || '');
-  if (code === 'AUTH_REQUIRED') return 'verdict.photoReadingSignIn';
-  if (code.startsWith('GUARDIAN_CONSENT')) return 'verdict.photoReadingGuardian';
-  if (code === 'EMAIL_UNVERIFIED') return 'verdict.photoReadingVerifyEmail';
-  return 'verdict.photoReadingServiceDown';
+  return accountBlockedKey(outcome) || 'verdict.photoReadingServiceDown';
+}
+
+/**
+ * The precise account-side reason a read was refused, or null when the reason
+ * is not the account (the reader itself, the network). The transcribe route's
+ * own refusal wins over the status probe's, and a refusal is read from its
+ * code first and its HTTP status second (a 401/403 whose body lost its code is
+ * still "sign in" / "this account may not", never "the reader is down").
+ */
+export function accountBlockedKey(outcome = null) {
+  const codes = [outcome?.error?.code, outcome?.readiness?.lastFailureCode].map(c => String(c || '')).filter(Boolean);
+  const status = Number(outcome?.error?.status);
+  for (const code of codes) {
+    if (code === 'AUTH_REQUIRED') return 'verdict.photoReadingSignIn';
+    // A failed consent-state lookup is infrastructure trouble, not evidence
+    // that this student needs a guardian. Fall through to service-unavailable.
+    if (code === 'GUARDIAN_CONSENT_UNAVAILABLE') return null;
+    if (code.startsWith('GUARDIAN_CONSENT') || code === 'AGE_DECLARATION_REQUIRED') return 'verdict.photoReadingGuardian';
+    if (code === 'EMAIL_UNVERIFIED') return 'verdict.photoReadingVerifyEmail';
+  }
+  if (status === 401) return 'verdict.photoReadingSignIn';
+  return null;
+}
+
+/** Blockers the student can clear in Account settings (sign in, verify, consent). */
+export const ACCOUNT_BLOCKED_KEYS = Object.freeze(new Set([
+  'ink.waitingSignIn', 'ink.waitingVerifyEmail', 'ink.waitingGuardian',
+  'verdict.photoReadingSignIn', 'verdict.photoReadingVerifyEmail', 'verdict.photoReadingGuardian'
+]));
+
+/** Semantic reader states: blockers are not handwriting failures. */
+export const INK_READER_STATE = Object.freeze({
+  IDLE: 'IDLE',
+  READING: 'READING',
+  READ_SUCCESS: 'READ_SUCCESS',
+  READ_UNCERTAIN: 'READ_UNCERTAIN',
+  READ_FAILED: 'READ_FAILED',
+  ACCOUNT_ACTION_REQUIRED: 'ACCOUNT_ACTION_REQUIRED',
+  READER_UNAVAILABLE: 'READER_UNAVAILABLE',
+  NETWORK_ERROR: 'NETWORK_ERROR'
+});
+
+export function inkReaderUiState(status = null, reading = null) {
+  if (status?.kind === 'reading') return Object.freeze({ kind: INK_READER_STATE.READING });
+  // Only an attempted read with no usable transcription is a real read failure.
+  if (status?.kind === 'empty') return Object.freeze({ kind: INK_READER_STATE.READ_FAILED });
+  if (status?.kind === 'allowance') {
+    return Object.freeze({ kind: INK_READER_STATE.READER_UNAVAILABLE, blocker: 'ink.cloudAllowanceUsed' });
+  }
+  if (status?.kind === 'waiting') {
+    if (ACCOUNT_BLOCKED_KEYS.has(status.key)) return Object.freeze({ kind: INK_READER_STATE.ACCOUNT_ACTION_REQUIRED, blocker: status.key });
+    if (status.key === 'ink.waitingOffline') return Object.freeze({ kind: INK_READER_STATE.NETWORK_ERROR, blocker: status.key });
+    return Object.freeze({ kind: INK_READER_STATE.READER_UNAVAILABLE, blocker: status.key || null });
+  }
+  if (Array.isArray(reading?.lines) && reading.lines.length) {
+    return Object.freeze({ kind: reading.needsConfirmation === true ? INK_READER_STATE.READ_UNCERTAIN : INK_READER_STATE.READ_SUCCESS });
+  }
+  return Object.freeze({ kind: INK_READER_STATE.IDLE });
 }
 
 const NOTICE_KEY = 'pri-cloud-reading-notice-v1';
