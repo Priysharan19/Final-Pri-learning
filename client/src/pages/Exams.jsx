@@ -185,7 +185,7 @@ function PaperHistory({ exams, openPaper, nav, india = false }) {
               </span>
               : <span className="tag tag-brand">{t('exams.inProgress')}</span>}
             <button className="btn btn-quiet btn-sm" title={t('exams.openPrintable')}
-              aria-label={t('exams.openPrintableAria', { title: e.title })} onClick={() => openPaper(e.id)}>🖨</button>
+              aria-label={t('exams.openPrintableAria', { title: e.title })} onClick={() => openPaper(e.id)}>{t('exams.print')}</button>
             <button className="btn btn-ghost btn-sm" onClick={() => nav(`/exams/${e.id}`)}>{e.finished_at ? t('nav.review') : t('exams.resume')}</button>
           </div>
         );
