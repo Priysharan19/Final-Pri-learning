@@ -49,6 +49,13 @@ check('teacher Tasks maps to Assignments', has(app, "studentOnly(<Tasks />, '/te
 check('teacher Progress maps to Analytics', has(app, "studentOnly(<Progress />, '/teach#teacher-analytics')"));
 check('teacher Classes maps to teacher Classes', has(app, "studentOnly(<Classes />, '/teach#teacher-classes')"));
 check('Teacher Studio is teacher-only', has(app, 'path="/teach" element={teacherOnly(<Teach />)}'));
+// The browser suites sign up a Teacher and walk /teach, but the Teacher role is
+// offered to a new profile only under PRI_FEATURE_EXTENDED_TRACKS. Each suite
+// must build the app under test with that flag itself (issue #355: test:a11y
+// on a plain checkout built without it and never reached /teach).
+const browserBuildFlags = "env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1' }";
+check('accessibility walk builds with the Teacher role on', has(read('client/test/a11y-check.mjs'), browserBuildFlags));
+check('end-to-end suite builds with the Teacher role on', has(read('client/test/e2e.mjs'), browserBuildFlags));
 
 check('/review is the one canonical review surface', has(app, 'path="/review" element={studentOnly(<History />)}'));
 check('/history is compatibility redirect', has(app, 'path="/history" element={<Navigate to="/review" replace />}'));
