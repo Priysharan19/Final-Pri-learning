@@ -108,3 +108,42 @@ export function unitWritten(expectedSuffix, texts) {
   }
   return false;
 }
+
+// ── Angles ───────────────────────────────────────────────────────────────────
+// An angle is the one quantity a student writes in two units that are both
+// right: 60° and π/3 are the same answer. The unit is read off the end of what
+// was written; a bare multiple of π is radians; a bare number is whatever unit
+// the question asked in. Nothing here changes the value — only the unit it is
+// read in — so 60 rad can never pass for 60°.
+
+const DEG_TAIL = /(?:°|º|˚|\bdeg(?:ree)?s?\.?)\s*$/i;
+const RAD_TAIL = /(?:\brad(?:ian)?s?\.?|ᶜ)\s*$/i;
+
+/** 'deg' | 'rad' | null — the angle unit a student wrote, if any. */
+export function angleUnitWritten(answerText) {
+  const s = String(answerText ?? '').trim();
+  if (DEG_TAIL.test(s)) return 'deg';
+  if (RAD_TAIL.test(s)) return 'rad';
+  if (/π|\bpi\b/i.test(s)) return 'rad';
+  return null;
+}
+
+/** The answer with a trailing degree/radian unit removed ("60°" → "60"). */
+export function withoutAngleUnit(answerText) {
+  return String(answerText ?? '').trim().replace(DEG_TAIL, '').replace(RAD_TAIL, '').trim();
+}
+
+/** The angle unit a question's suffix asks in: 'deg' | 'rad' | null. */
+export function angleUnitOfSuffix(suffix) {
+  const s = String(suffix ?? '').trim();
+  if (!s) return null;
+  if (/^(?:°|º|˚|deg(?:ree)?s?\.?)$/i.test(s)) return 'deg';
+  if (/^(?:rad(?:ian)?s?\.?|ᶜ)$/i.test(s)) return 'rad';
+  return null;
+}
+
+/** A value read in `from`, expressed in `to`. */
+export function convertAngle(value, from, to) {
+  if (!Number.isFinite(value) || from === to) return value;
+  return from === 'deg' ? value * Math.PI / 180 : value * 180 / Math.PI;
+}

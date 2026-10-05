@@ -1198,7 +1198,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const otherComments = (inkComments || []).filter(c => c !== firstBad && c.kind !== 'good');
 
   return (
-    <div className={`qpage ws ${split ? 'ws-split' : 'ws-single'}`} data-phase={state.phase} data-mode={isMcq ? 'mcq' : mode} data-question-id={question.id}>
+    <div className={`qpage ws ${split ? 'ws-split' : 'ws-single'}`} data-phase={state.phase} data-mode={isMcq ? 'mcq' : mode} data-question-id={question.id} data-answer-type={question.answerType}>
       {/* ── The question: the page's reference object ── */}
       <section className="ws-context" aria-label={t('verdict.questionRegion')}>
         <div className="q-topmeta">
@@ -1554,6 +1554,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   : <MathText text={state.res.feedback || t('verdict.oneMoreGo')} />}
               </div>
               {state.res.partial && <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{state.res.partial.note}</div>}
+              {state.res.partial && <LostMarks lost={state.res.partial.lost} t={t} />}
               {state.res.stepReport && <StepReport report={state.res.stepReport} />}
               <div className="verdict-next">{state.res?.conflict ? t('verdict.nextAfterConflict') : t(technicalRetry ? 'verdict.nextTechnical' : invalidRetry ? 'verdict.nextUnreadable'
                 : (state.res.stepReport?.lines?.some(l => l.status === 'break') || firstBad) ? 'verdict.nextFix' : 'verdict.nextTryAgain')}</div>
@@ -1621,7 +1622,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               </div>
             )}
 
-            <div className="eval-card" data-outcome={verdictGood ? 'correct' : res.revealed ? 'revealed' : 'incorrect'}>
+            <div className="eval-card" data-outcome={verdictGood ? 'correct' : res.revealed ? 'revealed' : 'incorrect'} data-verdict={verdictGood ? 'correct' : 'incorrect'}>
               <div className="eval-head">
                 <span className="eval-title">
                   <Icon name={verdictGood ? 'check' : 'correction'} />
@@ -1635,6 +1636,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               <div className="eval-body">
                 {res.feedback && !verdictGood && <div><MathText text={res.feedback} /></div>}
                 {res.partial && !verdictGood && <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{res.partial.note}</div>}
+                {res.partial && !verdictGood && <LostMarks lost={res.partial.lost} t={t} />}
                 {verdictGood && writeMode && inkResult?.lines?.length > 1 && (
                   <div>{t('verdict.everyLineChecked', { count: inkResult.lines.length, n: inkResult.lines.length })}</div>
                 )}
@@ -1657,7 +1659,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                             <Icon name={row.earned === row.outOf ? 'check' : 'correction'} size={14} />
                           </span>
                           {row.labelKey ? t(row.labelKey) : row.label}
-                          {row.why && <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2, marginLeft: 20 }}>{row.whyKey ? t(row.whyKey, { unit: row.whyVars?.unit ?? '' }) : row.why}</span>}
+                          {row.why && <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2, marginLeft: 20 }}>{row.whyKey ? t(row.whyKey, { unit: '', ...(row.whyVars || {}), rule: row.whyVars?.ruleKey ? t(row.whyVars.ruleKey) : (row.whyVars?.rule ?? '') }) : row.why}</span>}
                         </span>
                         <span className="set-v" style={{ fontVariantNumeric: 'tabular-nums' }}>
                           <span className="sr-only">{t('verdict.rowMarks', { earned: row.earned, total: row.outOf })} </span>{row.earned}/{row.outOf}
@@ -1794,6 +1796,23 @@ function CriteriaTable({ criteria, correct, selfMarking = true, selfMarks, setSe
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Where the marks went (ledger 3.6): one line per lost mark, naming the line
+ * and the rule it broke, rendered from catalogue keys so a Hindi-medium
+ * student reads it in Hindi. The rule itself is a catalogue key too — the
+ * diagnosed misconception when Step Check named one.
+ */
+function LostMarks({ lost, t }) {
+  if (!Array.isArray(lost) || !lost.length) return null;
+  return (
+    <ul className="lost-marks muted" style={{ marginTop: 6, paddingLeft: 18, fontSize: 13 }} aria-label={t('marks.lost.heading')}>
+      {lost.map((l, i) => (
+        <li key={i} data-lost-line={l.line}>{t(l.key, { ...(l.vars || {}), rule: l.ruleKey ? t(l.ruleKey) : '' })}</li>
+      ))}
+    </ul>
   );
 }
 

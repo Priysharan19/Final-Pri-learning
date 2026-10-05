@@ -553,7 +553,14 @@ export default function ExamRoom() {
             {d.partial && (
               <div className="verdict" style={{ marginTop: 8, background: 'var(--brand-soft)', border: '1px solid var(--brand-1)' }}>
                 <span className="verdict-ico">◐</span>
-                <div style={{ fontSize: 13.5 }}>{d.partial.note}</div>
+                <div style={{ fontSize: 13.5 }}>
+                  {d.partial.note}
+                  {Array.isArray(d.partial.lost) && d.partial.lost.length > 0 && (
+                    <ul className="lost-marks" style={{ margin: '6px 0 0', paddingLeft: 18, fontSize: 13 }} aria-label={t('marks.lost.heading')}>
+                      {d.partial.lost.map((l, i) => <li key={i} data-lost-line={l.line}>{t(l.key, { ...(l.vars || {}), rule: l.ruleKey ? t(l.ruleKey) : '' })}</li>)}
+                    </ul>
+                  )}
+                </div>
               </div>
             )}
             {!d.correct && (

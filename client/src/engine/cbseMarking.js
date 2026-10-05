@@ -40,6 +40,7 @@
 import en from '../i18n/strings.en.js';
 import { pluralCategory } from '../i18n/languages.js';
 import { unitWritten } from './units.js';
+import { ruleKeyFor } from './checker.js';
 
 const english = (key, vars = {}) => {
   let entry = en[key];
@@ -212,6 +213,14 @@ export function awardStepMarks({
   for (let i = 0; i < lines.length; i += 1) {
     if (reportLines[i]?.status === 'ok') credited += 1;
   }
+  // Where the credit stopped: the first line the checker refused, or the first
+  // it could not read. A point that was not reached is explained by that line
+  // and the rule it broke, not by a generic "did not reach this point".
+  const breakIndex = reportLines.findIndex(l => l?.status === 'break');
+  const unverifiedIndex = reportLines.findIndex(l => l && l.status !== 'ok' && l.status !== 'break');
+  const brokenLine = breakIndex >= 0 ? reportLines[breakIndex] : null;
+  const ruleKey = brokenLine ? ruleKeyFor(brokenLine, null) : null;
+  const ruleText = ruleKey ? (ruleKey.startsWith('misconception.') ? english(ruleKey) : (brokenLine?.diagnosis?.title || brokenLine?.note || english(ruleKey))) : '';
 
   const stepRows = scheme.rows.filter(r => r.kind !== MARK_KINDS.ANSWER);
   const answerRow = scheme.rows.find(r => r.kind === MARK_KINDS.ANSWER);
@@ -221,18 +230,22 @@ export function awardStepMarks({
   for (const row of stepRows) {
     const earned = Math.min(row.marks, budget);
     budget -= earned;
-    const whyKey = earned === row.marks
-      ? null
-      : lines.length === 0 ? 'board.whyNoWorking' : 'board.whyNotReached';
+    let whyKey = null, whyVars = null;
+    if (earned !== row.marks) {
+      if (lines.length === 0) whyKey = 'board.whyNoWorking';
+      else if (breakIndex >= 0) { whyKey = 'board.whyBrokeAtLine'; whyVars = { line: breakIndex + 1, rule: ruleText, ruleKey }; }
+      else if (unverifiedIndex >= 0) { whyKey = 'board.whyUnverifiedLine'; whyVars = { line: unverifiedIndex + 1 }; }
+      else whyKey = 'board.whyNotReached';
+    }
     rows.push({
       kind: row.kind,
       label: row.label,
       labelKey: row.labelKey || null,
       outOf: row.marks,
       earned,
-      why: whyKey ? english(whyKey) : null,
+      why: whyKey ? english(whyKey, whyVars || {}) : null,
       whyKey,
-      whyVars: null
+      whyVars
     });
   }
 

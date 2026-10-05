@@ -1659,6 +1659,23 @@ function stepMetaFor(q) {
 // Figures render as raw markup, so every one is put back through the allowlist
 // on the way out as well as on the way in: a device may already be holding a
 // row that was stored before the import boundary was closed.
+// Lost-mark explanations restored from a file: catalogue keys only, from the
+// two namespaces the marker writes, with whole-number line references. A key
+// outside those namespaces would render as itself, so it is dropped here.
+function safeLostMarks(list) {
+  if (!Array.isArray(list)) return [];
+  return list.slice(0, 40).map(l => {
+    if (!l || typeof l !== 'object') return null;
+    const key = typeof l.key === 'string' && /^marks\.lost\.[a-zA-Z]+$/.test(l.key) ? l.key : null;
+    if (!key) return null;
+    const ruleKey = typeof l.ruleKey === 'string' && /^(?:marks\.rule|misconception)\.[a-zA-Z]+(?:\.name)?$/.test(l.ruleKey) ? l.ruleKey : null;
+    const line = safeInt(l.line, 1, 400, 1);
+    const vars = { line };
+    if (l.vars && Number.isFinite(Number(l.vars.breakLine))) vars.breakLine = safeInt(l.vars.breakLine, 1, 400, 1);
+    return { line, key, vars, ruleKey };
+  }).filter(Boolean);
+}
+
 function sanitize(q, row) {
   if (q.multipart) {
     return {
@@ -1823,7 +1840,7 @@ function markSubmission(q, answer, steps) {
   if (!result.correct && !result.invalid && steps && String(steps).trim() && meta0) {
     try {
       const mm = methodMarks({ meta: meta0, working: String(steps), marks: criteriaFor(q).length, prompt: q.prompt, report: stepReport });
-      if (mm) partial = { okLines: mm.okLines, awarded: mm.awarded, note: mm.note };
+      if (mm) partial = { okLines: mm.okLines, awarded: mm.awarded, note: mm.note, lost: mm.lost };
     } catch { partial = null; }
   }
   return { result, feedback, stepReport, partial, meta0 };
@@ -2301,7 +2318,7 @@ function safeExamDetail(rows, ids = null) {
       answerType: sanitizeText(d.answerType, 20), mcqOptions: safeOptions(d.mcqOptions),
       given: sanitizeText(d.given, 300), feedback: sanitizeText(d.feedback, 600),
       partial: d.partial && typeof d.partial === 'object'
-        ? { okLines: safeInt(d.partial.okLines, 0, 40, 0), awarded: safeInt(d.partial.awarded, 0, 40, 0), note: sanitizeText(d.partial.note, 300) }
+        ? { okLines: safeInt(d.partial.okLines, 0, 40, 0), awarded: safeInt(d.partial.awarded, 0, 40, 0), note: sanitizeText(d.partial.note, 300), lost: safeLostMarks(d.partial.lost) }
         : null,
       working: d.working == null ? null : sanitizeText(d.working, 4000),
       solution: safeSolution(d.solution)
@@ -3632,7 +3649,7 @@ const routes = {
           const mm = methodMarks({ meta: metaQ, working: String(wk), marks: qMarks, prompt: q.prompt });
           if (mm) {
             awarded = mm.awarded;
-            partial = { okLines: mm.okLines, awarded: mm.awarded, note: mm.note };
+            partial = { okLines: mm.okLines, awarded: mm.awarded, note: mm.note, lost: mm.lost };
           }
         } catch { }
       }
