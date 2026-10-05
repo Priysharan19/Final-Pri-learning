@@ -236,7 +236,10 @@ export const flow = {
       `head reads ${JSON.stringify(await page.locator('.exam-head').innerText())}`);
 
     // ── 5 · marks come back ──────────────────────────────────────────────────
-    await page.getByRole('button', { name: 'Submit paper' }).click();
+    // Formal submission is a two-step, confirmed action that names what is unanswered.
+    await page.locator('.exam-head').getByRole('button', { name: 'Review and submit' }).click();
+    await check('final submission asks for confirmation first', await page.locator('[role="dialog"]').getByRole('button', { name: 'Submit paper' }).count() === 1);
+    await page.locator('[role="dialog"]').getByRole('button', { name: 'Submit paper' }).click();
     await page.waitForSelector('.hero-num', { timeout: 60000 });
     const headline = (await page.locator('.hero-num').innerText()).replace(/\s+/g, ' ').trim();
     const shown = /(\d{1,3})\s*%/.exec(headline);

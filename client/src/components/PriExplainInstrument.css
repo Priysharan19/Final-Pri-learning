@@ -1,0 +1,158 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Pri Explain · instrument layer
+
+   The explanation player was built across several iterations (V5–V8 files),
+   each with its own radii, pills, gradients and 7–10px labels. This sheet is
+   loaded last and re-expresses the player in the product's one visual system
+   (theme.css): token radii, hairlines, no gradients or glows, labels a student
+   can read, and mathematics that is never case-transformed.
+
+   It changes presentation only. Every selector, data attribute and timing the
+   player and its tests rely on is left in place.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* Launcher: a quiet row, not a floating pill */
+.pri-explain-launch { border-radius: var(--radius); border-color: var(--hairline-strong); box-shadow: none; }
+.pri-explain-launch small { font-size: 12.5px; }
+.pri-explain-play { background: var(--ink); color: var(--surface); }
+
+/* Dialog: a sheet over a dimmed desk */
+.pri-explain-backdrop { background: rgba(18, 18, 16, 0.62); backdrop-filter: none; }
+.pri-explain-dialog { border-radius: var(--radius-lg); box-shadow: var(--shadow); background: var(--paper); }
+.pri-explain-head { padding: 20px 24px 12px; align-items: flex-start; }
+.pri-explain-head h2 { font: var(--type-title); letter-spacing: -0.015em; margin-top: 4px; }
+.pri-explain-kicker { color: var(--ink-3); }
+.pri-explain-kicker, .pri-explain-final > span, .pri-explain-step-label {
+  font: var(--type-label); letter-spacing: var(--tracking-label);
+}
+
+/* The question is mathematics. Only its label is set in capitals; an
+   uppercased expression turns x into X, which is a different variable. */
+.pri-explain-question {
+  margin: 0 24px 14px; padding: 0 0 14px; border: 0; border-bottom: 1px solid var(--hairline);
+  border-radius: 0; background: none; gap: 4px;
+  text-transform: none; letter-spacing: 0;
+  font-family: var(--font-prose-math); font-size: 18px; line-height: 1.5; color: var(--ink);
+}
+.pri-explain-question > span:first-child { font: var(--type-label); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink-3); }
+.pri-explain-question > span:not(:first-child) {
+  font-family: var(--font-prose-math); font-size: 18px; font-weight: 400; line-height: 1.5;
+  text-transform: none; letter-spacing: 0; color: var(--ink);
+}
+
+/* Why the explanation is shaped this way: one ruled note, no badge */
+.pri-explain-adaptive {
+  margin: 0 24px 14px; padding: 0 0 0 14px; border: 0; border-left: 2px solid var(--accent-line);
+  border-radius: 0; background: none; gap: 4px 12px; grid-template-columns: minmax(0, 1fr);
+}
+.pri-explain-adaptive > span {
+  padding: 0; border-radius: 0; background: none; color: var(--accent);
+  font: var(--type-label); letter-spacing: var(--tracking-label);
+}
+.pri-explain-adaptive b { font-size: 14.5px; font-weight: 560; }
+.pri-explain-adaptive small { font-size: 13px; color: var(--ink-3); }
+.pri-explain-adaptive-focus { grid-column: 1; border-top: 0; padding-top: 2px; }
+.pri-explain-adaptive-focus strong { font-size: 13.5px; font-weight: 560; }
+.pri-explain-adaptive-focus p { font-size: 13.5px; }
+.pri-explain-adaptive-focus em { color: var(--accent); font-size: 13px; font-weight: 600; }
+
+/* Progress */
+.pri-explain-progress { padding: 0 24px 12px; }
+.pri-explain-progress > div { font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.pri-explain-progress > i { height: 3px; border-radius: 2px; }
+.pri-explain-progress > i > b { background: var(--accent); }
+
+/* Stage: flat paper; the scene is the only sheet on it */
+.pri-explain-stage { background: var(--surface-2); padding: 20px 24px; }
+.pri-explain-scene {
+  border-radius: var(--radius-lg); box-shadow: none; background: var(--paper);
+  border: 1px solid var(--hairline);
+}
+.pri-explain-scene.diagnosis { border-left: 1px solid var(--hairline); }
+.pri-explain-scene.key-teaching-step { box-shadow: none; border-color: var(--accent-line); }
+.pri-explain-scene h3 { font: var(--type-heading); font-size: 19px; }
+.pri-explain-step-label em { color: var(--ink-3); }
+.pri-explain-key-badge {
+  margin-left: auto; padding: 0; border-radius: 0; background: none; color: var(--accent);
+  font: var(--type-label); letter-spacing: var(--tracking-label);
+}
+.pri-explain-why-step {
+  border-left: 2px solid var(--hairline-strong); border-radius: 0; background: none;
+  padding: 2px 0 2px 12px; font-size: 14px; line-height: 1.5;
+}
+.pri-explain-line { font-family: var(--font-prose-math); font-size: 16.5px; }
+.pri-explain-line.current { background: var(--accent-soft); border-radius: var(--radius-xs); }
+.pri-explain-line-number, .pri-explain-rail button > span { font: 600 11px/1 var(--font); font-variant-numeric: tabular-nums; }
+.pri-explain-line.current .pri-explain-line-number { border-color: var(--accent-line); color: var(--accent); }
+.pri-explain-writing { font-size: 13px; }
+.pri-explain-writing i { background: var(--ink-3); }
+.pri-explain-teacher-cue { font: var(--type-label); letter-spacing: var(--tracking-label); }
+.pri-explain-teacher-cue i { background: var(--ink-3); box-shadow: none; }
+.pri-explain-final { border-radius: var(--radius); border-color: var(--hairline-strong); background: var(--surface); }
+.pri-explain-final strong { font-family: var(--font-prose-math); font-weight: 400; }
+
+/* The beat in focus is marked by its edge, not by a halo and a pill */
+.pri-explain-visual-beat.pending { filter: none; transform: none; }
+.pri-explain-visual-beat.active::before { display: none; }
+.pri-explain-visual-beat.active > :not(.pri-explain-now) { border-color: var(--accent-line); }
+.pri-explain-board { margin-top: 14px; }
+.pri-explain-step-label { justify-content: flex-start; }
+.pri-explain-step-label em::before { content: '· '; }
+.pri-explain-now {
+  padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--accent);
+  font: var(--type-label); letter-spacing: var(--tracking-label); right: 10px; top: 8px;
+}
+
+/* Visual blocks */
+.pri-v-transform { border-radius: var(--radius); border-color: var(--hairline); background: var(--surface); }
+.pri-v-ink, .pri-v-figure, .pri-v-attempt { border-radius: var(--radius); }
+.pri-v-ink svg { background: var(--paper); border-radius: var(--radius-sm); }
+.pri-v-attempt { border-left: 2px solid var(--correction-line); }
+.pri-v-caption, .pri-v-recognized > span, .pri-v-attempt > span, .pri-v-transform-arrow span {
+  font: var(--type-label); letter-spacing: var(--tracking-label);
+}
+.pri-v-caption b { color: var(--ink-2); font-weight: 600; }
+.pri-v-tokenstrip span { font-size: 13px; border-radius: var(--radius-xs); }
+.pri-v-tokenstrip span.changed { color: var(--ink); background: var(--accent-soft); border-color: var(--accent-line); }
+.pri-v-transform-arrow, .pri-v-transform-arrow i { color: var(--ink-3); }
+.pri-v-transform-arrow i { background: var(--hairline-strong); }
+.pri-v-flight-token { border-radius: var(--radius-xs); border-color: var(--accent-line); background: var(--surface-raised); }
+.pri-v-position-note { font: var(--type-label); letter-spacing: var(--tracking-label); }
+.pri-v-position-note::before, .pri-v-position-note::after { background: var(--hairline-strong); }
+.pri-v-figure-sequence span {
+  padding: 0; border: 0; border-radius: 0; background: none;
+  font: var(--type-label); letter-spacing: var(--tracking-label); color: var(--ink-3);
+}
+.pri-v-figure-sequence span.active { color: var(--accent); background: none; }
+.pri-v-figure-sequence span + span::before { content: '·'; margin-right: 6px; color: var(--hairline-strong); }
+
+/* Timeline rail */
+.pri-explain-rail { background: var(--paper); padding: 16px 12px; }
+.pri-explain-rail-title { font: var(--type-label); letter-spacing: var(--tracking-label); text-transform: uppercase; }
+.pri-explain-rail button { border-radius: var(--radius); font-size: 14px; padding: 10px; min-height: 44px; }
+.pri-explain-rail button:hover, .pri-explain-rail button.on { background: var(--surface-2); border-color: transparent; }
+.pri-explain-rail button.on { box-shadow: inset 2px 0 0 var(--accent); }
+.pri-explain-rail button.done > span { border-color: var(--accent-line); color: var(--accent); }
+.pri-explain-rail button b { font-weight: 560; }
+.pri-explain-rail button small { font-size: 12.5px; }
+
+/* Controls */
+.pri-explain-controls { padding: 12px 24px calc(14px + env(safe-area-inset-bottom)); }
+.pri-explain-settings label { font-size: 13.5px; }
+.pri-explain-settings select {
+  border-radius: var(--radius-sm); border-color: var(--control-border); background: var(--surface-raised);
+  min-height: 36px; padding: 4px 8px; font: inherit; font-size: 13.5px;
+}
+.pri-explain-voice input { accent-color: var(--accent); width: 18px; height: 18px; }
+.pri-explain-voice:has(input:checked) { color: var(--ink); }
+.pri-explain-followup span { font-size: 14px; }
+
+@media (max-width: 820px) {
+  .pri-explain-head, .pri-explain-progress, .pri-explain-controls { padding-left: 16px; padding-right: 16px; }
+  .pri-explain-question, .pri-explain-adaptive { margin-left: 16px; margin-right: 16px; }
+  .pri-explain-stage { padding: 12px; }
+  .pri-explain-dialog { border-radius: var(--radius); }
+}
+@media (pointer: coarse) {
+  .pri-explain-settings select { min-height: 44px; }
+}

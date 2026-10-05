@@ -54,6 +54,7 @@ async function answerCurrentQuestion(page) {
   const reveal = page.getByRole('button', { name: /Show solution/i }).first();
   if (await reveal.isVisible().catch(() => false)) {
     await reveal.click();
+    await reveal.click();   // Show solution forfeits the marks, so it asks twice
     await page.waitForTimeout(220);
   }
 }
@@ -109,7 +110,7 @@ export const flow = {
 
     // Appearance evidence uses the real Settings control.
     await goto('/settings');
-    await page.getByRole('button', { name: 'Light — paper', exact: true }).click();
+    await page.getByRole('button', { name: 'Paper', exact: true }).click();
     await page.waitForFunction(() => document.documentElement.dataset.theme === 'light', { timeout: 5000 });
     await page.waitForTimeout(120);
     await goto('/');
@@ -119,7 +120,7 @@ export const flow = {
     await snap(page, '05-new-student-desktop-light');
 
     await goto('/settings');
-    await page.getByRole('button', { name: 'Dark — blackboard', exact: true }).click();
+    await page.getByRole('button', { name: 'Night', exact: true }).click();
     await goto('/');
 
     // Offline is a real browser network state. No cloud-only assignment is
@@ -143,8 +144,9 @@ export const flow = {
 
     await goto('/');
     await page.waitForSelector('[data-home-primary]');
+    // The card is titled with the unfinished topic itself; the kind is the contract.
     await check('unfinished Practice becomes the next action',
-      /Resume where you left off/i.test(await page.locator('#home-next-title').innerText()));
+      await page.locator('[data-home-primary]').getAttribute('data-kind') === 'practice-resume');
     await snap(page, '07-resumable-practice');
 
     await page.locator('[data-home-primary-cta]').click();
@@ -172,7 +174,7 @@ export const flow = {
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
     await goto('/');
     await check('unfinished task context becomes the primary resume action',
-      /Continue|task/i.test(await page.locator('#home-next-title').innerText()));
+      ['task-resume', 'task'].includes(await page.locator('[data-home-primary]').getAttribute('data-kind')));
     await check('task primary CTA preserves the task query context',
       await page.locator('[data-home-primary-cta]').evaluate(el => el.textContent.length > 0));
     await snap(page, '09-task-resume-state');
@@ -207,7 +209,7 @@ export const flow = {
     await check('profile switch recomputes the recommendation',
       !/review/i.test(await page.locator('#home-next-title').innerText()));
     await check('profile A restores its own unfinished task context',
-      /Continue|task/i.test(await page.locator('#home-next-title').innerText()));
+      ['task-resume', 'task'].includes(await page.locator('[data-home-primary]').getAttribute('data-kind')));
 
     // A real teacher profile must never enter student Home.
     await switchProfile(page);
