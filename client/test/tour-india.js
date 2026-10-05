@@ -94,14 +94,17 @@ export const flow = {
     await createProfile(STUDENT);
     await check('creating the profile lands on Home as Asha',
       (await page.locator('.home-greet').innerText()).includes('Asha'));
-    await page.waitForSelector('.genbar-chips .chip', { timeout: 15000 });
-    const chips = await page.locator('.genbar-chips').innerText();
+    // The generate rail's first rung names the class (Section 7.2 moved the
+    // class from a chip to the rail; the chip now appears only when the request
+    // moves away from the profile's own class).
+    await page.waitForSelector('[data-gen-rail] .gen-rung', { timeout: 15000 });
+    const chips = await page.locator('[data-gen-rail] .gen-rail').innerText();
     await check('Home targets Class 10, not Year 10', /Class 10/.test(chips) && !/\bYear\b/.test(chips),
-      `chips read ${JSON.stringify(chips)}`);
-    await page.locator('.genbar-toggle').click();
+      `rail reads ${JSON.stringify(chips)}`);
+    await page.locator('[data-gen-rail] .gen-rung').first().click();
     await settle();
-    const cats = await page.locator('.gen-cats').innerText();
-    await check('the generator speaks in classes and tracks', /Class/.test(cats) && /Track/.test(cats) && !/\bYear\b/.test(cats),
+    const cats = await page.locator('[data-gen-rail] .gen-rail').innerText();
+    await check('the generator speaks in classes and tracks', /Class/i.test(cats) && /Track/i.test(cats) && !/\bYear\b/i.test(cats),
       `categories read ${JSON.stringify(cats)}`);
     await check('the week strip draws seven days in the profile’s week', await page.locator('.week-day').count() === 7,
       `${await page.locator('.week-day').count()} days drawn`);
@@ -117,9 +120,9 @@ export const flow = {
     await page.getByRole('button', { name: /Try the demo/ }).click();
     await page.waitForSelector('.home-greet', { timeout: 120000 });
     await check('the demo signs in as Pri', (await page.locator('.user-chip').innerText()).includes('Pri'));
-    await page.waitForSelector('.genbar-chips .chip', { timeout: 15000 });
-    await check('the demo practises Class 10', /Class 10/.test(await page.locator('.genbar-chips').innerText()),
-      `chips read ${JSON.stringify(await page.locator('.genbar-chips').innerText())}`);
+    await page.waitForSelector('[data-gen-rail] .gen-rung', { timeout: 15000 });
+    await check('the demo practises Class 10', /Class 10/.test(await page.locator('[data-gen-rail] .gen-rail').innerText()),
+      `rail reads ${JSON.stringify(await page.locator('[data-gen-rail] .gen-rail').innerText())}`);
     await check('the demo arrives with a streak', /\d+-day streak/.test(await page.locator('.goal-sub').innerText()),
       `goal card reads ${JSON.stringify(await page.locator('.goal-sub').innerText())}`);
 

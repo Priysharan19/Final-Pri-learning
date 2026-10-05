@@ -116,6 +116,7 @@ const SAME_IN_BOTH = new Map([
   ['common.percent', 'a number and a percent sign; there is nothing in it to translate'],
   ['common.none', 'an em dash standing in for "no value"'],
   ['home.difficultyChip', 'D1–D4 is the app’s own shorthand and is read as a code, not a word'],
+  ['help.keyModZ', 'keyboard key caps (⌘Z / Ctrl+Z), printed in Latin on every keyboard sold in India and read as keys, not words'],
 ]);
 
 // ─────────────────────────────────────────────────────────────────────────────

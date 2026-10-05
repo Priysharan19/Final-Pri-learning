@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { cloud } from '../platform/cloudTransport.js';
 import { resolveHomeRecommendation, actionOpenable } from '../home/recommendation.js';
@@ -13,8 +13,13 @@ import { practiceDifficulties, practiceHref } from '../lib/practiceLinks.js';
 import { textMatches, useGlossary } from '../i18n/glossary.js';
 import TermGloss from '../components/TermGloss.jsx';
 import { featureEnabled } from '../platform/features.js';
+import GettingStarted from '../components/GettingStarted.jsx';
+import PageState from '../components/PageState.jsx';
+import './Home.css';
 
 const DIFF_KEYS = { 1: 'difficulty.1', 2: 'difficulty.2', 3: 'difficulty.3', 4: 'difficulty.4' };
+// The rungs of the generate rail, in the order a student narrows a request.
+const RAIL = ['year', 'course', 'topics', 'dots', 'difficulty', 'type'];
 
 
 // The "This week" plan card is loaded after Home has painted. The planner and
@@ -39,6 +44,8 @@ export default function Home() {
   const t = useT();
   const tx = useTx();
   const [local, setLocal] = useState(null);
+  const [localFailed, setLocalFailed] = useState(false);
+  const location = useLocation();
   const [curriculum, setCurriculum] = useState(null);
   const [assignments, setAssignments] = useState(null);
   const stats = local?.stats || null;
@@ -53,6 +60,9 @@ export default function Home() {
   const [subtopic, setSubtopic] = useState(saved.current.subtopic ?? null);
   const [dotpoint, setDotpoint] = useState(saved.current.dotpoint ?? null);
   const [difficulty, setDifficulty] = useState(saved.current.difficulty ?? null);
+  // "Past papers only": the one question-type filter the backend serves (India).
+  const [pyq, setPyq] = useState(saved.current.pyq === true);
+  const railRefs = useRef({});
   // Typed into the topic filter. Kept out of the saved filter set on purpose:
   // it is how you find a topic, not part of what you asked for.
   const [topicQuery, setTopicQuery] = useState('');
@@ -70,6 +80,9 @@ export default function Home() {
       api.get('/exams'), api.get('/practice/resume')
     ]).then(([statsR, curriculumR, tasksR, examsR, resumeR]) => {
       if (!live) return;
+      // Every source failing at once is the app failing, not an empty page:
+      // say so, and offer the one action that helps.
+      setLocalFailed([statsR, curriculumR, tasksR, examsR, resumeR].every(r => r.status === 'rejected'));
       if (curriculumR.status === 'fulfilled') setCurriculum(curriculumR.value);
       setLocal({
         stats: statsR.status === 'fulfilled' ? statsR.value : null,
@@ -114,8 +127,8 @@ export default function Home() {
     api.get('/placement').then(setPlacement).catch(() => { });
   }, [user.course, user.role]);
   useEffect(() => {
-    saveFilters(filterOwner.current, { year, sectionKey, subtopic, dotpoint, difficulty });
-  }, [year, sectionKey, subtopic, dotpoint, difficulty]);
+    saveFilters(filterOwner.current, { year, sectionKey, subtopic, dotpoint, difficulty, pyq });
+  }, [year, sectionKey, subtopic, dotpoint, difficulty, pyq]);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? t('home.goodMorning') : hour < 18 ? t('home.goodAfternoon') : t('home.goodEvening');
@@ -199,30 +212,60 @@ export default function Home() {
   // course's copy while the curriculum is still loading.
   const india = user.course === 'in';
   const chips = [];
-  if (year != null) chips.push({ k: 'year', label: t(india ? 'common.classNumber' : 'common.yearNumber', { n: year }), clear: () => { setYear(user.year); setSectionKey(null); setSubtopic(null); setDotpoint(null); } });
+  // The rail's first rung already shows the class; a chip repeats it only when
+  // the request has moved away from the profile's own class.
+  if (year != null && year !== user.year) chips.push({ k: 'year', label: t(india ? 'common.classNumber' : 'common.yearNumber', { n: year }), clear: () => { setYear(user.year); setSectionKey(null); setSubtopic(null); setDotpoint(null); } });
   if (section) chips.push({ k: 'course', label: section.label, clear: () => { setSectionKey(null); setSubtopic(null); setDotpoint(null); } });
   if (selSub) chips.push({ k: 'topic', label: selSub.name, clear: () => { setSubtopic(null); setDotpoint(null); } });
   if (dotpoint != null && selSub) chips.push({ k: 'dp', label: t('home.dotpointChip', { n: dotpoint + 1 }), clear: () => setDotpoint(null) });
   if (chosenDifficulty != null) chips.push({ k: 'diff', label: t('home.difficultyChip', { n: chosenDifficulty, label: t(DIFF_KEYS[chosenDifficulty]) }), clear: () => setDifficulty(null) });
+  if (pyq && india) chips.push({ k: 'type', label: t('home.typePyq'), clear: () => setPyq(false) });
 
   const generate = () => {
     if (impossibleTarget) return;
-    nav(practiceHref({ subtopic, dotpoint, difficulty: chosenDifficulty, track: section?.track || null }));
+    nav(practiceHref({ subtopic, dotpoint, difficulty: chosenDifficulty, track: section?.track || null, pyq: pyq && india }));
   };
 
-  const resetAll = () => { setSectionKey(null); setSubtopic(null); setDotpoint(null); setDifficulty(null); setYear(user.year); };
+  const resetAll = () => { setSectionKey(null); setSubtopic(null); setDotpoint(null); setDifficulty(null); setPyq(false); setYear(user.year); };
+
+  // The rail: one rung per step of the request, each showing what it holds.
+  // Opening a rung opens the chooser on that step; arrow keys move along the
+  // rail (WAI-ARIA tabs), so the whole thing works from a keyboard.
+  const rungs = RAIL.filter(k => k !== 'type' || india).map(k => ({
+    k,
+    label: t(k === 'year' ? (india ? 'home.catClass' : 'home.catYear') : k === 'course' ? (india ? 'home.catTrack' : 'home.catCourse')
+      : k === 'topics' ? 'home.catTopics' : k === 'dots' ? 'home.catDots' : k === 'difficulty' ? 'home.catDifficulty' : 'home.catType'),
+    value: k === 'year' ? t(india ? 'common.classNumber' : 'common.yearNumber', { n: year })
+      : k === 'course' ? (section?.label || null)
+        : k === 'topics' ? (selSub?.name || null)
+          : k === 'dots' ? (dotpoint != null && selSub ? t('home.dotpointChip', { n: dotpoint + 1 }) : null)
+            : k === 'difficulty' ? (chosenDifficulty != null ? `D${chosenDifficulty}` : null)
+              : (pyq ? t('home.typePyq') : null),
+    disabled: (k === 'topics' && !section) || (k === 'dots' && !selSub)
+  }));
+  const openRung = (k) => { setCat(k); setOpen(true); };
+  const onRailKey = (e, i) => {
+    const enabled = rungs.filter(r => !r.disabled);
+    const at = enabled.findIndex(r => r.k === rungs[i].k);
+    let to = null;
+    if (e.key === 'ArrowRight') to = enabled[(at + 1) % enabled.length];
+    else if (e.key === 'ArrowLeft') to = enabled[(at - 1 + enabled.length) % enabled.length];
+    else if (e.key === 'Home') to = enabled[0];
+    else if (e.key === 'End') to = enabled[enabled.length - 1];
+    if (!to) return;
+    e.preventDefault();
+    openRung(to.k);
+    railRefs.current[to.k]?.focus();
+  };
+  // Guests see how many free questions remain, when the client is told. The
+  // count comes from the profile the server returns and is never computed here.
+  const guestLeft = user.guest === true && Number.isFinite(Number(user.guestRemaining)) ? Number(user.guestRemaining) : null;
 
   const homeDecision = useMemo(() => local ? resolveHomeRecommendation({
     user, stats, dueCount, tasks: local.tasks, exams: local.exams, resume: local.resume,
     assignments: Array.isArray(assignments) ? assignments : [], online, cloudReady: Array.isArray(assignments),
     cachedAssignments: assignments === false ? cachedAssignments(user) : []
   }) : { primary: null, alternatives: [] }, [local, user, stats, dueCount, assignments, online]);
-  // A generic "practice" alternative under a practice recommendation says the
-  // same thing twice; the manual chooser below already covers it.
-  const alternatives = homeDecision.alternatives.filter(item =>
-    item.kind !== 'daily-goal'
-    && !(item.kind === 'smart-practice' && ['first-practice', 'adaptive', 'smart-practice', 'daily-goal'].includes(homeDecision.primary?.kind)));
-
   const topicName = useMemo(() => {
     const names = new Map();
     for (const sec of [...(curriculum?.years || []), ...(curriculum?.streams || [])]) {
@@ -231,11 +274,42 @@ export default function Home() {
     return id => (id ? names.get(id) || null : null);
   }, [curriculum]);
 
+  // Today's standing items, kept in view whatever the resolver chose first:
+  // reviews that are due, and work left unfinished. Each is shown once — here
+  // when it is not already the primary action, and not again below.
+  const primaryKind = homeDecision.primary?.kind || null;
+  const today = [];
+  if (local && dueCount > 0 && primaryKind !== 'reviews') {
+    today.push({ k: 'reviews', title: t('home.todayReviews', { count: dueCount, n: dueCount }), cta: t('home.cta.review'), go: () => nav('/practice') });
+  }
+  if (local?.resume && !String(primaryKind || '').endsWith('resume')) {
+    const topic = topicName(local.resume.subtopic) || local.resume.title || '';
+    today.push({ k: 'resume', title: topic ? t('home.todayContinueTopic', { topic }) : t('home.todayContinue'), cta: t('home.cta.resume'), go: () => nav(local.resume.destination || '/practice') });
+  }
+  const shownToday = new Set(today.map(i => i.k === 'reviews' ? 'reviews' : 'resume'));
+  // A generic "practice" alternative under a practice recommendation says the
+  // same thing twice; the manual chooser below already covers it.
+  const alternatives = homeDecision.alternatives.filter(item =>
+    item.kind !== 'daily-goal'
+    && !(item.kind === 'reviews' && shownToday.has('reviews'))
+    && !(item.kind.endsWith('resume') && shownToday.has('resume'))
+    && !(item.kind === 'smart-practice' && ['first-practice', 'adaptive', 'smart-practice', 'daily-goal'].includes(homeDecision.primary?.kind)));
+
   return (
     <div className="home-wrap">
       <h1 className="home-greet">{tx('home.greeting', { greeting, name: <b>{firstName}</b> })}</h1>
 
       <HomeAction primary action={homeDecision.primary} nav={nav} topicName={topicName} resume={local?.resume} />
+      {today.length > 0 && (
+        <ul className="home-today" aria-label={t('home.today')} data-home-today>
+          {today.map(item => (
+            <li key={item.k} className="home-today-row" data-today={item.k}>
+              <span className="home-today-title">{item.title}</span>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={item.go}>{item.cta}</button>
+            </li>
+          ))}
+        </ul>
+      )}
       {assignments === false && (
         <div className="notice offline home-cloud-note" role="status">
           {t('home.cloudUnavailable')}
@@ -260,17 +334,27 @@ export default function Home() {
         </button>
 
         {/* ── Manual practice configuration is deliberately secondary ── */}
-        <div className="genbar">
-          <div className={`genbar-head ${open ? 'open' : ''}`}>
-            <button className="genbar-toggle" onClick={() => setOpen(o => !o)}
-              aria-label={open ? t('home.hideFilters') : t('home.showFilters')}
-              aria-expanded={open} aria-controls="gen-panel"><Icon name="chevronDown" size={16} /></button>
-            {chips.length === 0 ? (
-              <button className="genbar-empty" onClick={() => setOpen(true)}>
-                {open ? t('home.noFilters') : t('home.configureFilters')}
+        <div className="genbar" data-gen-rail data-open={open ? '' : undefined}>
+          {/* The rail itself: every step of the request in a row, each showing
+              what it holds. One tap on a rung opens that step's chooser in
+              place; there is no second screen between here and Generate. */}
+          <div className="gen-rail" role="tablist" aria-label={t('home.showFilters')} aria-orientation="horizontal">
+            {rungs.map((r, i) => (
+              <button key={r.k} type="button" ref={el => { railRefs.current[r.k] = el; }}
+                className={`gen-cat gen-rung${open && cat === r.k ? ' on' : ''}${r.value ? ' has-value' : ''}`}
+                role="tab" id={`gen-rung-${r.k}`} aria-selected={open && cat === r.k} aria-controls="gen-pane" aria-expanded={open && cat === r.k}
+                tabIndex={(open ? cat === r.k : i === 0) ? 0 : -1} disabled={r.disabled}
+                onClick={() => (open && cat === r.k ? setOpen(false) : openRung(r.k))} onKeyDown={e => onRailKey(e, i)}>
+                <span className="gen-rung-label">{r.label}</span>
+                <span className="gen-rung-value">{r.value || t('home.railAny')}</span>
               </button>
+            ))}
+          </div>
+          <div className={`genbar-head ${open ? 'open' : ''}`}>
+            {chips.length === 0 ? (
+              <span className="genbar-empty chip" data-gen-summary>{t('home.noFilters')}</span>
             ) : (
-              <div className="genbar-chips">
+              <div className="genbar-chips" data-gen-summary>
                 {chips.map(c => (
                   <span className="chip" key={c.k}>{c.label}
                     <button className="chip-x" aria-label={t('home.removeFilter', { filter: c.label })}
@@ -282,29 +366,14 @@ export default function Home() {
             {chips.length > 0 && (
               <button className="icon-btn" title={t('home.clearFilters')} aria-label={t('home.clearFilters')} onClick={resetAll}><Icon name="review" size={16} /></button>
             )}
-            <button className="btn btn-primary" onClick={generate} disabled={impossibleTarget}>{t('home.generate')}</button>
+            {guestLeft !== null && (
+              <span className="genbar-guest" data-guest-remaining={guestLeft}>{t('home.guestLeft', { count: guestLeft, n: guestLeft })}</span>
+            )}
+            <button className="btn btn-primary" onClick={generate} disabled={impossibleTarget} data-home-generate>{t('home.generate')}</button>
           </div>
           {open && (
             <div className="gen-panel" id="gen-panel">
-              <div className="gen-cats" role="tablist" aria-label={t('home.showFilters')}>
-                {[
-                  ['year', t(india ? 'home.catClass' : 'home.catYear')], ['course', t(india ? 'home.catTrack' : 'home.catCourse')], ['topics', t('home.catTopics')],
-                  ['dots', t('home.catDots')], ['difficulty', t('home.catDifficulty')],
-                ].map(([k, label]) => (
-                  <button
-                    key={k}
-                    className={`gen-cat ${cat === k ? 'on' : ''}`}
-                  role="tab" aria-selected={cat === k} aria-controls="gen-pane"
-                    disabled={(k === 'topics' && !section) || (k === 'dots' && !selSub)}
-                    onClick={() => setCat(k)}
-                  >
-                    {label}
-                    {((k === 'year') || (k === 'course' && section) || (k === 'topics' && selSub) || (k === 'dots' && dotpoint != null) || (k === 'difficulty' && chosenDifficulty != null)) && <span className="gen-cat-dot" />}
-                  </button>
-                ))}
-              </div>
-
-              <div className="gen-pane" id="gen-pane" role="tabpanel">
+              <div className="gen-pane" id="gen-pane" role="tabpanel" aria-labelledby={`gen-rung-${cat}`}>
                 {cat === 'year' && (
                   <>
                     <div className="gen-pane-title">{t(india ? 'home.pickClass' : 'home.pickYear')}</div>
@@ -398,6 +467,18 @@ export default function Home() {
                     </div>
                   </>
                 )}
+
+                {cat === 'type' && india && (
+                  <>
+                    <div className="gen-pane-note">{t('home.optional')}</div>
+                    <div className="gen-pane-title">{t('home.pickType')}</div>
+                    <div className="gen-opts">
+                      <button className={`gen-opt ${!pyq ? 'on' : ''}`} aria-pressed={!pyq} onClick={() => setPyq(false)}>{t('home.typeAny')}</button>
+                      <button className={`gen-opt ${pyq ? 'on' : ''}`} aria-pressed={pyq} onClick={() => setPyq(true)}>{t('home.typePyq')}</button>
+                    </div>
+                    <p className="muted" style={{ marginTop: 10, fontSize: 13 }}>{t('home.typeNote')}</p>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -408,6 +489,18 @@ export default function Home() {
         <h2 className="home-section-title" id="home-week-title">{t('home.thisWeek')}</h2>
         <GoalCard user={user} activity={stats?.activity || []} />
       </section>
+
+      {localFailed && (
+        <PageState kind="error" title={t('home.loadFailedTitle')} body={t('home.loadFailedBody')}
+          action={{ label: t('common.tryAgain'), onClick: () => window.location.reload() }} />
+      )}
+
+      {/* Getting started: three steps, once per device for a profile with no
+          attempts yet, and whenever Settings → Help restarts it. */}
+      <GettingStarted
+        show={!!local && (location.state?.tour === true || (Number(stats?.totals?.attempts) || 0) === 0)}
+        focus={location.state?.tour === true}
+        onStart={() => nav('/practice')} />
     </div>
   );
 }

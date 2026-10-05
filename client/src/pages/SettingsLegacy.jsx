@@ -14,6 +14,12 @@ import { MIN_PASSWORD, PasswordMeter, passwordVerdict } from './Login.jsx';
 import { LANGUAGES, useLanguage, useT } from '../i18n/index.js';
 import { loadGlossary } from '../i18n/glossary.js';
 import { priNative } from '../platform/native/index.js';
+import { TEXT_SCALE_MAX, TEXT_SCALE_MIN, TEXT_SCALE_STEP, applyTextScale, useDevicePref, writeDevicePref } from '../components/devicePrefs.js';
+import { PRACTICE_SHORTCUTS } from '../components/shortcuts.js';
+import { MathText } from '../lib/latex.jsx';
+import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
+import { Link, useNavigate } from 'react-router-dom';
+import './Settings.css';
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
 const COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB'], ['in', null, 'settings.courseIndia']];
@@ -251,16 +257,126 @@ function HandwritingSection({ toast }) {
   );
 }
 
+/**
+ * The running clock on the practice page. A device setting (devicePrefs.js):
+ * it is about this screen, not the student, so two siblings on one iPad share
+ * it and nothing about it is synced or scored.
+ */
+function PracticeTimerRow() {
+  const t = useT();
+  const [on, setOn] = useDevicePref('practiceTimer');
+  return (
+    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--hairline)' }}>
+      <div className="set-row">
+        <span className="set-k">
+          {t('settings.practiceTimer')}
+          <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 3, maxWidth: 460 }}>{t('settings.practiceTimerHelp')}</span>
+        </span>
+        <span className="set-v">
+          <button type="button" className={`btn btn-sm ${on ? 'btn-primary' : 'btn-quiet'}`} aria-pressed={on}
+            data-practice-timer-toggle onClick={() => setOn(!on)}>
+            {t(on ? 'common.on' : 'common.off')}
+          </button>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Interface text size, with the maths shown live at the chosen size. A device
+ * setting: the slider moves `--text-scale` on <html> (devicePrefs.js) and the
+ * question page's reading text follows it; the chrome keeps its measure.
+ */
+function TextSizeRow() {
+  const t = useT();
+  const [scale, setScale] = useDevicePref('textScale');
+  useEffect(() => { applyTextScale(scale); }, [scale]);
+  return (
+    <div className="set-textsize" style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--hairline)' }}>
+      <div className="set-row set-textsize-row" style={{ alignItems: 'flex-start' }}>
+        <span className="set-k">
+          <label htmlFor="set-text-scale">{t('settings.textSize')}</label>
+          <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 3, maxWidth: 460 }}>{t('settings.textSizeHelp')}</span>
+        </span>
+        <span className="set-v set-textsize-v">
+          <input type="range" id="set-text-scale" min={TEXT_SCALE_MIN} max={TEXT_SCALE_MAX} step={TEXT_SCALE_STEP} value={scale}
+            aria-valuetext={t('settings.textSizeValue', { percent: scale })} data-text-scale
+            onChange={e => setScale(Number(e.target.value))} />
+          <span className="set-textsize-pct" aria-hidden="true">{scale}%</span>
+        </span>
+      </div>
+      <div className="set-preview" data-text-scale-preview aria-label={t('settings.textSizePreviewAria')} style={{ '--text-scale': scale / 100 }}>
+        <div className="set-preview-prompt"><MathText block text={t('settings.textSizeSample')} /></div>
+        <p className="set-preview-note">{t('settings.textSizePreviewNote', { percent: scale })}</p>
+      </div>
+    </div>
+  );
+}
+
+// The editor's own keys (QuestionCard onFieldKey / onPaletteKey), listed with the page shortcuts.
+const EDITOR_KEYS = [{ key: 'Tab', label: 'help.shortcutTab' }, { key: 'Esc', label: 'help.shortcutEsc' }];
+
+/** The keyboard on the question page, listed where a student can find it. */
+function ShortcutsTable() {
+  const t = useT();
+  const KEY_LABEL = { next: 'help.shortcutNext', hint: 'help.shortcutHint', submit: 'help.shortcutSubmit', undo: 'help.shortcutUndo' };
+  const keyText = k => (k === 'mod+Z' ? t('help.keyModZ') : k);
+  return (
+    <table className="set-shortcuts" data-shortcuts-table>
+      <caption className="sr-only">{t('help.shortcutsTitle')}</caption>
+      <thead><tr><th scope="col">{t('help.keyColumn')}</th><th scope="col">{t('help.doesColumn')}</th></tr></thead>
+      <tbody>
+        {[...PRACTICE_SHORTCUTS.map(sc => ({ key: sc.key, label: KEY_LABEL[sc.action] })), ...EDITOR_KEYS].map(sc => (
+          <tr key={sc.key}><td><kbd>{keyText(sc.key)}</kbd></td><td>{t(sc.label)}</td></tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/**
+ * Export of the cloud account's data (GET /v1/account/export), offered only
+ * when this deployment has a cloud and this profile is signed in to one. The
+ * local backup above covers everything on the device; this is the server's
+ * copy, which is a separate thing and is named as such.
+ */
+function AccountExportRow({ toast, user }) {
+  const t = useT();
+  const [state, setState] = useState('checking');   // checking | ready | hidden
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let live = true;
+    if (!cloudAvailable() || typeof cloud.exportAccount !== 'function') { setState('hidden'); return () => { live = false; }; }
+    cloud.me().then(me => { if (live) setState(me?.account ? 'ready' : 'hidden'); }).catch(() => { if (live) setState('hidden'); });
+    return () => { live = false; };
+  }, [user?.id]);
+  if (state !== 'ready') return null;
+  const run = async () => {
+    setBusy(true);
+    try {
+      const data = await cloud.exportAccount();
+      downloadJSON(data, `pri-account-export-${dateStamp()}.json`);
+      toast(<span>{t('settings.accountExported')}</span>);
+    } catch (e) { toast(<span>{e.message}</span>); }
+    finally { setBusy(false); }
+  };
+  return (
+    <button className="btn btn-ghost btn-sm" data-account-export disabled={busy} onClick={run}>{t(busy ? 'settings.accountExporting' : 'settings.exportAccount')}</button>
+  );
+}
+
 const SECTIONS = [
-  ['plan', '♛', 'settings.secPlan'],
-  ['profile', '☺', 'settings.secProfile'],
-  ['security', '⚿', 'settings.secSecurity'],
-  ['handwriting', '✒', 'settings.secHandwriting'],
-  ['language', '◍', 'settings.secLanguage'],
-  ['appearance', '◐', 'settings.secAppearance'],
+  ['plan', '', 'settings.secSubscription'],
+  ['profile', '', 'settings.secProfile'],
+  ['security', '', 'settings.secSecurity'],
+  ['handwriting', '', 'settings.secHandwriting'],
+  ['language', '', 'settings.secLanguage'],
+  ['appearance', '', 'settings.secAppearance'],
   ['courses', '', 'settings.secCourses'],
-  ['data', '⇅', 'settings.secData'],
-  ['help', '?', 'settings.secHelp'],
+  ['data', '', 'settings.secData'],
+  ['help', '', 'settings.secHelp'],
+  ['about', '', 'settings.secAbout'],
 ];
 
 function SecuritySection({ toast }) {
@@ -377,6 +493,9 @@ export default function Settings() {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [del, setDel] = useState(null);   // { name, password, error, busy } while the wipe is being confirmed
+  const navigate = useNavigate();
+  const release = currentReleaseIdentity();
+  const scrollToCloud = () => document.getElementById('cloud-account-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const goto = (k) => {
     setActive(k);
@@ -481,9 +600,13 @@ export default function Settings() {
 
         <div className="grid" style={{ gap: 18 }}>
           {/* ── Plan ── */}
-          <div className="card" ref={el => secRefs.current.plan = el}>
-            <h2>{t('settings.localPlan')}</h2>
+          <div className="card" ref={el => secRefs.current.plan = el} id="settings-subscription" data-settings-section="subscription">
+            <h2>{t('settings.subscription')}</h2>
             <p className="muted" style={{ margin: '4px 0 14px' }}>{t('settings.localPlanSub', { limit: FREE_TIER.practicePerDay })}</p>
+            <p className="sub" style={{ margin: '0 0 14px' }}>
+              {t('settings.subscriptionCloudNote')}{' '}
+              <button type="button" className="btn-disclose" style={{ display: 'inline-flex' }} onClick={scrollToCloud} data-settings-to-cloud>{t('settings.openCloudSection')}</button>
+            </p>
             <div className="spread" style={{ fontSize: 14 }}>
               <span className="sub">{t('settings.questionBank')}</span><span>{t('settings.questionBankValue')}</span>
             </div>
@@ -619,6 +742,8 @@ export default function Settings() {
               ))}
             </div>
             <p className="muted" style={{ marginTop: 10 }}>{t(user.theme === 'system' ? 'settings.themeSystemNote' : 'settings.themeNote')}</p>
+            <PracticeTimerRow />
+            <TextSizeRow />
           </div>
 
           {/* ── Courses ── */}
@@ -636,8 +761,15 @@ export default function Settings() {
               <button className="btn btn-ghost btn-sm" onClick={exportBackup}>{t('settings.exportBackup')}</button>
               <button className="btn btn-ghost btn-sm" onClick={() => importRef.current?.click()}>{t('settings.restoreBackup')}</button>
               {user.role !== 'teacher' && <button className="btn btn-ghost btn-sm" onClick={exportProgressFile}>{t('settings.progressFile')}</button>}
+              <AccountExportRow toast={toast} user={user} />
               <input ref={importRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={importBackup} />
             </div>
+            {cloudAvailable() && (
+              <p className="muted" style={{ marginTop: 10, fontSize: 13 }}>
+                {t('settings.deleteCloudNote')}{' '}
+                <button type="button" className="btn-disclose" style={{ display: 'inline-flex' }} onClick={scrollToCloud}>{t('settings.openCloudSection')}</button>
+              </p>
+            )}
             <hr className="divider" />
             <div className="row" style={{ flexWrap: 'wrap' }}>
               <button className="btn btn-ghost btn-sm" onClick={switchProfile}>{t('app.switchProfile')}</button>
@@ -677,7 +809,7 @@ export default function Settings() {
           </div>
 
           {/* ── Help ── */}
-          <div className="card" ref={el => secRefs.current.help = el}>
+          <div className="card" ref={el => secRefs.current.help = el} id="settings-help" data-settings-section="help">
             <h2 style={{ marginBottom: 8 }}>{t('settings.helpSafety')}</h2>
             <p className="sub">
               {/* An India profile is told what India actually gets. The other
@@ -686,6 +818,48 @@ export default function Settings() {
               {t(user.course === 'in' ? 'settings.helpBodyIndia' : 'settings.helpBody')}
               {!priNative.isNativeShell() && t('settings.addToHomeScreen')}
             </p>
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--hairline)' }}>
+              <div className="set-row">
+                <span className="set-k">
+                  {t('help.tourTitle')}
+                  <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 3, maxWidth: 460 }}>{t('help.tourHelp')}</span>
+                </span>
+                <span className="set-v">
+                  <button type="button" className="btn btn-ghost btn-sm" data-restart-tour onClick={() => { writeDevicePref('tutorialSeen', false); navigate('/', { state: { tour: true } }); }}>{t('help.restartTour')}</button>
+                </span>
+              </div>
+            </div>
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--hairline)' }}>
+              <div className="sc-label" style={{ marginBottom: 6 }}>{t('help.shortcutsTitle')}</div>
+              <p className="muted" style={{ fontSize: 13, margin: '0 0 8px' }}>{t('help.shortcutsNote')}</p>
+              <ShortcutsTable />
+            </div>
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--hairline)' }}>
+              <div className="set-row">
+                <span className="set-k">
+                  {t('help.contactTitle')}
+                  <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 3, maxWidth: 460 }}>{t('help.contactHelp')}</span>
+                </span>
+                <span className="set-v"><Link className="btn btn-ghost btn-sm" to="/grievance" data-settings-contact>{t('help.contact')}</Link></span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── About ── */}
+          <div className="card" ref={el => secRefs.current.about = el} id="settings-about" data-settings-section="about">
+            <h2 style={{ marginBottom: 8 }}>{t('settings.about')}</h2>
+            <div className="set-row"><span className="set-k">{t('settings.version')}</span><span className="set-v" style={{ fontVariantNumeric: 'tabular-nums' }}>{release.productVersion || '—'}</span></div>
+            <div className="set-row"><span className="set-k">{t('settings.build')}</span><span className="set-v" style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5 }}>{String(release.releaseSha || '').slice(0, 12) || '—'}</span></div>
+            <div className="set-row"><span className="set-k">{t('settings.curriculumVersion')}</span><span className="set-v">{release.curriculumVersion || '—'}</span></div>
+            <p className="sub" style={{ margin: '12px 0 10px' }}>{t('settings.aboutBody')}</p>
+            <div className="row set-links" style={{ flexWrap: 'wrap', gap: 8 }} data-settings-links>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={scrollToCloud}>{t('settings.pricing')}</button>
+              <Link className="btn btn-ghost btn-sm" to="/grievance">{t('settings.contact')}</Link>
+              <Link className="btn btn-ghost btn-sm" to="/terms">{t('settings.terms')}</Link>
+              <Link className="btn btn-ghost btn-sm" to="/privacy">{t('settings.privacy')}</Link>
+              <Link className="btn btn-ghost btn-sm" to="/refund-policy">{t('settings.refunds')}</Link>
+            </div>
+            <p className="muted" style={{ marginTop: 10, fontSize: 12.5 }}>{t('settings.pricingNote')}</p>
           </div>
         </div>
       </div>

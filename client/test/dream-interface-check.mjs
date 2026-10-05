@@ -3,6 +3,7 @@
 
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { HOME_RECOMMENDATION_POLICY, resolveHomeRecommendation } from '../src/home/recommendation.js';
@@ -194,10 +195,10 @@ const src = rel => readFile(join(ROOT, rel), 'utf8');
     assert.ok(block.includes("user.course === 'in' && !assignmentMode && !taskId && (\n              <button type=\"button\" className=\"icon-btn ws-filter\""));
   });
 }
-const [backend, home, app, card, practicePage, ink, exam, en, recovery] = await Promise.all([
+const [backend, home, app, card, practicePage, ink, exam, en, recovery, shortcuts] = await Promise.all([
   'src/local/backend.js', 'src/pages/Home.jsx', 'src/App.jsx', 'src/components/QuestionCard.jsx',
   'src/pages/PracticeBase.jsx', 'src/ink/InkAnswer.jsx', 'src/pages/ExamRoom.jsx', 'src/i18n/strings.en.js',
-  'src/components/practiceRecovery.js'
+  'src/components/practiceRecovery.js', 'src/components/shortcuts.js'
 ].map(src));
 
 check('every component that calls t() first obtains it from useT() (the Diagnosis crash)', () => {
@@ -293,6 +294,135 @@ check('formal assessment: no hints, confirmed submission, flags and a spoken tim
   // The deadline clock announces the last five minutes and the last minute in words.
   assert.match(exam, /examRoom\.fiveMinutesLeft[\s\S]*examRoom\.oneMinuteLeft/);
   assert.match(exam, /role="timer"/);
+});
+
+// ── Section 7 parity: Home command centre and the question page ────────────
+check('Home keeps one rail with no second screen: rungs are tabs, the summary chip and Generate sit under them', () => {
+  assert.match(home, /className="gen-rail" role="tablist"/);
+  assert.match(home, /const RAIL = \['year', 'course', 'topics', 'dots', 'difficulty', 'type'\]/);
+  assert.match(home, /data-gen-summary/);
+  assert.match(home, /t\('home\.noFilters'\)/);
+  assert.equal((home.match(/data-home-generate/g) || []).length, 1);
+  // Arrow keys move along the rail (WAI-ARIA tabs), so it works from a keyboard.
+  assert.match(home, /e\.key === 'ArrowRight'[\s\S]*e\.key === 'ArrowLeft'[\s\S]*e\.key === 'Home'[\s\S]*e\.key === 'End'/);
+  // The guest count is rendered only from what the server hands the client.
+  assert.match(home, /user\.guest === true && Number\.isFinite\(Number\(user\.guestRemaining\)\)/);
+  // Due reviews and unfinished work are each shown once, never twice.
+  assert.match(home, /data-home-today/);
+  assert.match(home, /!\(item\.kind === 'reviews' && shownToday\.has\('reviews'\)\)/);
+});
+
+check('the running clock is a device preference the marker never reads', () => {
+  assert.match(card, /useDevicePref\('practiceTimer'\)/);
+  assert.match(card, /className="q-timer" role="timer"/);
+  // The attempt's time on task is still Date.now() - startRef, not the clock.
+  assert.match(card, /const ms = Date\.now\(\) - startRef\.current;/);
+  assert.doesNotMatch(card, /elapsed[^\n]*submit|submit[^\n]*elapsed|ms: elapsed/);
+  assert.match(card, /if \(!timerOn \|\| resolved\) return undefined;/);
+});
+
+check('the hint ladder is drawn from the question’s own hint count, climbed one rung at a time', () => {
+  assert.match(card, /<HintRail total=\{question\.hintsAvailable\} used=\{hintsUsed\} onHint=\{getHint\}/);
+  assert.match(card, /const next = n === used \+ 1;/);
+  assert.match(card, /disabled=\{disabled \|\| !next\}/);
+  assert.match(card, /data-hint-rail=\{total\} data-hints-used=\{used\}/);
+  // The ladder is never offered in a placement check.
+  assert.match(card, /!diagnostic && !isMcq && question\.hintsAvailable > 0 && !resolved && \(\s*<HintRail/);
+});
+
+check('keyboard shortcuts: N next, H hint, S submit, ⌘Z undo — and never while typing', () => {
+  // One table, read by the card (which obeys it) and by Settings → Help (which lists it).
+  assert.match(shortcuts, /PRACTICE_SHORTCUTS = Object\.freeze\(\[[\s\S]*'N'[\s\S]*'H'[\s\S]*'S'[\s\S]*'mod\+Z'/);
+  assert.match(card, /import \{ PRACTICE_SHORTCUTS \} from '\.\/shortcuts\.js'/);
+  assert.match(card, /if \(mod \|\| typing \|\| e\.key\.length !== 1\) return;/);
+  assert.match(card, /k === 's' && !s\.resolved && !s\.primary\.disabled/);
+  assert.match(card, /k === 'h' && !s\.diagnostic && !s\.isMcq && s\.hintsLeft > 0 && !s\.resolved/);
+  // ⌘Z in write mode presses the pen toolbar's own Undo: one undo, the pen's.
+  assert.match(card, /\.ink-toolbar button\[aria-label="\$\{s\.t\('ink\.undoLabel'\)\}"\]/);
+  // Tab opens the symbol palette and Escape returns (no keyboard trap).
+  assert.match(card, /e\.key === 'Tab' && !e\.shiftKey && !resolved/);
+  assert.match(card, /if \(e\.key === 'Escape'\) \{ e\.preventDefault\(\); setShowSyms\(false\); inputRef\.current\?\.focus\(\); \}/);
+});
+
+check('the footer strip and the provenance line say only what is true', () => {
+  assert.match(card, /className="ws-foot no-print" data-ws-foot/);
+  // The footer's Next is quiet; the action bar keeps the page's one primary.
+  const foot = card.slice(card.indexOf('<div className="ws-foot'), card.indexOf('<div className="ws-actions'));
+  assert.doesNotMatch(foot, /btn-primary/);
+  assert.match(card, /data-provenance=\{question\.pyq \? 'paper' : 'engine'\}/);
+  assert.match(en, /'verdict\.provenanceEngine': '[^']*deterministic marker, not by a model/);
+  assert.match(en, /'verdict\.provenancePaper': 'Transcribed from a published paper/);
+  assert.doesNotMatch(en, /'verdict\.provenance[A-Za-z]*': '[^']*generated by AI/i);
+  assert.match(card, /<figcaption className="q-figure-note">\{t\('verdict\.notToScale'\)\}<\/figcaption>/);
+});
+
+// ── Section 7 parity: Settings, Getting started, Favourites, page states ───
+const [settings, favorites, folders, pageState, tutorial, history] = await Promise.all([
+  'src/pages/SettingsLegacy.jsx', 'src/pages/Favorites.jsx', 'src/pages/favoriteFolders.js', 'src/components/PageState.jsx',
+  'src/components/GettingStarted.jsx', 'src/pages/History.jsx'
+].map(src));
+
+check('Settings reaches the sections of the reference product without duplicating the cloud panel’s authority', () => {
+  assert.match(settings, /\['plan', '', 'settings\.secSubscription'\]/);
+  assert.match(settings, /\['about', '', 'settings\.secAbout'\]/);
+  // Premium, pricing, account deletion and account export stay with the cloud panel / server.
+  assert.match(settings, /scrollToCloud = \(\) => document\.getElementById\('cloud-account-title'\)/);
+  assert.match(settings, /cloud\.exportAccount\(\)/);
+  assert.match(settings, /cloud\.me\(\)\.then\(me => \{ if \(live\) setState\(me\?\.account \? 'ready' : 'hidden'\); \}\)/);
+  assert.match(en, /'settings\.subscriptionCloudNote': '[^']*Only the server decides Premium/);
+  // Terms, privacy, refunds and contact are the real legal routes.
+  for (const route of ['/terms', '/privacy', '/refund-policy', '/grievance']) assert.ok(settings.includes(`to="${route}"`), route);
+});
+
+check('text size is a device preference that scales the reading text and leaves the chrome alone', () => {
+  assert.match(settings, /useDevicePref\('textScale'\)/);
+  assert.match(settings, /data-text-scale-preview/);
+  const cardCss = readFileSync(join(ROOT, 'src/components/QuestionCard.css'), 'utf8');
+  assert.match(cardCss, /\.ws \.q-prompt \{ font-size: calc\(var\(--text-math\) \* var\(--text-scale, 1\)\); \}/);
+  assert.doesNotMatch(cardCss, /\.ws-bar[^{]*\{[^}]*--text-scale/);
+  assert.match(app, /useEffect\(\(\) => \{ applyTextScale\(\); \}, \[\]\);/);
+});
+
+check('Help lists the same shortcut table the question page obeys, and the introduction restarts from it', () => {
+  assert.match(settings, /import \{ PRACTICE_SHORTCUTS \} from '\.\.\/components\/shortcuts\.js'/);
+  assert.match(settings, /data-shortcuts-table/);
+  assert.match(settings, /writeDevicePref\('tutorialSeen', false\); navigate\('\/', \{ state: \{ tour: true \} \}\)/);
+});
+
+check('Getting started is three steps, not a modal, once per device', () => {
+  assert.match(tutorial, /TUTORIAL_STEPS = Object\.freeze\(\[[\s\S]*'generate'[\s\S]*'write'[\s\S]*'verdict'/);
+  assert.doesNotMatch(tutorial, /role="dialog"|sheet-scrim|aria-modal/);
+  assert.match(tutorial, /useDevicePref\('tutorialSeen'\)/);
+  assert.match(home, /<GettingStarted[\s\S]*show=\{!!local && \(location\.state\?\.tour === true \|\| \(Number\(stats\?\.totals\?\.attempts\) \|\| 0\) === 0\)\}/);
+  // It takes focus only on an explicit restart, never on its own appearance (the skip link stays first).
+  assert.match(home, /focus=\{location\.state\?\.tour === true\}/);
+  assert.match(tutorial, /if \(open && focus\) headRef\.current\?\.focus/);
+});
+
+check('Favourites: bookmarks stay profile records; folders are device-local and never touch the backend', () => {
+  assert.match(favorites, /api\.post\(`\/history\/\$\{id\}\/bookmark`, \{\}\)/);
+  assert.match(folders, /const KEY = pid => `pri-fav-folders:\$\{pid\}`/);
+  assert.doesNotMatch(folders, /api\.|fetch\(/);
+  assert.doesNotMatch(backend, /folder/i);
+  assert.match(en, /'favorites\.foldersNote': '[^']*Folders are an arrangement kept on this device/);
+  // Practise this folder reuses the retry path; the worksheet prints through the platform's print path.
+  assert.match(favorites, /api\.post\(`\/history\/\$\{ids\[0\]\}\/retry`, \{ variant: 'same' \}\)/);
+  assert.match(practicePage, /shiftQueue\(\)/);
+  assert.match(favorites, /printPage\(\)/);
+  assert.match(favorites, /Answers are not printed|favorites\.worksheetFoot/);
+  assert.match(app, /<Route path="\/favorites" element=\{studentOnly\(<Favorites \/>\)\} \/>/);
+  assert.match(history, /data-open-favorites/);
+});
+
+check('page states are five different things drawn by one component', () => {
+  assert.match(pageState, /kind = 'loading'/);
+  assert.match(pageState, /TITLE_KEY = \{ empty: 'state\.emptyTitle', offline: 'state\.offlineTitle', error: 'state\.errorTitle', slow: 'state\.slowTitle' \}/);
+  assert.match(pageState, /const role = kind === 'error' \? 'alert' : 'status'/);
+  assert.match(en, /'state\.errorBody': 'Your work is still here and nothing was lost/);
+  assert.match(practicePage, /<PageState kind="offline"/);
+  assert.match(practicePage, /<PageState kind="slow"/);
+  assert.match(home, /<PageState kind="error"/);
+  assert.match(favorites, /<PageState kind="empty"/);
 });
 
 check('no effect shadows the translator it calls (the exam-timer crash)', () => {

@@ -1,0 +1,41 @@
+/* Favourites (Section 7.5): folders as tabs, one action row, the saved list in
+   History's row grammar, and a printed worksheet. Tokens only. */
+.fav { display: grid; gap: 16px; }
+.fav-head { flex-wrap: wrap; gap: 12px; }
+.fav-folders { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.fav-folders .seg-tab { margin-top: 0; border: 1px solid var(--hairline-strong); border-radius: var(--radius-sm); display: inline-flex; gap: 8px; align-items: center; }
+.fav-folder-n { color: var(--ink-3); font-variant-numeric: tabular-nums; font-size: 12.5px; }
+.fav-folder.on .fav-folder-n { color: var(--ink-2); }
+.fav-new { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.fav-new .input { width: 200px; }
+.fav-note { font-size: 13px; margin: -6px 0 0; }
+.fav-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 14px; border-top: 1px solid var(--hairline); }
+.fav-current { font-size: 17px; font-weight: 600; margin: 0 auto 0 0; }
+.fav-actions .btn svg { width: 15px; height: 15px; margin-right: 6px; }
+.fav-row-actions { flex-wrap: wrap; }
+.fav-move .input { min-height: 36px; height: 36px; padding: 0 8px; font-size: 13.5px; width: auto; }
+.fav-worksheet { display: none; }
+@media (pointer: coarse), (hover: none) {
+  .fav-move .input { min-height: 44px; height: 44px; }
+}
+@media (max-width: 760px) {
+  .fav-new .input { width: 100%; }
+  .fav-row-actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
+/* The printed worksheet: only it is on the page, in black on white, numbered,
+   with ruled space to work under each question. */
+@media print {
+  body:has(.fav-worksheet) .shell, body:has(.fav-worksheet) .toast-wrap { display: none !important; }
+  body:has(.fav-worksheet) .fav > *:not(.fav-worksheet) { display: none !important; }
+  .fav-worksheet { display: block; font-family: var(--font-math); color: var(--ink); }
+  .fav-ws-head h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+  .fav-ws-head p { margin: 0 0 18px; font-size: 13px; color: var(--ink-2); font-family: var(--font); }
+  .fav-ws-list { list-style: none; margin: 0; padding: 0; }
+  .fav-ws-item { break-inside: avoid; padding: 10px 0 14px; border-top: 1px solid var(--hairline-strong); }
+  .fav-ws-q { font-size: 15px; line-height: 1.6; display: flex; gap: 10px; align-items: baseline; }
+  .fav-ws-n { font-variant-numeric: tabular-nums; min-width: 24px; }
+  .fav-ws-meta { font-family: var(--font); font-size: 12px; color: var(--ink-3); margin: 2px 0 0 34px; }
+  .fav-ws-space { height: 150px; margin: 8px 0 0 34px; background-image: repeating-linear-gradient(180deg, transparent 0 29px, var(--hairline-strong) 29px 30px); }
+  .fav-ws-foot { margin-top: 18px; font-family: var(--font); font-size: 12px; color: var(--ink-3); }
+}

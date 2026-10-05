@@ -26,7 +26,11 @@ import { tLater, translate, useLanguage, useT } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
 import { useFormFactor } from '../platform/formFactor.js';
 import Icon from './Icon.jsx';
+import { useDevicePref } from './devicePrefs.js';
+import { PRACTICE_SHORTCUTS } from './shortcuts.js';
+export { PRACTICE_SHORTCUTS };
 import '../workspace.css';
+import './QuestionCard.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
 // True in a production build made with the tutor off (see src/tutor/flag.js).
 // A literal test of the build constants, not a helper imported from flag.js:
@@ -52,6 +56,53 @@ const SYMBOLS = [
   ['≠', 'sym.neq'], ['°', 'sym.degrees'], ['θ', 'sym.theta'], ['(', 'sym.openBracket'],
   [')', 'sym.closeBracket'], ['/', 'sym.dividedBy'], [':', 'sym.ratio']
 ];
+// mm:ss for the running clock. Hours are not expected on one question; if a
+// student does leave a page open that long the figure keeps counting honestly.
+const fmtClock = (ms) => {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(s / 60);
+  return `${m}:${String(s % 60).padStart(2, '0')}`;
+};
+
+// Typed answers keep a short history so Undo and Redo in the editor header
+// work the same whether the student typed, pasted or tapped a symbol in.
+const TYPED_HISTORY = 60;
+
+
+/**
+ * The hint ladder: one rung per hint the question carries, numbered, in order.
+ * Used rungs are filled; the next rung is the only live control; later rungs
+ * wait, so the ladder is climbed one step at a time. It is drawn from the
+ * question's own count (`hintsAvailable`), so a question with two hints shows
+ * two rungs and one with four shows four — the ladder logic stays with the
+ * content, not with this component.
+ */
+function HintRail({ total, used, onHint, disabled, t }) {
+  if (!(total > 0)) return null;
+  const rungs = Array.from({ length: total }, (_, i) => i + 1);
+  return (
+    <div className="hint-rail" role="group" aria-label={t('verdict.hints')} data-hint-rail={total} data-hints-used={used}>
+      {rungs.map(n => {
+        const opened = n <= used;
+        const next = n === used + 1;
+        const label = opened ? t('verdict.hintOpened', { n })
+          : next ? t('verdict.hintLabel', { n, total })
+            : t('verdict.hintLocked', { n, before: n - 1 });
+        return (
+          <button key={n} type="button"
+            className={`icon-btn hint-rung${opened ? ' is-open' : ''}${next ? ' hint-bulb' : ''}`}
+            data-rung={n} aria-pressed={opened || undefined} disabled={disabled || !next}
+            title={next ? t('verdict.hintTitle', { n }) : undefined} aria-label={label}
+            onClick={next ? onHint : undefined}>
+            <Icon name="hint" size={16} /><span className="hint-rung-n" aria-hidden="true">{n}</span>
+          </button>
+        );
+      })}
+      <span className="hint-rail-word" aria-hidden="true">{t('verdict.hint')}</span>
+    </div>
+  );
+}
+
 const preferMode = () => {
   const saved = localStorage.getItem('pri-input-mode');
   if (saved) return saved;
@@ -271,6 +322,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [showWhy, setShowWhy] = useState(false);
   const [showSyms, setShowSyms] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
+  // The running clock (Settings → Appearance can turn it off). It counts from
+  // the moment the question is on screen and stops on the verdict; the time
+  // the marker records (`ms`) is measured separately and is unaffected.
+  const [timerOn] = useDevicePref('practiceTimer');
+  const [elapsed, setElapsed] = useState(0);
+  // Undo and redo for the typed editor: past and future values of the field
+  // that is being edited (the answer, or the working on a working question).
+  const typedPast = useRef([]);
+  const typedFuture = useRef([]);
+  const [, bumpHistory] = useState(0);
+  const symFirstRef = useRef(null);
+  const cardRef = useRef(null);
   const [state, setState] = useState({ phase: 'answering' });
   const [busy, setBusy] = useState(false);
   const [selfMarks, setSelfMarks] = useState({});
@@ -336,6 +399,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     latestInk.current = null;
     setPeekOpen(false);
     startRef.current = Date.now();
+    setElapsed(0);
+    typedPast.current = []; typedFuture.current = []; bumpHistory(n => n + 1);
     if (mode === 'type') setTimeout(() => inputRef.current?.focus(), 60);
   }, [question.id]); // eslint-disable-line
 
@@ -580,8 +645,54 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       setSaveState(saveDraft('question', question.id, { typed, working: wk }, meta) ? 'saved' : 'failed');
     }, 450);
   };
-  const editAnswer = (v) => { setAnswer(v); stash(v, working); };
-  const editWorking = (v) => { setWorking(v); stash(answer, v); };
+  // Every edit of the live field is one step of history. A new edit after an
+  // undo discards the redo branch, as every editor does.
+  const remember = (prev) => {
+    typedPast.current = [...typedPast.current.slice(-(TYPED_HISTORY - 1)), prev];
+    typedFuture.current = [];
+    bumpHistory(n => n + 1);
+  };
+  const editAnswer = (v) => { if (v !== answer) remember(isWorking ? working : answer); setAnswer(v); stash(v, working); };
+  const editWorking = (v) => { if (v !== working) remember(isWorking ? working : answer); setWorking(v); stash(answer, v); };
+  const liveTyped = isWorking ? working : answer;
+  const applyTyped = (v) => { if (isWorking) { setWorking(v); stash(answer, v); } else { setAnswer(v); stash(v, working); } };
+  const undoTyped = () => {
+    if (!typedPast.current.length || resolved) return false;
+    const prev = typedPast.current[typedPast.current.length - 1];
+    typedPast.current = typedPast.current.slice(0, -1);
+    typedFuture.current = [...typedFuture.current, liveTyped];
+    applyTyped(prev); bumpHistory(n => n + 1);
+    return true;
+  };
+  const redoTyped = () => {
+    if (!typedFuture.current.length || resolved) return false;
+    const next = typedFuture.current[typedFuture.current.length - 1];
+    typedFuture.current = typedFuture.current.slice(0, -1);
+    typedPast.current = [...typedPast.current, liveTyped];
+    applyTyped(next); bumpHistory(n => n + 1);
+    return true;
+  };
+  const canUndoTyped = typedPast.current.length > 0;
+  const canRedoTyped = typedFuture.current.length > 0;
+
+  // Tab inside the field opens the symbol palette and moves into it, so
+  // "Tab to insert maths" is literally true; Shift+Tab leaves backwards as
+  // usual, and Escape in the palette returns to the field (WCAG 2.1.2).
+  const onFieldKey = (e) => {
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) redoTyped(); else undoTyped();
+      return;
+    }
+    if (e.key === 'Tab' && !e.shiftKey && !resolved) {
+      e.preventDefault();
+      setShowSyms(true);
+      requestAnimationFrame(() => symFirstRef.current?.focus());
+    }
+  };
+  const onPaletteKey = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); setShowSyms(false); inputRef.current?.focus(); }
+  };
 
   useEffect(() => {
     if (!resolved) return;
@@ -623,6 +734,16 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     window.addEventListener('offline', off);
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, []);
+
+  // The clock ticks once a second while the question is open and stops on the
+  // verdict, where it shows the time the attempt took. Off, nothing runs.
+  useEffect(() => {
+    if (!timerOn || resolved) return undefined;
+    const tick = () => setElapsed(Date.now() - startRef.current);
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [timerOn, resolved, question.id]);
 
   // ── The question, recalled while working far down the page ────────────────
   useEffect(() => {
@@ -1161,6 +1282,38 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           run: () => submit(), disabled: busy || !canSubmit
         };
 
+  // ── Keyboard: N next, H hint, S submit, ⌘Z undo ────────────────────────────
+  // Letters are read only when focus is not in a field, so typing "s" into an
+  // answer never submits it. ⌘Z inside a typed field is handled by the field
+  // itself (onFieldKey); outside one it undoes the last pen stroke by pressing
+  // the writing toolbar's own Undo, so there is one undo and it is the pen's.
+  const shortcutRef = useRef(null);
+  shortcutRef.current = { primary, getHint, onNext, undoTyped, writeMode, resolved, busy, hintsLeft, diagnostic, isMcq, t };
+  useEffect(() => {
+    const onKey = (e) => {
+      const s = shortcutRef.current;
+      if (!s || e.defaultPrevented || e.altKey) return;
+      const target = e.target;
+      const typing = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable);
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        if (typing) return;                                        // the field's own handler
+        if (s.writeMode && !s.resolved) {
+          const undo = cardRef.current?.querySelector(`.ink-toolbar button[aria-label="${s.t('ink.undoLabel')}"]`);
+          if (undo) { e.preventDefault(); undo.click(); }
+        } else if (s.undoTyped()) e.preventDefault();
+        return;
+      }
+      if (mod || typing || e.key.length !== 1) return;
+      const k = e.key.toLowerCase();
+      if (k === 'n' && s.onNext && !s.busy) { e.preventDefault(); s.onNext(); }
+      else if (k === 'h' && !s.diagnostic && !s.isMcq && s.hintsLeft > 0 && !s.resolved) { e.preventDefault(); s.getHint(); }
+      else if (k === 's' && !s.resolved && !s.primary.disabled) { e.preventDefault(); s.primary.run(); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
   const solutionBody = res?.solution?.steps ? (
     <div className="solution-block">
       {plotSpec && (
@@ -1198,7 +1351,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const otherComments = (inkComments || []).filter(c => c !== firstBad && c.kind !== 'good');
 
   return (
-    <div className={`qpage ws ${split ? 'ws-split' : 'ws-single'}`} data-phase={state.phase} data-mode={isMcq ? 'mcq' : mode} data-question-id={question.id}>
+    <div ref={cardRef} className={`qpage ws ${split ? 'ws-split' : 'ws-single'}`} data-phase={state.phase} data-mode={isMcq ? 'mcq' : mode} data-question-id={question.id}
+      data-shortcuts={PRACTICE_SHORTCUTS.map(s => s.key).join(' ')}>
       {/* ── The question: the page's reference object ── */}
       <section className="ws-context" aria-label={t('verdict.questionRegion')}>
         <div className="q-topmeta">
@@ -1213,8 +1367,16 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           {!reasonTag && reason === 'weak-spot' && <span className="tag tag-brand">{t('verdict.weakSpot')}</span>}
           {!reasonTag && reason === 'new-ground' && <span className="tag tag-brand">{t('verdict.newGround')}</span>}
           {reason === 'task' && <span className="tag tag-brand">{t('verdict.task')}</span>}
-          {/* Practice is untimed on screen: time on task is still measured for the
-              marker, but a running clock is pressure, not information. */}
+          {/* The running clock, top right. It is information, not a deadline:
+              nothing happens when it grows, and Settings → Appearance turns it
+              off for a student who finds it pressure. The marker's own `ms` is
+              measured separately and never read from here. */}
+          {timerOn && !diagnostic && (
+            <span className="q-timer" role="timer" aria-live="off" data-running={resolved ? undefined : ''}
+              aria-label={t(resolved ? 'verdict.timerTookAria' : 'verdict.timerAria', { time: fmtClock(elapsed) })}>
+              <Icon name="clock" size={14} />{fmtClock(elapsed)}
+            </span>
+          )}
         </div>
         {helpUsed > 0 && !resolved && (
           <p className="q-credit">{t('verdict.creditAvailable', { percent: Math.round(credit * 100), marks: Math.round(totalMarks * credit * 10) / 10 })}</p>
@@ -1223,7 +1385,24 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         <div ref={promptRef}>
           <MathText block className="q-prompt" text={question.prompt} />
         </div>
-        {figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: figure }} />}
+        {/* A diagram is a sketch: the engine draws the relationships, not the
+            measurements, so it says so — and a reader hears the figure's own
+            description (role="img" with its label) followed by the note. */}
+        {figure && (
+          <figure className="q-figure-wrap">
+            <div className="q-figure" dangerouslySetInnerHTML={{ __html: figure }} />
+            <figcaption className="q-figure-note">{t('verdict.notToScale')}</figcaption>
+          </figure>
+        )}
+        {/* Where this question came from, stated under every item. Pri's
+            questions are drawn from checked templates or transcribed papers,
+            and the mark comes from the deterministic marker — never from a
+            model — so that is what it says. */}
+        {!diagnostic && (
+          <p className="q-provenance" data-provenance={question.pyq ? 'paper' : 'engine'}>
+            {t(question.pyq ? 'verdict.provenancePaper' : 'verdict.provenanceEngine')}
+          </p>
+        )}
         {showWhy && why && <p className="q-why">{why}</p>}
 
         {hints.length > 0 && (
@@ -1272,13 +1451,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           )}
           <div className="ws-tools-end">
             {!diagnostic && !isMcq && question.hintsAvailable > 0 && !resolved && (
-              <button type="button" className="icon-btn hint-bulb" disabled={hintsLeft <= 0}
-                title={t('verdict.hintTitle', { n: hintsUsed + 1 })}
-                aria-label={hintsLeft > 0 ? t('verdict.hintLabel', { n: hintsUsed + 1, total: question.hintsAvailable }) : t('verdict.noHintsLeft')}
-                onClick={getHint}>
-                <Icon name="hint" /><span>{t('verdict.hint')}</span>
-                <span className="hint-left">{t('verdict.hintsLeft', { count: hintsLeft, n: hintsLeft })}</span>
-              </button>
+              <HintRail total={question.hintsAvailable} used={hintsUsed} onHint={getHint} disabled={busy} t={t} />
             )}
             {!resolved && (
               <button type="button" className={`icon-btn q-rail-btn ${showScribble ? 'on' : ''}`} aria-pressed={showScribble}
@@ -1324,12 +1497,16 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 <span className="editor-hint">{t(isWorking ? 'verdict.editorHintWorking' : 'verdict.editorHintType')}</span>
                 <span style={{ flex: 1 }} />
                 {question.answerSuffix && <span className="answer-suffix">{t('verdict.answerIn', { unit: question.answerSuffix })}</span>}
+                <span className="editor-history" role="group" aria-label={t('verdict.editorHistory')}>
+                  <button type="button" className="icon-btn editor-undo" disabled={!canUndoTyped} title={t('verdict.undoTyped')} aria-label={t('verdict.undoTyped')} onClick={undoTyped}><Icon name="undo" size={16} /></button>
+                  <button type="button" className="icon-btn editor-redo" disabled={!canRedoTyped} title={t('verdict.redoTyped')} aria-label={t('verdict.redoTyped')} onClick={redoTyped}><Icon name="redo" size={16} /></button>
+                </span>
               </div>
             )}
             {showSyms && !resolved && (
-              <div className="sym-palette">
-                {SYMBOLS.map(([sym, nameKey]) => (
-                  <button key={sym} className="sym-key" aria-label={t('verdict.insertSymbol', { name: t(nameKey) })} onClick={() => insertSym(sym)}>{sym}</button>
+              <div className="sym-palette" role="group" aria-label={t('verdict.symbolPalette')} onKeyDown={onPaletteKey}>
+                {SYMBOLS.map(([sym, nameKey], i) => (
+                  <button key={sym} ref={i === 0 ? symFirstRef : undefined} className="sym-key" aria-label={t('verdict.insertSymbol', { name: t(nameKey) })} onClick={() => insertSym(sym)}>{sym}</button>
                 ))}
               </div>
             )}
@@ -1388,6 +1565,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   placeholder={question.inputHint || t('verdict.workingPlaceholder')}
                   value={working} disabled={resolved}
                   onChange={e => editWorking(e.target.value)}
+                  onKeyDown={onFieldKey}
                   rows={6}
                 />
               ) : (
@@ -1401,7 +1579,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     value={answer}
                     disabled={resolved}
                     onChange={e => editAnswer(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') submit(); }}
+                    onKeyDown={e => { if (e.key === 'Enter') submit(); else onFieldKey(e); }}
                     autoCapitalize="none" autoCorrect="off" spellCheck={false}
                     // Answers are expressions as often as numbers (x², 3/4, √2),
                     // so a numeric keypad would block them: keep the full
@@ -1705,6 +1883,26 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               </div>
             )}
           </>
+        )}
+
+        {/* ── The footer strip: where this question sits in the syllabus, and the
+            way on. Year · course · difficulty · topic, then Next as a quiet
+            control (the action bar below keeps the page's one primary). ── */}
+        {!diagnostic && (
+          <div className="ws-foot no-print" data-ws-foot>
+            <span className="ws-foot-meta">
+              <span>{t(user.course === 'in' ? 'common.classNumber' : 'common.yearNumber', { n: question.year ?? user.year })}</span>
+              <span>{question.indiaTrack ? (user.indiaTrackName || user.courseLabel) : (user.courseLabel || '').replace(/^(?:Year|Class) \d+\s*·\s*/, '')}</span>
+              <span>{question.diffLabel}</span>
+              <span lang="en" className="ws-foot-topic"><TermGloss text={question.subtopicName} /></span>
+            </span>
+            {onNext && (
+              <button type="button" className="btn btn-ghost btn-sm ws-foot-next" onClick={() => onNext()} disabled={busy}
+                aria-keyshortcuts="n" title={t('practice.nextQuestion')}>
+                {t('practice.next')}<Icon name="next" size={15} />
+              </button>
+            )}
+          </div>
         )}
 
         {/* ── One obvious next move; everything else stays reachable and quiet ── */}

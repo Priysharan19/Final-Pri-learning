@@ -1,0 +1,55 @@
+/* Home as a command centre (Section 7.2): the Today rows under the one
+   recommendation, and the generate rail — every step of a request in one
+   row, a summary chip and one Generate, with no screen in between. Loaded
+   with Home, after theme.css; every value is a token from theme.css. */
+
+/* Today: reviews that are due and work left unfinished, as ruled rows. */
+.home-today { list-style: none; margin: 14px 0 0; padding: 0; border-top: 1px solid var(--hairline); }
+.home-today-row {
+  display: flex; align-items: center; gap: 12px; padding: 10px 4px; border-bottom: 1px solid var(--hairline);
+  font-size: 14.5px; color: var(--ink);
+}
+.home-today-title { flex: 1; min-width: 0; }
+.home-today-row .btn { flex: none; }
+
+/* The rail. Rules are scoped under .genbar so they outrank theme.css's
+   generic .gen-cat (which lays its children out in a row) whatever order the
+   two files land in the bundle. */
+.genbar .gen-rail {
+  display: flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--hairline-strong); border-bottom: 0;
+  border-radius: var(--radius) var(--radius) 0 0; background: var(--surface); overflow: hidden;
+}
+.genbar .gen-rung {
+  flex: 1 1 0; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; justify-items: start; align-content: start;
+  text-align: left; padding: 10px 12px 9px; border: 0; border-right: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
+  margin-bottom: -1px; background: none; color: var(--ink-2); font: inherit; cursor: pointer; min-height: 54px; width: auto; box-shadow: none;
+}
+.genbar .gen-rung:last-child { border-right: 0; }
+.genbar .gen-rung-label { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; }
+.genbar .gen-rung-value { font-size: 13.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.genbar .gen-rung.has-value .gen-rung-value { color: var(--ink); }
+.genbar .gen-rung:hover:not(:disabled) { background: var(--surface-2); }
+.genbar .gen-rung.on { background: var(--surface-2); color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+.genbar .gen-rung.on .gen-rung-label { color: var(--accent); }
+.genbar .gen-rung:disabled { opacity: 0.45; cursor: default; }
+
+/* The summary line under the rail: chips (or "No filters applied"), the guest
+   count when the server exposes one, and Generate. */
+.genbar .genbar-head { border-radius: 0 0 var(--radius) var(--radius); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.genbar[data-open] .genbar-head { border-radius: 0; border-bottom: 0; }
+.genbar-empty.chip { flex: 1; cursor: default; justify-content: flex-start; color: var(--ink-3); background: none; border-style: dashed; }
+.genbar-guest { color: var(--ink-3); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.genbar .gen-panel { display: block; min-height: 0; max-height: none; border-top: 1px solid var(--hairline); }
+.genbar .gen-pane { padding: 16px 18px 18px; max-height: 340px; overflow-y: auto; }
+
+/* Narrow: the rail wraps into two rows of three rather than hiding rungs
+   behind a scroll; the last rung in a row keeps its edge. */
+@media (max-width: 760px) {
+  .genbar .gen-rung { flex: 1 1 33%; padding-inline: 10px; }
+  .genbar .gen-rung:nth-child(3n) { border-right: 0; }
+  .genbar .genbar-head .btn-primary { flex: 1 1 100%; }
+}
+@media (pointer: coarse), (hover: none) {
+  .home-today-row .btn { min-height: 44px; }
+  .genbar .gen-rung { min-height: 56px; }
+}

@@ -12,6 +12,7 @@ import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import TermGloss from '../components/TermGloss.jsx';
 import Icon from '../components/Icon.jsx';
+import PageState from '../components/PageState.jsx';
 
 const FILTERS = [
   ['all', 'history.filterAll'],
@@ -62,8 +63,10 @@ export default function History() {
   const [open, setOpen] = useState(null);       // {id, detail}
   const nav = useNavigate();
 
+  const [failed, setFailed] = useState(false);
   const load = useCallback(() => {
-    api.post('/history/list', { filter, page }).then(setData).catch(() => setData({ items: [], total: 0 }));
+    setFailed(false);
+    api.post('/history/list', { filter, page }).then(setData).catch(() => { setFailed(true); setData({ items: [], total: 0 }); });
   }, [filter, page]);
   useEffect(() => { setPage(0); }, [filter]);
   useEffect(() => { load(); }, [load]);
@@ -118,8 +121,15 @@ export default function History() {
         ))}
       </div>
 
+      {filter === 'bookmarked' && (
+        <p className="muted" style={{ margin: 0 }}>
+          {t('history.favouritesHint')}{' '}
+          <button type="button" className="btn-disclose" style={{ display: 'inline-flex' }} data-open-favorites onClick={() => nav('/favorites')}>{t('history.openFavourites')}</button>
+        </p>
+      )}
+      {failed && <PageState kind="error" title={t('history.loadFailed')} action={{ label: t('common.tryAgain'), onClick: load }} />}
       <div className="card" style={{ padding: 10 }}>
-        {!data && <div className="skeleton" style={{ height: 300 }} />}
+        {!data && <PageState kind="loading" height={300} label={t('history.loading')} />}
         {data && !data.items.length && (
           <p className="muted" style={{ padding: 14 }}>
             {t(filter === 'all' ? 'history.emptyAll' : 'history.emptyFiltered')}
