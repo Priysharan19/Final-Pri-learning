@@ -1,0 +1,80 @@
+/* The question page's own furniture (Section 7.18/7.19 parity): the running
+   clock, the hint ladder, the editor's history controls, the provenance line,
+   the diagram note and the footer strip. Loaded with QuestionCard, after
+   theme.css and workspace.css; every value is a token from theme.css. */
+
+/* The clock sits at the far right of the meta line, in tabular figures. */
+.q-topmeta .q-timer {
+  margin-left: auto; color: var(--ink-3); font-size: 13px; font-variant-numeric: tabular-nums;
+  display: inline-flex; align-items: center; gap: 5px; letter-spacing: 0.01em;
+}
+.q-topmeta .q-timer svg { width: 14px; height: 14px; }
+.q-topmeta .q-timer[data-running] { color: var(--ink-2); }
+
+/* The hint ladder: numbered rungs, climbed in order. */
+.hint-rail { display: inline-flex; align-items: center; gap: 4px; }
+.hint-rung {
+  position: relative; width: 36px; height: 36px; border: 1px solid var(--hairline-strong); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--ink-2); display: inline-grid; place-items: center; padding: 0;
+}
+.hint-rung svg { width: 16px; height: 16px; }
+.hint-rung-n {
+  position: absolute; right: 2px; bottom: 1px; font: 600 12px/1 var(--font); color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.hint-rung.is-open { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
+.hint-rung.is-open .hint-rung-n { color: var(--accent); }
+.hint-rung.hint-bulb:not(:disabled) { border-color: var(--ink-3); color: var(--ink); }
+.hint-rung:disabled:not(.is-open) { opacity: 0.45; cursor: default; }
+.hint-rail-word { color: var(--ink-3); font-size: 13px; margin-left: 4px; }
+
+/* Undo and redo in the editor header. */
+.editor-history { display: inline-flex; gap: 2px; margin-left: 6px; }
+.editor-history .icon-btn { width: 32px; height: 32px; color: var(--ink-2); }
+.editor-history .icon-btn:disabled { color: var(--disabled); cursor: default; }
+
+/* Where the question came from, under the stem: a quiet note, not a badge. */
+.q-provenance { color: var(--ink-3); font-size: 12.5px; margin: 12px 0 0; max-width: var(--measure); line-height: 1.5; }
+
+/* A diagram is a sketch, and says so. */
+.q-figure-wrap { margin: 16px 0 0; }
+.q-figure-wrap .q-figure { margin: 0; }
+.q-figure-note { color: var(--ink-3); font-size: 12px; margin-top: 6px; font-style: italic; }
+
+/* The footer strip: syllabus position, then the way on. */
+.ws-foot {
+  display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap;
+  margin-top: 6px; padding: 10px 0 2px; border-top: 1px solid var(--hairline);
+  color: var(--ink-3); font-size: 13px;
+}
+.ws-foot-meta { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 0; min-width: 0; }
+.ws-foot-meta > span + span::before { content: '·'; margin: 0 8px; color: var(--hairline-strong); }
+.ws-foot-topic { color: var(--ink-2); }
+.ws-foot-next { margin-left: auto; gap: 6px; }
+.ws-foot-next svg { width: 15px; height: 15px; }
+
+@media (pointer: coarse), (hover: none) {
+  .hint-rung { width: 44px; height: 44px; }
+  .editor-history .icon-btn { width: 44px; height: 44px; }
+  .ws-foot-next { min-height: 44px; }
+}
+@media (max-width: 760px) {
+  .hint-rail-word { display: none; }
+  .hint-rung { width: 44px; height: 44px; }
+  .ws-foot { padding-bottom: 8px; }
+}
+@media print {
+  .q-timer { display: none; }
+}
+
+/* The question peek (workspace bar's recall strip) overlays the page rather
+   than pushing it, so the writing area never moves. Its text must therefore
+   never take a tap meant for what sits under it: only its button is pressable.
+   On a phone the fixed action bar is taller than the page's scroll padding when
+   its status wraps, so the controls carry their own scroll margins and land
+   clear of both bars when scrolled into view (WCAG 2.4.11), in every engine. */
+.ws-qpeek { pointer-events: none; }
+.ws-qpeek .btn { pointer-events: auto; }
+@media (max-width: 760px) {
+  .ws-tools, .mode-tab, .hint-rung, .q-rail-btn, .editor-shell, .mcq-opt { scroll-margin-top: 104px; scroll-margin-bottom: 170px; }
+}

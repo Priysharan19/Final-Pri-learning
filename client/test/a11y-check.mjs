@@ -656,21 +656,28 @@ async function run() {
 
     await step('home', '/', async () => { await goTo(page, BASE, '/'); });
 
+    // The generator is a rail of rungs (Section 7.2): pressing a rung opens its
+    // chooser in place. The views keep their names; they are reached by rung id.
     await step('home · generator open', '/', async () => {
       await goTo(page, BASE, '/');
-      await click(page, '.genbar-toggle');
+      await click(page, '#gen-rung-year');
     });
 
-    for (const label of ['Course', 'Topics', 'Dot Points', 'Difficulty']) {
+    // A selected rung closes its chooser when pressed again, so a rung is
+    // pressed only when it is not already the open one.
+    const openRung = async (rung) => {
+      const tab = page.locator(`#gen-rung-${rung}`);
+      if (await tab.getAttribute('aria-selected') !== 'true') await click(page, `#gen-rung-${rung}`);
+    };
+    for (const [label, rung] of [['Course', 'course'], ['Topics', 'topics'], ['Dot Points', 'dots'], ['Difficulty', 'difficulty']]) {
       await step(`home · generator · ${label.toLowerCase()}`, '/', async () => {
-        const tab = page.locator('.gen-cat', { hasText: label }).first();
-        if (await tab.isDisabled()) {
+        if (await page.locator(`#gen-rung-${rung}`).isDisabled()) {
           // walk far enough into the flow that this pane has something to show
-          await click(page, '.gen-cat', { text: 'Course' });
+          await openRung('course');
           await click(page, '.gen-pane .gen-opt');
           await click(page, '.gen-pane .gen-opt');
         }
-        await click(page, '.gen-cat', { text: label });
+        await openRung(rung);
       });
     }
 

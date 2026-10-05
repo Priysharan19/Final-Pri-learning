@@ -4,9 +4,14 @@ import { fileURLToPath } from 'node:url';
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 // Route-only styles load with their routes (src/workspace.css, src/ink/InkAnswer.css);
 // the system is these files read together, in load order.
+// Section 7 parity furniture (Home.css, QuestionCard.css) loads with its page
+// and is linted here with the rest, so a literal colour or a 20px radius in
+// a page file fails the same way it would in theme.css.
 const theme = readFileSync(new URL('../src/theme.css', import.meta.url), 'utf8')
   + '\n' + readFileSync(new URL('../src/workspace.css', import.meta.url), 'utf8')
-  + '\n' + readFileSync(new URL('../src/ink/InkAnswer.css', import.meta.url), 'utf8');
+  + '\n' + readFileSync(new URL('../src/ink/InkAnswer.css', import.meta.url), 'utf8')
+  + '\n' + readFileSync(new URL('../src/pages/Home.css', import.meta.url), 'utf8')
+  + '\n' + readFileSync(new URL('../src/components/QuestionCard.css', import.meta.url), 'utf8');
 const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
 
 const checks = [];
@@ -74,6 +79,21 @@ const selectors = [
   '.eval-card', '.verdict-good', '.pri-explain-dialog', '.mobilenav'
 ];
 for (const selector of selectors) check(`core primitive ${selector} is adopted`, theme.includes(selector), selector);
+
+// ── Section 7 parity furniture ────────────────────────────────────────────
+// The Home rail and the question page's clock, hint ladder, editor history,
+// provenance line, diagram note and footer strip exist, in the token system,
+// with no text under 12px and 44px targets on touch.
+const parity = readFileSync(new URL('../src/pages/Home.css', import.meta.url), 'utf8')
+  + '\n' + readFileSync(new URL('../src/components/QuestionCard.css', import.meta.url), 'utf8');
+for (const selector of ['.home-today', '.gen-rail', '.gen-rung', '.q-timer', '.hint-rail', '.hint-rung', '.editor-history', '.q-provenance', '.q-figure-note', '.ws-foot'])
+  check(`parity primitive ${selector} is styled`, parity.includes(selector), selector);
+const small = [...parity.matchAll(/font(?:-size)?:\s*(?:\d+\s+)?(\d+(?:\.\d+)?)px/g)].map(m => Number(m[1])).filter(n => n < 12);
+check('parity furniture sets no text below 12px', small.length === 0, small.join(','));
+check('parity furniture gives touch 44px rungs and history controls',
+  /\(pointer: coarse\), \(hover: none\)[\s\S]*\.hint-rung \{ width: 44px; height: 44px; \}/.test(parity)
+  && /\(pointer: coarse\), \(hover: none\)[\s\S]*\.editor-history \.icon-btn \{ width: 44px; height: 44px; \}/.test(parity));
+check('the running clock and the hint ladder use tabular figures', /\.q-timer \{[^}]*tabular-nums/.test(parity) && /\.hint-rung-n \{[^}]*tabular-nums/.test(parity));
 
 check('keyboard focus is visible', /:focus-visible\s*\{[^}]*outline:\s*3px\s+solid\s+var\(--focus\)/s.test(theme));
 // The motion system: every animated selector in it is switched off under

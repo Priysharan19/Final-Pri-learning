@@ -20,7 +20,7 @@ Rules that follow, in priority order:
 6. **Motion explains.** It shows cause or continuity, never decorates, never repeats, and never delays a result.
 7. **Say only what is known.** Saved, offline, marked, read: each is stated only when it is true on this device.
 
-Enforced in CI by `client/test/design-system-check.mjs` (no decorative gradients, no glows, no literal colours below the token block, radii ≤ 8px, no emoji in chrome, one icon family, 3px focus ring) and `client/test/dream-interface-check.mjs` (workspace, feedback, exam and theme contracts).
+Enforced in CI by `client/test/design-system-check.mjs` (no decorative gradients, no glows, no literal colours below the token block, radii ≤ 8px, no emoji in chrome, one icon family, 3px focus ring; `pages/Home.css` and `components/QuestionCard.css` are linted with the system and may set no text under 12px) and `client/test/dream-interface-check.mjs` (workspace, feedback, exam, theme, Home rail, clock, hint ladder, shortcut and provenance contracts). The browser flow `client/test/tour-s7-parity.js` drives the rail, the clock, the ladder, the editor and the shortcuts.
 
 ## 2. Authority and reconciliation
 
@@ -185,17 +185,21 @@ Each entry lists what it is for and the states it must have. A component is not 
 
 **Workspace (thinking mode).** `/practice` and `/exams/:id` remove the rail, bottom bar and account furniture. The action bar holds exactly one primary action: Submit answer → Check this reading first → Confirm reading → Submit again → Next question.
 
+The question page's own furniture (`components/QuestionCard.css`), top to bottom: the marks badge leads the meta line and a running clock (`.q-timer`, `role="timer"`) ends it — information, not a deadline; it is a device preference (Settings → Appearance), on by default, and the marker's time on task is measured separately and never read from it. Under the stem, a diagram is a `<figure>` with the note "Diagram not to scale." (the SVG carries its own `role="img"` label for a reader), and a provenance line (`.q-provenance`) says where the question came from — a checked template, or a transcribed paper — and that the mark comes from the deterministic marker, not from a model. Text / Pen / Photo is the answer-mode switch. The typed editor's header holds the Σ palette, "Tab to insert maths" (Tab opens the palette and moves into it; Escape returns) and Undo/Redo for typing. Above the action bar a footer strip (`.ws-foot`) states Year/Class · course · difficulty · topic with a quiet Next (`.btn-ghost`), so the action bar keeps the page's one primary.
+
+Keyboard shortcuts on the question page: **N** next, **H** next hint, **S** submit, **⌘Z / Ctrl+Z** undo (typing in the field; the last pen stroke outside it). Letters are ignored while focus is in a field.
+
 **Handwriting.** Pen, Eraser, Undo, Redo, Clear, Page (up to four sheets on one coordinate space) and Finger, which is always offered: Apple Pencil is never required. A tap-to-correct fix is dropped whenever strokes are undone, redone or cleared, so it can never land on a different symbol. Ruled paper with a copper margin rule; ink is `--ink` in both themes. Unfinished ink is kept in the profile-scoped recovery store (`components/practiceRecovery.js`), restored on resume and cleared on resolution; the status line says "saved" only after the record is read back. Recognition is answer-blind. Engine names and fallback labels are developer-only.
 
 **Reading and uncertainty.** The reading panel shows what Pri read, one line per row. The smallest doubtful region is offered for confirmation in place. Nothing is marked on an unconfirmed reading.
 
 **Feedback.** The header states the outcome and the mark once. The first meaningful break leads, with its diagnosis; other lines wait behind "Show all n lines". A step table restates the total only when there is more than one step. A correct answer folds the worked method behind "See another method"; otherwise the worked method sits beside the student's work. No percentages, mastery figures, points or badges in the result.
 
-**Hints.** Shown in the question column as a ruled note; each hint is numbered; the count remaining is on the control.
+**Hints.** A ladder (`.hint-rail`): one numbered rung per hint the question carries, climbed in order — opened rungs are filled, the next rung is the only live control, later rungs wait. Each opened hint is shown in the question column as a ruled note. The rung count comes from the question's own `hintsAvailable`, so the ladder follows the content, never a fixed three. H opens the next rung from the keyboard. Never offered in a placement check.
 
 **Explanation player (Pri Explain).** A board, not a chat: the question as typeset mathematics, a ruled note on why the explanation is shaped this way, one step per scene, a timeline rail. It says "This explanation cannot change your mark". The engine version is a `data-explain-engine` attribute, not chrome. Styled by `components/PriExplainInstrument.css`.
 
-**Home.** One recommendation from the KALP-04 resolver on one sheet, with its reason. "Choose something else" holds the alternatives and the manual chooser. One quiet week line.
+**Home (command centre).** Greeting by time of day; one recommendation from the KALP-04 resolver on one sheet, with its reason; then the Today rows (`.home-today`): reviews due and work left unfinished, each shown once and only when it is not already the recommendation. "Choose something else" holds the alternatives and the generate rail (`.gen-rail`, `pages/Home.css`): Class/Year → Course/Track → Topics → Dot points → Difficulty → Type as one row of rungs (WAI-ARIA tabs, arrow keys move along the rail), a summary chip that reads "No filters applied" until something is chosen, and one Generate. There is no screen between the rail and the question. Type offers only what the backend serves (any question, or past papers only, India). A guest's remaining free questions are shown only when the server hands the client the count. One quiet week line.
 
 **Progress.** One reading column: title, the paper estimate on the page's only sheet, a ruled facts line, the syllabus table, and a note on what the page does and does not claim. Whole marks only. No percentile, rank or prediction below the evidence threshold.
 
@@ -228,7 +232,7 @@ WCAG 2.2 AA is the floor. Text ≥ 4.5:1; control edges and focus ≥ 3:1; targe
 
 ## 15. Deferred
 
-- Examiner margin rail with step codes, a four-rung hint ladder, and the syllabus map (designed; see the direction document).
+- Examiner margin rail with step codes and the syllabus map (designed; see the direction document). The hint ladder is built (§10); its rung count follows the question's hints rather than a fixed four.
 - A third type voice for numerals and a more characterful interface face (needs self-hosted fonts and a layout-shift check).
 - Consolidating `theme.css` layers and the explanation player's historical stylesheets, including the remaining sub-12px sizes in legacy rules and in pages this pass did not touch (Tasks, Classes, Teach).
 - Splitting `QuestionCard.jsx` and the explanation player into composed parts.
