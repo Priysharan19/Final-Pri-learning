@@ -1615,6 +1615,27 @@
       "innerLimits": "≤30 events per batch"
     },
     {
+      "method": "POST",
+      "path": "/v1/telemetry/error",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "crash report owned by the session account: a closed platform (web/ios-shell/android-shell), an upper-case error code, a lower-case surface slug, a scope and an optional hex fingerprint and release SHA; every other field dropped, free text in a known field refused (TELEMETRY_ERROR_INVALID). Stored as a client-error operational event, counted on /v1/metrics (client_errors_total) and forwarded to the error sink (errorSink.js) as the same coded fields plus request id and server release — never a message, stack, URL or body. Consent-gated (guardian gate on the router, device preference on the client) and limited to 20 per 10 minutes per account",
+      "rateLimits": [
+        {
+          "key": "telemetry-error",
+          "limit": 20,
+          "windowMs": 600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
       "method": "GET",
       "path": "/v1/admin/health",
       "auth": "session",
@@ -1625,6 +1646,29 @@
       "guardianConsent": false,
       "mfa": true,
       "ownership": "admin; aggregate counts only; also carries the operator health detail (provider flags, backlog counts, housekeeping)",
+      "rateLimits": [
+        {
+          "key": "admin",
+          "limit": 300,
+          "windowMs": 60000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/admin/ai-usage",
+      "auth": "session",
+      "roles": [
+        "admin"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": true,
+      "ownership": "admin; cost telemetry (aiUsage.js): this month's and today's model calls and tokens by kind, the rupee estimate against PRI_MONTHLY_BUDGET_INR, and the heaviest accounts of the month by account id (no email, no content). Nothing a student-facing surface reads",
       "rateLimits": [
         {
           "key": "admin",

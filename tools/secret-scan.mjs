@@ -2,8 +2,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · secret scan gate (V1 blocker #14)
 //
-//   node tools/secret-scan.mjs              tracked files + client/dist if built
-//   node tools/secret-scan.mjs --dist-only  only the built client (CI build job)
+//   node tools/secret-scan.mjs                tracked files + client/dist if built
+//   node tools/secret-scan.mjs --dist-only    only the built client (CI build job)
+//   node tools/secret-scan.mjs --require-dist tracked files + client/dist, and FAIL
+//                                             (exit 2) when client/dist is absent —
+//                                             the CI step after `npm run build`, so
+//                                             a missing bundle can never pass as a
+//                                             clean one
+//   node tools/secret-scan.mjs --dist <dir>   scan that directory as the bundle
+//                                             (the planted-fixture self-test)
 //
 // High-signal patterns only — provider key formats that are never legitimate in
 // a repository: OpenAI keys, Razorpay live keys, Resend keys, PEM private keys,
@@ -111,13 +118,22 @@ export function trackedFiles(root = ROOT) {
   return out.toString('utf8').split('\0').filter(Boolean).map(path => join(root, path));
 }
 
+/** The CLI's options; exported for the self-test. */
+export function parseArgs(argv) {
+  const distIndex = argv.indexOf('--dist');
+  return {
+    distOnly: argv.includes('--dist-only'),
+    requireDist: argv.includes('--require-dist'),
+    dist: distIndex >= 0 && argv[distIndex + 1] ? argv[distIndex + 1] : join(ROOT, 'client', 'dist')
+  };
+}
+
 function main() {
-  const distOnly = process.argv.includes('--dist-only');
-  const dist = join(ROOT, 'client', 'dist');
+  const { distOnly, requireDist, dist } = parseArgs(process.argv.slice(2));
   const paths = new Set(distOnly ? [] : trackedFiles());
   if (existsSync(dist)) for (const path of walk(dist)) paths.add(path);
-  else if (distOnly) {
-    console.error('secret-scan: --dist-only needs client/dist (run the build first).');
+  else if (distOnly || requireDist) {
+    console.error(`secret-scan: ${distOnly ? '--dist-only' : '--require-dist'} needs the built client at ${relative(ROOT, dist) || dist} (run the build first).`);
     process.exit(2);
   }
   const { findings, allowed, scanned } = scanFiles([...paths]);
@@ -127,7 +143,7 @@ function main() {
     console.error(`SECRET SCAN: FAIL — ${findings.length} secret-shaped value(s) in ${scanned} files. Remove and rotate them; never commit provider secrets.`);
     process.exit(1);
   }
-  console.log(`SECRET SCAN: PASS — ${scanned} files${existsSync(dist) ? ' (including client/dist)' : ''}, ${PATTERNS.length} patterns, ${allowed.length} reviewed allowance(s)`);
+  console.log(`SECRET SCAN: PASS — ${scanned} files${existsSync(dist) ? ` (including the built client, ${walk(dist).length} files)` : ''}, ${PATTERNS.length} patterns, ${allowed.length} reviewed allowance(s)`);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) main();

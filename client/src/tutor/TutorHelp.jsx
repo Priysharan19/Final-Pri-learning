@@ -34,7 +34,7 @@ import { MAX_TURN_CHARS, cleanTurnText } from './conversation.js';
 import './TutorHelp.css';
 
 /** Why a deterministic reply is showing, as one of the panel's own sentences. */
-const OFFLINE_CODES = new Set(['TUTOR_OFFLINE', 'TUTOR_TIMEOUT', 'TUTOR_UNAVAILABLE', 'TUTOR_UNREACHABLE', 'CLOUD_DISABLED', 'AUTH_REQUIRED', 'RATE_LIMITED', 'PAID_CAPACITY_REACHED', 'TUTOR_NOT_CONFIGURED', 'TUTOR_DAILY_LIMIT', 'TUTOR_STREAM_INCOMPLETE', 'TUTOR_FAILED', 'TUTOR_EMPTY']);
+const OFFLINE_CODES = new Set(['TUTOR_OFFLINE', 'TUTOR_TIMEOUT', 'TUTOR_UNAVAILABLE', 'TUTOR_UNREACHABLE', 'CLOUD_DISABLED', 'AUTH_REQUIRED', 'RATE_LIMITED', 'PAID_CAPACITY_REACHED', 'TUTOR_NOT_CONFIGURED', 'TUTOR_DAILY_LIMIT', 'AI_DAILY_BUDGET_EXHAUSTED', 'TUTOR_STREAM_INCOMPLETE', 'TUTOR_FAILED', 'TUTOR_EMPTY']);
 
 let turnSerial = 0;
 function newTurnId() {
@@ -135,7 +135,7 @@ export default function TutorHelp({ question, work, locale, onUsed, onResolved, 
         note(level, {
           text: r?.message || null,
           source: r?.source === 'tutor' ? 'tutor' : 'deterministic',
-          offline: r?.source !== 'tutor' && ['TUTOR_OFFLINE', 'TUTOR_TIMEOUT', 'TUTOR_UNAVAILABLE', 'CLOUD_DISABLED', 'AUTH_REQUIRED', 'RATE_LIMITED', 'PAID_CAPACITY_REACHED', 'TUTOR_NOT_CONFIGURED'].includes(r?.code)
+          offline: r?.source !== 'tutor' && ['TUTOR_OFFLINE', 'TUTOR_TIMEOUT', 'TUTOR_UNAVAILABLE', 'CLOUD_DISABLED', 'AUTH_REQUIRED', 'RATE_LIMITED', 'PAID_CAPACITY_REACHED', 'AI_DAILY_BUDGET_EXHAUSTED', 'TUTOR_NOT_CONFIGURED'].includes(r?.code)
         });
       }
     } catch (error) {

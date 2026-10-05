@@ -19,6 +19,7 @@ import { asStore } from './store.js';
 import { rateLimit, requireSession, requireVerifiedEmail } from './security.js';
 import { consumeAiAllowance, refundAiAllowance, refuseAiAllowance } from './aiAllowance.js';
 import { consumePaidCall, refusePaidCall, spendCeilingMissing } from './spendCeiling.js';
+import { ensureAiUsageTable, recordAiUsage, usageCollector } from './aiUsage.js';
 import { cachedServerReleaseIdentity } from './releaseIdentity.js';
 import { recordProviderCall } from './metrics.js';
 import { logEvent } from './observability.js';
@@ -68,6 +69,7 @@ export function createHandwritingRouter(db, {
   env = process.env
 } = {}) {
   db = asStore(db);
+  ensureAiUsageTable(db);
   const router = asyncRouter();
 
   // One provider probe at a time per router. Concurrent /status requests share
@@ -183,14 +185,21 @@ export function createHandwritingRouter(db, {
       if (overBudget) { await refundAiAllowance(db, allowance); return refusePaidCall(res, overBudget); }
 
       const started = Date.now();
+      // Cost telemetry (aiUsage.js): every model call that answered, with the
+      // provider's token counts, recorded per account and day after the reply.
+      const usage = usageCollector();
+      const accountId = req.platformSession.account_id;
+      const recordUsage = () => recordAiUsage(db, { accountId, kind: 'handwriting', env, calls: Math.max(1, usage.calls()), ...usage.total() });
       try {
         // The fallback model is a second paid call and is counted as one, before
         // it is sent, so a request can never spend past the ceiling.
         const result = await transcribe(req.body.image, {
           env,
-          authorizeFallback: () => consumePaidCall(db, { env })
+          authorizeFallback: () => consumePaidCall(db, { env }),
+          onUsage: usage
         });
         recordProviderCall('handwriting', { ok: true, ms: Date.now() - started });
+        await recordUsage();
         res.json({
           transcription: {
             engine: result.engine,
@@ -208,6 +217,8 @@ export function createHandwritingRouter(db, {
         if (error?.paidCallVerdict) return refusePaidCall(res, error.paidCallVerdict);
         if (/NOT_CONFIGURED|CONFIG_INVALID/.test(String(error?.code || ''))) await refundAiAllowance(db, allowance);
         const code = error instanceof HandwritingProviderError ? error.code : 'HANDWRITING_FAILED';
+        // A call the provider answered (even badly) was paid for.
+        if (usage.calls() > 0 || !/NOT_CONFIGURED|CONFIG_INVALID|CANCELLED/.test(code)) await recordUsage();
         // A cancelled request is the student's choice, not a provider failure.
         if (code !== 'HANDWRITING_CANCELLED') {
           recordProviderCall('handwriting', { ok: false, code, ms: Date.now() - started });

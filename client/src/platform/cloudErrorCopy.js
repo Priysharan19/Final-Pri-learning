@@ -16,7 +16,8 @@ const KEY_FOR_CODE = Object.freeze({
   FEEDBACK_INVALID: 'cloudError.feedbackInvalid',
   ASSIGNMENT_SPEC_INVALID: 'cloudError.assignmentSpecInvalid',
   GUARDIAN_EMAIL_SAME_AS_STUDENT: 'cloudError.guardianEmailSameAsStudent',
-  CONSENT_DECLARATION_REQUIRED: 'cloudError.consentDeclarationRequired'
+  CONSENT_DECLARATION_REQUIRED: 'cloudError.consentDeclarationRequired',
+  AI_DAILY_BUDGET_EXHAUSTED: 'cloudError.aiDailyBudgetExhausted'
 });
 
 const megabytes = bytes => `${(Math.max(0, Number(bytes) || 0) / (1024 * 1024)).toFixed(1)} MB`;

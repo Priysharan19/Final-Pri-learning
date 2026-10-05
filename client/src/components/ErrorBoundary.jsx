@@ -11,6 +11,7 @@
 import React from 'react';
 import { listDrafts, flushDrafts } from './drafts.js';
 import { translate } from '../i18n/index.js';
+import { reportCrash } from '../platform/telemetry.js';
 
 let uid = 0;
 
@@ -56,6 +57,11 @@ export default class ErrorBoundary extends React.Component {
     let drafts = [];
     try { flushDrafts(); drafts = listDrafts(); } catch { drafts = []; }
     this.setState(s => ({ stack: info?.componentStack || '', drafts, attempts: s.attempts + 1 }));
+    // A coded, fingerprinted report through the server (platform/telemetry.js):
+    // the scope name and a hash of the error, never the message or the stack
+    // shown below. Gated by the account session and the device preference;
+    // never awaited, never allowed to throw into the boundary.
+    try { reportCrash({ surface: this.props.scope, code: 'RENDER_ERROR', scope: this.props.scope === 'route' ? 'route' : 'app', error }); } catch { /* reporting is best effort */ }
   }
 
   // A route crash is a first mount (<main> is keyed on the path), so the card

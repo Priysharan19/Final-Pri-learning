@@ -21,6 +21,7 @@ import { asStore } from './store.js';
 import { rateLimit, requireSession, requireVerifiedEmail } from './security.js';
 import { consumeAiAllowance, refundAiAllowance, refuseAiAllowance } from './aiAllowance.js';
 import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
+import { ensureAiUsageTable, recordAiUsage, usageCollector } from './aiUsage.js';
 import { recordProviderCall } from './metrics.js';
 import { logEvent } from './observability.js';
 import {
@@ -75,6 +76,7 @@ export function createWorkingRouter(db, {
   env = process.env
 } = {}) {
   db = asStore(db);
+  ensureAiUsageTable(db);
   const router = asyncRouter();
 
   router.get('/status', requireSession(db), async (req, res) => {
@@ -115,9 +117,13 @@ export function createWorkingRouter(db, {
       if (overBudget) { await refundAiAllowance(db, allowance); return refusePaidCall(res, overBudget); }
 
       const started = Date.now();
+      const usage = usageCollector();
+      const accountId = req.platformSession.account_id;
+      const recordUsage = () => recordAiUsage(db, { accountId, kind: 'working', env, calls: Math.max(1, usage.calls()), ...usage.total() });
       try {
-        const result = await check(req.body.prompt || '', lines, { env });
+        const result = await check(req.body.prompt || '', lines, { env, onUsage: usage });
         recordProviderCall('working', { ok: true, ms: Date.now() - started });
+        await recordUsage();
         res.json({
           check: {
             engine: result.engine,
@@ -132,6 +138,7 @@ export function createWorkingRouter(db, {
       } catch (error) {
         if (/NOT_CONFIGURED|CONFIG_INVALID/.test(String(error?.code || ''))) await refundAiAllowance(db, allowance);
         const code = error instanceof WorkingProviderError ? error.code : 'WORKING_FAILED';
+        if (usage.calls() > 0 || !/NOT_CONFIGURED|CONFIG_INVALID|CANCELLED/.test(code)) await recordUsage();
         recordProviderCall('working', { ok: false, code, ms: Date.now() - started });
         logEvent('warn', 'provider_call_failed', { requestId: req.requestId, provider: 'working', code, latencyMs: Date.now() - started, retryable: !!error?.retryable });
         if (error instanceof WorkingProviderError) {

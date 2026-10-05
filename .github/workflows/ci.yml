@@ -255,8 +255,14 @@ jobs:
           set -o pipefail
           node server/test/observability-check.mjs 2>&1 | tee ops.log
           node server/test/failure-drills-check.mjs 2>&1 | tee -a ops.log
+          node server/test/error-telemetry-check.mjs 2>&1 | tee -a ops.log
+          node server/test/ai-budget-check.mjs 2>&1 | tee -a ops.log
+          node server/test/static-caching-check.mjs 2>&1 | tee -a ops.log
           grep -Fq 'OBSERVABILITY: PASS' ops.log
           grep -Fq 'FAILURE DRILLS: PASS' ops.log
+          grep -Fq 'ERROR TELEMETRY: PASS' ops.log
+          grep -Fq 'AI BUDGET AND COST: PASS' ops.log
+          grep -Fq 'STATIC CACHING: PASS' ops.log
       # V1 blocker #14: every /v1 route is in the reviewed inventory with the
       # guards really mounted on it; every object-level route fails closed for
       # no session, revoked sessions, wrong account, wrong role, unverified
@@ -452,10 +458,13 @@ jobs:
         run: npm run verify:release:native
       # After the build and the iOS bundle sync, so the scan reads the bytes
       # that ship: every tracked file (iOS bundles included) and client/dist.
+      # --require-dist: the step fails (exit 2) rather than passing silently if
+      # the build directory is somehow absent; the self-test plants a key in a
+      # fake bundle first and proves the gate catches it (ledger 1.6).
       - name: Secret scan (tracked files, iOS bundles, built client)
         run: |
           node tools/secret-scan.test.mjs
-          node tools/secret-scan.mjs
+          node tools/secret-scan.mjs --require-dist
       - name: Cross-platform release matrix (CP-11)
         run: node scripts/release-matrix.mjs --require-native-apple
       - name: Built client loads no remote presentation assets

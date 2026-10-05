@@ -16,6 +16,7 @@ import { startAuthDeliveryWorker } from './platform/authDelivery.js';
 import { startGoogleNotificationWorker } from './platform/googleBilling.js';
 import { applyVerifiedEntitlement } from './platform/entitlements.js';
 import { startHousekeeping } from './platform/housekeeping.js';
+import { startAiBudgetGaugeRefresh } from './platform/aiUsage.js';
 import { createServerApp } from './app.js';
 
 // The platform store: Supabase Postgres when PRI_DATABASE_URL is set (ADR-0001),
@@ -51,6 +52,11 @@ const deliveryWorker = startAuthDeliveryWorker(platformDb);
 // purged at startup and every six hours; /v1/health reports the last run.
 startHousekeeping(platformDb);
 
+// This month's estimated model spend against PRI_MONTHLY_BUDGET_INR, re-read
+// every five minutes so AI_MONTHLY_BUDGET_70PCT on /v1/metrics stays current
+// between calls (aiUsage.js).
+const budgetGauge = startAiBudgetGaugeRefresh(platformDb);
+
 // Google Play real-time notifications are queued by the webhook and re-fetched
 // from the Play Developer API here, outside any database transaction.
 const googleWorker = startGoogleNotificationWorker(platformDb, { apply: event => applyVerifiedEntitlement(platformDb, event) });
@@ -70,6 +76,7 @@ function shutdown(signal) {
   console.log('platform_shutdown', { signal, deadlineMs: SHUTDOWN_DEADLINE_MS });
   deliveryWorker.stop();
   googleWorker.stop();
+  budgetGauge.stop();
   let finished = false;
   const finish = reason => {
     if (finished) return;

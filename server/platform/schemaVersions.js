@@ -22,10 +22,13 @@
 //    credential (account_tokens/auth_delivery_outbox admit 'guardian-withdraw'),
 //    audit_log append-only for pri_server and per-account restrictive RLS on
 //    the sync tables (supabase/migrations/20261007000000_security_hardening.sql).
-// 12: account_sessions.reauthenticated_at — when a session last proved its
+// 12: ai_usage_daily, the per-account per-day cost ledger of the paid model
+//    routes (supabase/migrations/20261008000000_ai_usage_daily.sql). SQLite
+//    creates the same table lazily in aiUsage.js.
+// 13: account_sessions.reauthenticated_at — when a session last proved its
 //    credential afresh; the data export and other sensitive reads require it
-//    inside REAUTH_FRESH_MS (supabase/migrations/20261008000000_session_reauth.sql).
-export const SCHEMA_VERSION = 12;
+//    inside REAUTH_FRESH_MS (supabase/migrations/20261009000000_session_reauth.sql).
+export const SCHEMA_VERSION = 13;
 // Billing 4: billing_payments keeps its row when the account is deleted
 //    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
 //    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).
