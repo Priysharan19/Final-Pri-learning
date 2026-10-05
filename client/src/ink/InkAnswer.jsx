@@ -57,6 +57,26 @@ const EMPTY_READING = { lines: [], text: '' };
 const strokeSignature = strokes => `${strokes.length}:${strokes.reduce((n, st) => n + (st?.points?.length || 0), 0)}`;
 
 /**
+ * Semantic reader state for the parent question UI. The ink surface knows
+ * whether recognition was attempted, blocked, offline, or genuinely returned
+ * no transcription; the parent must never infer that from strokes alone.
+ */
+export function inkReaderState(status, reading = EMPTY_READING) {
+  if (status?.kind === 'reading') return { state: 'READING', key: null };
+  if (status?.kind === 'empty') return { state: 'READ_FAILED', key: 'ink.serverEmpty' };
+  if (status?.kind === 'allowance') return { state: 'READER_UNAVAILABLE', key: 'ink.cloudAllowanceUsed' };
+  if (status?.kind === 'waiting') {
+    if (ACCOUNT_BLOCKED_KEYS.has(status.key)) return { state: 'ACCOUNT_ACTION_REQUIRED', key: status.key };
+    if (status.key === 'ink.waitingOffline') return { state: 'NETWORK_ERROR', key: status.key };
+    return { state: 'READER_UNAVAILABLE', key: status.key || null };
+  }
+  if (reading?.lines?.length) {
+    return { state: reading.needsConfirmation === true ? 'READ_UNCERTAIN' : 'READ_SUCCESS', key: null };
+  }
+  return { state: 'IDLE', key: null };
+}
+
+/**
  * lineVerdicts: optional array aligned with the read lines, e.g.
  * [{status:'ok'}, {status:'break', note:'…'}] — drawn as ✓/✗ badges in the
  * reading panel (and on the ink where line geometry is known).
@@ -68,7 +88,7 @@ const strokeSignature = strokes => `${strokes.length}:${strokes.reduce((n, st) =
  *  strokes and History replay all keep one coordinate space. */
 const MAX_PAGES = 4;
 
-export default function InkAnswer({ onRecognized, onStrokes = null, initialStrokes = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -94,6 +114,10 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
   const [cleared, setCleared] = useState(null);
   // null | { kind: 'reading' } | { kind: 'waiting', key } | { kind: 'empty' } | { kind: 'allowance' }
   const [status, setStatus] = useState(null);
+  useEffect(() => {
+    if (typeof onReaderState !== 'function') return;
+    try { onReaderState(inkReaderState(status, rec)); } catch { /* reporting must never break writing */ }
+  }, [status, rec, onReaderState]);
   const settleRef = useRef(null);
   const retryRef = useRef(null);
   const retriesRef = useRef(0);

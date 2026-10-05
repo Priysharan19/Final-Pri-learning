@@ -41,6 +41,9 @@ export const flow = {
     // writing on. /v1/handwriting/transcribe sits behind requireVerifiedEmail;
     // /v1/handwriting/status does not (it is a session-only readiness probe).
     let emailVerified = false;
+    // Flip the guardian gate independently to reproduce the production 403
+    // before the reader is called, then approve it while the page stays open.
+    let guardianPending = false;
     const requests = [];
     const reader = { text: '7', requests: [] };
     const READY = {
@@ -91,9 +94,9 @@ export const flow = {
       // The server reader, as the real one answers: a session-only status
       // probe, and a transcribe route that refuses an unverified email.
       if (path === '/v1/handwriting/status' && method === 'GET') {
-        return authenticated
-          ? respond(route, 200, READY)
-          : respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
+        if (!authenticated) return respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
+        if (guardianPending) return respond(route, 403, { error: { code: 'GUARDIAN_CONSENT_PENDING', message: 'A parent or guardian has been emailed to confirm this account.' } });
+        return respond(route, 200, READY);
       }
       if (path === '/v1/handwriting/transcribe' && method === 'POST') {
         let parsed = null;
@@ -274,14 +277,35 @@ export const flow = {
       (await classroom.innerText()).includes(ASSIGNMENT.className));
 
     // ── 1 · back to the page with the kept ink, signed in, no reload ────────
+    // Reproduce the production gate: /handwriting/status is refused before any
+    // transcription request can leave the device.
+    guardianPending = true;
     await page.getByRole('link', { name: 'Practice', exact: true }).first().click();
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
     await check('the same question and the kept handwriting come back, in writing mode',
       (await page.locator('.q-prompt').innerText()).replace(/\s+/g, ' ').trim() === inkPrompt,
       `prompt now ${JSON.stringify((await page.locator('.q-prompt').innerText()).slice(0, 120))}`);
     await check('without a reload', await page.evaluate(() => window.__PRI_E2E_NO_RELOAD__) === 'kept');
-    // The status is re-probed for the signed-in account, the ink is sent, and
-    // the transcribe refusal names the real blocker: verify the email.
+    await page.waitForFunction(() => /parent or guardian needs to confirm/i.test(document.querySelector('.ink-status')?.textContent || ''), null, { timeout: 20000 }).catch(() => {});
+    const guardianNote = (await page.locator('.ink-status').innerText().catch(() => '')) || '';
+    const guardianBlockedRequests = requests.slice(registerIndexBefore).filter(row => row.path.startsWith('/v1/handwriting/'));
+    await check('guardian pending is named as an account action, not a handwriting failure',
+      /parent or guardian needs to confirm/i.test(guardianNote), `status ${JSON.stringify(guardianNote)}`);
+    await check('guardian pending stops before transcription: status is probed but the ink is not sent to the reader',
+      guardianBlockedRequests.some(r => r.path === '/v1/handwriting/status') && !guardianBlockedRequests.some(r => r.path === '/v1/handwriting/transcribe'),
+      JSON.stringify(guardianBlockedRequests.map(r => `${r.method} ${r.path}`)));
+    const lowerWhileGated = (await page.locator('.status-line').innerText().catch(() => '')) || '';
+    await check('a pre-reader account gate never tells the student to rewrite clearer handwriting',
+      !/couldn.?t read|rewrite your last line more clearly/i.test(lowerWhileGated), `lower status ${JSON.stringify(lowerWhileGated)}`);
+    await check('guardian pending offers Account settings as the relevant action',
+      await inkLink.count() === 1 && (await inkLink.getAttribute('data-ink-blocker')) === 'ink.waitingGuardian');
+
+    // Approval can arrive elsewhere while this page stays open. Focus triggers
+    // the bounded fresh readiness probe; no force-quit or reload is required.
+    guardianPending = false;
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    // The status is now usable, the ink is sent, and the transcribe route names
+    // the next real blocker: the still-unverified email.
     await page.waitForFunction(() => /Verify your email address/.test(document.querySelector('.ink-status')?.textContent || ''), null, { timeout: 20000 }).catch(() => {});
     const afterSignIn = requests.slice(registerIndexBefore).filter(row => row.path.startsWith('/v1/handwriting/'));
     await check('after sign-in the device asks the server again: a status probe and the kept ink itself',

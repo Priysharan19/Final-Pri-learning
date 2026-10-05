@@ -500,6 +500,9 @@ export function accountBlockedKey(outcome = null) {
   const status = Number(outcome?.error?.status);
   for (const code of codes) {
     if (code === 'AUTH_REQUIRED') return 'verdict.photoReadingSignIn';
+    // A failed consent-state lookup is infrastructure trouble, not evidence
+    // that this student needs a guardian. Fall through to service-unavailable.
+    if (code === 'GUARDIAN_CONSENT_UNAVAILABLE') return null;
     if (code.startsWith('GUARDIAN_CONSENT') || code === 'AGE_DECLARATION_REQUIRED') return 'verdict.photoReadingGuardian';
     if (code === 'EMAIL_UNVERIFIED') return 'verdict.photoReadingVerifyEmail';
   }

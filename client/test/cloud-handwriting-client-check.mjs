@@ -445,6 +445,7 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { status: 401 } } }), 'ink.waitingSignIn', 'a bare 401 → sign-in copy');
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'GUARDIAN_CONSENT_PENDING', status: 403 } } }), 'ink.waitingGuardian', 'GUARDIAN_CONSENT_PENDING → guardian copy');
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'AGE_DECLARATION_REQUIRED', status: 403 } } }), 'ink.waitingGuardian', 'AGE_DECLARATION_REQUIRED → guardian copy');
+  eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'GUARDIAN_CONSENT_UNAVAILABLE', status: 403 } } }), 'ink.waitingServiceDown', 'a consent-state lookup outage is a service problem, not a guardian accusation');
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'HANDWRITING_PROVIDER_5XX', status: 503 } } }), 'ink.waitingServiceDown', 'only a true 5xx/transport failure says the reader is down');
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'EMAIL_UNVERIFIED' }, readiness: { lastFailureCode: 'HANDWRITING_PROVIDER_5XX' } } }), 'ink.waitingVerifyEmail', 'the transcribe refusal wins over a stale probe code');
   const { ACCOUNT_BLOCKED_KEYS } = await import('../src/ink/cloudReader.js');
@@ -488,6 +489,8 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   ok(/segmentInkLines\(strokes\)/.test(inkSrc) && /ink-linebox/.test(inkSrc) && /ink\.mistakeHere/.test(inkSrc), 'the ink surface draws line boxes and the mistake note again');
   const qc = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
   ok(/inkResult\?\.afterWait/.test(qc) && /autoMarkedRef\.current === inkResult\.readKey/.test(qc), 'ink read after waiting is marked once, by its reading key');
+  ok(/onReaderState=\{setInkReaderState\}/.test(qc) && /inkReaderState\?\.state === 'READ_FAILED'/.test(qc),
+    'the question-level “could not read” copy is driven by a genuine reader failure, never strokes-without-text alone');
 }
 
 // ── Review follow-ups: plausible placement, unbounded backoff, deferred mark ─
