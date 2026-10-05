@@ -164,9 +164,11 @@ export async function recordAiUsage(db, { accountId, kind, calls = 1, inputToken
   }
 }
 
-async function totals(store, where, params) {
+// One fixed statement, bound parameters only: a single day is the range
+// [day, day] inclusive, a month is [YYYY-MM-01, YYYY-MM-31].
+async function totals(store, fromDay, toDay) {
   const row = await store.get(`SELECT COALESCE(SUM(calls),0) AS calls, COALESCE(SUM(input_tokens),0) AS input_tokens,
-    COALESCE(SUM(output_tokens),0) AS output_tokens FROM ai_usage_daily WHERE ${where}`, params);
+    COALESCE(SUM(output_tokens),0) AS output_tokens FROM ai_usage_daily WHERE day >= ? AND day <= ?`, [fromDay, toDay]);
   return { calls: Number(row?.calls || 0), inputTokens: Number(row?.input_tokens || 0), outputTokens: Number(row?.output_tokens || 0) };
 }
 
@@ -175,7 +177,7 @@ export async function monthlyAiSpend(db, { env = process.env, now = Date.now() }
   const store = asStore(db);
   const config = aiUsageConfig(env);
   const month = usageDay(now).slice(0, 7);
-  const sums = await totals(store, 'day >= ? AND day < ?', [`${month}-01`, `${month}-32`]);
+  const sums = await totals(store, `${month}-01`, `${month}-31`);
   const estimatedInr = estimateInr(sums, config);
   const ratio = estimatedInr !== null && config.budgetInr ? Math.round((estimatedInr / config.budgetInr) * 10_000) / 10_000 : null;
   return {
@@ -209,13 +211,13 @@ export async function aiUsageSummary(db, { env = process.env, now = Date.now(), 
   const config = aiUsageConfig(env);
   const day = usageDay(now);
   const month = await monthlyAiSpend(store, { env, now });
-  const today = await totals(store, 'day = ?', [day]);
+  const today = await totals(store, day, day);
   const byKindRows = await store.all(`SELECT kind, COALESCE(SUM(calls),0) AS calls, COALESCE(SUM(input_tokens),0) AS input_tokens,
-    COALESCE(SUM(output_tokens),0) AS output_tokens FROM ai_usage_daily WHERE day >= ? AND day < ? GROUP BY kind ORDER BY kind`,
-  [`${month.month}-01`, `${month.month}-32`]);
+    COALESCE(SUM(output_tokens),0) AS output_tokens FROM ai_usage_daily WHERE day >= ? AND day <= ? GROUP BY kind ORDER BY kind`,
+  [`${month.month}-01`, `${month.month}-31`]);
   const topRows = await store.all(`SELECT account_id, COALESCE(SUM(calls),0) AS calls, COALESCE(SUM(input_tokens),0) AS input_tokens,
-    COALESCE(SUM(output_tokens),0) AS output_tokens FROM ai_usage_daily WHERE day >= ? AND day < ? AND account_id IS NOT NULL
-    GROUP BY account_id ORDER BY calls DESC, account_id ASC LIMIT ?`, [`${month.month}-01`, `${month.month}-32`, Math.max(1, Math.min(100, Math.floor(top)))]);
+    COALESCE(SUM(output_tokens),0) AS output_tokens FROM ai_usage_daily WHERE day >= ? AND day <= ? AND account_id IS NOT NULL
+    GROUP BY account_id ORDER BY calls DESC, account_id ASC LIMIT ?`, [`${month.month}-01`, `${month.month}-31`, Math.max(1, Math.min(100, Math.floor(top)))]);
   const shape = row => ({ calls: Number(row.calls || 0), inputTokens: Number(row.input_tokens || 0), outputTokens: Number(row.output_tokens || 0) });
   return {
     day,
