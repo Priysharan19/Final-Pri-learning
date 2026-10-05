@@ -167,13 +167,14 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // before the rows disappear (immediate cancel: the account cannot use the
   // remainder of a paid period once it is gone).
   const cancelWebSubscription = billingLifecycle.web?.cancel;
-  router.use('/account', createAccountRouter(db, {
-    beforeDelete: typeof cancelWebSubscription === 'function'
-      ? ({ accountId }) => cancelWebSubscription({ accountId, atCycleEnd: false, reason: 'account-deletion' })
-      : null
-  }));
+  const beforeDelete = typeof cancelWebSubscription === 'function'
+    ? ({ accountId }) => cancelWebSubscription({ accountId, atCycleEnd: false, reason: 'account-deletion' })
+    : null;
+  router.use('/account', createAccountRouter(db, { beforeDelete }));
   router.use('/account/identity', createIdentityRouter(db));
-  router.use('/account/otp', createOtpRouter(db));
+  // The public deletion request (no session) runs the same billing hook and
+  // the same deletion transaction as DELETE /v1/account.
+  router.use('/account/otp', createOtpRouter(db, { beforeDelete }));
   // ── Nothing of a child's leaves or arrives without their guardian ────────
   // Every route that moves a student's own data off the device, links them to
   // another person (a class, a teacher), or takes money for it is gated. Until
