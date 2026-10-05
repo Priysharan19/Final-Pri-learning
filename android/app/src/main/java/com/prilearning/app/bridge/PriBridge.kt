@@ -18,6 +18,7 @@ import androidx.webkit.JavaScriptReplyProxy
 import androidx.webkit.WebMessageCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import com.prilearning.app.auth.SmsCode
 import com.prilearning.app.billing.PlayBilling
 import com.prilearning.app.cloud.NativeCloud
 import com.prilearning.app.io.FileExchange
@@ -32,6 +33,7 @@ class PriBridge(
     private val cloud: NativeCloud? = null,
     private val files: FileExchange? = null,
     private val billing: PlayBilling? = null,
+    private val sms: SmsCode? = null,
 ) {
     private companion object { const val TAG = "PriBridge" }
     private var reply: JavaScriptReplyProxy? = null
@@ -71,6 +73,7 @@ class PriBridge(
         if (proxy !== reply) {
             // Nothing in flight for the previous document may answer this one.
             cloud?.cancelAll()
+            sms?.cancel()
             reply = proxy
             seq = 0
             setBackWanted(false)
@@ -118,6 +121,16 @@ class PriBridge(
                 f.print(webView) { r -> answerLater(proxy, fileReply(req.id, r)) }
                 null
             }
+            // A one-time sign-in code from one SMS the person agrees to share (SMS User Consent).
+            "otp.smsCode" -> {
+                val s = sms ?: return send(proxy, Envelope.fail(req.id, "UNSUPPORTED", "otp.smsCode is not supported by this app version."))
+                s.request { r -> answerLater(proxy, when (r) {
+                    is SmsCode.Result.Code -> Envelope.ok(req.id, JSONObject().put("code", r.code))
+                    is SmsCode.Result.Failed -> Envelope.fail(req.id, r.code, r.message)
+                }) }
+                null
+            }
+            "otp.cancel" -> { sms?.cancel(); null }
             "billing.products", "billing.purchase", "billing.unfinished", "billing.restore", "billing.finish" -> {
                 val b = billing ?: return send(proxy, Envelope.fail(req.id, "UNSUPPORTED", "Billing is not supported by this app version."))
                 val answer: (PlayBilling.Result) -> Unit = { r -> answerLater(proxy, billingReply(req.id, r)) }

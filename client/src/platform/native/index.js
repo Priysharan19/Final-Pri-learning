@@ -334,6 +334,30 @@ const device = Object.freeze({
   },
 });
 
+// A one-time sign-in code from SMS (Android: the SMS User Consent API, since a
+// WebView has no WebOTP). The person agrees to share one message in a system
+// sheet; only the digits come back. The server still verifies the code.
+//
+// Play services listens for the message for a fixed five minutes
+// (SmsRetriever.startSmsUserConsent). The page's own wait MUST be longer: the
+// consent sheet can appear at 4:59 and the person may tap "Allow" after 5:00.
+// If the page gave up at the same moment it would already have sent
+// otp.cancel, and the code the person just agreed to share would be lost.
+// Two extra minutes cover the sheet; a code typed by hand still wins instantly.
+export const OTP_NATIVE_SMS_WAIT_MS = 5 * 60 * 1000;
+export const OTP_WAIT_MS = 7 * 60 * 1000;
+const otp = Object.freeze({
+  smsAvailable: () => { const c = capOf('otp'); return c?.transport === 'bridge' && c?.sms === true; },
+  /** Resolves with a six-digit string; rejects on cancel, timeout or refusal. */
+  async smsCode({ signal = null } = {}) {
+    if (!otp.smsAvailable()) return unsupported('otp', 'smsCode');
+    const result = await viaBridge('otp', 'smsCode', {}, { timeoutMs: OTP_WAIT_MS, signal });
+    const code = String(result?.code || '');
+    if (!/^[0-9]{6}$/.test(code)) throw new PriNativeError('BAD_REQUEST', 'The shell returned no usable code');
+    return code;
+  },
+});
+
 // ── identity (Sign in with Apple) ────────────────────────────────────────────
 // The shell runs the system sign-in sheet and hands back Apple's identity
 // token; the Pri server (not the shell, not this page) verifies that token and
@@ -380,7 +404,7 @@ export const priNative = Object.freeze({
   has: cap => !!capOf(cap),
   version: cap => capOf(cap)?.version || 0,
   releaseIdentity: () => hostReleaseIdentity(scopeOf()),
-  ink, photo, billing, cloud, share, files, lifecycle, storage, device, identity, notifications,
+  ink, photo, billing, cloud, share, files, lifecycle, storage, device, identity, notifications, otp,
   /** Bridge counters for diagnostics (no user data). */
   stats: () => (runtime ? runtime.bridge.stats() : null),
   /** Cancel everything in flight (tests, explicit teardown). */
