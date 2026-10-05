@@ -231,6 +231,7 @@ jobs:
           node server/test/working-check-check.mjs
           node server/test/question-photo-check.mjs
           node server/test/tutor-help-check.mjs
+          node server/test/tutor-device-journey-check.mjs
           node server/test/tutor-stream-check.mjs
           node server/test/spend-ceiling-check.mjs
           node server/test/guardian-consent-check.mjs
@@ -294,7 +295,8 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 35/35 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 36/36 suites' platform-postgres.log
+          grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ security-acceptance-check.mjs' platform-postgres.log
           grep -Fq '✓ abuse-limits-check.mjs' platform-postgres.log
           grep -Fq '✓ google-billing-check.mjs' platform-postgres.log
