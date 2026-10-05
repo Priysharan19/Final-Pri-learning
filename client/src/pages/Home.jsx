@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { cloud, isGuardianConsentRefusal } from '../platform/cloudTransport.js';
 import { resolveHomeRecommendation, actionOpenable } from '../home/recommendation.js';
 import { cacheAssignments, cachedAssignments, loadSavedFilters, saveFilters } from '../home/homeCache.js';
+import Icon from '../components/Icon.jsx';
 import { useApp } from '../App.jsx';
 import { dotpointAvailable, practiceTargetAvailable, topicAvailability } from '../engine/curriculumAvailability.js';
 import { dayKey, formatWeekday } from '../lib/locale.js';
@@ -12,21 +13,6 @@ import { practiceDifficulties, practiceHref } from '../lib/practiceLinks.js';
 import { textMatches, useGlossary } from '../i18n/glossary.js';
 import TermGloss from '../components/TermGloss.jsx';
 import { featureEnabled } from '../platform/features.js';
-
-// Jokes in the idiom of a maths classroom — "The proof is left as an exercise
-// for you", "Integrate practice. Differentiate yourself." A translated pun is
-// not the same joke, so the Hindi catalogue carries a tagline written for a
-// Hindi-medium classroom under each key (उपपत्ति…, इति सिद्धम्), translated in
-// spirit rather than pun for pun.
-const TAGLINE_KEYS = [
-  'home.tagline1',
-  'home.tagline2',
-  'home.tagline3',
-  'home.tagline4',
-  'home.tagline5',
-  'home.tagline6',
-  'home.tagline7',
-];
 
 const DIFF_KEYS = { 1: 'difficulty.1', 2: 'difficulty.2', 3: 'difficulty.3', 4: 'difficulty.4' };
 
@@ -75,6 +61,8 @@ export default function Home() {
   // gets a working English filter, because textMatches falls back to the label.
   useGlossary(user?.mathsGloss === true);
 
+  // Every input to the recommendation is read from its own authority; none of
+  // it is persisted as truth. A source that fails leaves the rest usable.
   useEffect(() => {
     let live = true;
     Promise.allSettled([
@@ -97,19 +85,15 @@ export default function Home() {
     const update = () => setOnline(navigator.onLine !== false);
     window.addEventListener('online', update);
     window.addEventListener('offline', update);
-    return () => {
-      window.removeEventListener('online', update);
-      window.removeEventListener('offline', update);
-    };
+    return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update); };
   }, []);
 
+  // Teacher-set assignments exist only with a cloud student session. Offline,
+  // or with the cloud unreachable, they are left out rather than guessed at.
   useEffect(() => {
     let live = true;
-    const load = async () => {
-      if (!online) {
-        if (live) setAssignments(false);
-        return;
-      }
+    (async () => {
+      if (!online) { if (live) setAssignments(false); return; }
       try {
         const [me, result] = await Promise.all([cloud.me(), cloud.assignments()]);
         if (!live) return;
@@ -117,14 +101,11 @@ export default function Home() {
         if (rows) cacheAssignments(user, rows);
         setAssignments(rows);
       } catch (err) {
-        if (!live) return;
         // Signed out, no cloud, or a guardian has not confirmed this child's
         // account: none of those is an outage, so no "cloud unavailable" note.
-        setAssignments(err?.status === 401 || err?.code === 'CLOUD_DISABLED' || isGuardianConsentRefusal(err) ? null : false);
+        if (live) setAssignments(err?.status === 401 || err?.code === 'CLOUD_DISABLED' || isGuardianConsentRefusal(err) ? null : false);
       }
-    };
-
-    load();
+    })();
     return () => { live = false; };
   }, [online, user.id]);
   // The placement check (flagged, off in production builds) is offered to
@@ -216,8 +197,8 @@ export default function Home() {
     if (selectedDotpoint && !dotpointAvailable(selectedDotpoint)) setDotpoint(null);
   }, [curriculum, subtopic, selSub, selectedDotpoint]);
 
-  // The profile is already authoritative for region; do not flash Australian
-  // “Year” copy while the asynchronous curriculum response is still loading.
+  // The profile is already authoritative for region; do not flash the wrong
+  // course's copy while the curriculum is still loading.
   const india = user.course === 'in';
   const chips = [];
   if (year != null) chips.push({ k: 'year', label: t(india ? 'common.classNumber' : 'common.yearNumber', { n: year }), clear: () => { setYear(user.year); setSectionKey(null); setSubtopic(null); setDotpoint(null); } });
@@ -238,178 +219,331 @@ export default function Home() {
     assignments: Array.isArray(assignments) ? assignments : [], online, cloudReady: Array.isArray(assignments),
     cachedAssignments: assignments === false ? cachedAssignments(user) : []
   }) : { primary: null, alternatives: [] }, [local, user, stats, dueCount, assignments, online]);
+  // A generic "practice" alternative under a practice recommendation says the
+  // same thing twice; the manual chooser below already covers it.
+  const alternatives = homeDecision.alternatives.filter(item =>
+    item.kind !== 'daily-goal'
+    && !(item.kind === 'smart-practice' && ['first-practice', 'adaptive', 'smart-practice', 'daily-goal'].includes(homeDecision.primary?.kind)));
+
+  const topicName = useMemo(() => {
+    const names = new Map();
+    for (const sec of [...(curriculum?.years || []), ...(curriculum?.streams || [])]) {
+      for (const sub of sec.subtopics || []) names.set(sub.id, sub.name);
+    }
+    return id => (id ? names.get(id) || null : null);
+  }, [curriculum]);
 
   return (
     <div className="home-wrap">
       <h1 className="home-greet">{tx('home.greeting', { greeting, name: <b>{firstName}</b> })}</h1>
-      <Tagline />
 
-      <HomeAction primary action={homeDecision.primary} nav={nav} />
+      <HomeAction primary action={homeDecision.primary} nav={nav} topicName={topicName} resume={local?.resume} />
       {assignments === false && (
-        <div className="card home-cloud-note" role="status">
+        <div className="notice offline home-cloud-note" role="status">
           {t('home.cloudUnavailable')}
         </div>
       )}
 
-      <div className="home-cards home-support-grid">
+      <section className="home-section" aria-labelledby="home-manual-title">
+        <h2 className="home-section-title" id="home-manual-title">{t('home.chooseElse')}</h2>
         <PlacementCard placement={placement} onGo={path => nav(path)}
           onSkip={() => { setPlacement(p => ({ ...p, status: 'skipped' })); api.post('/placement/skip', {}).catch(() => { }); }} />
-        <GoalCard user={user} activity={stats?.activity || []} onGo={() => nav('/practice')} />
         <LazyPlanCard user={user} stats={stats} />
-        {homeDecision.alternatives.map(item => (
-          <HomeAction key={item.kind + ':' + item.id} action={item} nav={nav} online={online} />
-        ))}
-      </div>
+        {alternatives.length > 0 && (
+          <ul className="home-alts">
+            {alternatives.map(item => (
+              <HomeAction key={item.kind + ':' + item.id} action={item} nav={nav} topicName={topicName} resume={local?.resume} online={online} />
+            ))}
+          </ul>
+        )}
 
-      <section className="home-manual">
-        <h2 id="home-manual-title">{t('nav.practice')}</h2>
-        <button className="btn btn-ghost btn-sm" data-home-photo-practise onClick={() => nav('/practise-photo')}>
+        <button className="btn btn-ghost btn-sm home-photo-entry" data-home-photo-practise onClick={() => nav('/practise-photo')}>
           {t('snap.entry')}
         </button>
+
+        {/* ── Manual practice configuration is deliberately secondary ── */}
+        <div className="genbar">
+          <div className={`genbar-head ${open ? 'open' : ''}`}>
+            <button className="genbar-toggle" onClick={() => setOpen(o => !o)}
+              aria-label={open ? t('home.hideFilters') : t('home.showFilters')}
+              aria-expanded={open} aria-controls="gen-panel"><Icon name="chevronDown" size={16} /></button>
+            {chips.length === 0 ? (
+              <button className="genbar-empty" onClick={() => setOpen(true)}>
+                {open ? t('home.noFilters') : t('home.configureFilters')}
+              </button>
+            ) : (
+              <div className="genbar-chips">
+                {chips.map(c => (
+                  <span className="chip" key={c.k}>{c.label}
+                    <button className="chip-x" aria-label={t('home.removeFilter', { filter: c.label })}
+                      onClick={e => { e.stopPropagation(); c.clear(); }}><Icon name="close" size={12} /></button>
+                  </span>
+                ))}
+              </div>
+            )}
+            {chips.length > 0 && (
+              <button className="icon-btn" title={t('home.clearFilters')} aria-label={t('home.clearFilters')} onClick={resetAll}><Icon name="review" size={16} /></button>
+            )}
+            <button className="btn btn-primary" onClick={generate} disabled={impossibleTarget}>{t('home.generate')}</button>
+          </div>
+          {open && (
+            <div className="gen-panel" id="gen-panel">
+              <div className="gen-cats" role="tablist" aria-label={t('home.showFilters')}>
+                {[
+                  ['year', t(india ? 'home.catClass' : 'home.catYear')], ['course', t(india ? 'home.catTrack' : 'home.catCourse')], ['topics', t('home.catTopics')],
+                  ['dots', t('home.catDots')], ['difficulty', t('home.catDifficulty')],
+                ].map(([k, label]) => (
+                  <button
+                    key={k}
+                    className={`gen-cat ${cat === k ? 'on' : ''}`}
+                  role="tab" aria-selected={cat === k} aria-controls="gen-pane"
+                    disabled={(k === 'topics' && !section) || (k === 'dots' && !selSub)}
+                    onClick={() => setCat(k)}
+                  >
+                    {label}
+                    {((k === 'year') || (k === 'course' && section) || (k === 'topics' && selSub) || (k === 'dots' && dotpoint != null) || (k === 'difficulty' && chosenDifficulty != null)) && <span className="gen-cat-dot" />}
+                  </button>
+                ))}
+              </div>
+
+              <div className="gen-pane" id="gen-pane" role="tabpanel">
+                {cat === 'year' && (
+                  <>
+                    <div className="gen-pane-title">{t(india ? 'home.pickClass' : 'home.pickYear')}</div>
+                    <div className="gen-opts">
+                      {[7, 8, 9, 10, 11, 12].map(y => (
+                        <button key={y} className={`gen-opt ${year === y ? 'on' : ''}`} aria-pressed={year === y}
+                          onClick={() => { setYear(y); setSectionKey(null); setSubtopic(null); setDotpoint(null); setCat('course'); }}>
+                          {t(india ? 'common.classNumber' : 'common.yearNumber', { n: y })}{y === user.year ? <small>{t('home.yours')}</small> : null}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {cat === 'course' && (
+                  <>
+                    <div className="gen-pane-title">{t(india ? 'home.pickTrack' : 'home.pickCourse')}</div>
+                    <div className="gen-opts">
+                      {sections.map(s => (
+                        <button key={s.key} className={`gen-opt ${sectionKey === s.key ? 'on' : ''}`} aria-pressed={sectionKey === s.key}
+                          onClick={() => { setSectionKey(s.key); setSubtopic(null); setDotpoint(null); setCat('topics'); }}>
+                          {s.label}
+                        </button>
+                      ))}
+                      {!sections.length && <div className="muted">{t('home.loadingSyllabus')}</div>}
+                    </div>
+                  </>
+                )}
+
+                {cat === 'topics' && section && (
+                  <>
+                    <div className="gen-pane-note">{t('home.optional')}</div>
+                    <div className="gen-pane-title">{t('home.pickTopic')}</div>
+                    <input className="input" type="search" value={topicQuery} style={{ marginBottom: 12 }}
+                      placeholder={t('gloss.filterTopics')} aria-label={t('gloss.filterTopics')}
+                      onChange={e => setTopicQuery(e.target.value)} />
+                    {!byStrand.length && <div className="muted">{t('gloss.noTopicMatch', { query: topicQuery.trim() })}</div>}
+                    {byStrand.map(([strand, subs]) => (
+                      <div key={strand} style={{ marginBottom: 14 }}>
+                        <div className="gen-sub-head"><TermGloss text={strand} /></div>
+                        <div className="gen-opts">
+                          {subs.map(s => {
+                            const available = topicAvailability(s).selectable;
+                            return (
+                              <button key={s.id} className={`gen-opt ${subtopic === s.id ? 'on' : ''}`} aria-pressed={subtopic === s.id} style={{ textAlign: 'left' }}
+                                disabled={!available}
+                                aria-label={available ? s.name : t('home.topicComingSoon', { topic: s.name })}
+                                onClick={() => { if (!available) return; setSubtopic(subtopic === s.id ? null : s.id); setDotpoint(null); }}>
+                                <TermGloss text={s.name} />{!available ? <small>{t('home.comingSoon')}</small> : null}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+
+                {cat === 'dots' && selSub && (
+                  <>
+                    <div className="gen-pane-note">{t('home.optional')}</div>
+                    <div className="gen-pane-title">{t('home.pickDotpoint', { topic: selSub.name })}</div>
+                    <div className="gen-opts narrow">
+                      {selSub.dotpoints.map((dp, i) => {
+                        const text = typeof dp === 'string' ? dp : dp.text;
+                        const available = dotpointAvailable(dp);
+                        return (
+                          <button key={i} className={`gen-opt ${dotpoint === i ? 'on' : ''}`} aria-pressed={dotpoint === i} style={{ textAlign: 'left' }}
+                            disabled={!available}
+                            aria-label={available ? text : t('home.dotpointComingSoon', { dotpoint: text })}
+                            onClick={() => { if (available) setDotpoint(dotpoint === i ? null : i); }}>
+                            {text}{!available ? <small>{t('home.formsComingSoon')}</small> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
+                {cat === 'difficulty' && (
+                  <>
+                    <div className="gen-pane-note">{t('home.optional')}</div>
+                    <div className="gen-pane-title">{t('home.pickDifficulty')}</div>
+                    <div className="gen-opts">
+                      {offeredDifficulties.map(d => (
+                        <button key={d} className={`gen-opt ${difficulty === d ? 'on' : ''}`} aria-pressed={difficulty === d}
+                          onClick={() => setDifficulty(difficulty === d ? null : d)}>
+                          {`D${d}`} · {t(DIFF_KEYS[d])}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </section>
 
-      {/* ── Manual practice configuration is deliberately secondary ── */}
-      <div className="genbar">
-        <div className={`genbar-head ${open ? 'open' : ''}`}>
-          <button className="genbar-toggle" onClick={() => setOpen(o => !o)}
-            aria-label={open ? t('home.hideFilters') : t('home.showFilters')}
-            aria-expanded={open} aria-controls="gen-panel">{open ? '⌄' : '⌃'}</button>
-          {chips.length === 0 ? (
-            <button className="genbar-empty" onClick={() => setOpen(true)}>
-              {open ? t('home.noFilters') : t('home.configureFilters')}
-            </button>
-          ) : (
-            <div className="genbar-chips">
-              {chips.map(c => (
-                <span className="chip" key={c.k}>{c.label}
-                  <button className="chip-x" aria-label={t('home.removeFilter', { filter: c.label })}
-                    onClick={e => { e.stopPropagation(); c.clear(); }}>✕</button>
-                </span>
-              ))}
-            </div>
-          )}
-          {chips.length > 0 && (
-            <button className="editor-tool" title={t('home.clearFilters')} aria-label={t('home.clearFilters')} onClick={resetAll}>↺</button>
-          )}
-          <button className="btn btn-primary" style={{ padding: '7px 18px' }} onClick={generate} disabled={impossibleTarget}>{t('home.generate')}</button>
+      <section className="home-section" aria-labelledby="home-week-title">
+        <h2 className="home-section-title" id="home-week-title">{t('home.thisWeek')}</h2>
+        <GoalCard user={user} activity={stats?.activity || []} />
+      </section>
+    </div>
+  );
+}
+
+const WORK_REASONS = {
+  overdue: 'home.reason.overdue', due: 'home.reason.due', started: 'home.reason.started',
+  returned: 'home.reason.returned', ready: 'home.reason.ready'
+};
+
+/** The words for one recommendation. Every claim comes from the action's own data. */
+function actionCopy(action, user, t, topicName, resume) {
+  const d = action.data || {};
+  const india = user.course === 'in';
+  const resumeTopic = action.kind === 'practice-resume' ? topicName(resume?.subtopic) : null;
+  const adaptiveTopic = action.kind === 'adaptive' ? (d.topic || null) : null;
+  const title = action.kind === 'exam' || action.kind === 'exam-expired' ? (d.title || t('home.next.exam'))
+    : action.kind === 'assignment' || action.kind === 'task' ? d.title
+      : action.kind === 'task-resume' ? (d.title || t('home.next.resumePractice'))
+        : action.kind === 'practice-resume' ? (resumeTopic || t('home.next.resumePractice'))
+          : action.kind === 'reviews' ? t('home.next.reviews', d)
+            : action.kind === 'daily-goal' ? t('home.goalRemaining', d)
+              : action.kind === 'first-practice' ? t(india ? 'home.next.firstIndia' : 'home.next.firstNsw', d)
+                : adaptiveTopic ? adaptiveTopic
+                  : t('home.next.smart');
+  const reason = action.kind === 'exam' ? 'home.reason.examInProgress'
+    : action.kind === 'exam-expired' ? 'home.reason.examExpired'
+    : action.kind === 'assignment' && d.cached ? 'home.reason.assignmentCached'
+    : action.kind === 'assignment' || action.kind === 'task' ? WORK_REASONS[d.status] || 'home.reason.ready'
+      : action.kind.endsWith('resume') ? 'home.reason.resume'
+        : action.kind === 'reviews' ? 'home.reviewDue'
+          : action.kind === 'daily-goal' ? 'home.reason.dailyGoal'
+            : action.kind === 'adaptive' ? 'home.reason.adaptive'
+              : action.kind === 'first-practice' ? (action.offlineCaveat ? 'home.reason.practiceOffline' : 'home.reason.first')
+                : action.offlineCaveat ? 'home.reason.practiceOffline' : 'home.reason.practice';
+  const kicker = action.kind === 'exam' || action.kind === 'exam-expired' ? 'home.kicker.exam'
+    : action.kind === 'assignment' || action.kind === 'task' ? 'home.kicker.assigned'
+      : action.kind.endsWith('resume') ? 'home.kicker.continue'
+        : action.kind === 'reviews' ? 'home.kicker.review'
+          : action.kind === 'first-practice' ? 'home.kicker.start' : 'home.kicker.next';
+  const cta = action.kind === 'exam-expired' ? 'home.next.examResult'
+    : action.kind === 'exam' ? 'home.cta.exam'
+    : action.kind.endsWith('resume') ? 'home.cta.resume'
+      : action.kind === 'reviews' ? 'home.cta.review'
+        : action.kind === 'assignment' || action.kind === 'task' ? (d.status === 'started' ? 'home.cta.resume' : 'home.cta.start')
+          : action.kind === 'first-practice' ? 'home.cta.start' : 'home.cta.practise';
+  const meta = (action.kind === 'assignment' || action.kind === 'task') && d.remaining
+    ? t('home.meta.remaining', { count: d.remaining, n: d.remaining }) : '';
+  return {
+    title, kicker: t(kicker), cta: t(cta), meta,
+    reason: t(reason, { ...d, topic: adaptiveTopic || d.topic || '', date: action.dueAt ? new Date(action.dueAt).toLocaleDateString() : '' })
+  };
+}
+
+function HomeAction({ action, nav, primary, topicName, resume, online = true }) {
+  const { user } = useApp();
+  const t = useT();
+  if (!primary && !action) return null;
+  if (primary && !action) {
+    // Known content first: the greeting is already on screen, and this region
+    // holds its place quietly while the recommendation is worked out.
+    return (
+      <section className="home-next" data-loading="true" aria-busy="true" aria-labelledby="home-next-title">
+        <div className="home-next-kicker">{t('home.kicker.next')}</div>
+        <h2 className="home-next-title" id="home-next-title">{t('home.next.working')}</h2>
+        <div className="skeleton" style={{ height: 16, width: '60%' }} />
+      </section>
+    );
+  }
+  const copy = actionCopy(action, user, t, topicName, resume);
+  if (!primary) {
+    const key = String(action.kind + '-' + action.id).replace(/[^A-Za-z0-9_-]/g, '-');
+    // Offline, an alternative that needs the network says so and stays shut
+    // rather than opening onto a failure.
+    const openable = actionOpenable(action, { online });
+    return (
+      <li className="home-alt" data-home-alt>
+        <button type="button" disabled={!openable} data-home-alt-offline={openable ? undefined : ''}
+          onClick={() => { if (openable) nav(action.destination); }} aria-describedby={`home-alt-${key}`}>
+          <span className="home-alt-title">{copy.title}</span>
+          <span className="home-alt-reason" id={`home-alt-${key}`}>{openable ? copy.reason : t('home.needsConnection')}</span>
+          <span className="home-alt-go" aria-hidden="true"><Icon name="next" /></span>
+        </button>
+      </li>
+    );
+  }
+  const reasonId = 'home-primary-reason';
+  return (
+    <section className="home-next" data-home-primary data-kind={action.kind} aria-labelledby="home-next-title">
+      <div className="home-next-kicker">{copy.kicker}</div>
+      <h2 className="home-next-title" id="home-next-title">{copy.title}</h2>
+      <p className="home-next-reason" id={reasonId}>{copy.reason}</p>
+      {copy.meta && <p className="home-next-meta">{copy.meta}</p>}
+      <div className="home-next-cta">
+        <button className="btn btn-primary btn-lg" data-home-primary-cta aria-describedby={reasonId}
+          onClick={() => nav(action.destination)}>{copy.cta}</button>
+      </div>
+    </section>
+  );
+}
+
+function GoalCard({ user, activity }) {
+  const t = useT();
+  const done = user.today?.questions || 0;
+  const goal = user.dailyGoal || 10;
+  const byDate = Object.fromEntries(activity.map(d => [d.date, d]));
+  // The week is the student's week: each day is keyed and labelled in the
+  // profile's own timezone, the same boundary the backend files activity under.
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const ms = Date.now() - (6 - i) * 86400000;
+    const date = dayKey(ms, user.timezone);
+    const row = byDate[date];
+    return { date, lbl: formatWeekday(ms, user), hit: (row?.questions || 0) > 0, today: i === 6 };
+  });
+  const studied = days.filter(d => d.hit).length;
+  return (
+    <div className="home-week goal-card" data-today={done}>
+      <div className="goal-copy">
+        <div className="goal-title">
+          {done >= goal ? t('home.goalComplete')
+            : done > 0 ? t('home.goalRemaining', { count: goal - done, n: goal - done })
+              : t('home.goalTarget', { count: goal, n: goal })}
         </div>
-
-        {open && (
-          <div className="gen-panel" id="gen-panel">
-            <div className="gen-cats">
-              {[
-                ['year', t(india ? 'home.catClass' : 'home.catYear')], ['course', t(india ? 'home.catTrack' : 'home.catCourse')], ['topics', t('home.catTopics')],
-                ['dots', t('home.catDots')], ['difficulty', t('home.catDifficulty')],
-              ].map(([k, label]) => (
-                <button
-                  key={k}
-                  className={`gen-cat ${cat === k ? 'on' : ''}`}
-                  disabled={(k === 'topics' && !section) || (k === 'dots' && !selSub)}
-                  onClick={() => setCat(k)}
-                >
-                  {label}
-                  {((k === 'year') || (k === 'course' && section) || (k === 'topics' && selSub) || (k === 'dots' && dotpoint != null) || (k === 'difficulty' && chosenDifficulty != null)) && <span className="gen-cat-dot" />}
-                </button>
-              ))}
-            </div>
-
-            <div className="gen-pane">
-              {cat === 'year' && (
-                <>
-                  <div className="gen-pane-title">{t(india ? 'home.pickClass' : 'home.pickYear')}</div>
-                  <div className="gen-opts">
-                    {[7, 8, 9, 10, 11, 12].map(y => (
-                      <button key={y} className={`gen-opt ${year === y ? 'on' : ''}`}
-                        onClick={() => { setYear(y); setSectionKey(null); setSubtopic(null); setDotpoint(null); setCat('course'); }}>
-                        {t(india ? 'common.classNumber' : 'common.yearNumber', { n: y })}{y === user.year ? <small>{t('home.yours')}</small> : null}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {cat === 'course' && (
-                <>
-                  <div className="gen-pane-title">{t(india ? 'home.pickTrack' : 'home.pickCourse')}</div>
-                  <div className="gen-opts">
-                    {sections.map(s => (
-                      <button key={s.key} className={`gen-opt ${sectionKey === s.key ? 'on' : ''}`}
-                        onClick={() => { setSectionKey(s.key); setSubtopic(null); setDotpoint(null); setCat('topics'); }}>
-                        {s.label}
-                      </button>
-                    ))}
-                    {!sections.length && <div className="muted">{t('home.loadingSyllabus')}</div>}
-                  </div>
-                </>
-              )}
-
-              {cat === 'topics' && section && (
-                <>
-                  <div className="gen-pane-note">{t('home.optional')}</div>
-                  <div className="gen-pane-title">{t('home.pickTopic')}</div>
-                  <input className="input" type="search" value={topicQuery} style={{ marginBottom: 12 }}
-                    placeholder={t('gloss.filterTopics')} aria-label={t('gloss.filterTopics')}
-                    onChange={e => setTopicQuery(e.target.value)} />
-                  {!byStrand.length && <div className="muted">{t('gloss.noTopicMatch', { query: topicQuery.trim() })}</div>}
-                  {byStrand.map(([strand, subs]) => (
-                    <div key={strand} style={{ marginBottom: 14 }}>
-                      <div className="gen-sub-head"><TermGloss text={strand} /></div>
-                      <div className="gen-opts">
-                        {subs.map(s => {
-                          const available = topicAvailability(s).selectable;
-                          return (
-                            <button key={s.id} className={`gen-opt ${subtopic === s.id ? 'on' : ''}`} style={{ textAlign: 'left' }}
-                              disabled={!available}
-                              aria-label={available ? s.name : t('home.topicComingSoon', { topic: s.name })}
-                              onClick={() => { if (!available) return; setSubtopic(subtopic === s.id ? null : s.id); setDotpoint(null); }}>
-                              <TermGloss text={s.name} />{!available ? <small>{t('home.comingSoon')}</small> : null}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </>
-              )}
-
-              {cat === 'dots' && selSub && (
-                <>
-                  <div className="gen-pane-note">{t('home.optional')}</div>
-                  <div className="gen-pane-title">{t('home.pickDotpoint', { topic: selSub.name })}</div>
-                  <div className="gen-opts narrow">
-                    {selSub.dotpoints.map((dp, i) => {
-                      const text = typeof dp === 'string' ? dp : dp.text;
-                      const available = dotpointAvailable(dp);
-                      return (
-                        <button key={i} className={`gen-opt ${dotpoint === i ? 'on' : ''}`} style={{ textAlign: 'left' }}
-                          disabled={!available}
-                          aria-label={available ? text : t('home.dotpointComingSoon', { dotpoint: text })}
-                          onClick={() => { if (available) setDotpoint(dotpoint === i ? null : i); }}>
-                          {text}{!available ? <small>{t('home.formsComingSoon')}</small> : null}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-
-              {cat === 'difficulty' && (
-                <>
-                  <div className="gen-pane-note">{t('home.optional')}</div>
-                  <div className="gen-pane-title">{t('home.pickDifficulty')}</div>
-                  <div className="gen-opts">
-                    {offeredDifficulties.map(d => (
-                      <button key={d} className={`gen-opt ${difficulty === d ? 'on' : ''}`}
-                        onClick={() => setDifficulty(difficulty === d ? null : d)}>
-                        {`D${d}`} · {t(DIFF_KEYS[d])}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+        <div className="goal-sub">
+          {t('home.todayCount', { done, goal })}
+          {user.streak > 0 && <> · {t(done >= goal ? 'home.streakExtended' : 'home.streakOnTheLine', { count: user.streak, n: user.streak })}</>}
+        </div>
+      </div>
+      <div className="week-strip" role="img" aria-label={t('home.weekSummary', { count: studied, n: studied })}>
+        {days.map(d => (
+          <div key={d.date} className="week-day">
+            <div className={`week-dot ${d.hit ? 'hit' : ''} ${d.today ? 'today' : ''}`}>{d.hit ? '✓' : ''}</div>
+            <div className="week-lbl">{d.lbl}</div>
           </div>
-        )}
+        ))}
       </div>
     </div>
   );
@@ -443,163 +577,6 @@ function PlacementCard({ placement, onGo, onSkip }) {
             {rootChapter && <button className="btn btn-primary" onClick={() => onGo(practiceHref({ subtopic: rootChapter.id, track: 'cbse' }))}>{t('placement.practiseRoot', { chapter: rootChapter.name })}</button>}
             <button className="btn btn-ghost" onClick={() => onGo('/placement')}>{t('placement.seeResult')}</button>
           </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-const WORK_REASONS = {
-  overdue: 'home.reason.overdue', due: 'home.reason.due', started: 'home.reason.started',
-  returned: 'home.reason.returned', ready: 'home.reason.ready'
-};
-
-function actionCopy(action, user, t) {
-  const d = action.data || {};
-  const genericTitle = {
-    'practice-resume': 'home.next.resumePractice', reviews: 'nav.review',
-    'daily-goal': 'home.goalRemaining',
-    'first-practice': user.course === 'in' ? 'home.next.firstIndia' : 'home.next.firstNsw',
-    adaptive: 'nav.practice', 'smart-practice': 'nav.practice'
-  }[action.kind];
-  const title = (action.kind === 'task-resume' ? t('common.continue') + ': ' : '') + (d.title || t(genericTitle, d));
-  let reason = action.kind === 'exam' ? 'home.reason.examInProgress'
-    : action.kind === 'exam-expired' ? 'home.reason.examExpired'
-    : action.kind === 'assignment' && d.cached ? 'home.reason.assignmentCached'
-    : action.kind === 'assignment' || action.kind === 'task' ? WORK_REASONS[d.status]
-      : action.kind.endsWith('resume') ? 'home.reason.resume'
-      : action.kind === 'reviews' ? 'home.reviewDue'
-      : action.kind === 'daily-goal' ? 'home.goalTarget'
-      : action.kind === 'adaptive' ? 'home.reason.adaptive'
-      : action.offlineCaveat ? 'home.reason.practiceOffline' : 'home.reason.practice';
-  const cta = action.kind === 'reviews' ? 'nav.review'
-    : action.kind === 'exam-expired' ? 'home.next.examResult'
-    : ['exam', 'assignment', 'task', 'task-resume', 'practice-resume'].includes(action.kind) ? 'common.continue' : 'nav.practice';
-  return { title, reason: t(reason, { ...d, date: action.dueAt ? new Date(action.dueAt).toLocaleDateString() : '' }), cta: t(cta) };
-}
-
-function HomeAction({ action, nav, primary, online = true }) {
-  const { user } = useApp();
-  const t = useT();
-  if (!action) return null;
-  const copy = actionCopy(action, user, t);
-  const openable = actionOpenable(action, { online });
-  if (!primary) {
-    // Alternatives share CTA words ("Continue", "Practice"), so each button is
-    // named by its own card title and described by its own reason.
-    const key = String(action.id || action.destination || copy.title).replace(/[^A-Za-z0-9_-]/g, '-');
-    const titleId = `home-alt-title-${key}`;
-    const reasonId = `home-alt-reason-${key}`;
-    return (
-      <article className="home-card" data-home-alt aria-labelledby={titleId}>
-        <strong id={titleId}>{copy.title}</strong>
-        <p id={reasonId}>{copy.reason}</p>
-        <button className="btn btn-ghost btn-sm" aria-describedby={reasonId}
-          aria-labelledby={`${titleId}-cta ${copy.title === copy.cta ? reasonId : titleId}`}
-          disabled={!openable} data-home-alt-offline={openable ? undefined : ''}
-          onClick={() => { if (openable) nav(action.destination); }}><span id={`${titleId}-cta`}>{openable ? copy.cta : t('home.needsConnection')}</span></button>
-      </article>
-    );
-  }
-  const reasonId = 'home-primary-reason';
-  return (
-    <section className="card home-command" data-home-primary aria-labelledby="home-next-title">
-      <div className="home-command-copy">
-        <div className="home-command-kicker">{t('nav.practice')}</div>
-        <h2 id="home-next-title">{copy.title}</h2>
-        <p id={reasonId}>{copy.reason}</p>
-      </div>
-      <button className="btn btn-primary home-command-cta" data-home-primary-cta
-        aria-describedby={reasonId} onClick={() => nav(action.destination)}>{copy.cta}</button>
-    </section>
-  );
-}
-
-function Tagline() {
-  const t = useT();
-  const [idx, setIdx] = useState(() => Math.floor(Math.random() * TAGLINE_KEYS.length));
-  const [len, setLen] = useState(0);
-  const [phase, setPhase] = useState('typing'); // typing | holding | deleting
-
-  useEffect(() => {
-    const text = t(TAGLINE_KEYS[idx]);
-    let timer;
-    if (phase === 'typing') {
-      if (len < text.length) timer = setTimeout(() => setLen(l => l + 1), 34);
-      else timer = setTimeout(() => setPhase('holding'), 4200);
-    } else if (phase === 'holding') {
-      timer = setTimeout(() => setPhase('deleting'), 2600);
-    } else {
-      if (len > 0) timer = setTimeout(() => setLen(l => l - 1), 13);
-      else { setIdx(i => (i + 1) % TAGLINE_KEYS.length); setPhase('typing'); }
-    }
-    return () => clearTimeout(timer);
-  }, [phase, len, idx, t]);
-
-  return (
-    <div className="home-tagline">
-      {t(TAGLINE_KEYS[idx]).slice(0, len)}
-      <span className="type-caret" />
-    </div>
-  );
-}
-
-function GoalCard({ user, activity, onGo }) {
-  const t = useT();
-  const done = user.today?.questions || 0;
-  const goal = user.dailyGoal || 10;
-  const frac = Math.min(1, done / goal);
-  const R = 38, C = 2 * Math.PI * R;
-  const byDate = Object.fromEntries(activity.map(d => [d.date, d]));
-  // The week is the student's week: each day is keyed and labelled in the
-  // profile's own timezone, the same boundary the backend files activity under.
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const ms = Date.now() - (6 - i) * 86400000;
-    const date = dayKey(ms, user.timezone);
-    const row = byDate[date];
-    return {
-      date, lbl: formatWeekday(ms, user),
-      hit: (row?.questions || 0) > 0, today: i === 6
-    };
-  });
-  return (
-    <div className="home-card goal-card" style={{ maxWidth: 420 }}>
-      <div className="goal-ring" role="img" aria-label={t('home.goalRing', { done, goal })}>
-        <svg width="92" height="92" viewBox="0 0 92 92">
-          <circle className="goal-ring-track" cx="46" cy="46" r={R} fill="none" strokeWidth="7" />
-          <circle className={`goal-ring-fill ${frac >= 1 ? 'done' : ''}`} cx="46" cy="46" r={R} fill="none" strokeWidth="7"
-            strokeDasharray={C} strokeDashoffset={C * (1 - frac)} />
-        </svg>
-        <div className="goal-ring-num">
-          <div style={{ textAlign: 'center' }}>
-            {done}<span style={{ color: 'var(--ink-3)', fontSize: 13 }}>/{goal}</span>
-            <small>{t('home.today')}</small>
-          </div>
-        </div>
-      </div>
-      <div className="goal-copy">
-        <div className="goal-title">
-          {frac >= 1 ? t('home.goalComplete')
-            : done > 0 ? t('home.goalRemaining', { count: goal - done, n: goal - done })
-              : t('home.goalTarget', { count: goal, n: goal })}
-        </div>
-        <div className="goal-sub">
-          {user.streak > 0
-            ? <><span className="streak-flame">▲</span> {t(frac >= 1 ? 'home.streakExtended' : 'home.streakOnTheLine', { count: user.streak, n: user.streak })}</>
-            : t('home.startStreak')}
-        </div>
-        <div className="week-strip" aria-hidden="true">
-          {days.map(d => (
-            <div key={d.date} className="week-day">
-              <div className={`week-dot ${d.hit ? 'hit' : ''} ${d.today ? 'today' : ''}`}>{d.hit ? '✓' : ''}</div>
-              <div className="week-lbl">{d.lbl}</div>
-            </div>
-          ))}
-        </div>
-        {frac < 1 && (
-          <button className="btn btn-ghost btn-sm" style={{ marginTop: 12 }} onClick={onGo}>
-            {done > 0 ? t('home.keepGoing') : t('home.startNow')}
-          </button>
         )}
       </div>
     </div>
