@@ -593,7 +593,10 @@ async function run() {
         await drive();
         await audit(view, route);
       } catch (err) {
-        skipped.push(`${view} — ${String(err.message || err).split('\n')[0].slice(0, 130)}`);
+        // The URL the browser was actually at tells a timeout apart from a crash.
+        let where = '';
+        try { where = ` (at ${page.url()})`; } catch { }
+        skipped.push(`${view} — ${String(err.message || err).split('\n')[0].slice(0, 130)}${where}`);
       }
     };
 
@@ -951,6 +954,14 @@ async function run() {
         await wait(page, 500);
       });
     }
+
+    // ── the public Coverage page: a table a screen reader must be able to walk ──
+    await step('coverage · public manifest page', '/coverage', async () => {
+      await goTo(page, BASE, '/coverage');
+      await wait(page, 500);
+      await page.locator('[data-coverage-class="10"]').click();
+      await wait(page, 300);
+    });
 
     // ── the redirects are routes too ──
     for (const [path, route] of [['/map', '/map'], ['/stats', '/stats'], ['/badges', '/badges'], ['/no-such-page', '*']]) {

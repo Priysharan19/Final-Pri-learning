@@ -23,6 +23,16 @@ const DIFF_KEYS = { 1: 'difficulty.1', 2: 'difficulty.2', 3: 'difficulty.3', 4: 
 // its own warm chunk. A chunk that fails to arrive — a first run offline before
 // the warm pass — leaves Home without the card rather than without Home: the
 // failure is caught here instead of thrown at the route's error boundary.
+function LazyReviewQueueCard(props) {
+  const [Card, setCard] = useState(null);
+  useEffect(() => {
+    let live = true;
+    import('../home/ReviewQueueCard.jsx').then(m => { if (live) setCard(() => m.default); }).catch(() => { });
+    return () => { live = false; };
+  }, []);
+  return Card ? <Card {...props} /> : null;
+}
+
 function LazyPlanCard(props) {
   const [Card, setCard] = useState(null);
   useEffect(() => {
@@ -241,6 +251,11 @@ export default function Home() {
           {t('home.cloudUnavailable')}
         </div>
       )}
+
+      {/* "Due today" per dot point (§6.3) is the first card under the command
+          card: what is about to be forgotten comes before anything the student
+          might choose instead. It renders nothing until something is due. */}
+      <LazyReviewQueueCard user={user} />
 
       <section className="home-section" aria-labelledby="home-manual-title">
         <h2 className="home-section-title" id="home-manual-title">{t('home.chooseElse')}</h2>

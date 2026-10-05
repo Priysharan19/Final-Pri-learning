@@ -6,6 +6,7 @@ import { formatDate, formatWeekday } from '../lib/locale.js';
 import { usePlan } from './usePlan.js';
 import { PLAN_LIMITS } from './studyPlan.js';
 import { SESSION_TYPE_KEYS, reasonText, sessionHref } from './copy.js';
+import { useReviewQueue, ReviewQueueList } from '../home/ReviewQueueCard.jsx';
 
 // The Plan page: every week of the plan as a list of days, each day's sessions
 // with the reason each was chosen, and the three settings that shape it. Days
@@ -20,6 +21,7 @@ export default function PlanPage() {
   const t = useT();
   const nav = useNavigate();
   const { plan, progress, settings, update, loading } = usePlan(user);
+  const queue = useReviewQueue(user?.id);
   const [week, setWeek] = useState(0);
   const [saved, setSaved] = useState(false);
 
@@ -89,6 +91,20 @@ export default function PlanPage() {
       )}
 
       {plan?.summary.empty && <p className="muted" style={{ marginTop: 12 }}>{t('plan.empty')}</p>}
+
+      {queue && queue.counted > 0 && (
+        <section className="card" style={{ marginTop: 18 }} aria-labelledby="plan-review-title" data-plan-review-queue>
+          <h2 id="plan-review-title" style={{ marginBottom: 4 }}>{queue.due.length ? t('review.dueToday', { n: queue.dueCount, count: queue.dueCount }) : t('review.nothingDue')}</h2>
+          <p className="muted" style={{ margin: 0, fontSize: 13, lineHeight: 1.45 }}>{t('review.dueTodayWhy')}</p>
+          {queue.due.length > 0 && <ReviewQueueList items={queue.due} user={user} limit={12} onGo={href => nav(href)} />}
+          {queue.upcoming.length > 0 && (
+            <>
+              <h3 style={{ fontSize: 14, margin: '14px 0 0' }}>{t('review.upcoming')}</h3>
+              <ReviewQueueList items={queue.upcoming} user={user} limit={6} onGo={href => nav(href)} />
+            </>
+          )}
+        </section>
+      )}
 
       <section className="card" style={{ marginTop: 18 }} aria-labelledby="plan-settings-title">
         <h2 id="plan-settings-title" style={{ marginBottom: 8 }}>{t('plan.settings')}</h2>

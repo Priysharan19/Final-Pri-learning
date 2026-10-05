@@ -12,6 +12,7 @@ import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import TermGloss from '../components/TermGloss.jsx';
 import Icon from '../components/Icon.jsx';
+import ErrorNotebook from '../components/ErrorNotebook.jsx';
 
 const FILTERS = [
   ['all', 'history.filterAll'],
@@ -110,6 +111,8 @@ export default function History() {
         </div>
         <span className="chip">{data ? t('common.questionsCounted', { count: data.total, n: formatNumber(data.total, user) }) : '…'}</span>
       </div>
+
+      {filter === 'wrong' && <ErrorNotebook />}
 
       <div className="row" role="group" aria-label={t('history.filterGroup')} style={{ flexWrap: 'wrap', gap: 8 }}>
         {FILTERS.map(([k, key]) => (

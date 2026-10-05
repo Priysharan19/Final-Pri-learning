@@ -27,6 +27,9 @@ COPY release ./release
 # Legal.jsx renders docs/legal/*.md), so they are part of the build context.
 # Without them the image's client build fails with "Module not found".
 COPY docs/legal ./docs/legal
+# The public Coverage page (client/src/pages/Coverage.jsx) is built from the
+# committed coverage manifest, so it is part of the build context too.
+COPY docs/content/coverage-manifest.json ./docs/content/coverage-manifest.json
 # Precedence (RAILWAY_GIT_COMMIT_SHA > PRI_RELEASE_SHA) and build stamping are
 # applied in one place, shared with the server's run-time resolver.
 RUN node release/docker-build-identity.mjs
