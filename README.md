@@ -1,14 +1,20 @@
 # Pri Learning
 
-**Maths practice for Indian students — NCERT Classes 7 to 12, JEE Main and JEE Advanced — that
-generates its own questions, reads Apple Pencil handwriting on the device, and marks the working
-line by line.**
+**Maths practice for Indian students — NCERT Classes 7 to 12, JEE Main, JEE Advanced and the
+olympiad — that generates its own questions, reads Apple Pencil handwriting, and marks the
+working line by line.**
 
 Write your working with a Pencil or type it, and get it marked the way a teacher marks: not just
 right or wrong, but which line stopped being true and which mistake it was. The learning engine
-runs primarily on the device — questions, handwriting recognition and marking all work with the
-network off. A Pri cloud account is optional for core local practice and is used for account and
-cross-device services plus server-authoritative subscription verification.
+runs on the device — questions, the bundled handwriting recogniser and marking all work with the
+network off, and the mark is always decided by the deterministic engine on the device. A Pri
+cloud account is optional, and adds what needs a server: sign-in across devices, classes and
+assignments, a subscription — and, on by default once signed in and switchable off in Settings,
+server reading of handwriting: a PNG rasterised from the strokes (never the strokes, never the
+question or expected answer) goes to the Pri server, which passes it to OpenAI and keeps no copy.
+The provider may retain it briefly under its own terms; see
+[`docs/privacy/data-retention.md`](docs/privacy/data-retention.md) §4 and the
+[privacy notice](docs/legal/privacy.md).
 
 **Production authority:** this repository (`Priysharan19/Final-Pri-learning`) on `main`. See
 [`repository-authority.md`](docs/architecture/repository-authority.md),
@@ -128,7 +134,7 @@ row is something the suites or the tools can speak to; the numbers are in
 | **Questions** | 258 of 258 Indian dot points have a generator; every question is built from a seed rather than drawn from a fixed pool. Classes 8, 9 and 10 are authored against their NCERT textbooks exercise by exercise; Class 7 follows the current Ganita Prakash. Four difficulty tiers, with per-track windows. |
 | **Marking** | Equivalence marking across seven answer types, plus the forms NCERT and JEE actually use: solution sets, inequality and interval notation interchangeably, matrices, vectors in ijk form, n!, nCr, nPr, sec, cosec, cot. |
 | **Working, not just answers** | Step Check finds the first line that stops being true; a diagnosis engine names which mistake was made and the rule it breaks, and abstains rather than guessing. Method marks for correct reasoning behind a wrong answer. |
-| **Handwriting** | On-device recognition of Pencil ink: digits, letters, Greek, operators, fractions, roots, powers, multi-line working, ∫, !, ≡, ∞. Recognised working feeds Step Check, and ✓/✗ annotations land on the student's own ink. |
+| **Handwriting** | On-device recognition of Pencil ink: digits, letters, Greek, operators, fractions, roots, powers, multi-line working, ∫, !, ≡, ∞. Recognised working feeds Step Check, and ✓/✗ annotations land on the student's own ink. With a cloud account, a rasterised image of the ink is also read on the server (OpenAI) unless the student turns that off; the device still decides the mark. |
 | **Video-style solutions** | The worked solution plays back as a narrated, step-by-step lesson with play, pause and speed, built deterministically from the verified solution — no model writes the maths. |
 | **Animated graphs** | Where a question states a function, the curve is drawn on screen with its roots, turning points, tangent or shaded area. The curve must be one the question or its solution states. |
 | **Exams** | Public V1: CBSE Class 10 Standard and Basic and Class 12 at 80 marks, Sections A–E with internal choice; JEE Main at +4/−1/0; JEE Advanced Paper 1 with partial marking. |
@@ -141,8 +147,12 @@ row is something the suites or the tools can speak to; the numbers are in
 
 ## The handwriting engine
 
-Fully local — no ML service, no upload, no API key. That does *not* mean there is no model: a trained
-convolutional network ships **inside the bundle** and does the heavy lifting on your device.
+The bundled engine is fully local — no ML service, no upload, no API key — and it is the instant
+and connection-loss path for every student. That does *not* mean there is no model: a trained
+convolutional network ships **inside the bundle** and does the heavy lifting on your device. The
+optional server reading path (`client/src/ink/cloudRaster.js` → `POST /v1/handwriting/transcribe`
+→ `server/platform/handwritingProvider.js`) sits beside it, not in place of it: it proposes a
+transcription, and the deterministic marker on the device decides.
 
 1. **Ink capture** — pointer events with coalescing; pressure + velocity shape the stroke width;
    once a Pencil is detected, finger touches never draw (palm rejection); stroke eraser and undo/redo.

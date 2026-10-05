@@ -42,7 +42,9 @@ device can open a profile that has no password.
 ## What we receive if you create a cloud account
 
 - **Your email address**, to sign you in and to send verification and password
-  reset links.
+  reset links and one-time sign-in codes — or **your mobile number**, if you
+  sign in with a code sent by SMS instead; such an account has no email address
+  on record.
 - **Your name**, as you typed it.
 - **Learning events**: that you answered a question, which chapter it belonged
   to, whether you were right, and how long you took.
@@ -66,11 +68,14 @@ device can open a profile that has no password.
   Keep out of shot whatever you would not want sent, or type your working
   instead.
 
-  Either way, our server passes it to an outside reading service and keeps no
-  copy: it is not written to our database, our storage or our logs. We ask the
-  reading service not to store it. Under its own terms it does not use it to
-  train its models, but it may hold a copy for a limited time to watch for
-  abuse; we do not control that. Turning the setting off stops it at once, and it stays off.
+  Either way, our server passes it to an outside reading service — OpenAI, through
+  its API — and keeps no copy: it is not written to our database, our storage or
+  our logs. We ask the reading service not to store it. Under its own terms it
+  does not use it to train its models, but it may hold a copy for a limited time
+  to watch for abuse; we do not control that. Turning the setting off stops it at
+  once, and it stays off. What the reading service returns is a transcription of
+  your writing, nothing more: your mark is always decided by the marking engine
+  on your own device, never by the reading service.
 - **Your working and the question, only if you switch that on.** There is a
   second setting, also off unless you turn it on, that sends the lines of
   working you wrote and the text of the question when an answer is wrong and
@@ -80,8 +85,9 @@ device can open a profile that has no password.
   with it, and your name and profile are never sent with it. Your mark is
   decided on your device either way.
 - **A parent or guardian's name and email address**, only for an account of
-  someone under 18, so we can send them the confirmation link described under
-  Children and show you, partly hidden, where it went.
+  someone under 18 — or their mobile number in place of the email address — so
+  we can send them the confirmation link or code described under Children and
+  show you, partly hidden, where it went.
 - **Device information** needed to keep you signed in: a random device
   identifier this app generates (it is not your device's own id and not
   anything you typed), a one-way hash of your browser's user-agent string, and
@@ -100,17 +106,22 @@ parent or guardian.
 birth.** It asks which class you are in, which tells it what maths to set you.
 When you create a cloud account it asks whether you are 18 or older, and unless
 you say you are, the account is treated as a child's. It then asks for a parent
-or guardian's name and email address and emails them a link to confirm the
-account. Until they confirm, the account can sign in, show and export what it
-holds, and be deleted, and nothing else: it does not sync, join a class, send a
-report, subscribe, or use either server setting. The same email lets them
-withdraw at any time, which stops all of that at once.
+or guardian's name and email address or mobile number. One of two things
+happens next: we email them a link to confirm the account, or we send them a
+six-digit code, which they enter on their own page, on their own device, after
+reading a short notice of what they are agreeing to. Until they confirm, the
+account can sign in, show and export what it holds, and be deleted, and nothing
+else: it does not sync, join a class, send a report, send telemetry, subscribe,
+or use either server setting. The same email, or a code sent to the same
+mobile number, lets them withdraw at any time, which stops all of that at once;
+a withdrawn confirmation cannot be given again with the same link.
 
 **What that confirmation proves, and what it does not.** It shows that someone
-who can read that email inbox followed the link. It does not show that they are
-an adult, or that they are your parent or guardian, so it is not the verifiable
-parental consent the DPDP Act will require. Our record of it says which method
-was used, so nobody can mistake it for more than it is.
+who can read that email inbox, or who holds that mobile number, followed the
+link or entered the code. It does not show that they are an adult, or that
+they are your parent or guardian, so it is not the verifiable parental consent
+the DPDP Act will require. Our record of it says which method was used, so
+nobody can mistake it for more than it is.
 
 If you are under 18, please set this up with a parent or guardian and show them
 this notice, particularly the section on what a cloud account sends. Core local
@@ -132,13 +143,19 @@ choosing the next maths question.
 
 Only the services needed to run the parts you use:
 
-- **Email delivery** for verification and password reset links.
+- **Email delivery** for verification links, password reset links and one-time
+  codes, and **SMS delivery** for one-time codes sent to a mobile number. The
+  delivery service sees the address or number and the message, as a postal
+  service sees an envelope.
 - **Payment providers** if you subscribe. We never see or store your card
   details; the provider tells us only whether a subscription is active.
-- **A handwriting reader**, only while the optional server-reading setting is
-  on, and only the image of your writing described above.
-- **A step checker**, only while the optional working-check setting is on, and
-  only the working and question described above.
+- **Your teacher**, if you join their class — and then only aggregate progress
+  on the work they set. A teacher never sees your answers, your working or your
+  handwriting.
+- **A handwriting reader** (OpenAI), only while the optional server-reading
+  setting is on, and only the image of your writing described above.
+- **A step checker** (the same provider), only while the optional working-check
+  setting is on, and only the working and question described above.
 
 We do not sell your data. We do not share it for advertising.
 
@@ -168,7 +185,13 @@ You can ask us to:
 
 - **Show you** what we hold about you. The app exports it directly.
 - **Correct** anything that is wrong.
-- **Delete** your account and its data.
+- **Delete** your account and its data. You can do this inside the app, in
+  Settings → Account, whichever way you sign in: with your password, with your
+  Apple or Google sign-in, or with a code sent to your email address or mobile
+  number. If you no longer have the app, you can do it at
+  [/account/delete-request](/account/delete-request) with a code sent to the
+  account's email address. Either way the deletion is immediate, as described
+  under "How long we keep it".
 - **Withdraw consent**, after which we stop processing and delete.
 - **Nominate** someone to exercise these rights if you cannot.
 
@@ -180,7 +203,8 @@ India.
 
 Passwords are stored only as bcrypt hashes. Sign-in tokens are stored as one-way
 hashes. Verification and reset links are single-use, short-lived, and delivered
-encrypted. Connections use HTTPS.
+encrypted. One-time codes are never stored — only a keyed one-way hash of each
+is — and they expire after ten minutes and five attempts. Connections use HTTPS.
 
 No system is perfectly secure. If we discover a breach affecting your data, we
 will tell you and the Data Protection Board as the DPDP Act requires.
