@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
+import Icon from '../components/Icon.jsx';
 import { downloadJSON, readJSONFile, dateStamp } from '../lib/files.js';
 import Calibrate from '../ink/Calibrate.jsx';
 import { personalStats, clearPersonal, ensurePersonalLoaded } from '../ink/personal.js';
@@ -76,7 +77,7 @@ function CloudOptInRow({ field, user, setUser, toast, ask, label, copy, unavaila
   }
 
   return (
-    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line, rgba(128,128,128,.25))' }}>
+    <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--hairline)' }}>
       <div className="set-row">
         <span className="set-k">
           {label}
@@ -132,7 +133,7 @@ function LanguageSection() {
 
   return (
     <div className="card">
-      <h2 style={{ marginBottom: 12 }}>◍ {t('lang.label')}</h2>
+      <h2 style={{ marginBottom: 12 }}>{t('lang.label')}</h2>
       <div className="row" role="group" aria-label={t('lang.label')}>
         {LANGUAGES.map(l => (
           <button key={l.id} type="button" className={`gen-opt ${chosen === l.id ? 'on' : ''}`}
@@ -258,7 +259,7 @@ const SECTIONS = [
   ['handwriting', '✒', 'settings.secHandwriting'],
   ['language', '◍', 'settings.secLanguage'],
   ['appearance', '◐', 'settings.secAppearance'],
-  ['courses', '📖', 'settings.secCourses'],
+  ['courses', '', 'settings.secCourses'],
   ['data', '⇅', 'settings.secData'],
   ['help', '?', 'settings.secHelp'],
 ];
@@ -299,7 +300,7 @@ function SecuritySection({ toast }) {
 
   return (
     <div className="card">
-      <h2 style={{ marginBottom: 8 }}>⚿ {t('settings.secSecurity')}</h2>
+      <h2 style={{ marginBottom: 8 }}>{t('settings.secSecurity')}</h2>
       <div className="set-row">
         <span className="set-k">{t('settings.accountType')}</span>
         <span className="set-v">{t('settings.accountTypeValue')}</span>
@@ -310,7 +311,7 @@ function SecuritySection({ toast }) {
           <span className="set-v" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {user.email || <span className="muted">{t('settings.emailNotSet')}</span>}
             <button className="btn btn-quiet btn-sm" aria-label={t('settings.editEmail')}
-              onClick={() => { setEmail(user.email || ''); setEditEmail(true); }}>✎</button>
+              onClick={() => { setEmail(user.email || ''); setEditEmail(true); }}><Icon name="pen" size={15} /></button>
           </span>
         ) : (
           <span style={{ display: 'flex', gap: 8 }}>
@@ -478,9 +479,9 @@ export default function Settings() {
       <h1 style={{ marginBottom: 24 }}>{t('settings.title')}</h1>
       <div className="settings-grid">
         <div className="set-menu no-print">
-          {SECTIONS.map(([k, ico, key]) => (
+          {SECTIONS.map(([k, , key]) => (
             <button key={k} className={`set-menu-item ${active === k ? 'on' : ''}`} onClick={() => goto(k)}>
-              <span style={{ width: 18, textAlign: 'center' }}>{ico}</span>{t(key)}
+              {t(key)}
             </button>
           ))}
         </div>
@@ -521,7 +522,7 @@ export default function Settings() {
           <div className="card" ref={el => secRefs.current.profile = el}>
             <div className="spread">
               <h2>{t('settings.profileInfo')}</h2>
-              {!editing && <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}>✎ {t('common.edit')}</button>}
+              {!editing && <button className="btn btn-ghost btn-sm" onClick={() => setEditing(true)}><Icon name="pen" size={15} />{t('common.edit')}</button>}
             </div>
             {!editing ? (
               <div style={{ marginTop: 8 }}>
@@ -621,10 +622,13 @@ export default function Settings() {
           {/* ── Appearance ── */}
           <div className="card" ref={el => secRefs.current.appearance = el}>
             <h2 style={{ marginBottom: 12 }}>{t('settings.appearance')}</h2>
-            <div className="row">
-              <button className={`gen-opt ${user.theme !== 'light' ? 'on' : ''}`} aria-pressed={user.theme !== 'light'} style={{ width: 160 }} onClick={() => setTheme('dark')}>{t('settings.themeDark')}</button>
-              <button className={`gen-opt ${user.theme === 'light' ? 'on' : ''}`} aria-pressed={user.theme === 'light'} style={{ width: 160 }} onClick={() => setTheme('light')}>{t('settings.themeLight')}</button>
+            <div className="seg theme-seg" role="group" aria-label={t('settings.appearance')}>
+              {[['light', 'sun', 'settings.themeLight'], ['dark', 'moon', 'settings.themeDark'], ['system', 'device', 'settings.themeSystem']].map(([value, icon, label]) => (
+                <button key={value} type="button" className={user.theme === value ? 'on' : ''} aria-pressed={user.theme === value}
+                  onClick={() => setTheme(value)}><Icon name={icon} size={16} />{t(label)}</button>
+              ))}
             </div>
+            <p className="muted" style={{ marginTop: 10 }}>{t(user.theme === 'system' ? 'settings.themeSystemNote' : 'settings.themeNote')}</p>
           </div>
 
           {/* ── Courses ── */}
