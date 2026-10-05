@@ -149,9 +149,6 @@ Only the services needed to run the parts you use:
   service sees an envelope.
 - **Payment providers** if you subscribe. We never see or store your card
   details; the provider tells us only whether a subscription is active.
-- **Your teacher**, if you join their class — and then only aggregate progress
-  on the work they set. A teacher never sees your answers, your working or your
-  handwriting.
 - **A handwriting reader** (OpenAI), only while the optional server-reading
   setting is on, and only the image of your writing described above.
 - **A step checker** (the same provider), only while the optional working-check
