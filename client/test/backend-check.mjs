@@ -595,7 +595,26 @@ function wrongInput(q) {
 
 // ── The suite ────────────────────────────────────────────────────────────────
 
+/** A seedable stand-in for Math.random (mulberry32), as the other suites use. */
+function mulberry32(a) {
+  return () => {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
 async function run() {
+  // Serving draws from Math.random. Seeded, a run repeats exactly, so a check
+  // that fails here fails every time and names a real defect, not a bad roll.
+  // BACKEND_CHECK_SEED overrides it to sweep other draws.
+  const seed = Number(process.env.BACKEND_CHECK_SEED || 20261003);
+  const rng = mulberry32(seed);
+  Math.random = () => rng();
+  // Row ids order index scans, so they come from the same stream; local/idb.js
+  // falls back to a Math.random UUID when randomUUID is absent.
+  Object.defineProperty(globalThis.crypto, 'randomUUID', { value: undefined, configurable: true });
   installBrowserEnv();
   const { dispatch } = await import(`${SRC}local/backend.js`);
   const idb = await import(`${SRC}local/idb.js`);
@@ -1021,7 +1040,7 @@ async function run() {
   section('misconception repair');
   try {
     const { getRating, putRating } = await import(`${SRC}local/store.js`);
-    const { misconceptionKey, START_RATING, TRAP_ACTIVE_AT } = await import(`${SRC}engine/adaptive.js`);
+    const { misconceptionKey, START_RATING, TRAP_ACTIVE_AT, activeTraps } = await import(`${SRC}engine/adaptive.js`);
     const { misconceptionIdForTrap, mappedIdForTrap, AUTHORED_TRAP_SHAPES } = await import(`${SRC}engine/misconceptions.js`);
     const { cloudLinkRowId } = await import(`${SRC}platform/cloudAccount.js`);
 
@@ -1132,8 +1151,29 @@ async function run() {
     // carry it, so seeding the ID first also proves that targeting reads IDs.
     const MS = 'y10-quadratics';
     const M = 'root-sign-from-factor';
+    // Practice hunts the strongest active misconception, so the claim is only
+    // about M when M is the one being hunted. Earlier steps may have left a
+    // stronger slip on this subtopic (they pick theirs from whatever was
+    // served), so its ledger starts clear rather than depending on that.
+    const msRow = (await getRating(noether.id, MS)) || { rating: START_RATING, attempts: 0, correct: 0, last_at: null };
+    await putRating(noether.id, MS, { ...msRow, traps: {} });
     await seedTrap(MS, M, 'Targeted named slip');
+    eq('the seeded ontology ID is the misconception practice hunts', activeTraps((await ledger(MS)), Date.now())[0]?.key, M);
+    // The first hunt of a (subtopic, trap) pair measures every reachable cell
+    // once. That measurement runs synchronously inside the in-browser backend
+    // before the seek starts, so its cost is bounded here: a cell stops being
+    // probed once its yield has saturated, and the bound keeps the budget from
+    // creeping back towards the full 48 seeds on every cell.
+    const { trapProbeStatsForTests } = await import(`${SRC}local/backend.js`);
+    const probeBefore = trapProbeStatsForTests();
     const mapped = await servedWhere([MS], (s) => mappedProbes(s.payload).has(M), 40);
+    const probeAfter = trapProbeStatsForTests();
+    const huntCells = probeAfter.cells - probeBefore.cells;
+    const huntGenerations = probeAfter.generations - probeBefore.generations;
+    console.log(`  (first hunt of ${MS}/${M}: ${huntCells} cells, ${huntGenerations} generations)`);
+    ok('the first hunt of a misconception probed at least one cell', huntCells > 0, show(huntCells));
+    ok('the first hunt of a misconception costs at most 300 generations', huntGenerations <= 300, show(huntGenerations));
+    ok('…and stopped probing early rather than spending the full 48 seeds on every cell', huntGenerations < 48 * huntCells, show({ huntGenerations, huntCells }));
     if (ok('an active ontology-ID misconception steers practice to a question carrying it', !!mapped)) {
       ok('its repair opportunity is the ontology ID itself, not a text hash', probeKeys(mapped.payload, MS).has(M), show([...probeKeys(mapped.payload, MS)]));
       // An ontology ID no question in this subtopic carries.
