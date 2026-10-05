@@ -52,6 +52,9 @@ export const flow = {
     await check('the nudge rung is lit and the method rung is next', await page.locator('[data-hint-rung="nudge"].lit').count() === 1
       && await page.locator('[data-hint-rung="method"][data-hint-rung-state="next"]').count() === 1);
 
+    // The card hands focus back to the answer box after a hint lands, and H
+    // typed into a field is an answer, not a shortcut — so leave the field first.
+    await page.locator('.q-prompt').click();
     await page.keyboard.press('H');
     await page.waitForSelector('[data-hint-shown="method"]', { timeout: 15000 });
     await check('H again opens the method, 70 % remain', /70%/.test(await page.locator('.hints-block').innerText()));
