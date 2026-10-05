@@ -30,6 +30,8 @@ import { clearDraft, queueDraft, readDraft } from '../components/drafts.js';
 import ExamAnalysis from '../components/ExamAnalysis.jsx';
 import { compactStrokes, expandStrokes } from '../local/examSession.js';
 import { tLater, useT, useTx } from '../i18n/index.js';
+import Icon from '../components/Icon.jsx';
+import '../workspace.css';
 
 const SAVE_DEBOUNCE_MS = 600;
 const INK_POINTS_PER_SAVE = 9000;
@@ -115,6 +117,17 @@ export default function ExamRoom() {
   const saveTimer = useRef(null);
   const saveChain = useRef(Promise.resolve());
   const warned = useRef(new Set());
+  // Flags are the student's own marks to come back to; they ride in the draft.
+  const [flagged, setFlagged] = useState(() => readDraft('exam', id)?.flagged || {});
+  const [confirming, setConfirming] = useState(false);
+  const confirmRef = useRef(null);
+  useEffect(() => {
+    if (!confirming) return;
+    confirmRef.current?.querySelector('button')?.focus();
+    const onKey = e => { if (e.key === 'Escape') setConfirming(false); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [confirming]);
   const deadlineFired = useRef(false);
   // The backend's clock only moves forward (examSession observeClock). If the
   // device clock reads earlier than the time the paper has already seen, the
@@ -255,12 +268,12 @@ export default function ExamRoom() {
   useEffect(() => {
     if (!exam || phase !== 'sitting') return;
     scheduleSave();
-    queueDraft('exam', id, { answers, workings, cur }, {
+    queueDraft('exam', id, { answers, workings, cur, flagged }, {
       label: exam.title,
       note: t('examRoom.draftNote', { answered: answeredCount, total: exam.questions.length }),
       path: `/exams/${id}`
     });
-  }, [answers, workings, inks, modes, cur]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [answers, workings, inks, modes, cur, flagged]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A hidden tab may never come back: save now, not in 600 ms. Coming back
   // (visible again, or the window refocused) saves too — the reply carries the
@@ -329,6 +342,7 @@ export default function ExamRoom() {
   // ── Finalise ───────────────────────────────────────────────────────────────
   async function finalise(reason = 'student') {
     if (phaseRef.current !== 'sitting') return;
+    setConfirming(false);
     setPhaseBoth('finalising');
     setSubmitError('');
     if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
@@ -445,8 +459,8 @@ export default function ExamRoom() {
         <h1 className="sr-only">{t('examRoom.markedHeading', { title: exam.title })}</h1>
         <div className="card" style={{ textAlign: 'center', padding: 34 }}>
           <div className="card-title">{exam.title}</div>
-          {/* the big number is tinted good / neutral / bad; the tint is spelled out */}
-          <div className="hero-num" style={{ color: shownPct >= 80 ? 'var(--good)' : shownPct >= 50 ? 'var(--ink)' : 'var(--bad)' }}>
+          {/* The number is ink, never a traffic light; the sentence carries the meaning. */}
+          <div className="hero-num exam-result-num">
             {shownPct}%<span className="sr-only"> {t(shownPct >= 80 ? 'examRoom.pctSrStrong' : shownPct >= 50 ? 'examRoom.pctSrFair' : 'examRoom.pctSrLow')}</span>
           </div>
           <p className="sub" style={{ marginTop: 6 }}>{t('examRoom.scoreOf', { count: result.total, score: result.score, total: result.total })} · {t(
@@ -724,48 +738,66 @@ export default function ExamRoom() {
   const answeredQ = qq => keysOf(qq).some(k => !blank(answers[k]));
   const saveLabel = saveState === 'saving' ? t('examRoom.saving') : saveState === 'saved' ? t('examRoom.saved') : saveState === 'error' ? t('examRoom.saveError') : '';
 
+  const flaggedCount = Object.values(flagged).filter(Boolean).length;
+  const unanswered = exam.questions.length - answeredCount;
+  const low = left < 300;
+
   return (
-    <div className="grid" style={{ gap: 16, maxWidth: 860, margin: '0 auto' }}>
+    <div className="exam-page">
       <h1 className="sr-only">{exam.title}</h1>
-      <div className="card exam-head">
-        <div>
+      <header className="exam-head">
+        <button type="button" className="icon-btn" onClick={() => nav('/exams')} aria-label={t('exam.leaveSaved')}><Icon name="back" /></button>
+        <div className="exam-head-title">
           <b>{exam.title}</b>
-          <div className="muted" style={{ fontSize: 12.5 }}>
+          <span className="muted" style={{ fontSize: 12.5 }}>
             {t('examRoom.answeredProgress', { answered: answeredCount, total: exam.questions.length })}
             {resumed && ` ${t('examRoom.resumedNote')}`}
             {saveLabel && <> · <span className="exam-save" data-state={saveState}>{saveLabel}</span></>}
-          </div>
+          </span>
         </div>
-        <span className={`exam-timer ${left < 120 ? 'low' : ''}`} style={{ marginLeft: 'auto' }} data-deadline={deadlineAt || undefined}>
-          ⏱ {mmss(left)}
-          <span className="sr-only"> {t(left < 120 ? 'examRoom.timeLeftLow' : 'examRoom.timeLeft')}</span>
+        <span className={`exam-timer ${low ? 'low' : ''}`} role="timer" data-deadline={deadlineAt || undefined}
+          aria-label={t(left < 120 ? 'examRoom.timeLeftLow' : 'examRoom.timeLeft')}>
+          <Icon name="clock" />{mmss(left)}
+          {low && <span className="exam-timer-note">{t('exam.underFive')}</span>}
         </span>
-        <button className="btn btn-primary" onClick={() => finalise('student')} disabled={locked}>
-          {phase === 'finalising' ? t('verdict.marking') : t('examRoom.submitPaper')}
+        <button className="btn btn-ghost btn-sm" onClick={() => setConfirming(true)} disabled={locked}>
+          {phase === 'finalising' ? t('verdict.marking') : t('exam.reviewSubmit')}
         </button>
-      </div>
+      </header>
       <div className="sr-only" role="status" aria-live="polite">{announce}</div>
+
+      <div className="exam-body">
       {submitError && (
-        <div className="card" role="alert">
-          {submitError}
-          {phase === 'sitting' && left <= 0 && (
-            <button className="btn btn-primary btn-sm" style={{ marginLeft: 12 }} onClick={() => finalise('deadline')}>{t('common.tryAgain')}</button>
-          )}
+        <div className="verdict verdict-technical" role="alert">
+          <span className="verdict-ico"><Icon name="alert" /></span>
+          <div>
+            <div className="verdict-body">{submitError}</div>
+            {phase === 'sitting' && left <= 0 && (
+              <button className="btn btn-primary btn-sm" style={{ marginTop: 8 }} onClick={() => finalise('deadline')}>{t('common.tryAgain')}</button>
+            )}
+          </div>
         </div>
       )}
 
-      <div className="exam-nav">
+      <nav className="exam-nav" aria-label={t('exam.questions')}>
         {exam.questions.map((qq, i) => (
           <button key={qq.id}
-            className={`exam-dot ${i === cur ? 'cur' : ''} ${answeredQ(qq) ? 'done' : ''}`}
-            aria-label={t(answeredQ(qq) ? 'examRoom.dotAnswered' : 'examRoom.dotNotAnswered', { n: i + 1 })}
+            className={`exam-dot ${i === cur ? 'cur' : ''} ${answeredQ(qq) ? 'done' : ''} ${flagged[qq.id] ? 'flagged' : ''}`}
+            aria-label={answeredQ(qq)
+              ? (flagged[qq.id] ? t('exam.dotAnsweredFlagged', { n: i + 1 }) : t('examRoom.dotAnswered', { n: i + 1 }))
+              : (flagged[qq.id] ? t('exam.dotOpenFlagged', { n: i + 1 }) : t('examRoom.dotNotAnswered', { n: i + 1 }))}
             aria-current={i === cur ? 'true' : undefined}
             onClick={() => setCur(i)}>{i + 1}</button>
         ))}
+      </nav>
+      <div className="exam-legend" aria-hidden="true">
+        <span><i className="done" />{t('exam.legendAnswered')}</span>
+        <span><i />{t('exam.legendOpen')}</span>
+        <span><Icon name="flag" size={13} />{t('exam.legendFlagged')}</span>
       </div>
 
-      <div className="card">
-        <div className="q-meta">
+      <section className="exam-paper" aria-label={t('examRoom.questionOf', { n: qNumber, total: exam.questions.length })}>
+        <div className="q-meta exam-qhead">
           <span className="tag">{t('examRoom.questionOf', { n: qNumber, total: exam.questions.length })}</span>
           {q.sectionLabel && <span className="tag" lang="en">{q.sectionLabel}</span>}
           <span className="tag" lang="en">{q.subtopicName}</span>
@@ -777,6 +809,10 @@ export default function ExamRoom() {
               other question in the paper is authored practice, and a student
               is entitled to tell them apart while they are sitting it. */}
           {q.pyq && <span className="tag tag-brand" title={q.pyqSource || t('examRoom.pyqTitle')}>{q.pyqSource ? t('examRoom.pyqTag', { source: q.pyqSource }) : t('examRoom.pyqTagNoSource')}</span>}
+          <button type="button" className="icon-btn exam-flag" style={{ marginLeft: 'auto' }} aria-pressed={!!flagged[q.id]}
+            onClick={() => setFlagged(f => ({ ...f, [q.id]: !f[q.id] }))}>
+            <Icon name="flag" size={16} />{flagged[q.id] ? t('exam.flagged') : t('exam.flag')}
+          </button>
         </div>
         {q.multipart ? (
           <>
@@ -817,14 +853,35 @@ export default function ExamRoom() {
           </>
         )}
 
-        <div className="spread" style={{ marginTop: 20 }}>
+        <div className="exam-foot">
+          <span className="status-line" data-state={saveState === 'error' ? 'failed' : saveState === 'saved' ? 'saved' : saveState === 'saving' ? 'working' : 'idle'}>
+            {saveLabel && <span className="dot" aria-hidden="true" />}{saveLabel}
+          </span>
           <button className="btn btn-ghost" disabled={cur === 0} onClick={() => setCur(c => c - 1)}>{t('examRoom.previous')}</button>
           {cur < exam.questions.length - 1
-            ? <button className="btn btn-ghost" onClick={() => setCur(c => c + 1)}>{t('examRoom.next')}</button>
-            : <button className="btn btn-primary" onClick={() => finalise('student')} disabled={locked}>{t('examRoom.finishSubmit')}</button>}
+            ? <button className="btn btn-primary" onClick={() => setCur(c => c + 1)}>{t('examRoom.next')}</button>
+            : <button className="btn btn-primary" onClick={() => setConfirming(true)} disabled={locked}>{t('exam.reviewSubmit')}</button>}
         </div>
+      </section>
+      <p className="exam-rules">{t('examRoom.conditionsNote')}</p>
       </div>
-      <p className="muted" style={{ textAlign: 'center' }}>{t('examRoom.conditionsNote')}</p>
+
+      {confirming && (
+        <>
+          <button type="button" className="sheet-scrim" aria-label={t('exam.keepWorking')} onClick={() => setConfirming(false)} />
+          <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="exam-confirm-title" ref={confirmRef}>
+            <h2 id="exam-confirm-title">{t('exam.confirmTitle')}</h2>
+            <p className="sub">{t('exam.confirmAnswered', { answered: answeredCount, total: exam.questions.length })}</p>
+            {unanswered > 0 && <p className="sub" style={{ marginTop: 6 }}><b>{t('exam.confirmUnanswered', { count: unanswered, n: unanswered })}</b></p>}
+            {flaggedCount > 0 && <p className="sub" style={{ marginTop: 6 }}>{t('exam.confirmFlagged', { count: flaggedCount, n: flaggedCount })}</p>}
+            <p className="muted" style={{ marginTop: 10 }}>{t('exam.confirmFinal')}</p>
+            <div className="sheet-actions">
+              <button className="btn btn-ghost" onClick={() => setConfirming(false)}>{t('exam.keepWorking')}</button>
+              <button className="btn btn-primary" onClick={() => { setConfirming(false); finalise('student'); }} disabled={locked}>{t('exam.submitPaper')}</button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

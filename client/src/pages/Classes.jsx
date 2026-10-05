@@ -62,7 +62,6 @@ export default function Classes() {
         {joined.length === 0 ? (
           <div className="locked-wrap">
             <div className="card locked-card" style={{ padding: 40 }}>
-              <div className="locked-icon" aria-hidden="true">🎓</div>
               <div className="locked-title">{t('classes.emptyTitle')}</div>
               <div className="locked-sub">{t('classes.emptySub')}</div>
               <button className="btn btn-primary" onClick={() => fileRef.current?.click()}>{t('classes.emptyImport')}</button>
