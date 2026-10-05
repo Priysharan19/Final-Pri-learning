@@ -1,0 +1,1 @@
+import{l as e}from"./cloudSyncScheduler-COoer_do.js";export{e as installAutoSync};
