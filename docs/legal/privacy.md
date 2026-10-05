@@ -1,27 +1,32 @@
 # Privacy notice
 
-**Last updated: {{LAST_UPDATED}}**
+**Last updated: 2 October 2026**
 
 This notice explains what Pri Learning collects, why, and what you can ask us to
-do about it. It is written for students, parents and teachers in India, and
-follows the Digital Personal Data Protection Act 2023.
+do about it. It is written for students and parents or guardians in India, and follows the
+Digital Personal Data Protection Act 2023.
 
 The person responsible for your data (the "data fiduciary") is
 {{OWNER_LEGAL_NAME}}, {{OWNER_ADDRESS}}.
 
 ## The short version
 
-Pri Learning is built to work without sending your work anywhere. Questions,
-handwriting recognition, marking and your progress all run on your own device.
-You can use the whole app without an account and without a network. Two
-optional settings send work off the device, and both are described below: reading your
-handwriting and photos on a server, which is on by default once you sign in to
-an account and can be turned off, and checking your working, which is off
-unless you turn it on. Without an account, neither runs.
+Pri Learning keeps the core maths-practice loop local. Questions, marking of
+typed answers, local history and local progress run on your own device and can
+continue without a network. Some capabilities need an account or server
+connection, including account and cross-device services, guardian-consent
+services where required, server verification of paid access, and the server
+reading and checking described below. Two optional settings send work off the
+device, and both are described below: reading your handwriting and photos on a server,
+which is on by default once you sign in to an account and can be turned off,
+and checking your working, which is off unless you turn it on. Without an
+account, neither runs.
 
-A Pri cloud account is optional. It exists so your progress can follow you to a
-second device, so a teacher can set work, and so a subscription can be verified.
-If you never create one, nothing about your learning leaves your device.
+A Pri cloud account is optional for core local practice. It supports account and
+cross-device services and lets the server verify subscription status. If you do
+not create one, your local learning data stays on this device except for files
+you deliberately export, and capabilities that require an account or server are
+not available or cannot be verified.
 
 ## What stays on your device
 
@@ -87,7 +92,9 @@ device can open a profile that has no password.
   identifier this app generates (it is not your device's own id and not
   anything you typed), a one-way hash of your browser's user-agent string, and
   the times you signed in and were last seen.
-- **Subscription status** from your payment provider, if you subscribe.
+- **Subscription status** from your payment provider, if you subscribe. Paid
+  access is granted only from subscription state verified by our server; a
+  local setting on the device does not grant Premium.
 
 ## Children
 
@@ -117,8 +124,10 @@ the DPDP Act will require. Our record of it says which method was used, so
 nobody can mistake it for more than it is.
 
 If you are under 18, please set this up with a parent or guardian and show them
-this notice, particularly the section on what a cloud account sends. Everything
-works without an account, and without an account nothing leaves the device.
+this notice, particularly the section on what a cloud account sends. Core local
+practice can continue without a cloud account. Cloud sync, server reading and
+checking, and paid entitlement verification require account or server services
+where applicable.
 
 The DPDP Act's substantive obligations — including verifiable parental consent
 for anyone under 18 — commence on 14 May 2027. Before then, and before this app
@@ -140,9 +149,6 @@ Only the services needed to run the parts you use:
   service sees an envelope.
 - **Payment providers** if you subscribe. We never see or store your card
   details; the provider tells us only whether a subscription is active.
-- **Your teacher**, if you join their class — and then only aggregate progress
-  on the work they set. A teacher never sees your answers, your working or your
-  handwriting.
 - **A handwriting reader** (OpenAI), only while the optional server-reading
   setting is on, and only the image of your writing described above.
 - **A step checker** (the same provider), only while the optional working-check
@@ -156,8 +162,8 @@ We do not sell your data. We do not share it for advertising.
 - Learning events on our server are kept while your account is open.
 - When you delete your account it is deleted at once — there is no waiting
   period. That removes your profile, your sign-in details and every session,
-  your synced work, your class memberships and submissions, your subscription
-  link, your telemetry and any guardian's details. Your email address can then
+  your synced learning records, your subscription link, your telemetry and any
+  guardian's details. Your email address can then
   be used to create a new, empty account.
 - Three things are kept after deletion, with nothing in them that identifies
   you: the record of any payment you made (amount, currency, date and the

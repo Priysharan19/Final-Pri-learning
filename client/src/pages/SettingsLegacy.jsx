@@ -14,6 +14,7 @@ import { MIN_PASSWORD, PasswordMeter, passwordVerdict } from './Login.jsx';
 import { LANGUAGES, useLanguage, useT } from '../i18n/index.js';
 import { loadGlossary } from '../i18n/glossary.js';
 import { priNative } from '../platform/native/index.js';
+import { featureEnabled } from '../platform/features.js';
 
 const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧', '🦄', '⚡', '🌊', '🧠'];
 const COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB'], ['in', null, 'settings.courseIndia']];
@@ -374,6 +375,12 @@ export default function Settings() {
   const secRefs = useRef({});
   useEffect(() => { api.get('/data/storage').then(setStorageInfo).catch(() => { }); }, []);
   const [form, setForm] = useState({ name: user.name, year: user.year, dailyGoal: user.dailyGoal, course: user.course, avatar: user.avatar, pathway: user.pathway || 'advanced', indiaTrack: user.indiaTrack || 'cbse' });
+  // Public V1 (a build with both feature flags off) offers no door out of the
+  // India catalogue or into Olympiad from Settings: the Australian syllabus
+  // selector and the Olympiad track render only in a flagged build, or for a
+  // profile that already holds one (such profiles keep working unchanged).
+  const courseChoiceOffered = featureEnabled('australia') || user.course !== 'in';
+  const olympiadOffered = featureEnabled('extendedTracks') || user.indiaTrack === 'olympiad';
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [del, setDel] = useState(null);   // { name, password, error, busy } while the wipe is being confirmed
@@ -483,7 +490,7 @@ export default function Settings() {
           {/* ── Plan ── */}
           <div className="card" ref={el => secRefs.current.plan = el}>
             <h2>{t('settings.localPlan')}</h2>
-            <p className="muted" style={{ margin: '4px 0 14px' }}>{t('settings.localPlanSub', { limit: FREE_TIER.practicePerDay })}</p>
+            <p className="muted" style={{ margin: '4px 0 14px' }}>{t('settings.localPlanSub', { limit: FREE_TIER.practicePerDay, examLimit: FREE_TIER.examsPerWindow, days: FREE_TIER.examWindowDays })}</p>
             <div className="spread" style={{ fontSize: 14 }}>
               <span className="sub">{t('settings.questionBank')}</span><span>{t('settings.questionBankValue')}</span>
             </div>
@@ -492,6 +499,7 @@ export default function Settings() {
             <div className="set-row"><span className="set-k">{t('settings.allDifficulties')}</span><span className="set-v">✓</span></div>
             <div className="set-row"><span className="set-k">{t('settings.allCourses')}</span><span className="set-v">✓</span></div>
             <div className="set-row"><span className="set-k">{t('settings.allFeatures')}</span><span className="set-v">✓</span></div>
+            <p className="muted" style={{ marginTop: 12 }}>{t('settings.planWorkSafe')}</p>
           </div>
 
           {/* ── Account information ── */}
@@ -548,12 +556,14 @@ export default function Settings() {
                         {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>{t(form.course === 'in' ? 'common.classNumber' : 'common.yearNumber', { n: y })}</option>)}
                       </select>
                     </div>
-                    <div className="field">
-                      <label className="label" htmlFor="set-course">{t('settings.syllabus')}</label>
-                      <select className="input" id="set-course" value={form.course} onChange={e => setForm(f => ({ ...f, course: e.target.value }))}>
-                        {COURSES.map(([k, label, labelKey]) => <option key={k} value={k}>{labelKey ? t(labelKey) : label}</option>)}
-                      </select>
-                    </div>
+                    {courseChoiceOffered && (
+                      <div className="field">
+                        <label className="label" htmlFor="set-course">{t('settings.syllabus')}</label>
+                        <select className="input" id="set-course" value={form.course} onChange={e => setForm(f => ({ ...f, course: e.target.value }))}>
+                          {COURSES.map(([k, label, labelKey]) => <option key={k} value={k}>{labelKey ? t(labelKey) : label}</option>)}
+                        </select>
+                      </div>
+                    )}
                   </div>
                 )}
                 {user.role !== 'teacher' && form.course === 'nsw' && form.year >= 11 && (
@@ -574,7 +584,7 @@ export default function Settings() {
                   <div className="field">
                     <div className="label" id="set-india-track">{t('settings.indiaTrack')}</div>
                     <div className="pathway-row" role="group" aria-labelledby="set-india-track">
-                      {INDIA_TRACKS.filter(([k]) => form.year >= 11 || !k.startsWith('jee-')).map(([k, name, desc, nameKey]) => (
+                      {INDIA_TRACKS.filter(([k]) => (form.year >= 11 || !k.startsWith('jee-')) && (k !== 'olympiad' || olympiadOffered)).map(([k, name, desc, nameKey]) => (
                         <button key={k} type="button" className={`pathway-pick ${form.indiaTrack === k ? 'on' : ''}`}
                           onClick={() => setForm(f => ({ ...f, indiaTrack: k }))}><b>{nameKey ? t(nameKey) : name}</b><span>{t(desc)}</span></button>
                       ))}

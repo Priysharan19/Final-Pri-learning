@@ -227,7 +227,7 @@ function helpers(page, base, flowId) {
   /** Load a route and wait for the app to have decided who is signed in. */
   const goto = async (path = '/') => {
     await page.goto(base + path, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.auth-wrap .hero-title, .auth-card, .shell', { timeout: 30000 });
+    await page.waitForSelector('.auth-wrap .hero-title, .auth-card, .shell, .legal-body', { timeout: 30000 });
     // Routes are lazily loaded now, so the shell paints before the page inside
     // it does and Suspense shows "Loading…" in between. Without this wait the
     // next assertion races the chunk over the network and fails on a slow CI

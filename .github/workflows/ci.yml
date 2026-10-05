@@ -71,6 +71,7 @@ jobs:
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
+          grep -Fq 'V1 PRODUCT PROMISE: PASS — 42/42 checks' suites.log
           grep -Fq 'LEGAL PAGES: PASS — 234/234 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 94/94 checks' suites.log
           grep -Fq 'BROWSER RUN FIXES: PASS — 23/23 checks' suites.log
@@ -388,7 +389,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*358/358.*13 flows' browser.log
+          grep -Eq 'E2E SUITE.*364/364.*13 flows' browser.log
           grep -Fq 'Submission · interruption recovery and one attempt' browser.log
           grep -Fq 'Cloud · late results never rewrite an attempt' browser.log
           grep -Fq 'India exam · JEE Main handwritten, reloaded, analysed' browser.log

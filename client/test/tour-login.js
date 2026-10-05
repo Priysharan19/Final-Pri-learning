@@ -27,6 +27,18 @@ export const flow = {
     await check('the hero offers the way into onboarding',
       await page.getByRole('button', { name: 'Get Started' }).isVisible());
 
+    // KALP-R1: the signed-out privacy notice states the real local/server boundary.
+    await goto('/privacy');
+    await page.waitForSelector('.legal-body', { timeout: 15000 });
+    const privacyCopy = await page.locator('.legal-body').innerText();
+    await check('signed-out privacy copy distinguishes local core from server-dependent capability',
+      /core maths-practice loop local/i.test(privacyCopy) && /account or server connection/i.test(privacyCopy));
+    await check('signed-out privacy copy has no public teacher-work or whole-app-offline claim',
+      !/teacher can set work|your teacher|whole app without an account and without a network/i.test(privacyCopy));
+    await check('signed-out privacy copy states server-authoritative paid access',
+      /Paid access is granted only from subscription state verified by our server/i.test(privacyCopy));
+    await goto('/');
+
     await page.getByRole('button', { name: 'Get Started' }).click();
     await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
     await check('first-run starts by asking for the real product role',
@@ -44,6 +56,20 @@ export const flow = {
       greet.includes('Ada'), `Home greeting reads ${JSON.stringify(greet)}`);
     await check('the account chip carries the new profile',
       (await page.locator('.user-chip').innerText()).includes('Ada'));
+
+    // KALP-R1: the plan summary reads the enforced Free limits and names the real Premium family.
+    await goto('/settings');
+    await page.waitForSelector('.settings-grid', { timeout: 30000 });
+    const settingsText = await page.locator('.settings-grid').innerText();
+    await check('shipping plan copy matches Free and Premium boundaries',
+      /20 practice questions per day/i.test(settingsText)
+      && /1 exam simulation every 30 days/i.test(settingsText)
+      && /JEE Advanced/i.test(settingsText)
+      && /advanced Pri Explain/i.test(settingsText));
+    await check('shipping plan copy keeps completed local work available', /completed local work, history and progress stay/i.test(settingsText));
+    await check('shipping Settings do not advertise the old all-inclusive plan',
+      !/everything else unlimited|all courses|all pathways|all features/i.test(settingsText));
+    await goto('/');
 
     await switchProfile(page);
     const ada = page.locator('.acct-row', { hasText: STUDENT.name });
