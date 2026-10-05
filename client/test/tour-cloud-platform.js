@@ -201,6 +201,8 @@ export const flow = {
     await page.evaluate(() => { window.__PRI_E2E_NO_RELOAD__ = 'kept'; });
     await inkLink.click();
     await page.waitForURL(url => url.pathname === '/settings', { timeout: 15000 });
+    // Settings is a lazy route: wait for the account panel itself, not the URL.
+    await page.locator('#cloud-account-title').waitFor({ state: 'visible', timeout: 30000 });
     const registerIndexBefore = requests.length;
 
     const accountPanel = page.locator('section', { has: page.locator('#cloud-account-title') });
@@ -308,8 +310,9 @@ export const flow = {
     await check('and the waiting notice is gone', await page.locator('.ink-status-line').count() === 0);
     await check('still without a reload', await page.evaluate(() => window.__PRI_E2E_NO_RELOAD__) === 'kept');
 
-    // Back to Settings for the assignment hand-off, the same way a student goes.
-    await page.getByRole('link', { name: 'Settings', exact: true }).first().click();
+    // Back to Settings for the assignment hand-off. (A reload is fine from
+    // here: everything the no-reload invariant guards has been asserted.)
+    await goto('/settings');
     await inbox.waitFor({ state: 'visible', timeout: 15000 });
 
     await inbox.getByRole('button', { name: 'Start assignment' }).click();
