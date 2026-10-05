@@ -250,7 +250,7 @@ export const flow = {
     const marked = (await page.locator('.eval-card').innerText()).replace(/\s+/g, ' ');
     const marks = (await page.locator('.eval-marks').innerText()).replace(/\s+/g, ' ').trim();
     await check('the handwritten answer is marked correct — every mark awarded',
-      /^(\d+(?:\.\d)?) \/ \1 marks \(100%\)/.test(marks), `marks read ${JSON.stringify(marks)}`);
+      /^(\d+(?:\.\d)?) \/ \1 marks\b/.test(marks), `marks read ${JSON.stringify(marks)}`);
     const provenance = (await page.locator('.eval-card .eval-provenance').innerText().catch(() => '')) || '';
     await check('the verdict says who read it and who marked it: "Read by AI, marked by Pri’s engine"',
       /Read by AI, marked by Pri’s engine/.test(provenance), `provenance reads ${JSON.stringify(provenance)}`);

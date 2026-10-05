@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import '@fontsource-variable/inter';
+import './fonts.css';
 import './theme.css';
 import './theme-state.css';
 import './ink/interactionGuard.js';

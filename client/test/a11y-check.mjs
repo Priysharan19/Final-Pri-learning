@@ -694,7 +694,7 @@ async function run() {
     });
 
     await step('practice · scribble pad', '/practice', async () => {
-      await click(page, '.q-rail-btn', { text: '✎' });
+      await click(page, '.q-rail-btn[aria-label="Scratch"]');
     });
 
     await step('practice · handwriting mode', '/practice', async () => {
@@ -744,14 +744,14 @@ async function run() {
       for (let attempt = 0; attempt < 2; attempt++) {
         if (await input.count()) await input.fill(`999${attempt}1`);
         else if (await mcq.count()) await mcq.click();
-        const submit = page.getByRole('button', { name: /Submit Answer/ });
+        const submit = page.getByRole('button', { name: /Submit answer/ });
         if (!(await submit.count())) break;
         await submit.click();
         await wait(page, 1200);
       }
       if (!(await page.locator('.eval-card').count())) {
         const reveal = page.getByRole('button', { name: 'Show solution' });
-        if (await reveal.count()) { await reveal.click(); await wait(page, 1400); }
+        if (await reveal.count()) { await reveal.click(); await reveal.click(); await wait(page, 1400); }
       }
       await page.waitForSelector('.eval-card', { timeout: 20000 });
       const after = await page.evaluate(() =>
@@ -821,7 +821,9 @@ async function run() {
     });
 
     await step('exam room · marked paper', '/exams/:id', async () => {
-      await click(page, 'button.btn-primary', { text: 'Submit paper' });
+      await click(page, '.exam-head .btn', { text: 'Review and submit' });
+      await page.waitForSelector('[role="dialog"]', { timeout: 10000 });
+      await click(page, '[role="dialog"] button.btn-primary', { text: 'Submit paper' });
       await page.waitForSelector('.hero-num', { timeout: 60000 });
       await wait(page, 900);
     });
@@ -1013,7 +1015,9 @@ async function run() {
     });
 
     await step('india exam room · section analysis', '/exams/:id', async () => {
-      await click(page, 'button.btn-primary', { text: 'Submit paper' });
+      await click(page, '.exam-head .btn', { text: 'Review and submit' });
+      await page.waitForSelector('[role="dialog"]', { timeout: 10000 });
+      await click(page, '[role="dialog"] button.btn-primary', { text: 'Submit paper' });
       await page.waitForSelector('.exam-analysis', { timeout: 60000 });
       await wait(page, 700);
     });
