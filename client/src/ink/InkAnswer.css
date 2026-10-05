@@ -124,3 +124,7 @@
 .ink-sym { min-height: var(--tap-min); }
 }
 .ink-status-line { margin: 8px 2px 0; font-size: 12.5px; }
+/* A blocker the student can clear in Account settings: the way there sits
+   beside the notice, in the notice's own quiet voice. */
+.ink-status-action { margin: 4px 2px 0; font-size: 12.5px; }
+.ink-status-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }

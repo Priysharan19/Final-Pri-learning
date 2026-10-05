@@ -24,7 +24,8 @@ import InkCanvas from './InkCanvas.jsx';
 import NativeInkCanvas from './NativeInkCanvas.jsx';
 import { nativeInkAvailable } from './native.js';
 import { exprToLatex } from './inkLatex.js';
-import { cloudReadingEnabled, inkReadingBlockedKey, retryDelayMs, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
+import { ACCOUNT_BLOCKED_KEYS, cloudReadingEnabled, inkReadingBlockedKey, readinessIdentity, retryDelayMs, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
+import { Link, useInRouterContext } from 'react-router-dom';
 import { useApp } from '../App.jsx';
 import { feedbackGeometry } from './feedbackGeometry.js';
 import { plausibleLineMatch, segmentInkLines } from './inkLines.js';
@@ -76,6 +77,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
   const fittedHeight = inkCanvasHeight(height, formFactor);
   const canvasRef = useRef(null);
   const { user } = useApp();
+  const inRouter = useInRouterContext();
   const userRef = useRef(user);
   useEffect(() => { userRef.current = user; }, [user]);
   const [tool, setTool] = useState('pen');
@@ -143,13 +145,21 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
     const delay = retryDelayMs(retriesRef.current);
     retriesRef.current += 1;
     retryRef.current = setTimeout(() => {
-      if (seq === readSeqRef.current && !disabledRef.current) sendToReaderRef.current?.(strokesRef.current, seq);
+      // A timed retry asks the server afresh too: the cached "not ready" it
+      // is retrying was learned before the wait, and a wait is exactly when
+      // the account or the deployment changes.
+      if (seq === readSeqRef.current && !disabledRef.current) sendToReaderRef.current?.(strokesRef.current, seq, { fresh: true });
     }, delay);
   };
   const sendToReaderRef = useRef(null);
 
-  /** Send the page to the server reader. Its reading is the only reading. */
-  const sendToReader = useCallback((strokes, seq) => {
+  /**
+   * Send the page to the server reader. Its reading is the only reading.
+   * `fresh` bypasses the readiness cache: used for the first read after the
+   * account changed (signed in, verified, consented) so a status learned for
+   * the signed-out device is never the reason this student's page waits.
+   */
+  const sendToReader = useCallback((strokes, seq, { fresh = false } = {}) => {
     if (disabledRef.current) return;
     const who = userRef.current;
     // Offline is known before anything is sent: no doomed request, just the
@@ -165,7 +175,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
     abortRef.current = controller;
     sentRef.current = strokeSignature(strokes);
     setStatus({ kind: 'reading' });
-    readWithCloud(strokes, { user: who, signal: controller?.signal }).then(outcome => {
+    readWithCloud(strokes, { user: who, signal: controller?.signal, freshReadiness: fresh }).then(outcome => {
       // Newer writing replaced this read, or the page was submitted while the
       // server was reading it (§09: a late reading never rewrites the reading
       // a mark was given for).
@@ -194,17 +204,20 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
       queuedRef.current = true;
       setStatus({ kind: 'waiting', key: inkReadingBlockedKey(who, { outcome }) });
       scheduleRetry(seq);
-    }).catch(() => {
+    }).catch((error) => {
       if (seq !== readSeqRef.current || disabledRef.current) return;
       sentRef.current = null;
       queuedRef.current = true;
-      setStatus({ kind: 'waiting', key: inkReadingBlockedKey(who) });
+      // A refusal that escaped still names its reason (401 → sign in, 403
+      // EMAIL_UNVERIFIED → verify); only an unknown throw is "not answering".
+      const outcome = { error: { code: error?.code, status: error?.status } };
+      setStatus({ kind: 'waiting', key: inkReadingBlockedKey(who, { outcome }) });
       scheduleRetry(seq);
     });
   }, [publish]);
   sendToReaderRef.current = sendToReader;
 
-  const scheduleRead = useCallback((strokes, { immediate = false } = {}) => {
+  const scheduleRead = useCallback((strokes, { immediate = false, fresh = false } = {}) => {
     const seq = ++readSeqRef.current;
     clearRetry();
     if (settleRef.current) { clearTimeout(settleRef.current); settleRef.current = null; }
@@ -212,7 +225,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
     // Writing changed: whatever was read before is no longer this page.
     if (rec.lines.length) publish(EMPTY_READING, strokes);
     if (!strokes.length) { sentRef.current = null; setStatus(null); return; }
-    const go = () => sendToReader(strokes, seq);
+    const go = () => sendToReader(strokes, seq, { fresh });
     if (immediate) go(); else settleRef.current = setTimeout(go, SETTLE_MS);
   }, [publish, rec.lines.length, sendToReader]);
 
@@ -228,12 +241,14 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
   }, [scheduleRead]);
 
   // The working waits on the page; the moment the reason goes away it is read.
+  // Each of these is a moment the world may have changed (signed in, back
+  // online, back from Settings), so the server is asked afresh, not the cache.
   useEffect(() => {
     const retry = () => {
       if (disabledRef.current || !strokesRef.current.length) return;
       if (status?.kind !== 'waiting' && status?.kind !== 'allowance') return;
       retriesRef.current = 0;
-      scheduleRead(strokesRef.current, { immediate: true });
+      scheduleRead(strokesRef.current, { immediate: true, fresh: true });
     };
     const stopSession = onCloudSessionChange(retry);
     const onOnline = () => retry();
@@ -253,10 +268,16 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
     };
   }, [status, scheduleRead]);
 
-  // A profile that just became able to read (signed in elsewhere) re-reads.
+  // A profile that just became able to read (signed in, registered, switched
+  // account) re-reads — and asks the server afresh, because any readiness it
+  // cached was for the account state before this one.
+  const identityRef = useRef(readinessIdentity(user));
   useEffect(() => {
+    const identity = readinessIdentity(user);
+    const changed = identity !== identityRef.current;
+    identityRef.current = identity;
     if (status?.kind === 'waiting' && strokesRef.current.length && cloudReadingEnabled(user)) {
-      scheduleRead(strokesRef.current, { immediate: true });
+      scheduleRead(strokesRef.current, { immediate: true, fresh: changed });
     }
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -420,6 +441,18 @@ export default function InkAnswer({ onRecognized, onStrokes = null, initialStrok
       {statusLine && !disabled && (
         <div className="ink-status ink-status-line muted" role="status" aria-live="polite">
           {statusLine}
+        </div>
+      )}
+      {/* A blocker the student can clear themselves (sign in, verify their
+          email, guardian consent) is one tap from where it is cleared: the
+          account section of Settings holds sign-in and "send a fresh
+          verification email". Kept beside the notice, not inside it, so the
+          notice stays the one sentence it is announced as. */}
+      {status?.kind === 'waiting' && !disabled && ACCOUNT_BLOCKED_KEYS.has(status.key) && (
+        <div className="ink-status-action">
+          {inRouter
+            ? <Link className="ink-status-link" to="/settings" data-ink-blocker={status.key}>{t('app.accountSettings')}</Link>
+            : <a className="ink-status-link" href="/settings" data-ink-blocker={status.key}>{t('app.accountSettings')}</a>}
         </div>
       )}
 
