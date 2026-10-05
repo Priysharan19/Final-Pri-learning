@@ -103,6 +103,15 @@ export function setDraftProfile(id) {
   flushDrafts();
   activePid = id || null;
   setInkDraftProfile(id);
+
+  // Pre-sealed-store builds kept handwriting under
+  // `pri.draft.<pid>.ink.<questionId>` in plaintext localStorage. Those rows
+  // cannot stay on disk after an upgrade and must never appear on the crash
+  // card as if this build could restore them. Clean only the active profile's
+  // legacy namespace here: profile switching must never move or delete another
+  // student's work. Current builds write ink only to the sealed IndexedDB
+  // `inkDrafts` store, so this is an idempotent one-time compatibility cleanup.
+  for (const questionId of draftIdsIn('ink')) clearDraft('ink', questionId);
 }
 
 /** Write now. Use for milestones (page leave, submit, question change). */
@@ -165,7 +174,7 @@ export function clearDraft(scope, id) {
 // pick up by hand: a submission that was in flight and the ink of the question
 // on screen (practiceRecovery.js). The crash card lists what a student can go
 // back to; these come back by themselves, so they are not listed twice.
-const SELF_RECOVERING = new Set(['submit']);
+const SELF_RECOVERING = new Set(['submit', 'ink']);
 
 /** Ids of this profile's live drafts in one scope, newest first. */
 export function draftIdsIn(scope) {

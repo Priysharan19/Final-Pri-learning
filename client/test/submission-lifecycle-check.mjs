@@ -344,7 +344,27 @@ await check('a misconception proposal for a stale submission changes nothing; no
 
 // ── 6 · Client recovery store ───────────────────────────────────────────────
 await check('pending submissions and kept ink are profile-scoped, bounded and self-recovering', async () => {
+  // Upgrade safety: pre-sealed-store builds wrote ink drafts in plaintext
+  // localStorage. Activating a profile must remove only that profile's legacy
+  // rows, keep another profile's row untouched until that profile is selected,
+  // and never surface either row on the crash-card draft list.
+  const legacyA = 'pri.draft.pid-a.ink.q-legacy-a';
+  const legacyB = 'pri.draft.pid-b.ink.q-legacy-b';
+  const legacy = (id, x) => JSON.stringify({
+    v: 1, scope: 'ink', id, data: { strokes: [{ points: [[x, x + 1], [x + 2, x + 3]] }] },
+    label: 'Legacy handwriting', note: 'Handwriting in progress', path: '/practice', savedAt: Date.now()
+  });
+  localStorage.setItem(legacyA, legacy('q-legacy-a', 41));
+  localStorage.setItem(legacyB, legacy('q-legacy-b', 51));
+
   drafts.setDraftProfile('pid-a');
+  assert.equal(localStorage.getItem(legacyA), null, 'active profile legacy plaintext ink is removed on upgrade');
+  assert.notEqual(localStorage.getItem(legacyB), null, 'another profile legacy ink is not touched during the wrong profile switch');
+  assert.deepEqual(drafts.listDrafts().map(d => d.scope).filter(s => s === 'ink'), [], 'legacy ink is never offered on the crash card');
+  drafts.setDraftProfile('pid-b');
+  assert.equal(localStorage.getItem(legacyB), null, 'the other profile legacy row is removed only when that profile becomes active');
+  drafts.setDraftProfile('pid-a');
+
   const strokes = [{ points: [{ x: 10.4, y: 20.6, w: 3 }, { x: 11, y: 22 }] }, { points: [] }, { points: [[5, 6]] }];
   assert.equal(recovery.saveInkDraft('q-ink', strokes), true);
   assert.deepEqual(await recovery.readInkDraft('q-ink'), [
