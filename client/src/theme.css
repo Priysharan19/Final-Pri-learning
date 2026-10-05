@@ -2169,3 +2169,14 @@ html.theme-switching, html.theme-switching * {
   }
   .btn, .btn:active:not(:disabled) { transform: none; transition: none; }
 }
+
+/* ── Guest strip: the free-sample count and the way to an account ─────────── */
+.guest-strip {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 8px 18px; font-size: 13px;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface-2);
+}
+.guest-strip-count { color: var(--ink-2); }
+.guest-strip-count b { color: inherit; font-weight: 600; }
+@media (max-width: 760px) { .guest-strip { padding-inline: 12px; } }

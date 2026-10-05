@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createPlatformDb, nextSyncCursor, syncLockKey } from '../platform/db.js';
 import { asStore } from '../platform/store.js';
 import { ensureAuthDeliverySchema } from '../platform/authDelivery.js';
+import { SCHEMA_VERSION } from '../platform/schemaVersions.js';
 
 const db = createPlatformDb(':memory:');
 try {
@@ -12,7 +13,7 @@ try {
     'content_revisions','issue_reports','audit_log','idempotency_keys','rate_limits',
     'teacher_invites','login_attempts','oidc_nonces'
   ]) assert.ok(tables.has(required), `missing platform table ${required}`);
-  assert.equal(db.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get()?.value, '11');
+  assert.equal(db.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get()?.value, String(SCHEMA_VERSION));
 
   // v6 — a guardian's confirmation, and the two delivery constraints that had
   // to widen to carry it. Pinned by shape as well as by number, because the

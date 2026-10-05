@@ -2,6 +2,7 @@ import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from
 import { asyncHandler } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { tagPolicy } from './routePolicy.js';
+import { noteNewDeviceSignIn } from './sessionAlerts.js';
 
 export const SESSION_COOKIE = 'pri_cloud_session';
 export const CSRF_COOKIE = 'pri_csrf';
@@ -14,6 +15,12 @@ const SESSION_SLIDE_MIN_MS = 60 * 1000;
 // morning.
 export const PRIVILEGED_IDLE_MS = 12 * 60 * 60 * 1000;
 export const PRIVILEGED_ROLES = new Set(['admin', 'support']);
+/**
+ * How recently a session must have proved its credential again before a
+ * sensitive read or change (the data export, for one). A fresh sign-in counts
+ * as proof; after this window POST /v1/account/reauth is asked for.
+ */
+export const REAUTH_FRESH_MS = 10 * 60 * 1000;
 const DEFAULT_SESSION_MAX_AGE_DAYS = 90;
 const MAX_SESSION_MAX_AGE_DAYS = 3650;
 const CSRF_SECRET = process.env.PRI_CSRF_SECRET || randomBytes(32).toString('hex');
@@ -83,11 +90,38 @@ export async function createSession(db, res, accountId, deviceId = 'web', userAg
   const sessionId = id('ses');
   const role = (await db.get('SELECT role FROM accounts WHERE id = ?', [accountId]))?.role || 'student';
   const expiresAt = sessionExpiry(role, now, now);
+  const device = String(deviceId).slice(0, 160);
+  // A sign-in is itself fresh proof of the credential (reauthenticated_at), so
+  // a sensitive read right after signing in does not ask for it twice.
   await db.run(`INSERT INTO account_sessions
-    (id, account_id, token_hash, device_id, user_agent_hash, created_at, last_seen_at, expires_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, [sessionId, accountId, sha256(raw), String(deviceId).slice(0, 160), userAgent ? sha256(userAgent) : null, now, now, expiresAt]);
+    (id, account_id, token_hash, device_id, user_agent_hash, created_at, last_seen_at, expires_at, reauthenticated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [sessionId, accountId, sha256(raw), device, userAgent ? sha256(userAgent) : null, now, now, expiresAt, now]);
   setSessionCookies(res, raw, expiresAt - now);
+  // A sign-in from a device this account has never used before is told to the
+  // account's own address (sessionAlerts.js). It never blocks the sign-in.
+  await noteNewDeviceSignIn(db, { accountId, sessionId, deviceId: device, now });
   return sessionId;
+}
+
+/**
+ * Re-issue the presented session under a new token, same row, same device:
+ * the old cookie value stops authenticating at once. Used when a session's
+ * authority changes (a fresh credential proof), so a token copied before the
+ * change does not carry the new standing with it.
+ */
+export async function rotateSession(db, res, session, now = Date.now()) {
+  db = asStore(db);
+  const raw = opaqueToken(32);
+  const info = await db.run('UPDATE account_sessions SET token_hash = ? WHERE id = ? AND revoked_at IS NULL', [sha256(raw), session.id]);
+  if (info.changes !== 1) return null;
+  setSessionCookies(res, raw, Math.max(1000, session.expires_at - now));
+  return raw;
+}
+
+/** Whether this session proved its credential inside REAUTH_FRESH_MS. */
+export function reauthIsFresh(session, now = Date.now()) {
+  const at = Number(session?.reauthenticated_at) || 0;
+  return at > 0 && now - at <= REAUTH_FRESH_MS;
 }
 
 export async function sessionFromRequest(db, req, now = Date.now()) {

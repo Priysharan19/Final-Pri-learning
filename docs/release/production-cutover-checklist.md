@@ -57,7 +57,10 @@ Auth email, paid-ceiling, handwriting and working checks are all `ok`.
 
 - staging `pri-learning-staging` (`orudxrckgxyyraopyzmn`) has all **nine** repository platform
   migrations `20261001000000` through `20261007000000`; `pri.platform_meta` reads
-  `schema_version=11`, `billing_schema_version=6`, and `pri.sync_cursor_seq` exists;
+  `schema_version=12`, `billing_schema_version=6`, and `pri.sync_cursor_seq` exists;
+  the repository has since gained `20261008000000_ai_usage_daily.sql` (schema 12) and
+  `20261009000000_session_reauth.sql` (schema 13); neither was observed applied to staging in
+  this inspection, so a build from this tree refuses to boot there until both are applied in order;
 - production `pri-learning-production-india` (`mgmlvkesbwmipmvnzufk`) is healthy but does **not**
   yet have `pri.platform_meta` or `pri.sync_cursor_seq`, and its migration history does not contain
   the nine `20261001…20261007` platform migrations. No production migration was applied in this

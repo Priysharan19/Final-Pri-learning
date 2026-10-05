@@ -326,8 +326,42 @@ struct WebShell: UIViewRepresentable {
             host.documentDidStart()
         }
 
+        // ── Shell failures → crash reports ──
+        // When WebKit kills the content process (memory pressure, a renderer
+        // crash) the page is gone and nothing in it can report that. The shell
+        // reloads the app — the student's work is in IndexedDB, which the
+        // process kill does not touch — and, once the page has booted again,
+        // hands it a coded `shell.error` event to report through the server
+        // (ErrorBoundary does the same for a render crash). Only the code
+        // travels; the page decides, under its own consent gates, whether to
+        // send it.
+        private var pendingShellError: String?
+
+        func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            pendingShellError = "WEBCONTENT_TERMINATED"
+            webView.reload()
+        }
+
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            // The local scheme failed to serve the app at all: nothing to show
+            // but a retry, and a report once it does load.
+            if (error as NSError).code == NSURLErrorCancelled { return }
+            pendingShellError = "NAVIGATION_FAILED"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { webView.reload() }
+        }
+
+        private func flushPendingShellError() {
+            guard let code = pendingShellError else { return }
+            pendingShellError = nil
+            // After the page's own boot (host.ready), so the receiver exists.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                self?.host.reportShellError(code)
+            }
+        }
+
         private var bridgeSelfCheckRan = false
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            flushPendingShellError()
             // Simulator/CI only: prove the bridge contract inside real WebKit.
             applyTextSize()
             #if DEBUG

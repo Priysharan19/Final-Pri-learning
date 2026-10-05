@@ -365,7 +365,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     let cloudOutcome = null;
     if (cloudReadingEnabled(user)) {
       cloudOutcome = await readPhotoWithCloud(dataURL, { user });
-      if (cloudOutcome?.reason === 'allowance') return { allowance: true };
+      if (cloudOutcome?.reason === 'allowance' || cloudOutcome?.reason === 'budget') return { allowance: true, budget: cloudOutcome.reason === 'budget' };
       if (cloudOutcome && !cloudOutcome.error && !cloudOutcome.reason) {
         const text = String(cloudOutcome.transcription.text || '').trim();
         if (text) return { text, markable: lastLine(text), confidence: cloudOutcome.transcription.confidence, engine: cloudOutcome.transcription.engine };

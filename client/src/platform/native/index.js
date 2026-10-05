@@ -370,6 +370,18 @@ const identity = Object.freeze({
   },
 });
 
+/** The shell's own failures (WebContent process killed, navigation failed): `shell.error` events. */
+const shell = Object.freeze({
+  onError(fn) {
+    if (typeof fn !== 'function') return () => {};
+    const rt = getRuntime();
+    return rt.bus.on('shell.error', payload => {
+      const code = String(payload?.code || '');
+      if (/^[A-Z][A-Z0-9_]{1,63}$/.test(code)) fn({ code });
+    });
+  }
+});
+
 export const priNative = Object.freeze({
   /** Deep-frozen host descriptor: capabilities and shell/release facts, no OS. */
   host: () => { getRuntime(); return discoverHost(scopeOf()); },
@@ -380,7 +392,7 @@ export const priNative = Object.freeze({
   has: cap => !!capOf(cap),
   version: cap => capOf(cap)?.version || 0,
   releaseIdentity: () => hostReleaseIdentity(scopeOf()),
-  ink, photo, billing, cloud, share, files, lifecycle, storage, device, identity, notifications,
+  ink, photo, billing, cloud, share, files, lifecycle, storage, device, identity, notifications, shell,
   /** Bridge counters for diagnostics (no user data). */
   stats: () => (runtime ? runtime.bridge.stats() : null),
   /** Cancel everything in flight (tests, explicit teardown). */

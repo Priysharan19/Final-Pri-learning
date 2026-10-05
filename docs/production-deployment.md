@@ -7,7 +7,9 @@ Status (2026-10-02): this is the **target** contract of ADR-0001
 database in a SQLite file on a persistent `/data` volume (`platform_db_open { engine: 'sqlite' }`,
 `docs/release/PRI_R1_SCOPE_EVIDENCE.md` §2.10). The code supports both; `PRI_DATABASE_URL`
 selects which. Nothing here asserts that the cutover has happened; `docs/operations/postgres-cutover.md`
-is the procedure and `docs/release/LAUNCH-RUNBOOK.md` the owner's ordered checklist.
+is the procedure and `docs/release/LAUNCH-RUNBOOK.md` the owner's ordered checklist. When something
+is wrong in production — provider down, database down, a bad deploy to roll back, a credential to
+rotate — `docs/operations/runbook.md` is the procedure and `docs/operations/alerts.md` the signal.
 
 ## Railway
 
@@ -121,6 +123,7 @@ closed while anything in the **required** rows is missing or malformed.
 | Group | Variables | Production rule |
 |---|---|---|
 | Identity of the deployment | `NODE_ENV`, `PORT`, `PRI_PUBLIC_ORIGIN`, `PRI_TRUSTED_PROXY_HOPS`, `PRI_SHUTDOWN_DEADLINE_MS`, `PRI_CSP_CONNECT_SRC`, `PRI_BUILD_TIMESTAMP` (build arg) | **required:** `PRI_PUBLIC_ORIGIN` (clean `https://` origin), `PRI_TRUSTED_PROXY_HOPS` (§5) |
+| Error tracking | `PRI_SENTRY_DSN` | optional; a Sentry-compatible DSN makes every server 5xx and accepted client crash report an envelope POST of allowlisted fields (`server/platform/errorSink.js`); unset, the sink is a counted no-op. A malformed DSN fails the production boot. Railway variable only — never the repository |
 | Security material | `PRI_CSRF_SECRET`, `PRI_AUTH_DELIVERY_KEY`, `PRI_METRICS_TOKEN`, `PRI_MFA_KEY`, `PRI_SESSION_MAX_AGE_DAYS` | **required:** `PRI_CSRF_SECRET`, `PRI_AUTH_DELIVERY_KEY`; `PRI_MFA_KEY` (32-byte key) is required in production as soon as `PRI_BOOTSTRAP_ADMIN_EMAIL` is set or a staff account exists (`/v1/ready staffMfa`); `/v1/metrics` and the operator detail of `/v1/health` are closed in production until `PRI_METRICS_TOKEN` is set |
 | Database (target) | `PRI_DATABASE_URL`, `PRI_DATABASE_SSL_ROOT_CERT`, `PRI_DATABASE_SCHEMA`, `PRI_DATABASE_STATEMENT_TIMEOUT_MS`, `PRI_DATABASE_IDLE_TX_TIMEOUT_MS`, `PRI_DATABASE_LOCK_WAIT_MS`, `PRI_DATABASE_POOL_MAX` | one of `PRI_DATABASE_URL` (verified TLS) **or** `PRI_PLATFORM_DB` is required |
 | Database (pre-cutover) | `PRI_PLATFORM_DB` | absolute persistent path; ignored once `PRI_DATABASE_URL` is set |
@@ -128,7 +131,8 @@ closed while anything in the **required** rows is missing or malformed.
 | Sign-in providers | `PRI_GOOGLE_CLIENT_IDS`, `PRI_APPLE_CLIENT_IDS` | optional; client ids only, never a provider secret |
 | Administration | `PRI_BOOTSTRAP_ADMIN_EMAIL` | optional (`server/platform/bootstrapAdmin.js`) |
 | Paid model providers | `PRI_HANDWRITING_API_KEY`, `PRI_HANDWRITING_ENDPOINT`, `PRI_HANDWRITING_PROBE_ENDPOINT`, `PRI_HANDWRITING_MODEL`, `PRI_HANDWRITING_FALLBACK_MODEL`, `PRI_HANDWRITING_TIMEOUT_MS`, `PRI_HANDWRITING_CONFIDENCE_FLOOR`, `PRI_WORKING_ENDPOINT`, `PRI_WORKING_MODEL`, `PRI_WORKING_TIMEOUT_MS`, `PRI_WORKING_CONFIDENCE_FLOOR`, `PRI_TUTOR_ENDPOINT`, `PRI_TUTOR_MODEL`, `PRI_TUTOR_TIMEOUT_MS`, `PRI_FEATURE_TUTOR` | optional; recognition stays answer-blind and a model never sets a mark |
-| Spend and allowances | `PRI_PAID_CALLS_PER_HOUR`, `PRI_PAID_CALLS_PER_DAY`, `PRI_AI_DAILY_FREE`, `PRI_AI_DAILY_PREMIUM`, `PRI_TUTOR_CALLS_PER_ACCOUNT_DAY`, `PRI_TUTOR_CALLS_PER_ACCOUNT_DAY_PREMIUM` | **required** whenever a paid provider key is set: `PRI_PAID_CALLS_PER_HOUR` and `PRI_PAID_CALLS_PER_DAY` (no default; `spendCeiling.js`) |
+| Spend and allowances | `PRI_PAID_CALLS_PER_HOUR`, `PRI_PAID_CALLS_PER_DAY`, `PRI_AI_DAILY_FREE`, `PRI_AI_DAILY_PREMIUM`, `PRI_AI_DAILY_BUDGET_CALLS`, `PRI_TUTOR_CALLS_PER_ACCOUNT_DAY`, `PRI_TUTOR_CALLS_PER_ACCOUNT_DAY_PREMIUM` | **required** whenever a paid provider key is set: `PRI_PAID_CALLS_PER_HOUR` and `PRI_PAID_CALLS_PER_DAY` (no default; `spendCeiling.js`). `PRI_AI_DAILY_BUDGET_CALLS` (default 400) is one account's daily budget across handwriting, working, photo and tutor; spent, the routes answer `AI_DAILY_BUDGET_EXHAUSTED` and the client stays engine-only (`aiAllowance.js`) |
+| Cost telemetry | `PRI_MONTHLY_BUDGET_INR`, `PRI_AI_INR_PER_MILLION_INPUT_TOKENS`, `PRI_AI_INR_PER_MILLION_OUTPUT_TOKENS` | optional; with a budget both rates are **required** (the boot refuses a budget it cannot measure against). Every paid call is recorded per account, UTC day and kind with the provider's tokens (`aiUsage.js`, `pri.ai_usage_daily`); `GET /v1/admin/ai-usage` and the `AI_MONTHLY_BUDGET_70PCT` alert read it |
 | Shell compatibility floor | `PRI_MIN_IOS_BUILD`, `PRI_MIN_ANDROID_BUILD` | unset by default; a malformed value stops the boot (§6) |
 | Per-account sync quota | `PRI_SYNC_MAX_BYTES_PER_ACCOUNT`, `PRI_SYNC_MAX_EVENTS` | defaults 64 MiB / 200 000 events; the two numbers are published on `/v1/health syncQuota` |
 | Billing — Apple | `PRI_APPLE_MONTHLY_PRODUCT_ID`, `PRI_APPLE_ANNUAL_PRODUCT_ID`, `PRI_APPLE_APP_ID`, `PRI_APPLE_BUNDLE_ID`, `PRI_APPLE_ROOT_CA_PEM` / `PRI_APPLE_ROOT_CA_FILE`, `PRI_APPLE_ENVIRONMENTS`, `PRI_APPLE_ALLOW_SANDBOX` | once a product id is set, trust and `PRI_APPLE_APP_ID` are required (fail closed); `PRI_APPLE_ALLOW_SANDBOX` unset in production |
@@ -165,7 +169,9 @@ after any change to the edge (`docs/security/accepted-risks.md` R-4).
 |---|---|---|---|
 | `GET /v1/health` | **liveness** — the container `HEALTHCHECK` and Railway's check | none | to anyone: `service: pri-learning-platform`, `releaseIdentity` (exact SHA), `schemaVersion`, `billingSchemaVersion`, `database.engine` (`sqlite` / `postgres`) and `.reachable`, `syncQuota`. With a valid `PRI_METRICS_TOKEN` the operator detail is added (`server/platform/operatorHealth.js`): `storage.persistentDatabase`, `clientCompatibility` floors and refusals, `identityProviders`, `authDelivery.email`, `staffMfa.keyConfigured`, `billingProviders`, Google notification backlog counts, housekeeping. A database outage is a field here, never a failure of this endpoint, so an orchestrator does not restart a healthy process in a loop |
 | `GET /v1/ready` | **readiness** — can this replica serve? | none (deliberately: an uptime checker needs it) | 200 with one coded state per dependency (`database`, `authEmail`, `paidCeiling`, `billing` required; `handwriting` and `staffMfa` degrade only; `working` informational) or 503 + `Retry-After` while it cannot serve. No URL, host, key or count is ever included |
-| `GET /v1/metrics` | **operational signals** — counters, latency, and the alert rules of `docs/operations/alerts.md` evaluated as `alerts.firing` | `PRI_METRICS_TOKEN`; fails closed in production without one | per-replica, since boot, with 5- and 15-minute windows; labels from fixed alphabets only |
+| `GET /v1/metrics` | **operational signals** — counters, gauges, latency, and the alert rules of `docs/operations/alerts.md` evaluated as `alerts.firing` | `PRI_METRICS_TOKEN`; fails closed in production without one | per-replica, since boot, with 5- and 15-minute windows; labels from fixed alphabets only. Includes `client_errors_total{platform,code}`, `server_errors_total{code}`, `error_sink_total{outcome}`, `ai_calls_total{kind}`, `ai_tokens_total{kind,direction}` and the gauges `ai_budget_month_ratio`, `ai_month_estimated_inr`, `ai_budget_month_inr` |
+| `POST /v1/telemetry/error` | **crash reports** from the web app and the native shells | session + guardian consent; 20 per 10 minutes per account | a closed platform, surface slug, code, scope and fingerprint — never a message, stack or URL (`server/platform/telemetry.js`) |
+| `GET /v1/admin/ai-usage` | **cost telemetry** — this month and today by kind and heaviest accounts, the rupee estimate against `PRI_MONTHLY_BUDGET_INR` | admin + second factor | an estimate from recorded tokens and configured rates; the provider's invoice is the truth |
 
 Verify a deployment with:
 
@@ -178,6 +184,10 @@ A healthy target deployment reports `database.engine: "postgres"`, `database.rea
 `releaseIdentity` of the exact `main` SHA deployed, and — in the operator view — `storage.persistentDatabase: true`. None of these endpoints expose
 credentials, student data or filesystem paths. After the public deployment exists, set the GitHub
 App Health workflow's `PRI_APP_URL` variable so live-origin health joins release evidence.
+
+### Static client caching
+
+The server serves the built client itself (`server/app.js`, policy in `server/platform/staticCache.js`): hashed files under `/assets` are `public, max-age=31536000, immutable`; `index.html`, `sw.js`, `release.json` and the manifest are `no-cache` (always revalidated by ETag/Last-Modified, never stale); everything else one hour; Brotli or gzip by `Accept-Encoding` with `Vary: Accept-Encoding`; `/v1` stays `no-store`. `server/test/static-caching-check.mjs` fetches built files through the real server and asserts every rule. A CDN in front of Railway may honour these headers as they are; it must not cache `/v1`.
 
 ## 7. Release floor and compatibility rules (from `docs/release/release-policy.md`)
 

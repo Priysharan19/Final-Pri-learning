@@ -9,6 +9,7 @@ import {
 import QuestionCard, { SR_ONLY } from '../components/QuestionCard.jsx';
 import PriExplain from '../components/PriExplain.jsx';
 import FreeCapNotice from '../components/FreeCapNotice.jsx';
+import GuestCapNotice from '../components/GuestCapNotice.jsx';
 import { clearInkDraft, clearPendingSubmission, pendingSubmissionQuestionId, readPendingSubmission } from '../components/practiceRecovery.js';
 import { tLater, useT } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
@@ -19,7 +20,7 @@ import { queueTelemetry } from '../platform/telemetry.js';
 const EMPTY_SESSION = Object.freeze({ answered: 0, correct: 0, xp: 0 });
 
 export default function Practice() {
-  const { user } = useApp();
+  const { user, refreshUser } = useApp();
   const t = useT();
   const navigate = useNavigate();
   // A natural stopping point: the session that carries today's count across
@@ -203,7 +204,7 @@ export default function Practice() {
     } catch (e) {
       // A free-tier refusal is not a fault: it is the end of today's free
       // questions, and it is explained rather than shown as an error string.
-      if (e?.code === 'FREE_CAP_REACHED' || e?.code === 'FREE_EXAM_CAP_REACHED') setCapped(e);
+      if (e?.code === 'FREE_CAP_REACHED' || e?.code === 'FREE_EXAM_CAP_REACHED' || e?.code === 'GUEST_CAP_REACHED') setCapped(e);
       else {
         if (isContentEmpty(e?.code)) noteEmpty(e.code);
         setError(e.message); setErrorCode(e?.code || '');
@@ -280,6 +281,8 @@ export default function Practice() {
     };
     replaceSession(next);
     syncAssignmentProgress(next);
+    // The guest strip counts resolved questions; the count lives on the user.
+    if (user?.guest) refreshUser?.();
   };
 
   const retryAssignmentSubmission = () => {
@@ -439,7 +442,7 @@ export default function Practice() {
         )}
         {pyqOnly && <p className="muted">{t('practice.pyqOnlyNote')}</p>}
 
-        {capped && <FreeCapNotice gate={capped} onRetry={load} />}
+        {capped && (capped.code === 'GUEST_CAP_REACHED' ? <GuestCapNotice gate={capped} /> : <FreeCapNotice gate={capped} onRetry={load} />)}
 
         {/* No question exists for this exact selection: an empty state with a way
             forward, not a failure. */}

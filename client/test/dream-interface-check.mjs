@@ -227,7 +227,9 @@ check('Home consumes one central recommendation resolver and one primary action'
 });
 
 check('practice is a thinking-mode route: no navigation furniture while working', () => {
-  assert.match(app, /focusMode = user\.role !== 'teacher'\s*&& \(loc\.pathname === '\/practice' \|\| \/\^\\\/exams\\\/\[\^\/\]\+\/\.test\(loc\.pathname\)\)/);
+  // A guest is the one exception: /practice is their only room, and the
+  // strip and account menu above it are their only way to an account or out.
+  assert.match(app, /focusMode = !guest && user\.role !== 'teacher'\s*&& \(loc\.pathname === '\/practice' \|\| \/\^\\\/exams\\\/\[\^\/\]\+\/\.test\(loc\.pathname\)\)/);
   assert.match(practicePage, /className="ws-bar/);
   assert.match(practicePage, /aria-label=\{t\('practice\.leave'\)\}/);
 });

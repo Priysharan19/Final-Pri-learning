@@ -343,7 +343,7 @@ export function normalizeResult(parsed, { model, confidenceFloor }) {
   });
 }
 
-async function callModel({ model, imageDataUrl, config, fetchImpl, signal, timeoutMs = config.timeoutMs }) {
+async function callModel({ model, imageDataUrl, config, fetchImpl, signal, timeoutMs = config.timeoutMs, onUsage = null }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const onAbort = () => controller.abort();
@@ -426,6 +426,10 @@ async function callModel({ model, imageDataUrl, config, fetchImpl, signal, timeo
       code: 'HANDWRITING_PROVIDER_MALFORMED_RESPONSE', status: 502, retryable: true
     });
   }
+  // The provider's own token count for this call (cost telemetry, aiUsage.js);
+  // reported before the content is judged, because the tokens were spent
+  // either way.
+  if (typeof onUsage === 'function') { try { onUsage(payload?.usage || {}); } catch { /* telemetry never fails a reading */ } }
   const text = payload?.output_text
     ?? payload?.output?.flatMap(item => item?.content || []).find(part => typeof part?.text === 'string')?.text
     ?? null;
@@ -449,7 +453,10 @@ export async function transcribeHandwriting(imageDataUrl, {
   // Called before the fallback model is sent. Returns null to allow it, or a
   // spend-ceiling verdict to refuse it; a refusal is thrown with the verdict so
   // the route answers with the coded budget error and nothing more is spent.
-  authorizeFallback = () => null
+  authorizeFallback = () => null,
+  // Receives the provider's `usage` object after every model call that
+  // answered (primary and fallback alike); see aiUsage.js.
+  onUsage = null
 } = {}) {
   const config = providerConfig(env);
   const staticStatus = providerStaticStatus(env);
@@ -469,7 +476,7 @@ export async function transcribeHandwriting(imageDataUrl, {
   try {
     let raw;
     try {
-      raw = await callModel({ model: config.primaryModel, imageDataUrl, config, fetchImpl, signal, timeoutMs: primaryBudget });
+      raw = await callModel({ model: config.primaryModel, imageDataUrl, config, fetchImpl, signal, timeoutMs: primaryBudget, onUsage });
     } catch (error) {
       // A slow primary is not a reason to fail the student: try the fallback
       // once, inside what is left of the same budget.
@@ -479,7 +486,7 @@ export async function transcribeHandwriting(imageDataUrl, {
       if (verdict) throw error;
       timeoutFallbackTried = true;
       const rescued = normalizeResult(
-        await callModel({ model: config.fallbackModel, imageDataUrl, config, fetchImpl, signal, timeoutMs: remaining }),
+        await callModel({ model: config.fallbackModel, imageDataUrl, config, fetchImpl, signal, timeoutMs: remaining, onUsage }),
         { model: config.fallbackModel, confidenceFloor: config.confidenceFloor }
       );
       recordProviderDiagnostics({
@@ -519,7 +526,7 @@ export async function transcribeHandwriting(imageDataUrl, {
     try {
       const second = normalizeResult(
         await callModel({
-          model: config.fallbackModel, imageDataUrl, config, fetchImpl, signal,
+          model: config.fallbackModel, imageDataUrl, config, fetchImpl, signal, onUsage,
           timeoutMs: Math.max(MIN_FALLBACK_BUDGET_MS, config.timeoutMs - (Date.now() - started))
         }),
         { model: config.fallbackModel, confidenceFloor: config.confidenceFloor }

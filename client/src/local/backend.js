@@ -559,6 +559,43 @@ const BACKUP_STORES = ['ratings', 'attempts', 'questions', 'reviews', 'exams', '
 // Stores whose keys the database hands out, so a restored row must not carry one
 const AUTO_ID_STORES = ['attempts', 'rushRuns', 'matchRuns'];
 
+// ── Guest mode ───────────────────────────────────────────────────────────────
+// A visitor may answer this many questions before being asked to make a
+// profile. A guest is an ordinary local profile flagged `guest: true`: the
+// same deterministic engine marks its work and the same stores hold it, so
+// when the visitor signs up the rows are re-filed under the new profile (once,
+// through the backup import shapes) and the guest profile is wiped. Nothing
+// about a guest ever reaches a server: there is no cloud link to send it with.
+export const GUEST_QUESTION_LIMIT = 5;
+export const GUEST_NAME = 'Guest';
+
+/** The resolved questions a guest has used up. */
+async function guestQuestionsUsed(pid) {
+  const rows = await byIndex('questions', 'pid', pid).catch(() => []);
+  return rows.filter(r => r && r.answered && r.mode !== 'exam').length;
+}
+
+/** The one live guest profile on this device, if any. */
+async function findGuestProfile() {
+  return (await all('profiles')).find(p => p?.guest === true) || null;
+}
+
+/**
+ * Refuse a guest their sixth question with a coded, explained gate. Exams,
+ * Rush and Match (`always`) are not part of the free sample at all: they
+ * generate whole papers, and a guest came to try five questions.
+ */
+async function guestGate(p, { always = false } = {}) {
+  if (!p?.guest) return;
+  const used = await guestQuestionsUsed(p.id);
+  if (!always && used < GUEST_QUESTION_LIMIT) return;
+  throw Object.assign(new Error(always
+    ? 'Create your account to use this — the free sample is five practice questions.'
+    : `You have used all ${GUEST_QUESTION_LIMIT} free questions. Create your account to keep going — everything you did comes with you.`), {
+    status: 403, code: always ? 'GUEST_SIGN_UP_REQUIRED' : 'GUEST_CAP_REACHED', used, limit: GUEST_QUESTION_LIMIT
+  });
+}
+
 const DAY = 86400000;
 const MIN_PASSWORD = 8;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -914,7 +951,11 @@ async function publicUser(p, nowMs = Date.now()) {
     // allowance a student is shown and the allowance the gate enforces can
     // never disagree about when the day turns over.
     plan: await planView(p),
-    usage: await usageView(p)
+    usage: await usageView(p),
+    // Guest mode: a visitor without a profile of their own, and how many of
+    // their free questions are used. Absent (false/null) for every real profile.
+    guest: p.guest === true,
+    guestQuestions: p.guest === true ? { used: Math.min(GUEST_QUESTION_LIMIT, await guestQuestionsUsed(p.id)), limit: GUEST_QUESTION_LIMIT } : null
   };
 }
 
@@ -2599,7 +2640,8 @@ const routes = {
 
   // ---- profiles / accounts ----
   'GET /profiles': async () => {
-    const profiles = (await all('profiles')).sort((a, b) => (b.lastActiveAt || b.createdAt || 0) - (a.lastActiveAt || a.createdAt || 0));
+    // A guest profile is not somebody's: it never appears in the picker.
+    const profiles = (await all('profiles')).filter(p => p?.guest !== true).sort((a, b) => (b.lastActiveAt || b.createdAt || 0) - (a.lastActiveAt || a.createdAt || 0));
     return {
       profiles: profiles.map(p => ({
         id: p.id, name: p.name, year: p.year, avatar: p.avatar, role: p.role || 'student',
@@ -2776,6 +2818,68 @@ const routes = {
     }
     setCurrentPid(demo.id);
     return { user: await publicUser(demo) };
+  },
+  // Try before you sign up: one guest profile per device, reused while it
+  // lasts. No name, no password, no email, no cloud; the free-question count
+  // rides on the user object (publicUser.guestQuestions).
+  'POST /profiles/guest': async (body) => {
+    let guest = await findGuestProfile();
+    if (!guest) {
+      const requestedYear = body?.year === undefined ? 10 : Number(body.year);
+      const year = Number.isInteger(requestedYear) && requestedYear >= 7 && requestedYear <= 12 ? requestedYear : 10;
+      guest = {
+        id: uuid(), name: GUEST_NAME, year, course: 'in', role: 'student', guest: true,
+        avatar: '✎', theme: 'dark', dailyGoal: GUEST_QUESTION_LIMIT, xp: 0,
+        language: cleanLanguage(body?.language), mathsGloss: false,
+        pathway: null, indiaTrack: 'cbse', timezone: defaultTimezone('in'),
+        createdAt: Date.now(), lastActiveAt: Date.now()
+      };
+      await put('profiles', guest);
+    } else {
+      guest.lastActiveAt = Date.now();
+      await put('profiles', guest);
+    }
+    setCurrentPid(guest.id);
+    return { user: await publicUser(guest) };
+  },
+  // Carry a guest's work into the profile they just made — once. The rows go
+  // through the same shapes a backup restore uses (IMPORT_ROWS), so a guest
+  // row can no more choose where it lands than a file can; the guest profile
+  // is wiped at the end, which is what makes a second call a no-op.
+  'POST /profiles/guest/migrate': async (body) => {
+    const to = String(body?.to || '');
+    const target = to ? await get('profiles', to) : null;
+    if (!target) throw Object.assign(new Error('Profile not found'), { status: 404 });
+    if (target.guest === true) throw Object.assign(new Error('A guest profile cannot receive a migration.'), { status: 400 });
+    if (target.auth && !hasDataKey(target.id)) {
+      throw Object.assign(new Error('This profile is protected — enter its password.'), { status: 401, needsPassword: true, profileId: target.id });
+    }
+    const guest = await findGuestProfile();
+    if (!guest || guest.id === target.id) return { migrated: false, rows: 0, user: await publicUser(target) };
+    const ids = restoreIds();
+    let rows = 0;
+    for (const st of BACKUP_STORES) {
+      const shape = IMPORT_ROWS[st];
+      const src = await byIndex(st, 'pid', guest.id).catch(() => []);
+      for (const raw of src) {
+        if (!raw || typeof raw !== 'object') continue;
+        let row = null;
+        try { row = shape(raw, target.id, ids); } catch { row = null; }
+        if (!row) continue;
+        try {
+          if (AUTO_ID_STORES.includes(st)) await add(st, row);
+          else await put(st, row);
+          rows++;
+        } catch { }
+      }
+    }
+    const fresh = await get('profiles', target.id);
+    fresh.xp = (Number(fresh.xp) || 0) + (Number(guest.xp) || 0);
+    fresh.lastActiveAt = Date.now();
+    await put('profiles', fresh);
+    await wipeProfile(guest.id);
+    if (currentPid() === guest.id || !currentPid()) setCurrentPid(target.id);
+    return { migrated: true, rows, user: await publicUser(fresh) };
   },
   'POST /auth/logout': async () => { setCurrentPid(null); return { ok: true }; },
 
@@ -2976,6 +3080,7 @@ const routes = {
     const p = await requireProfile();
     const unfinished = await resumableQuestion(p, body);
     if (unfinished) return resumedQuestionResponse(unfinished);
+    await guestGate(p);
     const { mode = 'smart', subtopic, difficulty, dotpoint, taskId, track, pyqOnly = false } = body || {};
     // Task-driven question
     if (taskId) {
@@ -3447,6 +3552,7 @@ const routes = {
   // ---- exams ----
   'POST /exams': async (body) => {
     const p = await requireProfile();
+    await guestGate(p, { always: true });
     const length = [10, 15, 20].includes(Number(body?.length)) ? Number(body.length) : 10;
     const minutes = Math.min(90, Math.max(10, Number(body?.minutes) || (length * 3)));
     const year = Math.min(12, Math.max(7, Number(body?.year) || p.year));
@@ -3661,6 +3767,7 @@ const routes = {
   // ---- rush ----
   'POST /rush/start': async () => {
     const p = await requireProfile();
+    await guestGate(p, { always: true });
     // Rapid Fire drew from the NSW scope for every profile, so an Indian
     // Class 10 student playing it was answering MA5 subtopics. The India spine
     // already knows this student's chapters; there is no reason a game mode
@@ -3702,6 +3809,7 @@ const routes = {
   // ---- match mode ----
   'POST /match/start': async (body) => {
     const p = await requireProfile();
+    await guestGate(p, { always: true });
     const rivals = {
       rookie: { name: 'Robo-Rookie', avatar: '🤖', secPerQ: 22, accuracy: 0.62 },
       pro: { name: 'Captain Cosine', avatar: '🦾', secPerQ: 14, accuracy: 0.78 },

@@ -2078,6 +2078,78 @@ async function run() {
     ok('the demo profile has mastery to show', demoStats.strands.some(s => s.mastery > 0), show(demoStats.strands));
   } catch (err) { crashed(err); }
 
+  // ── Guest mode (ledger 2.3) ────────────────────────────────────────────────
+  // A visitor answers five questions with no profile of their own; the sixth
+  // is refused with a coded gate; signing up carries the five across exactly
+  // once and leaves nothing filed under the guest.
+  section('guest mode');
+  try {
+    const { GUEST_QUESTION_LIMIT } = await import(`${SRC}local/backend.js`);
+    eq('the free sample is five questions', GUEST_QUESTION_LIMIT, 5);
+    const guest = (await POST('/profiles/guest', {})).user;
+    eq('a guest is flagged as one', guest.guest, true);
+    eq('a guest starts with none of the sample used', guest.guestQuestions, { used: 0, limit: 5 });
+    ok('a guest has no email, password or cloud link', !guest.email && !guest.hasPassword && !guest.cloudLinked);
+    eq('asking twice reuses the same guest', (await POST('/profiles/guest', {})).user.id, guest.id);
+    ok('the guest never appears in the profile picker', (await GET('/profiles')).profiles.every(p => p.id !== guest.id));
+    const noRush = await rejects('a guest cannot start Rush', POST('/rush/start', {}), { status: 403 });
+    eq('and is told to sign up for it', noRush?.code, 'GUEST_SIGN_UP_REQUIRED');
+    const noMatch = await rejects('a guest cannot start Match', POST('/match/start', {}), { status: 403 });
+    eq('with the same code', noMatch?.code, 'GUEST_SIGN_UP_REQUIRED');
+
+    let xpEarned = 0;
+    for (let i = 1; i <= 5; i++) {
+      const q = await answerableQuestion({});
+      if (!ok(`question ${i} is served to the guest`, !!q)) break;
+      const r = await POST(`/practice/${q.question.id}/submit`, { answer: q.right, ms: 4000 });
+      ok(`question ${i} is marked by the deterministic engine`, r.resolved === true && r.correct === true, show({ resolved: r.resolved, correct: r.correct }));
+      xpEarned += r.xp || 0;
+      eq(`the count reads ${i} of 5`, (await GET('/me')).user.guestQuestions, { used: i, limit: 5 });
+    }
+    const capped = await rejects('the sixth question is refused', POST('/practice/next', {}), { status: 403, message: /Create your account/ });
+    eq('with the guest cap code and the figures', [capped?.code, capped?.used, capped?.limit], ['GUEST_CAP_REACHED', 5, 5]);
+    const guestMe = (await GET('/me')).user;
+    ok('the guest earned XP for the five', guestMe.xp > 0 && guestMe.xp === xpEarned, `xp ${guestMe.xp}, earned ${xpEarned}`);
+    const guestAttempts = (await idb.byIndex('attempts', 'pid', guest.id)).length;
+    eq('five attempts are on the guest\'s ledger', guestAttempts, 5);
+
+    // Sign-up: the new profile becomes current; the guest's work is re-filed under it.
+    const graduate = (await POST('/profiles', { name: 'Guest Graduate', year: 10, course: 'in', indiaTrack: 'cbse' })).user;
+    eq('the new profile starts at zero before migration', graduate.xp, 0);
+    const moved = await POST('/profiles/guest/migrate', { to: graduate.id });
+    eq('the migration reports success', moved.migrated, true);
+    ok('and how many rows it carried', moved.rows >= 10, `rows ${moved.rows}`);
+    const after = (await GET('/me')).user;
+    eq('the current profile is the graduate', after.id, graduate.id);
+    eq('who is not a guest', [after.guest, after.guestQuestions], [false, null]);
+    eq('the guest\'s XP came across', after.xp, guestMe.xp);
+    eq('the five attempts came across', (await idb.byIndex('attempts', 'pid', graduate.id)).length, 5);
+    eq('the five answered questions came across', (await idb.byIndex('questions', 'pid', graduate.id)).filter(r => r.answered).length, 5);
+    ok('the ratings came across', (await idb.byIndex('ratings', 'pid', graduate.id)).length >= 1);
+    eq('the graduate\'s history lists the five', (await POST('/history/list', { limit: 20 })).items.length, 5);
+    eq('the guest profile is gone', await idb.get('profiles', guest.id), undefined);
+    const leftovers = Object.entries(rawRows()).flatMap(([store, rows]) => rows.filter(r => r?.pid === guest.id || String(r?.key || '').startsWith(`${guest.id}:`)).map(() => store));
+    eq('no store still holds a row filed under the guest', leftovers, []);
+    const again = await POST('/profiles/guest/migrate', { to: graduate.id });
+    eq('a second migration is a no-op', [again.migrated, again.rows], [false, 0]);
+    eq('and changes nothing', (await GET('/me')).user.xp, guestMe.xp);
+    ok('the graduate practises on past the cap', !!(await POST('/practice/next', {})).question?.id);
+    await rejects('a migration into a profile that does not exist is refused', POST('/profiles/guest/migrate', { to: 'no-such-profile' }), { status: 404 });
+
+    // A protected profile receives the work sealed under its own key.
+    const guest2 = (await POST('/profiles/guest', {})).user;
+    ok('a fresh guest can be started after the first graduated', guest2.id !== guest.id && guest2.guestQuestions.used === 0);
+    const q2 = await answerableQuestion({});
+    await POST(`/practice/${q2.question.id}/submit`, { answer: q2.right, ms: 4000 });
+    const locked = (await POST('/profiles', { name: 'Locked Graduate', year: 10, course: 'in', indiaTrack: 'cbse', password: 'guest-graduate-pw' })).user;
+    const moved2 = await POST('/profiles/guest/migrate', { to: locked.id });
+    eq('a protected profile receives the guest\'s work', [moved2.migrated, (await idb.byIndex('attempts', 'pid', locked.id)).length], [true, 1]);
+    const rawAttempt = rawRows().attempts.find(r => r.pid === locked.id);
+    ok('and holds it sealed, not in the clear', !!rawAttempt && !('answer' in rawAttempt) && !('correct' in rawAttempt), show(rawAttempt));
+    await rejects('a migration into the wiped guest is refused', POST('/profiles/guest/migrate', { to: guest2.id }), { status: 404 });
+    await POST('/profiles/select', { id: ada.id });
+  } catch (err) { crashed(err); }
+
   // ── Deleting a profile ─────────────────────────────────────────────────────
   // Deleting is the one operation with nothing to undo it, so it is driven with
   // a profile that first puts a row in every store there is — including the

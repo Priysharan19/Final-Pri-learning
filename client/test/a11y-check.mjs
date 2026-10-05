@@ -604,6 +604,32 @@ async function run() {
       await wait(page, 600);
     });
 
+    // ── guest mode: five questions before a profile, and the way out of it ──
+    await step('guest · practice with the free-question strip', '/practice', async () => {
+      await page.getByTestId('hero-try-guest').click();
+      await page.waitForURL(/\/practice/, { timeout: 30000 });
+      await page.waitForSelector('[data-guest-strip]', { timeout: 30000 });
+      await page.waitForSelector('.q-prompt', { timeout: 30000 });
+      await wait(page, 700);
+    });
+
+    await step('guest · the account page', '/account', async () => {
+      await click(page, '[data-testid="guest-create-account"]');
+      await page.waitForSelector('[data-signup-step="role"]', { timeout: 15000 });
+      await wait(page, 700);
+    });
+
+    // Leave guest mode the way a visitor would who changes their mind: back to
+    // practice, then sign out, so the walk below starts from the landing page.
+    try {
+      await goTo(page, BASE, '/practice');
+      await click(page, '.user-chip');
+      await click(page, '[role="menuitem"]', { text: 'Switch profile' });
+      await page.waitForSelector('.auth-wrap', { timeout: 15000 });
+    } catch (err) {
+      skipped.push(`guest · sign out — ${String(err.message || err).split('\n')[0].slice(0, 130)}`);
+    }
+
     // ── the skip link, measured on a page nothing has focused yet ────────────
     try {
       await signInToDemo(page, BASE);

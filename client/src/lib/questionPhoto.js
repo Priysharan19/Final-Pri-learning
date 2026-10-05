@@ -33,7 +33,7 @@ export function stateForError(error, { online = true } = {}) {
   if (status === 401 || code === 'AUTH_REQUIRED') return 'signed-out';
   if (code === 'EMAIL_UNVERIFIED') return 'unverified';
   if (/^GUARDIAN_/.test(code)) return 'consent';
-  if (code === 'AI_ALLOWANCE_EXHAUSTED') return 'allowance';
+  if (code === 'AI_ALLOWANCE_EXHAUSTED' || code === 'AI_DAILY_BUDGET_EXHAUSTED') return 'allowance';
   if (/NOT_CONFIGURED|CONFIG_INVALID|PAID_CAPACITY_NOT_CONFIGURED/.test(code)) return 'not-configured';
   if (/IMAGE_INVALID|IMAGE_TOO_LARGE/.test(code)) return 'bad-photo';
   if (!status && !code) return 'offline';

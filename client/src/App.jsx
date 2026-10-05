@@ -9,6 +9,7 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
 import { setLanguage, signInLanguage, useT } from './i18n/index.js';
 import Login from './pages/Login.jsx';
+import GuestBanner from './components/GuestBanner.jsx';
 import Home from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
 import Icon from './components/Icon.jsx';
@@ -82,6 +83,13 @@ const TEACHER_NAV = [
   { label: 'nav.groupAccount', items: [{ to: '/settings', key: 'nav.settings', ico: I.settings }] },
 ];
 
+// A guest has two places: the practice workspace and the way to an account.
+// Nothing that reaches a server, nothing that needs a profile of their own.
+const GUEST_NAV = [
+  { label: 'nav.groupLearn', items: [{ to: '/practice', key: 'nav.practice', ico: I.practice }] },
+  { label: 'nav.groupAccount', items: [{ to: '/account', key: 'guest.createAccount', ico: I.settings }] },
+];
+const GUEST_MOBILE_PRIMARY = new Set(['/practice', '/account']);
 const STUDENT_MOBILE_PRIMARY = new Set(['/', '/practice', '/tasks', '/progress']);
 const TEACHER_MOBILE_PRIMARY = new Set(['/teach', '/teach#teacher-classes', '/teach#teacher-assignments', '/teach#teacher-analytics']);
 
@@ -194,7 +202,7 @@ export default function App() {
   // cleanup covers both orders — the effect torn down before the module lands
   // (nothing to uninstall, and the late arrival installs nothing) and after.
   useEffect(() => {
-    if (!user?.id) return undefined;
+    if (!user?.id || user.guest) return undefined;
     const pid = user.id;
     let uninstall = null;
     let torn = false;
@@ -349,15 +357,30 @@ export default function App() {
     );
   }
 
-  const navSections = user.role === 'teacher' ? TEACHER_NAV : STUDENT_NAV;
+  // Guest → account: the same sign-up screen a visitor meets on the welcome
+  // page, outside the shell, with the guest's work carried into whatever
+  // profile it makes (Login.jsx migrates on /profiles).
+  if (user.guest && loc.pathname === '/account') {
+    return (
+      <AppCtx.Provider value={ctx}>
+        <Login initialStage="account" guestUpgrade />
+        <ToastLayer toasts={toasts} />
+      </AppCtx.Provider>
+    );
+  }
+
+  const guest = !!user.guest;
+  const navSections = guest ? GUEST_NAV : user.role === 'teacher' ? TEACHER_NAV : STUDENT_NAV;
   const navItems = navSections.flatMap(section => section.items);
-  const primarySet = user.role === 'teacher' ? TEACHER_MOBILE_PRIMARY : STUDENT_MOBILE_PRIMARY;
+  const primarySet = guest ? GUEST_MOBILE_PRIMARY : user.role === 'teacher' ? TEACHER_MOBILE_PRIMARY : STUDENT_MOBILE_PRIMARY;
   const mobilePrimary = navItems.filter(item => primarySet.has(item.to));
   const mobileMore = navItems.filter(item => !primarySet.has(item.to));
-  const roleLanding = user.role === 'teacher' ? '/teach' : '/';
+  const roleLanding = guest ? '/practice' : user.role === 'teacher' ? '/teach' : '/';
 
+  // A guest reaches the practice workspace and nothing else in the shell:
+  // every other destination is the account they do not have yet.
   const studentOnly = (element, teacherTarget = '/teach') =>
-    user.role === 'teacher' ? <Navigate to={teacherTarget} replace /> : element;
+    guest ? <Navigate to="/practice" replace /> : user.role === 'teacher' ? <Navigate to={teacherTarget} replace /> : element;
   const teacherOnly = (element) =>
     user.role === 'teacher' ? element : <Navigate to="/" replace />;
 
@@ -388,7 +411,9 @@ export default function App() {
 
   // Thinking mode: while a question or a paper is open the shell steps back —
   // no rail, no bottom bar, no account furniture. The page keeps its own way out.
-  const focusMode = user.role !== 'teacher'
+  // A guest keeps the shell: /practice is their only room, and the strip and
+  // account menu above it are the only way to an account or out again.
+  const focusMode = !guest && user.role !== 'teacher'
     && (loc.pathname === '/practice' || /^\/exams\/[^/]+/.test(loc.pathname));
 
   return (
@@ -396,12 +421,13 @@ export default function App() {
       <div className={`shell${focusMode ? ' is-focus' : ''}`}>
         <a className="skip-link" href="#main" onClick={skipToMain}>{t('app.skipToMain')}</a>
         <header className="topbar">
-          <Logo onClick={() => nav('/')} />
+          <Logo onClick={() => nav(roleLanding)} />
           <div className="top-stats">
             <ThemeToggle />
             <AccountMenu user={user} onSwitch={switchProfile} />
           </div>
         </header>
+        {guest && <GuestBanner user={user} />}
 
         <div className="body-row">
           <aside className="sidebar no-print">
@@ -425,8 +451,8 @@ export default function App() {
                     reported as a broken route rather than blanking the shell. */}
                 <React.Suspense fallback={<RouteLoading />}>
                   <Routes>
-                    <Route path="/" element={user.role === 'teacher' ? <Navigate to="/teach" replace /> : <Home />} />
-                    <Route path="/practice" element={studentOnly(<Practice />)} />
+                    <Route path="/" element={guest ? <Navigate to="/practice" replace /> : user.role === 'teacher' ? <Navigate to="/teach" replace /> : <Home />} />
+                    <Route path="/practice" element={guest ? <Practice /> : studentOnly(<Practice />)} />
                     <Route path="/practise-photo" element={studentOnly(<PractisePhoto />)} />
                     <Route path="/progress" element={studentOnly(<Progress />, '/teach#teacher-analytics')} />
                     <Route path="/plan" element={studentOnly(<PlanPage />)} />
@@ -451,7 +477,11 @@ export default function App() {
                     <Route path="/terms" element={<Legal />} />
                     <Route path="/refund-policy" element={<Legal />} />
                     <Route path="/grievance" element={<Legal />} />
-                    <Route path="/settings" element={<Settings />} />
+                    <Route path="/settings" element={guest ? <Navigate to="/account" replace /> : <Settings />} />
+                    {/* A profile that already exists has nothing to do on the
+                        guest's account page: straight to work. (The moment a
+                        guest becomes a profile can render once with this path.) */}
+                    <Route path="/account" element={<Navigate to={user.role === 'teacher' ? '/teach' : '/practice'} replace />} />
                     <Route path="*" element={<Navigate to={roleLanding} replace />} />
                   </Routes>
                 </React.Suspense>

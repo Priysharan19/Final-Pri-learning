@@ -165,7 +165,8 @@ function extractText(payload) {
 export async function identifyQuestionPhoto(imageDataUrl, {
   env = process.env,
   fetchImpl = globalThis.fetch,
-  signal = null
+  signal = null,
+  onUsage = null
 } = {}) {
   const config = providerConfig(env);
   const staticStatus = providerStaticStatus(env);
@@ -227,6 +228,7 @@ export async function identifyQuestionPhoto(imageDataUrl, {
   let payload;
   try { payload = await response.json(); }
   catch { throw new QuestionPhotoError('The provider returned malformed JSON.', { code: 'QUESTION_PHOTO_MALFORMED', status: 502, retryable: true }); }
+  if (typeof onUsage === 'function') { try { onUsage(payload?.usage || {}); } catch { /* telemetry never fails a reading */ } }
   const text = extractText(payload);
   if (!text) throw new QuestionPhotoError('The provider returned nothing.', { code: 'QUESTION_PHOTO_EMPTY', status: 502, retryable: true });
   let parsed;

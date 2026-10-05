@@ -2,8 +2,8 @@ import { asyncRouter } from './asyncRouter.js';
 import { asStore, isDatabaseOverload, isUniqueViolation, sqliteHandle } from './store.js';
 import bcrypt from 'bcryptjs';
 import {
-  clearSessionCookies, consumeRateLimit, createSession, id, opaqueToken, rateLimit, requireSession,
-  sessionFromRequest, setSessionCookies, sha256
+  REAUTH_FRESH_MS, clearSessionCookies, consumeRateLimit, createSession, id, opaqueToken, rateLimit, reauthIsFresh,
+  requireSession, rotateSession, sessionFromRequest, setSessionCookies, sha256
 } from './security.js';
 import { encryptDeliveryToken } from './deliveryCrypto.js';
 import { verifyIdentityToken } from './oidc.js';
@@ -149,10 +149,13 @@ function reauthError(code, message, status = 401) {
 }
 
 /**
- * Destructive account deletion always requires fresh proof of the account's
- * authentication method. A long-lived session cookie is not enough on its own.
+ * Fresh proof of the account's own authentication method — the password, a
+ * one-time code sent to its own phone or email, or a fresh Apple/Google
+ * identity token for a linked subject. A long-lived session cookie is not
+ * enough on its own for deletion or for the data export. `purpose` only
+ * shapes the refusal message; the checks are the same.
  */
-export async function authorizeAccountDeletion(db, accountId, body = {}, identityVerifier = verifyIdentityToken) {
+export async function authorizeFreshProof(db, accountId, body = {}, { purpose = 'deleting the account', identityVerifier = verifyIdentityToken } = {}) {
   db = asStore(db);
   const row = await db.get('SELECT password_hash FROM accounts WHERE id = ? AND deleted_at IS NULL', [accountId]);
   if (!row) throw reauthError('ACCOUNT_NOT_FOUND', 'Account not found.', 404);
@@ -160,7 +163,7 @@ export async function authorizeAccountDeletion(db, accountId, body = {}, identit
   if (row.password_hash) {
     const password = String(body?.password || '');
     if (!password || !(await bcrypt.compare(password, row.password_hash))) {
-      throw reauthError('REAUTH_REQUIRED', 'Confirm your password before deleting the account.');
+      throw reauthError('REAUTH_REQUIRED', `Confirm your password before ${purpose}.`);
     }
     return { method: 'password' };
   }
@@ -174,10 +177,10 @@ export async function authorizeAccountDeletion(db, accountId, body = {}, identit
 
   const provider = String(body?.provider || '');
   if (!['google', 'apple'].includes(provider)) {
-    throw reauthError('SOCIAL_REAUTH_REQUIRED', 'Confirm your Apple or Google identity again before deleting the account.');
+    throw reauthError('SOCIAL_REAUTH_REQUIRED', `Confirm your Apple or Google identity again before ${purpose}.`);
   }
   const idToken = String(body?.idToken || '');
-  if (!idToken) throw reauthError('SOCIAL_REAUTH_REQUIRED', 'A fresh identity token is required before deleting the account.');
+  if (!idToken) throw reauthError('SOCIAL_REAUTH_REQUIRED', `A fresh identity token is required before ${purpose}.`);
 
   let identity;
   try {
@@ -192,6 +195,28 @@ export async function authorizeAccountDeletion(db, accountId, body = {}, identit
     WHERE provider=? AND provider_subject=? AND account_id=?`, [provider, identity.subject, accountId]);
   if (!linked) throw reauthError('SOCIAL_IDENTITY_MISMATCH', 'The confirmed identity is not linked to this Pri Learning account.');
   return { method: provider, subject: identity.subject };
+}
+
+/** Destructive account deletion always requires fresh proof (authorizeFreshProof). */
+export async function authorizeAccountDeletion(db, accountId, body = {}, identityVerifier = verifyIdentityToken) {
+  return authorizeFreshProof(db, accountId, body, { purpose: 'deleting the account', identityVerifier });
+}
+
+/** Which proofs this account can offer, so a client asks for the right one. */
+async function reauthMethods(db, accountId) {
+  const row = await db.get('SELECT password_hash FROM accounts WHERE id = ? AND deleted_at IS NULL', [accountId]);
+  if (row?.password_hash) return ['password'];
+  const providers = await db.all(`SELECT provider FROM account_identities WHERE account_id = ? AND provider IN ('google','apple') ORDER BY provider`, [accountId]);
+  const methods = providers.map(p => p.provider);
+  return methods.length ? methods : ['otp'];
+}
+
+/** The 401 a sensitive route answers until the session proves itself again. */
+async function reauthRefusal(db, res, accountId) {
+  res.status(401).json({
+    error: { code: 'REAUTH_REQUIRED', message: 'Confirm it is you before continuing.' },
+    reauth: { methods: await reauthMethods(db, accountId), freshMs: REAUTH_FRESH_MS }
+  });
 }
 
 /**
@@ -520,6 +545,30 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     } catch (err) { next(err); }
   });
 
+  // Fresh proof of the credential on THIS session (password, own-address code
+  // or linked provider), ahead of a sensitive read such as the data export.
+  // Success stamps the session and rotates its token: a cookie copied before
+  // the proof does not carry the proof with it.
+  router.post('/reauth', requireSession(db), rateLimit(db, 'reauth', { limit: 10, windowMs: 60 * 60 * 1000 }), async (req, res, next) => {
+    try {
+      const body = req.body || {};
+      if (body.provider && !(await consumeOidcNonce(db, body.nonce))) {
+        return res.status(401).json({ error: { code: 'OIDC_NONCE_INVALID', message: 'Request a fresh sign-in nonce before confirming your identity.' } });
+      }
+      const accountId = req.platformSession.account_id;
+      const proof = await authorizeFreshProof(db, accountId, body, { purpose: 'continuing' });
+      const now = Date.now();
+      await db.run('UPDATE account_sessions SET reauthenticated_at = ? WHERE id = ? AND revoked_at IS NULL', [now, req.platformSession.id]);
+      const rotated = await rotateSession(db, res, req.platformSession, now);
+      await audit(db, accountId, 'session.reauth', 'account', accountId, { method: proof.method, rotated: !!rotated }, now);
+      res.json({ ok: true, method: proof.method, freshUntil: now + REAUTH_FRESH_MS, rotated: !!rotated });
+    } catch (error) {
+      if (isDatabaseOverload(error)) return next(error);
+      if (error?.status) return res.status(error.status).json({ error: { code: error.code || 'REAUTH_REQUIRED', message: error.message } });
+      next(error);
+    }
+  });
+
   // Staff second factor (mfa.js): status, enrolment, confirmation, verification.
   router.use('/mfa', createMfaRouter(db));
 
@@ -551,8 +600,15 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
   // docs/privacy/data-retention.md for the table-by-table account.
   // Bounded so a stolen session cannot be used to pull the whole learning
   // history over and over, and one account cannot monopolise the database.
+  //
+  // The right of access (DPDP Act 2023 s.11) is exercised with fresh proof of
+  // the credential: a session cookie alone — on a shared iPad, or copied —
+  // must not be enough to pull a child's whole learning history. A sign-in or
+  // POST /reauth inside REAUTH_FRESH_MS satisfies it. Every export is receipted
+  // in audit_log with counts only: no row content, no address, no name.
   router.get('/export', requireSession(db), rateLimit(db, 'account-export', { limit: 10, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const accountId = req.platformSession.account_id;
+    if (!reauthIsFresh(req.platformSession)) return reauthRefusal(db, res, accountId);
     const account = await db.get('SELECT id,email,name,role,email_verified_at,created_at,updated_at FROM accounts WHERE id = ?', [accountId]);
     const identities = await db.all('SELECT provider,linked_at FROM account_identities WHERE account_id = ? ORDER BY linked_at', [accountId]);
     const events = await db.all('SELECT id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at FROM learning_events WHERE account_id = ? ORDER BY server_cursor', [accountId]);
@@ -576,10 +632,19 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     const entitlementRow = await db.get('SELECT * FROM entitlement_snapshots WHERE account_id=?', [accountId]);
     const entitlement = publicEntitlement(entitlementRow || { plan: 'free', status: 'free', provider: 'none' });
     const consent = await consentState(db, accountId);
+    const exportedAt = Date.now();
+    await audit(db, accountId, 'account.export', 'account', accountId, {
+      format: 'pri-account-export-v1',
+      rows: {
+        learningEvents: events.length, entities: entities.length, classes: classes.length,
+        assignmentSubmissions: submissions.length, assignmentFeedback: feedback.length,
+        telemetry: telemetry.length, issueReports: reports.length
+      }
+    }, exportedAt);
     res.set('Cache-Control', 'no-store');
     res.json({
       format: 'pri-account-export-v1',
-      exportedAt: Date.now(),
+      exportedAt,
       account,
       identities: identities.map(row => ({ provider: row.provider, linkedAt: row.linked_at })),
       learningEvents: events,

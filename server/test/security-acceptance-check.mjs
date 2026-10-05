@@ -29,6 +29,12 @@
 //      non-maths / identifier-carrying / oversized bodies refused, and the
 //      reply cache keyed by content only — one account's request never reads
 //      a reply cached for different content, and no identity is stored.
+//   I. Ledger 2.9: an IDOR sweep of every parameterised session route with a
+//      second account's REAL identifiers (nothing of theirs in any answer,
+//      nothing of theirs changed); session-token tampering (bit flip,
+//      truncation, stored hash, JWT-shaped forgeries, another account's
+//      session id) is 401; an HTML-form cross-site mutation is CSRF_REJECTED;
+//      the production header set carries HSTS and an enforced CSP.
 
 // Secret-shaped values are assembled at runtime so the repository secret scan
 // (tools/secret-scan.mjs) never sees one committed.
@@ -75,6 +81,9 @@ for (const stream of [process.stdout, process.stderr]) {
 }
 
 const { startApp, registerAccount, verifyEmail, checks, cookieHeader, enrolMfa } = await import('./support/app-harness.mjs');
+const { readTestOutbox, clearTestOutbox } = await import('../platform/smsProvider.js');
+const { securityHeaderValues, HSTS } = await import('../platform/headers.js');
+const { REAUTH_FRESH_MS } = await import('../platform/security.js');
 const { requestedEngine } = await import('./support/engine.mjs');
 const { decryptDeliveryToken } = await import('../platform/deliveryCrypto.js');
 const { loadInventory } = await import('./support/route-inventory.mjs');
@@ -318,6 +327,50 @@ try {
       c.eq((await h.request('/v1/account/me', { jar: bystander.jar })).status, 200, 'logout-all leaves another account signed in');
     }
 
+    // A sign-in from a device the account has never used is told to the
+    // account's own address (ledger 2.7 suspicious-login notice), through
+    // the same email provider as the one-time codes — the test adapter here.
+    {
+      clearTestOutbox();
+      const n = await account();
+      const notices = () => readTestOutbox({ to: n.email }).filter(m => m.purpose === 'new-device');
+      c.eq(notices().length, 0, 'the first sign-in of an account sends no new-device notice');
+      await resetLimits();
+      const sameDevice = {};
+      c.eq((await h.request('/v1/account/login', { method: 'POST', jar: sameDevice, body: { email: n.email, password: n.password, deviceId: n.deviceId } })).status, 200, 'the same device signs in again');
+      c.eq(notices().length, 0, 'a device the account already used sends no notice');
+      const phone = {};
+      c.eq((await h.request('/v1/account/login', { method: 'POST', jar: phone, body: { email: n.email, password: n.password, deviceId: 'phone-unseen' } })).status, 200, 'an unseen device signs in');
+      c.eq(notices().length, 1, 'exactly one new-device notice went to the account\'s own address');
+      const notice = notices()[0];
+      c.ok(/phone-unseen/.test(notice.body) && /Sign out everywhere/.test(notice.body), 'the notice names the device and the remedy');
+      c.ok(!notice.body.includes(n.email) && !notice.body.includes(phone.pri_cloud_session) && !/https?:\/\//.test(notice.body), 'the notice carries no address, no session token and no link to click');
+      const auditRows = await db.all("SELECT metadata_json FROM audit_log WHERE action='session.new-device' AND target_id=?", [n.id]);
+      c.deq(auditRows.map(row => row.metadata_json), ['{}'], 'the new-device sign-in is audited once, with no personal data in its metadata');
+      await resetLimits();
+      c.eq((await h.request('/v1/account/login', { method: 'POST', jar: {}, body: { email: n.email, password: n.password, deviceId: 'phone-unseen' } })).status, 200, 'the no-longer-new device signs in again');
+      c.eq(notices().length, 1, 'and is not reported a second time');
+      c.eq((await h.request('/v1/account/me', { jar: phone })).status, 200, 'the notice never blocked the sign-in');
+    }
+
+    // Leaving staff retires the account's sessions; other role changes keep
+    // them (the role is re-read on every request either way).
+    {
+      const staff = await account({ role: 'support' });
+      const bystander = await account();
+      const climber = await account();
+      await resetLimits();
+      const demoted = await h.request(`/v1/admin/users/${staff.id}/role`, { method: 'PATCH', jar: admin.jar, body: { role: 'student' } });
+      c.deq([demoted.status, demoted.data?.sessionsRevoked], [200, 1], 'demoting a support account retires its one session');
+      c.eq((await h.request('/v1/account/me', { jar: staff.jar })).status, 401, 'the demoted staff session is signed out');
+      c.eq((await h.request('/v1/account/me', { jar: bystander.jar })).status, 200, 'a bystander is untouched');
+      const promoted = await h.request(`/v1/admin/users/${climber.id}/role`, { method: 'PATCH', jar: admin.jar, body: { role: 'teacher' } });
+      c.deq([promoted.status, promoted.data?.sessionsRevoked], [200, 0], 'promoting a student to teacher retires nothing');
+      c.eq((await h.request('/v1/account/me', { jar: climber.jar })).data?.account?.role, 'teacher', 'and the promoted session sees its new role at once');
+      const roleAudit = await db.get("SELECT metadata_json FROM audit_log WHERE action='account.role' AND target_id=?", [staff.id]);
+      c.deq(JSON.parse(roleAudit.metadata_json), { role: 'student', from: 'support', sessionsRevoked: 1 }, 'the demotion receipt records the revocation');
+    }
+
     // Revoke each device in turn, including the current one.
     const everywhere = await account();
     await resetLimits();
@@ -469,6 +522,52 @@ try {
     await db.run("DELETE FROM class_members WHERE class_id IN ('cls_export_bob','cls_export_alice')");
     await db.run("DELETE FROM classes WHERE id IN ('cls_export_bob','cls_export_alice')");
     c.eq((await h.request(`/v1/account/export?accountId=${bob.id}`, { jar: alice.jar })).data.account.id, alice.id, 'an accountId query parameter is ignored');
+
+    // The export is receipted, and the receipt says how much, never what.
+    {
+      const receipts = await db.all("SELECT actor_account_id,target_id,metadata_json FROM audit_log WHERE action='account.export' AND target_id=?", [alice.id]);
+      c.eq(receipts.length, 2, 'every export of Alice\'s account is audited (two so far)');
+      const meta = receipts.map(row => row.metadata_json).join('\n');
+      c.ok(receipts.every(row => row.actor_account_id === alice.id), 'the receipt names the exporting account as actor');
+      c.ok(!meta.includes(alice.email) && !meta.includes('Alice') && !meta.includes('alice-entity-secret') && !meta.includes('alice-bookmark'), 'the receipt metadata carries no address, name or row content');
+      c.eq(JSON.parse(receipts[0].metadata_json).rows.entities, 1, 'the receipt records counts (1 entity)');
+      c.eq((await db.get("SELECT COUNT(*) AS n FROM audit_log WHERE action='account.export' AND target_id=?", [bob.id])).n, 0, 'Bob, who never exported, has no receipt');
+    }
+
+    // Fresh re-authentication (ledger 2.6): a session older than
+    // REAUTH_FRESH_MS proves its credential again before it may export.
+    {
+      await db.run('UPDATE account_sessions SET reauthenticated_at=? WHERE account_id=? AND revoked_at IS NULL', [Date.now() - REAUTH_FRESH_MS - 1000, alice.id]);
+      const stale = await h.request('/v1/account/export', { jar: alice.jar });
+      c.deq([stale.status, stale.data?.error?.code, stale.data?.reauth?.methods], [401, 'REAUTH_REQUIRED', ['password']], 'a stale session is refused the export and told which proof it can offer');
+      c.ok(!stale.text.includes('learningEvents'), 'the refusal carries no export data');
+      await db.run('UPDATE account_sessions SET reauthenticated_at=NULL WHERE account_id=? AND revoked_at IS NULL', [alice.id]);
+      c.eq((await h.request('/v1/account/export', { jar: alice.jar })).status, 401, 'a session row written before the stamp existed (NULL) is not fresh either');
+      await resetLimits();
+      const wrong = await h.request('/v1/account/reauth', { method: 'POST', jar: alice.jar, body: { password: 'not-alice-password' } });
+      c.deq([wrong.status, wrong.data?.error?.code], [401, 'REAUTH_REQUIRED'], 'a wrong password does not re-authenticate');
+      c.eq((await h.request('/v1/account/export', { jar: alice.jar })).status, 401, 'and the export stays refused');
+      const bobsPassword = await h.request('/v1/account/reauth', { method: 'POST', jar: alice.jar, body: { password: bob.password } });
+      c.eq(bobsPassword.status, 401, 'Bob\'s password does not re-authenticate Alice\'s session');
+      const noCsrf = await bare('/v1/account/reauth', { method: 'POST', jar: { ...alice.jar }, body: { password: alice.password } });
+      c.deq([noCsrf.status, noCsrf.data?.error?.code], [403, 'CSRF_REJECTED'], 'a cross-site re-authentication attempt is CSRF_REJECTED');
+      const staleCookie = { ...alice.jar };
+      const fresh = await h.request('/v1/account/reauth', { method: 'POST', jar: alice.jar, body: { password: alice.password } });
+      c.deq([fresh.status, fresh.data?.method, fresh.data?.rotated], [200, 'password', true], 'the right password re-authenticates and rotates the session token');
+      c.ok(alice.jar.pri_cloud_session && alice.jar.pri_cloud_session !== staleCookie.pri_cloud_session, 'a new session cookie was issued');
+      c.eq((await h.request('/v1/account/me', { jar: staleCookie })).status, 401, 'the pre-reauth cookie no longer authenticates');
+      const afterReauth = await h.request('/v1/account/export', { jar: alice.jar });
+      c.eq(afterReauth.status, 200, 'the re-authenticated session exports');
+      c.eq(afterReauth.data.account.id, alice.id, 'and still gets only its own account');
+      c.eq((await db.get("SELECT COUNT(*) AS n FROM audit_log WHERE action='session.reauth' AND target_id=?", [alice.id])).n, 1, 'the re-authentication is audited once');
+      c.eq((await h.request('/v1/account/devices', { jar: alice.jar })).data.devices.length, 1, 'rotation re-keyed the session rather than adding one');
+      // The proof an account without a password can offer: a code to its own
+      // address, named by the refusal so the client asks for the right thing.
+      const codeOnly = await account();
+      await db.run('UPDATE accounts SET password_hash=NULL WHERE id=?', [codeOnly.id]);
+      await db.run('UPDATE account_sessions SET reauthenticated_at=NULL WHERE account_id=?', [codeOnly.id]);
+      c.deq((await h.request('/v1/account/export', { jar: codeOnly.jar })).data?.reauth?.methods, ['otp'], 'a code-only account is told to prove itself by code');
+    }
 
     await db.run("UPDATE entitlement_snapshots SET plan='premium',status='active',provider='web' WHERE account_id=?", [bob.id]);
     const aliceBilling = await h.request(`/v1/billing/status?accountId=${bob.id}`, { jar: alice.jar });
@@ -855,6 +954,138 @@ try {
     const rows = await db.all('SELECT cache_key, response_json FROM tutor_cache');
     const stored = JSON.stringify(rows);
     c.ok(![first.id, second.id, first.email, second.email].some(value => stored.includes(value)), 'tutor: the cache stores no account id or email');
+  }
+  // ══ I. Ledger 2.9 — IDOR with real ids, token tampering, form CSRF, headers ══
+  {
+    // I1. Every parameterised session route, called by Alice with Bob's REAL
+    // identifiers. The answer may be 4xx or an empty 200 of Alice's own; it
+    // may never carry anything of Bob's and may never change anything of Bob's.
+    const idorTeacher = await account({ role: 'teacher', name: 'IDOR Teacher' });
+    const idorAlice = await account({ name: 'Idor Alice' });
+    const idorBob = await account({ name: 'Idor Bob' });
+    await resetLimits();
+    const bobClass = await h.request('/v1/classes/', { method: 'POST', jar: idorTeacher.jar, body: { name: 'IDOR Bob Only Class' } });
+    c.eq(bobClass.status, 201, 'I1: a class for Bob');
+    c.eq((await h.request('/v1/classes/join', { method: 'POST', jar: idorBob.jar, body: { code: bobClass.data.joinCode } })).status, 200, 'I1: Bob joins it');
+    const stamp = Date.now();
+    await db.run('INSERT INTO assignments(id,class_id,teacher_account_id,title,specification_json,created_at) VALUES (?,?,?,?,?,?)', ['asn_idor_bob', bobClass.data.class.id, idorTeacher.id, 'IDOR Bob Assignment', '{}', stamp]);
+    await db.run(`INSERT INTO assignment_submissions(assignment_id,student_account_id,state,summary_json,started_at,updated_at) VALUES (?,?,'started',?,?,?)`, ['asn_idor_bob', idorBob.id, JSON.stringify({ note: 'bob-idor-submission' }), stamp, stamp]);
+    const bobReport = await h.request('/v1/reports/', { method: 'POST', jar: idorBob.jar, body: { category: 'other', note: 'bob-idor-report-note' } });
+    c.eq(bobReport.status, 201, 'I1: Bob files a report');
+    c.eq((await h.request('/v1/sync/push', { method: 'POST', jar: idorBob.jar, body: pushBody(idorBob.deviceId, 1, { secret: 'bob-idor-sync-secret' }), headers: { 'Idempotency-Key': 'idor-bob-1' } })).status, 200, 'I1: Bob has sync data');
+    const bobSession = (await h.request('/v1/account/devices', { jar: idorBob.jar })).data.devices[0].id;
+    const draft = await h.request('/v1/content/drafts', { method: 'POST', jar: support.jar, body: { contentKey: 'idor.pack', curriculumVersion: 'cbse-2026', source: {}, body: { secret: 'bob-idor-content' } } });
+    const BOB_IDS = {
+      classId: bobClass.data.class.id, assignmentId: 'asn_idor_bob', studentId: idorBob.id, accountId: idorBob.id,
+      sessionId: bobSession, revisionId: draft.data?.revision?.id || SAMPLE.revisionId, reportId: bobReport.data.report.id,
+      provider: 'web', cursor: '0', key: 'acceptance.flag'
+    };
+    const withBob = path => path.replace(/:([A-Za-z]+)(\([^)]*\))?/g, (_, name) => BOB_IDS[name] ?? 'x');
+    const MARKERS = [idorBob.id, idorBob.email, 'Idor Bob', 'IDOR Bob Only Class', 'IDOR Bob Assignment', 'bob-idor-submission', 'bob-idor-report-note', 'bob-idor-sync-secret', 'bob-idor-content', bobSession];
+    const bobSnapshot = async () => JSON.stringify({
+      account: await db.get('SELECT email,name,role,password_hash,deleted_at FROM accounts WHERE id=?', [idorBob.id]),
+      sessions: await db.all('SELECT id,revoked_at FROM account_sessions WHERE account_id=? ORDER BY id', [idorBob.id]),
+      members: await db.all('SELECT class_id,removed_at FROM class_members WHERE student_account_id=? ORDER BY class_id', [idorBob.id]),
+      submissions: await db.all('SELECT assignment_id,state,summary_json FROM assignment_submissions WHERE student_account_id=? ORDER BY assignment_id', [idorBob.id]),
+      reports: await db.all('SELECT id,status,note FROM issue_reports WHERE account_id=? ORDER BY id', [idorBob.id]),
+      events: (await db.get('SELECT COUNT(*) AS n FROM learning_events WHERE account_id=?', [idorBob.id])).n,
+      entitlement: await db.get('SELECT plan,status FROM entitlement_snapshots WHERE account_id=?', [idorBob.id]),
+      classRow: await db.get('SELECT name,archived_at FROM classes WHERE id=?', [bobClass.data.class.id])
+    });
+    const before = await bobSnapshot();
+    const parameterised = sessionRoutes.filter(route => route.path.includes(':'));
+    c.ok(parameterised.length >= 25, `I1: ${parameterised.length} parameterised session routes swept with Bob's real ids`);
+    const leaks = [];
+    const crashes = [];
+    for (const route of parameterised) {
+      await resetLimits();
+      const r = await h.request(withBob(route.path), { method: route.method, jar: idorAlice.jar, ...(MUTATION.has(route.method) ? { body: {} } : {}) });
+      // A coded 503 (an unconfigured billing provider, say) is an answer the
+      // server composed; an uncoded or INTERNAL 5xx is a crash.
+      if (r.status >= 500 && (!r.data?.error?.code || r.data.error.code === 'INTERNAL')) crashes.push(`${route.method} ${route.path} → ${r.status}`);
+      const hit = MARKERS.filter(marker => marker && r.text.includes(marker));
+      if (hit.length) leaks.push(`${route.method} ${route.path} → ${r.status} leaked ${hit.join(',')}`);
+    }
+    c.deq(crashes, [], 'I1: no route crashes (uncoded 5xx) on another account\'s ids');
+    c.deq(leaks, [], 'I1: no route answers with anything of Bob\'s to Alice');
+    c.eq(await bobSnapshot(), before, 'I1: nothing of Bob\'s changed under the sweep');
+    c.eq((await h.request('/v1/account/me', { jar: idorBob.jar })).status, 200, 'I1: Bob is still signed in');
+    c.eq((await h.request('/v1/account/me', { jar: idorAlice.jar })).status, 200, 'I1: the sweep did not sign Alice out either');
+
+    // I2. Session-token tampering. The cookie is an opaque random token whose
+    // SHA-256 is stored; nothing derived from it, and nothing that merely
+    // looks like a credential, may authenticate.
+    {
+      const tok = idorAlice.jar.pri_cloud_session;
+      const flip = ch => (ch === 'A' ? 'B' : 'A');
+      const b64url = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+      const { createHash } = await import('node:crypto');
+      const forgeries = [
+        ['one character flipped', tok.slice(0, -1) + flip(tok.at(-1))],
+        ['first character flipped', flip(tok[0]) + tok.slice(1)],
+        ['truncated by four', tok.slice(0, -4)],
+        ['padded by four', tok + 'AAAA'],
+        ['the stored hash instead of the token', createHash('sha256').update(tok).digest('hex')],
+        ['JWT alg=none naming Bob', `${b64url({ alg: 'none', typ: 'JWT' })}.${b64url({ sub: idorBob.id, role: 'admin', exp: 4102444800 })}.`],
+        ['JWT HS256 with a guessed key', `${b64url({ alg: 'HS256', typ: 'JWT' })}.${b64url({ sub: idorAlice.id, role: 'admin' })}.${Buffer.from('forged-signature').toString('base64url')}`],
+        ["Bob's session id", bobSession],
+        ['empty', ''],
+        ['the CSRF token as the session', idorAlice.jar.pri_csrf]
+      ];
+      const failures = [];
+      for (const [label, cookie] of forgeries) {
+        const r = await bare('/v1/account/me', { jar: { pri_cloud_session: cookie } });
+        if (!(r.status === 401 && r.data?.error?.code === 'AUTH_REQUIRED')) failures.push(`${label}: ${r.status} ${r.data?.error?.code || r.text.slice(0, 60)}`);
+        const sync = await bare('/v1/sync/pull/0', { jar: { pri_cloud_session: cookie } });
+        if (sync.status !== 401 || sync.text.includes('bob-idor-sync-secret')) failures.push(`${label} on sync: ${sync.status}`);
+      }
+      c.deq(failures, [], 'I2: every tampered or forged session value is 401 AUTH_REQUIRED');
+      c.eq((await h.request('/v1/account/me', { jar: idorAlice.jar })).status, 200, 'I2: the genuine token still works after the forgeries');
+      // Admin paths never read role claims from a token: a session's role is the account's row.
+      const adminForgery = await bare('/v1/admin/users', { jar: { pri_cloud_session: `${b64url({ alg: 'none' })}.${b64url({ sub: admin.id, role: 'admin' })}.` } });
+      c.eq(adminForgery.status, 401, 'I2: a token claiming the admin\'s subject reaches no admin route');
+    }
+
+    // I3. CSRF as a browser would really mount it: an HTML form posting
+    // cross-site cannot set a custom header and sends a form body. Every
+    // state-changing route must refuse it even with a valid session cookie.
+    {
+      const failures = [];
+      const mutations = routes.filter(route => route.csrf === 'double-submit-when-session-cookie');
+      for (const route of mutations) {
+        await resetLimits();
+        const r = await bare(withBob(route.path), {
+          method: route.method, jar: { pri_cloud_session: idorAlice.jar.pri_cloud_session, pri_csrf: idorAlice.jar.pri_csrf },
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', Origin: 'https://evil.example' }, rawBody: 'role=admin&state=submitted'
+        });
+        if (!(r.status === 403 && ['CSRF_REJECTED', 'ORIGIN_REJECTED'].includes(r.data?.error?.code))) failures.push(`${route.method} ${route.path} → ${r.status} ${r.data?.error?.code || ''}`);
+      }
+      c.deq(failures, [], `I3: all ${mutations.length} cookie-auth mutations refuse a cross-site HTML form post`);
+      c.eq(await bobSnapshot(), before, 'I3: the form posts changed nothing of Bob\'s');
+      c.eq((await db.get('SELECT role FROM accounts WHERE id=?', [idorAlice.id])).role, 'student', 'I3: and nothing of Alice\'s');
+    }
+
+    // I4. The production header set: HSTS and an enforced CSP, as
+    // server/app.js mounts it (security-production-mode-check.mjs proves the
+    // coverage across paths; this pins the values).
+    {
+      const prod = securityHeaderValues({ production: true });
+      c.eq(prod['Strict-Transport-Security'], HSTS, 'I4: production sends HSTS');
+      c.match(HSTS, /max-age=(\d{8,})/, 'I4: HSTS max-age is at least a year');
+      c.ok(Number(/max-age=(\d+)/.exec(HSTS)[1]) >= 31536000 && /includeSubDomains/.test(HSTS), 'I4: 31536000 seconds and subdomains included');
+      const csp = prod['Content-Security-Policy'];
+      c.ok(/^default-src 'self'/.test(csp), 'I4: CSP default-src is self');
+      c.ok(/script-src 'self'(;|$)/.test(csp) && !/unsafe-eval|unsafe-inline' *;? *script|script-src[^;]*unsafe/.test(csp), 'I4: scripts are same-origin only, no eval, no inline');
+      for (const directive of ["object-src 'none'", "frame-ancestors 'none'", "base-uri 'self'", "form-action 'self'"]) {
+        c.ok(csp.includes(directive), `I4: CSP carries ${directive}`);
+      }
+      c.eq(prod['X-Content-Type-Options'], 'nosniff', 'I4: nosniff');
+      c.eq(prod['X-Frame-Options'], 'DENY', 'I4: X-Frame-Options DENY');
+      c.eq(securityHeaderValues({ production: false })['Strict-Transport-Security'], undefined, 'I4: a development server over http does not pin HSTS');
+      const live = await bare('/v1/health');
+      c.ok(String(live.headers.get('content-security-policy') || '').includes("frame-ancestors 'none'"), 'I4: the running server really sends the CSP on /v1');
+      c.eq(live.headers.get('x-content-type-options'), 'nosniff', 'I4: and nosniff');
+    }
   }
 } finally {
   await h.close();
