@@ -164,7 +164,7 @@
     "test:working:cloud": "node client/test/cloud-working-client-check.mjs",
     "test:platform:working": "node server/test/working-check-check.mjs",
     "test:platform:question-photo": "node server/test/question-photo-check.mjs",
-    "test:platform:tutor": "node server/test/tutor-help-check.mjs",
+    "test:platform:tutor": "node server/test/tutor-help-check.mjs && node server/test/tutor-device-journey-check.mjs",
     "test:platform:tutor:stream": "node server/test/tutor-stream-check.mjs",
     "test:tutor:ui": "node client/test/tutor-ui-check.mjs",
     "test:account:withdraw": "node client/test/account-action-guardian-withdraw-check.mjs",
