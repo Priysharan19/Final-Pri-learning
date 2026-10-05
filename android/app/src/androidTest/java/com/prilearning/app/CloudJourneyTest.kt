@@ -167,7 +167,7 @@ class CloudJourneyTest {
             // Learning offline: a typed attempt is marked on the device.
             var marked = false
             for (i in 0 until 12) {
-                eval(s, "(function(){var t=[].slice.call(document.querySelectorAll('button')).find(function(b){return (b.getAttribute('aria-label')||'')==='Answer by typing';});if(t)t.click();return true;})()")
+                eval(s, "(function(){var t=[].slice.call(document.querySelectorAll('button')).find(function(b){return (b.getAttribute('aria-label')||'')==='Type: answer by typing';});if(t)t.click();return true;})()")
                 Thread.sleep(400)
                 if (eval(s, "!!document.querySelector('.editor-body input.answer-input')") == "true") {
                     setValue(s, ".editor-body input.answer-input", "7")

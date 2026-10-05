@@ -144,17 +144,24 @@ export const flow = {
       await settle();
       const toolbar = page.locator('.ink-toolbar');
       const toolbarText = await toolbar.innerText();
-      for (const key of ['ink.pen', 'ink.eraser', 'ink.spaceShort', 'ink.finger', 'ink.hintEachLine']) {
+      // The instrument toolbar: Pen, Eraser, Page (sheets replace "more space"),
+      // Finger, and the one-step-per-line hint.
+      for (const key of ['ink.pen', 'ink.eraser', 'ink.addPage', 'ink.finger', 'ink.hint']) {
         await check(`Handwriting: the toolbar shows ${key} in Hindi`, toolbarText.includes(hi[key]), JSON.stringify(toolbarText));
       }
       const titles = await toolbar.locator('button').evaluateAll(els => els.map(el => [el.getAttribute('title'), el.getAttribute('aria-label')]));
-      for (const [titleKey, ariaKey] of [['ink.undo', 'ink.undoAria'], ['ink.redo', 'ink.redoAria'], ['ink.clear', 'ink.clearAria'],
-        ['ink.moreSpace', 'ink.moreSpaceAria'], ['ink.fingerToggleTitle', 'ink.fingerToggleAria']]) {
+      for (const [titleKey, ariaKey] of [['ink.undo', 'ink.undoLabel'], ['ink.redo', 'ink.redoLabel'], ['ink.clear', 'ink.clearLabel'],
+        ['ink.fingerTitle', 'ink.fingerLabel']]) {
         await check(`Handwriting: the ${titleKey} control is titled and labelled in Hindi`,
           titles.some(([title, aria]) => title === hi[titleKey] && aria === hi[ariaKey]), JSON.stringify(titles));
       }
+      // "More space" became Page: the control that adds a sheet is titled and
+      // labelled in Hindi (its label names the page number it will add).
+      await check('Handwriting: the ink.addPage control is titled and labelled in Hindi',
+        titles.some(([title, aria]) => title === hi['ink.addPage'] && !!aria && aria.startsWith(hi['ink.addPageLabel'].split('{n}')[0])),
+        JSON.stringify(titles));
       await check('Handwriting: the writing surface is labelled in Hindi',
-        await page.locator('.ink-stage [role="img"]').first().getAttribute('aria-label') === hi['ink.answerSpaceAria']);
+        await page.locator('.ink-stage [role="img"]').first().getAttribute('aria-label') === hi['ink.surfaceLabel']);
       await check('Handwriting: no developer engine diagnostics are shown to the student',
         await page.locator('.ink-answer [role="note"]').count() === 0);
 
