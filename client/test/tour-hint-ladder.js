@@ -68,7 +68,11 @@ export const flow = {
     await check('the solution rung ends the question with the worked solution', await page.locator('.solution-block .step').count() >= 1);
     await check('it is marked as a reveal, not a correct answer', /revealed/i.test(await page.locator('.eval-card').innerText()));
     await check('nothing can be submitted afterwards', await page.getByRole('button', { name: 'Submit Answer' }).count() === 0);
-    await check('every rung is now lit', await page.locator('[data-hint-rung].lit').count() === 4);
+    // The workspace toolbar folds its help away once the question is marked
+    // (main's rule for the single bulb too), so the evidence that the whole
+    // ladder was climbed is the eval card's outcome and the ledger's weight.
+    await check('the eval card records the outcome as revealed', await page.locator('.eval-card[data-outcome="revealed"]').count() === 1);
+    await check('the ladder is folded away once the question is resolved', await page.locator('[data-hint-ladder]').count() === 0);
 
     // ── 4 · the error notebook ──────────────────────────────────────────────
     await goto('/review?filter=wrong');

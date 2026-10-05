@@ -2172,6 +2172,16 @@ html.theme-switching, html.theme-switching * {
 
 /* The hint ladder: four rungs in the workspace toolbar; only the next one is live. */
 .hint-ladder { display: inline-flex; gap: 4px; align-items: center; }
+/* The toolbar's end group may take its own row rather than widen the page. */
+.ws-tools-end { flex-wrap: wrap; }
+@media (max-width: 760px) {
+  /* Four rungs plus the mode tabs do not fit a phone's width side by side:
+     the live rung keeps its percentage, every rung keeps its 44px target,
+     and the row wraps instead of scrolling the page sideways. */
+  .hint-ladder { flex-wrap: wrap; }
+  .hint-ladder .hint-bulb > span:not(.hint-left) { display: none; }
+  .hint-ladder .hint-bulb { padding-left: 8px; padding-right: 8px; }
+}
 /* The hint ladder's last rung ends the question; it reads as a different kind of button. */
 .hint-bulb-final { border-style: dashed; }
 .hint-bulb-final.lit { border-style: solid; }
