@@ -65,7 +65,7 @@ function safeProfile(row) {
     pathway: row.pathway ? String(row.pathway).slice(0, 30) : null,
     indiaTrack: row.indiaTrack ? String(row.indiaTrack).slice(0, 30) : null,
     avatar: String(row.avatar || '🙂').slice(0, 32),
-    theme: row.theme === 'light' ? 'light' : 'dark',
+    theme: ['light', 'dark', 'system'].includes(row.theme) ? row.theme : 'light',
     dailyGoal: Math.min(60, Math.max(3, Number(row.dailyGoal) || 10)),
     handwriting: row.handwriting !== false
   };

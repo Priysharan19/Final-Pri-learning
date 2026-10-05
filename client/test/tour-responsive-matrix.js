@@ -47,8 +47,10 @@ async function reachable(page, selector) {
 async function writableQuestion(page, settle) {
   for (let i = 0; i < 12; i++) {
     const ready = await page.evaluate(() => {
-      const tabs = [...document.querySelectorAll('.mode-tab')].map(t => t.getAttribute('aria-label') || '');
-      return tabs.includes('Answer by handwriting') && tabs.includes('Answer by typing');
+      // The accessible name leads with the visible word ("Write: answer by
+      // handwriting", WCAG 2.5.3), so match the phrase, not the whole name.
+      const tabs = [...document.querySelectorAll('.mode-tab')].map(t => (t.getAttribute('aria-label') || '').toLowerCase());
+      return tabs.some(n => n.includes('answer by handwriting')) && tabs.some(n => n.includes('answer by typing'));
     });
     if (ready) return true;
     const next = page.locator('.ctx-next');
@@ -83,8 +85,10 @@ export const flow = {
       }
 
       // ── 2 · form factor and navigation ───────────────────────────────────
-      await goto('/practice');
-      await page.waitForSelector('.q-prompt', { timeout: 30000 }).catch(() => null);
+      // Practice is a thinking-mode route (docs/design/PRI-DREAM-INTERFACE.md
+      // §10): it deliberately has no rail and no bottom bar. The shell is
+      // therefore measured on Home, and Practice is asserted to be free of it.
+      await goto('/');
       await settle();
       const shell = await page.evaluate(() => ({
         ff: document.documentElement.dataset.ff,
@@ -97,6 +101,22 @@ export const flow = {
       const phoneNav = vp.width <= 760;
       await check(`${tag}: ${phoneNav ? 'bottom bar, no sidebar' : 'sidebar, no bottom bar'}`,
         phoneNav ? shell.bar && !shell.side : shell.side && !shell.bar, JSON.stringify(shell));
+      // The top bar and sidebar line up (measured where the shell exists).
+      const align = vp.width > 760 ? await page.evaluate(() => {
+        const t = document.querySelector('.topbar')?.getBoundingClientRect();
+        const sb = document.querySelector('.sidebar')?.getBoundingClientRect();
+        return t && sb ? { topbarBottom: Math.round(t.bottom), sidebarTop: Math.round(sb.top) } : null;
+      }) : null;
+
+      await goto('/practice');
+      await page.waitForSelector('.q-prompt', { timeout: 30000 }).catch(() => null);
+      await settle();
+      const thinking = await page.evaluate(() => {
+        const shown = sel => { const el = document.querySelector(sel); return !!el && getComputedStyle(el).display !== 'none'; };
+        return { bar: shown('.mobilenav'), side: shown('.sidebar'), workspaceBar: shown('.ws-bar') };
+      });
+      await check(`${tag}: Practice is thinking mode — its own bar, no rail, no bottom bar`,
+        thinking.workspaceBar && !thinking.bar && !thinking.side, JSON.stringify(thinking));
       await check(`${tag}: a question renders`, await page.locator('.q-prompt').count() === 1);
       await check(`${tag}: a question with handwriting and typing is available`, await writableQuestion(page, settle));
 
@@ -109,7 +129,11 @@ export const flow = {
         return { h: Math.round(r.height), w: Math.round(r.width) };
       }) : null;
       if (vp.ff === 'expanded' && !vp.short || vp.id === 'tablet-portrait') {
-        await check(`${tag}: the writing area keeps the iPad height (${BASE_INK_HEIGHT}px)`, ink?.h === BASE_INK_HEIGHT, JSON.stringify(ink));
+        // One sheet of the notebook is at least the pre-CP-03 iPad height and
+        // never taller than the window less its bars (the redesign's page is
+        // 420px in landscape and up to 640px in portrait).
+        await check(`${tag}: the writing area is at least the iPad height (${BASE_INK_HEIGHT}px) and fits the window`,
+          !!ink && ink.h >= BASE_INK_HEIGHT && ink.h <= vp.height - 150, JSON.stringify(ink));
       } else {
         // Room must remain for the top bar, toolbar and the bottom bars: the
         // pre-CP-03 fixed 380px canvas fails this on a 640px-tall phone.
@@ -129,8 +153,15 @@ export const flow = {
         return { empty: maxY < 0, minX, maxX, minY, maxY, w: c.width, h: c.height };
       });
       let drew = false;
+      let inkDetail = '';
       if (ink) {
         await canvas.scrollIntoViewIfNeeded();
+        // The committed-ink canvas is sized once the ink engine is up; on a slow
+        // runner that is after the tab switch settles. Wait for it, not a clock.
+        await page.waitForFunction(() => {
+          const c = document.querySelector('.editor-shell .ink-canvas-base') || document.querySelector('.ink-canvas-base');
+          return !!c && c.width > 0;
+        }, null, { timeout: 15000 }).catch(() => null);
         const before = await inkBox();
         const box = await canvas.boundingBox();
         if (box && before?.empty) {
@@ -140,15 +171,21 @@ export const flow = {
             for (let i = 1; i <= 8; i++) await page.mouse.move(box.x + box.width * (x0 + (x1 - x0) * i / 8), box.y + box.height * y + (i % 2 ? 6 : -6));
             await page.mouse.up();
           }
-          await page.waitForTimeout(150);
-          const after = await inkBox();
+          // Strokes commit to the base canvas asynchronously: poll until ink
+          // appears (or 5s pass), then assert where it landed — same bounds.
+          let after = await inkBox();
+          for (let waited = 0; after?.empty && waited < 5000; waited += 100) {
+            await page.waitForTimeout(100);
+            after = await inkBox();
+          }
           const sx = after ? after.w / box.width : 1;
+          inkDetail = JSON.stringify({ box, before, after, scrollY: await page.evaluate(() => scrollY) });
           drew = !!after && !after.empty &&
             after.minX >= box.width * 0.15 * sx && after.maxX <= box.width * 0.65 * sx &&
             after.minY >= box.height * 0.25 * sx && after.maxY <= box.height * 0.72 * sx;
         }
       }
-      await check(`${tag}: synthetic strokes land on the writing area`, drew);
+      await check(`${tag}: synthetic strokes land on the writing area`, drew, inkDetail);
       if (vp.id === 'phone' && drew) {
         // Ink near the foot of the sheet is what widening could push off it.
         const low = await canvas.boundingBox();
@@ -157,15 +194,40 @@ export const flow = {
         for (let i = 1; i <= 8; i++) await page.mouse.move(low.x + low.width * (0.2 + 0.3 * i / 8), low.y + low.height * 0.9);
         await page.mouse.up();
         await page.waitForTimeout(150);
+        const beforeWiden = await inkBox();
         // Phone → tablet roughly doubles the sheet's width: the widening case.
         await page.setViewportSize({ width: 820, height: 1180 });
         await page.waitForTimeout(400);
-        const rotated = await inkBox();
+        // The sheet re-fits after the resize settles; measure once it has.
+        let rotated = await inkBox();
+        for (let i = 0; i < 15; i++) {
+          await page.waitForTimeout(200);
+          const again = await inkBox();
+          if (JSON.stringify(again) === JSON.stringify(rotated)) break;
+          rotated = again;
+        }
         // Ink scaled past the foot is simply not painted, so "still visible" is
         // the test: the lowest stroke (drawn at 90% height) must still show
         // near the foot of the wider sheet.
+        // The notebook sheet is taller on a tablet than on a phone (up to 640px
+        // against 340px), so ink drawn near the phone sheet's foot no longer
+        // sits at the tablet sheet's foot. What must hold is unchanged: the ink
+        // is still there, it moved down with the widening, and none of it is
+        // cut off at an edge.
         await check(`${tag}: widening to a tablet keeps every stroke on the sheet`,
-          !!rotated && !rotated.empty && rotated.maxY >= rotated.h * 0.85 && rotated.maxY <= rotated.h - 4, JSON.stringify(rotated));
+          !!rotated && !rotated.empty && rotated.maxY >= rotated.h * 0.5 && rotated.maxY <= rotated.h - 4 && rotated.maxX < rotated.w - 1,
+          JSON.stringify(rotated));
+        // And it was scaled, not merely left in place. Ink left at its phone
+        // size would keep its pixel extent, so its share of the wider sheet
+        // would shrink by the width ratio; a fit that keeps the handwriting's
+        // proportions may use less than the full width, but never more.
+        const shareBefore = beforeWiden && !beforeWiden.empty ? beforeWiden.maxX / beforeWiden.w : null;
+        const shareAfter = rotated && !rotated.empty ? rotated.maxX / rotated.w : null;
+        const unscaledShare = shareBefore != null && rotated ? shareBefore * beforeWiden.w / rotated.w : null;
+        await check(`${tag}: widening scales the ink with the sheet, never stretching it`,
+          shareBefore != null && shareAfter != null && unscaledShare != null
+            && shareAfter >= unscaledShare * 1.3 && shareAfter <= shareBefore + 0.05,
+          JSON.stringify({ shareBefore, shareAfter, unscaledShare }));
         // (Ink pushed past the foot is painted up to the very edge and cut off;
         //  the clamp leaves the lowest point 8px above it.)
         await page.setViewportSize({ width: 360, height: 640 });
@@ -206,29 +268,38 @@ export const flow = {
       await check(`${tag}: after answering, Next is visible and not covered`, after.ok, JSON.stringify(after));
       // A worked solution is what offers Pri Explain; ask for it so the launcher
       // check always has something to measure.
+      // Showing the solution ends the attempt with no marks, so it takes two
+      // deliberate presses (the first arms it).
       const show = page.getByRole('button', { name: 'Show solution' });
-      if (await show.count()) { await show.first().click({ timeout: 5000 }).catch(() => {}); await page.waitForTimeout(1200); }
+      for (let press = 0; press < 2 && await show.count(); press++) {
+        await show.first().click({ timeout: 5000 }).catch(() => {});
+        await page.waitForTimeout(press ? 1200 : 250);
+      }
+      // The launcher is a row in the flow of the page under the marked work,
+      // never a card floating over the student's reasoning: scroll to it, then
+      // measure that it is on screen, within the width, and clear of Next.
       const launcher = await page.evaluate(() => {
         const l = document.querySelector('.pri-explain-launch');
+        // Instant, centred scroll: the measurement must not race a scroll animation.
+        l?.scrollIntoView({ block: 'center', behavior: 'instant' });
         const n = document.querySelector('.ctx-next');
+        const bar = document.querySelector('.ws-actions');
         if (!l) return { present: false };
-        const a = l.getBoundingClientRect(), b = n?.getBoundingClientRect();
-        const overlap = !!b && !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom);
-        return { present: true, overlap, inside: a.left >= -1 && a.right <= innerWidth + 1 && a.bottom <= innerHeight + 1, widthShare: a.width / innerWidth };
+        const a = l.getBoundingClientRect(), b = n?.getBoundingClientRect(), c = bar?.getBoundingClientRect();
+        const hits = r => !!r && !(a.right <= r.left || a.left >= r.right || a.bottom <= r.top || a.top >= r.bottom);
+        const mid = document.elementFromPoint(a.left + a.width / 2, a.top + a.height / 2);
+        return {
+          present: true, overlap: hits(b), inside: a.left >= -1 && a.right <= innerWidth + 1 && a.top >= 0 && a.bottom <= innerHeight + 1,
+          pressable: !!mid && (mid === l || l.contains(mid)), position: getComputedStyle(l).position, underBar: hits(c)
+        };
       });
       await check(`${tag}: Pri Explain is offered once a worked solution exists`, launcher.present, JSON.stringify(launcher));
-      const compactPlacement = vp.width <= 760;
-      await check(`${tag}: its launcher sits clear of Next, inside the screen, ${compactPlacement ? 'as a full-width bar above the pill' : 'as a compact corner button'}`,
-        launcher.present && !launcher.overlap && launcher.inside && (compactPlacement ? launcher.widthShare > 0.85 : launcher.widthShare < 0.6),
+      await check(`${tag}: its launcher sits in the page flow, clear of Next, inside the screen and pressable`,
+        launcher.present && !launcher.overlap && !launcher.underBar && launcher.inside && launcher.pressable && launcher.position === 'static',
         JSON.stringify(launcher));
 
       // ── iPad composition: the top bar and sidebar line up ─────────────────
       if (vp.width > 760) {
-        const align = await page.evaluate(() => {
-          const t = document.querySelector('.topbar')?.getBoundingClientRect();
-          const sb = document.querySelector('.sidebar')?.getBoundingClientRect();
-          return t && sb ? { topbarBottom: Math.round(t.bottom), sidebarTop: Math.round(sb.top) } : null;
-        });
         await check(`${tag}: the sidebar starts below the top bar`, !!align && align.sidebarTop >= align.topbarBottom - 1, JSON.stringify(align));
       } else {
         await check(`${tag}: (sidebar alignment applies above 760px)`, true);

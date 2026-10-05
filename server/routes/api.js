@@ -28,7 +28,7 @@ api.patch('/me', requireAuth, (req, res) => {
   const u = req.user;
   const newName = name !== undefined ? String(name).trim().slice(0, 60) || u.name : u.name;
   const newYear = year !== undefined ? Math.min(12, Math.max(7, Number(year) || u.year)) : u.year;
-  const newTheme = theme !== undefined && ['dark', 'light'].includes(theme) ? theme : u.theme;
+  const newTheme = theme !== undefined && ['dark', 'light', 'system'].includes(theme) ? theme : u.theme;
   const newGoal = dailyGoal !== undefined ? Math.min(60, Math.max(3, Number(dailyGoal) || u.daily_goal)) : u.daily_goal;
   db.prepare('UPDATE users SET name = ?, year = ?, theme = ?, daily_goal = ? WHERE id = ?').run(newName, newYear, newTheme, newGoal, u.id);
   res.json({ user: publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(u.id)) });

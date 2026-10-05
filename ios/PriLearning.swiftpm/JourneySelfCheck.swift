@@ -77,7 +77,7 @@ enum JourneySelfCheck {
     await step('practice', async () => { await nav('/practice'); await waitFor(() => q('.q-prompt')); return 'question shown'; });
     await step('typedAttempt', async () => {
       for (let i = 0; i < 12; i++) {
-        const typing = byLabel('Answer by typing');
+        const typing = byLabel('Type: answer by typing');
         if (typing) { typing.click(); await sleep(250); }
         const input = q('.editor-body input.answer-input');
         if (input) {
@@ -139,7 +139,18 @@ enum JourneySelfCheck {
       if (!/11/.test(got.text || '')) throw new Error('read ' + JSON.stringify(got.text || ''));
       return 'engine=' + got.engine + ' text=' + JSON.stringify(got.text);
     });
-    await step('progress', async () => { await nav('/progress'); await waitFor(() => location.pathname === '/progress' && q('main')); return 'progress shown'; });
+    await step('progress', async () => {
+      // Practice is thinking mode: no navigation of its own. Leave it the way a
+      // student does (its Home control), then open Progress from the shell,
+      // through the compact "More" sheet when the bar has no Progress tab.
+      const exit = q('.ws-exit');
+      if (exit) { exit.click(); await waitFor(() => location.pathname === '/' && q('.home-greet')); }
+      const link = () => [...document.querySelectorAll('a[href="/progress"]')].find(a => a.offsetParent);
+      if (!link()) { q('.mobilenav button[aria-expanded]')?.click(); await waitFor(link); }
+      link().click();
+      await waitFor(() => location.pathname === '/progress' && q('main'));
+      return 'progress shown';
+    });
     await step('persistenceMarker', async () => { localStorage.setItem('pri-journey-marker', 'kept'); return 'written'; });
     return JSON.stringify(steps);
     """
@@ -287,7 +298,7 @@ enum JourneySelfCheck {
       await waitFor(() => q('.q-prompt'));
       let input = null;
       for (let i = 0; i < 12 && !input; i++) {
-        const t = byLabel('Answer by typing'); if (t) { t.click(); await sleep(250); }
+        const t = byLabel('Type: answer by typing'); if (t) { t.click(); await sleep(250); }
         input = q('.editor-body input.answer-input');
         if (!input) { q('.ctx-next')?.click(); await sleep(900); }
       }
