@@ -23,6 +23,7 @@
     "test:dream": "node client/test/dream-interface-check.mjs && node client/test/design-system-check.mjs",
     "test:outbox": "node client/test/outbox-check.mjs",
     "test:backend": "node client/test/backend-check.mjs",
+    "test:telemetry:consent": "node client/test/telemetry-consent-check.mjs",
     "test:security": "node client/test/security-check.mjs",
     "test:submission": "node client/test/submission-lifecycle-check.mjs",
     "test:submission:sync": "node client/test/submission-sync-durability-check.mjs",
