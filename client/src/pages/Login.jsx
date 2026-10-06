@@ -276,6 +276,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
   const [error, setError] = useState('');
   const stepHeadingRef = useRef(null);
   const createPendingRef = useRef(false);
+  const accountProfileRef = useRef(null);
 
   const load = () => api.get('/profiles').then(r => setProfiles(r.profiles)).catch(() => setProfiles([]));
   useEffect(() => { load(); }, []);
@@ -487,15 +488,29 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
   /** The account flow is done: make this device's profile, link it, and open the first question. */
   const finishAccount = async ({ account, name, year, track }) => {
     if (!account?.id) throw new Error(t('signup.genericError'));
-    const r = await api.post('/profiles', {
-      name: name || account.name || 'Pri', year: Number(year), avatar: '🚀', role: 'student',
-      language: signInLanguage(), course: 'in', indiaTrack: track || 'cbse'
-    });
+
+    // Creating the local profile and linking the cloud account are two requests.
+    // If the link (or the authoritative /me refresh) fails transiently, the
+    // signup panel stays mounted and lets the learner retry. Keep the first pid
+    // for that account so a retry never creates another orphan device profile.
+    let pid = accountProfileRef.current?.accountId === account.id
+      ? accountProfileRef.current.pid
+      : null;
+    if (!pid) {
+      const r = await api.post('/profiles', {
+        name: name || account.name || 'Pri', year: Number(year), avatar: '🚀', role: 'student',
+        language: signInLanguage(), course: 'in', indiaTrack: track || 'cbse'
+      });
+      pid = r.user.id;
+      accountProfileRef.current = { accountId: account.id, pid };
+    }
+
     const { linkSignedInAccount } = await import('../platform/cloudAccount.js');
-    await linkSignedInAccount(r.user.id, account);
+    await linkSignedInAccount(pid, account);
     // POST /profiles returns the view from before the cloud link exists. Re-read
     // it after linking so Practice never mounts with stale cloudLinked=false.
     const linkedUser = (await api.get('/me')).user;
+    accountProfileRef.current = null;
     localStorage.setItem('pri-seen-hero', '1');
     nav('/practice', { replace: true, flushSync: true });
     flushSync(() => setUser(linkedUser));
