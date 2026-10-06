@@ -680,13 +680,10 @@ export default {
   'settings.addToHomeScreen': ' For a full-screen app: use your browser’s “Add to Home Screen”.',
 
   // ── Sign-in and onboarding ─────────────────────────────────────────────────
-  // "Get Started" and "Start learning" are what the browser suites click by
-  // name. Renaming either in English breaks them, which is the point: those two
-  // buttons are load-bearing.
+  // Public account entry and explicit offline entry are load-bearing browser contracts.
   'login.heroTitle': 'Write it by hand.{br}Get every step {marked}.',
   'login.heroMarked': 'marked',
   'login.heroSub': 'Maths for NCERT Classes 7–12, JEE Main & Advanced and olympiad — questions generated on your device, your working marked line by line, with worked solutions. Typed practice works offline; handwriting needs a connection.',
-  'login.getStarted': 'Get Started',
   'login.heroPrivacy': 'Offline-first and private: profiles, progress and handwriting are stored on this device. A Pri cloud account is optional, and handwriting is read on a server only if you switch that on. No ads.',
   'login.cloudSignIn': 'Sign in to your Pri cloud account',
   'login.cloudIntent': 'Pri cloud account — first open or create the profile on this device that the account will sync. You’ll land in Account settings to sign in.',
