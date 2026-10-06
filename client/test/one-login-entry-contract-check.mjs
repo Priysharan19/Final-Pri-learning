@@ -41,7 +41,12 @@ assert.doesNotMatch(
 );
 assert.match(
   login,
-  /await linkSignedInAccount\(r\.user\.id, account\);[\s\S]{0,320}api\.get\('\/me'\)/,
+  /accountProfileRef\.current\?\.accountId === account\.id[\s\S]{0,520}if \(!pid\) \{[\s\S]{0,520}api\.post\('\/profiles'/,
+  'a retry for the same signed-in account must reuse the first local profile instead of creating a duplicate'
+);
+assert.match(
+  login,
+  /await linkSignedInAccount\(pid, account\);[\s\S]{0,320}api\.get\('\/me'\)/,
   'after linking, onboarding must re-read the authoritative profile view'
 );
 assert.match(
@@ -52,4 +57,4 @@ assert.match(
 
 assert.match(en, /'signup\.offline':\s*"Use without an account"/, 'offline entry copy must stay explicit');
 
-console.log('PASS — normal entry is account-first; offline mode is explicit; cloud onboarding cannot silently land in Practice with an unlinked/stale profile.');
+console.log('PASS — normal entry is account-first; offline mode is explicit; cloud onboarding is retry-safe and cannot silently land in Practice with an unlinked/stale profile.');
