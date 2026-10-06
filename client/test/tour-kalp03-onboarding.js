@@ -159,8 +159,9 @@ export const flow = {
       await page.locator('#signup-email').getAttribute('aria-invalid') === 'true');
     await page.locator('#signup-email').fill('');
     const identityCopy = await page.locator('.auth-card').innerText();
-    await check('local email and cloud identity are explained separately',
-      /not verified/i.test(identityCopy) && /cloud/i.test(identityCopy) && /separate/i.test(identityCopy));
+    await check('device-only identity is unmistakably not a cloud sign-in',
+      /(?:not|never) verified/i.test(identityCopy) && /not a sign-in/i.test(identityCopy)
+      && /handwriting\/photo reading/i.test(identityCopy));
     const identityPath = await page.getByTestId('onboarding-identity-path').innerText();
     await check('explicit offline onboarding stays device-only through the wizard',
       /Use this device profile only/i.test(identityPath)
