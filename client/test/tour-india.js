@@ -50,8 +50,8 @@ export const flow = {
       await check(`the landing screen links to ${label.toLowerCase()}`,
         await page.locator(`.auth-col a[href="${href}"]`).count() === 1, `${label} -> ${href}`);
     }
-    await check('the landing screen offers the cloud account sign-in',
-      await page.getByRole('button', { name: 'Sign in to your Pri cloud account' }).count() === 1);
+    await check('the landing screen offers the real account sign-in',
+      await page.getByRole('button', { name: 'I already have an account' }).count() === 1);
     await check('the tab is titled after the app', (await page.title()) === 'Pri Learning',
       `title reads ${JSON.stringify(await page.title())}`);
     const description = (await page.locator('meta[name="description"]').getAttribute('content')) || '';
