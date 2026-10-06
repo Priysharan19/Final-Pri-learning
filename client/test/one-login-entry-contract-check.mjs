@@ -21,6 +21,16 @@ assert.doesNotMatch(
   /onClick=\{cloudSignIn\}/,
   'the public welcome screen must not expose the legacy local-profile-then-cloud sign-in route'
 );
+assert.doesNotMatch(
+  login,
+  /onClick=\{\(\) => setCloudIntent\((?:true|false)\)\}/,
+  'the device-profile wizard must not ask a student to switch identity modes mid-flow'
+);
+assert.match(
+  en,
+  /'login\.localOnlySub':\s*'[^']*handwriting and photo reading need a Pri account\.'/i,
+  'explicit offline mode must say that handwriting/photo reading needs an account'
+);
 
 // Finishing real account onboarding is atomic: never enter Practice with a cloud session
 // that failed to link to the active local profile, and never publish the stale pre-link user.

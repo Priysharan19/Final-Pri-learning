@@ -850,18 +850,11 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                     )}
                   </div>
 
-                  <div className="field">
-                    <div className="label" id="signup-cloud-choice">{t('login.cloudChoice')}</div>
-                    <div className="pathway-row" role="group" aria-labelledby="signup-cloud-choice">
-                      <button type="button" className={`pathway-pick ${!cloudIntent ? 'on' : ''}`}
-                        aria-pressed={!cloudIntent} onClick={() => setCloudIntent(false)}>
-                        <b>{t('login.localOnly')}</b><span>{t('login.localOnlySub')}</span>
-                      </button>
-                      <button type="button" className={`pathway-pick ${cloudIntent ? 'on' : ''}`}
-                        aria-pressed={cloudIntent} onClick={() => setCloudIntent(true)}>
-                        <b>{t('login.connectCloudNext')}</b><span>{t('login.connectCloudNextSub')}</span>
-                      </button>
-                    </div>
+                  <div className="field" data-testid="onboarding-identity-path">
+                    <div className="label">{t(cloudIntent ? 'login.connectCloudNext' : 'login.localOnly')}</div>
+                    <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
+                      {t(cloudIntent ? 'login.connectCloudNextSub' : 'login.localOnlySub')}
+                    </p>
                   </div>
                   <p className="auth-note">{t('login.localCloudHonesty')}</p>
                 </>

@@ -49,7 +49,7 @@ async function personalise(page, name, { language = 'en', avatarIndex = 0 } = {}
   await next(page);
 }
 
-async function finishLocal(page, { email = '', protect = false, password = '', cloud = false } = {}) {
+async function finishLocal(page, { email = '', protect = false, password = '' } = {}) {
   await page.waitForSelector('[data-onboarding-step="4"]');
   if (email) await page.locator('#signup-email').fill(email);
   if (protect) {
@@ -57,7 +57,6 @@ async function finishLocal(page, { email = '', protect = false, password = '', c
     await page.getByLabel('Password', { exact: true }).fill(password);
     await page.getByLabel('Repeat password').fill(password);
   }
-  if (cloud) await page.locator('[aria-labelledby="signup-cloud-choice"] .pathway-pick').nth(1).click();
   await next(page);
   await page.waitForSelector('[data-onboarding-step="5"]');
 }
@@ -162,8 +161,10 @@ export const flow = {
     const identityCopy = await page.locator('.auth-card').innerText();
     await check('local email and cloud identity are explained separately',
       /not verified/i.test(identityCopy) && /cloud/i.test(identityCopy) && /separate/i.test(identityCopy));
-    await check('local-only is selected by default',
-      await page.locator('[aria-labelledby="signup-cloud-choice"] .pathway-pick').first().getAttribute('aria-pressed') === 'true');
+    const identityPath = await page.getByTestId('onboarding-identity-path').innerText();
+    await check('explicit offline onboarding stays device-only through the wizard',
+      /Use this device profile only/i.test(identityPath)
+      && await page.getByTestId('onboarding-identity-path').getByRole('button').count() === 0);
 
     await page.setViewportSize(DESKTOP);
     await snap(page, '04-desktop-protect');
@@ -285,13 +286,15 @@ export const flow = {
       await page.locator('#teacher-classes').count() === 1 && await page.locator('#teacher-assignments').count() === 1);
 
     await switchProfile(page);
+    await page.getByRole('button', { name: 'Sign in to your Pri cloud account' }).click();
     await beginAdditional(page, 'student');
     await chooseIndia(page, '9');
     await personalise(page, 'KALP03 Cloud Handoff');
     await page.waitForSelector('[data-onboarding-step="4"]');
-    await page.locator('[aria-labelledby="signup-cloud-choice"] .pathway-pick').nth(1).click();
-    await check('cloud intent is explicit before local profile creation',
-      await page.locator('[aria-labelledby="signup-cloud-choice"] .pathway-pick').nth(1).getAttribute('aria-pressed') === 'true');
+    const cloudIdentityPath = await page.getByTestId('onboarding-identity-path').innerText();
+    await check('cloud handoff intent is fixed before local profile creation',
+      /Connect a Pri cloud account next/i.test(cloudIdentityPath)
+      && await page.getByTestId('onboarding-identity-path').getByRole('button').count() === 0);
     await check('cloud path still says local profile comes first',
       /Create this real local profile first/i.test(await page.locator('.auth-card').innerText()));
     await next(page);
