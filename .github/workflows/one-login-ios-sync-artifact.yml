@@ -27,6 +27,8 @@ jobs:
         run: npm ci --prefix client
 
       - name: Build and regenerate both tracked iPad mirrors
+        env:
+          PRI_RELEASE_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           npm run build
