@@ -44,13 +44,10 @@ for (const bundle of BUNDLES) {
   const builtRelease = join(DIST, 'release.json');
   const bundledRelease = join(bundle.web, 'release.json');
 
-  // release.json contains the exact build commit SHA. A tracked bundle cannot
-  // contain the identity of the commit that is currently being created (and PR
-  // CI builds GitHub's synthetic merge commit), so --check deliberately gates
-  // only the reproducible web assets below. CI immediately materialises the
-  // exact native release.json with sync:ios and then verify:release:native
-  // compares it against the candidate identity before any release can pass.
-  if (!CHECK && existsSync(builtRelease)) {
+  if (CHECK && existsSync(bundledRelease) && readFileSync(bundledRelease, 'utf8') !== readFileSync(builtRelease, 'utf8')) {
+    failed = true;
+    console.error(`${bundle.label} release.json does not match this exact client build.`);
+  } else if (!CHECK && existsSync(builtRelease)) {
     mkdirSync(bundle.web, { recursive: true });
     cpSync(builtRelease, bundledRelease);
   }
