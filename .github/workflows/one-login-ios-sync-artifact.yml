@@ -1,0 +1,72 @@
+name: One Login iOS Sync Artifact
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  build-sync-artifact:
+    if: github.event.pull_request.number == 378
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Install client dependencies
+        run: npm ci --prefix client
+
+      - name: Build and regenerate both tracked iPad mirrors
+        run: |
+          set -euo pipefail
+          npm run build
+          npm run sync:ios
+          npm run check:ios
+
+      - name: Package changed mirror files
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, json, os, subprocess
+          paths = subprocess.check_output(
+              ['git','status','--porcelain=v1','-z','--',
+               'ios/PriLearning.swiftpm/Resources/Web',
+               'ios/PriLearning 2.swiftpm/Resources/Web']
+          ).split(b'\0')
+          changed, deleted = [], []
+          for raw in paths:
+              if not raw:
+                  continue
+              s = raw.decode('utf-8', 'surrogateescape')
+              status, p = s[:2], s[3:]
+              if status.startswith('R') or status.startswith('C'):
+                  raise SystemExit('unexpected rename/copy in generated mirrors: ' + s)
+              if 'D' in status:
+                  deleted.append(p)
+                  continue
+              with open(p, 'rb') as f:
+                  data = f.read()
+              changed.append({'path': p, 'content_b64': base64.b64encode(data).decode('ascii')})
+          with open('one-login-ios-sync.json','w',encoding='utf-8') as f:
+              json.dump({'changed': changed, 'deleted': deleted}, f, separators=(',',':'))
+          print(f'packaged {len(changed)} changed/added files and {len(deleted)} deletions')
+          PY
+          test -s one-login-ios-sync.json
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: one-login-ios-sync-${{ github.event.pull_request.head.sha }}
+          path: one-login-ios-sync.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 9
