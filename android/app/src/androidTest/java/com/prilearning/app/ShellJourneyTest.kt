@@ -175,14 +175,14 @@ class ShellJourneyTest {
 
         ActivityScenario.launch(MainActivity::class.java).use { s ->
             Log.i("PRITEST", "boot on the stable origin with the capability handshake")
-            assertEquals("\"https://appassets.androidplatform.net\"", waitFor(s, "(($byLabel)('Get Started') || document.querySelector('.home-greet')) && location.origin"))
+            assertEquals("\"https://appassets.androidplatform.net\"", waitFor(s, "(document.querySelector('[data-testid=\"hero-offline\"]') || document.querySelector('.home-greet')) && location.origin"))
             assertEquals("true", eval(s, "!!window.__PRI_HOST__ && Object.isFrozen(window.__PRI_HOST__) && window.__PRI_HOST__.capabilities.lifecycle.backButton === true"))
             assertEquals("false", eval(s, "'platform' in window.__PRI_HOST__ || 'ink' in window.__PRI_HOST__.capabilities"))
             assertEquals("true", eval(s, "/^[0-9a-f]{40}$/.test((window.__PRI_HOST__.release||{}).releaseSha||'')"))
             assertEquals("false", eval(s, "!!navigator.serviceWorker && !!navigator.serviceWorker.controller"))
 
             Log.i("PRITEST", "onboarding into a local profile")
-            click(s, "($byLabel)('Get Started')")
+            click(s, "document.querySelector('[data-testid=\"hero-offline\"]')")
             waitFor(s, "document.querySelector('[data-onboarding-step=\"1\"]')")
             click(s, "($byLabel)('Student')"); click(s, "document.querySelector('.auth-card .btn-primary')")
             waitFor(s, "document.querySelector('[data-onboarding-step=\"2\"]')")
