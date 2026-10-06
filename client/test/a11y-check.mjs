@@ -462,7 +462,7 @@ async function signInToDemo(page, base) {
   await wait(page, 500);
   if (await page.locator('.shell').count()) return;
 
-  const started = page.getByRole('button', { name: 'Get Started' });
+  const started = page.getByRole('button', { name: 'Use without an account' });
   if (await started.count()) { await started.click(); await wait(page, 300); }
   const addAnother = page.getByRole('button', { name: /Add another profile/ });
   if (await addAnother.count()) { await addAnother.click(); await wait(page, 300); }

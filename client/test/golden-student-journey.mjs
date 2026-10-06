@@ -31,7 +31,7 @@ async function waitApp(page) {
 
 async function createFreshStudent(page, origin) {
   await page.goto(origin, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('button', { name: 'Get Started' }).click();
+  await page.getByRole('button', { name: 'Use without an account' }).click();
   await page.waitForSelector('[data-onboarding-step="1"]');
   await page.getByRole('button', { name: 'Student', exact: true }).click();
   await page.locator('.auth-card .btn-primary').click();

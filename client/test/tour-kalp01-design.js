@@ -52,7 +52,7 @@ async function contrast(page) {
 }
 
 async function createStudentThroughUI(page, settle) {
-  await page.getByRole('button', { name: 'Get Started' }).click();
+  await page.getByRole('button', { name: 'Use without an account' }).click();
   await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
   await page.getByRole('button', { name: 'Student', exact: true }).click();
   await page.locator('.auth-card .btn-primary').click();

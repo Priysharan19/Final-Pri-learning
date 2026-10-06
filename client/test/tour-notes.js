@@ -35,7 +35,7 @@ const shot = async (page, name, opts = {}) => { if (SHOTS) await page.screenshot
 async function startDemo(page, origin) {
   await page.goto(origin, { waitUntil: 'domcontentloaded' });
   // A fresh local Class 10 CBSE profile, made through the real onboarding.
-  await page.getByRole('button', { name: 'Get Started' }).click();
+  await page.getByRole('button', { name: 'Use without an account' }).click();
   await page.waitForSelector('[data-onboarding-step="1"]');
   await page.getByRole('button', { name: 'Student', exact: true }).click();
   await page.locator('.auth-card .btn-primary').click();

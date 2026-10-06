@@ -249,7 +249,7 @@ function helpers(page, base, flowId) {
     course = 'nsw', track = null, role = 'student', language = 'en',
     avatar = null, cloud = false, fromPicker = false
   } = {}) => {
-    await page.getByRole('button', { name: fromPicker ? 'Add another profile' : 'Get Started' }).click();
+    await page.getByRole('button', { name: fromPicker ? 'Add another profile' : 'Use without an account' }).click();
     await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
     await page.getByRole('button', { name: role === 'teacher' ? 'Teacher' : 'Student', exact: true }).click();
     await page.locator('.auth-card .btn-primary').click();

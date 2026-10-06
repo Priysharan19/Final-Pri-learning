@@ -25,9 +25,9 @@ export const flow = {
       await page.locator('.hero-title').isVisible(),
       'no .hero-title on a first visit with no profiles');
     await check('the hero offers the way into onboarding',
-      await page.getByRole('button', { name: 'Get Started' }).isVisible());
+      await page.getByRole('button', { name: 'Use without an account' }).isVisible());
 
-    await page.getByRole('button', { name: 'Get Started' }).click();
+    await page.getByRole('button', { name: 'Use without an account' }).click();
     await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
     await check('first-run starts by asking for the real product role',
       await page.getByRole('button', { name: 'Student', exact: true }).count() === 1

@@ -106,7 +106,7 @@ export const flow = {
     await goto('/');
 
     await check('cold launch shows the first-run hero', await page.locator('.hero-title').isVisible());
-    await page.getByRole('button', { name: 'Get Started' }).click();
+    await page.getByRole('button', { name: 'Use without an account' }).click();
     await page.waitForSelector('[data-onboarding-step="1"]');
     await check('onboarding begins at role', await page.locator('[data-onboarding-step="1"]').count() === 1);
     await check('role buttons expose semantic selected state',
