@@ -148,25 +148,30 @@ export async function recordConsentRequest(db, { accountId, name, email, tokenHa
 /** The consent state of one account. */
 export async function consentState(db, accountId) {
   db = asStore(db);
-  // Age basis is the current authority for WHETHER consent is required. A
-  // historical guardian row is evidence of an earlier ceremony, not authority
-  // to keep an explicitly-adult account blocked forever. This ordering matters
-  // for the supported child→adult correction flow: the row is preserved for
-  // audit/history, while the new explicit declaration takes effect immediately.
+  // Age basis is the current authority for WHETHER consent is required except
+  // for an explicit guardian withdrawal, which is permission-reducing and wins.
+  // A historical pending/given row remains evidence of an earlier ceremony, not
+  // authority to keep an explicitly-adult account blocked forever.
   const account = await db.get('SELECT age_basis FROM accounts WHERE id = ?', [accountId]);
   const basis = account?.age_basis ?? null;
+  const row = await db.get('SELECT * FROM guardian_consents WHERE account_id = ?', [accountId]);
+
+  // Withdrawal is permission-reducing authority and always wins, even if the
+  // learner corrected their age basis after the guardian ceremony began. This
+  // prevents a correction followed by a guardian withdrawal from silently
+  // leaving cloud data enabled.
+  if (row?.withdrawn_at) return { required: true, state: 'withdrawn', row, ageBasis: basis };
+
   if (basis === 'adult' || basis === 'legacy') {
     return { required: false, state: 'not-required', row: null, ageBasis: basis };
   }
 
-  const row = await db.get('SELECT * FROM guardian_consents WHERE account_id = ?', [accountId]);
   if (!row) {
     // A child whose request row is missing, or an account with no recorded age
     // decision, fails closed. The account-completion route can repair the latter
     // without weakening this gate.
     return { required: true, state: 'undeclared', row: null, ageBasis: basis };
   }
-  if (row.withdrawn_at) return { required: true, state: 'withdrawn', row, ageBasis: basis };
   if (row.confirmed_at) return { required: true, state: 'given', row, ageBasis: basis };
   return { required: true, state: 'pending', row, ageBasis: basis };
 }
