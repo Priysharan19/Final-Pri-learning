@@ -42,6 +42,14 @@ export const CONSENT_NOTICE_VERSION = '2026-10-02';
 /** What was established. Deliberately not the words "verifiable consent". */
 export const CONSENT_METHOD = 'guardian-email-confirmation';
 
+/**
+ * A child whose age has been recorded but whose guardian contact has not yet
+ * been supplied stays behind the same consent gate. Kept here (rather than in
+ * otp.js) because account recovery/completion and OTP sign-up both create this
+ * state.
+ */
+export const GUARDIAN_AWAITING_METHOD = 'awaiting-guardian-contact';
+
 /** The classes whose students are children by definition. */
 const CHILD_CLASS = /^(7|8|9|10|11|12)$/;
 
@@ -140,20 +148,36 @@ export async function recordConsentRequest(db, { accountId, name, email, tokenHa
 /** The consent state of one account. */
 export async function consentState(db, accountId) {
   db = asStore(db);
+  // Age basis is the current authority for WHETHER consent is required. A
+  // historical guardian row is evidence of an earlier ceremony, not authority
+  // to keep an explicitly-adult account blocked forever. This ordering matters
+  // for the supported child→adult correction flow: the row is preserved for
+  // audit/history, while the new explicit declaration takes effect immediately.
+  const account = await db.get('SELECT age_basis FROM accounts WHERE id = ?', [accountId]);
+  const basis = account?.age_basis ?? null;
+  if (basis === 'adult' || basis === 'legacy') {
+    return { required: false, state: 'not-required', row: null, ageBasis: basis };
+  }
+
   const row = await db.get('SELECT * FROM guardian_consents WHERE account_id = ?', [accountId]);
   if (!row) {
-    // No consent row is only "not required" for an account whose creation
-    // recorded an adult (or that predates the record, backfilled 'legacy').
-    // An account with no recorded age decision — or a child whose request row
-    // is somehow missing — fails closed.
-    const account = await db.get('SELECT age_basis FROM accounts WHERE id = ?', [accountId]);
-    const basis = account?.age_basis;
-    if (basis === 'adult' || basis === 'legacy') return { required: false, state: 'not-required' };
-    return { required: true, state: 'undeclared', row: null };
+    // A child whose request row is missing, or an account with no recorded age
+    // decision, fails closed. The account-completion route can repair the latter
+    // without weakening this gate.
+    return { required: true, state: 'undeclared', row: null, ageBasis: basis };
   }
-  if (row.withdrawn_at) return { required: true, state: 'withdrawn', row };
-  if (row.confirmed_at) return { required: true, state: 'given', row };
-  return { required: true, state: 'pending', row };
+  if (row.withdrawn_at) return { required: true, state: 'withdrawn', row, ageBasis: basis };
+  if (row.confirmed_at) return { required: true, state: 'given', row, ageBasis: basis };
+  return { required: true, state: 'pending', row, ageBasis: basis };
+}
+
+/** Exact account-action code for a consent state, or null when cloud use is allowed. */
+export function consentBlockerCode(state) {
+  if (!state?.required || state?.state === 'given') return null;
+  if (state.state === 'undeclared') return 'AGE_DECLARATION_REQUIRED';
+  if (state.state === 'pending') return 'GUARDIAN_CONSENT_PENDING';
+  if (state.state === 'withdrawn') return 'GUARDIAN_CONSENT_WITHDRAWN';
+  return 'GUARDIAN_CONSENT_UNAVAILABLE';
 }
 
 /** Mark a guardian's confirmation. Returns false when there was nothing to confirm. */
@@ -215,17 +239,21 @@ export function requireGuardianConsent(db) {
       if (isDatabaseOverload(error)) throw error;
       return refuse(res, 'GUARDIAN_CONSENT_UNAVAILABLE', 'This account cannot sync right now.');
     }
-    if (!state.required || state.state === 'given') return next();
-    if (state.state === 'undeclared') {
-      return refuse(res, 'AGE_DECLARATION_REQUIRED',
+    const blocker = consentBlockerCode(state);
+    if (!blocker) return next();
+    if (blocker === 'AGE_DECLARATION_REQUIRED') {
+      return refuse(res, blocker,
         'This account has no age on record, so it cannot sync until one is given. Your work stays on this device.');
     }
-    if (state.state === 'pending') {
-      return refuse(res, 'GUARDIAN_CONSENT_PENDING',
-        'A parent or guardian has been emailed to confirm this account. Until they do, your work stays on this device — nothing is lost.');
+    if (blocker === 'GUARDIAN_CONSENT_PENDING') {
+      return refuse(res, blocker,
+        'A parent or guardian needs to confirm this account. Until they do, your work stays on this device — nothing is lost.');
     }
-    return refuse(res, 'GUARDIAN_CONSENT_WITHDRAWN',
-      'A parent or guardian has withdrawn permission for this account to sync. Your work stays on this device.');
+    if (blocker === 'GUARDIAN_CONSENT_WITHDRAWN') {
+      return refuse(res, blocker,
+        'A parent or guardian has withdrawn permission for this account to sync. Your work stays on this device.');
+    }
+    return refuse(res, blocker, 'This account cannot sync right now.');
   }), { guardianConsent: true });
 }
 

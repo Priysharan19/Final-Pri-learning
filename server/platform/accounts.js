@@ -9,7 +9,7 @@ import { encryptDeliveryToken } from './deliveryCrypto.js';
 import { verifyIdentityToken } from './oidc.js';
 import { clearLoginFailures, loginLockStatus, recordLoginFailure } from './loginLockout.js';
 import {
-  ageDecision, confirmConsent, consentState, recordConsentRequest, withdrawConsent
+  ageDecision, confirmConsent, consentBlockerCode, consentState, recordConsentRequest, withdrawConsent
 } from './guardianConsent.js';
 import { consumeTeacherInvite, findLiveTeacherInvite } from './teacherInvites.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
@@ -439,9 +439,13 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
 
   router.get('/guardian/state', requireSession(db), async (req, res) => {
     const state = await consentState(db, req.platformSession.account_id);
+    const account = await db.get('SELECT email_verified_at FROM accounts WHERE id = ?', [req.platformSession.account_id]);
     res.json({
       required: state.required,
       state: state.state,
+      ageBasis: state.ageBasis,
+      blockerCode: consentBlockerCode(state),
+      emailVerified: !!account?.email_verified_at,
       guardianEmail: state.row ? maskEmail(state.row.guardian_email) : null,
       noticeVersion: state.row?.notice_version || null,
       method: state.row?.method || null
