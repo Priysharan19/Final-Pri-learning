@@ -582,8 +582,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       const file = item.getAsFile();
       if (!file) return;
       event.preventDefault();
+      // The FileReader can finish after a question switch, attachment removal
+      // or a different paste. Claim the generation BEFORE awaiting file bytes.
+      const generation = ++photoReadGeneration.current;
       const reader = new FileReader();
       reader.onload = () => {
+        if (!mountedRef.current || generation !== photoReadGeneration.current) return;
         const dataURL = String(reader.result || '');
         if (!dataURL.startsWith('data:image/')) return;
         setPhoto(dataURL);
@@ -1473,7 +1477,19 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       the photo-library option, which is the wrong way round. A student
                       photographs their exercise book first and picks the shot afterwards. */}
                   <input ref={photoInputRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
-                    onChange={e => attachPhoto(e, setPhoto, decodePhoto, decodePdf, message => setPhotoOCR({ phase: 'failed', text: '', confidence: 0, engine: null, error: message }))} />
+                    onChange={e => {
+                      // FileReader, image decode and PDF byte reads can all
+                      // finish after a new attachment or question is chosen.
+                      // Scope even the initial file load, before decodePhoto's
+                      // own provider request creates its next generation.
+                      const generation = ++photoReadGeneration.current;
+                      const live = () => mountedRef.current && generation === photoReadGeneration.current;
+                      attachPhoto(e,
+                        data => { if (live()) setPhoto(data); },
+                        data => { if (live()) void decodePhoto(data); },
+                        data => { if (live()) void decodePdf(data); },
+                        message => { if (live()) setPhotoOCR({ phase: 'failed', text: '', confidence: 0, engine: null, error: message }); });
+                    }} />
                   {!photo && photoOCR.phase === 'idle'
                     ? <button className="btn btn-ghost" onClick={() => photoInputRef.current?.click()}>{t('verdict.photographWorking')}<span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2, fontWeight: 400 }}>{t('verdict.photoFormats', { pages: MAX_PDF_PAGES })}</span></button>
                     : (
