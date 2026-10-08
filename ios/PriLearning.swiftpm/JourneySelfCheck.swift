@@ -60,9 +60,9 @@ enum JourneySelfCheck {
     """
 
     private static let firstLaunch = helpers + """
-    await step('launch', async () => { await waitFor(() => q('.auth-card') || q('.home-greet') || byLabel('Get Started')); return location.href; });
+    await step('launch', async () => { await waitFor(() => q('[data-testid=hero-offline]') || q('.auth-card') || q('.home-greet')); return location.href; });
     await step('onboarding', async () => {
-      at = 'get-started'; (await waitFor(() => byLabel('Get Started'))).click();
+      at = 'explicit-offline'; (await waitFor(() => q('[data-testid=hero-offline]'))).click();
       at = 'step1'; await waitFor(() => q('[data-onboarding-step="1"]'));
       at = 'student'; (await waitFor(() => byLabel('Student'))).click(); await sleep(150); q('.auth-card .btn-primary').click();
       at = 'step2'; await waitFor(() => q('[data-onboarding-step="2"]'));
