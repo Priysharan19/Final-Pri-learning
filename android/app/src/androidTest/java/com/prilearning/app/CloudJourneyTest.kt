@@ -89,7 +89,8 @@ class CloudJourneyTest {
     private val byText = "function(t){return [].slice.call(document.querySelectorAll('button')).find(function(b){return b.offsetParent&&b.textContent.trim()===t;});}"
     private val stateTag = "(function(){var s=document.querySelector('section[aria-labelledby=\"cloud-account-title\"] .tag');return s?s.textContent.trim():'';})()"
 
-    /** Home with the local profile from the shell journey (or explicit device-only onboarding if run alone). */
+    /** This fixture tests legacy Settings cloud routes from a device-only profile.
+     * The normal student welcome stays account-first; never restore Get Started. */
     private fun reachHome(s: ActivityScenario<MainActivity>) {
         val state = waitFor(s, """(function(){if(document.querySelector('.home-greet'))return 'home';
             var b=[].slice.call(document.querySelectorAll('.auth-card button')).find(function(x){return /Android Student/.test(x.textContent);});
