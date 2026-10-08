@@ -2051,6 +2051,10 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   const attempt = {
     id: `${pid}:resolved:${claim}`,
     pid, questionId: row.id, subtopic: owner, generator: q.subtopic, difficulty: q.difficulty || 2,
+    // A grade event pulled back from the server must not award XP/mastery a
+    // second time on the device that already committed this exact receipt.
+    ...(row.serverQuestionId && row.serverReceipt?.attemptId
+      ? { serverAttemptId: row.serverReceipt.attemptId } : {}),
     // Which item, at which content version, this attempt was made on — so it
     // stays interpretable after the bank changes. A row from before identity
     // existed reads as the legacy version, never as current content.

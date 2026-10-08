@@ -278,12 +278,31 @@ export async function applyRemoteLearningEvents(pid, events) {
   if (!list.length) return summary;
   const profile = await get('profiles', pid).catch(() => null);
   if (!profile) return summary;
+  // Server-owned events carry the reserved "server-grader" device identity,
+  // even when the student's OWN device received and committed the grade.
+  // Hence the normal sync deviceId filter cannot prevent double-awarding.
+  // Our durable attempt row links the original local resolution to the exact
+  // server attempt ID, without trusting a client-provided mark or event body.
+  const locallyCommitted = new Set();
+  if (list.some(event => event.kind === 'graded-attempt')) {
+    for (const attempt of await byIndex('attempts', 'pid', pid)) {
+      if (typeof attempt.serverAttemptId === 'string' && safeId(attempt.serverAttemptId)) {
+        locallyCommitted.add(attempt.serverAttemptId);
+      }
+    }
+  }
 
   list.sort((a, b) => (eventTime(a) - eventTime(b)) || (num(a.serverCursor) - num(b.serverCursor)) || String(a.id).localeCompare(String(b.id)));
   for (const raw of list) {
     const event = { ...raw, payload: plain(raw.payload) ? raw.payload : {} };
     let outcome;
     if (PRACTICE_KINDS.has(event.kind)) {
+      if (locallyCommitted.has(event.id)) {
+        // Already committed locally in the same atomic batch as the source
+        // question resolution. Cache/sync is still safe; progress is not.
+        summary.duplicates++;
+        continue;
+      }
       // A client cannot publish graded-attempt through /sync/push: it is
       // excluded from server APPEND_EVENT. The server alone writes it, using
       // the reserved device identity in the same DB transaction as the grade.
