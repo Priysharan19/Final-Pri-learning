@@ -161,14 +161,13 @@ export default function Home() {
     return [...m.entries()];
   }, [section, topicQuery]);
 
+  // A topic is valid only inside the class and course the student selected.
+  // Previously a saved topic could be resolved from another year/track even
+  // when the active section had changed, silently practising the wrong syllabus.
   const selSub = useMemo(() => {
-    if (!subtopic || !curriculum) return null;
-    for (const sec of [...(curriculum.years || []), ...(curriculum.streams || [])]) {
-      const hit = sec.subtopics.find(s => s.id === subtopic);
-      if (hit) return hit;
-    }
-    return null;
-  }, [subtopic, curriculum]);
+    if (!subtopic || !section) return null;
+    return section.subtopics.find(s => s.id === subtopic) || null;
+  }, [subtopic, section]);
 
   const selectedDotpoint = dotpoint != null ? selSub?.dotpoints?.[dotpoint] || null : null;
   const impossibleTarget = Boolean(
@@ -259,7 +258,13 @@ export default function Home() {
           {t('snap.entry')}
         </button>
 
-        {/* ── Manual practice configuration is deliberately secondary ── */}
+        {/* Keep smart practice as the default, but make exact-topic practice
+            discoverable without guessing that the class chip is clickable. */}
+        <button type="button" className="btn btn-ghost btn-sm" data-testid="choose-topic"
+          onClick={() => { setOpen(true); setCat(section ? 'topics' : 'course'); }}>
+          <Icon name="classes" size={16} /> {t('home.pickTopic')}
+        </button>
+
         <div className="genbar">
           <div className={`genbar-head ${open ? 'open' : ''}`}>
             <button className="genbar-toggle" onClick={() => setOpen(o => !o)}
@@ -304,7 +309,8 @@ export default function Home() {
                 ))}
               </div>
 
-              <div className="gen-pane" id="gen-pane" role="tabpanel">
+              <div className="gen-pane" id="gen-pane" role="tabpanel"
+                style={{ minWidth: 0, minHeight: 0, WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain', touchAction: 'pan-y' }}>
                 {cat === 'year' && (
                   <>
                     <div className="gen-pane-title">{t(india ? 'home.pickClass' : 'home.pickYear')}</div>

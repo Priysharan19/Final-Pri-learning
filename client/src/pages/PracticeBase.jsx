@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
+import { onCloudSessionChange } from '../platform/cloudSession.js';
 import {
   assignmentProgressSummary, assignmentQuestionTarget, assignmentSessionFromSubmission
 } from '../platform/assignmentProgress.js';
@@ -15,6 +16,9 @@ import Icon from '../components/Icon.jsx';
 import { isContentEmpty, servable, contentEmptySignal } from '../lib/contentServe.js';
 import { practiceHref, practiceRequestFromQuery } from '../lib/practiceLinks.js';
 import { queueTelemetry } from '../platform/telemetry.js';
+
+// Reuse the existing verified account flow; never create a parallel practice login.
+const PracticeAccountRecovery = React.lazy(() => import('../components/CloudAccountPanel.jsx'));
 
 const EMPTY_SESSION = Object.freeze({ answered: 0, correct: 0, xp: 0 });
 
@@ -52,6 +56,7 @@ export default function Practice() {
   const handedRef = useRef(location.state?.serve || null);   // a retry handed over from History
   const [error, setError] = useState('');
   const [errorCode, setErrorCode] = useState('');
+  const [accountRecoveryOpen, setAccountRecoveryOpen] = useState(false);
   const [pyqAlternatives, setPyqAlternatives] = useState([]);
   const [capped, setCapped] = useState(null);
   const [session, setSession] = useState({ ...EMPTY_SESSION });
@@ -207,12 +212,22 @@ export default function Practice() {
       if (e?.code === 'FREE_CAP_REACHED' || e?.code === 'FREE_EXAM_CAP_REACHED') setCapped(e);
       else {
         if (isContentEmpty(e?.code)) noteEmpty(e.code);
-        setError(e.message); setErrorCode(e?.code || '');
+        setError(e.message); setErrorCode(e?.status === 401 ? 'AUTH_REQUIRED' : (e?.code || ''));
         setPyqAlternatives(e?.code === 'INDIA_PYQ_UNAVAILABLE' && Array.isArray(e?.detail?.alternatives) ? e.detail.alternatives : []);
       }
     }
     finally { loading.current = false; }
   }, [subtopic, dotpoint, difficulty, taskId, track, pyqOnly, assignmentMode, assignmentContext, assignmentClassId, assignmentId, noteEmpty]);
+
+  // After the existing account panel verifies the SAME local profile, retry
+  // the untouched topic/dotpoint/difficulty request. An event from a different
+  // student must never open this student's question or recover their work.
+  useEffect(() => onCloudSessionChange(event => {
+    if (event?.detail?.connected !== true ||
+        String(event.detail.localProfileId) !== String(user?.id)) return;
+    setAccountRecoveryOpen(false);
+    void load();
+  }), [load, user?.id]);
 
   const setPyqOnly = useCallback((on) => {
     const next = new URLSearchParams(params);
@@ -480,6 +495,20 @@ export default function Practice() {
                       </Link>
                     ))}
                   </div>
+                </div>
+              )}
+              {errorCode === 'AUTH_REQUIRED' && cloudAvailable() && (
+                <div data-practice-auth-recovery style={{ marginTop: 10 }}>
+                  <button type="button" className="btn btn-primary btn-sm"
+                    data-testid="practice-sign-in" aria-expanded={accountRecoveryOpen}
+                    onClick={() => setAccountRecoveryOpen(open => !open)}>
+                    {t('login.cloudSignIn')}
+                  </button>
+                  {accountRecoveryOpen && (
+                    <React.Suspense fallback={<p role="status">{t('cloud.stateChecking')}</p>}>
+                      <PracticeAccountRecovery />
+                    </React.Suspense>
+                  )}
                 </div>
               )}
               <div style={{ marginTop: 10 }}>
