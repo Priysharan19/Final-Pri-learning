@@ -443,7 +443,11 @@ async function recordTrap(pid, row, q, feedback) {
  * only — the authored sentence or the diagnosis title — and never the key.
  */
 async function recordMisconception(pid, row, q, owner, key, label) {
-  if (!key) return null;
+  // Server-attested distractors take this direct path rather than recordTrap.
+  // Both wrong tries belong to the same question and must count as ONE slip;
+  // fast games and custom questions must not create a conceptual weakness.
+  if (!key || row.trapKey || q.custom || !q.subtopic ||
+      row.mode === 'rush' || row.mode === 'match') return null;
   const st = await ratingWithOccurrence(pid, row, q, owner, key, label);
   await putRating(pid, owner, st);
   row.trapKey = key;
