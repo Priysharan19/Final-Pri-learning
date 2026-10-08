@@ -23,7 +23,7 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import { createPlatformDb } from '../platform/db.js';
 import {
-  CONSENT_METHOD, CONSENT_NOTICE_VERSION, confirmConsent, consentState,
+  CONSENT_METHOD, CONSENT_NOTICE_VERSION, confirmConsent, consentBlockerCode, consentState,
   hasAgeDeclaration, learnerIsChild, recordConsentRequest, requireGuardianConsent, validateGuardian, withdrawConsent
 } from '../platform/guardianConsent.js';
 import { authEmailMessage, buildAuthActionUrl } from '../platform/authDelivery.js';
@@ -73,6 +73,14 @@ for (const id of ['acct-child', 'acct-adult', 'acct-legacy', 'acct-silent']) {
 eq((await consentState(db, 'acct-adult')).state, 'not-required', 'an account created as an adult, with no consent row, needs none');
 eq((await consentState(db, 'acct-legacy')).state, 'not-required', 'nor does one that predates the age record (backfilled legacy)');
 eq((await consentState(db, 'acct-silent')).state, 'undeclared', 'regression: an account with no recorded age decision and no consent row is NOT "not required" — it fails closed');
+eq(consentBlockerCode(await consentState(db, 'acct-silent')), 'AGE_DECLARATION_REQUIRED', 'the state exposes the exact account action needed');
+await recordConsentRequest(db, { accountId: 'acct-adult', name: 'Historical Guardian', email: 'history@example.test', tokenHash: 'old', now });
+eq((await consentState(db, 'acct-adult')).state, 'not-required', 'age basis is authoritative: a preserved historical pending guardian row does not keep an adult account blocked');
+ok(!!db.prepare('SELECT 1 AS x FROM guardian_consents WHERE account_id=?').get('acct-adult'), 'the historical row remains stored rather than being erased to make the gate pass');
+ok(await withdrawConsent(db, 'acct-adult', now + 1), 'a guardian can still withdraw after that adult correction/history state');
+eq((await consentState(db, 'acct-adult')).state, 'withdrawn', 'guardian withdrawal always wins over adult age basis, regardless of ordering');
+db.prepare('UPDATE guardian_consents SET withdrawn_at = NULL WHERE account_id = ?').run('acct-adult');
+eq((await consentState(db, 'acct-adult')).state, 'not-required', 'without a withdrawal, the corrected adult basis resumes as authority');
 await recordConsentRequest(db, { accountId: 'acct-child', name: 'Meera Rao', email: 'meera@example.test', tokenHash: 'tok', now });
 eq((await consentState(db, 'acct-child')).state, 'pending', 'a child starts pending');
 eq((await consentState(db, 'acct-child')).row.notice_version, CONSENT_NOTICE_VERSION, 'and records which notice was agreed to');
