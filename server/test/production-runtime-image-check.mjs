@@ -120,6 +120,11 @@ c.eq(JSON.stringify(readdirSync(join(stage, 'client', 'src')).sort()), JSON.stri
   'no other client source directory can enter the production image');
 c.eq(JSON.parse(readFileSync(join(stage, 'client', 'package.json'), 'utf8')).type, 'module',
   'runtime maths engine retains the ESM package scope');
+const stagedMaths = await import(pathToFileURL(join(stage, 'client', 'src', 'engine', 'generators', 'index.js')));
+await stagedMaths.loadAllBanks();
+const canonical = stagedMaths.generateQuestion('c11-complex-numbers', 3, 56);
+c.ok(canonical?.answer && canonical?.prompt, 'canonical generator executes with ONLY packaged runtime sources');
+c.eq(canonical.answer.value, 135, 'private generated maths key stays available to the server');
 for (const legacy of ['server/auth.js', 'server/routes', 'server/db.js', 'server/badges.js', 'server/seed.js', 'server/engine']) {
   c.ok(!existsSync(join(stage, legacy)), `${legacy} is not in the image`);
 }
@@ -281,6 +286,14 @@ try {
     c.eq(r.status, 410, `${method} ${path} answers 410 in the production image`);
     c.eq((await r.json()).error?.code, 'LEGACY_API_REMOVED', `${method} ${path} names the removal`);
   }
+
+  const anonIssue = await fetch(`${origin}/v1/practice/issue`, {
+    method: 'POST',
+    headers: { Origin: railway.env.PRI_PUBLIC_ORIGIN, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ generator: 'c11-complex-numbers', difficulty: 3, curriculum: 'in' })
+  });
+  c.eq(anonIssue.status, 401, 'real production image mounts server issue endpoint but requires authentication');
+  c.eq((await anonIssue.json()).error?.code, 'AUTH_REQUIRED', 'anonymous issuance refuses without leaking canonical answers');
 
   const shell = await fetch(`${origin}/`);
   c.eq(shell.status, 200, 'client shell served from the image');
