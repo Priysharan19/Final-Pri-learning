@@ -24,7 +24,7 @@ import {
 } from './otpCore.js';
 import { createSmsProviderFromEnv } from './smsProvider.js';
 import { createOtpEmailSenderFromEnv } from './otpEmail.js';
-import { CONSENT_NOTICE_VERSION, ageDecision, confirmConsent, consentState, withdrawConsent } from './guardianConsent.js';
+import { CONSENT_NOTICE_VERSION, GUARDIAN_AWAITING_METHOD, ageDecision, confirmConsent, consentState, withdrawConsent } from './guardianConsent.js';
 import { deleteAccountRows, queueAccountToken } from './accounts.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
 import { clipText } from './text.js';
@@ -37,7 +37,6 @@ export const PHONE_ACCOUNT_EMAIL_DOMAIN = 'phone.invalid';
 
 export const GUARDIAN_PHONE_METHOD = 'guardian-phone-otp';
 export const GUARDIAN_EMAIL_OTP_METHOD = 'guardian-email-otp';
-export const GUARDIAN_AWAITING_METHOD = 'awaiting-guardian-contact';
 /** Every withdraw-request answers no sooner than this, match or not. */
 export const WITHDRAW_REQUEST_FLOOR_MS = 900;
 
@@ -344,6 +343,55 @@ export function createOtpRouter(db, {
       if (state.state === 'withdrawn') {
         return bad(res, 'GUARDIAN_CONSENT_WITHDRAWN', 'A parent or guardian withdrew permission. Only they can change that.', 409);
       }
+
+      // Recovery for a wrong/missing age capture. This is intentionally part of
+      // the existing authenticated + rate-limited guardian action surface, not
+      // a bypass around requireGuardianConsent. Only an explicit boolean true
+      // declares 18+, matching account creation. The historical guardian row is
+      // preserved; live confirmation bearers/challenges are retired so they
+      // cannot mutate it after the correction.
+      if (req.body?.isAdult === true) {
+        const now = Date.now();
+        await db.transaction(async () => {
+          await db.run(`DELETE FROM auth_delivery_outbox
+            WHERE account_id = ? AND kind = 'guardian-consent' AND delivered_at IS NULL`, [accountId]);
+          await db.run(`UPDATE account_tokens SET consumed_at = ?
+            WHERE account_id = ? AND purpose = 'guardian-consent' AND consumed_at IS NULL`, [now, accountId]);
+          await db.run(`UPDATE otp_challenges SET consumed_at = ?
+            WHERE account_id = ? AND purpose = 'guardian-consent' AND consumed_at IS NULL`, [now, accountId]);
+          await db.run("UPDATE accounts SET age_basis = 'adult', updated_at = ? WHERE id = ?", [now, accountId]);
+          await db.run('INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)', [
+            accountId, 'account.age-declaration.update', 'account', accountId,
+            JSON.stringify({
+              previousAgeBasis: state.ageBasis ?? null,
+              ageBasis: 'adult',
+              previousGuardianState: state.state,
+              guardianHistoryPreserved: !!state.row
+            }),
+            now
+          ]);
+        });
+        return res.json({
+          ok: true,
+          ageCorrected: true,
+          ageBasis: 'adult',
+          guardianConsent: { required: false, state: 'not-required', blockerCode: null }
+        });
+      }
+
+      // An older account can be blocked with no recorded age basis. Completing
+      // it as a child remains protective: the account is first recorded as
+      // child, then this same request records a guardian contact and sends the
+      // ordinary approval challenge. A child basis whose row is merely missing
+      // uses the same repair path without asking them to re-declare.
+      if (state.state === 'undeclared' && state.ageBasis == null) {
+        const decision = ageDecision(req.body || {}, { guardianLater: true });
+        if (!decision.ok) return bad(res, decision.code, decision.message);
+        if (decision.basis !== 'child') {
+          return bad(res, 'AGE_DECLARATION_REQUIRED', 'Choose whether this learner is under 18 or 18 or older.');
+        }
+      }
+
       const name = clipText(String(req.body?.guardianName || '').trim(), 80);
       if (!name) return bad(res, 'GUARDIAN_NAME_REQUIRED', 'Enter a parent or guardian’s name.');
       const channel = req.body?.channel === 'sms' ? 'sms' : req.body?.channel === 'email' ? 'email' : null;
@@ -365,10 +413,33 @@ export function createOtpRouter(db, {
       const now = Date.now();
       const method = channel === 'sms' ? GUARDIAN_PHONE_METHOD : GUARDIAN_EMAIL_OTP_METHOD;
       await db.transaction(async () => {
-        await db.run(`UPDATE guardian_consents SET guardian_name = ?, guardian_email = ?, guardian_phone = ?,
-            notice_version = ?, requested_at = ?, confirmed_at = NULL, method = ?
-          WHERE account_id = ? AND withdrawn_at IS NULL`, [name, channel === 'email' ? destination : '', channel === 'sms' ? destination : null,
-          CONSENT_NOTICE_VERSION, now, method, accountId]);
+        if (state.state === 'undeclared') {
+          await db.run("UPDATE accounts SET age_basis = 'child', updated_at = ? WHERE id = ?", [now, accountId]);
+          await db.run(`INSERT INTO guardian_consents
+              (account_id, guardian_name, guardian_email, guardian_phone, notice_version, requested_at, confirmed_at, withdrawn_at, method)
+            VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?)
+            ON CONFLICT(account_id) DO UPDATE SET
+              guardian_name=excluded.guardian_name,
+              guardian_email=excluded.guardian_email,
+              guardian_phone=excluded.guardian_phone,
+              notice_version=excluded.notice_version,
+              requested_at=excluded.requested_at,
+              confirmed_at=NULL,
+              method=excluded.method
+            WHERE guardian_consents.withdrawn_at IS NULL`,
+          [accountId, name, channel === 'email' ? destination : '', channel === 'sms' ? destination : null,
+            CONSENT_NOTICE_VERSION, now, method]);
+          await db.run('INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)', [
+            accountId, 'account.age-declaration.update', 'account', accountId,
+            JSON.stringify({ previousAgeBasis: state.ageBasis ?? null, ageBasis: 'child', previousGuardianState: state.state, guardianHistoryPreserved: !!state.row }),
+            now
+          ]);
+        } else {
+          await db.run(`UPDATE guardian_consents SET guardian_name = ?, guardian_email = ?, guardian_phone = ?,
+              notice_version = ?, requested_at = ?, confirmed_at = NULL, method = ?
+            WHERE account_id = ? AND withdrawn_at IS NULL`, [name, channel === 'email' ? destination : '', channel === 'sms' ? destination : null,
+            CONSENT_NOTICE_VERSION, now, method, accountId]);
+        }
         // Email parents also get the existing link, so they can approve (and
         // later withdraw) from their own inbox rather than the child's device.
         if (channel === 'email') await queueAccountToken(db, accountId, destination, 'guardian-consent', now);
