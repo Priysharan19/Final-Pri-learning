@@ -9,7 +9,7 @@
 // is method/path/status/ms only, and that the Dockerfile drops root.
 
 import assert from 'node:assert/strict';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -28,7 +28,26 @@ const runtime = dockerfile.slice(runtimeStart + 1);
 const copies = runtime.filter(line => /^COPY\s/.test(line)).map(line => line.replace(/^COPY\s+/, '').trim().split(/\s+/));
 c.ok(copies.length >= 3, `runtime stage has COPY instructions (${copies.length})`);
 c.ok(!copies.some(tokens => tokens[0] === 'server' || tokens[0] === 'server/'), 'the runtime stage no longer copies the whole server directory');
-c.ok(!copies.some(tokens => tokens.some(t => t.startsWith('client/src'))), 'client source is not in the image');
+// A runtime import added by the online-only grader needs the canonical engine.
+// The private mathematical source is the sole exception to the no-client-src
+// rule. Pin the exact source *and* destination: an accidental whole-client or
+// unauthorised web/notes source COPY must fail this contract.
+const clientRuntimeCopies = copies.flatMap(tokens => {
+  const sourceStart = tokens[0]?.startsWith('--from=') ? 1 : 0;
+  const dest = tokens.at(-1);
+  return tokens.slice(sourceStart, -1)
+    .filter(src => /^(?:client(?:\/|$)|\/app\/client(?:\/|$))/.test(src))
+    .map(src => [src, dest]);
+});
+const requiredClientCopies = [
+  ['client/src/engine', './client/src/engine'],
+  ['client/package.json', './client/package.json'],
+  ['/app/client/dist', './client/dist']
+];
+const stablePairs = arr => arr.map(pair => pair.join(' -> ')).sort();
+c.eq(JSON.stringify(stablePairs(clientRuntimeCopies)), JSON.stringify(stablePairs(requiredClientCopies)),
+  'runtime allowlists ONLY the private maths engine, its ESM package marker and compiled web dist');
+
 const userIndex = runtime.findIndex(line => /^USER\s+node\s*$/.test(line));
 const lastCopy = runtime.reduce((last, line, index) => (/^COPY\s/.test(line) ? index : last), -1);
 const cmdIndex = runtime.findIndex(line => /^CMD\s/.test(line));
@@ -92,7 +111,16 @@ for (const tokens of copies) {
   }
 }
 
-for (const legacy of ['server/auth.js', 'server/routes', 'server/db.js', 'server/badges.js', 'server/seed.js', 'server/engine', 'client/src']) {
+// Actual staged COPY contents, not merely Dockerfile text.
+for (const required of ['client/src/engine/generators/index.js', 'client/src/engine/checker.js',
+  'client/src/engine/answer-forms.js', 'client/package.json']) {
+  c.ok(existsSync(join(stage, required)), `${required} is available to the production grader`);
+}
+c.eq(JSON.stringify(readdirSync(join(stage, 'client', 'src')).sort()), JSON.stringify(['engine']),
+  'no other client source directory can enter the production image');
+c.eq(JSON.parse(readFileSync(join(stage, 'client', 'package.json'), 'utf8')).type, 'module',
+  'runtime maths engine retains the ESM package scope');
+for (const legacy of ['server/auth.js', 'server/routes', 'server/db.js', 'server/badges.js', 'server/seed.js', 'server/engine']) {
   c.ok(!existsSync(join(stage, legacy)), `${legacy} is not in the image`);
 }
 for (const required of ['server/index.js', 'server/app.js', 'server/package.json', 'server/platform/router.js', 'server/tools/housekeeping.mjs', 'server/tools/promote-role.mjs', 'release/metadata.json', 'release/release-identity.mjs', 'client/dist/index.html']) {
