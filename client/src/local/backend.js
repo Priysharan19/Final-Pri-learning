@@ -64,6 +64,9 @@ import { stageAttemptProgress } from '../platform/profileOutbox.js';
 import { requestTutorHelp } from './tutorBridge.js';
 import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
+import { cloud } from '../platform/cloudTransport.js';
+import { rasterizeInk } from '../ink/cloudRaster.js';
+import { preparePhoto } from '../ink/photoRaster.js';
 
 // True in a production build made with the tutor off. tutorFeatureEnabled() is
 // then false on every device, so the ask route below is dead code; written as
@@ -1005,17 +1008,35 @@ async function createIndiaQuestion(pid, chapter, target, mode, trackId, examId =
   // Candidate 0 is the resolved target; later candidates re-resolve it when the
   // caller can, so a chapter-level request is not stuck on one small cell.
   const targetOf = new Map();
+  const seedOf = new WeakMap();
   const picked = drawDistinct(k => {
     const t = (k > 0 && typeof retarget === 'function' && retarget()) || target;
-    const cand = generateQuestion(t.generator, t.difficulty);
+    const seed = Math.floor(Math.random() * 0x80000000);
+    const cand = generateQuestion(t.generator, t.difficulty, seed);
+    seedOf.set(cand, seed);
     targetOf.set(cand, t);
     return cand;
   }, recentlyServedContent(pid), { tries: trapKey ? Math.max(TRAP_SEEK_TRIES, CONTENT_DEDUP_TRIES) : CONTENT_DEDUP_TRIES, accept: trapKey ? springs : null });
-  const q = picked.q;
-  const delivered = trapKey && picked.accepted && springs(q) ? trapKey : null;
-  const served = targetOf.get(q) || target;
+  const selected = picked.q;
+  const delivered = trapKey && picked.accepted && springs(selected) ? trapKey : null;
+  const served = targetOf.get(selected) || target;
+  // Selection remains adaptive on device, but only the live server issues the
+  // exact version of the question whose expected answer it will later grade.
+  // Keep no locally regenerated answer key in IndexedDB.
+  const issuance = await cloud.issuePractice({
+    generator: served.generator, difficulty: served.difficulty,
+    seed: seedOf.get(selected), curriculum: 'in'
+  });
+  const q = issuance?.question;
+  if (!q?.id || q.prompt !== selected.prompt || q.answerType !== selected.answerType ||
+      (selected.contentId && q.contentId !== selected.contentId)) {
+    throw Object.assign(new Error('The server could not verify this exact question. Reconnect and try again.'), {
+      status: 503, code: 'QUESTION_AUTHORITY_MISMATCH'
+    });
+  }
   const row = {
-    id: uuid(), pid, subtopic: q.subtopic, difficulty: q.difficulty || served.difficulty, payload: q,
+    id: uuid(), serverQuestionId: q.id, pid, subtopic: q.subtopic,
+    difficulty: q.difficulty || served.difficulty, payload: q,
     // The generator is stored alongside the subtopic because they are not
     // always the same id: a previous-year question's payload names the chapter
     // it belongs to, while the bank that produced it is the archive. Retry
@@ -1875,12 +1896,23 @@ async function replaySubmission(p, row, q, submissionId, requestDigest, answer, 
   // The explanation the student was given is the one stored with the record.
   // Only a record written before explanations were stored is explained again.
   const stored = storedReplay(match.replay);
-  const { feedback, stepReport, partial, diagnosis } = stored || (() => {
-    const m = markSubmission(q, answer, steps);
-    return { ...m, diagnosis: m.stepReport?.diagnosis || null };
-  })();
+  const { feedback, stepReport, partial, diagnosis } = stored || (row.serverQuestionId
+    ? { feedback: null, stepReport: null, partial: null, diagnosis: null }
+    : (() => {
+        const m = markSubmission(q, answer, steps);
+        return { ...m, diagnosis: m.stepReport?.diagnosis || null };
+      })());
+  if (row.serverQuestionId && !(match === tried ? tried.serverReceipt : row.serverReceipt)?.authoritative) {
+    throw Object.assign(new Error('The stored authoritative grade receipt is unavailable.'), {
+      status: 503, code: 'GRADE_RECEIPT_MISSING'
+    });
+  }
   if (match === tried) {
     return {
+      ...(row.serverQuestionId ? {
+        authoritative: true, attemptId: tried.serverReceipt.attemptId,
+        serverAcknowledgedAt: tried.serverReceipt.serverAcknowledgedAt
+      } : {}),
       correct: false, resolved: false, triesLeft: 1,
       feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial,
       diagnosis: diagnosis || null,
@@ -1895,7 +1927,11 @@ async function replaySubmission(p, row, q, submissionId, requestDigest, answer, 
     correct, resolved: true, feedback, stepReport, partial: correct ? null : partial,
     diagnosis: diagnosis || null,
     misconception: await namedTrap(p.id, owner, recorded.trapHit || null),
-    solution: solutionOf(q),
+    solution: row.serverQuestionId ? row.serverReceipt.solution || null : solutionOf(q),
+    ...(row.serverQuestionId ? {
+      authoritative: true, attemptId: row.serverReceipt.attemptId,
+      serverAcknowledgedAt: row.serverReceipt.serverAcknowledgedAt
+    } : {}),
     xp: recorded.xp ?? 0, totalXp: recorded.totalXp ?? p.xp ?? 0, level: recorded.level ?? levelFromXp(p.xp || 0),
     ratingDelta: recorded.ratingDelta ?? 0, mastery: recorded.mastery ?? 0, band: recorded.band ?? null,
     predicted: recorded.predicted ?? null, streak, newBadges: [],
@@ -3186,6 +3222,8 @@ const routes = {
     const solution = { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText };
 
     if (level === 3) {
+      const serverReveal = await revealOnServer(row);
+      row.serverReceipt = serverReveal;
       // The walkthrough is the deterministic Pri Explain storyboard of the
       // verified solution — the whole solution, final answer included. Showing
       // it therefore ends the question exactly as Reveal does: resolved, marked
@@ -3200,8 +3238,8 @@ const routes = {
       return {
         tutorLevel, source: 'deterministic',
         correct: false, resolved: true, revealed: true,
-        walkthrough: { solution },
-        solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText },
+        walkthrough: { solution: serverReveal.solution },
+        solution: serverReveal.solution, authoritative: true, attemptId: serverReveal.attemptId,
         ...meta, syncQueued: true
       };
     }
@@ -3344,7 +3382,18 @@ const routes = {
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
     if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
 
-    const { result, feedback, stepReport, partial, meta0 } = markSubmission(q, answer, steps);
+    // Do not compute or publish any mark before a verified online receipt.
+    // A 401/403/503, timeout or disconnection leaves this question ungraded.
+    const authoritative = await gradeOnServer(row, body, submissionId, requestDigest);
+    const result = { correct: authoritative.correct, invalid: authoritative.invalid };
+    if (authoritative.resolved !== true && authoritative.resolved !== false) {
+      throw Object.assign(new Error('The server did not specify whether this attempt resolved the question.'), {
+        status: 503, code: 'GRADE_RESOLUTION_MISSING'
+      });
+    }
+    const feedback = authoritative.feedback;
+    const stepReport = authoritative.stepReport;
+    const partial = authoritative.partial;
     // A wrong answer that landed on a designed distractor is not a random miss:
     // the trap names the misconception behind it. Counted here, before the
     // two-try branch below, because the first attempt is the honest evidence.
@@ -3371,19 +3420,33 @@ const routes = {
     }
 
     const isFast = row.mode === 'rush' || row.mode === 'match';
-    if (!result.correct && !result.invalid && !isFast && (row.tries || 0) < 1) {
+    if (!result.correct && !result.invalid && !authoritative.resolved) {
       row.tries = (row.tries || 0) + 1;
       // The spent try remembers which submission spent it, in the same write.
       row.lastTry = submissionId ? {
         submissionId, digest: requestDigest, trapHit: trapHit || null,
+        serverReceipt: authoritative,
         replay: replayRecord({ feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial, diagnosis: stepReport?.diagnosis || null })
       } : null;
+      row.pendingGrade = null;
       await put('questions', row);
-      return { correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial, diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit), ...(submissionId ? { submissionId } : {}) };
+      return { authoritative: true, attemptId: authoritative.attemptId,
+        serverAcknowledgedAt: authoritative.serverAcknowledgedAt,
+        correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial, diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit), ...(submissionId ? { submissionId } : {}) };
     }
-    if (result.invalid && !isFast) {
-      return { correct: false, resolved: false, triesLeft: Math.max(0, 1 - (row.tries || 0)), invalid: true, feedback, stepReport };
+    if (result.invalid) {
+      row.pendingGrade = null;
+      await put('questions', row);
+      return { authoritative: true, attemptId: authoritative.attemptId,
+        serverAcknowledgedAt: authoritative.serverAcknowledgedAt,
+        correct: false, resolved: false, triesLeft: authoritative.triesLeft,
+        invalid: true, feedback, stepReport };
     }
+    // The persisted server receipt—not an inferred local grade—is the
+    // recovery/replay authority even if the device crashes during local sync.
+    row.serverReceipt = authoritative;
+    row.pendingGrade = null;
+    if (!result.correct && authoritative.resolved) row.tries = Math.max(row.tries || 0, 1);
     const meta = await resolve(p, row, q, result.correct, answer, ms, row.mode, !!viaInk, {
       submission: submissionId ? {
         submissionId, requestDigest, trapHit: trapHit || null,
@@ -3395,7 +3458,9 @@ const routes = {
       correct: result.correct, resolved: true, feedback, stepReport, partial,
       diagnosis: stepReport?.diagnosis || null,
       misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit),
-      solution: solutionOf(q),
+      solution: authoritative.solution || null,
+      authoritative: true, attemptId: authoritative.attemptId,
+      serverAcknowledgedAt: authoritative.serverAcknowledgedAt,
       ...meta,
       syncQueued: true,
       ...(submissionId ? { submissionId } : {})
@@ -3410,8 +3475,12 @@ const routes = {
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
     if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
     const q = row.payload;
+    const serverReveal = await revealOnServer(row);
+    row.serverReceipt = serverReveal;
     const meta = await resolve(p, row, q, false, 'revealed', body?.ms || 0, row.mode, false, { syncQueue: true });
-    return { correct: false, resolved: true, revealed: true, solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText }, ...meta, syncQueued: true };
+    return { correct: false, resolved: true, revealed: true, authoritative: true,
+      attemptId: serverReveal.attemptId, serverAcknowledgedAt: serverReveal.serverAcknowledgedAt,
+      solution: serverReveal.solution, ...meta, syncQueued: true };
   },
 
   // ---- reviews ----
@@ -4837,6 +4906,83 @@ async function entitlementGate(method, pattern, body, params) {
     };
   }
   return null;
+}
+
+// P0 live receipt boundary. Persist the recognition token before sending a
+// grade so a disconnect after COMMIT can retry with the identical payload.
+async function revealOnServer(row) {
+  if (!row.serverQuestionId) throw Object.assign(new Error('A live issued question is required.'), {
+    status: 503, code: 'ONLINE_REVEAL_REQUIRED'
+  });
+  const receipt = await cloud.revealPractice(row.serverQuestionId);
+  if (receipt?.authoritative !== true || receipt.revealed !== true || receipt.resolved !== true ||
+      receipt.questionId !== row.serverQuestionId || typeof receipt.attemptId !== 'string' ||
+      !receipt.solution || !Number.isFinite(receipt.serverAcknowledgedAt)) {
+    throw Object.assign(new Error('The server did not acknowledge the reveal.'), {
+      status: 503, code: 'REVEAL_ACK_MISSING'
+    });
+  }
+  return receipt;
+}
+
+async function gradeOnServer(row, body, submissionId, requestDigest) {
+  if (!row.serverQuestionId || !submissionId) {
+    throw Object.assign(new Error('An online-issued question and stable submission are required to mark.'), {
+      status: 503, code: 'ONLINE_GRADE_REQUIRED'
+    });
+  }
+  const earlier = row.pendingGrade;
+  if (earlier?.submissionId === submissionId && earlier.digest !== requestDigest) {
+    throw Object.assign(new Error('This submission key belongs to another answer.'), {
+      status: 409, code: 'SUBMISSION_ID_REUSED'
+    });
+  }
+  const mode = earlier?.submissionId === submissionId ? earlier.mode
+    : body.viaInk === true ? 'ink' : body.photo ? 'photo' : 'typed';
+  let receipt = earlier?.submissionId === submissionId ? earlier.receipt : null;
+  if (mode !== 'typed' && !receipt) {
+    const image = mode === 'ink'
+      ? rasterizeInk(body.ink?.strokes)?.dataUrl
+      : (await preparePhoto(body.photo))?.dataUrl;
+    if (!image) {
+      throw Object.assign(new Error('Your writing is safe, but the image cannot be read online. Please retry.'), {
+        status: 422, code: 'RECOGNITION_IMAGE_REQUIRED'
+      });
+    }
+    const read = await cloud.recognizePractice(row.serverQuestionId, mode, image);
+    receipt = read?.receipt;
+    if (!receipt || typeof read?.transcription?.text !== 'string') {
+      throw Object.assign(new Error('The server did not issue a valid reading receipt.'), {
+        status: 503, code: 'RECOGNITION_ACK_MISSING'
+      });
+    }
+    // Student corrections cannot forge a provider receipt. The server saves
+    // the original reading and the explicit correction under a second token.
+    if (read.transcription.text !== String(body.answer) || read.transcription.needsConfirmation === true) {
+      const corrected = await cloud.confirmPracticeRecognition(row.serverQuestionId, receipt, String(body.answer));
+      if (!corrected?.receipt) throw new Error('The corrected reading was not acknowledged by the server.');
+      receipt = corrected.receipt;
+    }
+  }
+  // Preserve the complete request bytes across uncertain acknowledgements.
+  // A later UI timer value must not silently change a committed idempotency key.
+  const payload = earlier?.submissionId === submissionId && earlier.payload
+    ? earlier.payload
+    : {
+        submissionId, answer: String(body.answer), mode, steps: body.steps,
+        ms: body.ms, ...(receipt ? { transcriptionReceipt: receipt } : {})
+      };
+  row.pendingGrade = { submissionId, digest: requestDigest, mode, receipt: receipt || null, payload };
+  await put('questions', row);
+  const acknowledged = await cloud.gradePractice(row.serverQuestionId, payload);
+  if (acknowledged?.authoritative !== true || acknowledged.questionId !== row.serverQuestionId ||
+      acknowledged.submissionId !== submissionId || typeof acknowledged.attemptId !== 'string' ||
+      typeof acknowledged.correct !== 'boolean' || !Number.isFinite(acknowledged.serverAcknowledgedAt)) {
+    throw Object.assign(new Error('The server did not confirm an authoritative mathematical grade.'), {
+      status: 503, code: 'GRADE_ACK_MISSING'
+    });
+  }
+  return acknowledged;
 }
 
 const mutationQueues = new Map();

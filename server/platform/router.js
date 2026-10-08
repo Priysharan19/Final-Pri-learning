@@ -13,6 +13,7 @@ import { createOtpRouter } from './otp.js';
 import { createReportRouter } from './reports.js';
 import { createSyncRouter } from './sync.js';
 import { createHandwritingRouter } from './handwriting.js';
+import { createPracticeRouter } from './practice.js';
 import { createWorkingRouter } from './working.js';
 import { createQuestionPhotoRouter } from './questionPhoto.js';
 import { createTutorRouter } from './tutor.js';
@@ -196,6 +197,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   router.use('/assignments', requireGuardianConsent(db), createAssignmentExecutionRouter(db));
   router.use('/content', createContentRouter(db));
   router.use('/reports', requireGuardianConsent(db), createReportRouter(db));
+  router.use('/practice', requireGuardianConsent(db), createPracticeRouter(db));
   router.use('/handwriting', requireGuardianConsent(db), createHandwritingRouter(db));
   router.use('/working', requireGuardianConsent(db), createWorkingRouter(db));
   router.use('/question-photo', requireGuardianConsent(db), createQuestionPhotoRouter(db));
