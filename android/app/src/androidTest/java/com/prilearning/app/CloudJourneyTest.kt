@@ -89,14 +89,14 @@ class CloudJourneyTest {
     private val byText = "function(t){return [].slice.call(document.querySelectorAll('button')).find(function(b){return b.offsetParent&&b.textContent.trim()===t;});}"
     private val stateTag = "(function(){var s=document.querySelector('section[aria-labelledby=\"cloud-account-title\"] .tag');return s?s.textContent.trim():'';})()"
 
-    /** Home with the local profile from the shell journey (or onboarding if run alone). */
+    /** Home with the local profile from the shell journey (or explicit device-only onboarding if run alone). */
     private fun reachHome(s: ActivityScenario<MainActivity>) {
         val state = waitFor(s, """(function(){if(document.querySelector('.home-greet'))return 'home';
             var b=[].slice.call(document.querySelectorAll('.auth-card button')).find(function(x){return /Android Student/.test(x.textContent);});
             if(b){b.click();return 'picker';}
-            var g=($byText)('Get Started');if(g)return 'onboarding';return false;})()""")
+            var g=document.querySelector('[data-testid=hero-offline]');if(g)return 'onboarding';return false;})()""")
         if (state == "\"onboarding\"") {
-            eval(s, "($byText)('Get Started').click()")
+            eval(s, "document.querySelector('[data-testid=hero-offline]').click()")
             waitFor(s, "document.querySelector('[data-onboarding-step=\"1\"]')")
             eval(s, "($byText)('Student').click()"); Thread.sleep(150); eval(s, "document.querySelector('.auth-card .btn-primary').click()")
             waitFor(s, "document.querySelector('#signup-track')")
