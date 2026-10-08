@@ -24,7 +24,7 @@ const eq = (actual, expected, name) => {
 const assertOk = (actual, name) => { assert.ok(actual, name); count++; };
 const issue = (jar, seed) => h.request('/v1/practice/issue', {
   method: 'POST', jar, body: {
-    generator: 'c8-linear-equations', difficulty: 2, seed, curriculum: 'in'
+    generator: 'c8-linear-equations-both-sides', difficulty: 2, seed, curriculum: 'in'
   }
 });
 const grade = (jar, qid, submissionId, answer, mode = 'typed', extra = {}) =>
