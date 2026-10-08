@@ -1025,7 +1025,7 @@ async function createIndiaQuestion(pid, chapter, target, mode, trackId, examId =
   // Keep no locally regenerated answer key in IndexedDB.
   const issuance = await cloud.issuePractice({
     generator: served.generator, difficulty: served.difficulty,
-    seed: seedOf.get(selected), curriculum: 'in'
+    seed: seedOf.get(selected), curriculum: 'in', mode
   });
   const q = issuance?.question;
   if (!q?.id || q.prompt !== selected.prompt || q.answerType !== selected.answerType ||
@@ -1719,8 +1719,11 @@ function sanitize(q, row) {
     hintsAvailable: (q.hints || []).length, hintsUsed: row.hintsUsed || 0,
     tutorLevel: row.tutorLevel || 0,
     triesLeft: 2 - (row.tries || 0),
-    supportsSteps: !!stepMetaFor(q),
-    criteria: criteriaFor(q),
+    supportsSteps: row.serverQuestionId ? q.supportsSteps === true : !!stepMetaFor(q),
+    criteria: row.serverQuestionId
+      ? Array.from({ length: Math.min(4, Math.max(1, Number(q.criteriaCount) || 1)) },
+        (_, i) => ({ mark: 1, text: 'Method or final-answer criterion ' + (i + 1) }))
+      : criteriaFor(q),
     taskId: row.taskId || null
   };
 }
@@ -1978,7 +1981,10 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
       };
     }
     const clean = correct && !helpUsed && !(row.tries || 0);
-    const traps = clean ? decayTraps(st.traps, repairOpportunitiesOf(q, owner)) : (st.traps || {});
+    const opportunities = row.serverQuestionId
+      ? new Set((row.serverRepairOpportunities || []).map(why => misconceptionIdForTrap(owner, why)).filter(Boolean))
+      : repairOpportunitiesOf(q, owner);
+    const traps = clean ? decayTraps(st.traps, opportunities) : (st.traps || {});
     const recent = [correct ? 1 : 0, ...(Array.isArray(st.recent) ? st.recent : [])].slice(0, RECENT_WINDOW);
     ratingNext = {
       ...st, key: `${pid}:${owner}`, pid, subtopic: owner,
@@ -3219,7 +3225,11 @@ const routes = {
       await put('questions', row);
     }
     const tutorLevel = Math.max(used, level);
-    const solution = { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText };
+    const solution = row.serverQuestionId ? (row.serverReceipt?.solution
+      ? { steps: row.serverReceipt.solution.steps || [], answerText: row.serverReceipt.solution.answerText,
+          solutionText: row.serverReceipt.solution.solutionText }
+      : null)
+      : { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText };
 
     if (level === 3) {
       const serverReveal = await revealOnServer(row);
@@ -3245,7 +3255,7 @@ const routes = {
     }
 
     const work = tutorWork(q, body?.work);
-    const request = tutorRequest(p, row, q, solution, { level: level === 1 ? 'nudge' : 'socratic', locale: body?.locale, work });
+    const request = solution ? tutorRequest(p, row, q, solution, { level: level === 1 ? 'nudge' : 'socratic', locale: body?.locale, work }) : null;
     const outcome = request ? await requestTutorHelp(request) : { error: { code: 'TUTOR_UNGROUNDED' } };
     const hints = Array.isArray(q.hints) ? q.hints : [];
     const authored = hints.length ? hints[Math.min(level - 1, hints.length - 1)] : null;
@@ -3274,8 +3284,12 @@ const routes = {
       .map(c => ({ id: String(c?.id || '').replace(/[^a-z0-9_-]/gi, '').slice(0, 40), text: sanitizeText(c?.text, 700) }))
       .filter(c => c.id && c.text);
     if (!captions.length) return { captions: [], source: 'deterministic', code: 'TUTOR_NO_CAPTIONS' };
-    const solution = { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText };
-    const request = tutorRequest(p, row, q, solution, { level: 'walkthrough', locale: body?.locale, work: tutorWork(q, body?.work), captions });
+    const solution = row.serverQuestionId ? (row.serverReceipt?.solution
+      ? { steps: row.serverReceipt.solution.steps || [], answerText: row.serverReceipt.solution.answerText,
+          solutionText: row.serverReceipt.solution.solutionText }
+      : null)
+      : { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText };
+    const request = solution ? tutorRequest(p, row, q, solution, { level: 'walkthrough', locale: body?.locale, work: tutorWork(q, body?.work), captions }) : null;
     const outcome = request ? await requestTutorHelp(request) : { error: { code: 'TUTOR_UNGROUNDED' } };
     const returned = Array.isArray(outcome?.tutor?.captions) ? outcome.tutor.captions : [];
     return {
@@ -3401,7 +3415,13 @@ const routes = {
     // distractor infers the mistake, the working shows it.
     let trapHit = null;
     if (!result.correct && !result.invalid) {
-      trapHit = await recordTrap(p.id, row, q, feedback);
+      if (row.serverQuestionId && authoritative.trapWhy) {
+        const owner = evidenceKeyOf(row, q);
+        trapHit = await recordMisconception(p.id, row, q, owner,
+          misconceptionIdForTrap(owner, authoritative.trapWhy), misconceptionLabel(authoritative.trapWhy));
+      } else if (!row.serverQuestionId) {
+        trapHit = await recordTrap(p.id, row, q, feedback);
+      }
       if (!trapHit) trapHit = await recordStepTrap(p.id, row, q, stepReport?.diagnosis);
     }
     // The student's own work is stored before any early return below. A first
@@ -3447,6 +3467,9 @@ const routes = {
     row.serverReceipt = authoritative;
     row.pendingGrade = null;
     if (!result.correct && authoritative.resolved) row.tries = Math.max(row.tries || 0, 1);
+    if (Array.isArray(authoritative.repairOpportunities)) {
+      row.serverRepairOpportunities = authoritative.repairOpportunities;
+    }
     const meta = await resolve(p, row, q, result.correct, answer, ms, row.mode, !!viaInk, {
       submission: submissionId ? {
         submissionId, requestDigest, trapHit: trapHit || null,

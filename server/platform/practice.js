@@ -26,7 +26,7 @@ const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
 const ID = /^[a-zA-Z0-9_-]{8,100}$/;
 const UUID = /^[0-9a-f-]{36}$/i;
 const INDIA_BANK = /^c(?:[7-9]|1[0-2])-[a-z][a-z0-9-]{2,95}$/;
-const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum']);
+const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum', 'mode']);
 const GRADE_FIELDS = new Set(['submissionId', 'answer', 'mode', 'steps', 'transcriptionReceipt', 'ms']);
 const RECOGNITION_FIELDS = new Set(['image', 'mode']);
 const CORRECTION_FIELDS = new Set(['text']);
@@ -78,7 +78,8 @@ function stepEvidence(q, answer, steps, result) {
 }
 
 function safeQuestion(id, q) {
-  const publicQ = { id };
+  const publicQ = { id, supportsSteps: !!stepMetaFor(q),
+    criteriaCount: Math.max(1, Math.min(4, (q.steps || []).filter(s => !/^(check|note|bonus)/i.test(s.h)).length || 1)) };
   for (const k of PUBLIC_Q) if (Object.hasOwn(q, k)) publicQ[k] = q[k];
   return publicQ;
 }
@@ -139,16 +140,23 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     if (!Number.isSafeInteger(seed) || seed < 0 || seed >= 0x80000000) {
       return reject(res, 400, 'PRACTICE_SEED_INVALID', 'Invalid question seed.');
     }
+    const practiceMode = body.mode ?? 'practice';
+    if (!['practice', 'review', 'task', 'rush', 'match'].includes(practiceMode)) {
+      return reject(res, 400, 'PRACTICE_MODE_INVALID', 'Invalid practice mode.');
+    }
     const accountId = req.platformSession.account_id;
     // Optional issue idempotency: normal practice may request a fresh question;
     // network retries can opt into the same server question with a stable key.
     const idem = String(req.get('idempotency-key') || '');
     if (idem && !ID.test(idem)) return reject(res, 400, 'IDEMPOTENCY_INVALID', 'Invalid issuance idempotency key.');
-    const requestDigest = digest({ generator, difficulty, seed: body.seed === undefined ? null : seed, curriculum: body.curriculum });
+    const requestDigest = digest({ generator, difficulty, seed: body.seed === undefined ? null : seed, curriculum: body.curriculum, mode: practiceMode });
     await ensureBanks();
     let q;
     try { q = generateQuestion(generator, difficulty, seed); }
     catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
+    // The issuance mode is escrowed with the answer. A later submission cannot
+    // falsely claim or downgrade the one-try Rush/Match policy.
+    q._practiceMode = practiceMode;
     // Serialize once: nothing client-provided can replace the stored answer.
     const payload = JSON.stringify(q);
     const id = randomUUID();
@@ -341,19 +349,37 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
 
       const q = JSON.parse(sealed.response_json);
       const result = checkAnswer(q, body.answer);
+      // Only after submission may authored misconception feedback be revealed.
+      // Never trust a caller-supplied explanation or make the device infer
+      // correctness from a withheld canonical answer.
+      const trapProbes = [
+        ...(Array.isArray(q.traps) ? q.traps : []),
+        ...Object.values(q.answer?.optionTraps || {}).map(why => ({ why }))
+      ];
+      const optionWhy = !result.correct && q.answerType === 'mcq'
+        ? q.answer?.optionTraps?.[Number(body.answer)] : null;
+      const feedback = String(optionWhy || result.feedback || '').slice(0, 3000);
+      const trapWhy = !result.correct
+        ? trapProbes.find(t => t?.why && String(t.why) === feedback)?.why || null : null;
       const working = Array.isArray(body.steps) ? body.steps.join('\n') : String(body.steps || '');
       const { stepReport, partial } = stepEvidence(q, body.answer, working, result);
       const priorTry = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-tries' AND key=?",
         [accountId, qid]);
       const tries = priorTry ? Number(JSON.parse(priorTry.response_json).tries) || 0 : 0;
       // Invalid input is not a failed mathematical attempt: do not consume a try or close the question.
-      const resolved = !result.invalid && Boolean(result.correct || tries >= 1);
+      const resolved = !result.invalid && Boolean(result.correct || tries >= 1 || ['rush', 'match'].includes(q._practiceMode));
       const attemptId = randomUUID();
       const response = { authoritative: true, questionId: qid, submissionId, attemptId,
         correct: result.correct === true, invalid: Boolean(result.invalid), resolved,
-        triesLeft: resolved ? 0 : 1, feedback: String(result.feedback || '').slice(0, 3000),
+        triesLeft: resolved ? 0 : 1, feedback, trapWhy,
         contentId: q.contentId || null, serverAcknowledgedAt: now,
-        stepReport, partial, ...(resolved ? { solution: solutionFor(q) } : {}) };
+        stepReport, partial, ...(resolved ? {
+          solution: solutionFor(q),
+          // Only a committed resolution may disclose opportunity explanations.
+          // Their ontology identity is derived by the client from these
+          // server-attested authored distractor explanations, not from an answer key.
+          repairOpportunities: [...new Set(trapProbes.map(t => t?.why).filter(Boolean))].slice(0, 40)
+        } : {}) };
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-grade',?,?,?,?,?)",
         [accountId, idKey, JSON.stringify(response), hash, now, now + MAX_AGE]);
       if (resolved) {
