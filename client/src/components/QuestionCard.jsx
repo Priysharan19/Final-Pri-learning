@@ -301,6 +301,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [photoSignInOpen, setPhotoSignInOpen] = useState(false);
   const [photoAuthEpoch, setPhotoAuthEpoch] = useState(0);
   const photoReadGeneration = useRef(0);
+  // Keep an original multi-page PDF in component memory only while the user
+  // needs an authenticated retry. A thumbnail cannot reconstruct every page.
+  const pendingPdf = useRef(null);
   const [pdfUnread, setPdfUnread] = useState(null);
   const [photoOCR, setPhotoOCR] = useState({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
   // One quiet line, once per device, the first time a photo is read on the
@@ -359,6 +362,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setSelfMarks({}); setSelfSaved(false); setSelfOpen(false);
     // An old photo must never follow the student into a new question.
     photoReadGeneration.current += 1;
+    pendingPdf.current = null;
     setPhoto(null); setPhotoSignInOpen(false); setBookmarked(false);
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
     setChecking(false); setVouched(null); setPdfUnread(null); setAttemptViaInk(false);
@@ -420,6 +424,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   const decodePhoto = useCallback(async (dataURL) => {
     if (!dataURL) return;
+    pendingPdf.current = null;
     // Even a rejected, signed-out replacement invalidates an older in-flight
     // provider response; authentication state cannot revive the old image.
     const generation = ++photoReadGeneration.current;
@@ -476,7 +481,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (!photo || photoOCR.phase !== 'unavailable' ||
         photoOCR.blockedKey !== 'verdict.photoReadingSignIn' ||
         !cloudReadingEnabled(user)) return;
-    void decodePhoto(photo);
+    if (pendingPdf.current) void decodePdf(pendingPdf.current);
+    else void decodePhoto(photo);
   // Intentional: only a verified profile/session transition initiates retry,
   // never a failing OCR state update or repeated render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -491,6 +497,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // scoped to this attachment, never to the next question or a replacement.
     const generation = ++photoReadGeneration.current;
     const stale = () => !mountedRef.current || generation !== photoReadGeneration.current;
+    pendingPdf.current = dataURL;
     setPdfUnread(null);
     setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
     let result = { pages: [], reason: 'unreadable' };
@@ -498,6 +505,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (stale()) return;
     const pages = result.pages || [];
     if (!pages.length) {
+      pendingPdf.current = null;
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
         error: result.reason === 'renderer-unavailable'
@@ -508,6 +516,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     }
     setPhoto(pages[0].dataUrl);
     if (pages.length === 1) { decodePhoto(pages[0].dataUrl); return; }
+    if (!cloudReadingEnabled(user)) {
+      const blockedKey = photoReadingBlockedKey(user);
+      setPhotoOCR({ phase: 'unavailable', text: '', confidence: 0, engine: null,
+        error: tLater(blockedKey), blockedKey });
+      return;
+    }
 
     const texts = [];
     let worst = 1;
@@ -519,12 +533,24 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // could be read" on a device that could have read it perfectly well.
       const page1 = await readOnePage(page.dataUrl);
       if (stale()) return;
+      if (page1?.blocked) {
+        setPhotoOCR({ phase: 'unavailable', text: '', confidence: 0, engine: null,
+          error: tLater(page1.blocked), blockedKey: page1.blocked });
+        return;
+      }
+      if (page1?.allowance) {
+        pendingPdf.current = null;
+        setPhotoOCR({ phase: 'failed', text: '', confidence: 0, engine: null,
+          error: tLater('photo.cloudAllowanceUsed') });
+        return;
+      }
       if (!page1) { unread += 1; continue; }
       if (page1.text) texts.push(page1.text);
       worst = Math.min(worst, Number(page1.confidence || 0));
       engine = page1.engine || engine;
     }
     if (!texts.length) {
+      pendingPdf.current = null;
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
         error: tLater('verdict.pdfNothingRead')
@@ -538,6 +564,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       setPdfUnread({ unread, total: pages.length });
     }
     const joined = texts.join('\n');
+    pendingPdf.current = null;
     if (isWorking) { setWorking(joined); setShowWorking(true); }
     const last = joined.split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
     if (last) setAnswer(last);
@@ -1429,8 +1456,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                             PDF failure message was unreachable and the screen simply did
                             not move. */}
                         {photo
-                          ? <div className="photo-thumb"><img src={photo} alt={t('history.paperWorking')} /><button aria-label={t('verdict.removePhoto')} onClick={() => { photoReadGeneration.current += 1; setPhoto(null); setPhotoSignInOpen(false); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>
-                          : <div className="photo-thumb" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}><span aria-hidden="true">▤</span><button aria-label={t('verdict.removeAttachment')} onClick={() => { photoReadGeneration.current += 1; setPhoto(null); setPdfUnread(null); setPhotoSignInOpen(false); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>}
+                          ? <div className="photo-thumb"><img src={photo} alt={t('history.paperWorking')} /><button aria-label={t('verdict.removePhoto')} onClick={() => { photoReadGeneration.current += 1; pendingPdf.current = null; setPdfUnread(null); setPhoto(null); setPhotoSignInOpen(false); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>
+                          : <div className="photo-thumb" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}><span aria-hidden="true">▤</span><button aria-label={t('verdict.removeAttachment')} onClick={() => { photoReadGeneration.current += 1; pendingPdf.current = null; setPhoto(null); setPdfUnread(null); setPhotoSignInOpen(false); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>}
                         <div style={{ flex: 1 }} role="status" aria-live="polite">
                           {photoOCR.phase === 'reading' && (
                             <span className="muted">{t('verdict.readingWork')}</span>
