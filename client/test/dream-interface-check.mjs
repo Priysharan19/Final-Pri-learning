@@ -240,10 +240,16 @@ check('the action bar holds exactly one primary action', () => {
 check('status only claims what the device actually knows', () => {
   assert.doesNotMatch(en, /'verdict\.status[A-Za-z]*': '[^']*(synced|uploaded|cloud)/i);
   assert.match(card, /saveDraft\('question', question\.id/);
-  // Ink is reported saved only after the record is read back from the store.
-  assert.match(card, /const at = draftSavedAt\('ink', question\.id\);\s*setSaveState\(at && at >= asked \? 'saved' : 'failed'\)/);
-  // …and a draft cleared by marking is never reported as a failed save.
-  assert.match(card, /if \(attemptRef\.current\) return;\s*const at = draftSavedAt/);
+  // Ink is kept in *sealed IndexedDB*, not the plaintext typed-draft store.
+  // Queue acceptance is not proof of durability: flush, read back, then
+  // compare exactly the strokes the student actually wrote before saying Saved.
+  assert.doesNotMatch(card, /draftSavedAt\('ink', question\.id\)/);
+  assert.match(card, /flushInkDrafts\(\)\.then\(\(\) => readInkDraft\(question\.id\)\)/);
+  assert.match(card, /JSON\.stringify\(compactInkStrokes\(kept\)\) === expected \? 'saved' : 'failed'/);
+  // A stale async completion must not say Saved for newer strokes, nor turn a
+  // successfully graded/cleared answer into a failed write.
+  assert.match(card, /attemptRef\.current \|\| inkSaveRevision\.current !== revision/);
+  assert.match(card, /setSaveState\('failed'\)/);
   // The same for a typed draft: a late timed write must not put back what marking cleared.
   assert.match(card, /if \(attemptRef\.current\) return;\s*setSaveState\(saveDraft\('question'/);
   assert.match(card, /if \(!saveInkDraft\(question\.id, strokes, [^)]*\)\) \{ setSaveState\('failed'\); return; \}/);
