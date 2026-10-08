@@ -166,7 +166,7 @@
     "test:tutor:ui": "node client/test/tutor-ui-check.mjs",
     "test:account:withdraw": "node client/test/account-action-guardian-withdraw-check.mjs",
     "test:mfa:ui": "node client/test/mfa-ui-check.mjs",
-    "test:photo:cloud": "node client/test/cloud-photo-client-check.mjs",
+    "test:photo:cloud": "node client/test/cloud-photo-client-check.mjs && node client/test/photo-account-recovery-check.mjs",
     "test:photo:practise": "node client/test/question-photo-client-check.mjs",
     "test:predictor": "node client/test/mark-predictor-check.mjs",
     "preflight": "node tools/production-preflight.mjs",

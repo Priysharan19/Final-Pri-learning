@@ -16,6 +16,7 @@ import {
   saveInkDraft, savePendingSubmission, submissionContentKey
 } from './practiceRecovery.js';
 import { cloudReadingEnabled, INK_READER_STATE, photoReadingBlockedKey, readPhotoWithCloud, takeCloudReadingNotice } from '../ink/cloudReader.js';
+import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
 import { plotSpecFor } from '../engine/plotSpec.js';
@@ -87,6 +88,9 @@ export const SR_ONLY = {
 // In a production build with the tutor off the panel is unreachable
 // (tutorEnabled below is false on every device), so it is not built at all.
 const TutorHelp = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/TutorHelp.jsx'));
+// Load account recovery only when a student explicitly asks to sign in.
+// Keeps the selected photo in component memory rather than plaintext storage.
+const PhotoAccountRecovery = React.lazy(() => import('./CloudAccountPanel.jsx'));
 
 class TutorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { failed: false }; }
@@ -294,6 +298,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [selfSaved, setSelfSaved] = useState(false);
   const [selfOpen, setSelfOpen] = useState(false);
   const [photo, setPhoto] = useState(null);
+  const [photoSignInOpen, setPhotoSignInOpen] = useState(false);
+  const [photoAuthEpoch, setPhotoAuthEpoch] = useState(0);
+  const photoReadGeneration = useRef(0);
   const [pdfUnread, setPdfUnread] = useState(null);
   const [photoOCR, setPhotoOCR] = useState({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
   // One quiet line, once per device, the first time a photo is read on the
@@ -349,7 +356,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setShowTutor(false); setTutorUsed(question.tutorLevel || 0);
     setWorking(draft?.working || ''); setShowWorking(!!draft?.working);
     setState({ phase: 'answering' }); setBusy(false);
-    setSelfMarks({}); setSelfSaved(false); setSelfOpen(false); setPhoto(null); setBookmarked(false);
+    setSelfMarks({}); setSelfSaved(false); setSelfOpen(false);
+    // An old photo must never follow the student into a new question.
+    photoReadGeneration.current += 1;
+    setPhoto(null); setPhotoSignInOpen(false); setBookmarked(false);
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
     setChecking(false); setVouched(null); setPdfUnread(null); setAttemptViaInk(false);
     setSaveState(draft?.typed || draft?.working ? 'saved' : null);
@@ -411,14 +421,17 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const decodePhoto = useCallback(async (dataURL) => {
     if (!dataURL) return;
     if (!cloudReadingEnabled(user)) {
+      const blockedKey = photoReadingBlockedKey(user);
       setPhotoOCR({
         phase: 'unavailable', text: '', confidence: 0, engine: null,
-        error: tLater(photoReadingBlockedKey(user))
+        error: tLater(blockedKey), blockedKey
       });
       return;
     }
+    const generation = ++photoReadGeneration.current;
     setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
     const page = await readOnePage(dataURL);
+    if (!mountedRef.current || generation !== photoReadGeneration.current) return;
     if (page?.allowance) {
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
@@ -429,7 +442,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (page?.blocked) {
       setPhotoOCR({
         phase: 'unavailable', text: '', confidence: 0, engine: null,
-        error: tLater(page.blocked)
+        error: tLater(page.blocked), blockedKey: page.blocked
       });
       return;
     }
@@ -443,8 +456,29 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (isWorking && page.text) { setWorking(page.text); setShowWorking(true); }
     if (page.markable) setAnswer(page.markable);
     if (String(page.engine || '').startsWith('cloud') && takeCloudReadingNotice(user)) setCloudNotice(true);
+    setPhotoSignInOpen(false);
     setPhotoOCR({ phase: 'done', text: page.text, confidence: Number(page.confidence || 0), error: '', engine: page.engine });
   }, [isWorking, user, readOnePage, t]);
+
+  // Successful cloud authentication is announced by the existing account
+  // service, not guessed from a device-local profile. Retry only the same
+  // on-screen image, once per session change; the provider and guardian gate
+  // remain authoritative. Do not queue private photos in localStorage.
+  useEffect(() => onCloudSessionChange(event => {
+    if (event?.detail?.connected === true &&
+        String(event.detail.localProfileId) === String(user?.id)) {
+      setPhotoAuthEpoch(n => n + 1);
+    }
+  }), [user?.id]);
+  useEffect(() => {
+    if (!photo || photoOCR.phase !== 'unavailable' ||
+        photoOCR.blockedKey !== 'verdict.photoReadingSignIn' ||
+        !cloudReadingEnabled(user)) return;
+    void decodePhoto(photo);
+  // Intentional: only a verified profile/session transition initiates retry,
+  // never a failing OCR state update or repeated render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.cloudLinked, photoAuthEpoch]);
 
   // A scanned PDF becomes pages, and the pages become the same thing a photo
   // already is. More than one page of working is joined in order, because a
@@ -1386,7 +1420,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                             PDF failure message was unreachable and the screen simply did
                             not move. */}
                         {photo
-                          ? <div className="photo-thumb"><img src={photo} alt={t('history.paperWorking')} /><button aria-label={t('verdict.removePhoto')} onClick={() => { setPhoto(null); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>
+                          ? <div className="photo-thumb"><img src={photo} alt={t('history.paperWorking')} /><button aria-label={t('verdict.removePhoto')} onClick={() => { photoReadGeneration.current += 1; setPhoto(null); setPhotoSignInOpen(false); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>
                           : <div className="photo-thumb" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}><span aria-hidden="true">▤</span><button aria-label={t('verdict.removeAttachment')} onClick={() => setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null })}>✕</button></div>}
                         <div style={{ flex: 1 }} role="status" aria-live="polite">
                           {photoOCR.phase === 'reading' && (
@@ -1400,7 +1434,17 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                                 <b>{String(photoOCR.engine || '').startsWith('cloud') ? t('verdict.readOnServer') : t('verdict.decodedOnDevice')}</b>
                                 {photoOCR.confidence ? t('verdict.ocrConfidence', { percent: Math.round(photoOCR.confidence * 100) }) : ''}
                               </div>
-                              <pre style={{ whiteSpace: 'pre-wrap', margin: 0, font: 'inherit', color: 'var(--ink)' }}>{photoOCR.text}</pre>
+                              <label className="sc-label" htmlFor="photo-recognition-correction">{t('verdict.readOnServer')}</label>
+                              <textarea id="photo-recognition-correction" className="working-input"
+                                data-photo-correct-transcript aria-label={t('verdict.readOnServer')}
+                                value={photoOCR.text} disabled={resolved} rows={Math.min(8, Math.max(3, photoOCR.text.split('\n').length + 1))}
+                                onChange={e => {
+                                  const corrected = e.target.value;
+                                  setPhotoOCR(v => ({ ...v, text: corrected }));
+                                  const lastLine = corrected.split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
+                                  if (isWorking) editWorking(corrected);
+                                  else { editAnswer(lastLine); }
+                                }} />
                               <div className="muted" style={{ marginTop: 6 }}>{t('verdict.filledFromLastLine')}</div>
                               {pdfUnread && <div className="verdict-body" style={{ marginTop: 6 }}>{t('verdict.pdfPagesUnread', pdfUnread)}</div>}
                               {cloudNotice && String(photoOCR.engine || '').startsWith('cloud') && (
@@ -1408,12 +1452,28 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                               )}
                             </>
                           )}
-                          {(photoOCR.phase === 'failed' || photoOCR.phase === 'unavailable') && <span className="verdict-body">{photoOCR.error}</span>}
+                           {(photoOCR.phase === 'failed' || photoOCR.phase === 'unavailable') && <span className="verdict-body">{photoOCR.error}</span>}
+                          {photoOCR.phase === 'unavailable' && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && (
+                            <div style={{ marginTop: 10 }}>
+                              <button className="btn btn-primary" type="button" data-photo-sign-in
+                                aria-expanded={photoSignInOpen} onClick={() => setPhotoSignInOpen(v => !v)}>
+                                {t('cloud.signIn')}
+                              </button>
+                              <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+                                {t('verdict.photoAttachedIdle')}
+                              </p>
+                            </div>
+                          )}
                           {photoOCR.phase === 'idle' && <span className="muted">{t('verdict.photoAttachedIdle')}</span>}
                         </div>
                       </div>
                     )}
                 </div>
+              )}
+              {photoSignInOpen && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && (
+                <React.Suspense fallback={<p role="status">{t('cloud.stateChecking')}</p>}>
+                  <PhotoAccountRecovery />
+                </React.Suspense>
               )}
               {isWorking ? (
                 <textarea

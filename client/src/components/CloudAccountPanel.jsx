@@ -74,6 +74,11 @@ export default function CloudAccountPanel() {
   const [appleProducts, setAppleProducts] = useState([]);
   const [appleStoreError, setAppleStoreError] = useState('');
   const [mode, setMode] = useState('login');
+  // When a linked account's cookie expires, this is reauthentication, not
+  // registration of a second identity on the existing student profile.
+  useEffect(() => {
+    if (link?.accountId && mode === 'register') setMode('login');
+  }, [link?.accountId, mode]);
   const [form, setForm] = useState({
     name: user?.name || '', email: '', password: '',
     // Declared, not inferred. The class a student picked already implies a
@@ -362,7 +367,7 @@ export default function CloudAccountPanel() {
     setError('');
     setMessage('');
     try {
-      if (mode === 'register') {
+      if (mode === 'register' && !link?.accountId) {
         await registerCloudAccount(user.id, {
           name: form.name || user.name, email: form.email, password: form.password,
           year: user?.year, isAdult: form.isAdult,
@@ -642,7 +647,7 @@ export default function CloudAccountPanel() {
           {t('cloud.offlineNote')}
         </div>
       )}
-      {enabled && !link?.accountId && <form onSubmit={submit} style={{ marginTop: 16 }}>
+      {enabled && (!link?.accountId || session?.reason === 'signed-out') && <form onSubmit={submit} style={{ marginTop: 16 }}>
         {appleStep === 'consent' ? (
           <div role="status" style={{ marginBottom: 12 }}>
             <div className="sc-label">{t('cloud.appleConsentTitle')}</div>
@@ -651,7 +656,7 @@ export default function CloudAccountPanel() {
         ) : (
           <div className="row" style={{ gap: 8, marginBottom: 12 }}>
             <button type="button" className={`btn btn-sm ${mode === 'login' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMode('login')}>{t('cloud.signIn')}</button>
-            <button type="button" className={`btn btn-sm ${mode === 'register' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMode('register')}>{t('cloud.createAccount')}</button>
+            {!link?.accountId && <button type="button" className={`btn btn-sm ${mode === 'register' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMode('register')}>{t('cloud.createAccount')}</button>}
           </div>
         )}
         {appleStep !== 'consent' && <div className="grid cols-2" style={{ gap: 12 }}>
