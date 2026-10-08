@@ -949,6 +949,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const pending = readPendingSubmission(question.id);
     if (!pending) return;
     pendingRef.current = { submissionId: pending.submissionId, contentKey: submissionContentKey(pending.answer, pending.steps), sourceMode: pending.sourceMode, ms: pending.ms };
+    if (pending.sourceMode === 'unknown') {
+      // Pre-provenance versions stored Photo and typed attempts identically.
+      // Preserve the answer so the student can inspect and submit explicitly,
+      // but never automatically re-grade it as typed after a crash.
+      setMode('type');
+      setAnswer(pending.answer);
+      setWorking(pending.steps || '');
+      return;
+    }
     if (pending.sourceMode === 'photo') {
       // The image is intentionally never written to a plaintext draft. If the
       // app was killed mid-request, retain the attempted answer and key but

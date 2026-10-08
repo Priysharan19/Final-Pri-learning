@@ -72,7 +72,10 @@ export function readPendingSubmission(questionId) {
     answer: String(d.answer ?? ''),
     steps: d.steps === undefined || d.steps === null ? undefined : String(d.steps),
     viaInk: d.viaInk === true,
-    sourceMode: d.sourceMode === 'photo' ? 'photo' : d.viaInk === true ? 'ink' : 'typed',
+    // Old builds omitted the source authority. A legacy pending answer could
+    // have come from a Photo; never silently replay unknown provenance as typed.
+    sourceMode: ['photo', 'ink', 'typed'].includes(d.sourceMode)
+      ? d.sourceMode : (d.viaInk === true ? 'ink' : 'unknown'),
     ms: Math.max(0, Number(d.ms) || 0),
     lines: cleanLines(d.lines)
   };
