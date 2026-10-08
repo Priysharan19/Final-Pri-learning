@@ -485,9 +485,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // student who scanned two sides of a page wrote one solution across them.
   const decodePdf = useCallback(async (dataURL) => {
     if (!dataURL) return;
+    // A PDF may render and read several pages asynchronously. Every await is
+    // scoped to this attachment, never to the next question or a replacement.
+    const generation = ++photoReadGeneration.current;
+    const stale = () => !mountedRef.current || generation !== photoReadGeneration.current;
+    setPdfUnread(null);
     setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
     let result = { pages: [], reason: 'unreadable' };
     try { result = await renderPdfPages(dataURL); } catch { /* reported below */ }
+    if (stale()) return;
     const pages = result.pages || [];
     if (!pages.length) {
       setPhotoOCR({
@@ -510,6 +516,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // reader alone meant a student who had not switched it on saw "nothing
       // could be read" on a device that could have read it perfectly well.
       const page1 = await readOnePage(page.dataUrl);
+      if (stale()) return;
       if (!page1) { unread += 1; continue; }
       if (page1.text) texts.push(page1.text);
       worst = Math.min(worst, Number(page1.confidence || 0));
@@ -533,7 +540,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const last = joined.split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
     if (last) setAnswer(last);
     setPhotoOCR({ phase: 'done', text: joined, confidence: worst, error: '', engine: engine || 'cloud-pdf' });
-  }, [decodePhoto, isWorking, user, t]);
+  }, [decodePhoto, isWorking, readOnePage, t]);
 
   // Paste a photo straight in. On a laptop this is how a student moves a shot
   // from their phone: AirDrop or a screenshot, then ⌘V.
@@ -1421,7 +1428,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                             not move. */}
                         {photo
                           ? <div className="photo-thumb"><img src={photo} alt={t('history.paperWorking')} /><button aria-label={t('verdict.removePhoto')} onClick={() => { photoReadGeneration.current += 1; setPhoto(null); setPhotoSignInOpen(false); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>
-                          : <div className="photo-thumb" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}><span aria-hidden="true">▤</span><button aria-label={t('verdict.removeAttachment')} onClick={() => setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null })}>✕</button></div>}
+                          : <div className="photo-thumb" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}><span aria-hidden="true">▤</span><button aria-label={t('verdict.removeAttachment')} onClick={() => { photoReadGeneration.current += 1; setPhoto(null); setPdfUnread(null); setPhotoSignInOpen(false); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>}
                         <div style={{ flex: 1 }} role="status" aria-live="polite">
                           {photoOCR.phase === 'reading' && (
                             <span className="muted">{t('verdict.readingWork')}</span>
