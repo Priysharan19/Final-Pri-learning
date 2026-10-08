@@ -756,7 +756,12 @@ export async function remoteLearningSummary(pid) {
   let correct = 0;
   const bySubtopic = {};
   for (const row of rows) {
-    if (row.kind !== 'practice-progress') continue;
+    // Legacy client-authored practice events are archival evidence, not marks.
+    // A remote score only exists when the canonical grader committed it.
+    if (row.kind !== 'graded-attempt' || row.deviceId !== 'server-grader' ||
+        row.eventId !== row.payload?.attemptId ||
+        row.entityId !== row.payload?.questionId ||
+        row.payload?.revealed === true) continue;
     const subtopic = row.payload?.subtopic;
     if (!subtopic) continue;
     attempts++;

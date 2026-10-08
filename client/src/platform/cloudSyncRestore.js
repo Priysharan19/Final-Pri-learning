@@ -33,9 +33,12 @@ const RECENT_WINDOW = 8;
 const ID = /^[A-Za-z0-9._:-]{1,160}$/;
 const LEARNING_MODES = new Set(['practice', 'review', 'task']);
 const GAME_MODES = new Set(['rush', 'match']);
-const PRACTICE_KINDS = new Set(['practice-progress', 'practice-attempt']);
+// Only a canonical server-created event may alter mastery, reviews, XP or
+// resolved attempt history. Old client-supplied practice-progress and
+// practice-attempt remain visible as archived sync data but are not marks.
+const PRACTICE_KINDS = new Set(['graded-attempt']);
 
-export const RESTORABLE_EVENT_KINDS = Object.freeze(['practice-progress', 'practice-attempt', 'exam-attempt', 'rush-history', 'match-history']);
+export const RESTORABLE_EVENT_KINDS = Object.freeze(['graded-attempt', 'exam-attempt', 'rush-history', 'match-history']);
 
 function plain(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value) &&
@@ -280,7 +283,18 @@ export async function applyRemoteLearningEvents(pid, events) {
   for (const raw of list) {
     const event = { ...raw, payload: plain(raw.payload) ? raw.payload : {} };
     let outcome;
-    if (PRACTICE_KINDS.has(event.kind)) outcome = await applyPracticeEvent(pid, profile, event);
+    if (PRACTICE_KINDS.has(event.kind)) {
+      // A client cannot publish graded-attempt through /sync/push: it is
+      // excluded from server APPEND_EVENT. The server alone writes it, using
+      // the reserved device identity in the same DB transaction as the grade.
+      outcome = event.deviceId === 'server-grader' &&
+          event.payload?.questionId === event.entityId &&
+          event.payload?.attemptId === event.id &&
+          (event.payload?.correct === true || event.payload?.correct === false) &&
+          event.payload?.revealed !== true &&
+          safeId(event.payload?.subtopic)
+        ? await applyPracticeEvent(pid, profile, event) : 'unsupported';
+    }
     else if (event.kind === 'exam-attempt') outcome = await applyExamEvent(pid, event);
     else if (event.kind === 'rush-history') outcome = await applyRunEvent(pid, event, 'rushRuns', ['score', 'correct', 'total', 'bestCombo', 'createdAt']);
     else if (event.kind === 'match-history') outcome = await applyRunEvent(pid, event, 'matchRuns', ['won', 'playerScore', 'rivalScore', 'rival', 'ms', 'createdAt']);

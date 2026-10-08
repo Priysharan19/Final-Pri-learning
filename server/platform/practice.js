@@ -288,7 +288,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const cursor = await nextSyncCursor(db, accountId);
       await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?, 'server-grader',?,'graded-attempt',?,?,?,?)",
         [cursor, attemptId, accountId, Number(last?.n || 0) + 1, qid, now, JSON.stringify({ attemptId, questionId: qid, correct: false,
-          revealed: true, contentId: q.contentId || null, serverAcknowledgedAt: now }), now]);
+          revealed: true, contentId: q.contentId || null,
+          subtopic: q.subtopic || null, difficulty: Number(q.difficulty) || 2,
+          mode: q._practiceMode || 'practice', hintsUsed: 1, support: 'supported',
+          createdAt: now, serverAcknowledgedAt: now }), now]);
       return { response };
     }, { accountScope: accountId, lock: syncLockKey(accountId) });
     if (result.status) return reject(res, result.status, result.code, 'The question is unavailable or already resolved.');
@@ -393,7 +396,13 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?, 'server-grader',?,'graded-attempt',?,?,?,?)",
           [cursor, attemptId, accountId, seq, qid, now, JSON.stringify({
             attemptId, submissionId, questionId: qid, correct: response.correct, contentId: response.contentId,
-            mode, serverAcknowledgedAt: now
+            subtopic: q.subtopic || null, difficulty: Number(q.difficulty) || 2,
+            mode: q._practiceMode || 'practice', inputMode: mode,
+            // Assistance is currently client-observed, not server-certified. Until
+            // hints/tutor levels are server-committed, restored progress must not
+            // claim independent mastery for a result whose help is unknown.
+            hintsUsed: 1, support: 'supported', createdAt: now,
+            serverAcknowledgedAt: now
           }), now]);
       } else if (!result.invalid) {
         await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-tries',?,?,?,?,?) ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json",
