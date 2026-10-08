@@ -420,6 +420,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   const decodePhoto = useCallback(async (dataURL) => {
     if (!dataURL) return;
+    // Even a rejected, signed-out replacement invalidates an older in-flight
+    // provider response; authentication state cannot revive the old image.
+    const generation = ++photoReadGeneration.current;
     if (!cloudReadingEnabled(user)) {
       const blockedKey = photoReadingBlockedKey(user);
       setPhotoOCR({
@@ -428,7 +431,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       });
       return;
     }
-    const generation = ++photoReadGeneration.current;
     setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
     const page = await readOnePage(dataURL);
     if (!mountedRef.current || generation !== photoReadGeneration.current) return;
