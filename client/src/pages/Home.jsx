@@ -10,6 +10,7 @@ import { dotpointAvailable, practiceTargetAvailable, topicAvailability } from '.
 import { dayKey, formatWeekday } from '../lib/locale.js';
 import { useT, useTx } from '../i18n/index.js';
 import { practiceDifficulties, practiceHref } from '../lib/practiceLinks.js';
+import { studyHref } from '../lib/studyJourney.js';
 import { textMatches, useGlossary } from '../i18n/glossary.js';
 import TermGloss from '../components/TermGloss.jsx';
 import { featureEnabled } from '../platform/features.js';
@@ -170,6 +171,22 @@ export default function Home() {
   }, [subtopic, section]);
 
   const selectedDotpoint = dotpoint != null ? selSub?.dotpoints?.[dotpoint] || null : null;
+  // Notes are published only when the existing reviewed chapter actually has
+  // content. The grade bundle is loaded on demand; a syllabus listing alone
+  // must never become an empty or invented "Study Notes" promise.
+  const [studyContent, setStudyContent] = useState({ id: null, available: false });
+  useEffect(() => {
+    let live = true;
+    setStudyContent({ id: null, available: false });
+    if (!selSub?.id || !/^c(?:7|8|9|10|11|12)-/.test(selSub.id)) return () => { live = false; };
+    void import('../notes/notesIndex.js').then(({ loadNotesForGrade }) => loadNotesForGrade(year))
+      .then(notes => {
+        if (live) setStudyContent({ id: selSub.id, available: !!notes?.[selSub.id]?.examples?.length });
+      }).catch(() => { if (live) setStudyContent({ id: selSub.id, available: false }); });
+    return () => { live = false; };
+  }, [selSub?.id, year]);
+  const studyAvailable = !!selSub && studyContent.id === selSub.id && studyContent.available;
+
   const impossibleTarget = Boolean(
     (subtopic && curriculum && !selSub) ||
     (selSub && !practiceTargetAvailable(selSub, dotpoint))
@@ -203,6 +220,15 @@ export default function Home() {
   if (selSub) chips.push({ k: 'topic', label: selSub.name, clear: () => { setSubtopic(null); setDotpoint(null); } });
   if (dotpoint != null && selSub) chips.push({ k: 'dp', label: t('home.dotpointChip', { n: dotpoint + 1 }), clear: () => setDotpoint(null) });
   if (chosenDifficulty != null) chips.push({ k: 'diff', label: t('home.difficultyChip', { n: chosenDifficulty, label: t(DIFF_KEYS[chosenDifficulty]) }), clear: () => setDifficulty(null) });
+
+  const learn = (view) => {
+    if (!studyAvailable || !selSub || impossibleTarget) return;
+    const href = studyHref({
+      subtopic: selSub.id, dotpoint, difficulty: chosenDifficulty,
+      track: section?.track || 'cbse', view
+    });
+    if (href) nav(href);
+  };
 
   const generate = () => {
     if (impossibleTarget) return;
@@ -408,6 +434,25 @@ export default function Home() {
             </div>
           )}
         </div>
+        {selSub && !impossibleTarget && (
+          <div className="home-study-choices" data-study-journey>
+            <h3 className="gen-pane-title">{t('study.choosePath')}</h3>
+            <p className="muted" data-study-context>
+              {selSub.name}{selectedDotpoint ? ` · ${typeof selectedDotpoint === 'string' ? selectedDotpoint : selectedDotpoint.text}` : ''}
+              {chosenDifficulty != null ? ` · D${chosenDifficulty}` : ''}
+            </p>
+            <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+              {studyAvailable && (
+                <>
+                  <button className="btn btn-secondary" type="button" data-study-notes onClick={() => learn('notes')}>{t('study.notes')}</button>
+                  <button className="btn btn-secondary" type="button" data-study-examples onClick={() => learn('examples')}>{t('study.examples')}</button>
+                </>
+              )}
+              <button className="btn btn-primary" type="button" data-study-practice onClick={generate}>{t('study.practice')}</button>
+            </div>
+            {!studyAvailable && <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>{t('study.reviewPending')}</p>}
+          </div>
+        )}
       </section>
 
       <section className="home-section" aria-labelledby="home-week-title">
