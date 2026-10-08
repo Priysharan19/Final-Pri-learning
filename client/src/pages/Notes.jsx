@@ -21,6 +21,14 @@ import { NOTES_GRADES, gradeOfChapter, loadNotesForGrade, notesPracticeHref, not
 import { studyHref, selectedStudyContext, selectedStudyPracticeHref } from '../lib/studyJourney.js';
 import '../notes/Notes.css';
 
+// Official exam-track names remain visible as students move between notes,
+// examples and practice; internal URL slugs are never presented as titles.
+const STUDY_TRACK_LABELS = Object.freeze({
+  cbse: 'CBSE / NCERT',
+  'jee-main': 'JEE Main',
+  'jee-advanced': 'JEE Advanced'
+});
+
 const BOOKMARK_KEY = 'pri.notes.bookmarks.v1';
 
 // ── Small utilities ──────────────────────────────────────────────────────────
@@ -374,10 +382,15 @@ function ChapterNotes({ chapterId }) {
         <nav className="nt-path" aria-label={t('study.path')} data-study-path>
           <Link to="/">{t('study.curriculum')}</Link>
           <span>{t('common.classNumber', { n: grade })}</span>
-          <span>{selected.track.toUpperCase()}</span>
+          <span data-study-track>{STUDY_TRACK_LABELS[selected.track]}</span>
           <span>{t('study.subject')}</span>
           <span aria-current="page">{chapter.name}</span>
         </nav>
+        {selected.difficulty != null && (
+          <p className="nt-selected-difficulty" data-study-difficulty>
+            {t('home.difficultyChip', { n: selected.difficulty, label: t(`difficulty.${selected.difficulty}`) })}
+          </p>
+        )}
         {selected.dotpoint != null && (
           <p className="nt-selected-outcome">{t('study.selectedOutcome')}: {typeof chapter.dotpoints[selected.dotpoint] === 'string'
             ? chapter.dotpoints[selected.dotpoint] : chapter.dotpoints[selected.dotpoint]?.text}</p>
