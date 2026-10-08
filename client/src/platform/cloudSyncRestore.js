@@ -291,7 +291,9 @@ export async function applyRemoteLearningEvents(pid, events) {
           event.payload?.questionId === event.entityId &&
           event.payload?.attemptId === event.id &&
           (event.payload?.correct === true || event.payload?.correct === false) &&
-          event.payload?.revealed !== true &&
+          // A server-committed Reveal is an incorrect, supported attempt too;
+          // local resolve() already records it, so restore must not omit it.
+          (event.payload?.revealed !== true || event.payload?.correct === false) &&
           safeId(event.payload?.subtopic)
         ? await applyPracticeEvent(pid, profile, event) : 'unsupported';
     }

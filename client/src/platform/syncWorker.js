@@ -761,7 +761,7 @@ export async function remoteLearningSummary(pid) {
     if (row.kind !== 'graded-attempt' || row.deviceId !== 'server-grader' ||
         row.eventId !== row.payload?.attemptId ||
         row.entityId !== row.payload?.questionId ||
-        row.payload?.revealed === true) continue;
+        (row.payload?.revealed === true && row.payload?.correct !== false)) continue;
     const subtopic = row.payload?.subtopic;
     if (!subtopic) continue;
     attempts++;
