@@ -299,6 +299,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [selfOpen, setSelfOpen] = useState(false);
   const [photo, setPhoto] = useState(null);
   const [photoSignInOpen, setPhotoSignInOpen] = useState(false);
+  const [photoReattachRequired, setPhotoReattachRequired] = useState(false);
   const [photoAuthEpoch, setPhotoAuthEpoch] = useState(0);
   const photoReadGeneration = useRef(0);
   // Keep an original multi-page PDF in component memory only while the user
@@ -363,7 +364,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // An old photo must never follow the student into a new question.
     photoReadGeneration.current += 1;
     pendingPdf.current = null;
-    setPhoto(null); setPhotoSignInOpen(false); setBookmarked(false);
+    setPhoto(null); setPhotoSignInOpen(false); setPhotoReattachRequired(false); setBookmarked(false);
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
     setChecking(false); setVouched(null); setPdfUnread(null); setAttemptViaInk(false);
     setSaveState(draft?.typed || draft?.working ? 'saved' : null);
@@ -790,6 +791,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   const flipMode = (m) => {
     setMode(m);
+    // Explicitly changing to typing abandons the Photo provenance. A later
+    // typed submission receives a fresh idempotency key, never the pending
+    // Photo key from an uncertain server acknowledgement.
+    if (photoReattachRequired && m === 'type') {
+      pendingRef.current = null;
+      clearPendingSubmission(question.id);
+      setPhotoReattachRequired(false);
+    }
     localStorage.setItem('pri-input-mode', m);
     if (m === 'type') setTimeout(() => inputRef.current?.focus(), 60);
     if (m === 'photo' && !photo) setTimeout(() => photoInputRef.current?.click(), 120);
@@ -816,6 +825,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   async function submit(vouchedNow) {
     if (inFlightRef.current || busy || resolved) return;
     if (needsCheck && vouchedNow !== reading) { setChecking(true); return; }
+    if (photoReattachRequired && mode === 'photo' && (!photo || photoOCR.phase !== 'done')) return;
     let given, steps, viaInk = false, ink, lines = null;
     if (isMcq) {
       given = mcqSel;
@@ -843,16 +853,21 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (String(given).trim() === '') return;
       steps = (showWorking || mode === 'photo') && working.trim() ? working : undefined;
     }
+    const sourceMode = viaInk ? 'ink' : (mode === 'photo' && photo ? 'photo' : 'typed');
+    // The same answer through a different input authority is NOT a replay of
+    // the same request. Never reuse a Photo idempotency key as a typed grade.
     const contentKey = submissionContentKey(given, steps);
-    const submissionId = pendingRef.current?.contentKey === contentKey
-      ? pendingRef.current.submissionId
-      : newSubmissionId();
-    pendingRef.current = { submissionId, contentKey };
-    const ms = Date.now() - startRef.current;
+    const replay = pendingRef.current?.contentKey === contentKey && pendingRef.current?.sourceMode === sourceMode;
+    const submissionId = replay ? pendingRef.current.submissionId : newSubmissionId();
+    // Preserve the original timer alongside the idempotency key: a retry made
+    // seconds later cannot become a different server request under one key.
+    const ms = replay && Number.isFinite(pendingRef.current.ms)
+      ? pendingRef.current.ms : Date.now() - startRef.current;
+    pendingRef.current = { submissionId, contentKey, sourceMode, ms };
     // On disk before the request leaves: a relaunch replays it under this key.
     // A placement answer is not replayed through practice on relaunch: the
     // placement session itself resumes at this exact question.
-    if (!diagnostic) savePendingSubmission(question.id, { submissionId, answer: String(given), steps, viaInk, ms, lines }, { label: question.subtopicName });
+    if (!diagnostic) savePendingSubmission(question.id, { submissionId, answer: String(given), steps, viaInk, sourceMode, ms, lines }, { label: question.subtopicName });
     const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
       ? compactInkStrokes(scribbleRef.current.getStrokes())
       : undefined;
@@ -929,7 +944,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (diagnostic) return;
     const pending = readPendingSubmission(question.id);
     if (!pending) return;
-    pendingRef.current = { submissionId: pending.submissionId, contentKey: submissionContentKey(pending.answer, pending.steps) };
+    pendingRef.current = { submissionId: pending.submissionId, contentKey: submissionContentKey(pending.answer, pending.steps), sourceMode: pending.sourceMode, ms: pending.ms };
+    if (pending.sourceMode === 'photo') {
+      // The image is intentionally never written to a plaintext draft. If the
+      // app was killed mid-request, retain the attempted answer and key but
+      // require a fresh attachment. Replaying the transcript as typed work
+      // would bypass the required provider-recognition receipt.
+      setMode('photo');
+      setAnswer(pending.answer);
+      setWorking(pending.steps || '');
+      setPhotoReattachRequired(true);
+      return;
+    }
     (pending.viaInk ? Promise.resolve().then(() => readInkDraft(question.id)).catch(() => null) : Promise.resolve(null)).then(kept => {
       deliver({
         answer: pending.answer, ms: pending.ms, steps: pending.steps, viaInk: pending.viaInk,
@@ -1193,7 +1219,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     });
     return cards.length ? cards : null;
   }, [writeMode, lineVerdicts, inkResult, t]);
-  const canSubmit = isMcq ? mcqSel !== null : isWorking ? (writeMode ? !!inkResult?.lines?.length : !!working.trim()) : writeMode ? !!inkResult?.answerLine : !!answer.trim();
+  const canSubmit = (isMcq ? mcqSel !== null : isWorking ? (writeMode ? !!inkResult?.lines?.length : !!working.trim()) : writeMode ? !!inkResult?.answerLine : !!answer.trim()) &&
+    (!photoReattachRequired || mode !== 'photo' || (!!photo && photoOCR.phase === 'done'));
 
   const earnedMarks = resolved
     ? (verdictGood ? totalMarks : (selfSaved ? Object.values(selfMarks).filter(Boolean).length : 0))

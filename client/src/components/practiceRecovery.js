@@ -54,6 +54,9 @@ export function savePendingSubmission(questionId, rec, meta = {}) {
     answer: String(rec.answer ?? '').slice(0, 4000),
     steps: rec.steps === undefined || rec.steps === null ? undefined : String(rec.steps).slice(0, 20000),
     viaInk: rec.viaInk === true,
+    // Persist provenance without persisting a plaintext photo or PDF. An
+    // interrupted Photo request must never restart as a typed grade.
+    sourceMode: rec.sourceMode === 'photo' ? 'photo' : rec.viaInk === true ? 'ink' : 'typed',
     ms: Math.max(0, Math.round(Number(rec.ms) || 0)),
     lines: cleanLines(rec.lines)
   }, { label: meta.label || '', note: 'Answer being marked', path: '/practice' });
@@ -69,6 +72,7 @@ export function readPendingSubmission(questionId) {
     answer: String(d.answer ?? ''),
     steps: d.steps === undefined || d.steps === null ? undefined : String(d.steps),
     viaInk: d.viaInk === true,
+    sourceMode: d.sourceMode === 'photo' ? 'photo' : d.viaInk === true ? 'ink' : 'typed',
     ms: Math.max(0, Number(d.ms) || 0),
     lines: cleanLines(d.lines)
   };
