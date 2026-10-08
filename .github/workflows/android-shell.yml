@@ -96,10 +96,13 @@ jobs:
           # google_apis API 33 image can restart GMSCore's FontsProvider while
           # instrumentation is live, which makes Android kill dependent apps
           # even though Pri has not crashed. API 36 still exercises google_apis
-          # on both phone and tablet, and the tablet keeps GPU compositing.
+          # on both phone and tablet. Hosted gfxstream/WebView compositing is
+          # unstable on the tablet too: repeated renderer SIGKILLs can take the
+          # emulator down mid-ink journey, so use the same proven software
+          # compositing path while keeping every product assertion enabled.
           - { api: 33, profile: pixel_6, expect: product, target: default, webviewFlags: "--disable-gpu-compositing" }
           - { api: 36, profile: pixel_6, expect: product, target: google_apis, webviewFlags: "--disable-gpu-compositing" }
-          - { api: 36, profile: pixel_tablet, expect: product, target: google_apis, webviewFlags: "" }
+          - { api: 36, profile: pixel_tablet, expect: product, target: google_apis, webviewFlags: "--disable-gpu-compositing" }
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
