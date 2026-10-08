@@ -426,6 +426,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const decodePhoto = useCallback(async (dataURL) => {
     if (!dataURL) return;
     pendingPdf.current = null;
+    // A new single photo must also clear an earlier multi-page PDF warning.
+    setPdfUnread(null);
     // Even a rejected, signed-out replacement invalidates an older in-flight
     // provider response; authentication state cannot revive the old image.
     const generation = ++photoReadGeneration.current;
@@ -829,6 +831,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   async function submit(vouchedNow) {
     if (inFlightRef.current || busy || resolved) return;
     if (needsCheck && vouchedNow !== reading) { setChecking(true); return; }
+    // A stale answer left over from another attachment is not evidence that
+    // the NEW photo was recognised. Never let Submit race its cloud reading or
+    // quietly grade only the readable subset of a multi-page PDF.
+    if (mode === 'photo' && (!photo || photoOCR.phase !== 'done' || pdfUnread)) return;
     if (photoReattachRequired && mode === 'photo' && (!photo || photoOCR.phase !== 'done')) return;
     let given, steps, viaInk = false, ink, lines = null;
     if (isMcq) {
@@ -1232,7 +1238,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     });
     return cards.length ? cards : null;
   }, [writeMode, lineVerdicts, inkResult, t]);
+  // Photo mode is never a back door for submitting an old typed transcript.
+  // Switch explicitly to Type when there is no fully recognised attachment.
+  const photoAwaitingValidReading = mode === 'photo' &&
+    (!photo || photoOCR.phase !== 'done' || !!pdfUnread);
   const canSubmit = (isMcq ? mcqSel !== null : isWorking ? (writeMode ? !!inkResult?.lines?.length : !!working.trim()) : writeMode ? !!inkResult?.answerLine : !!answer.trim()) &&
+    !photoAwaitingValidReading &&
     (!photoReattachRequired || mode !== 'photo' || (!!photo && photoOCR.phase === 'done'));
 
   const earnedMarks = resolved
