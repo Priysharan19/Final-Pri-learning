@@ -491,13 +491,13 @@ export default function ExamRoom() {
                 <span className="sr-only"> — {t(d.awarded === d.marks ? 'examRoom.allEarned' : d.awarded > 0 ? 'examRoom.partlyEarned' : 'examRoom.noneEarned')}</span>
               </span>
             </div>
-            <MathText block className="q-prompt" style={{ fontSize: 16 }} text={d.stem} />
+            <div lang="en"><MathText block className="q-prompt" style={{ fontSize: 16 }} text={d.stem} /></div>
             {d.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: d.figure }} />}
             {d.parts.map(pt => (
               <div key={pt.key} style={{ margin: '12px 0 0', paddingTop: 10, borderTop: '1px solid var(--hairline)' }}>
                 <div className="row" style={{ gap: 8, alignItems: 'baseline' }}>
                   <b>({pt.key})</b>
-                  <span style={{ flex: 1 }}><MathText text={pt.prompt} /></span>
+                  <span style={{ flex: 1 }} lang="en"><MathText text={pt.prompt} /></span>
                   <span className="tag" style={{ color: pt.correct ? 'var(--good)' : 'var(--bad)' }}>
                     {pt.awarded}/{pt.marks}<span className="sr-only"> {t(pt.correct ? 'examRoom.srMarksCorrect' : 'examRoom.srMarksIncorrect')}</span>
                   </span>
@@ -539,11 +539,11 @@ export default function ExamRoom() {
                 {d.unanswered && <span> {t('examRoom.notAttempted')}</span>}
               </span>
             </div>
-            <MathText block className="q-prompt" style={{ fontSize: 16 }} text={d.prompt} />
+            <div lang="en"><MathText block className="q-prompt" style={{ fontSize: 16 }} text={d.prompt} /></div>
             {d.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: d.figure }} />}
             {OBJECTIVE.has(d.answerType) && d.mcqOptions && (
               <div className="muted" style={{ marginBottom: 8 }}>
-                {t('examRoom.options')} {d.mcqOptions.map((o, j) => <span key={j} style={{ marginRight: 12 }}>{'ABCD'[j]}. <MathText text={o} /></span>)}
+                {t('examRoom.options')} {d.mcqOptions.map((o, j) => <span key={j} lang="en" style={{ marginRight: 12 }}>{'ABCD'[j]}. <MathText text={o} /></span>)}
               </div>
             )}
             <div className="row" style={{ flexWrap: 'wrap', gap: 16, fontSize: 14 }}>
@@ -789,6 +789,9 @@ export default function ExamRoom() {
         <span><Icon name="flag" size={13} />{t('exam.legendFlagged')}</span>
       </div>
 
+      {/* The paper retains English question content in a Hindi interface. Mark the
+          authored mathematics in its source language for screen readers; keep
+          the surrounding navigation and scoring labels translated with t(). */}
       <section className="exam-paper" aria-label={t('examRoom.questionOf', { n: qNumber, total: exam.questions.length })}>
         <div className="q-meta exam-qhead">
           <span className="tag">{t('examRoom.questionOf', { n: qNumber, total: exam.questions.length })}</span>
@@ -809,13 +812,13 @@ export default function ExamRoom() {
         </div>
         {q.multipart ? (
           <>
-            <MathText block className="q-prompt" text={q.stem} />
+            <div lang="en"><MathText block className="q-prompt" text={q.stem} /></div>
             {q.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: q.figure }} />}
             {q.parts.map(pt => (
               <div key={pt.key} style={{ margin: '14px 0 0', paddingTop: 12, borderTop: '1px solid var(--hairline)' }}>
                 <div className="row" style={{ gap: 8, alignItems: 'baseline', marginBottom: 8 }}>
                   <b style={{ fontSize: 16 }}>({pt.key})</b>
-                  <span style={{ flex: 1 }}><MathText text={pt.prompt} /></span>
+                  <span style={{ flex: 1 }} lang="en"><MathText text={pt.prompt} /></span>
                   <span className="tag">{t('examRoom.marksCount', { count: pt.marks, n: pt.marks })}</span>
                 </div>
                 {pt.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: pt.figure }} />}
@@ -823,7 +826,7 @@ export default function ExamRoom() {
                 {pt.alt && (
                   <div style={{ marginTop: 10 }}>
                     <div className="muted" style={{ fontWeight: 600, margin: '6px 0' }}>{t('examRoom.orLabel')}</div>
-                    <MathText block text={pt.alt.prompt} />
+                    <div lang="en"><MathText block text={pt.alt.prompt} /></div>
                     {answerControl(answerKey(q.id, pt.key, OR), pt.alt, t('examRoom.labelPartOr', { key: pt.key }))}
                   </div>
                 )}
@@ -832,13 +835,13 @@ export default function ExamRoom() {
           </>
         ) : (
           <>
-            <MathText block className="q-prompt" text={q.prompt} />
+            <div lang="en"><MathText block className="q-prompt" text={q.prompt} /></div>
             {q.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: q.figure }} />}
             {answerControl(q.id, q, t('examRoom.labelQuestion', { n: qNumber }))}
             {q.choice && (
               <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--hairline)' }}>
                 <div className="muted" style={{ fontWeight: 600, marginBottom: 6 }}>{t('examRoom.orChoiceNote')}</div>
-                <MathText block className="q-prompt" text={q.choice.prompt} />
+                <div lang="en"><MathText block className="q-prompt" text={q.choice.prompt} /></div>
                 {q.choice.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: q.choice.figure }} />}
                 {answerControl(answerKey(q.id, OR), q.choice, t('examRoom.labelQuestionOr', { n: qNumber }))}
               </div>
