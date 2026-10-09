@@ -15,6 +15,7 @@ on:
       - 'client/test/golden-student-journey.mjs'
       - 'client/test/kalp03-onboarding-check.mjs'
       - 'client/test/tour-kalp03-onboarding.js'
+      - 'client/test/support/**'
       - 'docs/design/KALP-03-onboarding-profile.md'
       - '.github/workflows/kalp-03-onboarding-profile.yml'
   workflow_dispatch:

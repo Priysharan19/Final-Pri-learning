@@ -12,6 +12,7 @@ on:
       - 'client/test/kalp02-navigation-check.mjs'
       - 'client/test/tour-kalp02-navigation.js'
       - 'client/test/tour-kalp01-design.js'
+      - 'client/test/support/**'
       - 'docs/design/KALP-02-information-architecture.md'
       - '.github/workflows/kalp-02-information-architecture.yml'
   workflow_dispatch:

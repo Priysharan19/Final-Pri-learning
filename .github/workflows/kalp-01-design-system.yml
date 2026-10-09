@@ -6,6 +6,7 @@ on:
       - 'client/src/**'
       - 'client/test/design-system-check.mjs'
       - 'client/test/tour-kalp01-design.js'
+      - 'client/test/support/**'
       - 'docs/design/**'
       - 'docs/evidence/KALP-01*'
       - '.github/workflows/kalp-01-design-system.yml'

@@ -14,6 +14,7 @@ on:
       - 'client/src/pages/PracticeBase.jsx'
       - 'client/src/engine/indiaProduct.js'
       - 'client/test/tour-kalp04-home.js'
+      - 'client/test/support/**'
       - 'client/test/e2e.mjs'
       - 'client/test/a11y-check.mjs'
       - 'client/test/tour-kalp01-design.js'

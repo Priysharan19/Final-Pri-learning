@@ -1,11 +1,18 @@
 // KALP-01 · real-browser visual and responsive acceptance flow.
-// This uses the same local-first production build and profile UI as the main
-// Pri E2E suite. It does not inject a profile, mock API responses, or fake a
-// success state. Screenshots are evidence of the state the working app reached.
+// This uses the same production build and profile UI as the main Pri E2E
+// suite. It does not inject a profile, mock API responses, or fake a success
+// state. Screenshots are evidence of the state the working app reached.
+//
+// Only Pri's server marks (owner decision 2026-10-10), so the flow runs
+// against the real in-process platform server (support/online-session.mjs).
+// It first proves the signed-out student is honestly refused — nothing marked,
+// nothing sent — then signs in through the app and proves the feedback on the
+// card is the server's own authoritative receipt.
 
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join } from 'node:path';
+import { serverMarking, nothingMarkedOnCard } from './support/server-marked.mjs';
 
 const ARTIFACTS = fileURLToPath(new URL('../../artifacts/kalp-01/', import.meta.url));
 const TABLET = { width: 1024, height: 1366 };
@@ -76,7 +83,10 @@ async function forceTypedAnswerMode(page) {
   await page.waitForTimeout(250);
 }
 
-async function reachFeedback(page, check) {
+/** POSTs that ask the server to issue, mark or reveal — not `prepare`. */
+const MARKING = /^\/v1\/practice\/(?:issue|[^/]+\/(?:submit|reveal|recognize|repeat|recognition\/.+))$/;
+
+async function enterAnAnswer(page, check) {
   await forceTypedAnswerMode(page);
   const mcq = page.locator('.mcq button:visible').first();
   if (await mcq.count()) {
@@ -88,30 +98,77 @@ async function reachFeedback(page, check) {
     else if (await working.count()) await working.fill('0');
     else {
       await check('practice exposes an answer control', false, 'no visible MCQ, typed answer or working field');
-      return false;
+      return null;
     }
   }
-
   const submit = page.locator('.editor-foot .btn-primary:visible, .row.no-print .btn-primary:visible').first();
   if (!(await submit.count())) {
     await check('practice exposes a real submit control', false, 'submit button not found');
-    return false;
+    return null;
   }
+  return submit;
+}
+
+/**
+ * Signed out, the card says so BEFORE anything is submitted, and nothing is
+ * marked. Submit is deliberately not pressed here: the refusal after a press is
+ * tour-online-check's subject, and this flow goes on to mark this same question.
+ */
+async function signedOutSaysSo(page, check, online) {
+  await forceTypedAnswerMode(page);
+  const notice = page.locator('[data-check-needs-account]');
+  await notice.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+  const row = await online.shownRow();
+  const shown = await nothingMarkedOnCard(page);
+  const sent = (await online.practiceCalls(MARKING)).map(c => c.path);
+  const words = await notice.innerText().catch(() => '');
+  return check('signed out, the question says checking needs a Pri account: sign-in in the card, no verdict, nothing issued or sent to be marked',
+    /needs a Pri account/i.test(words) && await notice.locator('[data-check-sign-in]').isEnabled().catch(() => false)
+      && row?.checkState === 'prepared' && !row.serverQuestionId && shown.none && sent.length === 0
+      && !/marked on this device|checked on this device/i.test(await page.locator('.qpage').innerText()),
+    JSON.stringify({ words: words.slice(0, 160), row: row && { checkState: row.checkState, issued: !!row.serverQuestionId }, card: shown.card, sent }));
+}
+
+async function reachFeedback(page, check, online) {
+  const submit = await enterAnAnswer(page, check);
+  if (!submit) return false;
   await submit.click();
-  const reached = await page.waitForSelector('.verdict, .eval-card', { timeout: 30000 })
+  const reached = await page.waitForSelector('.verdict-bad, .eval-card', { timeout: 30000 })
     .then(() => true).catch(() => false);
-  await check('submitting a real answer reaches real feedback', reached);
-  return reached;
+  const marking = await serverMarking(online, page);
+  // "Real feedback" is the server's: an authoritative receipt for the question
+  // this account was issued, and the verdict on the card is that receipt's.
+  await check('submitting a real answer reaches real feedback', reached && marking.ok, JSON.stringify(marking));
+  const ledger = online.ledger(marking.serverQuestionId);
+  await check('the feedback is the server\'s authoritative receipt for a question it issued to this account',
+    marking.owned && marking.authoritative && marking.agrees && ledger.issued >= 1
+      && ledger.thisDone === (marking.receipt?.resolved ? 1 : 0),
+    JSON.stringify({ marking, ledger }));
+  return reached && marking.ok;
 }
 
 export const flow = {
   id: 'kalp01-design',
   name: 'KALP-01 · visual system, tablet and real demo journey',
+  online: true,
 
-  async run({ page, check, goto, settle }) {
+  async run({ page, check, goto, settle, online }) {
+    // The flow now runs against the real server, and a browser logs every
+    // non-2xx reply as a console error of its own. While the student is signed
+    // out, the server answering 401 to the app's "is anyone signed in?" reads
+    // is the correct reply, not a fault: only those — a 401, from this
+    // server's /v1, before sign-in — are set aside. Every other console error,
+    // and any 401 once signed in, still fails the flow.
     const consoleErrors = [];
+    let signedIn = false;
     page.on('console', msg => {
-      if (msg.type() === 'error') consoleErrors.push(msg.text().slice(0, 300));
+      if (msg.type() !== 'error') return;
+      const text = msg.text();
+      let from = null;
+      try { from = new URL(msg.location()?.url || ''); } catch { from = null; }
+      const signedOutProbe = !signedIn && /^Failed to load resource: the server responded with a status of 401\b/.test(text)
+        && from?.origin === online.origin && from.pathname.startsWith('/v1/');
+      if (!signedOutProbe) consoleErrors.push(`${text.slice(0, 300)}${from ? ` @${from.pathname}` : ''}`);
     });
 
     await page.setViewportSize(TABLET);
@@ -165,7 +222,16 @@ export const flow = {
     await goto('/practice');
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
     await settle();
-    if (await reachFeedback(page, check)) {
+    await signedOutSaysSo(page, check, online);
+    await snap(page, '03a-practice-sign-in-needed-tablet');
+
+    // Sign in through the app (Settings → Pri account), then mark for real.
+    await online.signIn({ name: 'KALP Demo Student' });
+    signedIn = true;
+    await goto('/practice');
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
+    await settle();
+    if (await reachFeedback(page, check, online)) {
       await snap(page, '03-practice-feedback-tablet-dark');
       const explain = page.locator('.pri-explain-launch:visible, .pri-explain-play:visible').first();
       if (await explain.count()) {
