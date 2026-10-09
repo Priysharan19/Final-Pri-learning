@@ -305,10 +305,10 @@ function ProfilePractice() {
     return assignmentSync.current;
   }, [assignmentMode, assignmentContext, assignmentClassId, assignmentId, assignmentTarget, t]);
 
-  const onResolved = (res, questionId = null) => {
+  const onResolved = res => {
     // A network acknowledgement from a removed account's card cannot change
     // this student's session or send an assignment summary under a new login.
-    if (!alive.current || !consumeSessionReceipt(res, seenSessionAttempts.current, questionId)) return;
+    if (!alive.current || !consumeSessionReceipt(res, seenSessionAttempts.current)) return;
     const goal = Math.max(1, Number(user.dailyGoal) || 10);
     const before = Math.max(0, Number(user.today?.questions) || 0);
     if (!assignmentMode && !sessionDoneShown.current && before < goal && before + 1 >= goal) {

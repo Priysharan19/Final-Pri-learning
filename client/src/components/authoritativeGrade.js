@@ -61,21 +61,3 @@ export function showCommittedMethodAwardNote(result, grade) {
     Number.isFinite(result.partial.awarded) &&
     result.partial.awarded === grade.awarded;
 }
-
-// A device question (no signed-in account reached the server when it was
-// served, and none at submit) is marked by the bundled deterministic engine.
-// The local backend says so explicitly: `authoritative: false`, and never an
-// attempt id or a certified mark pair. Anything that mixes the two shapes is
-// neither a server receipt nor a device verdict and is refused. A device
-// verdict that names a submission must name the one that was sent.
-export function deviceMarkedResponse(result, submittedId) {
-  return result?.authoritative === false && result.attemptId == null &&
-    result.marksEarned == null && result.marksPossible == null &&
-    (result.submissionId == null || result.submissionId === submittedId);
-}
-
-// A device reveal settles the question with no marks and no server attempt.
-export function deviceRevealResponse(result) {
-  return deviceMarkedResponse(result, null) && result.submissionId == null &&
-    result.resolved === true && result.revealed === true;
-}

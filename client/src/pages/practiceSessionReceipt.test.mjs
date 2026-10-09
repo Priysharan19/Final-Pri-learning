@@ -7,7 +7,7 @@ assert.equal(seen.size, 1);
 assert.equal(consumeSessionReceipt({...r,replayed:true}, seen), false, 'lost ACK retry not a second session question');
 assert.equal(consumeSessionReceipt({...r,replayed:true,correct:true}, seen), false, 'same attempt may not replace its correctness');
 assert.equal(consumeSessionReceipt({...r,resolved:false,attemptId:'attempt-immutable-0002'},seen),false,'unresolved try is not completed');
-assert.equal(consumeSessionReceipt({...r,authoritative:false,attemptId:'attempt-immutable-0003'},seen),false,'a result that is not authoritative yet names a server attempt is neither');
+assert.equal(consumeSessionReceipt({...r,authoritative:false,attemptId:'attempt-immutable-0003'},seen),false,'local grade not committed');
 assert.equal(consumeSessionReceipt({...r,attemptId:''},seen),false,'no verifiable server attempt id');
 assert.equal(consumeSessionReceipt({...r,attemptId:'attempt-immutable-0004'},seen),true,'different committed attempt counted');
 assert.equal(seen.size,2);
@@ -15,16 +15,14 @@ assert.equal(consumeSessionReceipt({...r,attemptId:'attempt-immutable-0004',reve
 assert.equal(consumeSessionReceipt({...r,attemptId:'attempt-immutable-0005'},null),false,'missing Set fails closed');
 const otherStudent = new Set();
 assert.equal(consumeSessionReceipt(r,otherStudent),true,'new local profile has its own isolated session ledger');
-// Device questions (bundled deterministic engine, no server attempt): counted
-// once per question, never without a question identity, never as a server one.
+// Device-shaped results are never counted: practice is checked by the server
+// only, so a completed question always has a server attempt behind it.
 const device = { authoritative: false, resolved: true, correct: true, submissionId: 'sub-device-1' };
 const deviceSeen = new Set();
-assert.equal(consumeSessionReceipt(device, deviceSeen), false, 'a device verdict without its question id is not counted');
-assert.equal(consumeSessionReceipt(device, deviceSeen, 'question-A'), true, 'a resolved device question is counted');
-assert.equal(consumeSessionReceipt({...device,replayed:true}, deviceSeen, 'question-A'), false, 'a replay of the same device question is not counted twice');
-assert.equal(consumeSessionReceipt({...device,resolved:false}, deviceSeen, 'question-B'), false, 'an unresolved device try is not completed');
-assert.equal(consumeSessionReceipt({...device,marksEarned:1,marksPossible:1}, deviceSeen, 'question-C'), false, 'a device verdict cannot carry certified marks');
+assert.equal(consumeSessionReceipt(device, deviceSeen), false, 'a device verdict is not a completed session question');
+assert.equal(consumeSessionReceipt(device, deviceSeen, 'question-A'), false, 'naming its question does not make it one');
+assert.equal(consumeSessionReceipt({ authoritative: false, resolved: true, revealed: true }, deviceSeen, 'question-E'), false, 'a device reveal is not counted');
 assert.equal(consumeSessionReceipt({ resolved: true, correct: true }, deviceSeen, 'question-D'), false, 'a result that does not say who marked it is not counted');
-assert.equal(consumeSessionReceipt({ authoritative: false, resolved: true, revealed: true }, deviceSeen, 'question-E'), true, 'a device reveal completes its question once');
-assert.equal(deviceSeen.size, 2);
-console.log('STUDENT SESSION RECEIPT DEDUP: PASS 20/20');
+assert.equal(consumeSessionReceipt({ ...device, attemptId: 'attempt-immutable-0009' }, deviceSeen), false, 'a device verdict naming a server attempt is not counted');
+assert.equal(deviceSeen.size, 0, 'and none of them enters the session ledger');
+console.log('STUDENT SESSION RECEIPT DEDUP: PASS 18/18');
