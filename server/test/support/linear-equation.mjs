@@ -20,11 +20,14 @@ function side(text) {
   return { coefficient, constant, variable };
 }
 
-/** { variable, lhs, rhs, root } for a prompt that is one linear equation in one letter. */
+/** { variable, lhs, rhs, root, bare } for a prompt that holds one linear equation in one letter. */
 export function solveLinearPrompt(prompt) {
-  const source = String(prompt).match(/^\s*\$([^$]+)\$\s*$/);
-  assert.ok(source, `the prompt is one $…$ equation: ${prompt}`);
-  const equation = source[1].replace(/\s+/g, '').replace(/−/g, '-');
+  const spans = String(prompt).match(/\$[^$]+\$/g) || [];
+  assert.equal(spans.length, 1, `the prompt holds one $…$ equation: ${prompt}`);
+  // `bare`: the whole prompt is the equation (the generated form), not an
+  // authored exercise that words around it.
+  const bare = String(prompt).trim() === spans[0];
+  const equation = spans[0].slice(1, -1).replace(/\s+/g, '').replace(/−/g, '-');
   const sides = equation.split('=');
   assert.equal(sides.length, 2, `one equals sign: ${equation}`);
   const [l, r] = sides.map(side);
@@ -33,5 +36,5 @@ export function solveLinearPrompt(prompt) {
   const a = l.coefficient - r.coefficient;
   assert.notEqual(a, 0, `a unique root: ${equation}`);
   const root = (r.constant - l.constant) / a;
-  return { variable, lhs: sides[0], rhs: sides[1], root, left: l, right: r };
+  return { variable, lhs: sides[0], rhs: sides[1], root, left: l, right: r, bare };
 }
