@@ -49,14 +49,14 @@ function listenForSmsCode(onCode) {
   return () => controller.abort();
 }
 
-export default function SignUpFlow({ initialMode = 'signup', onCancel, onFinish, onStartOffline }) {
+export default function SignUpFlow({ initialMode = 'signup', initialName = '', onCancel, onFinish, onStartOffline }) {
   const t = useT();
   const [mode, setMode] = useState(initialMode);
   const [role, setRole] = useState(initialMode === 'signin' ? 'student' : '');
   const [age, setAge] = useState(null);           // number, or 18 for "18 or older"
   const [year, setYear] = useState(null);
   const [track, setTrack] = useState('cbse');
-  const [name, setName] = useState('');
+  const [name, setName] = useState(() => String(initialName || '').slice(0, 80));
   const [channel, setChannel] = useState('sms');
   const [destination, setDestination] = useState('');
   const [challenge, setChallenge] = useState(null);
@@ -281,7 +281,11 @@ export default function SignUpFlow({ initialMode = 'signup', onCancel, onFinish,
     );
   } else if (step === 'class') {
     const jee = track !== 'cbse';
-    const ready = year && (!jee || year >= 11);
+    // A code for an address with no account earns a sign-up ticket, and the
+    // account it creates needs a name. The name is normally asked on the
+    // method step, which a sign-in has already passed, so it is asked here.
+    const namePending = !!ticket && !account;
+    const ready = year && (!jee || year >= 11) && (!namePending || !!name.trim());
     body = (
       <>
         {heading('signup.classTitle')}
@@ -302,6 +306,13 @@ export default function SignUpFlow({ initialMode = 'signup', onCancel, onFinish,
           })}
         </div>
         {jee && <p className="signup-hint">{t('signup.trackJeeHint')}</p>}
+        {namePending && (
+          <>
+            <label className="label" htmlFor="signup-flow-name">{t('signup.nameLabel')}</label>
+            <input className="input" id="signup-flow-name" autoComplete="given-name" value={name} maxLength={80}
+              onChange={e => { setName(e.target.value); setError(''); }} />
+          </>
+        )}
         <button type="button" className="btn btn-primary btn-lg signup-next" disabled={!ready || !!busy}
           onClick={() => (account ? (minor && consent?.state !== 'given' ? go('parent') : finish()) : ticket ? completeWithTicket() : next())}
           data-testid="signup-class-next">

@@ -15,6 +15,11 @@ assert.equal(canOpenInkSignIn({...base,readerState:{kind:'ACCOUNT_ACTION_REQUIRE
 assert.match(inkRecoveryWords('en').action,/Sign in to check this answer/);
 assert.ok(inkRecoveryWords('hi').action.includes('साइन इन'));
 assert.doesNotMatch(inkRecoveryWords('en').detail,/saved|marked on device/i,'no unverified persistence/grade promise');
+for (const lang of ['en','hi']) for (const key of ['ink.waitingGuardian','ink.waitingVerifyEmail']) {
+  assert.ok(inkRecoveryWords(lang).blocker[key]?.length > 10, lang+' names the '+key+' blocker');
+  assert.doesNotMatch(inkRecoveryWords(lang).blocker[key], /saved|सहेज/i, 'the blocker sentence makes no save claim');
+}
+assert.equal(inkRecoveryWords('en').blocker['ink.waitingSignIn'], undefined, 'sign-in is an action, not a second sentence');
 const operations=[];
 const invoke=(overrides={})=>completeInkOtpRecovery({
   localProfileId:'local-a',currentProfileId:'local-a',account:{id:'cloud-a'},
@@ -40,4 +45,4 @@ await assert.rejects(invoke({linkAccount:async()=>{throw Error('Server refusal')
 assert.deepEqual(operations,['check'],'failed linkage cannot announce connected profile');
 assert.match(inkRecoveryWords('en').otpAction,/phone or email code/);
 assert.ok(inkRecoveryWords('hi').otpAction.includes('कोड'));
-console.log('SIGNED-OUT INK ACCOUNT RECOVERY: PASS 23/23');
+console.log('SIGNED-OUT INK ACCOUNT RECOVERY: PASS 32/32');

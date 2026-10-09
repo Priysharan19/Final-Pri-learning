@@ -21,6 +21,10 @@ export function inkRecoveryWords(language = 'en') {
         otpNotice: 'पुष्टि किया गया Pri खाता इसी प्रोफ़ाइल की सहेजी गई लिखावट से जुड़ जाएगा।',
         detail: 'आपकी लिखावट अभी जाँची नहीं गई है। इस डिवाइस पर सहेजने की स्थिति नीचे देखें।',
         saveFirst: 'साइन इन करने से पहले लिखावट सुरक्षित सहेजना आवश्यक है।',
+        blocker: {
+          'ink.waitingGuardian': 'हैंडराइटिंग पढ़ने से पहले किसी अभिभावक को आपके खाते की पुष्टि करनी होगी।',
+          'ink.waitingVerifyEmail': 'हैंडराइटिंग पढ़वाने के लिए अपना ईमेल पता सत्यापित करें।',
+        },
       }
     : {
         action: 'Sign in to check this answer',
@@ -28,6 +32,13 @@ export function inkRecoveryWords(language = 'en') {
         otpNotice: 'This connects the saved working on this profile to the Pri account you verify.',
         detail: 'Your handwriting has not been read or graded. Check its device-save status below.',
         saveFirst: 'Save your handwriting on this device before signing in.',
+        // What is actually in the way, without the generic sentence's
+        // unverified "your working is saved" claim (the save status below is
+        // the only place that claim is made, from an IndexedDB readback).
+        blocker: {
+          'ink.waitingGuardian': 'A parent or guardian needs to confirm your account before handwriting can be read.',
+          'ink.waitingVerifyEmail': 'Verify your email address to have handwriting read.',
+        },
       };
 }
 

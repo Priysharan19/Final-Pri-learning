@@ -22,7 +22,7 @@ import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
 import { canRetryPhotoReading, definitiveSubmissionRefusal, draftPersistenceWarning, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure, photoSupportedFormats, photoAwaitingOnlineReader, pdfReaderNeedsOnlineDownload } from './photoSubmissionGuard.js';
 import { plotSpecFor } from '../engine/plotSpec.js';
-import { attestedGrade, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable, showCommittedMethodAwardNote } from './authoritativeGrade.js';
+import { attestedGrade, deviceMarkedResponse, deviceRevealResponse, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable, showCommittedMethodAwardNote } from './authoritativeGrade.js';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 import { misconceptionById } from '../engine/misconceptions.js';
@@ -976,9 +976,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // After unmount a stale response may still commit on the server, but
       // must not modify another profile's pending state or trigger onResolved.
       if (!mountedRef.current) return;
-      if (!diagnostic && !matchingGradeResponse(r, question.id, body.submissionId)) {
-        // Never clear the durable idempotency record on a wrong-question,
-        // old-attempt or non-authoritative success response.
+      if (!diagnostic && !matchingGradeResponse(r, question.id, body.submissionId)
+          && !deviceMarkedResponse(r, body.submissionId)) {
+        // Never clear the durable idempotency record on a wrong-question or
+        // old-attempt response. A device question's verdict from the bundled
+        // engine is explicit (authoritative: false) and is accepted as such.
         throw new Error(gradingReceiptMismatch(language));
       }
       pendingRef.current = null;
@@ -1000,7 +1002,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         // The attempt is recorded whether or not this card is still on screen,
         // so the session still counts it — exactly once, because the pending
         // record that could replay it is already gone.
-        onResolved?.(r);
+        onResolved?.(r, String(question.id));
       } else {
         inkFrozenRef.current = false;
         if (live) setState({ phase: 'retry', res: r });
@@ -1139,8 +1141,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // A late reveal may commit on the original server question, but must not
       // clear the current profile's draft or navigate away from another card.
       if (!mountedRef.current) return;
-      if (r?.authoritative !== true || r?.resolved !== true || r?.revealed !== true ||
-          typeof r?.attemptId !== 'string' || !r.attemptId) {
+      if (!deviceRevealResponse(r) && (r?.authoritative !== true || r?.resolved !== true || r?.revealed !== true ||
+          typeof r?.attemptId !== 'string' || !r.attemptId)) {
         throw new Error(gradingReceiptMismatch(language));
       }
       // Revealing settles the question, so nothing kept for it may replay.
@@ -1154,7 +1156,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
         setSaveState(null);
       }
-      onResolved?.(r);
+      onResolved?.(r, String(question.id));
     } catch (e) {
       inkFrozenRef.current = false;
       throw e;
@@ -1356,6 +1358,16 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const serverAuthoritative = res?.authoritative === true;
   // Correctness and diagnostic partial feedback are not numerical awards.
   const committedGrade = resolved ? attestedGrade(res, question.id, attempt) : null;
+  // A device question is marked by the bundled deterministic engine: all the
+  // marks for a correct answer (less hint credit), otherwise what the student
+  // self-marked. It is never presented as a server-certified pair; the status
+  // line says "marked on this device".
+  const deviceGrade = resolved && !serverAuthoritative ? {
+    awarded: verdictGood ? Math.round(totalMarks * credit * 10) / 10
+      : (selfSaved ? Object.values(selfMarks).filter(Boolean).length : 0),
+    possible: totalMarks
+  } : null;
+  const shownGrade = committedGrade || deviceGrade;
 
   // The verdict lands in the middle of a long page. Spoken as one sentence, a
   // screen reader hears whether the answer was right without hunting for it.
@@ -1366,14 +1378,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         : t('verdict.speechRetry', { feedback: state.res?.feedback || t('verdict.oneMoreGo') });
     }
     if (!resolved) return '';
-    const marks = committedGrade
-      ? t('verdict.speechMarks', { count: committedGrade.possible,
-          earned: committedGrade.awarded, total: committedGrade.possible }) : '';
+    const marks = shownGrade
+      ? t('verdict.speechMarks', { count: shownGrade.possible,
+          earned: shownGrade.awarded, total: shownGrade.possible }) : '';
     if (res.revealed) return marks ? t('verdict.speechRevealed', { marks }) : t('verdict.revealed');
     if (verdictGood) return marks ? t('verdict.speechCorrect', { marks }) : t('verdict.correct');
     return (marks ? t('verdict.speechIncorrect', { marks }) : t('verdict.notThisTime'))
       + (res.solution?.answerText ? t('verdict.speechExpected', { answer: res.solution.answerText }) : '');
-  }, [state.phase, state.res, resolved, res, verdictGood, committedGrade, t]);
+  }, [state.phase, state.res, resolved, res, verdictGood, shownGrade?.awarded, shownGrade?.possible, t]);
 
   const answerLines = isMcq ? [] : writeMode
     ? (inkResult?.lines || [])
@@ -1490,7 +1502,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           {/* Practice is untimed on screen: time on task is still measured for the
               marker, but a running clock is pressure, not information. */}
         </div>
-        {helpUsed > 0 && !resolved && diagnostic && (
+        {/* The credit a hint costs is the device engine's rule. A device
+            question that has had help is never handed to the server (it stays
+            with the bundled engine), so the promise is one this device keeps;
+            a server-issued question's marks are the server's alone to state. */}
+        {helpUsed > 0 && !resolved && (diagnostic || question.serverIssued !== true) && (
           <p className="q-credit">{t('verdict.creditAvailable', { percent: Math.round(credit * 100), marks: Math.round(totalMarks * credit * 10) / 10 })}</p>
         )}
 
@@ -1759,6 +1775,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               )}
               {inkAccountBlocked && (
                 <div className="ink-account-recovery" data-ink-account-recovery role="group" aria-label={inkRecoveryCopy.action}>
+                  {/* The generic reader sentence is hidden while an account
+                      action is pending (it carries an unverified save claim),
+                      so the blocker itself is named here. */}
+                  {inkRecoveryCopy.blocker[inkReaderState?.blocker] && (
+                    <p data-ink-blocker-reason={inkReaderState.blocker}>{inkRecoveryCopy.blocker[inkReaderState.blocker]}</p>
+                  )}
                   <p role="status" aria-live="polite">{inkRecoveryCopy.detail}</p>
                   {saveState === 'failed' && (
                     <button type="button" className="btn btn-secondary btn-sm" data-ink-save-retry
@@ -1777,7 +1799,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       {inkSignInOpen && inkSignInReady && (
                         <React.Suspense fallback={<p role="status">{t('cloud.stateChecking')}</p>}>
                           {inkOtpOpen ? (
-                            <InkOtpAccountRecovery initialMode="signin"
+                            <InkOtpAccountRecovery initialMode="signin" initialName={user?.name || ''}
                               onCancel={() => setInkOtpOpen(false)}
                               onFinish={async ({ account }) => {
                                 // Guardian-approved sign-in may call onFinish
@@ -1903,7 +1925,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   // Level 3 ends the question like Reveal: same state, same refreshes.
                   setState({ phase: 'resolved', res: r });
                   celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
-                  onResolved?.(r);
+                  onResolved?.(r, String(question.id));
                 }}
                 onClose={() => setShowTutor(false)}
               />
@@ -2017,10 +2039,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   {t(verdictGood ? 'verdict.correct' : res.revealed ? 'verdict.revealed' : 'verdict.notThisTime')}
                 </span>
                 <span className="eval-marks">
-                  {committedGrade
-                    ? t('verdict.marksOutOf', { earned: committedGrade.awarded, total: committedGrade.possible })
+                  {shownGrade
+                    ? t('verdict.marksOutOf', { earned: shownGrade.awarded, total: shownGrade.possible })
                     : <span data-grade-unavailable>{numericalGradeUnavailable(language)}</span>}
-                  {committedGrade && helpUsed > 0 && <small> · {t('verdict.afterHints', { count: helpUsed, n: helpUsed })}</small>}
+                  {shownGrade && helpUsed > 0 && <small> · {t('verdict.afterHints', { count: helpUsed, n: helpUsed })}</small>}
                 </span>
               </div>
               <div className="eval-body">

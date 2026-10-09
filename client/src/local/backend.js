@@ -1721,6 +1721,9 @@ function sanitize(q, row) {
     hintsAvailable: (q.hints || []).length, hintsUsed: row.hintsUsed || 0,
     tutorLevel: row.tutorLevel || 0,
     triesLeft: 2 - (row.tries || 0),
+    // Who marks this question as it stands: the server (issued there, its
+    // answer key never on this device) or the bundled deterministic engine.
+    serverIssued: !!row.serverQuestionId,
     supportsSteps: row.serverQuestionId ? q.supportsSteps === true : !!stepMetaFor(q),
     criteria: row.serverQuestionId
       ? Array.from({ length: Math.min(4, Math.max(1, Number(q.criteriaCount) || 1)) },
@@ -1952,7 +1955,7 @@ async function replaySubmission(p, row, q, submissionId, requestDigest, answer, 
         ...replayMarks,
         authoritative: true, attemptId: tried.serverReceipt.attemptId,
         serverAcknowledgedAt: tried.serverReceipt.serverAcknowledgedAt
-      } : {}),
+      } : { authoritative: false }),
       correct: false, resolved: false, triesLeft: 1,
       feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial,
       diagnosis: diagnosis || null,
@@ -1972,7 +1975,7 @@ async function replaySubmission(p, row, q, submissionId, requestDigest, answer, 
       ...replayMarks,
       authoritative: true, attemptId: row.serverReceipt.attemptId,
       serverAcknowledgedAt: row.serverReceipt.serverAcknowledgedAt
-    } : {}),
+    } : { authoritative: false }),
     xp: recorded.xp ?? 0, totalXp: recorded.totalXp ?? p.xp ?? 0, level: recorded.level ?? levelFromXp(p.xp || 0),
     ratingDelta: recorded.ratingDelta ?? 0, mastery: recorded.mastery ?? 0, band: recorded.band ?? null,
     predicted: recorded.predicted ?? null, streak, newBadges: [],
@@ -3531,7 +3534,11 @@ const routes = {
       return { ...certified,
         correct: false, resolved: false,
         triesLeft: authoritative ? authoritative.triesLeft : Math.max(0, 1 - (row.tries || 0)),
-        invalid: true, feedback, stepReport };
+        invalid: true, feedback, stepReport,
+        // The card matches a server receipt to the submission it sent. Without
+        // this an unreadable answer on a server-issued question was shown as
+        // "the server response did not match this submission".
+        ...(submissionId ? { submissionId } : {}) };
     }
     if (authoritative) {
       // The persisted server receipt—not an inferred local grade—is the
