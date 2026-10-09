@@ -108,7 +108,7 @@ The diff-derived risk is authoritative. A PR may declare a higher risk, never a 
 - Never fabricate physical iPad, Apple Pencil, student, teacher, benchmark, learning-outcome, App Store, payment-provider or human-review evidence.
 - Synthetic/simulator evidence stays explicitly separate from real-human/physical evidence.
 - Handwriting recognition remains answer-blind. Never use hidden expected answers/solutions/marks to improve transcription.
-- AI proposes, the deterministic engine decides: a model output never sets a mark. Keep the deterministic engine bundled in the client as the instant and connection-loss fallback.
+- AI proposes, the deterministic engine decides: a model output never sets a mark. Marking is online-only and server-authoritative (ADR-0001 amendment 2026-10-10): the server runs the deterministic engine on a question it issued, for a verified eligible signed-in account. Nothing is checked, marked or revealed signed out or offline; the student's typed and written work is kept on the device until it can be checked. The engine stays bundled in the client for question generation, notation preview and reading attempts recorded by earlier versions — never to mark a new answer.
 - Preserve profile/data isolation: Row-Level Security plus server authorization on every client-reachable record.
 - Model-provider and database service credentials live only in server environment variables, never in the client, the repo or chat.
 - Security regressions are release-blocking.
