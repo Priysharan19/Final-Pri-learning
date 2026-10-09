@@ -20,9 +20,9 @@ assert.equal(consumeSessionReceipt(r,otherStudent),true,'new local profile has i
 const device = { authoritative: false, resolved: true, correct: true, submissionId: 'sub-device-1' };
 const deviceSeen = new Set();
 assert.equal(consumeSessionReceipt(device, deviceSeen), false, 'a device verdict is not a completed session question');
-assert.equal(consumeSessionReceipt(device, deviceSeen, 'question-A'), false, 'naming its question does not make it one');
-assert.equal(consumeSessionReceipt({ authoritative: false, resolved: true, revealed: true }, deviceSeen, 'question-E'), false, 'a device reveal is not counted');
-assert.equal(consumeSessionReceipt({ resolved: true, correct: true }, deviceSeen, 'question-D'), false, 'a result that does not say who marked it is not counted');
+assert.equal(consumeSessionReceipt({ ...device, questionId: 'question-A' }, deviceSeen), false, 'naming its question does not make it one');
+assert.equal(consumeSessionReceipt({ authoritative: false, resolved: true, revealed: true, questionId: 'question-E' }, deviceSeen), false, 'a device reveal is not counted');
+assert.equal(consumeSessionReceipt({ resolved: true, correct: true, questionId: 'question-D' }, deviceSeen), false, 'a result that does not say who marked it is not counted');
 assert.equal(consumeSessionReceipt({ ...device, attemptId: 'attempt-immutable-0009' }, deviceSeen), false, 'a device verdict naming a server attempt is not counted');
 assert.equal(deviceSeen.size, 0, 'and none of them enters the session ledger');
 console.log('STUDENT SESSION RECEIPT DEDUP: PASS 18/18');

@@ -731,7 +731,7 @@ async function run() {
     const holdsNoKey = payload => ['answer', 'steps', 'solutionText', 'seed', 'traps', 'stepcheck'].filter(k => k in (payload || {}));
 
     const owner = (await POST('/profiles', { name: 'Owner', year: 10 })).user;
-    const intruder = (await POST('/profiles', { name: 'Intruder', year: 10 })).user;
+    await POST('/profiles', { name: 'Intruder', year: 10 });
     const ownerAccount = online.accountOf(owner.id).accountId;
     await POST('/profiles/select', { id: owner.id });
     // The group serves more than a free day's questions while hunting for

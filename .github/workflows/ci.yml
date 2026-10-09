@@ -267,7 +267,7 @@ jobs:
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1143/1143 checks' practice-http.log
           grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
-          grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 26/26 checks' practice-http.log
+          grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 29/29 checks' practice-http.log
       - name: Account, origin, CMS and classroom contracts
         run: |
           node server/test/account-deletion-reauth-check.mjs

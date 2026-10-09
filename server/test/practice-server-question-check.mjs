@@ -76,6 +76,15 @@ try {
   eq((await post('/v1/practice/issue', { prepared: forged }, a.jar)).data?.error?.code, 'PRACTICE_PREPARED_INVALID', 'an altered token is refused');
   eq((await post('/v1/practice/issue', { prepared: 'v1.AAAA.BBBB.CCCC' }, a.jar)).data?.error?.code, 'PRACTICE_PREPARED_INVALID', 'a made-up token is refused');
 
+  // The claim and the issue are one transaction: two binds racing from the
+  // same account (a double tap, a retry crossing the first reply) end as one
+  // issued question, never as a burnt token.
+  const racing = (await post('/v1/practice/prepare', REQUEST)).data.prepared;
+  const [r1, r2] = await Promise.all([post('/v1/practice/issue', { prepared: racing }, b.jar), post('/v1/practice/issue', { prepared: racing }, b.jar)]);
+  eq([r1.status, r2.status], [201, 201], 'two racing binds by one account both succeed');
+  eq(r1.data.question.id, r2.data.question.id, 'as the same issued question');
+  eq((await post('/v1/practice/issue', { prepared: racing }, a.jar)).status, 409, 'and the other account still cannot take it up');
+
   // ── and it is marked like any issued question ───────────────────────────
   const qid = bound.data.question.id;
   const grade = await post(`/v1/practice/${qid}/submit`, { submissionId: 'prepared-wrong-0001', answer: '987654321', mode: 'typed' }, a.jar, { 'Idempotency-Key': 'prepared-wrong-0001' });

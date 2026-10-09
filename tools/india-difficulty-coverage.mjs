@@ -110,7 +110,7 @@ for (const t of ['cbse', 'jee-main', 'jee-advanced', 'olympiad']) {
   lines.push('| Class | Chapter | Chapter levels | Forms at hardest | Dot points without the hardest level (levels they do have) |');
   lines.push('|---:|---|---|---:|---|');
   for (const x of r) {
-    const dps = x.dpsWithoutHardest.map(d => `${d.ordinal + 1}. ${d.text.replace(/\|/g, '\\|')} (${D(d.levels)})`).join('<br>');
+    const dps = x.dpsWithoutHardest.map(d => `${d.ordinal + 1}. ${d.text.replace(/\\/g, '\\\\').replace(/\|/g, '\\|')} (${D(d.levels)})`).join('<br>');
     lines.push(`| ${x.grade ?? '—'} | ${x.name} (\`${x.id}\`) | ${D(x.chapterLevels)} | ${x.hardestForms} | ${dps} |`);
   }
   lines.push('');

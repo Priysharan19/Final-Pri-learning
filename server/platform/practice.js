@@ -14,7 +14,7 @@ import { createHash, createHmac, randomInt, randomUUID } from 'node:crypto';
 import { asyncRouter, asyncHandler } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { nextSyncCursor, syncLockKey } from './db.js';
-import { requireSession, requireVerifiedEmail, requireRole, rateLimit, consumeRateLimit, sessionFromRequest } from './security.js';
+import { requireSession, requireVerifiedEmail, requireRole, rateLimit, sessionFromRequest } from './security.js';
 import { encryptDeliveryToken, decryptDeliveryToken, practiceContentKey } from './deliveryCrypto.js';
 import { misconceptionIdForTrap } from '../../client/src/engine/misconceptions.js';
 import { PUBLIC_QUESTION_FIELDS } from '../../client/src/engine/publicQuestion.js';
@@ -29,7 +29,6 @@ import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
 const ID = /^[a-zA-Z0-9_-]{8,100}$/;
 const UUID = /^[0-9a-f-]{36}$/i;
-const INDIA_BANK = /^c(?:[7-9]|1[0-2])-[a-z0-9][a-z0-9-]{2,95}$/;
 // Every authored generator the client can serve is issuable: with online-only
 // grading a question the server refuses to issue could never be checked. The
 // name is only a lookup key; an unknown one fails generation with 422.
@@ -343,7 +342,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const accountId = req.platformSession.account_id;
     const now = Date.now();
     await ensureBanks();
-    let q, practiceMode, repeat = false, trapDelivered = false, preparedNonce = null, seedGiven = false;
+    let q, practiceMode, repeat = false, trapDelivered = false, preparedNonce = null, preparedExpiry = 0, seedGiven = false;
     if (plain(body) && body.prepared !== undefined) {
       // Binding a question the student started signed out. Nothing else in the
       // body is honoured: the sealed token is the whole request.
@@ -353,17 +352,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const sealed = readPrepared(body.prepared);
       if (!sealed) return reject(res, 400, 'PRACTICE_PREPARED_INVALID', 'This prepared question is not valid.');
       if (sealed.x < now) return reject(res, 410, 'PRACTICE_PREPARED_EXPIRED', 'This prepared question has expired.');
-      // The same account retrying after a lost reply gets the same issue back.
-      const mine = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-prepared' AND key=? AND expires_at>?",
-        [accountId, sealed.n, now]);
-      if (mine) return res.status(201).json({ ...JSON.parse(mine.response_json), accountId: String(accountId) });
-      // One account, once: a token passed to a second account is refused.
-      const claim = await consumeRateLimit(db, 'practice-prepared-claim:' + sealed.n, { limit: 1, windowMs: PREPARED_TTL * 2 }, now);
-      if (!claim.allowed) return reject(res, 409, 'PRACTICE_PREPARED_USED', 'This prepared question has already been taken up.');
       try { q = generateQuestion(sealed.g, sealed.d, sealed.s, sealed.p); }
       catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
       practiceMode = sealed.m;
       preparedNonce = sealed.n;
+      preparedExpiry = sealed.x;
     } else {
       const request = readQuestionRequest(body, ISSUE_FIELDS);
       if (request.error) return reject(res, ...request.error);
@@ -393,6 +386,17 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const id = randomUUID();
     const publicResponse = { question: safeQuestion(id, q), ...(repeat ? { repeat: true } : {}), ...(trapDelivered ? { trapDelivered: true } : {}) };
     const response = await db.transaction(async () => {
+      if (preparedNonce) {
+        // One account, once — decided in the same transaction as the issue it
+        // allows, so a failed issue never burns the token and a retry by the
+        // same account (a lost reply, a double tap) gets the same issue back.
+        const mine = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-prepared' AND key=? AND expires_at>?",
+          [accountId, preparedNonce, now]);
+        if (mine) return JSON.parse(mine.response_json);
+        const claim = await db.run("INSERT INTO rate_limits(bucket, window_start, count) VALUES (?, ?, 1) ON CONFLICT(bucket) DO NOTHING",
+          ['practice-prepared-claim:' + preparedNonce, now]);
+        if (!claim?.changes) return { preparedUsed: true };
+      }
       if (idem) {
         const before = await db.get("SELECT response_json,request_digest FROM idempotency_keys WHERE account_id=? AND scope='practice-issue' AND key=? AND expires_at>?", [accountId, idem, now]);
         if (before) {
@@ -405,10 +409,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (idem) await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-issue',?,?,?,?,?)",
         [accountId, idem, JSON.stringify(publicResponse), requestDigest, now, now + MAX_AGE]);
       if (preparedNonce) await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-prepared',?,?,?,?,?)",
-        [accountId, preparedNonce, JSON.stringify(publicResponse), requestDigest, now, now + PREPARED_TTL * 2]);
+        [accountId, preparedNonce, JSON.stringify(publicResponse), requestDigest, now, Math.max(preparedExpiry, now) + PREPARED_TTL]);
       return publicResponse;
     }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
     if (response.conflict) return reject(res, 409, 'IDEMPOTENCY_KEY_REUSED', 'This key already issued a different question.');
+    if (response.preparedUsed) return reject(res, 409, 'PRACTICE_PREPARED_USED', 'This prepared question has already been taken up.');
     // The account that owns this issue, so a device holding several profiles
     // can refuse a question issued under another profile's session.
     return res.status(201).json({ ...response, accountId: String(accountId) });

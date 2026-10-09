@@ -58,7 +58,7 @@ const ROOT = path.resolve(HERE, '../..');
 const { inspect } = await import('../../server/test/selfcheck.mjs');
 const { IN_CURRICULUM } = await import('../src/engine/curriculum-in.js');
 const {
-  indiaScope, indiaDifficultyWindow, resolveIndiaTarget, indiaChapterGrade, indiaRequestableDifficulties
+  indiaScope, indiaDifficultyWindow, resolveIndiaTarget, indiaRequestableDifficulties
 } = await import('../src/engine/indiaProduct.js');
 const { pyqCellsFor } = await import('../src/engine/pyq/pyqCoverage.js');
 const { generateQuestion, loadAllBanks, loadBanksFor, bankOf, GENERATORS } = await import('../src/engine/generators/index.js');
