@@ -22,6 +22,7 @@ import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
 import { canRetryPhotoReading, definitiveSubmissionRefusal, draftPersistenceWarning, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure } from './photoSubmissionGuard.js';
 import { plotSpecFor } from '../engine/plotSpec.js';
+import { attestedGrade, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable } from './authoritativeGrade.js';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 import { misconceptionById } from '../engine/misconceptions.js';
@@ -947,12 +948,20 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         // student submitted is marked, and only its outcome is stored.
         ? await api.post(diagnostic.submitPath, { answer: body.answer, ms: body.ms, steps: body.steps, viaInk: body.viaInk })
         : await api.post(`/practice/${question.id}/submit`, body);
+      // After unmount a stale response may still commit on the server, but
+      // must not modify another profile's pending state or trigger onResolved.
+      if (!mountedRef.current) return;
+      if (!diagnostic && !matchingGradeResponse(r, question.id, body.submissionId)) {
+        // Never clear the durable idempotency record on a wrong-question,
+        // old-attempt or non-authoritative success response.
+        throw new Error(gradingReceiptMismatch(language));
+      }
       pendingRef.current = null;
       clearPendingSubmission(question.id);
-      const live = mountedRef.current;
+      const live = true;
       if (r.resolved) {
         clearInkDraft(question.id);
-        const bound = { submissionId: r.submissionId || body.submissionId, lines: Array.isArray(lines) ? lines : null, viaInk: body.viaInk === true };
+        const bound = { questionId: String(question.id), submissionId: r.submissionId || body.submissionId, attemptId: r.attemptId || null, lines: Array.isArray(lines) ? lines : null, viaInk: body.viaInk === true };
         attemptRef.current = bound;
         if (live) {
           setAttempt(bound);
@@ -972,6 +981,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         if (live) setState({ phase: 'retry', res: r });
       }
     } catch (e) {
+      if (!mountedRef.current) return;
       // A refusal (4xx) is a definitive answer. Anything else — a fault, a
       // timeout — is not: the pending record stays, so an identical retry or a
       // relaunch reuses the same key and still lands as one attempt.
@@ -1305,17 +1315,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // bounded by the question's total. Partial method feedback by itself does
   // not certify that marks were committed to the student's account.
   const serverAuthoritative = res?.authoritative === true;
-  const serverMarks = res?.marksEarned;
-  const attestedMarks = serverAuthoritative && typeof serverMarks === 'number' &&
-    Number.isFinite(serverMarks) && serverMarks >= 0 && serverMarks <= totalMarks
-    ? serverMarks : null;
-  const earnedMarks = resolved
-    ? serverAuthoritative
-      ? (attestedMarks ?? (verdictGood ? totalMarks : 0))
-      : (verdictGood ? totalMarks : (selfSaved ? Object.values(selfMarks).filter(Boolean).length : 0))
-    : 0;
-  // Hints/retries cannot invent a different server-issued mark on the device.
-  const shownMarks = serverAuthoritative ? earnedMarks : Math.round(earnedMarks * credit * 10) / 10;
+  // Correctness and diagnostic partial feedback are not numerical awards.
+  const committedGrade = resolved ? attestedGrade(res, question.id, attempt) : null;
 
   // The verdict lands in the middle of a long page. Spoken as one sentence, a
   // screen reader hears whether the answer was right without hunting for it.
@@ -1326,13 +1327,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         : t('verdict.speechRetry', { feedback: state.res?.feedback || t('verdict.oneMoreGo') });
     }
     if (!resolved) return '';
-    const earned = verdictGood ? shownMarks : earnedMarks;
-    const marks = t('verdict.speechMarks', { count: totalMarks, earned, total: totalMarks });
-    if (res.revealed) return t('verdict.speechRevealed', { marks });
-    if (verdictGood) return t('verdict.speechCorrect', { marks });
-    return t('verdict.speechIncorrect', { marks })
+    const marks = committedGrade
+      ? t('verdict.speechMarks', { count: committedGrade.possible,
+          earned: committedGrade.awarded, total: committedGrade.possible }) : '';
+    if (res.revealed) return marks ? t('verdict.speechRevealed', { marks }) : t('verdict.revealed');
+    if (verdictGood) return marks ? t('verdict.speechCorrect', { marks }) : t('verdict.correct');
+    return (marks ? t('verdict.speechIncorrect', { marks }) : t('verdict.notThisTime'))
       + (res.solution?.answerText ? t('verdict.speechExpected', { answer: res.solution.answerText }) : '');
-  }, [state.phase, state.res, resolved, res, verdictGood, shownMarks, earnedMarks, totalMarks, t]);
+  }, [state.phase, state.res, resolved, res, verdictGood, committedGrade, t]);
 
   const answerLines = isMcq ? [] : writeMode
     ? (inkResult?.lines || [])
@@ -1367,7 +1369,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     : cloudPending ? t('verdict.statusMethod')
       : saveState === 'failed' ? t('verdict.statusNotSaved')
         : saveState === 'saving' ? t('verdict.statusSaving')
-          : resolved ? t('verdict.statusMarked')
+          : resolved ? (serverAuthoritative ? t(verdictGood ? 'verdict.correct' : res?.revealed ? 'verdict.revealed' : 'verdict.notThisTime') : t('verdict.statusMarked'))
             : inkUnread ? t('verdict.statusInkUnread')
             : saveState === 'saved' ? t(offline ? 'verdict.statusSavedOffline' : 'verdict.statusSaved')
               : (writeMode && !isMcq ? t('verdict.statusWriteHint') : '');
@@ -1425,7 +1427,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       {/* ── The question: the page's reference object ── */}
       <section className="ws-context" aria-label={t('verdict.questionRegion')}>
         <div className="q-topmeta">
-          <span className="q-marks">{t('verdict.marksAvailable', { count: totalMarks, n: totalMarks })}</span>
+          {!serverAuthoritative && <span className="q-marks">{t('verdict.marksAvailable', { count: totalMarks, n: totalMarks })}</span>}
           {/* The topic chip is where a student meets the name of what they are
               being asked, so it is the first place worth pairing. The question
               itself below is untouched: it will be in English in the exam hall. */}
@@ -1926,8 +1928,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   {t(verdictGood ? 'verdict.correct' : res.revealed ? 'verdict.revealed' : 'verdict.notThisTime')}
                 </span>
                 <span className="eval-marks">
-                  {t('verdict.marksOutOf', { earned: verdictGood ? shownMarks : earnedMarks, total: totalMarks })}
-                  {helpUsed > 0 && <small> · {t('verdict.afterHints', { count: helpUsed, n: helpUsed })}</small>}
+                  {committedGrade
+                    ? t('verdict.marksOutOf', { earned: committedGrade.awarded, total: committedGrade.possible })
+                    : <span data-grade-unavailable>{numericalGradeUnavailable(language)}</span>}
+                  {committedGrade && helpUsed > 0 && <small> · {t('verdict.afterHints', { count: helpUsed, n: helpUsed })}</small>}
                 </span>
               </div>
               <div className="eval-body">
@@ -1991,7 +1995,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               </section>
             ))}
 
-            {!diagnostic && res.solution?.criteria && (
+            {!diagnostic && !serverAuthoritative && res.solution?.criteria && (
               <div className="criteria-self">
                 <CriteriaTable
                   criteria={res.solution.criteria}
