@@ -384,12 +384,12 @@ class CloudJourneyTest {
             //
             // The first candidate is the question prepared signed out. Its
             // Submit was refused for want of an account, not dropped: the card
-            // keeps that one submission and delivers it, under the same key,
-            // once the account can be checked (QuestionCard's pending
-            // submission; a 401 is not a definitive refusal). So coming back to
-            // the card signed in, the server binds the prepared question to the
-            // account and marks the answer typed signed out — without a second
-            // press, and exactly once.
+            // HOLDS that one submission (practiceRecovery holdPendingSubmission)
+            // and sends nothing by itself. Coming back to the card signed in,
+            // the answer typed signed out is back in the editor and the server
+            // has still marked nothing; only the student's own Submit sends it,
+            // under the same key. The server then binds the prepared question
+            // to the account and marks that answer exactly once.
             openPractice(s)
             assertEquals("Practice comes back to the question prepared signed out", preparedId, qid(s))
             var escrow: JSONObject? = null
@@ -400,7 +400,21 @@ class CloudJourneyTest {
                 val got: String
                 if (i == 0) {
                     assertEquals("the answer typed signed out is still on the card", "\"$WRONG\"", waitFor(s, QuestionCardJs.TYPED))
-                    got = waitFor(s, "(function(){var o=${QuestionCardJs.OUTCOME};return (o==='nothing'||o==='confirm'||!${QuestionCardJs.CHECK_IDLE})?false:o;})()", 60_000).trim('"')
+                    // Signed in now: the card no longer asks for an account…
+                    assertEquals("signed in, the card no longer says checking needs an account", "true",
+                        waitFor(s, "!${QuestionCardJs.visible("[data-check-needs-account]")}"))
+                    // …and the held submission was NOT sent for the student.
+                    assertEquals("no check is running before Submit is pressed", "true", eval(s, QuestionCardJs.CHECK_IDLE))
+                    assertUnmarked(s, "back on the held question signed in, before Submit")
+                    assertEquals("no verdict of any kind is on the card before Submit", "false|false|false",
+                        eval(s, "!!document.querySelector('.verdict-bad')") + "|" + eval(s, "!!document.querySelector('.verdict-technical')") + "|" + eval(s, "!!document.querySelector('.verdict-unsure')"))
+                    val held = oracle("/marked")
+                    assertEquals("before Submit the server issued, bound and marked nothing for the account: $held", "0/0/0",
+                        "${held.getInt("issued")}/${held.getInt("prepared")}/${held.getJSONArray("completed").length()}")
+                    // The student's own press sends it (a second, automatic
+                    // delivery would spend the second try and fail the
+                    // one-try-left and two-grades assertions below).
+                    got = submitAndWait(s)
                 } else {
                     // An issued question: ask before spending a try on it.
                     val peek = oracle("/answer")
