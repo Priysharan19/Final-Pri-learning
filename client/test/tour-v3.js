@@ -107,6 +107,11 @@ export const flow = {
     const steps = await page.locator('.solution-block .step').count();
     await check('the worked solution is worked, step by step', steps >= 1, `${steps} steps rendered`);
 
+    await check('the marking criteria are shown',
+      await page.locator('.criteria-table tbody tr').count() >= 1);
+    await check('and they are the server\'s to state: read-only, nothing to self-mark',
+      await page.locator('.criteria-table input, .criteria-table button').count() === 0);
+
     const answer = (await mathText('.final-answer') || '').replace(/^Final answer\s*/i, '').trim();
     if (!await check('the final answer is stated', answer.length > 0,
       'the solution block carried no .final-answer')) return;

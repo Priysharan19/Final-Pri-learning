@@ -1165,6 +1165,43 @@ async function run() {
     });
 
     // ── teacher-only workspace, exercised under a real teacher profile ──────
+    // ── signed out (this India profile has no account): marked work that does
+    // not start says so in place — the placement check, Rapid Fire and Match.
+    const refusalBlock = selector => page.evaluate(sel => {
+      const block = document.querySelector(sel);
+      const button = block?.querySelector('[data-check-sign-in]');
+      const icon = block?.querySelector('.verdict-ico');
+      return block ? {
+        kind: block.getAttribute(sel.slice(1, -1)), role: block.getAttribute('role'),
+        text: (block.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200),
+        iconWord: (icon?.textContent || '').trim(),
+        button: button ? { tag: button.tagName.toLowerCase(), name: (button.textContent || '').trim(), expanded: button.getAttribute('aria-expanded'), disabled: button.disabled } : null
+      } : null;
+    }, selector);
+
+    await step('placement · refused signed out', '/placement', async () => {
+      await goTo(page, BASE, '/placement?go=1');
+      await page.waitForSelector('[data-placement-refused]', { timeout: 30000 });
+      await wait(page, 400);
+      refusals.placement = await refusalBlock('[data-placement-refused]');
+    });
+
+    await step('rapid fire · refused signed out', '/rush', async () => {
+      await goTo(page, BASE, '/rush');
+      await click(page, '.qcard .btn-primary.btn-lg');
+      await page.waitForSelector('[data-game-refused]', { timeout: 30000 });
+      await wait(page, 400);
+      refusals.rush = { ...(await refusalBlock('[data-game-refused]')), clock: await page.locator('.rush-timer').count() };
+    });
+
+    await step('match · refused signed out', '/match', async () => {
+      await goTo(page, BASE, '/match');
+      await click(page, '.btn-glow');
+      await page.waitForSelector('[data-game-refused]', { timeout: 30000 });
+      await wait(page, 400);
+      refusals.match = { ...(await refusalBlock('[data-game-refused]')), question: await page.locator('.q-prompt').count() };
+    });
+
     await step('teacher studio', '/teach', async () => {
       await goTo(page, BASE, '/');
       await click(page, '.user-chip');
@@ -1286,6 +1323,14 @@ async function run() {
       refusals.reconnect?.kind === 'reconnect' && /has not been checked/i.test((refusals.reconnect.spoken || []).join(' ')) &&
         refusals.reconnect.retry?.tag === 'button' && /\p{L}/u.test(refusals.reconnect.retry.name) && refusals.reconnect.result === 0,
       JSON.stringify(refusals.reconnect));
+
+    const announced = r => r?.kind === 'sign-in' && r.role === 'alert' && /\p{L}/u.test(r.iconWord || '') &&
+      r.button?.tag === 'button' && /\p{L}/u.test(r.button.name) && r.button.expanded === 'false' && r.button.disabled === false;
+    ok('signed out, a placement check that does not start is an alert in words (its icon named), with a real, named sign-in button in place',
+      announced(refusals.placement), JSON.stringify(refusals.placement));
+    ok('signed out, Rapid Fire and Match that do not start are alerts in words with the same named sign-in — and no clock or question appears',
+      announced(refusals.rush) && refusals.rush.clock === 0 && announced(refusals.match) && refusals.match.question === 0,
+      JSON.stringify({ rush: refusals.rush, match: refusals.match }));
 
     section('colour is never alone');
     ok('correct / incorrect is never carried by colour alone', findingsFor('colour').length === 0, show(findingsFor('colour')));

@@ -1,10 +1,22 @@
 // PRI-02 canonical browser regression — real student loop, restart and offline.
+//
+// Owner decision 2026-10-10: only Pri's server marks. The loop therefore runs
+// for a student signed in to the real platform server this file boots
+// (support/online-session.mjs: real /v1, SQLite file, a verified account signed
+// in through Settings). What "offline" protects changed with that decision and
+// is asserted positively: offline, the app still opens from the device, the
+// unfinished question and its typed draft are still there, History and
+// Progress are unchanged — and Submit marks NOTHING (the card asks to
+// reconnect, no verdict, no attempt). Back online, Try again is marked by the
+// server exactly once and practice continues. Offline marking is gone and is
+// not asserted anywhere.
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium } from '@playwright/test';
-import { ensureBuild, serveDist } from './e2e.mjs';
+import { ensureBuild } from './e2e.mjs';
+import { startOnlinePlatform } from './support/online-session.mjs';
 
 const TOPIC = 'y7-equations';
 const TOPIC_NAME = 'Linear Equations';
@@ -166,22 +178,44 @@ async function relaunch(profileDir) {
 
 const build = !process.argv.includes('--no-build');
 ensureBuild(build);
-const server = await serveDist();
+const platform = await startOnlinePlatform();
+const server = { origin: platform.origin, close: () => platform.close() };
 const profileDir = await mkdtemp(join(tmpdir(), 'pri-02-golden-'));
 let ctx = null;
+
+const attemptRows = page => page.evaluate(() => new Promise(ok => {
+  const r = indexedDB.open('pri-learning');
+  r.onsuccess = () => { const db = r.result; const c = db.transaction('attempts').objectStore('attempts').getAll();
+    c.onsuccess = () => { db.close(); ok(c.result.map(a => ({ server: a.serverAttemptId || null, remote: typeof a.remoteEventId === 'string' }))); };
+    c.onerror = () => { db.close(); ok(null); }; };
+  r.onerror = () => ok(null);
+}));
+const historyCount = async (page) => {
+  await page.goto(server.origin + '/history', { waitUntil: 'domcontentloaded' }).catch(() => {});
+  await page.waitForSelector('.hist-row');
+  return page.locator('.hist-row').count();
+};
 
 try {
   let launched = await relaunch(profileDir);
   ctx = launched.ctx;
   let page = launched.page;
+  let online = platform.session(ctx, page);
 
   await createFreshStudent(page, server.origin);
+  const account = await online.signIn({ name: 'PRI-02 Golden Student' });
   await gotoPractice(page, server.origin);
   for (let i = 0; i < 3; i++) {
     await typedQuestion(page, null);
     await resolveWrong(page, { doubleSecond: i === 2 });
     if (i < 2) await nextFreshTyped(page);
   }
+  // Marked by the server, and a double tap on the resolving submit is one attempt.
+  assert.equal(platform.ledger(account.id).completions, 3, 'the server must hold exactly three completed questions');
+  const firstGrades = await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/);
+  assert.ok(firstGrades.length >= 6 && firstGrades.every(c => c.status === 200 && c.json?.authoritative === true && c.json.correct === false),
+    'every verdict must be the server\'s authoritative result');
+  assert.equal(new Set(firstGrades.map(c => c.body?.submissionId)).size, 6, 'a double tap must reuse its submission key: six keys for six tries');
 
   const beforeRestart = await snapshot(page, server.origin);
   assert.equal(beforeRestart.history, 3);
@@ -209,6 +243,8 @@ try {
   launched = await relaunch(profileDir);
   ctx = launched.ctx;
   page = launched.page;
+  online = platform.session(ctx, page);
+  online.account = account;
   await gotoPractice(page, server.origin);
   await page.getByRole('button', { name: 'Answer by typing' }).click().catch(() => {});
   await page.waitForSelector('.editor-body input.answer-input');
@@ -226,53 +262,87 @@ try {
   assert.equal(clean(await page.locator('.q-prompt').textContent()), unfinishedPrompt);
   assert.equal(await page.locator('.editor-body input.answer-input').inputValue(), DRAFT);
 
+  // ── offline: the work is there, nothing is marked ──────────────────────────
   await ctx.setOffline(true);
   await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
   await page.waitForSelector('.q-prompt');
   await page.getByRole('button', { name: 'Answer by typing' }).click().catch(() => {});
   assert.equal(clean(await page.locator('.q-prompt').textContent()), unfinishedPrompt,
     'offline reload must resume the same unfinished question');
-  assert.equal(await page.locator('.editor-body input.answer-input').inputValue(), DRAFT,
+  const offlineInput = page.locator('.editor-body input.answer-input');
+  assert.equal(await offlineInput.inputValue(), DRAFT,
     'offline reload must keep the unfinished typed draft');
 
-  await resolveWrong(page);
-  const offlineNext = await nextFreshTyped(page);
-  assert.ok(offlineNext.prompt.length > 8,
-    'next real question must generate with cloud connectivity disabled');
-  const offlineNextPrompt = offlineNext.prompt;
+  await offlineInput.fill(WRONG_A);
+  await page.getByRole('button', { name: 'Submit Answer' }).click();
+  await page.waitForSelector('[data-check-refusal]');
+  assert.equal(await page.locator('[data-check-refusal]').first().getAttribute('data-check-refusal'), 'reconnect',
+    'offline, Submit must ask to reconnect');
+  assert.equal(await page.locator('.verdict-bad, .eval-card, .eval-marks, .solution-block').count(), 0,
+    'offline, nothing may be marked: no verdict, marks or solution');
+  assert.equal(await offlineInput.inputValue(), WRONG_A, 'offline, the typed answer must stay in the box');
+  assert.equal((await attemptRows(page)).length, 3, 'offline, no attempt may be written');
+  assert.equal(platform.ledger(account.id).completions, 3, 'offline, the server must have marked nothing');
+  assert.ok(!/marked on this device|checked on this device/i.test(await page.locator('.qpage').innerText()),
+    'nothing may claim a mark made on this device');
 
+  // ── a complete restart, still offline: nothing lost, nothing invented ──────
   await ctx.close();
   ctx = null;
   launched = await relaunch(profileDir);
   ctx = launched.ctx;
   page = launched.page;
+  online = platform.session(ctx, page);
+  online.account = account;
   await ctx.setOffline(true);
 
   await page.goto(server.origin + '/history', { waitUntil: 'domcontentloaded' }).catch(() => {});
   await page.waitForSelector('.hist-row');
-  assert.equal(await page.locator('.hist-row').count(), 4,
-    'offline-resolved attempt must survive a complete application restart');
+  assert.equal(await page.locator('.hist-row').count(), 3,
+    'the three server-marked attempts must survive a complete offline restart — and no fourth may appear');
 
   await page.goto(server.origin + '/practice?subtopic=' + TOPIC, { waitUntil: 'domcontentloaded' }).catch(() => {});
   await page.waitForSelector('.q-prompt');
-  assert.equal(clean(await page.locator('.q-prompt').textContent()), offlineNextPrompt,
-    'offline restart must resume the next unresolved real question');
+  assert.equal(clean(await page.locator('.q-prompt').textContent()), unfinishedPrompt,
+    'offline restart must resume the same unfinished question');
+  assert.equal(await page.locator('.verdict-bad, .eval-card').count(), 0,
+    'an offline restart must not mark the submission that was refused');
 
+  // ── back online: the same submission is marked by the server, once ─────────
+  await ctx.setOffline(false);
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await page.getByRole('button', { name: 'Answer by typing' }).click().catch(() => {});
+  if (!(await page.locator('.verdict-bad').count())) {
+    const retry = page.locator('[data-check-retry]');
+    if (await retry.count()) await retry.click();
+    else {
+      await page.locator('.editor-body input.answer-input').fill(WRONG_A);
+      await page.getByRole('button', { name: 'Submit Answer' }).click();
+    }
+  }
+  await page.waitForSelector('.verdict-bad');
+  assert.equal(await page.locator('.eval-card').count(), 0, 'the first try, marked after reconnecting, must leave the question open');
+  await page.locator('.editor-body input.answer-input').fill(WRONG_B);
+  await page.getByRole('button', { name: 'Submit Answer' }).click();
+  await page.waitForSelector('.eval-card');
+  assert.equal(platform.ledger(account.id).completions, 4, 'after reconnecting the server must hold exactly one more completion');
+  assert.equal(await historyCount(page), 4, 'the reconnected attempt must be in History exactly once');
+
+  await gotoPractice(page, server.origin);
   await typedQuestion(page, null);
   await resolveWrong(page);
+  assert.equal(await historyCount(page), 5, 'student must continue practising normally after the offline restart');
 
-  await page.goto(server.origin + '/history', { waitUntil: 'domcontentloaded' }).catch(() => {});
-  await page.waitForSelector('.hist-row');
-  assert.equal(await page.locator('.hist-row').count(), 5,
-    'student must continue practising normally after offline restart');
-
-  await ctx.setOffline(false);
   const finalState = await snapshot(page, server.origin);
   assert.equal(finalState.history, 5);
   assert.equal(finalState.topicAttempts, 5);
   assert.ok(finalState.mastery >= 0 && finalState.mastery <= 100);
+  const rows = await attemptRows(page);
+  assert.ok(rows.length === 5 && rows.every(a => typeof a.server === 'string') && new Set(rows.map(a => a.server)).size === 5,
+    'five attempt rows, each one a distinct server attempt: ' + JSON.stringify(rows));
+  assert.equal(platform.ledger(account.id).completions, 5, 'the server must hold exactly five completed questions');
 
-  console.log('PASS — PRI-02 golden student journey: fresh profile → 5 real marked questions → History/Progress/mastery → restart → unfinished recovery → offline marking/next → offline restart → continue.');
+  console.log('PASS — PRI-02 golden student journey: fresh profile → signed in → 5 server-marked questions → History/Progress/mastery → restart → unfinished recovery → offline: work kept, nothing marked, reconnect asked → offline restart → reconnect: marked once → continued practice.');
   console.log(JSON.stringify({ beforeRestart, finalState }, null, 2));
 } finally {
   if (ctx) await ctx.close().catch(() => {});

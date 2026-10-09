@@ -128,6 +128,11 @@ export async function startOnlinePlatform({ dist = DIST } = {}) {
 
   async function newAccount({ name = 'Online Student' } = {}) {
     const serial = ++accountSerial;
+    // Every student of a suite run arrives from the same loopback address, so
+    // the per-address sign-up and sign-in limits (8 an hour, 12 a quarter-hour)
+    // would stop the ninth flow. The desk clears those two counters; it is not
+    // a product path, and the limits themselves are proved by the server suites.
+    h.db.prepare("DELETE FROM rate_limits WHERE bucket LIKE 'register%' OR bucket LIKE 'login%'").run();
     const email = `e2e.${process.pid}.${serial}.${Date.now().toString(36)}@example.test`;
     const made = await desk(() => harness.registerAccount(h, { name, email, password: PASSWORD, deviceId: `e2e-desk-${serial}` }));
     if (made.status !== 201 || !made.account?.id) throw new Error(`online-session: register answered ${made.status} ${made.text}`);
