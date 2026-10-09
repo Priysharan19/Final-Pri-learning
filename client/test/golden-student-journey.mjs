@@ -312,20 +312,27 @@ try {
   await ctx.setOffline(false);
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
   await page.getByRole('button', { name: 'Answer by typing' }).click().catch(() => {});
-  // The first press after reconnecting can still be refused as "not reachable
-  // yet" while the app finds the server again. The student does what the card
-  // says — Try again — and the same submission goes through. Bounded; every
-  // press reuses the one submission key, which the count below holds to once.
-  for (const until = Date.now() + 45000; Date.now() < until && !(await page.locator('.verdict-bad').count());) {
+  // The card may still hold the "reconnect" refusal from before the restart,
+  // and the first press after reconnecting can be refused once more while the
+  // app finds the server again. The student presses Try again; at most TWO
+  // presses may be needed, and every press reuses the one submission key,
+  // which the counts below hold to exactly one marked attempt.
+  let presses = 0;
+  const refusals = [];
+  while (presses < 2 && !(await page.locator('.verdict-bad').count())) {
     const retry = page.locator('[data-check-retry]');
-    if (await retry.count()) await retry.click().catch(() => {});
-    else if (!(await page.locator('.verdict').count())) {
+    if (await retry.count()) await retry.click();
+    else {
       await page.locator('.editor-body input.answer-input').fill(WRONG_A);
-      await page.getByRole('button', { name: 'Submit Answer' }).click().catch(() => {});
+      await page.getByRole('button', { name: 'Submit Answer' }).click();
     }
-    await page.waitForSelector('.verdict-bad', { timeout: 3000 }).catch(() => {});
+    presses++;
+    await page.waitForSelector('.verdict-bad, [data-check-refusal]', { timeout: 30000 });
+    if (!(await page.locator('.verdict-bad').count())) refusals.push(await page.locator('[data-check-refusal]').first().getAttribute('data-check-refusal'));
   }
-  await page.waitForSelector('.verdict-bad', { timeout: 5000 });
+  assert.equal(await page.locator('.verdict-bad').count(), 1,
+    `after reconnecting, the kept answer must be marked within two presses (pressed ${presses}; refused as ${JSON.stringify(refusals)})`);
+  if (presses > 1) console.log(`note: reconnect needed ${presses} presses; first refused as ${JSON.stringify(refusals)}`);
   assert.equal(await page.locator('.eval-card').count(), 0, 'the first try, marked after reconnecting, must leave the question open');
   await page.locator('.editor-body input.answer-input').fill(WRONG_B);
   await page.getByRole('button', { name: 'Submit Answer' }).click();
