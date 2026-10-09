@@ -256,7 +256,10 @@ function drawQuestion(ctx, chapter, need, range, extraCells = []) {
     if (!q?.prompt) continue;
     const shaped = shapeFor(q, need, ctx.rng);
     if (!shaped) continue;
-    const signature = `${cell.generator}|${String(q.prompt).replace(/\s+/g, ' ').trim()}`;
+    // The question as the student reads it. Two cells can reach one question
+    // (a chapter generator and an archetype that draws from it, or two levels
+    // of a small bank), and the same question twice is one question too many.
+    const signature = String(q.prompt).replace(/\s+/g, ' ').trim();
     if (ctx.seen.has(signature)) continue;
     ctx.seen.add(signature);
     return {
@@ -762,7 +765,10 @@ function issueCell(ctx, cell) {
     if (!q?.prompt) continue;
     const shaped = shapeFor(q, cell.need, ctx.rng);
     if (!shaped) continue;
-    const signature = `${cell.generator}|${String(q.prompt).replace(/\s+/g, ' ').trim()}`;
+    // The question as the student reads it. Two cells can reach one question
+    // (a chapter generator and an archetype that draws from it, or two levels
+    // of a small bank), and the same question twice is one question too many.
+    const signature = String(q.prompt).replace(/\s+/g, ' ').trim();
     if (ctx.seen.has(signature)) continue;
     ctx.seen.add(signature);
     return {
