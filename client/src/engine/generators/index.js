@@ -12,6 +12,7 @@ import { dotpointById, dotpointAt, formDotpoints } from '../curriculum.js';
 import { hasJeePyqGenerator, loadJeePyqGenerator } from './jee-pyq-runtime.js';
 import { hasPyqGenerator } from '../pyq/pyqCoverage.js';
 import { stampContent } from '../contentIdentity.js';
+import { withSafeInputHints } from '../inputHint.js';
 
 // ── Banks ────────────────────────────────────────────────────────────────────
 
@@ -433,5 +434,5 @@ export function generateQuestion(subtopicId, difficulty, seed, dotpointId) {
   }
   // contentId / contentVersion / contentHash: what makes an attempt on this
   // question interpretable after the bank changes (engine/contentIdentity.js).
-  return stampContent(q, subtopicId);
+  return stampContent(withSafeInputHints(q), subtopicId);
 }
