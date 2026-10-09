@@ -37,6 +37,10 @@ export const ENGINE_SUITES = [
   // The immutable online-issued grading receipts and adversarial account, replay,
   // and awarded-marks checks MUST also pass with real pri_server Postgres.
   'online-marking-authority-check.mjs',
+  // Method marks need progress and issuing by seed is deterministic and
+  // per-account — through the same real HTTP routes, on the Postgres store.
+  'method-progress-http-check.mjs',
+  'practice-seed-reissue-check.mjs',
   'account-lifecycle-contract-check.mjs',
   'account-lifecycle-journey-check.mjs',
   'account-deletion-reauth-check.mjs',
@@ -57,6 +61,9 @@ export const ENGINE_SUITES = [
   'storekit-entitlement-state-machine-check.mjs',
   'tutor-help-check.mjs',
   'tutor-device-journey-check.mjs',
+  // The tutor grounded in the server's own escrowed question: the escrow read
+  // must be account-scoped under Row-Level Security as pri_server too.
+  'tutor-issued-grounding-check.mjs',
   'failure-drills-check.mjs',
   'security-acceptance-check.mjs',
   'abuse-limits-check.mjs',

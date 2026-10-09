@@ -31,8 +31,19 @@ an `aria-live="polite"` log so streamed text is announced.
 - **State the final answer or the result of the next step**, in any notation: digits,
   Devanagari digits, fractions, decimals, percentages, number words in English or Hindi,
   powers, short arithmetic, or a range that brackets the value (`server/platform/tutorGuard.js`).
-- **Recite a verified step word for word.** The solution it is grounded in arrives from the
-  device, so a reply that echoes a whole step would merely hand back what the client sent.
+- **Recite a verified step word for word.** For a device question the solution it is grounded
+  in arrives from the device, so a reply that echoes a whole step would merely hand back what
+  the client sent.
+- **Take the device's word for a server-issued question.** A question issued by
+  `/v1/practice/issue` leaves the device with no answer and no solution. The request names it
+  (`serverQuestionId`) and carries no prompt, step or answer; the server grounds the help in its
+  own escrowed copy, read for the signed-in account only — another account's question id is a
+  404, the same as an id that never existed. A body that names an issued question and also
+  describes a solution is refused. Until the server has resolved the question, the answer is
+  never excused in a reply (not even when the student's own working reaches it — the mark
+  confirms an answer, not the tutor), the server re-runs the Step Check rather than trusting the
+  device's count of verified lines, and the walkthrough level is refused
+  (`server/test/tutor-issued-grounding-check.mjs`).
 - **Mark.** No reply carries a verdict, score or mark. ADR-0001: AI proposes, the deterministic
   engine decides.
 - **Help in an exam.** A body that says `context: "exam"`, `mode: "exam"` or names an `examId`

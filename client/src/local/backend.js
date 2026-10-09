@@ -3270,6 +3270,9 @@ const routes = {
       await put('questions', row);
     }
     const tutorLevel = Math.max(used, level);
+    // A server-issued question has no solution on this device before it is
+    // resolved, and none is ever sent for it: tutorRequest() names the question
+    // and /v1/tutor grounds the help in the server's own copy.
     const solution = row.serverQuestionId ? (row.serverReceipt?.solution
       ? { steps: row.serverReceipt.solution.steps || [], answerText: row.serverReceipt.solution.answerText,
           solutionText: row.serverReceipt.solution.solutionText }
@@ -3307,7 +3310,7 @@ const routes = {
     }
 
     const work = tutorWork(q, body?.work);
-    const request = solution ? tutorRequest(p, row, q, solution, { level: level === 1 ? 'nudge' : 'socratic', locale: body?.locale, work }) : null;
+    const request = tutorRequest(p, row, q, solution, { level: level === 1 ? 'nudge' : 'socratic', locale: body?.locale, work });
     const outcome = request ? await requestTutorHelp(request) : { error: { code: 'TUTOR_UNGROUNDED' } };
     const hints = Array.isArray(q.hints) ? q.hints : [];
     const authored = hints.length ? hints[Math.min(level - 1, hints.length - 1)] : null;
@@ -3336,12 +3339,15 @@ const routes = {
       .map(c => ({ id: String(c?.id || '').replace(/[^a-z0-9_-]/gi, '').slice(0, 40), text: sanitizeText(c?.text, 700) }))
       .filter(c => c.id && c.text);
     if (!captions.length) return { captions: [], source: 'deterministic', code: 'TUTOR_NO_CAPTIONS' };
+    // A server-issued question has no solution on this device before it is
+    // resolved, and none is ever sent for it: tutorRequest() names the question
+    // and /v1/tutor grounds the help in the server's own copy.
     const solution = row.serverQuestionId ? (row.serverReceipt?.solution
       ? { steps: row.serverReceipt.solution.steps || [], answerText: row.serverReceipt.solution.answerText,
           solutionText: row.serverReceipt.solution.solutionText }
       : null)
       : { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText };
-    const request = solution ? tutorRequest(p, row, q, solution, { level: 'walkthrough', locale: body?.locale, work: tutorWork(q, body?.work), captions }) : null;
+    const request = tutorRequest(p, row, q, solution, { level: 'walkthrough', locale: body?.locale, work: tutorWork(q, body?.work), captions });
     const outcome = request ? await requestTutorHelp(request) : { error: { code: 'TUTOR_UNGROUNDED' } };
     const returned = Array.isArray(outcome?.tutor?.captions) ? outcome.tutor.captions : [];
     return {
@@ -4780,6 +4786,22 @@ function tutorWork(q, raw) {
 
 /** The /v1/tutor/help body for a practice row, or null when there is no verified solution to ground it. */
 function tutorRequest(p, row, q, solution, { level, locale, work, captions }) {
+  if (row.serverQuestionId) {
+    // Server-issued: name the question, send the student's own work, and
+    // nothing else. No prompt, step, answer or hint leaves the device for it —
+    // the server reads its own copy for this account and refuses any body that
+    // tries to describe a solution alongside the id.
+    const lang = locale === 'hi' || locale === 'en' ? locale : cleanLanguage(p.language);
+    return {
+      context: 'practice',
+      level,
+      locale: lang === 'hi' ? 'hi' : 'en',
+      serverQuestionId: String(row.serverQuestionId),
+      studentWork: work,
+      ...(captions ? { captions } : {})
+    };
+  }
+  if (!solution) return null;
   const steps = (solution.steps || []).slice(0, 24)
     .map(s => ({ h: String(s?.h ?? '').slice(0, 300), d: String(s?.d ?? '').slice(0, 700) }))
     .filter(s => s.h || s.d);
