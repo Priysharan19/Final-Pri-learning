@@ -23,7 +23,7 @@ import PriPlot from './PriPlot.jsx';
 import { canRetryPhotoReading, definitiveSubmissionRefusal, draftPersistenceWarning, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure, photoSupportedFormats, photoAwaitingOnlineReader, pdfReaderNeedsOnlineDownload } from './photoSubmissionGuard.js';
 import { plotSpecFor } from '../engine/plotSpec.js';
 import { attestedGrade, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable, showCommittedMethodAwardNote } from './authoritativeGrade.js';
-import { checkRefusalCopy, legacyDeviceReplay, needsAccountToCheck, refusedCheckState, retryActionFor, serverRevealReceipt } from './checkAccess.js';
+import { checkRefusalCopy, legacyDeviceReplay, needsAccountToCheck, refusalForQuestion, refusedCheckState, retryActionFor, serverRevealReceipt, unmarkableNotice } from './checkAccess.js';
 import { CheckRefusal, CheckSignIn } from './CheckRefusal.jsx';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
@@ -272,7 +272,7 @@ const REASON_TAG_KEY = {
 // `diagnostic.submitPath`, it is marked once by the same deterministic marker,
 // and nothing that belongs to practice is offered — no hints, no favourite, no
 // reveal, no self-marking, no XP or mastery tags. `I don't know` records a miss.
-export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, compact = false, diagnostic = null }) {
+export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, onReplace = null, compact = false, diagnostic = null }) {
   const { celebrate, refreshUser, refreshDue, refreshRecent, toast, user } = useApp();
   const t = useT();
   const [answer, setAnswer] = useState('');
@@ -417,6 +417,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const res = state.res;
 
   const isMcq = question.answerType === 'mcq';
+  // Whether this copy of the question can ever be marked (checkAccess.js).
+  const unmarkable = useMemo(() => (diagnostic ? null : unmarkableNotice(question)), [diagnostic, question.checkState, question.subtopic]);
   const isWorking = question.answerType === 'working';
   const totalMarks = question.criteria?.length || 1;
   // A question that carries method marks keeps its working area open, so
@@ -892,6 +894,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // around: a reading in doubt turns the press into the question instead.
   async function submit(vouchedNow) {
     if (inFlightRef.current || busy || resolved) return;
+    // A question that can never be marked is not sent to be marked.
+    if (unmarkable) return;
     if (needsCheck && vouchedNow !== reading) { setChecking(true); return; }
     // A stale answer left over from another attachment is not evidence that
     // the NEW photo was recognised. Never let Submit race its cloud reading or
@@ -987,6 +991,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         if (r.resolved === true) onNext?.();
         return;
       }
+      // A placement answer is marked by the server too: a resolved result that
+      // is not the server's is not a result.
+      if (diagnostic && r?.resolved && r.authoritative !== true) throw new Error(gradingReceiptMismatch(language));
       if (!diagnostic && !matchingGradeResponse(r, question.id, body.submissionId)) {
         // Only a matched server receipt is a practice result. Never clear the
         // durable idempotency record on a wrong-question, old-attempt or
@@ -1131,17 +1138,53 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     return () => clearTimeout(disarm);
   }, [revealArmed]);
 
+  // ── A question that cannot be marked ───────────────────────────────────────
+  // Opened with no connection (a draft), by an earlier version, or prepared
+  // too long ago. Asking for one that can be marked never costs the work on
+  // this one by itself: with something typed, written or attached it takes a
+  // second, deliberate press, and the question is replaced only when a
+  // markable one has actually arrived.
+  const [replaceArmed, setReplaceArmed] = useState(false);
+  const [replaceNote, setReplaceNote] = useState(false);
+  useEffect(() => { setReplaceArmed(false); setReplaceNote(false); }, [question.id]);
+  const hasWork = !!(String(answer).trim() || String(working).trim() || inkHasStrokes || photo || mcqSel !== null);
+  async function replaceQuestion() {
+    if (inFlightRef.current || busy || resolved) return;
+    if (hasWork && !replaceArmed) { setReplaceNote(false); setReplaceArmed(true); return; }
+    setReplaceArmed(false);
+    if (!onReplace) { onNext?.(); return; }
+    inFlightRef.current = true;
+    setBusy(true);
+    try {
+      const outcome = await onReplace();
+      if (mountedRef.current && outcome !== 'replaced') setReplaceNote(true);
+    } catch {
+      if (mountedRef.current) setReplaceNote(true);
+    } finally {
+      inFlightRef.current = false;
+      if (mountedRef.current) setBusy(false);
+    }
+  }
+
   async function dontKnow() {
-    if (busy || resolved || !diagnostic) return;
+    if (inFlightRef.current || busy || resolved || !diagnostic) return;
+    inFlightRef.current = true;
     setBusy(true);
     try {
       const r = await api.post(diagnostic.submitPath, { skip: true, ms: Date.now() - startRef.current });
       if (!mountedRef.current) return;
+      // Skipping shows the solution, which is the server's to show.
+      if (r?.authoritative !== true || r.resolved !== true) throw new Error(gradingReceiptMismatch(language));
       setState({ phase: 'resolved', res: r });
       onResolved?.(r);
     } catch (e) {
-      if (mountedRef.current) setState({ phase: 'retry', res: { feedback: e.message, invalid: true, technical: true, conflict: e?.status === 409 } });
-    } finally { if (mountedRef.current) setBusy(false); }
+      // A refused skip is a refused check like any other: it names its reason
+      // and offers the sign-in or the retry, and nothing was recorded.
+      refuseCheck(e, 'skip');
+    } finally {
+      inFlightRef.current = false;
+      if (mountedRef.current) setBusy(false);
+    }
   }
 
   /**
@@ -1385,14 +1428,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const serverAuthoritative = res?.authoritative === true;
   // Correctness and diagnostic partial feedback are not numerical awards.
   const committedGrade = resolved ? attestedGrade(res, question.id, attempt) : null;
-  // Practice shows marks only from a matched server receipt. The placement
-  // check is not practice: its one answer is marked by the bundled engine and
-  // is labelled "marked on this device", never as a server-certified pair.
-  const placementGrade = diagnostic && resolved && !serverAuthoritative ? {
-    awarded: verdictGood ? Math.round(totalMarks * credit * 10) / 10 : 0,
-    possible: totalMarks
-  } : null;
-  const shownGrade = committedGrade || placementGrade;
+  // Marks are shown only from a matched server receipt. A placement answer is
+  // marked by the server as right or wrong and its reply states no marks, so
+  // its verdict is shown without a marks figure rather than with a claim that
+  // marks are missing.
+  const shownGrade = committedGrade;
 
   // The verdict lands in the middle of a long page. Spoken as one sentence, a
   // screen reader hears whether the answer was right without hunting for it.
@@ -1428,14 +1468,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const technicalRetry = state.phase === 'retry' && state.res?.technical;
   // Why the last check was refused (sign in, reconnect, an account step, or a
   // question the server would not issue), when that is what happened.
-  const checkRefused = technicalRetry && !state.res?.conflict && checkRefusalCopy(state.res?.refusal) ? state.res.refusal : null;
+  const checkRefused = technicalRetry && !state.res?.conflict && checkRefusalCopy(state.res?.refusal)
+    ? refusalForQuestion(state.res.refusal, diagnostic ? null : question) : null;
   // Signing in never leaves the question, but a handwritten page is linked to
   // an account only after its sealed save has been read back.
   const checkSignInReady = !(writeMode && inkHasStrokes) || saveState === 'saved';
   // Said before Submit is pressed, not discovered by pressing it: checking
   // needs a Pri account. Hidden where the page already shows a sign-in for
   // this same reason (the ink or photo reader's, or a refused check's).
-  const accountNeeded = !diagnostic && !resolved && needsAccountToCheck(user)
+  const accountNeeded = !diagnostic && !resolved && !unmarkable && needsAccountToCheck(user)
     && checkRefused !== 'sign-in'
     && !(inkAccountBlocked && inkReaderState?.blocker === 'ink.waitingSignIn')
     && !(mode === 'photo' && photoOCR.phase === 'unavailable' && photoOCR.blockedKey === 'verdict.photoReadingSignIn');
@@ -1478,6 +1519,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // ── The one dominant next move ─────────────────────────────────────────────
   const primary = resolved || state.res?.conflict
     ? { label: t('practice.nextQuestion'), run: () => onNext?.(), disabled: false }
+    : unmarkable
+      // The way forward on a question that cannot be marked is a question
+      // that can — never a Submit that is bound to be refused. A teacher's
+      // own question has no such replacement, so it offers none.
+      ? (unmarkable.replace ? { label: t(replaceArmed ? 'check.draftConfirmAction' : 'check.draftAction'), run: replaceQuestion, disabled: busy } : null)
     : needsCheck && checking
       ? { label: t('verdict.confirmReading'), run: acceptReading, disabled: busy }
       : needsCheck
@@ -2006,8 +2052,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 <CheckRefusal kind={checkRefused} user={user} refreshUser={refreshUser}
                   signInReady={checkSignInReady} signInWaitText={inkRecoveryCopy.saveFirst} busy={busy}
                   onRetry={retryActionFor(state.res.via) === 'reveal' ? () => reveal(true)
+                    : retryActionFor(state.res.via) === 'skip' ? () => dontKnow()
                     : retryActionFor(state.res.via) === 'submit' ? () => submit() : null}
-                  onNext={onNext ? () => onNext() : null} />
+                  onRestart={diagnostic?.onRestart || null}
+                  nextLabel={replaceArmed ? t('check.draftConfirmAction') : null}
+                  onNext={checkRefused === 'new-question' && !diagnostic ? replaceQuestion : onNext ? () => onNext() : null} />
               ) : (
                 <>
                   <div className="verdict-title">{state.res?.conflict ? t('verdict.alreadyFinishedTitle') : t(technicalRetry ? 'verdict.notSubmittedTitle' : invalidRetry ? 'verdict.unreadable' : 'verdict.notQuite')}</div>
@@ -2101,6 +2150,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 <span className="eval-marks">
                   {shownGrade
                     ? t('verdict.marksOutOf', { earned: shownGrade.awarded, total: shownGrade.possible })
+                    : diagnostic && serverAuthoritative ? null
                     : <span data-grade-unavailable>{numericalGradeUnavailable(language)}</span>}
                   {shownGrade && helpUsed > 0 && <small> · {t('verdict.afterHints', { count: helpUsed, n: helpUsed })}</small>}
                 </span>
@@ -2148,6 +2198,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 )}
               </div>
               {diagnostic && <p className="muted" style={{ margin: '0 18px', fontSize: 12.5 }}>{t('placement.cardNote')}</p>}
+              {/* A repeat is marked like any answer but earns nothing; said
+                  here so the missing XP is not a mystery. */}
+              {!diagnostic && res.repeat === true && (
+                <p className="muted" data-repeat-note style={{ margin: '0 18px 12px', fontSize: 12.5 }}>{t('verdict.repeatNote')}</p>
+              )}
               {/* Only legacy device-graded results may claim on-device marking.
                   Online grade receipts must not be mislabeled to the learner. */}
               {!serverAuthoritative && (
@@ -2169,6 +2224,17 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             ))}
 
           </>
+        )}
+
+        {!resolved && (unmarkable || replaceArmed || replaceNote) && (
+          <div className="ink-account-recovery" data-check-unmarkable={unmarkable?.kind || 'expired'} role="group"
+            aria-label={t('check.newQuestionTitle')} style={{ margin: '12px 0 0' }}>
+            {/* Said before the student invests work: this copy of the question
+                was never the server's, so it cannot be marked — and what can. */}
+            {unmarkable && <p>{t(unmarkable.bodyKey)}</p>}
+            {replaceArmed && <p role="status" data-check-replace-confirm>{t('check.draftConfirm')}</p>}
+            {replaceNote && !replaceArmed && <p role="status" data-check-replace-note>{t('check.draftStillUnmarkable')}</p>}
+          </div>
         )}
 
         {accountNeeded && (
@@ -2196,15 +2262,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             {!resolved && diagnostic && (
               <button className="btn btn-quiet" onClick={dontKnow} disabled={busy}>{t('placement.dontKnow')}</button>
             )}
-            {!resolved && !diagnostic && (
+            {!resolved && !diagnostic && !unmarkable && (
               <button className={`btn ${revealArmed ? 'btn-ghost' : 'btn-quiet'}`} onClick={reveal} disabled={busy} aria-live="polite">
                 {revealArmed ? t('verdict.showSolutionConfirm') : t('verdict.showSolution')}
               </button>
             )}
             {resolved && !diagnostic && <button className="btn btn-quiet redo-chip" onClick={() => onRedo ? onRedo() : onNext?.()}>{t('verdict.redoQuestion')}</button>}
             {/* A placement answer is advanced by the placement page itself. */}
-            {!(diagnostic && resolved) && (
-              <button className="btn btn-primary" onClick={primary.run} disabled={primary.disabled} aria-busy={busy || undefined}>
+            {replaceArmed && !resolved && (
+              <button type="button" className="btn btn-quiet" data-check-replace-cancel onClick={() => setReplaceArmed(false)}>{t('check.draftKeep')}</button>
+            )}
+            {!(diagnostic && resolved) && primary && (
+              <button className="btn btn-primary" data-primary-action={unmarkable ? 'replace' : undefined} onClick={primary.run} disabled={primary.disabled} aria-busy={busy || undefined}>
                 {primary.label}
               </button>
             )}

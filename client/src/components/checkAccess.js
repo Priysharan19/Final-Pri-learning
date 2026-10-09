@@ -16,7 +16,13 @@ export const CHECK_REFUSAL = Object.freeze({
   // Opened with no connection, or prepared too long ago: this copy of the
   // question was never (or is no longer) the server's, so only a new one can
   // be marked. Retrying cannot help.
-  NEW_QUESTION: 'new-question'
+  NEW_QUESTION: 'new-question',
+  // A teacher's own question has no server copy, so Pri cannot mark it and no
+  // retry or new question changes that.
+  TEACHER_QUESTION: 'teacher-question',
+  // A placement check begun by a version that marked on the device: the server
+  // has none of its questions, so the check itself has to be started again.
+  RESTART: 'restart'
 });
 
 // The server answered, but not with a receipt this device can trust. That is
@@ -38,7 +44,10 @@ export function checkRefusal(error) {
   if (error.needsPassword || error.locked || error.code === 'EXAM_QUESTION_LOCKED') return null;
   const code = String(error.code || '');
   const status = Number(error.status);
-  if (code === 'SIGN_IN_TO_CHECK' || code === 'AUTH_REQUIRED') return CHECK_REFUSAL.SIGN_IN;
+  // A session that belongs to another profile's account (a shared iPad) is,
+  // for this profile, "sign in": the account panel offers its own sign-in.
+  if (code === 'SIGN_IN_TO_CHECK' || code === 'AUTH_REQUIRED' || code === 'PRACTICE_ACCOUNT_MISMATCH') return CHECK_REFUSAL.SIGN_IN;
+  if (code === 'PLACEMENT_RESTART_REQUIRED') return CHECK_REFUSAL.RESTART;
   if (code === 'RECONNECT_TO_CHECK' || code === 'CLOUD_DISABLED') return CHECK_REFUSAL.RECONNECT;
   if (code === 'QUESTION_CHECK_UNAVAILABLE') return CHECK_REFUSAL.QUESTION;
   if (code === 'QUESTION_NOT_SERVER_ISSUED' || code === 'QUESTION_PREPARED_EXPIRED') return CHECK_REFUSAL.NEW_QUESTION;
@@ -64,7 +73,9 @@ const COPY = Object.freeze({
   [CHECK_REFUSAL.UPDATE]: { titleKey: 'check.updateTitle', hintKey: 'check.updateHint', action: 'retry' },
   [CHECK_REFUSAL.ACCOUNT]: { titleKey: 'check.accountTitle', hintKey: 'check.accountHint', action: 'account' },
   [CHECK_REFUSAL.QUESTION]: { titleKey: 'check.questionTitle', hintKey: 'check.questionHint', action: 'retry' },
-  [CHECK_REFUSAL.NEW_QUESTION]: { titleKey: 'check.newQuestionTitle', hintKey: 'check.newQuestionHint', action: 'next' }
+  [CHECK_REFUSAL.NEW_QUESTION]: { titleKey: 'check.newQuestionTitle', hintKey: 'check.newQuestionHint', action: 'next' },
+  [CHECK_REFUSAL.TEACHER_QUESTION]: { titleKey: 'check.teacherTitle', hintKey: 'check.teacherHint', action: 'none' },
+  [CHECK_REFUSAL.RESTART]: { titleKey: 'check.restartTitle', hintKey: 'check.restartHint', action: 'restart' }
 });
 
 /**
@@ -140,5 +151,43 @@ export function refusedCheckState(error, via, { diagnostic = false } = {}) {
 
 /** What Retry does for a refused check: the same action, never a new attempt. */
 export function retryActionFor(via) {
-  return via === 'reveal' ? 'reveal' : via === 'tutor' ? null : 'submit';
+  return via === 'reveal' ? 'reveal' : via === 'skip' ? 'skip' : via === 'tutor' ? null : 'submit';
+}
+
+/**
+ * Whether the question on the card can ever be marked, from the public
+ * `checkState` the local backend puts on it.
+ *   markable — issued by the server, or prepared and bindable by an account;
+ *   draft    — opened with no connection: never the server's, never markable;
+ *   teacher  — a teacher's own question, which has no server copy;
+ *   legacy   — opened by an earlier version of the app, likewise unmarkable.
+ * A question with no checkState (a placement item) is the server's.
+ */
+export function questionCheckability(question) {
+  const state = question?.checkState;
+  if (state === 'draft') return 'draft';
+  if (state === 'legacy') return question?.subtopic === 'custom' ? 'teacher' : 'legacy';
+  return 'markable';
+}
+
+/**
+ * The refusal as it applies to this question. "Cannot be checked right now"
+ * invites a retry; on a question that can never be marked that retry would go
+ * on for ever, so it is named for what it is instead.
+ */
+export function refusalForQuestion(kind, question) {
+  if (kind !== CHECK_REFUSAL.QUESTION && kind !== CHECK_REFUSAL.NEW_QUESTION) return kind;
+  const can = questionCheckability(question);
+  if (can === 'teacher') return CHECK_REFUSAL.TEACHER_QUESTION;
+  if (can === 'draft' || can === 'legacy') return CHECK_REFUSAL.NEW_QUESTION;
+  return kind;
+}
+
+/** The catalogue keys for the notice an unmarkable question shows before any work. */
+export function unmarkableNotice(question) {
+  const can = questionCheckability(question);
+  if (can === 'draft') return { kind: can, bodyKey: 'check.draftNotice', replace: true };
+  if (can === 'legacy') return { kind: can, bodyKey: 'check.legacyNotice', replace: true };
+  if (can === 'teacher') return { kind: can, bodyKey: 'check.teacherNotice', replace: false };
+  return null;
 }

@@ -79,7 +79,7 @@ export function CheckSignIn({ user, refreshUser, ready = true, waitText = null, 
  */
 export function CheckRefusal({
   kind, context = 'answer', user, refreshUser, signInReady = true, signInWaitText = null,
-  onRetry = null, onNext = null, busy = false
+  onRetry = null, onNext = null, onRestart = null, nextLabel = null, busy = false
 }) {
   const t = useT();
   const inRouter = useInRouterContext();
@@ -99,14 +99,19 @@ export function CheckRefusal({
         {copy.action === 'account' && (inRouter
           ? <Link to="/settings" {...settings}>{t('app.accountSettings')}</Link>
           : <a href="/settings" {...settings}>{t('app.accountSettings')}</a>)}
-        {onRetry && copy.action !== 'next' && (
+        {onRetry && (copy.action === 'retry' || copy.action === 'account') && (
           <button type="button" className="btn btn-ghost btn-sm" data-check-retry disabled={busy} onClick={onRetry}>
             {t('common.tryAgain')}
           </button>
         )}
+        {copy.action === 'restart' && onRestart && (
+          <button type="button" className="btn btn-ghost btn-sm" data-check-restart disabled={busy} onClick={onRestart}>
+            {t('check.restartAction')}
+          </button>
+        )}
         {(kind === 'question' || kind === 'new-question') && onNext && (
-          <button type="button" className="btn btn-quiet btn-sm" data-check-next onClick={onNext}>
-            {t('practice.nextQuestion')}
+          <button type="button" className="btn btn-quiet btn-sm" data-check-next disabled={busy} onClick={onNext}>
+            {nextLabel || t('practice.nextQuestion')}
           </button>
         )}
       </div>}

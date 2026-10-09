@@ -190,7 +190,11 @@ function ProfilePractice() {
       // control is different: the student chose to skip, so record a safe
       // discard before serving a fresh question. A resolved row returns 409
       // here and is already safe to move past.
-      if (options?.fresh === true && currentQuestionRef.current && !assignmentMode) {
+      // Leaving a question that cannot be marked (an offline draft) for one
+      // that can is different again: the draft is given up only once a
+      // markable question has actually arrived, never on the way to asking.
+      const replacing = options?.replaceUnmarkable === true && !assignmentMode ? currentQuestionRef.current : null;
+      if (options?.fresh === true && currentQuestionRef.current && !assignmentMode && !replacing) {
         const leaving = currentQuestionRef.current;
         // A submission still being marked is not abandoned by moving on: the
         // card finishes it, and the discard below waits for it in the backend.
@@ -229,10 +233,29 @@ function ProfilePractice() {
       // Not served back means there is nothing left to recover (skipped, or
       // gone); a record that can never replay must not be sent forever.
       if (pendingQuestionId && r?.question?.id !== pendingQuestionId) clearPendingSubmission(pendingQuestionId);
+      if (replacing) {
+        const state = servable(r) ? r.question.checkState : 'draft';
+        if (state === 'draft' || state === 'legacy') {
+          // Still no markable question. The one just made is empty and is put
+          // aside; the question the student was working on stays as it was.
+          if (r?.question?.id && r.question.id !== replacing) {
+            await api.post(`/practice/${r.question.id}/discard`, {}).catch(() => undefined);
+          }
+          return 'still-unmarkable';
+        }
+        try { await api.post(`/practice/${replacing}/discard`, {}); }
+        catch (e) { if (e?.status !== 409) throw e; }
+        if (!readPendingSubmission(replacing)) clearInkDraft(replacing);
+        setServe(r);
+        return 'replaced';
+      }
       if (!servable(r)) throw Object.assign(new Error(emptyContext.current.t('practice.emptyTitle')), { code: 'CONTENT_EMPTY' });
       setServe(r);
     } catch (e) {
       if (!alive.current) return;
+      // Asking for a markable question failed: nothing was replaced, and the
+      // card says so beside the work that is still on it.
+      if (options?.replaceUnmarkable === true && currentQuestionRef.current) return 'still-unmarkable';
       // A free-tier refusal is not a fault: it is the end of today's free
       // questions, and it is explained rather than shown as an error string.
       if (e?.code === 'FREE_CAP_REACHED' || e?.code === 'FREE_EXAM_CAP_REACHED') setCapped(e);
@@ -646,6 +669,7 @@ function ProfilePractice() {
             why={serve.why}
             onResolved={onResolved}
             onNext={() => load({ fresh: true })}
+            onReplace={assignmentMode ? null : () => load({ fresh: true, replaceUnmarkable: true })}
             onRedo={redo}
           />
           <PriExplain
