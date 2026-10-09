@@ -13,6 +13,12 @@ import { readFileSync } from 'node:fs';
 import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 
 installBrowserEnv();
+// Online-only grading (owner decision 2026-10-10): the backend sections below
+// run against the real server. Every profile is a real verified account, so
+// its India questions are issued by the server and answered questions are
+// marked by it.
+const { startOnlineAuthority, nextSubmissionId } = await import('./support/online-authority.mjs');
+const online = await startOnlineAuthority({ label: 'content-certification' });
 
 const cert = await import('./content-certify.mjs');
 const {
@@ -30,7 +36,6 @@ const { CONTENT_EMPTY_CODES, isContentEmpty, servable, contentEmptySignal } = aw
 const { telemetryEvent } = await import('../src/platform/telemetry.js');
 const { dispatch } = await import('../src/local/backend.js');
 const idb = await import('../src/local/idb.js');
-const { cloudLinkRowId } = await import('../src/platform/cloudAccount.js');
 
 await loadAllBanks();
 // Every bank a V1 path reaches, including the demand-loaded archives — the app
@@ -214,12 +219,7 @@ ok(servable({ question: { id: 'x', prompt: 'p' } }) && servable({ question: { id
 resetStorage();
 async function premiumProfile(spec) {
   const created = await dispatch('POST', '/profiles', spec);
-  const now = Date.now();
-  await idb.put('device', {
-    id: cloudLinkRowId(created.user.id), accountId: `acct-${created.user.id}`, role: 'student', emailVerified: true,
-    linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
-    entitlement: { plan: 'premium', status: 'active', provider: 'web', currentPeriodEnd: now + 30 * 86400000, offlineUntil: now + 7 * 86400000, issuedAt: now, sourceVersion: 1 }
-  });
+  await online.link(created.user.id, { entitlement: 'premium' });
   return created.user;
 }
 const student = await premiumProfile({ name: 'Cert Student', course: 'in', indiaTrack: 'cbse', year: 10 });
@@ -239,22 +239,28 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
 {
   const r = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: 'c10-real-numbers', track: 'cbse' });
   const row = await idb.get('questions', r.question.id);
+  // The row is server-issued: what is on the device (q) has no answer and no
+  // seed. `key` is the same question regenerated from the parameters the
+  // device asked the server to issue — the suite's oracle, never the product's.
   const q = row.payload;
+  const key = await online.answerKey(row);
+  ok(!!row.serverQuestionId && !('answer' in q) && !('seed' in q), 'the served India question was issued by the server and carries no answer or seed on the device');
   ok(typeof q.contentId === 'string' && q.contentId.length > 0, `a served India question carries a contentId (${q.contentId})`);
   eq(q.contentVersion, CONTENT_VERSION, 'a served India question carries the current content version');
-  eq(q.contentHash, contentHashOf(q), 'its contentHash matches what was served');
-  if (!q.pyq) eq(q.contentId, contentIdOf(q, row.generator), 'its contentId names the generator, difficulty and seed that reproduce it');
-  const same = generateQuestion(row.generator, q.difficulty, q.seed);
+  eq(q.contentHash, contentHashOf(key), 'its contentHash matches what was served');
+  if (!key.pyq) eq(q.contentId, contentIdOf(key, row.generator), 'its contentId names the generator, difficulty and seed that reproduce it');
+  const same = generateQuestion(row.generator, q.difficulty, key.seed);
   eq(same.contentHash, q.contentHash, 'the contentId reproduces the same question under the same content version');
 
-  const answer = q.answerType === 'mcq' ? String(q.answer.correctIndex) : String(q.answer?.value ?? q.answer?.expr ?? '0');
-  await dispatch('POST', `/practice/${r.question.id}/submit`, { answer });
+  const answer = key.answerType === 'mcq' ? String(key.answer.correctIndex) : String(key.answer?.value ?? key.answer?.expr ?? '0');
+  const marked = await dispatch('POST', `/practice/${r.question.id}/submit`, { answer, submissionId: nextSubmissionId() });
+  ok(online.traffic.grade === 1 && typeof marked?.correct === 'boolean', `the answer was marked by the server (${online.traffic.grade} grade request, correct=${marked?.correct})`);
   const attempts = (await idb.byIndex('attempts', 'pid', student.id)).filter(a => a.questionId === r.question.id);
   eq(attempts.length, 1, 'the answered question produced one attempt');
   eq(attempts[0]?.contentId, q.contentId, 'the attempt records the contentId it was made on');
   eq(attempts[0]?.contentVersion, CONTENT_VERSION, 'the attempt records the content version');
   eq(attempts[0]?.contentHash, q.contentHash, 'the attempt records the content hash');
-  eq(attempts[0]?.seed, q.seed, 'the attempt records the seed');
+  eq(attempts[0]?.seed, key.seed, 'the attempt records the seed');
 }
 {
   // Legacy rows: no identity reads as the legacy version, never as current.
@@ -287,11 +293,11 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   // re-served from its stored payload rather than regenerated differently.
   const r = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: 'c10-quadratic-equations', track: 'cbse', difficulty: 2 });
   const row = await idb.get('questions', r.question.id);
+  const key = await online.answerKey(row);
   const old = { ...row, payload: { ...row.payload, contentVersion: '2025.1.0', prompt: `${row.payload.prompt} [as first served]` } };
   await idb.put('questions', old);
-  const q = row.payload;
-  const answer = q.answerType === 'mcq' ? String(q.answer.correctIndex) : String(q.answer?.value ?? q.answer?.expr ?? '0');
-  await dispatch('POST', `/practice/${r.question.id}/submit`, { answer }).catch(() => {});
+  const answer = key.answerType === 'mcq' ? String(key.answer.correctIndex) : String(key.answer?.value ?? key.answer?.expr ?? '0');
+  await dispatch('POST', `/practice/${r.question.id}/submit`, { answer, submissionId: nextSubmissionId() });
   const again = await dispatch('POST', `/history/${r.question.id}/retry`, { variant: 'same' }).catch(e => ({ error: e }));
   ok(again?.question?.prompt?.endsWith('[as first served]'), 'retrying a question from an older content version shows the question as it was first served');
 }
@@ -440,6 +446,7 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   eq(paths.filter(p => p.track === 'cbse' && p.dotpoint == null && !p.pyqOnly).length, chapters.length, 'every CBSE chapter is its own path');
 }
 
+await online.close();
 const total = pass + failures.length;
 if (failures.length) {
   for (const f of failures) console.log(`FAIL ${f}`);
