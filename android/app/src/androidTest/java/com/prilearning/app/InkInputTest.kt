@@ -80,22 +80,52 @@ class InkInputTest {
     private fun bandPixels(s: ActivityScenario<MainActivity>, from: Float, to: Float): Int = eval(s, """(function(){var c=document.querySelector('.editor-shell .ink-canvas-base')||document.querySelector('.ink-canvas-base');
         if(!c||!c.width)return -1;var y0=Math.floor(c.height*$from),y1=Math.ceil(c.height*$to);var d=c.getContext('2d').getImageData(0,y0,c.width,y1-y0).data;var n=0;for(var i=3;i<d.length;i+=4)if(d[i]>0)n++;return n;})()""").toIntOrNull() ?: -1
 
+    /**
+     * One evaluateJavascript round trip that tells its three ways of saying
+     * nothing apart: "gone" (the shell holds no WebView: the renderer died),
+     * "silent" (no callback inside `waitMs`), or the raw callback value.
+     */
+    private fun probe(s: ActivityScenario<MainActivity>, js: String, waitMs: Long): String {
+        var out = "silent"
+        val latch = CountDownLatch(1)
+        s.onActivity { act ->
+            val wv: WebView = act.webView ?: run { out = "gone"; latch.countDown(); return@onActivity }
+            wv.evaluateJavascript("(function(){try{return JSON.stringify($js);}catch(e){return JSON.stringify('ERR '+e.message);}})()") { v ->
+                out = v ?: "null"
+                latch.countDown()
+            }
+        }
+        latch.await(waitMs, TimeUnit.MILLISECONDS)
+        return out
+    }
+
     private fun metrics(s: ActivityScenario<MainActivity>): JSONObject {
         // evaluateJavascript can transiently return JSON null while WebView is
         // committing an injected MotionEvent, and API 33's AOSP WebView may
         // hand the JSON object back with one fewer string-encoding layer than
-        // newer WebViews. Retry the transient null, then accept either encoding
-        // without weakening any of the stroke assertions below.
-        val raw = waitFor(
-            s,
-            "JSON.stringify(window.__PRI_INK_METRICS__||{strokes:[],rejected:{touchAfterPen:0},cancels:0})",
-            10_000
-        )
-        return when (val decoded = JSONTokener(raw).nextValue()) {
-            is JSONObject -> decoded
-            is String -> JSONObject(decoded)
-            else -> throw AssertionError("ink metrics were not a JSON object: $raw")
+        // newer WebViews. On the hosted API 33 image a callback issued right
+        // after an injected stroke has also failed to arrive for 10 s
+        // (2026-10-09, run 37987037176) — and one eval that waits 10 s for its
+        // callback is not a retry. So each round trip is bounded and asked
+        // again until the page answers; either encoding is accepted, no stroke
+        // assertion below is weakened, and a page that never answers still
+        // fails, saying which kind of silence it was.
+        val js = "window.__PRI_INK_METRICS__||{strokes:[],rejected:{touchAfterPen:0},cancels:0}"
+        val end = System.currentTimeMillis() + 30_000
+        val seen = mutableListOf<String>()
+        while (System.currentTimeMillis() < end) {
+            val raw = probe(s, js, 2_500)
+            if (raw == "gone") throw AssertionError("the WebView renderer is gone: ink metrics cannot be read (earlier: $seen)")
+            if (raw != "silent" && raw != "null") {
+                var decoded: Any? = JSONTokener(raw).nextValue()
+                if (decoded is String) decoded = JSONTokener(decoded).nextValue()
+                if (decoded is JSONObject) return decoded
+                throw AssertionError("ink metrics were not a JSON object: $raw")
+            }
+            if (seen.size < 16) seen += raw
+            Thread.sleep(250)
         }
+        throw AssertionError("ink metrics were never answered in 30 s (each try: $seen)")
     }
 
     /** One stroke of real MotionEvents across the canvas at height fraction fy. */
