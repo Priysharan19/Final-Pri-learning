@@ -82,6 +82,17 @@ const OUTSTANDING = [
   // The three that used to sit here — the unnamed theme toggle, the wordmark that
   // navigated from a <span>, and the history verdict carried only by colour — are
   // fixed in the app rather than exempted here.
+  //
+  // One entry, 2026-10-10, reported as a product defect the same day (this
+  // suite may not edit client/src). The same icon was given its word on the
+  // question card, the placement page and both game lobbies; the Exams page
+  // was missed. Delete this entry when the group below goes red.
+  {
+    check: 'colour',
+    file: 'client/src/pages/Exams.jsx:82 — the refused paper start (.verdict-technical > span.verdict-ico)',
+    what: 'the alert icon of a paper that did NOT start is painted in the "incorrect" colour (--bad) with no word of its own (the sr-only "not checked" label the other refusals carry is missing here)',
+    test: f => f.signature === 'span.verdict-ico' && [...f.views].every(view => view === 'exams · refused signed out')
+  }
 ];
 
 // ── Assertions ───────────────────────────────────────────────────────────────
@@ -1129,7 +1140,22 @@ async function run() {
     // ── the India exam room: a JEE Main paper sat partly by hand ────────────
     // The handwriting surface, the write/type switch, the multiple-choice
     // options and the section analysis only exist on an India paper.
-    await step('india exam room · writing a numerical answer', '/exams/:id', async () => {
+    // ── signed out (the India profile made here has no account): marked work
+    // that does not start says so in place — a paper, the placement check,
+    // Rapid Fire and Match.
+    const refusalBlock = selector => page.evaluate(sel => {
+      const block = document.querySelector(sel);
+      const button = block?.querySelector('[data-check-sign-in]');
+      const icon = block?.querySelector('.verdict-ico');
+      return block ? {
+        kind: block.getAttribute(sel.slice(1, -1)), role: block.getAttribute('role'),
+        text: (block.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200),
+        iconWord: (icon?.textContent || '').trim(),
+        button: button ? { tag: button.tagName.toLowerCase(), name: (button.textContent || '').trim(), expanded: button.getAttribute('aria-expanded'), disabled: button.disabled } : null
+      } : null;
+    }, selector);
+
+    await step('exams · refused signed out', '/exams', async () => {
       await goTo(page, BASE, '/');
       await click(page, '.user-chip');
       await click(page, '[role="menuitem"]', { text: 'Switch profile' });
@@ -1146,7 +1172,46 @@ async function run() {
       await page.waitForSelector('[data-onboarding-step="5"]');
       await page.getByRole('button', { name: 'Start learning' }).click();
       await page.waitForSelector('.shell', { timeout: 30000 });
+      // Signed out, a paper does not start: the refusal is the state audited here.
       await goTo(page, BASE, '/exams');
+      await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
+      await page.waitForSelector('[data-exam-start-refused]', { timeout: 30000 });
+      await wait(page, 400);
+      refusals.exam = { ...(await refusalBlock('[data-exam-start-refused]')), room: await page.locator('.exam-nav').count() };
+    });
+
+    await step('placement · refused signed out', '/placement', async () => {
+      await goTo(page, BASE, '/placement?go=1');
+      await page.waitForSelector('[data-placement-refused]', { timeout: 30000 });
+      await wait(page, 400);
+      refusals.placement = await refusalBlock('[data-placement-refused]');
+    });
+
+    await step('rapid fire · refused signed out', '/rush', async () => {
+      await goTo(page, BASE, '/rush');
+      await click(page, '.qcard .btn-primary.btn-lg');
+      await page.waitForSelector('[data-game-refused]', { timeout: 30000 });
+      await wait(page, 400);
+      refusals.rush = { ...(await refusalBlock('[data-game-refused]')), clock: await page.locator('.rush-timer').count() };
+    });
+
+    await step('match · refused signed out', '/match', async () => {
+      await goTo(page, BASE, '/match');
+      await click(page, '.btn-glow');
+      await page.waitForSelector('[data-game-refused]', { timeout: 30000 });
+      await wait(page, 400);
+      refusals.match = { ...(await refusalBlock('[data-game-refused]')), question: await page.locator('.q-prompt').count() };
+    });
+
+    // The India student signs in where the paper was refused (a real account on
+    // the real server), and the paper — issued and marked by the server — opens.
+    await step('india exam room · writing a numerical answer', '/exams/:id', async () => {
+      await goTo(page, BASE, '/exams');
+      await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
+      const refusedStart = page.locator('[data-exam-start-refused]');
+      await refusedStart.waitFor({ state: 'visible', timeout: 30000 });
+      await refusedStart.locator('[data-check-sign-in]').click();
+      await online.signInHere(refusedStart, { name: 'Accessibility JEE Student' });
       await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
       await page.waitForSelector('.exam-nav', { timeout: 60000 });
       await click(page, '.mcq .mcq-opt');
@@ -1286,6 +1351,17 @@ async function run() {
       refusals.reconnect?.kind === 'reconnect' && /has not been checked/i.test((refusals.reconnect.spoken || []).join(' ')) &&
         refusals.reconnect.retry?.tag === 'button' && /\p{L}/u.test(refusals.reconnect.retry.name) && refusals.reconnect.result === 0,
       JSON.stringify(refusals.reconnect));
+
+    const announced = r => r?.kind === 'sign-in' && r.role === 'alert' && /\p{L}/u.test(r.iconWord || '') &&
+      r.button?.tag === 'button' && /\p{L}/u.test(r.button.name) && r.button.expanded === 'false' && r.button.disabled === false;
+    ok('signed out, a placement check that does not start is an alert in words (its icon named), with a real, named sign-in button in place',
+      announced(refusals.placement), JSON.stringify(refusals.placement));
+    ok('signed out, an exam paper that does not start is an alert in words with the same named sign-in — and no exam room opens',
+      // (Its icon alone has no word yet — Exams.jsx:82, tracked under "owned elsewhere".)
+      announced({ ...refusals.exam, iconWord: refusals.exam?.iconWord || 'tracked elsewhere' }) && refusals.exam.room === 0, JSON.stringify(refusals.exam));
+    ok('signed out, Rapid Fire and Match that do not start are alerts in words with the same named sign-in — and no clock or question appears',
+      announced(refusals.rush) && refusals.rush.clock === 0 && announced(refusals.match) && refusals.match.question === 0,
+      JSON.stringify({ rush: refusals.rush, match: refusals.match }));
 
     section('colour is never alone');
     ok('correct / incorrect is never carried by colour alone', findingsFor('colour').length === 0, show(findingsFor('colour')));

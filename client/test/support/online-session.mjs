@@ -128,6 +128,11 @@ export async function startOnlinePlatform({ dist = DIST } = {}) {
 
   async function newAccount({ name = 'Online Student' } = {}) {
     const serial = ++accountSerial;
+    // Every student of a suite run arrives from the same loopback address, so
+    // the per-address sign-up and sign-in limits (8 an hour, 12 a quarter-hour)
+    // would stop the ninth flow. The desk clears those two counters; it is not
+    // a product path, and the limits themselves are proved by the server suites.
+    h.db.prepare("DELETE FROM rate_limits WHERE bucket LIKE 'register%' OR bucket LIKE 'login%'").run();
     const email = `e2e.${process.pid}.${serial}.${Date.now().toString(36)}@example.test`;
     const made = await desk(() => harness.registerAccount(h, { name, email, password: PASSWORD, deviceId: `e2e-desk-${serial}` }));
     if (made.status !== 201 || !made.account?.id) throw new Error(`online-session: register answered ${made.status} ${made.text}`);
@@ -328,6 +333,55 @@ function onlineSession(platform, ctx, page) {
     return { answerType: q.answerType, prompt: q.prompt, serverQuestionId: shown.serverQuestionId, accountId: String(sealed.account_id), ...typedAnswerOf(q) };
   }
 
+  // ── Exam papers: the server's sealed paper and its stored result ───────────
+  /** The server's id for a paper this device holds (from the local exam row). */
+  const examServerId = (localExamId) => page.evaluate(id => new Promise(done => {
+    const open = indexedDB.open('pri-learning');
+    open.onerror = () => done(null);
+    open.onsuccess = () => {
+      const db = open.result;
+      const req = db.transaction('exams').objectStore('exams').get(id);
+      req.onsuccess = () => { db.close(); done(req.result?.server?.examId || null); };
+      req.onerror = () => { db.close(); done(null); };
+    };
+  }), localExamId);
+  const sealedExam = async (localExamId, scope) => {
+    const serverId = await examServerId(localExamId);
+    if (!serverId) return null;
+    const row = platform.h.db.prepare('SELECT account_id, response_json FROM idempotency_keys WHERE scope=? AND key=?').get(scope, serverId);
+    return row ? { serverId, accountId: String(row.account_id), ...JSON.parse(row.response_json) } : null;
+  };
+  /**
+   * The right typed answer for each single question of a paper, keyed by
+   * question number — read at the test's desk from the server's sealed paper.
+   * The device holds no answers for a server-issued paper and none is read
+   * from it or handed to it.
+   */
+  async function examAnswers(localExamId) {
+    const paper = await sealedExam(localExamId, 'exam-paper');
+    if (!paper) throw new Error(`online-session: the server holds no sealed paper for exam ${localExamId}`);
+    const out = [];
+    for (const [i, entry] of (paper.questions || []).entries()) {
+      const q = entry?.payload || entry;
+      const a = q?.answer;
+      if (!q || !a || q.multipart) continue;
+      let typed = null;
+      if (a.canonicalInput !== undefined) typed = String(a.canonicalInput);
+      else if (q.answerType === 'numeric') {
+        typed = a.surdForm ? `${a.surdForm.k === 1 ? '' : a.surdForm.k === -1 ? '-' : a.surdForm.k}sqrt(${a.surdForm.r})`
+          : a.simplestFraction ? `${a.simplestFraction.n}/${a.simplestFraction.d}`
+          : a.requireExact || a.value === undefined ? null : String(a.value);
+      } else if (q.answerType === 'expression') typed = a.expr;
+      else if (q.answerType === 'set') typed = a.values.join(', ');
+      else if (q.answerType === 'point') typed = `(${a.x}, ${a.y})`;
+      else if (q.answerType === 'ratio') typed = `${a.a}:${a.b}`;
+      if (typed) out.push([i + 1, typed]);
+    }
+    return out;
+  }
+  /** The server's stored result for a paper, or null while it is unmarked. */
+  const examResult = (localExamId) => sealedExam(localExamId, 'exam-result');
+
   /**
    * Cut the device off from the server at the network layer, for a signed-in
    * student: every /v1 request fails as an unreachable host does. The app
@@ -348,7 +402,7 @@ function onlineSession(platform, ctx, page) {
 
   const session = {
     platform, origin: platform.origin, reader: platform.reader, sms: platform.sms, calls, account: null,
-    settled, practiceCalls, signIn, signInHere, linkedAccounts, shownRow, answerOf, disconnect, reconnect,
+    settled, practiceCalls, examServerId, examAnswers, examResult, signIn, signInHere, linkedAccounts, shownRow, answerOf, disconnect, reconnect,
     ledger: (serverQuestionId = null) => platform.ledger(session.account?.id, serverQuestionId)
   };
   return session;

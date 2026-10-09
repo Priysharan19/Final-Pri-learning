@@ -227,11 +227,8 @@ export const flow = {
     });
     await check('back online, the kept handwriting is marked without another tap', await page.locator('.eval-card').count() === 1);
     await page.waitForTimeout(2500);   // anything still queued would land now
-    // Exactly once, where it is decided and where it was answered: one grade
-    // on the server, one resolution written by this device. (A sync pull that
-    // overlaps the submit can ALSO import the server's own copy of the same
-    // attempt as a second row — a product race, asserted strictly in
-    // known-red-online-only-grading.mjs and reported; it is not a second mark.)
+    // Exactly once, on the server and on the device: one grade, ONE attempt
+    // row, and that row carries the server's attempt id.
     const attemptRows = await page.evaluate(() => new Promise(ok => {
       const r = indexedDB.open('pri-learning');
       r.onsuccess = () => { const db = r.result; const c = db.transaction('attempts').objectStore('attempts').getAll();
@@ -240,9 +237,9 @@ export const flow = {
       r.onerror = () => ok(null);
     }));
     const flapGrades = (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).filter(c => c.status === 200);
-    await check('a flapping connection marks the kept answer exactly once: one server grade, one resolution on this device, one server attempt behind every row',
-      attemptsBefore === 0 && flapGrades.length === 1 && !!attemptRows && attemptRows.filter(a => !a.remote).length === 1 &&
-        new Set(attemptRows.map(a => a.server)).size === 1 && attemptRows[0].server === flapGrades[0].json?.attemptId,
+    await check('a flapping connection marks the kept answer exactly once: one server grade, one attempt row on this device, for that server attempt',
+      attemptsBefore === 0 && flapGrades.length === 1 && !!attemptRows && attemptRows.length === 1 && !attemptRows[0].remote &&
+        attemptRows[0].server === flapGrades[0].json?.attemptId,
       `attempts before ${attemptsBefore}; rows ${JSON.stringify(attemptRows)}; ${flapGrades.length} server grade(s)`);
     const marked = (await page.locator('.eval-card').innerText()).replace(/\s+/g, ' ');
     const marks = (await page.locator('.eval-marks').innerText()).replace(/\s+/g, ' ').trim();

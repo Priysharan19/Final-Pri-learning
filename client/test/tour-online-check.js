@@ -487,11 +487,10 @@ export const draftOffline = {
     await check('Submit on the draft is refused even after reconnecting: no verdict, marks, XP or solution',
       nothingMarked(shown) && (await online.practiceCalls(MARKING)).length === 0 && online.ledger().issued === before.issued,
       `${JSON.stringify(shown)}; ${JSON.stringify((await online.practiceCalls(MARKING)).map(c => c.path))}`);
-    // (The card currently files this refusal under an "already finished"
-    // heading — a product defect, asserted in known-red-online-only-grading.mjs.)
-    await check('the card says why and what to do: it was opened without a connection, the working is kept, open a new question',
-      /opened without a connection, so it cannot be marked/i.test(said) && /working is kept/i.test(said) && /open a new question/i.test(said),
-      JSON.stringify(said.slice(0, 260)));
+    await check('the card says why and what to do — a named refusal with Next question on it, never "already finished" or "another tab"',
+      /without a connection/i.test(said) && !/already finished|finished elsewhere|another tab/i.test(said) &&
+        await page.locator('[data-check-refusal]').count() === 1 && await page.locator('[data-check-next]').count() === 1,
+      `${JSON.stringify(said.slice(0, 260))}; refusal ${JSON.stringify(shown.refusal)}; ${await page.locator('[data-check-next]').count()} Next control(s)`);
     let facts = await deviceFacts(page, qid);
     await check('the work is kept and nothing was spent: answer still in the box and in the draft, no attempt, no try',
       await answerBox.inputValue() === SURELY_WRONG && facts.attempts === 0 && facts.row?.tries === 0 && facts.row?.answered === 0,
@@ -564,10 +563,10 @@ export const preparedTaken = {
       issues.length === 1 && issues[0].status === 409 && JSON.stringify(Object.keys(issues[0].body || {})) === '["prepared"]' && nothingMarked(shown) &&
         (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length === 0 && online.platform.ledger(account.id).issued === 0,
       `${JSON.stringify(issues.map(c => `${c.status} ${c.json?.error?.code}`))} ${JSON.stringify(shown)}`);
-    // (Its heading is the same misfiled "already finished" — known-red BUG 2.)
-    await check('the card says it cannot be marked, the working is kept, and to open a new question',
-      /cannot be (?:marked|checked)|too long ago to be marked/i.test(said) && /working is kept/i.test(said) && /new question|next question/i.test(said),
-      JSON.stringify(said.slice(0, 260)));
+    await check('the card says so as a named refusal with Next question on it, never "already finished" or "another tab"',
+      said.length > 20 && !/already finished|finished elsewhere|another tab/i.test(said) &&
+        await page.locator('[data-check-refusal]').count() === 1 && await page.locator('[data-check-next]').count() === 1,
+      `${JSON.stringify(said.slice(0, 260))}; refusal ${JSON.stringify(shown.refusal)}`);
     const facts = await deviceFacts(page, qid);
     await check('the work is kept and nothing was spent: same question, answer still in the box, no attempt, no try',
       await shownId(page) === qid && await mathText('.q-prompt') === prompt && await answerBox.inputValue() === SURELY_WRONG &&
@@ -592,24 +591,162 @@ export const preparedTaken = {
   }
 };
 
-// ── 4 · Exams, signed out ────────────────────────────────────────────────────
+// ── 3d · One answer is one attempt row, even when a sync overlaps it ────────
 
-export const examSignedOut = {
-  id: 'exam-signed-out',
-  name: 'Exams · signed out: a paper does not start; sign in in place, then it does',
+export const syncOverlap = {
+  id: 'sync-overlap',
+  name: 'Sync · a pull overlapping a submit never doubles an attempt',
   online: true,
 
+  async run({ page, ctx, base, check, goto, createProfile, settle, online }) {
+    await goto('/');
+    await createProfile({ name: 'Sync Overlap', year: 7 });
+    await online.signIn({ name: 'Sync Overlap' });
+    const rowsNow = () => page.evaluate(() => new Promise(ok => {
+      const r = indexedDB.open('pri-learning');
+      r.onsuccess = () => { const db = r.result; const c = db.transaction('attempts').objectStore('attempts').getAll();
+        c.onsuccess = () => { db.close(); ok(c.result.map(a => ({ remote: typeof a.remoteEventId === 'string', server: a.serverAttemptId || a.remoteEventId || null }))); };
+        c.onerror = () => { db.close(); ok(null); }; };
+      r.onerror = () => ok(null);
+    }));
+    let rows = [];
+    let rounds = 0;
+    for (; rounds < 4; rounds++) {
+      const known = await openTypedQuestion({ page, base, settle, online });
+      if (!known) break;
+      await page.locator('.editor-body input.answer-input').fill(known.text);
+      // The connection flaps around the submit: every return starts a sync pull.
+      const flap = (async () => { for (let i = 0; i < 12; i++) {
+        await ctx.setOffline(true); await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+        await ctx.setOffline(false); await page.evaluate(() => window.dispatchEvent(new Event('online')));
+        await page.waitForTimeout(25);
+      } })();
+      await submitButton(page).click().catch(() => {});
+      await flap;
+      await page.waitForSelector('.eval-card, .verdict', { timeout: 20000 }).catch(() => {});
+      const retry = page.locator('[data-check-retry]');
+      if (await retry.count()) { await retry.click(); await page.waitForSelector('.eval-card, .verdict-bad', { timeout: 20000 }).catch(() => {}); }
+      await page.waitForTimeout(2500);   // a late pull would land now
+      rows = await rowsNow() || [];
+    }
+    const perServerAttempt = new Map();
+    for (const a of rows) perServerAttempt.set(a.server, (perServerAttempt.get(a.server) || 0) + 1);
+    const ledger = online.ledger();
+    await check('four answers were submitted under a flapping connection, each marked by the server', rounds === 4 && ledger.completions === 4, `${rounds} rounds; ${JSON.stringify(ledger)}`);
+    await check('no server attempt appears as two attempt rows on the device: one row per answer',
+      rows.length === 4 && [...perServerAttempt.values()].every(n => n === 1) && !perServerAttempt.has(null), JSON.stringify(rows));
+  }
+};
+
+// ── 3e · Rapid Fire and Match: signed out no clock starts; answers are the server's ─
+
+export const games = {
+  id: 'games',
+  name: 'Rapid Fire and Match · signed out nothing starts; signed in every answer is server-marked',
+  online: true,
+
+  async run({ page, base, check, goto, createProfile, settle, online }) {
+    await goto('/');
+    await createProfile({ name: 'Game Player', year: 7 });
+    const attemptRows = () => page.evaluate(() => new Promise(ok => {
+      const r = indexedDB.open('pri-learning');
+      r.onsuccess = () => { const db = r.result; const c = db.transaction('attempts').objectStore('attempts').getAll();
+        c.onsuccess = () => { db.close(); ok(c.result.map(a => ({ mode: a.mode, server: a.serverAttemptId || null }))); }; c.onerror = () => { db.close(); ok(null); }; };
+      r.onerror = () => ok(null);
+    }));
+    const refusedIn = async () => {
+      const block = page.locator('[data-game-refused]');
+      await block.waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
+      return block;
+    };
+
+    // ── Match, signed out ────────────────────────────────────────────────────
+    await page.goto(`${base}/match`, { waitUntil: 'domcontentloaded' });
+    await page.locator('.btn-glow').waitFor({ timeout: 30000 });
+    await page.locator('.btn-glow').click();
+    let block = await refusedIn();
+    await check('signed out, Match does not start: the lobby says why, as an alert, with the sign-in in place',
+      await block.getAttribute('data-game-refused').catch(() => null) === 'sign-in' && await block.getAttribute('role') === 'alert' &&
+        await block.locator('[data-check-sign-in]').isEnabled() && await page.locator('.q-prompt').count() === 0,
+      (await block.innerText().catch(() => 'no refusal shown')).replace(/\s+/g, ' ').slice(0, 200));
+
+    // ── Rapid Fire, signed out ───────────────────────────────────────────────
+    await page.goto(`${base}/rush`, { waitUntil: 'domcontentloaded' });
+    const startRush = page.locator('.qcard .btn-primary.btn-lg');
+    await startRush.waitFor({ timeout: 30000 });
+    await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
+    await startRush.click();
+    block = await refusedIn();
+    await check('signed out, Rapid Fire does not start: no clock, no question, the sign-in in place',
+      await block.getAttribute('data-game-refused').catch(() => null) === 'sign-in' && await page.locator('.rush-timer').count() === 0 &&
+        await page.locator('.q-prompt').count() === 0 && await block.locator('[data-check-sign-in]').isEnabled(),
+      (await block.innerText().catch(() => 'no refusal shown')).replace(/\s+/g, ' ').slice(0, 200));
+    await check('signed out, nothing was marked or written by either game: no attempt row, no question issued',
+      (await attemptRows())?.length === 0 && (await online.practiceCalls(MARKING)).filter(c => c.status < 300).length === 0,
+      JSON.stringify(await attemptRows()));
+
+    // ── sign in, in the lobby ────────────────────────────────────────────────
+    await block.locator('[data-check-sign-in]').click();
+    const account = await online.signInHere(block, { name: 'Game Player' });
+    await check('sign-in completes in the Rapid Fire lobby: no navigation, no reload',
+      new URL(page.url()).pathname === '/rush' && await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept', page.url());
+
+    // ── Rapid Fire, signed in: three answers, each the server's ──────────────
+    const play = async (n) => {
+      for (let i = 0; i < n; i++) {
+        await page.waitForSelector('.q-prompt', { timeout: 30000 });
+        const before = (await attemptRows())?.length ?? 0;
+        const option = page.locator('.mcq-opt').first();
+        const box = page.locator('input.answer-input').first();
+        if (await option.count()) await option.click();
+        else { await box.fill('0'); await page.locator('.answer-row .btn-primary').click(); }
+        for (let w = 0; w < 80 && ((await attemptRows())?.length ?? 0) === before; w++) await page.waitForTimeout(100);
+      }
+    };
+    await page.locator('.qcard .btn-primary.btn-lg').click();
+    const clock = await page.waitForSelector('.rush-timer', { timeout: 30000 }).then(() => true, () => false);
+    if (!await check('signed in, Rapid Fire starts: a clock and a question', clock && await page.locator('.q-prompt').count() === 1)) return;
+    await play(3);
+    const rushRows = (await attemptRows()) || [];
+    const sealed = online.platform.db.prepare("SELECT COUNT(*) AS n FROM idempotency_keys WHERE account_id=? AND scope='practice-completion'").get(account.id).n;
+    await check('each Rapid Fire answer is a server-marked attempt: every row carries the server\'s attempt id, and the server completed as many',
+      rushRows.length === 3 && rushRows.every(a => a.mode === 'rush' && typeof a.server === 'string' && a.server.length > 0) && Number(sealed) === 3,
+      `${JSON.stringify(rushRows)}; server completions ${sealed}`);
+
+    // ── Match, signed in ─────────────────────────────────────────────────────
+    await page.goto(`${base}/match`, { waitUntil: 'domcontentloaded' });
+    await page.locator('.btn-glow').waitFor({ timeout: 30000 });
+    await page.locator('.btn-glow').click();
+    const playing = await page.waitForSelector('.q-prompt', { timeout: 30000 }).then(() => true, () => false);
+    if (!await check('signed in, Match starts', playing && await page.locator('[data-game-refused]').count() === 0)) return;
+    await play(2);
+    const allRows = (await attemptRows()) || [];
+    const matchRows = allRows.filter(a => a.mode === 'match');
+    await check('each Match answer is a server-marked attempt too',
+      matchRows.length === 2 && matchRows.every(a => typeof a.server === 'string' && a.server.length > 0) &&
+        Number(online.platform.db.prepare("SELECT COUNT(*) AS n FROM idempotency_keys WHERE account_id=? AND scope='practice-completion'").get(account.id).n) === 5,
+      JSON.stringify(allRows));
+    await check('and no uncaught refusal or device mark: every answer the games sent was accepted by the server',
+      (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).every(c => c.status === 200 && c.json?.authoritative === true && typeof c.json.attemptId === 'string'),
+      JSON.stringify((await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).map(c => c.status)));
+  }
+};
+
+// ── 4 · Exams, signed out (NSW paper and India simulation) ──────────────────
+
+const examSignedOutFor = ({ id, name, profile, startName }) => ({
+  id, name, online: true,
   async run({ page, base, check, goto, createProfile, online }) {
     await goto('/');
-    await createProfile({ name: 'Signed Out Candidate', year: 9 });
+    await createProfile(profile);
     await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
-    const start = page.getByRole('button', { name: 'Start practice paper' });
+    const start = page.getByRole('button', { name: startName });
     await start.waitFor({ timeout: 30000 });
     await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
     await start.click();
     const refused = page.locator('[data-exam-start-refused]');
     await refused.waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
-    await check('signed out, Start practice paper is refused in place: "Starting a paper needs a Pri account"',
+    await check('signed out, the paper is refused in place: "Starting a paper needs a Pri account"',
       await refused.getAttribute('data-exam-start-refused').catch(() => null) === 'sign-in' && await refused.getAttribute('role') === 'alert' &&
         /Starting a paper needs a Pri account/.test(await refused.innerText()) && /has not started/i.test(await refused.innerText()),
       (await refused.innerText().catch(() => 'no refusal shown')).slice(0, 200));
@@ -618,19 +755,108 @@ export const examSignedOut = {
       open.onsuccess = () => { const db = open.result; const r = db.transaction('exams').objectStore('exams').count(); r.onsuccess = () => { db.close(); done(r.result); }; r.onerror = () => { db.close(); done(-1); }; };
       open.onerror = () => done(-1);
     }));
-    await check('no paper was generated and the exam room did not open',
-      exams === 0 && new URL(page.url()).pathname === '/exams' && await page.locator('.exam-timer').count() === 0, `${exams} stored paper(s); ${page.url()}`);
+    await check('no paper was generated on the device or issued by the server, and the exam room did not open',
+      exams === 0 && new URL(page.url()).pathname === '/exams' && await page.locator('.exam-timer').count() === 0 &&
+        (await online.practiceCalls(/^\/v1\/exams$/)).filter(c => c.status < 300).length === 0, `${exams} stored paper(s); ${page.url()}`);
     await refused.locator('[data-check-sign-in]').click();
-    await online.signInHere(refused, { name: 'Signed Out Candidate' });
+    await online.signInHere(refused, { name: profile.name });
     await check('sign-in completes on the Exams page: no navigation, no reload',
       new URL(page.url()).pathname === '/exams' && await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept', page.url());
-    await page.getByRole('button', { name: 'Start practice paper' }).click();
+    await page.getByRole('button', { name: startName }).click();
     await page.waitForSelector('.exam-timer', { timeout: 60000 }).catch(() => {});
-    await check('signed in, the same button starts the paper', await page.locator('.exam-timer').count() === 1 && /\/exams\/[^/]+$/.test(new URL(page.url()).pathname), page.url());
+    const issued = (await online.practiceCalls(/^\/v1\/exams$/)).filter(c => c.status < 300);
+    await check('signed in, the same button starts the paper — issued by the server, once',
+      await page.locator('.exam-timer').count() === 1 && /\/exams\/[^/]+$/.test(new URL(page.url()).pathname) && issued.length === 1, `${page.url()}; ${issued.length} paper(s) issued`);
+  }
+});
+
+export const examSignedOut = examSignedOutFor({
+  id: 'exam-signed-out', name: 'Exams · signed out: a paper does not start; sign in in place, then it does',
+  profile: { name: 'Signed Out Candidate', year: 9 }, startName: 'Start practice paper'
+});
+export const indiaExamSignedOut = examSignedOutFor({
+  id: 'india-exam-signed-out', name: 'India exam · signed out: a simulation does not start; sign in in place, then it does',
+  profile: { name: 'Signed Out Aspirant', year: 12, course: 'in', track: 'jee-main' }, startName: 'Start JEE Main Mathematics simulation'
+});
+
+// ── 5 · A paper finished offline is submitted, not marked, until the server marks it ─
+
+export const examOfflineFinish = {
+  id: 'exam-offline-finish',
+  name: 'Exam · finished offline: submitted, no score; reconnected: the server\'s result',
+  online: true,
+
+  async run({ page, base, check, goto, createProfile, settle, online }) {
+    await goto('/');
+    await createProfile({ name: 'Offline Finisher', year: 9 });
+    const account = await online.signIn({ name: 'Offline Finisher' });
+    await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Start practice paper' }).waitFor({ timeout: 30000 });
+    await page.getByRole('button', { name: 'Start practice paper' }).click();
+    await page.waitForSelector('.exam-timer', { timeout: 60000 });
+    const examId = new URL(page.url()).pathname.split('/').pop();
+    const sealed = new Map(await online.examAnswers(examId));
+    const answerBox = page.locator('.answer-row input.answer-input');
+    const dots = await page.locator('.exam-dot').count();
+    let answeredAt = null;
+    for (let i = 0; i < dots && answeredAt === null; i++) {
+      await page.locator('.exam-dot').nth(i).click();
+      await settle();
+      if ((await page.locator('.q-meta').innerText()).includes('Structured') || await answerBox.count() !== 1 || !sealed.get(i + 1)) continue;
+      await answerBox.fill(sealed.get(i + 1));
+      answeredAt = i + 1;
+    }
+    if (!await check('a server-issued paper is open and one question is answered from the server\'s sealed paper', answeredAt !== null, `${sealed.size} sealed answers`)) return;
+    // The answer reaches the server as a checkpoint while the paper is sat.
+    const checkpoints = () => online.calls.filter(c => c.method === 'PATCH' && /^\/v1\/exams\/[^/]+\/answers$/.test(c.path) && c.status < 300);
+    for (let w = 0; w < 60 && !checkpoints().length; w++) await page.waitForTimeout(250);
+    await check('answers are checkpointed to the server while the paper is sat', checkpoints().length >= 1,
+      JSON.stringify(online.calls.filter(c => /^\/v1\/exams/.test(c.path)).map(c => `${c.status} ${c.method}`)));
+
+    // ── the connection goes; the student submits ─────────────────────────────
+    await online.disconnect();
+    await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
+    await page.locator('.exam-head').getByRole('button', { name: 'Review and submit' }).click();
+    await page.locator('[role="dialog"]').getByRole('button', { name: 'Submit paper' }).click();
+    const pending = page.locator('[data-exam-pending]').first();
+    await pending.waitFor({ state: 'visible', timeout: 60000 }).catch(() => {});
+    const pendingText = (await pending.innerText().catch(() => '')).replace(/\s+/g, ' ');
+    await check('offline, the room says "Submitted. Not marked yet." as a status — with no score, percentage or marks',
+      /Submitted\. Not marked yet\./.test(pendingText) && await pending.getAttribute('role') === 'status' &&
+        await page.locator('.hero-num').count() === 0 && !/\d+\s*%|\d+ of \d+ marks/.test(pendingText),
+      JSON.stringify(pendingText.slice(0, 240)));
+    await check('and the server has marked nothing: no result is held for the paper',
+      (await online.examResult(examId)) === null && (await online.practiceCalls(/^\/v1\/exams\/[^/]+\/finish$/)).filter(c => c.status === 200).length === 0);
+    await check('nothing claims a mark made on this device', !/marked on this device|checked on this device/i.test(await page.locator('main, .shell').first().innerText()));
+    // The Exams list tells the same truth.
+    await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.prio-item', { timeout: 30000 });
+    await check('the Exams list shows the paper as waiting to be marked, with no score',
+      await page.locator('.prio-item [data-exam-pending]').count() === 1 && !/\d+\/\d+/.test((await page.locator('.prio-item').first().innerText()).replace(/\d{1,2}[:/]\d{2}/g, '')),
+      (await page.locator('.prio-item').first().innerText()).replace(/\s+/g, ' ').slice(0, 160));
+
+    // ── reconnected: the server marks it, once, and the room shows that result ─
+    await page.goto(`${base}/exams/${examId}`, { waitUntil: 'domcontentloaded' });
+    await page.locator('[data-exam-pending]').first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    await online.reconnect();
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
+    await page.waitForSelector('.hero-num', { timeout: 45000 }).catch(() => {});
+    const result = await online.examResult(examId);
+    const summary = (await page.locator('.card').first().innerText().catch(() => '')).replace(/\s+/g, ' ');
+    const scored = /(\d+) of (\d+) marks/.exec(summary);
+    await check('after reconnecting the paper is marked by the server without being sat again, and the room shows the server\'s score',
+      await page.locator('.hero-num').count() === 1 && !!result && result.accountId === account.id && !!scored &&
+        JSON.stringify(result).includes(`"score":${scored[1]}`) && JSON.stringify(result).includes(`"total":${scored[2]}`),
+      `summary ${JSON.stringify(summary.slice(0, 160))}; server result ${result ? 'held' : 'missing'}`);
+    await page.waitForTimeout(1500);
+    const finishes = (await online.practiceCalls(/^\/v1\/exams\/[^/]+\/finish$/)).filter(c => c.status === 200);
+    await check('marked exactly once: every accepted finish carries the same result, and the answer given offline earned its marks',
+      finishes.length >= 1 && new Set(finishes.map(c => JSON.stringify(c.json?.result?.score ?? c.json?.score ?? null))).size === 1 && Number(scored?.[1]) >= 1,
+      `${finishes.length} accepted finish call(s); score ${scored?.[1]}/${scored?.[2]}`);
   }
 };
 
-export const flows = [typeSignedOut, typeOffline, writeOffline, draftOffline, preparedTaken, examSignedOut];
+export const flows = [typeSignedOut, typeOffline, writeOffline, draftOffline, preparedTaken, syncOverlap, games, examSignedOut, indiaExamSignedOut, examOfflineFinish];
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const { runFlows } = await import('./e2e.mjs');

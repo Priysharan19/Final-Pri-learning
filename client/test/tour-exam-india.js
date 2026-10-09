@@ -211,6 +211,14 @@ export const flow = {
     await page.waitForSelector('.hero-num', { timeout: 30000 });
     await check('a reload of a finalised paper shows the result, not the paper', await page.locator('.exam-timer').count() === 0);
     await check('and the analysis is still there', await page.locator('.exam-analysis').count() === 1);
+    // Who marked it: the server, once, for this account — and the device holds
+    // no answer for any question of the paper it was issued.
+    const finishCalls = await online.practiceCalls(/^\/v1\/exams\/[^/]+\/finish$/);
+    const serverResult = await online.examResult(examId);
+    await check('the JEE Main paper was issued once and marked once by the server; the analysis on screen is its result',
+      finishCalls.filter(c => c.status === 200).length === 1 && !!serverResult && serverResult.accountId === online.account.id &&
+        (await online.practiceCalls(/^\/v1\/exams$/)).filter(c => c.status < 300).length === 1,
+      `finish ${JSON.stringify(finishCalls.map(c => c.status))}; server result ${serverResult ? 'held' : 'missing'}`);
     note(`JEE Main paper scored ${scored?.[1]}/${scored?.[2]} with one MCQ and one handwritten numerical answer`);
   }
 };
