@@ -156,7 +156,7 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
           const asked = JSON.parse(String(options.body || '{}'));
           const reply = await response.clone().json();
           if (reply?.question?.id) issued.set(reply.question.id, {
-            generator: asked.generator, difficulty: Number(asked.difficulty), seed: Number(asked.seed), mode: asked.mode || 'practice'
+            generator: asked.generator, difficulty: Number(asked.difficulty), mode: asked.mode || 'practice', prepared: typeof asked.prepared === 'string'
           });
         } catch { /* an unreadable reply is the product's to refuse */ }
       }
@@ -237,11 +237,12 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
     const row = typeof rowOrId === 'string' ? await idb.get('questions', rowOrId) : rowOrId;
     assert.ok(row, 'answerKey() needs a stored question row');
     if (!row.serverQuestionId) return row.payload;
-    const asked = issued.get(row.serverQuestionId);
-    assert.ok(asked, `no issue request was seen for server question ${row.serverQuestionId}`);
-    await generators.loadAllBanks();
-    const q = generators.generateQuestion(asked.generator, asked.difficulty, asked.seed);
-    assert.equal(q.prompt, row.payload.prompt, 'the oracle regenerated a different question from the one issued');
+    // The server chooses the seed and never discloses it, so the oracle is the
+    // server's own sealed copy of the question it issued, read from its store.
+    const sealed = await app.db.get("SELECT response_json FROM idempotency_keys WHERE scope='practice-question' AND key=?", [row.serverQuestionId]);
+    assert.ok(sealed, `the server holds no issued question ${row.serverQuestionId}`);
+    const q = JSON.parse(sealed.response_json);
+    assert.equal(q.prompt, row.payload.prompt, 'the server\'s sealed question is not the one on screen');
     return q;
   }
 
