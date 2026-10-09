@@ -328,10 +328,19 @@ export async function reconcileDeferredGrades(pid) {
     if (!row?.deferredGrade || gradeInFlight(row)) continue;
     const event = row.deferredGrade.event;
     if (!row.answered && plain(event) && event.kind === 'graded-attempt' && recordIssuedAttempt) {
-      const outcome = await recordIssuedAttempt(pid, row.id, { ...event, payload: plain(event.payload) ? event.payload : {} });
+      const held = { ...event, payload: plain(event.payload) ? event.payload : {} };
+      let outcome = await recordIssuedAttempt(pid, row.id, held);
       // A submit took the question's lock first and is now in flight: leave
       // the deferred copy where it is for a later pass.
       if (outcome === 'deferred') continue;
+      // An event the device's own routine cannot settle (one from before marks
+      // were carried) is restored the way the pull path restores it, never
+      // dropped: the sync cursor has already moved past it.
+      if (outcome === 'unsupported' && held.deviceId === 'server-grader') {
+        const profile = await get('profiles', pid).catch(() => null);
+        if (!profile) continue;
+        outcome = await applyPracticeEvent(pid, profile, held);
+      }
       if (outcome && outcome.applied) applied++;
     } else if (!row.answered && !recordIssuedAttempt) continue;
     // Whatever happened, the copy kept with the row is no longer needed. Strip

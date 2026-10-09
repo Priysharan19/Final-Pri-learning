@@ -111,6 +111,20 @@ const claimOf = async q => `${me.id}:resolved:${await blindHash(`practice-resolu
   eq(attemptsOf().length, count + 1, 'and records nothing more');
 }
 
+// 3g · a deferred event the device's routine cannot settle is still restored, not dropped
+{
+  const q = await question({ pendingGrade: { submissionId: 's-legacy-000001', at: Date.now() } });
+  const count = attemptsOf().length;
+  const legacy = eventFor(q);
+  delete legacy.payload.marksEarned; delete legacy.payload.marksPossible; // an event from before marks were carried
+  await applyRemoteLearningEvents(me.id, [legacy]);
+  const held = await idb.get('questions', q.id);
+  await idb.put('questions', { ...held, pendingGrade: { ...held.pendingGrade, at: Date.now() - 10 * 60 * 1000 } });
+  eq([await reconcileDeferredGrades(me.id), attemptsOf().length], [1, count + 1], 'a deferred event without marks is restored as a remote attempt on a later pass');
+  ok(!(await idb.get('questions', q.id)).deferredGrade, 'and only then is the deferred copy dropped');
+  eq([await reconcileDeferredGrades(me.id), attemptsOf().length], [0, count + 1], 'once');
+}
+
 // 3e · two passes racing on the same event settle the question once
 {
   const q = await question({});
