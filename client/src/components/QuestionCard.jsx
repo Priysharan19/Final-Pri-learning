@@ -1511,6 +1511,23 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <MathText text={res.solution.answerText} />
         </div>
       )}
+      {/* What the marks are for, as the server's receipt states it. Read-only:
+          the marks themselves are the server's, shown above. */}
+      {Array.isArray(res.solution.criteria) && res.solution.criteria.length > 0 && (
+        <table className="criteria-table" style={{ marginTop: 14 }}>
+          <thead>
+            <tr><th style={{ width: '100%', textAlign: 'center' }}>{t('verdict.criteria')}</th><th>{t('verdict.marksColumn')}</th></tr>
+          </thead>
+          <tbody>
+            {res.solution.criteria.map((c, i) => (
+              <tr key={i}>
+                <td><span><span className="crit-bullet">•</span><MathText text={c.text} /></span></td>
+                <td>{c.mark}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   ) : null;
 

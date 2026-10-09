@@ -408,6 +408,8 @@ export default {
   'verdict.expected': 'Expected:',
   'verdict.workedSolution': 'Worked solution',
   'verdict.finalAnswer': 'Final answer',
+  'verdict.criteria': 'Criteria',
+  'verdict.marksColumn': 'Marks',
   'verdict.mistake': 'Mistake',
   'verdict.onLine': 'line {n}',
   // Spoken to a screen reader as one sentence, so the number and the noun have

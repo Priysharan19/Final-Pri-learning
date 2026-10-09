@@ -476,6 +476,8 @@ export default {
   'verdict.expected': 'अपेक्षित:',
   'verdict.workedSolution': 'विस्तृत हल',
   'verdict.finalAnswer': 'अंतिम उत्तर',
+  'verdict.criteria': 'मानदंड',
+  'verdict.marksColumn': 'अंक',
   'verdict.mistake': 'गलती',
   'verdict.onLine': 'पंक्ति {n}',
   'verdict.speechUnreadable': 'यह पढ़ा नहीं जा सका। {feedback}',
