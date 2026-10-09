@@ -11,11 +11,11 @@ import { useApp } from '../App.jsx';
 import InkCanvas from '../ink/InkCanvas.jsx';
 import { flushInkDrafts } from '../local/inkDrafts.js';
 import { sanitizeFigure } from '../lib/sanitize.js';
-import { clearDraft, queueDraft, readDraft, saveDraft } from './drafts.js';
+import { clearDraft, flushDrafts, queueDraft, readDraft, saveDraft } from './drafts.js';
 import {
   clearInkDraft, clearPendingSubmission, newSubmissionId, readInkDraft, readPendingSubmission,
   saveInkDraft, savePendingSubmission, submissionContentKey,
-  holdPendingSubmission
+  noteSubmissionEdited, recoveryPlan, settleFailedSubmission
 } from './practiceRecovery.js';
 import { cloudReadingEnabled, INK_READER_STATE, photoReadingBlockedKey, readPhotoWithCloud, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
@@ -745,8 +745,23 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       setSaveState(saveDraft('question', question.id, { typed, working: wk }, meta) ? 'saved' : 'failed');
     }, 450);
   };
-  const editAnswer = (v) => { setAnswer(v); stash(v, working); };
-  const editWorking = (v) => { setWorking(v); stash(answer, v); };
+  // The student changed what they would submit. A pending record for this
+  // question was written for the answer as it was pressed: one that was never
+  // sent is dropped, one whose outcome is unknown is flagged so no relaunch
+  // sends it by itself (practiceRecovery.js noteSubmissionEdited). `key` is
+  // the content now on screen, or null when it is not known yet (new ink).
+  const noteEdited = (key) => {
+    if (diagnostic || inFlightRef.current || attemptRef.current || !pendingRef.current) return;
+    const kept = noteSubmissionEdited(question.id, key, { label: question.subtopicName });
+    if (!kept) pendingRef.current = null;
+  };
+  // What Submit would send for typed work, exactly as submit() builds it.
+  const typedContentKey = (ans, wk) => (isWorking
+    ? submissionContentKey(wk, undefined)
+    : submissionContentKey(ans, (workingOpen || mode === 'photo') && String(wk).trim() ? wk : undefined));
+  const editAnswer = (v) => { setAnswer(v); stash(v, working); if (!writeMode) noteEdited(typedContentKey(v, working)); };
+  const editWorking = (v) => { setWorking(v); stash(answer, v); if (!writeMode) noteEdited(typedContentKey(answer, v)); };
+  const chooseOption = (i) => { setMcqSel(i); noteEdited(submissionContentKey(i, undefined)); };
 
   useEffect(() => {
     if (!resolved) return;
@@ -760,6 +775,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // has been read back from the store, never on the strength of having asked.
   const onInkStrokes = useCallback((strokes) => {
     if (inFlightRef.current || attemptRef.current) return;
+    // New pen strokes after a submission was pressed are an edit of it. The
+    // first report after a mount is the kept page being restored, not an edit.
+    // (Ink drawn over a typed or photo submission is an edit from the first stroke.)
+    if (pendingRef.current && !diagnostic && (latestInk.current || (pendingRef.current.sourceMode !== 'ink' && strokes?.length)) &&
+        JSON.stringify(compactInkStrokes(latestInk.current || [])) !== JSON.stringify(compactInkStrokes(strokes || []))) {
+      if (!noteSubmissionEdited(question.id, null, { label: question.subtopicName })) pendingRef.current = null;
+    }
     latestInk.current = strokes;
     setInkHasStrokes(Array.isArray(strokes) && strokes.length > 0);
     if (inkSaveTimer.current) { clearTimeout(inkSaveTimer.current); inkSaveTimer.current = null; }
@@ -941,6 +963,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const ms = replay && Number.isFinite(pendingRef.current.ms)
       ? pendingRef.current.ms : Date.now() - startRef.current;
     pendingRef.current = { submissionId, contentKey, sourceMode, ms };
+    // The typed draft goes to disk now too (a keystroke is otherwise written a
+    // moment later): relaunch recovery replays a submission only while the
+    // kept draft still says what was submitted.
+    flushDrafts();
     // On disk before the request leaves: a relaunch replays it under this key.
     // A placement answer is not replayed through practice on relaunch: the
     // placement session itself resumes at this exact question.
@@ -1030,11 +1056,16 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // A refusal (4xx) is a definitive answer. Anything else — a fault, a
       // timeout — is not: the pending record stays, so an identical retry or a
       // relaunch reuses the same key and still lands as one attempt.
-      if (definitiveSubmissionRefusal(e)) { pendingRef.current = null; clearPendingSubmission(question.id); }
-      // Refused for want of a session: the server marked nothing. The answer
-      // waits for the student to press Submit again after signing in; a later
-      // visit to this question must not send it for them and spend a try.
-      else if (e?.code === 'SIGN_IN_TO_CHECK' || e?.status === 401) holdPendingSubmission(question.id);
+      // A refusal that proves nothing was marked — no session, an account not
+      // yet eligible, a question that could not be bound, a reading that
+      // failed, a device that knows it is offline — HOLDS the submission: the
+      // answer waits for the student to press Submit again, and a later visit
+      // to this question must not send it for them and spend a try.
+      // (A placement answer keeps no pending record: its session resumes.)
+      const fate = diagnostic
+        ? (definitiveSubmissionRefusal(e) ? 'cleared' : 'in-flight')
+        : settleFailedSubmission(question.id, e, { definitive: definitiveSubmissionRefusal(e), meta: { label: question.subtopicName } });
+      if (fate === 'cleared') pendingRef.current = null;
       inkFrozenRef.current = false;
       if (recovering && e?.status === 409 && e?.code !== 'QUESTION_DISCARDED') {
         // Answered elsewhere under another submission: nothing here to recover.
@@ -1071,29 +1102,16 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const pending = readPendingSubmission(question.id);
     if (!pending) return;
     pendingRef.current = { submissionId: pending.submissionId, contentKey: submissionContentKey(pending.answer, pending.steps), sourceMode: pending.sourceMode, ms: pending.ms };
-    if (pending.refused) {
-      // Never sent to be marked: put the answer back and wait for Submit.
-      if (pending.sourceMode === 'typed') { setMode('type'); setAnswer(pending.answer); setWorking(pending.steps || ''); }
-      return;
-    }
-    if (pending.sourceMode === 'unknown') {
-      // Pre-provenance versions stored Photo and typed attempts identically.
-      // Preserve the answer so the student can inspect and submit explicitly,
-      // but never automatically re-grade it as typed after a crash.
-      setMode('type');
-      setAnswer(pending.answer);
-      setWorking(pending.steps || '');
-      return;
-    }
-    if (pending.sourceMode === 'photo') {
-      // The image is intentionally never written to a plaintext draft. If the
-      // app was killed mid-request, retain the attempted answer and key but
-      // require a fresh attachment. Replaying the transcript as typed work
-      // would bypass the required provider-recognition receipt.
-      setMode('photo');
-      setAnswer(pending.answer);
-      setWorking(pending.steps || '');
-      setPhotoReattachRequired(true);
+    // Only a submission the student pressed Submit on, whose outcome is
+    // unknown and which is still what is on screen, is sent again here. A
+    // held one (never sent), one edited since, a Photo and a record of unknown
+    // provenance put the work back and wait for the student's own Submit.
+    const plan = recoveryPlan(pending, { typedDraft: readDraft('question', question.id), workingIsAnswer: question.answerType === 'working' });
+    if (plan.action !== 'replay') {
+      if (plan.mode) setMode(plan.mode);
+      if (plan.fill) { setAnswer(pending.answer); setWorking(pending.steps || ''); }
+      // The image is never written to a plaintext draft: ask for it again.
+      if (plan.reattach) setPhotoReattachRequired(true);
       return;
     }
     (pending.viaInk ? Promise.resolve().then(() => readInkDraft(question.id)).catch(() => null) : Promise.resolve(null)).then(kept => {
@@ -1697,7 +1715,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 else if (mcqSel === i && !res.correct) { cls += ' wrong'; mark = t('verdict.yourChoice'); }
               }
               return (
-                <button key={i} className={cls} disabled={resolved} aria-pressed={!resolved ? mcqSel === i : undefined} onClick={() => setMcqSel(i)}>
+                <button key={i} className={cls} disabled={resolved} aria-pressed={!resolved ? mcqSel === i : undefined} onClick={() => chooseOption(i)}>
                   <span className="mcq-key">{'ABCD'[i]}</span>
                   <MathText text={opt} />
                   {mark && <span className="mcq-mark">{mark}</span>}

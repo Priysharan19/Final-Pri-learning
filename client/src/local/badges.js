@@ -47,7 +47,13 @@ export async function checkBadges(pid, event, nowMs = Date.now(), tz = null) {
   };
   const maybe = async (id, cond) => { if (cond) await award(id); };
 
-  const attempts = await byIndex('attempts', 'pid', pid);
+  // A repeat — an answer to content whose solution the account had already
+  // been shown — earns no badge and is never counted towards one: not at the
+  // moment it is sat, and not later as one of the correct answers, the last
+  // ten, the chapters explored or the handwritten answers a badge counts.
+  // (It is still a question of its day, so the day stays in the streak.)
+  if (event?.repeat === true) return out;
+  const attempts = (await byIndex('attempts', 'pid', pid)).filter(a => a.repeat !== true);
   const totalCorrect = attempts.filter(a => a.correct).length;
   await maybe('first-steps', totalCorrect >= 1);
   await maybe('ten-up', totalCorrect >= 10);

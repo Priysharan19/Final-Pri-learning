@@ -125,7 +125,10 @@ serverCursor += 1;
 serverEvents.push({ serverCursor, id: 'attempt-q-forged2', deviceId: GRADER, deviceSeq: 900, kind: 'graded-attempt', entityId: 'q-forged2', occurredAt: today + 230_000, payload: { attemptId: 'some-other-attempt', questionId: 'q-forged2', subtopic: 'surds', difficulty: 4, correct: true, ms: 100, hintsUsed: 0, mode: 'practice', createdAt: today + 230_000 } });
 remote('exam-attempt', 'exam-old', { state: 'finished', year: 10, title: 'Class 10 mock', score: 17, total: 25, createdAt: yesterday, finishedAt: yesterday + 3_600_000, indiaExam: { family: 'cbse-school' } }, yesterday);
 remote('exam-attempt', 'exam-unfinished', { state: 'started', year: 10, title: 'Abandoned', score: null, total: null, createdAt: today, finishedAt: null, indiaExam: null }, today);
-remote('rush-history', 'rush-old', { score: 80, correct: 8, total: 10, bestCombo: 5, createdAt: yesterday }, yesterday);
+// A Rapid Fire run as the product writes one: the score IS the number correct,
+// at most 20 (POST /rush/finish). (This fixture used to claim a score of 80
+// for 8 correct, which no version of the product could produce.)
+remote('rush-history', 'rush-old', { score: 8, correct: 8, total: 10, bestCombo: 5, createdAt: yesterday }, yesterday);
 remote('match-history', 'match-old', { won: true, playerScore: 7, rivalScore: 4, rival: 'Robo-Rookie', ms: 45000, createdAt: yesterday }, yesterday);
 
 // An event this device itself published before a reinstall-free relink would
@@ -203,7 +206,7 @@ eq('the profile earned the XP of the restored answers', (await get('profiles', '
 // Exam, Rush and Match history.
 const exams = await byIndex('exams', 'pid', 'p1');
 eq('the finished exam is restored; the abandoned one is not', exams.map(e => [e.title, e.score, e.total]), [['Class 10 mock', 17, 25]]);
-eq('Rush history is restored', (await byIndex('rushRuns', 'pid', 'p1')).map(r => r.score), [80]);
+eq('Rush history is restored', (await byIndex('rushRuns', 'pid', 'p1')).map(r => [r.score, r.correct, r.total, r.bestCombo, r.createdAt]), [[8, 8, 10, 5, yesterday]]);
 eq('Match history is restored', (await byIndex('matchRuns', 'pid', 'p1')).map(r => r.won), [true]);
 
 // The rescan must not republish what it just restored.
@@ -232,6 +235,100 @@ eq('the local answer is pushed as one event', liveEvents.map(e => e.entityId), [
 eq('the post-push pull returns this device\'s own event and restores nothing from it', live.restoredEvents, 0);
 eq('the attempts store holds the six restored rows plus the one local answer', (await byIndex('attempts', 'pid', 'p1')).length, 7);
 ok('the local answer keeps its own id', !!(await get('attempts', localAttemptId)));
+
+// ── A repeat, and a tampering device of the same account ────────────────────
+// (Review 4, B1 and M2.) The server flags an answer to content whose solution
+// the account had already been shown; the flag has to survive the restore or
+// the row reads as learning evidence. And a device of the same account can
+// publish anything it likes as its own Rush, Match and legacy exam history:
+// another device must rebuild those rows with the backup importer's types and
+// ranges, never copy them.
+{
+  const { isLearningEvidence, evidenceByKey } = await import('../src/engine/progressTruth.js');
+  const { markedByOf } = await import('../src/local/serverExam.js');
+  const { checkBadges } = await import('../src/local/badges.js');
+  const before = {
+    rating: await get('ratings', 'p1:linear'), review: await get('reviews', 'p1:linear'),
+    xp: (await get('profiles', 'p1'))?.xp, evidence: evidenceByKey(await byIndex('attempts', 'pid', 'p1')).linear,
+    day: (await byIndex('activity', 'pid', 'p1')).find(a => a.date === dayKey(now, TZ)),
+    badges: (await byIndex('badges', 'pid', 'p1')).length
+  };
+  const repeatAt = now + 1000;
+  practice('q-repeat', 'linear', true, repeatAt, { repeat: true, marksEarned: 1, marksPossible: 1 });
+  const EVIL = 'device-tampered-ipad';
+  const evil = (kind, id, payload) => {
+    serverCursor += 1;
+    serverEvents.push({ serverCursor, id, deviceId: EVIL, deviceSeq: serverCursor, kind, entityId: id, occurredAt: now, payload });
+  };
+  evil('rush-history', 'evil-rush', { score: 999999, correct: { a: 1 }, total: 'x', bestCombo: [1, 2], createdAt: 'never' });
+  evil('rush-history', 'evil-rush-2', { score: 19, correct: 500, total: -3, bestCombo: 1e9, createdAt: 9e15 });
+  evil('match-history', 'evil-match', { won: 'yes', playerScore: 1e9, rivalScore: -40, rival: { html: '<b>x</b>' }, ms: -5 });
+  evil('match-history', 'evil-match-2', { won: true, playerScore: 7, rivalScore: 3, rival: '<img src=x onerror=1>Robo', ms: 1e15 });
+  evil('exam-attempt', 'evil-exam', {
+    state: 'finished', title: '<script>x</script>JEE Main Full Paper ' + 'A'.repeat(300), year: 99, score: 300000, total: 300, durationMin: 1e9,
+    finishedAt: 9e15, indiaExam: { blueprintId: 'jee-main', label: { o: 1 }, sections: 'not-an-array', seed: -9, fullPaper: 'yes', server: { examId: 'x' } },
+    server: { examId: '11111111-1111-4111-8111-111111111111', questionIds: [] }, detail: [{ correct: true }], serverMarked: true
+  });
+  evil('exam-attempt', 'evil-exam-2', { state: 'finished', title: 'Mock', score: 41, total: 40, year: 10 });
+  const pulled = await syncNow('p1');
+  eq('the repeat and the six tampered history events are all restored (none is dropped)', pulled.restoredEvents, 7);
+
+  const rows = await byIndex('attempts', 'pid', 'p1');
+  const repeatRow = rows.find(a => a.remoteEventId === 'attempt-q-repeat');
+  eq('B1: a restored repeat keeps the server\'s repeat flag', repeatRow?.repeat, true);
+  eq('B1: so it is not learning evidence on this device either', repeatRow && isLearningEvidence(repeatRow), false);
+  eq('B1: the chapter\'s evidence is what it was before the repeat', evidenceByKey(rows).linear, before.evidence);
+  eq('B1: an ordinary restored attempt carries no repeat flag', rows.filter(a => a.remoteEventId && a !== repeatRow).some(a => 'repeat' in a), false);
+  eq('a restored repeat moves no rating', await get('ratings', 'p1:linear'), before.rating);
+  eq('a restored repeat earns no XP', (await get('profiles', 'p1'))?.xp, before.xp);
+  const reviewAfter = await get('reviews', 'p1:linear');
+  const helped = scheduleReview(before.review, gradeFor({ correct: true, hintsUsed: 1, tries: 0, ms: 5000, difficulty: 2 }), repeatAt);
+  eq('…and reschedules the review that already existed as a helped recall, as the sitting device does', [reviewAfter?.dueAt, reviewAfter?.reps], [helped.dueAt, helped.reps]);
+  const day = (await byIndex('activity', 'pid', 'p1')).find(a => a.date === dayKey(repeatAt, TZ));
+  eq('M3: a restored repeat is a question of its day and never one of the day\'s correct answers',
+    [day?.questions, day?.correct], [(before.day?.questions || 0) + 1, before.day?.correct || 0]);
+  // Badges are never earned from repeats: with nine more correct repeats on
+  // disk the ten-correct badge is still out of reach, and a repeat's own
+  // moment awards nothing.
+  for (let i = 0; i < 12; i++) await add('attempts', { pid: 'p1', questionId: `q-rep-${i}`, subtopic: 'linear', difficulty: 4, correct: 1, ms: 100, hintsUsed: 0, mode: 'practice', viaInk: true, repeat: true, createdAt: now + 2000 + i });
+  const onRepeat = await checkBadges('p1', { type: 'attempt', difficulty: 4, correct: true, hintsUsed: 0, year: 10, xp: 0, repeat: true }, now + 3000, TZ);
+  eq('M3: no badge is awarded at the moment of a repeat', [onRepeat.length, (await byIndex('badges', 'pid', 'p1')).length], [0, before.badges]);
+  const onReal = await checkBadges('p1', { type: 'attempt', difficulty: 2, correct: true, hintsUsed: 0, year: 10, xp: 0 }, now + 3000, TZ);
+  const earned = onReal.map(b => b.id);
+  ok('M3: and repeats on disk never count towards a later badge (ten correct, ten in a row, ten handwritten)',
+    !earned.includes('ten-up') && !earned.includes('sharpshooter') && !earned.includes('penmanship') && earned.includes('first-steps'), JSON.stringify(earned));
+
+  const rush = Object.fromEntries((await byIndex('rushRuns', 'pid', 'p1')).map(r => [r.remoteEventId, r]));
+  eq('M2: a tampered Rush run is typed and held to what Rapid Fire can produce',
+    rush['evil-rush'] && [rush['evil-rush'].score, rush['evil-rush'].correct, rush['evil-rush'].total, rush['evil-rush'].bestCombo, rush['evil-rush'].createdAt === now],
+    [20, 0, 20, 0, true]);
+  eq('M2: …correct never exceeds the score, total never falls below it, and the clock is bounded',
+    rush['evil-rush-2'] && [rush['evil-rush-2'].score, rush['evil-rush-2'].correct, rush['evil-rush-2'].total, rush['evil-rush-2'].bestCombo, rush['evil-rush-2'].createdAt <= 4102444800000],
+    [19, 19, 19, 19, true]);
+  eq('M2: the best Rapid Fire score another device can be made to show is a possible one', Math.max(...Object.values(rush).map(r => r.score)), 20);
+  const match = Object.fromEntries((await byIndex('matchRuns', 'pid', 'p1')).map(r => [r.remoteEventId, r]));
+  eq('M2: a tampered Match run is typed and clamped; a label that is not text is dropped',
+    match['evil-match'] && [match['evil-match'].won, match['evil-match'].playerScore, match['evil-match'].rivalScore, 'rival' in match['evil-match'], match['evil-match'].ms],
+    [true, 10, 0, false, 0]);
+  eq('M2: markup in a rival\'s name is stripped and the duration bounded',
+    match['evil-match-2'] && [match['evil-match-2'].rival, match['evil-match-2'].playerScore, match['evil-match-2'].ms], ['Robo', 7, 1e9]);
+  const papers = Object.fromEntries((await byIndex('exams', 'pid', 'p1')).map(e => [e.remoteEventId, e]));
+  const evilExam = papers['evil-exam'];
+  eq('M2: a tampered legacy exam has its title stripped and cut, and its year, score, total and clock clamped',
+    evilExam && [evilExam.title.length <= 80, /[<>]/.test(evilExam.title), evilExam.year, evilExam.score, evilExam.total, evilExam.finishedAt <= 4102444800000, evilExam.durationMin],
+    [true, false, 12, 300, 300, true, 600]);
+  eq('M2: …its India blueprint is rebuilt field by field', evilExam?.indiaExam && [evilExam.indiaExam.blueprintId, evilExam.indiaExam.sections, evilExam.indiaExam.seed, evilExam.indiaExam.fullPaper, 'label' in evilExam.indiaExam, 'server' in evilExam.indiaExam],
+    ['jee-main', [], 0, true, false, false]);
+  eq('M2: …it cannot name a server paper, a marked detail or any question', evilExam && ['server' in evilExam, 'detail' in evilExam, evilExam.questionIds], [false, false, []]);
+  eq('M2: …so it is listed as marked by an earlier version, never as the server\'s', markedByOf(evilExam), 'earlier-version');
+  eq('M2: a score above the paper\'s own total is cut to the total', papers['evil-exam-2'] && [papers['evil-exam-2'].score, papers['evil-exam-2'].total], [40, 40]);
+  eq('M2: the tampered history wrote no attempt, rating, review or XP', [
+    (await byIndex('attempts', 'pid', 'p1')).filter(a => a.remoteDeviceId === EVIL).length,
+    (await byIndex('ratings', 'pid', 'p1')).length, (await get('profiles', 'p1'))?.xp
+  ], [0, 2, before.xp]);
+  replayAllOnce = true;
+  eq('a replayed pull restores none of them twice', (await syncNow('p1')).restoredEvents, 0);
+}
 
 console.log(`\nCloud restore fidelity — ${pass}/${pass + fail} checks`);
 if (failures.length) {

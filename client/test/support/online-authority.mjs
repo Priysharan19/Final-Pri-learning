@@ -222,6 +222,28 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
     return account;
   }
 
+  /**
+   * A second device signing in to an account that already exists: link `pid`
+   * (a profile on a device whose storage was reset) to the account `fromPid`
+   * was registered with, through the product's own sign-in. The new profile
+   * gets its own session; the account, and everything the server holds for
+   * it, is the same.
+   */
+  async function linkExisting(pid, fromPid, { entitlement = null } = {}) {
+    const source = accounts.get(fromPid);
+    assert.ok(pid && source, 'linkExisting() needs a new profile id and an already-linked one');
+    const account = { accountId: source.accountId, email: source.email, name: source.name, jar: {} };
+    accounts.set(pid, account);
+    if (!keepRateLimits) await resetRateLimits();
+    const before = pinnedPid;
+    const wasOut = signedOut, wasOffline = offline;
+    pinnedPid = pid; signedOut = false; offline = false;
+    try { await cloudAccount.loginCloudAccount(pid, { email: source.email, password: PASSWORD }); }
+    finally { pinnedPid = before; signedOut = wasOut; offline = wasOffline; }
+    if (entitlement) await setEntitlement(pid, entitlement);
+    return account;
+  }
+
   /** Overwrite the entitlement snapshot on a real link row (account id kept). */
   async function setEntitlement(pid, entitlement) {
     const id = cloudAccount.cloudLinkRowId(pid);
@@ -385,7 +407,7 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
 
   const authority = {
     app, origin: app.origin, db: app.db, traffic, reader,
-    link, setEntitlement, ageExamPapers, answerKey, sealedQuestion, examPaper, examResult, examSnapshot, resetRateLimits, close,
+    link, linkExisting, setEntitlement, ageExamPapers, answerKey, sealedQuestion, examPaper, examResult, examSnapshot, resetRateLimits, close,
     accountOf: pid => accounts.get(pid) || null,
     /** Pin the device session to `pid`'s account; `undefined` follows the selected profile again. */
     useSessionOf(pid) { pinnedPid = pid; },

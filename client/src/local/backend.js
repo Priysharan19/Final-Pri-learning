@@ -63,8 +63,8 @@ import { stageAttemptProgress } from '../platform/profileOutbox.js';
 import { requestTutorHelp } from './tutorBridge.js';
 import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
-import { cloud } from '../platform/cloudTransport.js';
-import { registerIssuedAttemptRecorder } from '../platform/cloudSyncRestore.js';
+import { cloud, nativeCloudAvailable } from '../platform/cloudTransport.js';
+import { registerIssuedAttemptRecorder, registerRestoreSanitisers } from '../platform/cloudSyncRestore.js';
 import { publicQuestionFields } from '../engine/publicQuestion.js';
 import {
   isServerPaper, markedByOf, issueServerExam, serverFieldOf, localStartOf, scheduleCheckpoint,
@@ -2165,8 +2165,23 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   const activityKey = `${pid}:${date}`;
   const activityNext = (await get('activity', activityKey))
     || { key: activityKey, pid, date, questions: 0, correct: 0, xp: 0, ms: 0, predicted: null };
+  // A repeat (M3). One rule per counter, the same on this device and on a
+  // device that restores the attempt from the server (cloudSyncRestore.js):
+  //   · the day's `questions` — counts. The student did sit a question; the
+  //     day is an active day and the streak is kept.
+  //   · the day's `correct` — does not count. A correct answer to content whose
+  //     solution the account has already seen is not a result.
+  //   · a teacher's task: `done` advances (the question was sat, so the task
+  //     can still be finished when its pool has run out of unseen content),
+  //     `correct` does not, and `repeats` records why the two differ.
+  //   · badges — none is earned on a repeat, and no repeat is counted towards
+  //     one later (badges.js).
+  //   · rating, review start, mastery and XP — nothing, as above.
+  // A teacher's custom question is different: it has no chapter to rate, but
+  // its answer is a real first result and counts as `correct` in all of these.
+  const creditedCorrect = correct && !isRepeat;
   activityNext.questions += 1;
-  activityNext.correct += correct ? 1 : 0;
+  activityNext.correct += creditedCorrect ? 1 : 0;
   activityNext.xp += xp || 0;
   activityNext.ms += ms || 0;
 
@@ -2180,7 +2195,10 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
     const key = `${row.taskId}:${pid}`;
     const task = await get('tasks', row.taskId);
     const tp = (await get('taskProgress', key)) || { key, taskId: row.taskId, pid, done: 0, correct: 0, finishedAt: null };
-    taskProgressNext = { ...tp, done: tp.done + 1, correct: tp.correct + (correct ? 1 : 0) };
+    taskProgressNext = {
+      ...tp, done: tp.done + 1, correct: tp.correct + (creditedCorrect ? 1 : 0),
+      ...(isRepeat ? { repeats: (Number(tp.repeats) || 0) + 1 } : {})
+    };
     if (task && taskProgressNext.done >= task.count && !taskProgressNext.finishedAt) taskProgressNext.finishedAt = now;
   }
 
@@ -2298,7 +2316,8 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   try {
     newBadges = await checkBadges(pid, {
       type: 'attempt', difficulty: q.difficulty, correct,
-      hintsUsed: helpUsed, year: profile.year, xp: profileNext.xp
+      hintsUsed: helpUsed, year: profile.year, xp: profileNext.xp,
+      ...(isRepeat ? { repeat: true } : {})
     }, now, tz);
   } catch { /* core learning result is already durable */ }
 
@@ -2615,7 +2634,8 @@ const IMPORT_ROWS = {
     const taskId = safeId(r.taskId);
     return taskId && {
       key: `${taskId}:${pid}`, taskId, pid,
-      done: safeInt(r.done, 0, 1e5, 0), correct: safeInt(r.correct, 0, 1e5, 0), finishedAt: safeTime(r.finishedAt)
+      done: safeInt(r.done, 0, 1e5, 0), correct: safeInt(r.correct, 0, 1e5, 0), finishedAt: safeTime(r.finishedAt),
+      ...(safeInt(r.repeats, 0, 1e5, 0) > 0 ? { repeats: safeInt(r.repeats, 0, 1e5, 0) } : {})
     };
   },
   attempts: (r, pid, ids) => ({
@@ -2703,6 +2723,28 @@ const IMPORT_ROWS = {
     };
   }
 };
+
+// Cloud restore rebuilds a device-published Rush run, Match run or legacy exam
+// row with the same builders a backup import uses (see cloudSyncRestore.js):
+// one definition of what such a row may hold, whichever way it arrives.
+// On top of the importer's types and ranges, a restored run is held to what
+// this product can produce: a Rapid Fire run scores at most 20 (POST
+// /rush/finish) with `correct` equal to the score and `total` no smaller, and
+// a Match is ten questions (POST /match/start).
+const RUSH_MAX_SCORE = 20;
+const MATCH_QUESTIONS = 10;
+registerRestoreSanitisers({
+  rushRuns: (r, pid) => {
+    const row = IMPORT_ROWS.rushRuns(r, pid);
+    const score = Math.min(row.score, RUSH_MAX_SCORE);
+    return { ...row, score, correct: Math.min(row.correct, score), total: Math.max(row.total, score), bestCombo: Math.min(row.bestCombo, Math.max(row.total, score)) };
+  },
+  matchRuns: (r, pid) => {
+    const row = IMPORT_ROWS.matchRuns(r, pid);
+    return { ...row, playerScore: Math.min(row.playerScore, MATCH_QUESTIONS), rivalScore: Math.min(row.rivalScore, MATCH_QUESTIONS) };
+  },
+  exams: IMPORT_ROWS.exams
+});
 
 /**
  * The India fields a question row carries, rebuilt from the backup.
@@ -3634,7 +3676,10 @@ const routes = {
     // is spent, and the student's working stays where it is. A 401/403/503,
     // timeout or disconnection leaves the question ungraded and retryable
     // under the same key.
-    await requireServerIssue(row);
+    // Binding a prepared question to the account is not marking: whatever
+    // stops it (no account, no connection, an expired or draft question), the
+    // answer was not sent to be marked.
+    try { await requireServerIssue(row); } catch (cause) { throw notMarked(cause); }
     q = row.payload;
     const authoritative = await gradeOnServer(row, body, submissionId, requestDigest);
     const result = { correct: authoritative.correct, invalid: authoritative.invalid };
@@ -5113,11 +5158,14 @@ async function adoptPaperResult(p, e, serverResult, { record = true } = {}) {
         profile.xp = (profile.xp || 0) + xp;
         await put('profiles', profile);
         const ms = Math.round((Number(result.summary?.totalMs) || 0) / nQ);
-        await bumpActivity(p.id, { correct: !!d.correct, xp, ms }, now, timezoneOf(p));
+        // As in resolve(): a repeat is a question of the day, never a correct one.
+        await bumpActivity(p.id, { correct: !!d.correct && d.repeat !== true, xp, ms }, now, timezoneOf(p));
         await add('attempts', {
           pid: p.id, questionId: row.id, subtopic: row.payload?.multipartId || row.subtopic, difficulty: 3,
           correct: d.correct ? 1 : 0, answerGiven: `${d.awarded}/${d.marks} marks`, ms,
-          hintsUsed: 0, mode: 'exam', viaInk: false, ratingBefore: 0, ratingAfter: 0, createdAt: now
+          hintsUsed: 0, mode: 'exam', viaInk: false, ratingBefore: 0, ratingAfter: 0, createdAt: now,
+          // The server's finding stays on the row, so it is never read as evidence.
+          ...(d.repeat === true ? { repeat: true } : {})
         });
       }
       continue;
@@ -5370,10 +5418,29 @@ function checkUnavailable(reason, cause = null) {
   // An eligibility refusal (email not verified, guardian consent pending,
   // account restricted) keeps the server's own code so the card names it.
   if (reason === 'refused' && cause?.code) {
-    return Object.assign(new Error(cause.message || 'This account cannot check answers yet.'), { status: cause.status || 403, code: cause.code });
+    return Object.assign(new Error(cause.message || 'This account cannot check answers yet.'), { status: cause.status || 403, code: cause.code, beforeMarking: true });
   }
   const [status, code, message] = known[reason] || known.unavailable;
-  return Object.assign(new Error(message), { status, code });
+  // `beforeMarking` (H4): this refusal is proof that nothing was marked — the
+  // server answered that it will not mark for this session or account, or the
+  // question never was the server's. A lost connection or a fault proves
+  // nothing by itself (the request may have left and been committed), so
+  // 'offline' and 'unavailable' carry the mark only where a caller knows the
+  // marking request was never sent (notMarked below).
+  const proven = reason === 'sign-in' || reason === 'refused' || reason === 'draft' || reason === 'expired';
+  return Object.assign(new Error(message), { status, code, ...(proven ? { beforeMarking: true } : {}) });
+}
+
+/**
+ * Stamp an error raised at a point where the marking request provably had not
+ * been sent. The card holds such a submission (practiceRecovery.js): it is
+ * never sent again without the student pressing Submit. Anything not stamped
+ * is "sent, outcome unknown" and stays in flight, to be replayed under the
+ * same key so it lands as exactly one attempt.
+ */
+function notMarked(error) {
+  if (error && typeof error === 'object') error.beforeMarking = true;
+  return error;
 }
 
 const SERVER_MODES = ['practice', 'review', 'task', 'rush', 'match'];
@@ -5503,11 +5570,14 @@ async function revealOnServer(row) {
 
 async function gradeOnServer(row, body, submissionId, requestDigest) {
   if (!row.serverQuestionId || !submissionId) {
-    throw Object.assign(new Error('An online-issued question and stable submission are required to mark.'), {
+    throw notMarked(Object.assign(new Error('An online-issued question and stable submission are required to mark.'), {
       status: 503, code: 'ONLINE_GRADE_REQUIRED'
-    });
+    }));
   }
   const earlier = row.pendingGrade;
+  // Whether a marking request under this key may already have left this
+  // device. Once one has, no later failure proves the answer was not marked.
+  const sentBefore = earlier?.submissionId === submissionId;
   if (earlier?.submissionId === submissionId && earlier.digest !== requestDigest) {
     throw Object.assign(new Error('This submission key belongs to another answer.'), {
       status: 409, code: 'SUBMISSION_ID_REUSED'
@@ -5516,7 +5586,11 @@ async function gradeOnServer(row, body, submissionId, requestDigest) {
   const mode = earlier?.submissionId === submissionId ? earlier.mode
     : body.viaInk === true ? 'ink' : body.photo ? 'photo' : 'typed';
   let receipt = earlier?.submissionId === submissionId ? earlier.receipt : null;
-  if (mode !== 'typed' && !receipt) {
+  // Reading the handwriting or photo comes before marking and is not marking:
+  // a failure anywhere in it means the answer was not sent to be marked. (It
+  // runs only while no marking request under this key has been sent: after
+  // one, the reading receipt is the one stored with it.)
+  if (mode !== 'typed' && !receipt) try {
     const image = mode === 'ink'
       ? rasterizeInk(body.ink?.strokes)?.dataUrl
       : (await preparePhoto(body.photo))?.dataUrl;
@@ -5539,7 +5613,7 @@ async function gradeOnServer(row, body, submissionId, requestDigest) {
       if (!corrected?.receipt) throw new Error('The corrected reading was not acknowledged by the server.');
       receipt = corrected.receipt;
     }
-  }
+  } catch (cause) { throw notMarked(cause); }
   // Preserve the complete request bytes across uncertain acknowledgements.
   // A later UI timer value must not silently change a committed idempotency key.
   const payload = earlier?.submissionId === submissionId && earlier.payload
@@ -5550,9 +5624,22 @@ async function gradeOnServer(row, body, submissionId, requestDigest) {
       };
   // `at` lets a sync pull tell a grade in flight from one abandoned after the
   // server committed it (cloudSyncRestore: issued-here events).
+  // The device knows it has no connection: refuse here, before anything is
+  // sent and before the row records a grade in flight.
+  if (!sentBefore && globalThis.navigator?.onLine === false) throw notMarked(checkUnavailable('offline'));
   row.pendingGrade = { submissionId, digest: requestDigest, mode, receipt: receipt || null, payload, at: Date.now() };
   await put('questions', row);
-  const acknowledged = await viaServer(() => cloud.gradePractice(row.serverQuestionId, payload));
+  let acknowledged;
+  try { acknowledged = await cloud.gradePractice(row.serverQuestionId, payload); } catch (cause) {
+    // The server's own refusal to mark (no session, account not eligible) is
+    // stamped by checkUnavailable. Beyond that, only a web build with no
+    // server origin is known not to have sent anything: the transport refuses
+    // before it opens a connection. A timeout, a dropped connection or a 5xx
+    // is left unstamped — the request may have been marked.
+    const refusal = unreachable(cause);
+    if (!sentBefore && cause?.code === 'CLOUD_DISABLED' && !cause?.status && !nativeCloudAvailable()) notMarked(refusal);
+    throw refusal;
+  }
   if (acknowledged?.authoritative !== true || acknowledged.questionId !== row.serverQuestionId ||
       acknowledged.submissionId !== submissionId || typeof acknowledged.attemptId !== 'string' ||
       typeof acknowledged.correct !== 'boolean' || !Number.isFinite(acknowledged.serverAcknowledgedAt)) {

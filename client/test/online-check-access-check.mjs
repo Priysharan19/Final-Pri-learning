@@ -253,7 +253,10 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   // Refused for want of a session, the submission is held, not in flight: its
   // key and content stay for the student's own Submit, and nothing sends it.
   eq(recovery.readPendingSubmission(id)?.refused, false, 'a submission in flight is not yet marked as refused');
-  ok(recovery.holdPendingSubmission(id, { label: 'draft' }), 'a sign-in refusal holds the submission');
+  const { definitiveSubmissionRefusal } = await import('../src/components/photoSubmissionGuard.js');
+  eq([first.beforeMarking, again.beforeMarking], [true, true], 'the backend stamps the refusal as proof that nothing was marked');
+  eq(recovery.settleFailedSubmission(id, first, { definitive: definitiveSubmissionRefusal(first), meta: { label: 'draft' } }), 'held', 'a sign-in refusal holds the submission');
+  eq(recovery.recoveryPlan(recovery.readPendingSubmission(id), { typedDraft: drafts.readDraft('question', id) }), { action: 'restore', mode: 'type', fill: true, reattach: false }, 'a relaunch puts the answer back and sends nothing');
   eq([recovery.readPendingSubmission(id)?.refused, recovery.readPendingSubmission(id)?.submissionId, recovery.readPendingSubmission(id)?.answer], [true, submissionId, '343/6'], 'held: same key, same answer, flagged refused');
   ok(recovery.savePendingSubmission(id, { submissionId, answer: '343/6', steps: 'x = 0, 7', viaInk: false, sourceMode: 'typed', ms: 4200, lines: null }, { label: 'draft' }), 'the student pressing Submit again puts it back in flight');
   eq(recovery.readPendingSubmission(id)?.refused, false, 'and it is no longer held');
@@ -277,6 +280,7 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   const draftBefore = JSON.stringify(await idb.get('questions', draft.question.id));
   const draftSubmit = await refused(api.post(`/practice/${draft.question.id}/submit`, { answer: '1', ms: 900, submissionId: recovery.newSubmissionId() }));
   eq([draftSubmit?.status, draftSubmit?.code], [409, 'QUESTION_NOT_SERVER_ISSUED'], 'a draft is refused as never the server\'s question, even once the connection is back');
+  eq([draftSubmit?.beforeMarking, definitiveSubmissionRefusal(draftSubmit)], [true, true], 'that refusal is final and provably marked nothing: no key is kept to replay');
   eq(checkRefusal(draftSubmit), 'new-question', 'and the card reads that as: open a new question');
   eq(JSON.stringify(await idb.get('questions', draft.question.id)), draftBefore, 'nothing is spent on it');
   drafts.setDraftProfile(null);
@@ -473,8 +477,14 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   }
 
   const card = read('src/components/QuestionCard.jsx');
-  ok(/else if \(e\?\.code === 'SIGN_IN_TO_CHECK' \|\| e\?\.status === 401\) holdPendingSubmission\(question\.id\)/.test(card), 'the card holds a submission refused for sign-in');
-  ok(/if \(pending\.refused\) \{[\s\S]{0,260}?return;\s*\}\s*if \(pending\.sourceMode === 'unknown'\)/.test(card), 'and relaunch recovery never delivers a held submission by itself');
+  const recovery5 = await import('../src/components/practiceRecovery.js');
+  ok(/settleFailedSubmission\(question\.id, e, \{ definitive: definitiveSubmissionRefusal\(e\)/.test(card) &&
+    recovery5.refusedBeforeMarking(err(401, 'SIGN_IN_TO_CHECK')) && recovery5.refusedBeforeMarking(Object.assign(err(403, 'GUARDIAN_CONSENT_PENDING'), { beforeMarking: true })) &&
+    !recovery5.refusedBeforeMarking(err(503, 'RECONNECT_TO_CHECK')) && !recovery5.refusedBeforeMarking(err(500, 'INTERNAL_ERROR')),
+    'the card holds a submission refused for sign-in');
+  ok(/const plan = recoveryPlan\(pending, [\s\S]{0,160}?\);\s*if \(plan\.action !== 'replay'\) \{[\s\S]{0,420}?return;\s*\}/.test(card) &&
+    recovery5.recoveryPlan({ submissionId: 'sub_12345678', answer: '1', sourceMode: 'typed', refused: true }).action === 'restore',
+    'and relaunch recovery never delivers a held submission by itself');
   const replace = card.slice(card.indexOf('async function replaceQuestion()'), card.indexOf('async function dontKnow()'));
   ok(/if \(hasWork && !replaceArmed\) \{ setReplaceNote\(false\); setReplaceArmed\(true\); return; \}/.test(replace), 'with work on the page, leaving a draft takes a second, deliberate press');
   ok(/const hasWork = !!\(String\(answer\)\.trim\(\) \|\| String\(working\)\.trim\(\) \|\| inkHasStrokes \|\| photo \|\| mcqSel !== null\);/.test(card), 'work means a typed answer, typed working, ink, a photo or a chosen option');
@@ -514,7 +524,9 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
 
   const deliver = between('async function deliver(', '/** The submit, reveal or walkthrough did not go through');
   ok(/if \(!diagnostic && !matchingGradeResponse\(r, question\.id, body\.submissionId\)\) \{[\s\S]{0,400}?throw new Error\(gradingReceiptMismatch\(language\)\);/.test(deliver), 'a practice submit is valid only as a matched server receipt');
-  ok(/if \(definitiveSubmissionRefusal\(e\)\) \{ pendingRef\.current = null; clearPendingSubmission\(question\.id\); \}/.test(deliver), 'only a definitive refusal drops the submission key');
+  ok(/settleFailedSubmission\(question\.id, e, \{ definitive: definitiveSubmissionRefusal\(e\)[\s\S]{0,120}?\}\);\s*if \(fate === 'cleared'\) pendingRef\.current = null;/.test(deliver) &&
+    !/clearPendingSubmission\(question\.id\)/.test(deliver.slice(deliver.indexOf('} catch (e) {'))),
+    'only a definitive refusal drops the submission key');
   ok(/refuseCheck\(e, 'submit'\);/.test(deliver), 'every other failure becomes the refused-check state');
   const caught = deliver.slice(deliver.indexOf('} catch (e) {'));
   ok(!/setAnswer\(|setWorking\(|setPhoto\(|clearDraft\(|clearInkDraft\(|setInkResult\(/.test(caught), 'a refused submit clears no answer, working, photo, draft or ink');
