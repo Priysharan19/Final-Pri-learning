@@ -101,6 +101,35 @@ try {
   r = await h.request('/v1/sync/pull', { jar: studentJar });
   c.eq(r.data?.error?.code, 'GUARDIAN_CONSENT_PENDING', 'sync is refused while consent is pending');
 
+  // Recovery for a wrong age capture: the signed-in learner explicitly says
+  // 18+, using the same authenticated/rate-limited guardian action surface.
+  const studentAccountId = raw.prepare("SELECT id FROM accounts WHERE email='new.student@example.test'").get().id;
+  const historyBeforeCorrection = raw.prepare('SELECT * FROM guardian_consents WHERE account_id=?').get(studentAccountId);
+  r = await h.request('/v1/account/guardian/state', { jar: studentJar });
+  c.deq(
+    [r.data?.ageBasis, r.data?.state, r.data?.blockerCode, r.data?.emailVerified],
+    ['child', 'pending', 'GUARDIAN_CONSENT_PENDING', true],
+    'guardian state safely names the exact live blocker'
+  );
+  r = await post('/guardian/request', { isAdult: true }, studentJar);
+  c.eq(r.status, 200, 'a pending learner can explicitly correct a wrongly captured age to adult');
+  c.deq(
+    [r.data?.ageCorrected, r.data?.ageBasis, r.data?.guardianConsent?.required, r.data?.guardianConsent?.blockerCode],
+    [true, 'adult', false, null],
+    'the correction returns the new server-authoritative eligibility'
+  );
+  c.eq(raw.prepare('SELECT age_basis FROM accounts WHERE id=?').get(studentAccountId).age_basis, 'adult', 'the server records the corrected age basis');
+  const historyAfterCorrection = raw.prepare('SELECT * FROM guardian_consents WHERE account_id=?').get(studentAccountId);
+  c.deq(
+    [historyAfterCorrection.account_id, historyAfterCorrection.method, historyAfterCorrection.requested_at],
+    [historyBeforeCorrection.account_id, historyBeforeCorrection.method, historyBeforeCorrection.requested_at],
+    'adult correction preserves the guardian-history row'
+  );
+  c.ok(raw.prepare("SELECT COUNT(*) n FROM audit_log WHERE actor_account_id=? AND action='account.age-declaration.update'").get(studentAccountId).n >= 1,
+    'and records the correction in the audit log');
+  r = await h.request('/v1/sync/pull', { jar: studentJar });
+  c.ok(r.status !== 403, 'the corrected adult account passes the cloud gate immediately');
+
   // ── no enumeration: same answer for a known and an unknown address ──────
   resetLimits();
   const known = await post('/request', { channel: 'email', destination: 'new.student@example.test' });
@@ -223,7 +252,12 @@ try {
   r = await post('/guardian/request', { guardianName: 'Someone', channel: 'sms', destination: '9811111111' }, kidJar);
   c.eq(r.status, 409, 'after a withdrawal the child’s session cannot start a new consent request');
   c.eq(r.data?.error?.code, 'GUARDIAN_CONSENT_WITHDRAWN', 'it says the guardian withdrew');
+  r = await post('/guardian/request', { isAdult: true }, kidJar);
+  c.deq([r.status, r.data?.error?.code], [409, 'GUARDIAN_CONSENT_WITHDRAWN'],
+    'and self-service age correction cannot bypass a guardian withdrawal');
   c.ok(raw.prepare("SELECT withdrawn_at FROM guardian_consents WHERE account_id=(SELECT account_id FROM account_phones WHERE phone_e164='+919123456780')").get().withdrawn_at > 0, 'and the withdrawal stands');
+  c.eq(raw.prepare("SELECT age_basis FROM accounts WHERE id=(SELECT account_id FROM account_phones WHERE phone_e164='+919123456780')").get().age_basis, 'child',
+    'the withdrawn account remains classified child');
   c.eq(readTestOutbox({ to: '+919811111111' }).length, 0, 'and nothing was sent to the new number');
 
   // Withdraw-request: same timing floor for a number with and without consent.
@@ -262,6 +296,24 @@ try {
   c.deq(r.data.guardianConsent, { required: false, state: 'not-required' }, 'an adult needs no parent');
   r = await post('/guardian/request', { guardianName: 'X', channel: 'sms', destination: '9988776650' }, adultJar);
   c.eq(r.status, 409, 'and cannot start a consent request');
+
+  // An older authenticated account with no age basis can complete setup as a
+  // child through the same route; it remains blocked until that guardian acts.
+  const adultAccountId = raw.prepare("SELECT id FROM accounts WHERE email='adult@example.test'").get().id;
+  raw.prepare('UPDATE accounts SET age_basis=NULL WHERE id=?').run(adultAccountId);
+  r = await h.request('/v1/account/guardian/state', { jar: adultJar });
+  c.deq([r.data?.ageBasis, r.data?.state, r.data?.blockerCode], [null, 'undeclared', 'AGE_DECLARATION_REQUIRED'],
+    'missing age is diagnosed without guessing from UI copy');
+  r = await post('/guardian/request', {
+    isAdult: false, year: '11', guardianName: 'Adult Fixture Parent',
+    channel: 'email', destination: 'adult.fixture.parent@example.test'
+  }, adultJar);
+  c.eq(r.status, 202, 'missing age can be completed as child with guardian details');
+  c.eq(raw.prepare('SELECT age_basis FROM accounts WHERE id=?').get(adultAccountId).age_basis, 'child', 'child completion is server-authoritative');
+  c.eq(raw.prepare('SELECT method FROM guardian_consents WHERE account_id=?').get(adultAccountId).method, 'guardian-email-otp',
+    'and enters the ordinary guardian approval ceremony');
+  r = await h.request('/v1/sync/pull', { jar: adultJar });
+  c.eq(r.data?.error?.code, 'GUARDIAN_CONSENT_PENDING', 'child completion does not open cloud data before approval');
 
   // A claimed role or a missing age never makes an adult: only isAdult === true.
   resetLimits();
