@@ -99,12 +99,12 @@ export function CheckRefusal({
         {copy.action === 'account' && (inRouter
           ? <Link to="/settings" {...settings}>{t('app.accountSettings')}</Link>
           : <a href="/settings" {...settings}>{t('app.accountSettings')}</a>)}
-        {onRetry && (
+        {onRetry && copy.action !== 'next' && (
           <button type="button" className="btn btn-ghost btn-sm" data-check-retry disabled={busy} onClick={onRetry}>
             {t('common.tryAgain')}
           </button>
         )}
-        {kind === 'question' && onNext && (
+        {(kind === 'question' || kind === 'new-question') && onNext && (
           <button type="button" className="btn btn-quiet btn-sm" data-check-next onClick={onNext}>
             {t('practice.nextQuestion')}
           </button>

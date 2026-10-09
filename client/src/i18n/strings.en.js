@@ -2613,5 +2613,7 @@ export default {
   'check.accountTitle': 'This account cannot do this yet',
   'check.accountHint': 'Account settings shows what the account still needs.',
   'check.questionTitle': 'This question cannot be checked right now',
-  'check.questionHint': 'Try again, or go to the next question.'
+  'check.questionHint': 'Try again, or go to the next question.',
+  'check.newQuestionTitle': 'This question cannot be marked',
+  'check.newQuestionHint': 'It was opened without a connection to Pri, or too long ago. Go to the next question to have your answer marked.'
 };
