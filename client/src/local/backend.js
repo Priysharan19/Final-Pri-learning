@@ -3897,12 +3897,23 @@ const routes = {
     const row = await get('questions', body.id);
     if (!row || row.pid !== p.id || row.mode !== 'rush' && row.mode !== 'match') throw Object.assign(new Error('Question not found'), { status: 404 });
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
+    // One answer, marked by the server like any other question. The key is
+    // fixed to the row, so a retry after a lost reply returns the same receipt.
+    await requireServerIssue(row);
     const q = row.payload;
-    const result = checkAnswer(q, body.answer);
+    const answer = String(body.answer ?? '');
+    const submissionId = `fast-${row.id}`;
+    let receipt = await gradeOnServer(row, { answer, viaInk: false }, submissionId, submissionDigest(answer, undefined));
+    // An unreadable answer is not an attempt in practice; in a timed game it
+    // ends the question, which the server records as shown-the-answer.
+    if (receipt.resolved !== true) receipt = await revealOnServer(row);
+    row.serverReceipt = receipt;
+    row.pendingGrade = null;
+    const correct = receipt.correct === true;
     // Attempt and cloud queue entry in one transaction (§22): an app killed
     // mid-Rush can no longer leave an attempt the cloud never hears about.
-    await resolve(p, row, q, result.correct, body.answer, 0, row.mode, false, { syncQueue: true });
-    return { correct: result.correct, answerText: displayAnswer(q), syncQueued: true };
+    await resolve(p, row, q, correct, answer, 0, row.mode, false, { syncQueue: true });
+    return { correct, answerText: receipt.solution?.answerText ?? '', authoritative: true, attemptId: receipt.attemptId, ...certifiedPracticeMarks(receipt), syncQueued: true };
   },
   'POST /rush/finish': async (body) => {
     const p = await requireProfile();
@@ -4550,7 +4561,7 @@ const routes = {
     const { probe } = replayPlacement(cfg, []);
     // Generated before anything is written: a question bank that is not loaded
     // yet throws here, the API layer fetches it and re-runs this route.
-    const current = buildPlacementQuestion(cfg, probe, 0);
+    const current = await servePlacementQuestion(p.id, cfg, probe, 0);
     const now = Date.now();
     const placement = {
       v: 1, id: uuid(), config: { ...cfg }, status: 'active', startedAt: now, finishedAt: null,
@@ -4575,23 +4586,44 @@ const routes = {
     }
     const cur = pl.current;
     const q = cur.payload;
+    // A check begun by a version that marked on the device has no server
+    // question behind it and cannot be finished under online-only marking.
+    if (!cur.serverQuestionId) {
+      throw Object.assign(new Error('This placement check was started by an older version of Pri. Start it again.'), { status: 409, code: 'PLACEMENT_RESTART_REQUIRED' });
+    }
     const skipped = body?.skip === true;
     let correct = false;
     let feedback = '';
     let stepReport = null;
-    if (!skipped) {
-      // The deterministic marker decides, exactly as in practice. Nothing a
-      // model says reaches this verdict.
-      const result = checkAnswer(q, body?.answer);
-      if (result.invalid) {
-        return { correct: false, resolved: false, invalid: true, triesLeft: 1, feedback: result.feedback || 'That answer could not be read — check it and submit again.' };
+    let solution = null;
+    const settled = receipt => receipt?.authoritative === true && receipt.questionId === cur.serverQuestionId &&
+      typeof receipt.attemptId === 'string' && Number.isFinite(receipt.serverAcknowledgedAt);
+    const refused = cause => checkUnavailable(cause?.status === 401 ? 'sign-in' : cause?.status === 403 || cause?.status === 426 ? 'refused'
+      : !cause?.status || cause.status >= 500 || cause.status === 429 || cause?.code === 'CLOUD_DISABLED' ? 'offline' : 'unavailable', cause);
+    if (skipped) {
+      // Skipping shows the solution, which is the server's to show.
+      let receipt;
+      try { receipt = await cloud.revealPractice(cur.serverQuestionId); } catch (cause) { throw refused(cause); }
+      if (!settled(receipt) || receipt.revealed !== true) throw checkUnavailable('unavailable');
+      solution = receipt.solution || null;
+    } else {
+      // The server's deterministic marker decides, exactly as in practice.
+      // Nothing a model says reaches this verdict, and nothing is marked here.
+      const answer = String(body?.answer ?? '');
+      const steps = typeof body?.steps === 'string' && body.steps.trim() ? body.steps : undefined;
+      const submissionId = `placement-${cur.id}-${submissionDigest(answer, steps)}`.slice(0, 96);
+      let receipt;
+      try {
+        receipt = await cloud.gradePractice(cur.serverQuestionId, { submissionId, answer, mode: 'typed', ...(steps ? { steps } : {}), ms: Math.max(0, Math.min(36e5, Number(body?.ms) || 0)) });
+      } catch (cause) { throw refused(cause); }
+      if (!settled(receipt) || receipt.submissionId !== submissionId || typeof receipt.correct !== 'boolean') throw checkUnavailable('unavailable');
+      if (receipt.invalid) {
+        return { correct: false, resolved: false, invalid: true, triesLeft: 1, feedback: receipt.feedback || 'That answer could not be read — check it and submit again.' };
       }
-      correct = !!result.correct;
-      feedback = result.feedback || '';
-      if (!correct && q.answerType === 'mcq' && q.answer?.optionTraps) feedback = q.answer.optionTraps[Number(body?.answer)] || feedback;
-      const meta = stepMetaFor(q);
-      if (body?.steps && meta) { try { stepReport = stepCheck(meta, body.steps); } catch { stepReport = null; } }
-      if (!stepReport && result.stepReport) stepReport = result.stepReport;
+      correct = receipt.correct === true;
+      feedback = receipt.feedback || '';
+      stepReport = receipt.stepReport || null;
+      solution = receipt.solution || null;
     }
     const now = Date.now();
     const item = {
@@ -4610,7 +4642,7 @@ const routes = {
       throw Object.assign(new Error('This placement check was started by an older version of Pri. Start it again.'), { status: 409, code: 'PLACEMENT_RESTART_REQUIRED' });
     }
     const done = replay.done || items.length >= PLACEMENT_MAX;
-    const next = done ? null : buildPlacementQuestion(cfg, replay.probe, items.length);
+    const next = done ? null : await servePlacementQuestion(p.id, cfg, replay.probe, items.length);
     const result = done ? { ...summarisePlacement(cfg, items), finishedAt: now } : null;
     const placement = {
       ...pl, items, current: next,
@@ -4622,7 +4654,7 @@ const routes = {
     await writePlacement(p.id, { placement });
     return {
       correct, resolved: true, skipped, feedback, stepReport, diagnosis: stepReport?.diagnosis || null,
-      solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText },
+      solution, authoritative: true,
       progress: placementProgress(placement), done,
       next: next ? placementQuestionView(next) : null,
       result
@@ -4642,7 +4674,8 @@ const routes = {
 // trace a miss down the Pri-authored prerequisite graph to its plausible root.
 // The adaptive process and the summary live in engine/placement.js, which is
 // fetched only when a student opens the diagnostic: none of it is on the boot
-// path. Marking is the same deterministic checkAnswer() practice uses.
+// path. Every question is issued and marked by the server (online-only
+// grading); the check writes no attempt and counts as no progress.
 //
 // Storage. The whole session — configuration, the outcome of every answered
 // question and the one question on screen, exactly as it was generated — lives
@@ -4704,12 +4737,12 @@ function seededRandom(seed) {
 }
 
 /**
- * The question for one probe, generated deterministically from the session
- * seed and the probe's position. A handwritten answer is the point of the
+ * The question for one probe. The device picks the chapter and level from
+ * the session seed and the probe's position; the server picks the question. A handwritten answer is the point of the
  * diagnostic and a multiple-choice item can be guessed, so a few variants are
  * looked at and the first one with a written answer is preferred.
  */
-function buildPlacementQuestion(cfg, probe, index) {
+async function servePlacementQuestion(pid, cfg, probe, index) {
   const chapter = indiaChapter(probe?.chapterId);
   if (!chapter) throw Object.assign(new Error('The placement check asked for a chapter this app does not know.'), { status: 409, code: 'PLACEMENT_RESTART_REQUIRED' });
   const grade = indiaChapterGrade(chapter);
@@ -4722,14 +4755,23 @@ function buildPlacementQuestion(cfg, probe, index) {
   const target = (chapter.dotpoints?.length ? resolveIndiaTarget(chapter, { ...opts, dotpoint: 0 }) : null)
     || resolveIndiaTarget(chapter, opts);
   if (!target?.generator) throw Object.assign(new Error(`${chapter.name} has no authored question form for the placement check.`), { status: 409, code: 'INDIA_TARGET_UNCOVERED' });
-  let q = null;
-  for (let k = 0; k < 6; k++) {
-    const cand = generateQuestion(target.generator, target.difficulty, (base + k * 104729) % 2147483647);
-    if (!q) q = cand;
-    if (cand.answerType !== 'mcq' && !cand.multipart) { q = cand; break; }
+  // The check gives a verdict on every answer, so each question is the
+  // server's from the start: a signed-in eligible account, online. The server
+  // chooses it and prefers a form the student writes out.
+  const linkedAccount = await profileCloudAccountId(pid).catch(() => null);
+  if (!linkedAccount) throw checkUnavailable('sign-in');
+  let out;
+  try {
+    out = await cloud.issuePractice({ generator: target.generator, difficulty: target.difficulty, curriculum: 'in', mode: 'placement', written: true });
+  } catch (cause) {
+    throw checkUnavailable(cause?.status === 401 ? 'sign-in' : cause?.status === 403 || cause?.status === 426 ? 'refused'
+      : !cause?.status || cause.status >= 500 || cause.status === 429 || cause?.code === 'CLOUD_DISABLED' ? 'offline' : 'unavailable', cause);
   }
+  const q = out?.question;
+  if (String(out?.accountId || '') !== linkedAccount) throw checkUnavailable('sign-in');
+  if (!q?.id || typeof q.prompt !== 'string' || !q.prompt) throw checkUnavailable('unavailable');
   return {
-    id: uuid(), index, probe: { ...probe }, generator: target.generator,
+    id: uuid(), serverQuestionId: q.id, index, probe: { ...probe }, generator: target.generator,
     difficulty: q.difficulty || target.difficulty, dotpointIndex: target.dotpointIndex ?? null,
     payload: q, servedAt: Date.now()
   };
@@ -4737,7 +4779,7 @@ function buildPlacementQuestion(cfg, probe, index) {
 
 /** What the question card is shown: the practice sanitiser, with no help on offer. */
 function placementQuestionView(cur) {
-  const row = { id: cur.id, india: { chapterId: cur.probe.chapterId, track: 'cbse', dotpointIndex: cur.dotpointIndex }, hintsUsed: 0, tries: 0 };
+  const row = { id: cur.id, serverQuestionId: cur.serverQuestionId || null, india: { chapterId: cur.probe.chapterId, track: 'cbse', dotpointIndex: cur.dotpointIndex }, hintsUsed: 0, tries: 0 };
   return { ...sanitize(cur.payload, row), hintsAvailable: 0, triesLeft: 1, placement: true, phase: cur.probe.phase };
 }
 
