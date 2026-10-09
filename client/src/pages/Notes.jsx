@@ -20,6 +20,8 @@ import { IN_CURRICULUM, IN_CHAPTER_BY_ID } from '../engine/curriculum-in.js';
 import { NOTES_GRADES, gradeOfChapter, loadNotesForGrade, notesPracticeHref, notesSearchText } from '../notes/notesIndex.js';
 import { studyHref, selectedStudyContext, selectedStudyPracticeHref } from '../lib/studyJourney.js';
 import '../notes/Notes.css';
+import { notesBookmarkKey } from './notesBookmarkScope.js';
+import { chapterNotesLink, notesIndexReturnLink } from './notesStudyLinks.js';
 
 // Official exam-track names remain visible as students move between notes,
 // examples and practice; internal URL slugs are never presented as titles.
@@ -29,22 +31,27 @@ const STUDY_TRACK_LABELS = Object.freeze({
   'jee-advanced': 'JEE Advanced'
 });
 
-const BOOKMARK_KEY = 'pri.notes.bookmarks.v1';
-
 // ── Small utilities ──────────────────────────────────────────────────────────
-function readBookmarks() {
-  try { return new Set(JSON.parse(localStorage.getItem(BOOKMARK_KEY) || '[]')); } catch { return new Set(); }
+function readBookmarks(key) {
+  try {
+    const values = JSON.parse(localStorage.getItem(key) || '[]');
+    return new Set(Array.isArray(values) ? values.filter(v => typeof v === 'string') : []);
+  } catch { return new Set(); }
 }
 function useBookmarks() {
-  const [marks, setMarks] = useState(readBookmarks);
+  const { user } = useApp() || {};
+  const key = notesBookmarkKey(user?.id);
+  // The outer Notes route is also keyed by the active local profile, so a
+  // profile change never displays another student's in-memory bookmarks.
+  const [marks, setMarks] = useState(() => readBookmarks(key));
   const toggle = useCallback((id) => {
     setMarks(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
-      try { localStorage.setItem(BOOKMARK_KEY, JSON.stringify([...next])); } catch { /* private window: kept for this visit only */ }
+      try { localStorage.setItem(key, JSON.stringify([...next])); } catch { /* private window: kept for this visit only */ }
       return next;
     });
-  }, []);
+  }, [key]);
   return [marks, toggle];
 }
 
@@ -89,7 +96,13 @@ function useNotes(grade) {
 // ── Entry ────────────────────────────────────────────────────────────────────
 export default function Notes() {
   const { chapterId } = useParams();
-  return chapterId ? <ChapterNotes chapterId={chapterId} /> : <NotesIndex />;
+  const { user } = useApp() || {};
+  // Same browser session can switch local profiles without leaving this URL.
+  // Remount bookmark state before either student's saved preferences render.
+  const identity = String(user?.id ?? 'no-profile');
+  return <React.Fragment key={identity}>
+    {chapterId ? <ChapterNotes chapterId={chapterId} /> : <NotesIndex />}
+  </React.Fragment>;
 }
 
 // ── The index: classes, search, map, chapters ────────────────────────────────
@@ -167,7 +180,7 @@ function NotesIndex() {
                   const num = (group.chapters.indexOf(c) + 1);
                   return (
                     <li key={c.id} className="nt-reveal" style={{ '--i': Math.min(num, 14) }}>
-                      <Link to={`/notes/${c.id}`} className="nt-chapter" data-testid="notes-chapter">
+                      <Link to={chapterNotesLink(c, params)} className="nt-chapter" data-testid="notes-chapter">
                         <span className="nt-chapter-n">{String(num).padStart(2, '0')}</span>
                         <span className="nt-chapter-body">
                           <span className="nt-chapter-name">{c.name}</span>
@@ -218,6 +231,7 @@ function BookmarkGlyph({ on }) {
 function ChapterMap({ group, notes }) {
   const t = useT();
   const nav = useNavigate();
+  const [params] = useSearchParams();
   const [focus, setFocus] = useState(null);
   const strands = useMemo(() => [...new Set(group.chapters.map(c => c.strand))], [group]);
   const W = 1000, rowH = 54, padX = 40, top = 30;
@@ -266,7 +280,7 @@ function ChapterMap({ group, notes }) {
               aria-label={`${t('notes.chapterNumber', { n: i + 1 })}: ${c.name}`}
               onMouseEnter={() => setFocus(c.id)} onMouseLeave={() => setFocus(null)}
               onFocus={() => setFocus(c.id)} onBlur={() => setFocus(null)}
-              onClick={() => nav(`/notes/${c.id}`)}>
+              onClick={() => nav(chapterNotesLink(c, params))}>
               {i + 1}
             </button>
           ))}
@@ -280,6 +294,7 @@ function ChapterMap({ group, notes }) {
 // ── Search across every class ────────────────────────────────────────────────
 function SearchResults({ query }) {
   const t = useT();
+  const [params] = useSearchParams();
   const [all, setAll] = useState(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -310,7 +325,7 @@ function SearchResults({ query }) {
       <ol className="nt-chapters">
         {results.slice(0, 40).map(({ c, grade, snippet }) => (
           <li key={c.id}>
-            <Link to={`/notes/${c.id}`} className="nt-chapter">
+            <Link to={chapterNotesLink(c, params)} className="nt-chapter">
               <span className="nt-chapter-n">{grade}</span>
               <span className="nt-chapter-body">
                 <span className="nt-chapter-name">{c.name}</span>
@@ -368,7 +383,7 @@ function ChapterNotes({ chapterId }) {
 
   const group = IN_CURRICULUM.find(g => g.grade === grade);
   const number = group ? group.chapters.findIndex(c => c.id === chapterId) + 1 : 0;
-  const backTo = `/notes?class=${grade}`;
+  const backTo = notesIndexReturnLink(chapter, params);
 
   if (!chapter) {
     return <div className="nt"><p className="nt-quiet">{t('notes.notFound')}</p><Link className="nt-back" to="/notes">← {t('notes.back')}</Link></div>;
@@ -419,7 +434,7 @@ function ChapterNotes({ chapterId }) {
           <p className="nt-builds">
             <span>{t('notes.buildsOn')}</span>
             {notes.prereqs.filter(p => IN_CHAPTER_BY_ID[p]).map(p => (
-              <Link key={p} to={`/notes/${p}`}>{IN_CHAPTER_BY_ID[p].name} <small>{t('common.classNumber', { n: gradeOfChapter(p) })}</small></Link>
+              <Link key={p} to={chapterNotesLink(IN_CHAPTER_BY_ID[p], params)}>{IN_CHAPTER_BY_ID[p].name} <small>{t('common.classNumber', { n: gradeOfChapter(p) })}</small></Link>
             ))}
           </p>
         )}
