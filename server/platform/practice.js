@@ -14,7 +14,8 @@ import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { asyncRouter } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { nextSyncCursor, syncLockKey } from './db.js';
-import { requireSession, requireVerifiedEmail, requireRole, rateLimit } from './security.js';
+import { requireSession, requireVerifiedEmail, requireRole, rateLimit, sessionFromRequest } from './security.js';
+import { consentState, consentBlockerCode } from './guardianConsent.js';
 import { loadAllBanks, generateQuestion } from '../../client/src/engine/generators/index.js';
 import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
 import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../../client/src/engine/answer-forms.js';
@@ -232,13 +233,32 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const evidence = { questionId: qid, mode: body.mode, text, recognizedAt: acknowledgedAt,
       providerNeedsConfirmation: result.needsConfirmation === true };
     const committed = await db.transaction(async () => {
+      // The provider runs outside the transaction. During that wait a student
+      // may sign out, a session may expire, or a guardian may withdraw consent.
+      // The initial middleware gate is no longer sufficient authority to
+      // persist new student evidence: recheck at the point of commitment.
+      const liveSession = await sessionFromRequest(db, req);
+      if (!liveSession || liveSession.account_id !== accountId) {
+        return { status: 401, code: 'AUTH_REQUIRED' };
+      }
+      // A concurrent PostgreSQL guardian withdrawal updates this exact row.
+      // Lock it before the final consent check so it cannot commit between
+      // validation and the recognition receipt. SQLite transactions already
+      // serialize writers for this commit.
+      if (db.dialect === 'postgres') {
+        await db.get('SELECT account_id FROM guardian_consents WHERE account_id=? FOR UPDATE', [accountId]);
+      }
+      const blocker = consentBlockerCode(await consentState(db, accountId));
+      if (blocker) return { status: 403, code: blocker };
       const stillOpen = await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-completion' AND key=?", [accountId, qid]);
-      if (stillOpen) return false;
+      if (stillOpen) return { status: 409, code: 'QUESTION_ALREADY_GRADED' };
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-recognition',?,?,?,?,?)",
         [accountId, receipt, JSON.stringify(evidence), digest(evidence), acknowledgedAt, acknowledgedAt + MAX_AGE]);
-      return true;
+      return { status: 201 };
     }, { accountScope: accountId, lock: syncLockKey(accountId) });
-    if (!committed) return reject(res, 409, 'QUESTION_ALREADY_GRADED', 'This question has been completed.');
+    if (committed.status !== 201) return reject(res, committed.status, committed.code,
+      committed.status === 403 ? 'Guardian consent changed while this answer was being read.' :
+      committed.status === 401 ? 'Sign in again before retrying recognition.' : 'This question has been completed.');
     return res.status(201).json({ receipt, questionId: qid, mode: body.mode,
       transcription: { text, lines: result.lines || [], confidence: result.confidence ?? null,
         needsConfirmation: result.needsConfirmation === true } });
