@@ -85,7 +85,7 @@ export default function Exams() {
 
   const startRefused = refusal ? (
     <div className="verdict verdict-technical" role="alert" data-exam-start-refused={refusal} style={{ marginTop: 14, gridColumn: '1 / -1' }}>
-      <span className="verdict-ico"><Icon name="alert" /></span>
+      <span className="verdict-ico"><Icon name="alert" /><span className="sr-only">{t('exams.notStartedLabel')}</span></span>
       <div>
         <CheckRefusal kind={refusal} context="exam" user={user} refreshUser={refreshUser} onRetry={start} busy={busy} />
       </div>

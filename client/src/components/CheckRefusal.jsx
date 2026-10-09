@@ -92,7 +92,8 @@ export function CheckRefusal({
       <div className="verdict-body">{t(copy.contextKey)} <span className="muted">{t(copy.hintKey)}</span></div>
       {copy.action === 'sign-in' && (
         <div style={{ marginTop: 10 }}>
-          <CheckSignIn user={user} refreshUser={refreshUser} ready={signInReady} waitText={signInWaitText} />
+          <CheckSignIn user={user} refreshUser={refreshUser} ready={signInReady} waitText={signInWaitText}
+            label={context && context !== 'answer' ? t('check.signInActionPlain') : null} />
         </div>
       )}
       {copy.action !== 'sign-in' && <div className="row" style={{ marginTop: 10 }}>

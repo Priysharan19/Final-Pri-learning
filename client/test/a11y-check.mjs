@@ -82,17 +82,6 @@ const OUTSTANDING = [
   // The three that used to sit here — the unnamed theme toggle, the wordmark that
   // navigated from a <span>, and the history verdict carried only by colour — are
   // fixed in the app rather than exempted here.
-  //
-  // One entry, 2026-10-10, reported as a product defect the same day (this
-  // suite may not edit client/src). The same icon was given its word on the
-  // question card, the placement page and both game lobbies; the Exams page
-  // was missed. Delete this entry when the group below goes red.
-  {
-    check: 'colour',
-    file: 'client/src/pages/Exams.jsx:82 — the refused paper start (.verdict-technical > span.verdict-ico)',
-    what: 'the alert icon of a paper that did NOT start is painted in the "incorrect" colour (--bad) with no word of its own (the sr-only "not checked" label the other refusals carry is missing here)',
-    test: f => f.signature === 'span.verdict-ico' && [...f.views].every(view => view === 'exams · refused signed out')
-  }
 ];
 
 // ── Assertions ───────────────────────────────────────────────────────────────

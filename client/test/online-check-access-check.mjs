@@ -107,7 +107,7 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
 {
   const kinds = Object.values(CHECK_REFUSAL);
   eq(kinds.length, 10, 'ten reasons are named');
-  const used = new Set(['check.needsAccount', 'check.signInAction', 'check.draftNotice', 'check.legacyNotice', 'check.teacherNotice', 'check.draftAction', 'check.draftConfirm', 'check.draftConfirmAction', 'check.draftKeep', 'check.draftStillUnmarkable', 'check.restartAction']);
+  const used = new Set(['check.needsAccount', 'check.signInAction', 'check.signInActionPlain', 'check.draftNotice', 'check.legacyNotice', 'check.teacherNotice', 'check.draftAction', 'check.draftConfirm', 'check.draftConfirmAction', 'check.draftKeep', 'check.draftStillUnmarkable', 'check.restartAction']);
   // A timed game (Rapid Fire, Match) is refused at its start with the same reasons.
   for (const context of ['answer', 'exam', 'game', 'placement']) {
     for (const kind of kinds) {
