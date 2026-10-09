@@ -65,11 +65,16 @@ async function writableQuestion(page, settle) {
 export const flow = {
   id: 'responsive-matrix',
   name: 'Responsive matrix · 6 viewports, critical routes, write/type, actions',
+  online: true,
 
-  async run({ page, check, goto, settle, createProfile, note, browserName = 'chromium' }) {
+  async run({ page, check, goto, settle, createProfile, note, online, browserName = 'chromium' }) {
     note(`engine: ${browserName}`);
     await goto('/');
     await createProfile({ name: 'Matrix Student', year: 10, course: 'in' });
+    // Signed in to the real server: "after answering" and "once a worked
+    // solution exists" are states only a server-marked submission and a
+    // server-released solution can produce (online-only grading).
+    await online.signIn({ name: 'Matrix Student' });
     await settle();
 
     for (const vp of VIEWPORTS) {

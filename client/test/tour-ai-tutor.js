@@ -65,19 +65,17 @@ export const flowOff = {
 export const flow = {
   id: 'tutor',
   name: 'AI tutor · three levels, in order, with fallback',
+  online: true,
 
-  async run({ page, ctx, base, check, goto, createProfile }) {
+  async run({ page, ctx, base, check, goto, createProfile, online }) {
     const requests = [];
 
-    await page.addInitScript(origin => { window.__PRI_CLOUD_ORIGIN__ = origin; }, base);
-
+    // Only the tutor MODEL is stood in for, at its one route: its words are
+    // help, never a mark. Accounts, question issue, the solution the level-3
+    // walkthrough shows and the resolution it records are the real server's.
     const respond = (route, status, value) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) });
-    await ctx.route('**/v1/**', async route => {
+    await ctx.route(url => url.origin === base && url.pathname === '/v1/tutor/help', async route => {
       const request = route.request();
-      const path = new URL(request.url()).pathname;
-      if (path !== '/v1/tutor/help') {
-        return respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
-      }
       const body = JSON.parse(request.postData() || '{}');
       requests.push(body);
       if (body.level === 'nudge') {
@@ -99,6 +97,7 @@ export const flow = {
 
     await goto('/');
     await createProfile({ name: 'Tutor Student', year: 7 });
+    await online.signIn({ name: 'Tutor Student' });
     await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
 
@@ -163,6 +162,14 @@ export const flow = {
     await page.waitForSelector('.eval-card', { timeout: 15000 }).catch(() => {});
     await check('level 3 ends the question exactly like Reveal', /Solution revealed/i.test(await page.locator('.qpage').innerText()),
       (await page.locator('.qpage').innerText()).slice(0, 300));
+    // The solution it showed, and the resolution, are the server's: the
+    // question was issued there and its reveal committed there, once.
+    const issued = (await online.shownRow())?.serverQuestionId;
+    const reveals = await online.practiceCalls(new RegExp(`^/v1/practice/${issued}/reveal$`));
+    await check('the walkthrough showed the solution the server released, and the server recorded the question as revealed once',
+      !!issued && reveals.length === 1 && reveals[0].status === 200 && Array.isArray(reveals[0].json?.solution?.steps) &&
+        online.ledger(issued).thisDone === 1,
+      `server question ${issued}; reveal ${JSON.stringify(reveals.map(c => c.status))}; ${JSON.stringify(online.ledger(issued))}`);
     await check('the answer box is gone — the watched answer cannot be submitted for credit',
       await page.getByRole('button', { name: 'Submit Answer' }).count() === 0);
     await check('and no more help is offered on a closed question', await page.locator('[data-tutor-launch]').count() === 0);

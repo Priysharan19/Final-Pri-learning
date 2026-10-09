@@ -205,13 +205,30 @@ function onlineSession(platform, ctx, page) {
   async function signIn({ name = 'Online Student', account = null } = {}) {
     const who = account || await platform.newAccount({ name });
     await page.goto(`${platform.origin}/settings`, { waitUntil: 'domcontentloaded' });
+    // Selectors, not wording: the same sign-in is used by the Hindi flow.
     const panel = page.locator('section', { has: page.locator('#cloud-account-title') });
     await panel.waitFor({ state: 'visible', timeout: 30000 });
-    await panel.getByRole('button', { name: 'Sign in', exact: true }).first().click();
-    await panel.locator('#cloud-email').fill(who.email);
-    await panel.locator('#cloud-password').fill(who.password);
-    await panel.locator('form button[type="submit"]').click();
-    await panel.getByText('Connected', { exact: true }).waitFor({ timeout: 30000 });
+    const form = panel.locator('form', { has: page.locator('#cloud-password') });
+    await form.locator('button.btn-sm').first().click();
+    await form.locator('#cloud-email').fill(who.email);
+    await form.locator('#cloud-password').fill(who.password);
+    const answered = page.waitForResponse(r => new URL(r.url()).pathname === '/v1/account/login', { timeout: 30000 });
+    await form.locator('button[type="submit"]').click();
+    const login = await answered;
+    if (login.status() !== 200) throw new Error(`online-session: sign-in answered ${login.status()}`);
+    // The form goes away once the panel holds a linked, verified session.
+    await form.waitFor({ state: 'detached', timeout: 30000 });
+    const linked = await page.evaluate(() => new Promise(done => {
+      const open = indexedDB.open('pri-learning');
+      open.onerror = () => done(null);
+      open.onsuccess = () => {
+        const db = open.result;
+        const req = db.transaction('device').objectStore('device').getAll();
+        req.onsuccess = () => { db.close(); done(req.result.filter(r => String(r.id).startsWith('pri-cloud-account-link-v1:')).map(r => String(r.accountId))); };
+        req.onerror = () => { db.close(); done(null); };
+      };
+    }));
+    if (!linked?.includes(who.id)) throw new Error(`online-session: the profile is not linked to the account it signed in to (${JSON.stringify(linked)})`);
     session.account = who;
     return who;
   }

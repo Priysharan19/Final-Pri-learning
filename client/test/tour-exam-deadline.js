@@ -33,11 +33,14 @@ const storedExam = (page, examId) => page.evaluate(async (examId) => {
 export const flow = {
   id: 'exam-deadline',
   name: 'India exam · the clock runs out and the paper submits itself',
+  online: true,
 
-  async run({ page, base, check, note, goto, createProfile, settle }) {
+  async run({ page, base, check, note, goto, createProfile, settle, online }) {
     await page.clock.install();
     await goto('/');
     await createProfile({ name: 'Kavya Nair', year: 12, course: 'in', track: 'jee-main' });
+    // An exam is marked work: it is sat by a signed-in account.
+    await online.signIn({ name: 'Kavya Nair' });
 
     await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
     const start = page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' });
