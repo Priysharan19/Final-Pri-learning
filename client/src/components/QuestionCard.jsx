@@ -20,6 +20,7 @@ import { cloudReadingEnabled, INK_READER_STATE, photoReadingBlockedKey, readPhot
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
+import { definitiveSubmissionRefusal, draftPersistenceWarning, pdfReceiptWarning, photoEligibleForGrading } from './photoSubmissionGuard.js';
 import { plotSpecFor } from '../engine/plotSpec.js';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
@@ -300,6 +301,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [selfOpen, setSelfOpen] = useState(false);
   const [photo, setPhoto] = useState(null);
   const [photoSignInOpen, setPhotoSignInOpen] = useState(false);
+  const [gradingSignInOpen, setGradingSignInOpen] = useState(false);
   const [photoReattachRequired, setPhotoReattachRequired] = useState(false);
   const [photoAuthEpoch, setPhotoAuthEpoch] = useState(0);
   const photoReadGeneration = useRef(0);
@@ -307,6 +309,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // needs an authenticated retry. A thumbnail cannot reconstruct every page.
   const pendingPdf = useRef(null);
   const [pdfUnread, setPdfUnread] = useState(null);
+  // Number of rendered PDF pages, not count of successfully read pages. A
+  // multi-page transcript is not evidence that the server saw every page.
+  const [pdfPageCount, setPdfPageCount] = useState(0);
   const [photoOCR, setPhotoOCR] = useState({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
   // One quiet line, once per device, the first time a photo is read on the
   // server for a student who never chose either way in Settings.
@@ -368,9 +373,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // An old photo must never follow the student into a new question.
     photoReadGeneration.current += 1;
     pendingPdf.current = null;
-    setPhoto(null); setPhotoSignInOpen(false); setPhotoReattachRequired(false); setBookmarked(false);
+    setPhoto(null); setPhotoSignInOpen(false); setGradingSignInOpen(false); setPhotoReattachRequired(false); setBookmarked(false);
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
-    setChecking(false); setVouched(null); setPdfUnread(null); setAttemptViaInk(false);
+    setChecking(false); setVouched(null); setPdfUnread(null); setPdfPageCount(0); setAttemptViaInk(false);
     setSaveState(draft?.typed || draft?.working ? 'saved' : null);
     latestInk.current = null;
     ++inkSaveRevision.current;
@@ -433,6 +438,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     pendingPdf.current = null;
     // A new single photo must also clear an earlier multi-page PDF warning.
     setPdfUnread(null);
+    setPdfPageCount(0);
     // Even a rejected, signed-out replacement invalidates an older in-flight
     // provider response; authentication state cannot revive the old image.
     const generation = ++photoReadGeneration.current;
@@ -483,6 +489,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (event?.detail?.connected === true &&
         String(event.detail.localProfileId) === String(user?.id)) {
       setPhotoAuthEpoch(n => n + 1);
+      setGradingSignInOpen(false);
     }
   }), [user?.id]);
   useEffect(() => {
@@ -507,11 +514,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const stale = () => !mountedRef.current || generation !== photoReadGeneration.current;
     pendingPdf.current = dataURL;
     setPdfUnread(null);
+    setPdfPageCount(0);
     setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
     let result = { pages: [], reason: 'unreadable' };
     try { result = await renderPdfPages(dataURL); } catch { /* reported below */ }
     if (stale()) return;
     const pages = result.pages || [];
+    setPdfPageCount(pages.length);
     if (!pages.length) {
       pendingPdf.current = null;
       setPhotoOCR({
@@ -597,6 +606,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       pendingPdf.current = null;
       setPhoto(null);
       setPdfUnread(null);
+      setPdfPageCount(0);
       setPhotoSignInOpen(false);
       setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
       const reader = new FileReader();
@@ -860,8 +870,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // A stale answer left over from another attachment is not evidence that
     // the NEW photo was recognised. Never let Submit race its cloud reading or
     // quietly grade only the readable subset of a multi-page PDF.
-    if (mode === 'photo' && (!photo || photoOCR.phase !== 'done' || pdfUnread)) return;
-    if (photoReattachRequired && mode === 'photo' && (!photo || photoOCR.phase !== 'done')) return;
+    if (!photoEligibleForGrading({ mode, photo, ocrPhase: photoOCR.phase,
+      unreadPages: pdfUnread, pdfPageCount, reattachRequired: photoReattachRequired })) return;
     let given, steps, viaInk = false, ink, lines = null;
     if (isMcq) {
       given = mcqSel;
@@ -903,7 +913,19 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // On disk before the request leaves: a relaunch replays it under this key.
     // A placement answer is not replayed through practice on relaunch: the
     // placement session itself resumes at this exact question.
-    if (!diagnostic) savePendingSubmission(question.id, { submissionId, answer: String(given), steps, viaInk, sourceMode, ms, lines }, { label: question.subtopicName });
+    if (!diagnostic && !savePendingSubmission(question.id,
+      { submissionId, answer: String(given), steps, viaInk, sourceMode, ms, lines },
+      { label: question.subtopicName })) {
+      // Without durable idempotency identity, a response lost after COMMIT
+      // cannot be recovered safely. Do not send the answer and then pretend
+      // this browser has a crash-safe retry.
+      pendingRef.current = null;
+      setState({ phase: 'retry', res: {
+        invalid: true, technical: true,
+        feedback: draftPersistenceWarning(language)
+      } });
+      return;
+    }
     const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
       ? compactInkStrokes(scribbleRef.current.getStrokes())
       : undefined;
@@ -953,7 +975,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // A refusal (4xx) is a definitive answer. Anything else — a fault, a
       // timeout — is not: the pending record stays, so an identical retry or a
       // relaunch reuses the same key and still lands as one attempt.
-      if (e?.status >= 400 && e?.status < 500) { pendingRef.current = null; clearPendingSubmission(question.id); }
+      if (definitiveSubmissionRefusal(e)) { pendingRef.current = null; clearPendingSubmission(question.id); }
       inkFrozenRef.current = false;
       if (recovering && e?.status === 409 && e?.code !== 'QUESTION_DISCARDED') {
         // Answered elsewhere under another submission: nothing here to recover.
@@ -964,7 +986,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // work is still on screen and still in its draft. A 409 is different:
       // the question was already finished (another tab, a skipped question),
       // and asking the student to submit again would be untrue.
-      if (mountedRef.current) setState({ phase: 'retry', res: { feedback: e.message, invalid: true, technical: true, conflict: e?.status === 409 } });
+      if (mountedRef.current) setState({ phase: 'retry', res: {
+        feedback: e.message, invalid: true, technical: true,
+        authRequired: e?.status === 401, guardianRestricted: e?.status === 403,
+        conflict: e?.status === 409
+      } });
     } finally {
       inFlightRef.current = false;
       if (mountedRef.current) setBusy(false);
@@ -1268,11 +1294,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   }, [writeMode, lineVerdicts, inkResult, t]);
   // Photo mode is never a back door for submitting an old typed transcript.
   // Switch explicitly to Type when there is no fully recognised attachment.
-  const photoAwaitingValidReading = mode === 'photo' &&
-    (!photo || photoOCR.phase !== 'done' || !!pdfUnread);
+  const photoAwaitingValidReading = !photoEligibleForGrading({ mode, photo,
+    ocrPhase: photoOCR.phase, unreadPages: pdfUnread, pdfPageCount,
+    reattachRequired: photoReattachRequired });
   const canSubmit = (isMcq ? mcqSel !== null : isWorking ? (writeMode ? !!inkResult?.lines?.length : !!working.trim()) : writeMode ? !!inkResult?.answerLine : !!answer.trim()) &&
-    !photoAwaitingValidReading &&
-    (!photoReattachRequired || mode !== 'photo' || (!!photo && photoOCR.phase === 'done'));
+    !photoAwaitingValidReading;
 
   // Client checkboxes are a reflection exercise, never grading authority.
   // When the server supplies an explicit awarded-mark count, use it only if
@@ -1548,6 +1574,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       pendingPdf.current = null;
                       setPhoto(null);
                       setPdfUnread(null);
+                      setPdfPageCount(0);
                       setPhotoSignInOpen(false);
                       setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
                       attachPhoto(e,
@@ -1565,8 +1592,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                             PDF failure message was unreachable and the screen simply did
                             not move. */}
                         {photo
-                          ? <div className="photo-thumb"><img src={photo} alt={t('history.paperWorking')} /><button aria-label={t('verdict.removePhoto')} onClick={() => { photoReadGeneration.current += 1; pendingPdf.current = null; setPdfUnread(null); setPhoto(null); setPhotoSignInOpen(false); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>
-                          : <div className="photo-thumb" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}><span aria-hidden="true">▤</span><button aria-label={t('verdict.removeAttachment')} onClick={() => { photoReadGeneration.current += 1; pendingPdf.current = null; setPhoto(null); setPdfUnread(null); setPhotoSignInOpen(false); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>}
+                          ? <div className="photo-thumb"><img src={photo} alt={t('history.paperWorking')} /><button aria-label={t('verdict.removePhoto')} onClick={() => { photoReadGeneration.current += 1; pendingPdf.current = null; setPdfUnread(null); setPdfPageCount(0); setPhoto(null); setPhotoSignInOpen(false); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>
+                          : <div className="photo-thumb" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}><span aria-hidden="true">▤</span><button aria-label={t('verdict.removeAttachment')} onClick={() => { photoReadGeneration.current += 1; pendingPdf.current = null; setPhoto(null); setPdfUnread(null); setPdfPageCount(0); setPhotoSignInOpen(false); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>}
                         <div style={{ flex: 1 }} role="status" aria-live="polite">
                           {photoOCR.phase === 'reading' && (
                             <span className="muted">{t('verdict.readingWork')}</span>
@@ -1592,6 +1619,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                                 }} />
                               <div className="muted" style={{ marginTop: 6 }}>{t('verdict.filledFromLastLine')}</div>
                               {pdfUnread && <div className="verdict-body" style={{ marginTop: 6 }}>{t('verdict.pdfPagesUnread', pdfUnread)}</div>}
+                              {pdfPageCount > 1 && (
+                                <div className="verdict-body" data-pdf-receipt-blocked role="alert" style={{ marginTop: 6 }}>
+                                  {pdfReceiptWarning(language, pdfPageCount)}
+                                </div>
+                              )}
                               {cloudNotice && String(photoOCR.engine || '').startsWith('cloud') && (
                                 <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>{t('verdict.photoReadOnServerNotice')}</div>
                               )}
@@ -1794,6 +1826,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   ? <>{t('verdict.workIsSafe')} <span className="muted">{state.res.feedback}</span></>
                   : <MathText text={state.res.feedback || t('verdict.oneMoreGo')} />}
               </div>
+              {state.res?.authRequired && (
+                <div style={{ marginTop: 10 }}>
+                  <button type="button" className="btn btn-primary btn-sm"
+                    data-grade-recovery-sign-in aria-expanded={gradingSignInOpen}
+                    onClick={() => setGradingSignInOpen(v => !v)}>{t('cloud.signIn')}</button>
+                  {gradingSignInOpen && (
+                    <React.Suspense fallback={<p role="status">{t('cloud.stateChecking')}</p>}>
+                      <PhotoAccountRecovery />
+                    </React.Suspense>
+                  )}
+                </div>
+              )}
               {attemptViaInk && <div className="eval-provenance" data-provenance="handwriting" style={{ padding: '6px 0 0', border: 0 }}>{t('verdict.readByAiMarkedByEngine')}</div>}
               {state.res.partial && <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{state.res.partial.note}</div>}
               {state.res.stepReport && <StepReport report={state.res.stepReport} />}
