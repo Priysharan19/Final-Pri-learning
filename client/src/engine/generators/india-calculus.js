@@ -23,7 +23,10 @@ function exact(f, suffix) {
     : { value: f.value, simplestFraction: { n: f.n, d: f.d } };
   return {
     answer: base,
-    inputHint: f.d === 1 ? undefined : `e.g. ${f.n}/${f.d}`,
+    // The hint is a public field shown before the attempt: it may say what
+    // form the answer takes, never the answer. (It used to print the keyed
+    // fraction itself.)
+    inputHint: f.d === 1 ? undefined : 'An exact value — a fraction a/b',
     ...(suffix ? { answerSuffix: suffix } : {})
   };
 }

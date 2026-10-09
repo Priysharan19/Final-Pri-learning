@@ -38,7 +38,7 @@ function cleanText(value) {
   return String(value ?? '')
     .trim()
     .replace(/[−–—]/g, '-')
-    .replace(/\\int\b/g, '∫')
+    .replace(/\\int(?![a-zA-Z])/g, '∫')
     .replace(/\\(?:left|right|displaystyle|,|;|!)/g, '')
     .replace(/^∴\s*/, '')
     .replace(/^(so|hence|then|therefore)\s+/i, '')
