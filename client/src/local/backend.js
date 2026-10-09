@@ -5418,11 +5418,20 @@ async function gradeOnServer(row, body, submissionId, requestDigest) {
 
 // The sync pull hands a server-marked attempt on a question this device was
 // issued to the same resolution routine a submit uses (see cloudSyncRestore).
-registerIssuedAttemptRecorder(async (pid, rowId, event) => {
+registerIssuedAttemptRecorder((pid, rowId, event) => withMutationLock(`question:${rowId}`, async () => {
+  // Under the question's own lock, the one a submit holds from before it reads
+  // the row until its last write: a pull and a submit on the same question
+  // never interleave, and the row is read only once the lock is held.
   const profile = await get('profiles', pid).catch(() => null);
   const row = await get('questions', rowId).catch(() => null);
   if (!profile || !row || row.pid !== pid || row.serverQuestionId !== String(event.entityId || '')) return 'unsupported';
   if (row.answered) return 'duplicate';
+  // A submit that got in first and is still waiting on the server records the
+  // attempt itself; keep the event with the row in case it never does.
+  if (row.pendingGrade && Date.now() - (Number(row.pendingGrade.at) || 0) < 2 * 60 * 1000) {
+    if (row.deferredGrade?.event?.id !== event.id) await put('questions', { ...row, deferredGrade: { event, at: Date.now() } });
+    return 'deferred';
+  }
   const p = event.payload || {};
   // The receipt this device never received, rebuilt from the server's own
   // event. It carries the verdict and the marks; the solution was only in the
@@ -5453,7 +5462,7 @@ registerIssuedAttemptRecorder(async (pid, rowId, event) => {
     throw error;
   }
   return { applied: true, xp: 0 };
-});
+}));
 
 const mutationQueues = new Map();
 

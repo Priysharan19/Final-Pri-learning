@@ -111,6 +111,23 @@ const claimOf = async q => `${me.id}:resolved:${await blindHash(`practice-resolu
   eq(attemptsOf().length, count + 1, 'and records nothing more');
 }
 
+// 3e · two passes racing on the same event settle the question once
+{
+  const q = await question({});
+  const count = attemptsOf().length;
+  const [a, b] = await Promise.all([applyRemoteLearningEvents(me.id, [eventFor(q)]), applyRemoteLearningEvents(me.id, [eventFor(q)])]);
+  eq([a.applied + b.applied, attemptsOf().length - count], [1, 1], 'two pulls racing on one event record it once (the question lock and the claim)');
+}
+
+// 3f · a submit holds the question's lock while it waits on the server: the pull waits its turn
+{
+  const backendSource = (await import('node:fs')).readFileSync(new URL('../src/local/backend.js', import.meta.url), 'utf8');
+  ok(/registerIssuedAttemptRecorder\(\(pid, rowId, event\) => withMutationLock\(`question:\$\{rowId\}`/.test(backendSource),
+    'the recorder runs under the same question lock a submit holds');
+  ok(/key === 'POST \/practice\/:id\/submit'[\s\S]{0,400}withMutationLock\(`question:\$\{params\.id\}`/.test(backendSource),
+    'and submit takes that lock before it reads the row');
+}
+
 // 4 · another device's attempt (no local question) is imported as before
 {
   const foreign = { id: 'local-none', serverQuestionId: '11111111-1111-4111-8111-111111111111' };

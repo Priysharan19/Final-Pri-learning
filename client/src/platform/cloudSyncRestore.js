@@ -329,6 +329,9 @@ export async function reconcileDeferredGrades(pid) {
     const event = row.deferredGrade.event;
     if (!row.answered && plain(event) && event.kind === 'graded-attempt' && recordIssuedAttempt) {
       const outcome = await recordIssuedAttempt(pid, row.id, { ...event, payload: plain(event.payload) ? event.payload : {} });
+      // A submit took the question's lock first and is now in flight: leave
+      // the deferred copy where it is for a later pass.
+      if (outcome === 'deferred') continue;
       if (outcome && outcome.applied) applied++;
     } else if (!row.answered && !recordIssuedAttempt) continue;
     // Whatever happened, the copy kept with the row is no longer needed. Strip
