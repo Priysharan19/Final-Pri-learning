@@ -22,6 +22,10 @@ import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 
 installBrowserEnv();
 resetStorage();
+// An exam starts only for a signed-in account that can reach the server
+// (online-only grading), so the suite runs against the real one.
+const { startOnlineAuthority } = await import('./support/online-authority.mjs');
+const online = await startOnlineAuthority({ label: 'bad-input' });
 
 const { dispatch } = await import('../src/local/backend.js');
 const { validateRequest } = await import('../src/local/gateway.js');
@@ -79,7 +83,7 @@ ok('a route with no body contract is not silently given an object',
   validateRequest('POST', '/auth/logout', null).body === null,
   JSON.stringify(validateRequest('POST', '/auth/logout', null).body));
 
-await api.post('/profiles', { name: 'Bad Input', year: 10, course: 'nsw' });
+await online.link((await api.post('/profiles', { name: 'Bad Input', year: 10, course: 'nsw' })).user.id);
 for (const path of ['/rush/finish', '/match/finish', '/classes', '/tasks', '/history/list', '/practice/next']) {
   await shaped(`POST ${path} with a null body comes back shaped`, () => api.post(path, null));
 }
@@ -165,5 +169,6 @@ if (failures.length) {
   console.log('\nfailures:');
   for (const line of failures) console.log(`  ${line}`);
 }
+await online.close();
 console.log(`\nBAD INPUT: ${fail ? 'FAIL' : 'PASS'} — ${pass}/${pass + fail} checks`);
 process.exit(fail ? 1 : 0);
