@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import { loadAllSearchNotes, keepNotesQueryForReload, readNotesQueryAfterReload, clearNotesQueryAfterReload, notesSearchRetryKey } from './notesSearchRecovery.js';
+const grades = [7,8,9,10,11,12];
+let calls=[],fail=true;
+const get=async grade => { calls.push(grade);if(fail && grade===10)throw new Error('first network attempt failed');return {['c'+grade]:{verified:true}} };
+await assert.rejects(loadAllSearchNotes(grades,get),/first network attempt failed/);
+assert.deepEqual(calls, grades, 'all grades requested; a failed chunk cannot produce partial search results');
+calls=[];fail=false;
+const all=await loadAllSearchNotes(grades,get);
+assert.deepEqual(Object.keys(all),grades.map(String),'retry after failure loads every class without losing a grade');
+assert.deepEqual(calls,grades,'retry actually reissues previously unavailable chunk');
+assert.equal(all[10].c10.verified,true);
+await assert.rejects(loadAllSearchNotes([],get),/cannot be loaded/);
+await assert.rejects(loadAllSearchNotes([7],async()=>null),/unavailable/);
+console.log('NOTES SEARCH RETRY AND ALL-OR-NOTHING: PASS 6/6');
+
+const storage=new Map();
+const tab={setItem:(k,v)=>storage.set(k,v),getItem:k=>storage.get(k),removeItem:k=>storage.delete(k)};
+assert.equal(keepNotesQueryForReload('profile-A','quadratic',tab),true);
+assert.equal(readNotesQueryAfterReload('profile-B',tab),'','another profile cannot recover this query');
+assert.equal(readNotesQueryAfterReload('profile-A',tab),'quadratic','first StrictMode render reads own query');
+assert.equal(readNotesQueryAfterReload('profile-A',tab),'quadratic','second StrictMode render reads same value');
+clearNotesQueryAfterReload('profile-A',tab);
+assert.equal(readNotesQueryAfterReload('profile-A',tab),'','mounted effect consumes search text');
+assert.notEqual(notesSearchRetryKey('a'),notesSearchRetryKey('b'),'profile keys differ');
+assert.equal(keepNotesQueryForReload('a','',tab),false,'empty text is never persisted');
+console.log('NOTES SEARCH PROFILE-SCOPED ONE-TIME RELOAD: PASS 7/7');
