@@ -488,6 +488,16 @@ async function signInToDemo(page, base) {
 }
 
 async function goTo(page, base, path) {
+  // What the page asked for during this load, kept only to explain a route
+  // that never shows the app: requests still unanswered, and answers that
+  // were refusals. Paths only — never a body, a header or a query string.
+  const open = new Map(), refused = [];
+  const short = url => { try { const u = new URL(url); return u.pathname.slice(0, 80); } catch { return '?'; } };
+  const onRequest = r => open.set(r, short(r.url()));
+  const onDone = r => open.delete(r);
+  const onResponse = r => { if (r.status() >= 400) refused.push(`${r.status()} ${short(r.url())}`); };
+  page.on('request', onRequest); page.on('requestfinished', onDone); page.on('requestfailed', onDone); page.on('response', onResponse);
+  const unhook = () => { page.off('request', onRequest); page.off('requestfinished', onDone); page.off('requestfailed', onDone); page.off('response', onResponse); };
   await page.goto(base + path, { waitUntil: 'domcontentloaded' });
   // A route that never shows the app (seen once in CI on the second visit to
   // /exams, never locally) must say what WAS on screen: the root error
@@ -502,11 +512,16 @@ async function goTo(page, base, path) {
       crash: [...document.querySelectorAll('.crash-card')].map(el => el.innerText.replace(/\s+/g, ' ').slice(0, 240)),
       alerts: [...document.querySelectorAll('[role="alert"]')].map(el => el.innerText.replace(/\s+/g, ' ').slice(0, 160)),
       text: (document.body?.innerText || '').replace(/\s+/g, ' ').slice(0, 160),
+      root: (document.getElementById('root')?.firstElementChild?.outerHTML || '').replace(/\s+/g, ' ').slice(0, 200),
       serviceWorker: !!navigator.serviceWorker?.controller,
       online: navigator.onLine
     })).catch(e => ({ unreadable: String(e.message).split('\n')[0] }));
+    seen.unanswered = [...open.values()].slice(0, 12);
+    seen.refused = refused.slice(-12);
+    unhook();
     throw new Error(`${String(err.message).split('\n')[0]} · ${path} never showed the app · ${JSON.stringify(seen)}`);
   });
+  unhook();
   await wait(page, 700);
 }
 
