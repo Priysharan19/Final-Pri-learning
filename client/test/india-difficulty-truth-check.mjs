@@ -7,9 +7,14 @@
 // buttons the picker offers and the levels only a typed or stale link could
 // carry — and asserts, per request:
 //
-//   · served ⇒ requested === served === the level the generator really ran at
-//     (regenerating (generator, level, seed) reproduces the served prompt) and
-//     the label text is the label of that level;
+//   · served ⇒ requested === served === the level the generator really ran at,
+//     and the label text is the label of that level. The server chooses and
+//     issues every question (online-only grading) and the device holds no seed,
+//     so the proof reads the SERVER's sealed copy of the issued question: its
+//     difficulty equals the reply's and the card's, its generator is one the
+//     chapter / dot point declares at that level, it is the question on
+//     screen, and regenerating from the sealed generator + difficulty + seed
+//     reproduces the sealed prompt;
 //   · a level the picker OFFERS for the selection (`requestable` on
 //     GET /curriculum) is always served;
 //   · any other level is REFUSED with DIFFICULTY_UNAVAILABLE carrying the level
@@ -26,7 +31,6 @@ import { readFileSync } from 'node:fs';
 import { installBrowserEnv, resetStorage, rawRows } from './backend-check.mjs';
 
 const SRC = new URL('../src/', import.meta.url).href;
-const DAY = 86400000;
 
 function mulberry32(a) {
   return function () {
@@ -39,6 +43,7 @@ function mulberry32(a) {
 const rng = mulberry32(20261010);
 Math.random = () => rng();
 
+let online = null;
 let pass = 0;
 const failures = [];
 let group = 'startup';
@@ -55,14 +60,17 @@ const eq = (name, actual, expected) => ok(name, JSON.stringify(actual) === JSON.
 async function run() {
   installBrowserEnv();
   resetStorage();
+  // The real /v1 server, in process: every profile below is a real verified
+  // account, so its questions are chosen, issued and sealed by the server.
+  const { startOnlineAuthority } = await import('./support/online-authority.mjs');
+  online = await startOnlineAuthority({ label: 'difficulty-truth' });
   const { dispatch, namedDifficultyOf, difficultyUnavailable } = await import(`${SRC}local/backend.js`);
   const idb = await import(`${SRC}local/idb.js`);
-  const { cloudLinkRowId } = await import(`${SRC}platform/cloudAccount.js`);
   const { loadAllBanks, loadBanksFor, generateQuestion } = await import(`${SRC}engine/generators/index.js`);
   await loadAllBanks();
   const { DIFF_LABELS, CURRICULUM, dotpointsFor } = await import(`${SRC}engine/curriculum.js`);
   const { IN_CHAPTER_BY_ID } = await import(`${SRC}engine/curriculum-in.js`);
-  const { indiaRequestableDifficulties, indiaDifficultyWindow } = await import(`${SRC}engine/indiaProduct.js`);
+  const { indiaRequestableDifficulties, indiaDifficultyWindow, indiaChapter } = await import(`${SRC}engine/indiaProduct.js`);
   const { practiceDifficulties, practiceHref, practiceRequestFromQuery } = await import(`${SRC}lib/practiceLinks.js`);
   const { selectableDifficulties } = await import(`${SRC}engine/curriculumAvailability.js`);
 
@@ -70,15 +78,9 @@ async function run() {
   const POST = (path, body) => dispatch('POST', path, body);
 
   // The free tier's daily cap and the Premium JEE Advanced gate are other
-  // suites' subjects; a Premium snapshot keeps them out of this sweep.
-  async function premium(pid) {
-    const now = Date.now();
-    await idb.put('device', {
-      id: cloudLinkRowId(pid), accountId: `acct-${pid}`, role: 'student',
-      emailVerified: true, linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
-      entitlement: { plan: 'premium', status: 'active', provider: 'web', currentPeriodEnd: now + 30 * DAY, offlineUntil: now + 7 * DAY, issuedAt: now, sourceVersion: 1 }
-    });
-  }
+  // suites' subjects; a Premium snapshot on a real linked account keeps them
+  // out of this sweep.
+  const premium = pid => online.link(pid, { entitlement: 'premium' });
 
   /** One serve, with the stored row behind it. A refusal comes back as { error }. */
   async function serve(body) {
@@ -91,27 +93,35 @@ async function run() {
     }
   }
 
-  /** Regenerate the served question from what the row says produced it. */
-  async function regenerated(row, difficulty) {
-    const generator = row.issue?.generator || row.generator || row.payload?.subtopic;
-    const seed = row.issue?.seed ?? row.payload?.seed;
-    await loadBanksFor([generator]);
-    return generateQuestion(generator, difficulty, seed);
-  }
-
   const counts = { cells: 0, selections: 0, requests: 0, serves: 0, refusals: 0, alternativesFollowed: 0, noAlternative: 0 };
   const questionRows = async () => rawRows().questions.length;
 
-  /** A served question is exactly the level asked for, and labelled as it. */
-  async function assertServed(label, { res, row }, asked) {
+  /**
+   * A served question is exactly the level asked for, and labelled as it —
+   * proved against the server's sealed copy of the question it issued. `where`
+   * names the India chapter (and dot point) asked for, when there is one.
+   */
+  async function assertServed(label, { res, row }, asked, where = null) {
     const q = res.question;
     counts.serves++;
     eq(`${label}: served at the level asked for`, q.difficulty, asked);
     ok(`${label}: the label is the label of that level`, q.diffLabel === DIFF_LABELS[asked], show(q.diffLabel));
-    ok(`${label}: the stored row agrees`, Number(row.difficulty) === asked && (!row.issue || row.issue.difficulty === asked), show({ row: row.difficulty, issue: row.issue?.difficulty }));
-    const again = await regenerated(row, asked);
-    ok(`${label}: that is the level the generator ran at`, again.difficulty === asked && again.prompt === q.prompt,
-      `regenerating at D${asked} gave D${again.difficulty} ${show(String(again.prompt).slice(0, 80))}, served ${show(String(q.prompt).slice(0, 80))}`);
+    eq(`${label}: the stored row agrees`, Number(row.difficulty), asked);
+    ok(`${label}: the question was issued by the server and the device holds no seed or answer`,
+      !!row.serverQuestionId && !('seed' in (row.payload || {})) && !('answer' in (row.payload || {})) && !row.issue, show(Object.keys(row)));
+    const sealed = row.serverQuestionId ? await online.sealedQuestion(row.serverQuestionId) : null;
+    if (!ok(`${label}: the server holds a sealed copy`, !!sealed)) return;
+    eq(`${label}: the server sealed it at that level`, Number(sealed.difficulty), asked);
+    ok(`${label}: the sealed question is the one on the card`, sealed.prompt === q.prompt, `${show(String(sealed.prompt).slice(0, 80))} vs ${show(String(q.prompt).slice(0, 80))}`);
+    await loadBanksFor([sealed.subtopic]);
+    const again = generateQuestion(sealed.subtopic, Number(sealed.difficulty), sealed.seed);
+    ok(`${label}: that is the level the generator ran at`, again.difficulty === asked && again.prompt === sealed.prompt,
+      `regenerating ${sealed.subtopic} D${sealed.difficulty} seed ${sealed.seed} gave D${again.difficulty} ${show(String(again.prompt).slice(0, 80))}`);
+    if (where) {
+      const chapter = IN_CHAPTER_BY_ID[where.chapterId] || indiaChapter(where.chapterId);
+      const declared = (chapter?.covers || []).some(c => c.gen === sealed.subtopic && (c.diff || []).includes(asked) && (where.dp == null || c.dp.includes(where.dp)));
+      ok(`${label}: the sealed generator is one the selection declares at that level`, declared || !!sealed.pyq, `${sealed.subtopic} at D${asked} for ${where.chapterId}${where.dp == null ? '' : `#${where.dp}`}`);
+    }
     eq(`${label}: the reply names the level asked for`, res.difficultyRequested, asked);
     eq(`${label}: the reply names the same level as served`, res.difficultyServed, asked);
   }
@@ -132,12 +142,12 @@ async function run() {
    * One request that names `asked` for a selection: served exactly when the
    * picker offers the level, refused otherwise — and a refusal writes nothing.
    */
-  async function assertRequest(label, body, asked, requestable) {
+  async function assertRequest(label, body, asked, requestable, where = null) {
     counts.requests++;
     const before = await questionRows();
     const s = await serve(body);
     if (requestable.includes(asked)) {
-      if (ok(`${label}: a level the picker offers is served`, !s.error, `${s.error?.code || ''} ${s.error?.message || ''}`)) await assertServed(label, s, asked);
+      if (ok(`${label}: a level the picker offers is served`, !s.error, `${s.error?.code || ''} ${s.error?.message || ''}`)) await assertServed(label, s, asked, where);
       return s;
     }
     ok(`${label}: a level with no authored form is not served`, !!s.error, s.error ? '' : `served D${s.res?.question?.difficulty}`);
@@ -182,13 +192,13 @@ async function run() {
     // The student presses "Practise at D3 · Advanced": only now is D3 served.
     const chosen = await serve({ ...body, difficulty: 3 });
     if (ok('the level the student then chooses is served', !chosen.error, chosen.error?.message)) {
-      await assertServed('owner choice D3', chosen, 3);
+      await assertServed('owner choice D3', chosen, 3, { chapterId: chapter.id, dp: argument });
       eq('and it is labelled D3, never D4', chosen.res.question.diffLabel, DIFF_LABELS[3]);
     }
     // Every dot point and the chapter itself, at the hardest level.
     for (const dp of [null, ...chapter.dotpoints.map((_, i) => i)]) {
       const requestable = dp == null ? chapter.requestable : chapter.dotpoints[dp].requestable;
-      await assertRequest(`hardest · ${dp == null ? 'chapter' : `dp${dp}`}`, { mode: 'topic', subtopic: chapter.id, track: 'jee-advanced', dotpoint: dp ?? undefined, difficulty: 4 }, 4, requestable);
+      await assertRequest(`hardest · ${dp == null ? 'chapter' : `dp${dp}`}`, { mode: 'topic', subtopic: chapter.id, track: 'jee-advanced', dotpoint: dp ?? undefined, difficulty: 4 }, 4, requestable, { chapterId: chapter.id, dp });
     }
     eq('the modulus dot point (authored D1–D2 only) has no JEE Advanced level', chapter.dotpoints[0].requestable, []);
     const below = await serve({ mode: 'topic', subtopic: chapter.id, track: 'jee-advanced', dotpoint: 0, difficulty: 2 });
@@ -199,6 +209,7 @@ async function run() {
   section('allowance');
   {
     const free = (await POST('/profiles', { name: 'Free', year: 10, course: 'in', indiaTrack: 'cbse' })).user;
+    await online.link(free.id);
     const curriculum = await GET('/curriculum');
     const sec = curriculum.years.find(y => y.year === 10);
     const gap = sec.subtopics.flatMap(c => c.dotpoints.map((d, i) => ({ c, i, d }))).find(x => x.d.generated && x.d.requestable.length && x.d.requestable.length < 3);
@@ -216,7 +227,6 @@ async function run() {
     ok('the allowance moved by exactly the one question served', allowance && after.res?.allowance
       && JSON.stringify({ ...allowance, used: undefined, remaining: undefined }) === JSON.stringify({ ...after.res.allowance, used: undefined, remaining: undefined })
       && (after.res.allowance.used ?? 0) - (allowance.used ?? 0) === 1, show({ allowance, after: after.res?.allowance }));
-    void free;
   }
 
   // ── The page and the strings that say it ──────────────────────────────────
@@ -264,7 +274,7 @@ async function run() {
     const buttons = practiceDifficulties({ course: 'in', track: spec.indiaTrack, grade: spec.year, ceiling: sec.difficultyCeiling });
     for (const chapter of sec.subtopics) {
       counts.cells++;
-      const engineChapter = IN_CHAPTER_BY_ID[chapter.id] || (await import(`${SRC}engine/indiaProduct.js`)).indiaChapter(chapter.id);
+      const engineChapter = IN_CHAPTER_BY_ID[chapter.id] || indiaChapter(chapter.id);
       eq(`${chapter.id}: the curriculum response publishes the engine's requestable levels`, chapter.requestable,
         indiaRequestableDifficulties(engineChapter, { track: spec.indiaTrack, grade: spec.year }));
       ok(`${chapter.id}: requestable levels sit inside the track window`, chapter.requestable.every(d => d >= window.floor && d <= window.ceiling), show(chapter.requestable));
@@ -277,14 +287,14 @@ async function run() {
         ok(`${where}: the picker's buttons are a subset of what is requestable`, selectableDifficulties(buttons, sel).every(d => sel.requestable.includes(d)));
         for (const asked of [1, 2, 3, 4]) {
           const body = { mode: 'topic', subtopic: chapter.id, track: spec.indiaTrack, dotpoint: sel.dp ?? undefined, difficulty: asked };
-          const s = await assertRequest(`${where} D${asked}`, body, asked, sel.requestable);
+          const s = await assertRequest(`${where} D${asked}`, body, asked, sel.requestable, { chapterId: chapter.id, dp: sel.dp });
           // The student presses one of the buttons the refusal offered: that
           // level, and only that level, is then served.
           if (s.error?.code === 'DIFFICULTY_UNAVAILABLE' && asked === 4 && s.error.detail.available.length) {
             const pick = s.error.detail.available[0].difficulty;
             const followed = await serve({ ...body, difficulty: pick });
             counts.alternativesFollowed++;
-            if (ok(`${where} D${asked}→D${pick}: an offered alternative is served`, !followed.error, followed.error?.message)) await assertServed(`${where} D${asked}→D${pick}`, followed, pick);
+            if (ok(`${where} D${asked}→D${pick}: an offered alternative is served`, !followed.error, followed.error?.message)) await assertServed(`${where} D${asked}→D${pick}`, followed, pick, { chapterId: chapter.id, dp: sel.dp });
           }
         }
       }
@@ -382,7 +392,8 @@ async function run() {
   return 0;
 }
 
-run().then(code => process.exit(code)).catch(err => {
+run().then(async code => { await online?.close().catch(() => {}); process.exit(code); }).catch(async err => {
+  await online?.close().catch(() => {});
   console.error(err?.stack || err);
   console.log(`\nINDIA DIFFICULTY TRUTH: FAIL — crashed in "${group}" after ${pass} passing checks`);
   process.exit(1);
