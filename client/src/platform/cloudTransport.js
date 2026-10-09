@@ -430,6 +430,9 @@ export const cloud = Object.freeze({
   // Examination papers are issued, collected and marked by the server
   // (server/platform/exams.js). The device sends a paper spec and answers; it
   // never receives an answer key before the paper is finalised.
+  // The layout of a blueprint paper is the server's choice: the device asks for
+  // the seed, composes for it, and a create under any other seed is refused.
+  examLayout: body => cloudRequest('/v1/exams/layout', { method: 'POST', body }),
   createExam: (body, idempotencyKey) => cloudRequest('/v1/exams', { method: 'POST', body, idempotencyKey, timeoutMs: 30000 }),
   // PATCH, not PUT: the native iOS and Android bridges carry GET/POST/PATCH/DELETE.
   saveExamAnswers: (examId, body) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id') + '/answers', { method: 'PATCH', body }),

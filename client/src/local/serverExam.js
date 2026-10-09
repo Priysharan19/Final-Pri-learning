@@ -93,6 +93,29 @@ export async function requireExamAccount(pid) {
 const startRowId = pid => `exam-start:${pid}`;
 
 /**
+ * The layout seed the server has set for this account's next paper of a
+ * blueprint (POST /v1/exams/layout). The device composes its spec for this
+ * seed; the server accepts no other, and returns the same one until a paper is
+ * sealed under it. Throws the same refusals a start does when the server
+ * cannot be used.
+ */
+export async function issueExamLayout(pid, blueprint) {
+  const linked = await requireExamAccount(pid);
+  let out;
+  try { out = await cloud.examLayout({ blueprint }); }
+  catch (cause) {
+    const kind = unavailableKind(cause);
+    if (kind) throw checkUnavailable(kind, cause);
+    throw Object.assign(new Error(cause?.message || 'This paper could not be started.'), { status: cause?.status || 502, code: cause?.code || 'EXAM_START_FAILED' });
+  }
+  // The session may belong to another profile's account on a shared iPad.
+  if (String(out?.accountId || '') !== linked) throw checkUnavailable('sign-in');
+  const seed = Number(out?.layoutSeed);
+  if (!Number.isInteger(seed) || seed < 1 || seed > 0x7fffffff) throw checkUnavailable('unavailable');
+  return seed;
+}
+
+/**
  * Have the server issue a paper from `spec`. `signature` identifies what the
  * student asked for (track, class, length…): a start that failed after the
  * request left is retried with the SAME spec and idempotency key for a few

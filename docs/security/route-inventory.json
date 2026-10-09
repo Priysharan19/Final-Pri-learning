@@ -2128,6 +2128,29 @@
     },
     {
       "method": "POST",
+      "path": "/v1/exams/layout",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "eligible student asks for the layout seed of its next paper of one blueprint (body: blueprint track/class/variant only; a released blueprint, else 409 EXAM_BLUEPRINT_NOT_RELEASED). The seed is chosen by the server and held per (account_id, blueprint) in idempotency_keys scope exam-layout, written under the account's exam-create lock; every request returns the same pending seed until a paper is sealed under it (or the server retires it because it could not issue that paper), so a caller cannot draw layouts until a favourable one appears. Carries no question, answer or mark; reveals only an integer seed for the public layout allocation and the caller's own account id",
+      "rateLimits": [
+        {
+          "key": "exam-layout",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
       "path": "/v1/exams/",
       "auth": "session",
       "roles": [
@@ -2136,7 +2159,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "eligible student starts a paper: the body is a paper SPEC only (blueprint track/class/variant with a layout seed, or practice-paper year/minutes/pathway, and ordered slots; no title, seed, mark or question). A blueprint spec is held to the server's own layout for that seed (chapter allotted to each slot, internal-choice slots) and each slot's cells to that chapter inside the section's difficulty window; a practice paper to the year's subtopic scope, difficulty ladder and structured question. The plan is enforced from the server's entitlement record inside the create transaction: the free plan's exam simulations are counted from the account's own sealed papers (402 FREE_CAP_REACHED), a jee-advanced blueprint needs the jee-advanced-content capability (402 PREMIUM_REQUIRED), and an account holds at most 3 open papers (409 EXAM_OPEN_PAPER_LIMIT). The server chooses every question, owns title, marking grid, start and deadline, and seals them under a new exam id keyed by (account_id, id) in idempotency_keys scope exam-paper; returns the public paper only (allow-listed fields; content ids and hashes are keyed digests, never the engine seed or answer-derived hash); a required Idempotency-Key replays the same paper without counting it again, a different body under the same key is 409",
+      "ownership": "eligible student starts a paper: the body is a paper SPEC only (blueprint track/class/variant with the layout seed the server set for this account by POST /v1/exams/layout — any other seed is 409 EXAM_LAYOUT_NOT_ISSUED, and the seed is spent in the transaction that seals the paper — or practice-paper year/minutes/pathway, and ordered slots; no title, seed, mark or question). A blueprint spec is held to the server's own layout for that seed (chapter allotted to each slot, internal-choice slots) and each slot's cells to that chapter inside the section's difficulty window; a practice paper to the year's subtopic scope, difficulty ladder and structured question. The plan is enforced from the server's entitlement record inside the create transaction: the free plan's exam simulations are counted from the account's own sealed papers (402 FREE_CAP_REACHED), a jee-advanced blueprint needs the jee-advanced-content capability (402 PREMIUM_REQUIRED), and an account holds at most 3 unfinalised papers (409 EXAM_OPEN_PAPER_LIMIT); before either is counted, any paper of the account left unfinished past deadline + 2 minutes is finalised by the server on its last saved snapshot. The server chooses every question, owns title, marking grid, start and deadline, and seals them under a new exam id keyed by (account_id, id) in idempotency_keys scope exam-paper; returns the public paper only (allow-listed fields; content ids and hashes are keyed digests, never the engine seed or answer-derived hash); a required Idempotency-Key replays the same paper without counting it again, a different body under the same key is 409",
       "rateLimits": [
         {
           "key": "exam-create",
@@ -2205,7 +2228,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "owner only (same 404 rule); exactly-once finalisation in one transaction under the account sync lock: every question marked by the deterministic engine against the sealed key and server-owned grid, one immutable result, one exam-result (a kind /v1/sync/push refuses) and per-attempted-question graded-attempt learning events by device server-grader; a replay returns the stored result unchanged; arriving after deadline + 2 minutes marks only the last server-saved snapshot and flags late; no client award authority",
+      "ownership": "owner only (same 404 rule); exactly-once finalisation in one transaction under the account sync lock: every question marked by the deterministic engine against the sealed key and server-owned grid, one immutable result, one exam-result (a kind /v1/sync/push refuses) and per-attempted-question graded-attempt learning events by device server-grader; a replay returns the stored result unchanged; arriving after deadline + 2 minutes marks only the last server-saved snapshot and flags late (and if the server has already finalised the abandoned paper itself, returns that stored result); every item of the paper is recorded as seen content for the account (scope practice-content) and an item already seen is flagged repeat: true on its result line and event; no client award authority",
       "rateLimits": [
         {
           "key": "exam-finish",
@@ -2228,7 +2251,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "owner only (same 404 rule); the public paper, timing and saved snapshot while open; the stored result (marks, solutions) once finalised; never an answer, step, trap or seed of an unfinished paper",
+      "ownership": "owner only (same 404 rule); the public paper, timing and saved snapshot while open; a paper of the account left unfinished past deadline + 2 minutes is first finalised by the server, exactly once, on its last saved snapshot (the same transaction and marking as a late finish); the stored result (marks, solutions) once finalised; never an answer, step, trap or seed of an unfinished paper",
       "rateLimits": [
         {
           "key": "exam-read",

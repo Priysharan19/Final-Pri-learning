@@ -4,6 +4,15 @@
 // server, examination papers included. This router owns one paper from the
 // moment it exists until its result is read back years later:
 //
+//   POST /v1/exams/layout       a blueprint paper's LAYOUT seed (which chapter
+//                               each slot is allotted, which slots offer an
+//                               internal choice) is the server's to choose. The
+//                               device asks for it, composes its spec against
+//                               it, and a create is accepted only under the
+//                               seed this account was given for that blueprint.
+//                               The same seed is returned until a paper is
+//                               sealed under it, so asking again is not a way
+//                               to pick a layout.
 //   POST /v1/exams              the device sends a paper SPEC (which blueprint,
 //                               which authored cells, in which order). The
 //                               server validates it against its own copy of the
@@ -27,6 +36,27 @@
 //                               snapshot while it is open, or the stored
 //                               result once it is finished.
 //
+// AN ABANDONED PAPER IS STILL A SAT PAPER. A paper nobody finishes is finalised
+// by the server once `deadline + FINISH_GRACE_MS` has passed, on the last
+// snapshot it holds (nothing, if none was saved): exactly the marking a late
+// finish gets, written once, with the same events. It happens the next time
+// the account starts or reads any paper, and in housekeeping for an account
+// that never comes back. A device that finishes afterwards is answered with
+// that stored result. So a paper cannot be opened, read and dropped: it leaves
+// a result, counts as a sat paper against the free allowance, and its content
+// is recorded as seen.
+//
+// CONTENT ALREADY SEEN. Finalising a paper discloses the solution of every
+// question on it, so each one is recorded as seen by the account under the
+// key practice uses (contentSeen.js): a practice copy issued later is a
+// repeat. And an exam item whose solution the account had ALREADY been shown
+// when the paper was finalised (in practice, or in an earlier paper — a
+// previous-year question that came round again) is still marked and still
+// counts toward the paper's score, which is a true statement of what was
+// answered on this paper; but its result line and its graded-attempt event
+// carry `repeat: true`, and a repeat earns no XP, rating, review or mastery on
+// any device (client/src/local/backend.js resolve(), cloudSyncRestore.js).
+//
 // THE DEADLINE. `deadline = startedAt + duration`, both the server's clock. A
 // finish that arrives by `deadline + FINISH_GRACE_MS` (two minutes: the
 // automatic submit at the bell, a slow connection, a device a little behind)
@@ -43,7 +73,8 @@
 // A model never sets a mark here: there is no model in this file.
 //
 // Storage is the existing account-scoped idempotency_keys table (no schema
-// change), under four scopes:
+// change), under five scopes of its own, and practice's `practice-content`:
+//   exam-layout   blueprint → { layoutSeed }        pending until a paper is sealed under it
 //   exam-create   Idempotency-Key → { examId }      a retried create
 //   exam-paper    examId → the sealed paper          immutable
 //   exam-answers  examId → the latest snapshot       replaced by each save
@@ -69,6 +100,7 @@ import { multipartForYear } from '../../client/src/engine/generators/multipart.j
 import { FREE_EXAM_ALLOWANCE } from '../../client/src/engine/examAllowance.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
 import { stampExamItem } from '../../client/src/engine/contentIdentity.js';
+import { seenKeysOf, examItemsOf, seenAmong, markSeen } from './contentSeen.js';
 
 /** How long after the deadline a finish may still carry its own answers. */
 export const FINISH_GRACE_MS = 2 * 60 * 1000;
@@ -84,7 +116,7 @@ const TRACKS = ['cbse', 'jee-main', 'jee-advanced', 'olympiad'];
 const NEEDS = ['mcq', 'numerical', 'integer99', 'written', 'any', 'facts', 'factsNoFigure'];
 const PRACTICE_LENGTHS = [10, 15, 20];
 const ISSUE_TRIES = 8;
-// An account may hold this many papers open (unfinished, inside deadline + grace) at once.
+// An account may hold this many papers open (sealed and not yet finalised) at once.
 export const MAX_OPEN_PAPERS = 3;
 const MAX_ANSWER = 4000;
 const MAX_WORKING = 8000;
@@ -93,6 +125,7 @@ const MAX_MS = 24 * 60 * 60 * 1000;
 const OBJECTIVE = new Set(['mcq', 'multi-mcq']);
 
 const CREATE_FIELDS = new Set(['kind', 'blueprint', 'paper', 'layoutSeed', 'slots']);
+const LAYOUT_FIELDS = new Set(['blueprint']);
 const SNAPSHOT_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'cur', 'rev']);
 const FINISH_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'ms', 'reason', 'submissionKey']);
 
@@ -107,17 +140,32 @@ const notFound = res => reject(res, 404, 'EXAM_NOT_FOUND', 'This paper does not 
 
 // ── The public paper ─────────────────────────────────────────────────────────
 
-// Previous-year labels (pyqSource, pyqYear, pyqExam, archive citations) stay
-// public: the exam room shows a student which questions were really set in an
-// exam while they sit them. They add nothing to recover an answer with — a
-// previous-year item is a fixed, published question whose prompt alone
-// identifies it — and its archive id never leaves (the content id is opaque).
+// WHAT IS PUBLIC ABOUT A PREVIOUS-YEAR ITEM, AND WHY. The exam room shows a
+// student which questions were really set in an exam while they sit them, so
+// these travel with the question: `pyq`, `pyqSource`, `pyqYear`, `pyqExam`,
+// and `archive` — the exam and its label, the authority, year, paper, set
+// code, session, section and QUESTION NUMBER, the chapter, the provenance, the
+// citations (the authority's own document: title, url, file, dates) and who
+// wrote the worked steps. That is deliberately enough to find the question in
+// the authority's published paper; a previous-year item is a fixed, published
+// question and its prompt alone already identifies it.
+// What does not travel is this product's own handle on the record:
+// `archive.recordId` is removed here, `pyqId` is not on the allow-list, and
+// the content id (`pyq:<record id>` when sealed) leaves only as a keyed
+// digest. Nothing in the client reads the record id before or after a paper
+// is marked.
+function publicArchive(archive) {
+  if (!plain(archive)) return archive;
+  const { recordId: _recordId, ...rest } = archive;
+  return rest;
+}
 function publicSingle(q) {
   const out = { supportsSteps: !OBJECTIVE.has(q.answerType) && !!stepMetaFor(q) };
   for (const k of ['prompt', 'answerType', 'mcqOptions', 'options', 'matchList', 'figure', 'inputHint', 'answerPrefix', 'answerSuffix',
-    'subtopic', 'difficulty', 'dotpoint', 'dotpoints', 'pyq', 'pyqSource', 'pyqYear', 'pyqExam', 'archive']) {
+    'subtopic', 'difficulty', 'dotpoint', 'dotpoints', 'pyq', 'pyqSource', 'pyqYear', 'pyqExam']) {
     if (q[k] !== undefined && q[k] !== null) out[k] = q[k];
   }
+  if (q.archive !== undefined && q.archive !== null) out.archive = publicArchive(q.archive);
   return out;
 }
 
@@ -208,13 +256,16 @@ function cleanRecipe(recipe) {
 
 const INVALID = (message = 'This paper specification is not valid.') => refusal(400, 'EXAM_SPEC_INVALID', message);
 
-// The device may choose AMONG the papers a blueprint allows — never a paper the
-// blueprint would not have produced. So a spec is held to the blueprint slot by
-// slot, with the server's own copy of everything the composer decides before a
-// question is drawn:
+// The device composes the recipes of a paper — never a paper the blueprint
+// would not have produced, and never a layout of its choosing. So a spec is
+// held to the blueprint slot by slot, with the server's own copy of everything
+// the composer decides before a question is drawn:
 //   · the LAYOUT — which chapter each slot is allotted and which slots offer an
-//     internal choice — is recomputed from the spec's layout seed with the
-//     composer's own allocation (unit weightage, or the seeded chapter cycle);
+//     internal choice — is recomputed from the layout seed with the composer's
+//     own allocation (unit weightage, or the seeded chapter cycle). That seed
+//     is the server's: it is handed out by POST /v1/exams/layout and the create
+//     route accepts no other, so the device cannot shop among the hundreds of
+//     legitimate chapter allocations a blueprint has;
 //   · a slot's cells must belong to the chapter the slot names, inside the
 //     section's difficulty window (nearest rung when the chapter has none
 //     there), exactly as the composer draws them; previous-year cells are that
@@ -223,9 +274,8 @@ const INVALID = (message = 'This paper specification is not valid.') => refusal(
 //     could not fill a slot from that chapter it sends no recipe, and the
 //     server composes the slot by the composer's own rule: the allotted
 //     chapter first, another chapter in scope only if that one cannot supply.
-function readIndiaSpec(body) {
-  if (body.paper !== undefined) return INVALID();
-  const b = body.blueprint;
+/** The released blueprint a selection names, with its issuable cells — or the refusal. */
+function readBlueprint(b) {
   if (!plain(b) || unknown(b, new Set(['track', 'grade', 'variant'])).length) return INVALID('Name the track, class and variant of the paper.');
   if (!TRACKS.includes(b.track) || !Number.isInteger(b.grade) || b.grade < 6 || b.grade > 12 || !['standard', 'basic'].includes(b.variant ?? 'standard')) {
     return INVALID('Name the track, class and variant of the paper.');
@@ -237,6 +287,20 @@ function readIndiaSpec(body) {
   if (!spec || spec.track !== b.track) return refusal(409, 'EXAM_BLUEPRINT_NOT_RELEASED', 'No examination blueprint is released for this selection.');
   const cells = indiaIssuableCells(b.track, b.grade);
   if (!cells) return refusal(409, 'EXAM_BLUEPRINT_NOT_RELEASED', 'No curriculum scope is released for this selection.');
+  return { spec, cells, variant, track: b.track, grade: b.grade };
+}
+
+/** The key an account's pending layout seed is held under: one per blueprint selection. */
+const layoutKeyOf = blueprint => `${blueprint.track}:${blueprint.grade}:${blueprint.variant}`;
+
+function readIndiaSpec(body) {
+  if (body.paper !== undefined) return INVALID();
+  const b = body.blueprint;
+  const named = readBlueprint(b);
+  if (named.refused) return named;
+  const { spec, cells, variant } = named;
+  // The seed is the server's (POST /v1/exams/layout); the route checks that it
+  // is the one this account was given. Here it only has to be a seed.
   if (!Number.isInteger(body.layoutSeed) || body.layoutSeed < 1 || body.layoutSeed > 0x7fffffff) return INVALID('A blueprint paper names its layout seed.');
   const layout = paperLayout(spec, cells.chapters, body.layoutSeed);
   if (!Array.isArray(body.slots) || body.slots.length !== layout.slots.length) {
@@ -300,7 +364,7 @@ function readIndiaSpec(body) {
     slots.push({ section, index, choice, range, chapter, recipe });
   }
   return {
-    kind: 'india', spec, cells, pyq, slots,
+    kind: 'india', spec, cells, pyq, slots, layoutSeed: body.layoutSeed,
     durationMin: Number(spec.durationMinutes || spec.recommendedSectionMinutes || 60),
     blueprint: { id: spec.id, label: spec.label, track: b.track, grade: b.grade, variant },
     defaultTitle: spec.label
@@ -607,9 +671,16 @@ export function markResponse(q, given, working, grid) {
     outcome: correct ? 'correct' : 'wrong' };
 }
 
-/** Mark the whole paper. Pure: the sealed paper and the responses in, the result body out. */
-export function markPaper(paper, responses, { now, totalMs }) {
+/**
+ * Mark the whole paper. Pure: the sealed paper and the responses in, the result
+ * body out. `seen` is the set of content keys (contentSeen.js) this account had
+ * already been shown the solution of before this paper was finalised: an item
+ * among them is marked and scored like any other, and flagged `repeat: true`
+ * on its result line and its attempt, so it earns no progress anywhere.
+ */
+export function markPaper(paper, responses, { now, totalMs, seen = null }) {
   const { answers, workings, times, modes } = responses;
+  const isRepeat = item => !!seen && seen.size > 0 && seenKeysOf(item).some(key => seen.has(key));
   const timed = Object.keys(times).length > 0;
   const nQ = Math.max(1, paper.questions.length);
   const detail = [];
@@ -637,6 +708,7 @@ export function markPaper(paper, responses, { now, totalMs }) {
       subtopic: q.subtopic || sq.payload.subtopic || sq.generator, difficulty: Number(q.difficulty || sq.difficulty) || 2,
       ...(sq.chapterId ? { chapterId: sq.chapterId } : {}),
       ...(extra.part ? { part: extra.part } : {}),
+      ...(extra.repeat ? { repeat: true } : {}),
       mode: 'exam', inputMode: extra.inputMode, ms: extra.ms,
       // The server offers an exam question no hint, tutor or second try, but it
       // cannot see what else was open beside the paper. As with practice, an
@@ -658,7 +730,7 @@ export function markPaper(paper, responses, { now, totalMs }) {
     let out;
     if (q.multipart) {
       const partsOut = [];
-      let qMarks = 0, qAwarded = 0, allCorrect = true, anyAnswered = false;
+      let qMarks = 0, qAwarded = 0, allCorrect = true, anyAnswered = false, repeatParts = 0;
       const parts = q.parts || [];
       for (const part of parts) {
         const mainKey = `${sq.id}::${part.key}`;
@@ -668,6 +740,8 @@ export function markPaper(paper, responses, { now, totalMs }) {
         const synth = { ...chosen, subtopic: chosen.subtopic || q.subtopic, difficulty: chosen.difficulty || q.difficulty || 2 };
         const grid = { correct: part.marks, incorrect: 0, unanswered: 0 };
         const r = markResponse(synth, answers[key], workings[key], grid);
+        const repeat = isRepeat(chosen);
+        if (repeat) repeatParts++;
         qMarks += part.marks; qAwarded += r.awarded;
         if (!r.correct) allCorrect = false;
         let attemptId = null;
@@ -677,7 +751,7 @@ export function markPaper(paper, responses, { now, totalMs }) {
           // own evidence. A structured Section II question is one piece of work
           // with no single subtopic, so it is recorded on the paper only.
           if (paper.kind === 'india') {
-            attemptId = attempt(sq, synth, r, { marks: part.marks, part: String(part.key), inputMode: inputMode(key), ms: Math.round(ms / Math.max(1, parts.length)) });
+            attemptId = attempt(sq, synth, r, { marks: part.marks, part: String(part.key), repeat, inputMode: inputMode(key), ms: Math.round(ms / Math.max(1, parts.length)) });
           }
         }
         schemes[r.markingScheme] = (schemes[r.markingScheme] || 0) + 1;
@@ -688,6 +762,7 @@ export function markPaper(paper, responses, { now, totalMs }) {
           marks: part.marks, awarded: r.awarded, feedback: r.feedback, partial: r.partial, markingScheme: r.markingScheme,
           working: blank(workings[key]) ? null : String(workings[key]),
           answerText: keyedAnswer(chosen), steps: chosen.steps || [], subtopic: synth.subtopic, difficulty: synth.difficulty, attemptId,
+          ...(repeat ? { repeat: true } : {}),
           // Both versions of a part that offered a choice, now that it is marked.
           ...(part.alt ? { choices: Object.fromEntries([['main', part], ['or', part.alt]].map(([name, it]) => [name, {
             prompt: it.prompt, answerType: it.answerType, mcqOptions: it.mcqOptions || null, figure: it.figure || null,
@@ -698,7 +773,9 @@ export function markPaper(paper, responses, { now, totalMs }) {
       out = {
         ...base, multipart: true, title: q.title, stem: q.stem, figure: q.figure || null,
         marks: qMarks, awarded: qAwarded, correct: allCorrect && anyAnswered, unanswered: !anyAnswered, parts: partsOut,
-        markingScheme: 'final-answer', outcome: !anyAnswered ? 'unanswered' : allCorrect ? 'correct' : 'wrong'
+        markingScheme: 'final-answer', outcome: !anyAnswered ? 'unanswered' : allCorrect ? 'correct' : 'wrong',
+        // The whole question again, or every part of it: nothing on it is new work.
+        ...(isRepeat(q) || (parts.length > 0 && repeatParts === parts.length) ? { repeat: true } : {})
       };
     } else {
       const useAlt = blank(answers[sq.id]) && q.alt && !blank(answers[`${sq.id}::or`]);
@@ -706,10 +783,12 @@ export function markPaper(paper, responses, { now, totalMs }) {
       const chosen = useAlt ? { ...q.alt, subtopic: q.alt.subtopic || q.subtopic, difficulty: q.alt.difficulty || q.difficulty || 2 } : q;
       const r = markResponse(chosen, answers[key], workings[key], sq.marking);
       const marks = Number(sq.marking.correct);
+      // The question answered (the alternative, when that is the one taken).
+      const repeat = isRepeat(useAlt ? q.alt : q);
       // A blueprint paper leaves a question it never saw an answer to out of
       // the evidence: not attempted is not wrong. A practice paper has always
       // counted a blank as a wrong attempt, and still does.
-      const attemptId = r.unanswered && paper.kind === 'india' ? null : attempt(sq, chosen, r, { marks, inputMode: inputMode(key), ms });
+      const attemptId = r.unanswered && paper.kind === 'india' ? null : attempt(sq, chosen, r, { marks, repeat, inputMode: inputMode(key), ms });
       schemes[r.markingScheme] = (schemes[r.markingScheme] || 0) + 1;
       out = {
         ...base, prompt: chosen.prompt, answerType: chosen.answerType, mcqOptions: chosen.mcqOptions || null, matchList: chosen.matchList || null,
@@ -718,6 +797,7 @@ export function markPaper(paper, responses, { now, totalMs }) {
         marks, negativeMarks: Math.abs(Number(sq.marking.incorrect || 0)), awarded: r.awarded, partial: r.partial,
         working: blank(workings[key]) ? null : String(workings[key]), markingScheme: r.markingScheme, outcome: r.outcome,
         solution: solutionOf(chosen, marks, sq.marking), attemptId,
+        ...(repeat ? { repeat: true } : {}),
         // Both questions of an internal choice, now that the paper is marked.
         ...(q.alt ? { choices: Object.fromEntries([['main', q], ['or', q.alt]].map(([name, it]) => [name, {
           prompt: it.prompt, answerType: it.answerType, mcqOptions: it.mcqOptions || null, matchList: it.matchList || null,
@@ -780,28 +860,27 @@ async function entitlementRefusal(db, accountId, spec, now) {
 }
 
 /**
- * The papers this account holds open: sealed, not finalised, and still inside
- * deadline + grace. A paper abandoned past that no longer counts (a finish
- * would mark only its last snapshot). No paper runs longer than OPEN_HORIZON_MS.
+ * The papers this account has sealed and not finalised, oldest first. An
+ * abandoned paper does not drop out of this list by being left alone: it stays
+ * until it is finalised, which the server does itself once deadline + grace has
+ * passed (finaliseExpiredExams, run before every count below).
  */
-const OPEN_HORIZON_MS = 4 * 60 * 60 * 1000 + FINISH_GRACE_MS;
-async function openPapers(db, accountId, now) {
-  const recent = await db.all("SELECT key,response_json FROM idempotency_keys WHERE account_id=? AND scope='exam-paper' AND created_at>? ORDER BY created_at",
-    [accountId, now - OPEN_HORIZON_MS]);
+const UNFINALISED = `SELECT p.account_id AS account_id, p.key AS key, p.response_json AS response_json FROM idempotency_keys p
+  WHERE p.scope='exam-paper' AND NOT EXISTS (SELECT 1 FROM idempotency_keys r WHERE r.account_id=p.account_id AND r.scope='exam-result' AND r.key=p.key)`;
+async function openPapers(db, accountId) {
+  const rows = await db.all(UNFINALISED + ' AND p.account_id=? ORDER BY p.created_at', [accountId]);
   const open = [];
-  for (const row of recent) {
+  for (const row of rows) {
     let paper;
     try { paper = JSON.parse(row.response_json); } catch { continue; }
-    if (now > Number(paper.deadline) + FINISH_GRACE_MS) continue;
-    if (await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='exam-result' AND key=?", [accountId, row.key])) continue;
     open.push({ id: row.key, title: paper.title, deadline: paper.deadline });
   }
   return open;
 }
 
 /** Null, or the refusal for an account that already holds its limit of open papers. */
-async function openPaperRefusal(db, accountId, now) {
-  const open = await openPapers(db, accountId, now);
+async function openPaperRefusal(db, accountId) {
+  const open = await openPapers(db, accountId);
   if (open.length < MAX_OPEN_PAPERS) return null;
   return { status: 409, code: 'EXAM_OPEN_PAPER_LIMIT', openExamId: open[0].id, openExamIds: open.map(o => o.id), limit: MAX_OPEN_PAPERS,
     message: `You have ${open.length} papers still open. Finish one, or carry on with it, before starting another.` };
@@ -814,10 +893,139 @@ const refuseEntitlement = (res, r) => res.status(r.status).json({ error: {
   ...(r.nextAt ? { nextAt: r.nextAt, used: r.used, limit: r.limit, windowDays: r.windowDays } : {})
 } });
 
-// ── Router ───────────────────────────────────────────────────────────────────
+// ── Finalising ───────────────────────────────────────────────────────────────
 
 const SELECT = "SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope=? AND key=? AND expires_at>?";
 const INSERT = 'INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)';
+
+async function readRecord(db, accountId, scope, key, now) {
+  const row = await db.get(SELECT, [accountId, scope, key, now]);
+  return row ? JSON.parse(row.response_json) : null;
+}
+
+/**
+ * The one finalisation, in one transaction under the account's sync lock.
+ * `body` is a device's finish request, or null when the server is finalising a
+ * paper nobody finished (its time and grace have passed): then, and for any
+ * finish that arrives late, only the last snapshot the server holds is marked.
+ * Whoever gets here second is given the stored result; nothing is marked twice.
+ * Returns { result, written? } | { status, code?, message? } | { open: true }
+ * (an unattended call on a paper that is still inside its time). `written` is
+ * true only for the call that wrote the result.
+ */
+async function finalise(db, accountId, id, body, fixedNow = null) {
+  return db.transaction(async () => {
+    const now = fixedNow ?? Date.now();
+    const paper = await readRecord(db, accountId, 'exam-paper', id, now);
+    if (!paper) return { status: 404 };
+    // Replay first: the reply to a finish that committed before a timeout
+    // stays available, whatever the retry carries.
+    const stored = await readRecord(db, accountId, 'exam-result', id, now);
+    if (stored) return { result: stored };
+    const unattended = body === null;
+    const inTime = now <= paper.deadline + FINISH_GRACE_MS;
+    if (unattended && inTime) return { open: true };
+    let carried = { answers: {}, workings: {}, times: {}, modes: {} };
+    if (!unattended) {
+      if (!plain(body) || unknown(body, FINISH_FIELDS).length
+          || (body.reason !== undefined && body.reason !== 'student' && body.reason !== 'deadline')
+          || (body.submissionKey !== undefined && !(typeof body.submissionKey === 'string' && ID.test(body.submissionKey)))
+          || (body.ms !== undefined && (typeof body.ms !== 'number' || !Number.isFinite(body.ms) || body.ms < 0))) {
+        return { status: 400, code: 'EXAM_FINISH_INVALID', message: 'Send the answers for this paper only.' };
+      }
+      carried = readResponses(body, paper);
+      if (!carried) return { status: 400, code: 'EXAM_FINISH_INVALID', message: 'Send the answers for this paper only.' };
+    }
+    const snapshot = await readRecord(db, accountId, 'exam-answers', id, now);
+    const saved = snapshot
+      ? { answers: snapshot.answers || {}, workings: snapshot.workings || {}, times: snapshot.times || {}, modes: snapshot.modes || {} }
+      : { answers: {}, workings: {}, times: {}, modes: {} };
+    // In time: what the request carries, falling back to the snapshot for
+    // anything it left out. Late: only what the server had already saved.
+    const responses = inTime ? {
+      answers: body.answers === undefined || body.answers === null ? saved.answers : carried.answers,
+      workings: body.workings === undefined || body.workings === null ? saved.workings : carried.workings,
+      times: body.times === undefined || body.times === null ? saved.times : carried.times,
+      modes: body.modes === undefined || body.modes === null ? saved.modes : carried.modes
+    } : saved;
+    const elapsed = Math.max(0, Math.min(now, paper.deadline) - paper.startedAt);
+    const totalMs = inTime && body.ms > 0 ? Math.min(Math.round(body.ms), MAX_MS) : elapsed;
+    // What this account had been shown the solution of BEFORE this paper is
+    // marked: those items are repeats. Then every item of this paper joins
+    // them, because the result below discloses all of its solutions.
+    const contentKeys = paper.questions.flatMap(sq => examItemsOf(sq.payload).flatMap(seenKeysOf));
+    const seen = await seenAmong(db, accountId, contentKeys);
+    const marked = markPaper(paper, responses, { now, totalMs, seen });
+    const result = {
+      authoritative: true, examId: id, kind: paper.kind, title: paper.title,
+      blueprint: paper.blueprint, paper: paper.paper, paperVersion: paper.paperVersion,
+      startedAt: paper.startedAt, deadline: paper.deadline, finishedAt: now, serverAcknowledgedAt: now,
+      late: !inTime, finalisedBy: inTime ? (body.reason === 'deadline' ? 'deadline' : 'student') : 'deadline',
+      inputSource: inTime ? 'submission' : 'server-snapshot-before-deadline',
+      // True when no device finished the paper: the server closed it itself.
+      ...(unattended ? { unattended: true } : {}),
+      snapshotSavedAt: snapshot?.savedAt ?? null,
+      submissionKey: !unattended && typeof body.submissionKey === 'string' ? body.submissionKey : null,
+      score: marked.score, total: marked.total, pct: marked.pct, detail: marked.detail, summary: marked.summary
+    };
+    const json = JSON.stringify(result);
+    await db.run(INSERT, [accountId, 'exam-result', id, json, digest(json), now, now + RECORD_TTL]);
+    await markSeen(db, accountId, contentKeys, now);
+    // Progress is committed in the same transaction as the immutable result.
+    const last = await db.get("SELECT MAX(device_seq) AS n FROM learning_events WHERE account_id=? AND device_id='server-grader'", [accountId]);
+    let seq = Number(last?.n || 0);
+    const event = async (eventId, kind, entityId, payload) => {
+      const cursor = await nextSyncCursor(db, accountId);
+      await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?, 'server-grader',?,?,?,?,?,?)",
+        [cursor, eventId, accountId, ++seq, kind, entityId, now, JSON.stringify(payload), now]);
+    };
+    for (const a of marked.attempts) await event(a.attemptId, 'graded-attempt', a.questionId, a);
+    // `exam-result` is a kind only this server writes: /v1/sync/push does not
+    // accept it, so no device can publish a paper as server-marked.
+    await event(id, 'exam-result', id, {
+      state: 'finished', examId: id, serverMarked: true, kind: paper.kind, title: paper.title, durationMin: paper.durationMin,
+      year: paper.blueprint?.grade ?? paper.paper?.year ?? null,
+      score: marked.score, total: marked.total, late: !inTime,
+      createdAt: paper.startedAt, finishedAt: now, serverAcknowledgedAt: now,
+      blueprint: paper.blueprint, questions: paper.questions.length, attempted: marked.attempts.length,
+      // What a second device needs to file the paper under its track.
+      indiaExam: paper.kind === 'india' ? {
+        blueprintId: paper.blueprint.id, label: paper.blueprint.label, track: paper.blueprint.track,
+        variant: paper.blueprint.variant, grade: paper.blueprint.grade
+      } : null
+    });
+    return { result, written: true };
+  }, { accountScope: accountId, lock: syncLockKey(accountId) });
+}
+
+/**
+ * Finalise every paper whose deadline + grace has passed and that nobody
+ * finished: one account's (before it starts or reads a paper) or, with no
+ * account, everybody's (housekeeping). Each paper is its own transaction under
+ * its account's lock, so this is safe beside a device finishing the same paper
+ * at the same moment — one of them writes the result, the other reads it.
+ * Returns how many papers this call finalised.
+ */
+export async function finaliseExpiredExams(db, { accountId = null, now = null, limit = 500 } = {}) {
+  db = asStore(db);
+  const at = now ?? Date.now();
+  // No paper is shorter than ten minutes, so anything younger cannot be due.
+  const due = at - FINISH_GRACE_MS - 10 * 60 * 1000;
+  const rows = accountId
+    ? await db.all(UNFINALISED + ' AND p.created_at<=? AND p.account_id=? ORDER BY p.created_at LIMIT ?', [due, accountId, limit])
+    : await db.all(UNFINALISED + ' AND p.created_at<=? ORDER BY p.created_at LIMIT ?', [due, limit]);
+  let finalised = 0;
+  for (const row of rows) {
+    let paper;
+    try { paper = JSON.parse(row.response_json); } catch { continue; }
+    if (!(at > Number(paper.deadline) + FINISH_GRACE_MS)) continue;
+    const outcome = await finalise(db, String(row.account_id), String(row.key), null, now);
+    if (outcome.written) finalised++;
+  }
+  return finalised;
+}
+
+// ── Router ───────────────────────────────────────────────────────────────────
 
 export function createExamRouter(db) {
   db = asStore(db);
@@ -825,10 +1033,42 @@ export function createExamRouter(db) {
   router.use(requireSession(db), requireVerifiedEmail, requireRole('student'));
   router.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
 
-  const read = async (accountId, scope, key, now) => {
-    const row = await db.get(SELECT, [accountId, scope, key, now]);
-    return row ? JSON.parse(row.response_json) : null;
+  const read = (accountId, scope, key, now) => readRecord(db, accountId, scope, key, now);
+
+  const LAYOUT_SELECT = "SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='exam-layout' AND key=? AND expires_at>?";
+  /** The layout seed this account is holding for a blueprint, or null. */
+  const pendingLayout = async (accountId, blueprint, now) => {
+    const row = await db.get(LAYOUT_SELECT, [accountId, layoutKeyOf(blueprint), now]);
+    if (!row) return null;
+    try { return Number(JSON.parse(row.response_json).layoutSeed) || null; } catch { return null; }
   };
+  const LAYOUT_NOT_ISSUED = { status: 409, code: 'EXAM_LAYOUT_NOT_ISSUED',
+    message: 'This paper was not composed for the layout the server set. Ask for the layout again and compose the paper for it.' };
+
+  // The layout of the account's NEXT paper for a blueprint. Chosen here, held
+  // until a paper is sealed under it (or the server finds it cannot issue that
+  // paper), and returned unchanged to every request in between: there is one
+  // layout to take, not a draw to repeat until a favourable one comes up.
+  router.post('/layout', rateLimit(db, 'exam-layout', { limit: 120, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    const body = req.body;
+    if (!plain(body) || unknown(body, LAYOUT_FIELDS).length) return reject(res, 400, 'EXAM_SPEC_INVALID', 'Name the track, class and variant of the paper.');
+    const named = readBlueprint(body.blueprint);
+    if (named.refused) return reject(res, ...named.refused);
+    const accountId = req.platformSession.account_id;
+    const blueprint = { track: named.track, grade: named.grade, variant: named.variant };
+    const layoutSeed = await db.transaction(async () => {
+      const now = Date.now();
+      const held = await pendingLayout(accountId, blueprint, now);
+      if (held) return held;
+      const chosen = 1 + randomInt(0x7ffffffe);
+      const json = JSON.stringify({ layoutSeed: chosen });
+      // An expired row under the same key is replaced; a live one never is.
+      await db.run(INSERT + ' ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json, request_digest=excluded.request_digest, created_at=excluded.created_at, expires_at=excluded.expires_at',
+        [accountId, 'exam-layout', layoutKeyOf(blueprint), json, digest(json), now, now + RECORD_TTL]);
+      return chosen;
+    }, { accountScope: accountId, lock: 'exam-create:' + accountId });
+    return res.status(200).json({ blueprint, layoutSeed, accountId: String(accountId) });
+  });
 
   router.post('/', rateLimit(db, 'exam-create', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const idem = String(req.get('idempotency-key') || '');
@@ -850,25 +1090,45 @@ export function createExamRouter(db) {
     // counted by, the allowance below.
     if (before) return replay(before);
 
+    // A paper this account abandoned past its time is finalised before anything
+    // is counted: it stays an open paper until it has a result, and it has one
+    // before the limits below are read.
+    await finaliseExpiredExams(db, { accountId });
+
+    // A blueprint paper is composed for the layout the server set, and no other.
+    if (spec.kind === 'india' && (await pendingLayout(accountId, spec.blueprint, Date.now())) !== spec.layoutSeed) {
+      return reject(res, LAYOUT_NOT_ISSUED.status, LAYOUT_NOT_ISSUED.code, LAYOUT_NOT_ISSUED.message);
+    }
+
     // Refused early so nothing is generated for a paper that cannot start; the
     // authoritative check is repeated inside the transaction that seals it.
     const early = await entitlementRefusal(db, accountId, spec, Date.now());
     if (early) return refuseEntitlement(res, early);
     // Papers cannot be started in bulk and the best one kept: an account holds
     // a few open at most, whatever its plan.
-    const tooMany = await openPaperRefusal(db, accountId, Date.now());
+    const tooMany = await openPaperRefusal(db, accountId);
     if (tooMany) return refuseOpenLimit(res, tooMany);
 
     // Questions are chosen before the transaction: no generator runs while a
     // database lock is held.
     const issued = await issueQuestions(spec);
-    if (issued.refused) return reject(res, ...issued.refused);
+    if (issued.refused) {
+      // The server could not issue this layout's paper from the banks. The
+      // layout is retired — by the server, never at the device's asking — so
+      // the next request is given another instead of the same dead end.
+      if (spec.kind === 'india') {
+        await db.run("DELETE FROM idempotency_keys WHERE account_id=? AND scope='exam-layout' AND key=? AND response_json=?",
+          [accountId, layoutKeyOf(spec.blueprint), JSON.stringify({ layoutSeed: spec.layoutSeed })]);
+      }
+      return reject(res, ...issued.refused);
+    }
     const id = randomUUID();
     const startedAt = Date.now();
     const paper = {
       v: 1, id, kind: spec.kind, title: spec.title, durationMin: spec.durationMin,
       startedAt, deadline: startedAt + spec.durationMin * 60000,
       blueprint: spec.blueprint || null, paper: spec.paper || null,
+      ...(spec.kind === 'india' ? { layoutSeed: spec.layoutSeed } : {}),
       total: issued.questions.reduce((n, sq) => n + Number(sq.marks), 0),
       questions: issued.questions
     };
@@ -883,8 +1143,14 @@ export function createExamRouter(db) {
       // take the last free simulation, and a refused start seals nothing.
       const refused = await entitlementRefusal(db, accountId, spec, startedAt);
       if (refused) return { refused };
-      const tooManyOpen = await openPaperRefusal(db, accountId, startedAt);
+      const tooManyOpen = await openPaperRefusal(db, accountId);
       if (tooManyOpen) return { tooManyOpen };
+      if (spec.kind === 'india') {
+        // The layout is spent by the paper sealed under it, in the same
+        // transaction: two simultaneous creates cannot both use one layout.
+        if ((await pendingLayout(accountId, spec.blueprint, startedAt)) !== spec.layoutSeed) return { layoutGone: true };
+        await db.run("DELETE FROM idempotency_keys WHERE account_id=? AND scope='exam-layout' AND key=?", [accountId, layoutKeyOf(spec.blueprint)]);
+      }
       await db.run(INSERT, [accountId, 'exam-paper', id, sealed, digest(sealed), startedAt, startedAt + RECORD_TTL]);
       await db.run(INSERT, [accountId, 'exam-create', idem, JSON.stringify({ examId: id }), requestDigest, startedAt, startedAt + RECORD_TTL]);
       return {};
@@ -892,6 +1158,7 @@ export function createExamRouter(db) {
     if (outcome.raced) return replay(outcome.raced);
     if (outcome.refused) return refuseEntitlement(res, outcome.refused);
     if (outcome.tooManyOpen) return refuseOpenLimit(res, outcome.tooManyOpen);
+    if (outcome.layoutGone) return reject(res, LAYOUT_NOT_ISSUED.status, LAYOUT_NOT_ISSUED.code, LAYOUT_NOT_ISSUED.message);
     return res.status(201).json({ exam: publicPaper(paper, startedAt), accountId: String(accountId) });
   });
 
@@ -938,77 +1205,7 @@ export function createExamRouter(db) {
   router.post('/:id/finish', rateLimit(db, 'exam-finish', { limit: 120, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const id = String(req.params.id || '');
     if (!UUID.test(id)) return notFound(res);
-    const accountId = req.platformSession.account_id;
-    const body = req.body ?? {};
-    const outcome = await db.transaction(async () => {
-      const now = Date.now();
-      const paper = await read(accountId, 'exam-paper', id, now);
-      if (!paper) return { status: 404 };
-      // Replay first: the reply to a finish that committed before a timeout
-      // stays available, whatever the retry carries.
-      const stored = await read(accountId, 'exam-result', id, now);
-      if (stored) return { result: stored };
-      if (!plain(body) || unknown(body, FINISH_FIELDS).length
-          || (body.reason !== undefined && body.reason !== 'student' && body.reason !== 'deadline')
-          || (body.submissionKey !== undefined && !(typeof body.submissionKey === 'string' && ID.test(body.submissionKey)))
-          || (body.ms !== undefined && (typeof body.ms !== 'number' || !Number.isFinite(body.ms) || body.ms < 0))) {
-        return { status: 400, code: 'EXAM_FINISH_INVALID', message: 'Send the answers for this paper only.' };
-      }
-      const carried = readResponses(body, paper);
-      if (!carried) return { status: 400, code: 'EXAM_FINISH_INVALID', message: 'Send the answers for this paper only.' };
-      const snapshot = await read(accountId, 'exam-answers', id, now);
-      const inTime = now <= paper.deadline + FINISH_GRACE_MS;
-      const saved = snapshot
-        ? { answers: snapshot.answers || {}, workings: snapshot.workings || {}, times: snapshot.times || {}, modes: snapshot.modes || {} }
-        : { answers: {}, workings: {}, times: {}, modes: {} };
-      // In time: what the request carries, falling back to the snapshot for
-      // anything it left out. Late: only what the server had already saved.
-      const responses = inTime ? {
-        answers: body.answers === undefined || body.answers === null ? saved.answers : carried.answers,
-        workings: body.workings === undefined || body.workings === null ? saved.workings : carried.workings,
-        times: body.times === undefined || body.times === null ? saved.times : carried.times,
-        modes: body.modes === undefined || body.modes === null ? saved.modes : carried.modes
-      } : saved;
-      const elapsed = Math.max(0, Math.min(now, paper.deadline) - paper.startedAt);
-      const totalMs = inTime && body.ms > 0 ? Math.min(Math.round(body.ms), MAX_MS) : elapsed;
-      const marked = markPaper(paper, responses, { now, totalMs });
-      const result = {
-        authoritative: true, examId: id, kind: paper.kind, title: paper.title,
-        blueprint: paper.blueprint, paper: paper.paper, paperVersion: paper.paperVersion,
-        startedAt: paper.startedAt, deadline: paper.deadline, finishedAt: now, serverAcknowledgedAt: now,
-        late: !inTime, finalisedBy: inTime ? (body.reason === 'deadline' ? 'deadline' : 'student') : 'deadline',
-        inputSource: inTime ? 'submission' : 'server-snapshot-before-deadline',
-        snapshotSavedAt: snapshot?.savedAt ?? null,
-        submissionKey: typeof body.submissionKey === 'string' ? body.submissionKey : null,
-        score: marked.score, total: marked.total, pct: marked.pct, detail: marked.detail, summary: marked.summary
-      };
-      const json = JSON.stringify(result);
-      await db.run(INSERT, [accountId, 'exam-result', id, json, digest(json), now, now + RECORD_TTL]);
-      // Progress is committed in the same transaction as the immutable result.
-      const last = await db.get("SELECT MAX(device_seq) AS n FROM learning_events WHERE account_id=? AND device_id='server-grader'", [accountId]);
-      let seq = Number(last?.n || 0);
-      const event = async (eventId, kind, entityId, payload) => {
-        const cursor = await nextSyncCursor(db, accountId);
-        await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?, 'server-grader',?,?,?,?,?,?)",
-          [cursor, eventId, accountId, ++seq, kind, entityId, now, JSON.stringify(payload), now]);
-      };
-      for (const a of marked.attempts) await event(a.attemptId, 'graded-attempt', a.questionId, a);
-      // `exam-result` is a kind only this server writes: /v1/sync/push does not
-      // accept it, so no device can publish a paper as server-marked.
-      await event(id, 'exam-result', id, {
-        state: 'finished', examId: id, serverMarked: true, kind: paper.kind, title: paper.title, durationMin: paper.durationMin,
-        year: paper.blueprint?.grade ?? paper.paper?.year ?? null,
-        score: marked.score, total: marked.total, late: !inTime,
-        createdAt: paper.startedAt, finishedAt: now, serverAcknowledgedAt: now,
-        blueprint: paper.blueprint, questions: paper.questions.length, attempted: marked.attempts.length,
-        // What a second device needs to file the paper under its track.
-        indiaExam: paper.kind === 'india' ? {
-          blueprintId: paper.blueprint.id, label: paper.blueprint.label, track: paper.blueprint.track,
-          variant: paper.blueprint.variant, grade: paper.blueprint.grade
-        } : null
-      });
-      return { result };
-    }, { accountScope: accountId, lock: syncLockKey(accountId) });
+    const outcome = await finalise(db, req.platformSession.account_id, id, req.body ?? {});
     if (outcome.status === 404) return notFound(res);
     if (outcome.status) return reject(res, outcome.status, outcome.code, outcome.message);
     return res.status(200).json(outcome.result);
@@ -1018,6 +1215,9 @@ export function createExamRouter(db) {
     const id = String(req.params.id || '');
     if (!UUID.test(id)) return notFound(res);
     const accountId = req.platformSession.account_id;
+    // Any paper of this account's that ran out of time unfinished — this one
+    // included — is finalised now, on the answers the server already holds.
+    await finaliseExpiredExams(db, { accountId });
     const now = Date.now();
     const paper = await read(accountId, 'exam-paper', id, now);
     if (!paper) return notFound(res);
@@ -1027,7 +1227,9 @@ export function createExamRouter(db) {
     const snapshot = await read(accountId, 'exam-answers', id, now);
     return res.status(200).json({
       state: 'open', exam, snapshot: snapshot || null,
-      // Past the deadline and its grace: a finish now is marked on `snapshot`.
+      // Past the deadline and its grace the paper is finalised above, so an
+      // open paper read here is inside its time. The field stays for devices
+      // that read it.
       expired: now > paper.deadline + FINISH_GRACE_MS, accountId: String(accountId)
     });
   });

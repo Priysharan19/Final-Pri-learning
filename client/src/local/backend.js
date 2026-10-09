@@ -2105,7 +2105,9 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   const isRush = mode === 'rush' || mode === 'match';
   // A repeat of a question whose solution this account has already been shown
   // is recorded, and earns nothing: no rating, review, mastery or XP.
-  const isRepeat = row.serverReceipt?.repeat === true;
+  // An exam item flagged the same way by the server's result arrives through
+  // `resolution.repeat` (the paper's receipt is stored only after recording).
+  const isRepeat = row.serverReceipt?.repeat === true || resolution?.repeat === true;
   const isCustom = q.custom || isRepeat;
   let ratingNext = null;
 
@@ -2203,6 +2205,7 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
     // A paper the server marked: the attempt id its result gave this question
     // (or part), so the event pulled back later is recognised as this one.
     ...(resolution?.serverAttemptId ? { serverAttemptId: String(resolution.serverAttemptId) } : {}),
+    ...(resolution?.repeat === true ? { repeat: true } : {}),
     // Which item, at which content version, this attempt was made on — so it
     // stays interpretable after the bank changes. A row from before identity
     // existed reads as the legacy version, never as current content.
@@ -5100,7 +5103,9 @@ async function adoptPaperResult(p, e, serverResult, { record = true } = {}) {
         row.answered = 1;
         row.serverReceipt = { authoritative: true, examId: e.server.examId, parts: (d.parts || []).map(pt => ({ key: pt.key, answerText: pt.answerText, steps: pt.steps || [] })) };
         await put('questions', row);
-        const xp = Math.max(0, Number(d.awarded) || 0) * 6;
+        // A structured question the account had already been shown the
+        // solution of (the server's finding) is history and earns no XP.
+        const xp = d.repeat === true ? 0 : Math.max(0, Number(d.awarded) || 0) * 6;
         const profile = (await get('profiles', p.id)) || p;
         profile.xp = (profile.xp || 0) + xp;
         await put('profiles', profile);
@@ -5119,7 +5124,7 @@ async function adoptPaperResult(p, e, serverResult, { record = true } = {}) {
       difficulty: d.difficulty, prompt: d.prompt, answerType: d.answerType, mcqOptions: d.mcqOptions, figure: safeFigure(d.figure),
       given: d.given ?? '', correct: !!d.correct, unanswered: !!d.unanswered, feedback: d.feedback,
       marks: d.marks, awarded: d.awarded, partial: d.partial, working: d.working || null,
-      solution: d.solution
+      solution: d.solution, ...(d.repeat === true ? { repeat: true } : {})
     });
     if (!row) continue;
     // `record: false` — a paper sat on another device: its evidence reaches
@@ -5130,6 +5135,7 @@ async function adoptPaperResult(p, e, serverResult, { record = true } = {}) {
       // evidence — so it is counted here too.
       await recordIndiaExamEvidence(row, row.payload, {
         correct: d.correct, given: d.given, ms: d.ms, feedback: d.feedback, evidenceKey: 'question', serverAttemptId: d.attemptId,
+        repeat: d.repeat === true,
         trapWhy: !d.correct && d.feedback && (d.repairOpportunities || []).includes(d.feedback) ? d.feedback : null
       });
     }
@@ -5157,7 +5163,10 @@ async function adoptPaperResult(p, e, serverResult, { record = true } = {}) {
 // progress and the adaptive engine read exam outcomes without a second system.
 export function examStepMeta(q) { return stepMetaFor(q); }
 
-export async function recordIndiaExamEvidence(row, q, { correct, given, ms, feedback, evidenceKey, serverAttemptId = null, trapWhy = null } = {}) {
+// `repeat` is the server's finding that the account had already been shown this
+// item's solution before the paper was marked: the attempt is recorded, and
+// earns no XP, rating, review or mastery (resolve()).
+export async function recordIndiaExamEvidence(row, q, { correct, given, ms, feedback, evidenceKey, serverAttemptId = null, trapWhy = null, repeat = false } = {}) {
   const p = await requireProfile();
   if (!correct) {
     // A server-marked paper names the authored distractor explanation the
@@ -5171,7 +5180,7 @@ export async function recordIndiaExamEvidence(row, q, { correct, given, ms, feed
     return await resolve(
       p, row, q, !!correct, given ?? '', Math.max(0, Number(ms) || 0), 'exam', false,
       // each exam part's attempt is queued for the cloud in its own transaction (§22)
-      { evidenceKey: evidenceKey || 'question', syncQueue: true, ...(serverAttemptId ? { serverAttemptId } : {}) }
+      { evidenceKey: evidenceKey || 'question', syncQueue: true, ...(serverAttemptId ? { serverAttemptId } : {}), ...(repeat === true ? { repeat: true } : {}) }
     );
   } catch (err) {
     // Exam submission is replayable after an ambiguous interruption. The same

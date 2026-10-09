@@ -39,21 +39,12 @@ import {
 } from './examSession.js';
 import { analyseExam } from './examAnalysis.js';
 import {
-  isServerPaper, markedByOf, requireExamAccount, issueServerExam, serverFieldOf, scheduleCheckpoint,
+  isServerPaper, markedByOf, requireExamAccount, issueServerExam, issueExamLayout, serverFieldOf, scheduleCheckpoint,
   finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, localStartOf, finishedAtOf, fetchRemotePaper
 } from './serverExam.js';
 
 function error(message, status = 400, code = 'INDIA_EXAM_ERROR') {
   return Object.assign(new Error(message), { status, code });
-}
-
-function randomSeed() {
-  try {
-    const a = new Uint32Array(1);
-    globalThis.crypto?.getRandomValues?.(a);
-    if (a[0]) return a[0] & 0x7fffffff;
-  } catch { /* fallback below */ }
-  return Math.floor(Math.random() * 0x7fffffff);
 }
 
 const safeFigure = v => sanitizeFigure(typeof v === 'string' ? v : '') || null;
@@ -156,14 +147,19 @@ async function createIndiaExam(profile, body = {}) {
   const pyqCells = await pyqCellsByChapter(track, chapters);
   const count = (await byIndex('exams', 'pid', profile.id)).filter(e => e?.indiaExam?.blueprintId === spec.id).length;
   const title = titleFor(spec, count + 1);
-  let seed = Number.isFinite(Number(body.seed)) && Number(body.seed) > 0 ? Math.floor(Number(body.seed)) & 0x7fffffff : randomSeed();
+  let seed = null;
   let paper = null;
   let issued = null;
+  // The LAYOUT of the paper (which chapter each slot is allotted, which slots
+  // offer a choice) is the server's: it hands this account one layout seed for
+  // the blueprint, and accepts a paper composed for that seed only. A seed in
+  // the request body is not honoured — the device does not pick a layout.
   // A spec the server cannot issue (a recipe whose bank came up short on its
-  // own draws) is composed again from a fresh seed, twice, before the student
-  // is told. Nothing is ever dropped from a paper to make it fit.
+  // own draws) retires that layout on the server; the next one is asked for
+  // and composed, twice, before the student is told. Nothing is ever dropped
+  // from a paper to make it fit.
   for (let attempt = 0; attempt < 3 && !issued; attempt++) {
-    if (attempt) seed = randomSeed();
+    seed = await issueExamLayout(profile.id, { track, grade, variant });
     paper = composeIndiaPaper(spec, {
       seed, draw: generateQuestion, chapters,
       // The section's own difficulty window narrows the chapter's archive cells,
@@ -189,7 +185,9 @@ async function createIndiaExam(profile, body = {}) {
         `india:${track}:${grade}:${variant}:${body.source === 'reviewed' ? 'reviewed' : 'any'}`,
         { seed, units: paper.units, composition: paper.composition, reducedPattern: paper.reducedPattern });
     } catch (err) {
-      if (err?.code !== 'EXAM_CONTENT_UNSUPPORTED' || attempt === 2) throw err;
+      // EXAM_LAYOUT_NOT_ISSUED: the layout was spent meanwhile (another device
+      // of this account started a paper); the fresh one is composed next.
+      if ((err?.code !== 'EXAM_CONTENT_UNSUPPORTED' && err?.code !== 'EXAM_LAYOUT_NOT_ISSUED') || attempt === 2) throw err;
     }
   }
 
@@ -434,13 +432,14 @@ async function adoptResult(exam, serverResult, { record = true } = {}) {
         const synth = { ...(chosen || {}), prompt: part.prompt, answerType: part.answerType, subtopic: part.subtopic || q.subtopic, difficulty: part.difficulty || q.difficulty || 2 };
         await recordIndiaExamEvidence(row, synth, {
           correct: part.correct, given: part.given, ms: Math.round((d.ms || 0) / Math.max(1, d.parts.length)), feedback: part.feedback,
-          evidenceKey: `part:${part.key}`, serverAttemptId: part.attemptId
+          evidenceKey: `part:${part.key}`, serverAttemptId: part.attemptId, repeat: part.repeat === true
         });
       }
     } else if (!d.unanswered && d.attemptId) {
       const chosen = d.choiceTaken === 'or' && q.alt ? { ...q.alt, subtopic: q.alt.subtopic || q.subtopic, difficulty: q.alt.difficulty || q.difficulty || 2 } : q;
       await recordIndiaExamEvidence(row, chosen, {
         correct: d.correct, given: d.given, ms: d.ms, feedback: d.feedback, evidenceKey: 'question', serverAttemptId: d.attemptId,
+        repeat: d.repeat === true,
         trapWhy: !d.correct && d.feedback && (d.repairOpportunities || []).includes(d.feedback) ? d.feedback : null
       });
     }
