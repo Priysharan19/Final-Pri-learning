@@ -393,7 +393,19 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     let live = true;
     setRestoredInk(undefined);
     Promise.resolve().then(() => flushInkDrafts()).then(() => readInkDraft(question.id)).then(
-      kept => { if (!live) return; setRestoredInk(kept || null); if (kept?.length) { setMode('write'); setSaveState('saved'); } },
+      kept => {
+        if (!live) return;
+        setRestoredInk(kept || null);
+        if (kept?.length) {
+          // readInkDraft can return a pending in-memory queue row. A read at
+          // mount therefore proves the page can be restored, NOT that this
+          // pen revision has completed a sealed IndexedDB commit. Let the Ink
+          // surface's initial onStrokes event requeue/read back the exact
+          // restored strokes before claiming Saved or enabling sign-in.
+          setMode('write');
+          setSaveState('saving');
+        }
+      },
       () => { if (live) setRestoredInk(null); }
     );
     return () => { live = false; };
