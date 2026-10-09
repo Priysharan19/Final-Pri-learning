@@ -10,6 +10,7 @@
 // about exactness should not be marked against 10.67.
 // ─────────────────────────────────────────────────────────────────────────────
 import { ri, rc, nz, Frac } from '../qhelpers.js';
+import { areaPlan } from '../reason-area.js';
 
 const dydx = '\\dfrac{dy}{dx}';
 const d2 = '\\dfrac{d^2y}{dx^2}';
@@ -22,9 +23,23 @@ function exact(f, suffix) {
     : { value: f.value, simplestFraction: { n: f.n, d: f.d } };
   return {
     answer: base,
-    inputHint: f.d === 1 ? undefined : `e.g. ${f.n}/${f.d}`,
+    // The hint is a public field shown before the attempt: it may say what
+    // form the answer takes, never the answer. (It used to print the keyed
+    // fraction itself.)
+    inputHint: f.d === 1 ? undefined : 'An exact value — a fraction a/b',
     ...(suffix ? { answerSuffix: suffix } : {})
   };
+}
+
+/**
+ * The working rubric for an area task: limits, integrand, antiderivative and
+ * the evaluated area, each verified deterministically (reason-area.js). The
+ * plan is engine/server-private and is omitted entirely when its own pieces
+ * do not agree, so a question never claims marked working it cannot verify.
+ */
+function working(spec) {
+  const plan = areaPlan(spec);
+  return plan ? { stepcheck: plan } : {};
 }
 
 export const indiaCalculus = {
@@ -133,6 +148,7 @@ export const indiaCalculus = {
       return {
         prompt: `Find the area of the region bounded by the line $y = ${m}x$, the $x$-axis and the line $x = ${b}$.`,
         answerType: 'numeric', ...exact(area, 'square units'),
+        ...working({ integrand: `${m}x`, antiderivative: `${m}x^2/2`, lower: 0, upper: b, value: area.value, integrandGiven: true }),
         traps: [{ value: m * b * b, why: `$\\int_0^{${b}} ${m}x\\,dx = \\left[\\dfrac{${m}x^2}{2}\\right]_0^{${b}}$ — the division by 2 is part of the integral.` }].filter(t => t.value !== area.value),
         hints: [
           'The area under a curve above the x-axis is a definite integral.',
@@ -152,6 +168,7 @@ export const indiaCalculus = {
       return {
         prompt: `Find the area under the curve $y = x^2$ between $x = ${a}$ and $x = ${b}$.`,
         answerType: 'numeric', ...exact(area, 'square units'),
+        ...working({ integrand: 'x^2', antiderivative: 'x^3/3', lower: a, upper: b, value: area.value, integrandGiven: true }),
         traps: [{ value: Math.pow(b, 3) - Math.pow(a, 3), why: 'The antiderivative of $x^2$ is $\\dfrac{x^3}{3}$ — the division by 3 stays.' }].filter(t => t.value !== area.value),
         hints: [
           `$A = \\displaystyle\\int_{${a}}^{${b}} x^2\\,dx$.`,
@@ -172,6 +189,7 @@ export const indiaCalculus = {
       return {
         prompt: `Find the area of the region enclosed between the parabola $y = x^2$ and the line $y = ${m}x$.`,
         answerType: 'numeric', ...exact(area, 'square units'),
+        ...working({ integrand: `${m}x - x^2`, antiderivative: `${m}x^2/2 - x^3/3`, lower: 0, upper: m, value: area.value, limits: [0, m] }),
         traps: [
           { value: new Frac(Math.pow(m, 3), 3).value, why: 'Only the area under the line minus the area under the parabola counts — subtracting gives a sixth of $m^3$, not a third.' },
           { value: new Frac(Math.pow(m, 3), 2).value, why: 'That is the area under the line alone; the parabola underneath it still has to come off.' }
@@ -194,6 +212,7 @@ export const indiaCalculus = {
     return {
       prompt: `Find the area of the region bounded by the curve $y = x(${a} - x)$ and the $x$-axis.`,
       answerType: 'numeric', ...exact(area, 'square units'),
+      ...working({ integrand: `${a}x - x^2`, antiderivative: `${a}x^2/2 - x^3/3`, lower: 0, upper: a, value: area.value, limits: [0, a], integrandGiven: true }),
       traps: [
         { value: new Frac(Math.pow(a, 3), 2).value, why: `$\\int_0^{${a}}(${a}x - x^2)\\,dx = \\dfrac{${a}x^2}{2} - \\dfrac{x^3}{3}$ evaluated at $${a}$ — both terms count, not just the first.` },
         { value: a * a, why: 'That is not an area under this curve — set the integral up between the two roots.' }

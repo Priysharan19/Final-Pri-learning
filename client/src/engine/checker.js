@@ -13,6 +13,7 @@ import {
 } from './reason-v2-safe.js';
 import { assessEvaluationLine, assessPointLine } from './reason-v3.js';
 import { assessRelationChainLine, assessModulusInequalityLine } from './reason-v4.js';
+import { assessAreaLine, AREA_STAGE_KINDS } from './reason-area.js';
 import { cleanInput, parseNumericInput, checkAnswer as coreCheckAnswer } from './checker-core.js';
 
 export { cleanInput, parseNumericInput };
@@ -589,6 +590,12 @@ function assessPlanStage(stage, line) {
   if (stage.kind === 'point') return assessPointLine({ text: line, meta: stage });
   if (stage.kind === 'chained-inequality') return assessRelationChainLine({ text: line, meta: stage });
   if (stage.kind === 'modulus-inequality') return assessModulusInequalityLine({ text: line, meta: stage });
+  if (AREA_STAGE_KINDS.has(stage.kind)) {
+    return assessAreaLine({
+      text: line, meta: stage,
+      checkEquation: (equationMeta, clause) => stepCheckSingle(equationMeta, clause).lines?.[0]?.status === 'ok'
+    });
+  }
   if (derivativeSourceLine(stage, line)) {
     return { status: 'note', trusted: false, note: 'Starting function recognised — differentiate it on the next line.' };
   }
@@ -1172,6 +1179,7 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
   if (!okLines.length) return null;
   const given = questionClaims(meta, prompt);
   const counted = [];
+  const creditedStages = new Set();
   let restated = 0;
   let shownAuthoredEquation = false;
   const total = Math.max(1, Number(marks) || 1);
@@ -1204,6 +1212,13 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
       if (counted.some(c => isolatedFinalAnswer(c, meta))) { row.reason = 'repeat'; return row; }
     }
     if (claim && counted.some(c => methodProgressDuplicate(claim, c))) { row.reason = 'repeat'; return row; }
+    // An evidence plan (creditPerStage) carries one mark per verified stage:
+    // a second line inside a stage already credited is the same criterion
+    // shown again, however differently it is written.
+    if (meta.kind === 'plan' && meta.creditPerStage === true && Number.isInteger(l.stage)) {
+      if (creditedStages.has(l.stage)) { row.reason = 'repeat'; return row; }
+      creditedStages.add(l.stage);
+    }
     // A linear equation line earns a mark only when it stands further on than
     // the question and every line already credited. Equations that are not
     // linear in the unknown keep the written-duplicate rule above.
