@@ -22,7 +22,7 @@ import { studyHref, selectedStudyContext, selectedStudyPracticeHref } from '../l
 import '../notes/Notes.css';
 import { notesBookmarkKey } from './notesBookmarkScope.js';
 import { chapterNotesLink, notesIndexReturnLink } from './notesStudyLinks.js';
-import { loadAllSearchNotes } from './notesSearchRecovery.js';
+import { loadAllSearchNotes, keepNotesQueryForReload, readNotesQueryAfterReload, clearNotesQueryAfterReload } from './notesSearchRecovery.js';
 
 // Official exam-track names remain visible as students move between notes,
 // examples and practice; internal URL slugs are never presented as titles.
@@ -91,7 +91,12 @@ function useNotes(grade) {
     );
     return () => { live = false; };
   }, [grade, attempt]);
-  return [state, () => setAttempt(a => a + 1)];
+  return [state, () => {
+    // An explicit retry after a module import failure must make a fresh
+    // document: failed ES module records can be cached for this whole page.
+    if (typeof window !== 'undefined' && typeof window.location?.reload === 'function') window.location.reload();
+    else setAttempt(a => a + 1);
+  }];
 }
 
 // ── Entry ────────────────────────────────────────────────────────────────────
@@ -117,7 +122,13 @@ function NotesIndex() {
   const [{ notes, failed }, retry] = useNotes(grade);
   const [marks, toggleMark] = useBookmarks();
   const [onlyMarked, setOnlyMarked] = useState(false);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(() =>
+    readNotesQueryAfterReload(user?.id, typeof window === 'undefined' ? null : window.sessionStorage));
+  useEffect(() => {
+    // StrictMode may run the lazy initializer twice. Erase the profile-scoped
+    // restoration only after the query was captured in committed state.
+    clearNotesQueryAfterReload(user?.id, typeof window === 'undefined' ? null : window.sessionStorage);
+  }, [user?.id]);
   const root = useRef(null);
 
   const chapters = useMemo(() => (group?.chapters || []).filter(c => !onlyMarked || marks.has(c.id)), [group, onlyMarked, marks]);
@@ -295,6 +306,7 @@ function ChapterMap({ group, notes }) {
 // ── Search across every class ────────────────────────────────────────────────
 function SearchResults({ query }) {
   const t = useT();
+  const { user } = useApp() || {};
   const [params] = useSearchParams();
   const [all, setAll] = useState(null);
   const [failed, setFailed] = useState(false);
@@ -324,7 +336,15 @@ function SearchResults({ query }) {
     return out;
   }, [all, query]);
 
-  if (failed) return <LoadFailed retry={() => setAttempt(n => n + 1)} />;
+  if (failed) return <LoadFailed retry={() => {
+    // Browser modules that failed to download may not be importable again
+    // until a new document is created. A same-document retry stays red.
+    const kept = keepNotesQueryForReload(user?.id, query,
+      typeof window === 'undefined' ? null : window.sessionStorage);
+    if (typeof window !== 'undefined' && typeof window.location?.reload === 'function') {
+      window.location.reload();
+    } else if (!kept) setAttempt(n => n + 1);
+  }} />;
   if (!all) return <p className="nt-status" role="status">{t('notes.loading')}</p>;
   return (
     <section className="nt-results" aria-live="polite">
