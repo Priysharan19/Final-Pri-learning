@@ -26,12 +26,13 @@
 //     from this process is refused, so no suite can reach a real provider.
 //   · email and SMS delivery use the server's TEST adapters (no message sent).
 //
-// THE ORACLE. A server-issued question carries no answer key to the device.
-// A flow that needs the right answer asks `answerOf()`, which regenerates the
-// question in THIS process — the test's desk, not the student's browser — from
-// the generator, difficulty and seed the page itself sent to /practice/issue,
-// using the same bundled engine, and refuses to answer unless the regenerated
-// prompt is the one the server issued. Nothing is ever handed to the page.
+// THE ORACLE. The server chooses every creditable question and never discloses
+// a seed or an answer before the question is resolved, so the device holds no
+// key. A flow that needs the right answer asks `answerOf()`, which reads the
+// server's own sealed copy of the question it issued from the server's
+// database IN THIS PROCESS — the test's desk, not the student's browser — and
+// refuses to answer unless that copy is the question on screen. Nothing is
+// ever handed to the page.
 // ─────────────────────────────────────────────────────────────────────────────
 import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -109,10 +110,8 @@ export async function startOnlinePlatform({ dist = DIST } = {}) {
   const harness = await import('../../../server/test/support/app-harness.mjs');
   const { createPlatformDb } = await import('../../../server/platform/db.js');
   const sms = await import('../../../server/platform/smsProvider.js');
-  const engine = await import('../../src/engine/generators/index.js');
   const db = createPlatformDb(join(dir, 'platform.sqlite'));
   const h = await harness.startApp({ db, dist });
-  await engine.loadAllBanks();
 
   /**
    * A verified adult student account, made at the server's own routes. It is
@@ -149,7 +148,7 @@ export async function startOnlinePlatform({ dist = DIST } = {}) {
     rmSync(dir, { recursive: true, force: true });
   }
 
-  const platform = { origin: h.origin, h, db, sms, reader, engine, newAccount, ledger, close };
+  const platform = { origin: h.origin, h, db, sms, reader, newAccount, ledger, close };
   platform.session = (ctx, page) => onlineSession(platform, ctx, page);
   return platform;
 }
@@ -274,35 +273,33 @@ function onlineSession(platform, ctx, page) {
       catch { db.close(); return done({ id, row: false }); }
       req.onsuccess = () => {
         const row = req.result; db.close();
-        done({ id, row: !!row, serverQuestionId: row?.serverQuestionId || null, issue: row?.issue || null });
+        done({ id, row: !!row, serverQuestionId: row?.serverQuestionId || null, prompt: row?.payload?.prompt ?? null,
+          checkState: row?.serverQuestionId ? 'issued' : row?.prepared ? 'prepared' : row?.draftOnly ? 'draft' : 'legacy' });
       };
       req.onerror = () => { db.close(); done({ id, row: false }); };
     };
   }));
 
   /**
-   * The right answer to the question on screen, regenerated at the test's desk
-   * from what the page asked the server to issue. Returns { answerType, kind,
-   * text, index, prompt, serverQuestionId } or throws naming what was missing.
+   * The right answer to the question on screen, read at the test's desk from
+   * the server's own sealed copy of the question it issued. Returns
+   * { answerType, kind, text, index, prompt, serverQuestionId }; `kind` is
+   * 'unissued' while the server has not issued the question (a prepared
+   * question before sign-in, or an offline draft): nobody can know the answer
+   * then, which is the point.
    */
   async function answerOf() {
     await settled();
     const shown = await shownRow();
     if (!shown?.row) throw new Error(`online-session: no stored question behind the card (${JSON.stringify(shown)})`);
-    let issue = shown.issue;
-    let issuedPrompt = null;
-    if (shown.serverQuestionId) {
-      const call = calls.find(c => c.path === '/v1/practice/issue' && c.json?.question?.id === shown.serverQuestionId);
-      if (!call?.body) throw new Error(`online-session: question ${shown.serverQuestionId} was not issued in this session`);
-      issue = call.body;
-      issuedPrompt = call.json.question.prompt;
+    if (!shown.serverQuestionId) return { kind: 'unissued', text: null, serverQuestionId: null, checkState: shown.checkState };
+    const sealed = platform.h.db.prepare("SELECT account_id, response_json FROM idempotency_keys WHERE scope='practice-question' AND key=?").get(shown.serverQuestionId);
+    if (!sealed) throw new Error(`online-session: the server holds no issued question ${shown.serverQuestionId}`);
+    const q = JSON.parse(sealed.response_json);
+    if (shown.prompt !== null && q.prompt !== shown.prompt) {
+      throw new Error('online-session: the server\'s sealed question is not the one on screen — the oracle refuses to guess');
     }
-    if (!issue?.generator) throw new Error('online-session: the question on screen names no generator to regenerate from');
-    const q = platform.engine.generateQuestion(issue.generator, Number(issue.difficulty), Number(issue.seed));
-    if (issuedPrompt !== null && q.prompt !== issuedPrompt) {
-      throw new Error('online-session: the regenerated question is not the one the server issued — the oracle refuses to guess');
-    }
-    return { answerType: q.answerType, prompt: q.prompt, serverQuestionId: shown.serverQuestionId, issue, ...typedAnswerOf(q) };
+    return { answerType: q.answerType, prompt: q.prompt, serverQuestionId: shown.serverQuestionId, accountId: String(sealed.account_id), ...typedAnswerOf(q) };
   }
 
   /**
