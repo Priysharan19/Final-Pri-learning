@@ -702,14 +702,23 @@ async function run() {
     const { subtopicsForYear } = await import(`${SRC}engine/curriculum.js`);
     const topics = subtopicsForYear(10).map(t => t.id);
     let turn = 0;
-    /** An open question with a plain numeric answer the suite knows (before the server takes the key). */
+    /** Any open question, as served. */
+    async function anyQuestion() {
+      const served = (await POST('/practice/next', { mode: 'topic', subtopic: topics[turn++ % topics.length], resume: false })).question;
+      return { id: served.id, prompt: served.prompt, checkState: served.checkState };
+    }
+    /**
+     * An issued question with a plain numeric answer. The key is read from the
+     * server's own sealed copy (the suite's oracle): the device never has it.
+     */
     async function numericQuestion() {
       for (let i = 0; i < 80; i++) {
         const served = (await POST('/practice/next', { mode: 'topic', subtopic: topics[turn++ % topics.length], resume: false })).question;
         const row = await idb.get('questions', served.id);
-        const a = row.payload.answer;
-        if (row.payload.answerType === 'numeric' && a && !a.surdForm && !a.simplestFraction && !a.requireExact && a.canonicalInput === undefined &&
-            Number.isFinite(Number(a.value)) && checkAnswer(row.payload, String(a.value)).correct && !checkAnswer(row.payload, String(Number(a.value) + 7)).correct) {
+        const key = await online.answerKey(row);
+        const a = key.answer;
+        if (key.answerType === 'numeric' && a && !a.surdForm && !a.simplestFraction && !a.requireExact && a.canonicalInput === undefined &&
+            Number.isFinite(Number(a.value)) && checkAnswer(key, String(a.value)).correct && !checkAnswer(key, String(Number(a.value) + 7)).correct) {
           return { id: served.id, right: String(a.value), wrong: String(Number(a.value) + 7), prompt: row.payload.prompt };
         }
         await POST(`/practice/${served.id}/discard`, {});
@@ -725,13 +734,19 @@ async function run() {
     const intruder = (await POST('/profiles', { name: 'Intruder', year: 10 })).user;
     const ownerAccount = online.accountOf(owner.id).accountId;
     await POST('/profiles/select', { id: owner.id });
+    // The group serves more than a free day's questions while hunting for
+    // plain numeric ones; the daily cap is not what is attacked here.
+    await online.setEntitlement(owner.id, 'premium');
 
-    // 1 · Once the server has issued a question, the device holds no key to it.
+    // 1 · The server issues the question; the device holds no key to it, from
+    // the moment it is served, and never told the server which one to pick.
     const q1 = await numericQuestion();
+    eq('a served question keeps no answer key on the device before any try', holdsNoKey((await idb.get('questions', q1.id)).payload), []);
+    eq('the device sent the server no seed', online.traffic.seedsSent, 0);
     const first = await POST(`/practice/${q1.id}/submit`, { answer: q1.wrong, ms: 1000 });
     eq('a first wrong try is marked by the server and stays open', [first.correct, first.resolved, first.authoritative], [false, false, true]);
     const issuedRow = await idb.get('questions', q1.id);
-    ok('the question is now a server-issued one', typeof issuedRow.serverQuestionId === 'string' && !issuedRow.issue, show(Object.keys(issuedRow)));
+    ok('the question is a server-issued one', typeof issuedRow.serverQuestionId === 'string' && !issuedRow.prepared && !issuedRow.draftOnly, show(Object.keys(issuedRow)));
     eq('an open server-issued question keeps no answer key on the device', holdsNoKey(issuedRow.payload), []);
     eq('nor does the first-try receipt carry one', [first.solution, issuedRow.lastTry?.serverReceipt?.solution], [undefined, undefined]);
     ok('nothing on disk for this question names the right answer in an answer field',
@@ -764,8 +779,9 @@ async function run() {
     await idb.put('device', { id: cloudLinkRowId(squatter.id), accountId: ownerAccount, role: 'student', emailVerified: true,
       linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
       entitlement: { plan: 'premium', status: 'active', provider: 'web', currentPeriodEnd: now + 30 * 86400000, offlineUntil: now + 7 * 86400000, issuedAt: now, sourceVersion: 1 } });
-    const q4 = await numericQuestion();
-    const noSession = await refused(POST(`/practice/${q4.id}/submit`, { answer: q4.right, ms: 1000 }));
+    const q4 = await anyQuestion();
+    eq('with no session behind the link nothing is issued: the question is only prepared', [q4.checkState, (await idb.get('questions', q4.id)).serverQuestionId], ['prepared', undefined]);
+    const noSession = await refused(POST(`/practice/${q4.id}/submit`, { answer: '1', ms: 1000 }));
     eq('a hand-written account link with no session is told to sign in', [noSession?.status, noSession?.code], [401, 'SIGN_IN_TO_CHECK']);
     const noReveal = await refused(POST(`/practice/${q4.id}/reveal`, { ms: 500 }));
     eq('and is shown no solution', [noReveal?.status, noReveal?.code, noReveal?.solution], [401, 'SIGN_IN_TO_CHECK', undefined]);
@@ -782,8 +798,9 @@ async function run() {
     const mallory = (await POST('/profiles', { name: 'Mallory', year: 10 })).user;      // signs in as her own account
     const link = await idb.get('device', cloudLinkRowId(mallory.id));
     await idb.put('device', { ...link, accountId: ownerAccount });                       // then claims to be the owner
-    const q5 = await numericQuestion();
-    const mismatch = await refused(POST(`/practice/${q5.id}/submit`, { answer: q5.right, ms: 1000 }));
+    const q5 = await anyQuestion();
+    eq('a question is not issued under an account the link does not name', [q5.checkState, (await idb.get('questions', q5.id)).serverQuestionId], ['prepared', undefined]);
+    const mismatch = await refused(POST(`/practice/${q5.id}/submit`, { answer: '1', ms: 1000 }));
     eq('a link that names another account is refused under this session', [mismatch?.status, mismatch?.code], [401, 'SIGN_IN_TO_CHECK']);
     eq('nothing was marked for it', [(await idb.get('questions', q5.id)).tries || 0, await attempts(mallory.id, q5.id)], [0, 0]);
     ok('and the question was not adopted under the wrong account', !(await idb.get('questions', q5.id)).serverQuestionId);
@@ -791,9 +808,10 @@ async function run() {
 
     // 6 · A row pointed at a question the server issued to someone else.
     const theirs = issuedRow.serverQuestionId;                                           // issued to Owner's account in step 1
-    const q6 = await numericQuestion();
+    await online.setEntitlement(mallory.id, 'premium');
+    const q6 = await anyQuestion();
     const pointed = await idb.get('questions', q6.id);
-    delete pointed.issue;
+    ok('Mallory’s own question is issued to her own account', typeof pointed.serverQuestionId === 'string' && pointed.serverQuestionId !== theirs);
     pointed.serverQuestionId = theirs;
     await idb.put('questions', pointed);
     const crossGrade = await refused(POST(`/practice/${q6.id}/submit`, { answer: q1.right, ms: 1000 }));
