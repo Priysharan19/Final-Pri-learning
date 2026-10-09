@@ -13,7 +13,7 @@ A release candidate must preserve all of these properties:
 - bundled web mirror exactly matches the current client build;
 - release Web Inspector exposure is disabled (`isInspectable` may exist only under `#if DEBUG`);
 - production native cloud origin comes only from signed Info.plist `PRICloudOrigin` / build setting `PRI_CLOUD_ORIGIN`;
-- release cloud origin must validate as HTTPS; absent/invalid configuration fails closed and does not disable offline learning;
+- release cloud origin must validate as HTTPS; absent/invalid configuration fails closed — and because grading is online-only such a build can never mark an answer, so it is unshippable (archive gate, §6);
 - JavaScript cannot supply a destination origin or receive native session/CSRF cookies;
 - current security, handwriting, marking, offline and release gates are not weakened for a shipment.
 

@@ -284,6 +284,12 @@ export function platformConfigStatus() {
   const env = process.env;
   const production = process.env.NODE_ENV === 'production';
   const missing = [];
+  // NODE_ENV=test switches on behaviour that exists only for the test suites
+  // (a caller may choose a practice question's seed). It must never be how a
+  // deployment runs: refuse to start as a hosted service in test mode.
+  if (env.NODE_ENV === 'test' && (nonEmpty('RAILWAY_DEPLOYMENT_ID') || nonEmpty('RAILWAY_ENVIRONMENT') || nonEmpty('RAILWAY_ENVIRONMENT_NAME'))) {
+    missing.push('NODE_ENV=production (a deployment must not run with NODE_ENV=test)');
+  }
   if (production && !nonEmpty('PRI_PUBLIC_ORIGIN')) missing.push('PRI_PUBLIC_ORIGIN');
   if (production && csrfSecretProblem()) missing.push(csrfSecretProblem());
   if (production && !nonEmpty('PRI_AUTH_DELIVERY_KEY')) missing.push('PRI_AUTH_DELIVERY_KEY');
