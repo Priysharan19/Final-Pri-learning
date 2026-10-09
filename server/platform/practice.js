@@ -251,7 +251,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       return publicResponse;
     }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
     if (response.conflict) return reject(res, 409, 'IDEMPOTENCY_KEY_REUSED', 'This key already issued a different question.');
-    return res.status(201).json(response);
+    // The account that owns this issue, so a device holding several profiles
+    // can refuse a question issued under another profile's session.
+    return res.status(201).json({ ...response, accountId: String(accountId) });
   });
 
   // Recognition is issued by this server only after a live provider response.

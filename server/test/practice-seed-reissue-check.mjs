@@ -97,7 +97,7 @@ try {
       const leaked = keysOf(response).filter(key => PRIVATE_KEYS.includes(key));
       c.eq(leaked.join(','), '', `${tag}: the issue response carries no answer, solution or rubric key`);
     }
-    c.deq(Object.keys(first.data), ['question'], `${tag}: and nothing beside the question`);
+    c.deq(Object.keys(first.data).sort(), ['accountId', 'question'], `${tag}: and nothing beside the question and the caller's own account id`);
 
     // 4 · another account, the same seed
     const other = await issue(b.jar, request);

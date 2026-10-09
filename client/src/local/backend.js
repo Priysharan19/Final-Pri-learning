@@ -56,7 +56,7 @@ import {
 } from './examSession.js';
 import {
   assertExamAllowed, assertPracticeAllowed, examAllowance, practiceAllowance,
-  planView, profileCloudLinked, recordExamSimulation, recordPracticeServed, requireCapability, usageView
+  planView, profileCloudAccountId, profileCloudLinked, recordExamSimulation, recordPracticeServed, requireCapability, usageView
 } from './entitlementGate.js';
 import { ENTITLEMENTS } from '../platform/entitlements.js';
 import { featureEnabled } from '../platform/features.js';
@@ -5045,9 +5045,15 @@ async function entitlementGate(method, pattern, body, params) {
  * null leaves the question with the device engine and is never an error.
  */
 async function issueOnServer(pid, issue, shown) {
-  if (!issue || !(await profileCloudLinked(pid).catch(() => false))) return null;
+  if (!issue) return null;
+  // The session on this device may belong to another profile's account (a
+  // shared iPad). Only a question issued under THIS profile's linked account
+  // is accepted; anything else stays a device question.
+  const linkedAccount = await profileCloudAccountId(pid).catch(() => null);
+  if (!linkedAccount) return null;
   let issuance;
   try { issuance = await cloud.issuePractice(issue); } catch { return null; }
+  if (String(issuance?.accountId || '') !== linkedAccount) return null;
   const q = issuance?.question;
   if (!q?.id || q.prompt !== shown.prompt || q.answerType !== shown.answerType ||
       (shown.contentId && q.contentId !== shown.contentId)) return null;

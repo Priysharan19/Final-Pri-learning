@@ -92,6 +92,13 @@ export async function profileCloudLinked(pid) {
   return !!(await linkRow(pid))?.accountId;
 }
 
+/** The cloud account this local profile is linked to, or null. */
+export async function profileCloudAccountId(pid) {
+  if (!pid) return null;
+  const id = (await linkRow(pid))?.accountId;
+  return id ? String(id) : null;
+}
+
 async function usageRow(pid) {
   const row = await get('device', `${USAGE_PREFIX}${pid}`).catch(() => null);
   return row || { id: `${USAGE_PREFIX}${pid}`, pid, practice: null, exams: [] };

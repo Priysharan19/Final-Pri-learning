@@ -28,7 +28,10 @@ try {
     let local = null;
     try { local = generateQuestion(generator, 1, 104729); } catch { continue; }
     const res = await h.request('/v1/practice/issue', { method: 'POST', jar: student.jar, body: { generator, difficulty: 1, seed: 104729, curriculum: 'in', mode: 'practice' } });
-    if (res.status === 201 && res.data?.question?.prompt === local.prompt) issued++;
+    // Each issue names the account it was issued under, so a shared device can
+    // refuse a question issued under another profile's session.
+    if (res.status === 201 && res.data?.question?.prompt === local.prompt &&
+        res.data.accountId === String(student.account.id)) issued++;
     else refused.push(`${generator} → ${res.status} ${res.data?.error?.code || ''}`.trim());
     if (res.status === 429) break;
   }
