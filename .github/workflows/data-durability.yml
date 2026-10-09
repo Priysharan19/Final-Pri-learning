@@ -41,6 +41,10 @@ jobs:
           cache-dependency-path: client/package-lock.json
       - name: Install client dependencies
         run: npm ci --prefix client
+      # The local backend is marked only by the real /v1 server, which the
+      # regression suite boots in-process (online-only grading).
+      - name: Install server dependencies
+        run: npm ci --prefix server
       - name: Mid-restore failure injection
         run: node client/test/restore-durability-check.mjs
       - name: Local backend regression
