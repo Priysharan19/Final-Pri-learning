@@ -16,6 +16,7 @@ import Icon from '../components/Icon.jsx';
 import { isContentEmpty, servable, contentEmptySignal } from '../lib/contentServe.js';
 import { practiceHref, practiceRequestFromQuery } from '../lib/practiceLinks.js';
 import { queueTelemetry } from '../platform/telemetry.js';
+import { consumeSessionReceipt } from './practiceSessionReceipt.js';
 
 // Reuse the existing verified account flow; never create a parallel practice login.
 const PracticeAccountRecovery = React.lazy(() => import('../components/CloudAccountPanel.jsx'));
@@ -70,6 +71,7 @@ function ProfilePractice() {
   const [capped, setCapped] = useState(null);
   const [session, setSession] = useState({ ...EMPTY_SESSION });
   const sessionRef = useRef({ ...EMPTY_SESSION });
+  const seenSessionAttempts = useRef(new Set());
   const loading = useRef(false);
   const alive = useRef(true);
   useEffect(() => {
@@ -300,7 +302,7 @@ function ProfilePractice() {
   const onResolved = res => {
     // A network acknowledgement from a removed account's card cannot change
     // this student's session or send an assignment summary under a new login.
-    if (!alive.current) return;
+    if (!alive.current || !consumeSessionReceipt(res, seenSessionAttempts.current)) return;
     const goal = Math.max(1, Number(user.dailyGoal) || 10);
     const before = Math.max(0, Number(user.today?.questions) || 0);
     if (!assignmentMode && !sessionDoneShown.current && before < goal && before + 1 >= goal) {
