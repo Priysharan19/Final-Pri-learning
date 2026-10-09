@@ -190,7 +190,10 @@ async function eventForOutbox(item, pid, deviceId) {
         total: exam.total == null ? null : Number(exam.total),
         createdAt: Number(exam.createdAt) || common.occurredAt,
         finishedAt: Number(exam.finishedAt) || null,
-        indiaExam: plain(exam.indiaExam) ? { ...exam.indiaExam } : null
+        indiaExam: plain(exam.indiaExam) ? { ...exam.indiaExam } : null,
+        // A paper the server issued: its result is the server's own event, and
+        // other devices take the paper from that, not from this copy.
+        ...(exam.server?.examId ? { serverExamId: String(exam.server.examId) } : {})
       }
     };
   }

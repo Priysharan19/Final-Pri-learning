@@ -732,3 +732,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
 
   return router;
 }
+
+// The same server-owned question choice, public projection and rubric, for the
+// examination router (server/platform/exams.js). One implementation, so a
+// paper and a practice question can never be chosen or marked by two rules.
+export { ensureBanks, chooseQuestion, stepMetaFor, answerTextFor };

@@ -15,6 +15,13 @@
 import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 
 installBrowserEnv();
+// Owner decision 2026-10-10: examination papers are issued and marked by the
+// server. Every paper here is therefore started by a real, email-verified
+// account against the real /v1 app booted in-process, and every score below is
+// the server's (client/test/support/online-authority.mjs). Nothing is marked
+// on the device.
+const { startOnlineAuthority } = await import('./support/online-authority.mjs');
+const online = await startOnlineAuthority({ label: 'india-exam-flow' });
 const { dispatch } = await import('../src/local/backend.js');
 const { loadAllBanks } = await import('../src/engine/generators/index.js');
 const { markObjective, markMultiCorrect, JEE_MAIN_MATHEMATICS_2026, JEE_ADVANCED_2026 } = await import('../src/engine/indiaExams.js');
@@ -31,26 +38,17 @@ async function profileFor(spec) {
   ok(!!created?.user?.id, `${spec.name}: profile created`);
   // The free tier allows one exam simulation every 30 days, which
   // entitlement-enforcement-check.mjs is the suite for. This one is about
-  // whether each track can compose, sit and mark a paper at all, so every
-  // profile here holds a server-issued Premium snapshot.
-  const { cloudLinkRowId } = await import('../src/platform/cloudAccount.js');
-  const idb = await import('../src/local/idb.js');
-  const now = Date.now();
-  await idb.put('device', {
-    id: cloudLinkRowId(created.user.id), accountId: `acct-${created.user.id}`, role: 'student',
-    emailVerified: true, linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
-    entitlement: {
-      plan: 'premium', status: 'active', provider: 'web',
-      currentPeriodEnd: now + 30 * 86400000, offlineUntil: now + 7 * 86400000,
-      issuedAt: now, sourceVersion: 1
-    }
-  });
+  // whether each track can compose, sit and be marked on a paper at all, so
+  // every profile here is a real account holding a Premium snapshot.
+  await online.link(created.user.id, { name: spec.name, entitlement: 'premium' });
   return created.user;
 }
 
 // src/api.js routes an India profile's /exams calls to the India exam backend;
-// this suite drives dispatch() directly, so it does the same resolution.
-const examCall = (profile, method, path, body = {}) => dispatchIndiaExam(profile, method, path, body);
+// this suite drives dispatch() directly, so it does the same resolution. The
+// device session is the profile's own account, as it is when that student is
+// the one holding the iPad.
+const examCall = (profile, method, path, body = {}) => online.withSessionOf(profile.id, () => dispatchIndiaExam(profile, method, path, body));
 
 const sectionsOf = paper => {
   const groups = new Map();
@@ -123,6 +121,49 @@ for (const track of TRACKS) {
   ok(marked.score <= marked.total, `${track.label}: the score cannot exceed the paper total`);
   const breakdown = marked.summary?.sections || marked.indiaExam?.sections || marked.summary?.byChapter;
   ok(Array.isArray(breakdown) && breakdown.length > 0, `${track.label}: the result breaks the score down by section or chapter`);
+
+  // The paper is the server's from start to finish.
+  const idb = await import('../src/local/idb.js');
+  const storedExam = await idb.get('exams', exam.id);
+  ok(!!storedExam.server?.examId, `${track.label}: the paper was issued by the server`);
+  const held = [];
+  for (const qid of storedExam.questionIds) held.push((await idb.get('questions', qid)).payload);
+  const privateKeys = new Set(['answer', 'steps', 'traps', 'stepcheck', 'hints', 'optionTraps', 'correctIndex', 'correctIndices']);
+  const leaked = v => (!v || typeof v !== 'object' ? [] : Object.entries(v).flatMap(([k, x]) => [...(privateKeys.has(k) ? [k] : []), ...leaked(x)]));
+  eq(JSON.stringify(leaked(paper.questions)), '[]', `${track.label}: the paper handed to the room carries no answer, step or trap`);
+  const serverResult = await online.examResult(exam.id);
+  eq(marked.markedBy, 'server', `${track.label}: the result is the server's`);
+  eq(JSON.stringify([marked.score, marked.total]), JSON.stringify([serverResult?.score, serverResult?.total]), `${track.label}: the score shown is the server's stored result`);
+  eq(JSON.stringify(marked.detail.map(d => d.awarded)), JSON.stringify(serverResult.detail.map(d => d.awarded)), `${track.label}: and so is every question's mark`);
+  ok(held.every(q => q && !('answer' in q) && !('steps' in q) && !('traps' in q)), `${track.label}: even after marking, no answer key is copied into the question payloads — solutions live in the result`);
+}
+
+// ── A paper answered from the server's own key earns the published marks ─────
+// The oracle is the server's sealed paper, read from its store by the suite.
+{
+  const base = papers['JEE Main'];
+  if (base?.user) {
+    const idb = await import('../src/local/idb.js');
+    await dispatch('POST', '/profiles/select', { id: base.user.id });
+    const made = (await examCall(base.user, 'POST', '/exams', {})).exam;
+    const row = await idb.get('exams', made.id);
+    const before = [];
+    for (const qid of row.questionIds) before.push((await idb.get('questions', qid)).payload);
+    eq(JSON.stringify(before.flatMap(q => ['answer', 'steps', 'traps', 'seed'].filter(k => k in q))), '[]', 'JEE Main: an open paper\'s rows hold no answer, step, trap or seed on the device');
+    const sealed = await online.examPaper(row);
+    const answers = {};
+    let expected = 0;
+    sealed.questions.forEach((sq, i) => {
+      const qid = row.questionIds[i];
+      if (sq.payload.answerType !== 'mcq') return;                       // numerical: left blank, 0
+      if (i % 2 === 0) { answers[qid] = String(sq.payload.answer.correctIndex); expected += 4; }
+      else { answers[qid] = String((sq.payload.answer.correctIndex + 1) % 4); expected -= 1; }
+    });
+    const result = await examCall(base.user, 'POST', `/exams/${made.id}/submit`, { answers, ms: 30 * 60_000 });
+    eq(result.score, expected, 'JEE Main: right answers earn +4, wrong ones cost 1, blanks 0 — as the server marks them');
+    eq(result.total, 100, 'JEE Main: out of 100');
+    ok(result.detail.every(d => d.solution && typeof d.solution.answerText === 'string'), 'JEE Main: solutions arrive with the result, not before');
+  }
 }
 
 // ── PRI-02: multipart evidence is part-scoped and replay-safe ────────────────
@@ -296,5 +337,6 @@ ok(!/Band [1-6]|\bHSC\b|NESA/.test(indiaText), 'India exams carry no HSC band or
 
 console.log(failures.length
   ? `INDIA EXAM FLOW: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `INDIA EXAM FLOW: PASS — ${pass}/${pass} checks — CBSE Class 10 and 12, JEE Main, JEE Advanced and IOQM papers create, open, submit and mark.`);
+  : `INDIA EXAM FLOW: PASS — ${pass}/${pass} checks — CBSE Class 10 and 12, JEE Main, JEE Advanced and IOQM papers are issued, opened, submitted and marked by the server.`);
+await online.close();
 process.exit(failures.length ? 1 : 0);

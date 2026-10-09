@@ -65,9 +65,18 @@ The server-side OpenAI providers already exist (`server/platform/handwritingProv
      and marks nothing. No result is labelled as marked on the device.
    - The engine stays bundled in the client for question selection and generation, notation preview,
      and reading attempts recorded by earlier versions. It does not mark new work.
-   - Known open work, not hidden: exam papers and the placement diagnostic are still marked by the
-     bundled engine. An exam can only be started by a signed-in account that can reach the server;
-     server marking of exam papers is tracked in `docs/release/V1_COMPLETION_LEDGER.md`.
+   - Examination papers (CBSE, JEE Main, JEE Advanced, IOQM and the practice paper) are issued,
+     collected and marked by the server (`server/platform/exams.js`, `/v1/exams`). The device
+     composes a paper *spec*; the server validates it against its own blueprint and the track's
+     authored cells, chooses every question, seals questions, marking grid, start and deadline
+     under an exam id owned by the account, keeps the latest answer snapshot, and finalises exactly
+     once. A finish that arrives later than `deadline + 2 minutes` is marked on the last snapshot
+     the server holds and flagged late. With no connection at the finish the paper is queued on the
+     device, frozen and unscored, until the server's result arrives. A paper marked by an earlier
+     app version opens in review labelled as such and is never shown as certified.
+   - Known open work, not hidden: the placement diagnostic is still marked by the bundled engine.
+     An open paper is resumed on the device that started it; a second device sees a paper once it
+     is finished (its result and marked detail are read back from the account).
    - `.pri-os/fleet.json` keeps the principle key `deterministic_marking_fallback` (the fleet
      validator pins the key name). From this amendment it means: the deterministic engine, not a
      model, decides every mark — on the server.
