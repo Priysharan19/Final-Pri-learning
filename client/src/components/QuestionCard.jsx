@@ -22,7 +22,9 @@ import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
 import { canRetryPhotoReading, definitiveSubmissionRefusal, draftPersistenceWarning, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure, photoSupportedFormats, photoAwaitingOnlineReader, pdfReaderNeedsOnlineDownload } from './photoSubmissionGuard.js';
 import { plotSpecFor } from '../engine/plotSpec.js';
-import { attestedGrade, deviceMarkedResponse, deviceRevealResponse, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable, showCommittedMethodAwardNote } from './authoritativeGrade.js';
+import { attestedGrade, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable, showCommittedMethodAwardNote } from './authoritativeGrade.js';
+import { checkRefusalCopy, legacyDeviceReplay, needsAccountToCheck, refusedCheckState, retryActionFor, serverRevealReceipt } from './checkAccess.js';
+import { CheckRefusal, CheckSignIn } from './CheckRefusal.jsx';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 import { misconceptionById } from '../engine/misconceptions.js';
@@ -302,12 +304,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [bookmarked, setBookmarked] = useState(false);
   const [state, setState] = useState({ phase: 'answering' });
   const [busy, setBusy] = useState(false);
-  const [selfMarks, setSelfMarks] = useState({});
-  const [selfSaved, setSelfSaved] = useState(false);
-  const [selfOpen, setSelfOpen] = useState(false);
   const [photo, setPhoto] = useState(null);
   const [photoSignInOpen, setPhotoSignInOpen] = useState(false);
-  const [gradingSignInOpen, setGradingSignInOpen] = useState(false);
   const [inkSignInOpen, setInkSignInOpen] = useState(false);
   const [inkOtpOpen, setInkOtpOpen] = useState(false);
   const inkOtpFinishRef = useRef(null);
@@ -378,11 +376,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setShowTutor(false); setTutorUsed(question.tutorLevel || 0);
     setWorking(draft?.working || ''); setShowWorking(!!draft?.working);
     setState({ phase: 'answering' }); setBusy(false);
-    setSelfMarks({}); setSelfSaved(false); setSelfOpen(false);
     // An old photo must never follow the student into a new question.
     photoReadGeneration.current += 1;
     pendingPdf.current = null;
-    setPhoto(null); setPhotoSignInOpen(false); setGradingSignInOpen(false); setInkSignInOpen(false); setInkOtpOpen(false); setPhotoReattachRequired(false); setBookmarked(false);
+    setPhoto(null); setPhotoSignInOpen(false); setInkSignInOpen(false); setInkOtpOpen(false); setPhotoReattachRequired(false); setBookmarked(false);
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
     setChecking(false); setVouched(null); setPdfUnread(null); setPdfPageCount(0); setAttemptViaInk(false);
     setSaveState(draft?.typed || draft?.working ? 'saved' : null);
@@ -513,7 +510,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (event?.detail?.connected === true &&
         String(event.detail.localProfileId) === String(user?.id)) {
       setPhotoAuthEpoch(n => n + 1);
-      setGradingSignInOpen(false);
+      // The account this check was waiting for is here. The question, the
+      // typed answer, the working, the ink and the photo have not moved; the
+      // student presses Submit again, under the same submission key.
+      setState(s => (s.phase === 'retry' && s.res?.refusal === 'sign-in' ? { phase: 'answering' } : s));
       setInkSignInOpen(false);
       setInkOtpOpen(false);
     }
@@ -976,11 +976,21 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // After unmount a stale response may still commit on the server, but
       // must not modify another profile's pending state or trigger onResolved.
       if (!mountedRef.current) return;
-      if (!diagnostic && !matchingGradeResponse(r, question.id, body.submissionId)
-          && !deviceMarkedResponse(r, body.submissionId)) {
-        // Never clear the durable idempotency record on a wrong-question or
-        // old-attempt response. A device question's verdict from the bundled
-        // engine is explicit (authoritative: false) and is accepted as such.
+      if (!diagnostic && recovering && legacyDeviceReplay(r)) {
+        // A row an older version of the app marked on this device. That is
+        // history (a finished one is in History), not a check of anything on
+        // this card, so no verdict, marks or solution are shown from it. An
+        // unfinished one stays open: Submit now goes to the server.
+        pendingRef.current = null;
+        clearPendingSubmission(question.id);
+        inkFrozenRef.current = false;
+        if (r.resolved === true) onNext?.();
+        return;
+      }
+      if (!diagnostic && !matchingGradeResponse(r, question.id, body.submissionId)) {
+        // Only a matched server receipt is a practice result. Never clear the
+        // durable idempotency record on a wrong-question, old-attempt or
+        // device-shaped (authoritative: false) response.
         throw new Error(gradingReceiptMismatch(language));
       }
       pendingRef.current = null;
@@ -1002,7 +1012,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         // The attempt is recorded whether or not this card is still on screen,
         // so the session still counts it — exactly once, because the pending
         // record that could replay it is already gone.
-        onResolved?.(r, String(question.id));
+        onResolved?.(r);
       } else {
         inkFrozenRef.current = false;
         if (live) setState({ phase: 'retry', res: r });
@@ -1023,15 +1033,20 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // work is still on screen and still in its draft. A 409 is different:
       // the question was already finished (another tab, a skipped question),
       // and asking the student to submit again would be untrue.
-      if (mountedRef.current) setState({ phase: 'retry', res: {
-        feedback: e.message, invalid: true, technical: true,
-        authRequired: e?.status === 401, guardianRestricted: e?.status === 403,
-        conflict: e?.status === 409
-      } });
+      // A refused check (no account, no connection, account not eligible, or
+      // a question the server would not issue) marked nothing and spent
+      // nothing; the card names the reason and offers the way through it.
+      refuseCheck(e, 'submit');
     } finally {
       inFlightRef.current = false;
       if (mountedRef.current) setBusy(false);
     }
+  }
+
+  /** The submit, reveal or walkthrough did not go through; say why, mark nothing. */
+  function refuseCheck(e, via) {
+    if (!mountedRef.current) return;
+    setState(refusedCheckState(e, via, { diagnostic: !!diagnostic }));
   }
 
   // ── Relaunch recovery ──────────────────────────────────────────────────────
@@ -1129,11 +1144,34 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     } finally { if (mountedRef.current) setBusy(false); }
   }
 
-  async function reveal() {
+  /**
+   * The server's committed reveal settles the question: no marks, the solution
+   * shown. Show solution and the tutor's level-3 walkthrough both end here.
+   */
+  function settleReveal(r) {
+    // Revealing settles the question, so nothing kept for it may replay.
+    pendingRef.current = null;
+    clearPendingSubmission(question.id);
+    clearInkDraft(question.id);
+    inkFrozenRef.current = true;
+    attemptRef.current = { questionId: String(question.id), attemptId: r.attemptId, submissionId: null, lines: null, revealed: true };
+    if (mountedRef.current) {
+      setAttempt(attemptRef.current);
+      setState({ phase: 'resolved', res: r });
+      celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
+      setSaveState(null);
+    }
+    onResolved?.(r);
+  }
+
+  // `confirmed` is true only for a retry of a reveal the student already
+  // confirmed with two presses; a click passes its event, which is not that.
+  async function reveal(confirmed = false) {
     if (inFlightRef.current || busy || resolved) return;
-    if (!revealArmed) { setRevealArmed(true); return; }
+    if (confirmed !== true && !revealArmed) { setRevealArmed(true); return; }
     setRevealArmed(false);
     inFlightRef.current = true;
+    const wasFrozen = inkFrozenRef.current;
     inkFrozenRef.current = true;
     setBusy(true);
     try {
@@ -1141,25 +1179,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // A late reveal may commit on the original server question, but must not
       // clear the current profile's draft or navigate away from another card.
       if (!mountedRef.current) return;
-      if (!deviceRevealResponse(r) && (r?.authoritative !== true || r?.resolved !== true || r?.revealed !== true ||
-          typeof r?.attemptId !== 'string' || !r.attemptId)) {
-        throw new Error(gradingReceiptMismatch(language));
-      }
-      // Revealing settles the question, so nothing kept for it may replay.
-      pendingRef.current = null;
-      clearPendingSubmission(question.id);
-      clearInkDraft(question.id);
-      attemptRef.current = { questionId: String(question.id), attemptId: r.attemptId, submissionId: null, lines: null, revealed: true };
-      if (mountedRef.current) {
-        setAttempt(attemptRef.current);
-        setState({ phase: 'resolved', res: r });
-        celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
-        setSaveState(null);
-      }
-      onResolved?.(r, String(question.id));
+      // The solution is the server's to show: only its own committed reveal
+      // receipt opens it. A device-shaped result is not one.
+      if (!serverRevealReceipt(r)) throw new Error(gradingReceiptMismatch(language));
+      settleReveal(r);
     } catch (e) {
-      inkFrozenRef.current = false;
-      throw e;
+      // Nothing was revealed and nothing was spent. The working is untouched.
+      inkFrozenRef.current = wasFrozen;
+      refuseCheck(e, 'reveal');
     } finally {
       inFlightRef.current = false;
       if (mountedRef.current) setBusy(false);
@@ -1358,21 +1385,21 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const serverAuthoritative = res?.authoritative === true;
   // Correctness and diagnostic partial feedback are not numerical awards.
   const committedGrade = resolved ? attestedGrade(res, question.id, attempt) : null;
-  // A device question is marked by the bundled deterministic engine: all the
-  // marks for a correct answer (less hint credit), otherwise what the student
-  // self-marked. It is never presented as a server-certified pair; the status
-  // line says "marked on this device".
-  const deviceGrade = resolved && !serverAuthoritative ? {
-    awarded: verdictGood ? Math.round(totalMarks * credit * 10) / 10
-      : (selfSaved ? Object.values(selfMarks).filter(Boolean).length : 0),
+  // Practice shows marks only from a matched server receipt. The placement
+  // check is not practice: its one answer is marked by the bundled engine and
+  // is labelled "marked on this device", never as a server-certified pair.
+  const placementGrade = diagnostic && resolved && !serverAuthoritative ? {
+    awarded: verdictGood ? Math.round(totalMarks * credit * 10) / 10 : 0,
     possible: totalMarks
   } : null;
-  const shownGrade = committedGrade || deviceGrade;
+  const shownGrade = committedGrade || placementGrade;
 
   // The verdict lands in the middle of a long page. Spoken as one sentence, a
   // screen reader hears whether the answer was right without hunting for it.
   const verdictSpeech = useMemo(() => {
     if (state.phase === 'retry') {
+      const refused = checkRefusalCopy(state.res?.refusal);
+      if (refused) return `${t(refused.contextKey)} ${t(refused.hintKey)}`;
       return state.res?.invalid
         ? t('verdict.speechUnreadable', { feedback: state.res.feedback || '' })
         : t('verdict.speechRetry', { feedback: state.res?.feedback || t('verdict.oneMoreGo') });
@@ -1399,6 +1426,19 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const split = !isMcq && (writeMode || isWorking);
   const invalidRetry = state.phase === 'retry' && state.res?.invalid && !state.res?.technical;
   const technicalRetry = state.phase === 'retry' && state.res?.technical;
+  // Why the last check was refused (sign in, reconnect, an account step, or a
+  // question the server would not issue), when that is what happened.
+  const checkRefused = technicalRetry && !state.res?.conflict && checkRefusalCopy(state.res?.refusal) ? state.res.refusal : null;
+  // Signing in never leaves the question, but a handwritten page is linked to
+  // an account only after its sealed save has been read back.
+  const checkSignInReady = !(writeMode && inkHasStrokes) || saveState === 'saved';
+  // Said before Submit is pressed, not discovered by pressing it: checking
+  // needs a Pri account. Hidden where the page already shows a sign-in for
+  // this same reason (the ink or photo reader's, or a refused check's).
+  const accountNeeded = !diagnostic && !resolved && needsAccountToCheck(user)
+    && checkRefused !== 'sign-in'
+    && !(inkAccountBlocked && inkReaderState?.blocker === 'ink.waitingSignIn')
+    && !(mode === 'photo' && photoOCR.phase === 'unavailable' && photoOCR.blockedKey === 'verdict.photoReadingSignIn');
   // The text the engine last refused as unreadable. Guidance about it lasts
   // only while that same text is still in the field.
   const [rejectedAnswer, setRejectedAnswer] = useState(null);
@@ -1502,11 +1542,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           {/* Practice is untimed on screen: time on task is still measured for the
               marker, but a running clock is pressure, not information. */}
         </div>
-        {/* The credit a hint costs is the device engine's rule. A device
-            question that has had help is never handed to the server (it stays
-            with the bundled engine), so the promise is one this device keeps;
-            a server-issued question's marks are the server's alone to state. */}
-        {helpUsed > 0 && !resolved && (diagnostic || question.serverIssued !== true) && (
+        {/* A practice question's marks are the server's alone to state, so the
+            card promises no credit figure for it. */}
+        {helpUsed > 0 && !resolved && diagnostic && (
           <p className="q-credit">{t('verdict.creditAvailable', { percent: Math.round(credit * 100), marks: Math.round(totalMarks * credit * 10) / 10 })}</p>
         )}
 
@@ -1922,11 +1960,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 onUsed={level => setTutorUsed(u => Math.max(u, level))}
                 startedAt={startRef.current}
                 onResolved={r => {
-                  // Level 3 ends the question like Reveal: same state, same refreshes.
-                  setState({ phase: 'resolved', res: r });
-                  celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
-                  onResolved?.(r, String(question.id));
+                  // Level 3 ends the question like Reveal, and only as the
+                  // server's own committed reveal.
+                  if (serverRevealReceipt(r)) settleReveal(r);
+                  else refuseCheck(new Error(gradingReceiptMismatch(language)), 'tutor');
                 }}
+                onRefused={e => refuseCheck(e, 'tutor')}
                 onClose={() => setShowTutor(false)}
               />
             </React.Suspense>
@@ -1940,34 +1979,34 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <div className={`verdict ${technicalRetry ? 'verdict-technical' : invalidRetry ? 'verdict-bad verdict-unsure' : 'verdict-bad'}`}>
             <span className="verdict-ico"><Icon name={technicalRetry ? 'alert' : invalidRetry ? 'uncertain' : 'correction'} /></span>
             <div>
-              <div className="verdict-title">{state.res?.conflict ? t('verdict.alreadyFinishedTitle') : t(technicalRetry ? 'verdict.notSubmittedTitle' : invalidRetry ? 'verdict.unreadable' : 'verdict.notQuite')}</div>
-              <div className="verdict-body">
-                {state.res?.conflict
-                  ? <span className="muted">{state.res.feedback}</span>
-                  : technicalRetry
-                  ? <>{t('verdict.workIsSafe')} <span className="muted">{state.res.feedback}</span></>
-                  : invalidRetry && answerGuidance
-                  ? <span data-final-answer-verdict>{t(answerGuidance.titleKey)} {t(answerGuidance.bodyKey)}{answerGuidance.workingKey ? ' ' + t(answerGuidance.workingKey) : ''}</span>
-                  : <MathText text={state.res.feedback || t('verdict.oneMoreGo')} />}
-              </div>
-              {state.res?.authRequired && (
-                <div style={{ marginTop: 10 }}>
-                  <button type="button" className="btn btn-primary btn-sm"
-                    data-grade-recovery-sign-in aria-expanded={gradingSignInOpen}
-                    onClick={() => setGradingSignInOpen(v => !v)}>{t('cloud.signIn')}</button>
-                  {gradingSignInOpen && (
-                    <React.Suspense fallback={<p role="status">{t('cloud.stateChecking')}</p>}>
-                      <PhotoAccountRecovery />
-                    </React.Suspense>
-                  )}
-                </div>
+              {checkRefused ? (
+                /* An unchecked submission: the reason and the way through it.
+                   No verdict, marks, XP or solution exist for it. */
+                <CheckRefusal kind={checkRefused} user={user} refreshUser={refreshUser}
+                  signInReady={checkSignInReady} signInWaitText={inkRecoveryCopy.saveFirst} busy={busy}
+                  onRetry={retryActionFor(state.res.via) === 'reveal' ? () => reveal(true)
+                    : retryActionFor(state.res.via) === 'submit' ? () => submit() : null}
+                  onNext={onNext ? () => onNext() : null} />
+              ) : (
+                <>
+                  <div className="verdict-title">{state.res?.conflict ? t('verdict.alreadyFinishedTitle') : t(technicalRetry ? 'verdict.notSubmittedTitle' : invalidRetry ? 'verdict.unreadable' : 'verdict.notQuite')}</div>
+                  <div className="verdict-body">
+                    {state.res?.conflict
+                      ? <span className="muted">{state.res.feedback}</span>
+                      : technicalRetry
+                      ? <>{t('verdict.workIsSafe')} <span className="muted">{state.res.feedback}</span></>
+                      : invalidRetry && answerGuidance
+                      ? <span data-final-answer-verdict>{t(answerGuidance.titleKey)} {t(answerGuidance.bodyKey)}{answerGuidance.workingKey ? ' ' + t(answerGuidance.workingKey) : ''}</span>
+                      : <MathText text={state.res.feedback || t('verdict.oneMoreGo')} />}
+                  </div>
+                </>
               )}
-              {attemptViaInk && <div className="eval-provenance" data-provenance="handwriting" style={{ padding: '6px 0 0', border: 0 }}>{t('verdict.readByAiMarkedByEngine')}</div>}
+              {attemptViaInk && !checkRefused && <div className="eval-provenance" data-provenance="handwriting" style={{ padding: '6px 0 0', border: 0 }}>{t('verdict.readByAiMarkedByEngine')}</div>}
               {state.res?.authoritative !== true && state.res?.partial &&
                 <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{state.res.partial.note}</div>}
               {state.res.stepReport && <StepReport report={state.res.stepReport} />}
-              <div className="verdict-next">{state.res?.conflict ? t('verdict.nextAfterConflict') : t(technicalRetry ? 'verdict.nextTechnical' : invalidRetry ? 'verdict.nextUnreadable'
-                : (state.res.stepReport?.lines?.some(l => l.status === 'break') || firstBad) ? 'verdict.nextFix' : 'verdict.nextTryAgain')}</div>
+              {!checkRefused && <div className="verdict-next">{state.res?.conflict ? t('verdict.nextAfterConflict') : t(technicalRetry ? 'verdict.nextTechnical' : invalidRetry ? 'verdict.nextUnreadable'
+                : (state.res.stepReport?.lines?.some(l => l.status === 'break') || firstBad) ? 'verdict.nextFix' : 'verdict.nextTryAgain')}</div>}
             </div>
           </div>
         )}
@@ -2108,23 +2147,16 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               </section>
             ))}
 
-            {!diagnostic && !serverAuthoritative && res.solution?.criteria && (
-              <div className="criteria-self">
-                <CriteriaTable
-                  criteria={res.solution.criteria}
-                  correct={verdictGood}
-                  selfMarking={!serverAuthoritative && (!boardAward || selfOpen)}
-                  selfMarks={selfMarks} setSelfMarks={setSelfMarks}
-                  selfSaved={selfSaved} setSelfSaved={setSelfSaved}
-                />
-                {!serverAuthoritative && boardAward && !verdictGood && !selfSaved && !selfOpen && (
-                  <button type="button" className="btn-disclose" style={{ marginTop: 8 }} onClick={() => setSelfOpen(true)}>
-                    <Icon name="chevronDown" size={16} />{t('verdict.markItYourself')}
-                  </button>
-                )}
-              </div>
-            )}
           </>
+        )}
+
+        {accountNeeded && (
+          <div className="ink-account-recovery" data-check-needs-account role="group"
+            aria-label={t('check.signInAction')} style={{ margin: '12px 0 0' }}>
+            <p>{t('check.needsAccount')}</p>
+            <CheckSignIn user={user} refreshUser={refreshUser}
+              ready={checkSignInReady} waitText={inkRecoveryCopy.saveFirst} />
+          </div>
         )}
 
         {/* ── One obvious next move; everything else stays reachable and quiet ── */}
@@ -2168,50 +2200,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <div className="sheet-actions"><button className="btn btn-primary" onClick={() => setPeekOpen(false)}>{t('verdict.backToWork')}</button></div>
           </div>
         </>
-      )}
-    </div>
-  );
-}
-
-function CriteriaTable({ criteria, correct, selfMarking = true, selfMarks, setSelfMarks, selfSaved, setSelfSaved }) {
-  const t = useT();
-  const marked = i => correct || !!selfMarks[i];
-  const missed = i => selfSaved && !marked(i);
-  const earned = i => (correct || selfSaved) && marked(i);
-  return (
-    <div>
-      <table className="criteria-table">
-        <thead>
-          <tr><th style={{ width: '100%', textAlign: 'center' }}>{t('verdict.criteria')}</th><th>{t('verdict.marksColumn')}</th></tr>
-        </thead>
-        <tbody>
-          {criteria.map((c, i) => (
-            <tr key={i} className={missed(i) ? 'criteria-row-missed' : earned(i) ? 'criteria-row-earned' : ''}>
-              <td>
-                {!correct && !selfSaved && selfMarking ? (
-                  <label className="selfmark-row" style={{ padding: 0 }}>
-                    <input type="checkbox" checked={!!selfMarks[i]}
-                      onChange={e => setSelfMarks(m => ({ ...m, [i]: e.target.checked }))} />
-                    <span><MathText text={c.text} /></span>
-                  </label>
-                ) : (
-                  <span><span className="crit-bullet">{missed(i) ? '→' : earned(i) ? '✓' : '•'}</span><MathText text={c.text} /></span>
-                )}
-              </td>
-              <td className="cm">1</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {!correct && (selfMarking || selfSaved) && (
-        <div className="row" style={{ marginTop: 10 }}>
-          {!selfSaved
-            ? <>
-              <span className="muted">{t('verdict.tickCriteria')}</span>
-              <button className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setSelfSaved(true)}>{t('verdict.saveSelfMarking')}</button>
-            </>
-            : <span className="tag" style={{ color: 'var(--good)' }}>{t('verdict.selfMarkingRecorded', { earned: Object.values(selfMarks).filter(Boolean).length, total: criteria.length })}</span>}
-        </div>
       )}
     </div>
   );

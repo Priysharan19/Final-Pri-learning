@@ -65,20 +65,26 @@ assert.equal(showCommittedMethodAwardNote({ ...note, partial: { awarded: '2' } }
 assert.equal(showCommittedMethodAwardNote({ ...note, authoritative: false }, { awarded: 2, possible: 4 }), false);
 console.log('METHOD FEEDBACK NUMERIC AUTHORITY: PASS 6/6');
 
-// Device verdicts: the bundled engine's explicit, uncertified result.
+// Device-shaped results are never a practice result (online-only grading):
+// only a matched server receipt is, for a submission and for a reveal.
 {
-  const { deviceMarkedResponse, deviceRevealResponse } = await import('./authoritativeGrade.js');
+  const { matchingGradeResponse } = await import('./authoritativeGrade.js');
+  const { serverRevealReceipt, legacyDeviceReplay } = await import('./checkAccess.js');
+  const mod = await import('./authoritativeGrade.js');
+  assert.equal('deviceMarkedResponse' in mod || 'deviceRevealResponse' in mod, false, 'there is no device-verdict acceptor left to call');
   const dev = { authoritative: false, correct: true, resolved: true, submissionId: 'sub-1' };
-  assert.equal(deviceMarkedResponse(dev, 'sub-1'), true, 'explicit device verdict for the submission sent');
-  assert.equal(deviceMarkedResponse({ authoritative: false, correct: false, resolved: false, invalid: true }, 'sub-1'), true, 'an unreadable device answer names no submission');
-  assert.equal(deviceMarkedResponse(dev, 'sub-2'), false, 'a device verdict for another submission');
-  assert.equal(deviceMarkedResponse({ ...dev, authoritative: undefined }, 'sub-1'), false, 'a result that does not say who marked it');
-  assert.equal(deviceMarkedResponse({ ...dev, authoritative: true }, 'sub-1'), false, 'a server result is not a device verdict');
-  assert.equal(deviceMarkedResponse({ ...dev, attemptId: 'attempt-1' }, 'sub-1'), false, 'a device verdict cannot name a server attempt');
-  assert.equal(deviceMarkedResponse({ ...dev, marksEarned: 1, marksPossible: 1 }, 'sub-1'), false, 'a device verdict cannot carry certified marks');
+  assert.equal(matchingGradeResponse(dev, 'question-A', 'sub-1'), false, 'an explicit device verdict for the submission sent is refused');
+  assert.equal(matchingGradeResponse({ ...dev, attemptId: 'attempt-1' }, 'question-A', 'sub-1'), false, 'even when it names an attempt');
+  assert.equal(matchingGradeResponse({ authoritative: false, correct: false, resolved: false, invalid: true }, 'question-A', 'sub-1'), false, 'an unreadable device answer is refused');
+  assert.equal(matchingGradeResponse({ ...dev, authoritative: undefined, attemptId: 'attempt-1' }, 'question-A', 'sub-1'), false, 'a result that does not say who marked it is refused');
+  assert.equal(matchingGradeResponse({ ...dev, authoritative: true, attemptId: 'attempt-1' }, 'question-A', 'sub-1'), true, 'the matched server receipt is the only accepted shape');
   assert.equal(attestedGrade({ ...dev, attemptId: 'a', marksEarned: 1, marksPossible: 1 }, 'question-A', { questionId: 'question-A', attemptId: 'a', submissionId: 'sub-1' }), null, 'a device verdict is never an attested grade');
-  assert.equal(deviceRevealResponse({ authoritative: false, resolved: true, revealed: true, correct: false }), true, 'device reveal');
-  assert.equal(deviceRevealResponse({ authoritative: false, resolved: true, correct: false }), false, 'not a reveal');
-  assert.equal(deviceRevealResponse({ authoritative: false, resolved: true, revealed: true, attemptId: 'x' }), false, 'mixed reveal shape');
-  console.log('DEVICE VERDICT SHAPE: PASS 11/11');
+  assert.equal(serverRevealReceipt({ authoritative: false, resolved: true, revealed: true, correct: false }), false, 'a device reveal does not open the solution');
+  assert.equal(serverRevealReceipt({ authoritative: true, resolved: true, revealed: true }), false, 'a reveal with no server attempt is refused');
+  assert.equal(serverRevealReceipt({ authoritative: true, resolved: true, attemptId: 'attempt-1' }), false, 'a result that is not a reveal is refused');
+  assert.equal(serverRevealReceipt({ authoritative: true, resolved: true, revealed: true, attemptId: 'attempt-1' }), true, 'the server\'s committed reveal is accepted');
+  assert.equal(legacyDeviceReplay({ ...dev, replayed: true }), true, 'a replay of an older version\'s device mark is recognised as history');
+  assert.equal(legacyDeviceReplay(dev), false, 'a fresh device-shaped result is never treated as one');
+  assert.equal(legacyDeviceReplay({ ...dev, replayed: true, authoritative: true }), false, 'nor is a server replay');
+  console.log('DEVICE VERDICT REFUSED FOR PRACTICE: PASS 14/14');
 }
