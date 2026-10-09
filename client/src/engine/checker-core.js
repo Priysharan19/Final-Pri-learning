@@ -111,21 +111,83 @@ function percentAnswerWanted(question, ans) {
   return ASKS_PERCENT.test(String(question?.prompt ?? ''));
 }
 
-const GROUPED = /^\d{1,3}(?:,\d{3})+$|^\d{1,2}(?:,\d{2})*,\d{3}$|^\d{1,3}(?: \d{3})+$/;
+// One number written in groups: 1,234,567 · 12,34,567 (lakh) · 1 234 567 ·
+// 12 34 567 (lakh, spaced). Nothing else that breaks digits apart is a number.
+const GROUPED = /^\d{1,3}(?:,\d{3})+$|^\d{1,2}(?:,\d{2})*,\d{3}$|^\d{1,3}(?: \d{3})+$|^\d{1,2}(?: \d{2})* \d{3}$/;
+// A space a person types or pastes between digit groups: the plain space, the
+// no-break space and the thin spaces typesetting uses. A tab or a line break is
+// never one — it separates two things that were written.
+const GROUP_SPACE = /[    ]/g;
+// The calls whose commas the expression engine reads as argument separators:
+// nCr(n, r), nPr(n, r), sum(term, k, a, b) and the bare C(n, r) / P(n, r).
+// Everywhere else it removes a comma as a thousands separator, so "sqrt(1,2,3)"
+// would be the root of 123 and "log(2, 8)" the logarithm of 28.
+const COUNTING_CALL = /(?:^|[^A-Za-z])(?:[nN][cC][rR]|[nN][pP][rR]|[sS][uU][mM]|C|P)\s*$/;
+
+/**
+ * Are the digits of this answer broken apart in a way no single number is
+ * written? Commas, spaces, tabs and line breaks are all separators. Brackets
+ * that only group — "(1,2,3)", "[0 1 2 3]" — hide nothing: their inside is
+ * read like the rest, and so is the bracket after sqrt or log. Only the
+ * argument list of a counting call ("nCr(5, 2)", "C(5, 2)") is set aside,
+ * because there a comma separates arguments; each argument is still read on
+ * its own, so "nCr(1 0, 2)" is not ten choose two.
+ */
 function brokenDigitGroups(s) {
-  // Outside brackets only: nCr(5, 2) and log(2, 8) separate arguments.
-  let depth = 0, top = '';
-  for (const ch of s) {
+  const text = String(s).replace(GROUP_SPACE, ' ');
+  const pieces = [];
+  let top = '';
+  const stack = [];                       // one entry per open bracket: is it a call?
+  let call = null;                        // { depth, text } of the outermost open call
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if ('([{'.includes(ch)) {
+      const named = ch === '(' && COUNTING_CALL.test(text.slice(0, i));
+      stack.push(named);
+      if (call) call.text += ch;
+      else if (named) { call = { depth: stack.length, text: '' }; top += '#'; }
+      else top += ch;
+      continue;
+    }
+    if (')]}'.includes(ch)) {
+      if (call && stack.length === call.depth) {
+        pieces.push(...splitArguments(call.text));
+        call = null;
+        top += '#';
+      } else if (call) call.text += ch;
+      else top += ch;
+      if (stack.length) stack.pop();
+      continue;
+    }
+    if (call) call.text += ch; else top += ch;
+  }
+  if (call) pieces.push(...splitArguments(call.text));
+  pieces.push(top);
+  return pieces.some(brokenRun);
+}
+
+/** The arguments of a call, split at the commas that are not inside a bracket. */
+function splitArguments(inner) {
+  const out = [];
+  let depth = 0, part = '';
+  for (const ch of inner) {
     if ('([{'.includes(ch)) depth++;
     else if (')]}'.includes(ch)) depth = Math.max(0, depth - 1);
-    top += depth === 0 && !')]}'.includes(ch) ? ch : '#';
+    if (ch === ',' && depth === 0) { out.push(part); part = ''; } else part += ch;
   }
-  for (const run of top.match(/\d[\d, ]*\d/g) || []) {
-    if (/[, ]/.test(run) && !GROUPED.test(run.replace(/ +/g, ' ').replace(/ ?, ?/g, ','))) {
-      // "2 1/2" is a mixed numeral, read below.
-      if (/^\d+ +\d+$/.test(run) && new RegExp(run.replace(/ +/g, ' +') + '\\s*/\\s*\\d').test(top)) continue;
-      return true;
-    }
+  out.push(part);
+  return out;
+}
+
+function brokenRun(piece) {
+  for (const run of piece.match(/\d[\d,\s]*\d/g) || []) {
+    if (!/[,\s]/.test(run)) continue;
+    // A tab or a line break between digits is two things written, never one number.
+    if (/[^\d, ]/.test(run)) return true;
+    if (GROUPED.test(run.replace(/ +/g, ' ').replace(/ ?, ?/g, ','))) continue;
+    // "2 1/2" is a mixed numeral, read below.
+    if (/^\d+ +\d+$/.test(run) && new RegExp(run.replace(/ +/g, ' +') + ' */ *\\d').test(piece)) continue;
+    return true;
   }
   return false;
 }
@@ -138,8 +200,9 @@ export function parseNumericInput(raw) {
   if (roster !== null && !roster.includes(',')) s = cleanInput(roster);
   if (!s) throw new Error('Empty answer');
   // Digits broken up by commas or spaces are one number only when they are
-  // grouped the way numbers are written — 1,234,567 · 12,34,567 · 1 234 567.
-  // "1,2,3" and "0 1 2 3" are lists, not 123.
+  // grouped the way numbers are written — 1,234,567 · 12,34,567 · 1 234 567 ·
+  // 12 34 567. "1,2,3", "0 1 2 3", "(1,2,3)" and three lines "1", "2", "3" are
+  // lists, not 123.
   if (brokenDigitGroups(s)) throw new Error('Not a single number');
   const meta = { isPercent: /%\s*$/.test(s), text: s };
 
