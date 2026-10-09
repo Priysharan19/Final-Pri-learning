@@ -6,10 +6,14 @@
 //   1. journey — boot on the stable origin, the capability handshake,
 //      onboarding into a local profile, SPA routing + history Back, Back
 //      closing an open sheet first, rotation keeping an in-progress typed
-//      answer, blocked schemes, external links opening only from a real tap,
-//      and Back on the landing entry leaving the app;
-//   2. relaunch — after the process was killed, the profile (IndexedDB) and
-//      localStorage survived.
+//      answer, the typed answer kept as a draft on the device, Submit and
+//      Show solution refused on the card for an offline draft with nothing
+//      marked or recorded (grading is online-only and server-authoritative:
+//      owner decision 2026-10-10, ADR-0001 — this run has no server), blocked
+//      schemes, external links opening only from a real tap, and Back on the
+//      landing entry leaving the app;
+//   2. relaunch — after the process was killed, the profile (IndexedDB),
+//      localStorage and the draft question with its typed answer survived.
 // The `priExpect` argument says which branch the image must take: `floor` (a
 // WebView below the floor must show the fail-closed update screen) or
 // `product` (the full journey). SYNTHETIC / EMULATOR evidence — never a
@@ -245,31 +249,69 @@ class ShellJourneyTest {
             s.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
             Thread.sleep(1500)
 
-            Log.i("PRITEST", "a typed attempt is submitted and marked, feedback shown, next question, progress")
-            waitFor(s, "(function(){var b=[].slice.call(document.querySelectorAll('.editor-foot .btn-primary')).find(function(x){return x.offsetParent&&!x.disabled});if(!b)return false;b.click();return true;})()")
-            val feedback = waitFor(s, "(function(){var v=document.querySelector('.verdict')||document.querySelector('.your-answer');return v?(v.innerText||'marked').slice(0,60):false;})()")
-            assertTrue("the attempt was marked with feedback: $feedback", feedback.length > 2)
-            // A first wrong answer offers one more go; the attempt is resolved (and
-            // counted in Progress) once it is answered again.
-            for (i in 0 until 3) {
-                if (eval(s, "!!document.querySelector('.eval-card')") == "true") break
-                // One more go needs a changed answer before it can be submitted.
-                setValue(s, ".editor-body input.answer-input", "${8 + i}")
-                Thread.sleep(300)
-                eval(s, "(function(){var b=[].slice.call(document.querySelectorAll('.editor-foot .btn-primary')).find(function(x){return x.offsetParent&&!x.disabled});if(b)b.click();return true;})()")
-                Thread.sleep(1500)
-            }
-            Log.i("PRITEST", "after retries: " + eval(s, "(function(){var v=document.querySelector('.verdict');return (v?v.innerText:'no verdict').slice(0,120)+' · input='+((document.querySelector('.editor-body input.answer-input')||{}).value)+' · submit='+[].slice.call(document.querySelectorAll('.editor-foot .btn-primary')).map(function(b){return b.disabled?'off':'on'}).join(',');})()"))
-            assertEquals("the attempt is resolved with an evaluation", "true",
-                waitFor(s, "!!document.querySelector('.eval-card') || false"))
+            // Grading is online-only and server-authoritative (owner decision
+            // 2026-10-10, ADR-0001). This build has no server, so the question on
+            // the card is an offline draft: the work is kept on the device, and
+            // nothing is checked, marked or revealed.
+            Log.i("PRITEST", "a typed answer is kept as a draft on this device")
+            val firstId = waitFor(s, QuestionCardJs.QID).trim('"')
+            assertEquals("the typed answer is stored on this device under its question", "\"7\"",
+                waitFor(s, QuestionCardJs.storedTyped(firstId), 15_000))
+            assertEquals("nothing is marked before Submit", "\"\"", eval(s, QuestionCardJs.MARKED_TRACES))
+
+            Log.i("PRITEST", "Submit is refused on the card for an offline draft: no verdict, marks or solution")
+            waitFor(s, QuestionCardJs.PRESS_SUBMIT)
+            // No server ever issued this question, so it can never be marked:
+            // the refusal names that, and its one next step is a new question
+            // (not a retry, and not a sign-in that could not help).
+            assertEquals("Submit is refused as an offline draft", "\"new-question\"", waitFor(s, QuestionCardJs.REFUSAL))
+            assertEquals("the refusal offers a new question", "true", eval(s, QuestionCardJs.visible("[data-check-next]")))
+            assertEquals("the refusal offers no retry that cannot succeed", "false", eval(s, QuestionCardJs.visible("[data-check-retry]")))
+            assertEquals("the refusal itself offers no sign-in: signing in cannot make a draft markable", "false", eval(s, QuestionCardJs.visible(".verdict [data-check-sign-in]")))
+            // The card's standing notice (not the refusal) tells a signed-out
+            // student that checking needs an account.
+            assertEquals("the card says checking needs an account", "true", eval(s, QuestionCardJs.visible("[data-check-needs-account]")))
+            assertEquals("a refused Submit marks nothing", "\"\"", eval(s, QuestionCardJs.MARKED_TRACES))
+            assertEquals("the typed answer is still on the card", "\"7\"", eval(s, QuestionCardJs.TYPED))
+            assertEquals("…and still stored on this device", "\"7\"", eval(s, QuestionCardJs.storedTyped(firstId)))
+
+            Log.i("PRITEST", "Show solution is refused the same way")
+            // Armed by one press, confirmed by the next.
+            waitFor(s, QuestionCardJs.PRESS_REVEAL)
+            Thread.sleep(450)
+            eval(s, QuestionCardJs.PRESS_REVEAL)
+            Thread.sleep(2500)
+            assertEquals("Show solution is refused as an offline draft", "\"new-question\"", waitFor(s, QuestionCardJs.REFUSAL))
+            assertEquals("a refused Show solution reveals and marks nothing", "\"\"", eval(s, QuestionCardJs.MARKED_TRACES))
+
             // Next: the same element is replaced by a new question (by identity of
-            // the rendered node, not prompt text, which can repeat).
+            // the rendered node, not prompt text, which can repeat). The refusal's
+            // own next step is the control a student is pointed at.
+            Log.i("PRITEST", "the refusal's next step opens a new question; a draft typed there is kept")
             assertEquals("a Next control is offered", "true", eval(s, "!!document.querySelector('.ctx-next')"))
-            eval(s, "(function(){window.__q=document.querySelector('.q-prompt');document.querySelector('.ctx-next').click();return true;})()")
+            eval(s, "(function(){window.__q=document.querySelector('.q-prompt');document.querySelector('[data-check-next]').click();return true;})()")
             waitFor(s, "document.querySelector('.q-prompt') && document.querySelector('.q-prompt') !== window.__q && !document.querySelector('.verdict')")
+            waitFor(s, "(function(){var id=${QuestionCardJs.QID};return !!id && id !== '$firstId';})()")
+            var draftTyped = false
+            for (i in 0 until 12) {
+                eval(s, "(function(){var t=($byLabel)('Type: answer by typing');if(t)t.click();return true;})()")
+                Thread.sleep(400)
+                if (eval(s, "!!document.querySelector('.editor-body input.answer-input')") == "true") { draftTyped = true; break }
+                eval(s, "(function(){var n=document.querySelector('.ctx-next');if(n)n.click();return true;})()")
+                Thread.sleep(900)
+            }
+            assertTrue("a second question with a typed answer was found", draftTyped)
+            val draftId = waitFor(s, QuestionCardJs.QID).trim('"')
+            assertTrue("the draft is a different question from the refused one", draftId.isNotEmpty() && draftId != firstId)
+            setValue(s, ".editor-body input.answer-input", "42")
+            assertEquals("the new draft is stored on this device", "\"42\"", waitFor(s, QuestionCardJs.storedTyped(draftId), 15_000))
+            assertEquals("the new question opens unmarked and unrefused", "\"\"|false", eval(s, QuestionCardJs.MARKED_TRACES) + "|" + eval(s, QuestionCardJs.REFUSAL))
+            // Left for relaunchAfterProcessDeath: which question, and what was typed.
+            eval(s, "localStorage.setItem('pri-android-draft', JSON.stringify({id:'$draftId',answer:'42'}))")
             openProgress(s)
-            val answeredAfter = waitFor(s, ANSWERED).trim('"').toIntOrNull() ?: 0
-            assertTrue("Progress counts the attempt just marked ($answeredAfter answered)", answeredAfter >= 1)
+            // Nothing was marked, so nothing was answered: Progress counts only
+            // what Pri's server has marked.
+            assertEquals("Progress counts no attempt: a refused check records nothing", "\"0\"", waitFor(s, ANSWERED))
             // The real Back key walks the app's own history. Practice has no
             // Progress link (thinking mode), so openProgress left it through the
             // bar's exit (a PUSH of Home): Home(0) → Practice(1) → Home(2) →
@@ -341,6 +383,18 @@ class ShellJourneyTest {
             waitFor(s, "document.querySelector('.home-greet')")
             assertEquals("\"kept\"", eval(s, "localStorage.getItem('pri-android-marker')"))
             Log.i("PRITEST", "after process death the profile and localStorage survived")
+
+            // The draft left on the card before the process was killed: the same
+            // question comes back with what was typed, still unmarked.
+            val draftId = waitFor(s, "(function(){var d=JSON.parse(localStorage.getItem('pri-android-draft')||'null');return d&&d.id;})()").trim('"')
+            click(s, "[].slice.call(document.querySelectorAll('a[href=\"/practice\"]')).find(function(a){return a.offsetParent;})")
+            waitFor(s, "document.querySelector('.q-prompt') && location.pathname === '/practice' && !!${QuestionCardJs.QID}")
+            assertEquals("the same question came back after process death", "\"$draftId\"", eval(s, QuestionCardJs.QID))
+            waitFor(s, "(function(){if(document.querySelector('.editor-body input.answer-input'))return true;var t=[].slice.call(document.querySelectorAll('button')).find(function(b){return (b.getAttribute('aria-label')||'')==='Type: answer by typing';});if(t)t.click();return false;})()")
+            assertEquals("the typed draft survived process death", "\"42\"", waitFor(s, QuestionCardJs.TYPED))
+            assertEquals("the restored draft is unmarked", "\"\"", eval(s, QuestionCardJs.MARKED_TRACES))
+            assertEquals("…and no check was made for it", "false", eval(s, QuestionCardJs.REFUSAL))
+            Log.i("PRITEST", "after process death the draft question and its typed answer survived, unmarked")
         }
     }
 }
