@@ -172,7 +172,7 @@ export async function startOnlinePlatform({ dist = DIST } = {}) {
     const jar = {};
     const login = await desk(() => h.request('/v1/account/login', { method: 'POST', jar, body: { email: other.email, password: other.password, deviceId: 'e2e-desk-elsewhere' } }));
     if (login.status !== 200) throw new Error(`online-session: desk login answered ${login.status} ${login.text}`);
-    const bound = await desk(() => h.request('/v1/practice/issue', { method: 'POST', jar, body: { prepared } }));
+    const bound = await desk(() => h.request('/v1/practice/issue', { method: 'POST', jar, body: { prepared, account: String(other.id) } }));
     return { status: bound.status, accountId: other.id, questionId: bound.data?.question?.id || null };
   }
 

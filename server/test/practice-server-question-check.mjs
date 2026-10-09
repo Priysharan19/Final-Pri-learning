@@ -63,27 +63,27 @@ try {
   eq((await post('/v1/practice/prepare', { ...REQUEST, seed: 1 })).status, 400, 'a seed cannot be chosen when preparing either');
   eq((await post('/v1/practice/issue', { prepared: token })).status, 401, 'binding needs a signed-in account');
 
-  const bound = await post('/v1/practice/issue', { prepared: token }, a.jar);
+  const bound = await post('/v1/practice/issue', { prepared: token, account: String(a.account.id) }, a.jar);
   eq(bound.status, 201, 'the account binds the prepared question');
   eq(bound.data.question.prompt, prepared.data.question.prompt, 'it is the same question the student was working on');
   eq(bound.data.accountId, String(a.account.id), 'issued under that account');
-  const again = await post('/v1/practice/issue', { prepared: token }, a.jar);
+  const again = await post('/v1/practice/issue', { prepared: token, account: String(a.account.id) }, a.jar);
   eq([again.status, again.data?.question?.id], [201, bound.data.question.id], 'the same account retrying gets the same issue back');
-  const other = await post('/v1/practice/issue', { prepared: token }, b.jar);
+  const other = await post('/v1/practice/issue', { prepared: token, account: String(b.account.id) }, b.jar);
   eq([other.status, other.data?.error?.code], [409, 'PRACTICE_PREPARED_USED'], 'a second account cannot take the same prepared question up');
-  eq((await post('/v1/practice/issue', { prepared: token, generator: REQUEST.generator }, a.jar)).status, 400, 'nothing may ride along with a prepared token');
+  eq((await post('/v1/practice/issue', { prepared: token, generator: REQUEST.generator, account: String(a.account.id) }, a.jar)).status, 400, 'nothing may ride along with a prepared token');
   const forged = token.slice(0, -6) + (token.endsWith('AAAAAA') ? 'BBBBBB' : 'AAAAAA');
-  eq((await post('/v1/practice/issue', { prepared: forged }, a.jar)).data?.error?.code, 'PRACTICE_PREPARED_INVALID', 'an altered token is refused');
-  eq((await post('/v1/practice/issue', { prepared: 'v1.AAAA.BBBB.CCCC' }, a.jar)).data?.error?.code, 'PRACTICE_PREPARED_INVALID', 'a made-up token is refused');
+  eq((await post('/v1/practice/issue', { prepared: forged, account: String(a.account.id) }, a.jar)).data?.error?.code, 'PRACTICE_PREPARED_INVALID', 'an altered token is refused');
+  eq((await post('/v1/practice/issue', { prepared: 'v1.AAAA.BBBB.CCCC', account: String(a.account.id) }, a.jar)).data?.error?.code, 'PRACTICE_PREPARED_INVALID', 'a made-up token is refused');
 
   // The claim and the issue are one transaction: two binds racing from the
   // same account (a double tap, a retry crossing the first reply) end as one
   // issued question, never as a burnt token.
   const racing = (await post('/v1/practice/prepare', REQUEST)).data.prepared;
-  const [r1, r2] = await Promise.all([post('/v1/practice/issue', { prepared: racing }, b.jar), post('/v1/practice/issue', { prepared: racing }, b.jar)]);
+  const [r1, r2] = await Promise.all([post('/v1/practice/issue', { prepared: racing, account: String(b.account.id) }, b.jar), post('/v1/practice/issue', { prepared: racing, account: String(b.account.id) }, b.jar)]);
   eq([r1.status, r2.status], [201, 201], 'two racing binds by one account both succeed');
   eq(r1.data.question.id, r2.data.question.id, 'as the same issued question');
-  eq((await post('/v1/practice/issue', { prepared: racing }, a.jar)).status, 409, 'and the other account still cannot take it up');
+  eq((await post('/v1/practice/issue', { prepared: racing, account: String(a.account.id) }, a.jar)).status, 409, 'and the other account still cannot take it up');
 
   // A device holding several profiles names the account it means. The wrong
   // session is refused before the prepared question is taken up, so the right
