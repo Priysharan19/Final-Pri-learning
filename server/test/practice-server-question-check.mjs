@@ -84,6 +84,8 @@ try {
   const reveal = await post(`/v1/practice/${qid}/reveal`, {}, a.jar);
   ok(reveal.status === 200 && reveal.data.solution, 'the owner can be shown its solution by the server');
 
+  // The Postgres runner only counts a suite that says which engine it ran on.
+  console.log(`engine: ${h.engine}`);
   console.log(`SERVER-CHOSEN QUESTIONS: PASS — ${count}/${count} checks — the server picks the seed, discloses none, and a prepared question is bound once by one account.`);
 } finally {
   await h.close();
