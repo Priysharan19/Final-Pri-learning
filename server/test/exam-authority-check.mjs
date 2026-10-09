@@ -359,8 +359,7 @@ try {
     await refused({ ...cbse, layoutSeed: undefined }, 'a blueprint paper without its layout seed is refused');
     {
       const r = await create(a.jar, { ...cbse, layoutSeed: (cbse.layoutSeed % 0x7ffffffe) + 1 });
-      ok((r.status === 400 && r.data?.error?.code === 'EXAM_SPEC_INVALID') || (r.status === 409 && r.data?.error?.code === 'EXAM_LAYOUT_NOT_ISSUED'),
-        `a spec composed for one layout is refused under another layout seed (${r.status} ${r.data?.error?.code})`);
+      eq([r.status, r.data?.error?.code], [400, 'EXAM_SPEC_INVALID'], 'a spec composed for one layout does not fit another layout seed and is refused as an invalid spec');
     }
     const jeeAdvSpec = await india(a.jar, 'jee-advanced', 12);
 
@@ -386,10 +385,11 @@ try {
       while (chosen === cbse.layoutSeed) chosen++;
       const selfChosen = await create(a.jar, await indiaSpec('cbse', 10, chosen));
       eq([selfChosen.status, selfChosen.data?.error?.code], [409, 'EXAM_LAYOUT_NOT_ISSUED'], 'a valid paper composed for a layout seed the device chose is refused');
-      if (own.data.layoutSeed !== cbse.layoutSeed) {
-        const borrowed = await create(a.jar, await indiaSpec('cbse', 10, own.data.layoutSeed));
-        eq([borrowed.status, borrowed.data?.error?.code], [409, 'EXAM_LAYOUT_NOT_ISSUED'], 'and so is one composed for the layout set for another account');
-      } else count++;
+      // Two accounts drawing one 31-bit seed would make this check say nothing:
+      // that is a rerun, never a pass.
+      if (own.data.layoutSeed === cbse.layoutSeed) throw new Error('two accounts drew the same layout seed; rerun');
+      const borrowed = await create(a.jar, await indiaSpec('cbse', 10, own.data.layoutSeed));
+      eq([borrowed.status, borrowed.data?.error?.code], [409, 'EXAM_LAYOUT_NOT_ISSUED'], 'and so is one composed for the layout set for another account');
       eq(await rows(a.account.id, 'exam-paper'), 0, 'nothing was sealed under either');
       eq(await rows(b.account.id, 'exam-paper'), 0, 'and the other account still has no paper');
       await h.db.run("DELETE FROM idempotency_keys WHERE account_id=? AND scope='exam-layout'", [b.account.id]);
