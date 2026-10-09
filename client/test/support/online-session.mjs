@@ -117,11 +117,21 @@ export async function startOnlinePlatform({ dist = DIST } = {}) {
    * A verified adult student account, made at the server's own routes. It is
    * not signed in anywhere yet: `session.signIn()` does that through the app.
    */
+  // The desk's own requests reuse keep-alive sockets the server may have just
+  // timed out; a request that never left ("fetch failed") is sent again.
+  const desk = async (send) => {
+    for (let attempt = 0; ; attempt++) {
+      try { return await send(); }
+      catch (err) { if (attempt >= 3 || !/fetch failed/i.test(String(err?.message))) throw err; await new Promise(r => setTimeout(r, 50)); }
+    }
+  };
+
   async function newAccount({ name = 'Online Student' } = {}) {
-    const email = `e2e.${process.pid}.${++accountSerial}.${Date.now().toString(36)}@example.test`;
-    const made = await harness.registerAccount(h, { name, email, password: PASSWORD, deviceId: `e2e-desk-${accountSerial}` });
+    const serial = ++accountSerial;
+    const email = `e2e.${process.pid}.${serial}.${Date.now().toString(36)}@example.test`;
+    const made = await desk(() => harness.registerAccount(h, { name, email, password: PASSWORD, deviceId: `e2e-desk-${serial}` }));
     if (made.status !== 201 || !made.account?.id) throw new Error(`online-session: register answered ${made.status} ${made.text}`);
-    const verified = await harness.verifyEmail(h, made.account.id);
+    const verified = await desk(() => harness.verifyEmail(h, made.account.id));
     if (verified.status >= 300) throw new Error(`online-session: verify-email answered ${verified.status} ${verified.text}`);
     // The desk's own session is not the student's: end it so the only live
     // session for this account is the one the browser signs in with.
@@ -187,7 +197,10 @@ function onlineSession(platform, ctx, page) {
     const entry = { method: request.method(), path: url.pathname, status: response.status(), body: null, json: null };
     try { entry.body = request.postDataJSON(); } catch { entry.body = null; }
     calls.push(entry);
-    const read = response.json().then(json => { entry.json = json; }).catch(() => {}).finally(() => pending.delete(read));
+    // A body that never arrives (the connection was cut mid-reply) must not
+    // hold a flow open: give it five seconds, then leave `json` null.
+    const read = Promise.race([response.json(), new Promise((_, no) => setTimeout(no, 5000))])
+      .then(json => { entry.json = json; }).catch(() => {}).finally(() => pending.delete(read));
     pending.add(read);
   });
   const settled = async () => { while (pending.size) await Promise.all([...pending]); };

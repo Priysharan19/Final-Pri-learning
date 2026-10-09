@@ -19,9 +19,7 @@
 // and seed the page sent to /practice/issue and requires the two to agree; the
 // next question is then answered with its regenerated answer.
 //
-// "Redo Question" used to carry the second half of this flow. It no longer
-// brings back the same question for a server-issued one, and the copy it makes
-// can never be checked: see known-red-online-redo-uncheckable.mjs.
+// A missed question is tried again from History: the server repeats it.
 //
 // Run on its own:  node client/test/tour-v3.js
 // ─────────────────────────────────────────────────────────────────────────────
@@ -193,6 +191,29 @@ export const flow = {
     await check('both attempts are on the same question',
       scores.every(t => t.includes('Linear Equations')),
       `rows read ${JSON.stringify(scores.map(t => t.replace(/\s+/g, ' ').slice(0, 60)))}`);
+
+    // ── 6b · "Same question" from History: the server repeats it ─────────────
+    // The missed question is tried again. The server — which chose it and
+    // never disclosed a seed — is asked to repeat it; the new attempt is its
+    // own server question, marked by the server, and its receipt says repeat.
+    const missedRow = page.locator('.hist-row').filter({ has: page.locator('.hist-verdict.bad') }).first();
+    await missedRow.locator('.hist-actions .btn').first().click();
+    await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
+    if (await typeTab.count()) await typeTab.click();
+    await settle();
+    const againPrompt = await mathText('.q-prompt');
+    if (await check('"Same question" brings back the same question, same numbers',
+      againPrompt === prompt, `first: ${JSON.stringify(prompt)}\n      again: ${JSON.stringify(againPrompt)}`)) {
+      const repeatKnown = await online.answerOf();
+      await answerBox.fill(String(repeatKnown.text));
+      await page.getByRole('button', SUBMIT).click();
+      await page.waitForSelector('.eval-card', { timeout: 20000 });
+      const repeated = (await online.practiceCalls(new RegExp(`^/v1/practice/${repeatKnown.serverQuestionId}/submit$`))).at(-1);
+      await check('the repeat is its own server question, marked correct by the server, and its receipt says it was a repeat',
+        repeatKnown.serverQuestionId !== firstId && repeated?.json?.authoritative === true && repeated.json.correct === true && repeated.json.repeat === true &&
+          (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/repeat$/)).some(c => c.status < 300),
+        `${String(JSON.stringify(repeated?.json)).slice(0, 240)}; repeat calls ${JSON.stringify((await online.practiceCalls(/^\/v1\/practice\/[^/]+\/repeat$/)).map(c => c.status))}`);
+    }
 
     // ── 7 · a question that comes with a diagram ─────────────────────────────
     await page.goto(`${base}/practice?subtopic=y9-pythagoras`, { waitUntil: 'domcontentloaded' });

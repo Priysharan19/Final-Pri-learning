@@ -19,7 +19,14 @@
 //      request fails at the network layer); Submit shows the reconnect message
 //      and keeps the work; Retry after reconnecting is marked exactly once.
 //   3. Write, offline — the same, with handwriting.
-//   4. Exams, signed out — a paper does not start; sign-in is offered in place.
+//   4. Opened with no connection — the device shows its own offline draft,
+//      which can never be marked (even after reconnecting); the work is kept
+//      and the next question, online, is the server's and is marked.
+//   5. Exams, signed out — a paper does not start; sign-in is offered in place.
+//
+// THE ORACLE never regenerates anything: the server chooses every creditable
+// question and discloses no seed. Right answers are read at the test's desk
+// from the server's sealed copy of the issued question (online-session.mjs).
 //
 // WHAT IS REAL: the built client, the real platform server and its SQLite
 // database, the account, every grade. WHAT IS SYNTHETIC: the handwriting
@@ -98,10 +105,11 @@ async function nextQuestion(page, settle) {
 }
 
 /**
- * Open practice on a question with one typed answer box whose right answer the
- * oracle can regenerate as plain text (`accept` narrows it further).
+ * Open practice on a question with one typed answer box. Signed in, the server
+ * has issued it and the oracle knows its answer (`accept` narrows which answers
+ * will do); signed out it is only a prepared question and nobody knows it yet.
  */
-async function openTypedQuestion({ page, base, settle, online, accept = () => true }) {
+async function openTypedQuestion({ page, base, settle, online, issued = true, accept = () => true }) {
   await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
   const typeTab = page.getByRole('button', { name: 'Answer by typing' });
@@ -111,12 +119,16 @@ async function openTypedQuestion({ page, base, settle, online, accept = () => tr
     await settle();
     if (await answerBox.count() === 1) {
       const known = await online.answerOf();
+      if (!issued) return known;
       if (known.kind === 'text' && known.text !== null && accept(String(known.text))) return known;
     }
     await nextQuestion(page, settle);
   }
   return null;
 }
+
+/** POSTs that ask the server to issue, read, mark or reveal — not `prepare`. */
+const MARKING = /^\/v1\/practice\/(?:issue|[^/]+\/(?:submit|reveal|recognize|repeat|recognition\/.+))$/;
 
 async function historyRows(page, base, qid) {
   await page.goto(`${base}/history`, { waitUntil: 'domcontentloaded' });
@@ -141,11 +153,20 @@ export const typeSignedOut = {
   async run({ page, base, check, goto, createProfile, mathText, settle, online }) {
     await goto('/');
     await createProfile({ name: 'Signed Out Typist', year: 7 });
-    const known = await openTypedQuestion({ page, base, settle, online });
-    if (!await check('signed out, Practice serves a question to read and a box to type in', !!known)) return;
+    const unissued = await openTypedQuestion({ page, base, settle, online, issued: false });
+    if (!await check('signed out, Practice serves a question to read and a box to type in', !!unissued)) return;
     const qid = await shownId(page);
     const prompt = await mathText('.q-prompt');
     const answerBox = page.locator('.editor-body input.answer-input');
+    // Signed out but online, the question is one the server PREPARED: a public
+    // question and a sealed token, no id, no answer — and no seed anywhere.
+    const prepares = await online.practiceCalls(/^\/v1\/practice\/prepare$/);
+    const mine = prepares.filter(c => c.json?.question?.prompt === (unissued.checkState === 'prepared' ? (c.json?.question?.prompt) : null) && c.status === 200);
+    const shownPrepared = prepares.find(c => c.status === 200 && typeof c.json?.prepared === 'string' && c.json?.question && !('id' in c.json.question) && !('answer' in c.json.question));
+    await check('the question on screen was prepared by the server: a public question and a sealed token — no id, no answer, no seed sent or returned',
+      unissued.kind === 'unissued' && unissued.checkState === 'prepared' && !!shownPrepared && mine.length >= 1 &&
+        prepares.every(c => !('seed' in (c.body || {})) && !/"seed"|"answer"|"steps"/.test(JSON.stringify(c.json?.question || {}))),
+      `row ${JSON.stringify(unissued)}; ${prepares.length} prepare call(s) ${JSON.stringify(prepares.map(c => ({ status: c.status, body: c.body, keys: Object.keys(c.json || {}) })))}`.slice(0, 500));
 
     // ── said before Submit is pressed ────────────────────────────────────────
     const notice = page.locator('[data-check-needs-account]');
@@ -186,8 +207,8 @@ export const typeSignedOut = {
     await check('nothing was spent on the device: no attempt row, no try, the question still open',
       facts.attempts === 0 && facts.row?.tries === 0 && facts.row?.answered === 0 && !facts.row?.issued, JSON.stringify(facts));
     await check('nothing was sent to be marked: no practice request reached the server',
-      (await online.practiceCalls(/^\/v1\/practice\//)).length === 0,
-      JSON.stringify((await online.practiceCalls(/^\/v1\/practice\//)).map(c => c.path)));
+      (await online.practiceCalls(MARKING)).length === 0,
+      JSON.stringify((await online.practiceCalls(MARKING)).map(c => c.path)));
     await check('the typed answer is still in the box', await answerBox.inputValue() === SURELY_WRONG, JSON.stringify(await answerBox.inputValue()));
 
     // ── Show solution: refused the same way ──────────────────────────────────
@@ -198,7 +219,7 @@ export const typeSignedOut = {
     facts = await deviceFacts(page, qid);
     await check('Show solution is refused the same way: sign-in in the card, no solution, nothing revealed or spent',
       shown.refusal.join() === 'sign-in' && nothingMarked(shown) && facts.attempts === 0 && facts.row?.answered === 0 &&
-        (await online.practiceCalls(/^\/v1\/practice\//)).length === 0,
+        (await online.practiceCalls(MARKING)).length === 0,
       `${JSON.stringify(shown)} ${JSON.stringify(facts)}`);
     await check('nothing on the page offers or claims a mark made on this device',
       !/marked on this device|checked on this device/i.test(await visibleText(page, '.qpage')), (await visibleText(page, '.qpage')).slice(0, 240));
@@ -213,7 +234,7 @@ export const typeSignedOut = {
     await check('the SAME question and the SAME typed answer are on screen after sign-in',
       await shownId(page) === qid && await mathText('.q-prompt') === prompt && await answerBox.inputValue() === SURELY_WRONG,
       `question ${await shownId(page)} (was ${qid}); box ${JSON.stringify(await answerBox.inputValue())}`);
-    await check('signing in alone marks nothing', (await online.practiceCalls(/^\/v1\/practice\//)).length === 0 && nothingMarked(await resultOnCard(page)),
+    await check('signing in alone marks nothing', (await online.practiceCalls(MARKING)).length === 0 && nothingMarked(await resultOnCard(page)),
       JSON.stringify(await resultOnCard(page)));
 
     // ── server-marked: the kept wrong answer, then the right one ─────────────
@@ -222,20 +243,27 @@ export const typeSignedOut = {
     const issues = await online.practiceCalls(/^\/v1\/practice\/issue$/);
     const serverQid = issues[0]?.json?.question?.id || null;
     const first = (await online.practiceCalls(new RegExp(`^/v1/practice/${serverQid}/submit$`))).at(-1);
-    await check('the question was issued by the server at submit — generator, difficulty and seed, never an answer — and stayed the same question',
+    await check('at submit the SAME row was bound to this account: one issue carrying only the prepared token — no generator, seed or answer — same id, same prompt',
       issues.length === 1 && issues[0].status === 201 && !!serverQid && await shownId(page) === qid && await mathText('.q-prompt') === prompt &&
-        Object.keys(issues[0].body || {}).every(k => ['generator', 'difficulty', 'seed', 'curriculum', 'mode'].includes(k)),
-      JSON.stringify(issues.map(c => ({ status: c.status, body: c.body }))));
+        JSON.stringify(Object.keys(issues[0].body || {})) === '["prepared"]' && typeof issues[0].body.prepared === 'string' &&
+        prepares.some(c => c.json?.prepared === issues[0].body.prepared) && issues[0].json?.question?.prompt === prepares.find(c => c.json?.prepared === issues[0].body.prepared)?.json?.question?.prompt,
+      JSON.stringify(issues.map(c => ({ status: c.status, keys: Object.keys(c.body || {}) }))));
     await check('the kept wrong answer is marked by the server: authoritative, wrong, one try left',
       first?.status === 200 && first.json?.authoritative === true && first.json.correct === false && first.json.resolved === false &&
         first.json.triesLeft === 1 && first.body?.answer === SURELY_WRONG && first.body?.mode === 'typed' && await page.locator('.verdict-bad').count() >= 1,
       String(JSON.stringify(first && { status: first.status, body: first.body, json: first.json })).slice(0, 400));
+    // Only now does anyone know the answer: the server issued the question,
+    // and the test's desk reads its sealed copy from the server's database.
+    const known = await online.answerOf();
+    if (!await check('the oracle reads the right answer from the server\'s sealed copy of the issued question, owned by this account',
+      known.kind === 'text' && known.text !== null && known.serverQuestionId === serverQid && known.accountId === account.id,
+      JSON.stringify({ kind: known.kind, has: known.text !== null, owner: known.accountId === account.id }))) return;
     await answerBox.fill(known.text);
     await pressSubmit(page);
     await page.waitForSelector('.eval-card', { timeout: 30000 }).catch(() => {});
     const grades = await online.practiceCalls(new RegExp(`^/v1/practice/${serverQid}/submit$`));
     const marks = (await page.locator('.eval-marks').innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
-    await check('the right answer (regenerated at the test\'s desk) is marked correct by the server, full marks on the card',
+    await check('the right answer is marked correct by the server, full marks on the card',
       grades.length === 2 && grades[1].json?.authoritative === true && grades[1].json.correct === true && grades[1].json.resolved === true &&
         /^(\d+(?:\.\d)?) \/ \1 marks?\b/.test(marks) && await page.locator('.eval-card[data-outcome="correct"]').count() === 1,
       `marks ${JSON.stringify(marks)}; ${String(JSON.stringify(grades.at(-1)?.json)).slice(0, 240)}`);
@@ -413,6 +441,94 @@ export const writeOffline = {
   }
 };
 
+// ── 3b · Opened with no connection: an offline draft is never marked ────────
+
+export const draftOffline = {
+  id: 'draft-offline',
+  name: 'Draft · opened offline: never marked, work kept; a new question online is',
+  online: true,
+
+  async run({ page, base, check, goto, createProfile, mathText, settle, online }) {
+    await goto('/');
+    await createProfile({ name: 'Offline Opener', year: 7 });
+    await online.signIn({ name: 'Offline Opener' });
+    const before = online.ledger();
+    // No server reachable when the question is OPENED. The deployment's cloud
+    // origin is configured (as a production build's is) rather than discovered
+    // by the boot-time health probe, which an unreachable server cannot answer.
+    await page.addInitScript(origin => { window.__PRI_CLOUD_ORIGIN__ = origin; }, base);
+    await online.disconnect();
+    await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
+    const typeTab = page.getByRole('button', { name: 'Answer by typing' });
+    const answerBox = page.locator('.editor-body input.answer-input');
+    for (let skips = 0; skips <= MAX_SKIPS; skips++) {
+      if (await typeTab.count()) await typeTab.click();
+      await settle();
+      if (await answerBox.count() === 1) break;
+      await nextQuestion(page, settle);
+    }
+    const draftRow = await online.shownRow();
+    const qid = await shownId(page);
+    if (!await check('with no server reachable the device still shows a question to work on — its own offline draft, never the server\'s',
+      await answerBox.count() === 1 && draftRow?.checkState === 'draft' && !draftRow.serverQuestionId, JSON.stringify(draftRow))) return;
+    await answerBox.fill(SURELY_WRONG);
+    await page.waitForFunction(() => /saved on this device/i.test(document.querySelector('.ws-actions .status-line')?.innerText || ''), null, { timeout: 10000 }).catch(() => {});
+
+    // Back online: the draft is still a draft. It can never be marked.
+    await online.reconnect();
+    await pressSubmit(page);
+    await page.waitForSelector('.verdict, [data-check-refusal], .eval-card', { timeout: 20000 }).catch(() => {});
+    await page.waitForTimeout(600);
+    let shown = await resultOnCard(page);
+    const said = await visibleText(page, '.verdict');
+    await check('Submit on the draft is refused even after reconnecting: no verdict, marks, XP or solution',
+      nothingMarked(shown) && (await online.practiceCalls(MARKING)).length === 0 && online.ledger().issued === before.issued,
+      `${JSON.stringify(shown)}; ${JSON.stringify((await online.practiceCalls(MARKING)).map(c => c.path))}`);
+    // (The card currently files this refusal under an "already finished"
+    // heading — a product defect, asserted in known-red-online-only-grading.mjs.)
+    await check('the card says why and what to do: it was opened without a connection, the working is kept, open a new question',
+      /opened without a connection, so it cannot be marked/i.test(said) && /working is kept/i.test(said) && /open a new question/i.test(said),
+      JSON.stringify(said.slice(0, 260)));
+    let facts = await deviceFacts(page, qid);
+    await check('the work is kept and nothing was spent: answer still in the box and in the draft, no attempt, no try',
+      await answerBox.inputValue() === SURELY_WRONG && facts.attempts === 0 && facts.row?.tries === 0 && facts.row?.answered === 0,
+      `box ${JSON.stringify(await answerBox.inputValue())}; ${JSON.stringify(facts)}`);
+    const reveal = page.locator('.ws-actions-btns .btn').filter({ hasText: /solution/i }).first();
+    for (let press = 0; press < 2 && await reveal.count(); press++) { await reveal.click(); await page.waitForTimeout(300); }
+    await page.waitForTimeout(600);
+    shown = await resultOnCard(page);
+    facts = await deviceFacts(page, qid);
+    await check('Show solution on the draft is refused the same way: no solution, nothing revealed',
+      nothingMarked(shown) && facts.attempts === 0 && facts.row?.answered === 0 && (await online.practiceCalls(MARKING)).length === 0,
+      `${JSON.stringify(shown)} ${JSON.stringify(facts)}`);
+    await check('there is a way forward on the card: Next question is offered and nothing claims a device mark',
+      await page.locator('.ctx-next, [data-check-next]').first().isVisible() && !/marked on this device|checked on this device/i.test(await visibleText(page, '.qpage')));
+
+    // Next question, online: the server's question, which can be marked.
+    await nextQuestion(page, settle);
+    let known = null;
+    for (let skips = 0; skips <= MAX_SKIPS; skips++) {
+      if (await typeTab.count()) await typeTab.click();
+      await settle();
+      if (await answerBox.count() === 1) { known = await online.answerOf(); if (known.kind === 'text' && known.text !== null) break; }
+      known = null;
+      await nextQuestion(page, settle);
+    }
+    if (!await check('after reconnecting, Next question gives a question the server issued', !!known && (await online.shownRow())?.checkState === 'issued',
+      `${JSON.stringify(await online.shownRow())}; server calls since: ${JSON.stringify(online.calls.slice(-8).map(c => `${c.status} ${c.method} ${c.path} ${c.json?.error?.code || ''}`))}`)) return;
+    await answerBox.fill(known.text);
+    await pressSubmit(page);
+    await page.waitForSelector('.eval-card', { timeout: 30000 }).catch(() => {});
+    const grade = (await online.practiceCalls(new RegExp(`^/v1/practice/${known.serverQuestionId}/submit$`))).at(-1);
+    await check('and that one is marked by the server',
+      grade?.status === 200 && grade.json?.authoritative === true && grade.json.correct === true && await page.locator('.eval-card[data-outcome="correct"]').count() === 1,
+      String(JSON.stringify(grade?.json)).slice(0, 240));
+    const history = await historyRows(page, base, qid);
+    await check('the draft left no attempt behind: History holds only the server-marked question', history.all === 1 && history.mine === 0, JSON.stringify(history));
+  }
+};
+
 // ── 4 · Exams, signed out ────────────────────────────────────────────────────
 
 export const examSignedOut = {
@@ -451,7 +567,7 @@ export const examSignedOut = {
   }
 };
 
-export const flows = [typeSignedOut, typeOffline, writeOffline, examSignedOut];
+export const flows = [typeSignedOut, typeOffline, writeOffline, draftOffline, examSignedOut];
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const { runFlows } = await import('./e2e.mjs');

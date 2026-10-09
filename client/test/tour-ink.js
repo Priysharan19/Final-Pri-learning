@@ -227,9 +227,23 @@ export const flow = {
     });
     await check('back online, the kept handwriting is marked without another tap', await page.locator('.eval-card').count() === 1);
     await page.waitForTimeout(2500);   // anything still queued would land now
-    const attemptsAfter = await attemptCount();
-    await check('a flapping connection marks the kept answer exactly once',
-      attemptsBefore >= 0 && attemptsAfter - attemptsBefore === 1, `attempts ${attemptsBefore} → ${attemptsAfter}`);
+    // Exactly once, where it is decided and where it was answered: one grade
+    // on the server, one resolution written by this device. (A sync pull that
+    // overlaps the submit can ALSO import the server's own copy of the same
+    // attempt as a second row — a product race, asserted strictly in
+    // known-red-online-only-grading.mjs and reported; it is not a second mark.)
+    const attemptRows = await page.evaluate(() => new Promise(ok => {
+      const r = indexedDB.open('pri-learning');
+      r.onsuccess = () => { const db = r.result; const c = db.transaction('attempts').objectStore('attempts').getAll();
+        c.onsuccess = () => { db.close(); ok(c.result.map(a => ({ remote: typeof a.remoteEventId === 'string', server: a.serverAttemptId || a.remoteEventId || null }))); };
+        c.onerror = () => { db.close(); ok(null); }; };
+      r.onerror = () => ok(null);
+    }));
+    const flapGrades = (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).filter(c => c.status === 200);
+    await check('a flapping connection marks the kept answer exactly once: one server grade, one resolution on this device, one server attempt behind every row',
+      attemptsBefore === 0 && flapGrades.length === 1 && !!attemptRows && attemptRows.filter(a => !a.remote).length === 1 &&
+        new Set(attemptRows.map(a => a.server)).size === 1 && attemptRows[0].server === flapGrades[0].json?.attemptId,
+      `attempts before ${attemptsBefore}; rows ${JSON.stringify(attemptRows)}; ${flapGrades.length} server grade(s)`);
     const marked = (await page.locator('.eval-card').innerText()).replace(/\s+/g, ' ');
     const marks = (await page.locator('.eval-marks').innerText()).replace(/\s+/g, ' ').trim();
     await check('the handwritten answer is marked correct — every mark awarded',
@@ -262,9 +276,7 @@ export const flow = {
 
     // ── 6 · the writing was kept with the attempt ────────────────────────────
     // Read back from the device's own store (the `inks` row is filed under the
-    // question's id) and from the History row. Opening the History detail is
-    // not asserted here: it does not open for a server-marked attempt — see
-    // known-red-online-history-detail.mjs.
+    // question's id), from the History row, and from the row's own detail.
     const keptInk = await page.evaluate(id => new Promise(ok => {
       const r = indexedDB.open('pri-learning');
       r.onsuccess = () => {
@@ -288,6 +300,12 @@ export const flow = {
         (await histRow.locator('.hist-verdict .sr-only').innerText()) === 'Correct' &&
         await histRow.locator('.tag .sr-only').count() >= 1,
       (await page.locator('.hist-row').allInnerTexts()).map(t => t.replace(/\s+/g, ' ').slice(0, 80)).join(' | '));
+
+    await histRow.locator('.hist-main').click();
+    await page.waitForSelector('.hist-detail', { timeout: 20000 }).catch(() => {});
+    const detail = ((await page.locator('.hist-detail').innerText().catch(() => '')) || '').replace(/\s+/g, ' ');
+    await check('and its History detail opens with the handwriting and the reading beside it',
+      detail.includes('Your handwriting') && detail.includes(`read as \u201c${answer}\u201d`), `detail reads ${JSON.stringify(detail.slice(0, 200))}`);
 
     // ── 7 · a doubtful line: highlighted, corrected in one tap, no second read ─
     // The reader is unsure of what it read. The line is marked as doubtful, the
