@@ -1748,7 +1748,7 @@ function stepMetaFor(q) {
   if (q.answerType === 'expression' && a.expr) return { kind: 'expression', canonical: a.expr };
   if (q.answerType === 'numeric' && a.value !== undefined) {
     const m = (q.answerPrefix || '').match(/^([a-z])\s*=$/i);
-    if (m) return { kind: 'equation', variable: m[1].toLowerCase(), solutions: [a.value] };
+    if (m) return { kind: 'equation', variable: m[1], solutions: [a.value] };
   }
   if (q.answerType === 'set' && Array.isArray(a.values) && a.values.length) {
     return { kind: 'equation', variable: 'x', solutions: a.values };

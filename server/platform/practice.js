@@ -78,7 +78,8 @@ function stepMetaFor(q) {
   if (q.answerType === 'expression' && a.expr) return { kind: 'expression', canonical: a.expr };
   if (q.answerType === 'numeric' && a.value !== undefined) {
     const m = (q.answerPrefix || '').match(/^([a-z])\s*=$/i);
-    if (m) return { kind: 'equation', variable: m[1].toLowerCase(), solutions: [a.value] };
+    // The letter as the question writes it: an angle $A$ is not the side $a$.
+    if (m) return { kind: 'equation', variable: m[1], solutions: [a.value] };
     // Some authored Class 8 algebra forms print only `$6m+15=7m+29$`
     // and omit answerPrefix. Derive the variable ONLY from that entire,
     // single-variable, plain algebraic equation. Other numeric prompts
@@ -113,7 +114,9 @@ function stepEvidence(q, answer, steps, result) {
   const meta = stepMetaFor(q);
   let report = result.stepReport || null;
   if (meta && steps && !report) {
-    try { report = stepCheck(meta, steps); } catch { report = null; }
+    // The prompt lets a true line about another unknown of the question be
+    // verified against the system it gives, instead of being left unjudged.
+    try { report = stepCheck(meta, steps, { prompt: q.prompt }); } catch { report = null; }
   }
   let partial = null;
   // A blank final-answer box may still carry verified mathematical method
@@ -226,7 +229,7 @@ export async function issuedQuestionForTutor(db, accountId, questionId, now = Da
       const meta = stepMetaFor(q);
       if (!meta || !Array.isArray(lines) || !lines.length) return evidence;
       try {
-        const judged = stepCheck(meta, lines.join('\n'))?.lines || [];
+        const judged = stepCheck(meta, lines.join('\n'), { prompt: q.prompt })?.lines || [];
         const at = judged.findIndex(line => line?.status === 'break');
         if (at >= 0 && at < lines.length) evidence.firstBreak = at;
         while (evidence.verifiedLines < judged.length && evidence.verifiedLines < lines.length &&
