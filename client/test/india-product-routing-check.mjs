@@ -25,6 +25,26 @@ assert.match(indiaExamBackend, /indiaPyqCells\(track, chapters\)/,
   'and the India exam backend must compose from those reviewed cells');
 assert.match(read('../server/platform/exams.js'), /indiaIssuableCells\(b\.track, b\.grade\)/,
   'and the server must issue a paper from the same cells only');
+// Owner decision 2026-10-10: an examination paper is marked by the server and
+// nowhere else. The two exam backends and the module they share must not be
+// able to mark an answer: none of them may reach the engine's checker.
+for (const [name, source] of [['indiaExamBackend.js', indiaExamBackend], ['serverExam.js', read('src/local/serverExam.js')]]) {
+  assert.doesNotMatch(source, /engine\/checker\.js/, `${name} must not import the answer checker`);
+  assert.doesNotMatch(source, /\b(checkAnswer|stepCheck|methodMarks|markObjective|markMultiCorrect)\s*\(/, `${name} must not mark an answer`);
+}
+{
+  const from = legacyBackend.indexOf('  // ---- exams ----');
+  const to = legacyBackend.indexOf('  // ---- rush ----');
+  assert.ok(from > 0 && to > from, 'the practice-paper routes are where this check expects them');
+  const examRoutes = legacyBackend.slice(from, to);
+  assert.doesNotMatch(examRoutes, /\b(checkAnswer|stepCheck|methodMarks)\s*\(/, 'the practice-paper routes must not mark an answer on the device');
+  assert.match(examRoutes, /issueServerExam\(/, 'a practice paper must be issued by the server');
+  assert.match(examRoutes, /finishOnServer\(/, 'and finished on the server');
+  assert.match(examRoutes, /EXAM_NOT_SERVER_ISSUED/, 'and a paper the server never issued must be refused, not marked');
+}
+assert.match(indiaExamBackend, /issueServerExam\(/, 'an India paper must be issued by the server');
+assert.match(indiaExamBackend, /finishOnServer\(/, 'and finished on the server');
+assert.match(indiaExamBackend, /requireExamAccount\(profile\.id\)/, 'and may not start without a signed-in account');
 assert.match(indiaExamBackend, /JEE_REVIEWED_BANK_INSUFFICIENT/,
   'exam generation must fail closed when reviewed coverage cannot fill the authentic structure');
 assert.match(legacyBackend, /HSC-style/,
