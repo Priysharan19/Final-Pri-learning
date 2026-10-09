@@ -51,11 +51,17 @@ const draftIds = (page) => page.evaluate(() => {
   return null;
 });
 
-/** Leave storage exactly as a kill between "sent" and "answered" leaves it. */
+/**
+ * Leave storage exactly as a kill between "sent" and "answered" leaves it.
+ * The card records which input the answer came through (`sourceMode`): a
+ * record without it is a pre-provenance one, which is deliberately restored
+ * for the student to resubmit instead of being replayed as a typed answer.
+ * This flow is about a typed submission the current build wrote.
+ */
 const plantPending = (page, pid, qid, submissionId, answer) => page.evaluate(({ pid, qid, submissionId, answer }) => {
   localStorage.setItem(`pri.draft.${pid}.submit.${qid}`, JSON.stringify({
     v: 1, scope: 'submit', id: qid, label: '', note: 'Answer being marked', path: '/practice', savedAt: Date.now(),
-    data: { submissionId, answer, viaInk: false, ms: 1500, lines: null }
+    data: { submissionId, answer, viaInk: false, sourceMode: 'typed', ms: 1500, lines: null }
   }));
 }, { pid, qid, submissionId, answer });
 
