@@ -11,10 +11,13 @@
 //   · `--journey-selfcheck` — a device with NO server. Onboarding → Practice →
 //     a typed answer and working → strokes on the real PencilKit surface (the
 //     native bridge captures them, the page seals them in IndexedDB and the
-//     one save status follows that readback) → a photo attached. Submit and
-//     Show solution are REFUSED on the card; no verdict, marks or solution
-//     exist. `--journey-relaunch` proves the profile, the question, the typed
-//     work and the strokes survived the relaunch.
+//     one save status follows that readback) → a photo attached. The question
+//     is an offline draft: the card says BEFORE any work that it cannot be
+//     marked and offers NO Submit and NO Show solution; its one action, "Try
+//     for a markable question", asks first when there is work on the page and,
+//     with no server to open one, changes nothing. No verdict, marks or
+//     solution exist. `--journey-relaunch` proves the profile, the question,
+//     the typed work and the strokes survived the relaunch.
 //
 //   · `--journey-marking` — a real local Pri server (PRI_CLOUD_ORIGIN, DEBUG
 //     builds only) whose handwriting reader is a SYNTHETIC stand-in. A
@@ -88,6 +91,23 @@ enum JourneySelfCheck {
     const answerBox = () => q('.editor-body input.answer-input');
     const workingBox = () => q('.editor-body [data-working-area] textarea');
     const primaryBtn = () => q('.ws-actions .ws-actions-btns .btn-primary');
+    // Submit is the primary control only while the question can be marked: on
+    // an unmarkable question (an offline draft) the primary is the replace
+    // action, and there is no Submit and no Show solution at all.
+    const submitBtn = () => q('.ws-actions .ws-actions-btns .btn-primary:not([data-primary-action])');
+    const replaceBtn = () => allVis('.ws-actions .ws-actions-btns .btn-primary[data-primary-action="replace"]')[0] || null;
+    const unmarkableKind = () => { const el = allVis('[data-check-unmarkable]')[0]; return el ? el.getAttribute('data-check-unmarkable') : null; };
+    // What the card of an offline draft must offer, and must not.
+    function assertDraftCard(when) {
+      if (unmarkableKind() !== 'draft') throw new Error(when + ': the card does not say this is an offline draft (' + unmarkableKind() + ')');
+      const said = seen('[data-check-unmarkable]');
+      if (!/without a connection/i.test(said) || !/cannot be marked/i.test(said) || /already finished|finished elsewhere|another tab/i.test(said)) throw new Error(when + ': the draft notice reads: ' + said.slice(0, 120));
+      if (submitBtn()) throw new Error(when + ': a draft offers Submit');
+      if (allVis('.ws-actions button').some(b => /solution/i.test(b.textContent))) throw new Error(when + ': a draft offers a solution');
+      if (!replaceBtn() || allVis('.ws-actions .btn-primary').length !== 1) throw new Error(when + ': the one action is not "try for a markable question": ' + JSON.stringify(allVis('.ws-actions button').map(b => b.textContent.trim())));
+      if (allVis('[data-check-needs-account]').length || allVis('.qpage [data-check-sign-in]').length) throw new Error(when + ': a draft offers a sign-in that cannot make it markable');
+      return said;
+    }
     const WRONG = '-987654';
     const WORKING = '2 + 2 = 4\n3 + 3 = 6';
     const cardMode = () => { const c = q('.qpage'); return c ? c.getAttribute('data-mode') : null; };
@@ -241,7 +261,7 @@ enum JourneySelfCheck {
       return (q('.eval-card') && 'evaluated') || (refusalKind() && 'refused') || (q('.verdict-technical') && 'technical') ||
         (q('.verdict-unsure') && 'unreadable') || (q('.verdict-bad') && 'miss') || (q('.ws-check') && 'confirm') || 'nothing';
     }
-    const pressSubmit = async () => { (await waitFor(() => { const p = primaryBtn(); return p && !p.disabled && p; }, 20000)).click(); };
+    const pressSubmit = async () => { (await waitFor(() => { const p = submitBtn(); return p && !p.disabled && p; }, 20000)).click(); };
     const revealBtn = () => allVis('.ws-actions .ws-actions-btns button').find(b => /^Show solution/.test(b.textContent.trim()));
     // Show solution is armed by one press and confirmed by the next.
     const pressReveal = async () => { (await waitFor(revealBtn)).click(); await sleep(450); const again = revealBtn(); if (again) again.click(); };
@@ -254,7 +274,11 @@ enum JourneySelfCheck {
       await nav('/practice'); await waitFor(() => q('.q-prompt'));
       const n = await openTypedQuestion();
       assertUnmarked('opening');
-      return 'question shown; question ' + n + ' of the pinned chapter takes a typed answer, working, ink and a photo';
+      // Said before any work goes in: with no server this copy cannot be marked.
+      at = 'draft notice'; await waitFor(() => unmarkableKind());
+      assertDraftCard('opening');
+      if (replaceBtn().textContent.trim() !== 'Try for a markable question' || q('[data-check-replace-confirm]')) throw new Error('before any work the action reads: ' + replaceBtn().textContent.trim());
+      return 'question ' + n + ' of the pinned chapter takes a typed answer, working, ink and a photo; said to be an unmarkable draft before any work';
     });
     // Ink first, on an untouched card: the one save status is then about the
     // ink alone, so it can be held to the sealed row strictly.
@@ -313,25 +337,45 @@ enum JourneySelfCheck {
         if (q('[data-photo-correct-transcript]')) throw new Error('a photo transcript appeared with no server');
         await sleep(800);
         if (nativeReads) throw new Error('the on-device photo reader answered ' + nativeReads + ' time(s)');
-        if (primaryBtn() && !primaryBtn().disabled && !answerBox()) throw new Error('an unread photo can be submitted');
+        if (submitBtn()) throw new Error('an unread photo can be submitted');
         assertUnmarked('photo');
         return 'attached, not read on device: "' + said.slice(0, 70) + '"';
       } finally { window.__priPhotoReceive = original; }
     });
-    await step('checkRefused', async () => {
+    await step('noCheckOffered', async () => {
       at = 'type'; await typeMode();
       if ((answerBox() || {}).value !== '12345') throw new Error('typed answer lost across modes: ' + (answerBox() || {}).value);
-      at = 'submit'; const got = await checked(pressSubmit);
-      // No server ever issued this question: it can never be marked.
-      if (got !== 'refused' || refusalKind() !== 'new-question') throw new Error('Submit was not refused as an offline draft (' + got + '/' + refusalKind() + '): ' + seen('.verdict').slice(0, 110));
-      assertUnmarked('submit');
-      return 'Submit refused: "' + seen('.verdict .verdict-title') + '"; no verdict, marks or solution';
+      // No server ever issued this question: it can never be marked, so with
+      // an answer, working, ink and a photo on the page there is still no
+      // Submit and no Show solution to be refused.
+      at = 'offers'; const said = assertDraftCard('with work on the page');
+      if (revealBtn()) throw new Error('Show solution is offered on a draft');
+      if (refusalKind()) throw new Error('a check was refused that nobody asked for: ' + refusalKind());
+      assertUnmarked('draft with work');
+      return 'no Submit, no Show solution: "' + said.slice(0, 70) + '"';
     });
-    await step('solutionRefused', async () => {
-      const got = await checked(pressReveal);
-      if (got !== 'refused' || refusalKind() !== 'new-question') throw new Error('Show solution was not refused as an offline draft (' + got + '/' + refusalKind() + '): ' + seen('.verdict').slice(0, 110));
-      assertUnmarked('show solution');
-      return 'Show solution refused: "' + seen('.verdict .verdict-title') + '"; no solution shown';
+    await step('replaceKeepsWork', async () => {
+      const id = qid();
+      // With work on the page the first press only asks.
+      at = 'ask'; replaceBtn().click();
+      await waitFor(() => vis(q('[data-check-replace-confirm]')));
+      if (replaceBtn().textContent.trim() !== 'Leave this one and get a new question' || !vis(q('.ws-actions [data-check-replace-cancel]'))) throw new Error('asked, the actions read: ' + JSON.stringify(allVis('.ws-actions button').map(b => b.textContent.trim())));
+      if (qid() !== id || (answerBox() || {}).value !== '12345') throw new Error('asking changed the card');
+      // Confirmed: a markable question is asked for FIRST. With no server none
+      // can be opened, and then nothing here changes.
+      at = 'confirm'; replaceBtn().click();
+      await waitFor(() => !busyNow() && !q('[data-check-replace-confirm]') && vis(q('[data-check-replace-note]')), 60000);
+      const note = seen('[data-check-replace-note]');
+      if (!/could not be opened/i.test(note) || !/nothing here has changed/i.test(note)) throw new Error('the note reads: ' + note.slice(0, 120));
+      at = 'kept';
+      if (qid() !== id) throw new Error('a different question is on the card: ' + qid() + ' (was ' + id + ')');
+      if ((answerBox() || {}).value !== '12345') throw new Error('typed answer lost: ' + JSON.stringify((answerBox() || {}).value));
+      if (await shownWorking() !== WORKING) throw new Error('typed working lost');
+      if (await inkDraft(id) !== 'kept') throw new Error('sealed ink draft lost');
+      if (refusalKind()) throw new Error('a check was refused: ' + refusalKind());
+      assertDraftCard('after a declined replace');
+      assertUnmarked('declined replace');
+      return 'asked first; with no server nothing changed: same question, answer, working and ink kept; "' + note.slice(0, 50) + '"';
     });
     await step('nothingRecorded', async () => {
       const id = qid();
@@ -389,6 +433,7 @@ enum JourneySelfCheck {
       const working = await shownWorking();
       if (working !== WORKING) throw new Error('typed working lost: ' + JSON.stringify(working));
       assertUnmarked('relaunch');
+      assertDraftCard('relaunch');
       // Observed, not required: an attached photo is held by the open card
       // only (drafts.js keeps answers and working, never images).
       at = 'photo'; await photoMode();

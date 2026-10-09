@@ -106,8 +106,10 @@ jobs:
       # both must pass (scripts/iphone-journey.mjs):
       #   1. no server — typed answer and working, strokes on the PencilKit
       #      surface (hardware-correct ink facts, sealed draft, one truthful
-      #      save status), a photo that is not read on the device; Submit and
-      #      Show solution refused, nothing marked; relaunch keeps the work;
+      #      save status), a photo that is not read on the device; the offline
+      #      draft says it cannot be marked and offers no Submit or Show
+      #      solution, asking for a markable question changes nothing, nothing
+      #      is marked; relaunch keeps the work;
       #   2. a real local Pri server on SQLite with a SYNTHETIC handwriting
       #      reader — server-prepared question signed out, in-card sign-in,
       #      server-marked typed and handwritten answers, History after relaunch.
