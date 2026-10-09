@@ -48,6 +48,9 @@ jobs:
 
       - name: Install client dependencies
         run: npm ci --prefix client
+      # Client suites are marked by the real /v1 server, booted in-process (online-only grading).
+      - name: Install server dependencies
+        run: npm ci --prefix server
 
       - name: Install Chromium for real mounted flows
         working-directory: client

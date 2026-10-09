@@ -44,6 +44,9 @@ jobs:
 
       - name: Install client dependencies
         run: npm ci --prefix client
+      # Client suites are marked by the real /v1 server, booted in-process (online-only grading).
+      - name: Install server dependencies
+        run: npm ci --prefix server
 
       - name: KALP-02 route and role source gate
         run: node client/test/kalp02-navigation-check.mjs
