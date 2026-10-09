@@ -6,15 +6,22 @@
 // checker, that a wrong one comes back wrong, or that the worked solution the
 // engine wrote is the one the card renders. That gap is this flow.
 //
-// HOW A CORRECT ANSWER IS KNOWN WITHOUT CHEATING. Nothing here reads the
-// question's answer out of storage — it is sealed, and a test that unsealed it
-// would be testing its own copy of the maths. Instead the flow answers wrongly
-// twice, which is what a student gets for two misses: the card resolves and
-// prints the worked solution and the final answer. It then presses the card's
-// own "Redo Question", which regenerates the SAME question from the SAME seed,
-// and types back what the solution just said. If the marking works, that is
-// correct. If the seed does not hold, the prompts differ and the flow says so
-// before it ever gets to the answer.
+// WHO MARKS. The server, and only the server (owner decision 2026-10-10): the
+// profile is signed in to a verified account on the real platform server this
+// suite boots (support/online-session.mjs) and every verdict asserted below is
+// read from that server's receipt as well as from the card.
+//
+// HOW A CORRECT ANSWER IS KNOWN WITHOUT CHEATING. The device holds no answer
+// key for a server-issued question and nothing here reads one from the page.
+// The flow answers wrongly twice, which is what a student gets for two misses:
+// the card resolves and prints the server's worked solution and final answer.
+// The test's own desk regenerates that question from the generator, difficulty
+// and seed the page sent to /practice/issue and requires the two to agree; the
+// next question is then answered with its regenerated answer.
+//
+// "Redo Question" used to carry the second half of this flow. It no longer
+// brings back the same question for a server-issued one, and the copy it makes
+// can never be checked: see known-red-online-redo-uncheckable.mjs.
 //
 // Run on its own:  node client/test/tour-v3.js
 // ─────────────────────────────────────────────────────────────────────────────
@@ -29,10 +36,12 @@ const SUBMIT = { name: 'Submit Answer' };
 export const flow = {
   id: 'practice',
   name: 'Practice · a question, marked both ways',
+  online: true,
 
-  async run({ page, ctx, base, check, goto, createProfile, mathText, settle }) {
+  async run({ page, ctx, base, check, goto, createProfile, mathText, settle, online }) {
     await goto('/');
     await createProfile({ name: 'Blaise Pascal', year: 7 });
+    await online.signIn({ name: 'Blaise Pascal' });
 
     // ── 1 · a question renders ───────────────────────────────────────────────
     await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
@@ -99,35 +108,77 @@ export const flow = {
     await check('the worked solution appears', await page.locator('.solution-block').count() === 1);
     const steps = await page.locator('.solution-block .step').count();
     await check('the worked solution is worked, step by step', steps >= 1, `${steps} steps rendered`);
-    await check('the marking criteria are shown',
-      await page.locator('.criteria-table tbody tr').count() >= 1);
 
     const answer = (await mathText('.final-answer') || '').replace(/^Final answer\s*/i, '').trim();
     if (!await check('the final answer is stated', answer.length > 0,
       'the solution block carried no .final-answer')) return;
 
-    // ── 5 · the same question again, answered correctly ──────────────────────
-    await page.locator('.redo-chip').click();
-    await page.waitForSelector('.editor-body input.answer-input', { timeout: 30000 });
-    await settle();
-    const again = await mathText('.q-prompt');
-    if (!await check('"Redo Question" brings back the same question, same numbers',
-      again === prompt, `first: ${JSON.stringify(prompt)}\n      again: ${JSON.stringify(again)}`)) return;
+    // Who marked it. Both misses were committed by the server for a question
+    // the server issued; the device held no answer key and marked nothing.
+    const firstId = (await online.shownRow())?.serverQuestionId;
+    const misses = await online.practiceCalls(new RegExp(`^/v1/practice/${firstId}/submit$`));
+    await check('both misses were marked by the server, for a question the server issued',
+      !!firstId && misses.length === 2 && misses.every(c => c.status === 200 && c.json?.authoritative === true && c.json.correct === false) &&
+        misses[0].json.resolved === false && misses[1].json.resolved === true,
+      JSON.stringify(misses.map(c => ({ status: c.status, correct: c.json?.correct, resolved: c.json?.resolved }))));
+    await check('the marks on the card are the server\'s: 0 of the marks it issued the question for',
+      new RegExp(`^0 / ${misses[1]?.json?.marksPossible} marks?\\b`).test((await page.locator('.eval-marks').innerText()).replace(/\s+/g, ' ').trim()) &&
+        await page.locator('[data-grade-unavailable]').count() === 0,
+      `marks read ${JSON.stringify(await page.locator('.eval-marks').innerText())}; server said ${misses[1]?.json?.marksEarned}/${misses[1]?.json?.marksPossible}`);
+    await check('nothing on the card calls this a mark made on the device',
+      !/marked on this device/i.test(await page.locator('.qpage').innerText()));
+    // The solution the card printed is the server's. The test's own desk
+    // regenerates the same question from the generator, difficulty and seed the
+    // page asked the server to issue; the two must name the same answer.
+    const solved = await online.answerOf();
+    await check('the final answer the server released is the one the question\'s own generator gives',
+      solved.text !== null && answer.replace(/\s+/g, '').includes(String(solved.text).replace(/\s+/g, '')),
+      `card: ${JSON.stringify(answer)}; regenerated: ${JSON.stringify(solved.text)}`);
 
-    await page.locator('.editor-body input.answer-input').fill(answer);
+    // ── 5 · the next question, answered correctly ────────────────────────────
+    // The right answer comes from the oracle (support/online-session.mjs): the
+    // device no longer holds one to read, and the server never hands one out
+    // before the question is resolved.
+    await page.locator('.ws-actions .btn-primary').click();
+    await page.waitForFunction(id => {
+      const el = document.querySelector('.qpage[data-question-id]');
+      return el && el.getAttribute('data-question-id') !== id && el.querySelector('.q-prompt');
+    }, (await online.shownRow()).id, { timeout: 30000 });
+    let right = null;
+    for (let i = 0; i <= MAX_SKIPS; i++) {
+      if (await typeTab.count()) await typeTab.click();
+      await settle();
+      if (await answerBox.count() === 1) {
+        right = await online.answerOf();
+        if (right.kind === 'text' && right.text !== null) break;
+      }
+      right = null;
+      await page.locator('.ctx-next').click();
+      await page.waitForSelector('.q-prompt', { timeout: 30000 });
+    }
+    if (!await check('the next question is a typed one whose answer the oracle can regenerate',
+      !!right && await mathText('.q-prompt') !== prompt, JSON.stringify(right && { answerType: right.answerType }))) return;
+
+    await answerBox.fill(right.text);
     await page.getByRole('button', SUBMIT).click();
     await page.waitForSelector('.eval-card', { timeout: 20000 });
     // Full marks is the signal, not the wording: the card only awards every
     // mark when the checker said the answer was right.
     const marked = (await page.locator('.eval-card').innerText()).replace(/\s+/g, ' ');
     const marks = (await page.locator('.eval-marks').innerText()).replace(/\s+/g, ' ').trim();
-    await check(`the answer the solution gave (${JSON.stringify(answer)}) is marked correct`,
-      /^(\d+(?:\.\d)?) \/ \1 marks\b/.test(marks), `marks read ${JSON.stringify(marks)}`);
+    const graded = (await online.practiceCalls(new RegExp(`^/v1/practice/${(await online.shownRow())?.serverQuestionId}/submit$`))).at(-1);
+    await check(`the regenerated answer (${JSON.stringify(right.text)}) is marked correct, by the server, at the first try`,
+      /^(\d+(?:\.\d)?) \/ \1 marks\b/.test(marks) && graded?.json?.authoritative === true && graded.json.correct === true &&
+        graded.json.resolved === true && graded.json.marksEarned === graded.json.marksPossible,
+      `marks read ${JSON.stringify(marks)}; server ${String(JSON.stringify(graded?.json)).slice(0, 200)}`);
     await check('a correct answer is not told what was expected instead',
       !/Expected:/.test(marked), `evaluation reads ${JSON.stringify(marked.slice(0, 160))}`);
     await check('the session counter agrees it was right',
       /session 1\/2/.test(await page.locator('.ctx-pill-meta').innerText()),
       `context pill reads ${JSON.stringify(await page.locator('.ctx-pill-meta').innerText())}`);
+    const ledger = online.ledger();
+    await check('the server holds exactly these two questions as completed, once each',
+      ledger.completions === 2, JSON.stringify(ledger));
 
     // ── 6 · both attempts were kept ──────────────────────────────────────────
     await page.goto(`${base}/history`, { waitUntil: 'domcontentloaded' });
