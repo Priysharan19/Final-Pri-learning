@@ -66,7 +66,7 @@ import {
 } from '../../client/src/engine/indiaExamComposer.js';
 import { scopeForYear, subtopicsForYear, PATHWAYS } from '../../client/src/engine/curriculum.js';
 import { multipartForYear } from '../../client/src/engine/generators/multipart.js';
-import { FREE_EXAM_ALLOWANCE } from '../../client/src/platform/entitlements.js';
+import { FREE_EXAM_ALLOWANCE } from '../../client/src/engine/examAllowance.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
 import { stampExamItem } from '../../client/src/engine/contentIdentity.js';
 
