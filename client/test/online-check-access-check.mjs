@@ -109,7 +109,7 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   eq(kinds.length, 8, 'eight reasons are named');
   const used = new Set(['check.needsAccount', 'check.signInAction']);
   // A timed game (Rapid Fire, Match) is refused at its start with the same reasons.
-  for (const context of ['answer', 'exam', 'game']) {
+  for (const context of ['answer', 'exam', 'game', 'placement']) {
     for (const kind of kinds) {
       const copy = checkRefusalCopy(kind, context);
       ok(copy && ['sign-in', 'retry', 'account', 'next'].includes(copy.action), `${kind}/${context} has one next step`);
@@ -131,6 +131,7 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   eq(checkRefusalCopy('sign-in', 'exam').titleKey, 'check.examSignInTitle', 'an exam start says a paper, not an answer');
   eq(checkRefusalCopy('reconnect', 'exam').contextKey, 'check.examNotStarted', 'and that the paper has not started');
   eq(checkRefusalCopy('sign-in', 'game').contextKey, 'check.gameNotStarted', 'a game that could not start says so, and that nothing was marked');
+  eq(checkRefusalCopy('reconnect', 'placement').contextKey, 'check.placementNotStarted', 'a placement check that could not start says so');
   eq(checkRefusalCopy('nonsense'), null, 'an unknown reason has no words');
   const catalogueKeys = Object.keys(en).filter(k => k.startsWith('check.'));
   eq(catalogueKeys.filter(k => !used.has(k)), [], 'no check.* string is unused');
@@ -165,7 +166,7 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
     // identical Retry is the same submission.
     ok(definitiveSubmissionRefusal(error) === false, `${kind}: the submission key is kept for the retry`);
   }
-  eq(refusedCheckState(SIGN_IN, 'submit', { diagnostic: true }).res.refusal, null, 'the placement check names no account refusal');
+  eq(refusedCheckState(SIGN_IN, 'submit', { diagnostic: true }).res.refusal, 'sign-in', 'the placement check, now issued and marked by the server, names its account refusal too');
   eq(refusedCheckState(err(409, 'ALREADY_RESOLVED'), 'submit').res.conflict, true, 'a finished question is still a conflict, not a retry');
   // Regression (native simulator journey, 2026-10-10): an offline draft's 409
   // was shown as "This question is already finished" instead of its refusal.

@@ -80,7 +80,8 @@ export function checkRefusalCopy(kind, context = 'answer') {
   return {
     ...copy,
     titleKey: exam && kind === CHECK_REFUSAL.SIGN_IN ? 'check.examSignInTitle' : copy.titleKey,
-    contextKey: exam ? 'check.examNotStarted' : context === 'game' ? 'check.gameNotStarted' : 'check.notChecked'
+    contextKey: exam ? 'check.examNotStarted' : context === 'game' ? 'check.gameNotStarted'
+      : context === 'placement' ? 'check.placementNotStarted' : 'check.notChecked'
   };
 }
 
@@ -120,7 +121,9 @@ export function legacyDeviceReplay(result) {
  * marked on the device and has no account refusals to name.
  */
 export function refusedCheckState(error, via, { diagnostic = false } = {}) {
-  const refusal = diagnostic ? null : checkRefusal(error);
+  // The placement check is issued and marked by the server too, so it has the
+  // same account and connection refusals as any other check.
+  const refusal = checkRefusal(error);
   return {
     phase: 'retry',
     res: {

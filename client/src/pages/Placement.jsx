@@ -19,6 +19,9 @@ import QuestionCard from '../components/QuestionCard.jsx';
 import TermGloss from '../components/TermGloss.jsx';
 import { practiceHref } from '../lib/practiceLinks.js';
 import { tLater, useT } from '../i18n/index.js';
+import Icon from '../components/Icon.jsx';
+import { checkRefusal, checkRefusalCopy } from '../components/checkAccess.js';
+import { CheckRefusal } from '../components/CheckRefusal.jsx';
 import { MAP_STRANDS, PREREQ_GRAPH_VERSION, mapStrandOf } from '../engine/prerequisites.js';
 import { PREREQ_SKILLS_HI } from '../engine/prerequisiteSkillsHi.js';
 
@@ -41,7 +44,10 @@ const OUTCOME_KEY = {
 const STRONG_PRACTICE = { attempts: 5, mastery: 65 };
 
 export default function Placement() {
-  const { user } = useApp();
+  const { user, refreshUser } = useApp();
+  // Why the check could not start: its questions are issued and marked by the
+  // server, which needs a signed-in account and a connection.
+  const [refusal, setRefusal] = useState(null);
   const t = useT();
   const nav = useNavigate();
   const [view, setView] = useState(null);
@@ -80,15 +86,27 @@ export default function Placement() {
     if (busy) return;
     setBusy(true);
     try {
+      setRefusal(null);
       const r = await api.post('/placement/start', { restart });
       setView(v => ({ ...(v || {}), status: 'active' }));
       setQuestion(r.question);
       setProgress(r.progress);
       setAnswered(null);
       setError('');
-    } catch (err) { setError(err.message || tLater('placement.couldNotLoad')); }
+    } catch (err) {
+      const kind = checkRefusal(err);
+      if (checkRefusalCopy(kind, 'placement')) { setRefusal(kind); setError(''); }
+      else setError(err.message || tLater('placement.couldNotLoad'));
+    }
     finally { setBusy(false); }
   };
+
+  const startRefused = refusal ? (
+    <div className="verdict verdict-technical" role="alert" data-placement-refused={refusal} style={{ marginTop: 14, textAlign: 'left' }}>
+      <span className="verdict-ico"><Icon name="alert" /><span className="sr-only">{t('verdict.notCheckedLabel')}</span></span>
+      <div><CheckRefusal kind={refusal} context="placement" user={user} refreshUser={refreshUser} onRetry={() => start(false)} busy={busy} /></div>
+    </div>
+  ) : null;
 
   const skip = async () => {
     try { await api.post('/placement/skip', {}); } catch { /* skipping is a preference; nothing to recover */ }
@@ -146,6 +164,7 @@ export default function Placement() {
           <div className="pm-bar" aria-hidden="true"><div style={{ width: `${Math.min(100, Math.round(100 * (n - 1) / (progress?.target || 10)))}%` }} /></div>
         </div>
         {error && <div className="error-box" role="alert">{error}</div>}
+        {startRefused}
         <QuestionCard
           key={`${question.id}:${round}`}
           question={question}
@@ -175,6 +194,7 @@ export default function Placement() {
         <p className="muted">{t('placement.introEvidence')}</p>
         <p className="muted" style={{ fontSize: 12.5 }}>{t('placement.provenance', { version: PREREQ_GRAPH_VERSION })}</p>
         {error && <div className="error-box" role="alert">{error}</div>}
+        {startRefused}
         <div className="row" style={{ gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
           <button className="btn btn-primary btn-lg" disabled={busy} onClick={() => start(false)} data-placement-start>{t('placement.start')}</button>
           <button className="btn btn-quiet" disabled={busy} onClick={skip}>{t('placement.notNow')}</button>
