@@ -40,7 +40,8 @@ function canonical(q) {
   if(q.answerType==='working') return a.canonicalWorking ?? null;
   return null;
 }
-async function rightFor(id){ const row=await idb.get('questions',id); const x=canonical(row?.payload); return x!==null&&checkAnswer(row.payload,x).correct?x:null; }
+// The device holds no answer; the key is the server's sealed copy of the issued question (the suite's oracle).
+async function rightFor(id){ const key=await online.answerKey(await idb.get('questions',id)); const x=canonical(key); return x!==null&&checkAnswer(key,x).correct?x:null; }
 async function resolveAny(body={}){
   for(let i=0;i<40;i++){
     const s=await api.post('/practice/next',{...body,resume:true}); const right=await rightFor(s.question.id);
