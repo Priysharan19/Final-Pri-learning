@@ -25,6 +25,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 
 const keys = ['NODE_ENV', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLIC_ORIGIN', 'PRI_AUTH_EMAIL_PROVIDER'];
 const before = Object.fromEntries(keys.map(key => [key, process.env[key]]));
@@ -56,6 +57,7 @@ const { FREE_EXAM_ALLOWANCE } = await import('../../client/src/platform/entitlem
 const { contentHashOf } = await import('../../client/src/engine/contentIdentity.js');
 const { MAX_OPEN_PAPERS } = await import('../platform/exams.js');
 const { contentIdentityOf, seenKeysOf } = await import('../platform/contentSeen.js');
+const { encryptDeliveryToken } = await import('../platform/deliveryCrypto.js');
 
 const engine = requestedEngine();
 
@@ -774,6 +776,33 @@ try {
     const elsewhere = await issuePractice(firstTimer.jar, x);
     eq(elsewhere.data.repeat ?? false, false, 'another account\'s copy of that content is still its own first sitting');
     eq(await rows(firstTimer.account.id, 'practice-content'), 0, 'and nothing was recorded as seen for it');
+
+    // One content, one identity, however it reaches an account: as an item on
+    // a paper, as a practice copy, and as a question prepared signed-out and
+    // bound to the account later. (The prepared token is minted here exactly
+    // as /v1/practice/prepare mints it, for the paper's own generator,
+    // difficulty and seed: the route itself chooses its seed.)
+    {
+      const sealedPractice = async id => JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE scope='practice-question' AND key=?", [id])).response_json);
+      const preparedFor = sq => encryptDeliveryToken(JSON.stringify({ g: sq.generator, d: Number(sq.payload.difficulty), s: Number(sq.payload.seed), m: 'practice',
+        x: Date.now() + 60 * 60 * 1000, n: randomUUID() }), 'practice-prepared-v1');
+      const bind = (account, sq) => h.request('/v1/practice/issue', { method: 'POST', jar: account.jar, body: { prepared: preparedFor(sq), account: String(account.account.id) } });
+      const bound = await bind(rep, x);
+      eq([bound.status, bound.data.repeat, bound.data.question.prompt], [201, true, x.payload.prompt], 'the same content, prepared signed-out and bound to the account after the paper, is a repeat');
+      const identities = [contentIdentityOf(x.payload), contentIdentityOf(await sealedPractice(copy.data.question.id)), contentIdentityOf(await sealedPractice(bound.data.question.id))];
+      eq([new Set(identities).size, /^[0-9a-f]{32}$/.test(identities[0])], [1, true], 'the paper item, the practice copy and the bound prepared copy have one content identity');
+      eq(seenKeysOf(x.payload)[0], seenKeysOf(await sealedPractice(bound.data.question.id))[0], 'and so one seen-key');
+      // The other way round, on an account that never sat the paper: a bound
+      // prepared copy that shows its solution makes the practice copy a repeat.
+      const stranger = await registerAccount(h, { email: 'exam.prepared@example.test', deviceId: 'ipad-exam-prepared' });
+      eq((await verifyEmail(h, stranger.account.id)).status, 200, 'an account that never sat the paper is verified');
+      await h.db.run('DELETE FROM rate_limits');
+      const firstBound = await bind(stranger, x);
+      eq([firstBound.status, firstBound.data.repeat ?? false], [201, false], 'its bound prepared copy of that content is a first sitting');
+      eq((await h.request(`/v1/practice/${firstBound.data.question.id}/reveal`, { method: 'POST', jar: stranger.jar, body: {} })).status, 200, 'whose solution it reveals');
+      eq((await issuePractice(stranger.jar, x)).data.repeat, true, 'after which a practice copy of the same content is a repeat');
+      eq((await bind(stranger, x)).data.repeat, true, 'and so is another prepared copy of it');
+    }
 
     // Content seen before the paper is finalised is a repeat on the paper.
     let p2, paper2, y, z;

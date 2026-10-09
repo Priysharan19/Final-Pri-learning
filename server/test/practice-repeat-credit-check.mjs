@@ -290,6 +290,121 @@ try {
   eq([listedBind.status, listedBind.data?.error?.code], [409, 'PRACTICE_ACCOUNT_MISMATCH'], 'nor does it bind a prepared question');
   eq((await post('/v1/practice/issue', { prepared: prep2.data.prepared, account: String(named.account.id) }, named.jar)).status, 201, 'which is still there for the account named properly');
 
+  // ══════════════════════════════════════════════════════════════════════════
+  // R4 SERVER STREAM (H3) — a figure is content only when the answer is read
+  // from it. Separate block: its own accounts, helpers prefixed `fig`.
+  // ══════════════════════════════════════════════════════════════════════════
+  {
+    const { PUBLIC_QUESTION_FIELDS } = await import('../../client/src/engine/publicQuestion.js');
+    const figSealed = async id => JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE scope='practice-question' AND key=?", [id])).response_json);
+    const figIssue = async (jar, generator, difficulty, seed) => { await h.db.run("DELETE FROM rate_limits"); return post('/v1/practice/issue', { generator, difficulty, curriculum: 'in', ...(seed === undefined ? {} : { seed }) }, jar); };
+    const keyed = q => q.mcqOptions[q.answer.correctIndex];
+    const GRAPHS = 'c10-linear-graphs';
+
+    // Class X graphical pairs, D2–D4. These prompts used to state their own
+    // answer, so after one reveal every new figure was new content with a
+    // known key (150 issues: 57 copies / 171 marks at D3). Now the figure
+    // decides, and a prompt with its keyed answer is one figure.
+    for (const difficulty of [2, 3, 4]) {
+      // Fixed seeds: a question, another seed of the SAME question, and a
+      // seed of the same prompt keyed to a different answer by its figure.
+      const base = generateQuestion(GRAPHS, difficulty, 1000 + difficulty);
+      let sameSeed = null, otherSeed = null;
+      for (let seed = 1; seed < 6000 && (sameSeed === null || otherSeed === null); seed++) {
+        if (seed === 1000 + difficulty) continue;
+        const q = generateQuestion(GRAPHS, difficulty, seed);
+        if (q.prompt !== base.prompt) continue;
+        if (keyed(q) === keyed(base)) { if (sameSeed === null) sameSeed = seed; } else if (otherSeed === null) otherSeed = seed;
+      }
+      const same = generateQuestion(GRAPHS, difficulty, sameSeed), other = generateQuestion(GRAPHS, difficulty, otherSeed);
+      eq([same.figure === base.figure, contentIdentityOf(same) === contentIdentityOf(base), other.figure === base.figure, contentIdentityOf(other) === contentIdentityOf(base)],
+        [true, true, false, false], `D${difficulty}: one prompt with one keyed answer is one figure and one identity; the same prompt under another figure is keyed differently and is other content`);
+
+      const f = await account(`fig${difficulty}`);
+      const q0 = await figIssue(f.jar, GRAPHS, difficulty, 1000 + difficulty);
+      const shown = await post(`/v1/practice/${q0.data.question.id}/reveal`, {}, f.jar);
+      eq([q0.status, shown.status, shown.data.solution.answerText], [201, 200, keyed(base)], `D${difficulty}: a question is issued and its solution revealed`);
+      const again = await figIssue(f.jar, GRAPHS, difficulty, sameSeed);
+      eq([again.data.repeat, again.data.question.prompt === q0.data.question.prompt], [true, true], `D${difficulty}: the same question from another seed is a repeat`);
+      const differs = await figIssue(f.jar, GRAPHS, difficulty, otherSeed);
+      eq([differs.data.repeat ?? false, differs.data.question.prompt === q0.data.question.prompt, differs.data.question.figure === q0.data.question.figure], [false, true, false],
+        `D${difficulty}: the same prompt over a different graph is a different question`);
+      const replay = differs.data.question.mcqOptions.indexOf(keyed(base));
+      if (replay >= 0) {
+        const blind = await grade(f.jar, differs.data.question.id, replay);
+        eq([blind.data.correct, blind.data.marksEarned], [false, 0], `D${difficulty}: and the answer revealed for the first graph is wrong on it`);
+      } else eq(replay, -1, `D${difficulty}: and the answer revealed for the first graph is not even offered on it`);
+
+      // The farm: after that one reveal, whatever the server issues next,
+      // answering with the revealed answer wherever the prompt is the same
+      // earns no first-sitting credit.
+      let credit = 0, marks = 0, samePrompt = 0, flaggedAtIssue = 0;
+      for (let i = 0; i < 40; i++) {
+        const next = await figIssue(f.jar, GRAPHS, difficulty);
+        const q = next.data.question;
+        if (q.prompt !== q0.data.question.prompt) continue;
+        samePrompt++;
+        if (next.data.repeat) flaggedAtIssue++;
+        const index = q.mcqOptions.indexOf(keyed(base));
+        if (index < 0) continue;
+        const marked = await grade(f.jar, q.id, index);
+        if (marked.data.correct && !marked.data.repeat) { credit++; marks += marked.data.marksEarned; }
+      }
+      const fEvents = await attempts(f.account.id);
+      eq([credit, marks, fEvents.filter(x => x.correct && !x.repeat).length], [0, 0, 0],
+        `D${difficulty}: 40 more issues after one reveal: no first-sitting credit from the revealed answer (${samePrompt} with the same prompt, ${flaggedAtIssue} of them repeats at issue)`);
+      const sealedBase = await figSealed(q0.data.question.id);
+      eq(sealedBase.steps.filter(step => !/^(check|note|bonus)/i.test(step.h)).length, difficulty === 2 ? 2 : 3, `D${difficulty}: marks follow the reading the question asks for (${difficulty === 2 ? 2 : 3})`);
+    }
+
+    // A question whose prompt alone fixes the answer says so privately, and
+    // its figure is then not part of what makes it new: the NSW Year 10
+    // scatterplot forms, where each context always slopes one way.
+    const STATS = 'y10-stats';
+    const plots = [];
+    for (let seed = 1; seed < 4000 && plots.length < 2; seed++) {
+      const q = generateQuestion(STATS, 3, seed);
+      if (q.identityIgnoresFigure !== true || q.answerType !== 'mcq') continue;
+      if (!plots.length) plots.push({ seed, q });
+      else if (q.prompt === plots[0].q.prompt && q.figure !== plots[0].q.figure) plots.push({ seed, q });
+    }
+    eq([plots.length, keyed(plots[0].q) === keyed(plots[1].q), contentIdentityOf(plots[0].q) === contentIdentityOf(plots[1].q), plots[0].q.contentHash === plots[1].q.contentHash],
+      [2, true, true, false], 'two different plots of one prompt-determined question: one keyed answer, one identity, two engine hashes');
+    eq([PUBLIC_QUESTION_FIELDS.includes('identityIgnoresFigure'), contentIdentityOf({ ...plots[0].q, identityIgnoresFigure: undefined }) === contentIdentityOf(plots[0].q), contentIdentityOf({ ...plots[0].q, identityIgnoresFigure: 'true' }) === contentIdentityOf(plots[0].q)],
+      [false, false, false], 'the mark is not a public field, and only the generator\'s own `true` leaves the figure out');
+    const s = await account('figstats');
+    const s0 = await figIssue(s.jar, STATS, 3, plots[0].seed);
+    const hasKey = (value, key) => !!value && typeof value === 'object' && (Object.hasOwn(value, key) || Object.values(value).some(v => hasKey(v, key)));
+    eq([s0.status, hasKey(s0.data, 'identityIgnoresFigure'), (await figSealed(s0.data.question.id)).identityIgnoresFigure], [201, false, true], 'the issued question does not carry the mark; the server\'s sealed copy does');
+    const sShown = await post(`/v1/practice/${s0.data.question.id}/reveal`, {}, s.jar);
+    eq([sShown.status, hasKey(sShown.data, 'identityIgnoresFigure')], [200, false], 'nor does its revealed solution');
+    const s1 = await figIssue(s.jar, STATS, 3, plots[1].seed);
+    eq([s1.data.repeat, s1.data.question.figure === s0.data.question.figure], [true, false], 'the same question drawn with other points is a repeat');
+    const s1Grade = await grade(s.jar, s1.data.question.id, plots[1].q.answer.correctIndex);
+    eq([s1Grade.data.correct, s1Grade.data.repeat, hasKey(s1Grade.data, 'identityIgnoresFigure')], [true, true, false], 'and is marked as one');
+    // Tries follow it across plots too.
+    const t9 = await account('figtries');
+    const t9a = await figIssue(t9.jar, STATS, 3, plots[0].seed);
+    const wrongIndex = [0, 1, 2, 3].find(i => i !== plots[0].q.answer.correctIndex);
+    eq((await grade(t9.jar, t9a.data.question.id, wrongIndex)).data.resolved, false, 'a wrong first try on one plot');
+    eq((await figIssue(t9.jar, STATS, 3, plots[1].seed)).data.triesLeft, 1, 'is a try spent on the other plot of the same question');
+
+    // And a figure that DOES carry the data stays content: two triangles with
+    // one prompt and one answer are two questions.
+    const TRI = 'c10-triangles-current';
+    const tri = [];
+    for (let seed = 1; seed < 4000 && tri.length < 2; seed++) {
+      const q = generateQuestion(TRI, 1, seed);
+      if (!tri.length) tri.push({ seed, q });
+      else if (q.prompt === tri[0].q.prompt && q.answer.value === tri[0].q.answer.value && q.figure !== tri[0].q.figure) tri.push({ seed, q });
+    }
+    eq([tri.length, contentIdentityOf(tri[0].q) === contentIdentityOf(tri[1].q), tri[0].q.identityIgnoresFigure], [2, false, undefined], 'two figures with different data under one prompt and one answer are two identities');
+    const tr = await account('figtri');
+    const tr0 = await figIssue(tr.jar, TRI, 1, tri[0].seed);
+    eq((await post(`/v1/practice/${tr0.data.question.id}/reveal`, {}, tr.jar)).status, 200, 'one is revealed');
+    eq((await figIssue(tr.jar, TRI, 1, tri[1].seed)).data.repeat ?? false, false, 'the other, read from different lengths, is still new work');
+  }
+
   console.log(`REPEAT CREDIT: PASS — ${count}/${count} checks — content an account has been shown the solution of is a repeat however, whenever and in whatever option order it was issued; tries follow the content across copies; working without an answer always spends a try; unrelated arithmetic earns nothing.`);
 } finally {
   await h.close();

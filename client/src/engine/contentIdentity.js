@@ -23,7 +23,7 @@
 // an old attempt is never misattributed to content it was not answered on.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const CONTENT_VERSION = '2026.10.3';
+export const CONTENT_VERSION = '2026.10.4';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */
