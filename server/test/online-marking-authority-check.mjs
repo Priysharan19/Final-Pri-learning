@@ -161,6 +161,34 @@ try {
   eq(validAward.status, 200, 'valid answer remains possible after rejected forgery');
   eq(validAward.data.marksEarned, 2, 'only server attests the recovered full marks');
   eq(await eventCount(a.account.id), beforeForged + 1, 'recovered grade persists once');
+  // Agent 2 P0 mathematical-authority holdout: equivalence is not the same
+  // as useful progress. A student whose only "steps" multiply by one,
+  // divide by one or add zero has demonstrated no creditable method work,
+  // even if the text looks different from the original equation.
+  //
+  // The next three cases deliberately fail against the known vulnerable
+  // grading head. They must stay RED until the mathematical owner fixes
+  // the *engine*; never lower their threshold or silently remove them.
+  const noProgressWork = [
+    ['repeat-original', ['3x-14=2x-5', '3x-14=2x-5', '3x-14=2x-5']],
+    ['add-zero', ['3x-14=2x-5', '3x-14+0=2x-5', '3x-14=2x-5']],
+    ['multiply-one', ['3x-14=2x-5', '1(3x-14)=2x-5', '3x-14=2x-5']],
+    ['divide-one', ['3x-14=2x-5', '(3x-14)/1=2x-5', '3x-14=2x-5']]
+  ];
+  for (const [kind, steps] of noProgressWork) {
+    const caseIssued = await issue(a.jar, 104729);
+    eq(caseIssued.status, 201, kind + ': a real server-issued question is required');
+    eq(caseIssued.data.question.prompt, '$3x - 14=2x - 5$',
+      kind + ': exact original algebraic problem identity is fixed');
+    const award = await grade(a.jar, caseIssued.data.question.id,
+      'math-no-progress-' + kind, '777', 'typed', { steps });
+    eq(award.status, 200, kind + ': server returned a valid authoritative verdict');
+    eq(award.data?.correct, false, kind + ': final answer remains false');
+    eq(award.data?.marksPossible, 2, kind + ': expected original two-mark rubric');
+    eq(award.data?.marksEarned, 0,
+      kind + ': algebraically trivial restatement MUST NOT earn method credit');
+  }
+
   // OWNER'S EXACT MANUAL QUESTION — not a substitute for real Pencil input:
   // the server must issue the Class 12 CBSE question the owner saw, attest
   // 0/1 for written "4" and 1/1 for "1", and persist exactly one final grade.
