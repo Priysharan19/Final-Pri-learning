@@ -51,7 +51,7 @@ jobs:
           grep -Fq '1704000/1704000 self-checks passed across 213 subtopics' suites.log
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
           grep -Fq '✔ INDIA SUITE PASSED — 1832/1832 checks' suites.log
-          grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 25942/25942 checks' suites.log
+          grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 35861/35861 checks' suites.log
           grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 102244 prompts, 362 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
           grep -Fq '44000 questions from 440 declared (generator, difficulty) pairs × 100 draws — 44000 marked correct by their own marker, 44000 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
