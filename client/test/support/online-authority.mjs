@@ -20,12 +20,10 @@
 //   · switches a suite uses to prove the refusals: signed out (no cookies
 //     leave the device), offline (the request never leaves the device), and
 //     another profile's session (the wrong account);
-//   · a record of what each /v1/practice/issue request asked for (generator,
-//     difficulty, seed) keyed by the server's question id. A server-issued row
-//     carries no answer on the device, so a suite that needs "the right answer"
-//     regenerates the question from those parameters with the engine — a test
-//     oracle, never something the product reads.
-//
+//   · an oracle: answerKey(row) reads the server's own sealed copy of the
+//     question it issued for that row. The product never sends a seed and the
+//     device never holds an answer, so this is the only place a suite can
+//     learn "the right answer" — and only once the question is issued.
 //   · with `ink: true`, what a handwritten submission needs to reach the
 //     server from Node: a canvas stand-in so the device can rasterise strokes
 //     (Node has none), and a loopback stand-in for the third-party handwriting
@@ -113,8 +111,7 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
   let pinnedPid;                      // undefined = follow the selected profile
   let signedOut = false;
   let offline = false;
-  const traffic = { total: 0, issue: 0, grade: 0, reveal: 0, recognize: 0, refusedOffline: 0 };
-  const issued = new Map();           // server question id → { generator, difficulty, seed, mode }
+  const traffic = { total: 0, issue: 0, bind: 0, prepare: 0, repeat: 0, seedsSent: 0, grade: 0, reveal: 0, recognize: 0, refusedOffline: 0 };
 
   const selectedPid = () => {
     try { return globalThis.localStorage?.getItem('pri-current-profile') || null; } catch { return null; }
@@ -126,7 +123,9 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
   }
 
   async function resetRateLimits() {
-    await app.db.run('DELETE FROM rate_limits');
+    // A prepared question's one-account claim lives in the same table and is
+    // not a rate limit: it must outlive the reset or a token could bind twice.
+    await app.db.run("DELETE FROM rate_limits WHERE bucket NOT LIKE 'practice-prepared-claim:%'");
   }
 
   const realFetch = globalThis.fetch;
@@ -151,16 +150,13 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
     harness.absorbCookies(response, jar);
     if (path === '/v1/practice/issue') {
       traffic.issue += 1;
-      if (response.status === 201) {
-        try {
-          const asked = JSON.parse(String(options.body || '{}'));
-          const reply = await response.clone().json();
-          if (reply?.question?.id) issued.set(reply.question.id, {
-            generator: asked.generator, difficulty: Number(asked.difficulty), seed: Number(asked.seed), mode: asked.mode || 'practice'
-          });
-        } catch { /* an unreadable reply is the product's to refuse */ }
-      }
-    } else if (/^\/v1\/practice\/[^/]+\/submit$/.test(path)) traffic.grade += 1;
+      let asked = null;
+      try { asked = JSON.parse(String(options.body || '{}')); } catch { /* the server refuses it */ }
+      if (asked?.prepared !== undefined) traffic.bind += 1;
+      if (asked && 'seed' in asked) traffic.seedsSent += 1;
+    } else if (path === '/v1/practice/prepare') traffic.prepare += 1;
+    else if (/^\/v1\/practice\/[^/]+\/repeat$/.test(path)) traffic.repeat += 1;
+    else if (/^\/v1\/practice\/[^/]+\/submit$/.test(path)) traffic.grade += 1;
     else if (/^\/v1\/practice\/[^/]+\/reveal$/.test(path)) traffic.reveal += 1;
     else if (/^\/v1\/practice\/[^/]+\/recognize$/.test(path)) traffic.recognize += 1;
     return response;
@@ -186,7 +182,6 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
 
   const cloudAccount = await import('../../src/platform/cloudAccount.js');
   const idb = await import('../../src/local/idb.js');
-  const generators = await import('../../src/engine/generators/index.js');
 
   let accountSeq = 0;
   /**
@@ -229,19 +224,24 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
   }
 
   /**
-   * The full question (answer and steps included) behind a stored row.
-   * Not yet issued: the device copy. Issued: regenerated from the parameters
-   * the device asked the server to issue, and matched to what is on screen.
+   * The full question (answer, steps and traps included) behind a stored row:
+   * the server's own sealed copy of the question it issued, read straight from
+   * its database. The product never sees this; it is the suite's oracle. A
+   * prepared row has no server id until an account binds it, and an offline
+   * draft never has one, so neither has a key to read.
    */
   async function answerKey(rowOrId) {
     const row = typeof rowOrId === 'string' ? await idb.get('questions', rowOrId) : rowOrId;
     assert.ok(row, 'answerKey() needs a stored question row');
-    if (!row.serverQuestionId) return row.payload;
-    const asked = issued.get(row.serverQuestionId);
-    assert.ok(asked, `no issue request was seen for server question ${row.serverQuestionId}`);
-    await generators.loadAllBanks();
-    const q = generators.generateQuestion(asked.generator, asked.difficulty, asked.seed);
-    assert.equal(q.prompt, row.payload.prompt, 'the oracle regenerated a different question from the one issued');
+    if (!row.serverQuestionId) {
+      // A legacy device row (a restored backup, an exam or a game question) still carries its own key.
+      if (row.payload?.answer !== undefined || row.payload?.multipart) return row.payload;
+      assert.fail(`no answer key: the row is ${row.prepared ? 'prepared but not yet bound to an account' : row.draftOnly ? 'an offline draft' : 'not server-issued'}`);
+    }
+    const sealed = await app.db.get("SELECT response_json FROM idempotency_keys WHERE scope='practice-question' AND key=?", [row.serverQuestionId]);
+    assert.ok(sealed, `the server holds no issued question ${row.serverQuestionId}`);
+    const q = JSON.parse(sealed.response_json);
+    assert.equal(q.prompt, row.payload.prompt, 'the server\'s sealed question is not the one on screen');
     return q;
   }
 
@@ -265,7 +265,7 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
   }
 
   return {
-    app, origin: app.origin, db: app.db, traffic, issued, reader,
+    app, origin: app.origin, db: app.db, traffic, reader,
     link, setEntitlement, answerKey, resetRateLimits, close,
     accountOf: pid => accounts.get(pid) || null,
     /** Pin the device session to `pid`'s account; `undefined` follows the selected profile again. */
