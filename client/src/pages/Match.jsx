@@ -5,7 +5,7 @@ import { api } from '../api.js';
 import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import { useT, useTx } from '../i18n/index.js';
-import { Icon } from '../components/Icon.jsx';
+import Icon from '../components/Icon.jsx';
 import { checkRefusal, checkRefusalCopy } from '../components/checkAccess.js';
 import { CheckRefusal } from '../components/CheckRefusal.jsx';
 
