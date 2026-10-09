@@ -120,14 +120,17 @@ export function legacyDeviceReplay(result) {
  * marked on the device and has no account refusals to name.
  */
 export function refusedCheckState(error, via, { diagnostic = false } = {}) {
+  const refusal = diagnostic ? null : checkRefusal(error);
   return {
     phase: 'retry',
     res: {
       feedback: error?.message || '', invalid: true, technical: true,
-      refusal: diagnostic ? null : checkRefusal(error), via,
-      // A 409 that names a refusal (a draft, an expired prepared question) is
-      // that refusal, not "finished elsewhere".
-      conflict: error?.status === 409 && (diagnostic || !checkRefusal(error))
+      refusal, via,
+      // A finished question or a reused key. A question that was never the
+      // server's (an offline draft, an expired prepared one) also answers 409,
+      // but it is a named refusal with its own way forward, not "already
+      // finished".
+      conflict: error?.status === 409 && !refusal
     }
   };
 }
