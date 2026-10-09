@@ -3464,7 +3464,9 @@ const routes = {
     // was served, and none now) is marked by the bundled deterministic engine
     // and is never labelled server-certified.
     const isFast = row.mode === 'rush' || row.mode === 'match';
-    const authoritative = await adoptServerIssue(row)
+    // Adoption needs the stable submission key the server grades under; a
+    // caller without one stays with the device engine.
+    const authoritative = (row.serverQuestionId || (submissionId && await adoptServerIssue(row)))
       ? await gradeOnServer(row, body, submissionId, requestDigest) : null;
     const device = authoritative ? null : markOnDevice(row, answer, steps);
     const result = authoritative

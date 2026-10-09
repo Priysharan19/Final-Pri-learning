@@ -255,6 +255,8 @@ jobs:
           set -o pipefail
           node server/test/method-progress-http-check.mjs 2>&1 | tee practice-http.log
           node server/test/practice-seed-reissue-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/india-bank-issue-coverage-check.mjs 2>&1 | tee -a practice-http.log
+          grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1143/1143 checks' practice-http.log
           grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
       - name: Account, origin, CMS and classroom contracts

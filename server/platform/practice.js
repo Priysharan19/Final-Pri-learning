@@ -26,7 +26,7 @@ import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
 const ID = /^[a-zA-Z0-9_-]{8,100}$/;
 const UUID = /^[0-9a-f-]{36}$/i;
-const INDIA_BANK = /^c(?:[7-9]|1[0-2])-[a-z][a-z0-9-]{2,95}$/;
+const INDIA_BANK = /^c(?:[7-9]|1[0-2])-[a-z0-9][a-z0-9-]{2,95}$/;
 const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum', 'mode']);
 const GRADE_FIELDS = new Set(['submissionId', 'answer', 'mode', 'steps', 'transcriptionReceipt', 'ms']);
 const RECOGNITION_FIELDS = new Set(['image', 'mode']);

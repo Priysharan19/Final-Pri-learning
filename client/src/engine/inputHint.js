@@ -15,7 +15,9 @@ function safeHint(part) {
   const hint = part?.inputHint;
   if (typeof hint !== 'string') return hint;
   const body = hint.replace(/^\s*e\.g\.?\s*/i, '').trim();
-  if (!body || !accepted(part, body)) return hint;
+  // A hint may offer alternatives ("e.g. 1/2 or sqrt(3)/2"); none may be the answer.
+  const shown = [body, ...body.split(/\s+or\s+|\s*;\s*/i)].map(x => x.trim()).filter(Boolean);
+  if (!body || !shown.some(x => accepted(part, x))) return hint;
   if (/^-?\d+\s*\/\s*\d+$/.test(body)) {
     const neutral = NEUTRAL_FRACTIONS.find(example => !accepted(part, example));
     if (neutral) return `e.g. ${neutral}`;
