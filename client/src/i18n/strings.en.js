@@ -1435,6 +1435,7 @@ export default {
   'exams.paperMeta': '{date} · {n} min',
   'exams.paperMetaIndia': '{date} · {n} min suggested section timer',
   'exams.inProgress': 'In progress',
+  'exams.openPaperLimit': 'You already have papers open. Finish one, or carry on with it, before starting another.',
   'exams.waitingToBeMarked': 'Waiting to be marked',
   'exams.openPending': 'Open',
   'exams.markedEarlier': 'marked by an earlier version of the app',

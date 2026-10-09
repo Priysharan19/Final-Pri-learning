@@ -15,15 +15,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { get, put } from './idb.js';
 import { cloudLinkRowId } from '../platform/cloudAccount.js';
-import { ENTITLEMENTS, entitlementDecision, normalizeEntitlementSnapshot } from '../platform/entitlements.js';
+import { ENTITLEMENTS, FREE_EXAM_ALLOWANCE, entitlementDecision, normalizeEntitlementSnapshot } from '../platform/entitlements.js';
 
 const DAY = 86_400_000;
 const USAGE_PREFIX = 'pri-free-usage-v1:';
 
 export const FREE_TIER = Object.freeze({
   practicePerDay: 20,
-  examsPerWindow: 1,
-  examWindowDays: 30,
+  examsPerWindow: FREE_EXAM_ALLOWANCE.examsPerWindow,
+  examWindowDays: FREE_EXAM_ALLOWANCE.examWindowDays,
   explain: 'basic'
 });
 

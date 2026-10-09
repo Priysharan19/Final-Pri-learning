@@ -3806,7 +3806,7 @@ const routes = {
     const pwLabel = examPw && examPw !== 'advanced' ? ` ${PATHWAYS[examPw].short}` : '';
     const title = `Year ${year}${pwLabel} Practice Paper ${count + 1}`;
     const issued = await issueServerExam(p.id, {
-      kind: 'practice-paper', title, paper: { year, minutes, ...(examPw ? { pathway: examPw } : {}) }, slots
+      kind: 'practice-paper', paper: { year, minutes, ...(examPw ? { pathway: examPw } : {}) }, slots
     }, `practice-paper:${year}:${examPw || ''}:${length}:${minutes}`);
 
     const examId = String(issued.id);

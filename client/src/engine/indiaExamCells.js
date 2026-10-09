@@ -12,6 +12,7 @@
 // generator the student's own track and class do not own.
 import { indiaScope, resolveIndiaTarget } from './indiaProduct.js';
 import { pyqCellsFor } from './pyq/pyqCoverage.js';
+import { chapterCells } from './indiaExamComposer.js';
 
 /** Previous-year cells for every chapter in scope: Map(chapterId → cells). */
 export function indiaPyqCells(track, chapters) {
@@ -62,3 +63,29 @@ export function indiaIssuableCells(track, grade) {
     isPyq: cell => pyq.has(cellKey(cell?.generator, cell?.difficulty))
   };
 }
+
+/** Cells inside a difficulty window, or the nearest rungs to it when none are. */
+export function narrowCells(cells, { min = 1, max = 4 } = {}) {
+  if (!cells.length) return cells;
+  const inside = cells.filter(c => c.difficulty >= min && c.difficulty <= max);
+  if (inside.length) return inside;
+  const gap = c => Math.min(Math.abs(c.difficulty - min), Math.abs(c.difficulty - max));
+  const best = Math.min(...cells.map(gap));
+  return cells.filter(c => gap(c) === best);
+}
+
+/**
+ * The cells ONE chapter may supply inside one difficulty window — exactly what
+ * the composer draws a slot from: the chapter's authored cells in the window
+ * (nearest rung when it has none there), and its previous-year cells narrowed
+ * the same way. `pyq` is indiaPyqCells() for the track.
+ * Returns { authored: Set, any: Set } of `generator|difficulty` keys.
+ */
+export function chapterWindowCells(chapter, range, pyq) {
+  const authored = new Set(chapterCells(chapter, range).map(c => cellKey(c.generator, c.difficulty)));
+  const any = new Set(authored);
+  for (const cell of narrowCells(pyq?.get(chapter.id) || [], range)) any.add(cellKey(cell.generator, cell.difficulty));
+  return { authored, any };
+}
+
+export const cellKeyOf = cell => cellKey(cell?.generator, cell?.difficulty);

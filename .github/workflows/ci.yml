@@ -104,7 +104,7 @@ jobs:
           grep -Eq 'INSTALL BUDGET: PASS — 48/48 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
           grep -Fq 'nothing emitted left uncovered.' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
-          grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 61/61 checks' suites.log
+          grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 66/66 checks' suites.log
           grep -Fq 'JEE ADVANCED GATE: PASS — 27/27 checks' suites.log
           grep -Fq 'RESTORE FIDELITY: PASS — 45/45 checks' suites.log
           grep -Fq 'STREAK CALENDAR: PASS — 19/19 checks' suites.log
@@ -312,7 +312,7 @@ jobs:
         run: |
           set -o pipefail
           node server/test/exam-authority-check.mjs 2>&1 | tee exam-authority.log
-          grep -Fq 'EXAM AUTHORITY: PASS — 146/146 checks' exam-authority.log
+          grep -Fq 'EXAM AUTHORITY: PASS — 224/224 checks' exam-authority.log
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
       - name: Supabase migrations are self-contained transactions (supabase db push)

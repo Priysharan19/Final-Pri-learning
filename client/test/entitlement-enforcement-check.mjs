@@ -211,7 +211,30 @@ const examCapped = await gated('a second simulation inside 30 days is refused on
   { code: 'FREE_CAP_REACHED', capability: ENTITLEMENTS.PREMIUM_EXAMS });
 same('the refusal says when the next free simulation unlocks', examCapped?.nextAt, T0 + 30 * DAY);
 now = T0 + 30 * DAY + MIN;
+// The server counts its own sealed papers on its own clock, and it is the
+// authority: with only the device's clock moved it still refuses, and the
+// device shows the server's refusal.
+{
+  let serverSays = null;
+  try { await POST('/exams', { length: 10 }); } catch (err) { serverSays = err; }
+  same('a device whose own counter has lapsed is still refused by the server', [serverSays?.status, serverSays?.code, serverSays?.capability, serverSays?.reason], [402, 'FREE_CAP_REACHED', ENTITLEMENTS.PREMIUM_EXAMS, 'server-refused']);
+  ok('the server says when its own window unlocks', Number.isFinite(serverSays?.nextAt) && serverSays.nextAt > Date.now());
+  same('a start the server refused is not counted on the device either', (await gate.examAllowance(ned)).used, 0);
+}
+// Thirty days pass for the server too.
+await authority.ageExamPapers(ned.id, 30 * DAY + MIN);
 same('30 days later a simulation is free again', (await POST('/exams', { length: 10 })).allowance.used, 1);
+// A device that wipes its own counter gains nothing: the server still counts.
+{
+  const usageId = (await idb.all('device')).find(r => r?.pid === ned.id && Array.isArray(r.exams))?.id;
+  const usage = await idb.get('device', usageId);
+  await idb.put('device', { ...usage, exams: [] });
+  same('with its counter wiped the device believes a simulation is free', (await gate.examAllowance(ned)).allowed, true);
+  let bypass = null;
+  try { await POST('/exams', { length: 10 }); } catch (err) { bypass = err; }
+  same('but the server refuses the paper', [bypass?.status, bypass?.code], [402, 'FREE_CAP_REACHED']);
+  await idb.put('device', usage);
+}
 await link(ned.id, premiumSnapshot());
 const premiumPapers = [await POST('/exams', { length: 10 }), await POST('/exams', { length: 10 })];
 ok('premium-exams lifts the 30-day cap', premiumPapers.every(r => r.allowance.unlimited === true && r.exam?.id));
