@@ -160,6 +160,12 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   }
   eq(refusedCheckState(SIGN_IN, 'submit', { diagnostic: true }).res.refusal, null, 'the placement check names no account refusal');
   eq(refusedCheckState(err(409, 'ALREADY_RESOLVED'), 'submit').res.conflict, true, 'a finished question is still a conflict, not a retry');
+  // Regression (native simulator journey, 2026-10-10): an offline draft's 409
+  // was shown as "This question is already finished" instead of its refusal.
+  for (const code of ['QUESTION_NOT_SERVER_ISSUED', 'QUESTION_PREPARED_EXPIRED']) {
+    const state = refusedCheckState(err(409, code), 'submit');
+    eq([state.res.refusal, state.res.conflict], ['new-question', false], `${code}: named as a question that cannot be marked, not as an already-finished one`);
+  }
   eq([retryActionFor('submit'), retryActionFor('reveal'), retryActionFor('tutor')], ['submit', 'reveal', null], 'Retry repeats the refused action and nothing else');
 }
 
