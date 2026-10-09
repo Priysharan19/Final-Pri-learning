@@ -33,7 +33,7 @@ const UUID = /^[0-9a-f-]{36}$/i;
 // grading a question the server refuses to issue could never be checked. The
 // name is only a lookup key; an unknown one fails generation with 422.
 const AUTHORED_BANK = /^[a-z][a-z0-9]{0,11}-[a-z0-9][a-z0-9-]{1,95}$/;
-const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum', 'mode', 'prepared', 'avoid', 'trap', 'dotpoint', 'written']);
+const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum', 'mode', 'prepared', 'avoid', 'trap', 'dotpoint', 'written', 'account']);
 const PREPARE_FIELDS = new Set(['generator', 'difficulty', 'curriculum', 'mode', 'avoid', 'dotpoint']);
 const PRACTICE_MODES = ['practice', 'review', 'task', 'rush', 'match', 'placement'];
 // One answer settles the question in these modes.
@@ -141,6 +141,19 @@ const opaqueContentId = value => (value == null || value === '' ? null : 'srv:' 
 // Same shape as the engine's own content hash (16 hex), so the device stores
 // and compares it exactly as before.
 const opaqueContentHash = value => (value == null || value === '' ? null : keyed('hash:' + value).digest('hex').slice(0, 16));
+
+// What an account has already been shown the solution of. A later copy of the
+// same content — however it comes to be issued — is a repeat: it is marked
+// like any question, and its receipt and attempt say it is not new work.
+const SEEN_AGE = 5 * 365 * 24 * 60 * 60 * 1000;
+const seenKey = q => 'seen-' + opaqueContentHash(q.contentHash ?? q.contentId ?? q.prompt);
+async function contentSeen(db, accountId, q) {
+  return !!(await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-content' AND key=?", [accountId, seenKey(q)]));
+}
+async function markContentSeen(db, accountId, q, now) {
+  await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-content',?,?,?,?,?) ON CONFLICT(account_id,scope,key) DO NOTHING",
+    [accountId, seenKey(q), '{}', digest({ seen: seenKey(q) }), now, now + SEEN_AGE]);
+}
 
 function safeQuestion(id, q) {
   const publicQ = { id, supportsSteps: !!stepMetaFor(q),
@@ -341,12 +354,19 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const body = req.body;
     const accountId = req.platformSession.account_id;
     const now = Date.now();
+    // A device holding several profiles names the account it means. A session
+    // that belongs to another one is refused before anything is issued,
+    // bound or escrowed, so one student's question can never land in, or use
+    // up a prepared question for, another's account.
+    if (plain(body) && body.account !== undefined && String(body.account) !== String(accountId)) {
+      return reject(res, 409, 'PRACTICE_ACCOUNT_MISMATCH', 'This device is signed in to a different account.');
+    }
     await ensureBanks();
     let q, practiceMode, repeat = false, trapDelivered = false, preparedNonce = null, preparedExpiry = 0, seedGiven = false;
     if (plain(body) && body.prepared !== undefined) {
       // Binding a question the student started signed out. Nothing else in the
       // body is honoured: the sealed token is the whole request.
-      if (unknown(body, new Set(['prepared'])).length) {
+      if (unknown(body, new Set(['prepared', 'account'])).length) {
         return reject(res, 400, 'PRACTICE_ISSUE_INVALID', 'A prepared question is bound on its own.');
       }
       const sealed = readPrepared(body.prepared);
@@ -381,6 +401,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // The issuance mode is escrowed with the answer. A later submission cannot
     // falsely claim or downgrade the one-try Rush/Match policy.
     q._practiceMode = practiceMode;
+    // Sealed with the question, so the receipt and the attempt carry it
+    // whatever the device does or does not send.
+    if (await contentSeen(db, accountId, q)) { q._repeat = true; repeat = true; }
     // Serialize once: nothing client-provided can replace the stored answer.
     const payload = JSON.stringify(q);
     const id = randomUUID();
@@ -568,6 +591,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const completed = await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-completion' AND key=?", [accountId, qid]);
       if (completed) return { status: 409, code: 'QUESTION_ALREADY_GRADED' };
       const q = JSON.parse(escrow.response_json);
+      await markContentSeen(db, accountId, q, now);
       const attemptId = randomUUID();
       const response = { authoritative: true, revealed: true, resolved: true, correct: false,
         marksEarned: 0, marksPossible: marksPossibleFor(q),
@@ -687,7 +711,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         feedback: workingOnlyCredit ? partial.note : feedback, trapWhy,
         contentId: opaqueContentId(q.contentId), serverAcknowledgedAt: now,
         ...(q._repeat === true ? { repeat: true } : {}),
-        stepReport, partial, ...(resolved ? {
+        // An entry that is not an attempt costs nothing, so it may not return
+        // line-by-line verdicts either: they would be a free answer oracle.
+        stepReport: invalid ? null : stepReport, partial: invalid ? null : partial, ...(resolved ? {
           solution: solutionFor(q),
           // Only a committed resolution may disclose opportunity explanations.
           // Their ontology identity is derived by the client from these
@@ -697,6 +723,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-grade',?,?,?,?,?)",
         [accountId, idKey, JSON.stringify(response), hash, now, now + MAX_AGE]);
       if (resolved) {
+        await markContentSeen(db, accountId, q, now);
         await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-completion',?,?,?,?,?)",
           [accountId, qid, JSON.stringify({ attemptId, submissionId }), hash, now, now + MAX_AGE]);
         if (!recordsProgress(q)) return { response };

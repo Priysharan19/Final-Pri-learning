@@ -2102,7 +2102,10 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   const effHints = helpUsed + Math.max(0, row.tries || 0);
   let ratingAfter = st.rating;
   const isRush = mode === 'rush' || mode === 'match';
-  const isCustom = q.custom;
+  // A repeat of a question whose solution this account has already been shown
+  // is recorded, and earns nothing: no rating, review, mastery or XP.
+  const isRepeat = row.serverReceipt?.repeat === true;
+  const isCustom = q.custom || isRepeat;
   let ratingNext = null;
 
   if (!isRush && !isCustom) {
@@ -2144,7 +2147,7 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
     else if (st.attempts + 1 >= 3) reviewNext = { key, pid, subtopic: owner, ...scheduleReview(null, grade, now) };
   }
 
-  const xp = isRush ? (correct ? 6 : 0) : xpFor(q.difficulty, correct, 0, effHints);
+  const xp = isRepeat ? 0 : isRush ? (correct ? 6 : 0) : xpFor(q.difficulty, correct, 0, effHints);
   // The profile row this request read may be stale by now: a placement answer,
   // a settings change or another tab can have written it while this request
   // awaited. XP is therefore added to the row as it is at write time below
@@ -4854,7 +4857,7 @@ async function servePlacementQuestion(pid, cfg, probe, index) {
   if (!linkedAccount) throw checkUnavailable('sign-in');
   let out;
   try {
-    out = await cloud.issuePractice({ generator: target.generator, difficulty: target.difficulty, curriculum: 'in', mode: 'placement', written: true });
+    out = await cloud.issuePractice({ generator: target.generator, difficulty: target.difficulty, curriculum: 'in', mode: 'placement', written: true, account: linkedAccount });
   } catch (cause) {
     throw checkUnavailable(cause?.status === 401 ? 'sign-in' : cause?.status === 403 || cause?.status === 426 ? 'refused'
       : !cause?.status || cause.status >= 500 || cause.status === 429 || cause?.code === 'CLOUD_DISABLED' ? 'offline' : 'unavailable', cause);
@@ -5407,7 +5410,7 @@ async function serveQuestion(pid, { generator, difficulty, mode, dotpoint = null
   const linkedAccount = await profileCloudAccountId(pid).catch(() => null);
   if (linkedAccount) {
     try {
-      const out = await cloud.issuePractice({ ...body, ...(trap ? { trap } : {}) });
+      const out = await cloud.issuePractice({ ...body, ...(trap ? { trap } : {}), account: linkedAccount });
       if (String(out?.accountId || '') === linkedAccount && out?.question?.id && usable(out.question)) {
         return { q: out.question, fields: { serverQuestionId: out.question.id }, trapDelivered: out.trapDelivered === true, repeat: out.repeat === true };
       }
@@ -5435,7 +5438,11 @@ async function requireServerIssue(row) {
   if (!row.prepared) throw checkUnavailable(row.draftOnly ? 'draft' : 'unavailable');
   if (!linkedAccount) throw checkUnavailable('sign-in');
   let out;
-  try { out = await cloud.issuePractice({ prepared: row.prepared }); } catch (cause) {
+  // The request names the account it is for: a session that belongs to
+  // another profile's account is refused by the server before the prepared
+  // question is taken up, so it stays bindable by the right one.
+  try { out = await cloud.issuePractice({ prepared: row.prepared, account: linkedAccount }); } catch (cause) {
+    if (cause?.code === 'PRACTICE_ACCOUNT_MISMATCH') throw checkUnavailable('sign-in', cause);
     if (cause?.status === 401) throw checkUnavailable('sign-in', cause);
     if (cause?.status === 403 || cause?.status === 426) throw checkUnavailable('refused', cause);
     if (cause?.code === 'CLOUD_DISABLED' || !cause?.status || cause.status >= 500 || cause.status === 429) throw checkUnavailable('offline', cause);

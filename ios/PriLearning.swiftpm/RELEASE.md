@@ -13,7 +13,7 @@ A release candidate must preserve all of these properties:
 - bundled web mirror exactly matches the current client build;
 - release Web Inspector exposure is disabled (`isInspectable` may exist only under `#if DEBUG`);
 - production native cloud origin comes only from signed Info.plist `PRICloudOrigin` / build setting `PRI_CLOUD_ORIGIN`;
-- release cloud origin must validate as HTTPS; absent/invalid configuration fails closed and does not disable offline learning;
+- release cloud origin must validate as HTTPS; absent/invalid configuration fails closed — and because grading is online-only such a build can never mark an answer, so it is unshippable (archive gate, §6);
 - JavaScript cannot supply a destination origin or receive native session/CSRF cookies;
 - current security, handwriting, marking, offline and release gates are not weakened for a shipment.
 
@@ -104,7 +104,7 @@ After the exact candidate SHA is merged/approved and preflight is green:
 2. select the `PriLearning` scheme and a generic/eligible iOS device destination suitable for archiving;
 3. verify production signing team and bundle identifier;
 4. verify `PRI_CLOUD_ORIGIN` contains the approved HTTPS production origin, then prove it on the built product — grading is online-only, so an archive with an empty origin can show questions but can never mark one:
-   `npm run check:ios:archive -- <path to .xcarchive> --sha <release sha>` must print `NATIVE ARCHIVE GATE: PASS` (it refuses an empty, non-https, local, staging or path-bearing origin, a non-shipping bundle id, and a web bundle from another commit);
+   `npm run check:ios:archive -- <path to .xcarchive> --sha <release sha> --probe` must print `NATIVE ARCHIVE GATE: PASS` (it refuses an empty, non-https, local, staging or path-bearing origin, a non-shipping bundle id, and a web bundle from another commit);
 5. confirm the intended marketing/build versions shown by the package;
 6. create a Release archive with Product → Archive;
 7. in Organizer, inspect the archive identity, version/build number, signing and bundled app icon;

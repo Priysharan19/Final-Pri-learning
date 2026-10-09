@@ -85,11 +85,30 @@ try {
   eq(r1.data.question.id, r2.data.question.id, 'as the same issued question');
   eq((await post('/v1/practice/issue', { prepared: racing }, a.jar)).status, 409, 'and the other account still cannot take it up');
 
+  // A device holding several profiles names the account it means. The wrong
+  // session is refused before the prepared question is taken up, so the right
+  // account can still bind it; nothing is escrowed under the wrong one.
+  const shared = (await post('/v1/practice/prepare', REQUEST)).data.prepared;
+  const escrowedA = async () => Number((await h.db.get("SELECT COUNT(*) AS n FROM idempotency_keys WHERE account_id=? AND scope='practice-question'", [a.account.id])).n);
+  const before = await escrowedA();
+  const wrongSession = await post('/v1/practice/issue', { prepared: shared, account: String(b.account.id) }, a.jar);
+  eq([wrongSession.status, wrongSession.data?.error?.code], [409, 'PRACTICE_ACCOUNT_MISMATCH'], 'a bind sent under another account\'s session is refused');
+  eq(await escrowedA(), before, 'and escrows nothing under that session\'s account');
+  eq((await post('/v1/practice/issue', { ...REQUEST, account: String(b.account.id) }, a.jar)).data?.error?.code, 'PRACTICE_ACCOUNT_MISMATCH', 'a plain issue under the wrong session is refused the same way');
+  const rightSession = await post('/v1/practice/issue', { prepared: shared, account: String(b.account.id) }, b.jar);
+  eq(rightSession.status, 201, 'the prepared question is still there for the account it was meant for');
+
   // ── and it is marked like any issued question ───────────────────────────
   const qid = bound.data.question.id;
   const grade = await post(`/v1/practice/${qid}/submit`, { submissionId: 'prepared-wrong-0001', answer: '987654321', mode: 'typed' }, a.jar, { 'Idempotency-Key': 'prepared-wrong-0001' });
   eq([grade.status, grade.data?.authoritative, grade.data?.correct, grade.data?.marksEarned], [200, true, false, 0], 'a wrong answer on the bound question is server-marked 0');
   eq((await post(`/v1/practice/${qid}/submit`, { submissionId: 'prepared-foreign-001', answer: '1', mode: 'typed' }, b.jar, { 'Idempotency-Key': 'prepared-foreign-001' })).status, 404, 'the other account cannot mark it');
+  // An entry that is not an attempt costs nothing, so it must not come back
+  // with line-by-line verdicts: they would be a free answer oracle.
+  const probe = await post('/v1/practice/issue', REQUEST, a.jar);
+  const free = await post(`/v1/practice/${probe.data.question.id}/submit`, { submissionId: 'oracle-probe-000001', answer: '((', mode: 'typed', steps: 'x = 1\nx = 2\nx = 3' }, a.jar, { 'Idempotency-Key': 'oracle-probe-000001' });
+  eq([free.status, free.data?.invalid, free.data?.triesLeft, free.data?.stepReport ?? null, free.data?.partial ?? null], [200, true, 1, null, null],
+    'an unreadable final answer with working returns no step verdicts and spends nothing');
   const reveal = await post(`/v1/practice/${qid}/reveal`, {}, a.jar);
   ok(reveal.status === 200 && reveal.data.solution, 'the owner can be shown its solution by the server');
 

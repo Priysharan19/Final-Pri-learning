@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { originProblem, checkArchive } from '../../scripts/check-native-archive.mjs';
+import { originProblem, checkArchive, probeOrigin } from '../../scripts/check-native-archive.mjs';
 
 let n = 0;
 const bad = (v, why) => { assert.ok(originProblem(v), `${why}: ${JSON.stringify(v)} must be refused`); n++; };
@@ -28,8 +28,14 @@ try {
     return join(root, '..', '..', '..');
   };
   assert.deepEqual(checkArchive(app('https://api.prilearning.example'), { sha: 'a'.repeat(40) }).problems, [], 'a correct archive passes'); n++;
-  assert.equal(checkArchive(app('')).problems.length, 1, 'an archive with no origin fails'); n++;
-  assert.equal(checkArchive(app('https://api.prilearning.example', 'com.prilearning.qa')).problems.length, 1, 'a QA bundle id is not the shipping app'); n++;
+  assert.ok(checkArchive(app(''), { sha: 'a'.repeat(40) }).problems.some(p => /empty/.test(p)), 'an archive with no origin fails'); n++;
+  assert.ok(checkArchive(app('https://api.prilearning.example')).problems.some(p => /--sha/.test(p)), 'an archive checked without the release commit fails'); n++;
+  assert.equal(checkArchive(app('https://api.prilearning.example', 'com.prilearning.qa'), { sha: 'a'.repeat(40) }).problems.length, 1, 'a QA bundle id is not the shipping app'); n++;
   assert.equal(checkArchive(app('https://api.prilearning.example'), { sha: 'b'.repeat(40) }).problems.length, 1, 'a build from another commit fails'); n++;
 } finally { rmSync(dir, { recursive: true, force: true }); }
+const answer = body => async () => ({ ok: true, json: async () => body });
+assert.equal(await probeOrigin('https://api.prilearning.example', 'a'.repeat(40), answer({ service: 'pri-learning-platform', releaseIdentity: { releaseSha: 'a'.repeat(40) } })), null, 'an origin serving this release passes the probe'); n++;
+assert.match(await probeOrigin('https://api.prilearning.example', 'a'.repeat(40), answer({ service: 'pri-learning-platform', releaseIdentity: { releaseSha: 'b'.repeat(40) } })), /is serving/, 'an origin on another release fails it'); n++;
+assert.match(await probeOrigin('https://api.prilearning.example', 'a'.repeat(40), answer({ service: 'something-else' })), /did not answer as a Pri server/, 'a host that is not a Pri server fails it'); n++;
+assert.match(await probeOrigin('https://api.prilearning.example', 'a'.repeat(40), async () => { throw new TypeError('fetch failed'); }), /could not be reached/, 'an unreachable origin fails it'); n++;
 console.log(`NATIVE ARCHIVE GATE CHECK: PASS — ${n}/${n} checks — an iPad build without a usable production server origin is refused.`);

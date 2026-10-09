@@ -83,14 +83,33 @@ export function checkArchive(path, { sha = null } = {}) {
   const problems = [];
   const origin = originProblem(info.PRICloudOrigin);
   if (origin) problems.push(origin);
-  if (info.CFBundleIdentifier !== undefined && info.CFBundleIdentifier !== SHIPPING_BUNDLE) {
-    problems.push(`bundle id is ${info.CFBundleIdentifier}, not the shipping ${SHIPPING_BUNDLE}`);
+  // A built product always has a bundle id; only a bare source Info.plist
+  // handed in directly may lack one, and that is never a release artefact.
+  if (info.CFBundleIdentifier !== SHIPPING_BUNDLE) {
+    problems.push(`bundle id is ${info.CFBundleIdentifier ?? 'missing'}, not the shipping ${SHIPPING_BUNDLE}`);
   }
+  if (app && !sha) problems.push('no --sha given: a release archive is checked against the exact release commit');
   let releaseSha = null;
   const release = findReleaseJson(app);
   if (release) { try { releaseSha = JSON.parse(readFileSync(release, 'utf8')).releaseSha || null; } catch { releaseSha = null; } }
   if (sha && releaseSha !== sha) problems.push(`embedded web release is ${releaseSha || 'missing'}, not ${sha}`);
   return { problems, info, releaseSha };
+}
+
+/**
+ * Ask the origin the build names whether it is a Pri server running THIS
+ * release. A build pointed at a host that is not serving the same commit
+ * would ship a client and a server that were never certified together.
+ */
+export async function probeOrigin(origin, sha, fetchImpl = globalThis.fetch) {
+  try {
+    const res = await fetchImpl(new URL('/v1/health', origin), { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) });
+    const body = await res.json();
+    if (!res.ok || body?.service !== 'pri-learning-platform') return `${origin} did not answer as a Pri server`;
+    const serving = body?.releaseIdentity?.releaseSha || null;
+    if (sha && serving !== sha) return `${origin} is serving ${serving || 'an unknown release'}, not ${sha}`;
+    return null;
+  } catch (error) { return `${origin} could not be reached (${error?.name || 'error'})`; }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -100,6 +119,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const target = args.find((a, i) => !a.startsWith('--') && (shaAt < 0 || i !== shaAt + 1));
   if (!target) { console.error('usage: node scripts/check-native-archive.mjs <.app | .xcarchive | Info.plist> [--sha <40-hex>]'); process.exit(2); }
   const { problems, info, releaseSha } = checkArchive(target, { sha });
+  // --probe: also require the named origin to be a Pri server on this release.
+  if (args.includes('--probe') && !originProblem(info.PRICloudOrigin)) {
+    const unreachable = await probeOrigin(info.PRICloudOrigin.trim(), sha);
+    if (unreachable) problems.push(unreachable);
+  }
   console.log(`bundle ${info.CFBundleIdentifier ?? '?'} · version ${info.CFBundleShortVersionString ?? '?'} (${info.CFBundleVersion ?? '?'}) · web release ${releaseSha ?? 'not found'} · origin ${info.PRICloudOrigin || '(empty)'}`);
   if (problems.length) { console.error(`NATIVE ARCHIVE GATE: FAIL\n  · ${problems.join('\n  · ')}`); process.exit(1); }
   console.log('NATIVE ARCHIVE GATE: PASS — the built app names an https production server origin and the shipping bundle id.');

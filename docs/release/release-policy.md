@@ -35,6 +35,13 @@ production service's source was changed with
 after `deploy/production` was created at the SHA production was already running
 (`4d34439622176b5e2060ca7a549cb64090382944`), so the change itself shipped no new code.
 
+`deploy/production` is a protected branch (2026-10-10): the four required CI contexts must be green
+on the commit being pushed, administrators included, with force-pushes, deletion and non-linear
+history refused. Those contexts run on every push to `main`, so a certified `main` SHA carries them
+and an arbitrary commit does not. This refusal has not been exercised with a live push of an
+unverified commit, because a mistake there would deploy it; treat the commands below as required
+regardless.
+
 Promote (needs the approval that the release record names for that SHA):
 
 ```bash

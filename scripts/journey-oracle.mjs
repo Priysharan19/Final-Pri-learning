@@ -113,7 +113,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         return send(200, { completed: desk.completed().map(q => ({ serverQuestionId: q.id, inputMode: q.inputMode, grades: q.grades.map(gradeFacts) })), prepared: desk.rows('practice-prepared').length, issued: desk.rows('practice-question').length });
       }
       return send(404, { error: 'unknown question' });
-    } catch (error) { return send(500, { error: String(error?.message || error).slice(0, 160) }); }
+    } catch (error) {
+      // The detail goes to this process's own log, never to the caller.
+      console.error(`journey-oracle: ${error?.message || error}`);
+      return send(500, { error: 'the oracle could not answer; see its log' });
+    }
   });
   server.on('error', error => { console.error(`journey-oracle: ${error.message}`); process.exit(1); });
   // Loopback only: the emulator's 10.0.2.2 is this machine's 127.0.0.1.
