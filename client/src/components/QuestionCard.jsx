@@ -20,7 +20,7 @@ import { cloudReadingEnabled, INK_READER_STATE, photoReadingBlockedKey, readPhot
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
-import { definitiveSubmissionRefusal, draftPersistenceWarning, pdfReceiptWarning, photoEligibleForGrading } from './photoSubmissionGuard.js';
+import { canRetryPhotoReading, definitiveSubmissionRefusal, draftPersistenceWarning, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure } from './photoSubmissionGuard.js';
 import { plotSpecFor } from '../engine/plotSpec.js';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
@@ -451,7 +451,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       return;
     }
     setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
-    const page = await readOnePage(dataURL);
+    const page = await readOnePage(dataURL).catch(photoReadFailure);
     if (!mountedRef.current || generation !== photoReadGeneration.current) return;
     if (page?.allowance) {
       setPhotoOCR({
@@ -548,7 +548,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // The same ladder decodePhoto uses. Reading each page with the server
       // reader alone meant a student who had not switched it on saw "nothing
       // could be read" on a device that could have read it perfectly well.
-      const page1 = await readOnePage(page.dataUrl);
+      const page1 = await readOnePage(page.dataUrl).catch(photoReadFailure);
       if (stale()) return;
       if (page1?.blocked) {
         setPhotoOCR({ phase: 'unavailable', text: '', confidence: 0, engine: null,
@@ -1630,6 +1630,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                             </>
                           )}
                            {(photoOCR.phase === 'failed' || photoOCR.phase === 'unavailable') && <span className="verdict-body">{photoOCR.error}</span>}
+                          {photoOCR.phase === 'unavailable' &&
+                            canRetryPhotoReading(photoOCR.blockedKey, !!photo, !!pendingPdf.current) && (
+                              <div style={{ marginTop: 8 }}>
+                                <button type="button" className="btn btn-ghost btn-sm" data-photo-retry-reading
+                                  onClick={() => {
+                                    if (pendingPdf.current) void decodePdf(pendingPdf.current);
+                                    else if (photo) void decodePhoto(photo);
+                                  }}>
+                                  {t('common.tryAgain')}
+                                </button>
+                              </div>
+                            )}
                           {photoOCR.phase === 'unavailable' && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && (
                             <div style={{ marginTop: 10 }}>
                               <button className="btn btn-primary" type="button" data-photo-sign-in

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { definitiveSubmissionRefusal, draftPersistenceWarning, pdfReceiptWarning, photoEligibleForGrading } from './photoSubmissionGuard.js';
+import { canRetryPhotoReading, definitiveSubmissionRefusal, draftPersistenceWarning, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure } from './photoSubmissionGuard.js';
 
 const base = { mode: 'photo', photo: 'data:image/png;base64,AA==', ocrPhase: 'done', pdfPageCount: 0 };
 const cases = [
@@ -41,3 +41,18 @@ assert.match(pdfReceiptWarning('hi-IN', 2), /केवल एक तस्वी
 assert.match(draftPersistenceWarning('en-IN'), /Nothing has been submitted/);
 assert.match(draftPersistenceWarning('hi-IN'), /अभी जमा नहीं हुआ/);
 console.log('BILINGUAL PHOTO/RECOVERY DIAGNOSTICS: PASS 4/4');
+
+const privateFailure = await Promise.reject(new Error('private file bytes must not leak'))
+  .catch(photoReadFailure);
+assert.deepEqual(privateFailure, { blocked: 'verdict.photoReadingServiceDown' });
+assert.ok(!JSON.stringify(privateFailure).includes('private file bytes'));
+assert.deepEqual(await Promise.resolve({ text: 'x + 1' }).catch(photoReadFailure), { text: 'x + 1' });
+assert.equal((await Promise.resolve({ allowance: true }).catch(photoReadFailure)).allowance, true);
+console.log('PHOTO PROVIDER NETWORK-REJECTION SAFETY: PASS 4/4');
+
+assert.equal(canRetryPhotoReading('verdict.photoReadingServiceDown', true, false), true);
+assert.equal(canRetryPhotoReading('verdict.photoReadingOffline', false, true), true);
+assert.equal(canRetryPhotoReading('verdict.photoReadingServiceDown', false, false), false);
+assert.equal(canRetryPhotoReading('verdict.photoReadingSignIn', true, false), false);
+assert.equal(canRetryPhotoReading('verdict.photoReadingGuardian', true, true), false);
+console.log('PHOTO RETRY WITHOUT AUTH BYPASS: PASS 5/5');

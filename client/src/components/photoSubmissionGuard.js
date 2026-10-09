@@ -37,3 +37,19 @@ export function draftPersistenceWarning(language) {
     ? 'यह डिवाइस आपके उत्तर और जमा करने की पहचान को सुरक्षित नहीं रख पाया। जगह खाली करें या साइट डेटा चालू करें, फिर कोशिश करें। उत्तर अभी जमा नहीं हुआ है।'
     : 'This device could not safely save the attempt. Check available storage and site data, then try again. Nothing has been submitted.';
 }
+
+// Readiness/session/transport adapters can reject outside their own provider
+// try/catch (for example a dropped connection while loading provider status).
+// An unhandled rejection must never strand Photo at phase='reading' forever.
+// Keep error bytes/private handwriting out of student logs and UI.
+export function photoReadFailure() {
+  return { blocked: 'verdict.photoReadingServiceDown' };
+}
+
+// A recoverable connection failure should not force the learner to choose a
+// fresh image (or lose the original PDF). Auth/guardian refusal is not a
+// reason to offer a bypassing Retry button; those have their own account flow.
+export function canRetryPhotoReading(blockedKey, hasImage, hasPdf) {
+  return Boolean(hasImage || hasPdf) &&
+    ['verdict.photoReadingOffline', 'verdict.photoReadingServiceDown'].includes(blockedKey);
+}
