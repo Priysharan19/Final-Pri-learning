@@ -81,8 +81,10 @@
 //   exam-result   examId → the immutable result      written once
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { asyncRouter } from './asyncRouter.js';
-import { asStore } from './store.js';
+import { asStore, isDatabaseOverload } from './store.js';
 import { nextSyncCursor, syncLockKey } from './db.js';
+import { displaceDeviceEvent } from './sync.js';
+import { logEvent, safeCode } from './observability.js';
 import { requireSession, requireVerifiedEmail, requireRole, rateLimit } from './security.js';
 import { ensureBanks, chooseQuestion, stepMetaFor, answerTextFor, opaqueContentId, opaqueContentHash } from './practice.js';
 import { loadBanksFor } from '../../client/src/engine/generators/index.js';
@@ -975,6 +977,11 @@ async function finalise(db, accountId, id, body, fixedNow = null) {
     const last = await db.get("SELECT MAX(device_seq) AS n FROM learning_events WHERE account_id=? AND device_id='server-grader'", [accountId]);
     let seq = Number(last?.n || 0);
     const event = async (eventId, kind, entityId, payload) => {
+      // The paper's id has been known to the device since the paper was
+      // created. /v1/sync/push refuses server-shaped ids now, but a row a
+      // device stored on this id before it did must not make this insert —
+      // and with it the whole finalisation — fail for ever.
+      await displaceDeviceEvent(db, accountId, eventId);
       const cursor = await nextSyncCursor(db, accountId);
       await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?, 'server-grader',?,?,?,?,?,?)",
         [cursor, eventId, accountId, ++seq, kind, entityId, now, JSON.stringify(payload), now]);
@@ -1004,9 +1011,14 @@ async function finalise(db, accountId, id, body, fixedNow = null) {
  * account, everybody's (housekeeping). Each paper is its own transaction under
  * its account's lock, so this is safe beside a device finishing the same paper
  * at the same moment — one of them writes the result, the other reads it.
- * Returns how many papers this call finalised.
+ *
+ * One paper that cannot be finalised never stops the rest: its failure is
+ * counted and logged (a code, never the paper or its answers) and the pass
+ * moves on. Only a database that is refusing work altogether ends the pass.
+ * Returns { finalised, failed }: how many papers this call finalised, and how
+ * many it had to leave.
  */
-export async function finaliseExpiredExams(db, { accountId = null, now = null, limit = 500 } = {}) {
+export async function sweepExpiredExams(db, { accountId = null, now = null, limit = 500 } = {}) {
   db = asStore(db);
   const at = now ?? Date.now();
   // No paper is shorter than ten minutes, so anything younger cannot be due.
@@ -1014,15 +1026,26 @@ export async function finaliseExpiredExams(db, { accountId = null, now = null, l
   const rows = accountId
     ? await db.all(UNFINALISED + ' AND p.created_at<=? AND p.account_id=? ORDER BY p.created_at LIMIT ?', [due, accountId, limit])
     : await db.all(UNFINALISED + ' AND p.created_at<=? ORDER BY p.created_at LIMIT ?', [due, limit]);
-  let finalised = 0;
+  let finalised = 0, failed = 0;
   for (const row of rows) {
     let paper;
     try { paper = JSON.parse(row.response_json); } catch { continue; }
     if (!(at > Number(paper.deadline) + FINISH_GRACE_MS)) continue;
-    const outcome = await finalise(db, String(row.account_id), String(row.key), null, now);
-    if (outcome.written) finalised++;
+    try {
+      const outcome = await finalise(db, String(row.account_id), String(row.key), null, now);
+      if (outcome.written) finalised++;
+    } catch (error) {
+      if (isDatabaseOverload(error)) throw error;
+      failed++;
+      logEvent('error', 'platform_error', { code: 'EXAM_SWEEP_PAPER_FAILED', dbCode: safeCode(error?.code, 'UNKNOWN') });
+    }
   }
-  return finalised;
+  return { finalised, failed };
+}
+
+/** As sweepExpiredExams, returning only how many papers were finalised. */
+export async function finaliseExpiredExams(db, options = {}) {
+  return (await sweepExpiredExams(db, options)).finalised;
 }
 
 // ── Router ───────────────────────────────────────────────────────────────────

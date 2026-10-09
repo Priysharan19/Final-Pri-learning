@@ -312,7 +312,7 @@ jobs:
         run: |
           set -o pipefail
           node server/test/exam-authority-check.mjs 2>&1 | tee exam-authority.log
-          grep -Fq 'EXAM AUTHORITY: PASS — 314/314 checks' exam-authority.log
+          grep -Fq 'EXAM AUTHORITY: PASS — 346/346 checks' exam-authority.log
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
       - name: Supabase migrations are self-contained transactions (supabase db push)

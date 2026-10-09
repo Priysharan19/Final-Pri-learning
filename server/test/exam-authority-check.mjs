@@ -1077,6 +1077,104 @@ try {
     eq((await finish(lone.jar, alone.id, { answers: allRight(alonePaper) })).data, aloneStored, 'a device finishing later gets the stored result');
   }
 
+  // ── A device cannot occupy the id the server files a result under ──────────
+  // learning_events is unique on (account, id), the server files a paper's
+  // `exam-result` event under the paper's own id, and the device has known
+  // that id since the paper was created. A device event pushed under it used
+  // to make every finish of that paper fail with a 500, and stopped the global
+  // sweep of abandoned papers at that paper on every pass.
+  {
+    let pushSeq = 0;
+    const push = (jar, deviceId, events) => h.request('/v1/sync/push', { method: 'POST', jar,
+      headers: { 'Idempotency-Key': `exam-squat-${String(++pushSeq).padStart(4, '0')}-${realNow().toString(36)}` }, body: { schemaVersion: 1, deviceId, events } });
+    const member = async (name) => {
+      const account = await registerAccount(h, { email: `exam.${name}@example.test`, deviceId: `ipad-exam-${name}` });
+      eq((await verifyEmail(h, account.account.id)).status, 200, `the ${name} account is verified`);
+      await h.db.run('DELETE FROM rate_limits');
+      return { ...account, deviceId: `ipad-exam-${name}` };
+    };
+    const eventRows = accountId => h.db.all('SELECT id,device_id,kind,payload_json FROM learning_events WHERE account_id=? ORDER BY server_cursor', [accountId]);
+    const resultRow = async (accountId, id) => {
+      const row = await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='exam-result' AND key=?", [accountId, id]);
+      return row ? JSON.parse(row.response_json) : null;
+    };
+    // What a row stored before the push route refused such ids looks like: a
+    // real device event, moved onto the paper's id.
+    const squatOldData = async (account, examId, seq) => {
+      const own = `evt-${account.deviceId}-${seq}`;
+      const stored = await push(account.jar, account.deviceId, [{ id: own, deviceId: account.deviceId, deviceSeq: seq, kind: 'rush-history', payload: { score: seq } }]);
+      eq([stored.status, stored.data.acceptedEvents?.[0]?.id], [200, own], "the device's own event id is accepted as before");
+      eq((await h.db.run('UPDATE learning_events SET id=? WHERE account_id=? AND id=?', [examId, account.account.id, own])).changes, 1, "and (as old data) sits on the paper's id");
+    };
+
+    // The push itself is refused, in every spelling of a server id.
+    const squat = await member('squat');
+    const held = (await create(squat.jar, practice)).data.exam;
+    const heldPaper = await sealed(held.id);
+    const attempt = id => push(squat.jar, squat.deviceId, [{ id, deviceId: squat.deviceId, deviceSeq: 1, kind: 'rush-history', payload: { score: 1 } }]);
+    for (const [id, what] of [[held.id, "its own open paper's id"], [held.id.toUpperCase(), 'that id in capitals'],
+      ['3f2b8c1e-5a4d-4e6f-9a7b-0c1d2e3f4a5b', 'any id of the shape the server mints'], ['displaced:0123456789abcdef', "the namespace a displaced row is moved to"]]) {
+      const refused = await attempt(id);
+      eq([refused.status, refused.data?.error?.code], [400, 'SYNC_EVENT_ID_RESERVED'], `a device event pushed under ${what} is refused`);
+    }
+    eq((await eventRows(squat.account.id)).length, 0, 'and nothing was stored');
+    for (const id of [`evt-${squat.deviceId}-1`, `hist:${squat.deviceId}:rush:17`, `hist:${squat.deviceId}:3f2b8c1e-5a4d-4e6f-9a7b-0c1d2e3f4a5b`]) {
+      const seq = (await eventRows(squat.account.id)).length + 1;
+      const accepted = await push(squat.jar, squat.deviceId, [{ id, deviceId: squat.deviceId, deviceSeq: seq, kind: 'rush-history', payload: { score: 1 } }]);
+      eq([accepted.status, accepted.data.acceptedEvents?.[0]?.id], [200, id], `the ids a real device mints are still accepted (${id.split(':')[0].split('-')[0]}…)`);
+    }
+    // A squatting row from before the rule: the finish still completes.
+    await squatOldData(squat, held.id, 4);
+    const h1 = answerable(heldPaper)[0];
+    const heldDone = await finish(squat.jar, held.id, { answers: { [h1.id]: right(h1) } });
+    eq([heldDone.status, heldDone.data.score], [200, Number(h1.marking.correct)], 'a paper whose id a device row was sitting on is finished and marked');
+    eq((await finish(squat.jar, held.id, {})).data, heldDone.data, 'and replays identically');
+    const after = await eventRows(squat.account.id);
+    const onId = after.filter(row => row.id === held.id);
+    eq(onId.map(row => [row.device_id, row.kind]), [['server-grader', 'exam-result']], "the paper's id now holds the server's result event, and only that");
+    const movedRows = after.filter(row => row.device_id === squat.deviceId && row.id.startsWith('displaced:'));
+    eq(movedRows.map(row => [row.kind, JSON.parse(row.payload_json)]), [['rush-history', { score: 4 }]], "the device's row was moved aside intact, not deleted");
+    eq(after.filter(row => row.device_id === squat.deviceId).length, 4, "and none of the device's other events was touched");
+    const pulled = await h.request('/v1/sync/pull/0', { jar: squat.jar });
+    const pulledResult = pulled.data.events.filter(event => event.kind === 'exam-result');
+    eq(pulledResult.map(event => [event.id, event.entityId, event.payload.examId, event.deviceId]), [[held.id, held.id, held.id, 'server-grader']],
+      'a second device pulls the result under the id it restores by');
+
+    // The sweep: a paper that cannot be finalised never stops the others.
+    const poisoned = await member('poisoned');
+    const stuck = (await create(poisoned.jar, practice)).data.exam;
+    await squatOldData(poisoned, stuck.id, 1);
+    const broken = await member('broken');
+    const unreadable = (await create(broken.jar, practice)).data.exam;
+    const victim = await member('victim');
+    const abandoned = (await create(victim.jar, practice)).data.exam;
+    const abandonedPaper = await sealed(abandoned.id);
+    const v1 = answerable(abandonedPaper)[0];
+    eq((await save(victim.jar, abandoned.id, { answers: { [v1.id]: right(v1) }, rev: 1 })).data.saved, true, 'a later account saves one answer and never returns');
+    // A sealed paper the marker cannot read (damaged in storage): it parses,
+    // it is due, and marking it throws.
+    const brokenPaper = await sealed(unreadable.id);
+    eq((await h.db.run("UPDATE idempotency_keys SET response_json=? WHERE account_id=? AND scope='exam-paper' AND key=?",
+      [JSON.stringify({ ...brokenPaper, questions: null }), broken.account.id, unreadable.id])).changes, 1, 'one stored paper is damaged');
+    skew = Math.max(skew, abandonedPaper.deadline - realNow()) + FINISH_GRACE_MS + 1000;
+    const pass = await runHousekeeping(h.db);
+    eq(pass.examsFailed, 1, 'housekeeping reports the one paper it could not finalise');
+    ok(pass.examsFinalised >= 2, `and finalises the rest in the same pass (${pass.examsFinalised})`);
+    const stuckResult = await resultRow(poisoned.account.id, stuck.id);
+    eq([stuckResult?.unattended, (await events(poisoned.account.id, 'exam-result')).map(row => row.id)], [true, [stuck.id]],
+      'the paper a device row was sitting on is finalised by the sweep');
+    const victimResult = await resultRow(victim.account.id, abandoned.id);
+    eq([victimResult?.unattended, victimResult?.score, (await events(victim.account.id, 'exam-result')).length], [true, Number(v1.marking.correct), 1],
+      "the paper created after the unfinalisable one is finalised on its snapshot");
+    eq(await resultRow(broken.account.id, unreadable.id), null, 'the damaged paper has no result');
+    const again = await runHousekeeping(h.db);
+    eq([again.examsFinalised, again.examsFailed], [0, 1], 'a second pass finalises nothing twice and still says one paper is left');
+    eq([(await read(victim.jar, abandoned.id)).status, (await read(poisoned.jar, stuck.id)).data?.result?.examId], [200, stuck.id], 'and their owners read them');
+    await h.db.run("UPDATE idempotency_keys SET response_json=? WHERE account_id=? AND scope='exam-paper' AND key=?", [JSON.stringify(brokenPaper), broken.account.id, unreadable.id]);
+    const mended = await runHousekeeping(h.db);
+    eq([mended.examsFinalised, mended.examsFailed, (await resultRow(broken.account.id, unreadable.id))?.unattended], [1, 0, true], 'once the paper is readable again the next pass finalises it');
+  }
+
   // ── Restart on the same database ───────────────────────────────────────────
   const carried = (await create(a.jar, practice)).data.exam;
   const carriedPaper = await sealed(carried.id);
