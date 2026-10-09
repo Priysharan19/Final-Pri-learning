@@ -28,6 +28,8 @@ import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldChec
 import { misconceptionById } from '../engine/misconceptions.js';
 import { tLater, translate, useLanguage, useT } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
+import { blockedInkRecovery, canOpenInkSignIn, inkRecoveryWords } from './signedOutInkRecovery.js';
+import './inkAccountRecovery.css';
 import { useFormFactor } from '../platform/formFactor.js';
 import Icon from './Icon.jsx';
 import '../workspace.css';
@@ -303,6 +305,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [photo, setPhoto] = useState(null);
   const [photoSignInOpen, setPhotoSignInOpen] = useState(false);
   const [gradingSignInOpen, setGradingSignInOpen] = useState(false);
+  const [inkSignInOpen, setInkSignInOpen] = useState(false);
   const [photoReattachRequired, setPhotoReattachRequired] = useState(false);
   const [photoAuthEpoch, setPhotoAuthEpoch] = useState(0);
   const photoReadGeneration = useRef(0);
@@ -374,7 +377,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // An old photo must never follow the student into a new question.
     photoReadGeneration.current += 1;
     pendingPdf.current = null;
-    setPhoto(null); setPhotoSignInOpen(false); setGradingSignInOpen(false); setPhotoReattachRequired(false); setBookmarked(false);
+    setPhoto(null); setPhotoSignInOpen(false); setGradingSignInOpen(false); setInkSignInOpen(false); setPhotoReattachRequired(false); setBookmarked(false);
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
     setChecking(false); setVouched(null); setPdfUnread(null); setPdfPageCount(0); setAttemptViaInk(false);
     setSaveState(draft?.typed || draft?.working ? 'saved' : null);
@@ -491,6 +494,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         String(event.detail.localProfileId) === String(user?.id)) {
       setPhotoAuthEpoch(n => n + 1);
       setGradingSignInOpen(false);
+      setInkSignInOpen(false);
     }
   }), [user?.id]);
   useEffect(() => {
@@ -1317,6 +1321,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     reattachRequired: photoReattachRequired });
   const canSubmit = (isMcq ? mcqSel !== null : isWorking ? (writeMode ? !!inkResult?.lines?.length : !!working.trim()) : writeMode ? !!inkResult?.answerLine : !!answer.trim()) &&
     !photoAwaitingValidReading;
+  // Reader refused by authentication is not a handwriting error or a
+  // server-issued grading receipt. Keep original ink and its verified local
+  // save state separate; never unlock Submit with a guessed transcript.
+  const inkAccountBlocked = blockedInkRecovery({ readerState: inkReaderState, mode, inkHasStrokes, resolved });
+  const inkSignInReady = canOpenInkSignIn({ readerState: inkReaderState, mode, inkHasStrokes, resolved, saveState });
+  const inkRecoveryCopy = inkRecoveryWords(language);
 
   // Client checkboxes are a reflection exercise, never grading authority.
   // When the server supplies an explicit awarded-mark count, use it only if
@@ -1730,11 +1740,38 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <div className="ink-row">
             {/* data-marked starts the reading sweep (theme.css): it appears only
                 when the deterministic engine has actually marked this page. */}
-            <div className="editor-shell" data-marked={(resolved && !res?.revealed) || (state.phase === 'retry' && !state.res?.invalid) ? 'yes' : undefined}>
+            <div className={`editor-shell${inkAccountBlocked ? ' ink-account-waiting' : ''}${inkReaderState?.blocker === 'ink.waitingSignIn' && inkAccountBlocked ? ' ink-account-signin' : ''}`}
+              data-marked={(resolved && !res?.revealed) || (state.phase === 'retry' && !state.res?.invalid) ? 'yes' : undefined}>
               {InkAnswer && restoredInk !== undefined && (
                 <InkAnswer onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
                   disabled={resolved || busy} focusSymbol={checkFocus} recognitionContext={recognitionContext}
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes} />
+              )}
+              {inkAccountBlocked && (
+                <div className="ink-account-recovery" data-ink-account-recovery role="group" aria-label={inkRecoveryCopy.action}>
+                  <p role="status" aria-live="polite">{inkRecoveryCopy.detail}</p>
+                  {saveState === 'failed' && (
+                    <button type="button" className="btn btn-secondary btn-sm" data-ink-save-retry
+                      onClick={() => latestInk.current?.length && onInkStrokes(latestInk.current)}>
+                      {t('common.tryAgain')}
+                    </button>
+                  )}
+                  {inkReaderState?.blocker === 'ink.waitingSignIn' && (
+                    <>
+                      <button type="button" className="btn btn-primary" data-ink-sign-in
+                        disabled={!inkSignInReady} aria-expanded={inkSignInOpen}
+                        onClick={() => setInkSignInOpen(v => !v)}>
+                        {inkRecoveryCopy.action}
+                      </button>
+                      {!inkSignInReady && <p className="muted" role="status">{inkRecoveryCopy.saveFirst}</p>}
+                      {inkSignInOpen && inkSignInReady && (
+                        <React.Suspense fallback={<p role="status">{t('cloud.stateChecking')}</p>}>
+                          <PhotoAccountRecovery />
+                        </React.Suspense>
+                      )}
+                    </>
+                  )}
+                </div>
               )}
               {inkPhase === 'failed' && (
                 <div className="editor-body">

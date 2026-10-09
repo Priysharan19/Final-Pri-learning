@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import { blockedInkRecovery, canOpenInkSignIn, inkRecoveryWords } from './signedOutInkRecovery.js';
+const wait = { kind:'ACCOUNT_ACTION_REQUIRED', blocker:'ink.waitingSignIn' };
+const base = {readerState:wait,mode:'write',inkHasStrokes:true,resolved:false};
+assert.equal(blockedInkRecovery(base),true,'written signed-out question needs in-context action');
+assert.equal(canOpenInkSignIn({...base,saveState:'saving'}),false,'queued IndexedDB work is not attested');
+assert.equal(canOpenInkSignIn({...base,saveState:'failed'}),false,'failed IDB write cannot permit risky profile switch');
+assert.equal(canOpenInkSignIn({...base,saveState:'saved'}),true,'verified readback enables account recovery');
+assert.equal(blockedInkRecovery({...base,inkHasStrokes:false}),false,'empty ink not a claim of saved work');
+assert.equal(blockedInkRecovery({...base,mode:'type'}),false,'Type must remain available');
+assert.equal(blockedInkRecovery({...base,resolved:true}),false,'already graded question not reauthored');
+assert.equal(blockedInkRecovery({...base,readerState:{kind:'READ_FAILED'}}),false,'bad recognition is not a sign-in error');
+assert.equal(blockedInkRecovery({...base,readerState:{kind:'ACCOUNT_ACTION_REQUIRED',blocker:'ink.waitingGuardian'}}),true,'guardian remains separate account action');
+assert.equal(canOpenInkSignIn({...base,readerState:{kind:'ACCOUNT_ACTION_REQUIRED',blocker:'ink.waitingGuardian'},saveState:'saved'}),false,'guardian gate cannot be bypassed by signing in');
+assert.match(inkRecoveryWords('en').action,/Sign in to check this answer/);
+assert.ok(inkRecoveryWords('hi').action.includes('साइन इन'));
+assert.doesNotMatch(inkRecoveryWords('en').detail,/saved|marked on device/i,'no unverified persistence/grade promise');
+console.log('SIGNED-OUT INK ACCOUNT RECOVERY: PASS 13/13');

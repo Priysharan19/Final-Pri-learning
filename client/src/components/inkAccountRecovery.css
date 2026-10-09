@@ -1,0 +1,17 @@
+/* Only the inaccurate generic sentence is suppressed when the student owns
+   an unrecognised, account-blocked Ink page. The parent shows one truthful
+   state, derived from verified IndexedDB readback, plus the next action. */
+.editor-shell.ink-account-waiting .ink-answer > .ink-status-line {
+  display: none;
+}
+.editor-shell.ink-account-signin .ink-answer > .ink-status-action {
+  display: none;
+}
+.ink-account-recovery {
+  margin: 10px 10px 15px;
+  padding: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+}
+.ink-account-recovery > p { margin: 0 0 8px; }
+.ink-account-recovery .btn { min-height: 44px; }
