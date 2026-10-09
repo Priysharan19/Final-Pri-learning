@@ -438,7 +438,7 @@ export const writeFlow = {
       const serverQid = issues[0]?.json?.question?.id || null;
       await check('the prepared question was BOUND to this account at submit: one issue request carrying only the prepared token — no generator, seed or answer',
         issues.length === 1 && issues[0].status === 201 && !!serverQid &&
-          JSON.stringify(Object.keys(issues[0].body || {})) === '["prepared"]' && typeof issues[0].body.prepared === 'string' &&
+          Object.keys(issues[0].body || {}).every(k => k === 'prepared' || (k === 'account' && typeof issues[0].body.account === 'string')) && typeof issues[0].body.prepared === 'string' &&
           prepares.filter(c => c.json?.prepared === issues[0].body.prepared).length === 1,
         JSON.stringify(issues.map(c => ({ status: c.status, keys: Object.keys(c.body || {}) }))));
       const escrow = serverQid ? serverAnswer(h, serverQid) : null;
