@@ -6,6 +6,10 @@ import { useApp } from '../App.jsx';
 import { MathText } from '../lib/latex.jsx';
 import { indiaExamBlueprint, indiaExamClaim } from '../engine/indiaExams.js';
 import { tLater, useT, useTx } from '../i18n/index.js';
+import { checkRefusal, checkRefusalCopy } from '../components/checkAccess.js';
+import { CheckRefusal } from '../components/CheckRefusal.jsx';
+import { onCloudSessionChange } from '../platform/cloudSession.js';
+import Icon from '../components/Icon.jsx';
 
 // The India blueprints and their claims are engine data with an English source
 // of truth in engine/indiaExams.js; these are their catalogue keys, so the page
@@ -27,14 +31,24 @@ const CLAIM_KEYS = {
 };
 
 export default function Exams() {
-  const { user } = useApp();
+  const { user, refreshUser } = useApp();
   const t = useT();
   const [exams, setExams] = useState(null);
   const [cfg, setCfg] = useState({ length: 10, minutes: 30, year: user.year });
   const [busy, setBusy] = useState(false);
   const [paper, setPaper] = useState(null);
   const [error, setError] = useState('');
+  // Why a paper could not start: a paper is marked work, so it needs a
+  // signed-in eligible account and a connection, like checking an answer.
+  const [refusal, setRefusal] = useState(null);
   const nav = useNavigate();
+  // Signed in on this page for this profile: the reason is gone. The student
+  // starts the paper themselves; nothing starts on its own.
+  useEffect(() => onCloudSessionChange(event => {
+    if (event?.detail?.connected === true && String(event.detail.localProfileId) === String(user?.id)) {
+      setRefusal(kind => (kind === 'sign-in' ? null : kind));
+    }
+  }), [user?.id]);
   const indiaBlueprint = useMemo(() => user.course === 'in'
     ? indiaExamBlueprint({ track: user.indiaTrack || 'cbse', grade: user.year })
     : null, [user.course, user.indiaTrack, user.year]);
@@ -52,18 +66,30 @@ export default function Exams() {
   async function start() {
     setBusy(true);
     setError('');
+    setRefusal(null);
     try {
       const body = user.course === 'in' ? { year: user.year } : cfg;
       const r = await api.post('/exams', body);
       nav(`/exams/${r.exam.id}`);
     } catch (err) {
-      setError(err.message || tLater('exams.formatNotReady'));
+      const kind = checkRefusal(err);
+      if (checkRefusalCopy(kind, 'exam')) setRefusal(kind);
+      else setError(err.message || tLater('exams.formatNotReady'));
     } finally { setBusy(false); }
   }
 
+  const startRefused = refusal ? (
+    <div className="verdict verdict-technical" role="alert" data-exam-start-refused={refusal} style={{ marginTop: 14, gridColumn: '1 / -1' }}>
+      <span className="verdict-ico"><Icon name="alert" /></span>
+      <div>
+        <CheckRefusal kind={refusal} context="exam" user={user} refreshUser={refreshUser} onRetry={start} busy={busy} />
+      </div>
+    </div>
+  ) : null;
+
   if (user.course === 'in') {
     return <IndiaExams
-      user={user} exams={exams} blueprint={indiaBlueprint} busy={busy} error={error}
+      user={user} exams={exams} blueprint={indiaBlueprint} busy={busy} error={error} startRefused={startRefused}
       start={start} openPaper={openPaper} nav={nav} paper={paper} setPaper={setPaper}
     />;
   }
@@ -104,13 +130,14 @@ export default function Exams() {
       </div>
 
       <PaperHistory exams={exams} openPaper={openPaper} nav={nav} />
+      {startRefused}
       {error && <div className="card" role="alert" style={{ gridColumn: '1 / -1' }}>{error}</div>}
       {paper && <PrintPaper paper={paper} onClose={() => setPaper(null)} />}
     </div>
   );
 }
 
-function IndiaExams({ user, exams, blueprint, busy, error, start, openPaper, nav, paper, setPaper }) {
+function IndiaExams({ user, exams, blueprint, busy, error, startRefused, start, openPaper, nav, paper, setPaper }) {
   const claim = indiaExamClaim(blueprint);
   const track = user.indiaTrack || 'cbse';
   const jeeMainReady = track === 'jee-main' && blueprint?.authenticity === 'official-mathematics-section';
@@ -153,6 +180,7 @@ function IndiaExams({ user, exams, blueprint, busy, error, start, openPaper, nav
             {t('exams.notReleased')}
           </button>
         </>}
+        {startRefused}
         {error && <div role="alert" style={{ marginTop: 14, color: 'var(--bad)' }}>{error}</div>}
       </div>
 
