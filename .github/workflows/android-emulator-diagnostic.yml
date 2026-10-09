@@ -1,0 +1,75 @@
+# Diagnostic only (workflow_dispatch): which emulator configuration keeps the hosted
+# runner's headless phone emulator alive through the Android shell journey?
+# Issue #278 / #327. SYNTHETIC / EMULATOR evidence only. Not a release gate.
+name: Android Emulator Diagnostic
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { label: verbose-33-pixel6,   api: 33, profile: pixel_6, target: google_apis, build: '', ram: '', heap: '', cores: 2, webview: '', opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim -verbose -show-kernel' }
+          - { label: wv-nogpucomp-33,     api: 33, profile: pixel_6, target: google_apis, build: '', ram: '', heap: '', cores: 2, webview: '--disable-gpu-compositing', opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim' }
+          - { label: wv-nogpu-33,         api: 33, profile: pixel_6, target: google_apis, build: '', ram: '', heap: '', cores: 2, webview: '--disable-gpu', opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim' }
+          - { label: wv-no2dcanvas-33,    api: 33, profile: pixel_6, target: google_apis, build: '', ram: '', heap: '', cores: 2, webview: '--disable-accelerated-2d-canvas', opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan -no-snapshot -noaudio -no-boot-anim' }
+          - { label: nodirectmem-33,      api: 33, profile: pixel_6, target: google_apis, build: '', ram: '', heap: '', cores: 2, webview: '', opts: '-no-window -gpu swiftshader_indirect -feature -Vulkan,-GLDirectMem,-GLAsyncSwap -no-snapshot -noaudio -no-boot-anim' }
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build the shared web product and install the server
+        run: npm ci --prefix client && npm run build && npm ci --prefix server
+      - name: Build the app and the instrumented tests
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug assembleDebugAndroidTest
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Journey with a live logcat tee
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: ${{ matrix.api }}
+          target: ${{ matrix.target }}
+          arch: x86_64
+          profile: ${{ matrix.profile }}
+          cores: ${{ matrix.cores }}
+          ram-size: ${{ matrix.ram }}
+          heap-size: ${{ matrix.heap }}
+          emulator-build: ${{ matrix.build }}
+          disable-animations: true
+          emulator-options: ${{ matrix.opts }}
+          working-directory: android
+          script: mkdir -p app/build/outputs/pri-instrumented && { [ -n "${{ matrix.webview }}" ] && adb shell "echo '_ ${{ matrix.webview }}' > /data/local/tmp/webview-command-line && chmod 644 /data/local/tmp/webview-command-line" || true; } && (adb logcat -v threadtime > app/build/outputs/pri-instrumented/live-logcat.txt 2>&1 &) && node ../scripts/cloud-fixture-server.mjs --out /tmp/pri-cloud.env && set -a && . /tmp/pri-cloud.env && set +a && { ./scripts/run-instrumented.sh product; rc=$?; kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null; exit $rc; }
+      - name: Collect emulator crash data
+        if: always()
+        run: |
+          mkdir -p android/app/build/outputs/pri-instrumented/host
+          ls -la /tmp/android-runner 2>/dev/null || true
+          cp -r /tmp/android-runner android/app/build/outputs/pri-instrumented/host/ 2>/dev/null || true
+          dmesg 2>/dev/null | tail -200 > android/app/build/outputs/pri-instrumented/host/dmesg.txt || true
+          free -m > android/app/build/outputs/pri-instrumented/host/free.txt || true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: diag-${{ matrix.label }}
+          path: android/app/build/outputs/pri-instrumented
+          if-no-files-found: warn
