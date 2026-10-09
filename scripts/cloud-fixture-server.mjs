@@ -14,6 +14,10 @@
 // emulator (the default), 127.0.0.1 from an iOS simulator.
 // --db <file> --restart starts the server again on an existing fixture
 // database (offline → reconnect journeys) without creating anything.
+// --synthetic-reader starts the same real server through
+// scripts/synthetic-reader-server.mjs: the handwriting reader (the one hop to
+// the model) is a scripted stand-in, every other outbound request is refused.
+// Evidence from such a run is SYNTHETIC-READER evidence, never real-provider.
 // The server keeps running (detached); its log is written next to the DB.
 // ─────────────────────────────────────────────────────────────────────────────
 import { spawn } from 'node:child_process';
@@ -34,9 +38,25 @@ const dir = dirname(dbPath);
 if (restart && !arg('db')) { console.error('--restart needs --db <file>'); process.exit(2); }
 const log = openSync(join(dir, 'server.log'), 'a');
 
-const child = spawn(process.execPath, [join(ROOT, 'server/index.js')], {
+const syntheticReader = process.argv.includes('--synthetic-reader');
+const readerLog = join(dir, 'synthetic-reader.jsonl');
+const readerScript = join(dir, 'synthetic-reader-script.json');
+// The stand-in reader's environment: a key that is not a provider key (the
+// provider hop never leaves the process), a named synthetic model, and the
+// paid-call ceiling the server requires whenever a reader is configured.
+const readerEnv = syntheticReader ? {
+  PRI_HANDWRITING_API_KEY: 'synthetic-reader-not-a-provider-key',
+  PRI_HANDWRITING_MODEL: 'synthetic-reader',
+  PRI_HANDWRITING_FALLBACK_MODEL: 'synthetic-reader',
+  PRI_HANDWRITING_ENDPOINT: '', PRI_HANDWRITING_PROBE_ENDPOINT: '', PRI_HANDWRITING_CONFIDENCE_FLOOR: '',
+  PRI_PAID_CALLS_PER_HOUR: '10000', PRI_PAID_CALLS_PER_DAY: '100000',
+  PRI_SYNTHETIC_READER_LOG: readerLog, PRI_SYNTHETIC_READER_SCRIPT: readerScript
+} : {};
+const entry = syntheticReader ? join(ROOT, 'scripts/synthetic-reader-server.mjs') : join(ROOT, 'server/index.js');
+
+const child = spawn(process.execPath, [entry], {
   cwd: ROOT,
-  env: { ...process.env, PORT: String(port), PRI_PLATFORM_DB: dbPath, NODE_ENV: 'development', PRI_DATABASE_URL: '' },
+  env: { ...process.env, PORT: String(port), PRI_PLATFORM_DB: dbPath, NODE_ENV: 'development', PRI_DATABASE_URL: '', ...readerEnv },
   detached: true,
   stdio: ['ignore', log, log],
 });
@@ -78,7 +98,7 @@ if (changed !== 1) { console.error('could not mark the fixture account verified'
 // A second, never-registered credential for sign-up journeys.
 const newEmail = `native-new-${Date.now()}@example.test`;
 const newPassword = `Fixture-${randomBytes(9).toString('base64url')}`;
-const env = `PRI_CLOUD_ORIGIN=http://${deviceHost}:${port}\nPRI_CLOUD_EMAIL=${email}\nPRI_CLOUD_PASSWORD=${password}\nPRI_CLOUD_NEW_EMAIL=${newEmail}\nPRI_CLOUD_NEW_PASSWORD=${newPassword}\nPRI_CLOUD_DB=${dbPath}\nPRI_CLOUD_PORT=${port}\nPRI_CLOUD_SERVER_PID=${child.pid}\nPRI_CLOUD_SERVER_LOG=${join(dir, 'server.log')}\n`;
+const env = `PRI_CLOUD_ORIGIN=http://${deviceHost}:${port}\nPRI_CLOUD_EMAIL=${email}\nPRI_CLOUD_PASSWORD=${password}\nPRI_CLOUD_NEW_EMAIL=${newEmail}\nPRI_CLOUD_NEW_PASSWORD=${newPassword}\nPRI_CLOUD_DB=${dbPath}\nPRI_CLOUD_PORT=${port}\nPRI_CLOUD_SERVER_PID=${child.pid}\nPRI_CLOUD_SERVER_LOG=${join(dir, 'server.log')}\n${syntheticReader ? `PRI_CLOUD_READER=synthetic\nPRI_CLOUD_READER_LOG=${readerLog}\nPRI_CLOUD_READER_SCRIPT=${readerScript}\n` : ''}`;
 const out = arg('out');
 if (out) writeFileSync(out, env);
-console.log(`Real Pri server on ${base} (pid ${child.pid}); fixture account ${email} (verified). SYNTHETIC TEST FIXTURE.`);
+console.log(`Real Pri server on ${base} (pid ${child.pid}); fixture account ${email} (verified). SYNTHETIC TEST FIXTURE.${syntheticReader ? ' Handwriting reader: SYNTHETIC stand-in (no provider is reached).' : ''}`);
