@@ -58,7 +58,7 @@ const ROOT = path.resolve(HERE, '../..');
 const { inspect } = await import('../../server/test/selfcheck.mjs');
 const { IN_CURRICULUM } = await import('../src/engine/curriculum-in.js');
 const {
-  indiaScope, indiaDifficultyWindow, resolveIndiaTarget, indiaChapterGrade
+  indiaScope, indiaDifficultyWindow, resolveIndiaTarget, indiaChapterGrade, indiaRequestableDifficulties
 } = await import('../src/engine/indiaProduct.js');
 const { pyqCellsFor } = await import('../src/engine/pyq/pyqCoverage.js');
 const { generateQuestion, loadAllBanks, loadBanksFor, bankOf, GENERATORS } = await import('../src/engine/generators/index.js');
@@ -502,23 +502,14 @@ async function premiumProfile(spec) {
   return created.user;
 }
 
-/** The rungs a request may legitimately be served at: the nearest authored ones. */
-function nearestRungs(p, asked) {
-  // Every request is held to the track window first (adaptive-08), then served
-  // at the nearest authored rung to that.
-  const { floor, ceiling } = indiaDifficultyWindow(p.track, p.grade ?? 10);
-  const difficulty = Math.max(floor, Math.min(ceiling, asked));
-  const chapter = chapterById(p.chapterId);
-  const covers = p.dotpoint == null ? (chapter?.covers || []) : (chapter?.covers || []).filter(c => c.dp.includes(p.dotpoint));
-  const rungs = new Set(covers.flatMap(c => c.diff || []));
-  if (p.dotpoint == null) for (const cell of pyqCellsFor(p.track, p.chapterId)) rungs.add(cell.difficulty);
-  if (!rungs.size) return new Set();
-  // The resolver's preference: rungs inside the window, else below the floor,
-  // else above the ceiling — nearest to the held difficulty within that tier.
-  const all = [...rungs];
-  const tier = [all.filter(r => r >= floor && r <= ceiling), all.filter(r => r < floor), all.filter(r => r > ceiling)].find(t => t.length);
-  const gap = Math.min(...tier.map(r => Math.abs(r - difficulty)));
-  return new Set(tier.filter(r => Math.abs(r - difficulty) === gap));
+/**
+ * Whether a request that names D`asked` must be served (true) or refused
+ * (false): it is served exactly when an authored form sits at that level
+ * inside the track's window for the chapter or dot point — the engine's own
+ * indiaRequestableDifficulties, which is also what the picker offers.
+ */
+function exactLevel(p, asked) {
+  return indiaRequestableDifficulties(chapterById(p.chapterId), { dotpoint: p.dotpoint, track: p.track, grade: p.grade ?? 10 }).includes(asked);
 }
 
 /**
@@ -529,8 +520,8 @@ function nearestRungs(p, asked) {
  * difficulty of the window. The resolver, entitlement gate, repeat window, row
  * write and the sanitised reply are all in the loop. A refusal, a reply the
  * card cannot render, a stored row without content identity, a question from
- * another chapter, or one served at a rung that is not the nearest authored
- * rung to the one asked for fails the request.
+ * another chapter, or one served at any level other than the one asked for
+ * fails the request; a level with no authored form must be refused.
  *
  * Then every other surface that builds a practice link: the Class X NCERT
  * library's D1–D4 buttons and India Progress's per-chapter button, plus smart
@@ -563,12 +554,21 @@ export async function certifyBackend(paths, { surfaces = true } = {}) {
       else if (!payload?.contentId || !payload?.contentVersion || payload.contentHash !== contentHashOf(payload)) row.problem = 'stored question has no valid content identity';
       else if (expect.chapterId && stored.india?.chapterId !== expect.chapterId) row.problem = `served under ${stored.india?.chapterId}, not ${expect.chapterId}`;
       else if (expect.pyq && !payload.pyq) row.problem = 'past-papers-only served an authored question';
-      else if (expect.rungs && !payload.pyq && !expect.rungs.has(Number(stored.difficulty))) row.problem = `asked for D${expect.difficulty}, served D${stored.difficulty} (nearest authored: ${[...expect.rungs].join('/')})`;
-      else if (expect.rungs && Number(q.difficulty) !== Number(stored.difficulty)) row.problem = 'the card shows a different difficulty from the stored question';
+      // A named difficulty is served at exactly that level or refused (issue
+      // #408): never at the nearest authored one.
+      else if (expect.difficulty != null && expect.exact === false) row.problem = `D${expect.difficulty} has no authored form here, yet D${stored.difficulty} was served instead of a refusal`;
+      else if (expect.difficulty != null && Number(stored.difficulty) !== expect.difficulty) row.problem = `asked for D${expect.difficulty}, served D${stored.difficulty}`;
+      else if (expect.difficulty != null && Number(q.difficulty) !== Number(stored.difficulty)) row.problem = 'the card shows a different difficulty from the stored question';
       else row.ok = true;
       if (q?.id) await dispatch('POST', `/practice/${q.id}/discard`, {}).catch(() => {});
     } catch (err) {
       if (expect.refusal && err.code === expect.refusal) row.ok = true;
+      // The declared answer to a level with no authored form: a refusal that
+      // names the level and lists the levels that exist — never the level
+      // itself, and none when the picker would have offered it.
+      else if (expect.difficulty != null && expect.exact !== true && err.code === 'DIFFICULTY_UNAVAILABLE'
+        && err.detail?.difficultyRequested === expect.difficulty && Array.isArray(err.detail.available)
+        && !err.detail.available.some(a => a.difficulty === expect.difficulty)) row.ok = true;
       else row.problem = `refused: ${err.code || err.status || ''} ${err.message}`.slice(0, 200);
     }
     rows.push(row);
@@ -580,7 +580,7 @@ export async function certifyBackend(paths, { surfaces = true } = {}) {
     const base = { subtopic: p.chapterId, dotpoint: p.dotpoint, track: p.track, pyq: p.pyqOnly };
     await send(p.id, practiceHref(base), { chapterId: p.chapterId, pyq: p.pyqOnly });
     for (const d of p.difficulties) {
-      await send(`${p.id}@D${d}`, practiceHref({ ...base, difficulty: d }), { chapterId: p.chapterId, pyq: p.pyqOnly, difficulty: d, rungs: p.pyqOnly ? null : nearestRungs(p, d) });
+      await send(`${p.id}@D${d}`, practiceHref({ ...base, difficulty: d }), { chapterId: p.chapterId, pyq: p.pyqOnly, difficulty: d, exact: p.pyqOnly ? null : exactLevel(p, d) });
     }
   }
   if (!surfaces) return rows;
@@ -595,7 +595,7 @@ export async function certifyBackend(paths, { surfaces = true } = {}) {
   for (const chapter of NCERT_CLASS10_CONTENT) {
     for (const d of libraryRungs) {
       const p = { chapterId: chapter.id, dotpoint: null, track: 'cbse', grade: 10 };
-      await send(`surface/class10-library/${chapter.id}@D${d}`, class10LibraryPracticeHref(chapter, d), { chapterId: chapter.id, difficulty: d, rungs: nearestRungs(p, d) });
+      await send(`surface/class10-library/${chapter.id}@D${d}`, class10LibraryPracticeHref(chapter, d), { chapterId: chapter.id, difficulty: d, exact: exactLevel(p, d) });
     }
   }
   // India Progress: one Practise button per chapter of the student's scope.
@@ -790,7 +790,7 @@ function markdown(report) {
   lines.push(`- Difficulty: ${s.difficultyMismatch} questions served at a rung other than the one the resolver chose. Every difficulty of the track window is requested on every path, so a dot point authored at fewer rungs is served at its nearest authored rung: ${s.difficultySnapped} such snapped requests, ${s.difficultyBelowWindow} of them outside the track window and disclosed to the student as such`);
   lines.push(`- Repeats in a ${REPEAT_WINDOW}-question window: ${s.repeatsAvoidable} avoidable (pool of ${2 * REPEAT_WINDOW}+ distinct items met and still repeated); ${s.repeatsExhausted} from smaller pools, each flagged to the student as a repeat`);
   lines.push(`- Low-variety paths (≤2 distinct items across the sample): ${s.lowVarietyPaths}`);
-  lines.push(`- End to end through the local backend (POST /practice/next as the Practice page sends it): ${s.backend.passed}/${s.backend.paths} requests served a renderable, versioned question from the requested chapter at the nearest authored rung to the difficulty asked for — every advertised path with and without each window difficulty, the Class X NCERT library's D1–D4 buttons, India Progress's chapter buttons, and smart practice with and without the past-papers filter (where a class has no archive, the declared refusal)`);
+  lines.push(`- End to end through the local backend (POST /practice/next as the Practice page sends it): ${s.backend.passed}/${s.backend.paths} requests were answered as declared: a renderable, versioned question from the requested chapter at exactly the difficulty asked for, or — where that level has no authored form — a DIFFICULTY_UNAVAILABLE refusal listing the levels that exist — every advertised path with and without each window difficulty, the Class X NCERT library's D1–D4 buttons, India Progress's chapter buttons, and smart practice with and without the past-papers filter (where a class has no archive, the declared refusal)`);
   lines.push(`- Repeat window (live backend): ${s.repeatWindow.passed}/${s.repeatWindow.probes} probes served ${REPEAT_WINDOW} distinct questions in a row from pools small enough that the same draws without the window repeat`);
   lines.push(`- Generator cells (every V1 generator at all four rungs, ${s.generatorCells.drawsPerCell} draws each): ${s.generatorCells.passed}/${s.generatorCells.cells} pass, ${s.generatorCells.questions} questions`);
   lines.push(`- Exam papers: ${s.exams.passed}/${s.exams.selections} selections pass; ${s.exams.papers} papers, ${s.exams.questions} items, ${s.exams.failed} failed, ${s.exams.duplicatesInPaper} in-paper duplicates`);

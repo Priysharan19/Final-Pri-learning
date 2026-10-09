@@ -127,7 +127,7 @@ async function run() {
   const { SUBTOPIC_BY_ID } = await import(`${SRC}engine/curriculum.js`);
   const {
     indiaPracticeScope, indiaDifficultyWindow, indiaDotpointKey, parseIndiaDotpointKey, indiaChapterGrade, indiaAheadUnlocked,
-    indiaDotpointsInWindow
+    indiaDotpointsInWindow, indiaRequestableDifficulties
   } = await import(`${SRC}engine/indiaProduct.js`);
   const { misconceptionKey, TRAP_ACTIVE_AT, INTERLEAVE } = await import(`${SRC}engine/adaptive.js`);
   const { INDIA_REASON_TAGS } = await import(`${SRC}engine/indiaProgress.js`);
@@ -324,7 +324,11 @@ async function run() {
       // which is the correct behaviour and not something to probe through.
       for (const dp of indiaDotpointsInWindow(c, user.indiaTrack, user.year)) {
         if (found) break;
-        for (let d = window.floor; d <= window.ceiling && !found; d++) {
+        // Only the levels the dot point is authored at: a named level with no
+        // form is refused with DIFFICULTY_UNAVAILABLE (issue #408), never
+        // answered at another level, so it is not something to probe through.
+        for (const d of indiaRequestableDifficulties(c, { dotpoint: dp, track: user.indiaTrack, grade: user.year })) {
+          if (found) break;
           for (let i = 0; i < 3 && !found; i++) {
             const probe = await serve({ subtopic: c.id, dotpoint: dp, difficulty: d });
             const trap = (probe.payload.traps || []).find(t => t.value !== undefined && t.why && !checkAnswer(probe.payload, String(t.value)).correct);
@@ -502,7 +506,13 @@ async function run() {
   const j12log = await drive(24);
   ok('every JEE Advanced serve is D3 or D4', j12log.every(e => e.difficulty >= 3 && e.difficulty <= 4 && e.windowed === true), show([...new Set(j12log.map(e => e.difficulty))]));
   ok('JEE Advanced draws on both senior years', j12log.some(e => e.year === 11) && j12log.some(e => e.year === 12), show([...new Set(j12log.map(e => e.year))]));
-  ok('an explicit D1 request is held to the JEE Advanced floor', (await serve({ subtopic: j12log[0].chapter, difficulty: 1 })).question.difficulty >= 3);
+  // D1 is not a JEE Advanced level. It is refused with the levels that exist —
+  // never served, and never answered with a D3 question in its place (#408).
+  const belowFloor = await POST('/practice/next', { subtopic: j12log[0].chapter, difficulty: 1 }).then(() => null, e => e);
+  ok('an explicit D1 request is refused on JEE Advanced, not served at another level',
+    belowFloor?.code === 'DIFFICULTY_UNAVAILABLE' && belowFloor.detail?.difficultyRequested === 1
+      && belowFloor.detail.available.length > 0 && belowFloor.detail.available.every(a => a.difficulty >= 3 && a.difficulty <= 4),
+    show({ code: belowFloor?.code, detail: belowFloor?.detail }));
   ok('JEE Advanced keeps interleaving', longestRun(j12log) <= 2, `longest run ${longestRun(j12log)}`);
   ok('JEE Advanced rating rows are chapter-keyed', ratingRowsOf(j12.id).every(r => IN_CHAPTER_BY_ID[r.subtopic]));
 
