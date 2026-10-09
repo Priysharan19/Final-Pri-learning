@@ -16,13 +16,24 @@ import Icon from '../components/Icon.jsx';
 import { isContentEmpty, servable, contentEmptySignal } from '../lib/contentServe.js';
 import { practiceHref, practiceRequestFromQuery } from '../lib/practiceLinks.js';
 import { queueTelemetry } from '../platform/telemetry.js';
+import { consumeSessionReceipt } from './practiceSessionReceipt.js';
+import { shouldReloadPracticeOnCloudSignIn } from './practiceCloudRecovery.js';
 
 // Reuse the existing verified account flow; never create a parallel practice login.
 const PracticeAccountRecovery = React.lazy(() => import('../components/CloudAccountPanel.jsx'));
 
 const EMPTY_SESSION = Object.freeze({ answered: 0, correct: 0, xp: 0 });
 
+// A device may change local profiles while this route remains mounted.
+// Keep every in-memory question, photo, transcript and recovery ref scoped to
+// its owning profile. A cloud session refresh for the SAME local profile must
+// not remount the card or discard a Photo awaiting account recovery.
 export default function Practice() {
+  const { user } = useApp();
+  return <ProfilePractice key={String(user?.id ?? 'no-profile')} />;
+}
+
+function ProfilePractice() {
   const { user } = useApp();
   const t = useT();
   const tx = useTx();
@@ -61,7 +72,13 @@ export default function Practice() {
   const [capped, setCapped] = useState(null);
   const [session, setSession] = useState({ ...EMPTY_SESSION });
   const sessionRef = useRef({ ...EMPTY_SESSION });
+  const seenSessionAttempts = useRef(new Set());
   const loading = useRef(false);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; };
+  }, []);
 
   // An empty path is a deliberate state, not an error to retry: it is shown
   // once, with a way out, and reported as a low-cardinality signal.
@@ -201,12 +218,14 @@ export default function Practice() {
       const pendingQuestionId = body.resume === true ? pendingSubmissionQuestionId() : null;
       if (pendingQuestionId) body.pendingQuestionId = pendingQuestionId;
       const r = await api.post('/practice/next', body);
+      if (!alive.current) return; // A former profile cannot restore this question.
       // Not served back means there is nothing left to recover (skipped, or
       // gone); a record that can never replay must not be sent forever.
       if (pendingQuestionId && r?.question?.id !== pendingQuestionId) clearPendingSubmission(pendingQuestionId);
       if (!servable(r)) throw Object.assign(new Error(emptyContext.current.t('practice.emptyTitle')), { code: 'CONTENT_EMPTY' });
       setServe(r);
     } catch (e) {
+      if (!alive.current) return;
       // A free-tier refusal is not a fault: it is the end of today's free
       // questions, and it is explained rather than shown as an error string.
       if (e?.code === 'FREE_CAP_REACHED' || e?.code === 'FREE_EXAM_CAP_REACHED') setCapped(e);
@@ -226,7 +245,12 @@ export default function Practice() {
     if (event?.detail?.connected !== true ||
         String(event.detail.localProfileId) !== String(user?.id)) return;
     setAccountRecoveryOpen(false);
-    void load();
+    // Signing in while a student is writing must not re-issue a question or
+    // replace the mounted Ink canvas with another question ID. InkAnswer has
+    // its own same-profile session listener which retries recognition after
+    // the verified cloud-account transition. Only an empty Practice surface
+    // needs initial question issuance after sign-in.
+    if (shouldReloadPracticeOnCloudSignIn(event, user?.id, currentQuestionRef.current)) void load();
   }), [load, user?.id]);
 
   const setPyqOnly = useCallback((on) => {
@@ -282,6 +306,9 @@ export default function Practice() {
   }, [assignmentMode, assignmentContext, assignmentClassId, assignmentId, assignmentTarget, t]);
 
   const onResolved = res => {
+    // A network acknowledgement from a removed account's card cannot change
+    // this student's session or send an assignment summary under a new login.
+    if (!alive.current || !consumeSessionReceipt(res, seenSessionAttempts.current)) return;
     const goal = Math.max(1, Number(user.dailyGoal) || 10);
     const before = Math.max(0, Number(user.today?.questions) || 0);
     if (!assignmentMode && !sessionDoneShown.current && before < goal && before + 1 >= goal) {
@@ -566,7 +593,7 @@ export default function Practice() {
       {serve && !assignmentCompleteLocally && (
         <>
           <QuestionCard
-            key={serve.question.id}
+            key={`${user.id}:${serve.question.id}`}
             question={serve.question}
             reason={serve.reason}
             reasonTag={serve.reasonTag || null}
@@ -576,7 +603,7 @@ export default function Practice() {
             onRedo={redo}
           />
           <PriExplain
-            key={`explain-${serve.question.id}`}
+            key={`explain-${user.id}:${serve.question.id}`}
             questionId={serve.question.id}
             questionPrompt={serve.question.prompt}
             questionFigure={serve.question.figure}

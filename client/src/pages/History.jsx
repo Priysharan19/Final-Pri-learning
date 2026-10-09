@@ -3,7 +3,7 @@
 // Every answered question, forever: filter it, bookmark it, replay your
 // handwriting, and re-attempt any question — same numbers or fresh ones.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 import { MathText } from '../lib/latex.jsx';
@@ -12,6 +12,7 @@ import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import TermGloss from '../components/TermGloss.jsx';
 import Icon from '../components/Icon.jsx';
+import { createHistoryLoadGate } from './historyLoadLifecycle.js';
 
 const FILTERS = [
   ['all', 'history.filterAll'],
@@ -52,6 +53,13 @@ function InkReplay({ strokes, height = 160, label }) {
 }
 
 export default function History() {
+  const { user } = useApp();
+  // Saved attempts contain private ink, transcripts and photographs. A profile
+  // change discards this whole subtree before the new student sees History.
+  return <HistoryForProfile key={String(user?.id ?? 'no-profile')} />;
+}
+
+function HistoryForProfile() {
   const { toast, user } = useApp();
   const t = useT();
   const [params, setParams] = useSearchParams();
@@ -59,19 +67,30 @@ export default function History() {
   const filter = FILTERS.some(([key]) => key === requestedFilter) ? requestedFilter : 'all';
   const [page, setPage] = useState(0);
   const [data, setData] = useState(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [refresh, setRefresh] = useState(0);
   const [open, setOpen] = useState(null);       // {id, detail}
+  const detailGate = useRef(null);
   const nav = useNavigate();
 
-  const load = useCallback(() => {
-    api.post('/history/list', { filter, page }).then(setData).catch(() => setData({ items: [], total: 0 }));
-  }, [filter, page]);
   useEffect(() => { setPage(0); }, [filter]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const gate = createHistoryLoadGate();
+    detailGate.current?.cancel();
+    setData(null); setLoadFailed(false); setOpen(null);
+    api.post('/history/list', { filter, page }).then(
+      rows => { if (gate.current()) setData(rows); },
+      () => { if (gate.current()) setLoadFailed(true); }
+    );
+    return () => gate.cancel();
+  }, [filter, page, refresh]);
 
   async function toggleBookmark(id) {
     try {
       const r = await api.post(`/history/${id}/bookmark`, {});
-      setData(d => ({ ...d, items: d.items.map(x => x.id === id ? { ...x, bookmarked: r.bookmarked } : x) }));
+      setData(d => d?.items ? {
+        ...d, items: d.items.map(x => x.id === id ? { ...x, bookmarked: r.bookmarked } : x)
+      } : d);
     } catch { }
   }
 
@@ -91,11 +110,15 @@ export default function History() {
   }
 
   async function openDetail(id) {
+    detailGate.current?.cancel();
     if (open?.id === id) { setOpen(null); return; }
+    const gate = createHistoryLoadGate();
+    detailGate.current = gate;
+    setOpen(null);
     try {
       const detail = await api.get(`/history/${id}/detail`);
-      setOpen({ id, detail });
-    } catch { }
+      if (gate.current()) setOpen({ id, detail });
+    } catch { /* The student's previous attempt remains available for retry. */ }
   }
 
   const pages = data ? Math.ceil(data.total / data.pageSize) : 0;
@@ -119,7 +142,15 @@ export default function History() {
       </div>
 
       <div className="card" style={{ padding: 10 }}>
-        {!data && <div className="skeleton" style={{ height: 300 }} />}
+        {!data && !loadFailed && <div className="skeleton" style={{ height: 300 }} role="status" aria-label={t('common.loading')} />}
+        {loadFailed && (
+          <div className="error-box" role="alert" data-history-load-error>
+            <p>{t('errorScreen.title')}</p>
+            <button type="button" className="btn btn-secondary" onClick={() => setRefresh(n => n + 1)}>
+              {t('common.tryAgain')}
+            </button>
+          </div>
+        )}
         {data && !data.items.length && (
           <p className="muted" style={{ padding: 14 }}>
             {t(filter === 'all' ? 'history.emptyAll' : 'history.emptyFiltered')}

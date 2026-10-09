@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { shouldReloadPracticeOnCloudSignIn as reload } from './practiceCloudRecovery.js';
+const login={detail:{connected:true,localProfileId:'student-a'}};
+assert.equal(reload(login,'student-a',null),true,'no question: issue after successful sign-in');
+assert.equal(reload(login,'student-a','issued-123'),false,'same question and ink retained');
+assert.equal(reload(login,'student-a','old-local-123'),false,'pre-sign-in question cannot silently change identity');
+assert.equal(reload({detail:{connected:false,localProfileId:'student-a'}},'student-a',null),false,'logout never issues');
+assert.equal(reload({detail:{connected:true,localProfileId:'student-b'}},'student-a',null),false,'cross-profile event refused');
+assert.equal(reload({detail:{connected:true}},'student-a',null),false,'missing identity refused');
+assert.equal(reload(login,null,null),false,'missing active local profile refused');
+assert.equal(reload(null,'student-a',null),false,'missing event refused');
+console.log('PRACTICE CLOUD QUESTION CONTINUITY: PASS 8/8');
