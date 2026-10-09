@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { attestedGrade, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable } from './authoritativeGrade.js';
+import { attestedGrade, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable, showCommittedMethodAwardNote } from './authoritativeGrade.js';
 const attempt = { submissionId: 'sub_valid123', attemptId: 'attempt-001', questionId: 'question-A' };
 const base = { authoritative: true, resolved: true, questionId: 'question-A', submissionId: attempt.submissionId,
   attemptId: attempt.attemptId, marksEarned: 2, marksPossible: 4 };
@@ -46,3 +46,13 @@ console.log('EXACT SERVER RESPONSE CORRELATION: PASS 7/7');
 assert.match(gradingReceiptMismatch('en'), /safe retry/);
 assert.match(gradingReceiptMismatch('hi'), /फिर भेजें/);
 console.log('BILINGUAL RECEIPT MISMATCH: PASS 2/2');
+
+const note = { ...base, correct: false, partial: { awarded: 2,
+  note: '2 marks for working even though the final answer was incorrect.' } };
+assert.equal(showCommittedMethodAwardNote(note, { awarded: 2, possible: 4 }), true);
+assert.equal(showCommittedMethodAwardNote(note, { awarded: 1, possible: 4 }), false);
+assert.equal(showCommittedMethodAwardNote({ ...note, resolved: false }, { awarded: 2, possible: 4 }), false);
+assert.equal(showCommittedMethodAwardNote(note, null), false);
+assert.equal(showCommittedMethodAwardNote({ ...note, partial: { awarded: '2' } }, { awarded: 2, possible: 4 }), false);
+assert.equal(showCommittedMethodAwardNote({ ...note, authoritative: false }, { awarded: 2, possible: 4 }), false);
+console.log('METHOD FEEDBACK NUMERIC AUTHORITY: PASS 6/6');

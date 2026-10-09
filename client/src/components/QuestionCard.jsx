@@ -22,7 +22,7 @@ import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
 import { canRetryPhotoReading, definitiveSubmissionRefusal, draftPersistenceWarning, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure, photoSupportedFormats, photoAwaitingOnlineReader, pdfReaderNeedsOnlineDownload } from './photoSubmissionGuard.js';
 import { plotSpecFor } from '../engine/plotSpec.js';
-import { attestedGrade, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable } from './authoritativeGrade.js';
+import { attestedGrade, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable, showCommittedMethodAwardNote } from './authoritativeGrade.js';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 import { misconceptionById } from '../engine/misconceptions.js';
@@ -1853,7 +1853,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 </div>
               )}
               {attemptViaInk && <div className="eval-provenance" data-provenance="handwriting" style={{ padding: '6px 0 0', border: 0 }}>{t('verdict.readByAiMarkedByEngine')}</div>}
-              {state.res.partial && <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{state.res.partial.note}</div>}
+              {state.res?.authoritative !== true && state.res?.partial &&
+                <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{state.res.partial.note}</div>}
               {state.res.stepReport && <StepReport report={state.res.stepReport} />}
               <div className="verdict-next">{state.res?.conflict ? t('verdict.nextAfterConflict') : t(technicalRetry ? 'verdict.nextTechnical' : invalidRetry ? 'verdict.nextUnreadable'
                 : (state.res.stepReport?.lines?.some(l => l.status === 'break') || firstBad) ? 'verdict.nextFix' : 'verdict.nextTryAgain')}</div>
@@ -1936,7 +1937,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               </div>
               <div className="eval-body">
                 {res.feedback && !verdictGood && <div><MathText text={res.feedback} /></div>}
-                {res.partial && !verdictGood && <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{res.partial.note}</div>}
+                {res.partial && !verdictGood &&
+                  (!serverAuthoritative || showCommittedMethodAwardNote(res, committedGrade)) &&
+                  <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{res.partial.note}</div>}
                 {verdictGood && writeMode && inkResult?.lines?.length > 1 && (
                   <div>{t('verdict.everyLineChecked', { count: inkResult.lines.length, n: inkResult.lines.length })}</div>
                 )}

@@ -45,3 +45,14 @@ export function matchingGradeResponse(result, questionId, submittedId) {
     typeof result.submissionId === 'string' && result.submissionId === submittedId &&
     typeof result.attemptId === 'string' && result.attemptId.length > 0;
 }
+
+// The server may issue diagnostic method feedback on an unresolved try. That
+// note can contain text such as '1 mark for correct working', but it is not a
+// certified grade until a committed resolved receipt has a matching mark pair.
+export function showCommittedMethodAwardNote(result, grade) {
+  return result?.authoritative === true && result?.resolved === true &&
+    result?.correct !== true && grade != null &&
+    typeof result?.partial?.awarded === 'number' &&
+    Number.isFinite(result.partial.awarded) &&
+    result.partial.awarded === grade.awarded;
+}
