@@ -33,6 +33,11 @@ jobs:
         run: node client/test/native-shell-csp-check.mjs
       - name: Install client dependencies
         run: npm ci --prefix client
+      # Grading is online-only and server-authoritative, so the suites that
+      # check an answer or start an exam through the local backend boot the
+      # real platform server in-process (client/test/support/online-authority.mjs).
+      - name: Install server dependencies
+        run: npm ci --prefix server
       - name: Runtime dependency security floor
         run: node tools/runtime-audit-floor.mjs client
       - name: Every deterministic suite
@@ -63,10 +68,10 @@ jobs:
           grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1079/1079 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
-          grep -Fq 'INDIA ADAPTIVE: PASS — 302/302 checks' suites.log
+          grep -Fq 'INDIA ADAPTIVE: PASS — 305/305 checks' suites.log
           grep -Fq 'ADAPTIVE SIMULATION: PASS — 77/77 checks' suites.log
-          grep -Fq 'PROGRESS TRUTH: PASS — 92/92 checks' suites.log
-          grep -Fq 'PLACEMENT: PASS — 268/268 checks' suites.log
+          grep -Fq 'PROGRESS TRUTH: PASS — 106/106 checks' suites.log
+          grep -Fq 'PLACEMENT: PASS — 270/270 checks' suites.log
           grep -Fq 'IOS BUNDLE FEATURES: PASS — 20/20 checks' suites.log
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
@@ -103,14 +108,14 @@ jobs:
           grep -Fq 'STREAK CALENDAR: PASS — 19/19 checks' suites.log
           grep -Fq 'BAD INPUT: PASS — 38/38 checks' suites.log
           grep -Fq 'CLOUD SYNC ACK: PASS — 44/44 checks' suites.log
-          grep -Fq 'PASS — §09 submission lifecycle: 14 groups' suites.log
+          grep -Fq 'PASS — §09 submission lifecycle: 15 groups' suites.log
           grep -Fq 'PASS — §22 submission sync durability: 13 groups' suites.log
           grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
           grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
           # §06 content runtime certification: every V1 launch path (CBSE/NCERT
           # 7–12, JEE Main, JEE Advanced) served, validated, versioned and
           # end-to-end through the local backend; the path count may only grow.
-          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 142/142 checks' suites.log
+          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 144/144 checks' suites.log
           grep -Fq 'CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — ' suites.log
           grep -Fq '8/8 exam selections' suites.log
           paths=$(grep -Eo 'CONTENT CERTIFICATION [(]fast, 4/path/difficulty[)]: PASS — [0-9]+' suites.log | grep -Eo '[0-9]+$')
