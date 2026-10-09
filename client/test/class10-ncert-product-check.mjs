@@ -36,7 +36,9 @@ copy('ncert.c10Intro',/Apple Pencil handwriting/,'handwriting promise');
 // Practice from the library is the normal answer experience, which is checked
 // by Pri's server: the intro promises no offline practice or progress.
 copy('ncert.c10Intro',/^(?!.*offline)/i,'no offline-practice promise');
-copy('ncert.c10ChapterCount',/offline/,'offline chapter badge');
+// The count is a count. "· offline" beside a library whose practice is checked
+// by Pri's server read as an offline-practice promise, so the badge has none.
+copy('ncert.c10ChapterCount',/^\{n\}\/14 chapters$/,'chapter count badge, with no offline promise');
 
 // NCERT must reuse Pri's mature handwriting path instead of shipping a fork.
 assert.match(question,/mode.*'type'.*'write'.*'photo'/s,'QuestionCard retains Type/Write/Photo modes');
