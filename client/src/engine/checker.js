@@ -897,6 +897,69 @@ export function restatesQuestion(line, meta, prompt = '') {
 }
 
 /**
+ * Normalise ONLY arithmetic identities, not full algebraic equivalence.
+ *
+ * Solving an equation normally preserves its solution set. Treating every
+ * equivalent equation as a duplicate would erase legitimate method marks for
+ * subtraction, distribution, fraction clearing and alternate solution paths.
+ * These four identities do not change the written mathematical state at all:
+ * +0, -0, *1 and /1. Keep all other transformations visible to the rubric.
+ */
+function withoutNeutralArithmetic(node) {
+  const n = unwrapGroup(node);
+  if (!n || typeof n !== 'object') return n;
+  if (n.t === 'neg') return { ...n, v: withoutNeutralArithmetic(n.v) };
+  if (n.t !== 'bin') return n;
+  const l = withoutNeutralArithmetic(n.l);
+  const r = withoutNeutralArithmetic(n.r);
+  const isNumber = (part, value) => {
+    const p = unwrapGroup(part);
+    if (p?.t === 'num') return Number(p.v) === value;
+    if (p?.t === 'neg') {
+      const v = unwrapGroup(p.v);
+      return v?.t === 'num' && -Number(v.v) === value;
+    }
+    return false;
+  };
+  if (n.op === '+' && isNumber(r, 0)) return l;
+  if (n.op === '+' && isNumber(l, 0)) return r;
+  if (n.op === '-' && isNumber(r, 0)) return l;
+  if (n.op === '*' && isNumber(r, 1)) return l;
+  if (n.op === '*' && isNumber(l, 1)) return r;
+  if (n.op === '/' && isNumber(r, 1)) return l;
+  return { ...n, l, r };
+}
+
+function methodProgressDuplicate(a, b) {
+  if (a?.kind === 'equation' && b?.kind === 'equation') {
+    const identityFree = c => ({
+      ...c, ast: { ...c.ast,
+        l: withoutNeutralArithmetic(c.ast.l),
+        r: withoutNeutralArithmetic(c.ast.r) }
+    });
+    return sameWrittenClaim(identityFree(a), identityFree(b));
+  }
+  return sameWrittenClaim(a, b);
+}
+
+/** An isolated final value is an answer claim, not a new method step. */
+function isolatedFinalAnswer(claim, meta) {
+  if (meta?.kind !== 'equation' || claim?.kind !== 'equation') return false;
+  const solutions = uniqueNumeric(meta.solutions);
+  if (solutions.length !== 1) return false;
+  const l = withoutNeutralArithmetic(claim.ast.l);
+  const r = withoutNeutralArithmetic(claim.ast.r);
+  const isVariable = node => unwrapGroup(node)?.t === 'var'
+    && unwrapGroup(node).v === meta.variable;
+  const other = isVariable(l) ? r : isVariable(r) ? l : null;
+  if (!other) return false;
+  try {
+    const value = evaluate(other, {});
+    return Number.isFinite(value) && numsClose(value, solutions[0]);
+  } catch { return false; }
+}
+
+/**
  * Method marks for a wrong final answer, from the student's working.
  * Returns null when nothing in the working could be verified; otherwise
  * { okLines, progressLines, awarded, note, report }.
@@ -922,8 +985,21 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
     const row = { index, text: String(l.text ?? ''), status: l.status, mark: 0, reason: l.status === 'ok' ? 'progress' : l.status };
     if (l.status !== 'ok') return row;
     const claim = readClaim(l.text);
-    if (claim && given.some(c => sameWrittenClaim(claim, c))) { restated++; row.reason = 'restated'; return row; }
-    if (claim && counted.some(c => sameWrittenClaim(claim, c))) { row.reason = 'repeat'; return row; }
+    if (claim && given.some(c => methodProgressDuplicate(claim, c))) { restated++; row.reason = 'restated'; return row; }
+    // A final answer in a different spelling is still the same final answer,
+    // not two independently demonstrated method criteria. This applies only
+    // to single-root equations; branch and multi-root work retain their
+    // separately authored verification.
+    if (claim && isolatedFinalAnswer(claim, meta)) {
+      // An unsupported statement of the final answer is not a derivation.
+      // After a genuine preceding method step, however, the first isolated
+      // root can complete an authored step criterion exactly once. Retelling
+      // that same root as +0, *1 or another arithmetic spelling earns nothing.
+      if (!counted.length) { row.reason = 'final-answer'; return row; }
+      if (counted.length >= cap) { row.reason = 'cap'; return row; }
+      if (counted.some(c => isolatedFinalAnswer(c, meta))) { row.reason = 'repeat'; return row; }
+    }
+    if (claim && counted.some(c => methodProgressDuplicate(claim, c))) { row.reason = 'repeat'; return row; }
     counted.push(claim || { kind: 'text', text: String(l.text).trim() });
     if (counted.length <= cap) row.mark = 1; else row.reason = 'cap';
     return row;
