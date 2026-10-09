@@ -28,7 +28,7 @@ import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldChec
 import { misconceptionById } from '../engine/misconceptions.js';
 import { tLater, translate, useLanguage, useT } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
-import { blockedInkRecovery, canOpenInkSignIn, inkRecoveryWords } from './signedOutInkRecovery.js';
+import { blockedInkRecovery, canOpenInkSignIn, inkRecoveryWords, completeInkOtpRecovery } from './signedOutInkRecovery.js';
 import './inkAccountRecovery.css';
 import { useFormFactor } from '../platform/formFactor.js';
 import Icon from './Icon.jsx';
@@ -96,6 +96,7 @@ const TutorHelp = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/Tut
 // Load account recovery only when a student explicitly asks to sign in.
 // Keeps the selected photo in component memory rather than plaintext storage.
 const PhotoAccountRecovery = React.lazy(() => import('./CloudAccountPanel.jsx'));
+const InkOtpAccountRecovery = React.lazy(() => import('./SignUpFlow.jsx'));
 
 class TutorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { failed: false }; }
@@ -306,6 +307,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [photoSignInOpen, setPhotoSignInOpen] = useState(false);
   const [gradingSignInOpen, setGradingSignInOpen] = useState(false);
   const [inkSignInOpen, setInkSignInOpen] = useState(false);
+  const [inkOtpOpen, setInkOtpOpen] = useState(false);
+  const inkOtpFinishRef = useRef(null);
   const [photoReattachRequired, setPhotoReattachRequired] = useState(false);
   const [photoAuthEpoch, setPhotoAuthEpoch] = useState(0);
   const photoReadGeneration = useRef(0);
@@ -377,7 +380,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // An old photo must never follow the student into a new question.
     photoReadGeneration.current += 1;
     pendingPdf.current = null;
-    setPhoto(null); setPhotoSignInOpen(false); setGradingSignInOpen(false); setInkSignInOpen(false); setPhotoReattachRequired(false); setBookmarked(false);
+    setPhoto(null); setPhotoSignInOpen(false); setGradingSignInOpen(false); setInkSignInOpen(false); setInkOtpOpen(false); setPhotoReattachRequired(false); setBookmarked(false);
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
     setChecking(false); setVouched(null); setPdfUnread(null); setPdfPageCount(0); setAttemptViaInk(false);
     setSaveState(draft?.typed || draft?.working ? 'saved' : null);
@@ -507,6 +510,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       setPhotoAuthEpoch(n => n + 1);
       setGradingSignInOpen(false);
       setInkSignInOpen(false);
+      setInkOtpOpen(false);
     }
   }), [user?.id]);
   useEffect(() => {
@@ -1778,7 +1782,38 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       {!inkSignInReady && <p className="muted" role="status">{inkRecoveryCopy.saveFirst}</p>}
                       {inkSignInOpen && inkSignInReady && (
                         <React.Suspense fallback={<p role="status">{t('cloud.stateChecking')}</p>}>
-                          <PhotoAccountRecovery />
+                          {inkOtpOpen ? (
+                            <InkOtpAccountRecovery initialMode="signin"
+                              onCancel={() => setInkOtpOpen(false)}
+                              onFinish={async ({ account }) => {
+                                // Guardian-approved sign-in may call onFinish
+                                // twice while a slow profile refresh runs. One
+                                // verified account link is enough.
+                                if (!inkOtpFinishRef.current) {
+                                  inkOtpFinishRef.current = (async () => {
+                                    const { cloudAccountLink, linkSignedInAccount } = await import('../platform/cloudAccount.js');
+                                    await completeInkOtpRecovery({
+                                      localProfileId: user?.id,
+                                      currentProfileId: mountedRef.current ? user?.id : null,
+                                      account, verifiedSaved: saveState === 'saved',
+                                      getLinked: cloudAccountLink, linkAccount: linkSignedInAccount,
+                                      refreshProfile: refreshUser
+                                    });
+                                    setInkOtpOpen(false);
+                                    setInkSignInOpen(false);
+                                  })().finally(() => { inkOtpFinishRef.current = null; });
+                                }
+                                return inkOtpFinishRef.current;
+                              }}
+                            />
+                          ) : (
+                            <>
+                              <PhotoAccountRecovery />
+                              <p className="muted" style={{ marginTop: 8 }}>{inkRecoveryCopy.otpNotice}</p>
+                              <button type="button" className="btn btn-secondary" data-ink-code-sign-in
+                                onClick={() => setInkOtpOpen(true)}>{inkRecoveryCopy.otpAction}</button>
+                            </>
+                          )}
                         </React.Suspense>
                       )}
                     </>

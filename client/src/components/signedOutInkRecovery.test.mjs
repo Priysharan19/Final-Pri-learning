@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { blockedInkRecovery, canOpenInkSignIn, inkRecoveryWords } from './signedOutInkRecovery.js';
+import { blockedInkRecovery, canOpenInkSignIn, inkRecoveryWords, completeInkOtpRecovery } from './signedOutInkRecovery.js';
 const wait = { kind:'ACCOUNT_ACTION_REQUIRED', blocker:'ink.waitingSignIn' };
 const base = {readerState:wait,mode:'write',inkHasStrokes:true,resolved:false};
 assert.equal(blockedInkRecovery(base),true,'written signed-out question needs in-context action');
@@ -15,4 +15,29 @@ assert.equal(canOpenInkSignIn({...base,readerState:{kind:'ACCOUNT_ACTION_REQUIRE
 assert.match(inkRecoveryWords('en').action,/Sign in to check this answer/);
 assert.ok(inkRecoveryWords('hi').action.includes('साइन इन'));
 assert.doesNotMatch(inkRecoveryWords('en').detail,/saved|marked on device/i,'no unverified persistence/grade promise');
-console.log('SIGNED-OUT INK ACCOUNT RECOVERY: PASS 13/13');
+const operations=[];
+const invoke=(overrides={})=>completeInkOtpRecovery({
+  localProfileId:'local-a',currentProfileId:'local-a',account:{id:'cloud-a'},
+  verifiedSaved:true,
+  getLinked:async()=>{operations.push('check');return null;},
+  linkAccount:async(id,account)=>operations.push('link:'+id+':'+account.id),
+  refreshProfile:async()=>operations.push('refresh'),
+  ...overrides
+});
+await assert.rejects(invoke({currentProfileId:'local-b'}), e=>e.code==='INK_PROFILE_CHANGED');
+await assert.rejects(invoke({verifiedSaved:false}), e=>e.code==='INK_DRAFT_NOT_SAVED');
+await assert.rejects(invoke({account:null}), e=>e.code==='INK_ACCOUNT_NOT_VERIFIED');
+assert.deepEqual(operations,[],'missing/unsafe identities must never touch account storage');
+await assert.rejects(invoke({getLinked:async()=>({accountId:'cloud-other'})}),e=>e.code==='INK_ACCOUNT_MISMATCH');
+assert.deepEqual(operations,[],'another cloud account must not acquire private strokes');
+await invoke();
+assert.deepEqual(operations,['check','link:local-a:cloud-a','refresh'],'new link under same local identity');
+operations.length=0;
+await invoke({getLinked:async()=>({accountId:'cloud-a'})});
+assert.deepEqual(operations,['link:local-a:cloud-a','refresh'],'original account reauthentication is idempotent');
+operations.length=0;
+await assert.rejects(invoke({linkAccount:async()=>{throw Error('Server refusal');}}),/Server refusal/);
+assert.deepEqual(operations,['check'],'failed linkage cannot announce connected profile');
+assert.match(inkRecoveryWords('en').otpAction,/phone or email code/);
+assert.ok(inkRecoveryWords('hi').otpAction.includes('कोड'));
+console.log('SIGNED-OUT INK ACCOUNT RECOVERY: PASS 23/23');
