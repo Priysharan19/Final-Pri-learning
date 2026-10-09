@@ -22,7 +22,9 @@
 //   4. Opened with no connection — the device shows its own offline draft,
 //      which can never be marked (even after reconnecting); the work is kept
 //      and the next question, online, is the server's and is marked.
-//   5. Exams, signed out — a paper does not start; sign-in is offered in place.
+//   5. A prepared question another account took up first — refused here (one
+//      account, once), the work kept, the next question the server's.
+//   6. Exams, signed out — a paper does not start; sign-in is offered in place.
 //
 // THE ORACLE never regenerates anything: the server chooses every creditable
 // question and discloses no seed. Right answers are read at the test's desk
@@ -529,6 +531,67 @@ export const draftOffline = {
   }
 };
 
+// ── 3c · A prepared question taken up elsewhere is not marked here ───────────
+
+export const preparedTaken = {
+  id: 'prepared-taken',
+  name: 'Prepared · taken up by another account: not marked here, work kept, next one is',
+  online: true,
+
+  async run({ page, base, check, goto, createProfile, mathText, settle, online }) {
+    await goto('/');
+    await createProfile({ name: 'Late Binder', year: 7 });
+    const unissued = await openTypedQuestion({ page, base, settle, online, issued: false });
+    const qid = await shownId(page);
+    const prompt = await mathText('.q-prompt');
+    const answerBox = page.locator('.editor-body input.answer-input');
+    const mine = (await online.practiceCalls(/^\/v1\/practice\/prepare$/)).filter(c => c.status === 200 && typeof c.json?.prepared === 'string').at(-1);
+    if (!await check('signed out, the question on screen is a prepared one', unissued?.checkState === 'prepared' && !!mine, JSON.stringify(unissued))) return;
+    await answerBox.fill(SURELY_WRONG);
+    await page.waitForFunction(() => /saved on this device/i.test(document.querySelector('.ws-actions .status-line')?.innerText || ''), null, { timeout: 10000 }).catch(() => {});
+    // One account, once: another account binds the same token first.
+    const elsewhere = await online.platform.bindPreparedElsewhere(mine.json.prepared);
+    await check('another account took the prepared question up first (the server bound it there)', elsewhere.status === 201 && !!elsewhere.questionId, JSON.stringify(elsewhere));
+    await page.locator('[data-check-needs-account] [data-check-sign-in]').click();
+    const account = await online.signInHere(page.locator('.qpage'), { name: 'Late Binder' });
+    await pressSubmit(page);
+    await page.waitForSelector('.verdict, .eval-card', { timeout: 20000 }).catch(() => {});
+    await page.waitForTimeout(600);
+    const shown = await resultOnCard(page);
+    const said = await visibleText(page, '.verdict');
+    const issues = await online.practiceCalls(/^\/v1\/practice\/issue$/);
+    await check('the server refuses to bind it to a second account (409), and nothing is marked here: no verdict, marks, XP or solution',
+      issues.length === 1 && issues[0].status === 409 && JSON.stringify(Object.keys(issues[0].body || {})) === '["prepared"]' && nothingMarked(shown) &&
+        (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length === 0 && online.platform.ledger(account.id).issued === 0,
+      `${JSON.stringify(issues.map(c => `${c.status} ${c.json?.error?.code}`))} ${JSON.stringify(shown)}`);
+    // (Its heading is the same misfiled "already finished" — known-red BUG 2.)
+    await check('the card says it cannot be marked, the working is kept, and to open a new question',
+      /cannot be (?:marked|checked)|too long ago to be marked/i.test(said) && /working is kept/i.test(said) && /new question|next question/i.test(said),
+      JSON.stringify(said.slice(0, 260)));
+    const facts = await deviceFacts(page, qid);
+    await check('the work is kept and nothing was spent: same question, answer still in the box, no attempt, no try',
+      await shownId(page) === qid && await mathText('.q-prompt') === prompt && await answerBox.inputValue() === SURELY_WRONG &&
+        facts.attempts === 0 && facts.row?.tries === 0 && facts.row?.answered === 0, `${JSON.stringify(facts)}`);
+    await nextQuestion(page, settle);
+    const typeTab = page.getByRole('button', { name: 'Answer by typing' });
+    let known = null;
+    for (let skips = 0; skips <= MAX_SKIPS; skips++) {
+      if (await typeTab.count()) await typeTab.click();
+      await settle();
+      if (await answerBox.count() === 1) { known = await online.answerOf(); if (known.kind === 'text' && known.text !== null) break; }
+      known = null;
+      await nextQuestion(page, settle);
+    }
+    if (!await check('Next question gives a question the server issued to this account', !!known && known.accountId === account.id, JSON.stringify(await online.shownRow()))) return;
+    await answerBox.fill(known.text);
+    await pressSubmit(page);
+    await page.waitForSelector('.eval-card', { timeout: 30000 }).catch(() => {});
+    const grade = (await online.practiceCalls(new RegExp(`^/v1/practice/${known.serverQuestionId}/submit$`))).at(-1);
+    await check('and that one is marked by the server', grade?.status === 200 && grade.json?.authoritative === true && grade.json.correct === true,
+      String(JSON.stringify(grade?.json)).slice(0, 240));
+  }
+};
+
 // ── 4 · Exams, signed out ────────────────────────────────────────────────────
 
 export const examSignedOut = {
@@ -567,7 +630,7 @@ export const examSignedOut = {
   }
 };
 
-export const flows = [typeSignedOut, typeOffline, writeOffline, draftOffline, examSignedOut];
+export const flows = [typeSignedOut, typeOffline, writeOffline, draftOffline, preparedTaken, examSignedOut];
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const { runFlows } = await import('./e2e.mjs');

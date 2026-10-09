@@ -158,7 +158,20 @@ export async function startOnlinePlatform({ dist = DIST } = {}) {
     rmSync(dir, { recursive: true, force: true });
   }
 
-  const platform = { origin: h.origin, h, db, sms, reader, newAccount, ledger, close };
+  /**
+   * Another account, at the desk, takes up a prepared question first — what a
+   * shared token "used elsewhere" means. Returns the server's reply status.
+   */
+  async function bindPreparedElsewhere(prepared) {
+    const other = await newAccount({ name: 'Someone Else' });
+    const jar = {};
+    const login = await desk(() => h.request('/v1/account/login', { method: 'POST', jar, body: { email: other.email, password: other.password, deviceId: 'e2e-desk-elsewhere' } }));
+    if (login.status !== 200) throw new Error(`online-session: desk login answered ${login.status} ${login.text}`);
+    const bound = await desk(() => h.request('/v1/practice/issue', { method: 'POST', jar, body: { prepared } }));
+    return { status: bound.status, accountId: other.id, questionId: bound.data?.question?.id || null };
+  }
+
+  const platform = { origin: h.origin, h, db, sms, reader, newAccount, ledger, bindPreparedElsewhere, close };
   platform.session = (ctx, page) => onlineSession(platform, ctx, page);
   return platform;
 }

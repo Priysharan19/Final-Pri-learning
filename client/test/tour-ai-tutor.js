@@ -128,12 +128,29 @@ export const flow = {
     await check('and labels it as coming from the tutor', await note1.getAttribute('data-tutor-source') === 'tutor');
     const sent = requests.find(r => r.level === 'nudge') || {};
     await check('the tutor is asked about a practice question', sent.context === 'practice', JSON.stringify(sent).slice(0, 200));
-    await check('grounded in the verified solution', Array.isArray(sent.question?.steps) && sent.question.steps.length > 0 && !!sent.question?.answer);
+    // Grounding moved to the server: for a server-issued question the device
+    // names the question it was issued and sends the student's own work —
+    // no prompt, step or answer (it holds none); the server grounds the tutor
+    // in its own sealed copy. The id must be one this account was issued.
+    const issuedNow = (await online.shownRow())?.serverQuestionId;
+    await check('grounded by the server\u2019s own copy: the request names the issued question and carries no prompt, steps or answer',
+      !!issuedNow && sent.serverQuestionId === issuedNow && !('question' in sent) && !/"steps"|"answer"|"prompt"/.test(JSON.stringify(sent)) &&
+        online.ledger(issuedNow).issued >= 1,
+      JSON.stringify(sent).slice(0, 240));
     await check('with no name, email or profile id on the wire',
       !/Tutor Student|"name"|"email"|"pid"|"profile"/.test(JSON.stringify(sent)), JSON.stringify(sent).slice(0, 240));
-    await check('opening a level lowers the credit on the card',
-      /85%/.test(await page.locator('.q-credit').innerText().catch(() => '')),
-      await page.locator('.q-topmeta').innerText());
+    // A practice question's marks are the server's alone to state, so the
+    // card no longer promises a credit figure for it (that note is placement-
+    // only). What must still hold: the help that was opened is on record with
+    // the question, where the server's receipt accounts for it.
+    const helped = await page.evaluate(id => new Promise(done => {
+      const open = indexedDB.open('pri-learning');
+      open.onsuccess = () => { const db = open.result; const r = db.transaction('questions').objectStore('questions').get(id);
+        r.onsuccess = () => { db.close(); done({ tutorLevel: r.result?.tutorLevel ?? null, hintsUsed: r.result?.hintsUsed ?? null }); }; r.onerror = () => { db.close(); done(null); }; };
+      open.onerror = () => done(null);
+    }), (await online.shownRow())?.id);
+    await check('opening a level is recorded with the question, and the card promises no credit figure of its own',
+      !!helped && Number(helped.tutorLevel) >= 1 && await page.locator('.q-credit').count() === 0, JSON.stringify(helped));
 
     // ── 4 · level 2: an outage falls back to the question's own hint ─────────
     await check('level 2 unlocks after level 1', await level(2).isEnabled());

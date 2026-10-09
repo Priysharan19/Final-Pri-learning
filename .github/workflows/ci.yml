@@ -395,8 +395,11 @@ jobs:
           cache-dependency-path: client/package-lock.json
       - name: Install client dependencies
         run: npm ci --prefix client
-      # tour-otp-onboarding.js drives the real platform server in-process
-      # (SMS/email test adapters), so the browser job needs its dependencies.
+      # The marking flows, tour-otp-onboarding.js and the accessibility walk
+      # drive the real platform server in-process (SQLite file, SMS/email test
+      # adapters, synthetic handwriting reader at the provider hop — see
+      # client/test/support/online-session.mjs), so this job needs its
+      # dependencies. No server environment or secret is required.
       - name: Install server dependencies
         run: npm ci --prefix server
       - name: Install Chromium and WebKit
@@ -423,7 +426,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*375/375.*13 flows' browser.log
+          grep -Eq 'E2E SUITE.*389/389.*13 flows' browser.log
           grep -Fq 'Submission · interruption recovery and one attempt' browser.log
           grep -Fq 'Cloud · late results never rewrite an attempt' browser.log
           grep -Fq 'India exam · JEE Main handwritten, reloaded, analysed' browser.log
@@ -439,17 +442,39 @@ jobs:
           grep -Eq 'E2E SUITE.*13/13.*1 flows' browser.log
           grep -Fq 'AI tutor · dark by default in a production build' browser.log
           grep -Fq 'AI tutor · three levels, in order, with fallback' browser.log
-          grep -Eq 'E2E SUITE.*32/32.*2 flows' browser.log
+          grep -Eq 'E2E SUITE.*33/33.*2 flows' browser.log
           grep -Fq 'Hindi · Practice, handwriting, Exams, exam room, Progress, Explain' browser.log
-          grep -Eq 'E2E SUITE.*54/54.*1 flows' browser.log
+          grep -Eq 'E2E SUITE.*58/58.*1 flows' browser.log
           grep -Fq 'Progress truth · rendered numbers = attempt ledger' browser.log
-          grep -Eq 'E2E SUITE.*22/22.*1 flows' browser.log
+          grep -Eq 'E2E SUITE.*24/24.*1 flows' browser.log
           # Account deletion for a code-only account: in the app, and from the
           # public page (Apple 5.1.1(v), Play "Delete account"). Two flows.
           grep -Fq 'Account · deletion from the public page, no sign-in, by email code' browser.log
           grep -Fq 'Account · a code-only account deletes itself in Settings with a fresh code' browser.log
           grep -Eq 'E2E SUITE.*31/31.*2 flows' browser.log
-          grep -Eq 'ACCESSIBILITY SUITE.*38/38.*12 groups' browser.log
+          # Online-only, server-authoritative grading (owner decision
+          # 2026-10-10): the marking flows run signed in against the real /v1
+          # server; these journeys assert the refusals. Signed out (Write, Type),
+          # offline at submit (Type, Write), opened offline, a prepared question
+          # taken up elsewhere, exams signed out.
+          grep -Fq 'Write · signed out, sign in on the card, same question server-marked' browser.log
+          grep -Fq 'Type · typed answer and working survive sign-in on the card, server-marked' browser.log
+          grep -Eq 'E2E SUITE.*56/56.*2 flows' browser.log
+          grep -Fq 'Type · signed out: kept, not checked; signed in on the card, server-marked' browser.log
+          grep -Fq 'Type · offline: reconnect asked, work kept, Retry marked exactly once' browser.log
+          grep -Fq 'Write · offline: reconnect asked, ink kept, Retry marked exactly once' browser.log
+          grep -Fq 'Draft · opened offline: never marked, work kept; a new question online is' browser.log
+          grep -Fq 'Exams · signed out: a paper does not start; sign in in place, then it does' browser.log
+          grep -Fq 'Prepared · taken up by another account: not marked here, work kept, next one is' browser.log
+          grep -Eq 'E2E SUITE.*70/70.*6 flows' browser.log
+          grep -Fq 'Pri Explain V8 · adaptive board-style reasoning playback' browser.log
+          grep -Eq 'E2E SUITE.*18/18.*1 flows' browser.log
+          # The handwriting reader behind the real server is a scripted
+          # stand-in in these suites; the log must say so.
+          grep -Fq 'SYNTHETIC-READER EVIDENCE' browser.log
+          # The accessibility walk must have reached the refused-check states.
+          grep -Eq 'online-only checking +6/6' browser.log
+          grep -Eq 'ACCESSIBILITY SUITE.*45/45.*13 groups' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
           test "$(grep -Ec 'E2E SUITE PASSED — 158/158 checks across 1 flows' browser.log)" -eq 2
