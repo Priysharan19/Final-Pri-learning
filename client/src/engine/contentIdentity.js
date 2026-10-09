@@ -49,8 +49,23 @@ function substance(q) {
   return JSON.stringify([
     norm(q.stem), norm(q.prompt), q.answerType || null,
     (Array.isArray(q.mcqOptions) ? q.mcqOptions : []).map(norm),
-    q.answer ?? null, norm(q.figure), parts
+    q.answer ?? null, norm(q.figure), parts,
+    // A matching-list item keeps its question in the two lists: its prompt is
+    // the same sentence on every such item and its options are only codes
+    // ("P → 2, Q → 1, …"). Without the lists, two different matching items that
+    // happened to share a code set had one hash — "the same question twice" on
+    // a paper that held two different questions. Appended only when present,
+    // so the hash of every other question is unchanged.
+    ...(matchListOf(q) ? [matchListOf(q)] : [])
   ]);
+}
+
+/** The two lists of a matching-list item, normalised; null for anything else. */
+export function matchListOf(q) {
+  const lists = q?.matchList;
+  if (!lists || typeof lists !== 'object' || !Array.isArray(lists.left) || !Array.isArray(lists.right)) return null;
+  const side = rows => rows.map(row => [norm(row?.key), norm(row?.text)]);
+  return [side(lists.left), side(lists.right)];
 }
 
 /** Digest of what the student saw; equal hashes mean the same question. */

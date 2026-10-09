@@ -55,6 +55,7 @@ const { multipartForYear } = await import('../../client/src/engine/generators/mu
 const { FREE_EXAM_ALLOWANCE } = await import('../../client/src/platform/entitlements.js');
 const { contentHashOf } = await import('../../client/src/engine/contentIdentity.js');
 const { MAX_OPEN_PAPERS } = await import('../platform/exams.js');
+const { contentIdentityOf, seenKeysOf } = await import('../platform/contentSeen.js');
 
 const engine = requestedEngine();
 
@@ -865,6 +866,10 @@ try {
     const SEEDS = [1, 2, 3, 4, 5, 6];
     const refusedSpecs = [];
     const leaked = [];
+    const twice = [];
+    // Every unit a student is asked on a sealed item: the item, its
+    // alternative, each part and each part's alternative.
+    const unitsOf = p => [p, p.alt, ...(p.parts || []), ...(p.parts || []).map(part => part?.alt)].filter(Boolean);
     let accepted = 0, questions = 0;
     for (const [track, grade, variant] of SELECTIONS) {
       for (const seed of SEEDS) {
@@ -872,15 +877,41 @@ try {
         const r = await create(a.jar, await india(a.jar, track, grade, variant));
         if (r.status === 201) {
           accepted++; questions += r.data.exam.questions.length;
-          leaked.push(...identityLeaks(r.data.exam, await sealed(r.data.exam.id)).map(line => `${track}/${grade} seed ${seed} ${line}`));
+          const sealedPaper = await sealed(r.data.exam.id);
+          leaked.push(...identityLeaks(r.data.exam, sealedPaper).map(line => `${track}/${grade} seed ${seed} ${line}`));
+          const hashes = sealedPaper.questions.flatMap(sq => unitsOf(sq.payload).map(contentHashOf));
+          if (new Set(hashes).size !== hashes.length) twice.push(`${track}/${grade}/${variant} seed ${seed}`);
           await finish(a.jar, r.data.exam.id, {});
         }
         else refusedSpecs.push(`${track}/${grade}/${variant} seed ${seed}: ${r.status} ${r.data?.error?.code} ${r.data?.error?.message}`);
       }
     }
     eq(refusedSpecs, [], 'no device-composed spec is refused');
+    eq(twice, [], 'no sealed paper among them asks one question twice, as an item, an alternative or a part');
     eq(leaked, [], 'and no public paper among them carries anything derived from an answer or a seed');
     eq(accepted, SELECTIONS.length * SEEDS.length, `all ${SELECTIONS.length * SEEDS.length} sampled specs across ${SELECTIONS.length} selections are issued (${questions} questions)`);
+  }
+
+  // ── A matching-list item is known by its lists ─────────────────────────────
+  // Its prompt is one fixed sentence and its options are codes, so before the
+  // lists joined the hash and the identity two different matching items could
+  // be "the same question" — twice on one paper to the certifier, and a repeat
+  // that earns nothing to the marker.
+  {
+    // Stamped as a sealed item is (stampExamItem): its hash is the engine's.
+    const stamped = item => ({ ...item, contentHash: contentHashOf(item) });
+    const matching = (left, right) => stamped({
+      subtopic: 'c11-binomial-theorem', difficulty: 4, examItem: 'matrix-match',
+      prompt: 'Match each problem in List-I with its answer in List-II, then choose the option that gives the correct matching.',
+      matchList: { left: left.map((text, i) => ({ key: 'PQRS'[i], text })), right: right.map((text, i) => ({ key: String(i + 1), text })) },
+      answerType: 'mcq', answer: { correctIndex: 0 }, mcqOptions: ['P → 2, Q → 1, R → 4, S → 3', 'P → 1, Q → 2, R → 3, S → 4', 'P → 2, Q → 1, R → 3, S → 4', 'P → 1, Q → 2, R → 4, S → 3']
+    });
+    const one = matching(['Find $3!$.', 'Find $2^3$.', 'Find $5 - 3$.', 'Find $\\sqrt{49}$.'], ['8', '6', '7', '2']);
+    const two = matching(['Find $4 + 1$.', 'Find $3^2$.', 'Find $10 - 6$.', 'Find $2 \\times 6$.'], ['9', '5', '12', '4']);
+    ok(contentHashOf(one) !== contentHashOf(two), 'two matching-list items with different lists and the same codes have different content hashes');
+    ok(contentIdentityOf(one) !== contentIdentityOf(two), 'and different identities, so one is never a repeat of the other');
+    eq(seenKeysOf(one).filter(key => seenKeysOf(two).includes(key)), [], 'they share no seen-key');
+    eq([contentIdentityOf(one), contentHashOf(one)], [contentIdentityOf(JSON.parse(JSON.stringify(one))), one.contentHash], 'the same item is the same content');
   }
 
   // ── The plan is the server's to enforce ────────────────────────────────────

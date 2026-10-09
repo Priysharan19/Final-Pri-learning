@@ -101,7 +101,7 @@ import { scopeForYear, subtopicsForYear, PATHWAYS } from '../../client/src/engin
 import { multipartForYear } from '../../client/src/engine/generators/multipart.js';
 import { FREE_EXAM_ALLOWANCE } from '../../client/src/engine/examAllowance.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
-import { stampExamItem } from '../../client/src/engine/contentIdentity.js';
+import { stampExamItem, contentHashOf } from '../../client/src/engine/contentIdentity.js';
 import { seenKeysOf, examItemsOf, seenAmong, markSeen } from './contentSeen.js';
 
 /** How long after the deadline a finish may still carry its own answers. */
@@ -118,6 +118,8 @@ const TRACKS = ['cbse', 'jee-main', 'jee-advanced', 'olympiad'];
 const NEEDS = ['mcq', 'numerical', 'integer99', 'written', 'any', 'facts', 'factsNoFigure'];
 const PRACTICE_LENGTHS = [10, 15, 20];
 const ISSUE_TRIES = 8;
+// How many times a practice-paper slot is drawn again to avoid a question the paper already holds.
+const PRACTICE_REDRAWS = 24;
 // An account may hold this many papers open (sealed and not yet finalised) at once.
 export const MAX_OPEN_PAPERS = 3;
 const MAX_ANSWER = 4000;
@@ -461,6 +463,18 @@ async function issueQuestions(read) {
   // The server chooses every question: the same chooser practice uses, with no
   // seed from the caller.
   const draw = (generator, difficulty) => chooseQuestion({ generator, difficulty, avoid: new Set(), trap: null }).q;
+  // The last word on "one question, once per paper", at the seal. Every unit a
+  // student is asked on an item — the item, its alternative, each part and
+  // each part's alternative — is known by its engine content hash, and none
+  // may already be on the paper or appear twice inside the item. The composer
+  // already keeps one prompt from being drawn twice; this holds whatever path
+  // produced the item.
+  const onPaper = new Set();
+  const unitHashes = payload => examItemsOf(payload).map(contentHashOf);
+  const fresh = payload => {
+    const hashes = unitHashes(payload);
+    return new Set(hashes).size === hashes.length && !hashes.some(hash => onPaper.has(hash));
+  };
 
   if (read.kind === 'india') {
     // Reviewed previous-year banks are loaded on demand, by generator.
@@ -482,6 +496,7 @@ async function issueQuestions(read) {
         const seenBefore = new Set(ctx.seen);
         try { built = issueIndiaItem(slot.section, slot.recipe, ctx, { chapterName: slot.chapter.name }); }
         catch { built = null; }
+        if (built && !fresh(built.payload)) built = null;
         if (!built) ctx.seen = seenBefore;
       }
       if (!built) {
@@ -495,11 +510,13 @@ async function issueQuestions(read) {
           const seenBefore = new Set(ctx.seen);
           try { built = buildItem(ctx, read.spec, slot.section, { index: slot.index }, candidate, read.cells.chapters, paperWide, { writtenAsObjective: 0 }, slot.choice); }
           catch { built = null; }
+          if (built && !fresh(built.payload)) built = null;
           if (built) { chapter = built.fromChapter || candidate; break; }
           ctx.seen = seenBefore;
         }
       }
       if (!built) return UNSUPPORTED(questions.length + 1);
+      for (const hash of unitHashes(built.payload)) onPaper.add(hash);
       const grid = sectionMarking(slot.section);
       seal({
         section: String(slot.section.id), sectionLabel: slot.section.label || `Section ${slot.section.id}`, item: built.item,
@@ -524,9 +541,19 @@ async function issueQuestions(read) {
       }, { ...mp, parts, multipart: true, totalMarks: total, subtopic: mp.subtopic || slot.multipart, examItem: 'structured' });
       continue;
     }
+    // Drawn again while the question is already on this paper. A practice
+    // paper may name one subtopic at one level many times; when its bank at
+    // that level holds fewer different questions than the paper asks for, the
+    // last draw stands rather than the paper being refused.
     let q;
-    try { q = draw(slot.generator, slot.difficulty); } catch { return UNSUPPORTED(questions.length + 1); }
+    try {
+      for (let attempt = 0; attempt < PRACTICE_REDRAWS; attempt++) {
+        q = draw(slot.generator, slot.difficulty);
+        if (q?.prompt && fresh(q)) break;
+      }
+    } catch { return UNSUPPORTED(questions.length + 1); }
     if (!q?.prompt) return UNSUPPORTED(questions.length + 1);
+    for (const hash of unitHashes(q)) onPaper.add(hash);
     const marks = practiceMarks(q);
     seal({
       section: 'I', sectionLabel: 'Section I', item: 'question', chapterId: null, chapterName: null,
