@@ -107,8 +107,9 @@ function devanagariOnPage() {
 export const flow = {
   id: 'hindi',
   name: 'Hindi · Practice, handwriting, Exams, exam room, Progress, Explain',
+  online: true,
 
-  async run({ page, base, check, goto, createProfile, settle }) {
+  async run({ page, base, check, goto, createProfile, settle, online }) {
     const audit = async (screen) => {
       await settle();
       await check(`${screen}: the document is declared Hindi`,
@@ -184,6 +185,15 @@ export const flow = {
       await settle();
     }
 
+    // ── Sign in: only the server marks, so the rest of Practice is signed in ──
+    // Everything above ran signed out. The same profile now signs in to the
+    // real platform server through Settings (in Hindi), and Practice is opened
+    // again: what follows is marked by the server.
+    await online.signIn({ name: STUDENT.name });
+    await audit('Settings, signed in');
+    await page.goto(`${base}/practice`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
+
     const answerBox = page.locator('.editor-body input.answer-input');
     const typeTab = page.getByRole('button', { name: hi['verdict.modeTypeLabel'] });
     for (let skips = 0; skips < 20; skips++) {
@@ -207,6 +217,11 @@ export const flow = {
         await page.waitForSelector('.eval-card', { timeout: 20000 }).catch(() => {});
       }
       await audit('Practice verdict');
+      const marked = await online.practiceCalls(new RegExp(`^/v1/practice/${(await online.shownRow())?.serverQuestionId}/submit$`));
+      await check('Practice: the verdict shown in Hindi is the server\u2019s mark, not a device mark',
+        marked.length >= 1 && marked.every(c => c.status === 200 && c.json?.authoritative === true) && marked.at(-1).json.resolved === true &&
+          await page.locator('.eval-card').count() === 1,
+        JSON.stringify(marked.map(c => ({ status: c.status, resolved: c.json?.resolved }))));
 
       const launch = page.locator('.pri-explain-launch');
       if (await check('Explain: a resolved question offers the explanation in Hindi',

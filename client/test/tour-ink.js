@@ -12,14 +12,16 @@
 //
 // So this flow writes an answer by hand — real pointer events, one stroke at a
 // time, from the same template geometry the recogniser suites are scored on —
-// and follows it all the way to a mark. It knows what the answer is the same
-// way tour-v3 does: miss twice, read the worked solution, then press the card's
-// own "Redo Question" and hand-write the answer it just gave.
+// and follows it all the way to a mark — the SERVER's mark, on a question the
+// server issued, for a profile signed in to the real platform server this suite
+// boots. It knows what the answer is from the test's own oracle (see
+// support/online-session.mjs), never from the device.
 //
 // Run on its own:  node client/test/tour-ink.js
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
-import { handwrite, readLines, turnOnServerReading, useFakeServerReader } from './fakeServerReader.js';
+import { handwrite, readLines, turnOnServerReading } from './fakeServerReader.js';
+import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
 const TOPIC = 'y7-equations';
 const SURELY_WRONG = '-987654';
@@ -34,20 +36,30 @@ const readingArrives = (page) => page.waitForSelector('.ink-line', { timeout: 15
 export const flow = {
   id: 'ink',
   name: 'Ink · handwriting on the real canvas',
+  online: true,
 
-  async run({ page, ctx, base, check, note, goto, createProfile, mathText, settle }) {
-    // Handwriting is read only by the server reader (owner decision); this
-    // flow brings a stand-in reader and scripts what it "sees".
-    const reader = await useFakeServerReader(page, base);
+  async run({ page, ctx, base, check, note, goto, createProfile, mathText, settle, online }) {
+    // Handwriting is read only by the server reader (owner decision), and only
+    // the server marks. The profile is signed in to the real platform server;
+    // the one synthetic part is the reader's provider hop, a stand-in that
+    // returns what this flow scripts and never looks at the picture.
+    const reader = online.reader;
+    Object.assign(reader, { text: '1', confidence: 0.97, down: false });
+    reader.requests.length = 0;
+    note(`${SYNTHETIC_EVIDENCE}: the handwriting reader in "Ink · handwriting on the real canvas" is a scripted stand-in (it returns the text this flow sets, at a set confidence). The canvas, the server routes, the receipts and every mark are real. Not real-handwriting, real-provider or real-device evidence.`);
     await goto('/');
     await createProfile({ name: 'Ada Byron', year: 7 });
-    await check('server reading can be turned on for this profile', await turnOnServerReading(page, base));
+    await online.signIn({ name: 'Ada Byron' });
+    await check('server reading is on for this signed-in profile', await turnOnServerReading(page, base));
 
-    // ── 1 · miss twice to learn the answer, on a question worth writing ──────
+    // ── 1 · a question worth writing ─────────────────────────────────────────
     // Only a short whole number is hand-written here. Every glyph the flow draws
     // has to come from the template set, and an answer of "3/8" or "12.5 cm"
     // would be testing the layout engine's fraction stacking rather than the
-    // path from a stroke to a mark.
+    // path from a stroke to a mark. The answer is the oracle's: regenerated at
+    // the test's desk from the generator, difficulty and seed the page asked
+    // the server to issue (support/online-session.mjs) — never read off the
+    // device, which holds no key for a server-issued question.
     await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
 
@@ -59,29 +71,20 @@ export const flow = {
       if (await typeTab.count()) await typeTab.click();
       await settle();
       if (await answerBox.count() === 1) {
-        await answerBox.fill(SURELY_WRONG);
-        await page.getByRole('button', SUBMIT).click();
-        await page.waitForSelector('.verdict-bad', { timeout: 20000 });
-        await answerBox.fill(SURELY_WRONG + '1');
-        await page.getByRole('button', SUBMIT).click();
-        await page.waitForSelector('.eval-card', { timeout: 20000 });
-        const stated = (await mathText('.final-answer') || '').replace(/^Final answer\s*/i, '').trim();
-        const digits = /^(?:[a-z]\s*=\s*)?(-?\d{1,3})$/i.exec(stated);
-        if (digits) { answer = digits[1]; break; }
+        const known = await online.answerOf();
+        if (known.kind === 'text' && /^\d{1,3}$/.test(String(known.text))) { answer = String(known.text); break; }
       }
+      const leaving = (await online.shownRow())?.id;
       await page.locator('.ctx-next').click();
-      await page.waitForSelector('.q-prompt', { timeout: 30000 });
+      await page.waitForFunction(id => {
+        const el = document.querySelector('.qpage[data-question-id]');
+        return el && el.getAttribute('data-question-id') !== id && el.querySelector('.q-prompt');
+      }, leaving, { timeout: 30000 });
     }
     if (!await check('a question with a short whole-number answer was found', !!answer,
       `${asked} questions from ${TOPIC} and none had an answer worth hand-writing`)) return;
 
     const prompt = await mathText('.q-prompt');
-    await page.locator('.redo-chip').click();
-    await page.waitForSelector('.q-prompt', { timeout: 30000 });
-    await settle();
-    if (!await check('the same question comes back for the handwritten attempt',
-      await mathText('.q-prompt') === prompt,
-      `first: ${JSON.stringify(prompt)}\n      again: ${JSON.stringify(await mathText('.q-prompt'))}`)) return;
 
     // ── 2 · the canvas mounts ────────────────────────────────────────────────
     await page.getByRole('button', { name: 'Answer by handwriting' }).click();
@@ -102,10 +105,17 @@ export const flow = {
     await check('a stroke drawn with the pointer is sent and read back',
       (await reading(page)).length === 1 && reader.requests.length >= 1,
       `${reader.requests.length} requests; read ${JSON.stringify(await reading(page))}`);
+    // Answer-blind at both hops: what the page sent the server, and what the
+    // server's provider module sent on to the (stand-in) reader.
+    const readCalls = async () => (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/));
+    const pageSent = (await readCalls()).at(-1);
     const sent = reader.requests.at(-1);
+    const sentParts = (sent?.input || []).flatMap(m => m.content || []);
     await check('the request is the picture of the ink and nothing else — answer-blind',
-      !!sent && JSON.stringify(Object.keys(sent)) === '["image"]' && /^data:image\//.test(sent.image),
-      `request keys ${JSON.stringify(sent && Object.keys(sent))}`);
+      !!pageSent && Object.keys(pageSent.body || {}).every(k => ['image', 'mode'].includes(k)) && /^data:image\//.test(pageSent.body?.image || '') &&
+        sentParts.filter(part => part.type === 'input_image').length === 1 &&
+        !JSON.stringify(sentParts.filter(part => part.type !== 'input_image')).includes(prompt.slice(0, 24)),
+      `page sent ${JSON.stringify(pageSent && Object.keys(pageSent.body || {}))} to ${pageSent?.path}; provider request keys ${JSON.stringify(sent && Object.keys(sent))}`);
 
     await check('the footer says the server read it',
       /Read by Pri’s server reader/.test(await page.locator('.editor-foot').innerText().catch(() => '')));
@@ -160,9 +170,11 @@ export const flow = {
     const canvasAfter = await page.locator('.ink-canvas-live').boundingBox();
     await check('and the card came back to the pen by itself', !!canvasAfter && canvasAfter.width > 200);
     for (let i = 0; i < 60 && reader.requests.length === requestsBeforeReload; i++) await page.waitForTimeout(200);
+    const restoredSent = (await readCalls()).at(-1);
     await check('the kept strokes were restored and offered to the reader (one request, a picture, nothing else)',
-      reader.requests.length === requestsBeforeReload + 1 && JSON.stringify(Object.keys(reader.requests.at(-1) || {})) === '["image"]',
-      `${reader.requests.length - requestsBeforeReload} request(s) after the reload`);
+      reader.requests.length === requestsBeforeReload + 1 &&
+        Object.keys(restoredSent?.body || {}).every(k => ['image', 'mode'].includes(k)) && /^data:image\//.test(restoredSent?.body?.image || ''),
+      `${reader.requests.length - requestsBeforeReload} request(s) after the reload; page sent ${JSON.stringify(Object.keys(restoredSent?.body || {}))}`);
     await page.waitForSelector('.ink-status', { timeout: 10000 }).catch(() => {});
     const downNote = (await page.locator('.ink-status').innerText().catch(() => '')) || '';
     await check('with the reader down the page waits, saved, and says so', /saved/i.test(downNote) && await page.locator('.eval-card').count() === 0, JSON.stringify(downNote));
@@ -215,9 +227,23 @@ export const flow = {
     });
     await check('back online, the kept handwriting is marked without another tap', await page.locator('.eval-card').count() === 1);
     await page.waitForTimeout(2500);   // anything still queued would land now
-    const attemptsAfter = await attemptCount();
-    await check('a flapping connection marks the kept answer exactly once',
-      attemptsBefore >= 0 && attemptsAfter - attemptsBefore === 1, `attempts ${attemptsBefore} → ${attemptsAfter}`);
+    // Exactly once, where it is decided and where it was answered: one grade
+    // on the server, one resolution written by this device. (A sync pull that
+    // overlaps the submit can ALSO import the server's own copy of the same
+    // attempt as a second row — a product race, asserted strictly in
+    // known-red-online-only-grading.mjs and reported; it is not a second mark.)
+    const attemptRows = await page.evaluate(() => new Promise(ok => {
+      const r = indexedDB.open('pri-learning');
+      r.onsuccess = () => { const db = r.result; const c = db.transaction('attempts').objectStore('attempts').getAll();
+        c.onsuccess = () => { db.close(); ok(c.result.map(a => ({ remote: typeof a.remoteEventId === 'string', server: a.serverAttemptId || a.remoteEventId || null }))); };
+        c.onerror = () => { db.close(); ok(null); }; };
+      r.onerror = () => ok(null);
+    }));
+    const flapGrades = (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).filter(c => c.status === 200);
+    await check('a flapping connection marks the kept answer exactly once: one server grade, one resolution on this device, one server attempt behind every row',
+      attemptsBefore === 0 && flapGrades.length === 1 && !!attemptRows && attemptRows.filter(a => !a.remote).length === 1 &&
+        new Set(attemptRows.map(a => a.server)).size === 1 && attemptRows[0].server === flapGrades[0].json?.attemptId,
+      `attempts before ${attemptsBefore}; rows ${JSON.stringify(attemptRows)}; ${flapGrades.length} server grade(s)`);
     const marked = (await page.locator('.eval-card').innerText()).replace(/\s+/g, ' ');
     const marks = (await page.locator('.eval-marks').innerText()).replace(/\s+/g, ' ').trim();
     await check('the handwritten answer is marked correct — every mark awarded',
@@ -236,18 +262,50 @@ export const flow = {
       await page.locator('.ink-verdict.good').count() >= 1,
       'no ✓ drawn on the student’s own writing');
 
+    // ── 5b · and the mark was the server's ───────────────────────────────────
+    const inkRow = await online.shownRow();
+    const inkGrades = await online.practiceCalls(new RegExp(`^/v1/practice/${inkRow?.serverQuestionId}/submit$`));
+    await check('the handwritten answer was marked by the server, once, against its own reading receipt',
+      inkGrades.length === 1 && inkGrades[0].status === 200 && inkGrades[0].json?.authoritative === true &&
+        inkGrades[0].json.correct === true && inkGrades[0].json.resolved === true && inkGrades[0].body?.mode === 'ink' &&
+        typeof inkGrades[0].body?.transcriptionReceipt === 'string' && !('answer' in inkGrades[0].body && inkGrades[0].body.answer === undefined),
+      JSON.stringify(inkGrades.map(c => ({ status: c.status, mode: c.body?.mode, receipt: typeof c.body?.transcriptionReceipt, json: c.json })).slice(0, 2)).slice(0, 400));
+    await check('the server completed that question exactly once, and nothing calls it a device mark',
+      online.ledger(inkRow?.serverQuestionId).thisDone === 1 && !/marked on this device/i.test(await page.locator('.qpage').innerText()),
+      JSON.stringify(online.ledger(inkRow?.serverQuestionId)));
+
     // ── 6 · the writing was kept with the attempt ────────────────────────────
+    // Read back from the device's own store (the `inks` row is filed under the
+    // question's id), from the History row, and from the row's own detail.
+    const keptInk = await page.evaluate(id => new Promise(ok => {
+      const r = indexedDB.open('pri-learning');
+      r.onsuccess = () => {
+        const db = r.result;
+        let req;
+        try { req = db.transaction('inks').objectStore('inks').get(id); } catch (e) { db.close(); return ok({ error: String(e) }); }
+        req.onsuccess = () => { db.close(); const row = req.result; ok(row ? { strokes: Array.isArray(row.strokes) ? row.strokes.length : (row.sealed ? 'sealed' : 0), recognized: row.recognized ?? null, sealed: !!row.sealed } : null); };
+        req.onerror = () => { db.close(); ok({ error: 'read failed' }); };
+      };
+      r.onerror = () => ok({ error: 'open failed' });
+    }), inkRow?.id);
+    await check('the strokes themselves were kept with the attempt',
+      !!keptInk && (keptInk.strokes === 'sealed' || keptInk.strokes > 0), JSON.stringify(keptInk));
+    await check('and the reading was kept beside them',
+      !!keptInk && (keptInk.sealed || keptInk.recognized === answer), JSON.stringify(keptInk));
     await page.goto(`${base}/history`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.hist-row', { timeout: 30000 });
-    await page.locator('.hist-main').first().click();
-    await page.waitForSelector('.hist-detail', { timeout: 20000 });
-    const detail = (await page.locator('.hist-detail').innerText()).replace(/\s+/g, ' ');
-    await check('the strokes themselves were kept with the attempt',
-      detail.includes('Your handwriting'),
-      `detail reads ${JSON.stringify(detail.slice(0, 200))}`);
-    await check('and the reading was kept beside them',
-      detail.includes(`read as \u201c${answer}\u201d`),
-      `detail reads ${JSON.stringify(detail.slice(0, 200))}`);
+    const histRow = page.locator(`.hist-row[data-question-id="${inkRow?.id}"]`);
+    await check('History holds that attempt once, marked correct and labelled as handwritten',
+      await page.locator('.hist-row').count() === 1 && await histRow.count() === 1 &&
+        (await histRow.locator('.hist-verdict .sr-only').innerText()) === 'Correct' &&
+        await histRow.locator('.tag .sr-only').count() >= 1,
+      (await page.locator('.hist-row').allInnerTexts()).map(t => t.replace(/\s+/g, ' ').slice(0, 80)).join(' | '));
+
+    await histRow.locator('.hist-main').click();
+    await page.waitForSelector('.hist-detail', { timeout: 20000 }).catch(() => {});
+    const detail = ((await page.locator('.hist-detail').innerText().catch(() => '')) || '').replace(/\s+/g, ' ');
+    await check('and its History detail opens with the handwriting and the reading beside it',
+      detail.includes('Your handwriting') && detail.includes(`read as \u201c${answer}\u201d`), `detail reads ${JSON.stringify(detail.slice(0, 200))}`);
 
     // ── 7 · a doubtful line: highlighted, corrected in one tap, no second read ─
     // The reader is unsure of what it read. The line is marked as doubtful, the
@@ -288,7 +346,18 @@ export const flow = {
       await page.getByRole('button', SUBMIT).count() === 1 && await page.getByRole('button', { name: 'Check this reading first' }).count() === 0);
     await page.getByRole('button', SUBMIT).click();
     await page.waitForSelector('.eval-card, .verdict-bad', { timeout: 20000 });
-    await check('a verdict comes from the deterministic engine, still with no further read', reader.requests.length === readsBeforeCorrection);
+    // Who decides: the server's deterministic engine, on what the STUDENT said
+    // they wrote. To grade handwriting the server takes its own receipt of the
+    // picture (one reading, answer-blind) and records the student's correction
+    // on top of it; the doubtful "7" is never what gets marked.
+    const doubtRow = await online.shownRow();
+    const of = suffix => online.practiceCalls(new RegExp(`^/v1/practice/${doubtRow?.serverQuestionId}/${suffix}$`));
+    const [receipts, confirms, doubtGrades] = [await of('recognize'), await of('recognition/[^/]+/confirm'), await of('submit')];
+    await check('a verdict comes from the server\u2019s deterministic engine on the corrected line: one receipt reading, the correction confirmed as "1", one grade',
+      receipts.length === 1 && receipts[0].status === 201 && confirms.length === 1 && confirms[0].status < 300 && confirms[0].body?.text === '1' &&
+        doubtGrades.length === 1 && doubtGrades[0].json?.authoritative === true && doubtGrades[0].body?.mode === 'ink' &&
+        reader.requests.length === readsBeforeCorrection + 1,
+      `recognize ${receipts.map(c => c.status)}, confirm ${JSON.stringify(confirms.map(c => c.body))}, grades ${doubtGrades.length}, provider reads +${reader.requests.length - readsBeforeCorrection}`);
     const anyProvenance = (await page.locator('.eval-provenance').first().innerText().catch(() => '')) || '';
     await check('and whichever way it went, the handwritten verdict carries the honesty line',
       /Read by AI, marked by Pri’s engine/.test(anyProvenance), JSON.stringify(anyProvenance));

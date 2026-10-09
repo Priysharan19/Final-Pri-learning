@@ -43,8 +43,13 @@ export const flow = {
     // The welcome screen now also carries the legal links in a muted line, so
     // the privacy copy is named rather than taken as the only muted paragraph.
     const privacy = await page.locator('.auth-col p.muted').first().innerText();
-    await check('the privacy copy is offline-first, optional cloud, no ads',
-      /offline-first/i.test(privacy) && /cloud account is optional/i.test(privacy) && /no ads/i.test(privacy),
+    // Owner decision 2026-10-10: the welcome line may no longer promise an
+    // optional account or offline checking. What it must still say honestly is
+    // where a student's work lives and that there are no ads — and now, that
+    // checking needs an account and a connection.
+    await check('the privacy copy says work stays on this device, checking needs an account and a connection, no ads',
+      /stored on this device/i.test(privacy) && /checking answers needs a Pri account and a connection/i.test(privacy) && /no ads/i.test(privacy) &&
+        !/account is optional|offline-first|works offline/i.test(privacy),
       `privacy copy reads ${JSON.stringify(privacy)}`);
     for (const [label, href] of [['Privacy', '/privacy'], ['Terms', '/terms'], ['Refunds', '/refund-policy'], ['Grievances', '/grievance']]) {
       await check(`the landing screen links to ${label.toLowerCase()}`,

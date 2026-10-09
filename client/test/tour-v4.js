@@ -124,8 +124,9 @@ const reviewRows = (page) => page.evaluate(() => {
 export const flow = {
   id: 'exam',
   name: 'Exam · a paper generated, sat and marked',
+  online: true,
 
-  async run({ page, base, check, note, goto, createProfile, mathText, settle }) {
+  async run({ page, base, check, note, goto, createProfile, mathText, settle, online }) {
     await goto('/');
     await createProfile({ name: 'Emmy Noether', year: YEAR });
 
@@ -147,7 +148,12 @@ export const flow = {
         await page.locator('.crash-card').count() === 0);
     }
 
-    // ── 2 · a paper is generated ─────────────────────────────────────────────
+    // ── 2 · a paper is generated — for a signed-in account ───────────────────
+    // An exam is marked work, so it starts only for a signed-in account that
+    // can reach the server (owner decision 2026-10-10). The paper itself is
+    // still marked by the bundled engine at the end of the sitting, which is
+    // why this flow's oracle can still read the stored paper.
+    await online.signIn({ name: 'Emmy Noether' });
     await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('button:has-text("Start practice paper")', { timeout: 30000 });
     await page.locator('.card').first().locator('select').nth(1).selectOption(String(LENGTH));

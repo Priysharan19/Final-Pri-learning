@@ -65,19 +65,17 @@ export const flowOff = {
 export const flow = {
   id: 'tutor',
   name: 'AI tutor · three levels, in order, with fallback',
+  online: true,
 
-  async run({ page, ctx, base, check, goto, createProfile }) {
+  async run({ page, ctx, base, check, goto, createProfile, online }) {
     const requests = [];
 
-    await page.addInitScript(origin => { window.__PRI_CLOUD_ORIGIN__ = origin; }, base);
-
+    // Only the tutor MODEL is stood in for, at its one route: its words are
+    // help, never a mark. Accounts, question issue, the solution the level-3
+    // walkthrough shows and the resolution it records are the real server's.
     const respond = (route, status, value) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(value) });
-    await ctx.route('**/v1/**', async route => {
+    await ctx.route(url => url.origin === base && url.pathname === '/v1/tutor/help', async route => {
       const request = route.request();
-      const path = new URL(request.url()).pathname;
-      if (path !== '/v1/tutor/help') {
-        return respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
-      }
       const body = JSON.parse(request.postData() || '{}');
       requests.push(body);
       if (body.level === 'nudge') {
@@ -99,6 +97,7 @@ export const flow = {
 
     await goto('/');
     await createProfile({ name: 'Tutor Student', year: 7 });
+    await online.signIn({ name: 'Tutor Student' });
     await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
 
@@ -129,12 +128,29 @@ export const flow = {
     await check('and labels it as coming from the tutor', await note1.getAttribute('data-tutor-source') === 'tutor');
     const sent = requests.find(r => r.level === 'nudge') || {};
     await check('the tutor is asked about a practice question', sent.context === 'practice', JSON.stringify(sent).slice(0, 200));
-    await check('grounded in the verified solution', Array.isArray(sent.question?.steps) && sent.question.steps.length > 0 && !!sent.question?.answer);
+    // Grounding moved to the server: for a server-issued question the device
+    // names the question it was issued and sends the student's own work —
+    // no prompt, step or answer (it holds none); the server grounds the tutor
+    // in its own sealed copy. The id must be one this account was issued.
+    const issuedNow = (await online.shownRow())?.serverQuestionId;
+    await check('grounded by the server\u2019s own copy: the request names the issued question and carries no prompt, steps or answer',
+      !!issuedNow && sent.serverQuestionId === issuedNow && !('question' in sent) && !/"steps"|"answer"|"prompt"/.test(JSON.stringify(sent)) &&
+        online.ledger(issuedNow).issued >= 1,
+      JSON.stringify(sent).slice(0, 240));
     await check('with no name, email or profile id on the wire',
       !/Tutor Student|"name"|"email"|"pid"|"profile"/.test(JSON.stringify(sent)), JSON.stringify(sent).slice(0, 240));
-    await check('opening a level lowers the credit on the card',
-      /85%/.test(await page.locator('.q-credit').innerText().catch(() => '')),
-      await page.locator('.q-topmeta').innerText());
+    // A practice question's marks are the server's alone to state, so the
+    // card no longer promises a credit figure for it (that note is placement-
+    // only). What must still hold: the help that was opened is on record with
+    // the question, where the server's receipt accounts for it.
+    const helped = await page.evaluate(id => new Promise(done => {
+      const open = indexedDB.open('pri-learning');
+      open.onsuccess = () => { const db = open.result; const r = db.transaction('questions').objectStore('questions').get(id);
+        r.onsuccess = () => { db.close(); done({ tutorLevel: r.result?.tutorLevel ?? null, hintsUsed: r.result?.hintsUsed ?? null }); }; r.onerror = () => { db.close(); done(null); }; };
+      open.onerror = () => done(null);
+    }), (await online.shownRow())?.id);
+    await check('opening a level is recorded with the question, and the card promises no credit figure of its own',
+      !!helped && Number(helped.tutorLevel) >= 1 && await page.locator('.q-credit').count() === 0, JSON.stringify(helped));
 
     // ── 4 · level 2: an outage falls back to the question's own hint ─────────
     await check('level 2 unlocks after level 1', await level(2).isEnabled());
@@ -163,6 +179,14 @@ export const flow = {
     await page.waitForSelector('.eval-card', { timeout: 15000 }).catch(() => {});
     await check('level 3 ends the question exactly like Reveal', /Solution revealed/i.test(await page.locator('.qpage').innerText()),
       (await page.locator('.qpage').innerText()).slice(0, 300));
+    // The solution it showed, and the resolution, are the server's: the
+    // question was issued there and its reveal committed there, once.
+    const issued = (await online.shownRow())?.serverQuestionId;
+    const reveals = await online.practiceCalls(new RegExp(`^/v1/practice/${issued}/reveal$`));
+    await check('the walkthrough showed the solution the server released, and the server recorded the question as revealed once',
+      !!issued && reveals.length === 1 && reveals[0].status === 200 && Array.isArray(reveals[0].json?.solution?.steps) &&
+        online.ledger(issued).thisDone === 1,
+      `server question ${issued}; reveal ${JSON.stringify(reveals.map(c => c.status))}; ${JSON.stringify(online.ledger(issued))}`);
     await check('the answer box is gone — the watched answer cannot be submitted for credit',
       await page.getByRole('button', { name: 'Submit Answer' }).count() === 0);
     await check('and no more help is offered on a closed question', await page.locator('[data-tutor-launch]').count() === 0);

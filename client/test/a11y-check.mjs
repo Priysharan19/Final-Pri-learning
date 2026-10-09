@@ -64,6 +64,7 @@ import { readFileSync, existsSync, statSync, mkdtempSync, rmSync } from 'node:fs
 import { join, extname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { startOnlinePlatform } from './support/online-session.mjs';
 
 const CLIENT = fileURLToPath(new URL('../', import.meta.url));
 const APP_JSX = join(CLIENT, 'src', 'App.jsx');
@@ -81,6 +82,16 @@ const OUTSTANDING = [
   // The three that used to sit here — the unnamed theme toggle, the wordmark that
   // navigated from a <span>, and the history verdict carried only by colour — are
   // fixed in the app rather than exempted here.
+  //
+  // One entry, added 2026-10-10 with the online-only checking states, and
+  // reported as a product defect the same day: this suite may not edit
+  // client/src/components. Delete it when the group below goes red.
+  {
+    check: 'colour',
+    file: 'client/src/components/QuestionCard.jsx — the refused-check notice (.verdict.verdict-technical > span.verdict-ico)',
+    what: 'the alert icon of a check that was NOT made (sign in / reconnect / account blocker) is painted in the "incorrect" colour (--bad) and carries no word or accessible name of its own',
+    test: f => f.signature === 'span.verdict-ico'
+  }
 ];
 
 // ── Assertions ───────────────────────────────────────────────────────────────
@@ -521,7 +532,9 @@ async function reachAnswerModeQuestion(page, base, { attempts = 20 } = {}) {
 
 async function run() {
   section('setup');
-  let dist = null, server = null, browser = null;
+  let dist = null, server = null, browser = null, platform = null;
+  let online = null;
+  const refusals = {};
   const routesSeen = new Set();
   const views = [];
   const skipped = [];
@@ -532,9 +545,13 @@ async function run() {
   try {
     dist = buildApp();
     ok('the app under test builds from source', true);
-    const served = await serve(dist);
-    server = served.server;
-    const BASE = served.base;
+    // Only Pri's server marks (owner decision 2026-10-10), so the marked
+    // states can only be walked against a server: the build is served by the
+    // real platform server (support/online-session.mjs) from its own origin.
+    // The walk starts signed out — every screen up to the first refused check
+    // is audited as a signed-out student sees it — and signs in on the card.
+    platform = await startOnlinePlatform({ dist });
+    const BASE = platform.origin;
     ok('the build is being served', !!BASE);
 
     browser = await chromium.launch();
@@ -542,6 +559,7 @@ async function run() {
     const page = await ctx.newPage();
     const pageErrors = [];
     page.on('pageerror', e => pageErrors.push(e.message));
+    online = platform.session(ctx, page);
     const cdp = await ctx.newCDPSession(page);
     await cdp.send('Accessibility.enable');
     await cdp.send('DOM.enable');
@@ -593,7 +611,7 @@ async function run() {
         await drive();
         await audit(view, route);
       } catch (err) {
-        skipped.push(`${view} — ${String(err.message || err).split('\n')[0].slice(0, 130)}`);
+        skipped.push(`${view} — ${String(err.message || err).split('\n')[0].slice(0, 620)}`);
       }
     };
 
@@ -718,7 +736,17 @@ async function run() {
       await draw([[150, 50], [150, 105]]);
       // Server-only reading (owner decision): with no reader in this harness
       // the page shows the reading/waiting status rather than a local reading.
-      await page.waitForSelector('.ink-preview, .ink-status', { timeout: 20000 });
+      // Signed out (as this walk is here) the page shows the in-card sign-in
+      // for the kept ink instead: that state is what gets audited.
+      // Any ONE of them rendered: a hidden .ink-status sits earlier in the
+      // document than the visible in-card sign-in, so they are not waited for
+      // as one selector list.
+      await page.waitForFunction(() => [...document.querySelectorAll('.ink-preview, .ink-status, [data-ink-account-recovery]')]
+        .some(el => el.getClientRects().length > 0), null, { timeout: 20000 })
+        .catch(async err => { throw new Error(`${String(err.message).split('\n')[0]} · on screen: ${JSON.stringify(await page.evaluate(() => ({
+          recovery: !!document.querySelector('[data-ink-account-recovery]'), status: document.querySelector('.ink-status')?.textContent || null,
+          notice: !!document.querySelector('[data-check-needs-account]'), foot: (document.querySelector('.ws-actions')?.innerText || '').replace(/\s+/g, ' ').slice(0, 120),
+          canvas: !!document.querySelector('.ink-canvas-live') })))}`.slice(0, 600)); });
       await wait(page, 600);
     });
 
@@ -728,26 +756,148 @@ async function run() {
       await wait(page, 500);
     });
 
-    // the marked state — the verdict, the evaluation card and the criteria table
-    await step('practice · marked', '/practice', async () => {
+    // ── online-only checking: the states a refused check puts on the card ────
+    // What the live regions say (the spoken refusal), read the same way the
+    // marked verdict is read below.
+    const spokenNow = () => page.evaluate(() =>
+      [...document.querySelectorAll('[aria-live="polite"], [aria-live="assertive"], [role="status"], [role="alert"]')]
+        .map(r => (r.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean));
+    const typedQuestion = async () => {
       await goTo(page, BASE, '/practice');
       await page.waitForSelector('.q-prompt', { timeout: 30000 });
+      for (let i = 0; i < 20; i++) {
+        const typeTab = page.locator('.mode-tab').first();
+        if (await typeTab.count()) { await typeTab.click(); await wait(page, 250); }
+        if (await page.locator('.editor-body input.answer-input').count() === 1) return page.locator('.editor-body input.answer-input');
+        await page.locator('.ctx-next').first().click();
+        await page.waitForSelector('.q-prompt', { timeout: 30000 });
+        await wait(page, SETTLE);
+      }
+      throw new Error('no typed-answer practice question reachable within the bounded search');
+    };
+    const pressSubmit = async () => {
+      await page.getByRole('button', { name: /Submit answer/ }).click();
+      await page.waitForSelector('[data-check-refusal]', { timeout: 20000 });
+      await wait(page, 400);
+    };
+
+    // signed out, before Submit: the card already says checking needs an account
+    await step('practice · signed out, account needed', '/practice', async () => {
+      const input = await typedQuestion();
+      await input.fill('99901');
+      await page.waitForSelector('[data-check-needs-account]', { timeout: 15000 });
+      refusals.notice = await page.evaluate(() => {
+        const g = document.querySelector('[data-check-needs-account]');
+        const b = g?.querySelector('[data-check-sign-in]');
+        return { role: g?.getAttribute('role'), label: g?.getAttribute('aria-label'), text: (g?.textContent || '').replace(/\s+/g, ' ').trim(),
+          button: b ? { tag: b.tagName.toLowerCase(), expanded: b.getAttribute('aria-expanded'), name: (b.textContent || '').trim() } : null };
+      });
+    });
+
+    // signed out, Submit pressed: refused, with the sign-in in the card
+    await step('practice · signed out, check refused', '/practice', async () => {
+      await pressSubmit();
+      refusals.signIn = {
+        kind: await page.locator('[data-check-refusal]').first().getAttribute('data-check-refusal'),
+        spoken: await spokenNow(),
+        result: await page.locator('.eval-card, .verdict-bad, .eval-marks, .solution-block').count()
+      };
+    });
+
+    // the sign-in opened in place: its fields, and where the keyboard goes next
+    await step('practice · sign-in on the card', '/practice', async () => {
+      const button = page.locator('.verdict [data-check-sign-in]');
+      await button.focus();
+      await page.keyboard.press('Enter');
+      await page.waitForSelector('.qpage #cloud-password', { timeout: 20000 });
       await wait(page, 500);
-      const typeTab = page.locator('.mode-tab').first();
-      if (await typeTab.count()) { await typeTab.click(); await wait(page, 300); }
+      // Focus order: from the button that opened it, Tab goes into the panel
+      // it opened (inside the card), not on past it to the rest of the page.
+      await button.focus();
+      const stops = [];
+      for (let i = 0; i < 4; i++) {
+        await page.keyboard.press('Tab');
+        stops.push(await page.evaluate(() => {
+          const el = document.activeElement;
+          const card = document.querySelector('.qpage .verdict');
+          return { tag: el?.tagName.toLowerCase() || '', id: el?.id || '', text: (el?.textContent || '').trim().slice(0, 30), inRefusal: !!(card && el && card.contains(el)) };
+        }));
+      }
+      refusals.focus = { expanded: await button.getAttribute('aria-expanded'), stops };
+    });
+
+    // signed in on the card (the real server, a real verified account)
+    try {
+      await online.signInHere(page.locator('.qpage'), { name: 'Accessibility Student' });
+      await page.waitForFunction(() => !document.querySelector('.qpage #cloud-password'), null, { timeout: 30000 }).catch(() => { });
+      refusals.signedIn = true;
+    } catch (err) {
+      skipped.push(`practice · signing in on the card — ${String(err.message || err).split('\n')[0].slice(0, 130)}`);
+    }
+
+    // signed in, but the account may not check yet: the server's own refusal
+    // (email not verified), produced by the real server for this account.
+    await step('practice · account blocker', '/practice', async () => {
+      const verifiedAt = platform.db.prepare('SELECT email_verified_at AS at FROM accounts WHERE id=?').get(online.account.id).at;
+      platform.db.prepare('UPDATE accounts SET email_verified_at=NULL WHERE id=?').run(online.account.id);
+      try {
+        const input = await typedQuestion();
+        await input.fill('99902');
+        await pressSubmit();
+        refusals.blocker = {
+          kind: await page.locator('[data-check-refusal]').first().getAttribute('data-check-refusal'),
+          spoken: await spokenNow(),
+          link: await page.locator('.verdict [data-check-account]').evaluate(a => ({ tag: a.tagName.toLowerCase(), href: a.getAttribute('href'), name: (a.textContent || '').trim() })).catch(() => null),
+          result: await page.locator('.eval-card, .verdict-bad, .eval-marks, .solution-block').count()
+        };
+      } finally {
+        platform.db.prepare('UPDATE accounts SET email_verified_at=? WHERE id=?').run(verifiedAt, online.account.id);
+      }
+    });
+
+    // signed in, the connection gone: reconnect asked, with a Try again
+    await step('practice · reconnect asked', '/practice', async () => {
+      const input = await typedQuestion();
+      await input.fill('99903');
+      await online.disconnect();
+      try {
+        await pressSubmit();
+        refusals.reconnect = {
+          kind: await page.locator('[data-check-refusal]').first().getAttribute('data-check-refusal'),
+          spoken: await spokenNow(),
+          retry: await page.locator('.verdict [data-check-retry]').evaluate(b => ({ tag: b.tagName.toLowerCase(), name: (b.textContent || '').trim(), disabled: b.disabled })).catch(() => null),
+          result: await page.locator('.eval-card, .verdict-bad, .eval-marks, .solution-block').count()
+        };
+      } finally {
+        await online.reconnect();
+      }
+    });
+
+    // the marked state — the verdict, the evaluation card and the criteria table
+    await step('practice · marked', '/practice', async () => {
+      // Signed in by now: the verdict is the server's. A typed question, so the
+      // two misses below are what resolves it (the answer left in the box by
+      // the refused checks above is simply the first of them).
+      let input = await typedQuestion();
+      // The question the refused checks were made on may already carry a first
+      // miss; "says nothing before an answer is marked" is measured on a fresh one.
+      if (await page.locator('.verdict-bad, .eval-card').count()) {
+        await page.locator('.ctx-next').first().click();
+        await page.waitForSelector('.q-prompt', { timeout: 30000 });
+        await wait(page, SETTLE);
+        input = await typedQuestion();
+      }
       const before = await page.evaluate(() => {
         const r = document.querySelector('[aria-live], [role="status"]');
         return r ? (r.textContent || '').trim() : null;
       });
-      const input = page.locator('.answer-input, .working-input').first();
-      const mcq = page.locator('.mcq-opt').first();
-      for (let attempt = 0; attempt < 2; attempt++) {
-        if (await input.count()) await input.fill(`999${attempt}1`);
-        else if (await mcq.count()) await mcq.click();
+      for (let attempt = 0; attempt < 3 && !(await page.locator('.eval-card').count()); attempt++) {
+        await input.fill(`999${attempt}1`);
         const submit = page.getByRole('button', { name: /Submit answer/ });
         if (!(await submit.count())) break;
         await submit.click();
-        await wait(page, 1200);
+        await page.waitForSelector(attempt ? '.eval-card, .verdict-bad' : '.verdict-bad, .eval-card', { timeout: 20000 }).catch(() => { });
+        await wait(page, 900);
       }
       if (!(await page.locator('.eval-card').count())) {
         const reveal = page.getByRole('button', { name: 'Show solution' });
@@ -757,7 +907,7 @@ async function run() {
       const after = await page.evaluate(() =>
         [...document.querySelectorAll('[aria-live="polite"], [aria-live="assertive"], [role="status"], [role="alert"]')]
           .map(r => (r.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean));
-      liveVerdict = { before, after };
+      liveVerdict = { before, after, grades: (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/(?:submit|reveal)$/)).filter(c => c.status === 200 && c.json?.authoritative === true).length };
     });
 
     await step('progress · overview', '/progress', async () => {
@@ -814,7 +964,9 @@ async function run() {
     await step('exam room · sitting a paper', '/exams/:id', async () => {
       await goTo(page, BASE, '/exams');
       await click(page, 'button.btn-primary', { text: 'Start practice paper' });
-      await page.waitForSelector('.exam-nav', { timeout: 60000 });
+      await page.waitForSelector('.exam-nav', { timeout: 60000 }).catch(async err => {
+        throw new Error(`${String(err.message).split('\n')[0]} · on screen: ${JSON.stringify((await page.locator('[role="alert"]').allInnerTexts()).map(t => t.replace(/\s+/g, ' ').slice(0, 200)))} · last server calls ${JSON.stringify(online.calls.slice(-4).map(c => `${c.status} ${c.path}`))}`);
+      });
       await wait(page, 900);
       const wk = page.getByRole('button', { name: /Show working for partial credit/ });
       if (await wk.count()) { await wk.click(); await wait(page, SETTLE); }
@@ -1112,7 +1264,8 @@ async function run() {
     ok('there were fields to check', fields > 30, `${fields} inspected`);
 
     section('the marking verdict');
-    ok('a question was marked', !!liveVerdict, 'the practice view never reached a marked question');
+    ok('a question was marked — by the server', !!liveVerdict && liveVerdict.grades >= 1,
+      liveVerdict ? `${liveVerdict.grades} authoritative server results behind the marked card` : 'the practice view never reached a marked question');
     if (liveVerdict) {
       ok('the verdict region says nothing before an answer is marked',
         !liveVerdict.before || !/correct|not quite|revealed|marks/i.test(liveVerdict.before),
@@ -1122,6 +1275,27 @@ async function run() {
         /(correct|not quite|revealed)/i.test(spoken) && /marks?/i.test(spoken),
         `the live regions on the marked page said ${JSON.stringify(liveVerdict.after)}`);
     }
+
+    section('online-only checking');
+    ok('signed out, the card says before Submit that checking needs an account: a labelled group holding a real, named sign-in button',
+      refusals.notice?.role === 'group' && !!refusals.notice.label && /needs a Pri account/i.test(refusals.notice.text) &&
+        refusals.notice.button?.tag === 'button' && /\p{L}/u.test(refusals.notice.button.name) && refusals.notice.button.expanded === 'false',
+      JSON.stringify(refusals.notice));
+    ok('a refused check (signed out) is announced in a live region, in words — and nothing is marked',
+      refusals.signIn?.kind === 'sign-in' && /has not been checked/i.test((refusals.signIn.spoken || []).join(' ')) && refusals.signIn.result === 0,
+      JSON.stringify(refusals.signIn));
+    ok('opening the sign-in sets aria-expanded, and Tab from its button goes into the panel it opened, inside the card',
+      refusals.focus?.expanded === 'true' && refusals.focus.stops.length === 4 && refusals.focus.stops.every(stop => stop.inRefusal),
+      JSON.stringify(refusals.focus));
+    ok('the walk signed in on the card, on the real server', refusals.signedIn === true);
+    ok('an account blocker (email not verified) is announced in a live region and offers a named link to Account settings — and nothing is marked',
+      refusals.blocker?.kind === 'verify-email' && /has not been checked/i.test((refusals.blocker.spoken || []).join(' ')) &&
+        refusals.blocker.link?.tag === 'a' && refusals.blocker.link.href === '/settings' && /\p{L}/u.test(refusals.blocker.link.name) && refusals.blocker.result === 0,
+      JSON.stringify(refusals.blocker));
+    ok('offline, the reconnect message is announced in a live region with a named Try again button — and nothing is marked',
+      refusals.reconnect?.kind === 'reconnect' && /has not been checked/i.test((refusals.reconnect.spoken || []).join(' ')) &&
+        refusals.reconnect.retry?.tag === 'button' && /\p{L}/u.test(refusals.reconnect.retry.name) && refusals.reconnect.result === 0,
+      JSON.stringify(refusals.reconnect));
 
     section('colour is never alone');
     ok('correct / incorrect is never carried by colour alone', findingsFor('colour').length === 0, show(findingsFor('colour')));
@@ -1150,6 +1324,7 @@ async function run() {
   } finally {
     if (browser) await browser.close().catch(() => { });
     if (server) server.close();
+    if (platform) await platform.close().catch(() => { });
     if (dist) rmSync(dist, { recursive: true, force: true });
   }
 

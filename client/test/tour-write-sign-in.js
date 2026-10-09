@@ -379,8 +379,14 @@ export const writeFlow = {
       await check('the ink is not read or marked while signed out, and Submit waits for a reading',
         await page.locator('.ink-preview').count() === 0 && await page.locator('.ws-actions .btn-primary').isDisabled() &&
           /has not been read or graded/.test(await visibleText(page, '[data-ink-account-recovery] p')));
-      await check('nothing has been sent anywhere: no reader call, no practice call, no provider request',
-        !calls.some(c => /^\/v1\/(?:handwriting\/transcribe|practice\/)/.test(c.path)) && reader.requests.length === 0,
+      // Signed out but online, the question on screen is one the server
+      // PREPARED (anonymous: a public question and a sealed token). That is
+      // the only practice call allowed before sign-in: nothing is issued, read
+      // or marked, and the prepare request carries no seed and no answer.
+      const prepares = practiceCalls(calls, /^\/v1\/practice\/prepare$/);
+      await check('nothing has been sent to be read or marked: no reader call, no provider request, and the only practice call is the anonymous prepare (no seed, no answer)',
+        !calls.some(c => /^\/v1\/(?:handwriting\/transcribe|practice\/(?!prepare$))/.test(c.path)) && reader.requests.length === 0 &&
+          prepares.length >= 1 && prepares.every(c => !('seed' in (c.body || {})) && !('answer' in (c.json?.question || {})) && !('id' in (c.json?.question || {}))),
         JSON.stringify(calls.map(c => `${c.method} ${c.path}`)));
       await check('sign-in is enabled only once the ink is proven saved',
         await recovery.locator('[data-ink-sign-in]').isEnabled());
@@ -423,18 +429,18 @@ export const writeFlow = {
       await check('a doubtful transcript is editable in place',
         lines[0]?.low === true && await page.locator('.ink-line .ink-correct-btn').count() === 1, JSON.stringify(lines));
       await check('signing in alone marks nothing: no question was issued or graded yet',
-        practiceCalls(calls, /^\/v1\/practice\//).length === 0, JSON.stringify(practiceCalls(calls, /^\/v1\/practice\//).map(c => c.path)));
+        practiceCalls(calls, /^\/v1\/practice\/(?!prepare$)/).length === 0, JSON.stringify(practiceCalls(calls, /^\/v1\/practice\/(?!prepare$)/).map(c => c.path)));
 
       await correctReading(page, SURELY_WRONG);
       await pressSubmit(page);
       await page.waitForSelector('.verdict-bad, .eval-card', { timeout: 30000 }).catch(() => {});
       const issues = practiceCalls(calls, /^\/v1\/practice\/issue$/);
       const serverQid = issues[0]?.json?.question?.id || null;
-      await check('the question was ADOPTED by the server at submit: one issue request, naming generator/difficulty/seed and no answer',
+      await check('the prepared question was BOUND to this account at submit: one issue request carrying only the prepared token — no generator, seed or answer',
         issues.length === 1 && issues[0].status === 201 && !!serverQid &&
-          Object.keys(issues[0].body || {}).every(k => ['generator', 'difficulty', 'seed', 'curriculum', 'mode'].includes(k)) &&
-          Number.isInteger(issues[0].body?.seed),
-        JSON.stringify(issues.map(c => ({ status: c.status, body: c.body }))));
+          JSON.stringify(Object.keys(issues[0].body || {})) === '["prepared"]' && typeof issues[0].body.prepared === 'string' &&
+          prepares.filter(c => c.json?.prepared === issues[0].body.prepared).length === 1,
+        JSON.stringify(issues.map(c => ({ status: c.status, keys: Object.keys(c.body || {}) }))));
       const escrow = serverQid ? serverAnswer(h, serverQid) : null;
       await check('adopted, not replaced: the local question id and prompt are unchanged and the server holds that same question',
         await shownId(page) === qid && await mathText('.q-prompt') === prompt && !!escrow && escrow.prompt === issues[0]?.json?.question?.prompt,
