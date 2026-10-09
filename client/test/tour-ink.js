@@ -160,6 +160,7 @@ export const flow = {
     // restored from the store, offered to the reader (which proves the strokes
     // came back), and go on waiting — no mark, nothing lost.
     const requestsBeforeReload = reader.requests.length;
+    const readsBeforeReload = (await readCalls()).length;
     reader.down = true;
     await ctx.setOffline(false);
     await page.reload({ waitUntil: 'domcontentloaded' });
@@ -170,11 +171,17 @@ export const flow = {
     const canvasAfter = await page.locator('.ink-canvas-live').boundingBox();
     await check('and the card came back to the pen by itself', !!canvasAfter && canvasAfter.width > 200);
     for (let i = 0; i < 60 && reader.requests.length === requestsBeforeReload; i++) await page.waitForTimeout(200);
-    const restoredSent = (await readCalls()).at(-1);
+    // The page asks once. The server may put that one request to its fallback
+    // model when the first answers 5xx, so the provider can see it twice; a
+    // second request from the page would be a second read.
+    await page.waitForTimeout(1500);
+    const readsAfter = await readCalls();
+    const restoredSent = readsAfter.at(-1);
+    const providerCalls = reader.requests.length - requestsBeforeReload;
     await check('the kept strokes were restored and offered to the reader (one request, a picture, nothing else)',
-      reader.requests.length === requestsBeforeReload + 1 &&
+      readsAfter.length === readsBeforeReload + 1 && providerCalls >= 1 && providerCalls <= 2 &&
         Object.keys(restoredSent?.body || {}).every(k => ['image', 'mode'].includes(k)) && /^data:image\//.test(restoredSent?.body?.image || ''),
-      `${reader.requests.length - requestsBeforeReload} request(s) after the reload; page sent ${JSON.stringify(Object.keys(restoredSent?.body || {}))}`);
+      `${readsAfter.length - readsBeforeReload} page request(s), ${providerCalls} provider call(s) after the reload; page sent ${JSON.stringify(Object.keys(restoredSent?.body || {}))}`);
     await page.waitForSelector('.ink-status', { timeout: 10000 }).catch(() => {});
     const downNote = (await page.locator('.ink-status').innerText().catch(() => '')) || '';
     await check('with the reader down the page waits, saved, and says so', /saved/i.test(downNote) && await page.locator('.eval-card').count() === 0, JSON.stringify(downNote));
