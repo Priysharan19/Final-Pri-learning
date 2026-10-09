@@ -1966,6 +1966,121 @@
       "csrf": "double-submit-when-session-cookie",
       "origin": "enforced",
       "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/practice/issue",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "eligible student; issues an authored, private per-account question and sealed server question record; caller cannot supply mark scheme or correct answer",
+      "rateLimits": [
+        {
+          "key": "practice-issue",
+          "limit": 200,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/practice/:id/recognize",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "student owns the live server-issued question; one bounded ink/photo image goes to answer-blind recognition; receipt is private and bound to account and question; recheck session, guardian consent and completion after provider wait",
+      "rateLimits": [
+        {
+          "key": "practice-recognize",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/practice/:id/recognition/:receipt/confirm",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "student owns original server recognition receipt and its question; explicitly corrected transcript produces a new bound receipt; account-serialized with final grade and prohibited after completion",
+      "rateLimits": [
+        {
+          "key": "practice-correction",
+          "limit": 200,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/practice/:id/reveal",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "student owns the live server-issued question; a server-committed reveal closes the attempt as incorrect with zero credit; idempotent receipt and progress isolated to account",
+      "rateLimits": [
+        {
+          "key": "practice-reveal",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/practice/:id/submit",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "student owns a sealed server-issued question; final answer or authenticated ink/photo receipt is marked server-side; stable idempotency key commits numerical marks and exactly-once progress; no client award authority",
+      "rateLimits": [
+        {
+          "key": "practice-grade",
+          "limit": 300,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
     }
   ]
 }
