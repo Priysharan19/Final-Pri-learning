@@ -507,8 +507,19 @@ async function run() {
   });
   const emptyLedger = sitaLedger();
   const refusal = fn => fn().then(() => 'checked', err => err?.code || String(err));
-  const firstServed = await serve();
-  const firstRight = canonicalInput(firstServed.q) ?? '0';
+  // Signed out with the server reachable, the question is a PREPARED one: the
+  // device holds a sealed token and no answer, and nothing has a key to read
+  // until an account binds it.
+  let firstServed = null;
+  for (let i = 0; i < 12 && !firstServed; i++) {
+    const res = await POST('/practice/next', { resume: false });
+    const row = await idb.get('questions', res.question.id);
+    if (res.question.answerType !== 'mcq') firstServed = { res, row };
+    else await POST(`/practice/${row.id}/discard`, {});
+  }
+  ok('signed out, the question served is a prepared one with no answer on the device',
+    firstServed?.res.question.checkState === 'prepared' && typeof firstServed.row.prepared === 'string' && !firstServed.row.serverQuestionId && !('answer' in firstServed.row.payload), show(firstServed?.res.question.checkState));
+  const firstRight = '0';
   const gradedBefore = online.traffic.grade;
   // Before signing in: the question can be read, but not checked.
   eq('signed out, an answer is not checked', await refusal(() => POST(`/practice/${firstServed.row.id}/submit`, { answer: firstRight, ms: 9000, submissionId: nextSubmissionId('sub_progress_out') })), 'SIGN_IN_TO_CHECK');
@@ -523,8 +534,19 @@ async function run() {
   eq('…no attempt, rating, review, activity or XP was written', sitaLedger(), emptyLedger);
   eq('the server marked nothing while signed out or offline', online.traffic.grade, gradedBefore);
   const kept = await idb.get('questions', firstServed.row.id);
-  ok('the refused question is still there, unanswered, with no try spent', !!kept && !kept.answered && (kept.tries || 0) === 0 && kept.payload.prompt === firstServed.q.prompt, show({ answered: kept?.answered, tries: kept?.tries }));
-  // Back online, that same question is checked, and five more after it.
+  ok('the refused question is still there, unanswered, with no try spent, still holding its token',
+    !!kept && !kept.answered && (kept.tries || 0) === 0 && kept.payload.prompt === firstServed.res.question.prompt && kept.prepared === firstServed.row.prepared, show({ answered: kept?.answered, tries: kept?.tries }));
+  // Back online and signed in, the account binds that same row. An unreadable
+  // first entry binds it without spending a try (the server does not count
+  // unreadable input as an attempt), after which the suite's oracle can read
+  // the server's sealed copy and play the question like any other.
+  const bindsBefore = online.traffic.bind;
+  const unreadable = await POST(`/practice/${firstServed.row.id}/submit`, { answer: 'not maths at all ###', ms: 1000, submissionId: nextSubmissionId('sub_progress_bind') });
+  const boundRow = await idb.get('questions', firstServed.row.id);
+  eq('signed in and reconnected, the same row is bound to the account by one issue carrying its token',
+    [online.traffic.bind - bindsBefore, boundRow.id, typeof boundRow.serverQuestionId, boundRow.prepared, boundRow.payload.prompt], [1, firstServed.row.id, 'string', undefined, firstServed.res.question.prompt]);
+  eq('an unreadable entry is refused by the server as unreadable and spends nothing', [unreadable.invalid, unreadable.resolved, boundRow.tries || 0, sitaLedger()], [true, false, 0, emptyLedger]);
+  firstServed = { res: firstServed.res, row: boundRow, q: await online.answerKey(boundRow) };
   await play(firstServed, STYLES[0]); tick(MIN);
   for (let i = 1; i < 6; i++) { const s = await serve(); await play(s, STYLES[i]); tick(MIN); }
   ok('once reconnected the refused question was marked by the server', (await idb.get('questions', firstServed.row.id))?.serverReceipt?.authoritative === true);
