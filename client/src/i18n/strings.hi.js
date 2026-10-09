@@ -578,11 +578,6 @@ export default {
   'verdict.possibly': 'शायद',
   'verdict.yourAlgebra': 'आपका बीजगणित',
   'verdict.showSolution': 'हल देखें',
-  'verdict.criteria': 'मानदंड',
-  'verdict.marksColumn': 'अंक',
-  'verdict.tickCriteria': 'जो मानदंड आपके हल ने पूरे किए उन पर निशान लगाइए, फिर सहेजिए।',
-  'verdict.saveSelfMarking': 'स्व-मूल्यांकन सहेजें',
-  'verdict.selfMarkingRecorded': 'स्व-मूल्यांकन दर्ज — {total} में से {earned} अंक',
   'verdict.stepCheck': 'आपके हल की चरण-दर-चरण जाँच',
   'verdict.mistakeIsHere': 'यहाँ देखें',
 
@@ -1165,7 +1160,6 @@ export default {
 
   // Feedback follow-ups
   'verdict.nextTryAgain': "अपना उत्तर जाँचें, फिर से जमा करें।",
-  'verdict.markItYourself': "मानदंडों से स्वयं अंक दें",
 
   // Formal assessment
   'exam.leaveSaved': "प्रश्नपत्र छोड़ें। आपके उत्तर इस डिवाइस पर सहेजे रहेंगे और घड़ी चलती रहेगी।",
@@ -2664,5 +2658,26 @@ export default {
   'deleteRequest.rateLimited': 'दूसरा कोड माँगने से पहले थोड़ा रुकिए।',
   'deleteRequest.genericError': 'कुछ गड़बड़ हुई। थोड़ी देर में फिर कोशिश करें।',
   'deleteRequest.privacyLink': 'गोपनीयता सूचना',
-  'deleteRequest.languageLabel': 'भाषा'
+  'deleteRequest.languageLabel': 'भाषा',
+
+  // Online-only checking (owner decision 2026-10-10): what a refused check says.
+  'check.needsAccount': 'उत्तर जाँचने के लिए Pri खाता चाहिए। आप काम जारी रख सकते हैं और जब जाँच करानी हो तब साइन इन कर सकते हैं।',
+  'check.signInAction': 'इस उत्तर की जाँच के लिए साइन इन करें',
+  'check.signInTitle': 'जाँच के लिए Pri खाता चाहिए',
+  'check.examSignInTitle': 'पेपर शुरू करने के लिए Pri खाता चाहिए',
+  'check.signInHint': 'उत्तर Pri का सर्वर जाँचता और अंक देता है। यहीं साइन इन करें; इस पेज पर कुछ नहीं बदलेगा।',
+  'check.notChecked': 'यह उत्तर अभी जाँचा नहीं गया है, और आपका हल इसी पेज पर है।',
+  'check.examNotStarted': 'पेपर शुरू नहीं हुआ है।',
+  'check.reconnectTitle': 'Pri सर्वर तक नहीं पहुँच पाया',
+  'check.reconnectHint': 'अपना कनेक्शन देखें, फिर दोबारा कोशिश करें।',
+  'check.verifyEmailTitle': 'पहले अपना ईमेल पता सत्यापित करें',
+  'check.verifyEmailHint': 'Pri के भेजे ईमेल का लिंक खोलें। खाता सेटिंग्स से नया ईमेल भेजा जा सकता है।',
+  'check.guardianTitle': 'पहले माता-पिता या अभिभावक को इस खाते की पुष्टि करनी होगी',
+  'check.guardianHint': 'Pri ने उन्हें ईमेल से एक लिंक भेजा है। खाता सेटिंग्स में दिखता है कि उन्होंने पुष्टि की या नहीं।',
+  'check.updateTitle': 'पहले Pri को अपडेट करें',
+  'check.updateHint': 'ऐप का यह संस्करण Pri के सर्वर के लिए बहुत पुराना है। स्टोर से अपडेट करें, फिर दोबारा कोशिश करें।',
+  'check.accountTitle': 'यह खाता अभी यह नहीं कर सकता',
+  'check.accountHint': 'खाता सेटिंग्स में दिखता है कि खाते में अभी क्या बाकी है।',
+  'check.questionTitle': 'यह प्रश्न अभी जाँचा नहीं जा सकता',
+  'check.questionHint': 'दोबारा कोशिश करें, या अगले प्रश्न पर जाएँ।'
 };

@@ -52,7 +52,7 @@ const PLACEMENT_ON = featureEnabled('placement');
 // a connection to do anything, so it is never part of the install.
 const PractisePhoto = React.lazy(() => import('./pages/PractisePhoto.jsx'));
 
-const AppCtx = createContext(null);
+export const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);
 
 /* Navigation marks come from the one Pri icon family (components/Icon.jsx). */

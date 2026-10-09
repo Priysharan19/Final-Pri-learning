@@ -507,11 +507,6 @@ export default {
   'verdict.possibly': 'Possibly',
   'verdict.yourAlgebra': 'Your algebra',
   'verdict.showSolution': 'Show solution',
-  'verdict.criteria': 'Criteria',
-  'verdict.marksColumn': 'Marks',
-  'verdict.tickCriteria': 'Tick the criteria your working earned, then save.',
-  'verdict.saveSelfMarking': 'Save self-marking',
-  'verdict.selfMarkingRecorded': 'Self-marking recorded: {earned}/{total} marks',
   'verdict.stepCheck': 'Step check on your working',
   'verdict.mistakeIsHere': 'look here',
 
@@ -1099,7 +1094,6 @@ export default {
 
   // Feedback follow-ups
   'verdict.nextTryAgain': "Check your answer, then submit again.",
-  'verdict.markItYourself': "Mark it yourself against the criteria",
 
   // Formal assessment
   'exam.leaveSaved': "Leave the paper. Your answers stay saved on this device and the clock keeps running.",
@@ -2594,5 +2588,26 @@ export default {
   'deleteRequest.rateLimited': 'Wait a moment before asking for another code.',
   'deleteRequest.genericError': 'Something went wrong. Try again in a moment.',
   'deleteRequest.privacyLink': 'Privacy notice',
-  'deleteRequest.languageLabel': 'Language'
+  'deleteRequest.languageLabel': 'Language',
+
+  // Online-only checking (owner decision 2026-10-10): what a refused check says.
+  'check.needsAccount': 'Checking your answer needs a Pri account. You can keep working and sign in when you are ready to check it.',
+  'check.signInAction': 'Sign in to check this answer',
+  'check.signInTitle': 'Checking needs a Pri account',
+  'check.examSignInTitle': 'Starting a paper needs a Pri account',
+  'check.signInHint': 'Answers are checked and marked by Pri’s server. Sign in here; nothing on this page changes.',
+  'check.notChecked': 'This answer has not been checked, and your working is still on this page.',
+  'check.examNotStarted': 'The paper has not started.',
+  'check.reconnectTitle': 'Pri could not reach the server',
+  'check.reconnectHint': 'Check your connection, then try again.',
+  'check.verifyEmailTitle': 'Verify your email address first',
+  'check.verifyEmailHint': 'Open the link in the email Pri sent you. Account settings can send a fresh one.',
+  'check.guardianTitle': 'A parent or guardian needs to confirm this account first',
+  'check.guardianHint': 'Pri emailed them a link. Account settings shows whether they have confirmed.',
+  'check.updateTitle': 'Update Pri first',
+  'check.updateHint': 'This version of the app is too old for Pri’s server. Update it from the store, then try again.',
+  'check.accountTitle': 'This account cannot do this yet',
+  'check.accountHint': 'Account settings shows what the account still needs.',
+  'check.questionTitle': 'This question cannot be checked right now',
+  'check.questionHint': 'Try again, or go to the next question.'
 };

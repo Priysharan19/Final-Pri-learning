@@ -25,6 +25,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { api } from '../api.js';
+import { checkRefusal, checkRefusalCopy } from '../components/checkAccess.js';
 import { MathText } from '../lib/latex.jsx';
 import { useT } from '../i18n/index.js';
 import { buildDeterministicStoryboard } from '../explain/visualEngine.js';
@@ -56,7 +57,7 @@ function levelText(t) {
 
 export { safeCaptions };
 
-export default function TutorHelp({ question, work, locale, onUsed, onResolved, onClose, startedAt }) {
+export default function TutorHelp({ question, work, locale, onUsed, onResolved, onRefused, onClose, startedAt }) {
   const t = useT();
   const text = levelText(t);
   const headingId = useId();
@@ -139,7 +140,13 @@ export default function TutorHelp({ question, work, locale, onUsed, onResolved, 
         });
       }
     } catch (error) {
-      note(level, { text: error?.code === 'EXAM_QUESTION_LOCKED' ? t('tutor.examLocked') : t('tutor.unavailable'), source: 'error' });
+      // The walkthrough shows the solution, so it needs what a check needs: a
+      // signed-in eligible account, a connection and a server-issued question.
+      // When that is why it was refused, the card names the reason and offers
+      // the sign-in or retry; nothing was revealed and the question is open.
+      const refused = level === 3 ? checkRefusalCopy(checkRefusal(error)) : null;
+      if (refused) onRefused?.(error);
+      note(level, { text: refused ? t(refused.titleKey) : error?.code === 'EXAM_QUESTION_LOCKED' ? t('tutor.examLocked') : t('tutor.unavailable'), source: 'error' });
     } finally {
       setBusy(0);
     }
