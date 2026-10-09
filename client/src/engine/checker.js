@@ -5,7 +5,7 @@
 // that API stable while routing mathematical working through Pri Reason.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { normalize, parse, evaluate, exprEquivalent, numsClose } from './expr.js';
+import { normalize, parse, evaluate, exprEquivalent, numsClose, variablesOf } from './expr.js';
 import { diagnoseStep } from './diagnose.js';
 import {
   assessEquationLine, sameEquationClaim, sameExpressionClaim,
@@ -891,7 +891,8 @@ export function questionClaims(meta, prompt = '') {
   }
   for (const m of String(prompt || '').matchAll(TEX_MATH)) {
     const plain = plainTex(m[1]);
-    if (plain && /[=<>≤≥]/.test(plain)) texts.push(plain);
+    // An expression task hands the student an expression; a relation task a relation.
+    if (plain && (/[=<>≤≥]/.test(plain) || meta?.kind === 'expression')) texts.push(plain);
   }
   return texts.map(readClaim).filter(Boolean);
 }
@@ -915,25 +916,27 @@ export function restatesQuestion(line, meta, prompt = '') {
 function withoutNeutralArithmetic(node) {
   const n = unwrapGroup(node);
   if (!n || typeof n !== 'object') return n;
+  // A sub-expression with no unknown in it that is exactly 0 or 1 (`2^0`,
+  // `sqrt(1)`, `3-3`) is the literal it equals; anything else is left as written.
+  const fixed = constantValue(n);
+  if (fixed === 0 || fixed === 1) return { t: 'num', v: fixed };
   if (n.t === 'neg') return { ...n, v: withoutNeutralArithmetic(n.v) };
+  if (n.t === 'call') {
+    return Array.isArray(n.args)
+      ? { ...n, args: n.args.map(withoutNeutralArithmetic), arg: n.arg && withoutNeutralArithmetic(n.arg) }
+      : { ...n, arg: withoutNeutralArithmetic(n.arg) };
+  }
   if (n.t !== 'bin') return n;
   const l = withoutNeutralArithmetic(n.l);
   const r = withoutNeutralArithmetic(n.r);
-  const isNumber = (part, value) => {
-    const p = unwrapGroup(part);
-    if (p?.t === 'num') return Number(p.v) === value;
-    if (p?.t === 'neg') {
-      const v = unwrapGroup(p.v);
-      return v?.t === 'num' && -Number(v.v) === value;
-    }
-    return false;
-  };
+  const isNumber = (part, value) => literalValue(part) === value;
   if (n.op === '+' && isNumber(r, 0)) return l;
   if (n.op === '+' && isNumber(l, 0)) return r;
   if (n.op === '-' && isNumber(r, 0)) return l;
   if (n.op === '*' && isNumber(r, 1)) return l;
   if (n.op === '*' && isNumber(l, 1)) return r;
   if (n.op === '/' && isNumber(r, 1)) return l;
+  if (n.op === '^' && isNumber(r, 1)) return l;
   return cancelInsertedPairs({ ...n, l, r });
 }
 
@@ -947,31 +950,48 @@ const literalValue = node => {
   return null;
 };
 
+function constantValue(node) {
+  try {
+    if (variablesOf(node).size) return null;
+    const value = evaluate(node, {});
+    return Number.isFinite(value) ? (numsClose(value, 0) ? 0 : numsClose(value, 1) ? 1 : value) : null;
+  } catch { return null; }
+}
+
 /**
- * `+1-1` and `*2/2` are the same non-step as `+0` and `*1`, spelt with two
- * literals instead of one. Remove a numeric literal only together with its own
- * exact inverse inside the same sum or the same product; every other term and
- * factor stays exactly as written, so collecting, expanding and evaluating
- * remain visible to the rubric.
+ * `+1-1`, `+x-x` and `*2/2`, `*m/m` are the same non-step as `+0` and `*1`,
+ * spelt with two terms instead of one. Inside one sum, a term is removed only
+ * together with its own exact negative; inside one product, a factor only with
+ * the identical divisor. Every other term and factor stays exactly as written,
+ * so collecting, expanding, factorising and evaluating remain visible.
  */
 function cancelInsertedPairs(node) {
+  const sameWritten = (x, y) => { try { return writtenKey(x) === writtenKey(y); } catch { return false; } };
   if (node.op === '+' || node.op === '-') {
     const terms = [];
     const walk = (part, sign) => {
       const p = unwrapGroup(part);
       if (p?.t === 'bin' && (p.op === '+' || p.op === '-')) {
         walk(p.l, sign); walk(p.r, p.op === '-' ? -sign : sign);
-      } else terms.push({ sign, node: p });
+      } else if (p?.t === 'neg') walk(p.v, -sign);
+      else terms.push({ sign, node: p });
     };
     walk(node, 1);
     let cancelled = false;
+    // Several literals that together add nothing (`+2-1-1`).
+    const literals = terms.filter(t => literalValue(t.node) !== null);
+    for (let size = literals.length; size >= 2 && !cancelled; size--) {
+      const tail = literals.slice(literals.length - size);
+      if (tail.reduce((sum, t) => sum + t.sign * literalValue(t.node), 0) === 0 &&
+          tail.every(t => literalValue(t.node) !== 0)) {
+        for (const t of tail) terms[terms.indexOf(t)] = null;
+        cancelled = true;
+      }
+    }
     for (let i = 0; i < terms.length; i++) {
-      const a = terms[i] && literalValue(terms[i].node);
-      if (a === null || a === undefined || a === 0) continue;
+      if (!terms[i] || literalValue(terms[i].node) === 0) continue;
       for (let j = i + 1; j < terms.length; j++) {
-        const b = terms[j] && literalValue(terms[j].node);
-        if (b === null || b === undefined) continue;
-        if (terms[i].sign * a + terms[j].sign * b === 0) {
+        if (terms[j] && terms[j].sign === -terms[i].sign && sameWritten(terms[i].node, terms[j].node)) {
           terms[i] = terms[j] = null; cancelled = true; break;
         }
       }
@@ -994,11 +1014,11 @@ function cancelInsertedPairs(node) {
     walk(node, 1);
     let cancelled = false;
     for (let i = 0; i < factors.length; i++) {
-      const a = factors[i] && literalValue(factors[i].node);
-      if (a === null || a === undefined || a === 0 || a === 1) continue;
+      if (!factors[i]) continue;
+      const lit = literalValue(factors[i].node);
+      if (lit === 0 || lit === 1) continue;
       for (let j = i + 1; j < factors.length; j++) {
-        const b = factors[j] && literalValue(factors[j].node);
-        if (b === a && factors[j].power === -factors[i].power) {
+        if (factors[j] && factors[j].power === -factors[i].power && sameWritten(factors[i].node, factors[j].node)) {
           factors[i] = factors[j] = null; cancelled = true; break;
         }
       }
@@ -1013,16 +1033,39 @@ function cancelInsertedPairs(node) {
   return node;
 }
 
-function methodProgressDuplicate(a, b) {
-  if (a?.kind === 'equation' && b?.kind === 'equation') {
-    const identityFree = c => ({
-      ...c, ast: { ...c.ast,
-        l: withoutNeutralArithmetic(c.ast.l),
-        r: withoutNeutralArithmetic(c.ast.r) }
-    });
-    return sameWrittenClaim(identityFree(a), identityFree(b));
-  }
-  return sameWrittenClaim(a, b);
+const symbolCount = node => {
+  const n = unwrapGroup(node);
+  if (!n || typeof n !== 'object') return 0;
+  if (n.t === 'neg' || n.t === 'fact') return 1 + symbolCount(n.v);
+  if (n.t === 'call') return 1 + (Array.isArray(n.args) ? n.args : [n.arg]).reduce((t, x) => t + symbolCount(x), 0);
+  if (n.t === 'bin') return 1 + symbolCount(n.l) + symbolCount(n.r);
+  return 1;
+};
+const claimSides = c => c?.kind === 'equation' ? [c.ast.l, c.ast.r]
+  : c?.kind === 'relation' ? [c.relation.l, c.relation.r]
+  : c?.kind === 'expression' ? [c.ast] : null;
+
+/**
+ * Is `line` the reference written again? Exactly the same line always is. So
+ * is the reference with identities padded into it (`+0`, `*1`, `^1`, `+1-1`,
+ * `+x-x`, `*m/m`, `+2^0-1`) — on an equation, an inequality or an expression.
+ * A line that is the same once identities are removed but is written SHORTER
+ * than the reference has evaluated or collected something, and is a step.
+ */
+function methodProgressDuplicate(line, reference) {
+  if (sameWrittenClaim(line, reference)) return true;
+  const ls = claimSides(line), rs = claimSides(reference);
+  if (!ls || !rs || line.kind !== reference.kind) return false;
+  const strip = c => c.kind === 'relation'
+    ? { ...c, relation: { ...c.relation, l: withoutNeutralArithmetic(c.relation.l), r: withoutNeutralArithmetic(c.relation.r) } }
+    : c.kind === 'equation'
+      ? { ...c, ast: { ...c.ast, l: withoutNeutralArithmetic(c.ast.l), r: withoutNeutralArithmetic(c.ast.r) } }
+      : { ...c, ast: withoutNeutralArithmetic(c.ast) };
+  let same = false;
+  try { same = sameWrittenClaim(strip(line), strip(reference)); } catch { same = false; }
+  if (!same) return false;
+  const size = sides => sides.reduce((t, side) => t + symbolCount(side), 0);
+  return size(ls) >= size(rs);
 }
 
 /** An isolated final value is an answer claim, not a new method step. */
@@ -1120,19 +1163,21 @@ function affineSide(node, variable) {
  * `+1-1` / `*2/2` leaves all of these where they were.
  */
 function linearState(claim, variable) {
-  if (claim?.kind !== 'equation' || !variable) return null;
-  const l = affineSide(claim.ast.l, variable), r = affineSide(claim.ast.r, variable);
+  const written = claim?.kind === 'equation' || claim?.kind === 'relation' ? claimSides(claim) : null;
+  if (!written || !variable) return null;
+  const l = affineSide(written[0], variable), r = affineSide(written[1], variable);
   if (!l || !r || ![l.a, l.b, r.a, r.b].every(Number.isFinite)) return null;
   if (numsClose(l.a, r.a)) return null;
   // Moves still owed, counted the same whichever side the student collects on:
-  // the unknown on both sides (two: collecting it may leave a sign to clear); each constant that still has to move (both of
+  // the unknown on both sides (three: collecting it can leave a constant and a
+  // coefficient to clear, and scaling the equation before collecting is not a move); each constant that still has to move (both of
   // them while the unknown is on both sides, the one beside it afterwards);
   // and a net coefficient that still has to be divided out.
   const zero = x => numsClose(x, 0);
   const both = !zero(l.a) && !zero(r.a);
   const own = zero(r.a) ? l : r;
   const left = both
-    ? 2 + (zero(l.b) ? 0 : 1) + (zero(r.b) ? 0 : 1) + (numsClose(l.a - r.a, 1) || numsClose(r.a - l.a, 1) ? 0 : 1)
+    ? 3 + (zero(l.b) ? 0 : 1) + (zero(r.b) ? 0 : 1)
     : (zero(own.b) ? 0 : 1) + (numsClose(own.a, 1) ? 0 : 1);
   const whole = x => numsClose(x, Math.round(x));
   let brackets = 0, terms = 0, symbols = 0;
@@ -1151,7 +1196,7 @@ function linearState(claim, variable) {
     }
     walk(n.l); walk(n.r);
   };
-  walk(claim.ast.l); walk(claim.ast.r);
+  walk(written[0]); walk(written[1]);
   return {
     sides: [l.a, l.b, r.a, r.b],
     left,
@@ -1166,12 +1211,47 @@ function linearStateAdvances(f, g) {
   if (f.left > g.left) return false;
   if (f.fractional < g.fractional) return true;
   const same = (x, y) => x.every((v, i) => numsClose(v, y[i]));
+  // Dividing a whole-number equation through by a common factor.
+  if (!f.fractional && !g.fractional) {
+    const pivot = g.sides.findIndex((v, i) => !numsClose(v, 0) && !numsClose(f.sides[i], 0));
+    const k = pivot < 0 ? 0 : g.sides[pivot] / f.sides[pivot];
+    if (Number.isInteger(Math.round(k)) && numsClose(k, Math.round(k)) && Math.abs(k) > 1 &&
+        same(g.sides, f.sides.map(v => v * k))) return true;
+  }
   const [a, b, c, d] = g.sides;
   if (!same(f.sides, g.sides) && !same(f.sides, [c, d, a, b])) return false;
   for (let i = 0; i < f.written.length; i++) {
     if (f.written[i] !== g.written[i]) return f.written[i] < g.written[i];
   }
   return false;
+}
+
+/**
+ * Is `line` the equation `reference` with one constant added to both sides, or
+ * both sides multiplied by one constant? Checked numerically at fixed points.
+ * Such a move can be a real step where the equation is not linear (completing
+ * the square, clearing a denominator), but repeating it is never a second one.
+ * Returns 'same' when both sides are unchanged as functions.
+ */
+function rescalesBothSides(line, reference, variable) {
+  if (line?.kind !== 'equation' || reference?.kind !== 'equation' || !variable) return false;
+  const at = (node, x) => evaluate(node, { [variable]: x });
+  let shift = null, scale = null, shifted = true, scaled = true;
+  try {
+    for (const x of [0.37, 1.91, -2.43, 5.13]) {
+      const [ll, lr, gl, gr] = [at(line.ast.l, x), at(line.ast.r, x), at(reference.ast.l, x), at(reference.ast.r, x)];
+      if (![ll, lr, gl, gr].every(Number.isFinite)) return false;
+      const c = ll - gl;
+      if (!numsClose(c, lr - gr) || (shift !== null && !numsClose(c, shift))) shifted = false;
+      shift = shift ?? c;
+      const pivot = Math.abs(gl) > Math.abs(gr) ? [ll, gl] : [lr, gr];
+      const k = numsClose(pivot[1], 0) ? NaN : pivot[0] / pivot[1];
+      if (!Number.isFinite(k) || !numsClose(ll, k * gl) || !numsClose(lr, k * gr) || (scale !== null && !numsClose(k, scale))) scaled = false;
+      scale = scale ?? k;
+    }
+  } catch { return false; }
+  if (shifted && numsClose(shift, 0)) return 'same';
+  return (shifted && !numsClose(shift, 0)) || (scaled && !numsClose(scale, 1));
 }
 
 /**
@@ -1193,6 +1273,7 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
   const creditedStages = new Set();
   let restated = 0;
   let shownAuthoredEquation = false;
+  let rescaled = false;
   const total = Math.max(1, Number(marks) || 1);
   const cap = Math.max(0, total - 1);
   // The per-line mark vector: one entry per written line, in order, saying
@@ -1233,10 +1314,16 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
     // A linear equation line earns a mark only when it stands further on than
     // the question and every line already credited. Equations that are not
     // linear in the unknown keep the written-duplicate rule above.
-    const state = meta.kind === 'equation' ? linearState(claim, meta.variable) : null;
+    const state = meta.variable ? linearState(claim, meta.variable) : null;
     if (state) {
       const before = [...given, ...counted].map(c => linearState(c, meta.variable)).filter(Boolean);
       if (before.some(g => !linearStateAdvances(state, g))) { row.reason = 'repeat'; return row; }
+    } else if (meta.kind === 'equation' && claim?.kind === 'equation' &&
+        // Rewriting a credited line (factorising it, writing it as a square) is not a rescale.
+        !counted.some(c => rescalesBothSides(claim, c, meta.variable) === 'same') &&
+        [...given, ...counted].some(c => rescalesBothSides(claim, c, meta.variable) === true)) {
+      if (rescaled) { row.reason = 'repeat'; return row; }
+      rescaled = true;
     }
     counted.push(claim || { kind: 'text', text: String(l.text).trim() });
     if (counted.length <= cap) row.mark = 1; else row.reason = 'cap';

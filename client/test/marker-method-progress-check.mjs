@@ -119,7 +119,40 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   ok(run('(x-2)(x-3)=0\nx=99') === 1, 'quadratic: factorising still earns its mark');
 }
 
+// Independent-review counterexamples: identities spelt other ways, on linear
+// and non-linear equations, expressions and inequalities.
+{
+  const linear = { kind: 'equation', variable: 'm', solutions: [-14], source: '6m+15=7m+29' };
+  const quad = { kind: 'equation', variable: 'x', solutions: [2, 3], source: 'x^2-5x+6=0' };
+  const expr = { kind: 'expression', canonical: '6x+6' };
+  const ineq = { kind: 'inequality', variable: 'x', source: '3x+5>11' };
+  const run = (meta, prompt, working, marks = 3) => {
+    try { return methodMarks({ meta, working, marks, prompt, report: stepCheck(meta, working) })?.awarded ?? 0; } catch { return 0; }
+  };
+  for (const line of ['(6m+15)^1=7m+29', '6m+15+2^0-1=7m+29', '6m+15+sqrt(1)-1=7m+29', '6m+15+m^2-m^2=7m+29',
+    '(6m+15)*m/m=7m+29', '6(m+1-1)+15=7m+29', '6m+15+2-1-1=7m+29', '(6m+15)*4/2/2=7m+29']) {
+    ok(run(linear, '$6m+15=7m+29$', `${line}\nm=9`) === 0, `identity padding "${line}" earns nothing`);
+  }
+  ok(run(linear, '$6m+15=7m+29$', '(6m+15)^1=7m+29\n(6m+15)^1+2^0-1=7m+29\nm=9') === 0, 'stacked identity padding earns nothing');
+  const halved = { kind: 'equation', variable: 'x', solutions: [3], source: '4x+3=2x+9' };
+  ok(run(halved, '$4x+3=2x+9$', '2x+1.5=x+4.5\nx=99') === 0, 'halving both sides with the unknown on both sides earns nothing');
+  ok(run({ ...halved, source: '5x+1=3x+7' }, '$5x+1=3x+7$', '(5x+1)/2=(3x+7)/2\nx=99') === 0, 'dividing both sides by 2 unsimplified earns nothing');
+  ok(run({ kind: 'equation', variable: 'x', solutions: [1], source: '6x+12=18x' }, '$6x+12=18x$', 'x+2=3x\nx=99') === 1, 'dividing through by a common factor is a step');
+  ok(run(quad, '$x^2-5x+6=0$', 'x^2-5x+6+2-1-1=0\nx=99', 4) === 0, 'quadratic: +2-1-1 earns nothing');
+  ok(run(quad, '$x^2-5x+6=0$', 'x^2-5x+6+x-x=0\nx=99', 4) === 0, 'quadratic: +x-x earns nothing');
+  ok(run(quad, '$x^2-5x+6=0$', '2x^2-10x+12=0\n3x^2-15x+18=0\nx=99', 4) <= 1, 'quadratic: rescaling twice is at most one step');
+  ok(run(quad, '$x^2-5x+6=0$', 'x^2-5x+7=1\nx^2-5x+8=2\nx=99', 4) <= 1, 'quadratic: shifting twice is at most one step');
+  ok(run({ kind: 'equation', variable: 'x', solutions: [-1, 7], source: 'x^2-6x=7' }, '$x^2-6x=7$', 'x^2-6x+9=16\n(x-3)^2=16\nx=99', 4) === 2, 'completing the square keeps both its steps');
+  ok(run(expr, 'Simplify $2(x+3)+4x$', '2(x+3)+4x+1-1\n7x') === 0, 'expression: +1-1 earns nothing');
+  ok(run(expr, 'Simplify $2(x+3)+4x$', '2(x+3)+4x+0\n7x') === 0, 'expression: +0 earns nothing');
+  ok(run(expr, 'Simplify $2(x+3)+4x$', '2x+6+4x\n7x') === 1, 'expression: expanding earns its mark');
+  ok(run(ineq, 'Solve $3x+5>11$', '3x+5+1-1>11\nx>99') === 0, 'inequality: +1-1 earns nothing');
+  ok(run(ineq, 'Solve $3x+5>11$', '3x+6>12\n3x+7>13\nx>99') === 0, 'inequality: shifting both sides earns nothing');
+  ok(run(linear, '$6m+15=7m+29$', '15-29=7m-6m\n-14=7m-6m\nm=9') === 2, 'evaluating one side is still a step');
+  ok(run(linear, '$6m+15=7m+29$', '15-29=7m-6m\n15-29+1-1=7m-6m\nm=9') === 1, 'padding a credited line earns nothing more');
+}
+
 console.log(failures.length
   ? `METHOD PROGRESS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `METHOD PROGRESS: PASS — ${pass}/${pass} checks — a neutral line never raises method marks, and every genuine step keeps its mark.`);
+  : `METHOD PROGRESS: PASS — ${pass}/${pass} checks — identity padding and both-sides restatements earn nothing, and every genuine step keeps its mark.`);
 process.exit(failures.length ? 1 : 0);
