@@ -192,6 +192,18 @@ try {
   c.eq(worked.data?.tutor?.source, 'fallback', 'correct working does not unlock the answer from the tutor either');
   c.ok(!/is right/.test(JSON.stringify(worked.data)), 'the mark, not the tutor, is what confirms an answer');
 
+  // Which line is the first mistake is a verdict too. While the question is
+  // unresolved the model is told neither that a wrong line is wrong nor that a
+  // right one is right, so asking the tutor cannot test a guess for free.
+  {
+    const { groundIssued } = await import('../platform/tutor.js');
+    const grounded = async line => (await groundIssued(h.db, a.account.id, { serverQuestionId: qid, level: 'socratic', studentWork: { lines: [line] } })).request?.studentWork;
+    const wrongLine = await grounded(`${variable}=${Number(root) + 1}`);
+    const rightLine = await grounded(`${variable}=${root}`);
+    c.eq(JSON.stringify([wrongLine?.firstBreak, wrongLine?.verifiedLines]), '[-1,0]', 'an unresolved question: a wrong line is not reported to the model as the first mistake');
+    c.eq(JSON.stringify([rightLine?.firstBreak, rightLine?.verifiedLines]), '[-1,0]', 'and a right line is not reported as verified: the two look the same');
+  }
+
   // The final solution line, verbatim, is a leak as well.
   nextReply = { message: `The last line of the solution is $${variable}=${root}$.`, references_step_index: 3, reveals_answer: false };
   const finalLine = await help(a.jar, ask(qid, { level: 'nudge', studentWork: { lines: ['1=1'] } }));

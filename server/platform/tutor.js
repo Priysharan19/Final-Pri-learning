@@ -142,7 +142,7 @@ const ISSUED_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
  * existed are the same 404. Nothing the device said about the solution or about
  * which of its lines are verified survives: the solution comes from escrow and
  * the Step Check is re-run here. While the question is unresolved the guard is
- * told no line is verified, so the answer is never excused in a reply — a
+ * told no line is verified and no line is the first mistake, so the answer is never excused in a reply — a
  * tutor turn cannot be used to test a guessed answer — and the walkthrough
  * level, whose captions restate the solution, is refused.
  */
@@ -173,7 +173,10 @@ export async function groundIssued(db, accountId, request, at = Date.now()) {
       question: checked.question,
       studentWork: {
         ...request.studentWork,
-        firstBreak: evidence.firstBreak,
+        // Which line is the first mistake is a verdict on the student's working.
+        // Before the question is resolved it would cost nothing and tell them
+        // whether a guessed line is right, so it is withheld with the rest.
+        firstBreak: issued.resolved ? evidence.firstBreak : -1,
         verifiedLines: issued.resolved ? evidence.verifiedLines : 0,
         misconception: null
       }
