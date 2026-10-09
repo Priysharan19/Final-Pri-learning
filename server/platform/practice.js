@@ -53,6 +53,20 @@ function stepMetaFor(q) {
   if (q.answerType === 'numeric' && a.value !== undefined) {
     const m = (q.answerPrefix || '').match(/^([a-z])\s*=$/i);
     if (m) return { kind: 'equation', variable: m[1].toLowerCase(), solutions: [a.value] };
+    // Some authored Class 8 algebra forms print only `$6m+15=7m+29$`
+    // and omit answerPrefix. Derive the variable ONLY from that entire,
+    // single-variable, plain algebraic equation. Other numeric prompts
+    // (evaluation, geometry, scientific units, multi-equation systems) must
+    // not acquire method-credit authority from a guessed letter.
+    const source = String(q.prompt || '').match(/^\s*\$([^$]+)\$\s*$/);
+    const equation = source?.[1]?.trim();
+    if (equation && /^[0-9a-z\s+*/().=\-]+$/i.test(equation) &&
+        equation.split('=').length === 2 && Number.isFinite(Number(a.value))) {
+      const symbols = [...new Set((equation.match(/[a-z]/gi) || []).map(v => v.toLowerCase()))];
+      if (symbols.length === 1) return {
+        kind: 'equation', variable: symbols[0], solutions: [a.value], source: equation
+      };
+    }
   }
   if (q.answerType === 'set' && Array.isArray(a.values) && a.values.length) {
     return { kind: 'equation', variable: 'x', solutions: a.values };

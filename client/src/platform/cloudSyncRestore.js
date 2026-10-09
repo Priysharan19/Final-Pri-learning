@@ -108,6 +108,18 @@ function attemptRowFrom(pid, event, at) {
       contentHash: typeof p.contentHash === 'string' ? p.contentHash.slice(0, 32) : null
     } : {}),
     correct: p.correct ? 1 : 0,
+    // Only a real, server-grader-origin progress event reaches this path.
+    // Legacy events missing the two certified numeric fields remain valid
+    // historical attempts, but their marks are UNKNOWN, not inferred as
+    // zero/full from the boolean correct verdict.
+    ...(Number.isInteger(p.marksEarned) && Number.isInteger(p.marksPossible) &&
+      p.marksPossible >= 1 && p.marksPossible <= 4 &&
+      p.marksEarned >= 0 && p.marksEarned <= p.marksPossible &&
+      (p.correct !== true || p.marksEarned === p.marksPossible) &&
+      (p.correct !== false || p.marksEarned < p.marksPossible) &&
+      (p.revealed !== true || p.marksEarned === 0)
+      ? { marksEarned: p.marksEarned, marksPossible: p.marksPossible }
+      : {}),
     // The student's written answer never travels through the generic replica.
     answerGiven: '',
     ms: Math.max(0, num(p.ms, 0)),

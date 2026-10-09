@@ -1887,6 +1887,27 @@ function storedReplay(raw) {
   };
 }
 
+// Project only server-attested numerical marks. A legacy/partial receipt that
+// has no explicit numbers is UNKNOWN, not 0 or full marks. Never reconstruct
+// awards from correctness, method text, a client rubric or a sync projection.
+function certifiedPracticeMarks(receipt) {
+  const earned = receipt?.marksEarned, possible = receipt?.marksPossible;
+  if (receipt?.authoritative !== true ||
+      !Number.isInteger(earned) || !Number.isInteger(possible) ||
+      possible < 1 || possible > 4 || earned < 0 || earned > possible ||
+      (receipt.correct === true && earned !== possible) ||
+      (receipt.invalid === true && earned !== 0) ||
+      (receipt.revealed === true && earned !== 0) ||
+      (receipt.correct === false && earned === possible) ||
+      (receipt.partial != null && receipt.correct === false &&
+        receipt.partial.awarded !== earned)) {
+    throw Object.assign(new Error('The server has not certified a consistent numerical mark for this attempt.'), {
+      status: 503, code: 'GRADE_MARKS_UNCERTIFIED'
+    });
+  }
+  return { marksEarned: earned, marksPossible: possible };
+}
+
 async function replaySubmission(p, row, q, submissionId, requestDigest, answer, steps) {
   const recorded = row.answered ? row.resolution : null;
   // A question skipped after its first try has no try left to report: the
@@ -1914,9 +1935,12 @@ async function replaySubmission(p, row, q, submissionId, requestDigest, answer, 
       status: 503, code: 'GRADE_RECEIPT_MISSING'
     });
   }
+  const replayMarks = row.serverQuestionId
+    ? certifiedPracticeMarks(match === tried ? tried.serverReceipt : row.serverReceipt) : {};
   if (match === tried) {
     return {
       ...(row.serverQuestionId ? {
+        ...replayMarks,
         authoritative: true, attemptId: tried.serverReceipt.attemptId,
         serverAcknowledgedAt: tried.serverReceipt.serverAcknowledgedAt
       } : {}),
@@ -1936,6 +1960,7 @@ async function replaySubmission(p, row, q, submissionId, requestDigest, answer, 
     misconception: await namedTrap(p.id, owner, recorded.trapHit || null),
     solution: row.serverQuestionId ? row.serverReceipt.solution || null : solutionOf(q),
     ...(row.serverQuestionId ? {
+      ...replayMarks,
       authoritative: true, attemptId: row.serverReceipt.attemptId,
       serverAcknowledgedAt: row.serverReceipt.serverAcknowledgedAt
     } : {}),
@@ -2054,7 +2079,10 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
     // A grade event pulled back from the server must not award XP/mastery a
     // second time on the device that already committed this exact receipt.
     ...(row.serverQuestionId && row.serverReceipt?.attemptId
-      ? { serverAttemptId: row.serverReceipt.attemptId } : {}),
+      ? {
+          serverAttemptId: row.serverReceipt.attemptId,
+          ...certifiedPracticeMarks(row.serverReceipt)
+        } : {}),
     // Which item, at which content version, this attempt was made on — so it
     // stays interpretable after the bank changes. A row from before identity
     // existed reads as the legacy version, never as current content.
@@ -3258,7 +3286,8 @@ const routes = {
         correct: false, resolved: true, revealed: true,
         walkthrough: { solution: serverReveal.solution },
         solution: serverReveal.solution, authoritative: true, attemptId: serverReveal.attemptId,
-        ...meta, syncQueued: true
+        serverAcknowledgedAt: serverReveal.serverAcknowledgedAt,
+        ...meta, ...certifiedPracticeMarks(serverReveal), syncQueued: true
       };
     }
 
@@ -3460,6 +3489,7 @@ const routes = {
       await put('questions', row);
       return { authoritative: true, attemptId: authoritative.attemptId,
         serverAcknowledgedAt: authoritative.serverAcknowledgedAt,
+        ...certifiedPracticeMarks(authoritative),
         correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial, diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit), ...(submissionId ? { submissionId } : {}) };
     }
     if (result.invalid) {
@@ -3467,6 +3497,7 @@ const routes = {
       await put('questions', row);
       return { authoritative: true, attemptId: authoritative.attemptId,
         serverAcknowledgedAt: authoritative.serverAcknowledgedAt,
+        ...certifiedPracticeMarks(authoritative),
         correct: false, resolved: false, triesLeft: authoritative.triesLeft,
         invalid: true, feedback, stepReport };
     }
@@ -3493,6 +3524,7 @@ const routes = {
       authoritative: true, attemptId: authoritative.attemptId,
       serverAcknowledgedAt: authoritative.serverAcknowledgedAt,
       ...meta,
+      ...certifiedPracticeMarks(authoritative),
       syncQueued: true,
       ...(submissionId ? { submissionId } : {})
     };
@@ -3511,7 +3543,8 @@ const routes = {
     const meta = await resolve(p, row, q, false, 'revealed', body?.ms || 0, row.mode, false, { syncQueue: true });
     return { correct: false, resolved: true, revealed: true, authoritative: true,
       attemptId: serverReveal.attemptId, serverAcknowledgedAt: serverReveal.serverAcknowledgedAt,
-      solution: serverReveal.solution, ...meta, syncQueued: true };
+      solution: serverReveal.solution, ...meta,
+      ...certifiedPracticeMarks(serverReveal), syncQueued: true };
   },
 
   // ---- reviews ----
@@ -4953,6 +4986,7 @@ async function revealOnServer(row) {
       status: 503, code: 'REVEAL_ACK_MISSING'
     });
   }
+  certifiedPracticeMarks(receipt);
   return receipt;
 }
 
@@ -5013,6 +5047,7 @@ async function gradeOnServer(row, body, submissionId, requestDigest) {
       status: 503, code: 'GRADE_ACK_MISSING'
     });
   }
+  certifiedPracticeMarks(acknowledged);
   return acknowledged;
 }
 
