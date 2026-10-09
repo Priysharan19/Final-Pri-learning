@@ -393,6 +393,23 @@ export async function cloudStreamRequest(path, { body, onEvent, timeoutMs = 45_0
 
 export const cloud = Object.freeze({
   health: () => cloudRequest('/v1/health'),
+  // The device never computes a grade: question and attempt authority are on
+  // the authenticated server. Transport failures are propagated, not converted
+  // into local answers or queued pseudo-receipts.
+  issuePractice: body => cloudRequest('/v1/practice/issue', { method: 'POST', body }),
+  gradePractice: (questionId, body) => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/submit', {
+    method: 'POST', body, idempotencyKey: body.submissionId
+  }),
+  revealPractice: questionId => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/reveal', { method: 'POST', body: {} }),
+  recognizePractice: (questionId, mode, image) =>
+    cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/recognize', {
+      method: 'POST', body: { mode, image }, timeoutMs: 55000
+    }),
+  confirmPracticeRecognition: (questionId, receipt, text) =>
+    cloudRequest('/v1/practice/' + pathId(questionId, 'question id') +
+      '/recognition/' + pathId(receipt, 'receipt') + '/confirm', {
+      method: 'POST', body: { text }
+    }),
   me: () => cloudRequest('/v1/account/me'),
   register: body => cloudRequest('/v1/account/register', { method: 'POST', body }),
   // A guardian answering the email has no account and no session — the token in

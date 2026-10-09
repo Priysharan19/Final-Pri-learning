@@ -33,9 +33,12 @@ const RECENT_WINDOW = 8;
 const ID = /^[A-Za-z0-9._:-]{1,160}$/;
 const LEARNING_MODES = new Set(['practice', 'review', 'task']);
 const GAME_MODES = new Set(['rush', 'match']);
-const PRACTICE_KINDS = new Set(['practice-progress', 'practice-attempt']);
+// Only a canonical server-created event may alter mastery, reviews, XP or
+// resolved attempt history. Old client-supplied practice-progress and
+// practice-attempt remain visible as archived sync data but are not marks.
+const PRACTICE_KINDS = new Set(['graded-attempt']);
 
-export const RESTORABLE_EVENT_KINDS = Object.freeze(['practice-progress', 'practice-attempt', 'exam-attempt', 'rush-history', 'match-history']);
+export const RESTORABLE_EVENT_KINDS = Object.freeze(['graded-attempt', 'exam-attempt', 'rush-history', 'match-history']);
 
 function plain(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value) &&
@@ -105,6 +108,18 @@ function attemptRowFrom(pid, event, at) {
       contentHash: typeof p.contentHash === 'string' ? p.contentHash.slice(0, 32) : null
     } : {}),
     correct: p.correct ? 1 : 0,
+    // Only a real, server-grader-origin progress event reaches this path.
+    // Legacy events missing the two certified numeric fields remain valid
+    // historical attempts, but their marks are UNKNOWN, not inferred as
+    // zero/full from the boolean correct verdict.
+    ...(Number.isInteger(p.marksEarned) && Number.isInteger(p.marksPossible) &&
+      p.marksPossible >= 1 && p.marksPossible <= 4 &&
+      p.marksEarned >= 0 && p.marksEarned <= p.marksPossible &&
+      (p.correct !== true || p.marksEarned === p.marksPossible) &&
+      (p.correct !== false || p.marksEarned < p.marksPossible) &&
+      (p.revealed !== true || p.marksEarned === 0)
+      ? { marksEarned: p.marksEarned, marksPossible: p.marksPossible }
+      : {}),
     // The student's written answer never travels through the generic replica.
     answerGiven: '',
     ms: Math.max(0, num(p.ms, 0)),
@@ -275,12 +290,44 @@ export async function applyRemoteLearningEvents(pid, events) {
   if (!list.length) return summary;
   const profile = await get('profiles', pid).catch(() => null);
   if (!profile) return summary;
+  // Server-owned events carry the reserved "server-grader" device identity,
+  // even when the student's OWN device received and committed the grade.
+  // Hence the normal sync deviceId filter cannot prevent double-awarding.
+  // Our durable attempt row links the original local resolution to the exact
+  // server attempt ID, without trusting a client-provided mark or event body.
+  const locallyCommitted = new Set();
+  if (list.some(event => event.kind === 'graded-attempt')) {
+    for (const attempt of await byIndex('attempts', 'pid', pid)) {
+      if (typeof attempt.serverAttemptId === 'string' && safeId(attempt.serverAttemptId)) {
+        locallyCommitted.add(attempt.serverAttemptId);
+      }
+    }
+  }
 
   list.sort((a, b) => (eventTime(a) - eventTime(b)) || (num(a.serverCursor) - num(b.serverCursor)) || String(a.id).localeCompare(String(b.id)));
   for (const raw of list) {
     const event = { ...raw, payload: plain(raw.payload) ? raw.payload : {} };
     let outcome;
-    if (PRACTICE_KINDS.has(event.kind)) outcome = await applyPracticeEvent(pid, profile, event);
+    if (PRACTICE_KINDS.has(event.kind)) {
+      if (locallyCommitted.has(event.id)) {
+        // Already committed locally in the same atomic batch as the source
+        // question resolution. Cache/sync is still safe; progress is not.
+        summary.duplicates++;
+        continue;
+      }
+      // A client cannot publish graded-attempt through /sync/push: it is
+      // excluded from server APPEND_EVENT. The server alone writes it, using
+      // the reserved device identity in the same DB transaction as the grade.
+      outcome = event.deviceId === 'server-grader' &&
+          event.payload?.questionId === event.entityId &&
+          event.payload?.attemptId === event.id &&
+          (event.payload?.correct === true || event.payload?.correct === false) &&
+          // A server-committed Reveal is an incorrect, supported attempt too;
+          // local resolve() already records it, so restore must not omit it.
+          (event.payload?.revealed !== true || event.payload?.correct === false) &&
+          safeId(event.payload?.subtopic)
+        ? await applyPracticeEvent(pid, profile, event) : 'unsupported';
+    }
     else if (event.kind === 'exam-attempt') outcome = await applyExamEvent(pid, event);
     else if (event.kind === 'rush-history') outcome = await applyRunEvent(pid, event, 'rushRuns', ['score', 'correct', 'total', 'bestCombo', 'createdAt']);
     else if (event.kind === 'match-history') outcome = await applyRunEvent(pid, event, 'matchRuns', ['won', 'playerScore', 'rivalScore', 'rival', 'ms', 'createdAt']);
