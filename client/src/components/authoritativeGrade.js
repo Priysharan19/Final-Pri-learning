@@ -3,9 +3,14 @@
 // can supply the marks shown to a learner.
 export function attestedGrade(res, questionId, attempt) {
   if (res?.authoritative !== true || res?.resolved !== true ||
-      !attempt || !res?.attemptId || !res?.submissionId ||
+      !attempt || typeof res?.attemptId !== 'string' || !res.attemptId ||
       res.attemptId !== attempt.attemptId ||
-      res.submissionId !== attempt.submissionId ||
+      // A reveal is a server-committed zero-mark outcome, not a submission.
+      // It has no answer submission ID but must be explicitly bound to reveal.
+      (attempt.revealed === true
+        ? (res.revealed !== true || res.submissionId != null)
+        : (typeof res.submissionId !== 'string' || !res.submissionId ||
+           res.submissionId !== attempt.submissionId)) ||
       // The local practice adapter verified the server-issued question, but
       // does not always forward the raw question ID; pin to card binding.
       attempt.questionId !== String(questionId || '') ||

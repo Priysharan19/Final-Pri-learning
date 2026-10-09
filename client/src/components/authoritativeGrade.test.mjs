@@ -27,6 +27,14 @@ const unsafe = [
  ['no attempt ID',{attemptId:null}],['no submission ID',{submissionId:null}]
 ];
 for(const [name,fields] of unsafe) assert.equal(attestedGrade({...base,...fields},'question-A',attempt),null,name);
+const revealAttempt = { questionId: 'question-A', attemptId: 'reveal-attempt-001', submissionId: null, revealed: true };
+const reveal = { authoritative: true, resolved: true, revealed: true, questionId: 'question-A',
+  attemptId: 'reveal-attempt-001', marksEarned: 0, marksPossible: 4 };
+assert.deepEqual(attestedGrade(reveal, 'question-A', revealAttempt), { awarded: 0, possible: 4 }, 'server zero for committed reveal');
+assert.equal(attestedGrade({ ...reveal, marksEarned: undefined }, 'question-A', revealAttempt), null, 'legacy reveal cannot fabricate zero');
+assert.equal(attestedGrade({ ...reveal, attemptId: 'stale-reveal' }, 'question-A', revealAttempt), null, 'late different reveal cannot settle this card');
+assert.equal(attestedGrade({ ...reveal, revealed: false }, 'question-A', revealAttempt), null, 'not a reveal receipt');
+console.log('SERVER-ATTESTED REVEAL ZERO: PASS 4/4');
 assert.equal(attestedGrade(base,'question-A',null),null,'no mounted attempt');
 console.log('ATTESTED GRADE NEGATIVE: PASS 20/20');
 

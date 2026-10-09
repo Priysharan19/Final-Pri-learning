@@ -1094,11 +1094,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setBusy(true);
     try {
       const r = await api.post(diagnostic.submitPath, { skip: true, ms: Date.now() - startRef.current });
+      if (!mountedRef.current) return;
       setState({ phase: 'resolved', res: r });
       onResolved?.(r);
     } catch (e) {
-      setState({ phase: 'retry', res: { feedback: e.message, invalid: true, technical: true, conflict: e?.status === 409 } });
-    } finally { setBusy(false); }
+      if (mountedRef.current) setState({ phase: 'retry', res: { feedback: e.message, invalid: true, technical: true, conflict: e?.status === 409 } });
+    } finally { if (mountedRef.current) setBusy(false); }
   }
 
   async function reveal() {
@@ -1110,11 +1111,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setBusy(true);
     try {
       const r = await api.post(`/practice/${question.id}/reveal`, { ms: Date.now() - startRef.current });
+      // A late reveal may commit on the original server question, but must not
+      // clear the current profile's draft or navigate away from another card.
+      if (!mountedRef.current) return;
+      if (r?.authoritative !== true || r?.resolved !== true || r?.revealed !== true ||
+          typeof r?.attemptId !== 'string' || !r.attemptId) {
+        throw new Error(gradingReceiptMismatch(language));
+      }
       // Revealing settles the question, so nothing kept for it may replay.
       pendingRef.current = null;
       clearPendingSubmission(question.id);
       clearInkDraft(question.id);
-      attemptRef.current = { submissionId: null, lines: null, revealed: true };
+      attemptRef.current = { questionId: String(question.id), attemptId: r.attemptId, submissionId: null, lines: null, revealed: true };
       if (mountedRef.current) {
         setAttempt(attemptRef.current);
         setState({ phase: 'resolved', res: r });
