@@ -2140,7 +2140,7 @@
       "rateLimits": [
         {
           "key": "exam-create",
-          "limit": 30,
+          "limit": 60,
           "windowMs": 3600000,
           "identity": "account"
         }
@@ -2160,6 +2160,29 @@
       "guardianConsent": true,
       "mfa": false,
       "ownership": "owner only: the sealed paper is read by (account_id, id), so another account's id, an unknown id and a malformed id are the same 404 EXAM_NOT_FOUND and write nothing; stores the latest answer snapshot (answers, working, per-question time, input mode — text only, keys of this paper only) with the server's timestamp; an older revision never replaces a newer one; refused with 409 once the paper is finalised or deadline + 2 minutes has passed",
+      "rateLimits": [
+        {
+          "key": "exam-answers",
+          "limit": 1800,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "PATCH",
+      "path": "/v1/exams/:id/answers",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "the same handler and rule as PUT /v1/exams/:id/answers (the native iOS and Android cloud bridges carry GET, POST, PATCH and DELETE only): owner only: the sealed paper is read by (account_id, id), so another account's id, an unknown id and a malformed id are the same 404 EXAM_NOT_FOUND and write nothing; stores the latest answer snapshot (answers, working, per-question time, input mode — text only, keys of this paper only) with the server's timestamp; an older revision never replaces a newer one; refused with 409 once the paper is finalised or deadline + 2 minutes has passed",
       "rateLimits": [
         {
           "key": "exam-answers",

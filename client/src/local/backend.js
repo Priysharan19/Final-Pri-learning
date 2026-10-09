@@ -51,8 +51,7 @@ import {
 } from './auth.js';
 import { sanitizeFigure, sanitizeText } from '../lib/sanitize.js';
 import {
-  startExamClock, ensureExamClock, saveExamResponses, examMarkingInputs,
-  paperFingerprint, freezeExam, isReplayOf, examSessionView
+  startExamClock, ensureExamClock, saveExamResponses, isReplayOf, examSessionView
 } from './examSession.js';
 import {
   assertExamAllowed, assertPracticeAllowed, examAllowance, practiceAllowance,
@@ -66,6 +65,10 @@ import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
 import { cloud } from '../platform/cloudTransport.js';
 import { publicQuestionFields } from '../engine/publicQuestion.js';
+import {
+  isServerPaper, markedByOf, issueServerExam, serverFieldOf, localStartOf, scheduleCheckpoint,
+  finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, finishedAtOf
+} from './serverExam.js';
 import { rasterizeInk } from '../ink/cloudRaster.js';
 import { preparePhoto } from '../ink/photoRaster.js';
 
@@ -1701,7 +1704,7 @@ function stepMetaFor(q) {
 // on the way out as well as on the way in: a device may already be holding a
 // row that was stored before the import boundary was closed.
 // A row whose payload is the public form: issued, prepared, or an offline draft.
-const publicShaped = row => !!(row.serverQuestionId || row.prepared || row.draftOnly);
+const publicShaped = row => !!(row.serverQuestionId || row.prepared || row.draftOnly || row.examServer);
 
 function sanitize(q, row) {
   if (q.multipart) {
@@ -2133,6 +2136,9 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
           serverAttemptId: row.serverReceipt.attemptId,
           ...certifiedPracticeMarks(row.serverReceipt)
         } : {}),
+    // A paper the server marked: the attempt id its result gave this question
+    // (or part), so the event pulled back later is recognised as this one.
+    ...(resolution?.serverAttemptId ? { serverAttemptId: String(resolution.serverAttemptId) } : {}),
     // Which item, at which content version, this attempt was made on — so it
     // stays interpretable after the bank changes. A row from before identity
     // existed reads as the legacy version, never as current content.
@@ -3661,55 +3667,97 @@ const routes = {
   },
 
   // ---- exams ----
+  // A practice paper is issued and marked by the server (server/platform/
+  // exams.js; owner decision 2026-10-10). The device decides WHAT the paper
+  // covers — the year, the spread of subtopics and difficulty, the structured
+  // question — and sends that spec; the server chooses the questions and holds
+  // their answers until it has marked the paper. Nothing here marks an answer.
   'POST /exams': async (body) => {
     const p = await requireProfile();
     const length = [10, 15, 20].includes(Number(body?.length)) ? Number(body.length) : 10;
-    const minutes = Math.min(90, Math.max(10, Number(body?.minutes) || (length * 3)));
-    const year = Math.min(12, Math.max(7, Number(body?.year) || p.year));
+    const minutes = Math.round(Math.min(90, Math.max(10, Number(body?.minutes) || (length * 3))));
+    const year = Math.min(12, Math.max(7, Math.round(Number(body?.year) || p.year)));
     const examPw = year >= 11 ? (cleanPathway(p.pathway, year) || 'advanced') : null;
     const subtopics = examPw ? scopeForYear(year, examPw).own : subtopicsForYear(year);
     const diffs = [];
     for (let i = 0; i < length; i++) { const t = i / length; diffs.push(t < 0.2 ? 1 : t < 0.6 ? 2 : t < 0.9 ? 3 : 4); }
     const bag = [];
     for (const s of subtopics) for (let i = 0; i < Math.max(1, Math.round(s.weight / 3)); i++) bag.push(s.id);
-    const examId = uuid();
-    const qids = [];
+    const slots = [];
     let lastPick = null;
     for (let i = 0; i < length; i++) {
       let pick = bag[Math.floor(Math.random() * bag.length)];
       let guard = 20;
       while (pick === lastPick && guard--) pick = bag[Math.floor(Math.random() * bag.length)];
       lastPick = pick;
-      const { row } = await createQuestion(p.id, pick, diffs[i], 'exam', examId);
-      qids.push(row.id);
+      slots.push({ generator: pick, difficulty: diffs[i] });
     }
     // Section II: one structured multipart question, HSC-style
-    const { multipartForYear, generateMultipart } = await loadMultipart();
+    const { multipartForYear } = await loadMultipart();
     const mpIds = multipartForYear(year, examPw || 'advanced');
-    if (mpIds.length) {
-      const mpId = mpIds[Math.floor(Math.random() * mpIds.length)];
-      const mp = generateMultipart(mpId);
-      const mpRow = { id: uuid(), pid: p.id, subtopic: mpId, difficulty: 3, payload: mp, mode: 'exam', examId, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now() };
-      await put('questions', mpRow);
-      qids.push(mpRow.id);
-    }
+    if (mpIds.length) slots.push({ multipart: mpIds[Math.floor(Math.random() * mpIds.length)] });
     const count = (await byIndex('exams', 'pid', p.id)).length;
     const pwLabel = examPw && examPw !== 'advanced' ? ` ${PATHWAYS[examPw].short}` : '';
-    const exam = { id: examId, pid: p.id, year, pathway: examPw, title: `Year ${year}${pwLabel} Practice Paper ${count + 1}`, durationMin: minutes, questionIds: qids, createdAt: Date.now(), finishedAt: null, score: null, total: null, detail: null };
-    const rows = [];
-    for (const qid of qids) rows.push(await get('questions', qid));
-    exam.paperVersion = paperFingerprint(rows.filter(Boolean));
-    startExamClock(exam, exam.createdAt);
+    const title = `Year ${year}${pwLabel} Practice Paper ${count + 1}`;
+    const issued = await issueServerExam(p.id, {
+      kind: 'practice-paper', title, paper: { year, minutes, ...(examPw ? { pathway: examPw } : {}) }, slots
+    }, `practice-paper:${year}:${examPw || ''}:${length}:${minutes}`);
+
+    const examId = String(issued.id);
+    const now = Date.now();
+    const qids = [];
+    try {
+      for (const sq of issued.questions) {
+        const q = sq.payload;
+        const row = {
+          id: String(sq.id), pid: p.id, subtopic: q.multipart ? sq.generator : (q.subtopic || sq.generator), difficulty: q.multipart ? 3 : (q.difficulty || sq.difficulty || 2),
+          // The public payload only: no answer, step or trap is on this device.
+          payload: q, mode: 'exam', examId, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: now,
+          examMarking: sq.marking, examServer: true
+        };
+        await put('questions', row);
+        qids.push(row.id);
+      }
+    } catch (err) {
+      await Promise.all(qids.map(id => del('questions', id).catch(() => {})));
+      throw err;
+    }
+    const exam = {
+      id: examId, pid: p.id, year, pathway: examPw, title, durationMin: issued.durationMin, questionIds: qids,
+      createdAt: now, finishedAt: null, score: null, total: issued.total, detail: null,
+      paperVersion: issued.paperVersion,
+      server: serverFieldOf(issued, await profileCloudAccountId(p.id).catch(() => null))
+    };
+    startExamClock(exam, localStartOf(issued, now));
     await put('exams', exam);
+    noteReconciled(exam.id);
     return { exam: await examFor(p.id, examId) };
   },
   'GET /exams': async () => {
     const p = await requireProfile();
     const rows = (await byIndex('exams', 'pid', p.id)).sort((a, b) => b.createdAt - a.createdAt);
-    return { exams: rows.map(e => ({ id: e.id, title: e.title, year: e.year, duration_min: e.durationMin, created_at: e.createdAt, finished_at: e.finishedAt, deadline_at: Number.isFinite(e.deadlineAt) ? e.deadlineAt : null, score: e.score, total: e.total })) };
+    return { exams: rows.map(e => ({
+      id: e.id, title: e.title, year: e.year, duration_min: e.durationMin, created_at: e.createdAt, finished_at: e.finishedAt,
+      deadline_at: Number.isFinite(e.deadlineAt) ? e.deadlineAt : null, score: e.score, total: e.total,
+      // Who marked a finished paper, and whether one is still waiting to be.
+      marked_by: markedByOf(e), pending: !!e.pendingFinish
+    })) };
   },
   'GET /exams/:id': async (body, params) => {
     const p = await requireProfile();
+    // An open server paper is brought up to date with the server first: a
+    // queued finish is sent, a result from another device is adopted, a newer
+    // snapshot replaces the local one. Unreachable: the local state stands.
+    const held = await get('exams', params.id);
+    if (held && held.pid === p.id && isServerPaper(held) && !held.finishedAt) {
+      await withMutationLock(`exam:${params.id}`, async () => {
+        const fresh = await get('exams', params.id);
+        if (!fresh || fresh.finishedAt) return;
+        const out = await reconcileWithServer(fresh);
+        if (out.result) await adoptPaperResult(p, fresh, out.result);
+        else if (out.changed) await put('exams', fresh);
+      });
+    }
     const exam = await examFor(p.id, params.id);
     if (!exam) throw Object.assign(new Error('Exam not found'), { status: 404 });
     return { exam };
@@ -3721,6 +3769,7 @@ const routes = {
     // A paper still being sat prints as a question paper only: answers, worked
     // steps and marking criteria join it once the paper is submitted (#230).
     const finished = !!e.finishedAt;
+    const marked = new Map((e.detail || []).map(d => [String(d.id), d]));
     const questions = [];
     for (const qid of e.questionIds) {
       const row = await get('questions', qid);
@@ -3730,18 +3779,33 @@ const routes = {
       // one lost question must not take the paper it was on with it.
       if (!row?.payload) continue;
       const q = row.payload;
+      // A server-issued paper prints its solutions from the server's result —
+      // the only place they exist on this device.
+      const d = row.examServer ? marked.get(String(qid)) : null;
       if (q.multipart) {
         questions.push({
           multipart: true, stem: q.stem, title: q.title, figure: safeFigure(q.figure),
           subtopicName: q.title, difficulty: q.difficulty,
-          parts: partsOf(q).map(pt => ({
-            key: pt.key, prompt: pt.prompt, marks: pt.marks, answerType: pt.answerType, mcqOptions: pt.mcqOptions,
-            ...(finished ? {
-              answerText: displayAnswer({ answerType: pt.answerType, answer: pt.answer, mcqOptions: pt.mcqOptions, answerPrefix: pt.answerPrefix, answerSuffix: pt.answerSuffix }),
-              steps: pt.steps
-            } : {})
-          })),
+          parts: partsOf(q).map(pt => {
+            const dp = (d?.parts || []).find(x => String(x.key) === String(pt.key));
+            return {
+              key: pt.key, prompt: pt.prompt, marks: pt.marks, answerType: pt.answerType, mcqOptions: pt.mcqOptions,
+              ...(finished ? (row.examServer ? { answerText: dp?.answerText ?? '', steps: dp?.steps || [] } : {
+                answerText: displayAnswer({ answerType: pt.answerType, answer: pt.answer, mcqOptions: pt.mcqOptions, answerPrefix: pt.answerPrefix, answerSuffix: pt.answerSuffix }),
+                steps: pt.steps
+              }) : {})
+            };
+          }),
           criteria: finished ? partsOf(q).map(pt => ({ mark: pt.marks, text: `Part (${pt.key})` })) : undefined
+        });
+        continue;
+      }
+      if (row.examServer) {
+        questions.push({
+          prompt: q.prompt, difficulty: q.difficulty, subtopicName: SUBTOPIC_BY_ID[q.subtopic]?.name,
+          answerType: q.answerType, mcqOptions: q.mcqOptions, figure: safeFigure(q.figure),
+          marks: Number(row.examMarking?.correct) || 1,
+          ...(finished && d?.solution ? { answerText: d.solution.answerText ?? '', steps: d.solution.steps || [], criteria: d.solution.criteria || [] } : {})
         });
         continue;
       }
@@ -3753,14 +3817,18 @@ const routes = {
         ...(finished ? { answerText: displayAnswer(q), steps: q.steps, criteria } : {})
       });
     }
-    return { title: e.title, year: e.year, durationMin: e.durationMin, course: courseLabel(p.course || 'nsw', e.year, e.pathway), questions, solutionsAvailable: finished };
+    return { title: e.title, year: e.year, durationMin: e.durationMin, course: courseLabel(p.course || 'nsw', e.year, e.pathway), questions, solutionsAvailable: finished, markedBy: markedByOf(e) };
   },
   'POST /exams/:id/responses': async (body, params) => {
     const p = await requireProfile();
     const e = await get('exams', params.id);
     if (!e || e.pid !== p.id) throw Object.assign(new Error('Exam not found'), { status: 404 });
+    if (e.pendingFinish) throw Object.assign(new Error('This paper has been submitted and is waiting to be marked — it can no longer change.'), { status: 409, code: 'EXAM_SUBMITTED_PENDING' });
     const saved = saveExamResponses(e, body || {});
     await put('exams', e);
+    // Saved on the device; the server's copy follows a moment later and is
+    // retried until it lands. It never delays or fails this save.
+    if (isServerPaper(e)) scheduleCheckpoint(e.id, body?.urgent === true ? 0 : undefined);
     return { saved: true, ...saved };
   },
   'POST /exams/:id/submit': async (body, params) => {
@@ -3768,110 +3836,22 @@ const routes = {
     const e = await get('exams', params.id);
     if (!e || e.pid !== p.id) throw Object.assign(new Error('Exam not found'), { status: 404 });
     if (isReplayOf(e, body || {})) {
-      return { score: e.score, total: e.total, pct: Math.round(100 * e.score / Math.max(1, e.total)), detail: e.detail, newBadges: [], replayed: true };
+      return { score: e.score, total: e.total, pct: Math.round(100 * e.score / Math.max(1, e.total)), detail: e.detail, newBadges: [], replayed: true, markedBy: markedByOf(e) };
     }
     if (e.finishedAt) throw Object.assign(new Error('Exam already submitted'), { status: 409 });
-    const now = Date.now();
-    // After the deadline only what was autosaved before it is marked.
-    const inputs = examMarkingInputs(e, body || {}, now);
-    const at = Number(e.latestSeenAt) || now;   // the paper's time, after any rollback correction
-    const answers = inputs.answers;
-    const workings = inputs.workings;
-    const totalMs = Number(inputs.ms) || 0;
-    const markedRows = [];
-    const nQ = e.questionIds.length;
-    let marksAwarded = 0, totalMarks = 0;
-    const detail = [];
-    for (const qid of e.questionIds) {
-      const row = await get('questions', qid);
-      // A question whose row is gone cannot be marked, and must not be marked
-      // as wrong either: it contributes neither marks awarded nor marks
-      // available, so the score is out of what was actually there to answer.
-      if (!row?.payload) continue;
-      markedRows.push(row);
-      const q = row.payload;
-
-      // ── Structured multipart question: mark each part on its own marks ──
-      if (q.multipart) {
-        const partsOut = [];
-        let qMarks = 0, qAwarded = 0, allCorrect = true;
-        for (const part of partsOf(q)) {
-          const given = answers[`${qid}::${part.key}`];
-          const synth = { answerType: part.answerType, answer: part.answer, mcqOptions: part.mcqOptions, traps: part.traps };
-          const result = given === undefined || given === null || given === '' ? { correct: false } : checkAnswer(synth, given);
-          const awarded = result.correct ? part.marks : 0;
-          qMarks += part.marks; qAwarded += awarded;
-          if (!result.correct) allCorrect = false;
-          partsOut.push({
-            key: part.key, prompt: part.prompt, answerType: part.answerType, mcqOptions: part.mcqOptions,
-            given: given ?? '', correct: !!result.correct, marks: part.marks, awarded, feedback: result.feedback,
-            answerText: displayAnswer({ answerType: part.answerType, answer: part.answer, mcqOptions: part.mcqOptions, answerPrefix: part.answerPrefix, answerSuffix: part.answerSuffix }),
-            steps: part.steps
-          });
-        }
-        totalMarks += qMarks; marksAwarded += qAwarded;
-        if (!row.answered) {
-          row.answered = 1;
-          await put('questions', row);
-          const xp = qAwarded * 6;
-          p.xp = (p.xp || 0) + xp;
-          await put('profiles', p);
-          await bumpActivity(p.id, { correct: allCorrect, xp, ms: Math.round(totalMs / nQ) }, now, timezoneOf(p));
-          await add('attempts', {
-            pid: p.id, questionId: row.id, subtopic: q.multipartId, difficulty: 3,
-            correct: allCorrect ? 1 : 0, answerGiven: `${qAwarded}/${qMarks} marks`, ms: Math.round(totalMs / nQ),
-            hintsUsed: 0, mode: 'exam', viaInk: false, ratingBefore: 0, ratingAfter: 0, createdAt: now
-          });
-        }
-        detail.push({
-          id: qid, multipart: true, title: q.title, stem: q.stem, figure: safeFigure(q.figure),
-          subtopicName: q.title, difficulty: q.difficulty,
-          marks: qMarks, awarded: qAwarded, correct: allCorrect, parts: partsOut
-        });
-        continue;
-      }
-
-      // ── Single question: full marks when correct, partial credit from working ──
-      const crit = criteriaFor(q);
-      const qMarks = crit.length;
-      const given = answers[qid];
-      const result = given === undefined || given === null || given === '' ? { correct: false } : checkAnswer(q, given);
-      let awarded = result.correct ? qMarks : 0;
-      let partial = null;
-      const wk = workings[qid];
-      const metaQ = stepMetaFor(q);
-      if (!result.correct && wk && String(wk).trim() && metaQ) {
-        // The same rule Practice applies: restating the question earns
-        // nothing; each verified line that moves the solution on earns one
-        // mark, capped one below the question's marks.
-        try {
-          const mm = methodMarks({ meta: metaQ, working: String(wk), marks: qMarks, prompt: q.prompt });
-          if (mm) {
-            awarded = mm.awarded;
-            partial = { okLines: mm.okLines, awarded: mm.awarded, note: mm.note };
-          }
-        } catch { }
-      }
-      totalMarks += qMarks; marksAwarded += awarded;
-      // An exam answer that landed on a designed distractor is the same
-      // evidence a practice one is, and under exam conditions it is better
-      // evidence — so it is counted here too.
-      if (!row.answered && !result.correct) await recordTrap(p.id, row, q, result.feedback);
-      if (!row.answered) await resolve(p, row, q, !!result.correct, given ?? '', Math.round(totalMs / nQ), 'exam');
-      detail.push({
-        id: qid, subtopic: q.subtopic, subtopicName: SUBTOPIC_BY_ID[q.subtopic]?.name,
-        difficulty: q.difficulty, prompt: q.prompt, answerType: q.answerType, mcqOptions: q.mcqOptions, figure: safeFigure(q.figure),
-        given: given ?? '', correct: !!result.correct, feedback: result.feedback,
-        marks: qMarks, awarded, partial, working: wk ? String(wk) : null,
-        solution: { steps: q.steps, answerText: displayAnswer(q), criteria: crit }
-      });
+    // A paper an earlier version of the app composed holds its answers on the
+    // device. Marking is the server's alone now, and the server never issued it.
+    if (!isServerPaper(e)) {
+      throw Object.assign(new Error('This paper was started in an earlier version of the app, so it cannot be marked. Start a new paper to be marked.'), { status: 409, code: 'EXAM_NOT_SERVER_ISSUED' });
     }
-    const pct = Math.round(100 * marksAwarded / Math.max(1, totalMarks));
-    Object.assign(e, { finishedAt: at, score: marksAwarded, total: totalMarks, detail });
-    freezeExam(e, { inputs, paperVersion: paperFingerprint(markedRows), submissionKey: body?.submissionKey, now: at });
-    await put('exams', e);
-    const newBadges = await checkBadges(p.id, { type: 'exam', pct }, now, timezoneOf(p));
-    return { score: marksAwarded, total: totalMarks, pct, detail, newBadges };
+    const out = await finishOnServer(e, body || {}, Date.now());
+    if (out.pending) {
+      // Queued: frozen on the device, unmarked, and no score exists yet.
+      await put('exams', e);
+      return { ...out.pending, score: null, total: e.total, detail: null, newBadges: [] };
+    }
+    const newBadges = await adoptPaperResult(p, e, out.result);
+    return { score: e.score, total: e.total, pct: Math.round(100 * e.score / Math.max(1, e.total)), detail: e.detail, newBadges, markedBy: 'server', final: { submittedAt: e.final.submittedAt, finalisedBy: e.final.finalisedBy, late: e.final.late, paperVersion: e.final.paperVersion } };
   },
 
   // ---- rush ----
@@ -4337,7 +4317,10 @@ const routes = {
     return {
       question: sanitize(q, row),
       solution: q.multipart
-        ? { parts: partsOf(q).map(pt => ({ key: pt.key, answerText: displayAnswer({ answerType: pt.answerType, answer: pt.answer, mcqOptions: pt.mcqOptions }), steps: pt.steps })) }
+        // A server-marked paper's parts carry the solutions its result disclosed.
+        ? row.examServer
+          ? { parts: (row.serverReceipt?.parts || []).map(pt => ({ key: pt.key, answerText: pt.answerText ?? '', steps: pt.steps || [] })) }
+          : { parts: partsOf(q).map(pt => ({ key: pt.key, answerText: displayAnswer({ answerType: pt.answerType, answer: pt.answer, mcqOptions: pt.mcqOptions }), steps: pt.steps })) }
         // A server-marked question's solution is the one its receipt carried;
         // the device never held the answer. An unresolved one has none to show.
         : publicShaped(row)
@@ -4908,7 +4891,80 @@ async function examFor(pid, examId) {
     if (!row) continue;
     questions.push(sanitize(row.payload, row));
   }
-  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null, session: examSessionView(e, viewedAt) };
+  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null, session: { ...examSessionView(e, viewedAt), pending: pendingView(e) }, markedBy: markedByOf(e), serverIssued: isServerPaper(e) };
+}
+
+/**
+ * Store the server's result on a practice paper and record the evidence it
+ * certifies. Each attempt carries the server's attempt id, so recording is
+ * exactly-once here and is recognised when the event is pulled back by sync.
+ */
+async function adoptPaperResult(p, e, serverResult) {
+  const result = localResult(e, serverResult);
+  const now = Date.now();
+  const nQ = Math.max(1, e.questionIds.length);
+  const detail = [];
+  for (const d of result.detail) {
+    const row = await get('questions', d.id);
+    if (d.multipart) {
+      detail.push({
+        id: d.id, multipart: true, title: d.title, stem: d.stem, figure: safeFigure(d.figure),
+        subtopicName: d.title, difficulty: d.difficulty, marks: d.marks, awarded: d.awarded, correct: d.correct, unanswered: d.unanswered,
+        parts: (d.parts || []).map(pt => ({
+          key: pt.key, prompt: pt.prompt, answerType: pt.answerType, mcqOptions: pt.mcqOptions,
+          given: pt.given ?? '', correct: !!pt.correct, marks: pt.marks, awarded: pt.awarded, feedback: pt.feedback,
+          answerText: pt.answerText, steps: pt.steps
+        }))
+      });
+      if (row && !row.answered) {
+        // A structured question is one piece of work with no single subtopic:
+        // it earns XP and a history row, and moves no rating.
+        row.answered = 1;
+        row.serverReceipt = { authoritative: true, examId: e.server.examId, parts: (d.parts || []).map(pt => ({ key: pt.key, answerText: pt.answerText, steps: pt.steps || [] })) };
+        await put('questions', row);
+        const xp = Math.max(0, Number(d.awarded) || 0) * 6;
+        const profile = (await get('profiles', p.id)) || p;
+        profile.xp = (profile.xp || 0) + xp;
+        await put('profiles', profile);
+        const ms = Math.round((Number(result.summary?.totalMs) || 0) / nQ);
+        await bumpActivity(p.id, { correct: !!d.correct, xp, ms }, now, timezoneOf(p));
+        await add('attempts', {
+          pid: p.id, questionId: row.id, subtopic: row.payload?.multipartId || row.subtopic, difficulty: 3,
+          correct: d.correct ? 1 : 0, answerGiven: `${d.awarded}/${d.marks} marks`, ms,
+          hintsUsed: 0, mode: 'exam', viaInk: false, ratingBefore: 0, ratingAfter: 0, createdAt: now
+        });
+      }
+      continue;
+    }
+    detail.push({
+      id: d.id, subtopic: d.subtopic, subtopicName: SUBTOPIC_BY_ID[d.subtopic]?.name || SUBTOPIC_BY_ID[d.generator]?.name,
+      difficulty: d.difficulty, prompt: d.prompt, answerType: d.answerType, mcqOptions: d.mcqOptions, figure: safeFigure(d.figure),
+      given: d.given ?? '', correct: !!d.correct, unanswered: !!d.unanswered, feedback: d.feedback,
+      marks: d.marks, awarded: d.awarded, partial: d.partial, working: d.working || null,
+      solution: d.solution
+    });
+    if (!row) continue;
+    if (!d.unanswered && d.attemptId) {
+      // An exam answer that landed on a designed distractor is the same
+      // evidence a practice one is, and under exam conditions it is better
+      // evidence — so it is counted here too.
+      await recordIndiaExamEvidence(row, row.payload, {
+        correct: d.correct, given: d.given, ms: d.ms, feedback: d.feedback, evidenceKey: 'question', serverAttemptId: d.attemptId,
+        trapWhy: !d.correct && d.feedback && (d.repairOpportunities || []).includes(d.feedback) ? d.feedback : null
+      });
+    }
+    const settled = (await get('questions', d.id)) || row;
+    settled.answered = 1;
+    settled.serverReceipt = { authoritative: true, examId: e.server.examId, attemptId: d.attemptId || null, solution: d.solution };
+    await put('questions', settled);
+  }
+  Object.assign(e, { finishedAt: finishedAtOf(e, result), score: result.score, total: result.total, detail });
+  e.final = serverFinal(e, { ...result, detail });
+  delete e.responses;
+  delete e.pendingFinish;
+  await put('exams', e);
+  const pct = Math.round(100 * e.score / Math.max(1, e.total));
+  return checkBadges(p.id, { type: 'exam', pct }, now, timezoneOf(p));
 }
 
 // ── Dispatcher (same contract as the old fetch layer) ────────────────────────
@@ -4920,14 +4976,21 @@ async function examFor(pid, examId) {
 // progress and the adaptive engine read exam outcomes without a second system.
 export function examStepMeta(q) { return stepMetaFor(q); }
 
-export async function recordIndiaExamEvidence(row, q, { correct, given, ms, feedback, evidenceKey } = {}) {
+export async function recordIndiaExamEvidence(row, q, { correct, given, ms, feedback, evidenceKey, serverAttemptId = null, trapWhy = null } = {}) {
   const p = await requireProfile();
-  if (!correct) await recordTrap(p.id, row, q, feedback);
+  if (!correct) {
+    // A server-marked paper names the authored distractor explanation the
+    // answer landed on; the device holds no trap list to look it up in.
+    if (trapWhy) {
+      const owner = evidenceKeyOf(row, q);
+      await recordMisconception(p.id, row, q, owner, misconceptionIdForTrap(owner, trapWhy), misconceptionLabel(trapWhy));
+    } else await recordTrap(p.id, row, q, feedback);
+  }
   try {
     return await resolve(
       p, row, q, !!correct, given ?? '', Math.max(0, Number(ms) || 0), 'exam', false,
       // each exam part's attempt is queued for the cloud in its own transaction (§22)
-      { evidenceKey: evidenceKey || 'question', syncQueue: true }
+      { evidenceKey: evidenceKey || 'question', syncQueue: true, ...(serverAttemptId ? { serverAttemptId } : {}) }
     );
   } catch (err) {
     // Exam submission is replayable after an ambiguous interruption. The same
@@ -5328,6 +5391,10 @@ async function runGated(method, pattern, handler, body, params) {
 export function withExamLock(examId, work) {
   return withMutationLock(`exam:${examId}`, work);
 }
+
+// The coded refusals a practice check uses, for starting and finishing a paper
+// (local/serverExam.js, local/indiaExamBackend.js).
+export { checkUnavailable };
 
 export async function dispatch(method, path, body) {
   // exact match first

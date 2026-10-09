@@ -13,7 +13,7 @@
 //                               the marking grid, the start time and the
 //                               deadline under a new exam id owned by the
 //                               account. Only the public paper is returned.
-//   PUT  /v1/exams/:id/answers  durable answer collection: the latest snapshot
+//   PUT  /v1/exams/:id/answers  (also PATCH, for the native shells) durable answer collection: the latest snapshot
 //                               of what the student has entered, stamped with
 //                               the server's time. Refused once the paper is
 //                               finalised or its time (plus grace) has passed.
@@ -576,7 +576,12 @@ export function markPaper(paper, responses, { now, totalMs }) {
           given: blank(answers[key]) ? '' : String(answers[key]), correct: r.correct, unanswered: r.unanswered,
           marks: part.marks, awarded: r.awarded, feedback: r.feedback, partial: r.partial, markingScheme: r.markingScheme,
           working: blank(workings[key]) ? null : String(workings[key]),
-          answerText: keyedAnswer(chosen), steps: chosen.steps || [], subtopic: synth.subtopic, difficulty: synth.difficulty, attemptId
+          answerText: keyedAnswer(chosen), steps: chosen.steps || [], subtopic: synth.subtopic, difficulty: synth.difficulty, attemptId,
+          // Both versions of a part that offered a choice, now that it is marked.
+          ...(part.alt ? { choices: Object.fromEntries([['main', part], ['or', part.alt]].map(([name, it]) => [name, {
+            prompt: it.prompt, answerType: it.answerType, mcqOptions: it.mcqOptions || null, figure: it.figure || null,
+            answerText: keyedAnswer(it), steps: it.steps || []
+          }])) } : {})
         });
       }
       out = {
@@ -599,6 +604,11 @@ export function markPaper(paper, responses, { now, totalMs }) {
         marks, negativeMarks: Math.abs(Number(sq.marking.incorrect || 0)), awarded: r.awarded, partial: r.partial,
         working: blank(workings[key]) ? null : String(workings[key]), markingScheme: r.markingScheme, outcome: r.outcome,
         solution: solutionOf(chosen, marks, sq.marking), attemptId,
+        // Both questions of an internal choice, now that the paper is marked.
+        ...(q.alt ? { choices: Object.fromEntries([['main', q], ['or', q.alt]].map(([name, it]) => [name, {
+          prompt: it.prompt, answerType: it.answerType, mcqOptions: it.mcqOptions || null, matchList: it.matchList || null,
+          figure: it.figure || null, solution: solutionOf(it, marks, sq.marking)
+        }])) } : {}),
         // Authored distractor explanations, disclosed only now: the device
         // derives misconception identity from these, never from an answer key.
         repairOpportunities: [...new Set([
@@ -639,7 +649,7 @@ export function createExamRouter(db) {
     return row ? JSON.parse(row.response_json) : null;
   };
 
-  router.post('/', rateLimit(db, 'exam-create', { limit: 30, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+  router.post('/', rateLimit(db, 'exam-create', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const idem = String(req.get('idempotency-key') || '');
     if (!ID.test(idem)) return reject(res, 400, 'IDEMPOTENCY_KEY_REQUIRED', 'Starting a paper needs a stable idempotency key.');
     const spec = readSpec(req.body);
@@ -685,7 +695,9 @@ export function createExamRouter(db) {
     return res.status(201).json({ exam: publicPaper(paper, startedAt), accountId: String(accountId) });
   });
 
-  router.put('/:id/answers', rateLimit(db, 'exam-answers', { limit: 1800, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+  // PUT is the contract; PATCH is the same handler, because the native iOS and
+  // Android cloud bridges carry GET, POST, PATCH and DELETE only.
+  const saveAnswers = async (req, res) => {
     const id = String(req.params.id || '');
     if (!UUID.test(id)) return notFound(res);
     const accountId = req.platformSession.account_id;
@@ -719,7 +731,9 @@ export function createExamRouter(db) {
     if (outcome.status === 404) return notFound(res);
     if (outcome.status) return reject(res, outcome.status, outcome.code, outcome.message);
     return res.status(200).json(outcome.reply);
-  });
+  };
+  router.put('/:id/answers', rateLimit(db, 'exam-answers', { limit: 1800, windowMs: 60 * 60 * 1000 }), saveAnswers);
+  router.patch('/:id/answers', rateLimit(db, 'exam-answers', { limit: 1800, windowMs: 60 * 60 * 1000 }), saveAnswers);
 
   router.post('/:id/finish', rateLimit(db, 'exam-finish', { limit: 120, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const id = String(req.params.id || '');
@@ -784,7 +798,12 @@ export function createExamRouter(db) {
         year: paper.blueprint?.grade ?? paper.paper?.year ?? null,
         score: marked.score, total: marked.total, late: !inTime,
         createdAt: paper.startedAt, finishedAt: now, serverAcknowledgedAt: now,
-        blueprint: paper.blueprint, questions: paper.questions.length, attempted: marked.attempts.length
+        blueprint: paper.blueprint, questions: paper.questions.length, attempted: marked.attempts.length,
+        // What a second device needs to file the paper under its track.
+        indiaExam: paper.kind === 'india' ? {
+          blueprintId: paper.blueprint.id, label: paper.blueprint.label, track: paper.blueprint.track,
+          variant: paper.blueprint.variant, grade: paper.blueprint.grade
+        } : null
       });
       return { result };
     }, { accountScope: accountId, lock: syncLockKey(accountId) });

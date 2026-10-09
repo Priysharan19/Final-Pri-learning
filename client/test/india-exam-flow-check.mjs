@@ -15,6 +15,13 @@
 import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 
 installBrowserEnv();
+// Owner decision 2026-10-10: examination papers are issued and marked by the
+// server. Every paper here is therefore started by a real, email-verified
+// account against the real /v1 app booted in-process, and every score below is
+// the server's (client/test/support/online-authority.mjs). Nothing is marked
+// on the device.
+const { startOnlineAuthority } = await import('./support/online-authority.mjs');
+const online = await startOnlineAuthority({ label: 'india-exam-flow' });
 const { dispatch } = await import('../src/local/backend.js');
 const { loadAllBanks } = await import('../src/engine/generators/index.js');
 const { markObjective, markMultiCorrect, JEE_MAIN_MATHEMATICS_2026, JEE_ADVANCED_2026 } = await import('../src/engine/indiaExams.js');
@@ -31,26 +38,17 @@ async function profileFor(spec) {
   ok(!!created?.user?.id, `${spec.name}: profile created`);
   // The free tier allows one exam simulation every 30 days, which
   // entitlement-enforcement-check.mjs is the suite for. This one is about
-  // whether each track can compose, sit and mark a paper at all, so every
-  // profile here holds a server-issued Premium snapshot.
-  const { cloudLinkRowId } = await import('../src/platform/cloudAccount.js');
-  const idb = await import('../src/local/idb.js');
-  const now = Date.now();
-  await idb.put('device', {
-    id: cloudLinkRowId(created.user.id), accountId: `acct-${created.user.id}`, role: 'student',
-    emailVerified: true, linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
-    entitlement: {
-      plan: 'premium', status: 'active', provider: 'web',
-      currentPeriodEnd: now + 30 * 86400000, offlineUntil: now + 7 * 86400000,
-      issuedAt: now, sourceVersion: 1
-    }
-  });
+  // whether each track can compose, sit and be marked on a paper at all, so
+  // every profile here is a real account holding a Premium snapshot.
+  await online.link(created.user.id, { name: spec.name, entitlement: 'premium' });
   return created.user;
 }
 
 // src/api.js routes an India profile's /exams calls to the India exam backend;
-// this suite drives dispatch() directly, so it does the same resolution.
-const examCall = (profile, method, path, body = {}) => dispatchIndiaExam(profile, method, path, body);
+// this suite drives dispatch() directly, so it does the same resolution. The
+// device session is the profile's own account, as it is when that student is
+// the one holding the iPad.
+const examCall = (profile, method, path, body = {}) => online.withSessionOf(profile.id, () => dispatchIndiaExam(profile, method, path, body));
 
 const sectionsOf = paper => {
   const groups = new Map();
@@ -297,4 +295,5 @@ ok(!/Band [1-6]|\bHSC\b|NESA/.test(indiaText), 'India exams carry no HSC band or
 console.log(failures.length
   ? `INDIA EXAM FLOW: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `INDIA EXAM FLOW: PASS — ${pass}/${pass} checks — CBSE Class 10 and 12, JEE Main, JEE Advanced and IOQM papers create, open, submit and mark.`);
+await online.close();
 process.exit(failures.length ? 1 : 0);

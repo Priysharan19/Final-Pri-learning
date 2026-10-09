@@ -3,8 +3,12 @@
 // finalised paper (doc §15).
 //
 // Drives the real local exam backends (local/indiaExamBackend.js for a JEE Main
-// paper, local/backend.js for the legacy practice paper) with a controllable
-// clock, and pins what a timed paper promises a student:
+// paper, local/backend.js for the practice paper) against the real /v1 server
+// booted in-process, with a controllable clock, and pins what a timed paper
+// promises a student. Owner decision 2026-10-10: the SERVER issues and marks
+// every paper. The device holds the public paper only; every score below is
+// the server's, and "the right answer" is read from the server's own sealed
+// paper as a test oracle (support/online-authority.mjs), never from the device.
 //
 //   · the deadline is an absolute timestamp written when the paper starts, and
 //     reading the paper back later ("a reload", "a relaunch") reports the same
@@ -18,7 +22,15 @@
 //     frozen result without marking again, and any other resubmission is
 //     refused without touching learning state;
 //   · finalisation freezes the paper version and the exact inputs it marked;
-//   · an autosave racing the final submit can never un-finalise the paper.
+//   · an autosave racing the final submit can never un-finalise the paper;
+//   · a paper cannot start signed out or offline, and says why;
+//   · every autosave is checkpointed to the server, retried when it fails, and
+//     never blocks the local save;
+//   · a finish with no connection is queued: no score exists until the server's
+//     result arrives, and what is marked after the bell is the last checkpoint;
+//   · a paper carried further or finished on another device is adopted on open;
+//   · a paper marked by an earlier app version opens in review labelled as
+//     such, and one it left unfinished cannot be marked on the device.
 // ─────────────────────────────────────────────────────────────────────────────
 import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 
@@ -33,6 +45,8 @@ const { dispatch } = await import('../src/local/backend.js');
 const { dispatchIndiaExam } = await import('../src/local/indiaExamBackend.js');
 const { loadAllBanks } = await import('../src/engine/generators/index.js');
 const { SUBMIT_GRACE_MS } = await import('../src/local/examSession.js');
+const { flushExamCheckpoints } = await import('../src/local/serverExam.js');
+const gate = await import('../src/local/entitlementGate.js');
 const idb = await import('../src/local/idb.js');
 await loadAllBanks();
 
@@ -62,8 +76,32 @@ async function premium(user) {
 resetStorage();
 const student = (await dispatch('POST', '/profiles', { name: 'Chitra', course: 'in', indiaTrack: 'jee-main', year: 12 })).user;
 await premium(student);
-const call = (method, path, body = {}) => dispatchIndiaExam(student, method, path, body);
-const payloadOf = async id => (await idb.get('questions', id))?.payload;
+// The device session is the student's own account for every call below.
+const call = (method, path, body = {}) => online.withSessionOf(student.id, () => dispatchIndiaExam(student, method, path, body));
+// The oracle: the server's sealed copy of a question on the paper.
+const payloadOf = async id => online.answerKey(await idb.get('questions', id));
+// "A moment passes with a connection": every pending checkpoint has landed.
+const settle = () => online.withSessionOf(student.id, () => flushExamCheckpoints());
+const PRIVATE = new Set(['answer', 'steps', 'traps', 'stepcheck', 'seed', 'hints', 'optionTraps', 'correctIndex', 'correctIndices', 'solution', 'solutionText', 'criteria', 'builtFrom']);
+const leaks = (value, path = '') => (!value || typeof value !== 'object' ? []
+  : Object.entries(value).flatMap(([k, v]) => [...(PRIVATE.has(k) ? [path + k] : []), ...leaks(v, path + k + '.')]));
+
+// ── 0 · a paper is marked work: it starts only signed in and connected ───────
+{
+  const examsBefore = (await idb.byIndex('exams', 'pid', student.id)).length;
+  const usedBefore = (await gate.examAllowance(student)).used;
+  const signedOut = await rejectsWith(online.signedOut(() => dispatchIndiaExam(student, 'POST', '/exams', {})), 'SIGN_IN_TO_CHECK', 'a signed-out India student cannot start a paper');
+  eq(signedOut?.status, 401, 'and is told to sign in, as a practice check is');
+  const offlineErr = await rejectsWith(online.offline(() => call('POST', '/exams', {})), 'RECONNECT_TO_CHECK', 'an India paper cannot start without a connection');
+  eq(offlineErr?.status, 503, 'and is told to reconnect');
+  const stranger = (await dispatch('POST', '/profiles', { name: 'Unlinked', course: 'in', indiaTrack: 'jee-main', year: 12 })).user;
+  await rejectsWith(dispatchIndiaExam(stranger, 'POST', '/exams', {}), 'SIGN_IN_TO_CHECK', 'a profile that has never signed in cannot start a paper');
+  await dispatch('POST', '/profiles/select', { id: student.id });
+  eq((await idb.byIndex('exams', 'pid', student.id)).length, examsBefore, 'a refused start stores no paper');
+  eq((await idb.byIndex('exams', 'pid', stranger.id)).length, 0, 'for either profile');
+  eq((await gate.examAllowance(student)).used, usedBefore, 'and spends no exam simulation');
+  eq(Number((await online.db.get("SELECT COUNT(*) AS n FROM idempotency_keys WHERE scope='exam-paper'"))?.n || 0), 0, 'and the server issued none');
+}
 
 // ── 1 · the deadline is written once, at the start ───────────────────────────
 const made = (await call('POST', '/exams', { seed: 4242 })).exam;
@@ -73,7 +111,15 @@ eq(row0.deadlineAt - row0.startedAt, made.durationMin * MIN, 'the deadline is th
 eq(made.session.deadlineAt, row0.deadlineAt, 'the room is handed the stored deadline');
 ok(made.session.remainingMs > 0 && made.session.remainingMs <= made.durationMin * MIN, 'the room is told how long is left');
 eq(made.session.expired, false, 'a new paper is not expired');
-ok(/^pv1-[0-9a-f]{8}-25$/.test(row0.paperVersion || ''), `the composed paper is fingerprinted (${row0.paperVersion})`);
+ok(/^sv1-[0-9a-f]{24}-25$/.test(row0.paperVersion || ''), `the issued paper carries the server's version of it (${row0.paperVersion})`);
+ok(!!row0.server?.examId && row0.server.questionIds.length === 25, 'the paper is the server\'s: the device keeps its exam and question ids');
+eq((await online.examPaper(row0)).id, row0.server.examId, 'and the server holds the sealed paper');
+{
+  const stored = [];
+  for (const qid of row0.questionIds) stored.push(await idb.get('questions', qid));
+  eq(leaks(stored.map(r => r.payload)), [], 'no answer, step, trap or seed of the paper is stored on the device');
+  eq(leaks(made.questions), [], 'and none is handed to the room');
+}
 
 const questions = made.questions;
 const mcq = questions.filter(q => q.answerType === 'mcq');
@@ -105,6 +151,15 @@ const saved = await call('POST', `/exams/${made.id}/responses`, {
 });
 eq(saved.saved, true, 'an autosave is accepted while the clock runs');
 eq(saved.rev, 1, 'the first autosave is revision 1');
+eq(await online.examSnapshot(made.id), null, 'the local save does not wait for the server');
+await settle();
+{
+  const snap = await online.examSnapshot(made.id);
+  eq([snap?.rev, snap?.answers?.[mcq[0].id], snap?.answers?.[numeric[0].id], snap?.workings?.[numeric[0].id]], [1, right[mcq[0].id], '12', 'x = 3\n4x = 12'],
+    'a moment later the server holds the same answers and working');
+  ok(!('inks' in snap) && JSON.stringify(snap).length < 2000, 'strokes stay on the device: the checkpoint is text');
+  eq((await idb.get('exams', made.id)).server.savedRev, 1, 'and the device knows which revision the server holds');
+}
 
 offset += 10 * MIN;   // "the app is relaunched ten minutes later"
 const reread = (await call('GET', `/exams/${made.id}`)).exam;
@@ -132,6 +187,8 @@ ok(!!r2.inks[numeric[0].id] && !!r2.inks[numeric[1].id], 'ink is merged per ques
 eq(r2.workings[numeric[0].id], 'x = 3\n4x = 12', 'a save that does not carry working keeps the saved working');
 await call('POST', `/exams/${made.id}/responses`, { inks: { [numeric[1].id]: { strokes: [], lines: [] } } });
 ok(!(await call('GET', `/exams/${made.id}`)).exam.session.responses.inks[numeric[1].id], 'clearing a question\'s writing removes its saved strokes');
+await settle();
+eq((await online.examSnapshot(made.id))?.rev, 3, 'the server holds the latest revision before the bell');
 
 // ── 3 · nothing saves after the deadline ─────────────────────────────────────
 offset += made.durationMin * MIN;   // well past the deadline
@@ -156,7 +213,13 @@ const d1 = late.detail.find(d => d.id === mcq[1].id);
 eq([d0.awarded, d1.awarded], [4, -1], 'JEE Main marks the saved answers +4 / −1');
 eq(d0.timed, true, 'a question with measured time is marked as timed');
 const row1 = await idb.get('exams', made.id);
-eq(row1.final.inputSource, 'autosave-before-deadline', 'the frozen record names where its inputs came from');
+eq(row1.final.inputSource, 'server-snapshot-before-deadline', 'the frozen record names where its inputs came from: the server\'s own snapshot');
+eq([row1.final.markedBy, late.markedBy], ['server', 'server'], 'the paper is marked by the server');
+{
+  const stored = await online.examResult(made.id);
+  eq([stored.score, stored.total, stored.late], [late.score, late.total, true], 'the score shown is the server\'s stored result');
+  eq(late.detail.map(d => d.awarded), stored.detail.map(d => d.awarded), 'question by question');
+}
 eq(row1.final.responses.answers, r2.answers, 'finalisation freezes exactly the responses it marked');
 eq(row1.final.paperVersion, row0.paperVersion, 'finalisation freezes the paper version, and it is the version that was composed');
 eq(row1.final.paperVersionChanged, false, 'the paper did not change between start and finalisation');
@@ -229,11 +292,13 @@ eq((await idb.get('exams', fifth.id)).deadlineAt, migrated.deadlineAt, 'and that
 // ── 8 · an autosave racing the final submit cannot un-finalise the paper ─────
 const sixth = (await call('POST', '/exams', { seed: 781 })).exam;
 const q6 = sixth.questions[0].id;
-const [raceSave, raceSubmit] = await Promise.allSettled([
-  call('POST', `/exams/${sixth.id}/responses`, { answers: { [q6]: '0' } }),
-  call('POST', `/exams/${sixth.id}/submit`, { answers: { [q6]: '0' }, submissionKey: 'race' }),
-  call('POST', `/exams/${sixth.id}/responses`, { answers: { [q6]: '1' } })
-]).then(rs => [rs[2], rs[1]]);
+// One session for the three racing requests (the pin is not re-entrant).
+const raw = (method, path, body = {}) => dispatchIndiaExam(student, method, path, body);
+const [raceSave, raceSubmit] = await online.withSessionOf(student.id, () => Promise.allSettled([
+  raw('POST', `/exams/${sixth.id}/responses`, { answers: { [q6]: '0' } }),
+  raw('POST', `/exams/${sixth.id}/submit`, { answers: { [q6]: '0' }, submissionKey: 'race' }),
+  raw('POST', `/exams/${sixth.id}/responses`, { answers: { [q6]: '1' } })
+])).then(rs => [rs[2], rs[1]]);
 eq(raceSubmit.status, 'fulfilled', 'the racing submit finalises the paper');
 eq(raceSave.status, 'rejected', 'the autosave queued behind the submit is refused');
 const raced = await idb.get('exams', sixth.id);
@@ -248,12 +313,15 @@ eq(paper.session.deadlineAt - paper.session.startedAt, 15 * MIN, 'a legacy paper
 const first = paper.questions.find(q => !q.multipart);
 await dispatch('POST', `/exams/${paper.id}/responses`, { answers: { [first.id]: 'saved-answer' } });
 eq((await dispatch('GET', `/exams/${paper.id}`)).exam.session.responses.answers[first.id], 'saved-answer', 'a legacy paper autosaves and reads back');
-offset = 16 * MIN;
+await flushExamCheckpoints();
+offset = 16 * MIN + 2 * MIN;
 await rejectsWith(dispatch('POST', `/exams/${paper.id}/responses`, { answers: {} }), 'EXAM_DEADLINE_PASSED', 'a legacy paper refuses an autosave after its deadline');
 const legacyLate = await dispatch('POST', `/exams/${paper.id}/submit`, { answers: { [first.id]: 'late-answer' }, submissionKey: 'legacy' });
 eq(legacyLate.detail.find(d => d.id === first.id)?.given, 'saved-answer', 'a late legacy submit marks the saved answer, not the late one');
 eq((await dispatch('POST', `/exams/${paper.id}/submit`, { submissionKey: 'legacy' })).replayed, true, 'a legacy replay returns the frozen result');
 await rejectsWith(dispatch('POST', `/exams/${paper.id}/submit`, {}), 409, 'a legacy resubmission is still refused');
+
+await dispatch('POST', '/profiles/select', { id: student.id });
 
 // ── 10 · winding the device clock back buys nothing ─────────────────────────
 // A paper's clock only moves forward: every read, save and submit records the
@@ -264,6 +332,7 @@ const rbMcq = rb.questions.filter(q => q.answerType === 'mcq');
 const rbRight = String((await payloadOf(rbMcq[0].id)).answer.correctIndex);
 const rbWrong = String((Number(rbRight) + 1) % 4);
 await call('POST', `/exams/${rb.id}/responses`, { answers: { [rbMcq[0].id]: rbWrong } });
+await settle();
 
 // (a) halfway through, the clock is wound back 25 minutes: no time is gained
 offset = 30 * MIN;
@@ -312,6 +381,7 @@ offset = 50 * MIN + WOUND;        // the heartbeat, just after the rollback: rea
 await call('POST', `/exams/${rt.id}/responses`, { answers: { [rtMcq[0].id]: rtWrong } });
 offset = 50 * MIN + WOUND + 5 * MIN;   // real +55, device +25
 const afterWind = await call('POST', `/exams/${rt.id}/responses`, { answers: { [rtMcq[0].id]: rtWrong } });
+await settle();
 const leftAfterWind = (await idb.get('exams', rt.id)).deadlineAt - afterWind.now;
 ok(Math.abs(leftAfterWind - 5 * MIN) < 1000, `five real minutes after a 30-minute rollback, five minutes are left — not thirty-five (${Math.round(leftAfterWind / 1000)} s left)`);
 ok(afterWind.now - Date.now() >= 30 * MIN - 1000, 'the save tells the room how far its clock is behind the paper');
@@ -328,9 +398,148 @@ const rtRow = await idb.get('exams', rt.id);
 ok(rtRow.clockOffsetMs >= 30 * MIN - 1000 && rtRow.final.clockRolledBack === true, `the forward-only correction equals the rollback (${Math.round((rtRow.clockOffsetMs || 0) / 1000)} s) and is recorded`);
 ok(rtRow.finishedAt >= rtRow.deadlineAt + 27 * MIN, 'the finalisation time is the paper\'s real time, not the wound-back device time');
 
+// ── 12 · a dropped connection never costs typed work; a failed checkpoint is retried
+offset = 0;
+await dispatch('POST', '/profiles/select', { id: student.id });
+const dc = (await call('POST', '/exams', { seed: 1201 })).exam;
+const dcMcq = dc.questions.filter(q => q.answerType === 'mcq');
+const dcRight = {};
+for (const q of dcMcq) dcRight[q.id] = String((await payloadOf(q.id)).answer.correctIndex);
+await call('POST', `/exams/${dc.id}/responses`, { answers: { [dcMcq[0].id]: dcRight[dcMcq[0].id] } });
+await settle();
+eq((await online.examSnapshot(dc.id))?.rev, 1, 'online, the first answer is checkpointed');
+online.setOffline(true);
+const offSave = await call('POST', `/exams/${dc.id}/responses`, { answers: { [dcMcq[0].id]: dcRight[dcMcq[0].id], [dcMcq[1].id]: dcRight[dcMcq[1].id] } });
+eq([offSave.saved, offSave.rev], [true, 2], 'with the connection gone the autosave still succeeds on the device');
+await settle();
+eq((await online.examSnapshot(dc.id))?.rev, 1, 'the server still holds the earlier checkpoint');
+eq((await idb.get('exams', dc.id)).server.savedRev, 1, 'and the device knows its newer answers are not there yet');
+eq((await call('GET', `/exams/${dc.id}`)).exam.session.responses.answers[dcMcq[1].id], dcRight[dcMcq[1].id], 'the paper reopens offline with everything typed');
+online.setOffline(false);
+await settle();
+eq([(await online.examSnapshot(dc.id))?.rev, (await online.examSnapshot(dc.id))?.answers?.[dcMcq[1].id]], [2, dcRight[dcMcq[1].id]], 'back online the failed checkpoint is retried and lands');
+
+// ── 13 · finishing with no connection queues the finish; nothing is marked yet
+const attemptsPre = (await idb.byIndex('attempts', 'pid', student.id)).length;
+const queued = await online.offline(() => call('POST', `/exams/${dc.id}/submit`, {
+  answers: { [dcMcq[0].id]: dcRight[dcMcq[0].id], [dcMcq[1].id]: dcRight[dcMcq[1].id], [dcMcq[2].id]: dcRight[dcMcq[2].id] }, submissionKey: 'queued-finish-0001'
+}));
+eq([queued.pending, queued.code, queued.reason], [true, 'EXAM_FINISH_QUEUED', 'offline'], 'an offline finish is queued, and says so');
+eq([queued.score, queued.detail], [null, null], 'no score and no marked detail exist for a queued paper');
+ok(/not marked yet/i.test(queued.message) && /back online/i.test(queued.message), `it says plainly the paper is not marked yet (${queued.message})`);
+const queuedRow = await idb.get('exams', dc.id);
+eq([queuedRow.finishedAt, queuedRow.score, queuedRow.detail], [null, null, null], 'the stored paper is unfinished and unscored');
+ok(!!queuedRow.pendingFinish?.submissionKey, 'and holds the queued submission');
+eq(await online.examResult(dc.id), null, 'the server has marked nothing');
+eq((await idb.byIndex('attempts', 'pid', student.id)).length, attemptsPre, 'no learning evidence is recorded for an unmarked paper');
+await rejectsWith(call('POST', `/exams/${dc.id}/responses`, { answers: { [dcMcq[3].id]: dcRight[dcMcq[3].id] } }), 'EXAM_SUBMITTED_PENDING', 'a submitted paper waiting to be marked can no longer change');
+const stillOff = (await online.offline(() => call('GET', `/exams/${dc.id}`))).exam;
+eq([stillOff.finishedAt, stillOff.score, stillOff.session.pending?.code, stillOff.markedBy], [null, null, 'EXAM_FINISH_QUEUED', null], 'reopened offline it is still waiting, with no score');
+const listedPending = (await call('GET', '/exams')).exams.find(e => e.id === dc.id);
+eq([listedPending.pending, listedPending.finished_at, listedPending.score], [true, null, null], 'the list shows it as waiting, not as marked');
+const resubmit = await online.offline(() => call('POST', `/exams/${dc.id}/submit`, { answers: { [dcMcq[4].id]: dcRight[dcMcq[4].id] }, submissionKey: 'another-key-0002' }));
+eq([resubmit.pending, (await idb.get('exams', dc.id)).pendingFinish.submissionKey], [true, 'queued-finish-0001'], 'submitting again while queued changes nothing about what was submitted');
+// Back online: opening the paper sends the queued finish and shows the server's result.
+const settled = (await call('GET', `/exams/${dc.id}`)).exam;
+eq([settled.score, settled.markedBy, settled.session.pending, settled.session.finalised], [12, 'server', null, true], 'back online the queued finish is marked by the server: three right = 12');
+eq((await online.examResult(dc.id))?.score, 12, 'the score shown is the server\'s stored result');
+eq(settled.detail.filter(d => !d.unanswered).map(d => d.id).sort(), [dcMcq[0].id, dcMcq[1].id, dcMcq[2].id].sort(), 'what was submitted is what was marked');
+ok((await idb.byIndex('attempts', 'pid', student.id)).length === attemptsPre + 3, 'and the evidence is recorded once the server has marked it');
+eq((await call('POST', `/exams/${dc.id}/submit`, { submissionKey: 'queued-finish-0001' })).replayed, true, 'the room\'s own retry of that submission is a replay');
+eq(Number((await online.db.get("SELECT COUNT(*) AS n FROM learning_events WHERE kind='exam-attempt' AND entity_id=?", [queuedRow.server.examId]))?.n), 1, 'the server finalised it exactly once');
+
+// ── 14 · offline at the bell: the last checkpoint is marked, nothing after it ─
+offset = 0;
+const bell = (await call('POST', '/exams', { seed: 1401 })).exam;
+const bellMcq = bell.questions.filter(q => q.answerType === 'mcq');
+const bellRight = {};
+for (const q of bellMcq) bellRight[q.id] = String((await payloadOf(q.id)).answer.correctIndex);
+await call('POST', `/exams/${bell.id}/responses`, { answers: { [bellMcq[0].id]: bellRight[bellMcq[0].id] } });
+await settle();
+online.setOffline(true);
+await call('POST', `/exams/${bell.id}/responses`, { answers: { [bellMcq[0].id]: bellRight[bellMcq[0].id], [bellMcq[1].id]: bellRight[bellMcq[1].id] } });
+const bellQueued = await call('POST', `/exams/${bell.id}/submit`, { answers: { [bellMcq[0].id]: bellRight[bellMcq[0].id], [bellMcq[1].id]: bellRight[bellMcq[1].id] }, reason: 'student', submissionKey: 'bell-finish-0001' });
+eq(bellQueued.pending, true, 'offline before the bell, the finish is queued');
+ok(/answers last saved to the server/i.test(bellQueued.message), 'and the student is told which answers count if they reconnect after time');
+offset = bell.durationMin * MIN + 5 * MIN;   // the bell rings, and the server's grace passes, with no connection
+online.setOffline(false);
+const bellDone = (await call('GET', `/exams/${bell.id}`)).exam;
+eq([bellDone.score, bellDone.session.final.late, bellDone.session.final.finalisedBy], [4, true, 'deadline'], 'reconnecting after time marks the last checkpoint only, and flags the paper late');
+eq(bellDone.detail.filter(d => !d.unanswered).map(d => d.id), [bellMcq[0].id], 'the answer that never reached the server before the bell is not marked');
+eq((await idb.get('exams', bell.id)).final.inputSource, 'server-snapshot-before-deadline', 'the record says the server\'s snapshot was marked');
+eq((await idb.get('exams', bell.id)).final.responses.answers, { [bellMcq[0].id]: bellRight[bellMcq[0].id] }, 'and freezes exactly what was marked');
+
+// ── 15 · a paper carried further, or finished, on another device ────────────
+offset = 0;
+const two = (await call('POST', '/exams', { seed: 1501 })).exam;
+const twoMcq = two.questions.filter(q => q.answerType === 'mcq');
+const twoRight = {};
+for (const q of twoMcq) twoRight[q.id] = String((await payloadOf(q.id)).answer.correctIndex);
+await call('POST', `/exams/${two.id}/responses`, { answers: { [twoMcq[0].id]: twoRight[twoMcq[0].id] } });
+await settle();
+const twoRow = await idb.get('exams', two.id);
+const jar = online.accountOf(student.id).jar;
+// "The other device": the same account, straight to the server.
+const otherSave = await online.app.request(`/v1/exams/${twoRow.server.examId}/answers`, { method: 'PATCH', jar, body: {
+  answers: { [twoMcq[0].id]: twoRight[twoMcq[0].id], [twoMcq[1].id]: twoRight[twoMcq[1].id] }, cur: 1, rev: 7 } });
+eq([otherSave.status, otherSave.data.saved], [200, true], 'another device checkpoints further answers');
+await new Promise(resolve => setTimeout(resolve, 3100));   // past the reconcile throttle
+const carried = (await call('GET', `/exams/${two.id}`)).exam.session.responses;
+eq([carried.rev, carried.answers[twoMcq[1].id], carried.cur], [7, twoRight[twoMcq[1].id], 1], 'reopening here adopts the newer snapshot from the server');
+const otherFinish = await online.app.request(`/v1/exams/${twoRow.server.examId}/finish`, { method: 'POST', jar, body: {
+  answers: { [twoMcq[0].id]: twoRight[twoMcq[0].id], [twoMcq[1].id]: twoRight[twoMcq[1].id], [twoMcq[2].id]: twoRight[twoMcq[2].id] } } });
+eq(otherFinish.status, 200, 'the other device finishes the paper');
+await new Promise(resolve => setTimeout(resolve, 3100));
+const adopted = (await call('GET', `/exams/${two.id}`)).exam;
+eq([adopted.score, adopted.markedBy, adopted.session.finalised], [12, 'server', true], 'reopening here shows the server\'s result, not a second marking');
+await rejectsWith(call('POST', `/exams/${two.id}/submit`, { answers: {}, submissionKey: 'second-device-01' }), 'INDIA_EXAM_ALREADY_SUBMITTED', 'and the paper cannot be submitted again from here');
+eq(Number((await online.db.get("SELECT COUNT(*) AS n FROM learning_events WHERE kind='exam-attempt' AND entity_id=?", [twoRow.server.examId]))?.n), 1, 'it was finalised once');
+
+// ── 16 · a session that lapsed mid-paper: the finish waits for sign-in ──────
+const lapsed = (await call('POST', '/exams', { seed: 1601 })).exam;
+const lapsedQ = lapsed.questions.find(q => q.answerType === 'mcq');
+const lapsedRight = String((await payloadOf(lapsedQ.id)).answer.correctIndex);
+const signedOutFinish = await online.signedOut(() => dispatchIndiaExam(student, 'POST', `/exams/${lapsed.id}/submit`, { answers: { [lapsedQ.id]: lapsedRight }, submissionKey: 'lapsed-finish-001' }));
+eq([signedOutFinish.pending, signedOutFinish.reason, signedOutFinish.score], [true, 'sign-in', null], 'signed out at the finish, the paper waits to be marked and shows no score');
+eq((await call('GET', `/exams/${lapsed.id}`)).exam.score, 4, 'signed in again, the server marks what was submitted');
+
+// ── 17 · papers from an earlier version of the app ──────────────────────────
+// A paper an earlier version MARKED on the device opens in review, says who
+// marked it, and is never presented as the server's. One it left unfinished
+// holds its answers on the device and cannot be marked at all.
+{
+  const now = Date.now();
+  const oldQ = { id: 'legacy-q-1', pid: student.id, subtopic: 'c12-matrices', difficulty: 2, mode: 'exam', examId: 'legacy-exam-1', answered: 1, tries: 0, hintsUsed: 0, createdAt: now - 86400000,
+    india: { chapterId: null, track: 'jee-main', dotpointIndex: null }, indiaExamSection: 'A', indiaExamSectionLabel: 'Section A', indiaExamItem: 'mcq', examOrder: 1,
+    examMarking: { correct: 4, incorrect: -1, unanswered: 0 },
+    payload: { prompt: 'Legacy question', answerType: 'mcq', mcqOptions: ['1', '2', '3', '4'], answer: { correctIndex: 2 }, steps: [{ h: 'Step', d: 'Detail' }], subtopic: 'c12-matrices', difficulty: 2 } };
+  await idb.put('questions', oldQ);
+  const indiaExam = (await idb.get('exams', made.id)).indiaExam;
+  await idb.put('exams', { id: 'legacy-exam-1', pid: student.id, year: 12, title: 'JEE Main · earlier version', durationMin: 60, questionIds: ['legacy-q-1'],
+    createdAt: now - 86400000, startedAt: now - 86400000, deadlineAt: now - 86400000 + 3600000, finishedAt: now - 86000000, score: 4, total: 4, indiaExam,
+    detail: [{ id: 'legacy-q-1', order: 1, section: 'A', sectionLabel: 'Section A', prompt: 'Legacy question', answerType: 'mcq', mcqOptions: ['1', '2', '3', '4'], given: '2', correct: true, unanswered: false, marks: 4, negativeMarks: 1, awarded: 4, ms: 1000, difficulty: 2, subtopicName: 'Matrices', solution: { steps: [{ h: 'Step', d: 'Detail' }], answerText: '3', criteria: [] } }],
+    summary: { sections: [], chapters: [], negativeMarks: 0, totalMs: 1000, markingSchemes: {} },
+    final: { submittedAt: now - 86000000, finalisedBy: 'student', late: false, paperVersion: 'pv1-00000000-1', responses: { answers: { 'legacy-q-1': '2' }, workings: {}, times: {} }, inks: {} } });
+  const legacyView = (await call('GET', '/exams/legacy-exam-1')).exam;
+  eq([legacyView.score, legacyView.markedBy, legacyView.serverIssued, legacyView.detail.length], [4, 'earlier-version', false, 1], 'a paper marked by an earlier version still opens in review, labelled as such');
+  eq((await call('GET', '/exams')).exams.find(e => e.id === 'legacy-exam-1').marked_by, 'earlier-version', 'the list says who marked it');
+  eq((await call('GET', '/exams/legacy-exam-1/paper')).markedBy, 'earlier-version', 'and so does its printable paper');
+  eq((await call('GET', `/exams/${made.id}`)).exam.markedBy, 'server', 'a paper the server marked says so');
+
+  await idb.put('questions', { ...oldQ, id: 'legacy-q-2', examId: 'legacy-exam-2', answered: 0 });
+  await idb.put('exams', { id: 'legacy-exam-2', pid: student.id, year: 12, title: 'JEE Main · unfinished earlier version', durationMin: 60, questionIds: ['legacy-q-2'],
+    createdAt: now, startedAt: now, deadlineAt: now + 3600000, finishedAt: null, score: null, total: 4, detail: null, indiaExam });
+  const unfinished = (await call('GET', '/exams/legacy-exam-2')).exam;
+  eq([unfinished.questions.length, unfinished.serverIssued, leaks(unfinished.questions)], [1, false, []], 'an unfinished earlier-version paper still opens, without its answers');
+  const refusedLegacy = await rejectsWith(call('POST', '/exams/legacy-exam-2/submit', { answers: { 'legacy-q-2': '2' } }), 'EXAM_NOT_SERVER_ISSUED', 'but it cannot be marked on the device');
+  ok(/earlier version/i.test(refusedLegacy?.message || ''), 'and the student is told why');
+  const after = await idb.get('exams', 'legacy-exam-2');
+  eq([after.finishedAt, after.score, after.detail], [null, null, null], 'no device mark was produced for it');
+}
+
 Date.now = realNow;
 await online.close();
 console.log(failures.length
   ? `EXAM SESSION: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `EXAM SESSION: PASS — ${pass}/${pass} checks — absolute deadline, autosave with handwriting, no writes after time or finalisation, late submits mark only saved work, idempotent frozen finalisation.`);
+  : `EXAM SESSION: PASS — ${pass}/${pass} checks — the server issues and marks every paper: absolute deadline, autosave with handwriting checkpointed to the server, no writes after time or finalisation, late and offline finishes mark only saved work, idempotent frozen finalisation, earlier-version papers never certified.`);
 process.exit(failures.length ? 1 : 0);
