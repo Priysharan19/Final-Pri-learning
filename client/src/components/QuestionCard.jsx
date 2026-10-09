@@ -2088,34 +2088,52 @@ function Diagnosis({ d, line }) {
 function attachPhoto(e, setPhoto, onReady, onPdf, onFailed) {
   const f = e.target.files?.[0];
   if (!f) return;
-  // A scanner app hands back a PDF, not a photo. Read it as bytes and let the
-  // caller render its pages; everything after that is identical.
+  const failed = key => onFailed?.(translate(key));
+  // A scanner app hands back a PDF, not a photo. FileReader can reject or
+  // abort even after the picker succeeded (device eviction, file permissions).
+  // Never strand the student indefinitely in the "Reading…" state.
   if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name || '')) {
     const reader = new FileReader();
-    reader.onload = () => { onPdf?.(String(reader.result || '')); };
-    reader.readAsDataURL(f);
+    reader.onload = () => {
+      const data = String(reader.result || '');
+      if (!data.startsWith('data:')) { failed('verdict.pdfUnopenable'); return; }
+      onPdf?.(data);
+    };
+    reader.onerror = reader.onabort = () => failed('verdict.pdfUnopenable');
+    try { reader.readAsDataURL(f); } catch { failed('verdict.pdfUnopenable'); }
     e.target.value = '';
     return;
   }
   const img = new Image();
-  const url = URL.createObjectURL(f);
+  let url;
+  try { url = URL.createObjectURL(f); }
+  catch { failed('verdict.imageUnopenable'); e.target.value = ''; return; }
+  const release = () => URL.revokeObjectURL(url);
   img.onload = () => {
-    const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
-    const cv = document.createElement('canvas');
-    cv.width = Math.round(img.width * scale); cv.height = Math.round(img.height * scale);
-    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-    const dataURL = cv.toDataURL('image/jpeg', 0.88);
-    setPhoto(dataURL);
-    onReady?.(dataURL);
-    URL.revokeObjectURL(url);
+    try {
+      const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(img.width * scale); cv.height = Math.round(img.height * scale);
+      const context = cv.getContext('2d');
+      if (!context) throw new Error('Canvas unavailable');
+      context.drawImage(img, 0, 0, cv.width, cv.height);
+      const dataURL = cv.toDataURL('image/jpeg', 0.88);
+      if (!dataURL.startsWith('data:image/')) throw new Error('Image encoding failed');
+      setPhoto(dataURL);
+      onReady?.(dataURL);
+    } catch {
+      failed('verdict.imageUnopenable');
+    } finally {
+      release();
+    }
   };
   img.onerror = () => {
-    URL.revokeObjectURL(url);
-    // Previously a silent no-op: the student picked a file and the UI did not
-    // move. A HEIC from an iPhone opened on Android lands here.
-    onFailed?.(translate('verdict.imageUnopenable'));
+    release();
+    // A HEIC from an iPhone opened on Android may land here.
+    failed('verdict.imageUnopenable');
   };
-  img.src = url;
+  try { img.src = url; }
+  catch { release(); failed('verdict.imageUnopenable'); }
   e.target.value = '';
 }
 
