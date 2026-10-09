@@ -1969,6 +1969,27 @@
     },
     {
       "method": "POST",
+      "path": "/v1/practice/prepare",
+      "auth": "none",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "public; server-chosen question preview for a signed-out student plus an encrypted, expiring token; no account data read or written; the token is bound once by one eligible account through /v1/practice/issue",
+      "rateLimits": [
+        {
+          "key": "practice-prepare",
+          "limit": 90,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
       "path": "/v1/practice/issue",
       "auth": "session",
       "roles": [
@@ -1977,7 +1998,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "eligible student; issues an authored, private per-account question and sealed server question record; caller cannot supply mark scheme or correct answer",
+      "ownership": "eligible student; the server chooses and issues an authored, private per-account question (or binds a prepared one, once); sealed server question record; a caller-chosen seed is refused outside NODE_ENV=test",
       "rateLimits": [
         {
           "key": "practice-issue",
@@ -2050,6 +2071,29 @@
       "rateLimits": [
         {
           "key": "practice-reveal",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/practice/:id/repeat",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "eligible student; re-issues to the same account a question it has already resolved, flagged as a repeat so its attempt is never new credit; another account's or an unresolved question id is refused",
+      "rateLimits": [
+        {
+          "key": "practice-repeat",
           "limit": 120,
           "windowMs": 3600000,
           "identity": "account"

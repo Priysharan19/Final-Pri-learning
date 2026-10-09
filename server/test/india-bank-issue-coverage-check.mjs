@@ -4,7 +4,7 @@
 // so `c11-3d-introduction` and `c12-3d-geometry` were refused (400) and a
 // signed-in student's 3D-geometry questions silently stayed device-marked.
 // Over real HTTP: every India class generator the client ships is issued (201)
-// with the same prompt the device generated.
+// from that bank, under the caller's account, with no seed disclosed.
 import assert from 'node:assert/strict';
 
 process.env.PRI_AUTH_DELIVERY_KEY = process.env.PRI_AUTH_DELIVERY_KEY || '55'.repeat(32);
@@ -25,12 +25,13 @@ try {
   // Every India class bank the client ships, at a difficulty it authors.
   const banks = Object.keys(GENERATORS).filter(id => /^c(?:[7-9]|1[0-2])-/.test(id));
   for (const generator of banks) {
-    let local = null;
-    try { local = generateQuestion(generator, 1, 104729); } catch { continue; }
-    const res = await h.request('/v1/practice/issue', { method: 'POST', jar: student.jar, body: { generator, difficulty: 1, seed: 104729, curriculum: 'in', mode: 'practice' } });
+    try { generateQuestion(generator, 1, 104729); } catch { continue; }
+    // The product never sends a seed: the server chooses the question.
+    const res = await h.request('/v1/practice/issue', { method: 'POST', jar: student.jar, body: { generator, difficulty: 1, curriculum: 'in', mode: 'practice' } });
     // Each issue names the account it was issued under, so a shared device can
     // refuse a question issued under another profile's session.
-    if (res.status === 201 && res.data?.question?.prompt === local.prompt &&
+    if (res.status === 201 && res.data?.question?.subtopic === generator && typeof res.data.question.prompt === 'string' &&
+        res.data.question.prompt.length > 0 && !('seed' in res.data.question) && !('seed' in res.data) &&
         res.data.accountId === String(student.account.id)) issued++;
     else refused.push(`${generator} → ${res.status} ${res.data?.error?.code || ''}`.trim());
     if (res.status === 429) break;
