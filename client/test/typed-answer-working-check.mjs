@@ -316,7 +316,10 @@ const publicQ = { id: 'q-area', answerType: 'numeric', supportsSteps: true, prom
   ok(/invalidRetry && answerGuidance/.test(card), 'an invalid numeric answer gets the specific message in the verdict too');
   const backend = read('src/local/backend.js');
   ok(/function stepMetaFor\(q\) \{\s*if \(q\.stepcheck\) return q\.stepcheck;/.test(backend), 'the device path marks working against the authored plan');
-  ok(/supportsSteps: row\.serverQuestionId \? q\.supportsSteps === true : !!stepMetaFor\(q\)/.test(backend), 'and reports supportsSteps only from a real rubric');
+  // A server question (issued, prepared) and an offline draft are public
+  // projections: the flag on them is the one computed where the rubric lives.
+  ok(/supportsSteps: publicShaped\(row\) \? q\.supportsSteps === true : !!stepMetaFor\(q\)/.test(backend) &&
+    /function draftQuestion\(q\) \{\s*return \{ \.\.\.publicQuestionFields\(q\), supportsSteps: !!stepMetaFor\(q\)/.test(backend), 'and reports supportsSteps only from a real rubric');
   const sanitize = /function sanitize\(q, row\) \{[\s\S]*?\n\}/.exec(backend)?.[0] || '';
   ok(sanitize && !/stepcheck|q\.answer\b|q\.steps\b/.test(sanitize.replace(/stepMetaFor\(q\)/g, '')), 'the device’s public question view never carries the plan, the key or the solution');
 }

@@ -94,7 +94,8 @@ async function markable(body = {}) {
   for (let i = 0; i < 60; i++) {
     const s = await api.post('/practice/next', { mode: 'topic', subtopic: YEAR10[topicTurn++ % YEAR10.length], ...body, resume: false });
     const row = await rowOf(s.question.id);
-    const q = row.payload;
+    // The device holds no answer; the key is the server's sealed copy (oracle).
+    const q = await online.answerKey(row);
     const right = canonical(q), wrong = wrongFor(q);
     const ok = right !== null && wrong !== null && checkAnswer(q, right).correct && !checkAnswer(q, wrong).correct
       && !checkAnswer(q, wrong).invalid
@@ -219,6 +220,76 @@ await check('a submission without a key is not marked; two keyed deliveries raci
   assert.equal((await outboxFor(me.id, t.id)).length, 1);
 });
 
+// ── A question opened signed out is the server's, waiting for an account ────
+// Signed out with the server reachable, the student is shown a PREPARED
+// question: they write and tap Submit, are asked to sign in, and the same row
+// — with the page of handwriting and the pending submission the card kept —
+// is then bound to their account and marked. Opened with no connection it is
+// a DRAFT, which is never marked.
+await check('a prepared question keeps its row, ink and pending submission through sign-in and is then marked once', async () => {
+  const guest = (await api.post('/profiles', { name: 'Lifecycle Guest', year: 10 })).user;
+  try {
+    drafts.setDraftProfile(guest.id);
+    const s = await api.post('/practice/next', { mode: 'topic', subtopic: YEAR10[topicTurn++ % YEAR10.length], resume: false });
+    const id = s.question.id;
+    const served = await rowOf(id);
+    assert.deepEqual([s.question.checkState, typeof served.prepared, served.serverQuestionId], ['prepared', 'string', undefined]);
+    assert.ok(!('answer' in served.payload) && !('steps' in served.payload) && !('seed' in served.payload), 'no key on the device');
+    const typed = s.question.answerType === 'mcq' ? '0' : '987654321';
+    const sid = recovery.newSubmissionId();
+    const strokes = [{ points: [{ x: 11, y: 12 }, { x: 13, y: 14 }] }];
+    assert.equal(recovery.saveInkDraft(id, strokes), true);
+    await inkDrafts.flushInkDrafts();
+    recovery.savePendingSubmission(id, { submissionId: sid, answer: typed, ms: 700, viaInk: false, lines: ['signed-out working'] });
+    const before = { ...online.traffic };
+
+    const e = await refusal(api.post(`/practice/${id}/submit`, { answer: typed, ms: 700, submissionId: sid }));
+    assert.deepEqual([e.status, e.code], [401, 'SIGN_IN_TO_CHECK']);
+    assert.deepEqual([online.traffic.issue - before.issue, online.traffic.grade - before.grade], [0, 0], 'nothing was bound or graded signed out');
+    assert.equal((await rowOf(id)).prepared, served.prepared, 'the token is kept');
+    assert.equal((await attemptsOf(guest.id, id)).length, 0);
+
+    await online.link(guest.id, { name: guest.name });
+    // Everything the card kept is still there for the signed-in student…
+    assert.deepEqual((await recovery.readInkDraft(id))?.[0]?.points, strokes[0].points);
+    const pending = recovery.readPendingSubmission(id);
+    assert.deepEqual([pending?.submissionId, pending?.answer], [sid, typed]);
+    const relaunch = await api.post('/practice/next', { resume: true, pendingQuestionId: recovery.pendingSubmissionQuestionId() });
+    assert.equal(relaunch.question.id, id, 'the same question is served back');
+    // …and the pending submission, same key, is what the server marks.
+    const marked = await api.post(`/practice/${id}/submit`, { answer: pending.answer, ms: pending.ms, submissionId: pending.submissionId });
+    const bound = await rowOf(id);
+    assert.deepEqual([online.traffic.bind - before.bind, online.traffic.grade - before.grade], [1, 1], 'one bind carrying the token, one grade');
+    assert.deepEqual([bound.id, bound.payload.prompt, typeof bound.serverQuestionId, bound.prepared], [id, s.question.prompt, 'string', undefined]);
+    assert.deepEqual([marked.authoritative, marked.submissionId, typeof marked.attemptId], [true, sid, 'string']);
+    assert.equal(marked.correct, checkAnswer(await online.answerKey(bound), typed).correct === true, 'the verdict is the server\'s, against its own sealed question');
+    const replay = await api.post(`/practice/${id}/submit`, { answer: pending.answer, ms: pending.ms, submissionId: pending.submissionId });
+    assert.deepEqual([replay.replayed, replay.attemptId], [true, marked.attemptId]);
+    assert.deepEqual([online.traffic.bind - before.bind, online.traffic.grade - before.grade], [1, 1], 'a replay binds and grades nothing more');
+    assert.equal((await attemptsOf(guest.id, id)).length, marked.resolved ? 1 : 0);
+    assert.deepEqual((await recovery.readInkDraft(id))?.[0]?.points, strokes[0].points, 'the handwriting outlived the whole exchange');
+    if (!marked.resolved) await api.post(`/practice/${id}/reveal`, { ms: 100 });
+
+    // Opened with no connection: a draft. Never marked, working kept.
+    const d = await online.offline(() => api.post('/practice/next', { mode: 'topic', subtopic: YEAR10[topicTurn++ % YEAR10.length], resume: false }));
+    assert.deepEqual([d.question.checkState, (await rowOf(d.question.id)).draftOnly], ['draft', true]);
+    const dsid = recovery.newSubmissionId();
+    recovery.savePendingSubmission(d.question.id, { submissionId: dsid, answer: '1', ms: 5, viaInk: false });
+    const de = await refusal(api.post(`/practice/${d.question.id}/submit`, { answer: '1', ms: 5, submissionId: dsid }));
+    assert.deepEqual([de.status, de.code], [409, 'QUESTION_NOT_SERVER_ISSUED']);
+    const dr = await rowOf(d.question.id);
+    assert.deepEqual([dr.tries || 0, dr.answered || 0, (await attemptsOf(guest.id, d.question.id)).length], [0, 0, 0]);
+    assert.equal(recovery.readPendingSubmission(d.question.id)?.submissionId, dsid, 'the working is kept');
+    recovery.clearPendingSubmission(d.question.id);
+    recovery.clearPendingSubmission(id);
+    await recovery.clearInkDraft(id);
+    await api.post(`/practice/${d.question.id}/discard`, {});
+  } finally {
+    drafts.setDraftProfile(null);
+    await api.post('/profiles/select', { id: me.id });
+  }
+});
+
 // ── Online-only grading: a refusal marks nothing and loses nothing ──────────
 await check('signed out, offline or with no server: the submission is refused by name, nothing is spent, and the working is kept', async () => {
   const t = await markable();
@@ -232,6 +303,7 @@ await check('signed out, offline or with no server: the submission is refused by
   const xp = (await api.get('/me')).user.xp;
   const sent = online.traffic.grade;
 
+  try {
   const refusals = [
     ['signed out', fn => online.signedOut(fn), 401, 'SIGN_IN_TO_CHECK'],
     ['offline', fn => online.offline(fn), 503, 'RECONNECT_TO_CHECK'],
@@ -265,9 +337,12 @@ await check('signed out, offline or with no server: the submission is refused by
   assert.deepEqual([replay.replayed, replay.attemptId], [true, marked.attemptId]);
   assert.equal((await attemptsOf(me.id, t.id)).length, 1);
   assert.equal((await outboxFor(me.id, t.id)).length, 1);
-  recovery.clearPendingSubmission(t.id);
-  await recovery.clearInkDraft(t.id);
-  drafts.setDraftProfile(null);
+  } finally {
+    // Whatever the verdict, the next groups start with nothing kept.
+    recovery.clearPendingSubmission(t.id);
+    await recovery.clearInkDraft(t.id);
+    drafts.setDraftProfile(null);
+  }
 });
 
 // ── 2 · Sync carries each attempt exactly once ──────────────────────────────
