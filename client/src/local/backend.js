@@ -3429,7 +3429,10 @@ const routes = {
       throw Object.assign(new Error('Ask for the help levels in order.'), { status: 409, code: 'TUTOR_LEVEL_ORDER', next: used + 1 });
     }
     const q = row.payload;
-    if (level > used) {
+    // Level 3 shows the solution, which the server may refuse (no account, no
+    // connection, a question it never issued). Its level is recorded only once
+    // the server has revealed, so a refused walkthrough leaves no help charged.
+    if (level > used && level < 3) {
       row.tutorLevel = level;
       await put('questions', row);
     }
@@ -3447,6 +3450,7 @@ const routes = {
       await requireServerIssue(row);
       const serverReveal = await revealOnServer(row);
       row.serverReceipt = serverReveal;
+      row.tutorLevel = tutorLevel;
       // The walkthrough is the deterministic Pri Explain storyboard of the
       // verified solution — the whole solution, final answer included. Showing
       // it therefore ends the question exactly as Reveal does: resolved, marked
