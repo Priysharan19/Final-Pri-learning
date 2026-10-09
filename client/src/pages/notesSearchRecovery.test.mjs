@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { loadAllSearchNotes } from './notesSearchRecovery.js';
+const grades = [7,8,9,10,11,12];
+let calls=[],fail=true;
+const get=async grade => { calls.push(grade);if(fail && grade===10)throw new Error('first network attempt failed');return {['c'+grade]:{verified:true}} };
+await assert.rejects(loadAllSearchNotes(grades,get),/first network attempt failed/);
+assert.deepEqual(calls, grades, 'all grades requested; a failed chunk cannot produce partial search results');
+calls=[];fail=false;
+const all=await loadAllSearchNotes(grades,get);
+assert.deepEqual(Object.keys(all),grades.map(String),'retry after failure loads every class without losing a grade');
+assert.deepEqual(calls,grades,'retry actually reissues previously unavailable chunk');
+assert.equal(all[10].c10.verified,true);
+await assert.rejects(loadAllSearchNotes([],get),/cannot be loaded/);
+await assert.rejects(loadAllSearchNotes([7],async()=>null),/unavailable/);
+console.log('NOTES SEARCH RETRY AND ALL-OR-NOTHING: PASS 6/6');

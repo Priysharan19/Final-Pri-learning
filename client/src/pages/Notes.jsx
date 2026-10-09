@@ -22,6 +22,7 @@ import { studyHref, selectedStudyContext, selectedStudyPracticeHref } from '../l
 import '../notes/Notes.css';
 import { notesBookmarkKey } from './notesBookmarkScope.js';
 import { chapterNotesLink, notesIndexReturnLink } from './notesStudyLinks.js';
+import { loadAllSearchNotes } from './notesSearchRecovery.js';
 
 // Official exam-track names remain visible as students move between notes,
 // examples and practice; internal URL slugs are never presented as titles.
@@ -297,12 +298,18 @@ function SearchResults({ query }) {
   const [params] = useSearchParams();
   const [all, setAll] = useState(null);
   const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let live = true;
-    Promise.all(NOTES_GRADES.map(g => loadNotesForGrade(g).then(n => [g, n])))
-      .then(rows => { if (live) setAll(Object.fromEntries(rows)); }, () => { if (live) setFailed(true); });
+    // Retry must invoke the real dynamic grade loaders again. Clearing only
+    // the failed flag used to strand the learner on a permanent Loading message.
+    setAll(null); setFailed(false);
+    loadAllSearchNotes(NOTES_GRADES, loadNotesForGrade).then(
+      notes => { if (live) setAll(notes); },
+      () => { if (live) setFailed(true); }
+    );
     return () => { live = false; };
-  }, []);
+  }, [attempt]);
   const results = useMemo(() => {
     if (!all) return [];
     const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -317,7 +324,7 @@ function SearchResults({ query }) {
     return out;
   }, [all, query]);
 
-  if (failed) return <LoadFailed retry={() => { setFailed(false); }} />;
+  if (failed) return <LoadFailed retry={() => setAttempt(n => n + 1)} />;
   if (!all) return <p className="nt-status" role="status">{t('notes.loading')}</p>;
   return (
     <section className="nt-results" aria-live="polite">
