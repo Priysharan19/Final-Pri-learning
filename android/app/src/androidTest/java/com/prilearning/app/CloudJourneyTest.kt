@@ -6,22 +6,36 @@
 // host at 10.0.2.2). The methods run in this order, in separate runs, with the
 // runner controlling the server (kill, restart) and `am force-stop` between:
 //   0. cloudSignUpThenDeleteAccount;
-//   1. cloudSignInAndSync — the real Settings UI signs in through the native
+//   1. cloudSignInAndSync — signed out with the server reachable, the student
+//      is shown a server-PREPARED question and Submit is refused on the card
+//      with the sign-in; then the real Settings UI signs in through the native
 //      bridge (page → priBridge → HttpURLConnection → server), Sync now pushes
-//      the local profile, the session lives only in the Keystore-encrypted jar
-//      (not in the WebView cookie store, not readable by the page, not
-//      plaintext on disk);
-//   1b. offlineLearningContinuesAndSyncIsNotOffered — with the server stopped,
-//      an attempt is marked on the device and Sync is not offered;
+//      the local profile, and the server marks a typed answer: a wrong answer
+//      scores 0 with a try left, the right answer scores full marks, History
+//      shows it. The session lives only in the Keystore-encrypted jar (not in
+//      the WebView cookie store, not readable by the page, not plaintext on
+//      disk);
+//   1b. offlineWorkIsKeptUnmarkedAndSyncIsNotOffered — with the server
+//      stopped, a question opened on the device is a draft: what is typed is
+//      kept, Submit is refused on the card, nothing is marked or recorded,
+//      and Sync is not offered;
 //   2. cloudSessionSurvivesProcessDeathThenDisconnectClearsIt — the server is
-//      back on the same database; after the
-//      process was killed the account is still connected; Disconnect logs out
-//      on the server and the jar no longer holds a session.
+//      back on the same database; after the process was killed the account is
+//      still connected, History still shows the server-marked attempt, the
+//      server marked nothing that was typed offline; Disconnect logs out on
+//      the server and the jar no longer holds a session.
+// Grading is online-only and server-authoritative (owner decision 2026-10-10,
+// ADR-0001): the device never holds the answer of a question it shows. The
+// right answer therefore comes from OUTSIDE the page and the app — the
+// server's sealed copy of the issued question, read from the throwaway
+// fixture database by scripts/journey-oracle.mjs and asked for by this test
+// process over the emulator's loopback alias (priOracle / priOracleToken).
 // Skipped (not failed) when no server arguments are given. SYNTHETIC / EMULATOR
 // evidence against a throwaway server and fixture account.
 // ─────────────────────────────────────────────────────────────────────────────
 package com.prilearning.app
 
+import android.util.Log
 import android.webkit.WebView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -29,6 +43,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.prilearning.app.cloud.CloudConfig
 import com.prilearning.app.cloud.CookieJar
 import com.prilearning.app.cloud.SecureStore
+import org.json.JSONObject
 import org.json.JSONTokener
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -118,6 +133,101 @@ class CloudJourneyTest {
 
     private fun jarOnDisk(): CookieJar = CookieJar().apply { load(SecureStore(context).read()) }
 
+    // ── The question card, and the oracle outside it ─────────────────────────
+    /** A wrong answer no sealed answer is allowed to equal (the oracle is told to avoid it). */
+    private val WRONG = "-987654"
+
+    /** Ask the oracle relay (never the page, never the app's bridge) one question. */
+    private fun oracle(path: String): JSONObject {
+        val base = args.getString("priOracle", "")
+        val token = args.getString("priOracleToken", "")
+        assertTrue("the sealed-answer oracle is given (priOracle, priOracleToken)", base.isNotEmpty() && token.isNotEmpty())
+        val conn = java.net.URL("$base$path").openConnection() as java.net.HttpURLConnection
+        conn.connectTimeout = 10_000; conn.readTimeout = 10_000
+        conn.setRequestProperty("X-Pri-Oracle", token)
+        return try {
+            assertEquals("the oracle answers $path", 200, conn.responseCode)
+            JSONObject(conn.inputStream.bufferedReader().readText())
+        } finally { conn.disconnect() }
+    }
+
+    private fun openPractice(s: ActivityScenario<MainActivity>) {
+        eval(s, "(function(){history.pushState({},'','/practice');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
+        waitFor(s, "document.querySelector('.q-prompt') && !!${QuestionCardJs.QID}")
+        Thread.sleep(500)
+    }
+
+    private fun qid(s: ActivityScenario<MainActivity>) = eval(s, QuestionCardJs.QID).trim('"')
+
+    /** The card's own Next control: a different question is on the card afterwards. */
+    private fun nextQuestion(s: ActivityScenario<MainActivity>) {
+        val before = qid(s)
+        waitFor(s, "(function(){var n=document.querySelector('.ctx-next');if(!n)return false;n.click();return true;})()")
+        waitFor(s, "(function(){var id=${QuestionCardJs.QID};return !!id && id !== '$before' && !!document.querySelector('.q-prompt');})()")
+        Thread.sleep(500)
+    }
+
+    /** Open the typed-answer editor if this question has one. */
+    private fun typedEditor(s: ActivityScenario<MainActivity>): Boolean {
+        eval(s, "(function(){var t=[].slice.call(document.querySelectorAll('button')).find(function(b){return (b.getAttribute('aria-label')||'')==='Type: answer by typing';});if(t)t.click();return true;})()")
+        Thread.sleep(400)
+        return eval(s, "!!document.querySelector('.editor-body input.answer-input')") == "true"
+    }
+
+    /** Move on (at most `max` questions) until one takes a typed final answer. */
+    private fun openTypedQuestion(s: ActivityScenario<MainActivity>, max: Int = 12, advanceFirst: Boolean = false) {
+        if (advanceFirst) nextQuestion(s)
+        for (i in 0 until max) {
+            if (typedEditor(s)) return
+            nextQuestion(s)
+        }
+        throw AssertionError("no question with a typed answer in $max")
+    }
+
+    /** Press Submit and wait for the check it starts to finish; what the card then shows. */
+    private fun submitAndWait(s: ActivityScenario<MainActivity>): String {
+        waitFor(s, QuestionCardJs.PRESS_SUBMIT, 20_000)
+        waitFor(s, QuestionCardJs.CHECK_STARTED, 15_000)
+        waitFor(s, QuestionCardJs.CHECK_IDLE, 45_000)
+        Thread.sleep(500)
+        return eval(s, QuestionCardJs.OUTCOME).trim('"')
+    }
+
+    private fun assertUnmarked(s: ActivityScenario<MainActivity>, whenText: String) =
+        assertEquals("$whenText: nothing a marker leaves is on the card", "\"\"", eval(s, QuestionCardJs.MARKED_TRACES))
+
+    private fun openHistory(s: ActivityScenario<MainActivity>) {
+        eval(s, "(function(){history.pushState({},'','/review');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
+        waitFor(s, "location.pathname === '/review' && !!document.querySelector('main')")
+        Thread.sleep(1500)
+    }
+
+    /** History's verdict for one question, as a screen reader hears it ('missing' when absent). */
+    private fun historyVerdict(s: ActivityScenario<MainActivity>, id: String) = eval(s,
+        "([].slice.call(document.querySelectorAll('.hist-row[data-question-id=\"$id\"] .hist-verdict .sr-only')).map(function(n){return n.textContent.trim();}).join('+')||'missing')").trim('"')
+
+    /** The server's own record: exactly one completed question, a typed miss (0, one try left) then full marks. */
+    private fun assertServerMarkedOnce(whenText: String): String {
+        val marked = oracle("/marked")
+        val done = marked.getJSONArray("completed")
+        assertEquals("$whenText: the server completed exactly one question: $marked", 1, done.length())
+        val q = done.getJSONObject(0)
+        assertEquals("$whenText: it was answered by typing", "typed", q.optString("inputMode"))
+        val grades = q.getJSONArray("grades")
+        assertEquals("$whenText: the server gave two grades: $grades", 2, grades.length())
+        val miss = grades.getJSONObject(0); val hit = grades.getJSONObject(1)
+        assertTrue("$whenText: the wrong answer was marked 0 by the server with one try left: $miss",
+            miss.getBoolean("authoritative") && !miss.getBoolean("correct") && !miss.getBoolean("invalid") &&
+                miss.getDouble("marksEarned") == 0.0 && !miss.getBoolean("resolved") && miss.getInt("triesLeft") == 1)
+        assertTrue("$whenText: the right answer was given full marks by the server: $hit",
+            hit.getBoolean("authoritative") && hit.getBoolean("correct") && hit.getBoolean("resolved") &&
+                hit.getDouble("marksPossible") > 0.0 && hit.getDouble("marksEarned") == hit.getDouble("marksPossible"))
+        return q.getString("serverQuestionId")
+    }
+
+    /** What cloudSignInAndSync left for the runs after the process is killed. */
+    private val gradedFile get() = java.io.File(context.filesDir, "pri-test-graded-question")
+
     /** Sign up through Settings, sign in, then permanently delete the account. */
     @Test
     fun cloudSignUpThenDeleteAccount() {
@@ -159,38 +269,34 @@ class CloudJourneyTest {
 
     /** Runs while the cloud server is unreachable (the runner passes priCloudOffline). */
     @Test
-    fun offlineLearningContinuesAndSyncIsNotOffered() {
+    fun offlineWorkIsKeptUnmarkedAndSyncIsNotOffered() {
         assumeTrue("run by android/scripts/run-instrumented.sh with the server stopped", args.getString("priCloudOffline", "") == "true")
+        val graded = JSONObject(gradedFile.readText())
         ActivityScenario.launch(MainActivity::class.java).use { s ->
             reachHome(s)
-            eval(s, "(function(){history.pushState({},'','/practice');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
-            waitFor(s, "document.querySelector('.q-prompt')")
-            // Learning offline: a typed attempt is marked on the device.
-            var marked = false
-            for (i in 0 until 12) {
-                eval(s, "(function(){var t=[].slice.call(document.querySelectorAll('button')).find(function(b){return (b.getAttribute('aria-label')||'')==='Type: answer by typing';});if(t)t.click();return true;})()")
-                Thread.sleep(400)
-                if (eval(s, "!!document.querySelector('.editor-body input.answer-input')") == "true") {
-                    setValue(s, ".editor-body input.answer-input", "7")
-                    waitFor(s, "(function(){var b=[].slice.call(document.querySelectorAll('.editor-foot .btn-primary')).find(function(x){return x.offsetParent&&!x.disabled});if(!b)return false;b.click();return true;})()")
-                    waitFor(s, "document.querySelector('.verdict')||document.querySelector('.your-answer')")
-                    // Resolve it (a first wrong answer offers one more go), so it is a learning event to sync.
-                    for (k in 0 until 3) {
-                        if (eval(s, "!!document.querySelector('.eval-card')") == "true") break
-                        // One more go needs a changed answer before it can be submitted.
-                        setValue(s, ".editor-body input.answer-input", "${8 + k}")
-                        Thread.sleep(300)
-                        eval(s, "(function(){var b=[].slice.call(document.querySelectorAll('.editor-foot .btn-primary')).find(function(x){return x.offsetParent&&!x.disabled});if(b)b.click();return true;})()")
-                        Thread.sleep(1500)
-                    }
-                    waitFor(s, "!!document.querySelector('.eval-card') || false")
-                    marked = true
-                    break
-                }
-                eval(s, "(function(){var n=document.querySelector('.ctx-next');if(n)n.click();return true;})()")
-                Thread.sleep(900)
-            }
-            assertTrue("an attempt is marked while the cloud is unreachable", marked)
+            openPractice(s)
+            // A question opened now was never the server's: the device shows one
+            // of its own as a draft to work on. It can be typed into and is kept,
+            // but it can never be marked — not now, and not after reconnecting.
+            openTypedQuestion(s, advanceFirst = true)
+            val draftId = qid(s)
+            assertTrue("the offline question is not the one the server marked", draftId.isNotEmpty() && draftId != graded.getString("id"))
+            setValue(s, ".editor-body input.answer-input", "7")
+            assertEquals("the typed answer is stored on this device", "\"7\"", waitFor(s, QuestionCardJs.storedTyped(draftId), 15_000))
+            assertUnmarked(s, "typing offline")
+            assertEquals("Submit is refused on the card while the server is unreachable", "refused", submitAndWait(s))
+            assertEquals("the refusal says this copy was never the server's", "\"new-question\"", eval(s, QuestionCardJs.REFUSAL))
+            assertEquals("the refusal's next step is a new question", "true", eval(s, QuestionCardJs.visible("[data-check-next]")))
+            assertEquals("the refusal offers no retry that cannot succeed", "false", eval(s, QuestionCardJs.visible("[data-check-retry]")))
+            assertUnmarked(s, "a refused Submit offline")
+            assertEquals("the typed answer is still on the card", "\"7\"", eval(s, QuestionCardJs.TYPED))
+            // Nothing was recorded: History holds the server-marked attempt and no other.
+            openHistory(s)
+            assertEquals("the offline draft is not in History", "missing", historyVerdict(s, draftId))
+            assertEquals("the server-marked attempt is still in History", "Correct", historyVerdict(s, graded.getString("id")))
+            // …and the server's own record is unchanged (its database is read by the oracle).
+            assertEquals("the server's record is unchanged while it is stopped", graded.getString("server"), assertServerMarkedOnce("offline"))
+            offlineDraftFile.writeText(draftId)
             openSettings(s)
             waitFor(s, "$stateTag === 'Linked · offline'", 60_000)
             assertEquals("true", waitFor(s, "!!document.querySelector('[data-cloud-offline]')"))
@@ -198,6 +304,9 @@ class CloudJourneyTest {
                 eval(s, "(function(){var b=($byText)('Sync now');return !b||b.disabled;})()"))
         }
     }
+
+    /** The draft opened while the server was stopped, for the run after reconnect. */
+    private val offlineDraftFile get() = java.io.File(context.filesDir, "pri-test-offline-draft")
 
     @Test
     fun cloudSignInAndSync() {
@@ -208,6 +317,27 @@ class CloudJourneyTest {
             reachHome(s)
             assertEquals("the host advertises a configured cloud over the bridge", "true",
                 eval(s, "window.__PRI_HOST__.capabilities.cloud.configured === true && window.__PRI_HOST__.capabilities.cloud.transport === 'bridge'"))
+
+            // Signed out with the server reachable: the question is the server's
+            // (prepared), and checking it needs an account.
+            val before = oracle("/marked")
+            assertEquals("the fixture account starts with nothing issued or marked: $before", "0/0/0",
+                "${before.getInt("issued")}/${before.getInt("prepared")}/${before.getJSONArray("completed").length()}")
+            openPractice(s)
+            // Practice restores the question that was open last, which may be a
+            // draft the shell journey opened with no server (never markable).
+            // A question opened NOW, with the server reachable, is the server's.
+            openTypedQuestion(s, advanceFirst = true)
+            val preparedId = qid(s)
+            assertEquals("the card says checking needs an account", "true", waitFor(s, QuestionCardJs.visible("[data-check-needs-account]")))
+            setValue(s, ".editor-body input.answer-input", WRONG)
+            assertEquals("Submit is refused signed out", "refused", submitAndWait(s))
+            assertEquals("the refusal is the in-card sign-in", "\"sign-in\"", eval(s, QuestionCardJs.REFUSAL))
+            assertEquals("the refusal offers the sign-in on the card", "true", eval(s, QuestionCardJs.visible(".verdict [data-check-sign-in]")))
+            assertUnmarked(s, "signed-out Submit")
+            assertEquals("the typed answer is kept through the refusal", "\"$WRONG\"", eval(s, QuestionCardJs.TYPED))
+            assertEquals("signed out, the server issued and marked nothing for the account", 0, oracle("/marked").getInt("issued"))
+
             openSettings(s)
             assertEquals("\"Not connected\"", waitFor(s, stateTag))
             eval(s, "($byText)('Sign in').click()")
@@ -216,11 +346,81 @@ class CloudJourneyTest {
             eval(s, "document.querySelector('#cloud-email').form.querySelector('button[type=submit]').click()")
             waitFor(s, "$stateTag === 'Connected'")
 
+
             waitFor(s, "(function(){var b=($byText)('Sync now');if(!b||b.disabled)return false;b.click();return true;})()")
             val synced = waitFor(s, "(function(){var t=document.querySelector('section[aria-labelledby=\"cloud-account-title\"]').innerText;var m=t.match(/Sync complete[^\\n]*/);return m?m[0]:false;})()", 60_000)
             assertTrue("the local profile synced to the real server: $synced", synced.contains("Sync complete"))
-            // Remember what the server holds now: the offline attempt made next must add to it.
-            eventBaselineFile.writeText(serverEventCount(jarOnDisk().value(java.net.URI(origin).host, "pri_cloud_session")!!).toString())
+            val sessionNow = jarOnDisk().value(java.net.URI(origin).host, "pri_cloud_session")!!
+            val eventsBefore = serverEventCount(sessionNow)
+
+            // Signed in: the server marks. A wrong answer first, then the right
+            // one, on a question whose sealed answer the oracle can state.
+            //
+            // The first candidate is the question prepared signed out. Its
+            // Submit was refused for want of an account, not dropped: the card
+            // keeps that one submission and delivers it, under the same key,
+            // once the account can be checked (QuestionCard's pending
+            // submission; a 401 is not a definitive refusal). So coming back to
+            // the card signed in, the server binds the prepared question to the
+            // account and marks the answer typed signed out — without a second
+            // press, and exactly once.
+            openPractice(s)
+            assertEquals("Practice comes back to the question prepared signed out", preparedId, qid(s))
+            var escrow: JSONObject? = null
+            val passed = mutableListOf<String>()
+            for (i in 0 until 12) {
+                if (i > 0) nextQuestion(s)
+                if (!typedEditor(s)) { passed += "no-typed-answer"; continue }
+                val got: String
+                if (i == 0) {
+                    assertEquals("the answer typed signed out is still on the card", "\"$WRONG\"", waitFor(s, QuestionCardJs.TYPED))
+                    got = waitFor(s, "(function(){var o=${QuestionCardJs.OUTCOME};return (o==='nothing'||o==='confirm'||!${QuestionCardJs.CHECK_IDLE})?false:o;})()", 60_000).trim('"')
+                } else {
+                    // An issued question: ask before spending a try on it.
+                    val peek = oracle("/answer")
+                    if (!peek.optBoolean("supported")) { passed += peek.optString("answerType", peek.optString("reason", "unstatable")); continue }
+                    setValue(s, ".editor-body input.answer-input", WRONG)
+                    Thread.sleep(300)
+                    got = submitAndWait(s)
+                }
+                assertTrue("the signed-in check was not refused ($got / ${eval(s, QuestionCardJs.REFUSAL)}; passed over: $passed)", got != "refused" && got != "technical")
+                // Only now is the question certainly the account's: read its sealed answer.
+                val sealed = oracle("/answer")
+                if (i == 0) {
+                    assertTrue("the server bound the question it prepared signed out to the account: $sealed", sealed.optBoolean("fromPrepared"))
+                    assertEquals("exactly one prepared question was bound", 1, oracle("/marked").getInt("prepared"))
+                }
+                if (got != "miss" || !sealed.optBoolean("supported")) { passed += "$got/${sealed.optString("answerType", "unstatable")}"; continue }
+                assertEquals("a first miss does not resolve the question", "false|false",
+                    eval(s, "!!document.querySelector('.eval-card')") + "|" + eval(s, "!!document.querySelector('.solution-panel')"))
+                assertEquals("a second try is offered", "true", eval(s, "(function(){var b=document.querySelector('.editor-body input.answer-input');return !!b&&!b.disabled;})()"))
+                Log.i("PRITEST", "server marked the wrong answer on question ${i + 1}" +
+                    (if (i == 0) " (prepared signed out, bound to the account at check time)" else " (issued to the account)") + "; passed over: $passed")
+                escrow = sealed
+                break
+            }
+            assertNotNull("a question with a statable numeric answer was found in 12 (passed over: $passed)", escrow)
+            val gradedId = qid(s)
+            setValue(s, ".editor-body input.answer-input", escrow!!.getString("text"))
+            Thread.sleep(300)
+            assertEquals("the right answer is evaluated", "evaluated", submitAndWait(s))
+            assertEquals("the evaluation is Correct", "\"correct\"", eval(s, "document.querySelector('.eval-card').getAttribute('data-outcome')"))
+            assertEquals("the marks shown are the server's, not 'unavailable'", "false", eval(s, "!!document.querySelector('[data-grade-unavailable]')"))
+            val marks = eval(s, QuestionCardJs.FULL_MARKS).trim('"')
+            assertTrue("full marks are shown ($marks)", marks.isNotEmpty())
+            // What the SERVER holds, whatever the screen said.
+            val serverId = assertServerMarkedOnce("after the right answer")
+            assertEquals("the completed question is the one whose sealed answer was typed", escrow.getString("serverQuestionId"), serverId)
+            openHistory(s)
+            assertEquals("History shows the server-marked attempt", "Correct", historyVerdict(s, gradedId))
+            gradedFile.writeText(JSONObject().put("id", gradedId).put("server", serverId).toString())
+            Log.i("PRITEST", "server marked 0 with a try left, then $marks; History shows Correct")
+            // The server recorded the marked attempt as a learning event of its
+            // own. Remember the count: nothing typed offline next may add a mark.
+            val eventsAfter = serverEventCount(sessionNow)
+            assertTrue("the server-marked attempt is a learning event on the server ($eventsAfter, $eventsBefore before)", eventsAfter > eventsBefore)
+            eventBaselineFile.writeText(eventsAfter.toString())
+            openSettings(s)
 
             // Google Play billing on an image without the Play Store, against a
             // server with no Google configuration: it answers in the closed error
@@ -290,20 +490,24 @@ class CloudJourneyTest {
             reachHome(s)
             openSettings(s)
             waitFor(s, "$stateTag === 'Connected'")
-            // Reconnected (the same server came back): the attempt made offline is pushed.
-            // Automatic sync (on start / back online / visible) may already have pushed
-            // it before Sync now is pressed, so the manual push can legitimately report
-            // 0; the server's own record is the proof that the offline work arrived.
+            // Reconnected (the same server came back). Nothing typed offline was
+            // ever marked, so reconnecting has no mark to deliver: the server's
+            // record is still exactly the one attempt it marked itself, and it
+            // lost none of what it held.
             waitFor(s, "(function(){var b=($byText)('Sync now');if(!b||b.disabled)return false;b.click();return true;})()")
-            val pushed = waitFor(s, "(function(){var t=document.querySelector('section[aria-labelledby=\"cloud-account-title\"]').innerText;var m=t.match(/Sync complete: (\\d+) learning event/);return m?m[1]:false;})()", 60_000)
-            val pushedNow = pushed.trim('"').toIntOrNull() ?: 0
+            waitFor(s, "(function(){var t=document.querySelector('section[aria-labelledby=\"cloud-account-title\"]').innerText;var m=t.match(/Sync complete[^\\n]*/);return m?m[0]:false;})()", 60_000)
+            val graded = JSONObject(gradedFile.readText())
+            assertEquals("after reconnect the server still holds exactly the attempt it marked", graded.getString("server"), assertServerMarkedOnce("after reconnect"))
             val onServer = serverEventCount(session)
-            val baseline = eventBaselineFile.takeIf { it.exists() }?.readText()?.trim()?.toIntOrNull()
-            if (baseline != null) {
-                assertTrue("work done offline reaches the server on reconnect (server holds $onServer learning event(s), $baseline after sign-in; $pushedNow pushed by Sync now)", onServer > baseline)
-            } else {
-                assertTrue("work done offline reaches the server on reconnect (server holds $onServer learning event(s); $pushedNow pushed by Sync now)", pushedNow >= 1 || onServer >= 1)
-            }
+            val baseline = eventBaselineFile.readText().trim().toInt()
+            assertTrue("the server lost nothing across the restart (holds $onServer learning event(s), $baseline after it marked)", onServer >= baseline)
+            // After the process death, History still shows the server-marked
+            // attempt, and the draft typed offline was not turned into one.
+            openHistory(s)
+            assertEquals("History shows the server-marked attempt after relaunch", "Correct", historyVerdict(s, graded.getString("id")))
+            assertEquals("the offline draft is still not in History", "missing", historyVerdict(s, offlineDraftFile.readText().trim()))
+            openSettings(s)
+            waitFor(s, "$stateTag === 'Connected'")
             eval(s, "($byText)('Disconnect').click()")
             waitFor(s, "$stateTag === 'Not connected'")
             val end = System.currentTimeMillis() + 5_000
