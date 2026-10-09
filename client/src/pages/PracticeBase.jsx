@@ -17,6 +17,7 @@ import { isContentEmpty, servable, contentEmptySignal } from '../lib/contentServ
 import { practiceHref, practiceRequestFromQuery } from '../lib/practiceLinks.js';
 import { queueTelemetry } from '../platform/telemetry.js';
 import { consumeSessionReceipt } from './practiceSessionReceipt.js';
+import { shouldReloadPracticeOnCloudSignIn } from './practiceCloudRecovery.js';
 
 // Reuse the existing verified account flow; never create a parallel practice login.
 const PracticeAccountRecovery = React.lazy(() => import('../components/CloudAccountPanel.jsx'));
@@ -244,7 +245,12 @@ function ProfilePractice() {
     if (event?.detail?.connected !== true ||
         String(event.detail.localProfileId) !== String(user?.id)) return;
     setAccountRecoveryOpen(false);
-    void load();
+    // Signing in while a student is writing must not re-issue a question or
+    // replace the mounted Ink canvas with another question ID. InkAnswer has
+    // its own same-profile session listener which retries recognition after
+    // the verified cloud-account transition. Only an empty Practice surface
+    // needs initial question issuance after sign-in.
+    if (shouldReloadPracticeOnCloudSignIn(event, user?.id, currentQuestionRef.current)) void load();
   }), [load, user?.id]);
 
   const setPyqOnly = useCallback((on) => {
