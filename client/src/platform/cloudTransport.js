@@ -232,16 +232,13 @@ export async function cloudRequest(path, {
     return data;
   }
 
-  let origin = normalizeCloudOrigin();
-  if (!origin) {
-    // No server was found when the page loaded. Look once more (briefly, and
-    // not more than every few seconds) before saying there is none.
-    if (Date.now() - lastRediscovery > 4000) {
-      lastRediscovery = Date.now();
-      await discoverCloudOrigin({ timeoutMs: 1500 });
-      origin = normalizeCloudOrigin();
-    }
+  // No server was found when the page loaded: look once more (briefly, and
+  // not more than every few seconds) before saying there is none.
+  if (!normalizeCloudOrigin() && Date.now() - lastRediscovery > 4000) {
+    lastRediscovery = Date.now();
+    await discoverCloudOrigin({ timeoutMs: 1500 });
   }
+  const origin = normalizeCloudOrigin();
   if (!origin) {
     const err = new Error('Pri\'s server cannot be reached from this device right now.');
     err.code = 'CLOUD_DISABLED';
@@ -341,16 +338,13 @@ function streamUnsupported(status) {
 export async function cloudStreamRequest(path, { body, onEvent, timeoutMs = 45_000, signal = null } = {}) {
   if (!PATH.test(String(path || '')) || String(path).includes('..')) throw new Error('Cloud path is not allowed');
   if (nativeCloudAvailable()) throw streamUnsupported();
-  let origin = normalizeCloudOrigin();
-  if (!origin) {
-    // No server was found when the page loaded. Look once more (briefly, and
-    // not more than every few seconds) before saying there is none.
-    if (Date.now() - lastRediscovery > 4000) {
-      lastRediscovery = Date.now();
-      await discoverCloudOrigin({ timeoutMs: 1500 });
-      origin = normalizeCloudOrigin();
-    }
+  // No server was found when the page loaded: look once more (briefly, and
+  // not more than every few seconds) before saying there is none.
+  if (!normalizeCloudOrigin() && Date.now() - lastRediscovery > 4000) {
+    lastRediscovery = Date.now();
+    await discoverCloudOrigin({ timeoutMs: 1500 });
   }
+  const origin = normalizeCloudOrigin();
   if (!origin) {
     const err = new Error('Pri\'s server cannot be reached from this device right now.');
     err.code = 'CLOUD_DISABLED';
