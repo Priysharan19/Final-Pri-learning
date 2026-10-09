@@ -295,6 +295,17 @@ async function run() {
   let view = await GET('/placement');
   eq('a new India profile has no placement yet', view.status, 'none');
   ok('the view carries practice evidence for every Class 7–12 chapter', view.chapters.length === spine.length, `${view.chapters.length}/${spine.length}`);
+  // The placement check is served and marked by the server (owner decision
+  // 2026-10-10), so it needs a signed-in, reachable account from the start.
+  const eventsOf = async accountId => (await online.db.get('SELECT COUNT(*) AS n FROM learning_events WHERE account_id=?', [accountId])).n;
+  eq('signed out, the placement check does not start', await expectError(() => POST('/placement/start', {}), 'SIGN_IN_TO_CHECK'), 'SIGN_IN_TO_CHECK');
+  eq('and nothing was begun', [(await GET('/placement')).status, !!storedProfile(asha.id).placement?.current], ['none', false]);
+  await online.link(asha.id, { name: 'Asha' });
+  eq('offline, it does not start either', await online.offline(() => expectError(() => POST('/placement/start', {}), 'RECONNECT_TO_CHECK')), 'RECONNECT_TO_CHECK');
+  eq('and still nothing was begun', (await GET('/placement')).status, 'none');
+  const ashaAccount = online.accountOf(asha.id).accountId;
+  const ashaEventsBefore = await eventsOf(ashaAccount);
+  const placementTraffic = { ...online.traffic };
   const started = await POST('/placement/start', {});
   const q1 = started.question;
   ok('start serves a question', !!q1?.id && typeof q1.prompt === 'string' && q1.prompt.length > 3);
@@ -306,6 +317,9 @@ async function run() {
   ok('starting again resumes the same question', again.resumed === true && again.question.id === q1.id && again.question.prompt === q1.prompt);
   const row = storedProfile(asha.id);
   ok('the session is stored on the profile row', row?.placement?.current?.id === q1.id);
+  ok('the stored question is the server\'s: issued to this account, with no answer, steps or seed on the device',
+    typeof row.placement.current.serverQuestionId === 'string' && ['answer', 'steps', 'solutionText', 'seed'].every(k => !(k in row.placement.current.payload)), show(Object.keys(row.placement.current.payload)));
+  eq('the device sent no seed to get it', online.traffic.seedsSent, 0);
   // A relaunch: a fresh copy of the backend module reads only what is stored.
   const relaunched = await import(`${SRC}local/backend.js?relaunch=1`);
   const afterRelaunch = await relaunched.dispatch('GET', '/placement');
@@ -316,8 +330,19 @@ async function run() {
   ok('an unreadable answer is not counted', invalid.resolved === false && (await GET('/placement')).progress.asked === 0, show(invalid));
   ok('the gateway refuses an answer that is not text', (() => { try { validateRequest('POST', `/placement/${q1.id}/answer`, { answer: { x: 1 } }); return false; } catch (e) { return e.code === 'INVALID_FIELD'; } })());
 
-  // Drive the diagnostic as a learner with a Class 8 factorisation gap, using
-  // the real marker on the real generated questions.
+  // Offline, an answer is not marked and the question stays the current one.
+  {
+    const before = storedProfile(asha.id).placement;
+    const gradedBefore = online.traffic.grade + online.traffic.reveal;
+    eq('offline, a placement answer is refused', await online.offline(() => expectError(() => POST(`/placement/${q1.id}/answer`, { answer: '1', ms: 1000 }), 'RECONNECT_TO_CHECK')), 'RECONNECT_TO_CHECK');
+    eq('offline, a skip is refused too', await online.offline(() => expectError(() => POST(`/placement/${q1.id}/answer`, { skip: true, ms: 1000 }), 'RECONNECT_TO_CHECK')), 'RECONNECT_TO_CHECK');
+    const after = storedProfile(asha.id).placement;
+    eq('the question is still the current one and nothing was counted', [after.current.id, after.items.length, online.traffic.grade + online.traffic.reveal - gradedBefore], [before.current.id, before.items.length, 0]);
+  }
+
+  // Drive the diagnostic as a learner with a Class 8 factorisation gap. What
+  // to type comes from the server's sealed copy of each question (the suite's
+  // oracle); every verdict is the server's.
   const learner = learnerWithGaps(['c8-factorisation']);
   let current = q1;
   let answered = 0;
@@ -327,14 +352,16 @@ async function run() {
     const stored = storedProfile(asha.id).placement.current;
     ok(`question ${answered + 1}: the stored question is the one on screen`, stored.id === current.id);
     const want = learner(stored.probe);
-    const right = canonicalInput(stored.payload);
-    const canRight = right !== null && checkAnswer(stored.payload, right).correct === true;
+    const sealedQ = await online.sealedQuestion(stored.serverQuestionId);
+    if (!ok(`question ${answered + 1}: the device holds the public question only`, sealedQ.prompt === stored.payload.prompt && !('answer' in stored.payload))) break;
+    const right = canonicalInput(sealedQ);
+    const canRight = right !== null && checkAnswer(sealedQ, right).correct === true;
     let res;
     if (want && canRight) res = await POST(`/placement/${current.id}/answer`, { answer: right, ms: 20000, viaInk: true });
     else res = await POST(`/placement/${current.id}/answer`, { skip: true, ms: 5000 });
     marks.push({ chapterId: stored.probe.chapterId, want, correct: res.correct });
-    if (want && canRight) ok(`question ${answered + 1}: the deterministic marker accepts the canonical answer`, res.correct === true);
-    if (!want) ok(`question ${answered + 1}: a skip is marked as not correct`, res.correct === false && res.skipped === true);
+    if (want && canRight) ok(`question ${answered + 1}: the server's deterministic marker accepts the canonical answer`, res.correct === true && res.authoritative === true, show({ correct: res.correct, authoritative: res.authoritative }));
+    if (!want) ok(`question ${answered + 1}: a skip is marked as not correct`, res.correct === false && res.skipped === true && res.authoritative === true);
     ok(`question ${answered + 1}: a marked answer returns the worked solution`, !!res.solution?.answerText || Array.isArray(res.solution?.steps));
     answered++;
     last = res;
@@ -359,6 +386,9 @@ async function run() {
   ok('and carries the result', view.result?.asked === answered);
 
   section('backend · diagnostic is not mastery');
+  eq('every placement answer was decided by the server: one grade or reveal each',
+    (online.traffic.grade - placementTraffic.grade) + (online.traffic.reveal - placementTraffic.reveal) >= answered, true);
+  eq('the whole placement run wrote no learning event on the server: it is diagnostic evidence, not progress', await eventsOf(ashaAccount), ashaEventsBefore);
   const raw = rawRows();
   eq('no attempt rows were written', raw.attempts.filter(r => r.pid === asha.id).length, 0);
   eq('no rating rows were written', raw.ratings.filter(r => r.pid === asha.id).length, 0);
@@ -402,6 +432,7 @@ async function run() {
 
   section('backend · isolation and scope');
   const ravi = (await POST('/profiles', { name: 'Ravi', year: 9, course: 'in', indiaTrack: 'cbse' })).user;
+  await online.link(ravi.id, { name: 'Ravi' });
   view = await GET('/placement');
   eq('another profile starts with no placement', view.status, 'none');
   eq('another profile cannot answer the first profile\'s question', await expectError(() => POST(`/placement/${retake.question.id}/answer`, { skip: true }), 'PLACEMENT_NOT_ACTIVE'), 'PLACEMENT_NOT_ACTIVE');
@@ -413,7 +444,8 @@ async function run() {
   const kai = (await POST('/profiles', { name: 'Kai', year: 9, course: 'nsw' })).user;
   ok('an Australian profile is told the check is India-only', (await GET('/placement')).available === false && !!kai.id);
   eq('and cannot start one', await expectError(() => POST('/placement/start', {}), 'PLACEMENT_UNAVAILABLE'), 'PLACEMENT_UNAVAILABLE');
-  await POST('/profiles', { name: 'Meera', year: 8, course: 'in', indiaTrack: 'cbse' });
+  const meeraMade = (await POST('/profiles', { name: 'Meera', year: 8, course: 'in', indiaTrack: 'cbse' })).user;
+  await online.link(meeraMade.id, { name: 'Meera' });
   await POST('/placement/skip', {});
   eq('skipping is remembered', (await GET('/placement')).status, 'skipped');
   const late = await POST('/placement/start', {});
@@ -439,7 +471,6 @@ async function run() {
     ok('the check is still running for the XP race', !!q2?.id);
     // The practice answer in this race is marked by the real server, so the
     // profile signs in to its own verified account first.
-    await online.link(meera.id, { name: 'Meera Rao' });
     const smart = await POST('/practice/next', {});
     const smartRow = await idbGet('questions', smart.question.id);
     ok('a signed-in India profile is served a server-issued question with no answer on the device',
