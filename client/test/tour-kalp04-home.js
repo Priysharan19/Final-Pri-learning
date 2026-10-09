@@ -1,7 +1,15 @@
-
+// KALP-04 · the Home command centre across a real learning day.
+//
+// Only Pri's server marks (owner decision 2026-10-10), so the flow runs against
+// the real in-process platform server (support/online-session.mjs). Offline,
+// Home must say the honest thing — a question opened now is a draft that
+// cannot be marked — and "Home refreshes after real learning" means learning
+// the server marked and recorded for the signed-in account, not a card that
+// merely changed.
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join } from 'node:path';
+import { serverMarking } from './support/server-marked.mjs';
 
 const ARTIFACTS = fileURLToPath(new URL('../../artifacts/kalp-04/', import.meta.url));
 const PHONE = { width: 390, height: 844 };
@@ -20,7 +28,11 @@ async function switchProfile(page) {
   await page.waitForSelector('.acct-list', { timeout: 15000 });
 }
 
-async function answerCurrentQuestion(page) {
+/**
+ * Answer the question on screen and close it on the server. Returns the
+ * server's marking of the submit, and whether the server holds the completion.
+ */
+async function answerCurrentQuestion(page, online) {
   const type = page.getByRole('button', { name: /Answer by typing/i }).first();
   if (await type.count()) await type.click();
   await page.waitForTimeout(120);
@@ -41,11 +53,12 @@ async function answerCurrentQuestion(page) {
   async function submit() {
     const button = page.locator('.editor-foot .btn-primary:visible, .row.no-print .btn-primary:visible').first();
     await button.click();
-    await page.waitForTimeout(180);
+    await page.waitForSelector('.verdict-bad, .eval-card', { timeout: 30000 }).catch(() => {});
   }
 
   await enter();
   await submit();
+  const marking = await serverMarking(online, page);
 
   // A wrong first attempt is still real learning. If the question is not yet
   // resolved, the real product keeps "Show solution" visible; use that action
@@ -55,15 +68,20 @@ async function answerCurrentQuestion(page) {
   if (await reveal.isVisible().catch(() => false)) {
     await reveal.click();
     await reveal.click();   // Show solution forfeits the marks, so it asks twice
-    await page.waitForTimeout(220);
   }
+  await page.waitForSelector('.eval-card', { timeout: 30000 }).catch(() => {});
+  const resolvedOnCard = await page.locator('.eval-card:visible').count();
+  const reveals = marking.serverQuestionId
+    ? (await online.practiceCalls(new RegExp(`^/v1/practice/${marking.serverQuestionId}/reveal$`))).filter(c => c.status === 200 && c.json?.authoritative === true).length : 0;
+  return { marking, resolvedOnCard, reveals, ledger: online.ledger(marking.serverQuestionId) };
 }
 
 export const flow = {
   id: 'kalp04-home',
   name: 'KALP-04 · daily learning command centre',
+  online: true,
 
-  async run({ page, ctx, check, goto, createProfile, settle }) {
+  async run({ page, ctx, check, goto, createProfile, settle, online }) {
     await page.setViewportSize(IPAD_PORTRAIT);
     await goto('/');
     await createProfile({
@@ -125,15 +143,33 @@ export const flow = {
 
     // Offline is a real browser network state. No cloud-only assignment is
     // allowed to become primary, and a new learner gets an explicit caveat.
+    const onlineReason = (await page.locator('#home-primary-reason').innerText()).trim();
     await ctx.setOffline(true);
     await page.waitForTimeout(250);
     await check('offline new learner still has a valid local-first action',
       await page.locator('[data-home-primary-cta]').isEnabled());
+    // The honest offline reason (owner decision 2026-10-10): a question opened
+    // now is a DRAFT that cannot be marked, and connecting is what gets one
+    // that can. It may not promise a later check or a mark made on the device.
+    const offlineReason = (await page.locator('#home-primary-reason').innerText()).replace(/\s+/g, ' ').trim();
     await check('offline first-practice reason is honest about uncached chapters',
-      /download|connection/i.test(await page.locator('#home-primary-reason').innerText()));
+      /\boffline\b/i.test(offlineReason) && /\bdraft\b/i.test(offlineReason) && /cannot be marked/i.test(offlineReason)
+        && /\bconnect\b/i.test(offlineReason)
+        && !/checked later|marked later|when you(?: a|')re back|on this device|download/i.test(offlineReason),
+      JSON.stringify(offlineReason));
     await snap(page, '06-offline-local-first');
     await ctx.setOffline(false);
     await page.waitForTimeout(250);
+    const backOnlineReason = (await page.locator('#home-primary-reason').innerText()).trim();
+    await check('back online the offline caveat is withdrawn, and it was not shown before going offline',
+      !/offline|draft|cannot be marked/i.test(backOnlineReason) && backOnlineReason === onlineReason && onlineReason.length > 10,
+      JSON.stringify({ onlineReason, backOnlineReason }));
+
+    // Marked learning needs a signed-in account: sign this profile in through
+    // the app (Settings → Pri account), then come back to Home.
+    await online.signIn({ name: 'KALP04 Class 10 Student' });
+    await goto('/');
+    await page.waitForSelector('[data-home-primary-cta]', { timeout: 30000 });
 
     // Real Practice continuity: start through the Home CTA, then leave the
     // generated question unfinished and return Home.
@@ -154,13 +190,23 @@ export const flow = {
     await check('resume reopens the exact unfinished question',
       (await page.locator('.q-prompt').innerText()).trim() === firstPrompt);
 
-    await answerCurrentQuestion(page);
+    const learned = await answerCurrentQuestion(page, online);
+    await check('that learning was marked by the server: an authoritative receipt for a question issued to this account, shown on the card',
+      learned.marking.ok, JSON.stringify(learned.marking));
+    await check('the question is closed on the server exactly once — by the marked answer, or by the server\'s own reveal',
+      learned.resolvedOnCard === 1 && learned.ledger.thisDone === 1 && learned.ledger.completions === 1
+        && (learned.marking.receipt?.resolved ? learned.reveals === 0 : learned.reveals === 1),
+      JSON.stringify({ resolvedOnCard: learned.resolvedOnCard, reveals: learned.reveals, ledger: learned.ledger, receipt: learned.marking.receipt }));
     await goto('/');
     await page.waitForSelector('[data-home-primary]');
     const afterLearning = await page.locator('#home-next-title').innerText();
+    const afterKind = await page.locator('[data-home-primary]').getAttribute('data-kind');
+    // The resume card is titled with the unfinished topic itself, so the title
+    // alone cannot tell "resolved" from "still open": the kind is the contract.
     await check('Home refreshes after real learning without app reload',
-      !/first Class 10 practice/i.test(afterLearning) && !/Resume where you left off/i.test(afterLearning),
-      'selected: ' + afterLearning);
+      !/first Class 10 practice/i.test(afterLearning) && !/Resume where you left off/i.test(afterLearning)
+        && !!afterKind && afterKind !== 'practice-resume' && afterKind !== 'first-practice',
+      `selected: ${afterLearning} (${afterKind})`);
     await snap(page, '08-returning-after-learning');
 
     // A real personal task, created through the product, becomes resumable when
