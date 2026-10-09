@@ -68,6 +68,9 @@ const STEPS = [
   ['4x+8=12', 'x', 1, 'x+2=3', 'dividing through'],
   ['2x-4=14', 'x', 9, '2x=18', 'adding to both sides to remove a constant'],
   ['-x=5-2x', 'x', 5, 'x=5', 'collecting the unknown on one side'],
+  ['7y+15=2y', 'y', -3, '5y+15=0', 'collecting the unknown beside the only constant'],
+  ['-6x-9=-5x', 'x', -9, '-x-9=0', 'collecting the unknown to a negative unit coefficient'],
+  ['3m+12=m+8', 'm', -2, '2m+12=8', 'collecting the unknown away from a unit coefficient'],
 ];
 for (const [source, variable, root, step, name] of STEPS) {
   const got = award(source, variable, root, `${source}\n${step}\n${variable}=424242`);

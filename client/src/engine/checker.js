@@ -1124,7 +1124,16 @@ function linearState(claim, variable) {
   const l = affineSide(claim.ast.l, variable), r = affineSide(claim.ast.r, variable);
   if (!l || !r || ![l.a, l.b, r.a, r.b].every(Number.isFinite)) return null;
   if (numsClose(l.a, r.a)) return null;
-  const owed = (own, other) => (numsClose(own.a, 1) && numsClose(other.a, 0) ? 0 : 1) + (numsClose(own.b, 0) ? 0 : 1) + (numsClose(other.a, 0) ? 0 : 1);
+  // Moves still owed, counted the same whichever side the student collects on:
+  // the unknown on both sides (two: collecting it may leave a sign to clear); each constant that still has to move (both of
+  // them while the unknown is on both sides, the one beside it afterwards);
+  // and a net coefficient that still has to be divided out.
+  const zero = x => numsClose(x, 0);
+  const both = !zero(l.a) && !zero(r.a);
+  const own = zero(r.a) ? l : r;
+  const left = both
+    ? 2 + (zero(l.b) ? 0 : 1) + (zero(r.b) ? 0 : 1) + (numsClose(l.a - r.a, 1) || numsClose(r.a - l.a, 1) ? 0 : 1)
+    : (zero(own.b) ? 0 : 1) + (numsClose(own.a, 1) ? 0 : 1);
   const whole = x => numsClose(x, Math.round(x));
   let brackets = 0, terms = 0, symbols = 0;
   const walk = node => {
@@ -1145,7 +1154,7 @@ function linearState(claim, variable) {
   walk(claim.ast.l); walk(claim.ast.r);
   return {
     sides: [l.a, l.b, r.a, r.b],
-    left: Math.min(owed(l, r), owed(r, l)),
+    left,
     fractional: [l.a, l.b, r.a, r.b].filter(x => !whole(x)).length,
     written: [brackets, terms, symbols]
   };
