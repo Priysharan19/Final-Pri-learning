@@ -50,7 +50,6 @@ function generalForm([m, c]) {
   return m > 0 ? `${k}x-y=${-c}` : `${k}x+y=${c}`;
 }
 
-const same = (p, q) => p[0] === q[0] && p[1] === q[1];
 /** How a pair of lines stands: 'intersecting' | 'parallel' | 'coincident'. */
 const caseOf = (p, q) => (p[0] !== q[0] ? 'intersecting' : p[1] === q[1] ? 'coincident' : 'parallel');
 const rise = m => `${Math.abs(m)} unit${Math.abs(m) === 1 ? '' : 's'} ${m > 0 ? 'up' : 'down'}`;
