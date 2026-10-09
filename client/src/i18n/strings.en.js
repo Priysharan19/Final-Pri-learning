@@ -651,7 +651,7 @@ export default {
   'settings.cloudHandwritingCopy': 'Handwriting and photos are read only by this server reader; the on-device reader is not accurate enough to mark from. It is on by default for a signed-in account, and you can turn it off here — but then handwriting and photos are not read at all, and you type your answers instead. While it is on, a picture drawn from your strokes or your photo is sent through Pri’s server to an outside AI reading service to be read. It is a picture of your writing only — never the question, never the answer, never your name. Pri keeps no copy; the reading service is asked not to store it, but may hold it for a limited time under its own safety-monitoring rules. The reading only proposes what you wrote: Pri’s own marker decides the mark.',
   'settings.cloudMarkingLabel': 'Tell me which line my working went wrong on',
   'settings.cloudMarkingUnavailable': 'Checking working line by line on a server is not available on this install.',
-  'settings.cloudMarkingCopy': 'When an answer is wrong and Pri cannot tell you where, turn this on and your working is checked line by line. It says which line broke and what kind of mistake it was — and if you slipped once and then worked correctly from your own wrong number, it says that too, instead of marking you wrong five times for one mistake. Your question and your working are sent; the expected answer never is, and it will not tell you the answer. Your mark is decided on this device either way and does not change.',
+  'settings.cloudMarkingCopy': 'When an answer is wrong and Pri cannot tell you where, turn this on and your working is checked line by line. It says which line broke and what kind of mistake it was — and if you slipped once and then worked correctly from your own wrong number, it says that too, instead of marking you wrong five times for one mistake. Your question and your working are sent; the expected answer never is, and it will not tell you the answer. Your mark is decided by Pri’s deterministic marker on the server either way and does not change.',
 
   'settings.appearance': 'Appearance',
   'settings.themeDark': 'Night',
@@ -2605,6 +2605,7 @@ export default {
   'check.examSignInTitle': 'Starting a paper needs a Pri account',
   'check.signInHint': 'Answers are checked and marked by Pri’s server. Sign in here; nothing on this page changes.',
   'check.notChecked': 'This answer has not been checked, and your working is still on this page.',
+  'verdict.notCheckedLabel': 'Not checked',
   'check.examNotStarted': 'The paper has not started.',
   'check.reconnectTitle': 'Pri could not reach the server',
   'check.reconnectHint': 'Check your connection, then try again.',

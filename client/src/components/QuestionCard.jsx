@@ -1977,7 +1977,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         {/* ── Feedback, attached to the work ── */}
         {state.phase === 'retry' && (
           <div className={`verdict ${technicalRetry ? 'verdict-technical' : invalidRetry ? 'verdict-bad verdict-unsure' : 'verdict-bad'}`}>
-            <span className="verdict-ico"><Icon name={technicalRetry ? 'alert' : invalidRetry ? 'uncertain' : 'correction'} /></span>
+            <span className="verdict-ico">
+              <Icon name={technicalRetry ? 'alert' : invalidRetry ? 'uncertain' : 'correction'} />
+              {/* The state is said in words, not only by the icon's colour. */}
+              {technicalRetry && <span className="sr-only">{t('verdict.notCheckedLabel')}</span>}
+            </span>
             <div>
               {checkRefused ? (
                 /* An unchecked submission: the reason and the way through it.

@@ -296,11 +296,21 @@ export async function applyRemoteLearningEvents(pid, events) {
   // Our durable attempt row links the original local resolution to the exact
   // server attempt ID, without trusting a client-provided mark or event body.
   const locallyCommitted = new Set();
+  // A question this device was issued is recorded by this device, in the same
+  // write as its resolution, and by nothing else. Matching only on the attempt
+  // id raced with a submit in flight: a pull landing between the server's
+  // commit and the local write imported the same attempt a second time. The
+  // question row carries the server question id before any grade is sent, so
+  // it is already here for every event the server can have for it.
+  const issuedHere = new Set();
   if (list.some(event => event.kind === 'graded-attempt')) {
     for (const attempt of await byIndex('attempts', 'pid', pid)) {
       if (typeof attempt.serverAttemptId === 'string' && safeId(attempt.serverAttemptId)) {
         locallyCommitted.add(attempt.serverAttemptId);
       }
+    }
+    for (const question of await byIndex('questions', 'pid', pid)) {
+      if (typeof question.serverQuestionId === 'string' && question.serverQuestionId) issuedHere.add(question.serverQuestionId);
     }
   }
 
@@ -309,7 +319,7 @@ export async function applyRemoteLearningEvents(pid, events) {
     const event = { ...raw, payload: plain(raw.payload) ? raw.payload : {} };
     let outcome;
     if (PRACTICE_KINDS.has(event.kind)) {
-      if (locallyCommitted.has(event.id)) {
+      if (locallyCommitted.has(event.id) || issuedHere.has(String(event.entityId || ''))) {
         // Already committed locally in the same atomic batch as the source
         // question resolution. Cache/sync is still safe; progress is not.
         summary.duplicates++;

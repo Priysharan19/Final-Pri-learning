@@ -125,7 +125,9 @@ export function refusedCheckState(error, via, { diagnostic = false } = {}) {
     res: {
       feedback: error?.message || '', invalid: true, technical: true,
       refusal: diagnostic ? null : checkRefusal(error), via,
-      conflict: error?.status === 409
+      // A 409 that names a refusal (a draft, an expired prepared question) is
+      // that refusal, not "finished elsewhere".
+      conflict: error?.status === 409 && (diagnostic || !checkRefusal(error))
     }
   };
 }

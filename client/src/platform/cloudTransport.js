@@ -24,6 +24,7 @@ const SAFE_ID = /^[A-Za-z0-9._:-]{1,160}$/;
 const ORIGIN_META = 'pri-cloud-origin';
 const HEALTH_SERVICE = 'pri-learning-platform';
 let discovery = null;
+let lastRediscovery = 0;
 
 function metaOrigin() {
   try { return String(globalThis.document?.querySelector?.(`meta[name="${ORIGIN_META}"]`)?.getAttribute('content') || '').trim(); }
@@ -99,6 +100,10 @@ export function discoverCloudOrigin({ timeoutMs = 1500 } = {}) {
       clearTimeout(timer);
     }
   })();
+  // A page loaded while the server was unreachable must find it again once it
+  // is back: only a successful probe is remembered.
+  const attempt = discovery;
+  attempt.then(found => { if (!found && discovery === attempt) discovery = null; });
   return discovery;
 }
 
@@ -227,9 +232,18 @@ export async function cloudRequest(path, {
     return data;
   }
 
-  const origin = normalizeCloudOrigin();
+  let origin = normalizeCloudOrigin();
   if (!origin) {
-    const err = new Error('Cloud is not configured; local Pri Learning remains available offline.');
+    // No server was found when the page loaded. Look once more (briefly, and
+    // not more than every few seconds) before saying there is none.
+    if (Date.now() - lastRediscovery > 4000) {
+      lastRediscovery = Date.now();
+      await discoverCloudOrigin({ timeoutMs: 1500 });
+      origin = normalizeCloudOrigin();
+    }
+  }
+  if (!origin) {
+    const err = new Error('Pri\'s server cannot be reached from this device right now.');
     err.code = 'CLOUD_DISABLED';
     throw err;
   }
@@ -327,9 +341,18 @@ function streamUnsupported(status) {
 export async function cloudStreamRequest(path, { body, onEvent, timeoutMs = 45_000, signal = null } = {}) {
   if (!PATH.test(String(path || '')) || String(path).includes('..')) throw new Error('Cloud path is not allowed');
   if (nativeCloudAvailable()) throw streamUnsupported();
-  const origin = normalizeCloudOrigin();
+  let origin = normalizeCloudOrigin();
   if (!origin) {
-    const err = new Error('Cloud is not configured; local Pri Learning remains available offline.');
+    // No server was found when the page loaded. Look once more (briefly, and
+    // not more than every few seconds) before saying there is none.
+    if (Date.now() - lastRediscovery > 4000) {
+      lastRediscovery = Date.now();
+      await discoverCloudOrigin({ timeoutMs: 1500 });
+      origin = normalizeCloudOrigin();
+    }
+  }
+  if (!origin) {
+    const err = new Error('Pri\'s server cannot be reached from this device right now.');
     err.code = 'CLOUD_DISABLED';
     throw err;
   }

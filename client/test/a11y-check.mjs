@@ -82,16 +82,6 @@ const OUTSTANDING = [
   // The three that used to sit here — the unnamed theme toggle, the wordmark that
   // navigated from a <span>, and the history verdict carried only by colour — are
   // fixed in the app rather than exempted here.
-  //
-  // One entry, added 2026-10-10 with the online-only checking states, and
-  // reported as a product defect the same day: this suite may not edit
-  // client/src/components. Delete it when the group below goes red.
-  {
-    check: 'colour',
-    file: 'client/src/components/QuestionCard.jsx — the refused-check notice (.verdict.verdict-technical > span.verdict-ico)',
-    what: 'the alert icon of a check that was NOT made (sign in / reconnect / account blocker) is painted in the "incorrect" colour (--bad) and carries no word or accessible name of its own',
-    test: f => f.signature === 'span.verdict-ico'
-  }
 ];
 
 // ── Assertions ───────────────────────────────────────────────────────────────
