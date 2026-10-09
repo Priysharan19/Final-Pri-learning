@@ -1232,7 +1232,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // Indian student is told this and almost none get to practise it, because the
   // teacher who would read their working has twenty-six other children.
   const boardAward = useMemo(() => {
-    if (!resolved || res?.invalid || res?.revealed) return null;
+    // A server-attested result owns the marking decision, including method
+    // credit. Never overlay it with a competing device-generated award.
+    if (!resolved || res?.invalid || res?.revealed || res?.authoritative === true) return null;
     const lines = writeMode ? (inkResult?.lines || []) : String(working || '').split(/\n+/);
     const shown = lines.map(l => String(l || '').trim()).filter(Boolean);
     try {
@@ -1272,10 +1274,22 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     !photoAwaitingValidReading &&
     (!photoReattachRequired || mode !== 'photo' || (!!photo && photoOCR.phase === 'done'));
 
+  // Client checkboxes are a reflection exercise, never grading authority.
+  // When the server supplies an explicit awarded-mark count, use it only if
+  // bounded by the question's total. Partial method feedback by itself does
+  // not certify that marks were committed to the student's account.
+  const serverAuthoritative = res?.authoritative === true;
+  const serverMarks = res?.marksEarned;
+  const attestedMarks = serverAuthoritative && typeof serverMarks === 'number' &&
+    Number.isFinite(serverMarks) && serverMarks >= 0 && serverMarks <= totalMarks
+    ? serverMarks : null;
   const earnedMarks = resolved
-    ? (verdictGood ? totalMarks : (selfSaved ? Object.values(selfMarks).filter(Boolean).length : 0))
+    ? serverAuthoritative
+      ? (attestedMarks ?? (verdictGood ? totalMarks : 0))
+      : (verdictGood ? totalMarks : (selfSaved ? Object.values(selfMarks).filter(Boolean).length : 0))
     : 0;
-  const shownMarks = Math.round(earnedMarks * credit * 10) / 10;
+  // Hints/retries cannot invent a different server-issued mark on the device.
+  const shownMarks = serverAuthoritative ? earnedMarks : Math.round(earnedMarks * credit * 10) / 10;
 
   // The verdict lands in the middle of a long page. Spoken as one sentence, a
   // screen reader hears whether the answer was right without hunting for it.
@@ -1901,7 +1915,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 )}
               </div>
               {diagnostic && <p className="muted" style={{ margin: '0 18px', fontSize: 12.5 }}>{t('placement.cardNote')}</p>}
-              <div className="eval-disclaimer" style={{ paddingBottom: attemptViaInk ? 4 : 12 }}>{t('verdict.markedOnDevice')}</div>
+              {/* Only legacy device-graded results may claim on-device marking.
+                  Online grade receipts must not be mislabeled to the learner. */}
+              {!serverAuthoritative && (
+                <div className="eval-disclaimer" style={{ paddingBottom: attemptViaInk ? 4 : 12 }}>{t('verdict.markedOnDevice')}</div>
+              )}
               {attemptViaInk && <div className="eval-provenance" data-provenance="handwriting" style={{ border: 0 }}>{t('verdict.readByAiMarkedByEngine')}</div>}
             </div>
 
@@ -1922,11 +1940,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 <CriteriaTable
                   criteria={res.solution.criteria}
                   correct={verdictGood}
-                  selfMarking={!boardAward || selfOpen}
+                  selfMarking={!serverAuthoritative && (!boardAward || selfOpen)}
                   selfMarks={selfMarks} setSelfMarks={setSelfMarks}
                   selfSaved={selfSaved} setSelfSaved={setSelfSaved}
                 />
-                {boardAward && !verdictGood && !selfSaved && !selfOpen && (
+                {!serverAuthoritative && boardAward && !verdictGood && !selfSaved && !selfOpen && (
                   <button type="button" className="btn-disclose" style={{ marginTop: 8 }} onClick={() => setSelfOpen(true)}>
                     <Icon name="chevronDown" size={16} />{t('verdict.markItYourself')}
                   </button>
