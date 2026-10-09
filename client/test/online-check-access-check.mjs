@@ -106,12 +106,12 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
 // ── 2 · Words for every reason, in both languages ────────────────────────────
 {
   const kinds = Object.values(CHECK_REFUSAL);
-  eq(kinds.length, 7, 'seven reasons are named');
+  eq(kinds.length, 8, 'eight reasons are named');
   const used = new Set(['check.needsAccount', 'check.signInAction']);
   for (const context of ['answer', 'exam']) {
     for (const kind of kinds) {
       const copy = checkRefusalCopy(kind, context);
-      ok(copy && ['sign-in', 'retry', 'account'].includes(copy.action), `${kind}/${context} has one next step`);
+      ok(copy && ['sign-in', 'retry', 'account', 'next'].includes(copy.action), `${kind}/${context} has one next step`);
       for (const key of [copy.titleKey, copy.contextKey, copy.hintKey]) {
         used.add(key);
         ok(typeof en[key] === 'string' && en[key].trim() && typeof hi[key] === 'string' && hi[key].trim() && en[key] !== hi[key], `${key} is in both catalogues`);
@@ -121,6 +121,11 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   eq(checkRefusalCopy('sign-in').action, 'sign-in', 'the sign-in reason offers the sign-in itself');
   eq(checkRefusalCopy('reconnect').action, 'retry', 'the reconnect reason offers a retry');
   eq(checkRefusalCopy('question').action, 'retry', 'so does a question that cannot be checked');
+  // A question the server never issued (opened offline) or whose prepared
+  // token ran out cannot be marked by retrying or signing in: the way on is a
+  // new question.
+  eq(checkRefusalCopy('new-question').action, 'next', 'a question that can never be marked offers the next question');
+  eq([checkRefusal({ status: 409, code: 'QUESTION_NOT_SERVER_ISSUED' }), checkRefusal({ status: 409, code: 'QUESTION_PREPARED_EXPIRED' })], ['new-question', 'new-question'], 'an offline draft and an expired prepared question both read as that reason');
   eq([checkRefusalCopy('verify-email').action, checkRefusalCopy('guardian').action], ['account', 'account'], 'the email and guardian reasons point at the account, where they are cleared');
   eq(checkRefusalCopy('sign-in', 'exam').titleKey, 'check.examSignInTitle', 'an exam start says a paper, not an answer');
   eq(checkRefusalCopy('reconnect', 'exam').contextKey, 'check.examNotStarted', 'and that the paper has not started');
@@ -183,7 +188,14 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
 }
 
 // ── 5 · The real local backend, signed out ───────────────────────────────────
+// Signed out with the server reachable (the real /v1 app, in-process) the
+// student is shown a PREPARED question: it is the server's, waiting for an
+// account, so the refusal is "sign in to check" and the in-card sign-in is the
+// way on. With no connection the question is an offline DRAFT, which can never
+// be marked: that refusal offers the next question instead.
 {
+  const { startOnlineAuthority } = await import('./support/online-authority.mjs');
+  const online = await startOnlineAuthority({ label: 'online-check-access' });
   const { api } = await import('../src/api.js');
   const idb = await import('../src/local/idb.js');
   const recovery = await import('../src/components/practiceRecovery.js');
@@ -201,6 +213,7 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   const served = await api.post('/practice/next', {});
   const id = served.question.id;
   ok(typeof served.question.prompt === 'string' && served.question.prompt.length > 0, 'signed out, the question is still served and readable');
+  eq([served.question.checkState, typeof (await idb.get('questions', id)).prepared, (await idb.get('questions', id)).serverQuestionId], ['prepared', 'string', undefined], 'as a prepared question: the server\'s, not yet bound to any account');
   const rowBefore = JSON.stringify(await idb.get('questions', id));
 
   // What the card keeps while the student works, before any account exists.
@@ -240,7 +253,16 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   const exam = await refused(api.post('/exams', { length: 10, minutes: 30, year: 10 }));
   eq([exam?.status, exam?.code], [401, 'SIGN_IN_TO_CHECK'], 'an exam paper does not start signed out');
   eq(checkRefusalCopy(checkRefusal(exam), 'exam')?.titleKey, 'check.examSignInTitle', 'and the exam page offers the sign-in for it');
+  // Opened with no connection, the question is a draft of the device's own.
+  const draft = await online.offline(() => api.post('/practice/next', { resume: false }));
+  eq(draft.question.checkState, 'draft', 'with no connection the question served is an offline draft');
+  const draftBefore = JSON.stringify(await idb.get('questions', draft.question.id));
+  const draftSubmit = await refused(api.post(`/practice/${draft.question.id}/submit`, { answer: '1', ms: 900, submissionId: recovery.newSubmissionId() }));
+  eq([draftSubmit?.status, draftSubmit?.code], [409, 'QUESTION_NOT_SERVER_ISSUED'], 'a draft is refused as never the server\'s question, even once the connection is back');
+  eq(checkRefusal(draftSubmit), 'new-question', 'and the card reads that as: open a new question');
+  eq(JSON.stringify(await idb.get('questions', draft.question.id)), draftBefore, 'nothing is spent on it');
   drafts.setDraftProfile(null);
+  await online.close();
 }
 
 // ── 6 · 7 · Mounted ──────────────────────────────────────────────────────────
