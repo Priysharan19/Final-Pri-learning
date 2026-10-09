@@ -175,4 +175,5 @@ console.log('ONLINE MARKING AUTHORITY PASS — ' + count + ' checks against a re
 // online authority suite is invoked; keep the test-owned provider-independent
 // replay, ownership and progress checks alongside the 32 issuer checks.
 await import('./online-marking-adversarial-local.mjs');
+await import('./online-marking-midflight-permission-check.mjs');
 console.log('engine: ' + h.engine);
