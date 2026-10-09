@@ -90,7 +90,12 @@ function stepEvidence(q, answer, steps, result) {
     try { report = stepCheck(meta, steps); } catch { report = null; }
   }
   let partial = null;
-  if (meta && steps && !result.correct && !result.invalid) {
+  // A blank final-answer box may still carry verified mathematical method
+  // evidence. Invalid nonblank expressions do not become creditable merely
+  // because working was attached; only an actually empty final-answer field
+  // can be graded by method alone.
+  const blankFinal = typeof answer === 'string' && answer.trim() === '';
+  if (meta && steps && !result.correct && (!result.invalid || blankFinal)) {
     try {
       const method = methodMarks({
         meta, working: steps, marks: marksPossibleFor(q), prompt: q.prompt, report
@@ -421,22 +426,27 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const working = Array.isArray(body.steps) ? body.steps.join('\n') : String(body.steps || '');
       const { stepReport, partial } = stepEvidence(q, body.answer, working, result);
       const marksPossible = marksPossibleFor(q);
-      // A correct final answer earns all criteria. Otherwise only independently
-      // verified, non-restated method steps earn marks; invalid input earns zero.
-      // The client must never reconstruct a numeric grade from correct/partial.
-      const marksEarned = result.invalid ? 0 : result.correct
+      // Blank final answers are not automatically attempts: verified positive
+      // method evidence alone makes an otherwise blank response gradable.
+      // Unreadable working or an invalid NONBLANK answer still cannot earn
+      // marks. This prevents rewarding a mere copy of the question.
+      const workingOnlyCredit = result.invalid === true && body.answer.trim() === '' &&
+        Number.isInteger(partial?.awarded) && partial.awarded > 0;
+      const invalid = Boolean(result.invalid && !workingOnlyCredit);
+      const marksEarned = invalid ? 0 : result.correct
         ? marksPossible
         : Math.max(0, Math.min(marksPossible - 1, partial?.awarded ?? 0));
       const priorTry = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-tries' AND key=?",
         [accountId, qid]);
       const tries = priorTry ? Number(JSON.parse(priorTry.response_json).tries) || 0 : 0;
       // Invalid input is not a failed mathematical attempt: do not consume a try or close the question.
-      const resolved = !result.invalid && Boolean(result.correct || tries >= 1 || ['rush', 'match'].includes(q._practiceMode));
+      const resolved = !invalid && Boolean(result.correct || tries >= 1 || ['rush', 'match'].includes(q._practiceMode));
       const attemptId = randomUUID();
       const response = { authoritative: true, questionId: qid, submissionId, attemptId,
-        correct: result.correct === true, invalid: Boolean(result.invalid), resolved,
+        correct: result.correct === true, invalid, resolved,
         marksEarned, marksPossible,
-        triesLeft: resolved ? 0 : 1, feedback, trapWhy,
+        triesLeft: resolved ? 0 : 1,
+        feedback: workingOnlyCredit ? partial.note : feedback, trapWhy,
         contentId: q.contentId || null, serverAcknowledgedAt: now,
         stepReport, partial, ...(resolved ? {
           solution: solutionFor(q),
@@ -468,7 +478,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
             hintsUsed: 1, support: 'supported', createdAt: now,
             serverAcknowledgedAt: now
           }), now]);
-      } else if (!result.invalid) {
+      } else if (!invalid) {
         await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-tries',?,?,?,?,?) ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json",
           [accountId, qid, JSON.stringify({ tries: tries + 1 }), hash, now, now + MAX_AGE]);
       }
