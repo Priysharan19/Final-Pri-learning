@@ -505,7 +505,11 @@ class CloudJourneyTest {
             // attempt, and the draft typed offline was not turned into one.
             openHistory(s)
             assertEquals("History shows the server-marked attempt after relaunch", "Correct", historyVerdict(s, graded.getString("id")))
-            assertEquals("the offline draft is still not in History", "missing", historyVerdict(s, offlineDraftFile.readText().trim()))
+            // The offline phase runs only when the runner started the server
+            // itself (it has to stop it); without it there is no draft to check.
+            offlineDraftFile.takeIf { it.exists() }?.readText()?.trim()?.let {
+                assertEquals("the offline draft is still not in History", "missing", historyVerdict(s, it))
+            }
             openSettings(s)
             waitFor(s, "$stateTag === 'Connected'")
             eval(s, "($byText)('Disconnect').click()")
