@@ -280,14 +280,25 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
   }
 
   /**
-   * "Time passes" for the server's count of this profile's exam papers: every
-   * paper it has sealed for the account is back-dated by `ms`. For a suite
-   * whose clock is the entitlement gate's own, not Date.now.
+   * "Time passes" for this profile's exam papers on the server: every paper it
+   * has sealed for the account is back-dated by `ms` — the row the allowance
+   * counts, and the sealed paper's own start and deadline, so a paper left
+   * unfinished is as overdue as it would really be (the server then finalises
+   * it on the account's next start, as it does an abandoned paper). For a
+   * suite whose clock is the entitlement gate's own, not Date.now.
    */
   async function ageExamPapers(pid, ms) {
     const accountId = accounts.get(pid)?.accountId;
     assert.ok(accountId, 'ageExamPapers() needs a linked profile');
-    await app.db.run("UPDATE idempotency_keys SET created_at=created_at-? WHERE account_id=? AND scope='exam-paper'", [Math.round(ms), accountId]);
+    const by = Math.round(ms);
+    const papers = await app.db.all("SELECT key,response_json FROM idempotency_keys WHERE account_id=? AND scope='exam-paper'", [accountId]);
+    for (const row of papers) {
+      const paper = JSON.parse(row.response_json);
+      paper.startedAt -= by;
+      paper.deadline -= by;
+      await app.db.run("UPDATE idempotency_keys SET created_at=created_at-?, response_json=? WHERE account_id=? AND scope='exam-paper' AND key=?",
+        [by, JSON.stringify(paper), accountId, row.key]);
+    }
   }
 
   /**

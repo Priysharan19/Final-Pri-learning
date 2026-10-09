@@ -14,8 +14,13 @@
 // correct / wrong / blank / partial-working marks; exactly-once finalisation
 // under a concurrent double finish; identical replay; the deadline rule (in
 // grace, late, answers added after the bell); account isolation on every
-// route; learning events written once; and an app restart on the same
-// database.
+// route; learning events written once; an app restart on the same database;
+// the layout seed is the server's (a spec composed for any other is refused);
+// a paper abandoned past its time is finalised by the server once, on its last
+// snapshot, on the next read, the next start and in housekeeping; a finished
+// paper's content is seen (a practice copy is a repeat) and an item already
+// seen is flagged a repeat on the paper; and deleting the account removes
+// every exam row.
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -36,6 +41,7 @@ const { ensureBillingSchema } = await import('../platform/billingSchema.js');
 const { ensureAuthDeliverySchema } = await import('../platform/authDelivery.js');
 const { asStore, createPostgresStore } = await import('../platform/store.js');
 const { FINISH_GRACE_MS } = await import('../platform/exams.js');
+const { runHousekeeping } = await import('../platform/housekeeping.js');
 const { checkAnswer, methodMarks } = await import('../../client/src/engine/checker.js');
 const { stepMetaFor } = await import('../platform/practice.js');
 const { loadAllBanks, loadBanksFor, generateQuestion } = await import('../../client/src/engine/generators/index.js');
@@ -112,6 +118,15 @@ const sealed = async id => JSON.parse((await h.db.get("SELECT response_json FROM
 
 // ── Specs, composed the way a device composes them ───────────────────────────
 await loadAllBanks();
+const layoutOf = (jar, track, grade, variant = 'standard') => h.request('/v1/exams/layout', { method: 'POST', jar, body: { blueprint: { track, grade, variant } } });
+/** A spec composed, as a device composes it, for the layout the server set for this account. */
+async function india(jar, track, grade, variant = 'standard') {
+  await h.db.run('DELETE FROM rate_limits');
+  const set = await layoutOf(jar, track, grade, variant);
+  assert.equal(set.status, 200, `asking for the ${track}/${grade}/${variant} layout: ${set.status} ${set.text}`);
+  return indiaSpec(track, grade, set.data.layoutSeed, variant);
+}
+const hasKey = (value, key) => !!value && typeof value === 'object' && (Object.hasOwn(value, key) || Object.values(value).some(v => hasKey(v, key)));
 async function indiaSpec(track, grade, seed, variant = 'standard') {
   const spec = indiaExamPaperSpec({ track, grade, variant });
   const chapters = indiaScope(track, grade);
@@ -280,7 +295,7 @@ try {
   };
   eq((await grantPremium(a.account.id)).status, 200, 'the sitting account is granted Premium by an admin');
 
-  const cbse = await indiaSpec('cbse', 10, 1001);
+  let cbse = await india(a.jar, 'cbse', 10);
   const practice = practiceSpec();
 
   // ── Who may start a paper ──────────────────────────────────────────────────
@@ -343,8 +358,43 @@ try {
   // ── A blueprint paper is held to the blueprint, slot by slot ──────────────
   {
     await refused({ ...cbse, layoutSeed: undefined }, 'a blueprint paper without its layout seed is refused');
-    await refused({ ...cbse, layoutSeed: 1002 }, 'a spec composed for one layout is refused under another layout seed');
-    const jeeAdvSpec = await indiaSpec('jee-advanced', 12, 3003);
+    {
+      const r = await create(a.jar, { ...cbse, layoutSeed: (cbse.layoutSeed % 0x7ffffffe) + 1 });
+      ok((r.status === 400 && r.data?.error?.code === 'EXAM_SPEC_INVALID') || (r.status === 409 && r.data?.error?.code === 'EXAM_LAYOUT_NOT_ISSUED'),
+        `a spec composed for one layout is refused under another layout seed (${r.status} ${r.data?.error?.code})`);
+    }
+    const jeeAdvSpec = await india(a.jar, 'jee-advanced', 12);
+
+    // ── The layout is the server's ───────────────────────────────────────────
+    // A blueprint has hundreds of legitimate chapter allocations. Which one a
+    // paper gets is not the device's to pick: the seed comes from the server,
+    // stays the same until a paper is sealed under it, and no other is taken.
+    {
+      eq((await layoutOf({}, 'cbse', 10)).status, 401, 'a signed-out caller is given no layout');
+      eq((await layoutOf(teacher.jar, 'cbse', 10)).status, 403, 'nor a teacher');
+      const badLayout = await h.request('/v1/exams/layout', { method: 'POST', jar: a.jar, body: { blueprint: { track: 'cbse', grade: 10, variant: 'standard' }, layoutSeed: 7 } });
+      eq([badLayout.status, badLayout.data?.error?.code], [400, 'EXAM_SPEC_INVALID'], 'a layout request cannot carry a seed of its own');
+      const unreleased = await layoutOf(a.jar, 'cbse', 7);
+      eq([unreleased.status, unreleased.data?.error?.code], [409, 'EXAM_BLUEPRINT_NOT_RELEASED'], 'no layout is set for a blueprint that is not released');
+      const seeds = new Set();
+      for (let n = 0; n < 12; n++) { await h.db.run('DELETE FROM rate_limits'); seeds.add((await layoutOf(a.jar, 'cbse', 10)).data.layoutSeed); }
+      eq([...seeds], [cbse.layoutSeed], 'asking twelve more times returns the one layout already set: there is nothing to shop among');
+      eq(await rows(a.account.id, 'exam-layout'), 2, 'one pending layout per blueprint is held for the account');
+      const own = await layoutOf(b.jar, 'cbse', 10);
+      ok(own.status === 200 && Number.isInteger(own.data.layoutSeed) && own.data.accountId === String(b.account.id), 'another account is set a layout of its own');
+      // A complete, valid paper composed for a seed the device chose itself.
+      let chosen = 1001;
+      while (chosen === cbse.layoutSeed) chosen++;
+      const selfChosen = await create(a.jar, await indiaSpec('cbse', 10, chosen));
+      eq([selfChosen.status, selfChosen.data?.error?.code], [409, 'EXAM_LAYOUT_NOT_ISSUED'], 'a valid paper composed for a layout seed the device chose is refused');
+      if (own.data.layoutSeed !== cbse.layoutSeed) {
+        const borrowed = await create(a.jar, await indiaSpec('cbse', 10, own.data.layoutSeed));
+        eq([borrowed.status, borrowed.data?.error?.code], [409, 'EXAM_LAYOUT_NOT_ISSUED'], 'and so is one composed for the layout set for another account');
+      } else count++;
+      eq(await rows(a.account.id, 'exam-paper'), 0, 'nothing was sealed under either');
+      eq(await rows(b.account.id, 'exam-paper'), 0, 'and the other account still has no paper');
+      await h.db.run("DELETE FROM idempotency_keys WHERE account_id=? AND scope='exam-layout'", [b.account.id]);
+    }
     const scopeOf = async (track, grade, variant, seed) => {
       const blueprint = indiaExamPaperSpec({ track, grade, variant });
       const chapters = indiaScope(track, grade);
@@ -354,7 +404,7 @@ try {
     const copy = spec => JSON.parse(JSON.stringify(spec));
 
     // A cell from another chapter, under this slot's chapter label.
-    const c10 = await scopeOf('cbse', 10, 'standard', 1001);
+    const c10 = await scopeOf('cbse', 10, 'standard', cbse.layoutSeed);
     const wrongChapter = copy(cbse);
     const at = wrongChapter.slots.findIndex(slot => slot.recipe?.kind === 'single');
     const range = sectionRangeOf(c10.blueprint, c10.layout.slots[at].section);
@@ -367,7 +417,7 @@ try {
     await refused(wrongChapter, 'a cell from another chapter under this slot’s chapter is refused');
 
     // A cell of the right chapter, outside the section's difficulty window.
-    const ja = await scopeOf('jee-advanced', 12, 'standard', 3003);
+    const ja = await scopeOf('jee-advanced', 12, 'standard', jeeAdvSpec.layoutSeed);
     const tooEasy = copy(jeeAdvSpec);
     let eased = -1, easyCell = null;
     tooEasy.slots.forEach((slot, i) => {
@@ -403,7 +453,7 @@ try {
     // Relabelling: every slot of a paper named as one chapter (the cells left
     // as composed, or dropped). The layout allots the chapters; the device
     // cannot move a question, or the evidence it earns, to a chapter it chose.
-    for (const [name, spec] of [['CBSE Class 10', cbse], ['JEE Main', await indiaSpec('jee-main', 12, 2002)]]) {
+    for (const [name, spec] of [['CBSE Class 10', cbse], ['JEE Main', await india(a.jar, 'jee-main', 12)]]) {
       const one = spec.slots[0].chapter;
       ok(spec.slots.some(slot => slot.chapter !== one), `${name}: the layout spreads the paper over several chapters`);
       const relabel = copy(spec);
@@ -435,8 +485,17 @@ try {
     ok(p.questions.filter((sq, i) => sq.chapterId === bare.slots[i].chapter).length >= 30, 'filed under the chapters the layout allots');
     eq(identityLeaks(r.data.exam, p), [], 'and its public paper carries nothing derived from an answer or a seed');
     await finish(a.jar, r.data.exam.id, {});
-    await h.db.run("DELETE FROM idempotency_keys WHERE account_id=? AND scope LIKE 'exam-%'", [a.account.id]);
+    // The paper sealed under the layout spent it: the same spec is not a
+    // second paper, and the account is set a new layout for its next one.
+    eq((await h.db.get("SELECT COUNT(*) AS n FROM idempotency_keys WHERE account_id=? AND scope='exam-layout' AND key='cbse:10:standard'", [a.account.id])).n | 0, 0,
+      'sealing a paper spends the layout it was composed for');
+    const spent = await create(a.jar, bare);
+    eq([spent.status, spent.data?.error?.code], [409, 'EXAM_LAYOUT_NOT_ISSUED'], 'a second paper cannot be started under the spent layout');
+    eq((await sealed(r.data.exam.id)).layoutSeed, bare.layoutSeed, 'the sealed paper records the layout it was issued under');
+    ok(!hasKey(r.data.exam, 'layoutSeed'), 'which the public paper does not carry');
+    await h.db.run("DELETE FROM idempotency_keys WHERE account_id=? AND (scope LIKE 'exam-%' OR scope='practice-content')", [a.account.id]);
     await h.db.run('DELETE FROM learning_events WHERE account_id=?', [a.account.id]);
+    cbse = await india(a.jar, 'cbse', 10);
   }
 
   // ── A CBSE Class 10 paper is issued by the server ──────────────────────────
@@ -471,7 +530,7 @@ try {
   const reused = await create(a.jar, practice, firstKey);
   eq([reused.status, reused.data?.error?.code], [409, 'IDEMPOTENCY_KEY_REUSED'], 'the same key cannot start a different paper');
   eq(await rows(a.account.id, 'exam-paper'), 1, 'one paper was sealed for three requests');
-  const other = await create(a.jar, cbse);
+  const other = await create(a.jar, await india(a.jar, 'cbse', 10));
   ok(other.status === 201 && other.data.exam.id !== exam.id, 'a new key starts a new paper');
   ok(JSON.stringify(other.data.exam.questions.map(q => q.payload.prompt || q.payload.stem)) !== JSON.stringify(exam.questions.map(q => q.payload.prompt || q.payload.stem)),
     'the server chooses the questions: the same spec is not the same paper twice');
@@ -624,7 +683,7 @@ try {
   }
 
   // ── JEE: negative marks, partial per option, previous-year items ───────────
-  const jeeMain = await create(a.jar, await indiaSpec('jee-main', 12, 2002));
+  const jeeMain = await create(a.jar, await india(a.jar, 'jee-main', 12));
   eq(jeeMain.status, 201, 'a JEE Main mathematics section is issued');
   eq(leaks(jeeMain.data), [], 'and discloses nothing private');
   eq([jeeMain.data.exam.questions.length, jeeMain.data.exam.total], [25, 100], '25 questions, 100 marks');
@@ -638,7 +697,7 @@ try {
   ok(jmDone.data.detail.some(d => d.awarded === -1) && jmDone.data.summary.negativeMarks > 0, 'a wrong answer costs a mark');
   eq(Object.fromEntries(jmDone.data.detail.map(d => [d.id, d.awarded])), jmPlan.expected, 'question by question');
 
-  const jeeAdvIssued = await issueUntil(a.jar, n => indiaSpec('jee-advanced', 12, 3003 + n),
+  const jeeAdvIssued = await issueUntil(a.jar, () => india(a.jar, 'jee-advanced', 12),
     paper => paper.questions.find(sq => sq.payload.answerType === 'multi-mcq' && sq.payload.answer.correctIndices.length > 1), 'a multiple-correct question with more than one correct option');
   const jeeAdv = jeeAdvIssued.response;
   eq(leaks(jeeAdv.data), [], 'a JEE Advanced paper discloses nothing private');
@@ -660,9 +719,136 @@ try {
   const partialLine = jaDone.data.detail.find(d => d.id === partialOn.id);
   eq([partialLine.awarded, !!partialLine.partial, partialLine.markingScheme], [partialOn.marking.partialPerOption, true, 'objective-partial'], 'one correct option of several earns the per-option mark');
 
+  // ── Seen content: a finished paper's, and content seen before a paper ──────
+  // Finalising a paper discloses every solution on it, so its content is seen
+  // by the account exactly as practice records it: a practice copy issued
+  // afterwards is a repeat. And an item the account had already been shown the
+  // solution of when the paper was finalised is marked and scored, and flagged
+  // a repeat on its result line and its event, so no device credits it.
+  {
+    const rep = await registerAccount(h, { email: 'exam.repeat@example.test', deviceId: 'ipad-exam-repeat' });
+    const firstTimer = await registerAccount(h, { email: 'exam.firsttime@example.test', deviceId: 'ipad-exam-firsttime' });
+    eq([(await verifyEmail(h, rep.account.id)).status, (await verifyEmail(h, firstTimer.account.id)).status], [200, 200], 'two more accounts are verified');
+    eq((await grantPremium(rep.account.id)).status, 200, 'one is granted Premium');
+    await h.db.run('DELETE FROM rate_limits');
+    const itemsOf = q => [q, q.alt, ...(q.parts || []), ...(q.parts || []).map(part => part.alt)].filter(Boolean);
+    const hashesOf = item => [...new Set([contentHashOf(item), item.contentHash].filter(Boolean))];
+    // The oracle's own record of what the account has been shown, by the
+    // engine's content hash of each sealed item.
+    const shownHashes = new Set();
+    const noteShown = paper => { for (const sq of paper.questions) for (const item of itemsOf(sq.payload)) for (const hash of hashesOf(item)) shownHashes.add(hash); };
+    const wasShown = sq => hashesOf(sq.payload).some(hash => shownHashes.has(hash));
+    const predicted = paper => singles(paper).filter(wasShown).map(sq => sq.id).sort();
+    const flagged = result => result.detail.filter(d => !d.multipart && d.repeat === true).map(d => d.id).sort();
+    // A sealed question practice can issue again as the same content: the
+    // generator, difficulty and seed reproduce exactly what the paper shows.
+    const reproducible = sq => {
+      const q = sq.payload;
+      if (!Number.isFinite(Number(q.seed)) || rightAnswer(q) === null) return false;
+      try { return contentHashOf(generateQuestion(sq.generator, Number(q.difficulty), Number(q.seed))) === contentHashOf(q); } catch { return false; }
+    };
+    const issuePractice = (jar, sq) => h.request('/v1/practice/issue', { method: 'POST', jar,
+      body: { generator: sq.generator, difficulty: Number(sq.payload.difficulty), seed: Number(sq.payload.seed), curriculum: 'in' } });
+    const gradeEvent = async (accountId, attemptId) => JSON.parse((await h.db.get("SELECT payload_json FROM learning_events WHERE account_id=? AND kind='graded-attempt' AND id=?", [accountId, attemptId])).payload_json);
+
+    // A finished paper's content is seen.
+    const p1 = (await create(rep.jar, practice)).data.exam;
+    const paper1 = await sealed(p1.id);
+    const x = singles(paper1).find(reproducible);
+    ok(!!x, 'the paper holds a question practice can issue again as the same content');
+    const beforeFinish = await issuePractice(firstTimer.jar, x);
+    eq([beforeFinish.status, beforeFinish.data.repeat ?? false, beforeFinish.data.question.prompt], [201, false, x.payload.prompt], 'that content, issued in practice to an account that never sat the paper, is not a repeat');
+    eq(await rows(rep.account.id, 'practice-content'), 0, 'an open paper has disclosed nothing: none of its content is seen yet');
+    const r1 = await finish(rep.jar, p1.id, { answers: { [x.id]: rightAnswer(x.payload) } });
+    eq([r1.status, flagged(r1.data), predicted(paper1)], [200, [], []], 'nothing on an account\'s first paper is a repeat');
+    const d1 = r1.data.detail.find(d => d.id === x.id);
+    eq([d1.correct, d1.awarded, d1.repeat ?? false, (await gradeEvent(rep.account.id, d1.attemptId)).repeat ?? false], [true, Number(x.marking.correct), false, false], 'the question is marked and its attempt is new work');
+    noteShown(paper1);
+    ok(await rows(rep.account.id, 'practice-content') >= paper1.questions.length, `finishing the paper records its content as seen (${await rows(rep.account.id, 'practice-content')} keys for ${paper1.questions.length} questions)`);
+    const copy = await issuePractice(rep.jar, x);
+    eq([copy.status, copy.data.repeat, copy.data.question.prompt], [201, true, x.payload.prompt], 'the same content issued in practice afterwards is declared a repeat');
+    const copyGrade = await h.request(`/v1/practice/${copy.data.question.id}/submit`, { method: 'POST', jar: rep.jar, headers: { 'Idempotency-Key': 'exam-seen-copy-0001' },
+      body: { submissionId: 'exam-seen-copy-0001', answer: rightAnswer(x.payload), mode: 'typed' } });
+    eq([copyGrade.status, copyGrade.data.authoritative, copyGrade.data.correct, copyGrade.data.repeat], [200, true, true, true], 'it is still marked, and its receipt says repeat');
+    eq((await gradeEvent(rep.account.id, copyGrade.data.attemptId)).repeat, true, 'and so does its graded-attempt event: no fresh credit for a solution the paper released');
+    const elsewhere = await issuePractice(firstTimer.jar, x);
+    eq(elsewhere.data.repeat ?? false, false, 'another account\'s copy of that content is still its own first sitting');
+    eq(await rows(firstTimer.account.id, 'practice-content'), 0, 'and nothing was recorded as seen for it');
+
+    // Content seen before the paper is finalised is a repeat on the paper.
+    let p2, paper2, y, z;
+    for (let n = 0; n < 8 && !y; n++) {
+      await h.db.run('DELETE FROM rate_limits');
+      p2 = (await create(rep.jar, practice)).data.exam;
+      paper2 = await sealed(p2.id);
+      const candidates = singles(paper2).filter(sq => reproducible(sq) && !wasShown(sq));
+      if (candidates.length >= 2) [y, z] = candidates;
+      else { const r = await finish(rep.jar, p2.id, {}); eq(flagged(r.data), predicted(paper2), 'a paper finished on the way flags exactly the content already seen'); count--; noteShown(paper2); }
+    }
+    ok(!!y && !!z && y.id !== z.id, 'a second paper holds two questions the account has not been shown');
+    const shown = await issuePractice(rep.jar, y);
+    eq([shown.status, shown.data.repeat ?? false], [201, false], 'while the paper is open, one of them is issued in practice');
+    eq((await h.request(`/v1/practice/${shown.data.question.id}/reveal`, { method: 'POST', jar: rep.jar, body: {} })).status, 200, 'and its solution is revealed there');
+    for (const hash of hashesOf(y.payload)) shownHashes.add(hash);
+    const r2 = await finish(rep.jar, p2.id, { answers: { [y.id]: rightAnswer(y.payload), [z.id]: rightAnswer(z.payload) } });
+    eq([r2.status, flagged(r2.data)], [200, predicted(paper2)], 'the paper flags as repeats exactly the questions the account had already been shown');
+    const dy = r2.data.detail.find(d => d.id === y.id);
+    const dz = r2.data.detail.find(d => d.id === z.id);
+    eq([dy.repeat, dy.correct, dy.awarded], [true, true, Number(y.marking.correct)], 'the question whose solution was already seen is still marked and awarded on the paper');
+    eq([dz.repeat ?? false, dz.correct, dz.awarded], [false, true, Number(z.marking.correct)], 'beside one that is new work');
+    eq(r2.data.score, Number(y.marking.correct) + Number(z.marking.correct), 'and the paper\'s score counts both: it states what was answered on this paper');
+    const ey = await gradeEvent(rep.account.id, dy.attemptId);
+    const ez = await gradeEvent(rep.account.id, dz.attemptId);
+    eq([ey.repeat, ey.correct, ey.marksEarned, ey.mode], [true, true, Number(y.marking.correct), 'exam'], 'its graded-attempt event carries repeat: true, which earns no XP, rating or mastery on any device');
+    eq([Object.hasOwn(ez, 'repeat'), ez.correct], [false, true], 'the new work\'s event carries no such flag');
+    eq((await finish(rep.jar, p2.id, {})).data, r2.data, 'and a replay returns the same result, flags included');
+
+    // ── Deleting the account removes every exam row ──────────────────────────
+    // An account's exam data is: its pending layout (exam-layout), the create
+    // keys (exam-create), the sealed papers (exam-paper), answer snapshots
+    // (exam-answers), results (exam-result) and seen-content keys
+    // (practice-content) in idempotency_keys, and its exam-result and
+    // graded-attempt rows in learning_events. All are the account's own rows.
+    await h.db.run('DELETE FROM rate_limits');
+    eq((await layoutOf(rep.jar, 'cbse', 10)).status, 200, 'the account also holds a pending layout');
+    const openOne = (await create(rep.jar, practice)).data.exam;
+    eq((await save(rep.jar, openOne.id, { answers: {}, rev: 1 })).status, 200, 'and an open paper with a saved snapshot');
+    const scopeCounts = async () => Object.fromEntries((await h.db.all('SELECT scope, COUNT(*) AS n FROM idempotency_keys WHERE account_id=? GROUP BY scope', [rep.account.id])).map(r => [r.scope, Number(r.n)]));
+    const held = await scopeCounts();
+    ok(['exam-layout', 'exam-create', 'exam-paper', 'exam-answers', 'exam-result', 'practice-content'].every(scope => held[scope] > 0), `before deletion every kind of exam row exists (${JSON.stringify(held)})`);
+    const eventsHeld = Number((await h.db.get("SELECT COUNT(*) AS n FROM learning_events WHERE account_id=? AND kind IN ('exam-result','graded-attempt')", [rep.account.id])).n);
+    ok(eventsHeld >= 4, `with the exam events (${eventsHeld})`);
+    const removed = await h.request('/v1/account', { method: 'DELETE', jar: rep.jar, body: { password: 'correct-horse-battery' } });
+    eq([removed.status, removed.data?.deleted], [200, true], 'the account is deleted with its password');
+    eq([await scopeCounts(), Number((await h.db.get('SELECT COUNT(*) AS n FROM learning_events WHERE account_id=?', [rep.account.id])).n)], [{}, 0],
+      'no layout, create key, sealed paper, snapshot, result, seen-content key or learning event of the account remains');
+    eq(Number((await h.db.get("SELECT COUNT(*) AS n FROM idempotency_keys WHERE scope IN ('exam-paper','exam-result','exam-answers') AND key IN (?,?,?)", [p1.id, p2.id, openOne.id])).n), 0, 'and its papers are not held under any other account');
+    eq((await read(rep.jar, p1.id)).status, 401, 'the deleted account\'s session reaches nothing');
+    ok(await rows(a.account.id, 'exam-paper') > 0 && await rows(firstTimer.account.id, 'practice-question') > 0, 'while other accounts\' rows are untouched');
+  }
+
+  // What is public about a previous-year item: its labels and the authority's
+  // citation (enough to find it in the published paper) — and not this
+  // product's own handle on the archive record.
+  {
+    const archived = await issueUntil(a.jar, () => india(a.jar, 'cbse', 10),
+      paper => paper.questions.find(sq => sq.payload.archive?.recordId && sq.payload.pyqId), 'a previous-year item from the source-cited archive');
+    const sealedPyq = archived.found;
+    const publicExam = archived.exam;
+    const publicPyq = publicExam.questions.find(q => q.id === sealedPyq.id);
+    ok(typeof sealedPyq.payload.archive.recordId === 'string' && typeof sealedPyq.payload.pyqId === 'string', 'the sealed item holds its archive record id');
+    ok(!hasKey(publicExam, 'recordId') && !hasKey(publicExam, 'pyqId'), 'no archive record id is anywhere in the public paper');
+    ok(!strings(publicExam).some(text => text.includes(sealedPyq.payload.archive.recordId)), 'nor inside any public string');
+    const { recordId: _omitted, ...citation } = sealedPyq.payload.archive;
+    eq(publicPyq.payload.archive, JSON.parse(JSON.stringify(citation)), 'the rest of the archive citation is public as sealed: exam, year, paper, question number, citations');
+    ok(publicPyq.payload.archive.citations.length > 0 && publicPyq.payload.archive.questionNumber !== undefined, 'so a student can still check the question against the authority\'s paper');
+    ok(!hasKey((await read(a.jar, publicExam.id)).data, 'recordId'), 'and reading the open paper back does not carry it either');
+    eq((await finish(a.jar, publicExam.id, {})).status, 200, 'that paper is finished');
+  }
+
   // Internal choice: the OR question is the one marked.
   {
-    const issued = await issueUntil(a.jar, n => indiaSpec('cbse', 10, 1001 + n),
+    const issued = await issueUntil(a.jar, () => india(a.jar, 'cbse', 10),
       paper => paper.questions.find(sq => sq.payload.alt && rightAnswer(sq.payload.alt) !== null), 'an internal choice whose alternative the oracle can answer');
     const withChoice = issued.found;
     const r = await finish(a.jar, issued.exam.id, { answers: { [`${withChoice.id}::or`]: rightAnswer(withChoice.payload.alt) } });
@@ -676,14 +862,15 @@ try {
   {
     const SELECTIONS = [['cbse', 10, 'standard'], ['cbse', 10, 'basic'], ['cbse', 11, 'standard'], ['cbse', 12, 'standard'],
       ['jee-main', 11, 'standard'], ['jee-main', 12, 'standard'], ['jee-advanced', 12, 'standard'], ['olympiad', 10, 'standard']];
-    const SEEDS = [11, 4242, 90210, 271828, 314159, 1618033];
+    // Six papers per selection, each composed for the layout the server set.
+    const SEEDS = [1, 2, 3, 4, 5, 6];
     const refusedSpecs = [];
     const leaked = [];
     let accepted = 0, questions = 0;
     for (const [track, grade, variant] of SELECTIONS) {
       for (const seed of SEEDS) {
         await h.db.run('DELETE FROM rate_limits');
-        const r = await create(a.jar, await indiaSpec(track, grade, seed, variant));
+        const r = await create(a.jar, await india(a.jar, track, grade, variant));
         if (r.status === 201) {
           accepted++; questions += r.data.exam.questions.length;
           leaked.push(...identityLeaks(r.data.exam, await sealed(r.data.exam.id)).map(line => `${track}/${grade} seed ${seed} ${line}`));
@@ -715,7 +902,7 @@ try {
   eq([capped.status, capped.data?.error?.code, capped.data?.error?.capability], [402, 'FREE_CAP_REACHED', 'premium-exams'], 'a second paper inside the window is refused with the device\'s own code');
   eq([capped.data.error.used, capped.data.error.limit, capped.data.error.windowDays, capped.data.error.nextAt], [1, 1, 30, firstFree.data.exam.startedAt + 30 * 86400000],
     'and says when the next free simulation unlocks');
-  const cappedIndia = await create(free.jar, cbse);
+  const cappedIndia = await create(free.jar, await india(free.jar, 'cbse', 10));
   eq([cappedIndia.status, cappedIndia.data?.error?.code], [402, 'FREE_CAP_REACHED'], 'a blueprint paper is counted against the same allowance');
   eq(await rows(free.account.id, 'exam-paper'), 1, 'a refused start seals nothing and consumes nothing');
   const retried = await create(free.jar, practice, freeKey);
@@ -723,12 +910,12 @@ try {
   eq(await rows(free.account.id, 'exam-paper'), 1, 'and is not counted twice');
   ok((await finish(free.jar, firstFree.data.exam.id, {})).status === 200 && (await create(free.jar, practice)).status === 402, 'finishing the paper does not hand back the simulation');
 
-  const jeeAdvSpecForPlan = await indiaSpec('jee-advanced', 12, 3003);
+  const jeeAdvSpecForPlan = await india(advFree.jar, 'jee-advanced', 12);
   const advRefused = await create(advFree.jar, jeeAdvSpecForPlan);
   eq([advRefused.status, advRefused.data?.error?.code, advRefused.data?.error?.capability], [402, 'PREMIUM_REQUIRED', 'jee-advanced-content'],
     'a free account cannot start a JEE Advanced paper, and is told the track is the reason');
   eq(await rows(advFree.account.id, 'exam-paper'), 0, 'the refusal spends no simulation');
-  eq((await create(advFree.jar, await indiaSpec('jee-main', 12, 2002))).status, 201, 'the same account may spend its free simulation on JEE Main');
+  eq((await create(advFree.jar, await india(advFree.jar, 'jee-main', 12))).status, 201, 'the same account may spend its free simulation on JEE Main');
   eq((await create(advFree.jar, jeeAdvSpecForPlan)).data?.error?.code, 'PREMIUM_REQUIRED', 'JEE Advanced stays refused for the track, whatever the allowance');
 
   const [raceA, raceB] = await Promise.all([create(racer.jar, practice), create(racer.jar, practice)]);
@@ -737,7 +924,7 @@ try {
 
   eq((await grantPremium(free.account.id)).status, 200, 'an admin grants the free account Premium');
   eq([(await create(free.jar, practice)).status, (await create(free.jar, practice)).status], [201, 201], 'Premium lifts the simulation cap');
-  eq((await create(free.jar, jeeAdvSpecForPlan)).status, 201, 'and carries the JEE Advanced capability');
+  eq((await create(free.jar, await india(free.jar, 'jee-advanced', 12))).status, 201, 'and carries the JEE Advanced capability');
   // ── A few papers open at once, whatever the plan ──────────────────────────
   {
     eq(MAX_OPEN_PAPERS, 3, 'an account holds at most three papers open');
@@ -752,10 +939,40 @@ try {
     const afterFinishing = await create(free.jar, practice);
     eq(afterFinishing.status, 201, 'makes room for a new paper');
     eq((await create(free.jar, practice)).data?.error?.code, 'EXAM_OPEN_PAPER_LIMIT', 'and only for one');
-    // Abandoned papers stop counting once their time and grace have passed.
+    // An abandoned paper is not dropped: it stays open until it has a result,
+    // and the server gives it one once its time and grace have passed.
+    const abandoned = (await h.db.all("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='exam-paper' AND key NOT IN (SELECT key FROM idempotency_keys WHERE account_id=? AND scope='exam-result')", [free.account.id, free.account.id])).map(r => r.key);
+    const resultsBefore = await rows(free.account.id, 'exam-result');
+    const resultEventsBefore = (await events(free.account.id, 'exam-result')).length;
+    eq(abandoned.length, 3, 'three papers are open and about to be abandoned');
     skew += 3 * 60 * 60000 + FINISH_GRACE_MS + 60000;
     await h.db.run('DELETE FROM rate_limits');
-    eq((await create(free.jar, practice)).status, 201, 'papers abandoned past deadline + grace no longer count as open');
+    eq((await create(free.jar, practice)).status, 201, 'once their time and grace have passed, the next start is allowed');
+    eq(await rows(free.account.id, 'exam-result') - resultsBefore, 3, 'because the server finalised each abandoned paper before counting');
+    eq((await events(free.account.id, 'exam-result')).length - resultEventsBefore, 3, 'with one exam-result event each');
+    const closed = await read(free.jar, abandoned[0]);
+    eq([closed.data.state, closed.data.result.unattended, closed.data.result.late, closed.data.result.score, closed.data.result.inputSource],
+      ['finished', true, true, 0, 'server-snapshot-before-deadline'], 'an abandoned paper with nothing saved is a finished paper that scored nothing');
+    ok(closed.data.result.detail.every(d => d.multipart ? d.parts.every(p => typeof p.answerText === 'string') : !!d.solution), 'and its solutions are released like any finished paper\'s');
+  }
+
+  // An abandoned paper is a sat paper: it has a result, it used the free
+  // simulation, and opening a paper to read it and walk away buys nothing.
+  {
+    const walker = await registerAccount(h, { email: 'exam.walker@example.test', deviceId: 'ipad-exam-walker' });
+    eq((await verifyEmail(h, walker.account.id)).status, 200, 'a free account that will walk away from its paper is verified');
+    await h.db.run('DELETE FROM rate_limits');
+    const walked = await create(walker.jar, practice);
+    eq(walked.status, 201, 'it starts its one free simulation');
+    eq((await read(walker.jar, walked.data.exam.id)).data.state, 'open', 'reads the paper');
+    skew += 30 * 60000 + FINISH_GRACE_MS + 1000;
+    await h.db.run('DELETE FROM rate_limits');
+    const second = await create(walker.jar, practice);
+    eq([second.status, second.data?.error?.code, second.data?.error?.used], [402, 'FREE_CAP_REACHED', 1], 'and after abandoning it has still used its free simulation');
+    eq([await rows(walker.account.id, 'exam-paper'), await rows(walker.account.id, 'exam-result'), (await events(walker.account.id, 'exam-result')).length], [1, 1, 1],
+      'the abandoned paper was finalised by that refused start: one paper, one result, one event');
+    const walkedResult = await read(walker.jar, walked.data.exam.id);
+    eq([walkedResult.data.state, walkedResult.data.result.unattended, walkedResult.data.result.score], ['finished', true, 0], 'and reads back as a finished paper');
   }
 
   const strangerGrant = await h.request('/v1/entitlements/admin/grant', { method: 'POST', jar: racer.jar, body: { accountId: racer.account.id, durationMs: 86400000 } });
@@ -775,10 +992,28 @@ try {
   skew += 10000;
   const tooLate = await save(a.jar, late.id, { answers: { [q1.id]: right(q1), [q2.id]: right(q2), [q3.id]: right(q3) }, rev: 3 });
   eq([tooLate.status, tooLate.data?.error?.code], [409, 'EXAM_DEADLINE_PASSED'], 'after deadline + grace nothing more can be saved');
+  // No device finished it. The next read finds a finished paper: the server
+  // marked the last snapshot it held, once.
+  const lateEventsBefore = (await events(a.account.id, 'exam-result')).filter(e => e.entity_id === late.id).length;
   const expired = await read(a.jar, late.id);
-  eq([expired.data.state, expired.data.expired, expired.data.snapshot.rev], ['open', true, 2], 'the paper reads as expired, holding its last snapshot');
+  eq([lateEventsBefore, expired.status, expired.data.state, expired.data.snapshot], [0, 200, 'finished', undefined], 'the next read of an unfinished paper past deadline + grace returns a finished paper');
+  eq([expired.data.result.authoritative, expired.data.result.unattended, expired.data.result.late, expired.data.result.finalisedBy, expired.data.result.inputSource, expired.data.result.snapshotSavedAt <= late.deadline + FINISH_GRACE_MS],
+    [true, true, true, 'deadline', 'server-snapshot-before-deadline', true], 'finalised by the server, late, on the snapshot saved before the bell');
+  eq(expired.data.result.score, Number(q1.marking.correct) + Number(q2.marking.correct), 'marked on exactly that snapshot');
+  eq(leaks(expired.data.exam), [], 'the paper beside the result is still the public paper');
+  eq((await read(a.jar, late.id)).data.result, expired.data.result, 'a second read returns the same stored result');
   const lateDone = await finish(a.jar, late.id, { answers: allRight(latePaper), reason: 'student' });
-  eq([lateDone.status, lateDone.data.late, lateDone.data.finalisedBy, lateDone.data.inputSource], [200, true, 'deadline', 'server-snapshot-before-deadline'], 'a finish after the grace is flagged late');
+  eq([lateDone.status, lateDone.data], [200, expired.data.result], 'a device that finishes afterwards is given that stored result, not a second marking');
+  eq([lateDone.data.late, lateDone.data.finalisedBy, lateDone.data.inputSource], [true, 'deadline', 'server-snapshot-before-deadline'], 'which is flagged late');
+  eq([await rows(a.account.id, 'exam-result') > 0, (await h.db.get("SELECT COUNT(*) AS n FROM idempotency_keys WHERE account_id=? AND scope='exam-result' AND key=?", [a.account.id, late.id])).n | 0,
+    (await events(a.account.id, 'exam-result')).filter(e => e.entity_id === late.id).length], [true, 1, 1], 'one result row and one exam-result event exist for the paper');
+  {
+    const lateAttempts = lateDone.data.detail.filter(d => d.attemptId).map(d => d.attemptId).sort();
+    const lateGraded = (await events(a.account.id, 'graded-attempt')).filter(e => JSON.parse(e.payload_json).examId === late.id).map(e => e.id).sort();
+    eq(lateGraded, lateAttempts, 'and each attempt on it was written once');
+  }
+  const afterClosed = await save(a.jar, late.id, { answers: { [q1.id]: right(q1) }, rev: 9 });
+  eq([afterClosed.status, afterClosed.data?.error?.code], [409, 'EXAM_FINALISED'], 'the closed paper takes no more answers');
   eq(lateDone.data.score, Number(q1.marking.correct) + Number(q2.marking.correct), 'and marks only the snapshot saved before it');
   eq(lateDone.data.detail.filter(d => !d.unanswered).map(d => d.id), [q1.id, q2.id], 'answers added after the bell are ignored');
   eq(lateDone.data.detail.find(d => d.id === q3.id).given, '', 'the late answer is not even recorded as given');
@@ -796,6 +1031,52 @@ try {
   const silentPaper = await sealed(silent.id);
   const silentDone = await finish(a.jar, silent.id, { answers: allRight(silentPaper) });
   eq([silentDone.data.late, silentDone.data.score, silentDone.data.detail.every(d => d.unanswered)], [true, 0, true], 'a late finish with nothing checkpointed marks nothing');
+
+  // ── Housekeeping closes a paper whose account never comes back ─────────────
+  {
+    const gone = await registerAccount(h, { email: 'exam.gone@example.test', deviceId: 'ipad-exam-gone' });
+    eq((await verifyEmail(h, gone.account.id)).status, 200, 'an account that will never come back is verified');
+    await h.db.run('DELETE FROM rate_limits');
+    const left = (await create(gone.jar, practice)).data.exam;
+    const leftPaper = await sealed(left.id);
+    const l1 = answerable(leftPaper)[0];
+    eq((await save(gone.jar, left.id, { answers: { [l1.id]: right(l1) }, rev: 1 })).data.saved, true, 'it saves one answer and leaves');
+    // Papers the free accounts above walked away from, never touched again.
+    const drained = await runHousekeeping(h.db);
+    ok(drained.examsFinalised >= 2, `housekeeping closes the papers accounts above abandoned and never returned to (${drained.examsFinalised})`);
+    for (const account of [racer, advFree]) {
+      eq([await rows(account.account.id, 'exam-result'), (await events(account.account.id, 'exam-result')).length], [await rows(account.account.id, 'exam-paper'), await rows(account.account.id, 'exam-paper')],
+        'every paper of such an account now has one result and one event');
+    }
+    const early = await runHousekeeping(h.db);
+    eq([early.examsFinalised, await rows(gone.account.id, 'exam-result')], [0, 0], 'housekeeping leaves a paper that is still inside its time alone');
+    skew += 30 * 60000 + FINISH_GRACE_MS + 1000;
+    const [sweepOne, sweepTwo] = await Promise.all([runHousekeeping(h.db), finish(gone.jar, left.id, { answers: allRight(leftPaper) })]);
+    eq(sweepTwo.status, 200, 'a late device finish racing housekeeping is answered');
+    const stored = JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='exam-result' AND key=?", [gone.account.id, left.id])).response_json);
+    eq(sweepTwo.data, stored, 'with the one stored result');
+    eq([stored.late, stored.score, stored.inputSource], [true, Number(l1.marking.correct), 'server-snapshot-before-deadline'], 'marked on the snapshot, whichever of the two wrote it');
+    eq([await rows(gone.account.id, 'exam-result'), (await events(gone.account.id, 'exam-result')).length, (await events(gone.account.id, 'graded-attempt')).length],
+      [1, 1, stored.detail.filter(d => d.attemptId).length], 'one result, one exam-result event and each attempt once');
+    ok(sweepOne.examsFinalised === (stored.unattended ? 1 : 0), `housekeeping reports what it finalised (${sweepOne.examsFinalised})`);
+
+    // And on its own, with no device at all.
+    const lone = await registerAccount(h, { email: 'exam.lone@example.test', deviceId: 'ipad-exam-lone' });
+    eq((await verifyEmail(h, lone.account.id)).status, 200, 'another account that will never come back is verified');
+    await h.db.run('DELETE FROM rate_limits');
+    const alone = (await create(lone.jar, practice)).data.exam;
+    const alonePaper = await sealed(alone.id);
+    const a1 = answerable(alonePaper)[0];
+    await save(lone.jar, alone.id, { answers: { [a1.id]: right(a1) }, rev: 1 });
+    skew += 30 * 60000 + FINISH_GRACE_MS + 1000;
+    const swept = await runHousekeeping(h.db);
+    eq(swept.examsFinalised, 1, 'housekeeping finalises the abandoned paper');
+    const aloneStored = JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='exam-result' AND key=?", [lone.account.id, alone.id])).response_json);
+    eq([aloneStored.unattended, aloneStored.late, aloneStored.score, aloneStored.finalisedBy], [true, true, Number(a1.marking.correct), 'deadline'], 'on its last snapshot, flagged as closed by the server');
+    eq((await runHousekeeping(h.db)).examsFinalised, 0, 'a second pass finds nothing to do');
+    eq([(await events(lone.account.id, 'exam-result')).length, await rows(lone.account.id, 'exam-result')], [1, 1], 'and wrote nothing twice');
+    eq((await finish(lone.jar, alone.id, { answers: allRight(alonePaper) })).data, aloneStored, 'a device finishing later gets the stored result');
+  }
 
   // ── Restart on the same database ───────────────────────────────────────────
   const carried = (await create(a.jar, practice)).data.exam;

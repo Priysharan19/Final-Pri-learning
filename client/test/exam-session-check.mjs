@@ -495,6 +495,52 @@ eq([adopted.score, adopted.markedBy, adopted.session.finalised], [12, 'server', 
 await rejectsWith(call('POST', `/exams/${two.id}/submit`, { answers: {}, submissionKey: 'second-device-01' }), 'INDIA_EXAM_ALREADY_SUBMITTED', 'and the paper cannot be submitted again from here');
 eq(Number((await online.db.get("SELECT COUNT(*) AS n FROM learning_events WHERE kind='exam-result' AND entity_id=?", [twoRow.server.examId]))?.n), 1, 'it was finalised once');
 
+// ── 15b · a question the account had already been shown earns no progress ───
+// The server flags it (`repeat: true` on the result line): the paper's score
+// counts it, and this device records the attempt without rating, mastery or XP.
+{
+  const { seenKeysOf, markSeen } = await import('../../server/platform/contentSeen.js');
+  const rp = (await call('POST', '/exams', {})).exam;
+  const rpRow = await idb.get('exams', rp.id);
+  const rpSealed = await online.examPaper(rpRow);
+  const rpMcq = rp.questions.filter(q => q.answerType === 'mcq');
+  const chapterOf = q => rpSealed.questions.find(sq => sq.id === q.id).chapterId;
+  const seenQ = rpMcq[0];
+  // "Already shown": the account's seen-content record on the server holds the
+  // first question's content, as a practice reveal or an earlier paper leaves it.
+  const accountId = online.accountOf(student.id).accountId;
+  await markSeen(online.db, accountId, seenKeysOf(rpSealed.questions.find(sq => sq.id === seenQ.id).payload), Date.now());
+  const keyOf = async q => String((await payloadOf(q.id)).answer.correctIndex);
+  const ratingOf = async q => idb.get('ratings', `${student.id}:${chapterOf(q)}`).catch(() => null);
+  const seenBefore = await ratingOf(seenQ);
+  const xpBefore = (await idb.get('profiles', student.id)).xp || 0;
+  const done = await call('POST', `/exams/${rp.id}/submit`, { answers: { [seenQ.id]: await keyOf(seenQ) }, submissionKey: 'repeat-on-paper-01' });
+  const line = done.detail.find(d => d.id === seenQ.id);
+  eq([line.correct, line.awarded, line.repeat, done.score], [true, 4, true, 4], 'the question is marked right and counted in the score, and the result says it is a repeat');
+  const attempt = (await idb.byIndex('attempts', 'pid', student.id)).find(a => a.questionId === seenQ.id);
+  eq([!!attempt, attempt?.repeat, attempt?.correct, attempt?.ratingAfter === attempt?.ratingBefore], [true, true, 1, true], 'its attempt is recorded as a repeat and moves no rating');
+  eq([(await ratingOf(seenQ))?.attempts ?? 0, (await ratingOf(seenQ))?.rating ?? null], [seenBefore?.attempts ?? 0, seenBefore?.rating ?? null], 'the chapter\'s mastery state is untouched');
+  eq((await idb.get('profiles', student.id)).xp || 0, xpBefore, 'and it earns no XP');
+  const event = JSON.parse((await online.db.get("SELECT payload_json FROM learning_events WHERE kind='graded-attempt' AND id=?", [line.attemptId])).payload_json);
+  eq([event.repeat, event.marksEarned], [true, 4], 'the server\'s own event says the same, for every other device');
+
+  // The control: an account that has been shown nothing. The same answer on
+  // its first paper is new work, and earns.
+  const newcomer = (await dispatch('POST', '/profiles', { name: 'Newcomer', course: 'in', indiaTrack: 'jee-main', year: 12 })).user;
+  await premium(newcomer);
+  await dispatch('POST', '/profiles/select', { id: newcomer.id });
+  const callNew = (method, path, body = {}) => online.withSessionOf(newcomer.id, () => dispatchIndiaExam(newcomer, method, path, body));
+  const first = (await callNew('POST', '/exams', {})).exam;
+  const firstQ = first.questions.find(q => q.answerType === 'mcq');
+  const xpNew = (await idb.get('profiles', newcomer.id)).xp || 0;
+  const doneNew = await callNew('POST', `/exams/${first.id}/submit`, { answers: { [firstQ.id]: await keyOf(firstQ) }, submissionKey: 'repeat-on-paper-02' });
+  const lineNew = doneNew.detail.find(d => d.id === firstQ.id);
+  const attemptNew = (await idb.byIndex('attempts', 'pid', newcomer.id)).find(a => a.questionId === firstQ.id);
+  eq([lineNew.correct, lineNew.repeat ?? false, attemptNew?.repeat ?? false, doneNew.detail.some(d => d.repeat === true)], [true, false, false, false], 'on an account that has seen nothing, no question of its first paper is a repeat');
+  ok(((await idb.get('profiles', newcomer.id)).xp || 0) > xpNew && attemptNew.ratingAfter !== attemptNew.ratingBefore, 'and the same right answer earns XP and moves its rating');
+  await dispatch('POST', '/profiles/select', { id: student.id });
+}
+
 // ── 16 · a session that lapsed mid-paper: the finish waits for sign-in ──────
 const lapsed = (await call('POST', '/exams', { seed: 1601 })).exam;
 const lapsedQ = lapsed.questions.find(q => q.answerType === 'mcq');
