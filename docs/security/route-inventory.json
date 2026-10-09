@@ -2205,7 +2205,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "owner only (same 404 rule); exactly-once finalisation in one transaction under the account sync lock: every question marked by the deterministic engine against the sealed key and server-owned grid, one immutable result, one exam-attempt and per-attempted-question graded-attempt learning events by device server-grader; a replay returns the stored result unchanged; arriving after deadline + 2 minutes marks only the last server-saved snapshot and flags late; no client award authority",
+      "ownership": "owner only (same 404 rule); exactly-once finalisation in one transaction under the account sync lock: every question marked by the deterministic engine against the sealed key and server-owned grid, one immutable result, one exam-result (a kind /v1/sync/push refuses) and per-attempted-question graded-attempt learning events by device server-grader; a replay returns the stored result unchanged; arriving after deadline + 2 minutes marks only the last server-saved snapshot and flags late; no client award authority",
       "rateLimits": [
         {
           "key": "exam-finish",

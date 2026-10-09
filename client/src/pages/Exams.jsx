@@ -205,16 +205,21 @@ function PaperHistory({ exams, openPaper, nav, india = false }) {
               <div style={{ fontWeight: 640, fontSize: 14 }}>{e.title}</div>
               <div className="muted" style={{ fontSize: 12.5 }}>
                 {t(india ? 'exams.paperMetaIndia' : 'exams.paperMeta', { date: new Date(e.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }), n: e.duration_min })}
+                {/* A score the server did not certify says where it came from. */}
+                {e.finished_at && e.marked_by === 'earlier-version' && <> · <span data-exam-marked-by="earlier-version">{t('exams.markedEarlier')}</span></>}
+                {e.finished_at && e.marked_by === 'backup' && <> · <span data-exam-marked-by="backup">{t('exams.markedBackup')}</span></>}
               </div>
             </div>
             {e.finished_at
               ? <span className="tag" style={{ color: pct >= 80 ? 'var(--good)' : pct >= 50 ? 'var(--ink)' : 'var(--bad)' }}>
                 {e.score}/{e.total} · {pct}%
               </span>
-              : <span className="tag tag-brand">{t('exams.inProgress')}</span>}
+              : e.pending
+                ? <span className="tag" data-exam-pending>{t('exams.waitingToBeMarked')}</span>
+                : <span className="tag tag-brand">{t('exams.inProgress')}</span>}
             <button className="btn btn-quiet btn-sm" title={t('exams.openPrintable')}
               aria-label={t('exams.openPrintableAria', { title: e.title })} onClick={() => openPaper(e.id)}>{t('exams.print')}</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => nav(`/exams/${e.id}`)}>{e.finished_at ? t('nav.review') : t('exams.resume')}</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => nav(`/exams/${e.id}`)}>{e.finished_at ? t('nav.review') : e.pending ? t('exams.openPending') : t('exams.resume')}</button>
           </div>
         );
       })}

@@ -446,7 +446,7 @@ eq((await online.examResult(dc.id))?.score, 12, 'the score shown is the server\'
 eq(settled.detail.filter(d => !d.unanswered).map(d => d.id).sort(), [dcMcq[0].id, dcMcq[1].id, dcMcq[2].id].sort(), 'what was submitted is what was marked');
 ok((await idb.byIndex('attempts', 'pid', student.id)).length === attemptsPre + 3, 'and the evidence is recorded once the server has marked it');
 eq((await call('POST', `/exams/${dc.id}/submit`, { submissionKey: 'queued-finish-0001' })).replayed, true, 'the room\'s own retry of that submission is a replay');
-eq(Number((await online.db.get("SELECT COUNT(*) AS n FROM learning_events WHERE kind='exam-attempt' AND entity_id=?", [queuedRow.server.examId]))?.n), 1, 'the server finalised it exactly once');
+eq(Number((await online.db.get("SELECT COUNT(*) AS n FROM learning_events WHERE kind='exam-result' AND entity_id=?", [queuedRow.server.examId]))?.n), 1, 'the server finalised it exactly once');
 
 // ── 14 · offline at the bell: the last checkpoint is marked, nothing after it ─
 offset = 0;
@@ -493,7 +493,7 @@ await new Promise(resolve => setTimeout(resolve, 3100));
 const adopted = (await call('GET', `/exams/${two.id}`)).exam;
 eq([adopted.score, adopted.markedBy, adopted.session.finalised], [12, 'server', true], 'reopening here shows the server\'s result, not a second marking');
 await rejectsWith(call('POST', `/exams/${two.id}/submit`, { answers: {}, submissionKey: 'second-device-01' }), 'INDIA_EXAM_ALREADY_SUBMITTED', 'and the paper cannot be submitted again from here');
-eq(Number((await online.db.get("SELECT COUNT(*) AS n FROM learning_events WHERE kind='exam-attempt' AND entity_id=?", [twoRow.server.examId]))?.n), 1, 'it was finalised once');
+eq(Number((await online.db.get("SELECT COUNT(*) AS n FROM learning_events WHERE kind='exam-result' AND entity_id=?", [twoRow.server.examId]))?.n), 1, 'it was finalised once');
 
 // ── 16 · a session that lapsed mid-paper: the finish waits for sign-in ──────
 const lapsed = (await call('POST', '/exams', { seed: 1601 })).exam;
@@ -535,6 +535,66 @@ eq((await call('GET', `/exams/${lapsed.id}`)).exam.score, 4, 'signed in again, t
   ok(/earlier version/i.test(refusedLegacy?.message || ''), 'and the student is told why');
   const after = await idb.get('exams', 'legacy-exam-2');
   eq([after.finishedAt, after.score, after.detail], [null, null, null], 'no device mark was produced for it');
+}
+
+// ── 18 · History on a second device: the server's result, read from the account
+// What reaches another device through sync is the server's own events. The
+// paper's result arrives as `exam-result` (a kind only the server writes) and
+// each marked answer as `graded-attempt`; the sitting device's own copy of the
+// paper is not restored as a second, uncertified row.
+{
+  const { applyRemoteLearningEvents } = await import('../src/platform/cloudSyncRestore.js');
+  const pulled = [];
+  for (let cursor = 0, page = 0; page < 20; page++) {
+    const r = await online.app.request(`/v1/sync/pull/${cursor}`, { jar: online.accountOf(student.id).jar });
+    eq(r.status, 200, 'the account\'s events are pulled');
+    pulled.push(...r.data.events);
+    if (!r.data.hasMore || r.data.cursor === cursor) break;
+    cursor = r.data.cursor;
+  }
+  const results = pulled.filter(e => e.kind === 'exam-result');
+  const serverPapers = (await idb.byIndex('exams', 'pid', student.id)).filter(e => e.server?.examId && e.finishedAt && !e.server.remote);
+  eq(results.length, serverPapers.length, 'one exam-result event per paper the server marked');
+  ok(results.every(e => e.deviceId === 'server-grader' && e.payload.serverMarked === true && e.payload.examId === e.id), 'each written by the server grader');
+
+  // The sitting device: every one of them is already here.
+  const examsBefore = (await idb.byIndex('exams', 'pid', student.id)).length;
+  const attemptsBeforeApply = (await idb.byIndex('attempts', 'pid', student.id)).length;
+  const xpBefore = (await idb.get('profiles', student.id)).xp;
+  const own = await applyRemoteLearningEvents(student.id, pulled.filter(e => e.deviceId === 'server-grader'));
+  eq([own.applied, (await idb.byIndex('exams', 'pid', student.id)).length, (await idb.byIndex('attempts', 'pid', student.id)).length, (await idb.get('profiles', student.id)).xp],
+    [0, examsBefore, attemptsBeforeApply, xpBefore], 'on the device that sat the papers, pulling them back adds no paper, no attempt and no XP');
+
+  // A second device: a profile that has none of it locally, on the same account.
+  const second = (await dispatch('POST', '/profiles', { name: 'Chitra iPad 2', course: 'in', indiaTrack: 'jee-main', year: 12 })).user;
+  const clientCopy = { id: 'evt-other-device-1', deviceId: 'other-ipad', deviceSeq: 1, serverCursor: 999999, kind: 'exam-attempt', entityId: made.id, occurredAt: Date.now(),
+    payload: { state: 'finished', title: 'device copy', year: 12, score: 100, total: 100, finishedAt: Date.now(), indiaExam: { track: 'jee-main' }, serverExamId: row0.server.examId } };
+  const legacyCopy = { ...clientCopy, id: 'evt-other-device-2', deviceSeq: 2, payload: { ...clientCopy.payload, title: 'earlier version paper', score: 40, serverExamId: undefined } };
+  const forged = { ...clientCopy, id: row0.server.examId, deviceSeq: 3, kind: 'exam-result', entityId: row0.server.examId,
+    payload: { state: 'finished', examId: row0.server.examId, serverMarked: true, score: 100, total: 100, title: 'forged' } };
+  const restored = await applyRemoteLearningEvents(second.id, [...pulled.filter(e => e.deviceId === 'server-grader'), clientCopy, legacyCopy, forged]);
+  const there = await idb.byIndex('exams', 'pid', second.id);
+  eq(there.filter(e => e.server?.examId).length, results.length, 'the second device lists every paper the server marked');
+  eq(there.filter(e => e.title === 'device copy').length, 0, 'the sitting device\'s own copy of a server paper is not restored as a second row');
+  eq(there.filter(e => e.title === 'forged').length, 0, 'an exam-result that did not come from the server grader is ignored');
+  const legacyRestored = there.find(e => e.title === 'earlier version paper');
+  ok(!!legacyRestored && !legacyRestored.server, 'a paper an earlier version published restores without any server claim');
+  ok(restored.byKind['graded-attempt'] > 0, `the marked answers arrive as evidence (${restored.byKind['graded-attempt']})`);
+
+  await dispatch('POST', '/profiles/select', { id: second.id });
+  const secondCall = (method, path, body = {}) => online.withSessionOf(student.id, () => dispatchIndiaExam(second, method, path, body));
+  const listed = (await secondCall('GET', '/exams')).exams;
+  const theirs = there.find(e => e.server?.examId === row0.server.examId);
+  eq(listed.find(e => e.id === theirs.id)?.marked_by, 'server', 'the list shows the server\'s result as the server\'s');
+  eq(listed.find(e => e.id === legacyRestored.id)?.marked_by, 'earlier-version', 'and the earlier-version paper as not certified');
+  const attemptsSecond = (await idb.byIndex('attempts', 'pid', second.id)).length;
+  const opened = (await secondCall('GET', `/exams/${theirs.id}`)).exam;
+  const stored = await online.examResult(made.id);
+  eq([opened.score, opened.total, opened.markedBy, opened.questions.length, opened.detail.length], [stored.score, stored.total, 'server', 25, 25], 'opening it reads the questions and the marked detail back from the account');
+  eq(opened.detail.map(d => d.awarded), stored.detail.map(d => d.awarded), 'with the server\'s marks, question by question');
+  eq((await idb.byIndex('attempts', 'pid', second.id)).length, attemptsSecond, 'and records no second copy of the evidence');
+  eq(leaks((await secondCall('GET', '/exams')).exams), [], 'the list itself carries no solution');
+  await dispatch('POST', '/profiles/select', { id: student.id });
 }
 
 Date.now = realNow;

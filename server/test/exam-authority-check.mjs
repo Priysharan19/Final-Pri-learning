@@ -301,6 +301,8 @@ try {
   const saved = await save(a.jar, exam.id, { answers: { [first.id]: '41' }, workings: {}, times: { [first.id]: 5000 }, modes: {}, cur: 0, rev: 2 });
   eq([saved.status, saved.data.saved, saved.data.rev], [200, true, 2], 'a snapshot is saved');
   ok(Number.isFinite(saved.data.savedAt) && saved.data.remainingMs > 0 && saved.data.deadline === exam.deadline, 'with the server\'s timestamp and clock');
+  const viaPatch = await h.request(`/v1/exams/${exam.id}/answers`, { method: 'PATCH', jar: a.jar, body: { answers: { [first.id]: '41' }, rev: 2 } });
+  eq([viaPatch.status, viaPatch.data.stale], [200, true], 'PATCH is the same checkpoint route (the native shells carry no PUT)');
   const stale = await save(a.jar, exam.id, { answers: { [first.id]: 'older' }, rev: 1 });
   eq([stale.status, stale.data.saved, stale.data.stale, stale.data.rev], [200, false, true, 2], 'a retried older snapshot never replaces a newer one');
   eq((await read(a.jar, exam.id)).data.snapshot.answers, { [first.id]: '41' }, 'the latest snapshot reads back');
@@ -325,7 +327,7 @@ try {
   eq([(await save(b.jar, 'not-an-id', { rev: 1 })).status, (await finish(b.jar, unknownId)).status], [404, 404], 'malformed and unknown ids are 404 on every route');
   eq([(await read({}, exam.id)).status, (await save({}, exam.id, { rev: 9 })).status, (await finish({}, exam.id)).status], [401, 401, 401], 'a signed-out caller reaches no paper');
   eq([await rows(b.account.id, 'exam-paper'), await rows(b.account.id, 'exam-answers'), await rows(b.account.id, 'exam-result')], [0, 0, 0], 'the other account wrote nothing');
-  eq((await events(b.account.id, 'graded-attempt')).length + (await events(b.account.id, 'exam-attempt')).length, 0, 'and earned no learning events');
+  eq((await events(b.account.id, 'graded-attempt')).length + (await events(b.account.id, 'exam-result')).length, 0, 'and earned no learning events');
   eq([(await read(a.jar, exam.id)).data.state, (await read(a.jar, exam.id)).data.snapshot.answers[first.id]], ['open', '41'], 'the owner\'s paper is untouched and still open');
   eq(await rows(a.account.id, 'exam-result'), 0, 'and was not finalised by the stranger');
 
@@ -362,11 +364,17 @@ try {
   eq(graded.map(e => e.id).sort(), attempted.map(x => x.attemptId).sort(), 'keyed by the attempt ids the result carries');
   ok(graded.every(e => { const p = JSON.parse(e.payload_json); return e.device_id === 'server-grader' && p.attemptId === e.id && p.questionId === e.entity_id && p.mode === 'exam' && p.examId === exam.id && typeof p.subtopic === 'string' && (p.correct === true || p.correct === false); }),
     'in the practice payload conventions, by the server grader, in exam mode');
-  const examEvents = await events(a.account.id, 'exam-attempt');
+  const examEvents = await events(a.account.id, 'exam-result');
   eq(examEvents.length, 1, 'one exam-level event');
   const examPayload = JSON.parse(examEvents[0].payload_json);
   eq([examEvents[0].device_id, examEvents[0].entity_id, examPayload.state, examPayload.examId, examPayload.score, examPayload.total, examPayload.serverMarked],
     ['server-grader', exam.id, 'finished', exam.id, sat.score, 80, true], 'written by the server grader with the certified score');
+  // No device can publish that event: the sync push route refuses the kind.
+  const forged = await h.request('/v1/sync/push', { method: 'POST', jar: b.jar, headers: { 'Idempotency-Key': 'forged-exam-result-0001' }, body: {
+    schemaVersion: 1, deviceId: 'ipad-exam-b', baseCursor: 0, events: [{ id: 'evt-forged-1', deviceId: 'ipad-exam-b', deviceSeq: 1, kind: 'exam-result', entityId: unknownId, occurredAt: 1,
+      payload: { state: 'finished', examId: unknownId, serverMarked: true, score: 80, total: 80 } }], entities: [] } });
+  ok(forged.status >= 400 && forged.status < 500, `a device cannot push an exam-result event (${forged.status} ${forged.data?.error?.code})`);
+  eq((await events(b.account.id, 'exam-result')).length, 0, 'and none was stored for it');
 
   // ── Exactly once under a concurrent double finish ──────────────────────────
   const twin = other.data.exam;
@@ -380,7 +388,7 @@ try {
   eq(one.data, two.data, 'with one and the same result');
   eq(one.data.score, twinPlan.score, 'equal to the oracle');
   eq(await rows(a.account.id, 'exam-result'), 2, 'one result row per paper');
-  eq((await events(a.account.id, 'exam-attempt')).length, 2, 'the exam-level event was written once');
+  eq((await events(a.account.id, 'exam-result')).length, 2, 'the exam-level event was written once');
   eq((await events(a.account.id, 'graded-attempt')).length - gradedBefore,
     one.data.detail.flatMap(d => (d.multipart ? d.parts : [d])).filter(x => x.attemptId).length, 'and each attempt once');
 

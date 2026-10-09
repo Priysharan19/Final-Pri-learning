@@ -38,7 +38,12 @@ const GAME_MODES = new Set(['rush', 'match']);
 // practice-attempt remain visible as archived sync data but are not marks.
 const PRACTICE_KINDS = new Set(['graded-attempt']);
 
-export const RESTORABLE_EVENT_KINDS = Object.freeze(['graded-attempt', 'exam-attempt', 'rush-history', 'match-history']);
+// An examination paper's result. Only the server writes this kind (the sync
+// push route refuses it), so a row restored from one is the server's word.
+const EXAM_RESULT_KIND = 'exam-result';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export const RESTORABLE_EVENT_KINDS = Object.freeze(['graded-attempt', 'exam-attempt', EXAM_RESULT_KIND, 'rush-history', 'match-history']);
 
 function plain(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value) &&
@@ -221,6 +226,18 @@ async function applyExamEvent(pid, event) {
   // An exam another device started and never finished cannot be resumed here:
   // the paper itself does not travel. Finished results are history worth keeping.
   if (p.state !== 'finished') return 'unsupported';
+  // A paper the server marked is recorded by the server's own `exam-result`
+  // event. The sitting device's copy of the same paper says which server exam
+  // it was; restoring both would list the paper twice, and the device's copy
+  // carries a score no server vouched for on this path.
+  const serverResult = event.kind === EXAM_RESULT_KIND;
+  if (serverResult) {
+    if (event.deviceId !== 'server-grader' || p.serverMarked !== true || !UUID.test(String(p.examId || '')) ||
+        p.examId !== event.id || p.examId !== event.entityId) return 'unsupported';
+    // The device that sat the paper already holds it, with its questions.
+    const held = (await byIndex('exams', 'pid', pid).catch(() => [])).some(e => e?.server?.examId === p.examId);
+    if (held) return 'duplicate';
+  } else if (p.serverExamId) return 'unsupported';
   const id = restoredRowId(pid, event.id);
   if (await alreadyRestored('exams', id)) return 'duplicate';
   const at = eventTime(event) || Date.now();
@@ -235,6 +252,11 @@ async function applyExamEvent(pid, event) {
       score: p.score == null ? null : num(p.score, 0),
       total: p.total == null ? null : num(p.total, 0),
       indiaExam: plain(p.indiaExam) ? { ...p.indiaExam } : null,
+      ...(Number.isFinite(Number(p.durationMin)) && Number(p.durationMin) > 0 ? { durationMin: Math.min(600, Math.round(Number(p.durationMin))) } : {}),
+      // The server's own result: this row names the server's exam, so its
+      // questions and marked detail can be read back from the account. Any
+      // other restored paper carries no `server` and is never shown as certified.
+      ...(serverResult ? { server: { examId: String(p.examId), questionIds: [], kind: typeof p.kind === 'string' ? p.kind.slice(0, 20) : null, remote: true } } : {}),
       remoteEventId: event.id,
       remoteDeviceId: event.deviceId
     });
@@ -328,7 +350,7 @@ export async function applyRemoteLearningEvents(pid, events) {
           safeId(event.payload?.subtopic)
         ? await applyPracticeEvent(pid, profile, event) : 'unsupported';
     }
-    else if (event.kind === 'exam-attempt') outcome = await applyExamEvent(pid, event);
+    else if (event.kind === 'exam-attempt' || event.kind === EXAM_RESULT_KIND) outcome = await applyExamEvent(pid, event);
     else if (event.kind === 'rush-history') outcome = await applyRunEvent(pid, event, 'rushRuns', ['score', 'correct', 'total', 'bestCombo', 'createdAt']);
     else if (event.kind === 'match-history') outcome = await applyRunEvent(pid, event, 'matchRuns', ['won', 'playerScore', 'rivalScore', 'rival', 'ms', 'createdAt']);
     else outcome = 'unsupported';

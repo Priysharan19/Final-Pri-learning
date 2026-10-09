@@ -40,7 +40,7 @@ import {
 import { analyseExam } from './examAnalysis.js';
 import {
   isServerPaper, markedByOf, requireExamAccount, issueServerExam, serverFieldOf, scheduleCheckpoint,
-  finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, localStartOf, finishedAtOf
+  finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, localStartOf, finishedAtOf, fetchRemotePaper
 } from './serverExam.js';
 
 function error(message, status = 400, code = 'INDIA_EXAM_ERROR') {
@@ -196,7 +196,8 @@ async function createIndiaExam(profile, body = {}) {
     // questions, and no answer to any of them comes back until it has marked.
     try {
       issued = await issueServerExam(profile.id, { ...paperSpecOf(paper, { track, grade, variant }), title },
-        `india:${track}:${grade}:${variant}:${body.source === 'reviewed' ? 'reviewed' : 'any'}`);
+        `india:${track}:${grade}:${variant}:${body.source === 'reviewed' ? 'reviewed' : 'any'}`,
+        { seed, units: paper.units, composition: paper.composition, reducedPattern: paper.reducedPattern });
     } catch (err) {
       if (err?.code !== 'EXAM_CONTENT_UNSUPPORTED' || attempt === 2) throw err;
     }
@@ -220,10 +221,12 @@ async function createIndiaExam(profile, body = {}) {
     throw err;
   }
 
+  // What the device knew about the spec the server actually issued from.
+  const composed = issued.composed || { seed, units: paper.units, composition: paper.composition, reducedPattern: paper.reducedPattern };
   // What the paper is made of is counted from what the server issued.
   const tally = fn => issued.questions.filter(fn).length;
   const composition = {
-    ...paper.composition,
+    ...composed.composition,
     pyq: tally(q => q.pyq), authored: tally(q => !q.pyq),
     nativeMcq: tally(q => q.conversion === 'native-mcq'), numericToMcq: tally(q => q.conversion === 'numeric-to-mcq'),
     assertionReason: tally(q => q.item === 'assertion-reason'), caseStudy: tally(q => q.item === 'case-study'),
@@ -256,13 +259,13 @@ async function createIndiaExam(profile, body = {}) {
       fullPaperDurationMinutes: spec.fullPaperDurationMinutes || spec.durationMinutes || null,
       // The seed the device composed the SPEC from. The questions are the
       // server's; no seed on this device reproduces them.
-      seed,
+      seed: composed.seed,
       sections: spec.sections.map(s => ({
         id: s.id, label: s.label || `Section ${s.id}`, questions: s.questions, marks: s.marks,
         marksEach: s.marksEach ?? s.correct, negative: Math.abs(Number(s.incorrect || 0)), partialPerOption: s.partialPerOption ?? null,
         types: s.types || [s.type]
       })),
-      units: paper.units,
+      units: composed.units,
       // What this paper actually drew from the previous-year archive, and what
       // the archive holds. `absent` is present when the student's track is one
       // the archive deliberately carries nothing for, so an empty PYQ count is
@@ -274,7 +277,7 @@ async function createIndiaExam(profile, body = {}) {
         absent: pyqAbsenceFor(track)
       },
       composition,
-      reducedPattern: paper.reducedPattern,
+      reducedPattern: composed.reducedPattern,
       composerNotes: composerNotes(spec),
       sources: (spec.sources || []).map(s => ({ authority: s.authority, title: s.title, url: s.url }))
     },
@@ -300,6 +303,10 @@ async function requireExam(profile, id) {
 
 async function examView(profile, id) {
   let exam = await requireExam(profile, id);
+  if (isServerPaper(exam) && exam.server.remote && exam.finishedAt) {
+    await hydrateRemote(profile, id);
+    exam = await requireExam(profile, id);
+  }
   // An open paper the server owns is brought up to date with it first: a
   // queued finish is sent, a result produced on another device is adopted, a
   // newer snapshot replaces the local one. Unreachable server: local state stands.
@@ -413,7 +420,7 @@ async function saveResponses(profile, id, body = {}) {
  * exactly-once on this device and is recognised when the same event is pulled
  * back through sync.
  */
-async function adoptResult(exam, serverResult) {
+async function adoptResult(exam, serverResult, { record = true } = {}) {
   const result = localResult(exam, serverResult);
   const detail = [];
   for (const d of result.detail) {
@@ -427,7 +434,9 @@ async function adoptResult(exam, serverResult) {
     detail.push(out);
     if (!row) continue;
     const q = row.payload || {};
-    if (d.multipart) {
+    // `record: false` — a paper sat on another device: its evidence reaches
+    // this one through the server's own graded-attempt events, once.
+    if (!record) { /* store the solution below; record nothing */ } else if (d.multipart) {
       for (const part of d.parts || []) {
         if (part.unanswered || !part.attemptId) continue;
         const shown = (q.parts || []).find(x => String(x.key) === String(part.key));
@@ -464,8 +473,37 @@ async function adoptResult(exam, serverResult) {
   delete exam.responses;
   delete exam.pendingFinish;
   await put('exams', exam);
+  if (!record) return [];
   const pct = Math.round(1000 * exam.score / Math.max(1, exam.total)) / 10;
   return finishIndiaExamEvidence(Math.max(0, pct));
+}
+
+/**
+ * A paper the server marked on another device reached this one as a result
+ * only. Read its public questions and stored result back from the account so
+ * it opens in review here. Nothing is marked and no evidence is recorded.
+ */
+async function hydrateRemote(profile, id) {
+  await withExamLock(id, async () => {
+    const exam = await requireExam(profile, id);
+    const remote = await fetchRemotePaper(exam);
+    if (!remote) return;
+    const track = exam.indiaExam?.track || cleanIndiaTrack(profile.indiaTrack || 'cbse', Number(profile.year));
+    const ids = [];
+    for (const sq of remote.paper.questions) {
+      const row = rowOf(profile.id, track, exam.id, sq, exam.createdAt);
+      await put('questions', row);
+      ids.push(row.id);
+    }
+    exam.questionIds = ids;
+    exam.server = { ...exam.server, questionIds: ids.slice(), remote: false };
+    exam.durationMin = remote.paper.durationMin;
+    exam.paperVersion = remote.paper.paperVersion;
+    const kept = exam.finishedAt;
+    await adoptResult(exam, remote.result, { record: false });
+    // History keeps the time the result event gave this paper.
+    if (kept) { exam.finishedAt = kept; await put('exams', exam); }
+  });
 }
 
 async function submitExam(profile, id, body = {}) {

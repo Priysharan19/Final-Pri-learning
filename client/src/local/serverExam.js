@@ -89,15 +89,16 @@ const startRowId = pid => `exam-start:${pid}`;
  * Have the server issue a paper from `spec`. `signature` identifies what the
  * student asked for (track, class, length…): a start that failed after the
  * request left is retried with the SAME spec and idempotency key for a few
- * minutes, so a lost reply cannot leave two papers behind.
- * Returns the server's public paper.
+ * minutes, so a lost reply cannot leave two papers behind. `meta` is whatever
+ * the caller wants back alongside the spec that was really sent.
+ * Returns the server's public paper, with `composed` = that meta.
  */
-export async function issueServerExam(pid, spec, signature) {
+export async function issueServerExam(pid, spec, signature, meta = null) {
   const linked = await requireExamAccount(pid);
   const now = Date.now();
   const held = await get('device', startRowId(pid)).catch(() => null);
   const reuse = held && held.signature === signature && held.accountId === linked && now - Number(held.at) < START_RETRY_WINDOW_MS && now >= Number(held.at);
-  const attempt = reuse ? held : { id: startRowId(pid), pid, signature, accountId: linked, key: randomKey('exam-start'), spec, at: now };
+  const attempt = reuse ? held : { id: startRowId(pid), pid, signature, accountId: linked, key: randomKey('exam-start'), spec, meta, at: now };
   if (!reuse) await put('device', attempt).catch(() => {});
   let out;
   try { out = await cloud.createExam(attempt.spec, attempt.key); }
@@ -113,7 +114,9 @@ export async function issueServerExam(pid, spec, signature) {
   if (String(out?.accountId || '') !== linked) throw checkUnavailable('sign-in');
   const exam = out?.exam;
   if (!exam?.id || !Array.isArray(exam.questions) || !exam.questions.length) throw checkUnavailable('unavailable');
-  return exam;
+  // `composed` is what the device knew about the spec that was actually sent —
+  // the retried one's, when a retry reused it.
+  return { ...exam, composed: attempt.meta ?? meta };
 }
 
 /**
@@ -392,6 +395,21 @@ export function serverFinal(exam, result) {
     responses: { answers: marked.answers, workings: marked.workings, times: { ...(exam.pendingFinish?.inputs?.times || exam.responses?.times || {}) } },
     inks: Object.fromEntries(Object.entries(inks).map(([k, v]) => [k, { strokes: v.strokes, lines: v.lines, answerLine: v.answerLine, engine: v.engine }]))
   };
+}
+
+// ── A paper sat on another device ────────────────────────────────────────────
+
+/**
+ * A finished server paper this device knows only by its result event (restored
+ * through sync): the server's public paper and stored result, so History here
+ * can show the questions and the marked detail. Null while it cannot be read.
+ */
+export async function fetchRemotePaper(exam) {
+  if (!isServerPaper(exam) || !exam.server.remote) return null;
+  let remote;
+  try { remote = await cloud.getExam(exam.server.examId); } catch { return null; }
+  if (remote?.state !== 'finished' || remote.result?.authoritative !== true || !Array.isArray(remote.exam?.questions)) return null;
+  return { paper: remote.exam, result: remote.result };
 }
 
 // ── Reconciling ──────────────────────────────────────────────────────────────

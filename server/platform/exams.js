@@ -20,7 +20,7 @@
 //   POST /v1/exams/:id/finish   exactly-once finalisation, in one transaction:
 //                               every question is marked by the deterministic
 //                               engine, one immutable result is written with
-//                               one exam-level learning event and one
+//                               one exam-level learning event (exam-result) and one
 //                               graded-attempt event per attempted question.
 //                               A replay returns the stored result unchanged.
 //   GET  /v1/exams/:id          the owner reads the public paper and the saved
@@ -800,8 +800,10 @@ export function createExamRouter(db) {
           [cursor, eventId, accountId, ++seq, kind, entityId, now, JSON.stringify(payload), now]);
       };
       for (const a of marked.attempts) await event(a.attemptId, 'graded-attempt', a.questionId, a);
-      await event(id, 'exam-attempt', id, {
-        state: 'finished', examId: id, serverMarked: true, kind: paper.kind, title: paper.title,
+      // `exam-result` is a kind only this server writes: /v1/sync/push does not
+      // accept it, so no device can publish a paper as server-marked.
+      await event(id, 'exam-result', id, {
+        state: 'finished', examId: id, serverMarked: true, kind: paper.kind, title: paper.title, durationMin: paper.durationMin,
         year: paper.blueprint?.grade ?? paper.paper?.year ?? null,
         score: marked.score, total: marked.total, late: !inTime,
         createdAt: paper.startedAt, finishedAt: now, serverAcknowledgedAt: now,

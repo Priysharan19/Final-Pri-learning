@@ -67,7 +67,7 @@ import { cloud } from '../platform/cloudTransport.js';
 import { publicQuestionFields } from '../engine/publicQuestion.js';
 import {
   isServerPaper, markedByOf, issueServerExam, serverFieldOf, localStartOf, scheduleCheckpoint,
-  finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, finishedAtOf
+  finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, finishedAtOf, fetchRemotePaper
 } from './serverExam.js';
 import { rasterizeInk } from '../ink/cloudRaster.js';
 import { preparePhoto } from '../ink/photoRaster.js';
@@ -3769,7 +3769,22 @@ const routes = {
     // queued finish is sent, a result from another device is adopted, a newer
     // snapshot replaces the local one. Unreachable: the local state stands.
     const held = await get('exams', params.id);
-    if (held && held.pid === p.id && isServerPaper(held) && (!held.finishedAt || held.server.restored)) {
+    if (held && held.pid === p.id && isServerPaper(held) && held.server.remote && held.finishedAt) {
+      // A paper the server marked on another device reached this one as a
+      // result only: read its public questions and stored result back from
+      // the account so it opens in review. Nothing is marked or recorded here.
+      await withMutationLock(`exam:${params.id}`, async () => {
+        const fresh = await get('exams', params.id);
+        const remote = await fetchRemotePaper(fresh);
+        if (!remote) return;
+        const ids = [];
+        for (const sq of remote.paper.questions) { const row = paperRowOf(p.id, fresh.id, sq, fresh.createdAt); await put('questions', row); ids.push(row.id); }
+        const kept = fresh.finishedAt;
+        Object.assign(fresh, { questionIds: ids, durationMin: remote.paper.durationMin, paperVersion: remote.paper.paperVersion, server: { ...fresh.server, questionIds: ids.slice(), remote: false } });
+        await adoptPaperResult(p, fresh, remote.result, { record: false });
+        if (kept) { fresh.finishedAt = kept; await put('exams', fresh); }
+      });
+    } else if (held && held.pid === p.id && isServerPaper(held) && (!held.finishedAt || held.server.restored)) {
       await withMutationLock(`exam:${params.id}`, async () => {
         const fresh = await get('exams', params.id);
         if (!fresh || (fresh.finishedAt && !fresh.server?.restored)) return;
@@ -4930,7 +4945,7 @@ function paperRowOf(pid, examId, sq, now, id = String(sq.id)) {
  * certifies. Each attempt carries the server's attempt id, so recording is
  * exactly-once here and is recognised when the event is pulled back by sync.
  */
-async function adoptPaperResult(p, e, serverResult) {
+async function adoptPaperResult(p, e, serverResult, { record = true } = {}) {
   const result = localResult(e, serverResult);
   const now = Date.now();
   const nQ = Math.max(1, e.questionIds.length);
@@ -4947,7 +4962,11 @@ async function adoptPaperResult(p, e, serverResult) {
           answerText: pt.answerText, steps: pt.steps
         }))
       });
-      if (row && !row.answered) {
+      if (row && !row.answered && !record) {
+        row.answered = 1;
+        row.serverReceipt = { authoritative: true, examId: e.server.examId, parts: (d.parts || []).map(pt => ({ key: pt.key, answerText: pt.answerText, steps: pt.steps || [] })) };
+        await put('questions', row);
+      } else if (row && !row.answered) {
         // A structured question is one piece of work with no single subtopic:
         // it earns XP and a history row, and moves no rating.
         row.answered = 1;
@@ -4975,7 +4994,9 @@ async function adoptPaperResult(p, e, serverResult) {
       solution: d.solution
     });
     if (!row) continue;
-    if (d.attemptId) {
+    // `record: false` — a paper sat on another device: its evidence reaches
+    // this one through the server's own graded-attempt events, once.
+    if (record && d.attemptId) {
       // An exam answer that landed on a designed distractor is the same
       // evidence a practice one is, and under exam conditions it is better
       // evidence — so it is counted here too.
@@ -4994,6 +5015,7 @@ async function adoptPaperResult(p, e, serverResult) {
   delete e.responses;
   delete e.pendingFinish;
   await put('exams', e);
+  if (!record) return [];
   const pct = Math.round(100 * e.score / Math.max(1, e.total));
   return checkBadges(p.id, { type: 'exam', pct }, now, timezoneOf(p));
 }
