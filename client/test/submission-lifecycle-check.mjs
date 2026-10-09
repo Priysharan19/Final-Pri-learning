@@ -428,7 +428,20 @@ await check('QuestionCard and InkAnswer bind late results to the attempt', async
   const card = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
   const ink = readFileSync(new URL('../src/ink/InkAnswer.jsx', import.meta.url), 'utf8');
   assert.match(card, /if \(inFlightRef\.current \|\| busy \|\| resolved\) return;/, 'submit has a synchronous in-flight guard');
-  assert.match(card, /savePendingSubmission\(question\.id,[\s\S]{0,200}\);\s*const scribbleStrokes[\s\S]{0,300}await deliver\(/, 'the pending record is written before the request leaves');
+  // The pending record is persisted first, and the request is the very next
+  // thing that can happen: either the write is durable and `deliver` runs, or
+  // the write is refused and the submit path returns without sending anything.
+  const pendingThenSend = card.match(/if \(!diagnostic && !savePendingSubmission\(question\.id,[\s\S]{0,200}?\)\) \{([\s\S]{0,700}?)\n {4}\}\s*const scribbleStrokes[\s\S]{0,300}?await deliver\(/);
+  assert.ok(pendingThenSend, 'the pending record is written before the request leaves');
+  const refused = pendingThenSend[1];
+  assert.doesNotMatch(refused, /deliver\(|api\(|fetch\(/, 'a submission whose pending record could not be written is never sent');
+  assert.match(refused, /pendingRef\.current = null;/, 'a refused submission keeps no idempotency key it could not persist');
+  assert.match(refused, /setState\(\{ phase: 'retry'[\s\S]*draftPersistenceWarning\(language\)/, 'the student is told the answer was not sent');
+  assert.match(refused, /return;\s*$/, 'the refusal ends the submit path');
+  const submitBody = card.slice(card.indexOf('async function submit('), card.indexOf('async function deliver('));
+  assert.ok(submitBody.includes('savePendingSubmission(question.id,'), 'submit owns the pending write');
+  assert.equal((submitBody.match(/await deliver\(/g) || []).length, 1, 'submit has exactly one send, after the pending write');
+  assert.ok(submitBody.indexOf('savePendingSubmission(question.id,') < submitBody.indexOf('await deliver('), 'no send precedes the pending write');
   assert.match(card, /attemptRef\.current\?\.submissionId !== bound\.submissionId\) return;/, 'a late working check for another attempt is dropped');
   assert.match(card, /misconception`, \{ \.\.\.proposal\.body, submissionId: sid \}/, 'a proposal names its submission');
   assert.match(card, /disabled=\{resolved \|\| busy\}/, 'the ink surface locks while marking');

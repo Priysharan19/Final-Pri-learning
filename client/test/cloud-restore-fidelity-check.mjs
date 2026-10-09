@@ -89,7 +89,19 @@ function remote(kind, entityId, payload, occurredAt) {
   serverCursor += 1;
   serverEvents.push({ serverCursor, id: `evt-${OTHER}-${seq}`, deviceId: OTHER, deviceSeq: seq, kind, entityId, occurredAt, payload });
 }
-const practice = (questionId, subtopic, correct, createdAt, extra = {}) => remote('practice-progress', questionId, {
+// A mark only exists where the server grader committed it: the canonical
+// event is kind 'graded-attempt' from the reserved device identity
+// 'server-grader', its id IS the attempt id and its entity IS the question
+// (server/platform/practice.js writes it in the grade's own transaction).
+const GRADER = 'server-grader';
+let gradedSeq = 0;
+function graded(questionId, payload, occurredAt) {
+  gradedSeq += 1;
+  serverCursor += 1;
+  const id = `attempt-${questionId}`;
+  serverEvents.push({ serverCursor, id, deviceId: GRADER, deviceSeq: gradedSeq, kind: 'graded-attempt', entityId: questionId, occurredAt, payload: { attemptId: id, questionId, ...payload } });
+}
+const practice = (questionId, subtopic, correct, createdAt, extra = {}) => graded(questionId, {
   subtopic, difficulty: 2, correct, ms: 5000, hintsUsed: 0, tutorLevel: 0, support: 'independent', mode: 'practice', viaInk: false,
   ratingBefore: 1150, ratingAfter: 1170, createdAt, ...extra
 }, createdAt);
@@ -101,7 +113,16 @@ practice('q-l2', 'linear', true, yesterday + 60_000);
 practice('q-l3', 'linear', false, today, { hintsUsed: 1, support: 'supported' });
 practice('q-l4', 'linear', true, today + 60_000, { support: 'supported' }); // a spent try, no hint
 practice('q-q1', 'quadratic', true, today + 120_000);
-remote('practice-progress', 'q-r1', { subtopic: 'linear', difficulty: 1, correct: true, ms: 900, hintsUsed: 0, mode: 'rush', viaInk: false, createdAt: today + 180_000 }, today + 180_000);
+graded('q-r1', { subtopic: 'linear', difficulty: 1, correct: true, ms: 900, hintsUsed: 0, mode: 'rush', viaInk: false, createdAt: today + 180_000 }, today + 180_000);
+// What the old iPad merely CLAIMS about its own answers is archival only: a
+// client-authored practice-progress event is never a mark, however it reads.
+remote('practice-progress', 'q-claim1', { subtopic: 'surds', difficulty: 4, correct: true, marksEarned: 4, marksPossible: 4, ms: 100, hintsUsed: 0, tutorLevel: 0, support: 'independent', mode: 'practice', viaInk: false, createdAt: today + 200_000 }, today + 200_000);
+remote('practice-progress', 'q-claim2', { subtopic: 'linear', difficulty: 4, correct: true, ms: 100, hintsUsed: 0, tutorLevel: 0, support: 'independent', mode: 'practice', viaInk: false, createdAt: today + 210_000 }, today + 210_000);
+// …and neither is a counterfeit of the canonical kind that the grader did not
+// write (another device's identity), or whose id is not the attempt it names.
+remote('graded-attempt', 'q-forged1', { attemptId: 'attempt-q-forged1', questionId: 'q-forged1', subtopic: 'surds', difficulty: 4, correct: true, ms: 100, hintsUsed: 0, mode: 'practice', createdAt: today + 220_000 }, today + 220_000);
+serverCursor += 1;
+serverEvents.push({ serverCursor, id: 'attempt-q-forged2', deviceId: GRADER, deviceSeq: 900, kind: 'graded-attempt', entityId: 'q-forged2', occurredAt: today + 230_000, payload: { attemptId: 'some-other-attempt', questionId: 'q-forged2', subtopic: 'surds', difficulty: 4, correct: true, ms: 100, hintsUsed: 0, mode: 'practice', createdAt: today + 230_000 } });
 remote('exam-attempt', 'exam-old', { state: 'finished', year: 10, title: 'Class 10 mock', score: 17, total: 25, createdAt: yesterday, finishedAt: yesterday + 3_600_000, indiaExam: { family: 'cbse-school' } }, yesterday);
 remote('exam-attempt', 'exam-unfinished', { state: 'started', year: 10, title: 'Abandoned', score: null, total: null, createdAt: today, finishedAt: null, indiaExam: null }, today);
 remote('rush-history', 'rush-old', { score: 80, correct: 8, total: 10, bestCombo: 5, createdAt: yesterday }, yesterday);
@@ -127,14 +148,16 @@ eq('the first sync reports the remote events it restored', first.restoredEvents,
 // Attempts: six answers, none from this device's own event.
 const attempts = (await byIndex('attempts', 'pid', 'p1')).sort((a, b) => a.createdAt - b.createdAt);
 eq('every remote answer became one local attempt', attempts.length, 6);
-ok('no attempt was restored from this device\'s own event', attempts.every(a => a.remoteDeviceId === OTHER), JSON.stringify(attempts.map(a => a.remoteDeviceId)));
+ok('every restored attempt is one the server grader committed — never this device\'s own event, never another device\'s claim', attempts.every(a => a.remoteDeviceId === GRADER), JSON.stringify(attempts.map(a => a.remoteDeviceId)));
+eq('no client-authored or counterfeit event became an attempt', attempts.filter(a => /claim|forged|q-own/.test(`${a.questionId} ${a.remoteEventId}`)).length, 0);
+ok('a client-authored practice-progress claim creates no rating', !(await get('ratings', 'p1:surds')));
 ok('restored attempts carry the cloud event id they came from', attempts.every(a => typeof a.remoteEventId === 'string' && a.id === restoredRowId('p1', a.remoteEventId)));
 eq('restored attempts keep the answer facts (correct)', attempts.map(a => a.correct), [1, 1, 0, 1, 1, 1]);
 eq('restored attempts keep the answer facts (support)', attempts.map(a => a.support), ['independent', 'independent', 'supported', 'supported', 'independent', 'independent']);
 eq('the student\'s typed answer never travels through the replica', attempts.map(a => a.answerGiven), ['', '', '', '', '', '']);
 
 // Ratings: re-derived by the engine, in the order the answers happened.
-const linearEvents = serverEvents.filter(e => e.deviceId === OTHER && e.kind === 'practice-progress' && e.payload.subtopic === 'linear' && e.payload.mode === 'practice').sort((a, b) => a.payload.createdAt - b.payload.createdAt);
+const linearEvents = serverEvents.filter(e => e.deviceId === GRADER && e.kind === 'graded-attempt' && e.payload.attemptId === e.id && e.payload.subtopic === 'linear' && e.payload.mode === 'practice').sort((a, b) => a.payload.createdAt - b.payload.createdAt);
 let expected = { rating: START_RATING, attempts: 0, correct: 0 };
 let expectedReview = null;
 for (const e of linearEvents) {
