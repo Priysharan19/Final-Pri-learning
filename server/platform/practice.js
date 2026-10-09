@@ -10,12 +10,13 @@
 // unapproved production Postgres DDL. Old clients are not authorised to treat
 // their offline grades as server grades. The client transport integration is
 // a separate mandatory release gate.
-import { createHash, createHmac, randomInt, randomUUID } from 'node:crypto';
+import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { asyncRouter, asyncHandler } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { nextSyncCursor, syncLockKey } from './db.js';
 import { requireSession, requireVerifiedEmail, requireRole, rateLimit, sessionFromRequest } from './security.js';
-import { encryptDeliveryToken, decryptDeliveryToken, practiceContentKey } from './deliveryCrypto.js';
+import { encryptDeliveryToken, decryptDeliveryToken } from './deliveryCrypto.js';
+import { opaqueContentId, opaqueContentHash, contentSeen, markContentSeen, contentTried, markContentTried } from './contentSeen.js';
 import { misconceptionIdForTrap } from '../../client/src/engine/misconceptions.js';
 import { PUBLIC_QUESTION_FIELDS } from '../../client/src/engine/publicQuestion.js';
 import { consentState, consentBlockerCode } from './guardianConsent.js';
@@ -131,29 +132,20 @@ function stepEvidence(q, answer, steps, result) {
   return { stepReport: report, partial };
 }
 
-// What a device may know a question by. The engine's content id names the seed
-// and its content hash is taken over the answer, so either would let a device
-// with the bundled generators recover the key. These are stable per content,
-// which is all the device needs them for (recently-seen lists, attempt
-// records), and say nothing about it.
-const keyed = value => createHmac('sha256', practiceContentKey()).update(String(value));
-const opaqueContentId = value => (value == null || value === '' ? null : 'srv:' + keyed(value).digest('base64url').slice(0, 30));
-// Same shape as the engine's own content hash (16 hex), so the device stores
-// and compares it exactly as before.
-const opaqueContentHash = value => (value == null || value === '' ? null : keyed('hash:' + value).digest('hex').slice(0, 16));
-
-// What an account has already been shown the solution of. A later copy of the
-// same content — however it comes to be issued — is a repeat: it is marked
-// like any question, and its receipt and attempt say it is not new work.
-const SEEN_AGE = 5 * 365 * 24 * 60 * 60 * 1000;
-const seenKey = q => 'seen-' + opaqueContentHash(q.contentHash ?? q.contentId ?? q.prompt);
-async function contentSeen(db, accountId, q) {
-  return !!(await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-content' AND key=?", [accountId, seenKey(q)]));
-}
-async function markContentSeen(db, accountId, q, now) {
-  await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-content',?,?,?,?,?) ON CONFLICT(account_id,scope,key) DO NOTHING",
-    [accountId, seenKey(q), '{}', digest({ seen: seenKey(q) }), now, now + SEEN_AGE]);
-}
+// What a device may know a question by (`opaqueContentId`, `opaqueContentHash`)
+// and what an account has already been shown the solution of or spent a try on
+// (`contentSeen`, `contentTried`) have ONE definition, in contentSeen.js, shared
+// with the examination router. A later copy of the same content — however it
+// comes to be issued, and whatever order its options are dealt in — is a
+// repeat once its solution has been shown: it is marked like any question, and
+// its receipt and attempt say it is not new work.
+//
+// Tries follow the content too. A question allows two tries; were they counted
+// per issued copy alone, each fresh copy of one question would be a free,
+// unrecorded guess with feedback. So a try spent on any copy is spent on every
+// copy of that content the account holds or is later issued, until the content
+// resolves. `triesLeft: 1` on an issue response says so, so the card is honest
+// about the copy it shows; a copy with both tries in hand says nothing.
 
 function safeQuestion(id, q) {
   const publicQ = { id, supportsSteps: !!stepMetaFor(q),
@@ -358,7 +350,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // that belongs to another one is refused before anything is issued,
     // bound or escrowed, so one student's question can never land in, or use
     // up a prepared question for, another's account.
-    if (plain(body) && body.account !== undefined && String(body.account) !== String(accountId)) {
+    // The account is named by its id as a string, exactly as the server gave
+    // it; anything else (an array or number that merely prints the same) is
+    // not that name.
+    if (plain(body) && body.account !== undefined && (typeof body.account !== 'string' || body.account !== String(accountId))) {
       return reject(res, 409, 'PRACTICE_ACCOUNT_MISMATCH', 'This device is signed in to a different account.');
     }
     // A prepared question is bound once. The request that binds it must say
@@ -408,11 +403,15 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     q._practiceMode = practiceMode;
     // Sealed with the question, so the receipt and the attempt carry it
     // whatever the device does or does not send.
-    if (await contentSeen(db, accountId, q)) { q._repeat = true; repeat = true; }
+    if (await contentSeen(db, accountId, q, now)) { q._repeat = true; repeat = true; }
+    // A try already spent on another copy of this content is spent on this one
+    // (decided again, authoritatively, when it is marked). Content that has
+    // resolved is a repeat and starts over with both tries: it earns nothing.
+    const trySpent = !repeat && !ONE_TRY_MODES.includes(practiceMode) && await contentTried(db, accountId, q, now);
     // Serialize once: nothing client-provided can replace the stored answer.
     const payload = JSON.stringify(q);
     const id = randomUUID();
-    const publicResponse = { question: safeQuestion(id, q), ...(repeat ? { repeat: true } : {}), ...(trapDelivered ? { trapDelivered: true } : {}) };
+    const publicResponse = { question: safeQuestion(id, q), ...(repeat ? { repeat: true } : {}), ...(trySpent ? { triesLeft: 1 } : {}), ...(trapDelivered ? { trapDelivered: true } : {}) };
     const response = await db.transaction(async () => {
       if (preparedNonce) {
         // One account, once — decided in the same transaction as the issue it
@@ -598,7 +597,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const q = JSON.parse(escrow.response_json);
       // Decided now, not only at issue: copies issued before the first of them
       // was resolved are repeats the moment its solution has been shown.
-      if (await contentSeen(db, accountId, q)) q._repeat = true;
+      if (await contentSeen(db, accountId, q, now)) q._repeat = true;
       await markContentSeen(db, accountId, q, now);
       const attemptId = randomUUID();
       const response = { authoritative: true, revealed: true, resolved: true, correct: false,
@@ -683,7 +682,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // Decided now, not only at issue: several copies of one question can be
       // issued before any is resolved, and once one of them has shown its
       // solution the others are no longer new work.
-      if (await contentSeen(db, accountId, q)) q._repeat = true;
+      if (await contentSeen(db, accountId, q, now)) q._repeat = true;
       const result = checkAnswer(q, body.answer);
       // Only after submission may authored misconception feedback be revealed.
       // Never trust a caller-supplied explanation or make the device infer
@@ -718,8 +717,13 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const priorTry = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-tries' AND key=?",
         [accountId, qid]);
       const tries = priorTry ? Number(JSON.parse(priorTry.response_json).tries) || 0 : 0;
+      // A try spent on ANY copy of this content is spent on this one: the
+      // first try is not renewed by asking for the question again. Content
+      // already resolved is a repeat, which earns nothing and keeps its own
+      // two tries.
+      const spent = tries >= 1 || (q._repeat !== true && await contentTried(db, accountId, q, now));
       // Invalid input is not a failed mathematical attempt: do not consume a try or close the question.
-      const resolved = !invalid && Boolean(result.correct || tries >= 1 || ONE_TRY_MODES.includes(q._practiceMode));
+      const resolved = !invalid && Boolean(result.correct || spent || ONE_TRY_MODES.includes(q._practiceMode));
       const attemptId = randomUUID();
       const response = { authoritative: true, questionId: qid, submissionId, attemptId,
         correct: result.correct === true, invalid, resolved,
@@ -766,6 +770,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       } else if (!invalid) {
         await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-tries',?,?,?,?,?) ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json",
           [accountId, qid, JSON.stringify({ tries: tries + 1 }), hash, now, now + MAX_AGE]);
+        if (q._repeat !== true) await markContentTried(db, accountId, q, now);
       }
       return { response };
     }, { accountScope: accountId, lock: syncLockKey(accountId) });

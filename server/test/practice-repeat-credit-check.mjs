@@ -119,7 +119,178 @@ try {
     eq((await grade(g.jar, q.data.question.id, (await sealedAnswer(q.data.question.id)).value)).status, 200, `and that account's own answers are still marked (${seed})`);
   }
 
-  console.log(`REPEAT CREDIT: PASS — ${count}/${count} checks — content an account has been shown the solution of is a repeat however and whenever it was issued; working without an answer always spends a try; unrelated arithmetic earns nothing.`);
+  // ══ the same question with its options dealt in another order ════════════
+  // A multiple-choice question is the same content whatever order its options
+  // come in. Keyed on a hash that includes the order, "seen" let one reveal
+  // buy full first-sitting credit on every reshuffled copy.
+  const { loadAllBanks, generateQuestion } = await import('../../client/src/engine/generators/index.js');
+  const { contentIdentityOf, seenKeysOf, triedKeyOf, opaqueContentHash } = await import('../platform/contentSeen.js');
+  await loadAllBanks();
+  const MCQ = 'c9-euclid-geometry';
+  // Fixed seeds of ONE prompt whose options come out in four different orders.
+  const deals = [];
+  for (let seed = 1; seed < 400 && deals.length < 6; seed++) {
+    const q = generateQuestion(MCQ, 1, seed);
+    if (q.answerType !== 'mcq' || (deals.length && q.prompt !== deals[0].q.prompt)) continue;
+    if (deals.some(d => d.q.contentHash === q.contentHash)) continue;
+    deals.push({ seed, q });
+  }
+  eq([deals.length, new Set(deals.map(d => d.q.mcqOptions.join('|'))).size, new Set(deals.map(d => [...d.q.mcqOptions].sort().join('|'))).size, new Set(deals.map(d => d.q.mcqOptions[d.q.answer.correctIndex])).size],
+    [6, 6, 1, 1], 'six deals of one question: six option orders, one option set, one keyed option');
+  const issueMcq = (jar, deal, extra = {}) => post('/v1/practice/issue', { generator: MCQ, difficulty: 1, seed: deal.seed, curriculum: 'in', ...extra }, jar);
+  const right = deal => deal.q.answer.correctIndex;
+  const wrong = (deal, nth = 0) => [0, 1, 2, 3].filter(i => i !== deal.q.answer.correctIndex)[nth];
+  // Registration is rate-limited per caller; this suite needs more accounts
+  // than one hour allows, and that limit is not what it is testing.
+  const account = async tag => { await h.db.run("DELETE FROM rate_limits WHERE bucket LIKE 'register%'"); const x = await registerAccount(h, { email: `repeat.${tag}@example.test`, deviceId: `ipad-repeat-${tag}` }); await verifyEmail(h, x.account.id); return x; };
+  const attempts = async id => (await h.db.all("SELECT payload_json FROM learning_events WHERE account_id=? AND kind='graded-attempt' ORDER BY device_seq", [id])).map(r => JSON.parse(r.payload_json));
+
+  // the identity itself
+  const [d0, d1, d2, d3, d4, d5] = deals;
+  eq(new Set(deals.map(d => contentIdentityOf(d.q))).size, 1, 'every deal of the question has one content identity');
+  eq(new Set(deals.map(d => seenKeysOf(d.q)[0])).size, 1, 'and so one shared seen-key');
+  eq(seenKeysOf(d0.q).includes('seen-' + opaqueContentHash(d0.q.contentHash)), true, 'the key content was recorded under before the identity existed is still one of its keys');
+  const rekeyed = { ...d0.q, answer: { ...d0.q.answer, correctIndex: wrong(d0) } };
+  eq(contentIdentityOf(rekeyed) === contentIdentityOf(d0.q), false, 'the same prompt and options keyed to a different answer is different content');
+  eq(contentIdentityOf({ ...d0.q, mcqOptions: d0.q.mcqOptions.map((o, i) => (i === wrong(d0) ? o + ' at all' : o)) }) === contentIdentityOf(d0.q), false, 'so is the same prompt with a different option');
+  eq(contentIdentityOf({ ...d0.q, prompt: d0.q.prompt + ' (ii)' }) === contentIdentityOf(d0.q), false, 'and a different prompt');
+  eq(contentIdentityOf({ ...d0.q, figure: '<svg data-n="2"/>' }) === contentIdentityOf(d0.q), false, 'and a different figure');
+  const lin = n => generateQuestion('c8-linear-equations-both-sides', 2, n);
+  eq(new Set([1, 2, 3, 4, 5, 6, 7, 8].map(n => contentIdentityOf(lin(n)))).size, new Set([1, 2, 3, 4, 5, 6, 7, 8].map(n => lin(n).prompt)).size, 'written questions with different numbers keep different identities');
+  const twoPart = { prompt: 'A', answerType: 'multipart', parts: [{ prompt: 'a', answerType: 'mcq', mcqOptions: ['1', '2'], answer: { correctIndex: 0 } }] };
+  const twoPartDealt = { ...twoPart, parts: [{ ...twoPart.parts[0], mcqOptions: ['2', '1'], answer: { correctIndex: 1 } }] };
+  const twoPartRekeyed = { ...twoPart, parts: [{ ...twoPart.parts[0], answer: { correctIndex: 1 } }] };
+  eq([contentIdentityOf(twoPartDealt) === contentIdentityOf(twoPart), contentIdentityOf(twoPartRekeyed) === contentIdentityOf(twoPart)], [true, false], 'a part\'s options may be dealt in any order; a part keyed differently is different content');
+  const opaque = [contentIdentityOf(d0.q), ...seenKeysOf(d0.q), triedKeyOf(d0.q)].join(' ');
+  eq([/^[0-9a-f]{32}$/.test(contentIdentityOf(d0.q)), opaque.includes(String(d0.seed) + ':'), opaque.includes(d0.q.contentHash), opaque.includes(d0.q.contentId)], [true, false, false, false], 'the identity is opaque: no seed, engine hash or content id in it');
+
+  // reveal one deal, then be issued the others
+  const e = await account('e');
+  const e0 = await issueMcq(e.jar, d0);
+  eq([e0.status, e0.data.repeat ?? false, e0.data.triesLeft], [201, false, undefined], 'a first sitting of the multiple-choice question: not a repeat, both tries in hand');
+  eq((await post(`/v1/practice/${e0.data.question.id}/reveal`, {}, e.jar)).status, 200, 'its solution is revealed');
+  const e1 = await issueMcq(e.jar, d1);
+  eq([e1.status, e1.data.question.prompt === e0.data.question.prompt, e1.data.question.contentHash === e0.data.question.contentHash, e1.data.repeat], [201, true, false, true],
+    'the same question with its options in another order is declared a repeat when issued');
+  const e1Grade = await grade(e.jar, e1.data.question.id, right(d1));
+  eq([e1Grade.data.correct, e1Grade.data.repeat], [true, true], 'and its receipt says repeat');
+  eq((await eventOf(e1.data.question.id)).repeat, true, 'and so does its graded-attempt event');
+  for (const deal of [d2, d3, d4, d5]) {
+    const copy = await issueMcq(e.jar, deal);
+    const marked = await grade(e.jar, copy.data.question.id, right(deal));
+    eq([copy.data.repeat, marked.data.correct, marked.data.repeat], [true, true, true], `every other deal is a repeat too (seed ${deal.seed})`);
+  }
+  eq((await attempts(e.account.id)).filter(x => x.correct && !x.repeat).length, 0, 'one reveal bought no first-sitting credit on any reshuffled copy');
+  const seenRows = await h.db.all("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-content'", [e.account.id]);
+  eq([seenRows.some(r => r.key === seenKeysOf(d0.q)[0]), seenRows.some(r => r.key.includes(d0.q.contentHash))], [true, false], 'the record is the keyed identity, never the engine hash');
+
+  // resolved by a correct answer, then a reshuffled copy
+  const f = await account('f');
+  const f0 = await issueMcq(f.jar, d2);
+  eq([(await grade(f.jar, f0.data.question.id, right(d2))).data.repeat ?? false, (await issueMcq(f.jar, d4)).data.repeat], [false, true], 'answered once for credit, the reshuffled copy is a repeat');
+
+  // deals issued up front, before any is resolved
+  const g2 = await account('g2');
+  const upfront = [];
+  for (const deal of [d0, d1, d2]) upfront.push(await issueMcq(g2.jar, deal));
+  eq(upfront.map(x => x.data.repeat ?? false), [false, false, false], 'three deals issued before any is resolved: none is a repeat yet');
+  eq((await post(`/v1/practice/${upfront[0].data.question.id}/reveal`, {}, g2.jar)).data.repeat ?? false, false, 'the first is revealed as new work');
+  eq((await grade(g2.jar, upfront[1].data.question.id, right(d1))).data.repeat, true, 'a differently dealt copy answered after it is a repeat');
+  eq((await post(`/v1/practice/${upfront[2].data.question.id}/reveal`, {}, g2.jar)).data.repeat, true, 'and revealing the third is a repeat');
+  const otherPrompt = await issue(g2.jar, 777);
+  eq(otherPrompt.data.repeat ?? false, false, 'a different question is not swept up with it');
+
+  // content recorded as seen before the identity existed stays seen
+  const legacy = await account('legacy');
+  const stamp = Date.now();
+  await h.db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-content',?,?,?,?,?)",
+    [legacy.account.id, 'seen-' + opaqueContentHash(d3.q.contentHash), '{}', 'legacy-row', stamp, stamp + 86_400_000]);
+  eq([(await issueMcq(legacy.jar, d3)).data.repeat, (await issueMcq(legacy.jar, d5)).data.repeat ?? false], [true, false], 'a record under the old key alone still makes that copy a repeat (and, as before, only that copy)');
+
+  // a record past its expiry is not a record, and seeing the content again renews it
+  const lapsed = await account('lapsed');
+  for (const key of seenKeysOf(d0.q)) await h.db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-content',?,?,?,?,?)",
+    [lapsed.account.id, key, '{}', 'lapsed-row', stamp - 2000, stamp - 1000]);
+  const lapsed0 = await issueMcq(lapsed.jar, d0);
+  eq(lapsed0.data.repeat ?? false, false, 'an expired seen-record does not make content a repeat');
+  eq((await grade(lapsed.jar, lapsed0.data.question.id, right(d0))).data.repeat ?? false, false, 'nor when it is marked');
+  eq((await issueMcq(lapsed.jar, d1)).data.repeat, true, 'resolving it renews the record: the next copy is a repeat');
+
+  // ══ tries follow the content, not the issued copy ════════════════════════
+  // Two tries per question. Counted per copy alone, every fresh copy was one
+  // more free guess with feedback, and nothing was recorded until one landed.
+  const t = await account('t');
+  const t0 = await issueMcq(t.jar, d0);
+  const t0Wrong = await grade(t.jar, t0.data.question.id, wrong(d0, 0));
+  eq([t0Wrong.data.correct, t0Wrong.data.resolved, t0Wrong.data.triesLeft, t0Wrong.data.solution], [false, false, 1, undefined], 'a first wrong try leaves one try and shows no solution');
+  const t1 = await issueMcq(t.jar, d1);
+  eq([t1.status, t1.data.repeat ?? false, t1.data.triesLeft], [201, false, 1], 'a fresh copy of that content is issued with the try already spent, and says so');
+  const t1Sid = `repeat-credit-${String(n + 1).padStart(4, '0')}`;
+  const t1Wrong = await grade(t.jar, t1.data.question.id, wrong(d1, 1));
+  eq([t1Wrong.data.correct, t1Wrong.data.resolved, t1Wrong.data.triesLeft, t1Wrong.data.marksEarned, typeof t1Wrong.data.solution?.answerText], [false, true, 0, 0, 'string'],
+    'a wrong answer on the copy is the second try: it resolves the question as wrong');
+  const t1Event = await eventOf(t1.data.question.id);
+  eq([t1Event?.correct, t1Event?.marksEarned, t1Event?.repeat ?? false], [false, 0, false], 'and the wrong attempt is recorded');
+  const t1Replay = await post(`/v1/practice/${t1.data.question.id}/submit`, { submissionId: t1Sid, answer: String(wrong(d1, 1)), mode: 'typed' }, t.jar, { 'Idempotency-Key': t1Sid });
+  eq([t1Replay.status, t1Replay.data], [200, t1Wrong.data], 'replaying that submission returns the stored receipt');
+  const t2 = await issueMcq(t.jar, d2);
+  eq([t2.data.repeat, t2.data.triesLeft], [true, undefined], 'the content is now seen: the next copy is a repeat');
+  const t2Grade = await grade(t.jar, t2.data.question.id, right(d2));
+  eq([t2Grade.data.correct, t2Grade.data.repeat], [true, true], 'so the answer the wrong tries narrowed down earns no first-sitting credit');
+  const t0Late = await grade(t.jar, t0.data.question.id, right(d0));
+  eq([t0Late.data.correct, t0Late.data.repeat], [true, true], 'nor does going back to the copy left open');
+  const tEvents = await attempts(t.account.id);
+  eq([tEvents.filter(x => x.correct && !x.repeat).length, tEvents.filter(x => !x.correct).length], [0, 1], 'guessing across copies ends with the wrong resolution on record and no new credit');
+
+  // one option per fresh copy, for as many copies as it takes
+  const u = await account('u');
+  const tried = new Set();
+  let landed = null;
+  for (const deal of deals) {
+    const copy = await issueMcq(u.jar, deal);
+    const pick = deal.q.mcqOptions.findIndex(o => o !== deal.q.mcqOptions[right(deal)] && !tried.has(o));
+    const index = pick >= 0 ? pick : right(deal);
+    tried.add(deal.q.mcqOptions[index]);
+    const marked = await grade(u.jar, copy.data.question.id, index);
+    if (marked.data.correct) { landed = marked.data; break; }
+  }
+  const uEvents = await attempts(u.account.id);
+  eq([landed?.repeat, uEvents.filter(x => x.correct && !x.repeat).length, uEvents.filter(x => !x.correct).length], [true, 0, 1],
+    'eliminating one wrong option per fresh copy converges only on a repeat, with the wrong resolution recorded');
+
+  // the second try, taken on a copy, is still a second try
+  const v = await account('v');
+  const v0 = await issue(v.jar, 6161);
+  eq((await grade(v.jar, v0.data.question.id, '987654')).data.triesLeft, 1, 'a written question: one wrong try');
+  const v1 = await issue(v.jar, 6161);
+  eq([v1.data.repeat ?? false, v1.data.triesLeft], [false, 1], 'the same question issued again starts with that try spent');
+  const unread = await grade(v.jar, v1.data.question.id, 'abc');
+  eq([unread.data.invalid, unread.data.resolved, unread.data.triesLeft, unread.data.solution], [true, false, 1, undefined], 'an entry that cannot be read as an answer still spends nothing on it');
+  const v1Grade = await grade(v.jar, v1.data.question.id, (await sealedAnswer(v1.data.question.id)).value);
+  eq([v1Grade.data.correct, v1Grade.data.resolved, v1Grade.data.repeat ?? false, v1Grade.data.marksEarned === v1Grade.data.marksPossible], [true, true, false, true], 'a right answer there is marked exactly as the second try on the original would be');
+  eq((await grade(v.jar, v0.data.question.id, (await sealedAnswer(v0.data.question.id)).value)).data.repeat, true, 'after which the original is a repeat');
+  eq((await issue(v.jar, 6262)).data.triesLeft, undefined, 'a different question has both tries');
+  eq((await issue(b.jar, 6161)).data.triesLeft, undefined, 'and another account\'s tries are its own');
+
+  // one-try modes are unchanged
+  const w = await account('w');
+  const w0 = await issueMcq(w.jar, d0);
+  eq((await grade(w.jar, w0.data.question.id, wrong(d0))).data.resolved, false, 'a wrong first try in practice');
+  const wRush = await issueMcq(w.jar, d1, { mode: 'rush' });
+  eq([wRush.status, wRush.data.triesLeft], [201, undefined], 'a one-try copy of it reports no second try to lose');
+  const wRushGrade = await grade(w.jar, wRush.data.question.id, right(d1));
+  eq([wRushGrade.data.correct, wRushGrade.data.resolved, wRushGrade.data.triesLeft], [true, true, 0], 'and resolves on its one answer as it always did');
+
+  // ══ the account a request names is a string ══════════════════════════════
+  const named = await account('named');
+  const listed = await post('/v1/practice/issue', { generator: 'c8-linear-equations-both-sides', difficulty: 2, curriculum: 'in', account: [String(named.account.id)] }, named.jar);
+  eq([listed.status, listed.data?.error?.code], [409, 'PRACTICE_ACCOUNT_MISMATCH'], 'an array that merely prints as the account id does not name the account');
+  const prep2 = await post('/v1/practice/prepare', { generator: 'c8-linear-equations-both-sides', difficulty: 2, curriculum: 'in' });
+  const listedBind = await post('/v1/practice/issue', { prepared: prep2.data.prepared, account: [String(named.account.id)] }, named.jar);
+  eq([listedBind.status, listedBind.data?.error?.code], [409, 'PRACTICE_ACCOUNT_MISMATCH'], 'nor does it bind a prepared question');
+  eq((await post('/v1/practice/issue', { prepared: prep2.data.prepared, account: String(named.account.id) }, named.jar)).status, 201, 'which is still there for the account named properly');
+
+  console.log(`REPEAT CREDIT: PASS — ${count}/${count} checks — content an account has been shown the solution of is a repeat however, whenever and in whatever option order it was issued; tries follow the content across copies; working without an answer always spends a try; unrelated arithmetic earns nothing.`);
 } finally {
   await h.close();
   rmSync(scratch, { recursive: true, force: true });
