@@ -1805,7 +1805,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       {inkSignInOpen && inkSignInReady && (
                         <React.Suspense fallback={<p role="status">{t('cloud.stateChecking')}</p>}>
                           {inkOtpOpen ? (
-                            <InkOtpAccountRecovery initialMode="signin"
+                            <InkOtpAccountRecovery initialMode="signin" initialName={user?.name || ''}
                               onCancel={() => setInkOtpOpen(false)}
                               onFinish={async ({ account }) => {
                                 // Guardian-approved sign-in may call onFinish
