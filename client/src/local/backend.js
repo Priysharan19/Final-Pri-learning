@@ -5433,7 +5433,9 @@ async function serveQuestion(pid, { generator, difficulty, mode, dotpoint = null
     try {
       const out = await cloud.issuePractice({ ...body, ...(trap ? { trap } : {}), account: linkedAccount });
       if (String(out?.accountId || '') === linkedAccount && out?.question?.id && usable(out.question)) {
-        return { q: out.question, fields: { serverQuestionId: out.question.id }, trapDelivered: out.trapDelivered === true, repeat: out.repeat === true };
+        // A copy of content this account has already spent a try on starts with
+        // that try spent; the card must say one try is left, as the server will.
+        return { q: out.question, fields: { serverQuestionId: out.question.id, ...(out.triesLeft === 1 ? { tries: 1 } : {}) }, trapDelivered: out.trapDelivered === true, repeat: out.repeat === true };
       }
     } catch { /* not issuable right now: prepared or draft below */ }
   }
@@ -5474,6 +5476,7 @@ async function requireServerIssue(row) {
   const q = out?.question;
   if (!q?.id || q.prompt !== row.payload?.prompt || q.answerType !== row.payload?.answerType) throw checkUnavailable('unavailable');
   row.serverQuestionId = q.id;
+  if (out.triesLeft === 1) row.tries = Math.max(1, row.tries || 0);
   row.payload = q;
   delete row.prepared;
   delete row.preparedExpiresAt;
