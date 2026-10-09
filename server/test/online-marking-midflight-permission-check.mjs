@@ -44,10 +44,16 @@ Object.assign(process.env,{
 delete process.env.PRI_PUBLIC_ORIGIN;
 const {startApp,registerAccount,verifyEmail} = await import('./support/app-harness.mjs');
 const {requestedEngine} = await import('./support/engine.mjs');
+const {decryptDeliveryToken}=await import('../platform/deliveryCrypto.js');
 const h=await startApp({engine:requestedEngine()});
 const image='data:image/png;base64,'+Buffer.from('a'.repeat(600)).toString('base64');
 const issue=jar=>h.request('/v1/practice/issue',{method:'POST',jar,body:{generator:'c8-linear-equations-both-sides',difficulty:2,seed:104729,curriculum:'in'}});
 const recognize=(jar,qid)=>h.request('/v1/practice/'+qid+'/recognize',{method:'POST',jar,body:{mode:'photo',image}});
+async function guardianToken(accountId,kind){
+ const row=await h.db.get('SELECT token_id,token_ciphertext FROM auth_delivery_outbox WHERE account_id=? AND kind=? ORDER BY created_at DESC LIMIT 1',[accountId,kind]);
+ assert.ok(row,'guardian delivery envelope must exist');
+ return decryptDeliveryToken(row.token_ciphertext,accountId+':'+kind+':'+row.token_id);
+}
 const receipts=accountId=>h.db.get("SELECT COUNT(*) AS n FROM idempotency_keys WHERE account_id=? AND scope='practice-recognition'",[accountId]);
 try{
  const a=await registerAccount(h,{email:'ocr.revocation.qa@example.test',deviceId:'qa-ipad-ocr'});
@@ -80,6 +86,37 @@ try{
  console.log('GRADE_COMPLETION_DURING_PROVIDER',after.status,after.data?.error?.code,'RECEIPTS',(await receipts(b.account.id))?.n);
  eq(after.status,409);
  eq(Number((await receipts(b.account.id))?.n),0);
+ // Actual minor registration, email verification and guardian consent ceremony.
+ // The guardian withdraws permission while the provider is waiting, rather
+ // than a test mutating client flags or faking a server permission response.
+ const childJar={};
+ const registration=await h.request('/v1/account/register',{method:'POST',jar:childJar,body:{
+  name:'QA Student',email:'ocr.child.qa@example.test',password:'guardian-pass-123',
+  deviceId:'qa-child-ipad',isAdult:false,year:'9',
+  guardianName:'QA Guardian',guardianEmail:'ocr.guardian.qa@example.test'
+ }});
+ eq(registration.status,201,'minor registration creates pending account');
+ const childId=registration.data.account.id;
+ eq((await verifyEmail(h,childId)).status,200,'minor email verified');
+ const guardianConsentToken=await guardianToken(childId,'guardian-consent');
+ const confirmed=await h.request('/v1/account/guardian/confirm',{method:'POST',body:{token:guardianConsentToken}});
+ eq(confirmed.status,200,'guardian confirmation accepted');
+ eq(confirmed.data?.confirmed,true,'guardian consent granted');
+ const childQuestion=await issue(childJar);
+ eq(childQuestion.status,201,'guardian-approved minor receives online issued question');
+ const heldChild=recognize({...childJar},childQuestion.data.question.id);
+ const heldReply=await waitingProvider();
+ const withdrawToken=await guardianToken(childId,'guardian-withdraw');
+ const withdrawn=await h.request('/v1/account/guardian/withdraw',{method:'POST',body:{token:withdrawToken}});
+ eq(withdrawn.status,200,'guardian withdrawal accepted during OCR wait');
+ eq(withdrawn.data?.withdrawn,true,'guardian withdrawal is recorded');
+ finish(heldReply);
+ const blockedChild=await heldChild;
+ eq(blockedChild.status,403,'a withdrawn minor cannot receive a late OCR receipt');
+ eq(blockedChild.data?.error?.code,'GUARDIAN_CONSENT_WITHDRAWN',
+    'late OCR fails with explicit guardian revocation');
+ eq(Number((await receipts(childId))?.n),0,
+    'guardian withdrawal leaves zero persisted recognition receipts');
  console.log('ONLINE MARKING MIDFLIGHT PERMISSIONS PASS — '+checks+'/'+checks+' checks, real '+h.engine+' HTTP, local test provider');
 } finally {
  await h.close();
