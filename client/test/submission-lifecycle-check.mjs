@@ -42,6 +42,11 @@ Object.defineProperty(fakeWindow, 'localStorage', { get: () => globalThis.localS
 globalThis.window = fakeWindow;
 if (typeof globalThis.document === 'undefined') globalThis.document = Object.assign(new EventTarget(), { visibilityState: 'visible' });
 
+// Only the server marks (owner decision 2026-10-10): every submission below is
+// graded by the real /v1 app for a real verified account.
+const { startOnlineAuthority } = await import('./support/online-authority.mjs');
+const online = await startOnlineAuthority({ label: 'lifecycle' });
+
 const { api } = await import('../src/api.js');
 const idb = await import('../src/local/idb.js');
 const { checkAnswer } = await import('../src/engine/checker.js');
@@ -108,12 +113,9 @@ async function refusal(promise) {
 }
 
 const me = (await api.post('/profiles', { name: 'Lifecycle Student', year: 10 })).user;
-// Premium, so the free daily cap does not end the suite early.
-{
-  const now = Date.now();
-  await idb.put('device', { id: cloudLinkRowId(me.id), accountId: `acct-${me.id}`, role: 'student', emailVerified: true, linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
-    entitlement: { plan: 'premium', status: 'active', provider: 'web', currentPeriodEnd: now + 30 * 86400000, offlineUntil: now + 7 * 86400000, issuedAt: now, sourceVersion: 1 } });
-}
+// Signed in to a real verified account; Premium, so the free daily cap does
+// not end the suite early.
+await online.link(me.id, { name: me.name, entitlement: 'premium' });
 
 // ── 1 · One tap, one attempt ────────────────────────────────────────────────
 await check('a doubled delivery of one first wrong answer spends one try, not two', async () => {
@@ -190,15 +192,82 @@ await check('a malformed submission id is refused at the gateway, not silently i
   await api.post(`/practice/${t.id}/discard`, {});
 });
 
-await check('submissions without a key keep the exactly-once 409 contract', async () => {
+// The server grades under the submission key, so a submission with no key is
+// no longer marked at all (before online-only grading the device marked it and
+// a race of two was held to one by the 409). The exactly-once contract is kept
+// where two deliveries can still race: two different keys for one question.
+await check('a submission without a key is not marked; two keyed deliveries racing still record exactly once', async () => {
   const t = await markable();
-  const raced = await Promise.allSettled([
+  const keyless = await Promise.allSettled([
     api.post(`/practice/${t.id}/submit`, { answer: t.right }),
     api.post(`/practice/${t.id}/submit`, { answer: t.right })
+  ]);
+  assert.deepEqual(keyless.map(x => [x.status, x.reason?.status, x.reason?.code]),
+    [['rejected', 503, 'ONLINE_GRADE_REQUIRED'], ['rejected', 503, 'ONLINE_GRADE_REQUIRED']]);
+  const open = await rowOf(t.id);
+  assert.deepEqual([open.tries || 0, open.answered || 0], [0, 0], 'nothing was spent');
+  assert.equal((await attemptsOf(me.id, t.id)).length, 0);
+  assert.equal((await outboxFor(me.id, t.id)).length, 0);
+
+  const raced = await Promise.allSettled([
+    api.post(`/practice/${t.id}/submit`, { answer: t.right, submissionId: recovery.newSubmissionId() }),
+    api.post(`/practice/${t.id}/submit`, { answer: t.right, submissionId: recovery.newSubmissionId() })
   ]);
   assert.equal(raced.filter(x => x.status === 'fulfilled').length, 1);
   assert.equal(raced.filter(x => x.status === 'rejected' && x.reason?.status === 409).length, 1);
   assert.equal((await attemptsOf(me.id, t.id)).length, 1);
+  assert.equal((await outboxFor(me.id, t.id)).length, 1);
+});
+
+// ── Online-only grading: a refusal marks nothing and loses nothing ──────────
+await check('signed out, offline or with no server: the submission is refused by name, nothing is spent, and the working is kept', async () => {
+  const t = await markable();
+  const sid = recovery.newSubmissionId();
+  const strokes = [{ points: [{ x: 3, y: 4 }, { x: 5, y: 6 }] }];
+  drafts.setDraftProfile(me.id);
+  // What the card keeps while the student works and when they tap Submit.
+  assert.equal(recovery.saveInkDraft(t.id, strokes), true);
+  await inkDrafts.flushInkDrafts();
+  recovery.savePendingSubmission(t.id, { submissionId: sid, answer: t.right, ms: 800, viaInk: false, lines: ['my working'] });
+  const xp = (await api.get('/me')).user.xp;
+  const sent = online.traffic.grade;
+
+  const refusals = [
+    ['signed out', fn => online.signedOut(fn), 401, 'SIGN_IN_TO_CHECK'],
+    ['offline', fn => online.offline(fn), 503, 'RECONNECT_TO_CHECK'],
+    ['no server configured', fn => online.unconfigured(fn), 503, 'RECONNECT_TO_CHECK']
+  ];
+  for (const [label, during, status, code] of refusals) {
+    const e = await during(() => refusal(api.post(`/practice/${t.id}/submit`, { answer: t.right, ms: 800, submissionId: sid })));
+    assert.deepEqual([e.status, e.code], [status, code], label);
+    assert.ok(!('correct' in e) && !('solution' in e), `${label}: the refusal carries no verdict`);
+    const reveal = await during(() => refusal(api.post(`/practice/${t.id}/reveal`, { ms: 100 })));
+    assert.deepEqual([reveal.status, reveal.code], [status, code], `${label}: reveal`);
+    const row = await rowOf(t.id);
+    assert.deepEqual([row.tries || 0, row.answered || 0, !!row.discardedAt, !!row.lastTry], [0, 0, false, false], `${label}: no try spent`);
+    assert.equal((await attemptsOf(me.id, t.id)).length, 0, `${label}: no attempt`);
+    assert.equal((await outboxFor(me.id, t.id)).length, 0, `${label}: nothing queued for sync`);
+    assert.equal((await api.get('/me')).user.xp, xp, `${label}: no XP`);
+    // The question, the pending submission and the handwriting are all still there.
+    assert.deepEqual((await recovery.readInkDraft(t.id))?.[0]?.points, strokes[0].points, `${label}: the handwriting is kept`);
+    assert.deepEqual([recovery.readPendingSubmission(t.id)?.submissionId, recovery.readPendingSubmission(t.id)?.answer], [sid, t.right], `${label}: the pending submission is kept`);
+    assert.equal(recovery.pendingSubmissionQuestionId(), t.id, `${label}: and still names its question`);
+    const relaunch = await during(() => api.post('/practice/next', { resume: true, pendingQuestionId: recovery.pendingSubmissionQuestionId() }));
+    assert.equal(relaunch.question.id, t.id, `${label}: the same question is served to keep working on`);
+    assert.equal(relaunch.question.prompt, t.q.prompt, `${label}: unchanged`);
+  }
+  assert.equal(online.traffic.grade, sent, 'the server graded nothing during the refusals');
+
+  // Signed in and connected again, the kept submission — same key — is marked once.
+  const marked = await api.post(`/practice/${t.id}/submit`, { answer: t.right, ms: 800, submissionId: sid });
+  assert.deepEqual([marked.correct, marked.resolved, marked.authoritative, marked.submissionId], [true, true, true, sid]);
+  const replay = await api.post(`/practice/${t.id}/submit`, { answer: t.right, ms: 800, submissionId: sid });
+  assert.deepEqual([replay.replayed, replay.attemptId], [true, marked.attemptId]);
+  assert.equal((await attemptsOf(me.id, t.id)).length, 1);
+  assert.equal((await outboxFor(me.id, t.id)).length, 1);
+  recovery.clearPendingSubmission(t.id);
+  await recovery.clearInkDraft(t.id);
+  drafts.setDraftProfile(null);
 });
 
 // ── 2 · Sync carries each attempt exactly once ──────────────────────────────
@@ -449,6 +518,7 @@ await check('QuestionCard and InkAnswer bind late results to the attempt', async
   assert.doesNotMatch(card, /onRecognized=\{setInkResult\}/, 'readings pass through the freeze');
 });
 
+await online.close();
 if (failures.length) {
   console.log(`\n✖ submission lifecycle — ${failures.length} failed, ${passed} passed\n`);
   for (const f of failures) console.log('  ' + f + '\n');
