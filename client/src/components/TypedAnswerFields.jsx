@@ -35,7 +35,10 @@ export default function TypedAnswerFields({
   );
   return (
     <>
-      <label className="sc-label" style={{ display: 'block' }} htmlFor={answerId} data-final-answer-label>{t('verdict.finalAnswer')}</label>
+      {/* Once marked the field is disabled; a label for it would be clickable but dead to a keyboard. */}
+      {resolved
+        ? <div className="sc-label" style={{ display: 'block' }} data-final-answer-label>{t('verdict.finalAnswer')}</div>
+        : <label className="sc-label" style={{ display: 'block' }} htmlFor={answerId} data-final-answer-label>{t('verdict.finalAnswer')}</label>}
       <div className="answer-row">
         {question.answerPrefix && <span className="answer-prefix"><MathText text={question.answerPrefix} /></span>}
         <input
