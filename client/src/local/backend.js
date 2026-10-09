@@ -5193,9 +5193,8 @@ async function entitlementGate(method, pattern, body, params) {
   if (key === 'POST /exams') {
     const p = await requireProfile();
     // An exam is marked work, so it starts only for a signed-in account that
-    // can reach the server now (online-only grading). The paper itself is
-    // still marked by the bundled engine at the end of the sitting until the
-    // server marks exam papers; that is tracked as open work, not hidden.
+    // can reach the server now (online-only grading). The server issues the
+    // paper and marks it (server/platform/exams.js); nothing is marked here.
     if (!(await profileCloudAccountId(p.id).catch(() => null))) throw checkUnavailable('sign-in');
     try { await cloud.me(); } catch (cause) {
       throw checkUnavailable(cause?.status === 401 ? 'sign-in' : cause?.status === 403 ? 'refused' : 'offline', cause);
