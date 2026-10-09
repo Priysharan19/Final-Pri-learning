@@ -11,8 +11,9 @@
 // IOQM 2/3/5), and records every attempted question through the ordinary
 // evidence path in backend.js so progress and the adaptive engine see it.
 import { get, put, del, byIndex, uuid } from './idb.js';
-import { indiaScope, indiaChapter, cleanIndiaTrack, resolveIndiaTarget } from '../engine/indiaProduct.js';
-import { pyqCellsFor, pyqAbsenceFor, PYQ_MANIFEST } from '../engine/pyq/pyqCoverage.js';
+import { indiaScope, indiaChapter, cleanIndiaTrack } from '../engine/indiaProduct.js';
+import { pyqAbsenceFor, PYQ_MANIFEST } from '../engine/pyq/pyqCoverage.js';
+import { indiaPyqCells } from '../engine/indiaExamCells.js';
 import { generateQuestion, loadBanksFor } from '../engine/generators/index.js';
 import { checkAnswer, stepCheck } from '../engine/checker.js';
 import { sanitizeFigure } from '../lib/sanitize.js';
@@ -106,32 +107,13 @@ function titleFor(spec, n) {
 
 /**
  * Previous-year cells for every chapter in scope, once their banks are loaded.
- * Two archives can contribute and both are used: the reviewed JEE department
- * catalog for JEE tracks, and the source-cited archive (engine/pyq) for any
- * track it publishes — which today is CBSE Classes 10 and 12 and JEE Advanced.
+ * Two archives can contribute and both are used (engine/indiaExamCells.js).
  * Authored forms fill whatever the archives cannot, and the composer labels
  * every question with which of the two it was.
  */
 async function pyqCellsByChapter(track, chapters) {
-  const cells = new Map();
-  const generators = new Set();
-  for (const chapter of chapters) {
-    const list = [];
-    if (track === 'jee-main' || track === 'jee-advanced') {
-      for (const difficulty of [3, 4]) {
-        const target = resolveIndiaTarget(chapter, { track, grade: 12, difficulty, random: () => 0 });
-        if (target?.pyqArchive !== 'jee-question-department') continue;
-        if (list.some(c => c.generator === target.generator && c.difficulty === target.difficulty)) continue;
-        list.push({ generator: target.generator, difficulty: target.difficulty, pyq: true });
-      }
-    }
-    // Every rung the source-cited archive actually publishes for this chapter.
-    // buildItem narrows them to the section's own window before drawing.
-    for (const cell of pyqCellsFor(track, chapter.id)) list.push(cell);
-    if (!list.length) continue;
-    for (const cell of list) generators.add(cell.generator);
-    cells.set(chapter.id, list);
-  }
+  const cells = indiaPyqCells(track, chapters);
+  const generators = new Set([...cells.values()].flatMap(list => list.map(cell => cell.generator)));
   if (generators.size) await loadBanksFor([...generators]);
   return cells;
 }
