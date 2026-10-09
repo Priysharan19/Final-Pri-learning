@@ -21,7 +21,7 @@ import { misconceptionIdForTrap } from '../../client/src/engine/misconceptions.j
 import { PUBLIC_QUESTION_FIELDS } from '../../client/src/engine/publicQuestion.js';
 import { consentState, consentBlockerCode } from './guardianConsent.js';
 import { loadAllBanks, generateQuestion } from '../../client/src/engine/generators/index.js';
-import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
+import { checkAnswer, stepCheck, methodMarks, unresolvedWorkingView } from '../../client/src/engine/checker.js';
 import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../../client/src/engine/answer-forms.js';
 import { transcribeHandwriting, validateImage, HandwritingProviderError } from './handwritingProvider.js';
 import { consumeAiAllowance, refundAiAllowance, refuseAiAllowance } from './aiAllowance.js';
@@ -133,6 +133,33 @@ function stepEvidence(q, answer, steps, result) {
     } catch { partial = null; }
   }
   return { stepReport: report, partial };
+}
+
+// A wrong first try leaves the question open, so its report may not hand over
+// the answer. The engine decides what may be shown (`unresolvedWorkingView`):
+// lines that state or check a value are not judged, the first mistake is
+// marked without saying what the line should have been, nothing after it is
+// judged, and the method marks shown are those of the judged lines alone. The
+// full report and the full method marks are returned when the question
+// resolves. The stored reply is this one, so a replay says the same.
+function unresolvedEvidence(q, answer, steps, result, evidence) {
+  const marks = marksPossibleFor(q);
+  // A question answered BY its working is reported on the answer itself.
+  const reported = result.stepReport
+    ? { meta: q.answer?.stepMeta, working: answer }
+    : { meta: stepMetaFor(q), working: steps };
+  let stepReport = null, partial = null;
+  if (evidence.stepReport && reported.meta) {
+    try {
+      stepReport = unresolvedWorkingView({ ...reported, marks, prompt: q.prompt, withMarks: false }).stepReport;
+    } catch { stepReport = null; }
+  }
+  if (evidence.partial) {
+    try {
+      partial = unresolvedWorkingView({ meta: stepMetaFor(q), working: steps, marks, prompt: q.prompt }).partial;
+    } catch { partial = null; }
+  }
+  return { stepReport, partial };
 }
 
 // What a device may know a question by (`opaqueContentId`, `opaqueContentHash`)
@@ -700,23 +727,14 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const trapWhy = !result.correct
         ? trapProbes.find(t => t?.why && String(t.why) === feedback)?.why || null : null;
       const working = Array.isArray(body.steps) ? body.steps.join('\n') : String(body.steps || '');
-      const { stepReport, partial } = stepEvidence(q, body.answer, working, result);
+      const evidence = stepEvidence(q, body.answer, working, result);
       const marksPossible = marksPossibleFor(q);
-      // Blank final answers are not automatically attempts: verified positive
-      // method evidence alone makes an otherwise blank response gradable.
-      // Unreadable working or an invalid NONBLANK answer still cannot earn
-      // marks. This prevents rewarding a mere copy of the question.
-      const workingOnlyCredit = result.invalid === true && body.answer.trim() === '' &&
-        Number.isInteger(partial?.awarded) && partial.awarded > 0;
       // Working sent without a final answer is an attempt whether or not its
       // lines are right, and spends a try either way. Were only true working
       // an attempt, a false line would be refused for free and each refusal
       // would say "this step is wrong" — an unlimited check of every guess.
       const workingOnly = result.invalid === true && body.answer.trim() === '' && working.trim() !== '';
       const invalid = Boolean(result.invalid && !workingOnly);
-      const marksEarned = invalid ? 0 : result.correct
-        ? marksPossible
-        : Math.max(0, Math.min(marksPossible - 1, partial?.awarded ?? 0));
       const priorTry = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-tries' AND key=?",
         [accountId, qid]);
       const tries = priorTry ? Number(JSON.parse(priorTry.response_json).tries) || 0 : 0;
@@ -727,6 +745,18 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const spent = tries >= 1 || (q._repeat !== true && await contentTried(db, accountId, q, now));
       // Invalid input is not a failed mathematical attempt: do not consume a try or close the question.
       const resolved = !invalid && Boolean(result.correct || spent || ONE_TRY_MODES.includes(q._practiceMode));
+      // While the question is open, the report and the marks are those of the
+      // lines that may be judged without confirming a value of the unknown.
+      const { stepReport, partial } = resolved ? evidence : unresolvedEvidence(q, body.answer, working, result, evidence);
+      // Blank final answers are not automatically attempts: verified positive
+      // method evidence alone makes an otherwise blank response gradable.
+      // Unreadable working or an invalid NONBLANK answer still cannot earn
+      // marks. This prevents rewarding a mere copy of the question.
+      const workingOnlyCredit = result.invalid === true && body.answer.trim() === '' &&
+        Number.isInteger(partial?.awarded) && partial.awarded > 0;
+      const marksEarned = invalid ? 0 : result.correct
+        ? marksPossible
+        : Math.max(0, Math.min(marksPossible - 1, partial?.awarded ?? 0));
       const attemptId = randomUUID();
       const response = { authoritative: true, questionId: qid, submissionId, attemptId,
         correct: result.correct === true, invalid, resolved,

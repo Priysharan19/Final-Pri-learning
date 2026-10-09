@@ -290,7 +290,85 @@ try {
   eq([listedBind.status, listedBind.data?.error?.code], [409, 'PRACTICE_ACCOUNT_MISMATCH'], 'nor does it bind a prepared question');
   eq((await post('/v1/practice/issue', { prepared: prep2.data.prepared, account: String(named.account.id) }, named.jar)).status, 201, 'which is still there for the account named properly');
 
-  console.log(`REPEAT CREDIT: PASS — ${count}/${count} checks — content an account has been shown the solution of is a repeat however, whenever and in whatever option order it was issued; tries follow the content across copies; working without an answer always spends a try; unrelated arithmetic earns nothing.`);
+  // ══ a wrong first try is not told the answer through its working ═════════
+  // A page of ninety-one guessed values under a wrong final answer came back
+  // with exactly the true one marked right; the second try then earned full
+  // marks as new work. One false line came back with a diagnosis naming the
+  // answer. While a question is open, a line that states or checks a value is
+  // not judged, the first mistake is marked without saying what it should have
+  // been, and nothing after it is judged. Resolution returns the full report.
+  const work = (jar, id, answer, steps) => { const sid = `repeat-credit-${String(++n).padStart(4, '0')}`; return { sid, sent: post(`/v1/practice/${id}/submit`, { submissionId: sid, answer: String(answer), mode: 'typed', steps }, jar, { 'Idempotency-Key': sid }) }; };
+  const lineStatuses = report => (report?.lines || []).map(l => l.status);
+  const guesser = await account('guess');
+  const or_g0 = await issue(guesser.jar, 21);
+  const gKey = Number((await sealedAnswer(or_g0.data.question.id)).value);
+  const gLetter = or_g0.data.question.prompt.match(/[a-z]/i)[0];
+  const guesses = [];
+  for (let k = gKey - 45; k <= gKey + 45; k++) guesses.push(`${gLetter} = ${k}`);
+  const or_g1 = work(guesser.jar, or_g0.data.question.id, '987654', guesses);
+  const or_g1r = await or_g1.sent;
+  eq([or_g1r.status, or_g1r.data.correct, or_g1r.data.resolved, or_g1r.data.triesLeft, or_g1r.data.solution], [200, false, false, 1, undefined], 'ninety-one guessed values under a wrong answer: a wrong first try, still open');
+  eq([or_g1r.data.stepReport.lines.length, [...new Set(lineStatuses(or_g1r.data.stepReport))]], [91, ['note']], 'not one of the ninety-one lines is confirmed or refuted');
+  const trueLine = or_g1r.data.stepReport.lines[45], falseLine = or_g1r.data.stepReport.lines[44];
+  eq([trueLine.text, { ...trueLine, text: null }], [`${gLetter} = ${gKey}`, { ...falseLine, text: null }], 'the line that states the true value comes back exactly as a false one does');
+  eq([or_g1r.data.marksEarned, or_g1r.data.partial, or_g1r.data.stepReport.firstBreak, or_g1r.data.stepReport.diagnosis], [0, null, -1, null], 'and there are no marks, no per-line marks and no first mistake to read it from');
+  eq((await post(`/v1/practice/${or_g0.data.question.id}/submit`, { submissionId: or_g1.sid, answer: '987654', mode: 'typed', steps: guesses }, guesser.jar, { 'Idempotency-Key': or_g1.sid })).data, or_g1r.data, 'the stored reply is the same one');
+  const or_g2r = await work(guesser.jar, or_g0.data.question.id, '987654', guesses).sent;
+  eq([or_g2r.data.resolved, or_g2r.data.correct, typeof or_g2r.data.solution], [true, false, 'object'], 'the second wrong try resolves the question');
+  eq(or_g2r.data.stepReport.lines.filter(l => l.status === 'ok').map(l => l.text), [`${gLetter} = ${gKey}`], 'and the full report is then returned: the true value is the one line verified');
+  eq(or_g2r.data.stepReport.withheld ?? false, false, 'nothing in it is withheld');
+
+  // Genuine working is still judged on the first try, and shows its marks —
+  // whatever values are stated beside it.
+  const PAIR = { generator: 'c10-linear-pair-methods', difficulty: 2, seed: 7, curriculum: 'in' };
+  const elimination = (y, x) => ['12x + 6y = -120', '12x - 3y = -66', '9y = -54', `y = ${y}`, `x = ${x}`, `6(${x}) + 3(${y}) = -60`];
+  const solver = await account('solver'), bluffer = await account('bluffer');
+  const or_s0 = await post('/v1/practice/issue', PAIR, solver.jar), or_b0 = await post('/v1/practice/issue', PAIR, bluffer.jar);
+  eq([or_s0.data.question.prompt, or_b0.data.question.prompt, (await sealedAnswer(or_s0.data.question.id)).value],
+    Array(2).fill('Solve by elimination: $6x + 3y = -60$ and $4x - y = -22$. Find the value of $y$.').concat(-6), 'two accounts sit the same pair of equations');
+  const or_s1r = await work(solver.jar, or_s0.data.question.id, '5', elimination(-6, -7)).sent;
+  const or_b1r = await work(bluffer.jar, or_b0.data.question.id, '5', elimination(6, 7)).sent;
+  eq(lineStatuses(or_s1r.data.stepReport), ['ok', 'ok', 'ok', 'note', 'note', 'note'], 'the eliminations are verified line by line; the values stated after them and the check are not');
+  eq([or_s1r.data.resolved, or_s1r.data.marksEarned, or_s1r.data.marksPossible, or_s1r.data.partial.awarded, or_s1r.data.partial.lines.map(l => l.mark)], [false, 1, 2, 1, [0, 0, 1, 0, 0, 0]], 'the step that eliminates x shows its method mark');
+  const unsent = r => ({ report: { ...r.data.stepReport, lines: r.data.stepReport.lines.map(l => ({ ...l, text: null })) }, partial: { ...r.data.partial, lines: r.data.partial.lines.map(l => ({ ...l, text: null })) }, marks: [r.data.marksEarned, r.data.marksPossible], feedback: r.data.feedback });
+  eq(unsent(or_b1r), unsent(or_s1r), 'the same working with the wrong values stated comes back identically, line for line and mark for mark');
+  const or_s2r = await work(solver.jar, or_s0.data.question.id, '5', elimination(-6, -7)).sent;
+  eq([or_s2r.data.resolved, lineStatuses(or_s2r.data.stepReport), or_s2r.data.marksEarned], [true, ['ok', 'ok', 'ok', 'ok', 'ok', 'ok'], 1], 'on resolution every line is judged, and the marks earned are the ones shown');
+  const or_b2r = await work(bluffer.jar, or_b0.data.question.id, '5', elimination(6, 7)).sent;
+  eq([or_b2r.data.resolved, lineStatuses(or_b2r.data.stepReport).slice(0, 4), or_b2r.data.stepReport.firstBreak], [true, ['ok', 'ok', 'ok', 'break'], 3], 'and the wrong value is then the first mistake');
+
+  // One false line: the first mistake is marked, the answer is not given away.
+  const slipper = guesser;   // a pair of equations is new content to this account
+  const or_sl0 = await post('/v1/practice/issue', PAIR, slipper.jar);
+  const or_sl1r = await work(slipper.jar, or_sl0.data.question.id, '5', ['9y = -50', '9y = -54', '18x = -126']).sent;
+  eq([or_sl1r.data.resolved, lineStatuses(or_sl1r.data.stepReport), or_sl1r.data.stepReport.firstBreak, or_sl1r.data.marksEarned], [false, ['break', 'note', 'note'], 0, 0], 'a false line is the first mistake, and nothing after it is judged');
+  const told = JSON.stringify([or_sl1r.data.stepReport.diagnosis, or_sl1r.data.stepReport.lines.map(l => [l.note, l.diagnosis]), or_sl1r.data.partial, or_sl1r.data.feedback, or_sl1r.data.trapWhy]);
+  eq(/-\s?6|-\s?7|54|126/.test(told), false, 'nothing said about that mistake contains the solution of the pair or the number the line should have had');
+  const or_sl2r = await work(slipper.jar, or_sl0.data.question.id, '5', ['9y = -50', '9y = -54', '18x = -126']).sent;
+  eq([or_sl2r.data.resolved, or_sl2r.data.stepReport.withheld ?? false, /-6|-54/.test(JSON.stringify([or_sl2r.data.stepReport.diagnosis, or_sl2r.data.stepReport.lines[0].note]))], [true, false, true], 'the full diagnosis, which does name it, is returned once the question is resolved');
+
+  // A mark that IS the stated value waits for resolution, and is then earned.
+  const oneStep = solver;
+  const os0 = await issue(oneStep.jar, 1234579);
+  const osKey = Number((await sealedAnswer(os0.data.question.id)).value);
+  const osLetter = os0.data.question.prompt.match(/[a-z]/i)[0];
+  const osWork = value => [os0.data.question.prompt.replace(/\$/g, ''), `${osLetter} = ${value}`];
+  const os1r = await work(oneStep.jar, os0.data.question.id, '987654', osWork(osKey)).sent;
+  eq([os0.data.question.prompt, os1r.data.resolved, os1r.data.marksEarned, os1r.data.partial?.awarded, lineStatuses(os1r.data.stepReport)], ['$2t=t - 3$', false, 0, 0, ['ok', 'note']],
+    'the question copied out and its root stated: on the open question the root is not confirmed and shows no mark');
+  const os2r = await work(oneStep.jar, os0.data.question.id, '987654', osWork(osKey)).sent;
+  eq([os2r.data.resolved, os2r.data.marksEarned, os2r.data.partial?.awarded, lineStatuses(os2r.data.stepReport)], [true, 1, 1, ['ok', 'ok']],
+    'on resolution the one-step solution earns its method mark');
+
+  // Arithmetic folded from the question's own numbers is not a method.
+  const or_f0 = await post('/v1/practice/issue', { ...PAIR, seed: 531 }, bluffer.jar);
+  const folded = ['5 + 4 = 9', '3 + 2 = 5', '2 + 2 = 4', '9 - 5 = 4', '4 + 4 = 8'];
+  eq([or_f0.data.question.prompt, (await sealedAnswer(or_f0.data.question.id)).value], ['Solve by elimination: $5x + 4y = -3$ and $2x + 2y = 2$. Find the value of $y$.', 8], 'a second pair of equations');
+  const or_f1r = await work(bluffer.jar, or_f0.data.question.id, '1', folded).sent;
+  const or_f2r = await work(bluffer.jar, or_f0.data.question.id, '2', folded).sent;
+  eq([or_f1r.data.marksEarned, or_f2r.data.marksEarned, or_f2r.data.resolved, (await eventOf(or_f0.data.question.id)).marksEarned], [0, 0, true, 0], 'five true sums on the six numbers of a pair of equations that end on y earn nothing, on either try or on record');
+
+  console.log(`REPEAT CREDIT: PASS — ${count}/${count} checks — content an account has been shown the solution of is a repeat however, whenever and in whatever option order it was issued; tries follow the content across copies; working without an answer always spends a try; unrelated arithmetic earns nothing; a wrong first try is told nothing that confirms a value.`);
 } finally {
   await h.close();
   rmSync(scratch, { recursive: true, force: true });

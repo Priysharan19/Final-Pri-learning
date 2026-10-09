@@ -1348,18 +1348,35 @@ function linearState(claim, variable) {
   };
 }
 
+/** Are the sides `f` the sides `g` (as written, or swapped) all multiplied by one number other than 1? */
+function scaledSides(f, g) {
+  const [a, b, c, d] = g;
+  return [[a, b, c, d], [c, d, a, b]].some(ref => {
+    const pivot = ref.findIndex(v => !numsClose(v, 0));
+    if (pivot < 0 || numsClose(f[pivot], 0)) return false;
+    const k = f[pivot] / ref[pivot];
+    return !numsClose(k, 1) && ref.every((v, i) => numsClose(f[i], v * k));
+  });
+}
+
 /** Is linear state `f` strictly further on than `g`? */
 function linearStateAdvances(f, g) {
-  if (f.left < g.left) return true;
-  if (f.left > g.left) return false;
   // Scaling both sides isolates nothing, so it is a step only once it has been
   // carried out: `x + 2 = 3x` from `6x + 12 = 18x`, `x + 2 = 8` from
   // `x/2 + 1 = 4`. Wrapping each side in a bracket and writing the factor
   // beside it — `(4x + 10)/2 = (-2x + 46)/2`, `2(0.4f - 0.7) = 2(0.1f - 2.5)` —
   // announces the operation without doing it.
   const carriedOut = f.written[0] <= g.written[0];
-  if (f.fractional < g.fractional && carriedOut) return true;
   const same = (x, y) => x.every((v, i) => numsClose(v, y[i]));
+  // The same holds where the scaling also brings a coefficient to 1, which
+  // reads as one move fewer owed: `(2y - 12)/2 = (-22)/2` — and
+  // `(2y - 12)/2 = -11`, where only the bare number was worked out — is
+  // `2y - 12 = -22` with the division still to do on the side that carries
+  // the unknown.
+  if (!carriedOut && scaledSides(f.sides, g.sides)) return false;
+  if (f.left < g.left) return true;
+  if (f.left > g.left) return false;
+  if (f.fractional < g.fractional && carriedOut) return true;
   // Dividing a whole-number equation through by a common factor.
   if (!f.fractional && !g.fractional && carriedOut) {
     const pivot = g.sides.findIndex((v, i) => !numsClose(v, 0) && !numsClose(f.sides[i], 0));
@@ -1409,31 +1426,26 @@ const UNKNOWN_PROBES = [1.37, -2.11, 5.03, 0.29];
 
 // ── Working with no letter in it ─────────────────────────────────────────────
 // `3 + 4 = 7` is true on every question ever set, so a true sum cannot earn a
-// method mark for being true: any amount of it would fill the marks. But some
-// working has no letter in it and is the method all the same — checking a root
-// by putting it into the equation, finding a gradient from two points, a
-// z-score from a mean and a deviation. Two readings earn a mark, and nothing
-// else without a letter does.
+// method mark for being true: any amount of it would fill the marks. Nor can
+// it earn one for being built from the numbers the question prints: a handful
+// of small numbers folds into the answer in many ways that are not the method
+// (`6/3 = 2; 60 - 4 = 56; 56/2 = 28; 22 - 28 = -6` "solves" a pair of
+// equations), and nothing in a sum says which fold the student meant. No
+// general rule tells arithmetic that is the method from arithmetic that
+// happens to land, so none is applied: where a method is arithmetic (a
+// gradient from two points, a z-score), its marks need an authored plan for
+// that question (`meta.kind === 'plan'`), which says which quantities the
+// method computes.
 //
-//  1. A check of a root. The line is one of the question's own equations with
-//     numbers put in for its letters, the unknown's number being a root. It
-//     may be written out (`4(6) + 10 = -2(6) + 46`) or, when the unknown
-//     stands on both sides of the equation so that neither side's value is
-//     printed in the question, with each term of both sides worked out
-//     (`24 + 10 = -12 + 46`; not `24 + 10 = 34`, which shows one side only).
-//     When one side of the question is a bare number, only the written-out
-//     form counts: `-4 - 7 = -11` reaches a number the question shows, and so
-//     does every other sum that comes to -11.
-//
-//  2. Arithmetic on the question's own numbers that the answer is built from.
-//     This applies only when the question hands the student no equation in the
-//     unknown alone to solve — there, solving is work on the unknown. Every
-//     number the line computes with must be written in the question or be the
-//     result of an earlier such line, and the line's result must go on to be
-//     used: by a later such line, by a verified line that states the unknown,
-//     or by being the answer itself. A sum that is never used is not working.
-
-const isBareNumber = node => literalValue(node) !== null;
+// One letter-free line is working, because the question itself authors it —
+// a check of a root. The line is the question's own equation in the unknown
+// alone with a root put in for the unknown. It may be written out (`4(6) + 10 = -2(6) + 46`) or,
+// when the unknown stands on both sides of the equation so that neither
+// side's value is printed in the question, with each term of both sides
+// worked out (`24 + 10 = -12 + 46`; not `24 + 10 = 34`, which shows one side
+// only). When one side of the question is a bare number, only the written-out
+// form counts: `-4 - 7 = -11` reaches a number the question shows, and so
+// does every other sum that comes to -11.
 
 /** Is `line` the tree `given` with each letter replaced, consistently, by a number? */
 function substitutedInto(given, line, bound) {
@@ -1508,146 +1520,26 @@ function checkedRoot(claim, given, meta) {
     if (g?.kind !== 'equation') continue;
     const [gl, gr] = claimSides(g);
     const letters = variablesOf(g.ast);
-    if (!letters.has(variable) || appliesLetter(g.ast)) continue;
+    // An equation in the unknown alone. A formula in several letters
+    // (`y = 2x - 8`, find y when x = 3) is not checked this way: with only
+    // two or three numbers in the question, a page of every sum they make
+    // contains `2(3) - 8 = -2` without the student having chosen it.
+    if (letters.size !== 1 || !letters.has(variable) || appliesLetter(g.ast)) continue;
     for (const [a, b] of [[gl, gr], [gr, gl]]) {
       const bound = new Map();
-      if (substitutedInto(a, l, bound) && substitutedInto(b, r, bound) && bound.size === letters.size) {
+      if (substitutedInto(a, l, bound) && substitutedInto(b, r, bound) && bound.size === 1) {
         const root = roots.find(x => numsClose(x, bound.get(variable)));
         if (root !== undefined) return root;
       }
-      // Each term worked out: only where the unknown is the equation's one
-      // letter and stands on both sides, so neither side's value is printed.
-      if (letters.size !== 1 || !variablesOf(gl).has(variable) || !variablesOf(gr).has(variable)) continue;
+      // Each term worked out: only where the unknown stands on both sides,
+      // so neither side's value is printed.
+      if (!variablesOf(gl).has(variable) || !variablesOf(gr).has(variable)) continue;
       for (const root of roots) {
         if (evaluatedSide(a, l, variable, root) && evaluatedSide(b, r, variable, root)) return root;
       }
     }
   }
   return null;
-}
-
-/** Every number written in a tree, as magnitudes; an exponent is not an operand. */
-function operandNumbers(node, acc = []) {
-  const n = unwrapGroup(node);
-  if (!n || typeof n !== 'object') return acc;
-  if (n.t === 'num') { acc.push(Math.abs(Number(n.v))); return acc; }
-  if (n.t === 'bin' && n.op === '^' && isBareNumber(n.r)) return operandNumbers(n.l, acc);
-  for (const key of ['l', 'r', 'v', 'arg']) if (n[key] && typeof n[key] === 'object') operandNumbers(n[key], acc);
-  if (Array.isArray(n.args)) for (const a of n.args) operandNumbers(a, acc);
-  return acc;
-}
-
-/**
- * Which letter-free lines are arithmetic the answer is built from (reading 2
- * above). Returns a Map from line index to { result, answer } — `answer` when
- * the line's result is the answer itself and nothing later uses it.
- *
- * The four conditions, exactly:
- *  · it computes: `sum = number`, and the number is not one of the sum's own
- *    operands (`49 * 1 = 49` and `5 - 0 = 5` work nothing out);
- *  · every operand is a number written in the question — each written
- *    occurrence may be used once across all credited lines — or the result of
- *    an earlier credited line;
- *  · its result is used once by a later credited line or by a verified line
- *    that computes the unknown (`m = -12/4`, not the bare `m = -3`), or is the
- *    answer. Two sums that reach the same number compete for the one place
- *    that number is used;
- *  · between them, the credited sums and the lines that compute the unknown
- *    use every number written in the question. Small numbers combine into
- *    the answer in many ways that are not the method; using all of the data,
- *    each piece once, is what separates the method from a coincidence.
- */
-function questionArithmetic({ meta, given, prompt, lines }) {
-  const found = new Map();
-  if (meta?.kind !== 'equation' || !meta.variable) return found;
-  const variable = meta.variable;
-  // The question gives an equation in the unknown alone: solving it is the method.
-  const toSolve = given.some(c => {
-    if (c.kind !== 'equation') return false;
-    const names = variablesOf(c.ast);
-    return names.size === 1 && names.has(variable);
-  });
-  if (toSolve) return found;
-  // One answer to build. Where there are several, a sum that lands on one of
-  // them says nothing about how the others were found.
-  const roots = uniqueNumeric(meta.solutions);
-  if (roots.length !== 1) return found;
-  const written = (String(prompt || '').match(/\d+(?:\.\d+)?/g) || []).map(Number);
-  const take = (pool, value) => {
-    const at = pool.findIndex(x => numsClose(x, Math.abs(value)));
-    if (at < 0) return false;
-    pool.splice(at, 1);
-    return true;
-  };
-  const sums = [];          // { index, result, operands }
-  const states = [];        // verified lines that compute the unknown
-  const idle = [];          // the numbers in sums that work nothing out
-  lines.forEach((line, index) => {
-    if (line.status !== 'ok') return;
-    const claim = readClaim(line.text);
-    if (claim?.kind !== 'equation') return;
-    const [l, r] = claimSides(claim);
-    const names = variablesOf(claim.ast);
-    if (names.size) {
-      if (names.size !== 1 || !names.has(variable) || silentOnUnknown(claim, variable)) return;
-      // The bare `m = -3` computes nothing; `m = -12/4` does.
-      const numbers = [l, r].filter(side => !isBareNumber(side)).flatMap(side => operandNumbers(side));
-      if (numbers.length) states.push({ index, numbers });
-      return;
-    }
-    const worked = isBareNumber(r) && !isBareNumber(l) ? [l, r] : isBareNumber(l) && !isBareNumber(r) ? [r, l] : null;
-    if (!worked) return;
-    const result = literalValue(worked[1]);
-    const operands = operandNumbers(worked[0]);
-    if (!operands.length) return;
-    // `5 - 0 = 5` works nothing out, but it does show the 5 and the 0 in use.
-    const same = operands.findIndex(v => numsClose(v, Math.abs(result)));
-    if (same >= 0) {
-      if (operands.every((v, i) => i === same || numsClose(v, 0) || numsClose(v, 1))) idle.push(operands);
-      return;
-    }
-    sums.push({ index, result, operands });
-  });
-  const dropped = new Set();
-  for (let guard = 0; guard <= sums.length; guard++) {
-    // Back from the end: a sum is kept when a later kept line has a place for
-    // its result, or when its result is the answer.
-    const consumers = states.map(x => ({ index: x.index, slots: [...x.numbers] }));
-    const kept = [];
-    for (let k = sums.length - 1; k >= 0; k--) {
-      const sum = sums[k];
-      if (dropped.has(sum.index)) continue;
-      const feeds = consumers.some(c => c.index > sum.index && take(c.slots, sum.result));
-      const answer = !feeds && roots.some(x => numsClose(x, sum.result));
-      if (!feeds && !answer) continue;
-      kept.unshift({ ...sum, answer });
-      consumers.push({ index: sum.index, slots: [...sum.operands] });
-    }
-    // Forward: every operand is an earlier kept result or a written number not yet used.
-    const pool = [...written], results = [];
-    const failed = kept.find(sum => {
-      const p = [...pool], rs = [...results];
-      if (!sum.operands.every(v => take(rs, v) || take(p, v))) return true;
-      pool.splice(0, pool.length, ...p);
-      results.splice(0, results.length, ...rs, Math.abs(sum.result));
-      return false;
-    });
-    if (!failed) {
-      // Between them the lines must use every number the question gives. A
-      // chain that lands on the answer while leaving part of the data unused
-      // has not been built from the question.
-      for (const numbers of idle) {
-        const p = [...pool];
-        if (numbers.every(v => take(p, v))) pool.splice(0, pool.length, ...p);
-      }
-      for (const x of states) for (const v of x.numbers) take(pool, v);
-      if (pool.length) return found;
-      for (const sum of kept) found.set(sum.index, { result: sum.result, answer: sum.answer });
-      return found;
-    }
-    dropped.add(failed.index);
-  }
-  return found;
 }
 
 /** Does an equation in the unknown alone hold whatever the unknown is? */
@@ -1666,6 +1558,41 @@ function silentOnUnknown(claim, variable) {
     seen++;
   }
   return seen >= 3;
+}
+
+/**
+ * Is `claim` one of the question's own equations rearranged to make a letter
+ * its subject (`y = 10 - x` from `x + y = 10`)? Tested as functions, not at
+ * the solution alone: with the subject's expression put in for that letter,
+ * the given equation must hold whatever the other letters are.
+ */
+function subjectOfGiven(claim, given) {
+  if (claim?.kind !== 'equation') return false;
+  const [cl, cr] = claimSides(claim).map(unwrapGroup);
+  for (const [subject, expression] of [[cl, cr], [cr, cl]]) {
+    if (subject?.t !== 'var' || variablesOf(expression).has(subject.v)) continue;
+    const free = [...variablesOf(expression)];
+    if (!free.length) continue;
+    for (const g of given) {
+      if (g?.kind !== 'equation') continue;
+      const letters = variablesOf(g.ast);
+      if (!letters.has(subject.v) || ![...letters].every(name => name === subject.v || free.includes(name))) continue;
+      let seen = 0, holds = true;
+      for (let k = 0; k < UNKNOWN_PROBES.length && holds; k++) {
+        const env = {};
+        free.forEach((name, i) => { env[name] = UNKNOWN_PROBES[(k + i) % UNKNOWN_PROBES.length] + 0.173 * i; });
+        try {
+          env[subject.v] = evaluate(expression, env);
+          const L = evaluate(g.ast.l, env), R = evaluate(g.ast.r, env);
+          if (![env[subject.v], L, R].every(Number.isFinite)) continue;
+          if (!numsClose(L, R)) holds = false;
+          seen++;
+        } catch { /* a probe the expression is undefined at says nothing */ }
+      }
+      if (holds && seen >= 3) return true;
+    }
+  }
+  return false;
 }
 
 const letterFree = claim => {
@@ -1697,15 +1624,13 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
   });
   const okLines = allLines.filter(l => l.status === 'ok');
   if (!okLines.length) return null;
-  const arithmetic = questionArithmetic({ meta, given, prompt, lines: allLines });
   const counted = [];
   const creditedStages = new Set();
   const checkedRoots = [];
-  const otherStates = new Map();     // per other unknown: the linear states already credited
+  const otherFound = new Set();      // the other unknowns whose value has already earned its mark
   let restated = 0;
   let shownAuthoredEquation = false;
   let rescaled = false;
-  let answerReached = false;
   let isolatedOther = false;
   const total = Math.max(1, Number(marks) || 1);
   const cap = Math.max(0, total - 1);
@@ -1728,28 +1653,30 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
     }
     if (claim && counted.some(c => methodProgressDuplicate(claim, c))) { row.reason = 'repeat'; return row; }
     // A verified line in another unknown of the question's system. Finding the
-    // other unknown is part of solving the pair, and it is progress on the
-    // same terms as a line in the asked unknown: it must stand further on than
-    // every line in that letter already credited, and a bare value with no
-    // working before it is a statement, not a derivation. A line still in both
-    // letters has eliminated nothing; making one letter the subject (the first
-    // move of substitution) is a step, once.
+    // other unknown is part of solving the pair, and it earns at most two
+    // marks, each once:
+    //  · making one letter the subject of one of the question's own equations
+    //    (the first move of substitution). A line in both letters that is not
+    //    a rearrangement of an equation the question gives has eliminated
+    //    nothing, however true it is at the solution;
+    //  · reaching the other unknown: the first verified line in that letter
+    //    alone. Every such line says the same one thing — what that letter is
+    //    — so `6y = 12`, `3y = 6`, `y = 2` is one finding written three ways,
+    //    not three steps. A bare value with no working before it is a
+    //    statement, not a derivation.
     const foreign = claim?.kind === 'equation' ? foreignLetters(claim.ast, meta) : [];
     if (foreign.length) {
       const names = [...variablesOf(claim.ast)];
       if (names.length !== 1) {
-        const [cl, cr] = claimSides(claim).map(unwrapGroup);
-        const subject = [[cl, cr], [cr, cl]].some(([a, b]) => a?.t === 'var' && !variablesOf(b).has(a.v));
-        if (!subject || isolatedOther) { row.reason = 'other-unknown'; return row; }
+        if (isolatedOther || !subjectOfGiven(claim, given)) { row.reason = 'other-unknown'; return row; }
         isolatedOther = true;
         return credit();
       }
       const state = linearState(claim, names[0]);
       if (!state) { row.reason = 'other-unknown'; return row; }
-      const before = otherStates.get(names[0]) || [];
-      if (before.some(g => !linearStateAdvances(state, g))) { row.reason = 'repeat'; return row; }
+      if (otherFound.has(names[0])) { row.reason = 'repeat'; return row; }
       if (state.left === 0 && !counted.length) { row.reason = 'other-unknown'; return row; }
-      otherStates.set(names[0], [...before, state]);
+      otherFound.add(names[0]);
       return credit();
     }
     // A final answer in a different spelling is still the same final answer,
@@ -1765,31 +1692,19 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
         row.reason = 'final-answer'; return row;
       }
       if (counted.length >= cap) { row.reason = 'cap'; return row; }
-      if (answerReached || counted.some(c => isolatedFinalAnswer(c, meta))) { row.reason = 'repeat'; return row; }
+      if (counted.some(c => isolatedFinalAnswer(c, meta))) { row.reason = 'repeat'; return row; }
     }
     if (meta.kind === 'equation' && meta.variable && claim) {
       // Solving an equation is work on its unknown. A line that is true
       // whatever the unknown is (x + 1 = 1 + x) moves nothing on.
       if (silentOnUnknown(claim, meta.variable)) { row.reason = 'unrelated'; return row; }
-      // A line with no letter in it earns a mark only as a check of a root or
-      // as arithmetic the answer is built from — see "Working with no letter".
+      // A line with no letter in it earns a mark only as a check of a root —
+      // see "Working with no letter in it". True arithmetic is not a method.
       if (letterFree(claim)) {
         const root = checkedRoot(claim, given, meta);
-        const sum = arithmetic.get(index);
-        if (root !== null) {
-          if (checkedRoots.some(x => numsClose(x, root))) { row.reason = 'repeat'; return row; }
-          checkedRoots.push(root);
-        } else if (sum) {
-          if (sum.answer) {
-            // The answer itself, reached by arithmetic: like any isolated
-            // final value, a step only after working, and only once.
-            if (!counted.length) { row.reason = 'final-answer'; return row; }
-            if (counted.length >= cap) { row.reason = 'cap'; return row; }
-            if (answerReached || counted.some(c => isolatedFinalAnswer(c, meta))) { row.reason = 'repeat'; return row; }
-            answerReached = true;
-          }
-          return credit();
-        } else { row.reason = 'unrelated'; return row; }
+        if (root === null) { row.reason = 'unrelated'; return row; }
+        if (checkedRoots.some(x => numsClose(x, root))) { row.reason = 'repeat'; return row; }
+        checkedRoots.push(root);
       }
     }
     // An evidence plan (creditPerStage) carries one mark per verified stage:
@@ -1824,4 +1739,142 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
       ? 'No method marks: the lines that check out only restate the question. Marks come from steps that move the solution on.'
       : 'No method marks: correct working earns marks only when it moves the solution on, and this question carries a single mark for the answer.';
   return { okLines: okLines.length, progressLines: progress, restatedLines: restated, awarded, note, lines: vector, report: rep };
+}
+
+// ── What a wrong first try may be told about its working ─────────────────────
+// A question allows two tries. Between them, the report on the working must
+// not hand over the answer: a page of `t = -45` … `t = 45` under a wrong final
+// answer came back with exactly the true line marked right, and the second try
+// then earned full marks. So while a question is unresolved:
+//
+//  · a line that states a value — a letter set equal to a number, a bare
+//    number, a list of solutions — or that checks one by putting numbers into
+//    the question's equation is not judged at all. It is returned as a note,
+//    whether it is right or wrong, and earns nothing yet;
+//  · the first mistake is marked, without saying what the line should have
+//    been (the engine's own diagnosis names the answer: "put x = 2 — the
+//    answer to the original — into this line");
+//  · nothing after the first mistake is judged.
+//
+// Every other line is judged as usual, and the method marks shown are those of
+// the judged lines alone. The lines withheld are taken out BEFORE anything is
+// checked, and whether a line is withheld is decided from how it is written,
+// never from the answer — so what comes back cannot depend on whether a stated
+// value was the right one. Once the question resolves, the full report and
+// the full method marks are those of `stepCheck` and `methodMarks`.
+
+const WITHHELD = {
+  value: 'Not checked yet — a line that states or checks a value is checked once this question is finished.',
+  after: 'Not checked yet — lines after the first mistake are checked once this question is finished.',
+  broken: 'The working first goes wrong on this line. What went wrong is shown once this question is finished.'
+};
+
+/** The question's equation with numbers written in for its letters — true or not. */
+function substitutionShaped(claim, given, meta) {
+  if (claim?.kind !== 'equation' || !meta?.variable) return false;
+  const [l, r] = claimSides(claim);
+  return given.some(g => {
+    if (g?.kind !== 'equation') return false;
+    const [gl, gr] = claimSides(g);
+    const letters = variablesOf(g.ast);
+    if (!letters.has(meta.variable)) return false;
+    return [[gl, gr], [gr, gl]].some(([a, b]) => {
+      const bound = new Map();
+      return substitutedInto(a, l, bound) && substitutedInto(b, r, bound) && bound.size === letters.size;
+    });
+  });
+}
+
+/** Does this line state a value, or check one, rather than work towards it? */
+function statesOrChecksValue(text, meta, given) {
+  const src = String(text ?? '').trim()
+    .replace(/[−–—]/g, '-')
+    .replace(/^∴\s*/, '')
+    .replace(/^(so|hence|then|therefore)\s+/i, '');
+  if (!src) return false;
+  try { if (readSolutionList(src, meta)) return true; } catch { /* not a list */ }
+  let cleaned;
+  try { cleaned = normalize(src.replace(/±/g, '+')); } catch { return false; }
+  // On an equation, a line with no `=` can only be read as a value.
+  if (!cleaned.includes('=')) return meta?.kind === 'equation';
+  let ast;
+  try { ast = parse(cleaned); } catch { return false; }
+  if (ast?.t !== 'equation') return false;
+  const l = withoutNeutralArithmetic(ast.l), r = withoutNeutralArithmetic(ast.r);
+  const lone = node => unwrapGroup(node)?.t === 'var';
+  if ((lone(l) && !variablesOf(r).size) || (lone(r) && !variablesOf(l).size)) return true;
+  if (variablesOf(ast).size || meta?.kind !== 'equation') return false;
+  // No letter at all: a number set equal to a number, or a check of a root.
+  if (literalValue(unwrapGroup(l)) !== null && literalValue(unwrapGroup(r)) !== null) return true;
+  const claim = { kind: 'equation', ast };
+  try { return substitutionShaped(claim, given, meta) || checkedRoot(claim, given, meta) !== null; } catch { return true; }
+}
+
+/**
+ * The report and method marks a wrong, unresolved try may be shown.
+ * Returns { stepReport, partial }; either may be null.
+ */
+export function unresolvedWorkingView({ meta, working, marks, prompt = '', withMarks = true } = {}) {
+  if (!meta || working == null || !String(working).trim()) return { stepReport: null, partial: null };
+  const rawLines = String(working).split('\n').map(line => line.trim()).filter(Boolean);
+  let given = [];
+  try { given = questionClaims(meta, prompt); } catch { given = []; }
+  const withheld = rawLines.map(line => {
+    try { return statesOrChecksValue(line, meta, given); } catch { return true; }
+  });
+  const kept = rawLines.map((text, index) => ({ text, index })).filter(x => !withheld[x.index]);
+  const neutral = (text, note) => ({ text, status: 'note', note, withheld: true });
+  const closed = () => ({
+    stepReport: { lines: rawLines.map(text => neutral(text, WITHHELD.value)), firstBreak: -1, diagnosis: null, withheld: true },
+    partial: null
+  });
+  let judged = { lines: [], firstBreak: -1, diagnosis: null };
+  if (kept.length) {
+    try { judged = stepCheck(meta, kept.map(x => x.text).join('\n'), { prompt }); } catch { return closed(); }
+    if (!Array.isArray(judged?.lines) || judged.lines.length !== kept.length) return closed();
+  }
+  const stop = Number.isInteger(judged.firstBreak) ? judged.firstBreak : -1;
+  // The kind of mistake may be named; the line it should have been may not.
+  const safeDiagnosis = d => (d && typeof d === 'object'
+    ? { code: d.code, title: d.title, message: WITHHELD.broken, fix: d.fix, confidence: d.confidence }
+    : null);
+  const lines = rawLines.map(text => neutral(text, WITHHELD.value));
+  kept.forEach((x, j) => {
+    const line = judged.lines[j];
+    if (stop >= 0 && j > stop) { lines[x.index] = neutral(x.text, WITHHELD.after); return; }
+    const { diagnosis, ...rest } = line;
+    lines[x.index] = stop === j
+      ? { ...rest, text: x.text, status: 'break', note: WITHHELD.broken, ...(diagnosis ? { diagnosis: safeDiagnosis(diagnosis) } : {}) }
+      : { ...rest, text: x.text };
+  });
+  const { lines: _lines, firstBreak: _firstBreak, diagnosis: _diagnosis, ...summary } = judged;
+  const stepReport = {
+    ...summary, lines,
+    firstBreak: stop >= 0 ? kept[stop].index : -1,
+    diagnosis: stop >= 0 ? safeDiagnosis(judged.diagnosis || judged.lines[stop]?.diagnosis) : null,
+    withheld: true
+  };
+  if (!withMarks) return { stepReport, partial: null };
+  let partial = null;
+  const upTo = stop >= 0 ? stop + 1 : kept.length;
+  if (upTo > 0) {
+    let method = null;
+    try {
+      method = methodMarks({
+        meta, working: kept.slice(0, upTo).map(x => x.text).join('\n'), marks, prompt,
+        report: { ...judged, lines: judged.lines.slice(0, upTo) }
+      });
+    } catch { method = null; }
+    if (method) {
+      const rows = rawLines.map((text, index) => ({ index, text, status: 'note', mark: 0, reason: 'withheld' }));
+      method.lines.forEach((row, j) => { rows[kept[j].index] = { ...row, index: kept[j].index }; });
+      const held = rawLines.length - upTo;
+      partial = {
+        okLines: method.okLines, awarded: method.awarded,
+        note: held > 0 ? `${method.note} ${held === 1 ? 'One line is' : `${held} lines are`} not checked until this question is finished.` : method.note,
+        lines: rows
+      };
+    }
+  }
+  return { stepReport, partial };
 }
