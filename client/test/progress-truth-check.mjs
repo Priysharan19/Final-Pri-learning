@@ -504,14 +504,54 @@ async function run() {
   eq('syncing again publishes nothing new', practiceEvents(), S.answered);
   const afterSync = await GET('/stats');
   eq('sync does not change local progress', [afterSync.totals, afterSync.streak], [offline.totals, offline.streak]);
-  // A second device's answers arrive in every pull — the server is replaying.
+  // Another device's answers arrive in every pull — the server is replaying.
   // Two were answered today, two yesterday (the profile's own timezone).
+  //
+  // Only the canonical event the SERVER GRADER wrote in the same transaction
+  // as the mark changes progress here (kind 'graded-attempt', the reserved
+  // device identity 'server-grader', event id === payload.attemptId, entity id
+  // === payload.questionId — see cloudSyncRestore.js / syncWorker.js). What
+  // another device merely *claims* about its own answers is archival.
   const remoteAt = i => Date.now() - i * MIN - (i >= 2 ? DAY : 0);
-  remoteFeed = [0, 1, 2, 3].map(i => ({
-    id: `evt-other-${i}`, deviceId: 'device-other', deviceSeq: i + 1, serverCursor: 500 + i, kind: 'practice-progress',
+  const remotePayload = (i, extra = {}) => ({ subtopic: 'in-c8-rational-numbers', difficulty: 2, correct: i % 2 === 0, ms: 20000, hintsUsed: 0, tutorLevel: 0, support: 'independent', mode: 'practice', viaInk: false, ratingBefore: null, ratingAfter: null, createdAt: remoteAt(i), ...extra });
+  const gradedFeed = [0, 1, 2, 3].map(i => ({
+    id: `evt-other-${i}`, deviceId: 'server-grader', deviceSeq: i + 1, serverCursor: 500 + i, kind: 'graded-attempt',
     entityId: `q-other-${i}`, occurredAt: remoteAt(i),
-    payload: { subtopic: 'in-c8-rational-numbers', difficulty: 2, correct: i % 2 === 0, ms: 20000, hintsUsed: 0, tutorLevel: 0, support: 'independent', mode: 'practice', viaInk: false, ratingBefore: null, ratingAfter: null, createdAt: remoteAt(i) }
+    payload: remotePayload(i, { attemptId: `evt-other-${i}`, questionId: `q-other-${i}` })
   }));
+  // First, the negative: the same four answers as a client-authored
+  // 'practice-progress' claim from another device, every one "correct", plus
+  // two counterfeits of the canonical kind (one not from the server grader,
+  // one whose id is not the attempt it names). None of them is a mark.
+  const stats0 = await GET('/stats');
+  const rows0 = rawRows().attempts.filter(a => a.pid === sita.id).length;
+  const activity0 = JSON.stringify(rawRows().activity.filter(r => r.pid === sita.id));
+  const ratings0 = JSON.stringify(rawRows().ratings?.filter(r => r.pid === sita.id) ?? null);
+  remoteFeed = [
+    ...[0, 1, 2, 3].map(i => ({
+      id: `evt-claim-${i}`, deviceId: 'device-other', deviceSeq: i + 1, serverCursor: 400 + i, kind: 'practice-progress',
+      entityId: `q-claim-${i}`, occurredAt: remoteAt(i),
+      payload: remotePayload(i, { correct: true, marksEarned: 4, marksPossible: 4 })
+    })),
+    { id: 'evt-forged-device', deviceId: 'device-other', deviceSeq: 5, serverCursor: 404, kind: 'graded-attempt',
+      entityId: 'q-forged-device', occurredAt: remoteAt(0),
+      payload: remotePayload(0, { attemptId: 'evt-forged-device', questionId: 'q-forged-device' }) },
+    { id: 'evt-forged-id', deviceId: 'server-grader', deviceSeq: 99, serverCursor: 405, kind: 'graded-attempt',
+      entityId: 'q-forged-id', occurredAt: remoteAt(0),
+      payload: remotePayload(0, { attemptId: 'some-other-attempt', questionId: 'q-forged-id' }) }
+  ];
+  await syncNow(sita.id);
+  await syncNow(sita.id);
+  const claimed = await remoteLearningSummary(sita.id);
+  ok('the client-authored claims were received and archived', claimed.cachedEvents >= 4, show(claimed));
+  eq('a client-authored practice-progress event from another device is not counted as marks', [claimed.attempts, claimed.correct], [0, 0]);
+  const stats1 = await GET('/stats');
+  eq('…and changes no total, accuracy or streak on this device', [stats1.totals, stats1.streak], [stats0.totals, stats0.streak]);
+  eq('…and adds no attempt row', rawRows().attempts.filter(a => a.pid === sita.id).length, rows0);
+  eq('…and no activity-day count', JSON.stringify(rawRows().activity.filter(r => r.pid === sita.id)), activity0);
+  eq('…and no rating', JSON.stringify(rawRows().ratings?.filter(r => r.pid === sita.id) ?? null), ratings0);
+  // Now the canonical server-graded events for the same four answers.
+  remoteFeed = [...remoteFeed, ...gradedFeed];
   const ashaBefore = rawRows().attempts.filter(a => a.pid === asha.id).length;
   await syncNow(sita.id);
   const once = await remoteLearningSummary(sita.id);
@@ -538,7 +578,7 @@ async function run() {
   eq('pulling the same events a third time leaves the totals unchanged', (await GET('/stats')).totals, folded);
   const restoredRows = rawRows().attempts.filter(a => a.pid === sita.id && typeof a.remoteEventId === 'string');
   eq('the four restored attempt rows carry the cloud event id they came from', restoredRows.map(a => a.remoteEventId).sort(), ['evt-other-0', 'evt-other-1', 'evt-other-2', 'evt-other-3']);
-  ok('every restored row names the other device', restoredRows.every(a => a.remoteDeviceId === 'device-other'));
+  ok('every restored row names the server grader that marked it', restoredRows.every(a => a.remoteDeviceId === 'server-grader'));
   eq('no local answer was re-stamped as remote', rawRows().attempts.filter(a => a.pid === sita.id).length - restoredRows.length, S.answered);
   eq('the streak reflects the remote days in the profile\'s timezone', after2.streak, S2.streak);
   eq('…which is yesterday and today', [S2.streak, Object.keys(S2.days).length], [2, 2]);
