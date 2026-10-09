@@ -220,10 +220,14 @@ export const flow = {
     await check('the reading is set as maths, not as loose characters',
       !!asMaths && asMaths.length > 0, `reading panel renders ${JSON.stringify(asMaths)}`);
 
-    // ── 5 · the kept answer is marked by itself once it is read ─────────────
-    // The student was told it "will be read and marked when you're back
-    // online": no second tap. A doubtful reading would still ask first.
+    // ── 5 · the kept answer is read and waits; the student's Submit marks it ──
+    // The student was told it "will be read when you are back online". Nothing
+    // is sent to be marked by the reading arriving: the card shows the reading
+    // and the mark comes from a press of Submit. A doubtful reading asks first.
     const confirm = page.getByRole('button', { name: 'That’s what I wrote' });
+    await page.waitForTimeout(2500);
+    const markedByItself = await page.locator('.eval-card').count();
+    await page.getByRole('button', SUBMIT).click();
     await page.waitForSelector('.eval-card', { timeout: 20000 }).catch(async () => {
       if (await confirm.count()) {
         note('the reading was doubtful enough to ask first, so the flow confirmed it — the designed path');
@@ -231,7 +235,8 @@ export const flow = {
         await page.waitForSelector('.eval-card', { timeout: 20000 });
       }
     });
-    await check('back online, the kept handwriting is marked without another tap', await page.locator('.eval-card').count() === 1);
+    await check('back online, the kept handwriting is read and waits: nothing is marked until Submit is pressed, and then it is',
+      markedByItself === 0 && await page.locator('.eval-card').count() === 1, `${markedByItself} verdict(s) before the press`);
     await page.waitForTimeout(2500);   // anything still queued would land now
     // Exactly once, on the server and on the device: one grade, ONE attempt
     // row, and that row carries the server's attempt id.

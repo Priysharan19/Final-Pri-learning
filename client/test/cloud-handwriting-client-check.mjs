@@ -506,7 +506,7 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   const inkSrc = readFileSync(new URL('../src/ink/InkAnswer.jsx', import.meta.url), 'utf8');
   ok(/segmentInkLines\(strokes\)/.test(inkSrc) && /ink-linebox/.test(inkSrc) && /ink\.mistakeHere/.test(inkSrc), 'the ink surface draws line boxes and the mistake note again');
   const qc = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
-  ok(/inkResult\?\.afterWait/.test(qc) && /autoMarkedRef\.current === inkResult\.readKey/.test(qc), 'ink read after waiting is marked once, by its reading key');
+  ok(!/inkResult\?\.afterWait/.test(qc) && !/autoMarkedRef/.test(qc), 'ink read after waiting is shown, never sent to be marked without the student\'s Submit');
   ok(/onReaderState=\{setInkReaderState\}/.test(qc) && /inkReaderState\?\.kind === INK_READER_STATE\.READ_FAILED/.test(qc),
     'the question-level “could not read” copy is driven by a genuine reader failure, never strokes-without-text alone');
   ok(/setStatus\(prev => prev\?\.kind === 'empty' \? null : prev\)/.test(inkSrc),
@@ -529,8 +529,8 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   ok(/'visibilitychange'/.test(ink) && /'focus'/.test(ink), 'and retries on focus and on a return to the tab');
   ok(/plausibleLineMatch\(/.test(ink), 'and only places a reading on the ink when it plausibly matches');
   const qc = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
-  ok(/if \(busy \|\| inFlightRef\.current\) return;\s*autoMarkedRef\.current = inkResult\.readKey;/.test(qc) && /\}, \[inkResult, busy\]\)/.test(qc),
-    'a waited-for reading that lands while the card is busy is marked when it is idle, not dropped');
+  ok(/const onInkRecognized = useCallback\(\(r\) => \{\s*if \(inkFrozenRef\.current\) return;\s*setInkResult\(r\);/.test(qc),
+    'a waited-for reading that lands while the card is busy is still shown, not dropped');
 }
 
 // ── Doubtful lines, one-tap correction, and no second provider call (4.4) ───
@@ -600,7 +600,7 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   ok(/\['inkDrafts', 'pid'\]/.test(idb), 'and is erased with its profile');
   const card = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
   ok(/InkAnswer && restoredInk !== undefined && \(/.test(card), 'the ink surface mounts only once the kept page has been looked for');
-  ok(/autoMarkedRef\.current === inkResult\.readKey/.test(card), 'a page read after waiting is marked once per reading (idempotent on the read key)');
+  ok(!/autoMarkedRef/.test(card), 'a page read after waiting is not marked by the card on its own');
 }
 
 console.log(failures.length

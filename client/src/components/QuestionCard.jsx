@@ -1114,21 +1114,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (inFlightRef.current || attemptRef.current) inkFrozenRef.current = true;
   }, []);
 
-  // Ink that waited for the reader (offline, signed out, reader down) is
-  // marked as soon as it is read: the student already wrote their answer and
-  // was told it would be. Once per reading; the deterministic engine decides
-  // the mark exactly as for a tap on Submit, and a doubtful reading still turns
-  // into the confirmation question instead of a mark.
-  const autoMarkedRef = useRef(null);
-  useEffect(() => {
-    if (!writeMode || !inkResult?.afterWait || !inkResult.readKey) return;
-    if (autoMarkedRef.current === inkResult.readKey || resolved) return;
-    // Busy (a submit or a hint in flight): wait — the effect runs again when
-    // the card is idle, and the reading is marked then, not dropped.
-    if (busy || inFlightRef.current) return;
-    autoMarkedRef.current = inkResult.readKey;
-    submit();
-  }, [inkResult, busy]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Ink that waited for the reader (offline, signed out, reader down) is READ
+  // as soon as the reader is there, and shown. It is not sent to be marked:
+  // the student was told it would be read, checks the reading, and presses
+  // Submit. Nothing spends a try without that press.
 
   async function getHint() {
     if (hintsLeft <= 0 || resolved) return;
