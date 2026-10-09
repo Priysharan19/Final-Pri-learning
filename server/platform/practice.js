@@ -27,6 +27,10 @@ const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
 const ID = /^[a-zA-Z0-9_-]{8,100}$/;
 const UUID = /^[0-9a-f-]{36}$/i;
 const INDIA_BANK = /^c(?:[7-9]|1[0-2])-[a-z0-9][a-z0-9-]{2,95}$/;
+// Every authored generator the client can serve is issuable: with online-only
+// grading a question the server refuses to issue could never be checked. The
+// name is only a lookup key; an unknown one fails generation with 422.
+const AUTHORED_BANK = /^[a-z][a-z0-9]{0,11}-[a-z0-9][a-z0-9-]{1,95}$/;
 const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum', 'mode']);
 const GRADE_FIELDS = new Set(['submissionId', 'answer', 'mode', 'steps', 'transcriptionReceipt', 'ms']);
 const RECOGNITION_FIELDS = new Set(['image', 'mode']);
@@ -206,7 +210,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     }
     const generator = typeof body.generator === 'string' ? body.generator : '';
     const difficulty = typeof body.difficulty === 'number' || typeof body.difficulty === 'string' ? Number(body.difficulty) : NaN;
-    if (body.curriculum !== 'in' || !INDIA_BANK.test(generator) || !Number.isInteger(difficulty) || difficulty < 1 || difficulty > 4) {
+    if (body.curriculum !== 'in' || !AUTHORED_BANK.test(generator) || !Number.isInteger(difficulty) || difficulty < 1 || difficulty > 4) {
       return reject(res, 400, 'PRACTICE_GENERATOR_INVALID', 'Choose an authored India curriculum question and difficulty 1–4.');
     }
     const seed = body.seed === undefined ? randomInt(0x80000000) :
