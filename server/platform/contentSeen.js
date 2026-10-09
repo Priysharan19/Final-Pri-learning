@@ -16,7 +16,10 @@
 //
 //   · `seen-c<…>` — the content identity (`contentIdentityOf`): the prompt, the
 //     option texts as a SET, the TEXT of the keyed option (or the keyed value of
-//     a written answer), the figure and the parts. It does not depend on the
+//     a written answer), the figure, the parts and — for a matching-list item —
+//     its two lists. The figure is left out for a question its generator
+//     marks `identityIgnoresFigure` (the prompt alone fixes the answer and the
+//     figure only illustrates it). It does not depend on the
 //     order the options were dealt in, so the same question with its options
 //     shuffled is the same content. Every new record carries it.
 //   · `seen-<…>` of the engine hash the item was stamped with, and
@@ -31,7 +34,7 @@
 // a device cannot compute one.
 import { createHash, createHmac } from 'node:crypto';
 import { practiceContentKey } from './deliveryCrypto.js';
-import { contentHashOf } from '../../client/src/engine/contentIdentity.js';
+import { contentHashOf, matchListOf } from '../../client/src/engine/contentIdentity.js';
 
 const SEEN_AGE = 5 * 365 * 24 * 60 * 60 * 1000;
 // A spent try lives as long as the question it was spent on (practice.js
@@ -70,7 +73,15 @@ function identitySubstance(item) {
     : null;
   return JSON.stringify([
     norm(item.stem), norm(item.prompt), item.answerType || null,
-    optionsOf(item).sort(), keyedAnswerOf(item), norm(item.figure), parts
+    optionsOf(item).sort(), keyedAnswerOf(item),
+    // A generator marks a question whose figure does not bear on its answer
+    // (`identityIgnoresFigure`, a private field no student is sent): every
+    // drawing of it is then one question, so a new picture is not new content.
+    item.identityIgnoresFigure === true ? '' : norm(item.figure), parts,
+    // A matching-list item is its two lists (its prompt and option codes are
+    // shared by every such item). Present only on those items, so every other
+    // identity is what it was.
+    ...(matchListOf(item) ? [matchListOf(item)] : [])
   ]);
 }
 

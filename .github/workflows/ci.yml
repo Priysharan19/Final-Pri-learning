@@ -151,6 +151,7 @@ jobs:
           node client/test/cloud-session-refresh-check.mjs
           node client/test/account-action-boundary-check.mjs
           node client/test/india-exam-blueprint-check.mjs
+          node client/test/india-exam-duplicate-check.mjs
           node client/test/india-progress-product-check.mjs
           node tools/india-production-census.mjs
       - name: Real ink diagnostic (advisory in PR CI)
@@ -270,7 +271,7 @@ jobs:
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1143/1143 checks' practice-http.log
           grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
           grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 34/34 checks' practice-http.log
-          grep -Fq 'REPEAT CREDIT: PASS — 109/109 checks' practice-http.log
+          grep -Fq 'REPEAT CREDIT: PASS — 141/141 checks' practice-http.log
       - name: Account, origin, CMS and classroom contracts
         run: |
           node server/test/account-deletion-reauth-check.mjs
@@ -313,7 +314,7 @@ jobs:
         run: |
           set -o pipefail
           node server/test/exam-authority-check.mjs 2>&1 | tee exam-authority.log
-          grep -Fq 'EXAM AUTHORITY: PASS — 314/314 checks' exam-authority.log
+          grep -Fq 'EXAM AUTHORITY: PASS — 359/359 checks' exam-authority.log
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
       - name: Supabase migrations are self-contained transactions (supabase db push)
