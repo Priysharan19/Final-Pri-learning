@@ -36,8 +36,11 @@ globalThis.fetch = async (url, options = {}) => {
   if (path.startsWith('/v1/sync/pull/')) {
     const from = replayAllOnce ? 0 : (Number(path.split('/').pop()) || 0);
     replayAllOnce = false;
-    const events = serverEvents.filter(row => row.serverCursor > from);
-    return json({ schemaVersion: 1, cursor: Math.max(Number(path.split('/').pop()) || 0, serverCursor), hasMore: false, events, entities: [] });
+    // Paged as the real server pages: at most 400 events a response.
+    const waiting = serverEvents.filter(row => row.serverCursor > from).sort((x, y) => x.serverCursor - y.serverCursor);
+    const events = waiting.slice(0, 400);
+    const hasMore = waiting.length > events.length;
+    return json({ schemaVersion: 1, cursor: hasMore ? events[events.length - 1].serverCursor : Math.max(Number(path.split('/').pop()) || 0, serverCursor), hasMore, events, entities: [] });
   }
   if (path === '/v1/sync/push') {
     const body = JSON.parse(options.body || '{}');
@@ -328,6 +331,101 @@ ok('the local answer keeps its own id', !!(await get('attempts', localAttemptId)
   ], [0, 2, before.xp]);
   replayAllOnce = true;
   eq('a replayed pull restores none of them twice', (await syncNow('p1')).restoredEvents, 0);
+}
+
+// ── Poison: no event may stop the pull (review 5, R1) ───────────────────────
+// A device of the same account can publish any JSON as its own history. Values
+// whose coercion throws ({ toString: 1 }), arrays, huge strings and non-finite
+// numbers go into every numeric, label and time field of every restorable
+// kind, and into the event's own clock. The pull must complete, the cursor
+// must move past all of it, the genuine server mark that comes AFTER it must
+// be restored, and nothing absurd may be on disk.
+{
+  const { applyRemoteLearningEvents } = await import('../src/platform/cloudSyncRestore.js');
+  const POISON = [
+    { toString: 1 }, { valueOf: 1, toString: 1 }, { valueOf: 1 }, {}, [], [1, 2], [[{}]], 'x'.repeat(5000), '9'.repeat(400),
+    1e308, -1e308, 9e15, -1, 0.5, '', ' ', 'NaN', 'Infinity', true, false, null, { a: { b: { c: 1 } } }, '<img src=x onerror=1>'
+  ];
+  const FIELDS = {
+    'rush-history': ['score', 'correct', 'total', 'bestCombo', 'createdAt'],
+    'match-history': ['won', 'playerScore', 'rivalScore', 'rival', 'ms', 'createdAt'],
+    'exam-attempt': ['title', 'year', 'score', 'total', 'durationMin', 'createdAt', 'finishedAt', 'indiaExam', 'serverExamId'],
+    'task-completion': ['createdAt', 'taskId', 'done'],
+    'practice-progress': ['subtopic', 'difficulty', 'correct', 'ms', 'hintsUsed', 'mode', 'createdAt'],
+    'graded-attempt': ['subtopic', 'difficulty', 'correct', 'ms', 'hintsUsed', 'tutorLevel', 'mode', 'createdAt', 'contentId', 'contentVersion', 'ratingBefore', 'marksEarned', 'repeat']
+  };
+  const BASE = {
+    'rush-history': { score: 5, correct: 5, total: 6, bestCombo: 2 },
+    'match-history': { won: false, playerScore: 3, rivalScore: 4, rival: 'Robo', ms: 1000 },
+    'exam-attempt': { state: 'finished', title: 'Mock', year: 10, score: 3, total: 5 },
+    'task-completion': {}, 'practice-progress': { subtopic: 'linear', correct: true },
+    'graded-attempt': { subtopic: 'linear', difficulty: 2, correct: true, mode: 'practice' }
+  };
+  const EVIL = 'device-poison-ipad';
+  const before = {
+    attempts: (await byIndex('attempts', 'pid', 'p1')).length, xp: (await get('profiles', 'p1'))?.xp,
+    ratings: JSON.stringify(await byIndex('ratings', 'pid', 'p1'))
+  };
+  let n = 0;
+  const poisonAt = now + 5000;
+  for (const [kind, fields] of Object.entries(FIELDS)) {
+    for (const field of fields) for (const bad of POISON) {
+      n += 1; serverCursor += 1;
+      const id = `poison-${n}`;
+      // A forged graded-attempt names itself as the grader's in the payload; it is still a device's.
+      const payload = { ...BASE[kind], ...(kind === 'graded-attempt' ? { attemptId: id, questionId: id } : {}), [field]: bad };
+      serverEvents.push({ serverCursor, id, deviceId: EVIL, deviceSeq: n, kind, entityId: n % 2 ? id : null, occurredAt: poisonAt, payload });
+    }
+  }
+  // The four events the reviewer's probe pushed through the real server, verbatim.
+  for (const [id, kind, payload] of [
+    ['evt-poison-m', 'match-history', { won: true, playerScore: 10, rival: { toString: 1 } }],
+    ['evt-poison-r', 'rush-history', { score: { valueOf: 1, toString: 1 } }],
+    ['evt-poison-x', 'exam-attempt', { state: 'finished', title: { toString: 1 }, score: 1, total: 1 }],
+    ['evt-poison-t', 'task-completion', { createdAt: { toString: 1 } }]
+  ]) { n += 1; serverCursor += 1; serverEvents.push({ serverCursor, id, deviceId: EVIL, deviceSeq: n, kind, entityId: null, occurredAt: poisonAt, payload }); }
+  // …and a real mark the server wrote after all of it.
+  practice('q-after-poison', 'quadratic', true, poisonAt + 1000);
+  const cursorBefore = serverCursor;
+  const pulled = await syncNow('p1').then(r => r, e => ({ threw: `${e?.constructor?.name}: ${e?.message}` }));
+  ok(`R1: a pull of ${n} poisoned device events completes`, !pulled.threw, JSON.stringify(pulled).slice(0, 300));
+  const after = await byIndex('attempts', 'pid', 'p1');
+  ok('R1: the genuine server mark that came after the poison IS restored', after.some(a => a.remoteEventId === 'attempt-q-after-poison' && a.correct === 1 && a.subtopic === 'quadratic'));
+  eq('R1: …and it is the only attempt the pull added: no device event became a mark', [after.length - before.attempts, after.filter(a => a.remoteDeviceId === EVIL).length], [1, 0]);
+  const again2 = await syncNow('p1').then(r => r, e => ({ threw: String(e?.message) }));
+  eq('R1: the cursor moved past the poison: the next pull restores nothing and throws nothing', [again2.threw, again2.restoredEvents], [undefined, 0]);
+  ok('R1: the server was asked for nothing older than the poison again', serverCursor === cursorBefore);
+  const finiteInt = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
+  const rushBad = (await byIndex('rushRuns', 'pid', 'p1')).filter(r => r.remoteDeviceId === EVIL)
+    .filter(r => !['score', 'correct', 'total', 'bestCombo'].every(f => r[f] === undefined || finiteInt(r[f], 0, 100)) || (r.score ?? 0) > 20 || !finiteInt(r.createdAt, 1, 4102444800000));
+  eq('R1: every restored Rush run is typed and in range', rushBad.slice(0, 2), []);
+  const matchBad = (await byIndex('matchRuns', 'pid', 'p1')).filter(r => r.remoteDeviceId === EVIL)
+    .filter(r => (r.won !== undefined && typeof r.won !== 'boolean') || !['playerScore', 'rivalScore'].every(f => r[f] === undefined || finiteInt(r[f], 0, 10)) ||
+      (r.rival !== undefined && (typeof r.rival !== 'string' || r.rival.length > 40 || /[<>]/.test(r.rival))) || (r.ms !== undefined && !finiteInt(r.ms, 0, 1e9)) || !finiteInt(r.createdAt, 1, 4102444800000));
+  eq('R1: every restored Match run is typed and in range', matchBad.slice(0, 2), []);
+  const examBad = (await byIndex('exams', 'pid', 'p1')).filter(e => e.remoteDeviceId === EVIL)
+    .filter(e => typeof e.title !== 'string' || e.title.length > 80 || /[<>]/.test(e.title) || !(e.year === null || finiteInt(e.year, 7, 12)) ||
+      !(e.score === null || finiteInt(e.score, -999, 999)) || !(e.total === null || finiteInt(e.total, 0, 999)) || (e.score !== null && e.total !== null && e.score > e.total) ||
+      !finiteInt(e.createdAt, 1, 4102444800000) || !finiteInt(e.finishedAt, 1, 4102444800000) || 'server' in e || (e.durationMin !== undefined && !finiteInt(e.durationMin, 1, 600)) ||
+      JSON.stringify(e).length > 4000);
+  eq('R1: every restored legacy exam is typed, in range and small', examBad.slice(0, 2), []);
+  ok('R1: the poisoned history was restored as history, not dropped wholesale', (await byIndex('rushRuns', 'pid', 'p1')).filter(r => r.remoteDeviceId === EVIL).length >= 50);
+  eq('R1: none of it earned XP beyond the genuine mark, or touched another chapter\'s rating', [(await get('profiles', 'p1'))?.xp - before.xp, (await get('ratings', 'p1:linear')) && JSON.stringify(await get('ratings', 'p1:linear')) === JSON.stringify(JSON.parse(before.ratings).find(r => r.subtopic === 'linear'))], [xpFor(2, true, 0, 0), true]);
+
+  // An event that throws while being read (a getter), direct to the restore.
+  const thrower = (id, deviceId, kind, extra = {}) => ({
+    id, deviceId, deviceSeq: 1, serverCursor: 1, kind, entityId: id, occurredAt: poisonAt + 2000,
+    payload: Object.defineProperty({ attemptId: id, questionId: id, subtopic: 'linear', difficulty: 2, correct: true, mode: 'practice', score: 1, ...extra }, 'ms', { enumerable: true, get() { throw new RangeError('poisoned read'); } })
+  });
+  const good = (id, at) => ({ id, deviceId: 'server-grader', deviceSeq: 2, serverCursor: 2, kind: 'graded-attempt', entityId: `q-${id}`, occurredAt: at,
+    payload: { attemptId: id, questionId: `q-${id}`, subtopic: 'quadratic', difficulty: 2, correct: false, mode: 'practice', ms: 10, createdAt: at } });
+  const s1 = await applyRemoteLearningEvents('p1', [thrower('throw-device-run', EVIL, 'match-history'), good('attempt-after-device-throw', poisonAt + 3000)]).then(r => r, e => ({ threw: e?.code || String(e) }));
+  eq('R1: a device event that throws is rejected, counted, and the mark after it is applied', [s1.threw, s1.rejected, s1.unsupported, s1.applied], [undefined, 1, 1, 1]);
+  // A genuine server mark that cannot be recorded is NOT passed over.
+  const s2 = await applyRemoteLearningEvents('p1', [thrower('throw-server-mark', 'server-grader', 'graded-attempt'), good('attempt-after-server-throw', poisonAt + 4000)]).then(r => r, e => ({ threw: e?.code, ids: e?.eventIds, summary: e?.summary }));
+  eq('R1: a server mark that cannot be recorded is surfaced, not skipped — after everything else was applied', [s2.threw, s2.ids, s2.summary?.applied, s2.summary?.rejected], ['RESTORE_SERVER_EVENT_FAILED', ['throw-server-mark'], 1, 0]);
+  ok('R1: …so the mark that followed it is on disk, and a retry applies nothing twice', (await byIndex('attempts', 'pid', 'p1')).some(a => a.remoteEventId === 'attempt-after-server-throw') &&
+    (await applyRemoteLearningEvents('p1', [good('attempt-after-server-throw', poisonAt + 4000)])).duplicates === 1);
 }
 
 console.log(`\nCloud restore fidelity — ${pass}/${pass + fail} checks`);

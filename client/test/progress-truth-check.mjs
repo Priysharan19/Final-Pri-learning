@@ -319,7 +319,11 @@ async function run() {
     const evCorrect = ev.filter(a => a.correct).length;
     return {
       atts, ev, byCh, days, streak,
-      answered: atts.length, correct: atts.filter(a => a.correct).length,
+      // A repeat is a question answered and never a correct one: every quoted
+      // "correct" excludes it, and a plain accuracy is taken over `scored`.
+      answered: atts.length, correct: atts.filter(a => a.correct && a.repeat !== true).length,
+      repeats: atts.filter(a => a.repeat === true).length, scored: atts.filter(a => a.repeat !== true).length,
+      byDiff: [1, 2, 3, 4].map(d => ({ difficulty: d, n: atts.filter(a => a.difficulty === d && a.repeat !== true).length, c: atts.filter(a => a.difficulty === d && a.correct && a.repeat !== true).length })).filter(r => r.n),
       evidence: { attempts: ev.length, correct: evCorrect, independentCorrect: ev.filter(a => a.correct && a.support !== 'supported').length, supportedCorrect: ev.filter(a => a.correct && a.support === 'supported').length },
       accuracy: ev.length >= PROGRESS_THRESHOLDS.overallAccuracy ? Math.round(1000 * evCorrect / ev.length) / 10 : null,
       today: days[dateOf(NOW)] || 0
@@ -407,7 +411,12 @@ async function run() {
   section('GET /stats');
   const stats = await GET('/stats');
   eq('questions answered = every attempt row', stats.totals.attempts, X.answered);
-  eq('correct = every correct attempt row', stats.totals.correct, X.correct);
+  eq('correct = every correct attempt row that is not a repeat', stats.totals.correct, X.correct);
+  ok('the history holds correct repeats, so that rule is exercised', X.atts.some(a => a.repeat === true && a.correct) && X.correct < X.atts.filter(a => a.correct).length);
+  eq('repeats and first sittings are counted apart, and add up to the answers', [stats.totals.repeats, stats.totals.scored, stats.totals.repeats + stats.totals.scored], [X.repeats, X.scored, X.answered]);
+  eq('accuracy by difficulty leaves repeats out of both sides', stats.byDiff, X.byDiff);
+  const file = await GET('/data/progress-file');
+  eq('the progress file a teacher imports quotes the same totals', file.totals, { attempts: X.answered, correct: X.correct, repeats: X.repeats, scored: X.scored });
   eq('learning evidence (games excluded) matches', stats.totals.evidence, X.evidence);
   eq('accuracy is the evidence ratio', stats.totals.accuracy.value, X.accuracy);
   eq('the accuracy claim is marked as enough evidence', stats.totals.accuracy.enough, true);
@@ -466,7 +475,7 @@ async function run() {
   // ── /report ────────────────────────────────────────────────────────────────
   section('GET /report');
   const report = await GET('/report');
-  eq('report totals = ledger', report.totals, { attempts: X.answered, correct: X.correct });
+  eq('report totals = ledger', report.totals, { attempts: X.answered, correct: X.correct, repeats: X.repeats, scored: X.scored });
   eq('report streak = ledger', report.streak, X.streak);
   eq('report active days (28) = distinct IST days with an answer', report.activeDays, Object.keys(X.days).length);
   const repDrift = report.chapters.filter(c => (X.byCh[c.id]?.attempts || 0) !== c.attempts).map(c => c.id);
@@ -658,7 +667,7 @@ async function run() {
     independentCorrect: offline.totals.evidence.independentCorrect + 2, supportedCorrect: offline.totals.evidence.supportedCorrect
   };
   const folded = {
-    attempts: offline.totals.attempts + 4, correct: offline.totals.correct + 2, ms: offline.totals.ms + 4 * 20000,
+    attempts: offline.totals.attempts + 4, correct: offline.totals.correct + 2, repeats: offline.totals.repeats, scored: offline.totals.scored + 4, ms: offline.totals.ms + 4 * 20000,
     evidence: foldedEvidence, accuracy: accuracyClaim(foldedEvidence.correct, foldedEvidence.attempts, PROGRESS_THRESHOLDS.overallAccuracy)
   };
   const after2 = await GET('/stats');
@@ -726,7 +735,11 @@ async function run() {
     const before = {
       day: rawRows().activity.find(r => r.pid === asha.id && r.date === tz10) || { questions: 0, correct: 0, xp: 0 },
       xp: (await idb.get('profiles', asha.id)).xp, badges: rawRows().badges.filter(b => b.pid === asha.id).length,
-      rating: JSON.stringify(rawRows().ratings.filter(r => r.pid === asha.id)), evidence: (await GET('/stats')).totals.evidence
+      rating: JSON.stringify(rawRows().ratings.filter(r => r.pid === asha.id)), evidence: (await GET('/stats')).totals.evidence,
+      quoted: await (async () => {
+        const st = await GET('/stats'); const rep = await GET('/report'); const pf = await GET('/data/progress-file');
+        return { stats: [st.totals.attempts, st.totals.correct, st.totals.repeats], byDiff: st.byDiff, accuracy: st.totals.accuracy.value, report: rep.totals, file: pf.totals };
+      })()
     };
     tick(30000);
     const res = await POST(`/practice/${retried.id}/submit`, { answer: key, ms: 20000, submissionId: nextSubmissionId('sub_progress_m3') });
@@ -738,6 +751,16 @@ async function run() {
     eq('on a teacher\'s task a repeat is done, not correct, and recorded as a repeat', tp && [tp.done, tp.correct, tp.repeats], [1, 0, 1]);
     eq('a repeat earns no XP and no badge', [(await idb.get('profiles', asha.id)).xp, res.xp, res.newBadges, rawRows().badges.filter(b => b.pid === asha.id).length], [before.xp, 0, [], before.badges]);
     eq('a repeat moves no rating and no learning evidence', [JSON.stringify(rawRows().ratings.filter(r => r.pid === asha.id)), (await GET('/stats')).totals.evidence], [before.rating, before.evidence]);
+    // Every surface that quotes a number of correct answers, with the repeat present.
+    const quoted = async () => {
+      const st = await GET('/stats'); const rep = await GET('/report'); const pf = await GET('/data/progress-file');
+      return { stats: [st.totals.attempts, st.totals.correct, st.totals.repeats], byDiff: st.byDiff, accuracy: st.totals.accuracy.value, report: rep.totals, file: pf.totals };
+    };
+    const after = await quoted();
+    eq('/stats: one more answer, one more repeat, not one more correct', [after.stats[0] - before.quoted.stats[0], after.stats[1] - before.quoted.stats[1], after.stats[2] - before.quoted.stats[2]], [1, 0, 1]);
+    eq('/stats accuracy and accuracy by difficulty do not move', [after.accuracy, after.byDiff], [before.quoted.accuracy, before.quoted.byDiff]);
+    eq('/report and the progress file: attempts +1, repeats +1, correct and scored unchanged',
+      [after.report, after.file], [before.quoted.report, before.quoted.file].map(q => ({ attempts: q.attempts + 1, correct: q.correct, repeats: q.repeats + 1, scored: q.scored })));
     // The whole ledger: each day's correct count is its correct answers minus its correct repeats.
     const mine = rawRows().attempts.filter(a => a.pid === asha.id);
     const dayDrift = rawRows().activity.filter(r => r.pid === asha.id).filter(r => {

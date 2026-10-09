@@ -67,7 +67,10 @@ function Overview({ stats, curriculum, section, sections, sectionKey, setSection
   const t = useT();
   const tx = useTx();
   if (!stats) return <div className="skeleton" style={{ height: 400 }} />;
-  const acc = stats.totals.attempts ? Math.round(100 * stats.totals.correct / stats.totals.attempts) : 0;
+  // Accuracy over first sittings: a repeat (content whose solution was already
+  // seen) is a question answered, never a correct one, and is in neither side.
+  const scored = stats.totals.scored ?? stats.totals.attempts;
+  const acc = scored ? Math.round(100 * stats.totals.correct / scored) : 0;
   const scopeSubs = section?.subtopics || [];
   const attempted = scopeSubs.filter(s => s.attempts > 0);
   const outcomes = scopeSubs.reduce((n, s) => n + (s.dotpoints?.length || 0), 0);
@@ -91,7 +94,7 @@ function Overview({ stats, curriculum, section, sections, sectionKey, setSection
           {band && <div className="muted">{band.desc || ''}</div>}
 
           <div className="stat-line">
-            <span>{t('progressAu.correctOf', { correct: stats.totals.correct, total: stats.totals.attempts })}</span>
+            <span>{t('progressAu.correctOf', { correct: stats.totals.correct, total: scored })}</span>
             <span className="sc-label">{tx('progressAu.accuracyLabel', { pct: <span className="big" style={{ color: 'var(--ink)' }}>{acc}%</span> })}</span>
           </div>
           <div className="meter"><i style={{ width: `${acc}%` }} /></div>

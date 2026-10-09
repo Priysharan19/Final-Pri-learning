@@ -52,6 +52,31 @@ export function isLearningEvidence(a) {
 }
 
 /**
+ * A repeat: an answer to content whose solution the account had already been
+ * shown (the server's finding, kept on the attempt row).
+ */
+export const isRepeat = a => a?.repeat === true;
+
+/**
+ * A correct answer that may be QUOTED as correct. One rule, everywhere a
+ * number of correct answers or an accuracy is shown: a repeat is a question
+ * the student sat — it counts as answered — and is never a correct one.
+ */
+export const isCreditedCorrect = a => !!a?.correct && !isRepeat(a);
+
+/**
+ * `{ attempts, correct, repeats, scored }` for any list of attempt rows:
+ * every sitting, the correct ones that count, the repeats among the sittings,
+ * and the sittings an accuracy may be taken over (`scored` = not repeats). An
+ * accuracy is `correct / scored` — a repeat neither raises nor lowers it.
+ */
+export function quotedTotals(attempts = []) {
+  const rows = (attempts || []).filter(Boolean);
+  const repeats = rows.filter(isRepeat).length;
+  return { attempts: rows.length, correct: rows.filter(isCreditedCorrect).length, repeats, scored: rows.length - repeats };
+}
+
+/**
  * An answer that needed help — a hint, tutor help or a second try. Attempts
  * written before `support` existed are read from the help they recorded.
  */
@@ -94,7 +119,9 @@ export function accuracyClaim(correct, attempts, minimum) {
  * The headline totals for one profile's attempts.
  *
  *   answered  every marked answer in every mode, games included
- *   correct   correct answers among them
+ *   correct   correct answers among them, repeats excluded (isCreditedCorrect)
+ *   repeats   how many of the answers were repeats
+ *   scored    answered − repeats: what a plain accuracy may be taken over
  *   ms        time spent answering, as the answer rows recorded it
  *   evidence  the learning-evidence subset: attempts, correct, and correct
  *             split into independent (no help) and supported (help used)
@@ -104,15 +131,19 @@ export function attemptTotals(attempts = [], thresholds = PROGRESS_THRESHOLDS) {
   const rows = (attempts || []).filter(Boolean);
   const evidence = bucket();
   let correct = 0;
+  let repeats = 0;
   let ms = 0;
   for (const a of rows) {
-    if (a.correct) correct++;
+    if (isCreditedCorrect(a)) correct++;
+    if (isRepeat(a)) repeats++;
     ms += Math.max(0, Number(a.ms) || 0);
     if (isLearningEvidence(a)) count(evidence, a);
   }
   return {
     answered: rows.length,
     correct,
+    repeats,
+    scored: rows.length - repeats,
     ms,
     evidence,
     accuracy: accuracyClaim(evidence.correct, evidence.attempts, thresholds.overallAccuracy)
@@ -148,7 +179,7 @@ export function answersByDay(attempts = [], dayKeyOf) {
     const date = dayKeyOf(at);
     const d = out[date] || (out[date] = { questions: 0, correct: 0 });
     d.questions++;
-    if (a.correct) d.correct++;
+    if (isCreditedCorrect(a)) d.correct++;
   }
   return out;
 }

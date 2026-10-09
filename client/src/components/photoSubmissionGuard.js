@@ -33,6 +33,20 @@ export function pdfReceiptWarning(language, pages) {
     : `This PDF has ${pages} pages. You can review the transcription, but online Photo grading currently verifies only one image. Attach a single-page photo or switch to Type after checking your answer.`;
 }
 
+// Shown with a result that belongs to an EARLIER press of Submit whose reply
+// was lost: the student has changed the answer since, and must not take this
+// verdict for the answer now on screen. `answer` is quoted only when it is
+// short typed text (never an option index or a page of working).
+export function earlierSubmissionNotice(language, answer, resolved) {
+  const shown = typeof answer === 'string' && answer.trim() && answer.length <= 60 && !answer.includes('\n') ? answer.trim() : '';
+  if (hindi(language)) {
+    return `यह परिणाम आपके पहले जमा किए गए उत्तर${shown ? ` (“${shown}”)` : ''} का है — उसका जवाब पहले नहीं पहुँच पाया था। ` +
+      (resolved ? 'आपका बदला हुआ उत्तर नहीं भेजा गया।' : 'आपका बदला हुआ उत्तर अभी नहीं भेजा गया है: उसे जाँचकर फिर से जमा करें।');
+  }
+  return `This is the result for the answer you submitted earlier${shown ? ` (“${shown}”)` : ''} — its reply did not reach this device at the time. ` +
+    (resolved ? 'Your changed answer was not sent.' : 'Your changed answer has not been sent yet: check it and press Submit to send it.');
+}
+
 export function draftPersistenceWarning(language) {
   return hindi(language)
     ? 'यह डिवाइस आपके उत्तर और जमा करने की पहचान को सुरक्षित नहीं रख पाया। जगह खाली करें या साइट डेटा चालू करें, फिर कोशिश करें। उत्तर अभी जमा नहीं हुआ है।'

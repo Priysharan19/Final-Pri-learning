@@ -107,7 +107,34 @@ export function holdPendingSubmission(questionId, meta = {}) {
  * may have been marked, so that submission stays in flight.
  */
 export function refusedBeforeMarking(error) {
-  return error?.beforeMarking === true || error?.code === 'SIGN_IN_TO_CHECK' || Number(error?.status) === 401;
+  // The stamp and nothing else. A bare 401 or SIGN_IN_TO_CHECK is not proof:
+  // the backend leaves it unstamped when an earlier send of the same key may
+  // already have been marked (its reply was lost), and that submission must
+  // stay in flight so the same key is replayed and its result is shown.
+  return error?.beforeMarking === true;
+}
+
+/**
+ * The submission that has to be settled before a DIFFERENT answer may be sent.
+ *
+ * A record in flight (sent, outcome unknown) may already have been marked: it
+ * may have spent the first try. If the student has since changed the answer,
+ * sending the new one under a new key would be marked as the next try, and the
+ * student would never have seen the result of the first. So the original is
+ * replayed first, under its own key — the server returns what it stored, or
+ * marks it now as the first try it always was; nothing new can be spent — its
+ * result is shown, and the changed answer goes with the student's next press.
+ *
+ * Returns the pending record to replay first, or null. Only a typed or
+ * handwritten submission is replayed (a Photo needs its image again, and a
+ * record of unknown provenance is never replayed as typed).
+ */
+export function submissionToSettleFirst(questionId, contentKey, sourceMode) {
+  const pending = readPendingSubmission(questionId);
+  if (!pending || pending.refused) return null;
+  if (pending.sourceMode !== 'typed' && pending.sourceMode !== 'ink') return null;
+  if (submissionContentKey(pending.answer, pending.steps) === contentKey && pending.sourceMode === sourceMode) return null;
+  return pending;
 }
 
 /**
@@ -180,7 +207,9 @@ export function recoveryPlan(pending, { typedDraft = null, workingIsAnswer = fal
   const shown = typedDraft && typeof typedDraft === 'object'
     ? String((workingIsAnswer ? typedDraft.working : typedDraft.typed) ?? '') : null;
   const draftDiffers = pending.sourceMode === 'typed' && shown !== null && !pending.refused &&
-    (shown !== pending.answer || (!workingIsAnswer && pending.steps !== undefined && String(typedDraft.working ?? '') !== pending.steps));
+    // Working is compared always, absent read as empty: working ADDED after a
+    // submission that carried none is an edit too.
+    (shown !== pending.answer || (!workingIsAnswer && String(typedDraft.working ?? '').trim() !== String(pending.steps ?? '').trim()));
   if (pending.edited || draftDiffers) return { action: 'restore', mode: null, fill: false, reattach: false };
   // Never sent to be marked: put the work back and wait for Submit.
   if (pending.refused) return { action: 'restore', mode, fill: pending.sourceMode !== 'ink', reattach: pending.sourceMode === 'photo' };
