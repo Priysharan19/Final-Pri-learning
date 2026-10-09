@@ -131,12 +131,13 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     if (!plain(body) || unknown(body, ISSUE_FIELDS).length) {
       return reject(res, 400, 'PRACTICE_ISSUE_INVALID', 'Only a canonical generator, difficulty and optional seed may be requested.');
     }
-    const generator = String(body.generator || '');
-    const difficulty = Number(body.difficulty);
+    const generator = typeof body.generator === 'string' ? body.generator : '';
+    const difficulty = typeof body.difficulty === 'number' || typeof body.difficulty === 'string' ? Number(body.difficulty) : NaN;
     if (body.curriculum !== 'in' || !INDIA_BANK.test(generator) || !Number.isInteger(difficulty) || difficulty < 1 || difficulty > 4) {
       return reject(res, 400, 'PRACTICE_GENERATOR_INVALID', 'Choose an authored India curriculum question and difficulty 1–4.');
     }
-    const seed = body.seed === undefined ? randomInt(0x80000000) : Number(body.seed);
+    const seed = body.seed === undefined ? randomInt(0x80000000) :
+      (typeof body.seed === 'number' || typeof body.seed === 'string' ? Number(body.seed) : NaN);
     if (!Number.isSafeInteger(seed) || seed < 0 || seed >= 0x80000000) {
       return reject(res, 400, 'PRACTICE_SEED_INVALID', 'Invalid question seed.');
     }
@@ -312,7 +313,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     if (!UUID.test(qid) || !plain(body) || unknown(body, GRADE_FIELDS).length) {
       return reject(res, 400, 'PRACTICE_SUBMISSION_INVALID', 'A server-issued question and allowed answer fields are required.');
     }
-    const submissionId = String(body.submissionId || '');
+    const submissionId = typeof body.submissionId === 'string' ? body.submissionId : '';
     const mode = body.mode ?? 'typed';
     if (!ID.test(submissionId) || !['typed', 'ink', 'photo'].includes(mode) ||
         !limitedText(body.answer, 12000) ||
@@ -343,7 +344,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (!sealed) return { status: 404, code: 'QUESTION_NOT_FOUND' };
 
       if (mode !== 'typed') {
-        const token = String(body.transcriptionReceipt || '');
+        const token = typeof body.transcriptionReceipt === 'string' ? body.transcriptionReceipt : '';
         if (!ID.test(token)) return { status: 422, code: 'RECOGNITION_RECEIPT_REQUIRED' };
         const evidence = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-recognition' AND key=? AND expires_at>?",
           [accountId, token, now]);
