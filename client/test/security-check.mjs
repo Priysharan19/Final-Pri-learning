@@ -407,6 +407,11 @@ const EVIL = '<img src=x onerror=alert(1)><script>alert(2)</script>';
 
 async function run() {
   installBrowserEnv();
+  // Only the server marks (owner decision 2026-10-10): the groups that reveal
+  // a solution or start an exam do it as a real verified account against the
+  // real /v1 app, and the last group attacks that authority from the device.
+  const { startOnlineAuthority, nextSubmissionId } = await import('./support/online-authority.mjs');
+  const online = await startOnlineAuthority({ label: 'security' });
   const { sanitizeFigure, sanitizeText } = await import(`${SRC}lib/sanitize.js`);
   const { dispatch } = await import(`${SRC}local/backend.js`);
   const idb = await import(`${SRC}local/idb.js`);
@@ -423,7 +428,15 @@ async function run() {
   const render = text => String(MathText({ text })?.props?.dangerouslySetInnerHTML?.__html ?? '');
 
   const GET = (path, body) => dispatch('GET', path, body);
-  const POST = (path, body) => dispatch('POST', path, body);
+  const POST = async (path, body) => {
+    if (/^\/practice\/[^/]+\/submit$/.test(path) && body && body.submissionId === undefined) {
+      body = { ...body, submissionId: nextSubmissionId('sub_security') };
+    }
+    const result = await dispatch('POST', path, body);
+    // A profile made on this device signs in to its own verified account.
+    if (path === '/profiles' && result?.user?.id) await online.link(result.user.id, { name: 'Security Student' });
+    return result;
+  };
 
   let figureCount = 0;
   let sinkCount = 0;
@@ -676,6 +689,139 @@ async function run() {
     eq('the classes list carries nothing that can run', scan(await GET('/classes'), render), []);
   } catch (err) { crashed(err); }
 
+  // ── The marking authority, attacked from the device ───────────────────────
+  // Only the server marks (owner decision 2026-10-10). Everything on the
+  // device — its rows, its link to an account, its cookies — belongs to
+  // whoever holds the iPad, so each thing below is something that person can
+  // do. None of it may produce a mark, a solution, XP or an attempt.
+  section('marking authority');
+  try {
+    resetStorage();
+    const { checkAnswer } = await import(`${SRC}engine/checker.js`);
+    const { cloudLinkRowId } = await import(`${SRC}platform/cloudAccount.js`);
+    const { subtopicsForYear } = await import(`${SRC}engine/curriculum.js`);
+    const topics = subtopicsForYear(10).map(t => t.id);
+    let turn = 0;
+    /** An open question with a plain numeric answer the suite knows (before the server takes the key). */
+    async function numericQuestion() {
+      for (let i = 0; i < 80; i++) {
+        const served = (await POST('/practice/next', { mode: 'topic', subtopic: topics[turn++ % topics.length], resume: false })).question;
+        const row = await idb.get('questions', served.id);
+        const a = row.payload.answer;
+        if (row.payload.answerType === 'numeric' && a && !a.surdForm && !a.simplestFraction && !a.requireExact && a.canonicalInput === undefined &&
+            Number.isFinite(Number(a.value)) && checkAnswer(row.payload, String(a.value)).correct && !checkAnswer(row.payload, String(Number(a.value) + 7)).correct) {
+          return { id: served.id, right: String(a.value), wrong: String(Number(a.value) + 7), prompt: row.payload.prompt };
+        }
+        await POST(`/practice/${served.id}/discard`, {});
+      }
+      throw new Error('no plain numeric question was served');
+    }
+    const refused = async (promise) => { try { await promise; return null; } catch (err) { return err; } };
+    const attempts = async (pid, qid) => (await idb.byIndex('attempts', 'pid', pid)).filter(a => a.questionId === qid).length;
+    const xpOf = async () => (await GET('/me')).user.xp;
+    const holdsNoKey = payload => ['answer', 'steps', 'solutionText', 'seed', 'traps', 'stepcheck'].filter(k => k in (payload || {}));
+
+    const owner = (await POST('/profiles', { name: 'Owner', year: 10 })).user;
+    const intruder = (await POST('/profiles', { name: 'Intruder', year: 10 })).user;
+    const ownerAccount = online.accountOf(owner.id).accountId;
+    await POST('/profiles/select', { id: owner.id });
+
+    // 1 · Once the server has issued a question, the device holds no key to it.
+    const q1 = await numericQuestion();
+    const first = await POST(`/practice/${q1.id}/submit`, { answer: q1.wrong, ms: 1000 });
+    eq('a first wrong try is marked by the server and stays open', [first.correct, first.resolved, first.authoritative], [false, false, true]);
+    const issuedRow = await idb.get('questions', q1.id);
+    ok('the question is now a server-issued one', typeof issuedRow.serverQuestionId === 'string' && !issuedRow.issue, show(Object.keys(issuedRow)));
+    eq('an open server-issued question keeps no answer key on the device', holdsNoKey(issuedRow.payload), []);
+    eq('nor does the first-try receipt carry one', [first.solution, issuedRow.lastTry?.serverReceipt?.solution], [undefined, undefined]);
+    ok('nothing on disk for this question names the right answer in an answer field',
+      rawRows().questions.filter(r => r.id === q1.id).every(r => !('answer' in (r.payload || {}))), 'the stored row still carries payload.answer');
+
+    // 2 · Writing an answer key back onto the row does not move the mark.
+    const forged = structuredClone(issuedRow);
+    forged.payload.answer = { value: Number(q1.wrong) };
+    await idb.put('questions', forged);
+    const second = await POST(`/practice/${q1.id}/submit`, { answer: q1.wrong, ms: 1000 });
+    eq('a forged local answer key does not make a wrong answer right', [second.correct, second.resolved, second.authoritative], [false, true, true]);
+    eq('the solution shown is the server’s, not the forged key', second.solution?.answerText?.includes(q1.right), true);
+    const forgedAttempt = (await idb.byIndex('attempts', 'pid', owner.id)).filter(a => a.questionId === q1.id);
+    eq('and the one attempt recorded is a wrong one, under the server’s receipt',
+      [forgedAttempt.length, forgedAttempt[0]?.correct, second.attemptId === (await idb.get('questions', q1.id)).serverReceipt?.attemptId], [1, 0, true]);
+
+    // 3 · Marking the row answered-and-correct by hand awards nothing.
+    const q3 = await numericQuestion();
+    const xp3 = await xpOf();
+    const selfMarked = { ...(await idb.get('questions', q3.id)), answered: 1, correct: 1, resolution: { correct: true } };
+    await idb.put('questions', selfMarked);
+    const afterSelfMark = await refused(POST(`/practice/${q3.id}/submit`, { answer: q3.right, ms: 1000 }));
+    eq('a row marked answered by hand is not marked again', afterSelfMark?.status, 409);
+    eq('and earns no attempt and no XP', [await attempts(owner.id, q3.id), await xpOf()], [0, xp3]);
+
+    // 4 · A device whose link row was written by hand has no account behind it.
+    resetStorage();
+    const squatter = (await dispatch('POST', '/profiles', { name: 'Squatter', year: 10 })).user;
+    const now = Date.now();
+    await idb.put('device', { id: cloudLinkRowId(squatter.id), accountId: ownerAccount, role: 'student', emailVerified: true,
+      linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
+      entitlement: { plan: 'premium', status: 'active', provider: 'web', currentPeriodEnd: now + 30 * 86400000, offlineUntil: now + 7 * 86400000, issuedAt: now, sourceVersion: 1 } });
+    const q4 = await numericQuestion();
+    const noSession = await refused(POST(`/practice/${q4.id}/submit`, { answer: q4.right, ms: 1000 }));
+    eq('a hand-written account link with no session is told to sign in', [noSession?.status, noSession?.code], [401, 'SIGN_IN_TO_CHECK']);
+    const noReveal = await refused(POST(`/practice/${q4.id}/reveal`, { ms: 500 }));
+    eq('and is shown no solution', [noReveal?.status, noReveal?.code, noReveal?.solution], [401, 'SIGN_IN_TO_CHECK', undefined]);
+    const noExam = await refused(POST('/exams', { length: 10 }));
+    eq('and cannot start an exam', [noExam?.status, noExam?.code], [401, 'SIGN_IN_TO_CHECK']);
+    {
+      const row = await idb.get('questions', q4.id);
+      eq('nothing was marked, spent or recorded', [row.tries || 0, row.answered || 0, await attempts(squatter.id, q4.id), await xpOf()], [0, 0, 0, 0]);
+      ok('the question is still there to answer, with its prompt', row.payload.prompt === q4.prompt && !row.discardedAt);
+    }
+
+    // 5 · A link row naming one account, under another account's real session.
+    resetStorage();
+    const mallory = (await POST('/profiles', { name: 'Mallory', year: 10 })).user;      // signs in as her own account
+    const link = await idb.get('device', cloudLinkRowId(mallory.id));
+    await idb.put('device', { ...link, accountId: ownerAccount });                       // then claims to be the owner
+    const q5 = await numericQuestion();
+    const mismatch = await refused(POST(`/practice/${q5.id}/submit`, { answer: q5.right, ms: 1000 }));
+    eq('a link that names another account is refused under this session', [mismatch?.status, mismatch?.code], [401, 'SIGN_IN_TO_CHECK']);
+    eq('nothing was marked for it', [(await idb.get('questions', q5.id)).tries || 0, await attempts(mallory.id, q5.id)], [0, 0]);
+    ok('and the question was not adopted under the wrong account', !(await idb.get('questions', q5.id)).serverQuestionId);
+    await idb.put('device', link);
+
+    // 6 · A row pointed at a question the server issued to someone else.
+    const theirs = issuedRow.serverQuestionId;                                           // issued to Owner's account in step 1
+    const q6 = await numericQuestion();
+    const pointed = await idb.get('questions', q6.id);
+    delete pointed.issue;
+    pointed.serverQuestionId = theirs;
+    await idb.put('questions', pointed);
+    const crossGrade = await refused(POST(`/practice/${q6.id}/submit`, { answer: q1.right, ms: 1000 }));
+    eq('another account’s question id cannot be graded from this account', crossGrade?.status, 404);
+    const crossReveal = await refused(POST(`/practice/${q6.id}/reveal`, { ms: 500 }));
+    eq('nor revealed', crossReveal?.status, 404);
+    ok('neither refusal says anything about the answer',
+      [crossGrade, crossReveal].every(e => e && !('correct' in e) && !('solution' in e) && !String(e.message).includes(q1.right)), show([crossGrade?.message, crossReveal?.message]));
+    eq('nothing was marked or recorded', [(await idb.get('questions', q6.id)).answered || 0, await attempts(mallory.id, q6.id)], [0, 0]);
+
+    // 7 · Offline and signed out: refused, coded, and nothing kept that could be replayed as a mark.
+    const q7 = await numericQuestion();
+    const key7 = nextSubmissionId('sub_security_offline');
+    const sent = online.traffic.total;
+    const off = await online.offline(() => refused(POST(`/practice/${q7.id}/submit`, { answer: q7.right, ms: 1000, submissionId: key7 })));
+    eq('offline, an answer is not checked', [off?.status, off?.code], [503, 'RECONNECT_TO_CHECK']);
+    eq('and nothing left the device', online.traffic.total, sent);
+    const out = await online.signedOut(() => refused(POST(`/practice/${q7.id}/submit`, { answer: q7.right, ms: 1000, submissionId: key7 })));
+    eq('signed out, an answer is not checked', [out?.status, out?.code], [401, 'SIGN_IN_TO_CHECK']);
+    {
+      const row = await idb.get('questions', q7.id);
+      eq('neither refusal spent a try, recorded an attempt or queued a result',
+        [row.tries || 0, row.answered || 0, await attempts(mallory.id, q7.id), !!row.resolution, !!row.serverReceipt], [0, 0, 0, false, false]);
+    }
+    const honest = await POST(`/practice/${q7.id}/submit`, { answer: q7.right, ms: 1000, submissionId: key7 });
+    eq('signed in and connected, the same submission is marked once by the server', [honest.correct, honest.authoritative, await attempts(mallory.id, q7.id)], [true, true, 1]);
+  } catch (err) { crashed(err); }
+
   // ── Where raw markup is written to the page ───────────────────────────────
   section('raw-markup sinks');
   try {
@@ -802,6 +948,7 @@ async function run() {
     }
   } catch (err) { crashed(err); }
 
+  await online.close();
   rmSync(built, { recursive: true, force: true });
   return report({ figureCount, sinkCount });
 }
