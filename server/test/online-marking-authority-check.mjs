@@ -90,6 +90,77 @@ try {
     eq(await eventCount(a.account.id), wrong.data?.resolved ? 1 : 0,
       mode + ' rejected recognition cannot change progress');
   }
+
+  // A verified method step earns real positive credit even with an incorrect
+  // OR blank final answer. The numeric award must come from the same server
+  // receipt across retries, never inferred from the device's transcript.
+  const methodCases = [
+    { seed: 654321, answer: '17', steps: ['6t-1=-t-22', '7t-1=-22', '7t=-21', 't=-3'] },
+    { seed: 1234579, answer: '', steps: ['2t=t-3', 't=-3'] }
+  ];
+  for (const sample of methodCases) {
+    const beforeCredit = await eventCount(a.account.id);
+    const mq = await issue(a.jar, sample.seed);
+    eq(mq.status, 201, 'method case: independently issued live server question');
+    const mid = mq.data.question.id;
+    const submission = 'method-' + sample.seed;
+    const first = await grade(a.jar, mid, submission, sample.answer, 'typed', { steps: sample.steps });
+    eq(first.status, 200, 'method case: real HTTP grade committed');
+    eq(first.data.authoritative, true, 'method case: server owns mark authority');
+    eq(first.data.correct, false, 'method case: final answer does not earn full credit');
+    eq(first.data.marksPossible, 2, 'method case: server-owned two-mark rubric');
+    eq(first.data.marksEarned, 1, 'method case: validated reasoning earns one mark');
+    eq(first.data.partial?.awarded, 1, 'method case: method evidence agrees with awarded marks');
+    const repeated = await grade(a.jar, mid, submission, sample.answer, 'typed', { steps: sample.steps });
+    eq(repeated.status, 200, 'method case: same-key replay succeeds');
+    eq(repeated.data, first.data, 'method case: lost-ack replay returns exact server receipt');
+    eq(await eventCount(a.account.id), beforeCredit + (first.data.resolved ? 1 : 0),
+      'method case: replay does not duplicate progress');
+    if (!first.data.resolved) {
+      const final = await grade(a.jar, mid, submission + '-resolve', '-3');
+      eq(final.status, 200, 'method case: second legitimate attempt accepted');
+      eq(final.data.correct, true, 'method case: second verified final answer');
+      eq(final.data.marksEarned, 2, 'method case: full credit after correct second answer');
+      eq(await eventCount(a.account.id), beforeCredit + 1,
+        'method case: resolved attempts commit exactly one progress event');
+    }
+  }
+
+  const fullBefore = await eventCount(a.account.id);
+  const fullQ = await issue(a.jar, 104729);
+  eq(fullQ.status, 201, 'full-credit question is server-issued');
+  const full = await grade(a.jar, fullQ.data.question.id, 'marks-full-104729', '9');
+  eq(full.status, 200, 'correct final answer accepted through real HTTP');
+  eq(full.data.correct, true, 'server certifies mathematical correctness');
+  eq(full.data.marksEarned, 2, 'full correct answer receives 2 of 2');
+  eq(full.data.marksPossible, 2, 'server certifies original marks total');
+  eq(await eventCount(a.account.id), fullBefore + 1,
+    'full mark commits a single progress event');
+  const fullReplay = await grade(a.jar, fullQ.data.question.id, 'marks-full-104729', '9');
+  eq(fullReplay.data, full.data, 'full-credit replay returns identical receipt');
+  eq(await eventCount(a.account.id), fullBefore + 1, 'full-credit replay cannot duplicate progress');
+
+  const zeroQ = await issue(a.jar, 654321);
+  eq(zeroQ.status, 201, 'zero-credit question is server-issued');
+  const zero = await grade(a.jar, zeroQ.data.question.id, 'marks-zero-654321', '71');
+  eq(zero.status, 200, 'incorrect final without working gets server receipt');
+  eq(zero.data.correct, false, 'incorrect final is not accepted as correct');
+  eq(zero.data.marksEarned, 0, 'incorrect final without method evidence earns zero');
+  eq(zero.data.marksPossible, 2, 'zero mark retains the original rubric total');
+  eq((await grade(a.jar, zeroQ.data.question.id, 'marks-zero-654321', '71')).data,
+    zero.data, 'zero-credit replay never changes marks');
+
+  const forgedQ = await issue(a.jar, 1234579);
+  eq(forgedQ.status, 201, 'tampering probe is server-issued');
+  const beforeForged = await eventCount(a.account.id);
+  const forgedAward = await grade(a.jar, forgedQ.data.question.id, 'fake-award-1234579', '-3',
+    'typed', { marksEarned: 999, marksPossible: 2 });
+  eq(forgedAward.status, 400, 'caller-supplied marks are rejected by strict schema');
+  eq(await eventCount(a.account.id), beforeForged, 'forged scores never alter progress');
+  const validAward = await grade(a.jar, forgedQ.data.question.id, 'valid-award-1234579', '-3');
+  eq(validAward.status, 200, 'valid answer remains possible after rejected forgery');
+  eq(validAward.data.marksEarned, 2, 'only server attests the recovered full marks');
+  eq(await eventCount(a.account.id), beforeForged + 1, 'recovered grade persists once');
 } finally {
   await h.close();
   rmSync(scratch, { recursive: true, force: true });
