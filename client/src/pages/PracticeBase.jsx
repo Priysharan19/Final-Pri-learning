@@ -69,6 +69,9 @@ function ProfilePractice() {
   const [errorCode, setErrorCode] = useState('');
   const [accountRecoveryOpen, setAccountRecoveryOpen] = useState(false);
   const [pyqAlternatives, setPyqAlternatives] = useState([]);
+  // A named difficulty with no authored form: the refusal's own detail — the
+  // level asked for and the levels that exist — so the student can choose.
+  const [difficultyGap, setDifficultyGap] = useState(null);
   const [capped, setCapped] = useState(null);
   const [session, setSession] = useState({ ...EMPTY_SESSION });
   const sessionRef = useRef({ ...EMPTY_SESSION });
@@ -180,6 +183,7 @@ function ProfilePractice() {
     setError('');
     setErrorCode('');
     setPyqAlternatives([]);
+    setDifficultyGap(null);
     setCapped(null);
     try {
       // Reload/restart resumes unfinished work. Pressing the explicit Next
@@ -198,15 +202,18 @@ function ProfilePractice() {
       const assignmentSubtopic = assignmentSpec.subtopic ? String(assignmentSpec.subtopic) : null;
       const assignmentTrack = assignmentSpec.track ? String(assignmentSpec.track) : null;
       const assignmentDifficulty = Number.isFinite(Number(assignmentSpec.difficulty)) ? Number(assignmentSpec.difficulty) : null;
-      const body = taskId ? { taskId }
+      // A level the student chose after a DIFFICULTY_UNAVAILABLE refusal is in
+      // the URL; it stands in for the level a task or assignment named.
+      const chosenLevel = difficulty != null && difficulty !== '' && Number.isFinite(Number(difficulty)) ? Number(difficulty) : null;
+      const body = taskId ? { taskId, ...(chosenLevel != null ? { difficulty: chosenLevel } : {}) }
         : assignmentMode && assignmentSubtopic ? {
             mode: 'topic', subtopic: assignmentSubtopic,
             track: assignmentTrack || undefined,
-            difficulty: assignmentDifficulty ?? undefined
+            difficulty: chosenLevel ?? assignmentDifficulty ?? undefined
           }
           : assignmentMode ? {
               mode: 'smart', track: assignmentTrack || undefined,
-              difficulty: assignmentDifficulty ?? undefined
+              difficulty: chosenLevel ?? assignmentDifficulty ?? undefined
             }
           : practiceRequestFromQuery(params);
       // Real local practice resumes the exact unresolved question after reload,
@@ -233,6 +240,15 @@ function ProfilePractice() {
         if (isContentEmpty(e?.code)) noteEmpty(e.code);
         setError(e.message); setErrorCode(e?.status === 401 ? 'AUTH_REQUIRED' : (e?.code || ''));
         setPyqAlternatives(e?.code === 'INDIA_PYQ_UNAVAILABLE' && Array.isArray(e?.detail?.alternatives) ? e.detail.alternatives : []);
+        if (e?.code === 'DIFFICULTY_UNAVAILABLE') {
+          // Nothing was served, and nothing is shown in its place but the choice.
+          setServe(null);
+          setDifficultyGap({
+            requested: Number(e?.detail?.difficultyRequested) || null,
+            available: (Array.isArray(e?.detail?.available) ? e.detail.available : []).map(a => Number(a?.difficulty)).filter(d => Number.isInteger(d) && d >= 1 && d <= 4),
+            dotpoint: e?.detail?.dotpoint != null
+          });
+        }
       }
     }
     finally { loading.current = false; }
@@ -503,7 +519,37 @@ function ProfilePractice() {
           </div>
         )}
 
-        {error && !capped && !isContentEmpty(errorCode) && (
+        {/* The level asked for has no questions for this selection. Nothing is
+            served in its place: the page names the level, lists the levels that
+            do exist, and waits for the student to choose one (issue #408). */}
+        {error && !capped && errorCode === 'DIFFICULTY_UNAVAILABLE' && difficultyGap && (
+          <div className="notice" role="status" data-difficulty-unavailable
+            data-difficulty-requested={difficultyGap.requested || ''}>
+            <strong>{t(difficultyGap.dotpoint ? 'practice.levelUnavailableDotpoint' : 'practice.levelUnavailableTopic', {
+              requested: difficultyGap.requested ? `D${difficultyGap.requested} · ${t(`difficulty.${difficultyGap.requested}`)}` : ''
+            })}</strong>
+            <p className="muted" style={{ margin: '4px 0 10px' }}>
+              {t(difficultyGap.available.length ? 'practice.levelUnavailableChoose' : 'practice.levelUnavailableNone')}
+            </p>
+            <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+              {difficultyGap.available.map(d => (
+                <button key={d} type="button" className="btn btn-primary btn-sm" data-difficulty-choice={d}
+                  onClick={() => { const next = new URLSearchParams(params); next.set('difficulty', String(d)); setParams(next); }}>
+                  {t('practice.levelPractiseAt', { level: `D${d} · ${t(`difficulty.${d}`)}` })}
+                </button>
+              ))}
+              {difficulty != null && !taskId && !assignmentMode && (
+                <button type="button" className="btn btn-quiet btn-sm" data-difficulty-choice="adaptive"
+                  onClick={() => { const next = new URLSearchParams(params); next.delete('difficulty'); setParams(next); }}>
+                  {t('practice.levelLetPriChoose')}
+                </button>
+              )}
+              <Link className="btn btn-quiet btn-sm" to="/">{t('practice.emptyChooseTopic')}</Link>
+            </div>
+          </div>
+        )}
+
+        {error && !capped && errorCode !== 'DIFFICULTY_UNAVAILABLE' && !isContentEmpty(errorCode) && (
           <div className="verdict verdict-technical" role="alert" data-practice-error={errorCode || 'error'}>
             <span className="verdict-ico"><Icon name="alert" /></span>
             <div>
@@ -592,20 +638,6 @@ function ProfilePractice() {
 
       {serve && !assignmentCompleteLocally && (
         <>
-          {/* The level asked for is not always a level a question exists at.
-              When they differ the page says so before the question, in words —
-              the card's own difficulty tag is always the level really served,
-              never the level requested (issue #408). */}
-          {Number.isInteger(serve.difficultyRequested) && Number.isInteger(serve.difficultyServed)
-            && serve.difficultyRequested !== serve.difficultyServed && (
-            <div className="notice" role="status" data-difficulty-substituted
-              data-difficulty-requested={serve.difficultyRequested} data-difficulty-served={serve.difficultyServed}>
-              {t(dotpoint != null ? 'practice.difficultySubstitutedDotpoint' : 'practice.difficultySubstituted', {
-                requested: `D${serve.difficultyRequested} · ${t(`difficulty.${serve.difficultyRequested}`)}`,
-                served: `D${serve.difficultyServed} · ${t(`difficulty.${serve.difficultyServed}`)}`
-              })}
-            </div>
-          )}
           <QuestionCard
             key={`${user.id}:${serve.question.id}`}
             question={serve.question}

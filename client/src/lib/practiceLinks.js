@@ -49,6 +49,17 @@ export function practiceRequestFromQuery(params) {
     : { mode: 'smart', track: track || undefined, difficulty: difficulty != null ? Number(difficulty) : undefined, pyqOnly: pyqOnly || undefined };
 }
 
+/**
+ * The Class X NCERT library's difficulty buttons for one chapter: the CBSE
+ * levels a question really exists at for it. `requestable` is the engine's
+ * list for the chapter (indiaRequestableDifficulties); a level the chapter has
+ * no authored form at gets no button, because pressing it would be refused.
+ */
+export function class10LibraryDifficulties(requestable) {
+  const real = Array.isArray(requestable) ? requestable : [];
+  return practiceDifficulties({ track: 'cbse' }).filter(d => real.includes(d));
+}
+
 /** The Class X NCERT library's practice button for one chapter at one difficulty. */
 export function class10LibraryPracticeHref(chapter, difficulty) {
   return practiceHref({ subtopic: chapter?.id, track: 'cbse', difficulty });
