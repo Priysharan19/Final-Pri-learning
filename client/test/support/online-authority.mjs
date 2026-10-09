@@ -262,6 +262,14 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
     }
     const grant = () => app.request('/v1/entitlements/admin/grant', { method: 'POST', jar: admin.jar, body: { accountId, durationMs: PREMIUM_DAYS * 86400000 } });
     let granted = await grant();
+    if (granted.status === 401) {
+      // A suite that moves the clock a long way outlives the admin's session.
+      admin.jar = {};
+      const again = await app.request('/v1/account/login', { method: 'POST', jar: admin.jar, body: { email: `${label}.admin@example.test`, password: PASSWORD, deviceId: 'suite-admin-device' } });
+      assert.ok(again.status === 200 || again.status === 201, `admin sign-in: ${again.status} ${again.text}`);
+      await harness.verifyMfa(app, admin.jar, admin.secret);
+      granted = await grant();
+    }
     if (granted.status === 403 && granted.data?.error?.code === 'MFA_STEP_UP_REQUIRED') {
       // A suite that moves the clock outlives the step-up window.
       const fresh = await harness.verifyMfa(app, admin.jar, admin.secret);

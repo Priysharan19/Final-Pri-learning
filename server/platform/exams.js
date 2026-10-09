@@ -107,6 +107,11 @@ const notFound = res => reject(res, 404, 'EXAM_NOT_FOUND', 'This paper does not 
 
 // ── The public paper ─────────────────────────────────────────────────────────
 
+// Previous-year labels (pyqSource, pyqYear, pyqExam, archive citations) stay
+// public: the exam room shows a student which questions were really set in an
+// exam while they sit them. They add nothing to recover an answer with — a
+// previous-year item is a fixed, published question whose prompt alone
+// identifies it — and its archive id never leaves (the content id is opaque).
 function publicSingle(q) {
   const out = { supportsSteps: !OBJECTIVE.has(q.answerType) && !!stepMetaFor(q) };
   for (const k of ['prompt', 'answerType', 'mcqOptions', 'options', 'matchList', 'figure', 'inputHint', 'answerPrefix', 'answerSuffix',

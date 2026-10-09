@@ -67,8 +67,10 @@ The server-side OpenAI providers already exist (`server/platform/handwritingProv
      and reading attempts recorded by earlier versions. It does not mark new work.
    - Examination papers (CBSE, JEE Main, JEE Advanced, IOQM and the practice paper) are issued,
      collected and marked by the server (`server/platform/exams.js`, `/v1/exams`). The device
-     composes a paper *spec*; the server validates it against its own blueprint and the track's
-     authored cells, chooses every question, seals questions, marking grid, start and deadline
+     composes a paper *spec*; the server holds it to its own blueprint slot by slot (the layout its
+     seed allots, each chapter's cells inside the section's difficulty window), enforces the plan
+     from its own entitlement record (free exam simulations counted from its sealed papers, the JEE
+     Advanced capability, at most three open papers), chooses every question, titles the paper, seals questions, marking grid, start and deadline
      under an exam id owned by the account, keeps the latest answer snapshot, and finalises exactly
      once. A finish that arrives later than `deadline + 2 minutes` is marked on the last snapshot
      the server holds and flagged late. With no connection at the finish the paper is queued on the

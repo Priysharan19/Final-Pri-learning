@@ -269,6 +269,9 @@ for (const [label, profile] of [
   const badLabels = [];
   let lastExam = null;
   for (let seed = 1; seed <= 4; seed += 1) {
+    // An account holds only a few papers open at once: the previous one is
+    // handed in, blank, before the next is started. The last stays open to be sat.
+    if (lastExam) await dispatchIndiaExam(user, 'POST', `/exams/${lastExam.id}/submit`, { answers: {}, ms: 1000 });
     const made = await dispatchIndiaExam(user, 'POST', '/exams', { seed });
     const paper = (await dispatchIndiaExam(user, 'GET', `/exams/${made.exam.id}`, {})).exam;
     lastExam = { id: made.exam.id, paper };

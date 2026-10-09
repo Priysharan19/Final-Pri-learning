@@ -284,6 +284,9 @@ if (mainMarking) {
     for (let seed = 1; seed <= 500; seed += 1) {
       const made = await examCall(user, 'POST', '/exams', { seed });
       const paper = (await examCall(user, 'GET', `/exams/${made.exam.id}`, {})).exam;
+      // An account holds only a few papers open at once (the server's rule),
+      // so each examined paper is handed in, blank, before the next is started.
+      await examCall(user, 'POST', `/exams/${made.exam.id}/submit`, { answers: {}, ms: 1000 });
       for (const q of (paper.questions || []).filter(q => q.mcqOptions?.length)) {
         examined += 1;
         const texts = q.mcqOptions.map(o => String(o?.text ?? o?.label ?? o?.value ?? o).trim());
