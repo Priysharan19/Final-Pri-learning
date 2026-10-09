@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MathText } from '../lib/latex.jsx';
 import { useT } from '../i18n/index.js';
-import { class10LibraryPracticeHref, practiceDifficulties } from '../lib/practiceLinks.js';
+import { class10LibraryPracticeHref, class10LibraryDifficulties } from '../lib/practiceLinks.js';
+import { indiaChapter, indiaRequestableDifficulties } from '../engine/indiaProduct.js';
 import { NCERT_CLASS10_CONTENT, NCERT_CLASS10_RELEASE_AUDIT } from '../engine/ncert/class10-content.js';
 
 // Tab ids with the catalogue keys for their labels (Topper Notes, Worked Examples, Exercises, Source Coverage).
@@ -19,6 +20,8 @@ export default function Class10NCERTLibrary(){
   // practice resolves (its covers include this chapter's question bank); the
   // generator id alone left 8 of 14 chapters answering INDIA_TOPIC_NOT_FOUND.
   const practice=(d)=>nav(class10LibraryPracticeHref(chapter,d));
+  // Only the levels this chapter has questions at get a button (issue #408).
+  const levels=useMemo(()=>class10LibraryDifficulties(indiaRequestableDifficulties(indiaChapter(chapter.id),{track:'cbse',grade:10})),[chapter.id]);
   return <section className="card" aria-labelledby="ncert10-title" style={{marginBottom:24,padding:20}}>
     <div className="spread" style={{gap:16,alignItems:'flex-start'}}>
       <div>
@@ -37,7 +40,7 @@ export default function Class10NCERTLibrary(){
       <div className="spread" style={{gap:12,alignItems:'flex-start'}}>
         <div><div className="sc-label">{t('ncert.c10ChapterNum',{n:chapter.num})}</div><h3 style={{margin:'3px 0'}}>{chapter.title}</h3><div className="muted">{t('ncert.c10ChapterMeta',{count:chapter.exercises.length,n:chapter.exercises.length,file:chapter.sourceFile,pages:chapter.pages})}</div></div>
         <div className="row" style={{flexWrap:'wrap',justifyContent:'flex-end'}}>
-          {practiceDifficulties({track:'cbse'}).map(d=><button key={d} className="btn btn-primary btn-sm" onClick={()=>practice(d)}>{`D${d} ${t(DIFF[d])}`}</button>)}
+          {levels.map(d=><button key={d} className="btn btn-primary btn-sm" onClick={()=>practice(d)}>{`D${d} ${t(DIFF[d])}`}</button>)}
         </div>
       </div>
 

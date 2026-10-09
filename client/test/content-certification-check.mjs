@@ -31,7 +31,7 @@ const {
 } = await import('../src/engine/contentIdentity.js');
 const { generateQuestion, loadAllBanks } = await import('../src/engine/generators/index.js');
 const { IN_CURRICULUM, IN_CHAPTER_BY_ID } = await import('../src/engine/curriculum-in.js');
-const { resolveIndiaTarget } = await import('../src/engine/indiaProduct.js');
+const { resolveIndiaTarget, indiaRequestableDifficulties } = await import('../src/engine/indiaProduct.js');
 const { CONTENT_EMPTY_CODES, isContentEmpty, servable, contentEmptySignal } = await import('../src/lib/contentServe.js');
 const { telemetryEvent } = await import('../src/platform/telemetry.js');
 const { dispatch } = await import('../src/local/backend.js');
@@ -327,26 +327,33 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   // authored rung to the one pressed, and a stale generator-id link resolves to
   // its chapter instead of refusing.
   const { NCERT_CLASS10_CONTENT } = await import('../src/engine/ncert/class10-content.js');
-  const { class10LibraryPracticeHref, practiceRequestFromQuery, practiceHref, practiceDifficulties } = await import('../src/lib/practiceLinks.js');
+  const { class10LibraryPracticeHref, class10LibraryDifficulties, practiceRequestFromQuery, practiceHref, practiceDifficulties } = await import('../src/lib/practiceLinks.js');
   await premiumProfile({ name: 'Cert Library', course: 'in', indiaTrack: 'cbse', year: 10 });
   const refused = [], offChapter = [], offRung = [];
   for (const chapter of NCERT_CLASS10_CONTENT) {
     const rungs = new Set((IN_CHAPTER_BY_ID[chapter.id]?.covers || []).flatMap(c => c.diff || []));
-    for (const d of practiceDifficulties({ track: 'cbse' })) {
+    // The library shows a button only for a level the chapter has (issue #408);
+    // a level it lacks is refused with the levels that exist, never served at
+    // the nearest one.
+    const offered = class10LibraryDifficulties(indiaRequestableDifficulties(IN_CHAPTER_BY_ID[chapter.id], { track: 'cbse', grade: 10 }));
+    if (!offered.length) refused.push(`${chapter.id} offers no level`);
+    for (const d of practiceDifficulties({ track: 'cbse' }).filter(x => !offered.includes(x))) {
+      const e = await dispatch('POST', '/practice/next', practiceRequestFromQuery(new URL(class10LibraryPracticeHref(chapter, d), 'https://x.invalid').searchParams)).then(() => null, err => err);
+      if (e?.code !== 'DIFFICULTY_UNAVAILABLE' || JSON.stringify(e.detail.available.map(a => a.difficulty)) !== JSON.stringify(offered)) offRung.push(`${chapter.id}@D${d} not refused with ${offered}`);
+    }
+    for (const d of offered) {
       const href = class10LibraryPracticeHref(chapter, d);
       const r = await dispatch('POST', '/practice/next', practiceRequestFromQuery(new URL(href, 'https://x.invalid').searchParams)).catch(e => ({ error: e }));
       if (r.error) { refused.push(`${chapter.id}@D${d} ${r.error.code}`); continue; }
       const row = await idb.get('questions', r.question.id);
       if (row.india?.chapterId !== chapter.id) offChapter.push(`${chapter.id}@D${d}`);
-      const held = Math.min(3, d); // CBSE practice is held to D1–D3 (adaptive-08)
-      const gap = Math.min(...[...rungs].map(x => Math.abs(x - held)));
-      if (Math.abs(row.difficulty - held) !== gap) offRung.push(`${chapter.id}@D${d}→D${row.difficulty}`);
+      if (row.difficulty !== d || !rungs.has(d)) offRung.push(`${chapter.id}@D${d}→D${row.difficulty}`);
       await dispatch('POST', `/practice/${r.question.id}/discard`, {});
     }
   }
   eq(refused.length, 0, `every Class X library button serves a question (refused: ${refused.slice(0, 4).join(', ')})`);
   eq(offChapter.length, 0, `every Class X library button serves its own chapter (${offChapter.slice(0, 4).join(', ')})`);
-  eq(offRung.length, 0, `every Class X library button serves the nearest authored rung to the one pressed, held to the CBSE window (${offRung.slice(0, 4).join(', ')})`);
+  eq(offRung.length, 0, `every Class X library button serves exactly the level pressed, and a level the chapter lacks is refused with the levels it has (${offRung.slice(0, 4).join(', ')})`);
   for (const [gen, chapterId] of [['c10-polynomial-zeroes', 'c10-polynomials'], ['c10-linear-graphs', 'c10-pair-linear-equations'], ['c10-triangles-current', 'c10-triangles'], ['c10-surface-area-combo', 'c10-surface-volume']]) {
     const r = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: gen, track: 'cbse', difficulty: 2 }).catch(e => ({ error: e }));
     const row = r.question ? await idb.get('questions', r.question.id) : null;
@@ -355,12 +362,11 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   }
   {
     // Defence for links built before the D4 button was hidden (bookmarks,
-    // shared links): the backend still holds them to D3 and says so.
-    const r = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: 'c10-polynomials', track: 'cbse', difficulty: 4 });
-    const row = await idb.get('questions', r.question.id);
-    eq(row.difficulty, 3, 'a named D4 on a CBSE chapter is held to the CBSE window (adaptive-08)');
-    ok(/You asked for D4; CBSE \/ NCERT practice is held to D1–D3/.test(r.why), `and the reply says so instead of moving it silently (${r.why})`);
-    await dispatch('POST', `/practice/${r.question.id}/discard`, {});
+    // shared links): D4 is not a CBSE level, so the request is refused with the
+    // CBSE levels the chapter has — never served at D3 in its place (#408).
+    const e = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: 'c10-polynomials', track: 'cbse', difficulty: 4 }).then(() => null, err => err);
+    eq(e?.code, 'DIFFICULTY_UNAVAILABLE', 'a named D4 on a CBSE chapter is refused, not moved to another level (adaptive-08, #408)');
+    ok(e?.detail?.difficultyRequested === 4 && e.detail.available.length > 0 && e.detail.available.every(a => a.difficulty <= 3), `and the refusal lists the CBSE levels that exist (${JSON.stringify(e?.detail?.available)})`);
   }
   // The link reader sends exactly what Practice always sent.
   const body = practiceRequestFromQuery(new URL(practiceHref({ subtopic: 'c10-polynomials', dotpoint: 1, difficulty: 3, track: 'cbse', pyq: true }), 'https://x.invalid').searchParams);
@@ -411,10 +417,11 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   ok(!/difficulty=4/.test(practiceHref({ subtopic: 'c10-polynomials', track: 'cbse', difficulty: 4 })), 'the shared builder never emits a CBSE D4 link');
   ok(/difficulty=4/.test(practiceHref({ subtopic: 'c12-integrals-methods', track: 'jee-advanced', difficulty: 4 })), 'a JEE D4 link is still built');
   const { NCERT_CLASS10_CONTENT } = await import('../src/engine/ncert/class10-content.js');
-  const libLinks = NCERT_CLASS10_CONTENT.flatMap(c => practiceDifficulties({ track: 'cbse' }).map(d => class10LibraryPracticeHref(c, d)));
-  ok(libLinks.length === NCERT_CLASS10_CONTENT.length * 3 && libLinks.every(h => !/difficulty=4/.test(h)), 'the Class X library renders D1–D3 links only');
+  const { class10LibraryDifficulties } = await import('../src/lib/practiceLinks.js');
+  const libLinks = NCERT_CLASS10_CONTENT.flatMap(c => class10LibraryDifficulties(indiaRequestableDifficulties(IN_CHAPTER_BY_ID[c.id], { track: 'cbse', grade: 10 })).map(d => class10LibraryPracticeHref(c, d)));
+  ok(libLinks.length >= NCERT_CLASS10_CONTENT.length && libLinks.length <= NCERT_CLASS10_CONTENT.length * 3 && libLinks.every(h => !/difficulty=4/.test(h)), 'the Class X library renders D1–D3 links only');
   const library = src('../src/components/Class10NCERTLibrary.jsx');
-  ok(library.includes("practiceDifficulties({track:'cbse'}).map(") && !library.includes('[1,2,3,4].map'), 'the Class X library buttons come from the shared CBSE difficulty list');
+  ok(library.includes('class10LibraryDifficulties(indiaRequestableDifficulties(') && library.includes('{levels.map(') && !library.includes('[1,2,3,4].map'), 'the Class X library buttons are the shared CBSE levels the chapter really has');
   const home = src('../src/pages/Home.jsx');
   ok(home.includes('offeredDifficulties.map(') && !/\[1, 2, 3, 4\]\.filter/.test(home), 'Home\'s difficulty picker offers only practiceDifficulties for the context');
   ok(home.includes('difficulty: chosenDifficulty'), 'a remembered D4 filter is not sent from a CBSE Home');

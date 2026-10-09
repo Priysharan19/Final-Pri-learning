@@ -12,9 +12,9 @@ track is named after. A cell that is not listed below has *a* form at the hardes
 single routine template.
 
 **What the product does with a gap.** The picker does not offer a level that has no authored form for
-the chosen chapter or dot point, and a request that still names one (an old link, a task) is answered
-with the nearest authored level, labelled as that level, under a notice that says the requested level
-is not available.
+the chosen chapter or dot point. A request that still names one (an old link, a typed URL, a task) is
+refused: no question is served at another level. The page says the level is unavailable, lists the
+levels that do exist, and serves a question only after the student chooses one.
 
 ## Summary
 
