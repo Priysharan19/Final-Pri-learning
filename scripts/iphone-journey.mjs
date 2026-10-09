@@ -12,9 +12,11 @@
 //   1. no server (--journey-selfcheck, --journey-relaunch): onboarding →
 //      practice → typed answer and working → strokes on the native PencilKit
 //      surface, sealed in IndexedDB with one truthful save status → a photo
-//      attached and not read on the device → Submit and Show solution refused
-//      on the card, nothing marked, nothing in History → relaunch keeps the
-//      profile, the question, the typed work and the strokes;
+//      attached and not read on the device → the question is an offline
+//      draft: the card says so before any work and offers no Submit and no
+//      Show solution; "Try for a markable question" asks first and, with no
+//      server, changes nothing; nothing marked, nothing in History → relaunch
+//      keeps the profile, the question, the typed work and the strokes;
 //   2. a real local Pri server on SQLite with a SYNTHETIC handwriting reader
 //      (--journey-marking, --journey-marking-relaunch; a fresh install): a
 //      server-prepared question signed out → in-card sign-in → the server
@@ -51,7 +53,7 @@ import { openServerDesk } from './journey-oracle.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
 const PACKAGE = join(ROOT, 'ios/PriLearning.swiftpm');
-const FIRST = ['launch', 'onboarding', 'practice', 'typedDraft', 'nativeInk', 'photoDraft', 'checkRefused', 'solutionRefused', 'nothingRecorded', 'progress', 'persistenceMarker'];
+const FIRST = ['launch', 'onboarding', 'practice', 'typedDraft', 'nativeInk', 'photoDraft', 'noCheckOffered', 'replaceKeepsWork', 'nothingRecorded', 'progress', 'persistenceMarker'];
 const RELAUNCH = ['relaunchProfile', 'relaunchMarker', 'relaunchDraftKept'];
 // The signed-in leg. The server* steps are read by this process from the
 // server's own database, request log and the stand-in reader's request log.

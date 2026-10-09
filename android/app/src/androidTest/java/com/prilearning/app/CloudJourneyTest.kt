@@ -16,9 +16,11 @@
 //      the WebView cookie store, not readable by the page, not plaintext on
 //      disk);
 //   1b. offlineWorkIsKeptUnmarkedAndSyncIsNotOffered — with the server
-//      stopped, a question opened on the device is a draft: what is typed is
-//      kept, Submit is refused on the card, nothing is marked or recorded,
-//      and Sync is not offered;
+//      stopped, a question opened on the device is a draft: the card says
+//      before any work that it cannot be marked and offers no Submit or Show
+//      solution; what is typed is kept, asking for a markable question changes
+//      nothing while none can be opened, nothing is marked or recorded, and
+//      Sync is not offered;
 //   2. cloudSessionSurvivesProcessDeathThenDisconnectClearsIt — the server is
 //      back on the same database; after the process was killed the account is
 //      still connected, History still shows the server-marked attempt, the
@@ -281,15 +283,39 @@ class CloudJourneyTest {
             openTypedQuestion(s, advanceFirst = true)
             val draftId = qid(s)
             assertTrue("the offline question is not the one the server marked", draftId.isNotEmpty() && draftId != graded.getString("id"))
+            // Said before any work goes in, and with no Submit or Show solution
+            // that could only be refused: the one action is to try for a
+            // markable question.
+            assertEquals("the card names the question an offline draft", "\"draft\"", waitFor(s, QuestionCardJs.UNMARKABLE))
+            val draftSays = eval(s, QuestionCardJs.UNMARKABLE_SAYS)
+            assertTrue("the notice says it was opened without a connection and cannot be marked: $draftSays",
+                Regex("without a connection", RegexOption.IGNORE_CASE).containsMatchIn(draftSays) &&
+                    Regex("cannot be marked", RegexOption.IGNORE_CASE).containsMatchIn(draftSays))
+            assertEquals("a draft offers no Submit and no Show solution", "\"replace|1|no-solution\"|false|false",
+                eval(s, QuestionCardJs.OFFERS) + "|" + eval(s, QuestionCardJs.PRESS_SUBMIT) + "|" + eval(s, QuestionCardJs.PRESS_REVEAL))
             setValue(s, ".editor-body input.answer-input", "7")
             assertEquals("the typed answer is stored on this device", "\"7\"", waitFor(s, QuestionCardJs.storedTyped(draftId), 15_000))
             assertUnmarked(s, "typing offline")
-            assertEquals("Submit is refused on the card while the server is unreachable", "refused", submitAndWait(s))
-            assertEquals("the refusal says this copy was never the server's", "\"new-question\"", eval(s, QuestionCardJs.REFUSAL))
-            assertEquals("the refusal's next step is a new question", "true", eval(s, QuestionCardJs.visible("[data-check-next]")))
-            assertEquals("the refusal offers no retry that cannot succeed", "false", eval(s, QuestionCardJs.visible("[data-check-retry]")))
-            assertUnmarked(s, "a refused Submit offline")
+            assertEquals("typing adds no Submit and no Show solution", "\"replace|1|no-solution\"|false|false",
+                eval(s, QuestionCardJs.OFFERS) + "|" + eval(s, QuestionCardJs.PRESS_SUBMIT) + "|" + eval(s, QuestionCardJs.PRESS_REVEAL))
+            // With work on the page the first press only asks; confirmed while
+            // the server is unreachable, no markable question can be opened and
+            // nothing changes.
+            waitFor(s, QuestionCardJs.PRESS_REPLACE)
+            waitFor(s, QuestionCardJs.visible("[data-check-replace-confirm]"))
+            assertEquals("asking changed nothing", "$draftId|\"7\"", qid(s) + "|" + eval(s, QuestionCardJs.TYPED))
+            waitFor(s, QuestionCardJs.PRESS_REPLACE)
+            waitFor(s, QuestionCardJs.REPLACE_DECLINED, 90_000)
+            val noteSays = eval(s, QuestionCardJs.REPLACE_NOTE_SAYS)
+            assertTrue("the card says a markable question could not be opened and that nothing has changed: $noteSays",
+                Regex("could not be opened", RegexOption.IGNORE_CASE).containsMatchIn(noteSays) &&
+                    Regex("nothing here has changed", RegexOption.IGNORE_CASE).containsMatchIn(noteSays))
+            assertEquals("the same question is still on the card", draftId, qid(s))
+            assertEquals("no check was made, so none was refused", "false", eval(s, QuestionCardJs.REFUSAL))
+            assertEquals("no retry that cannot succeed is offered", "false", eval(s, QuestionCardJs.visible("[data-check-retry]")))
+            assertUnmarked(s, "a declined replace offline")
             assertEquals("the typed answer is still on the card", "\"7\"", eval(s, QuestionCardJs.TYPED))
+            assertEquals("…and still stored on this device", "\"7\"", eval(s, QuestionCardJs.storedTyped(draftId)))
             // Nothing was recorded: History holds the server-marked attempt and no other.
             openHistory(s)
             assertEquals("the offline draft is not in History", "missing", historyVerdict(s, draftId))

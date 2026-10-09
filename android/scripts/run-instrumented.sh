@@ -11,7 +11,8 @@
 # (scripts/cloud-fixture-server.mjs), it then runs the cloud journey
 # against that real server the same way: sign in + sync and a server-marked
 # answer (the right answer comes from scripts/journey-oracle.mjs, outside the
-# page), an offline draft that is kept and never marked, force-stop, then the
+# page), an offline draft that says it cannot be marked, offers no Submit or
+# Show solution, is kept and is never marked, force-stop, then the
 # session survives and Disconnect clears it. SYNTHETIC / EMULATOR evidence.
 set -euo pipefail
 EXPECT="${1:-any}"; shift || true
@@ -95,7 +96,7 @@ if [ -n "${PRI_CLOUD_ORIGIN:-}" ] && [ "$EXPECT" != "floor" ]; then
     # Reconnect: the same server and database come back.
     node "$HERE/../scripts/cloud-fixture-server.mjs" --port "$PRI_CLOUD_PORT" --db "$PRI_CLOUD_DB" --restart --out "$OUT/restart.env"
     RESTARTED_PID="$(sed -n 's/^PRI_CLOUD_SERVER_PID=//p' "$OUT/restart.env")"
-    summary="$summary, offline draft kept and refused"
+    summary="$summary, offline draft said to be unmarkable (no Submit or Show solution), kept and never marked"
   fi
   adb shell am force-stop com.prilearning.app
   sleep 2
