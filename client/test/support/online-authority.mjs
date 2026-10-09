@@ -67,6 +67,14 @@ let submissionSeq = 0;
 export const nextSubmissionId = (prefix = 'sub_suite') =>
   `${prefix}_${String(++submissionSeq).padStart(6, '0')}_${Date.now().toString(36)}`;
 
+/**
+ * The authority this process already started, if any. A module that is both a
+ * suite of its own and a library for another suite (content-certify) uses the
+ * running one instead of booting a second server.
+ */
+let current = null;
+export const currentOnlineAuthority = () => current;
+
 export async function startOnlineAuthority({ label = 'suite', keepRateLimits = false, ink = false, env = {} } = {}) {
   const prior = Object.fromEntries([...ENV_NAMES, ...Object.keys(env)].map(name => [name, process.env[name]]));
   const scratch = mkdtempSync(join(tmpdir(), `pri-online-${label}-`));
@@ -259,6 +267,7 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
   async function close() {
     if (closed) return;
     closed = true;
+    current = null;
     await app.close();
     if (reader.server) await new Promise(resolve => { reader.server.closeAllConnections?.(); reader.server.close(resolve); });
     globalThis.fetch = realFetch;
@@ -269,7 +278,7 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
     }
   }
 
-  return {
+  const authority = {
     app, origin: app.origin, db: app.db, traffic, reader,
     link, setEntitlement, answerKey, sealedQuestion, resetRateLimits, close,
     accountOf: pid => accounts.get(pid) || null,
@@ -288,4 +297,6 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
       return scoped(() => { pinnedPid = pid; }, () => { pinnedPid = before; }, fn);
     }
   };
+  current = authority;
+  return authority;
 }

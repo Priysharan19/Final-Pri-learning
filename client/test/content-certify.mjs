@@ -488,17 +488,27 @@ export async function certifyExams(seeds) {
 
 // ── End to end through the local backend ────────────────────────────────────
 
+// Questions are chosen, issued and marked by the server (owner decisions
+// 2026-10-10), so "end to end" runs against the real /v1 app: every profile is
+// a real verified account. A suite that imports this module and already runs
+// an authority shares it; run on its own, this module boots one and closes it.
+let ownAuthority = null;
+async function suiteAuthority() {
+  const support = await import('./support/online-authority.mjs');
+  const running = support.currentOnlineAuthority();
+  if (running) return running;
+  ownAuthority = await support.startOnlineAuthority({ label: 'content-certify' });
+  return ownAuthority;
+}
+async function closeOwnAuthority() {
+  if (ownAuthority) { const mine = ownAuthority; ownAuthority = null; await mine.close(); }
+}
+
 async function premiumProfile(spec) {
+  const online = await suiteAuthority();
   const { dispatch } = await import('../src/local/backend.js');
-  const idb = await import('../src/local/idb.js');
-  const { cloudLinkRowId } = await import('../src/platform/cloudAccount.js');
   const created = await dispatch('POST', '/profiles', spec);
-  const now = Date.now();
-  await idb.put('device', {
-    id: cloudLinkRowId(created.user.id), accountId: `acct-${created.user.id}`, role: 'student', emailVerified: true,
-    linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
-    entitlement: { plan: 'premium', status: 'active', provider: 'web', currentPeriodEnd: now + 30 * 86400000, offlineUntil: now + 7 * 86400000, issuedAt: now, sourceVersion: 1 }
-  });
+  await online.link(created.user.id, { entitlement: 'premium' });
   return created.user;
 }
 
@@ -550,8 +560,15 @@ export async function certifyBackend(paths, { surfaces = true } = {}) {
       const q = r?.question;
       const stored = q?.id ? await idb.get('questions', q.id) : null;
       const payload = stored?.payload;
+      // The device holds the server's public question: identity fields but no
+      // answer. The identity is checked against the server's own sealed copy
+      // of the question it issued — the hash must be the hash of THAT content.
+      const sealed = stored?.serverQuestionId ? await (await suiteAuthority()).answerKey(stored) : null;
       if (!q?.id || !(q.prompt || q.stem)) row.problem = 'reply carries no renderable question';
-      else if (!payload?.contentId || !payload?.contentVersion || payload.contentHash !== contentHashOf(payload)) row.problem = 'stored question has no valid content identity';
+      else if (!stored.serverQuestionId) row.problem = 'the question was not issued by the server';
+      else if ('answer' in payload || 'seed' in payload || 'steps' in payload) row.problem = 'the device was handed the answer, the solution or the seed';
+      else if (!payload?.contentId || !payload?.contentVersion || payload.contentId !== sealed.contentId || payload.contentVersion !== sealed.contentVersion
+        || payload.contentHash !== contentHashOf(sealed)) row.problem = 'stored question has no valid content identity';
       else if (expect.chapterId && stored.india?.chapterId !== expect.chapterId) row.problem = `served under ${stored.india?.chapterId}, not ${expect.chapterId}`;
       else if (expect.pyq && !payload.pyq) row.problem = 'past-papers-only served an authored question';
       // A named difficulty is served at exactly that level or refused (issue
@@ -910,6 +927,7 @@ export async function run(argv = process.argv.slice(2)) {
   const ok = !failingPaths.length && exams.every(e => e.pass) && cells.every(c => c.pass) && e2e.every(r => r.ok) && repeatRows.length > 0 && repeatRows.every(r => r.ok) && !!committed && cmp.ok;
   const g = summary.generatorCells;
   console.log(`CONTENT CERTIFICATION (${s.mode}, ${n}/path/difficulty): ${ok ? 'PASS' : 'FAIL'} — ${s.passed}/${s.paths} launch paths, ${s.questionsServed} questions validated, ${s.backend.passed}/${s.backend.paths} served end to end, ${s.repeatWindow.passed}/${s.repeatWindow.probes} repeat-window probes, ${g.passed}/${g.cells} generator cells, ${s.exams.passed}/${s.exams.selections} exam selections (${s.exams.questions} paper items), contentVersion ${CONTENT_VERSION} — ${secs}s`);
+  await closeOwnAuthority();
   return ok ? 0 : 1;
 }
 

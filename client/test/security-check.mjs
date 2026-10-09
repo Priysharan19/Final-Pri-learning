@@ -743,6 +743,16 @@ async function run() {
     const q1 = await numericQuestion();
     eq('a served question keeps no answer key on the device before any try', holdsNoKey((await idb.get('questions', q1.id)).payload), []);
     eq('the device sent the server no seed', online.traffic.seedsSent, 0);
+    // The bundled engine regenerates any question from its generator,
+    // difficulty and seed — answer included. So the seed the server chose is
+    // as good as the answer key and must not reach the device in any field.
+    {
+      const servedRow = await idb.get('questions', q1.id);
+      const sealedSeed = (await online.answerKey(servedRow)).seed;
+      const carriers = Object.entries(servedRow.payload).filter(([, v]) => typeof v === 'string' && new RegExp(`(^|[^0-9])${sealedSeed}([^0-9]|$)`).test(v)).map(([k]) => k);
+      ok('the server chose a seed for this question', Number.isSafeInteger(sealedSeed), show(sealedSeed));
+      eq('nothing the device was handed spells out the server’s seed', carriers, []);
+    }
     const first = await POST(`/practice/${q1.id}/submit`, { answer: q1.wrong, ms: 1000 });
     eq('a first wrong try is marked by the server and stays open', [first.correct, first.resolved, first.authoritative], [false, false, true]);
     const issuedRow = await idb.get('questions', q1.id);
