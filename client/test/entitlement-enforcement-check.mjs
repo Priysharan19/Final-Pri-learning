@@ -220,6 +220,16 @@ await backToFree(ned.id);
 // ── G · the India exam module shares the same rule and counter ───────────────
 now = T0;
 const jai = (await POST('/profiles', { name: 'Jai', year: 12, course: 'in', indiaTrack: 'jee-main' })).user;
+// A paper is marked by the server, so the India path starts one only for a
+// signed-in account — the same refusal the practice paper gives. It used to
+// start for anyone. A refused start spends nothing.
+{
+  let refusal = null;
+  try { await dispatchIndiaExam(jai, 'POST', '/exams', {}); } catch (err) { refusal = err; }
+  same('an India profile that has never signed in cannot start a paper', [refusal?.status, refusal?.code], [401, 'SIGN_IN_TO_CHECK']);
+  same('a refused start is not counted as a simulation', (await gate.examAllowance(jai)).used, 0);
+}
+await backToFree(jai.id);   // signed in to a real account, on the free plan
 const jeeSection = await dispatchIndiaExam(jai, 'POST', '/exams', {});
 ok('a JEE Main mathematics section is built for a free Class 12 profile', jeeSection.exam?.indiaExam?.track === 'jee-main' && jeeSection.allowance?.used === 1,
   JSON.stringify({ track: jeeSection.exam?.indiaExam?.track, allowance: jeeSection.allowance }));

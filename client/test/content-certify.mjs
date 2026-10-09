@@ -429,12 +429,24 @@ export function paperProblems(items) {
 }
 
 /**
- * Compose real papers through the local exam backend and certify every item.
+ * Start real papers through the local exam backend and certify every item.
  * `seeds` papers per selection. Needs the browser shim from backend-check.
+ *
+ * A paper is issued by the server (owner decision 2026-10-10): the device
+ * composes its spec and holds only the public paper. So the items certified
+ * here are the SERVER's sealed questions for each paper — the ones a student
+ * is actually marked against — read from the in-process server's store, and
+ * the device's own copy is checked to hold no answer.
  */
 export async function certifyExams(seeds) {
   const { installBrowserEnv } = await import('./backend-check.mjs');
   installBrowserEnv();
+  const { startOnlineAuthority } = await import('./support/online-authority.mjs');
+  const online = await startOnlineAuthority({ label: 'content-certify-exams' });
+  try { return await certifyIssuedExams(seeds, online); } finally { await online.close(); delete globalThis.__PRI_CLOUD_ORIGIN__; }
+}
+
+async function certifyIssuedExams(seeds, online) {
   const { dispatch } = await import('../src/local/backend.js');
   const { dispatchIndiaExam } = await import('../src/local/indiaExamBackend.js');
   const idb = await import('../src/local/idb.js');
@@ -446,12 +458,9 @@ export async function certifyExams(seeds) {
     if (!spec) { row.pass = true; row.note = 'no released blueprint for this selection — the exam page states INDIA_EXAM_NOT_RELEASED'; rows.push(row); continue; }
     const created = await dispatch('POST', '/profiles', { name: `Cert ${sel.track} ${sel.grade}`, course: 'in', indiaTrack: sel.track, year: sel.grade });
     const user = created.user;
-    const now = Date.now();
-    await idb.put('device', {
-      id: cloudLinkRowId(user.id), accountId: `acct-${user.id}`, role: 'student', emailVerified: true,
-      linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
-      entitlement: { plan: 'premium', status: 'active', provider: 'web', currentPeriodEnd: now + 30 * 86400000, offlineUntil: now + 7 * 86400000, issuedAt: now, sourceVersion: 1 }
-    });
+    // A real verified account with a Premium snapshot (the free tier's one
+    // simulation a month is not what is being certified).
+    await online.link(user.id, { name: `Cert ${sel.track} ${sel.grade}`, entitlement: 'premium' });
     for (let s = 0; s < seeds; s++) {
       const seed = seedFor(row.id, s);
       let exam;
@@ -465,8 +474,14 @@ export async function certifyExams(seeds) {
       }
       row.papers++;
       const stored = await idb.get('exams', exam.id);
-      const items = [];
-      for (const qid of stored.questionIds) items.push((await idb.get('questions', qid)).payload);
+      const items = (await online.examPaper(stored)).questions.map(q => q.payload);
+      // The device's copy of the same paper holds no answer key.
+      for (const qid of stored.questionIds) {
+        const held = (await idb.get('questions', qid))?.payload || {};
+        const leaked = ['answer', 'steps', 'traps', 'stepcheck', 'seed'].filter(k => k in held || (held.parts || []).some(part => k in part) || (held.alt && k in held.alt));
+        if (leaked.length) { row.failed++; row.failures['device copy holds private fields'] = { count: (row.failures['device copy holds private fields']?.count || 0) + 1, example: `${held.subtopic}: ${leaked.join(', ')}`, seed }; }
+      }
+      if (items.length !== stored.questionIds.length) { row.failed++; row.failures['paper size mismatch'] = { count: 1, example: `server ${items.length}, device ${stored.questionIds.length}`, seed }; }
       row.questions += items.length;
       for (const { item, problems } of paperProblems(items)) {
         if (problems.some(pr => pr.startsWith('exam item carries no content identity'))) row.unidentified++;

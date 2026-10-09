@@ -2395,6 +2395,18 @@ function safePayload(src) {
  */
 const partsOf = q => (Array.isArray(q?.parts) ? q.parts : []);
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const safeUuid = v => (typeof v === 'string' && UUID_RE.test(v) ? v.toLowerCase() : null);
+
+/** The solution a server result disclosed for one exam question, from a backup. */
+function safeExamReceipt(src) {
+  const out = { authoritative: true, examId: safeUuid(src.examId), attemptId: safeUuid(src.attemptId) };
+  if (Array.isArray(src.parts)) {
+    out.parts = src.parts.slice(0, 20).map(pt => ({ key: sanitizeText(pt?.key, 8), answerText: sanitizeText(pt?.answerText, 300), steps: safeSteps(pt?.steps), attemptId: safeUuid(pt?.attemptId) }));
+  } else if (src.solution && typeof src.solution === 'object') out.solution = safeSolution(src.solution);
+  return out;
+}
+
 const safeSolution = (s) => ({
   steps: safeSteps(s?.steps),
   answerText: sanitizeText(s?.answerText, 300),
@@ -2587,15 +2599,29 @@ const IMPORT_ROWS = {
       // in re-graded a restored 100-mark JEE Main paper as 25 marks with no
       // negative marking, and moved every answer's evidence off the chapter and
       // onto whichever NSW generator happened to draw the question.
-      ...safeIndiaQuestion(r)
+      ...safeIndiaQuestion(r),
+      // A question on a server-issued paper holds no answer; what it does hold
+      // is the fact that the server issued it and, once marked, the solution
+      // the result disclosed. Losing the marker would have every reader of the
+      // row look for an answer key that was never on this device.
+      ...(r.examServer === true ? { examServer: true, ...(r.serverReceipt && typeof r.serverReceipt === 'object' ? { serverReceipt: safeExamReceipt(r.serverReceipt) } : {}) } : {})
     };
   },
   exams: (r, pid, ids) => {
     const id = ids.exam(r.id);
+    // A server-issued paper comes back naming the server's exam and question
+    // ids, position for position with the local ones, so it can be reconciled
+    // with the server again. A score from a file is not the server's word:
+    // the row is marked `restored` until the server confirms it.
+    const serverIds = r.server && typeof r.server === 'object' && Array.isArray(r.server.questionIds) ? r.server.questionIds : null;
+    const pairs = (Array.isArray(r.questionIds) ? r.questionIds : []).slice(0, 80)
+      .map((qid, i) => [ids.question(qid), serverIds ? safeUuid(serverIds[i]) : null]).filter(([local]) => local);
+    const serverExamId = serverIds && pairs.every(([, remote]) => remote) ? safeUuid(r.server.examId) : null;
     return id && {
+      ...(serverExamId ? { server: { examId: serverExamId, questionIds: pairs.map(([, remote]) => remote), kind: sanitizeText(r.server.kind, 20) || null, savedRev: 0, savedAt: null, restored: true } } : {}),
       id, pid, year: safeInt(r.year, 7, 12, 9), pathway: PATHWAYS[r.pathway] ? r.pathway : null,
       title: safeLabel(r.title, 80) || 'Practice paper', durationMin: safeInt(r.durationMin, 5, 240, 30),
-      questionIds: (Array.isArray(r.questionIds) ? r.questionIds : []).slice(0, 80).map(ids.question).filter(Boolean),
+      questionIds: pairs.map(([local]) => local),
       createdAt: safeTime(r.createdAt) || Date.now(), finishedAt: safeTime(r.finishedAt),
       score: r.score == null ? null : safeInt(r.score, -999, 999, 0),
       total: r.total == null ? null : safeInt(r.total, 0, 999, 0),
@@ -3708,13 +3734,7 @@ const routes = {
     const qids = [];
     try {
       for (const sq of issued.questions) {
-        const q = sq.payload;
-        const row = {
-          id: String(sq.id), pid: p.id, subtopic: q.multipart ? sq.generator : (q.subtopic || sq.generator), difficulty: q.multipart ? 3 : (q.difficulty || sq.difficulty || 2),
-          // The public payload only: no answer, step or trap is on this device.
-          payload: q, mode: 'exam', examId, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: now,
-          examMarking: sq.marking, examServer: true
-        };
+        const row = paperRowOf(p.id, examId, sq, now);
         await put('questions', row);
         qids.push(row.id);
       }
@@ -3749,12 +3769,12 @@ const routes = {
     // queued finish is sent, a result from another device is adopted, a newer
     // snapshot replaces the local one. Unreachable: the local state stands.
     const held = await get('exams', params.id);
-    if (held && held.pid === p.id && isServerPaper(held) && !held.finishedAt) {
+    if (held && held.pid === p.id && isServerPaper(held) && (!held.finishedAt || held.server.restored)) {
       await withMutationLock(`exam:${params.id}`, async () => {
         const fresh = await get('exams', params.id);
-        if (!fresh || fresh.finishedAt) return;
-        const out = await reconcileWithServer(fresh);
-        if (out.result) await adoptPaperResult(p, fresh, out.result);
+        if (!fresh || (fresh.finishedAt && !fresh.server?.restored)) return;
+        const out = await reconcileWithServer(fresh, { rebuildRow: (sq, localId) => paperRowOf(p.id, fresh.id, sq, fresh.createdAt, localId) });
+        if (out.result && !fresh.finishedAt) await adoptPaperResult(p, fresh, out.result);
         else if (out.changed) await put('exams', fresh);
       });
     }
@@ -4894,6 +4914,17 @@ async function examFor(pid, examId) {
   return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null, session: { ...examSessionView(e, viewedAt), pending: pendingView(e) }, markedBy: markedByOf(e), serverIssued: isServerPaper(e) };
 }
 
+/** The device's row for one server-issued practice-paper question: the public payload only. */
+function paperRowOf(pid, examId, sq, now, id = String(sq.id)) {
+  const q = sq.payload;
+  return {
+    id, pid, subtopic: q.multipart ? sq.generator : (q.subtopic || sq.generator), difficulty: q.multipart ? 3 : (q.difficulty || sq.difficulty || 2),
+    // No answer, step or trap is on this device.
+    payload: q, mode: 'exam', examId, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: now,
+    examMarking: sq.marking, examServer: true
+  };
+}
+
 /**
  * Store the server's result on a practice paper and record the evidence it
  * certifies. Each attempt carries the server's attempt id, so recording is
@@ -4944,7 +4975,7 @@ async function adoptPaperResult(p, e, serverResult) {
       solution: d.solution
     });
     if (!row) continue;
-    if (!d.unanswered && d.attemptId) {
+    if (d.attemptId) {
       // An exam answer that landed on a designed distractor is the same
       // evidence a practice one is, and under exam conditions it is better
       // evidence — so it is counted here too.

@@ -79,7 +79,7 @@ const PART_KEY = /^[a-z0-9]{1,8}$/i;
 const TRACKS = ['cbse', 'jee-main', 'jee-advanced', 'olympiad'];
 const NEEDS = ['mcq', 'numerical', 'integer99', 'written', 'any', 'facts', 'factsNoFigure'];
 const PRACTICE_LENGTHS = [10, 15, 20];
-const ISSUE_TRIES = 6;
+const ISSUE_TRIES = 24;
 const MAX_ANSWER = 4000;
 const MAX_WORKING = 8000;
 const MAX_KEYS = 400;
@@ -320,8 +320,12 @@ async function issueQuestions(read) {
     for (const slot of read.slots) {
       let built = null;
       for (let attempt = 0; attempt < ISSUE_TRIES && !built; attempt++) {
+        // Draws that did not make an item are not on the paper: forget them,
+        // so a small bank is not used up by attempts that came to nothing.
+        const seenBefore = new Set(ctx.seen);
         try { built = issueIndiaItem(slot.section, slot.recipe, ctx, { chapterName: slot.chapter.name }); }
         catch { built = null; }
+        if (!built) ctx.seen = seenBefore;
       }
       if (!built) return UNSUPPORTED(questions.length + 1);
       const grid = sectionMarking(slot.section);
@@ -595,7 +599,10 @@ export function markPaper(paper, responses, { now, totalMs }) {
       const chosen = useAlt ? { ...q.alt, subtopic: q.alt.subtopic || q.subtopic, difficulty: q.alt.difficulty || q.difficulty || 2 } : q;
       const r = markResponse(chosen, answers[key], workings[key], sq.marking);
       const marks = Number(sq.marking.correct);
-      const attemptId = r.unanswered ? null : attempt(sq, chosen, r, { marks, inputMode: inputMode(key), ms });
+      // A blueprint paper leaves a question it never saw an answer to out of
+      // the evidence: not attempted is not wrong. A practice paper has always
+      // counted a blank as a wrong attempt, and still does.
+      const attemptId = r.unanswered && paper.kind === 'india' ? null : attempt(sq, chosen, r, { marks, inputMode: inputMode(key), ms });
       schemes[r.markingScheme] = (schemes[r.markingScheme] || 0) + 1;
       out = {
         ...base, prompt: chosen.prompt, answerType: chosen.answerType, mcqOptions: chosen.mcqOptions || null, matchList: chosen.matchList || null,

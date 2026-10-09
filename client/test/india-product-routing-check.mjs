@@ -16,8 +16,15 @@ const legacyBackend = read('src/local/backend.js');
 
 assert.match(api, /activeUser\?\.course === 'in' && indiaExamRoute\(method, path\)/,
   'India profiles must intercept exam routes before the legacy backend');
-assert.match(indiaExamBackend, /target\?\.pyq/,
+// The reviewed-provenance rule for JEE previous-year cells is one definition,
+// read by the device when it composes a paper and by the server when it checks
+// the paper spec (engine/indiaExamCells.js).
+assert.match(read('src/engine/indiaExamCells.js'), /target\?\.pyqArchive !== 'jee-question-department'/,
   'JEE Main exam mode must require reviewed PYQ provenance');
+assert.match(indiaExamBackend, /indiaPyqCells\(track, chapters\)/,
+  'and the India exam backend must compose from those reviewed cells');
+assert.match(read('../server/platform/exams.js'), /indiaIssuableCells\(b\.track, b\.grade\)/,
+  'and the server must issue a paper from the same cells only');
 assert.match(indiaExamBackend, /JEE_REVIEWED_BANK_INSUFFICIENT/,
   'exam generation must fail closed when reviewed coverage cannot fill the authentic structure');
 assert.match(legacyBackend, /HSC-style/,

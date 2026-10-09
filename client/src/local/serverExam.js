@@ -47,8 +47,17 @@ const RECONCILE_EVERY_MS = 3000;
 const SUBMISSION_KEY = /^[a-zA-Z0-9_-]{8,100}$/;
 
 export const isServerPaper = exam => !!exam?.server?.examId;
-/** A paper finished by an earlier app version: marked on the device, never certified. */
-export const markedByOf = exam => (!exam?.finishedAt ? null : isServerPaper(exam) ? 'server' : 'earlier-version');
+/**
+ * Who a finished paper's marks come from, as far as this device can vouch:
+ *   'server'           the server's stored result;
+ *   'backup'           a server paper restored from a backup file whose score
+ *                      the server has not confirmed yet;
+ *   'earlier-version'  marked on the device by an earlier app version.
+ * Only the first is a certified result.
+ */
+export const markedByOf = exam => (!exam?.finishedAt ? null
+  : !isServerPaper(exam) ? 'earlier-version'
+    : exam.server.restored ? 'backup' : 'server');
 
 function randomKey(prefix) {
   let id = '';
@@ -400,20 +409,46 @@ export function noteReconciled(examId) { lastReconciled.set(String(examId), mono
  *   {}           nothing to do, or the server could not be reached (local state stands)
  * The caller holds the paper's lock and writes `exam` back when told to.
  */
-export async function reconcileWithServer(exam, { force = false } = {}) {
-  if (!isServerPaper(exam) || exam.finishedAt) return {};
+export async function reconcileWithServer(exam, { force = false, rebuildRow = null } = {}) {
+  if (!isServerPaper(exam)) return {};
+  if (exam.finishedAt) {
+    // A finished paper that came back from a backup file: its score is the
+    // file's until the server says what it stored.
+    if (!exam.server.restored) return {};
+    let remote;
+    try { remote = await cloud.getExam(exam.server.examId); } catch { return {}; }
+    if (remote?.state !== 'finished' || remote.result?.authoritative !== true) return {};
+    exam.score = Number(remote.result.score);
+    exam.total = Number(remote.result.total);
+    exam.server.restored = false;
+    return { changed: true };
+  }
   if (exam.pendingFinish) {
     const out = await finishOnServer(exam, {}, Date.now()).catch(() => ({ pending: pendingView(exam) }));
     return out.result ? { result: out.result } : { pending: out.pending || null, changed: true };
   }
   const key = String(exam.id);
-  if (!force && lastReconciled.has(key) && monotonic() - lastReconciled.get(key) < RECONCILE_EVERY_MS) return {};
+  // A question row the device has lost (a truncated restore, an interrupted
+  // delete) is still on the paper: the server holds it, and it is put back.
+  const missing = [];
+  if (rebuildRow) {
+    for (const [i, qid] of (exam.questionIds || []).entries()) {
+      if (!(await get('questions', qid).catch(() => null))) missing.push(i);
+    }
+  }
+  if (!force && !missing.length && !exam.server.restored && lastReconciled.has(key) && monotonic() - lastReconciled.get(key) < RECONCILE_EVERY_MS) return {};
   let remote;
   try { remote = await cloud.getExam(exam.server.examId); } catch { return {}; }
   noteReconciled(key);
+  let changed = false;
+  for (const i of missing) {
+    const sq = (remote?.exam?.questions || []).find(q => String(q.id) === String(exam.server.questionIds?.[i]));
+    if (sq) { await put('questions', rebuildRow(sq, exam.questionIds[i])); changed = true; }
+  }
   if (remote?.state === 'finished' && remote.result?.authoritative === true) return { result: remote.result };
-  if (remote?.state !== 'open') return {};
-  let changed = clampDeadline(exam, remote.exam?.remainingMs);
+  if (remote?.state !== 'open') return { changed };
+  if (exam.server.restored) { exam.server.restored = false; changed = true; }
+  changed = clampDeadline(exam, remote.exam?.remainingMs) || changed;
   const snapshot = remote.snapshot;
   const localRev = Number(exam.responses?.rev) || 0;
   if (snapshot && Number(snapshot.rev) > localRev) {

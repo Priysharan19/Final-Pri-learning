@@ -1666,14 +1666,26 @@ async function run() {
     eq('the paper of an unsubmitted exam withholds model answers (#230)', paper.questions.filter(q => q.answerText !== undefined).length, 0);
     eq('the paper names the course', paper.course, 'Year 10 · Stage 5');
 
-    // Answer the whole paper correctly, straight from the stored payloads.
+    // The paper is the server's: the device holds no answer to any of it.
+    {
+      const storedRows = [];
+      for (const qid of (await idb.get('exams', created.id)).questionIds) storedRows.push(await idb.get('questions', qid));
+      const privateKeys = new Set(['answer', 'steps', 'traps', 'stepcheck', 'seed', 'hints', 'solutionText']);
+      const held = v => (!v || typeof v !== 'object' ? [] : Object.entries(v).flatMap(([k, x]) => [...(privateKeys.has(k) ? [k] : []), ...held(x)]));
+      eq('no answer, step or trap of the paper is stored on the device', held(storedRows.map(r => r.payload)), []);
+      ok('the paper is server-issued', !!(await idb.get('exams', created.id)).server?.examId && storedRows.every(r => r.examServer === true));
+    }
+    // Answer the whole paper correctly, from the SERVER's sealed paper (a test
+    // oracle read from its store; the product never sees it).
     const perfect = {};
     for (const qid of (await idb.get('exams', created.id)).questionIds) {
-      const q = (await idb.get('questions', qid)).payload;
+      const q = await online.answerKey(await idb.get('questions', qid));
       if (q.multipart) for (const part of q.parts) perfect[`${qid}::${part.key}`] = canonicalInput(part);
       else perfect[qid] = canonicalInput(q);
     }
     marked = await POST(`/exams/${created.id}/submit`, { answers: perfect, ms: 1200000 });
+    eq('the paper is marked by the server', marked.markedBy, 'server');
+    eq('the score is the server\'s stored result', [marked.score, marked.total], await online.examResult(created.id).then(r => [r?.score, r?.total]));
     ok('every mark on the paper is awarded', marked.score === marked.total, `${marked.score}/${marked.total}`);
     eq('a perfect paper is 100%', marked.pct, 100);
     ok('the paper is worth what its criteria say', marked.total > 0, `total ${marked.total}`);
@@ -1690,7 +1702,7 @@ async function run() {
       const payloads = [];
       for (const qid of (await idb.get('exams', created.id)).questionIds) {
         const row = await idb.get('questions', qid);
-        if (row?.payload) payloads.push(row.payload);
+        if (row?.payload) payloads.push(await online.answerKey(row));
       }
       const refused = [];
       markedPaper.questions.forEach((pq, i) => {

@@ -136,6 +136,20 @@ function narrowCells(cells, { min = 1, max = 4 } = {}) {
   return cells.filter(c => gap(c) === best);
 }
 
+/** The device's row for one server-issued question: the public payload and where it sits on the paper. */
+function rowOf(pid, track, examId, sq, now, id = String(sq.id)) {
+  return {
+    id, pid, subtopic: sq.payload.subtopic || sq.generator, difficulty: sq.difficulty,
+    // The public payload only: prompt, options, parts. No answer, step or trap.
+    payload: sq.payload,
+    india: { chapterId: sq.chapterId, track, dotpointIndex: null },
+    mode: 'exam', examId, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: now,
+    indiaExamSection: sq.section, indiaExamSectionLabel: sq.sectionLabel, indiaExamItem: sq.item, examOrder: sq.order,
+    examMarking: sq.marking, sourceKind: sq.pyq ? 'reviewed-jee-pyq' : 'authored-generator', conversion: sq.conversion,
+    examServer: true
+  };
+}
+
 async function createIndiaExam(profile, body = {}) {
   const grade = Number(profile.year);
   const track = cleanIndiaTrack(profile.indiaTrack || 'cbse', grade);
@@ -150,32 +164,43 @@ async function createIndiaExam(profile, body = {}) {
   if (!chapters.length) throw error('The curriculum scope for this track is unavailable.', 503, 'INDIA_SCOPE_UNAVAILABLE');
   await loadBanksFor([...new Set(chapters.flatMap(c => (c.covers || []).map(x => x.gen)))]);
   const pyqCells = await pyqCellsByChapter(track, chapters);
-  const seed = Number.isFinite(Number(body.seed)) && Number(body.seed) > 0 ? Math.floor(Number(body.seed)) & 0x7fffffff : randomSeed();
-
-  const paper = composeIndiaPaper(spec, {
-    seed, draw: generateQuestion, chapters,
-    // The section's own difficulty window narrows the chapter's archive cells,
-    // by the same nearest-rung rule chapterCells uses for authored ones: a
-    // one-mark Section A slot should not be handed a D4 JEE Advanced item just
-    // because the chapter has one, but a chapter whose only past-paper question
-    // sits a rung outside the window is still better than no past paper at all.
-    pyqCellsFor: (chapter, range) => narrowCells(pyqCells.get(chapter.id) || [], range)
-  });
-  if (body.source === 'reviewed' && paper.composition.pyq < paper.questions.length) {
-    throw error(
-      'The reviewed JEE PYQ archive cannot currently supply enough unique questions for a reviewed-only Mathematics-section simulation.',
-      503,
-      'JEE_REVIEWED_BANK_INSUFFICIENT'
-    );
-  }
-
   const count = (await byIndex('exams', 'pid', profile.id)).filter(e => e?.indiaExam?.blueprintId === spec.id).length;
   const title = titleFor(spec, count + 1);
-  // The device's own draws were only how it learnt what the banks can supply.
-  // What goes to the server is the recipe of each item; the server chooses the
-  // questions, and no answer to any of them comes back until it has marked.
-  const issued = await issueServerExam(profile.id, { ...paperSpecOf(paper, { track, grade, variant }), title },
-    `india:${track}:${grade}:${variant}:${body.source === 'reviewed' ? 'reviewed' : 'any'}`);
+  let seed = Number.isFinite(Number(body.seed)) && Number(body.seed) > 0 ? Math.floor(Number(body.seed)) & 0x7fffffff : randomSeed();
+  let paper = null;
+  let issued = null;
+  // A spec the server cannot issue (a recipe whose bank came up short on its
+  // own draws) is composed again from a fresh seed, twice, before the student
+  // is told. Nothing is ever dropped from a paper to make it fit.
+  for (let attempt = 0; attempt < 3 && !issued; attempt++) {
+    if (attempt) seed = randomSeed();
+    paper = composeIndiaPaper(spec, {
+      seed, draw: generateQuestion, chapters,
+      // The section's own difficulty window narrows the chapter's archive cells,
+      // by the same nearest-rung rule chapterCells uses for authored ones: a
+      // one-mark Section A slot should not be handed a D4 JEE Advanced item just
+      // because the chapter has one, but a chapter whose only past-paper question
+      // sits a rung outside the window is still better than no past paper at all.
+      pyqCellsFor: (chapter, range) => narrowCells(pyqCells.get(chapter.id) || [], range)
+    });
+    if (body.source === 'reviewed' && paper.composition.pyq < paper.questions.length) {
+      throw error(
+        'The reviewed JEE PYQ archive cannot currently supply enough unique questions for a reviewed-only Mathematics-section simulation.',
+        503,
+        'JEE_REVIEWED_BANK_INSUFFICIENT'
+      );
+    }
+
+    // The device's own draws were only how it learnt what the banks can supply.
+    // What goes to the server is the recipe of each item; the server chooses the
+    // questions, and no answer to any of them comes back until it has marked.
+    try {
+      issued = await issueServerExam(profile.id, { ...paperSpecOf(paper, { track, grade, variant }), title },
+        `india:${track}:${grade}:${variant}:${body.source === 'reviewed' ? 'reviewed' : 'any'}`);
+    } catch (err) {
+      if (err?.code !== 'EXAM_CONTENT_UNSUPPORTED' || attempt === 2) throw err;
+    }
+  }
 
   const examId = String(issued.id);
   const questionIds = [];
@@ -183,16 +208,7 @@ async function createIndiaExam(profile, body = {}) {
   const now = Date.now();
   try {
     for (const sq of issued.questions) {
-      const row = {
-        id: String(sq.id), pid: profile.id, subtopic: sq.payload.subtopic || sq.generator, difficulty: sq.difficulty,
-        // The public payload only: prompt, options, parts. No answer, step or trap.
-        payload: sq.payload,
-        india: { chapterId: sq.chapterId, track, dotpointIndex: null },
-        mode: 'exam', examId, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: now,
-        indiaExamSection: sq.section, indiaExamSectionLabel: sq.sectionLabel, indiaExamItem: sq.item, examOrder: sq.order,
-        examMarking: sq.marking, sourceKind: sq.pyq ? 'reviewed-jee-pyq' : 'authored-generator', conversion: sq.conversion,
-        examServer: true
-      };
+      const row = rowOf(profile.id, track, examId, sq, now);
       await put('questions', row);
       created.push(row.id);
       questionIds.push(row.id);
@@ -287,12 +303,14 @@ async function examView(profile, id) {
   // An open paper the server owns is brought up to date with it first: a
   // queued finish is sent, a result produced on another device is adopted, a
   // newer snapshot replaces the local one. Unreachable server: local state stands.
-  if (isServerPaper(exam) && !exam.finishedAt) {
+  if (isServerPaper(exam) && (!exam.finishedAt || exam.server.restored)) {
     await withExamLock(id, async () => {
       const fresh = await requireExam(profile, id);
-      if (fresh.finishedAt) return;
-      const out = await reconcileWithServer(fresh);
-      if (out.result) await adoptResult(fresh, out.result);
+      if (fresh.finishedAt && !fresh.server.restored) return;
+      const out = await reconcileWithServer(fresh, {
+        rebuildRow: (sq, localId) => rowOf(profile.id, fresh.indiaExam?.track, fresh.id, sq, fresh.createdAt, localId)
+      });
+      if (out.result && !fresh.finishedAt) await adoptResult(fresh, out.result);
       else if (out.changed) await put('exams', fresh);
     });
     exam = await requireExam(profile, id);
