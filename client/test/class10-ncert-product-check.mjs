@@ -33,7 +33,9 @@ copy('ncert.c10TabExercises',/Exercises/,'Exercises tab');
 copy('ncert.c10TabSourceCoverage',/Source Coverage/,'Source Coverage tab');
 copy('ncert.c10AppendixNote',/Answers\/Hints appendix/,'appendix authority note');
 copy('ncert.c10Intro',/Apple Pencil handwriting/,'handwriting promise');
-copy('ncert.c10Intro',/offline/,'offline promise');
+// Practice from the library is the normal answer experience, which is checked
+// by Pri's server: the intro promises no offline practice or progress.
+copy('ncert.c10Intro',/^(?!.*offline)/i,'no offline-practice promise');
 copy('ncert.c10ChapterCount',/offline/,'offline chapter badge');
 
 // NCERT must reuse Pri's mature handwriting path instead of shipping a fork.

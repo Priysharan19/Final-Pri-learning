@@ -70,9 +70,12 @@ ok(/year: user\?\.year/.test(panel),
 ok(/cloud\.register\(\{[^)]*guardianEmail/.test(account),
   'and cloudAccount.js forwards every one of them to the server rather than dropping them');
 
-// ── 4 · The student is told what waiting costs them, which is nothing ─────────
-ok(/keeps working/i.test(panelCopy) && /nothing is lost/i.test(panelCopy),
-  'the student is told the app keeps working while a guardian is asked — because it does');
+// ── 4 · The student is told what waiting costs them, truthfully ───────────────
+// Online-only grading: until a guardian confirms, answers cannot be checked.
+// The student can keep writing, and is told so without a promise of marking.
+ok(/keep writing/i.test(panelCopy) && /answers can be checked once they confirm/i.test(panelCopy)
+  && !/marking and handwriting all run on this device/i.test(panelCopy),
+  'the student is told they can keep writing while a guardian is asked, and that checking waits for the confirmation');
 ok(/email them a link/i.test(panelCopy), 'and what will actually happen');
 
 // ── 5 · It never overstates what the confirmation establishes ────────────────

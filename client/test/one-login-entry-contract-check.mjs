@@ -28,8 +28,8 @@ assert.doesNotMatch(
 );
 assert.match(
   en,
-  /'login\.localOnlySub':\s*'[^']*handwriting and photo reading need a Pri account\.'/i,
-  'explicit offline mode must say that handwriting/photo reading needs an account'
+  /'login\.localOnlySub':\s*'(?![^']*(?:practice works|offline))[^']*checking answers needs a Pri account\.'/i,
+  'explicit device-only mode must say that checking answers needs an account, and promise no offline practice (online-only grading)'
 );
 
 // Finishing real account onboarding is atomic: never enter Practice with a cloud session

@@ -36,8 +36,10 @@ for (const key of ['settings.helpBody', 'settings.helpBodyIndia']) {
   ok(!/on this device|on-device|strokes → symbols/.test(en[key]) && /server reader/.test(en[key]), `${key} (EN) says handwriting is read by the server`);
   ok(!/इसी डिवाइस पर पहचाने|स्ट्रोक → चिह्न/.test(hi[key]) && /सर्वर रीडर/.test(hi[key]), `${key} (HI) says handwriting is read by the server`);
 }
-ok(/Typed practice works offline; handwriting needs a connection\./.test(en['login.heroSub']), 'the welcome line scopes "works offline" to typed practice (EN)');
-ok(/हस्तलेखन के लिए कनेक्शन चाहिए/.test(hi['login.heroSub']), 'and in Hindi');
+// Online-only checking (owner decision 2026-10-10): the welcome line promises
+// no offline or on-device marking, and says what checking needs.
+ok(!/offline|on your device/i.test(en['login.heroSub']) && /checked by Pri’s server/.test(en['login.heroSub']) && /Pri account and a connection/.test(en['login.heroSub']), 'the welcome line says answers are checked by the server with an account and a connection (EN)');
+ok(!/बिना इंटरनेट/.test(hi['login.heroSub']) && /Pri का सर्वर जाँचता है/.test(hi['login.heroSub']) && /Pri खाता और कनेक्शन चाहिए/.test(hi['login.heroSub']), 'and in Hindi');
 
 // ── 3 · The editor footer names who reads, accurately ────────────────────────
 const card = read('client/src/components/QuestionCard.jsx');
