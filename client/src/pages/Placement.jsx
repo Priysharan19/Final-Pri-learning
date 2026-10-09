@@ -104,7 +104,7 @@ export default function Placement() {
   const startRefused = refusal ? (
     <div className="verdict verdict-technical" role="alert" data-placement-refused={refusal} style={{ marginTop: 14, textAlign: 'left' }}>
       <span className="verdict-ico"><Icon name="alert" /><span className="sr-only">{t('verdict.notCheckedLabel')}</span></span>
-      <div><CheckRefusal kind={refusal} context="placement" user={user} refreshUser={refreshUser} onRetry={() => start(false)} busy={busy} /></div>
+      <div><CheckRefusal kind={refusal} context="placement" user={user} refreshUser={refreshUser} onRetry={() => start(false)} onRestart={() => start(true)} busy={busy} /></div>
     </div>
   ) : null;
 
@@ -113,17 +113,19 @@ export default function Placement() {
     nav('/', { replace: true });
   };
 
-  // The card's "Next question" after a refused answer (409). A stale or
-  // already-answered item reloads to the current one. If the server still
-  // offers the very question it just refused, its sitting cannot be replayed
-  // (begun by an older version), so it is started again rather than looping.
+  // The card's "Next question" after a refused answer (409): a stale or
+  // already-answered item reloads to the question the check is actually on.
+  // It only ever moves to the current question — it never starts the check
+  // again. A check that has to be restarted (begun by an older version, so the
+  // server has none of its questions) says so on the card, and restarting is
+  // the student's own press there.
   const recover = async () => {
-    const refused = question?.id;
-    try {
-      const v = await api.get('/placement');
-      if (v.status === 'active' && v.question?.id === refused) { await start(true); setRound(r => r + 1); return; }
-    } catch { /* refresh below reports a load failure */ }
-    refresh();
+    await refresh();
+    setRound(r => r + 1);
+  };
+  const restart = async () => {
+    await start(true);
+    setRound(r => r + 1);
   };
 
   // The answered card drops its own button; keyboard focus moves to this one.
@@ -168,7 +170,7 @@ export default function Placement() {
         <QuestionCard
           key={`${question.id}:${round}`}
           question={question}
-          diagnostic={{ submitPath: `/placement/${question.id}/answer` }}
+          diagnostic={{ submitPath: `/placement/${question.id}/answer`, onRestart: restart }}
           onResolved={setAnswered}
           onNext={recover}
         />
