@@ -2125,6 +2125,98 @@
       "csrf": "double-submit-when-session-cookie",
       "origin": "enforced",
       "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/exams/",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "eligible student starts a paper: the body is a paper SPEC only (blueprint track/class/variant or practice-paper year/minutes, and ordered slots naming authored cells); validated against the server's own blueprint and the track's authored and previous-year cells; the server chooses every question (no caller seed), owns the marking grid, start time and deadline, and seals them under a new exam id keyed by (account_id, id) in idempotency_keys scope exam-paper; returns the public paper only (allow-listed fields, no answer, step, trap, seed or criterion); a required Idempotency-Key replays the same paper, a different body under the same key is 409",
+      "rateLimits": [
+        {
+          "key": "exam-create",
+          "limit": 30,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/exams/:id/answers",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "owner only: the sealed paper is read by (account_id, id), so another account's id, an unknown id and a malformed id are the same 404 EXAM_NOT_FOUND and write nothing; stores the latest answer snapshot (answers, working, per-question time, input mode — text only, keys of this paper only) with the server's timestamp; an older revision never replaces a newer one; refused with 409 once the paper is finalised or deadline + 2 minutes has passed",
+      "rateLimits": [
+        {
+          "key": "exam-answers",
+          "limit": 1800,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/exams/:id/finish",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "owner only (same 404 rule); exactly-once finalisation in one transaction under the account sync lock: every question marked by the deterministic engine against the sealed key and server-owned grid, one immutable result, one exam-attempt and per-attempted-question graded-attempt learning events by device server-grader; a replay returns the stored result unchanged; arriving after deadline + 2 minutes marks only the last server-saved snapshot and flags late; no client award authority",
+      "rateLimits": [
+        {
+          "key": "exam-finish",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/exams/:id",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "owner only (same 404 rule); the public paper, timing and saved snapshot while open; the stored result (marks, solutions) once finalised; never an answer, step, trap or seed of an unfinished paper",
+      "rateLimits": [
+        {
+          "key": "exam-read",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
     }
   ]
 }

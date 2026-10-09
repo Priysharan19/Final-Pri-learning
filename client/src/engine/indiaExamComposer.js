@@ -784,3 +784,16 @@ export function issueIndiaItem(section, recipe, ctx, { chapterName = '' } = {}) 
   if (recipe.kind === 'multi-correct') return assembleMultiCorrect(ctx, draws[0], draws[1]);
   return assembleMatrixMatch(ctx, draws);
 }
+
+/**
+ * The spec a device sends to have a composed paper issued: the blueprint
+ * selection and, per question in paper order, its section, its chapter and its
+ * recipe. No question text, answer, seed or mark travels in it.
+ */
+export function paperSpecOf(paper, { track, grade, variant = 'standard' }) {
+  return {
+    kind: 'india',
+    blueprint: { track, grade: Number(grade), variant },
+    slots: paper.questions.map(q => ({ section: String(q.section), chapter: q.chapterId, recipe: q.recipe }))
+  };
+}

@@ -37,6 +37,9 @@ export const ENGINE_SUITES = [
   // The immutable online-issued grading receipts and adversarial account, replay,
   // and awarded-marks checks MUST also pass with real pri_server Postgres.
   'online-marking-authority-check.mjs',
+  // Examination papers: sealed paper, answer snapshots, exactly-once
+  // finalisation and the deadline rule, account-scoped under Row-Level Security.
+  'exam-authority-check.mjs',
   // Method marks need progress and issuing by seed is deterministic and
   // per-account — through the same real HTTP routes, on the Postgres store.
   'method-progress-http-check.mjs',
