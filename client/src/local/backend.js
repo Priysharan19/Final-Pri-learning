@@ -3948,6 +3948,7 @@ const routes = {
   // ---- rush ----
   'POST /rush/start': async () => {
     const p = await requireProfile();
+    await requireCheckableSession(p.id);
     // Rapid Fire drew from the NSW scope for every profile, so an Indian
     // Class 10 student playing it was answering MA5 subtopics. The India spine
     // already knows this student's chapters; there is no reason a game mode
@@ -4000,6 +4001,7 @@ const routes = {
   // ---- match mode ----
   'POST /match/start': async (body) => {
     const p = await requireProfile();
+    await requireCheckableSession(p.id);
     const rivals = {
       rookie: { name: 'Robo-Rookie', avatar: '🤖', secPerQ: 22, accuracy: 0.62 },
       pro: { name: 'Captain Cosine', avatar: '🦾', secPerQ: 14, accuracy: 0.78 },
@@ -5196,13 +5198,8 @@ async function entitlementGate(method, pattern, body, params) {
   if (key === 'POST /exams') {
     const p = await requireProfile();
     // An exam is marked work, so it starts only for a signed-in account that
-    // can reach the server now (online-only grading). The paper itself is
-    // still marked by the bundled engine at the end of the sitting until the
-    // server marks exam papers; that is tracked as open work, not hidden.
-    if (!(await profileCloudAccountId(p.id).catch(() => null))) throw checkUnavailable('sign-in');
-    try { await cloud.me(); } catch (cause) {
-      throw checkUnavailable(cause?.status === 401 ? 'sign-in' : cause?.status === 403 ? 'refused' : 'offline', cause);
-    }
+    // can reach the server now (online-only grading).
+    await requireCheckableSession(p.id);
     await assertExamAllowed(p);
     return async result => {
       await recordExamSimulation(p);
@@ -5257,6 +5254,16 @@ const viaServer = async call => { try { return await call(); } catch (cause) { t
 /** A locally generated question reduced to what a student may see unmarked. */
 function draftQuestion(q) {
   return { ...publicQuestionFields(q), supportsSteps: !!stepMetaFor(q), criteriaCount: criteriaFor(q).length };
+}
+
+/**
+ * A timed activity is marked answer by answer, so it starts only when marking
+ * is possible: a linked account whose session the server accepts right now.
+ * Refusing at the start is kinder than stopping a running clock.
+ */
+async function requireCheckableSession(pid) {
+  if (!(await profileCloudAccountId(pid).catch(() => null))) throw checkUnavailable('sign-in');
+  try { await cloud.me(); } catch (cause) { throw unreachable(cause); }
 }
 
 /**

@@ -108,7 +108,8 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   const kinds = Object.values(CHECK_REFUSAL);
   eq(kinds.length, 8, 'eight reasons are named');
   const used = new Set(['check.needsAccount', 'check.signInAction']);
-  for (const context of ['answer', 'exam']) {
+  // A timed game (Rapid Fire, Match) is refused at its start with the same reasons.
+  for (const context of ['answer', 'exam', 'game']) {
     for (const kind of kinds) {
       const copy = checkRefusalCopy(kind, context);
       ok(copy && ['sign-in', 'retry', 'account', 'next'].includes(copy.action), `${kind}/${context} has one next step`);
@@ -129,6 +130,7 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   eq([checkRefusalCopy('verify-email').action, checkRefusalCopy('guardian').action], ['account', 'account'], 'the email and guardian reasons point at the account, where they are cleared');
   eq(checkRefusalCopy('sign-in', 'exam').titleKey, 'check.examSignInTitle', 'an exam start says a paper, not an answer');
   eq(checkRefusalCopy('reconnect', 'exam').contextKey, 'check.examNotStarted', 'and that the paper has not started');
+  eq(checkRefusalCopy('sign-in', 'game').contextKey, 'check.gameNotStarted', 'a game that could not start says so, and that nothing was marked');
   eq(checkRefusalCopy('nonsense'), null, 'an unknown reason has no words');
   const catalogueKeys = Object.keys(en).filter(k => k.startsWith('check.'));
   eq(catalogueKeys.filter(k => !used.has(k)), [], 'no check.* string is unused');

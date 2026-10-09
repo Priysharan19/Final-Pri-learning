@@ -80,7 +80,7 @@ export function checkRefusalCopy(kind, context = 'answer') {
   return {
     ...copy,
     titleKey: exam && kind === CHECK_REFUSAL.SIGN_IN ? 'check.examSignInTitle' : copy.titleKey,
-    contextKey: exam ? 'check.examNotStarted' : 'check.notChecked'
+    contextKey: exam ? 'check.examNotStarted' : context === 'game' ? 'check.gameNotStarted' : 'check.notChecked'
   };
 }
 

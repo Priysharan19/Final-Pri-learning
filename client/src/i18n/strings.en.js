@@ -2619,6 +2619,7 @@ export default {
   'check.accountHint': 'Account settings shows what the account still needs.',
   'check.questionTitle': 'This question cannot be checked right now',
   'check.questionHint': 'Try again, or go to the next question.',
+  'check.gameNotStarted': 'The game has not started, and nothing was marked.',
   'check.newQuestionTitle': 'This question cannot be marked',
   'check.newQuestionHint': 'It was opened without a connection to Pri, or too long ago. Go to the next question to have your answer marked.'
 };
