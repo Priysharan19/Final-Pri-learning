@@ -150,6 +150,50 @@ function solutionFor(q) {
   return { steps, answerText: answerTextFor(q), criteria, solutionText: q.solutionText };
 }
 
+/**
+ * Server-side tutor grounding for one issued question (server/platform/tutor.js).
+ *
+ * The escrowed question is read for THIS account only: another account's
+ * question id is indistinguishable from an id that never existed (null). What
+ * comes back never leaves the server — it is the material the tutor guard
+ * checks a model's reply against, not a response body. `workEvidence` runs the
+ * deterministic Step Check on the student's own lines, so the device's word
+ * about which lines are verified is never trusted for an issued question.
+ */
+export async function issuedQuestionForTutor(db, accountId, questionId, now = Date.now()) {
+  db = asStore(db);
+  if (typeof questionId !== 'string' || !UUID.test(questionId)) return null;
+  const sealed = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?",
+    [accountId, questionId, now]);
+  if (!sealed) return null;
+  let q;
+  try { q = JSON.parse(sealed.response_json); } catch { return null; }
+  const completed = await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-completion' AND key=?",
+    [accountId, questionId]);
+  return {
+    resolved: !!completed,
+    mode: q._practiceMode || 'practice',
+    version: String(q.contentVersion || q.version || 1),
+    prompt: String(q.prompt || ''),
+    steps: (q.steps || []).map(step => ({ h: String(step?.h ?? ''), d: String(step?.d ?? '') })),
+    answerText: String(answerTextFor(q) ?? ''),
+    hints: Array.isArray(q.hints) ? q.hints.filter(h => typeof h === 'string') : [],
+    workEvidence(lines) {
+      const evidence = { firstBreak: -1, verifiedLines: 0, misconception: null };
+      const meta = stepMetaFor(q);
+      if (!meta || !Array.isArray(lines) || !lines.length) return evidence;
+      try {
+        const judged = stepCheck(meta, lines.join('\n'))?.lines || [];
+        const at = judged.findIndex(line => line?.status === 'break');
+        if (at >= 0 && at < lines.length) evidence.firstBreak = at;
+        while (evidence.verifiedLines < judged.length && evidence.verifiedLines < lines.length &&
+          judged[evidence.verifiedLines]?.status === 'ok') evidence.verifiedLines += 1;
+      } catch { /* the checker's silence is not evidence */ }
+      return evidence;
+    }
+  };
+}
+
 export function createPracticeRouter(db, { transcribe = transcribeHandwriting, env = process.env } = {}) {
   db = asStore(db);
   const router = asyncRouter();
