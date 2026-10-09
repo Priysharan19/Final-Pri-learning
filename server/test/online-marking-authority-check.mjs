@@ -161,6 +161,49 @@ try {
   eq(validAward.status, 200, 'valid answer remains possible after rejected forgery');
   eq(validAward.data.marksEarned, 2, 'only server attests the recovered full marks');
   eq(await eventCount(a.account.id), beforeForged + 1, 'recovered grade persists once');
+  // OWNER'S EXACT MANUAL QUESTION — not a substitute for real Pencil input:
+  // the server must issue the Class 12 CBSE question the owner saw, attest
+  // 0/1 for written "4" and 1/1 for "1", and persist exactly one final grade.
+  // The seed is fixed against the real published question generator; the
+  // client cannot send its own rubric or claim mathematical authority.
+  const ownerQuestion = await h.request('/v1/practice/issue', {
+    method: 'POST', jar: a.jar,
+    body: { generator: 'c12-differential-equations', difficulty: 1, seed: 19, curriculum: 'in' }
+  });
+  eq(ownerQuestion.status, 201, 'manual blocker: server issues the exact order question');
+  const publicOrder = ownerQuestion.data.question;
+  eq(publicOrder.prompt, 'Find the order of the differential equation $\\dfrac{dy}{dx} + 4y = 7$.',
+    'manual blocker: exact Class 12 differential equation is issued');
+  eq(publicOrder.criteriaCount, 1, 'manual blocker: original question is one mark');
+  assertOk(!Object.hasOwn(publicOrder, 'answer'), 'manual blocker: answer key does not leak');
+  const priorOwnerEvents = Number((await h.db.get(
+    'SELECT COUNT(*) AS n FROM learning_events WHERE account_id=? AND entity_id=?',
+    [a.account.id, publicOrder.id]
+  ))?.n || 0);
+  eq(priorOwnerEvents, 0, 'manual blocker: no progress before grading');
+  const ownerWrong = await grade(a.jar, publicOrder.id, 'manual-order-four', '4');
+  eq(ownerWrong.status, 200, 'manual blocker: wrong answer has a server receipt');
+  eq(ownerWrong.data.authoritative, true, 'manual blocker: only server issues marks');
+  eq(ownerWrong.data.correct, false, 'manual blocker: the coefficient 4 is not the order');
+  eq(ownerWrong.data.marksEarned, 0, 'manual blocker: written 4 scores zero');
+  eq(ownerWrong.data.marksPossible, 1, 'manual blocker: written 4 scores out of one');
+  eq((await grade(a.jar, publicOrder.id, 'manual-order-four', '4')).data,
+    ownerWrong.data, 'manual blocker: uncertain wrong-answer acknowledgement replays');
+  const ownerRight = await grade(a.jar, publicOrder.id, 'manual-order-one', '1');
+  eq(ownerRight.status, 200, 'manual blocker: correct order accepted on second try');
+  eq(ownerRight.data.authoritative, true, 'manual blocker: correct result is server attested');
+  eq(ownerRight.data.correct, true, 'manual blocker: order is the highest derivative');
+  eq(ownerRight.data.marksEarned, 1, 'manual blocker: written 1 scores full credit');
+  eq(ownerRight.data.marksPossible, 1, 'manual blocker: correct answer is out of one');
+  eq(ownerRight.data.resolved, true, 'manual blocker: final success commits the attempt');
+  assertOk(ownerRight.data.solution?.answerText?.includes('1'),
+    'manual blocker: released explanation identifies order one');
+  eq((await grade(a.jar, publicOrder.id, 'manual-order-one', '1')).data,
+    ownerRight.data, 'manual blocker: completed grade replays unchanged');
+  eq(Number((await h.db.get(
+    'SELECT COUNT(*) AS n FROM learning_events WHERE account_id=? AND entity_id=?',
+    [a.account.id, publicOrder.id]
+  ))?.n || 0), 1, 'manual blocker: both tries and both replays create one progress event');
 } finally {
   await h.close();
   rmSync(scratch, { recursive: true, force: true });
