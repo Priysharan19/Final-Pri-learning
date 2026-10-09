@@ -128,14 +128,22 @@ async function reachRealFeedback(page, check, online) {
       && ledger.thisDone === (marking.receipt?.resolved ? 1 : 0),
     JSON.stringify({ marking, ledger }));
 
-  const marked = (await page.locator('.q-prompt').innerText()).trim();
+  // Another question is another question id. Its wording may match the last
+  // one word for word when the numbers are read from the figure, so the text
+  // is not what tells them apart, and a fixed pause is not what waits for it.
+  const idOf = () => page.locator('.qpage[data-question-id]').first().getAttribute('data-question-id').catch(() => null);
+  const markedId = await idOf();
   const nextButton = page.locator('.ctx-next:visible').first();
   if (await nextButton.count()) {
     await nextButton.click();
-    await page.waitForTimeout(200);
+    await page.waitForFunction(id => {
+      const el = document.querySelector('.qpage[data-question-id]');
+      return el && el.getAttribute('data-question-id') !== id && el.querySelector('.q-prompt');
+    }, markedId, { timeout: 30000 }).catch(() => {});
+    const afterId = await idOf();
     const after = (await page.locator('.q-prompt').innerText()).trim();
-    await check('the learning journey can continue to another question', after.length > 5 && after !== marked,
-      `before ${JSON.stringify(marked.slice(0, 60))}; after ${JSON.stringify(after.slice(0, 60))}`);
+    await check('the learning journey can continue to another question', !!markedId && !!afterId && afterId !== markedId && after.length > 5,
+      `before ${markedId}; after ${afterId}; prompt ${JSON.stringify(after.slice(0, 60))}`);
   } else {
     await check('the learning journey can continue to another question', false, 'no Next control on the marked question');
   }
