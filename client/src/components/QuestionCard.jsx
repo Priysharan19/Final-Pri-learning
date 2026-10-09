@@ -20,7 +20,7 @@ import { cloudReadingEnabled, INK_READER_STATE, photoReadingBlockedKey, readPhot
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { MAX_PDF_PAGES, renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
-import { canRetryPhotoReading, definitiveSubmissionRefusal, draftPersistenceWarning, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure } from './photoSubmissionGuard.js';
+import { canRetryPhotoReading, definitiveSubmissionRefusal, draftPersistenceWarning, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure, photoSupportedFormats, photoAwaitingOnlineReader, pdfReaderNeedsOnlineDownload } from './photoSubmissionGuard.js';
 import { plotSpecFor } from '../engine/plotSpec.js';
 import { attestedGrade, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable } from './authoritativeGrade.js';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
@@ -527,7 +527,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
         error: result.reason === 'renderer-unavailable'
-          ? tLater('verdict.pdfRendererMissing')
+          ? pdfReaderNeedsOnlineDownload(language)
           : tLater('verdict.pdfUnopenable')
       });
       return;
@@ -1441,7 +1441,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           {/* Practice is untimed on screen: time on task is still measured for the
               marker, but a running clock is pressure, not information. */}
         </div>
-        {helpUsed > 0 && !resolved && (
+        {helpUsed > 0 && !resolved && diagnostic && (
           <p className="q-credit">{t('verdict.creditAvailable', { percent: Math.round(credit * 100), marks: Math.round(totalMarks * credit * 10) / 10 })}</p>
         )}
 
@@ -1586,7 +1586,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                         message => { if (live()) setPhotoOCR({ phase: 'failed', text: '', confidence: 0, engine: null, error: message }); });
                     }} />
                   {!photo && photoOCR.phase === 'idle'
-                    ? <button className="btn btn-ghost" onClick={() => photoInputRef.current?.click()}>{t('verdict.photographWorking')}<span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2, fontWeight: 400 }}>{t('verdict.photoFormats', { pages: MAX_PDF_PAGES })}</span></button>
+                    ? <button className="btn btn-ghost" onClick={() => photoInputRef.current?.click()}>{t('verdict.photographWorking')}<span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2, fontWeight: 400 }}>{photoSupportedFormats(language)}</span></button>
                     : (
                       <div className="photo-attach">
                         {/* A PDF sets no thumbnail until its pages render, and the whole
@@ -1651,11 +1651,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                                 {t('cloud.signIn')}
                               </button>
                               <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-                                {t('verdict.photoAttachedIdle')}
+                                {photoAwaitingOnlineReader(language)}
                               </p>
                             </div>
                           )}
-                          {photoOCR.phase === 'idle' && <span className="muted">{t('verdict.photoAttachedIdle')}</span>}
+                          {photoOCR.phase === 'idle' && <span className="muted">{photoAwaitingOnlineReader(language)}</span>}
                         </div>
                       </div>
                     )}

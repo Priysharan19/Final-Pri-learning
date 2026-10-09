@@ -53,3 +53,21 @@ export function canRetryPhotoReading(blockedKey, hasImage, hasPdf) {
   return Boolean(hasImage || hasPdf) &&
     ['verdict.photoReadingOffline', 'verdict.photoReadingServiceDown'].includes(blockedKey);
 }
+
+// These online-only student notices are temporary source-adjacent EN/HI copy.
+// Central i18n owner should relocate them into parity-checked translations.
+export function photoSupportedFormats(language) {
+  return hindi(language)
+    ? 'ऑनलाइन जाँच के लिए एक फ़ोटो या एक पेज की PDF चुनें। कई पेज की PDF पढ़ी जा सकती है, लेकिन अभी पूरी PDF के अंक नहीं दिए जा सकते।'
+    : 'For online grading, use one photo or a single-page PDF. A multi-page PDF can be transcribed but cannot yet receive a verified Photo grade.';
+}
+export function photoAwaitingOnlineReader(language) {
+  return hindi(language)
+    ? 'तस्वीर सुरक्षित रूप से इसी स्क्रीन पर है। इसकी लिखावट पढ़ने और जाँचने के लिए इंटरनेट, सही खाता और आवश्यक अभिभावक अनुमति चाहिए।'
+    : 'The attachment remains on this screen. Reading and grading it require an online eligible account and any required guardian consent.';
+}
+export function pdfReaderNeedsOnlineDownload(language) {
+  return hindi(language)
+    ? 'इस डिवाइस पर PDF खोलने की सुविधा पहले डाउनलोड करनी होगी। इंटरनेट से जुड़कर फिर कोशिश करें। फ़ोटो और PDF की गणित-जाँच भी ऑनलाइन ही होती है।'
+    : 'This device needs a one-time online download to open PDFs. Reconnect and try again. Photo and PDF mathematical grading also requires an online server.';
+}

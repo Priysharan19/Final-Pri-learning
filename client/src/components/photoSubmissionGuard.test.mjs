@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { canRetryPhotoReading, definitiveSubmissionRefusal, draftPersistenceWarning, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure } from './photoSubmissionGuard.js';
+import { canRetryPhotoReading, definitiveSubmissionRefusal, draftPersistenceWarning, photoSupportedFormats, photoAwaitingOnlineReader, pdfReaderNeedsOnlineDownload, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure } from './photoSubmissionGuard.js';
 
 const base = { mode: 'photo', photo: 'data:image/png;base64,AA==', ocrPhase: 'done', pdfPageCount: 0 };
 const cases = [
@@ -56,3 +56,11 @@ assert.equal(canRetryPhotoReading('verdict.photoReadingServiceDown', false, fals
 assert.equal(canRetryPhotoReading('verdict.photoReadingSignIn', true, false), false);
 assert.equal(canRetryPhotoReading('verdict.photoReadingGuardian', true, true), false);
 console.log('PHOTO RETRY WITHOUT AUTH BYPASS: PASS 5/5');
+
+assert.match(photoSupportedFormats('en-IN'), /single-page PDF/);
+assert.match(photoSupportedFormats('hi-IN'), /एक पेज की PDF/);
+assert.match(photoAwaitingOnlineReader('en-IN'), /online eligible account/);
+assert.match(photoAwaitingOnlineReader('hi-IN'), /अभिभावक अनुमति/);
+assert.match(pdfReaderNeedsOnlineDownload('en-IN'), /online server/);
+assert.match(pdfReaderNeedsOnlineDownload('hi-IN'), /ऑनलाइन ही होती है/);
+console.log('ONLINE-ONLY PHOTO COPY: PASS 6/6');
