@@ -9,8 +9,9 @@ import { api } from '../api.js';
 import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import InkCanvas from '../ink/InkCanvas.jsx';
+import { flushInkDrafts } from '../local/inkDrafts.js';
 import { sanitizeFigure } from '../lib/sanitize.js';
-import { clearDraft, draftSavedAt, queueDraft, readDraft, saveDraft } from './drafts.js';
+import { clearDraft, queueDraft, readDraft, saveDraft } from './drafts.js';
 import {
   clearInkDraft, clearPendingSubmission, newSubmissionId, readInkDraft, readPendingSubmission,
   saveInkDraft, savePendingSubmission, submissionContentKey
@@ -349,6 +350,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [peek, setPeek] = useState(false);
   const [peekOpen, setPeekOpen] = useState(false);
   const inkSaveTimer = useRef(null);
+  // The most recent pen-lift owns the save indicator. A previous asynchronous
+  // IDB acknowledgement must never overwrite the status of newer strokes.
+  const inkSaveRevision = useRef(0);
   // The newest strokes on the page. Leaving write mode unmounts the canvas;
   // coming back must restore this, never the draft the card was mounted with.
   const latestInk = useRef(null);
@@ -369,6 +373,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setChecking(false); setVouched(null); setPdfUnread(null); setAttemptViaInk(false);
     setSaveState(draft?.typed || draft?.working ? 'saved' : null);
     latestInk.current = null;
+    ++inkSaveRevision.current;
     setPeekOpen(false);
     startRef.current = Date.now();
     if (mode === 'type') setTimeout(() => inputRef.current?.focus(), 60);
@@ -378,7 +383,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   useEffect(() => {
     let live = true;
     setRestoredInk(undefined);
-    Promise.resolve().then(() => readInkDraft(question.id)).then(
+    Promise.resolve().then(() => flushInkDrafts()).then(() => readInkDraft(question.id)).then(
       kept => { if (!live) return; setRestoredInk(kept || null); if (kept?.length) { setMode('write'); setSaveState('saved'); } },
       () => { if (live) setRestoredInk(null); }
     );
@@ -719,22 +724,30 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     latestInk.current = strokes;
     setInkHasStrokes(Array.isArray(strokes) && strokes.length > 0);
     if (inkSaveTimer.current) { clearTimeout(inkSaveTimer.current); inkSaveTimer.current = null; }
-    const asked = Date.now();
+    const revision = ++inkSaveRevision.current;
+    // saveInkDraft queues *sealed IndexedDB*, not drafts.js localStorage.
+    // Its boolean acknowledges only acceptance into a write queue, not disk.
     if (!saveInkDraft(question.id, strokes, { label: question.subtopicName })) { setSaveState('failed'); return; }
     if (!Array.isArray(strokes) || !strokes.length) { setSaveState(null); return; }
+    const expected = JSON.stringify(compactInkStrokes(strokes));
     setSaveState('saving');
     inkSaveTimer.current = setTimeout(() => {
       inkSaveTimer.current = null;
-      // A marked question has had its draft cleared on purpose; its absence
-      // then is not a failed save. (While a submission is only in flight the
-      // draft is still there, so the read-back goes ahead and the status never
-      // stays on "Saving".)
-      if (attemptRef.current) return;
-      const at = draftSavedAt('ink', question.id);
-      setSaveState(at && at >= asked ? 'saved' : 'failed');
+      // Await the sealed store's actual write, then read the same question back.
+      // A storage rejection is swallowed by the store (ink remains on canvas),
+      // so only an exact durable stroke match can justify saying "Saved".
+      flushInkDrafts().then(() => readInkDraft(question.id)).then(
+        kept => {
+          if (!mountedRef.current || attemptRef.current || inkSaveRevision.current !== revision) return;
+          setSaveState(kept && JSON.stringify(compactInkStrokes(kept)) === expected ? 'saved' : 'failed');
+        },
+        () => {
+          if (mountedRef.current && !attemptRef.current && inkSaveRevision.current === revision) setSaveState('failed');
+        }
+      );
     }, 700);
   }, [question.id, question.subtopicName]);
-  useEffect(() => () => { if (inkSaveTimer.current) clearTimeout(inkSaveTimer.current); }, []);
+  useEffect(() => () => { ++inkSaveRevision.current; if (inkSaveTimer.current) clearTimeout(inkSaveTimer.current); }, []);
   useEffect(() => () => { if (typedSaveTimer.current) clearTimeout(typedSaveTimer.current); }, []);
 
   useEffect(() => {
