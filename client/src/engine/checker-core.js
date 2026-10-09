@@ -115,9 +115,10 @@ function percentAnswerWanted(question, ans) {
 // 12 34 567 (lakh, spaced). Nothing else that breaks digits apart is a number.
 const GROUPED = /^\d{1,3}(?:,\d{3})+$|^\d{1,2}(?:,\d{2})*,\d{3}$|^\d{1,3}(?: \d{3})+$|^\d{1,2}(?: \d{2})* \d{3}$/;
 // A space a person types or pastes between digit groups: the plain space, the
-// no-break space and the thin spaces typesetting uses. A tab or a line break is
-// never one — it separates two things that were written.
-const GROUP_SPACE = /[    ]/g;
+// no-break space, and the thin, narrow no-break, en, figure and punctuation
+// spaces typesetting uses for digit groups. A tab or a line break is never one
+// — it separates two things that were written.
+const GROUP_SPACE = /[ \u00a0\u2002\u2007\u2008\u2009\u202f]/g;
 // The calls whose commas the expression engine reads as argument separators:
 // nCr(n, r), nPr(n, r), sum(term, k, a, b) and the bare C(n, r) / P(n, r).
 // Everywhere else it removes a comma as a thousands separator, so "sqrt(1,2,3)"
@@ -184,7 +185,9 @@ function brokenRun(piece) {
     if (!/[,\s]/.test(run)) continue;
     // A tab or a line break between digits is two things written, never one number.
     if (/[^\d, ]/.test(run)) return true;
-    if (GROUPED.test(run.replace(/ +/g, ' ').replace(/ ?, ?/g, ','))) continue;
+    // A comma with a space beside it separates two things: "1, 234" is the
+    // list 1 and 234, not one thousand two hundred and thirty-four.
+    if (GROUPED.test(run.replace(/ +/g, ' '))) continue;
     // "2 1/2" is a mixed numeral, read below.
     if (/^\d+ +\d+$/.test(run) && new RegExp(run.replace(/ +/g, ' +') + ' */ *\\d').test(piece)) continue;
     return true;

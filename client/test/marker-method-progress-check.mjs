@@ -14,7 +14,7 @@
 //
 // Every case is authored. Nothing here is generated.
 // ─────────────────────────────────────────────────────────────────
-import { methodMarks, stepCheck, checkAnswer } from '../src/engine/checker.js';
+import { methodMarks, stepCheck, checkAnswer, unresolvedWorkingView } from '../src/engine/checker.js';
 import { parseNumericInput } from '../src/engine/checker-core.js';
 
 let pass = 0;
@@ -239,39 +239,76 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   ok(run(brackets, 'Solve $2(x + 3) = 8$.', '8/2 = 4\n4 - 3 = 1\n9+9 = 18') === 0, 'on an equation to be solved, arithmetic that never mentions the unknown earns nothing');
   ok(run(brackets, 'Solve $2(x + 3) = 8$.', 'x + 3 = 4\nx = 4 - 3') === 2, '…and the same solution written on the unknown keeps both marks');
 
-  // A gradient is found by arithmetic: the question gives no equation to solve.
+  // ── Arithmetic built from the question's numbers is not a method ──────────
+  // For one round a general rule credited letter-free sums on a question with
+  // no equation to solve — a gradient, a z-score, a formula evaluated — when
+  // they were true, were built from the numbers the question prints and used
+  // every one of them. That rule cannot tell the method from a coincidence: a
+  // handful of small numbers folds into the answer in many ways. Reported
+  // against the live marker, each of these earned method marks under a wrong
+  // final answer. None is the method of its question.
+  const pairY = { kind: 'equation', variable: 'y', solutions: [-6] };
+  const pairYPrompt = 'Solve by elimination: $6x + 3y = -60$ and $4x - y = -22$. Find the value of $y$.';
+  ok(run(pairY, pairYPrompt, '6 / 3 = 2\n60 - 4 = 56\n56 / 2 = 28\n22 - 28 = -6\ny = 5', 2) === 0, 'a pair of equations is not solved by folding its six numbers into the answer');
+  const pairY8 = { kind: 'equation', variable: 'y', solutions: [8] };
+  ok(run(pairY8, 'Solve by elimination: $5x + 4y = -3$ and $2x + 2y = 2$. Find the value of $y$.', '5 + 4 = 9\n3 + 2 = 5\n2 + 2 = 4\n9 - 5 = 4\n4 + 4 = 8\ny = 1', 2) === 0, 'five true sums that happen to end on y earn nothing');
+  const arctan = { kind: 'equation', variable: 'k', solutions: [2] };
+  const arctanPrompt = 'The standard integral $\\displaystyle\\int \\dfrac{dx}{x^2 + 4} = \\dfrac{1}{k}\\tan^{-1}\\left(\\dfrac{x}{2}\\right) + C$. Find $k$.';
+  ok(run(arctan, arctanPrompt, '2 + 4 = 6\n1 + 1 = 2\n2 + 2 = 4\n6 - 4 = 2\nk = 9', 3) === 0, 'a standard integral\'s constant is not found by adding the digits printed in it');
+  const intercept = { kind: 'equation', variable: 'c', solutions: [2] };
+  const interceptPrompt = 'A line of slope $-6$ passes through $(1,\\ -4)$. Find its $y$-intercept.';
+  ok(run(intercept, interceptPrompt, '4 - 1 = 3\n6 / 3 = 2\nc = 7', 2) === 0, 'an intercept is not (4 - 1) and then 6 over it');
+  const signs = { kind: 'equation', variable: 'm', solutions: [2] };
+  const signsPrompt = 'Find the gradient of the line through $(1, -4)$ and $(4, 2)$.';
+  ok(run(signs, signsPrompt, '4 + 2 = 6\n1 - 4 = -3\n6/3 = 2\nm = 99', 3) === 0, 'differences taken with inconsistent signs that land on the gradient earn nothing');
+  // A page of every true sum two of the question's numbers make, with either
+  // sign — written by someone who knows no method at all — earns nothing on
+  // any of them. (Enumerated in a fixed order; nothing here is random.)
+  for (const [meta, prompt] of [[pairY, pairYPrompt], [arctan, arctanPrompt], [intercept, interceptPrompt], [signs, signsPrompt]]) {
+    const numbers = [...new Set((prompt.match(/\d+(?:\.\d+)?/g) || []).map(Number).flatMap(v => [v, -v]))];
+    const show = v => (v < 0 ? `(${v})` : String(v));
+    const page = [];
+    for (const a of numbers) for (const b of numbers) {
+      for (const [op, value] of [['+', a + b], ['-', a - b], ['*', a * b], ['/', b ? a / b : NaN]]) {
+        if (Number.isInteger(value)) page.push(`${show(a)} ${op} ${show(b)} = ${value}`);
+      }
+    }
+    for (let from = 0; from < page.length; from += 100) {
+      const got = methodMarks({ meta, working: `${page.slice(from, from + 100).join('\n')}\n${meta.variable} = 987654`, marks: 4, prompt });
+      ok((got?.awarded ?? 0) === 0 && !(got?.lines || []).some(l => l.mark), `a page of every sum of two numbers in "${prompt.slice(0, 40)}…" (lines ${from + 1}–) earns nothing`);
+    }
+  }
+
+  // The cost, pinned so that it is a known one: where the method IS arithmetic
+  // and the question gives no equation in the unknown alone, numeric working
+  // earns no method mark under a wrong final answer. Marks for it need an
+  // authored plan for that question's arithmetic, not a general rule.
   const gradient = { kind: 'equation', variable: 'm', solutions: [-3] };
   const gPrompt = 'Find the gradient of the line through $(-1, -6)$ and $(3, -18)$.';
-  ok(run(gradient, gPrompt, '-18 - -6 = -12\n3 - -1 = 4\nm = -12/4') === 3, 'gradient: both differences and the quotient keep their three marks');
-  ok(run(gradient, gPrompt, '-18 - -6 = -12\n3 - -1 = 4\n-12/4 = -3') === 3, 'gradient: the quotient written without the letter keeps its mark');
-  ok(run(gradient, gPrompt, '3 - -1 = 4\n-18 - -6 = -12\nm = -12/4') === 3, 'gradient: the differences in either order');
-  ok(run(gradient, gPrompt, '-18 - -6 = -12\n3 - -1 = 4\n1 + 3 = 4\n4*1 = 4\nm = -12/4', 5) === 3, 'gradient: a second sum reaching a number already found, and a ×1, add nothing');
-  for (const working of ['1 + 1 = 2\n2 + 2 = 4\n5*5 = 25', '3 + 4 = 7', '18 - 6 = 12\n1 + 3 = 4', '1 + 3 = 4\n4 + 6 = 10\n10 + 18 = 28', '6 - 3 = 3\n1*6 = 6\n3 + 3 = 6',
+  for (const working of ['-18 - -6 = -12\n3 - -1 = 4\nm = -12/4', '-18 - -6 = -12\n3 - -1 = 4\n-12/4 = -3', '3 - -1 = 4\n-18 - -6 = -12\nm = -12/4',
+    '1 + 1 = 2\n2 + 2 = 4\n5*5 = 25', '3 + 4 = 7', '18 - 6 = 12\n1 + 3 = 4', '1 + 3 = 4\n4 + 6 = 10\n10 + 18 = 28', '6 - 3 = 3\n1*6 = 6\n3 + 3 = 6',
     '-18 - -6 = -12', '-12/4 = -3', '6 - 3 = 3\n3 - 6 = -3', '-18 - -6 = -12\n3 - -1 = 4\nm = 4/-12']) {
-    ok(run(gradient, gPrompt, `${working}\nm = 99`) === 0, `gradient: "${working.replace(/\n/g, ' ; ')}" reaches no verified answer and earns nothing`);
+    ok(run(gradient, gPrompt, `${working}\nm = 99`) === 0, `gradient: "${working.replace(/\n/g, ' ; ')}" earns no method mark`);
   }
   const coincidence = { kind: 'equation', variable: 'm', solutions: [2] };
   const cPrompt = 'Find the gradient of the line through $(-4, 5)$ and $(-3, 7)$.';
-  ok(run(coincidence, cPrompt, '4 - 7 = -3\n5 - 3 = 2') === 0, 'sums that land on the answer without using all of the question earn nothing');
-  ok(run(coincidence, cPrompt, '7 - 5 = 2\n-3 - -4 = 1\nm = 2/1') === 3, '…and the real differences, one of which happens to equal the answer, keep their marks');
-
-  // A z-score is found by arithmetic.
+  ok(run(coincidence, cPrompt, '4 - 7 = -3\n5 - 3 = 2') === 0, 'sums that land on the answer earn nothing');
+  ok(run(coincidence, cPrompt, '7 - 5 = 2\n-3 - -4 = 1\nm = 2/1') === 0, '…and neither do the real differences, which no general rule can tell from them');
   const z = { kind: 'equation', variable: 'z', solutions: [1] };
   const zPrompt = 'Test scores are normally distributed with mean $65$ and standard deviation $2$. Find the **z-score** of a mark of $67$.';
-  ok(run(z, zPrompt, '67 - 65 = 2\n2/2 = 1') === 2, 'z-score: the difference and the division keep their two marks');
-  ok(run(z, zPrompt, '2/2 = 1') === 0, 'z-score: the answer alone, with no working before it, is not a step');
-  ok(run(z, zPrompt, '67 - 65 = 2') === 0, 'z-score: a difference that is never used earns nothing');
-  ok(run(z, zPrompt, '3 + 4 = 7\n65 + 2 = 67\n67 - 2 = 65\n5*5 = 25') === 0, 'z-score: unrelated and circular sums earn nothing');
-  ok(run(z, zPrompt, '3 + 4 = 7\n67 - 65 = 2\n5*5 = 25\n2/2 = 1\n65 + 2 = 67') === 2, 'z-score: unrelated sums around the working neither add nor take away');
-
-  // Evaluating a formula the question gives.
+  for (const working of ['67 - 65 = 2\n2/2 = 1', '2/2 = 1', '67 - 65 = 2', '3 + 4 = 7\n65 + 2 = 67\n67 - 2 = 65\n5*5 = 25', '3 + 4 = 7\n67 - 65 = 2\n5*5 = 25\n2/2 = 1\n65 + 2 = 67']) {
+    ok(run(z, zPrompt, `${working}\nz = 99`) === 0, `z-score: "${working.replace(/\n/g, ' ; ')}" earns no method mark`);
+  }
+  // A number the prompt mentions in passing changes nothing either way.
+  ok(run(z, `${zPrompt.slice(0, -1)}, correct to 2 decimal places.`, '67 - 65 = 2\n2/2 = 1\nz = 99') === 0, 'z-score: the same working on a prompt that also says "2 decimal places" earns the same nothing');
   const formula = { kind: 'equation', variable: 'y', solutions: [-2] };
   const fPrompt = 'A line has equation $y = 2x - 8$. Find $y$ when $x = 3$.';
-  ok(run(formula, fPrompt, '2*3 = 6\n6 - 8 = -2') === 2, 'formula: evaluating it in two sums keeps both marks');
-  ok(run(formula, fPrompt, '-2 = 2(3) - 8') === 1, 'formula: the question\'s own formula with its numbers put in is a step');
-  ok(run(formula, fPrompt, '2(3) - 8 = -2\n-2 = 2(3) - 8') === 1, 'formula: written twice it is one step');
-  ok(run(formula, fPrompt, '2 = 2(5) - 8\n-8 = 2(0) - 8\n0 = 2(4) - 8') === 0, 'formula: true instances of it at other values are not this question');
-  ok(run(formula, fPrompt, '3 + 4 = 7\n2 + 8 = 10\n8 - 3 = 5') === 0, 'formula: unrelated sums earn nothing');
+  for (const working of ['2*3 = 6\n6 - 8 = -2', '-2 = 2(3) - 8', '2(3) - 8 = -2\n-2 = 2(3) - 8', '2 = 2(5) - 8\n-8 = 2(0) - 8\n0 = 2(4) - 8', '3 + 4 = 7\n2 + 8 = 10\n8 - 3 = 5']) {
+    ok(run(formula, fPrompt, `${working}\ny = 99`) === 0, `formula: "${working.replace(/\n/g, ' ; ')}" earns no method mark`);
+  }
+  // Working in the unknown is still working, on every one of these.
+  ok(run(intercept, interceptPrompt, '-4 = -6(1) + c\n-4 = -6 + c\nc = 7', 3) === 2, 'intercept: the line\'s equation with the point put in, then simplified, keeps both marks');
+  ok(run(pairY, pairYPrompt, '12x + 6y = -120\n12x - 3y = -66\n9y = -54\ny = 5', 3) === 1, 'pair: eliminating x to an equation in y alone keeps its mark');
   // Function notation is not a formula to put numbers into.
   const zeroes = { kind: 'equation', variable: 'x', solutions: [-1, 3] };
   ok(run(zeroes, 'The graph of $y=p(x)$ is shown. Read the zeroes of $p(x)$ from the graph.', '2*3 = 6\n1*3 = 3') === 0, '"y = p(x)" is not read as y = p × x with numbers put in');
@@ -306,12 +343,12 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   const marksFor = (working, marks = 4, report = undefined) => {
     try { return methodMarks({ meta, working, marks, prompt, ...(report ? { report } : {}) })?.awarded ?? 0; } catch { return -1; }
   };
-  ok(marksFor('-31x = -155\nx = 5\ny = 99') === 2, 'eliminating to x and finding it earns two method marks');
-  ok(marksFor('-31x = -155\nx = 5\ny = 99', 4, stepCheck(meta, '-31x = -155\nx = 5\ny = 99')) === 2, '…the same when the caller\'s report was made without the prompt');
-  ok(marksFor('-31x = -155\nx = 5\n3(5) + 5y = 5\n5y = -10\ny = 99', 5) === 4, 'the whole elimination keeps a mark for each step');
+  ok(marksFor('-31x = -155\nx = 5\ny = 99') === 1, 'eliminating to x is one finding — dividing it out says the same thing again');
+  ok(marksFor('-31x = -155\nx = 5\ny = 99', 4, stepCheck(meta, '-31x = -155\nx = 5\ny = 99')) === 1, '…the same when the caller\'s report was made without the prompt');
+  ok(marksFor('-31x = -155\nx = 5\n3(5) + 5y = 5\n5y = -10\ny = 99', 5) === 3, 'the whole elimination: one mark for finding x, one for each step in y');
   ok(marksFor('x = 5\ny = 99') === 0, 'the other unknown stated with no working is not a step');
   ok(marksFor('2x = 10\n3x = 15\n4x = 20\n10 = 2x\ny = 99') === 1, 'the same value of x written four ways is one step');
-  ok(marksFor('-31x = -155\nx = 5\n2x = 10\n-31x = -155\ny = 99') === 2, 'going back over x after finding it earns nothing more');
+  ok(marksFor('-31x = -155\nx = 5\n2x = 10\n-31x = -155\ny = 99') === 1, 'going back over x after finding it earns nothing more');
   ok(marksFor('6x + 10y = 10\n9x + 15y = 15\n8x + 3y = 34\nx + y = 3\ny = 99') === 0, 'lines still in both unknowns have eliminated nothing');
   ok(marksFor('x = (5 - 5y)/3\ny = 99') === 1, 'making x the subject is the first step of substitution');
   ok(marksFor('x = (5 - 5y)/3\nx = (29 + 2y)/5\ny = (5 - 3x)/5\ny = 99') === 1, '…and it is one step however many ways it is done');
@@ -368,7 +405,139 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   ok(run('2x-7=-11', 'x', -2, '2x - 7 + 7 = -11 + 7') === 1, 'adding 7 to both sides to remove the -7 is a step');
 }
 
+// ── The other unknown is found once ──────────────────────────────────────────
+// A line in the other unknown alone is checked at the solution of the pair, so
+// every such line says one thing: what that letter is. `6y = 12`, `3y = 6`,
+// `y = 2` earned three of four marks for one finding written three ways.
+{
+  const meta = { kind: 'equation', variable: 'x', solutions: [8] };
+  const prompt = 'Solve by substitution: $x + y = 10$ and $4x - y = 30$. Find the value of $x$.';
+  const run = (working, marks = 4) => {
+    try { return methodMarks({ meta, working: `${working}\nx = 987654`, marks, prompt })?.awarded ?? 0; } catch { return -1; }
+  };
+  ok(run('6y = 12\n3y = 6\ny = 2') === 1, 'the other unknown reached by halving twice is one mark');
+  ok(run('5y = 10\ny = 2') === 1, 'an equation in y alone and then its value are one finding');
+  ok(run('6y = 12') === 1, 'an equation in y alone is that finding');
+  ok(run('y = 2') === 0, 'the bare value of the other unknown, with no working, is still not a step');
+  ok(run('6y = 12\n3y = 6\n2y = 4\ny = 2\ny + 1 = 3\ny - 1 = 1\ny/2 = 1\n-y = -2') === 1, 'eight ways of writing y = 2 are one mark');
+  // Making a letter the subject is a step only as a rearrangement of an
+  // equation the question gives — not for being true at the solution.
+  ok(run('y = 10 - x') === 1, 'y made the subject of the first equation is the first step of substitution');
+  ok(run('y = 4x - 30') === 1, '…and so is y made the subject of the second');
+  ok(run('y = x - 6') === 0, 'a line in both letters that is true only at the solution has rearranged nothing');
+  ok(run('x = y + 6') === 0, '…whichever letter it is written for');
+  ok(run('6y = 12\n3y = 6\ny = 2\ny = x - 6\nx = y + 6') === 1, 'a stack of restatements of the solution earns the one mark for finding y');
+  ok(run('y = 10 - x\n4x - (10 - x) = 30\n5x - 10 = 30\n5x = 40') === 3, 'genuine substitution keeps a mark for each step');
+  ok(run('5y = 10\ny = 2\nx + 2 = 10') === 2, 'finding y and putting it back are two steps');
+}
+
+// ── An announced division is not carried out by working out the bare side ────
+// `(2y - 12)/2 = (-22)/2` earned a mark where halving brought the coefficient
+// to 1: it read as one isolating move fewer, with the brackets still unopened.
+{
+  const run = (source, variable, root, working) => award(source, variable, root, `${working}\n${variable}=424242`);
+  ok(run('2y - 12=-22', 'y', -5, '(2y - 12)/2 = (-22)/2') === 0, 'halving both sides inside brackets earns nothing when it would leave a coefficient of 1');
+  ok(run('2y - 12=-22', 'y', -5, '(2y - 12)/2 = -11') === 0, 'working out only the bare number has not divided the side that carries the unknown');
+  ok(run('2y - 12=-22', 'y', -5, '-11 = (2y - 12)/2') === 0, '…whichever side it is written on');
+  ok(run('3x + 6=21', 'x', 5, '(3x + 6)/3 = 21/3') === 0, 'dividing 3x + 6 = 21 by 3 inside brackets earns nothing');
+  ok(run('2y - 12=-22', 'y', -5, '(2y - 12)/2 = (-22)/2\n(2y - 12)/2 = -11\n(2y - 12)/2 + 0 = -11') === 0, 'a stack of announced halvings earns nothing');
+  ok(run('2y - 12=-22', 'y', -5, 'y - 6 = -11') === 1, 'the division carried out is a step');
+  ok(run('2y - 12=-22', 'y', -5, '(2y - 12)/2 = (-22)/2\ny - 6 = -11') === 1, 'announced and then carried out, it is one step');
+  ok(run('2y - 12=-22', 'y', -5, '2y = -10') === 1, 'adding 12 first is a step as before');
+  ok(run('3x + 6=21', 'x', 5, 'x + 2 = 7') === 1, 'dividing 3x + 6 = 21 through by 3, carried out, is a step');
+}
+
+// ── What a wrong first try is told about its working ─────────────────────────
+// A question allows two tries. A page of `t = -45` … `t = 45` under a wrong
+// answer came back with exactly the true line marked right, and one false line
+// came back with a diagnosis that named the answer. `unresolvedWorkingView` is
+// what a server may return while the question is open.
+{
+  const meta = { kind: 'equation', variable: 't', solutions: [37], source: '3t - 1=110' };
+  const prompt = '$3t - 1=110$';
+  const view = working => unresolvedWorkingView({ meta, working, marks: 4, prompt });
+  const shape = v => JSON.stringify([v.stepReport.lines.map(l => [l.status, l.note ?? null, l.diagnosis?.code ?? null]), v.stepReport.firstBreak,
+    v.stepReport.diagnosis, v.partial && [v.partial.awarded, v.partial.okLines, v.partial.note, v.partial.lines.map(l => [l.status, l.mark, l.reason])]]);
+  const guesses = [];
+  for (let k = -45; k <= 45; k++) guesses.push(`t = ${k}`);
+  const page = view(guesses.join('\n'));
+  ok(page.stepReport.lines.length === 91 && page.stepReport.lines.every(l => l.status === 'note'), 'ninety-one guessed values: not one is confirmed or refuted');
+  ok(new Set(page.stepReport.lines.map(l => l.note)).size === 1, '…and the true one carries the same note as the ninety false ones');
+  ok(page.stepReport.firstBreak === -1 && page.partial === null, '…with no first mistake and no method evidence');
+  // The full report, by contrast, picks the root out — which is why it waits.
+  ok(stepCheck(meta, guesses.join('\n'), { prompt }).lines.filter(l => l.status === 'ok').map(l => l.text).join() === 't = 37', '(the full report does single out t = 37)');
+
+  // Every way of stating or checking a value comes back the same, right or wrong.
+  for (const [right, wrong] of [['t = 37', 't = 36'], ['37 = t', '36 = t'], ['t = 111/3', 't = 110/3'], ['t = 37 + 0', 't = 36 + 0'], ['37', '36'],
+    ['3(37) - 1 = 110', '3(36) - 1 = 110'], ['110 = 3(37) - 1', '110 = 3(36) - 1'], ['so t = 37', 'so t = 36'], ['∴ t = 37', '∴ t = 36']]) {
+    ok(shape(view(right)) === shape(view(wrong)), `"${right}" and "${wrong}" come back identically`);
+    for (const before of ['3t = 111', '3t - 1 = 110\n3t = 111']) for (const after of ['', '\n3t = 111', '\n3t = 112', '\n6t = 222']) {
+      ok(shape(view(`${before}\n${right}${after}`)) === shape(view(`${before}\n${wrong}${after}`)),
+        `…and so does everything around them: "${before.replace(/\n/g, ' ; ')} ; ${right}${after.replace(/\n/g, ' ; ')}"`);
+    }
+  }
+
+  // Genuine working is still judged, and still shows its marks.
+  const genuine = view('3t - 1 = 110\n3t = 111\nt = 37');
+  ok(genuine.stepReport.lines.map(l => l.status).join() === 'ok,ok,note', 'working towards the answer is verified line by line; the value it ends on is not');
+  ok(genuine.partial.awarded === 1 && genuine.partial.lines.map(l => l.mark).join() === '0,1,0', 'the collecting step shows its method mark');
+  ok(genuine.partial.lines[2].reason === 'withheld' && genuine.stepReport.lines[2].withheld === true, 'the stated value is marked as not yet checked');
+  ok(/not checked until this question is finished/.test(genuine.partial.note), 'and the note says a line is waiting');
+  ok(genuine.partial.lines.reduce((t, l) => t + l.mark, 0) === genuine.partial.awarded, 'the per-line marks add up to the marks shown');
+
+  // The first mistake is marked; what the line should have been is not said,
+  // and nothing after it is judged.
+  const slip = view('3t = 112\n3t = 111\nt = 37\n6t = 222');
+  ok(slip.stepReport.firstBreak === 0 && slip.stepReport.lines.map(l => l.status).join() === 'break,note,note,note', 'after the first mistake nothing is judged');
+  const fullSlip = stepCheck(meta, '3t = 112\n3t = 111\nt = 37\n6t = 222', { prompt });
+  ok(/111|37/.test(JSON.stringify([fullSlip.diagnosis, fullSlip.lines[0].note])), '(the full diagnosis of that slip names the number the line should have had)');
+  const said = JSON.stringify([slip.stepReport.diagnosis, slip.stepReport.lines.map(l => [l.note, l.diagnosis]), slip.partial?.note]);
+  ok(!/\d/.test(said.replace(/"confidence":"[a-z]+"/g, '')), 'no number at all appears in what the unresolved report says about the mistake');
+  ok(slip.stepReport.diagnosis?.code && slip.stepReport.diagnosis.title && !('detail' in slip.stepReport.diagnosis), 'the kind of mistake is still named');
+  ok((slip.partial?.awarded ?? 0) === 0, 'a line after the mistake shows no mark yet');
+  const later = view('3t = 111\n3t = 112\n6t = 222');
+  ok(later.stepReport.lines.map(l => l.status).join() === 'ok,break,note' && later.partial.awarded === 1, 'a step before the mistake keeps its mark');
+
+  // Other unknowns, and equations with more than one root.
+  const pair = { kind: 'equation', variable: 'y', solutions: [-6] };
+  const pairPrompt = 'Solve by elimination: $6x + 3y = -60$ and $4x - y = -22$. Find the value of $y$.';
+  const pairView = working => unresolvedWorkingView({ meta: pair, working, marks: 3, prompt: pairPrompt });
+  for (const [right, wrong] of [['x = -7', 'x = -8'], ['y = -6', 'y = 6'], ['6(-7) + 3(-6) = -60', '6(-7) + 3(-5) = -60'], ['4(-7) - (-6) = -22', '4(-6) - (-6) = -22']]) {
+    ok(shape(pairView(`18x = -126\n${right}\n9y = -54`)) === shape(pairView(`18x = -126\n${wrong}\n9y = -54`)), `pair: "${right}" and "${wrong}" come back identically`);
+  }
+  ok(pairView('18x = -126\nx = -7\n9y = -54').stepReport.lines.map(l => l.status).join() === 'ok,note,ok', 'pair: the eliminations are verified, the stated value of x is not');
+  const quad = { kind: 'equation', variable: 'x', solutions: [2, -3], source: 'x^2+x-6=0' };
+  const quadView = working => unresolvedWorkingView({ meta: quad, working, marks: 3, prompt: '$x^2+x-6=0$' });
+  for (const [right, wrong] of [['x = 2', 'x = 5'], ['x = 2 or x = -3', 'x = 2 or x = 3'], ['x = 2, -3', 'x = 2, 5'], ['x = -3', 'x = 3']]) {
+    ok(shape(quadView(`(x - 2)(x + 3) = 0\n${right}`)) === shape(quadView(`(x - 2)(x + 3) = 0\n${wrong}`)), `two roots: "${right}" and "${wrong}" come back identically`);
+  }
+  ok(quadView('(x - 2)(x + 3) = 0\nx = 2\nx = -3').stepReport.lines.map(l => l.status).join() === 'ok,note,note', 'two roots: the factorisation is verified, the roots read off it are not');
+  ok(unresolvedWorkingView({ meta, working: '   \n ', marks: 3, prompt }).stepReport === null, 'no working, no report');
+}
+
+// ── A comma with a space beside it is a list ─────────────────────────────────
+{
+  const read = text => { try { return parseNumericInput(text).value; } catch { return null; } };
+  const marked = (value, text) => checkAnswer({ answerType: 'numeric', answer: { value }, prompt: 'Find the value.' }, text);
+  for (const text of ['1, 234', '1 ,234', '1 , 234', '(1, 234)', 'x = 1, 234', '12, 34, 567', '1,234, 567', '1, 234 cm']) {
+    ok(read(text) === null, `${JSON.stringify(text)} is two things written, not one number`);
+    const got = marked(Number(text.replace(/[^0-9]/g, '')), text);
+    ok(got.correct !== true && got.invalid === true, `…so ${JSON.stringify(text)} is unreadable, never the digits run together`);
+  }
+  // The spaces typesetting puts between digit groups group like a plain space.
+  for (const [name, space] of [['no-break', ' '], ['thin', ' '], ['narrow no-break', ' '], ['en', ' '], ['figure', ' '], ['punctuation', ' ']]) {
+    ok(read(`1${space}234`) === 1234, `1234 grouped with a ${name} space is 1234`);
+    ok(read(`12${space}34${space}567`) === 1234567, `12 34 567 (lakh) grouped with ${name} spaces is 1234567`);
+    ok(marked(100000, `1${space}00${space}000`).correct === true, `1 00 000 with ${name} spaces is marked correct`);
+    ok(read(`1${space}23`) === null && read(`1${space}2${space}3`) === null, `a ${name} space between digits that are not grouped is still not a number`);
+    ok(read(`1,${space}234`) === null, `a comma and a ${name} space is still a list`);
+  }
+  for (const [name, space] of [['tab', '\t'], ['line break', '\n'], ['em', ' '], ['ideographic', '　'], ['zero-width', '​']]) {
+    ok(read(`1${space}234`) !== 1234, `a ${name} between digit groups is not a grouping space`);
+  }
+}
+
 console.log(failures.length
   ? `METHOD PROGRESS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `METHOD PROGRESS: PASS — ${pass}/${pass} checks — identity padding and both-sides restatements earn nothing, and every genuine step keeps its mark.`);
+  : `METHOD PROGRESS: PASS — ${pass}/${pass} checks — identity padding, both-sides restatements and arithmetic built from the question's numbers earn nothing, every genuine step keeps its mark, and an unresolved try is told nothing that confirms a value.`);
 process.exit(failures.length ? 1 : 0);

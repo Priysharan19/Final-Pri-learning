@@ -94,9 +94,16 @@ try {
   // A verified method step earns real positive credit even with an incorrect
   // OR blank final answer. The numeric award must come from the same server
   // receipt across retries, never inferred from the device's transcript.
+  //
+  // While the question is open, a line that only states the value of the
+  // unknown is not judged: `2t=t-3` then `t=-3` under a blank answer was told
+  // "one mark" exactly when the stated value was right, which checks a guess
+  // for the price of nothing. That working shows no mark on the first try; a
+  // step that moves the equation on still does.
   const methodCases = [
-    { seed: 654321, answer: '17', steps: ['6t-1=-t-22', '7t-1=-22', '7t=-21', 't=-3'] },
-    { seed: 1234579, answer: '', steps: ['2t=t-3', 't=-3'] }
+    { seed: 654321, answer: '17', steps: ['6t-1=-t-22', '7t-1=-22', '7t=-21', 't=-3'], root: '-3', shown: 1 },
+    { seed: 2, answer: '', steps: ['3m+12=m+8', '2m+12=8', '2m=-4'], root: '-2', shown: 1 },
+    { seed: 1234579, answer: '', steps: ['2t=t-3', 't=-3'], root: '-3', shown: 0 }
   ];
   for (const sample of methodCases) {
     const beforeCredit = await eventCount(a.account.id);
@@ -109,15 +116,22 @@ try {
     eq(first.data.authoritative, true, 'method case: server owns mark authority');
     eq(first.data.correct, false, 'method case: final answer does not earn full credit');
     eq(first.data.marksPossible, 2, 'method case: server-owned two-mark rubric');
-    eq(first.data.marksEarned, 1, 'method case: validated reasoning earns one mark');
-    eq(first.data.partial?.awarded, 1, 'method case: method evidence agrees with awarded marks');
+    eq(first.data.marksEarned, sample.shown, sample.shown
+      ? 'method case: validated reasoning earns one mark'
+      : 'method case: a stated value earns nothing while the question is open');
+    eq(first.data.partial?.awarded, sample.shown, 'method case: method evidence agrees with awarded marks');
+    if (!first.data.resolved) {
+      eq(first.data.stepReport.lines.filter(l => /^[a-z]=-?\d+$/.test(l.text)).map(l => l.status),
+        first.data.stepReport.lines.filter(l => /^[a-z]=-?\d+$/.test(l.text)).map(() => 'note'),
+        'method case: no stated value is confirmed on an open question');
+    }
     const repeated = await grade(a.jar, mid, submission, sample.answer, 'typed', { steps: sample.steps });
     eq(repeated.status, 200, 'method case: same-key replay succeeds');
     eq(repeated.data, first.data, 'method case: lost-ack replay returns exact server receipt');
     eq(await eventCount(a.account.id), beforeCredit + (first.data.resolved ? 1 : 0),
       'method case: replay does not duplicate progress');
     if (!first.data.resolved) {
-      const final = await grade(a.jar, mid, submission + '-resolve', '-3');
+      const final = await grade(a.jar, mid, submission + '-resolve', sample.root);
       eq(final.status, 200, 'method case: second legitimate attempt accepted');
       eq(final.data.correct, true, 'method case: second verified final answer');
       eq(final.data.marksEarned, 2, 'method case: full credit after correct second answer');
