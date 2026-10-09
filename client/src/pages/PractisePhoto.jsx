@@ -11,6 +11,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useT } from '../i18n/index.js';
 import { useApp } from '../App.jsx';
+import { cloudAvailable } from '../platform/cloudTransport.js';
+// The same account component used by Practice, never an alternate sign-in
+// flow or a route bypassing verified/guardian eligibility.
+const PhotoAccountRecovery = React.lazy(() => import('../components/CloudAccountPanel.jsx'));
 import { chapterChoices, identifyQuestionPhoto, practiseHrefFor } from '../lib/questionPhoto.js';
 import { createPhotoRequestGate } from './photoPractiseRequest.js';
 
@@ -62,13 +66,14 @@ export default function PractisePhoto() {
   // profile's transcript during a cloud/local account switch.
   const [reading, setReading] = useState(null);
   const result = reading?.accountId === accountId ? reading.result : null;
+  const [accountRecoveryOpen, setAccountRecoveryOpen] = useState(false);
   const [chapterId, setChapterId] = useState('');
   const choices = useMemo(() => chapterChoices(), []);
   const requestGate = useRef(null);
   useEffect(() => {
     const gate = createPhotoRequestGate();
     requestGate.current = gate;
-    setBusy(false); setReading(null); setChapterId('');
+    setBusy(false); setReading(null); setChapterId(''); setAccountRecoveryOpen(false);
     return () => {
       gate.dispose();
       if (requestGate.current === gate) requestGate.current = null;
@@ -84,7 +89,8 @@ export default function PractisePhoto() {
     const { epoch, signal } = gate.next();
     setBusy(true);
     setReading(null);
-    setChapterId(''); // A stale previously confirmed skill may not remain actionable.
+    setChapterId('');
+    setAccountRecoveryOpen(false); // photo replacement ends previous auth-error pane.
     let stage = 'decoding';
     try {
       const dataUrl = await readFile(file, signal);
@@ -128,6 +134,22 @@ export default function PractisePhoto() {
       {result && result.state !== 'ok' && (
         <div className="error-box" role="alert" style={{ marginTop: 12 }} data-photo-practise-state={result.state}>
           {t(STATE_KEY[result.state] || 'snap.providerDown')}
+        </div>
+      )}
+
+      {result?.state === 'signed-out' && cloudAvailable() && (
+        <div data-photo-practise-account-recovery style={{ marginTop: 12 }}>
+          <button type="button" className="btn btn-primary btn-sm"
+            aria-expanded={accountRecoveryOpen}
+            data-testid="photo-practise-sign-in"
+            onClick={() => setAccountRecoveryOpen(open => !open)}>
+            {t('login.cloudSignIn')}
+          </button>
+          {accountRecoveryOpen && (
+            <React.Suspense fallback={<p role="status">{t('cloud.stateChecking')}</p>}>
+              <PhotoAccountRecovery />
+            </React.Suspense>
+          )}
         </div>
       )}
 

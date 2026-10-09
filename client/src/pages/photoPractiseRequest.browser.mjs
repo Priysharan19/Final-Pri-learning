@@ -28,6 +28,7 @@ export const flow = {
      const k=++requests;
      if(k===1) await new Promise(r=>setTimeout(r,1900));
      if(k===3) return route.fulfill({status:503,contentType:'application/json',body:'{"error":{"code":"QUESTION_PHOTO_PROVIDER_5XX","message":"down"}}'}).catch(()=>{});
+     if(k===5) return route.fulfill({status:401,contentType:'application/json',body:'{"error":{"code":"AUTH_REQUIRED","message":"Please sign in"}}'}).catch(()=>{});
      return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({identification:{
        isMathsQuestion:true,readable:true,questionText:k===1?'OLD PHOTO TRANSCRIPT':'NEW PHOTO TRANSCRIPT',
        candidates:[candidate],needsConfirmation:true
@@ -56,6 +57,15 @@ export const flow = {
    await file.setInputFiles({name:'recovered.png',mimeType:'image/png',buffer:IMG});
    await page.waitForSelector('[data-photo-practise-state="ok"]',{timeout:15000});
    await check('next photo recovers after outage',await page.locator('[data-photo-practise-start]').isEnabled());
+   await file.setInputFiles({name:'expired-session.png',mimeType:'image/png',buffer:IMG});
+   await page.waitForSelector('[data-photo-practise-state="signed-out"]',{timeout:15000});
+   await check('expired provider session has a direct existing-account recovery control',
+     await page.getByTestId('photo-practise-sign-in').isVisible() &&
+     await page.locator('[data-photo-practise-start]').count()===0);
+   await page.getByTestId('photo-practise-sign-in').click();
+   await check('single account recovery panel can expand without guest-grading bypass',
+     await page.getByTestId('photo-practise-sign-in').getAttribute('aria-expanded')==='true');
+
  }
 };
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url){
