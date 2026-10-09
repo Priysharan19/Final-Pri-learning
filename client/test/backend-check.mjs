@@ -2032,6 +2032,7 @@ async function run() {
         if (marked.value?.resolved) {
           const meAfter = (await GET('/me')).user;
           eq('a repeat earns no XP', [marked.value.xp, meAfter.xp], [0, meBefore.xp]);
+          eq('and the result says it was a repeat, so the card can', marked.value.repeat, true);
           eq('— and moves no rating', JSON.stringify(rawRows().ratings.filter(r => r.pid === meAfter.id).map(r => [r.key, r.rating, r.attempts]).sort()), ratingsBefore);
         }
         eq('— by the server', marked.value?.authoritative, true);

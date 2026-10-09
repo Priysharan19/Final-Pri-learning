@@ -2014,7 +2014,8 @@ function certifiedPracticeMarks(receipt) {
       status: 503, code: 'GRADE_MARKS_UNCERTIFIED'
     });
   }
-  return { marksEarned: earned, marksPossible: possible };
+  // A repeat is the server's finding; the card says the answer earned nothing.
+  return { marksEarned: earned, marksPossible: possible, ...(receipt.repeat === true ? { repeat: true } : {}) };
 }
 
 async function replaySubmission(p, row, q, submissionId, requestDigest, answer, steps) {
