@@ -88,7 +88,9 @@ try {
     c.eq(q2.prompt, q1.prompt, `${tag}: the same prompt both times`);
     c.eq(q2.answerType, q1.answerType, `${tag}: the same answerType`);
     c.eq(q2.contentId, q1.contentId, `${tag}: the same contentId`);
-    c.ok(typeof q1.contentId === 'string' && q1.contentId.includes(String(request.seed)), `${tag}: and the contentId names the seed`);
+    // The public id identifies the content without spelling out its seed: with
+    // the bundled generators a seed is the answer key.
+    c.ok(typeof q1.contentId === 'string' && q1.contentId.length > 8 && !q1.contentId.includes(String(request.seed)), `${tag}: and the contentId does not name the seed`);
     c.deq(withoutId(q2), withoutId(q1), `${tag}: the whole public question is identical apart from its id`);
     c.ok(q1.id && q2.id && q1.id !== q2.id, `${tag}: as two server questions, each with its own id`);
 

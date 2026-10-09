@@ -1714,7 +1714,10 @@ async function run() {
     const sent = askCalls[0] || {};
     eq('the server is asked as practice, at the conversational level, with the cleaned message', [sent.context, sent.level, sent.message], ['practice', 'ask', 'Why do we undo the last operation first?']);
     eq('and the history the panel sent', sent.history, [{ role: 'tutor', text: 'Look at the operation.' }]);
-    ok('grounded here in the verified solution and answer', Array.isArray(sent.question?.steps) && sent.question.steps.length > 0 && !!sent.question?.answer, show(sent.question));
+    // The device holds no answer for a server-issued question, so it sends the
+    // server's question id and the server grounds the reply from its own copy.
+    ok('grounded by the server: the request names the issued question and carries no solution or answer',
+      typeof sent.serverQuestionId === 'string' && sent.serverQuestionId.length > 8 && sent.question === undefined, show(sent));
     ok('with the student\'s own working', Array.isArray(sent.studentWork?.lines) && sent.studentWork.lines[0] === 'first line', show(sent.studentWork));
     ok('and nothing that identifies the student', !/Ada|Lovelace|ada\.lovelace|"pid"|"email"|"name"/.test(JSON.stringify(sent)), JSON.stringify(sent).slice(0, 200));
     eq('a conversation costs no further credit: the row still shows level 1', (await idb.get('questions', id)).tutorLevel, 1);

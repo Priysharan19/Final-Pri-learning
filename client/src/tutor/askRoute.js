@@ -70,7 +70,9 @@ export function createTutorAskRoute({
     const turnId = typeof body?.turnId === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(body.turnId) ? body.turnId : null;
 
     const q = row.payload;
-    const solution = { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText };
+    // A server-issued question's payload holds no answer: the server grounds
+    // the reply from its own copy (tutorRequest sends only the question id).
+    const solution = q.answer ? { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText } : null;
     const work = tutorWork(q, body?.work);
     const base = tutorRequest(p, row, q, solution, { level: 'ask', locale: body?.locale, work });
     const authored = authoredTurnHint(q, history);

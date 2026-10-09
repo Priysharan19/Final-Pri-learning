@@ -301,7 +301,10 @@ await check('signed out, offline or with no server: the submission is refused by
   await inkDrafts.flushInkDrafts();
   recovery.savePendingSubmission(t.id, { submissionId: sid, answer: t.right, ms: 800, viaInk: false, lines: ['my working'] });
   const xp = (await api.get('/me')).user.xp;
-  const sent = online.traffic.grade;
+  // What the server has marked, read from its own store: a refused request may
+  // still reach it (an expired session is only known there) and marks nothing.
+  const serverGrades = async () => Number((await online.db.get("SELECT COUNT(*) AS n FROM idempotency_keys WHERE scope='practice-grade'"))?.n || 0);
+  const sent = await serverGrades();
 
   try {
   const refusals = [
@@ -328,7 +331,7 @@ await check('signed out, offline or with no server: the submission is refused by
     assert.equal(relaunch.question.id, t.id, `${label}: the same question is served to keep working on`);
     assert.equal(relaunch.question.prompt, t.q.prompt, `${label}: unchanged`);
   }
-  assert.equal(online.traffic.grade, sent, 'the server graded nothing during the refusals');
+  assert.equal(await serverGrades(), sent, 'the server graded nothing during the refusals');
 
   // Signed in and connected again, the kept submission — same key — is marked once.
   const marked = await api.post(`/practice/${t.id}/submit`, { answer: t.right, ms: 800, submissionId: sid });

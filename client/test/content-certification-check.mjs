@@ -247,10 +247,17 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   ok(!!row.serverQuestionId && !('answer' in q) && !('seed' in q), 'the served India question was issued by the server and carries no answer or seed on the device');
   ok(typeof q.contentId === 'string' && q.contentId.length > 0, `a served India question carries a contentId (${q.contentId})`);
   eq(q.contentVersion, CONTENT_VERSION, 'a served India question carries the current content version');
-  eq(q.contentHash, contentHashOf(key), 'its contentHash matches what was served');
-  if (!key.pyq) eq(q.contentId, contentIdOf(key, row.generator), 'its contentId names the generator, difficulty and seed that reproduce it');
+  // The engine's own content id spells out the seed and its content hash is
+  // taken over the answer; with the bundled generators either is the answer
+  // key. The device is handed keyed digests instead, and the server's sealed
+  // copy keeps the real identity.
+  ok(/^[0-9a-f]{16}$/.test(q.contentHash) && q.contentHash !== contentHashOf(key), 'its contentHash on the device is not the answer-derived hash');
+  if (!key.pyq) {
+    ok(q.contentId !== contentIdOf(key, row.generator) && !q.contentId.includes(String(key.seed)), 'its contentId on the device does not name the seed');
+    eq(key.contentId, contentIdOf(key, row.generator), 'the server\'s sealed copy names the generator, difficulty and seed that reproduce it');
+  }
   const same = generateQuestion(row.generator, q.difficulty, key.seed);
-  eq(same.contentHash, q.contentHash, 'the contentId reproduces the same question under the same content version');
+  eq(same.contentHash, key.contentHash, 'the sealed identity reproduces the same question under the same content version');
 
   const answer = key.answerType === 'mcq' ? String(key.answer.correctIndex) : String(key.answer?.value ?? key.answer?.expr ?? '0');
   const marked = await dispatch('POST', `/practice/${r.question.id}/submit`, { answer, submissionId: nextSubmissionId() });

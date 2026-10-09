@@ -567,8 +567,12 @@ export async function certifyBackend(paths, { surfaces = true } = {}) {
       if (!q?.id || !(q.prompt || q.stem)) row.problem = 'reply carries no renderable question';
       else if (!stored.serverQuestionId) row.problem = 'the question was not issued by the server';
       else if ('answer' in payload || 'seed' in payload || 'steps' in payload) row.problem = 'the device was handed the answer, the solution or the seed';
-      else if (!payload?.contentId || !payload?.contentVersion || payload.contentId !== sealed.contentId || payload.contentVersion !== sealed.contentVersion
-        || payload.contentHash !== contentHashOf(sealed)) row.problem = 'stored question has no valid content identity';
+      // The device's ids are keyed digests (the real id names the seed, the
+      // real hash covers the answer); the sealed copy carries the real identity.
+      else if (payload.contentId === sealed.contentId || payload.contentHash === contentHashOf(sealed)
+        || (Number.isFinite(Number(sealed.seed)) && String(payload.contentId).includes(String(sealed.seed)))) row.problem = 'the device was handed an identity that reveals the seed or the answer';
+      else if (!payload?.contentId || !/^[0-9a-f]{16}$/.test(String(payload.contentHash)) || payload.contentVersion !== sealed.contentVersion
+        || !sealed.contentId || sealed.contentHash !== contentHashOf(sealed)) row.problem = 'stored question has no valid content identity';
       else if (expect.chapterId && stored.india?.chapterId !== expect.chapterId) row.problem = `served under ${stored.india?.chapterId}, not ${expect.chapterId}`;
       else if (expect.pyq && !payload.pyq) row.problem = 'past-papers-only served an authored question';
       // A named difficulty is served at exactly that level or refused (issue

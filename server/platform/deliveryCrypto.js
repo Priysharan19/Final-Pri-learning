@@ -9,6 +9,16 @@ export function otpHmacKey() {
   return createHmac('sha256', deliveryKey()).update('pri-otp-code-v1').digest();
 }
 
+/**
+ * The key public practice content identifiers are derived under. A question's
+ * own content id spells out its seed and its content hash covers its answer;
+ * neither may reach a device before the question is resolved, so the server
+ * hands out keyed digests of them instead.
+ */
+export function practiceContentKey() {
+  return createHmac('sha256', deliveryKey()).update('pri-practice-content-v1').digest();
+}
+
 function decodeConfiguredKey(raw) {
   const value = String(raw || '').trim();
   if (!value) return null;

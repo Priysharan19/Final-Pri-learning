@@ -10,12 +10,12 @@
 // unapproved production Postgres DDL. Old clients are not authorised to treat
 // their offline grades as server grades. The client transport integration is
 // a separate mandatory release gate.
-import { createHash, randomInt, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomInt, randomUUID } from 'node:crypto';
 import { asyncRouter, asyncHandler } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { nextSyncCursor, syncLockKey } from './db.js';
 import { requireSession, requireVerifiedEmail, requireRole, rateLimit, consumeRateLimit, sessionFromRequest } from './security.js';
-import { encryptDeliveryToken, decryptDeliveryToken } from './deliveryCrypto.js';
+import { encryptDeliveryToken, decryptDeliveryToken, practiceContentKey } from './deliveryCrypto.js';
 import { misconceptionIdForTrap } from '../../client/src/engine/misconceptions.js';
 import { PUBLIC_QUESTION_FIELDS } from '../../client/src/engine/publicQuestion.js';
 import { consentState, consentBlockerCode } from './guardianConsent.js';
@@ -132,10 +132,23 @@ function stepEvidence(q, answer, steps, result) {
   return { stepReport: report, partial };
 }
 
+// What a device may know a question by. The engine's content id names the seed
+// and its content hash is taken over the answer, so either would let a device
+// with the bundled generators recover the key. These are stable per content,
+// which is all the device needs them for (recently-seen lists, attempt
+// records), and say nothing about it.
+const keyed = value => createHmac('sha256', practiceContentKey()).update(String(value));
+const opaqueContentId = value => (value == null || value === '' ? null : 'srv:' + keyed(value).digest('base64url').slice(0, 30));
+// Same shape as the engine's own content hash (16 hex), so the device stores
+// and compares it exactly as before.
+const opaqueContentHash = value => (value == null || value === '' ? null : keyed('hash:' + value).digest('hex').slice(0, 16));
+
 function safeQuestion(id, q) {
   const publicQ = { id, supportsSteps: !!stepMetaFor(q),
     criteriaCount: marksPossibleFor(q) };
   for (const k of PUBLIC_Q) if (Object.hasOwn(q, k)) publicQ[k] = q[k];
+  if ('contentId' in publicQ) publicQ.contentId = opaqueContentId(q.contentId);
+  if ('contentHash' in publicQ) publicQ.contentHash = opaqueContentHash(q.contentHash);
   return publicQ;
 }
 
@@ -271,7 +284,7 @@ function chooseQuestion({ generator, difficulty, dotpoint, avoid, trap, written 
   let fallback = null;
   for (let i = 0; i < SEEK_TRIES; i++) {
     const q = generateQuestion(generator, difficulty, randomInt(0x80000000), dotpoint);
-    const fresh = !avoid.has(q.contentHash);
+    const fresh = !avoid.has(opaqueContentHash(q.contentHash));
     // `written` asks for a form the student writes out; a multiple-choice
     // item can be guessed, which a diagnostic must avoid where it can.
     const springs = (!trap || carriesTrap(trap.owner, q, trap.key)) && (!written || (q.answerType !== 'mcq' && !q.multipart));
@@ -567,7 +580,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         [cursor, attemptId, accountId, Number(last?.n || 0) + 1, qid, now, JSON.stringify({ attemptId, questionId: qid, correct: false,
           revealed: true, marksEarned: 0, marksPossible: response.marksPossible,
           ...(q._repeat === true ? { repeat: true } : {}),
-          contentId: q.contentId || null,
+          contentId: opaqueContentId(q.contentId),
           subtopic: q.subtopic || null, difficulty: Number(q.difficulty) || 2,
           mode: q._practiceMode || 'practice', hintsUsed: 1, support: 'supported',
           createdAt: now, serverAcknowledgedAt: now }), now]);
@@ -667,7 +680,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         marksEarned, marksPossible,
         triesLeft: resolved ? 0 : 1,
         feedback: workingOnlyCredit ? partial.note : feedback, trapWhy,
-        contentId: q.contentId || null, serverAcknowledgedAt: now,
+        contentId: opaqueContentId(q.contentId), serverAcknowledgedAt: now,
         ...(q._repeat === true ? { repeat: true } : {}),
         stepReport, partial, ...(resolved ? {
           solution: solutionFor(q),

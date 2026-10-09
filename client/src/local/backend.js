@@ -5239,6 +5239,21 @@ function checkUnavailable(reason, cause = null) {
 
 const SERVER_MODES = ['practice', 'review', 'task', 'rush', 'match'];
 
+/**
+ * A server call that could not be made, as the reason a check is unavailable.
+ * An answer the server did give — a finished question, a reused key, an
+ * unreadable image — is the server's and passes through unchanged.
+ */
+function unreachable(cause) {
+  if (cause?.status === 401) return checkUnavailable('sign-in', cause);
+  if (cause?.status === 403 || cause?.status === 426) return checkUnavailable('refused', cause);
+  if (cause?.code === 'CLOUD_DISABLED' || !cause?.status || cause.status >= 500 || cause.status === 429 || cause.status === 408) {
+    return checkUnavailable('offline', cause);
+  }
+  return cause;
+}
+const viaServer = async call => { try { return await call(); } catch (cause) { throw unreachable(cause); } };
+
 /** A locally generated question reduced to what a student may see unmarked. */
 function draftQuestion(q) {
   return { ...publicQuestionFields(q), supportsSteps: !!stepMetaFor(q), criteriaCount: criteriaFor(q).length };
@@ -5318,7 +5333,7 @@ async function revealOnServer(row) {
   if (!row.serverQuestionId) throw Object.assign(new Error('A live issued question is required.'), {
     status: 503, code: 'ONLINE_REVEAL_REQUIRED'
   });
-  const receipt = await cloud.revealPractice(row.serverQuestionId);
+  const receipt = await viaServer(() => cloud.revealPractice(row.serverQuestionId));
   if (receipt?.authoritative !== true || receipt.revealed !== true || receipt.resolved !== true ||
       receipt.questionId !== row.serverQuestionId || typeof receipt.attemptId !== 'string' ||
       !receipt.solution || !Number.isFinite(receipt.serverAcknowledgedAt)) {
@@ -5354,7 +5369,7 @@ async function gradeOnServer(row, body, submissionId, requestDigest) {
         status: 422, code: 'RECOGNITION_IMAGE_REQUIRED'
       });
     }
-    const read = await cloud.recognizePractice(row.serverQuestionId, mode, image);
+    const read = await viaServer(() => cloud.recognizePractice(row.serverQuestionId, mode, image));
     receipt = read?.receipt;
     if (!receipt || typeof read?.transcription?.text !== 'string') {
       throw Object.assign(new Error('The server did not issue a valid reading receipt.'), {
@@ -5364,7 +5379,7 @@ async function gradeOnServer(row, body, submissionId, requestDigest) {
     // Student corrections cannot forge a provider receipt. The server saves
     // the original reading and the explicit correction under a second token.
     if (read.transcription.text !== String(body.answer) || read.transcription.needsConfirmation === true) {
-      const corrected = await cloud.confirmPracticeRecognition(row.serverQuestionId, receipt, String(body.answer));
+      const corrected = await viaServer(() => cloud.confirmPracticeRecognition(row.serverQuestionId, receipt, String(body.answer)));
       if (!corrected?.receipt) throw new Error('The corrected reading was not acknowledged by the server.');
       receipt = corrected.receipt;
     }
@@ -5379,7 +5394,7 @@ async function gradeOnServer(row, body, submissionId, requestDigest) {
       };
   row.pendingGrade = { submissionId, digest: requestDigest, mode, receipt: receipt || null, payload };
   await put('questions', row);
-  const acknowledged = await cloud.gradePractice(row.serverQuestionId, payload);
+  const acknowledged = await viaServer(() => cloud.gradePractice(row.serverQuestionId, payload));
   if (acknowledged?.authoritative !== true || acknowledged.questionId !== row.serverQuestionId ||
       acknowledged.submissionId !== submissionId || typeof acknowledged.attemptId !== 'string' ||
       typeof acknowledged.correct !== 'boolean' || !Number.isFinite(acknowledged.serverAcknowledgedAt)) {
