@@ -44,7 +44,14 @@ export const CHECKPOINT_DEBOUNCE_MS = 1500;
 const CHECKPOINT_RETRY_MS = [4000, 8000, 15000, 30000, 60000];
 const START_RETRY_WINDOW_MS = 10 * 60 * 1000;
 const RECONCILE_EVERY_MS = 3000;
+// Opening a paper never waits long on a hanging connection: local state stands.
+const RECONCILE_TIMEOUT_MS = 6000;
+const RECONCILE_FINISH_TIMEOUT_MS = 10000;
+// Under continuous typing the server is sent a checkpoint at most this often.
+const CHECKPOINT_MIN_INTERVAL_MS = 4000;
 const SUBMISSION_KEY = /^[a-zA-Z0-9_-]{8,100}$/;
+
+const monotonic = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
 
 export const isServerPaper = exam => !!exam?.server?.examId;
 /**
@@ -209,8 +216,11 @@ function clampDeadline(exam, remainingMs) {
 const checkpoints = new Map();   // local exam id → { timer, failures, running }
 
 function arm(examId, delay) {
-  const state = checkpoints.get(examId) || { timer: null, failures: 0, running: null };
+  const state = checkpoints.get(examId) || { timer: null, failures: 0, running: null, sentAt: 0 };
   if (state.timer) clearTimeout(state.timer);
+  // An urgent send (delay 0: the page is hiding) goes now; anything else keeps
+  // its distance from the last one.
+  if (delay > 0 && state.sentAt) delay = Math.max(delay, state.sentAt + CHECKPOINT_MIN_INTERVAL_MS - monotonic());
   state.timer = setTimeout(() => { state.timer = null; checkpointNow(examId).catch(() => {}); }, delay);
   // A pending checkpoint never keeps a test process or a closing tab alive.
   state.timer?.unref?.();
@@ -257,6 +267,7 @@ export async function checkpointNow(examId) {
       return 'closed';
     }
     state.failures = 0;
+    state.sentAt = monotonic();
     let again = false;
     await withExamLock(examId, async () => {
       const fresh = await get('exams', examId).catch(() => null);
@@ -306,7 +317,7 @@ export function pendingView(exam) {
  * the paper. Throws only for a refusal that retrying cannot change.
  * The caller holds the paper's lock and writes `exam` back.
  */
-export async function finishOnServer(exam, body = {}, now = Date.now()) {
+export async function finishOnServer(exam, body = {}, now = Date.now(), { timeoutMs = undefined } = {}) {
   if (!exam.pendingFinish) {
     // What the device sends is frozen at the first submit: a queued paper can
     // not be edited, and a retry sends exactly the same thing.
@@ -330,7 +341,7 @@ export async function finishOnServer(exam, body = {}, now = Date.now()) {
   try {
     const result = await cloud.finishExam(exam.server.examId, {
       ...(await wireResponses(exam, queued.inputs)), ms: queued.inputs.ms, reason: queued.reason, submissionKey: queued.submissionKey
-    }, queued.submissionKey);
+    }, queued.submissionKey, timeoutMs);
     if (result?.authoritative !== true || !Array.isArray(result.detail) || !Number.isFinite(Number(result.score)) || !Number.isFinite(Number(result.total))) {
       throw Object.assign(new Error('The server did not return a certified result.'), { status: 502 });
     }
@@ -407,7 +418,7 @@ export function serverFinal(exam, result) {
 export async function fetchRemotePaper(exam) {
   if (!isServerPaper(exam) || !exam.server.remote) return null;
   let remote;
-  try { remote = await cloud.getExam(exam.server.examId); } catch { return null; }
+  try { remote = await cloud.getExam(exam.server.examId, RECONCILE_TIMEOUT_MS); } catch { return null; }
   if (remote?.state !== 'finished' || remote.result?.authoritative !== true || !Array.isArray(remote.exam?.questions)) return null;
   return { paper: remote.exam, result: remote.result };
 }
@@ -415,7 +426,6 @@ export async function fetchRemotePaper(exam) {
 // ── Reconciling ──────────────────────────────────────────────────────────────
 
 const lastReconciled = new Map();   // local exam id → monotonic ms
-const monotonic = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
 /** A paper the device has just heard from the server about needs no second ask. */
 export function noteReconciled(examId) { lastReconciled.set(String(examId), monotonic()); }
 
@@ -434,7 +444,7 @@ export async function reconcileWithServer(exam, { force = false, rebuildRow = nu
     // file's until the server says what it stored.
     if (!exam.server.restored) return {};
     let remote;
-    try { remote = await cloud.getExam(exam.server.examId); } catch { return {}; }
+    try { remote = await cloud.getExam(exam.server.examId, RECONCILE_TIMEOUT_MS); } catch { return {}; }
     if (remote?.state !== 'finished' || remote.result?.authoritative !== true) return {};
     exam.score = Number(remote.result.score);
     exam.total = Number(remote.result.total);
@@ -442,7 +452,7 @@ export async function reconcileWithServer(exam, { force = false, rebuildRow = nu
     return { changed: true };
   }
   if (exam.pendingFinish) {
-    const out = await finishOnServer(exam, {}, Date.now()).catch(() => ({ pending: pendingView(exam) }));
+    const out = await finishOnServer(exam, {}, Date.now(), { timeoutMs: RECONCILE_FINISH_TIMEOUT_MS }).catch(() => ({ pending: pendingView(exam) }));
     return out.result ? { result: out.result } : { pending: out.pending || null, changed: true };
   }
   const key = String(exam.id);
@@ -456,7 +466,7 @@ export async function reconcileWithServer(exam, { force = false, rebuildRow = nu
   }
   if (!force && !missing.length && !exam.server.restored && lastReconciled.has(key) && monotonic() - lastReconciled.get(key) < RECONCILE_EVERY_MS) return {};
   let remote;
-  try { remote = await cloud.getExam(exam.server.examId); } catch { return {}; }
+  try { remote = await cloud.getExam(exam.server.examId, RECONCILE_TIMEOUT_MS); } catch { return {}; }
   noteReconciled(key);
   let changed = false;
   for (const i of missing) {

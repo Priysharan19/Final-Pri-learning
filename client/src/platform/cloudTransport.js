@@ -408,10 +408,10 @@ export const cloud = Object.freeze({
   createExam: (body, idempotencyKey) => cloudRequest('/v1/exams', { method: 'POST', body, idempotencyKey, timeoutMs: 30000 }),
   // PATCH, not PUT: the native iOS and Android bridges carry GET/POST/PATCH/DELETE.
   saveExamAnswers: (examId, body) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id') + '/answers', { method: 'PATCH', body }),
-  finishExam: (examId, body, idempotencyKey) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id') + '/finish', {
-    method: 'POST', body, idempotencyKey, timeoutMs: 30000
+  finishExam: (examId, body, idempotencyKey, timeoutMs = 30000) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id') + '/finish', {
+    method: 'POST', body, idempotencyKey, timeoutMs
   }),
-  getExam: examId => cloudRequest('/v1/exams/' + pathId(examId, 'exam id')),
+  getExam: (examId, timeoutMs = undefined) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id'), { timeoutMs }),
   repeatPractice: questionId => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/repeat', { method: 'POST', body: {} }),
   revealPractice: questionId => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/reveal', { method: 'POST', body: {} }),
   recognizePractice: (questionId, mode, image) =>
