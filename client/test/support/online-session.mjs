@@ -1,0 +1,287 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Pri Learning · the online session every browser flow marks against.
+//
+// Owner decision 2026-10-10: checking an answer, awarding marks and showing a
+// solution need a verified signed-in account, a connection and a question the
+// SERVER issued. A browser flow that marks anything therefore needs a server
+// and an account, and this module is the one place both come from.
+//
+// WHAT IS REAL
+//   · the platform server (server/app.js → /v1), in this process, on its own
+//     SQLite file, serving the built client from the same origin — so the page
+//     reaches /v1 exactly as the deployed app does (same-origin, real cookies,
+//     real CSRF pair, real security headers). No Playwright route stands in for
+//     a verdict: every mark in a flow that uses this session was committed by
+//     the server's deterministic engine and read back from its receipt.
+//   · the account: registered and email-verified over the server's own HTTP
+//     routes, then SIGNED IN THROUGH THE APP — Settings → Pri account → Sign
+//     in — which is the product code that links a local profile to an account.
+//
+// WHAT IS SYNTHETIC — and must be labelled so wherever it is evidence
+//   · the handwriting READER. The single hop from the server's provider module
+//     to the model is answered here by a stand-in that never looks at the
+//     picture: it returns the text and confidence the flow scripts. Nothing
+//     that passes through it is evidence about real handwriting recognition, a
+//     real provider, a real iPad or a real Pencil. Every other outbound request
+//     from this process is refused, so no suite can reach a real provider.
+//   · email and SMS delivery use the server's TEST adapters (no message sent).
+//
+// THE ORACLE. A server-issued question carries no answer key to the device.
+// A flow that needs the right answer asks `answerOf()`, which regenerates the
+// question in THIS process — the test's desk, not the student's browser — from
+// the generator, difficulty and seed the page itself sent to /practice/issue,
+// using the same bundled engine, and refuses to answer unless the regenerated
+// prompt is the one the server issued. Nothing is ever handed to the page.
+// ─────────────────────────────────────────────────────────────────────────────
+import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+export const SYNTHETIC_EVIDENCE = 'SYNTHETIC-READER EVIDENCE';
+
+const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+const DIST = join(ROOT, 'client', 'dist');
+const PASSWORD = 'online-session-e2e-passphrase-42';
+
+const ENV = {
+  PRI_SMS_PROVIDER: 'test',
+  PRI_AUTH_EMAIL_PROVIDER: 'test',
+  PRI_HANDWRITING_API_KEY: 'synthetic-reader-not-a-provider-key',
+  PRI_HANDWRITING_MODEL: 'synthetic-reader',
+  PRI_HANDWRITING_FALLBACK_MODEL: 'synthetic-reader',
+  PRI_PAID_CALLS_PER_HOUR: '10000',
+  PRI_PAID_CALLS_PER_DAY: '100000'
+};
+// PRI_PUBLIC_ORIGIN is cleared: outside production the server then accepts the
+// page's own origin, which is this server's ephemeral loopback port.
+const ENV_CLEARED = ['PRI_HANDWRITING_ENDPOINT', 'PRI_HANDWRITING_PROBE_ENDPOINT', 'PRI_HANDWRITING_CONFIDENCE_FLOOR',
+  'PRI_PLATFORM_DB', 'PRI_PUBLIC_ORIGIN', 'NODE_ENV'];
+
+let shared = null;
+let accountSerial = 0;
+
+/** The one platform of this suite run, booted on first use. */
+export function onlinePlatform() {
+  if (!shared) shared = startOnlinePlatform().catch(err => { shared = null; throw err; });
+  return shared;
+}
+
+/** Close the shared platform if a flow ever started it. Safe to call twice. */
+export async function closeOnlinePlatform() {
+  const running = shared;
+  shared = null;
+  if (running) await (await running.catch(() => null))?.close();
+}
+
+export async function startOnlinePlatform({ dist = DIST } = {}) {
+  if (!existsSync(join(dist, 'index.html'))) throw new Error(`online-session: ${dist} has no built client`);
+  const saved = Object.fromEntries([...Object.keys(ENV), ...ENV_CLEARED, 'PRI_AUTH_DELIVERY_KEY'].map(k => [k, process.env[k]]));
+  process.env.PRI_AUTH_DELIVERY_KEY = process.env.PRI_AUTH_DELIVERY_KEY || '44'.repeat(32);
+  Object.assign(process.env, ENV);
+  for (const k of ENV_CLEARED) delete process.env[k];
+
+  // The stand-in reader. `text` / `confidence` are scripted by the flow; every
+  // request the provider module sends is kept so a flow can prove the reader
+  // was sent the picture and nothing about the question. `down` makes the
+  // provider hop fail the way an unreachable model does.
+  const reader = { text: '7', confidence: 0.6, down: false, requests: [], refused: [] };
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init = {}) => {
+    const url = new URL(typeof input === 'string' ? input : input.url);
+    if (url.hostname === '127.0.0.1' || url.hostname === 'localhost') return realFetch(input, init);
+    if (url.host === 'api.openai.com' && url.pathname.startsWith('/v1/models/')) {
+      return new Response(JSON.stringify({ id: 'synthetic-reader' }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    if (url.host === 'api.openai.com' && url.pathname === '/v1/responses') {
+      reader.requests.push(JSON.parse(String(init.body || '{}')));
+      if (reader.down) return new Response(JSON.stringify({ error: { message: 'synthetic reader scripted down' } }), { status: 503, headers: { 'content-type': 'application/json' } });
+      const lines = String(reader.text).split('\n').filter(Boolean).map(text => ({ text, latex: text, confidence: reader.confidence }));
+      return new Response(JSON.stringify({
+        output_text: JSON.stringify({ lines, confidence: reader.confidence, needs_confirmation: reader.confidence < 0.82 })
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    reader.refused.push(url.origin + url.pathname);
+    throw new Error(`online-session: outbound request refused (${url.origin}) — browser suites never reach a real provider`);
+  };
+
+  const dir = mkdtempSync(join(tmpdir(), 'pri-online-session-'));
+  const harness = await import('../../../server/test/support/app-harness.mjs');
+  const { createPlatformDb } = await import('../../../server/platform/db.js');
+  const sms = await import('../../../server/platform/smsProvider.js');
+  const engine = await import('../../src/engine/generators/index.js');
+  const db = createPlatformDb(join(dir, 'platform.sqlite'));
+  const h = await harness.startApp({ db, dist });
+  await engine.loadAllBanks();
+
+  /**
+   * A verified adult student account, made at the server's own routes. It is
+   * not signed in anywhere yet: `session.signIn()` does that through the app.
+   */
+  async function newAccount({ name = 'Online Student' } = {}) {
+    const email = `e2e.${process.pid}.${++accountSerial}.${Date.now().toString(36)}@example.test`;
+    const made = await harness.registerAccount(h, { name, email, password: PASSWORD, deviceId: `e2e-desk-${accountSerial}` });
+    if (made.status !== 201 || !made.account?.id) throw new Error(`online-session: register answered ${made.status} ${made.text}`);
+    const verified = await harness.verifyEmail(h, made.account.id);
+    if (verified.status >= 300) throw new Error(`online-session: verify-email answered ${verified.status} ${verified.text}`);
+    // The desk's own session is not the student's: end it so the only live
+    // session for this account is the one the browser signs in with.
+    await h.request('/v1/account/logout', { method: 'POST', jar: made.jar }).catch(() => {});
+    return { id: String(made.account.id), name, email, password: PASSWORD };
+  }
+
+  /** What the server durably holds for one account's practice. */
+  function ledger(accountId, serverQuestionId = null) {
+    const n = (scope, key = null) => Number(h.db.prepare(
+      `SELECT COUNT(*) AS n FROM idempotency_keys WHERE account_id=? AND scope=?${key ? ' AND key=?' : ''}`
+    ).get(...(key ? [accountId, scope, key] : [accountId, scope])).n);
+    return {
+      issued: n('practice-question'), completions: n('practice-completion'),
+      thisDone: serverQuestionId ? n('practice-completion', serverQuestionId) : null
+    };
+  }
+
+  async function close() {
+    await h.close();
+    try { db.close?.(); } catch { /* already closed */ }
+    globalThis.fetch = realFetch;
+    for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    rmSync(dir, { recursive: true, force: true });
+  }
+
+  const platform = { origin: h.origin, h, db, sms, reader, engine, newAccount, ledger, close };
+  platform.session = (ctx, page) => onlineSession(platform, ctx, page);
+  return platform;
+}
+
+// ── One flow's view of the platform ──────────────────────────────────────────
+
+const V1 = /^\/v1\//;
+
+/** The answer a student would type for a generated question, by answer type. */
+export function typedAnswerOf(q) {
+  const a = q.answer || {};
+  switch (q.answerType) {
+    case 'mcq': return { kind: 'mcq', index: a.correctIndex, text: q.mcqOptions?.[a.correctIndex] ?? null };
+    case 'numeric':
+      if (a.canonicalInput) return { kind: 'text', text: String(a.canonicalInput) };
+      if (a.simplestFraction) return { kind: 'text', text: `${a.simplestFraction.n}/${a.simplestFraction.d}` };
+      if (a.value !== undefined) return { kind: 'text', text: String(a.value) };
+      return { kind: 'text', text: null };
+    case 'expression': return { kind: 'text', text: a.expr || null };
+    case 'set': return { kind: 'text', text: Array.isArray(a.values) ? a.values.join(', ') : null };
+    case 'point': return { kind: 'text', text: `(${a.x}, ${a.y})` };
+    case 'ratio': return { kind: 'text', text: `${a.a} : ${a.b}` };
+    default: return { kind: q.answerType, text: null };
+  }
+}
+
+function onlineSession(platform, ctx, page) {
+  const calls = [];
+  const pending = new Set();
+  // Observed, never intercepted: the request goes to the real server and this
+  // only keeps what was exchanged, so a flow can assert on the server's reply.
+  ctx.on('response', response => {
+    const request = response.request();
+    let url; try { url = new URL(request.url()); } catch { return; }
+    if (url.origin !== platform.origin || !V1.test(url.pathname)) return;
+    const entry = { method: request.method(), path: url.pathname, status: response.status(), body: null, json: null };
+    try { entry.body = request.postDataJSON(); } catch { entry.body = null; }
+    calls.push(entry);
+    const read = response.json().then(json => { entry.json = json; }).catch(() => {}).finally(() => pending.delete(read));
+    pending.add(read);
+  });
+  const settled = async () => { while (pending.size) await Promise.all([...pending]); };
+
+  /** POSTs to /v1/practice/… matching `re`, with their replies read. */
+  const practiceCalls = async (re) => { await settled(); return calls.filter(c => c.method === 'POST' && re.test(c.path)); };
+
+  /**
+   * Sign this context's active local profile in to a fresh verified account,
+   * through Settings → Pri account → Sign in, and come back linked. This is
+   * the app's own sign-in: the profile ↔ account link in IndexedDB and the
+   * session cookie are written by product code, not by the test.
+   */
+  async function signIn({ name = 'Online Student', account = null } = {}) {
+    const who = account || await platform.newAccount({ name });
+    await page.goto(`${platform.origin}/settings`, { waitUntil: 'domcontentloaded' });
+    const panel = page.locator('section', { has: page.locator('#cloud-account-title') });
+    await panel.waitFor({ state: 'visible', timeout: 30000 });
+    await panel.getByRole('button', { name: 'Sign in', exact: true }).first().click();
+    await panel.locator('#cloud-email').fill(who.email);
+    await panel.locator('#cloud-password').fill(who.password);
+    await panel.locator('form button[type="submit"]').click();
+    await panel.getByText('Connected', { exact: true }).waitFor({ timeout: 30000 });
+    session.account = who;
+    return who;
+  }
+
+  /** The stored row behind the question on screen — ids and issue data only. */
+  const shownRow = () => page.evaluate(() => new Promise(done => {
+    const id = document.querySelector('.qpage[data-question-id]')?.getAttribute('data-question-id');
+    if (!id) return done(null);
+    const open = indexedDB.open('pri-learning');
+    open.onerror = () => done({ id, row: false });
+    open.onsuccess = () => {
+      const db = open.result;
+      let req;
+      try { req = db.transaction('questions').objectStore('questions').get(id); }
+      catch { db.close(); return done({ id, row: false }); }
+      req.onsuccess = () => {
+        const row = req.result; db.close();
+        done({ id, row: !!row, serverQuestionId: row?.serverQuestionId || null, issue: row?.issue || null });
+      };
+      req.onerror = () => { db.close(); done({ id, row: false }); };
+    };
+  }));
+
+  /**
+   * The right answer to the question on screen, regenerated at the test's desk
+   * from what the page asked the server to issue. Returns { answerType, kind,
+   * text, index, prompt, serverQuestionId } or throws naming what was missing.
+   */
+  async function answerOf() {
+    await settled();
+    const shown = await shownRow();
+    if (!shown?.row) throw new Error(`online-session: no stored question behind the card (${JSON.stringify(shown)})`);
+    let issue = shown.issue;
+    let issuedPrompt = null;
+    if (shown.serverQuestionId) {
+      const call = calls.find(c => c.path === '/v1/practice/issue' && c.json?.question?.id === shown.serverQuestionId);
+      if (!call?.body) throw new Error(`online-session: question ${shown.serverQuestionId} was not issued in this session`);
+      issue = call.body;
+      issuedPrompt = call.json.question.prompt;
+    }
+    if (!issue?.generator) throw new Error('online-session: the question on screen names no generator to regenerate from');
+    const q = platform.engine.generateQuestion(issue.generator, Number(issue.difficulty), Number(issue.seed));
+    if (issuedPrompt !== null && q.prompt !== issuedPrompt) {
+      throw new Error('online-session: the regenerated question is not the one the server issued — the oracle refuses to guess');
+    }
+    return { answerType: q.answerType, prompt: q.prompt, serverQuestionId: shown.serverQuestionId, issue, ...typedAnswerOf(q) };
+  }
+
+  /**
+   * Cut the device off from the server at the network layer, for a signed-in
+   * student: every /v1 request fails as an unreachable host does. The app
+   * shell and its assets still load, as they do from the service worker.
+   */
+  let cut = null;
+  const toServer = url => url.origin === platform.origin && V1.test(url.pathname);
+  async function disconnect() {
+    if (cut) return;
+    cut = route => route.abort('internetdisconnected');
+    await ctx.route(toServer, cut);
+  }
+  async function reconnect() {
+    if (!cut) return;
+    await ctx.unroute(toServer, cut);
+    cut = null;
+  }
+
+  const session = {
+    platform, origin: platform.origin, reader: platform.reader, sms: platform.sms, calls, account: null,
+    settled, practiceCalls, signIn, shownRow, answerOf, disconnect, reconnect,
+    ledger: (serverQuestionId = null) => platform.ledger(session.account?.id, serverQuestionId)
+  };
+  return session;
+}

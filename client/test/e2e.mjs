@@ -37,6 +37,7 @@ import { join, normalize, extname, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { chromium, webkit } from '@playwright/test';
+import { onlinePlatform, closeOnlinePlatform } from './support/online-session.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DIST = join(ROOT, 'client', 'dist');
@@ -330,9 +331,20 @@ async function runFlow(flow, { browser, base, opts }) {
   const crashes = [];
   page.on('pageerror', e => crashes.push(String(e?.message || e).slice(0, 200)));
 
+  // A flow that marks anything declares `online: true` and runs against the
+  // real platform server, which serves this same build from its own origin
+  // (support/online-session.mjs). Its `online` session signs the profile in
+  // through the app. Every other flow keeps the plain file server: a device
+  // with no Pri server behind it, which is what "signed out" means here.
+  let online = null;
+  if (flow.online) {
+    const platform = await onlinePlatform();
+    base = platform.origin;
+    online = platform.session(ctx, page);
+  }
   const api = helpers(page, base, flow.id);
   try {
-    await flow.run({ page, ctx, base, note, browserName: opts.browser, ...api });
+    await flow.run({ page, ctx, base, note, online, browserName: opts.browser, ...api });
   } catch (err) {
     const path = await api.shot('FAIL-crash');
     ok('the flow ran to the end', false,
@@ -382,6 +394,7 @@ async function run(flows, opts) {
   } finally {
     await browser.close();
     await server.close();
+    await closeOnlinePlatform();
   }
   return report();
 }
