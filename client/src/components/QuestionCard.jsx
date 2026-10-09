@@ -1487,7 +1487,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           {/* Practice is untimed on screen: time on task is still measured for the
               marker, but a running clock is pressure, not information. */}
         </div>
-        {helpUsed > 0 && !resolved && diagnostic && (
+        {/* The credit a hint costs is the device engine's rule. A device
+            question that has had help is never handed to the server (it stays
+            with the bundled engine), so the promise is one this device keeps;
+            a server-issued question's marks are the server's alone to state. */}
+        {helpUsed > 0 && !resolved && (diagnostic || question.serverIssued !== true) && (
           <p className="q-credit">{t('verdict.creditAvailable', { percent: Math.round(credit * 100), marks: Math.round(totalMarks * credit * 10) / 10 })}</p>
         )}
 

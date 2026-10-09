@@ -1721,6 +1721,9 @@ function sanitize(q, row) {
     hintsAvailable: (q.hints || []).length, hintsUsed: row.hintsUsed || 0,
     tutorLevel: row.tutorLevel || 0,
     triesLeft: 2 - (row.tries || 0),
+    // Who marks this question as it stands: the server (issued there, its
+    // answer key never on this device) or the bundled deterministic engine.
+    serverIssued: !!row.serverQuestionId,
     supportsSteps: row.serverQuestionId ? q.supportsSteps === true : !!stepMetaFor(q),
     criteria: row.serverQuestionId
       ? Array.from({ length: Math.min(4, Math.max(1, Number(q.criteriaCount) || 1)) },
