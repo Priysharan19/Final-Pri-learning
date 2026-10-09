@@ -24,4 +24,5 @@ assert.equal(other.get('dotpoint'), null, 'chapter change may not reuse old dotp
 const cbse = new URL(chapterNotesLink(complex, new URLSearchParams('track=cbse&difficulty=4')), 'https://local.test').searchParams;
 assert.equal(cbse.get('track'), 'cbse');
 assert.equal(cbse.get('difficulty'), null, 'D4 cannot be silently served as CBSE');
-console.log('NOTES JEE ROUTE CONTINUITY: PASS 15/15');
+assert.equal(chapterNotesLink(complex, new URLSearchParams('class=11')), '/notes/c11-complex-numbers');
+console.log('NOTES JEE ROUTE CONTINUITY: PASS 16/16');

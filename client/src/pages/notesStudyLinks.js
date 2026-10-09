@@ -5,6 +5,11 @@ import { selectedStudyContext, studyHref } from '../lib/studyJourney.js';
 // chapter, never to the next chapter with the same numeric dotpoint index.
 export function chapterNotesLink(chapter, params) {
   if (!chapter?.id) return null;
+  // A plain index click has no study filter to carry. Preserve the existing
+  // canonical chapter URL for ordinary navigation and old bookmarks.
+  if (!['track', 'difficulty', 'subtopic', 'dotpoint'].some(k => params?.has?.(k))) {
+    return '/notes/' + encodeURIComponent(chapter.id);
+  }
   const selection = selectedStudyContext(chapter, params);
   const selectedChapter = params?.get?.('subtopic');
   const dotpoint = selectedChapter === chapter.id ? selection.dotpoint : null;
