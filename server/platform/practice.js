@@ -59,6 +59,15 @@ function stepMetaFor(q) {
   return null;
 }
 
+// An issued question and every committed grade must use the SAME server-owned
+// rubric. Difficulty alone is not marks; the authored non-auxiliary criteria
+// define the total, bounded by the question's four-mark practice contract.
+function marksPossibleFor(q) {
+  const keySteps = (q.steps || []).filter(step => !/^(check|note|bonus)/i.test(step.h));
+  const maxMarks = Math.min(4, Math.max(1, Number(q.difficulty) || 1));
+  return Math.max(1, Math.min(maxMarks, keySteps.length || 1));
+}
+
 function stepEvidence(q, answer, steps, result) {
   const meta = stepMetaFor(q);
   let report = result.stepReport || null;
@@ -68,9 +77,9 @@ function stepEvidence(q, answer, steps, result) {
   let partial = null;
   if (meta && steps && !result.correct && !result.invalid) {
     try {
-      const keySteps = (q.steps || []).filter(s => !/^(check|note|bonus)/i.test(s.h));
-      const marks = Math.max(1, Math.min(q.difficulty || 1, keySteps.length || 1));
-      const method = methodMarks({ meta, working: steps, marks, prompt: q.prompt, report });
+      const method = methodMarks({
+        meta, working: steps, marks: marksPossibleFor(q), prompt: q.prompt, report
+      });
       if (method) partial = { okLines: method.okLines, awarded: method.awarded, note: method.note, lines: method.lines };
     } catch { partial = null; }
   }
@@ -79,7 +88,7 @@ function stepEvidence(q, answer, steps, result) {
 
 function safeQuestion(id, q) {
   const publicQ = { id, supportsSteps: !!stepMetaFor(q),
-    criteriaCount: Math.max(1, Math.min(4, (q.steps || []).filter(s => !/^(check|note|bonus)/i.test(s.h)).length || 1)) };
+    criteriaCount: marksPossibleFor(q) };
   for (const k of PUBLIC_Q) if (Object.hasOwn(q, k)) publicQ[k] = q[k];
   return publicQ;
 }
@@ -112,7 +121,7 @@ function answerTextFor(q) {
 
 function solutionFor(q) {
   const steps = q.steps || [];
-  const marks = Math.min(4, Math.max(1, q.difficulty || 1));
+  const marks = marksPossibleFor(q);
   const keySteps = steps.filter(s => !/^(check|note|bonus)/i.test(s.h)).slice(0, marks);
   const criteria = keySteps.length
     ? keySteps.map((step, i) => ({ mark: 1, text: i === keySteps.length - 1
@@ -287,6 +296,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const q = JSON.parse(escrow.response_json);
       const attemptId = randomUUID();
       const response = { authoritative: true, revealed: true, resolved: true, correct: false,
+        marksEarned: 0, marksPossible: marksPossibleFor(q),
         questionId: qid, attemptId, serverAcknowledgedAt: now, solution: solutionFor(q) };
       const hash = digest({ qid, operation: 'reveal' });
       for (const [scope, value] of [['practice-reveal', response], ['practice-completion', { attemptId, revealed: true }]]) {
@@ -297,7 +307,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const cursor = await nextSyncCursor(db, accountId);
       await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?, 'server-grader',?,'graded-attempt',?,?,?,?)",
         [cursor, attemptId, accountId, Number(last?.n || 0) + 1, qid, now, JSON.stringify({ attemptId, questionId: qid, correct: false,
-          revealed: true, contentId: q.contentId || null,
+          revealed: true, marksEarned: 0, marksPossible: response.marksPossible,
+          contentId: q.contentId || null,
           subtopic: q.subtopic || null, difficulty: Number(q.difficulty) || 2,
           mode: q._practiceMode || 'practice', hintsUsed: 1, support: 'supported',
           createdAt: now, serverAcknowledgedAt: now }), now]);
@@ -375,6 +386,13 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         ? trapProbes.find(t => t?.why && String(t.why) === feedback)?.why || null : null;
       const working = Array.isArray(body.steps) ? body.steps.join('\n') : String(body.steps || '');
       const { stepReport, partial } = stepEvidence(q, body.answer, working, result);
+      const marksPossible = marksPossibleFor(q);
+      // A correct final answer earns all criteria. Otherwise only independently
+      // verified, non-restated method steps earn marks; invalid input earns zero.
+      // The client must never reconstruct a numeric grade from correct/partial.
+      const marksEarned = result.invalid ? 0 : result.correct
+        ? marksPossible
+        : Math.max(0, Math.min(marksPossible - 1, partial?.awarded ?? 0));
       const priorTry = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-tries' AND key=?",
         [accountId, qid]);
       const tries = priorTry ? Number(JSON.parse(priorTry.response_json).tries) || 0 : 0;
@@ -383,6 +401,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const attemptId = randomUUID();
       const response = { authoritative: true, questionId: qid, submissionId, attemptId,
         correct: result.correct === true, invalid: Boolean(result.invalid), resolved,
+        marksEarned, marksPossible,
         triesLeft: resolved ? 0 : 1, feedback, trapWhy,
         contentId: q.contentId || null, serverAcknowledgedAt: now,
         stepReport, partial, ...(resolved ? {
@@ -404,7 +423,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         const cursor = await nextSyncCursor(db, accountId);
       await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?, 'server-grader',?,'graded-attempt',?,?,?,?)",
           [cursor, attemptId, accountId, seq, qid, now, JSON.stringify({
-            attemptId, submissionId, questionId: qid, correct: response.correct, contentId: response.contentId,
+            attemptId, submissionId, questionId: qid, correct: response.correct,
+            marksEarned: response.marksEarned, marksPossible: response.marksPossible,
+            contentId: response.contentId,
             subtopic: q.subtopic || null, difficulty: Number(q.difficulty) || 2,
             mode: q._practiceMode || 'practice', inputMode: mode,
             // Assistance is currently client-observed, not server-certified. Until
