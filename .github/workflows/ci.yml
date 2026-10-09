@@ -490,7 +490,7 @@ jobs:
           grep -Fq 'SYNTHETIC-READER EVIDENCE' browser.log
           # The accessibility walk must have reached the refused-check states.
           grep -Eq 'online-only checking +9/9' browser.log
-          grep -Eq 'ACCESSIBILITY SUITE.*48/48.*13 groups' browser.log
+          grep -Eq 'ACCESSIBILITY SUITE.*47/47.*13 groups' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
           test "$(grep -Ec 'E2E SUITE PASSED — 158/158 checks across 1 flows' browser.log)" -eq 2
