@@ -64,3 +64,21 @@ assert.equal(showCommittedMethodAwardNote(note, null), false);
 assert.equal(showCommittedMethodAwardNote({ ...note, partial: { awarded: '2' } }, { awarded: 2, possible: 4 }), false);
 assert.equal(showCommittedMethodAwardNote({ ...note, authoritative: false }, { awarded: 2, possible: 4 }), false);
 console.log('METHOD FEEDBACK NUMERIC AUTHORITY: PASS 6/6');
+
+// Device verdicts: the bundled engine's explicit, uncertified result.
+{
+  const { deviceMarkedResponse, deviceRevealResponse } = await import('./authoritativeGrade.js');
+  const dev = { authoritative: false, correct: true, resolved: true, submissionId: 'sub-1' };
+  assert.equal(deviceMarkedResponse(dev, 'sub-1'), true, 'explicit device verdict for the submission sent');
+  assert.equal(deviceMarkedResponse({ authoritative: false, correct: false, resolved: false, invalid: true }, 'sub-1'), true, 'an unreadable device answer names no submission');
+  assert.equal(deviceMarkedResponse(dev, 'sub-2'), false, 'a device verdict for another submission');
+  assert.equal(deviceMarkedResponse({ ...dev, authoritative: undefined }, 'sub-1'), false, 'a result that does not say who marked it');
+  assert.equal(deviceMarkedResponse({ ...dev, authoritative: true }, 'sub-1'), false, 'a server result is not a device verdict');
+  assert.equal(deviceMarkedResponse({ ...dev, attemptId: 'attempt-1' }, 'sub-1'), false, 'a device verdict cannot name a server attempt');
+  assert.equal(deviceMarkedResponse({ ...dev, marksEarned: 1, marksPossible: 1 }, 'sub-1'), false, 'a device verdict cannot carry certified marks');
+  assert.equal(attestedGrade({ ...dev, attemptId: 'a', marksEarned: 1, marksPossible: 1 }, 'question-A', { questionId: 'question-A', attemptId: 'a', submissionId: 'sub-1' }), null, 'a device verdict is never an attested grade');
+  assert.equal(deviceRevealResponse({ authoritative: false, resolved: true, revealed: true, correct: false }), true, 'device reveal');
+  assert.equal(deviceRevealResponse({ authoritative: false, resolved: true, correct: false }), false, 'not a reveal');
+  assert.equal(deviceRevealResponse({ authoritative: false, resolved: true, revealed: true, attemptId: 'x' }), false, 'mixed reveal shape');
+  console.log('DEVICE VERDICT SHAPE: PASS 11/11');
+}
