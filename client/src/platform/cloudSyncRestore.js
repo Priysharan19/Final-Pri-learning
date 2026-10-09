@@ -27,6 +27,7 @@
 import { add, atomicBatch, byIndex, get, put } from '../local/idb.js';
 import { dayKey, timezoneOf } from '../lib/locale.js';
 import { START_RATING, gradeFor, scheduleReview, updateRating, xpFor } from '../engine/adaptive.js';
+import { indiaNameOf } from '../engine/indiaProduct.js';
 
 // backend.js's RECENT_WINDOW: the rolling right/wrong window a rating row keeps.
 const RECENT_WINDOW = 8;
@@ -97,14 +98,33 @@ export function effectiveHelp(payload) {
   return { hints, tutor, tries: supported && hints + tutor === 0 ? 1 : 0, help: hints + tutor };
 }
 
-function attemptRowFrom(pid, event, at) {
+/**
+ * The key an answer's evidence is filed under on this device.
+ *
+ * The server's event names the GENERATOR that authored the question. The
+ * device that sat it filed the evidence under the NCERT chapter the question
+ * was served for (resolve(): evidenceKeyOf), and every chapter surface — the
+ * progress table, /stats, the report, the review queue — reads that key. So an
+ * Indian profile's restored answer is filed under the chapter that draws on
+ * the generator, resolved the way a legacy generator-keyed row already is
+ * (indiaNameOf; the profile's class breaks a tie). Anything that names no
+ * Indian chapter keeps the id it came with.
+ */
+export function evidenceOwnerOf(profile, subtopic) {
+  const id = safeId(subtopic);
+  if (!id) return 'custom';
+  if ((profile?.course || 'nsw') !== 'in') return id;
+  return indiaNameOf(id, { grade: profile?.year ?? null })?.id || id;
+}
+
+function attemptRowFrom(pid, event, at, profile = null) {
   const p = event.payload;
   const { hints, tutor, tries, help } = effectiveHelp(p);
   return {
     id: restoredRowId(pid, event.id),
     pid,
     questionId: safeId(event.entityId) || restoredRowId(pid, event.id),
-    subtopic: safeId(p.subtopic) || 'custom',
+    subtopic: evidenceOwnerOf(profile, p.subtopic),
     generator: safeId(p.subtopic) || 'custom',
     difficulty: clampInt(p.difficulty, 1, 4, 2),
     ...(typeof p.contentId === 'string' && p.contentId ? {
@@ -113,6 +133,12 @@ function attemptRowFrom(pid, event, at) {
       contentHash: typeof p.contentHash === 'string' ? p.contentHash.slice(0, 32) : null
     } : {}),
     correct: p.correct ? 1 : 0,
+    // A repeat stays a repeat on every device. The server flags an answer to
+    // content whose solution the account had already been shown; restored
+    // without the flag the row would read as learning evidence here (accuracy,
+    // chapter counts, the progress table) that the device which sat it never
+    // gave it.
+    ...(p.repeat === true ? { repeat: true } : {}),
     // Only a real, server-grader-origin progress event reaches this path.
     // Legacy events missing the two certified numeric fields remain valid
     // historical attempts, but their marks are UNKNOWN, not inferred as
@@ -142,6 +168,21 @@ function attemptRowFrom(pid, event, at) {
   };
 }
 
+// The backup importer's row builders (backend.js IMPORT_ROWS) are the one
+// definition of what a Rush run, a Match run or an exam row may hold. They are
+// handed over by the local backend rather than imported: backend.js imports
+// this module, and a static import back would be a cycle. A pull that lands
+// before the backend has loaded loads it.
+let rowSanitisers = null;
+export function registerRestoreSanitisers(builders) {
+  rowSanitisers = builders && typeof builders === 'object' ? builders : null;
+}
+async function sanitisers() {
+  if (!rowSanitisers) await import('../local/backend.js');
+  if (!rowSanitisers) throw new Error('Restore row sanitisers are unavailable.');
+  return rowSanitisers;
+}
+
 async function alreadyRestored(store, id) {
   return !!(await get(store, id).catch(() => null));
 }
@@ -157,7 +198,7 @@ async function applyPracticeEvent(pid, profile, event) {
   if (await alreadyRestored('attempts', id)) return 'duplicate';
   const p = event.payload;
   const at = eventTime(event) || Date.now();
-  const attempt = attemptRowFrom(pid, event, at);
+  const attempt = attemptRowFrom(pid, event, at, profile);
   const owner = attempt.subtopic;
   const correct = !!p.correct;
   const mode = attempt.mode;
@@ -217,8 +258,11 @@ async function applyPracticeEvent(pid, profile, event) {
     type: 'put', store: 'activity',
     value: {
       ...activity, key: activityKey, pid, date,
+      // Exactly as resolve() counts it: a repeat is time the student spent, so
+      // it is a question of the day (and keeps a streak), and it is never one
+      // of the day's correct answers.
       questions: num(activity.questions, 0) + 1,
-      correct: num(activity.correct, 0) + (correct ? 1 : 0),
+      correct: num(activity.correct, 0) + (correct && !isRepeat ? 1 : 0),
       xp: num(activity.xp, 0) + xp,
       ms: num(activity.ms, 0) + attempt.ms
     }
@@ -255,17 +299,53 @@ async function applyExamEvent(pid, event) {
   const id = restoredRowId(pid, event.id);
   if (await alreadyRestored('exams', id)) return 'duplicate';
   const at = eventTime(event) || Date.now();
-  try {
-    await add('exams', {
-      id, pid,
+  // The server's own result is the server's word and is kept as it is. A
+  // device's `exam-attempt` is whatever that device published: every field is
+  // rebuilt by the backup importer's exam builder (title, year, score and
+  // total ranges, the India blueprint field by field) rather than copied. Such
+  // a row carries no `server`, so it is listed as a paper marked by an earlier
+  // version, never as certified, and it writes no attempt, rating, review,
+  // activity, XP or badge: it is history only.
+  let fields;
+  if (serverResult) {
+    fields = {
       title: String(p.title || '').slice(0, 120),
       year: Number.isFinite(Number(p.year)) ? Number(p.year) : null,
-      questionIds: [],
-      createdAt: at,
       finishedAt: num(p.finishedAt, 0) || at,
       score: p.score == null ? null : num(p.score, 0),
       total: p.total == null ? null : num(p.total, 0),
-      indiaExam: plain(p.indiaExam) ? { ...p.indiaExam } : null,
+      indiaExam: plain(p.indiaExam) ? { ...p.indiaExam } : null
+    };
+  } else {
+    const safe = (await sanitisers()).exams({
+      id, title: p.title, year: p.year, createdAt: at, finishedAt: num(p.finishedAt, 0) || at,
+      score: p.score, total: p.total, indiaExam: plain(p.indiaExam) ? p.indiaExam : null
+    }, pid, { exam: () => id, question: () => null });
+    fields = {
+      title: safe.title,
+      year: Number.isFinite(Number(p.year)) ? safe.year : null,
+      finishedAt: safe.finishedAt || at,
+      // A score above the paper's own total is not a result any paper can have.
+      score: safe.score != null && safe.total != null ? Math.min(safe.score, safe.total) : safe.score,
+      total: safe.total,
+      // Only the fields the event carried: the builder's defaults (a seed,
+      // say) are not facts about this paper.
+      indiaExam: safe.indiaExam && plain(p.indiaExam)
+        ? Object.fromEntries(Object.entries(safe.indiaExam).filter(([field]) => Object.prototype.hasOwnProperty.call(p.indiaExam, field)))
+        : null
+    };
+  }
+  try {
+    await add('exams', {
+      id, pid,
+      title: fields.title,
+      year: fields.year,
+      questionIds: [],
+      createdAt: at,
+      finishedAt: fields.finishedAt,
+      score: fields.score,
+      total: fields.total,
+      indiaExam: fields.indiaExam,
       ...(Number.isFinite(Number(p.durationMin)) && Number(p.durationMin) > 0 ? { durationMin: Math.min(600, Math.round(Number(p.durationMin))) } : {}),
       // The server's own result: this row names the server's exam, so its
       // questions and marked detail can be read back from the account. Any
@@ -284,9 +364,19 @@ async function applyExamEvent(pid, event) {
 async function applyRunEvent(pid, event, store, fields) {
   const id = restoredRowId(pid, event.id);
   if (await alreadyRestored(store, id)) return 'duplicate';
+  // A Rush or Match run is published by the device that played it, so another
+  // device of the same account can publish anything. The row is rebuilt by the
+  // backup importer's builder for that store — typed and range-clamped — and
+  // only the fields the event actually carried are kept.
+  const safe = (await sanitisers())[store]({ ...event.payload, createdAt: num(event.payload.createdAt, 0) || eventTime(event) || Date.now() }, pid);
   const row = { id, pid, remoteEventId: event.id, remoteDeviceId: event.deviceId };
-  for (const field of fields) if (event.payload[field] !== undefined) row[field] = event.payload[field];
-  row.createdAt = num(row.createdAt, 0) || eventTime(event) || Date.now();
+  for (const field of fields) {
+    const sent = event.payload[field];
+    // A label that did not arrive as text is dropped, not stringified.
+    if (sent === undefined || sent === null || (typeof safe[field] === 'string' && typeof sent !== 'string')) continue;
+    row[field] = safe[field];
+  }
+  row.createdAt = safe.createdAt;
   try {
     await add(store, row);
   } catch (error) {

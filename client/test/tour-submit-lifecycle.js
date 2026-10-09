@@ -60,6 +60,14 @@ const draftIds = (page) => page.evaluate(() => {
  * This flow is about a typed submission the current build wrote.
  */
 const plantPending = (page, pid, qid, submissionId, answer) => page.evaluate(({ pid, qid, submissionId, answer }) => {
+  // The card writes the typed draft to disk when Submit is pressed, before the
+  // pending record: after a kill the two agree. (A draft that differs means
+  // the student edited after pressing, and such a submission is never
+  // replayed on its own.)
+  const draftKey = `pri.draft.${pid}.question.${qid}`;
+  let draft = null;
+  try { draft = JSON.parse(localStorage.getItem(draftKey)); } catch { draft = null; }
+  if (draft?.data) localStorage.setItem(draftKey, JSON.stringify({ ...draft, savedAt: Date.now(), data: { ...draft.data, typed: answer } }));
   localStorage.setItem(`pri.draft.${pid}.submit.${qid}`, JSON.stringify({
     v: 1, scope: 'submit', id: qid, label: '', note: 'Answer being marked', path: '/practice', savedAt: Date.now(),
     data: { submissionId, answer, viaInk: false, sourceMode: 'typed', ms: 1500, lines: null }

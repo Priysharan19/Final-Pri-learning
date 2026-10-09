@@ -701,6 +701,127 @@ async function run() {
   const real2 = await syncNow(asha.id).then(r => r, err => ({ threw: err?.code || String(err) }));
   ok('a sync with the real server completes', !real1?.threw && !real2?.threw, show([real1, real2]));
   eq('syncing with the real server double-counts no server-marked answer', [(await GET('/stats')).totals, rawRows().attempts.filter(a => a.pid === asha.id).length], realBefore);
+
+  // ── A repeat, counter by counter (review 4, M3) ────────────────────────────
+  // A second deterministic repeat, this time on a question that belongs to a
+  // teacher's task, answered correctly. It is a question of the day; it is not
+  // a correct answer of the day, it is `done` and not `correct` on the task,
+  // and it earns no rating, XP or badge.
+  section('repeat counters');
+  {
+    const tz10 = dateOf(Date.now());
+    const candidates = rawRows().questions.filter(r => r.pid === asha.id && r.serverQuestionId && r.answered && !r.examId && ['practice', 'review'].includes(r.mode) && r.id !== seededRepeatQuestion);
+    let retried = null, key = null;
+    for (const row of candidates) {
+      const out = await POST(`/history/${row.id}/retry`, { variant: 'same' }).catch(() => null);
+      const fresh = out?.question?.id ? await idb.get('questions', out.question.id) : null;
+      const k = fresh ? canonicalInput(await online.answerKey(fresh)) : null;
+      if (fresh && k !== null) { retried = fresh; key = k; break; }
+      if (fresh) await POST(`/practice/${fresh.id}/discard`, {}).catch(() => {});
+    }
+    ok('a finished question could be sat again as the same question', !!retried);
+    // (The task row itself is sealed to its class roll and is not needed
+    // here: the counters under test are the student's own progress row.)
+    await idb.put('questions', { ...retried, taskId: 'task-m3' });
+    const before = {
+      day: rawRows().activity.find(r => r.pid === asha.id && r.date === tz10) || { questions: 0, correct: 0, xp: 0 },
+      xp: (await idb.get('profiles', asha.id)).xp, badges: rawRows().badges.filter(b => b.pid === asha.id).length,
+      rating: JSON.stringify(rawRows().ratings.filter(r => r.pid === asha.id)), evidence: (await GET('/stats')).totals.evidence
+    };
+    tick(30000);
+    const res = await POST(`/practice/${retried.id}/submit`, { answer: key, ms: 20000, submissionId: nextSubmissionId('sub_progress_m3') });
+    const row = rawRows().attempts.find(a => a.pid === asha.id && a.questionId === retried.id);
+    eq('the server marked it correct and flagged it a repeat; the attempt row says both', [res.correct, res.repeat, row?.correct, row?.repeat], [true, true, 1, true]);
+    const day = rawRows().activity.find(r => r.pid === asha.id && r.date === tz10);
+    eq('a repeat is a question of the day, and not one of the day\'s correct answers', [day.questions - before.day.questions, day.correct - before.day.correct, day.xp - before.day.xp], [1, 0, 0]);
+    const tp = await idb.get('taskProgress', `task-m3:${asha.id}`);
+    eq('on a teacher\'s task a repeat is done, not correct, and recorded as a repeat', tp && [tp.done, tp.correct, tp.repeats], [1, 0, 1]);
+    eq('a repeat earns no XP and no badge', [(await idb.get('profiles', asha.id)).xp, res.xp, res.newBadges, rawRows().badges.filter(b => b.pid === asha.id).length], [before.xp, 0, [], before.badges]);
+    eq('a repeat moves no rating and no learning evidence', [JSON.stringify(rawRows().ratings.filter(r => r.pid === asha.id)), (await GET('/stats')).totals.evidence], [before.rating, before.evidence]);
+    // The whole ledger: each day's correct count is its correct answers minus its correct repeats.
+    const mine = rawRows().attempts.filter(a => a.pid === asha.id);
+    const dayDrift = rawRows().activity.filter(r => r.pid === asha.id).filter(r => {
+      const on = mine.filter(a => dateOf(a.createdAt) === r.date);
+      return r.questions !== on.length || r.correct !== on.filter(a => a.correct && a.repeat !== true).length;
+    }).map(r => r.date);
+    eq('every day: questions = every answer, correct = correct answers that were not repeats', dayDrift, []);
+  }
+
+  // ── Cloud restore: a fresh device, the same account ───────────────────────
+  // The student signs in on a new iPad (or reinstalls). Nothing is on the
+  // device; everything it shows is rebuilt from the account's events on the
+  // real server. It must show exactly what the original device shows: the
+  // same answers, the same learning evidence chapter by chapter, the same
+  // reviews, the same days. In particular the seeded REPEAT must come back as
+  // a repeat — restored without the server's flag it would count as evidence
+  // here that the device which sat it never gave it (review 4, B1).
+  section('cloud restore replay');
+  const snapshot = async pid => {
+    const st = await GET('/stats');
+    const yr10 = (await GET('/curriculum')).years.find(y => y.year === 10);
+    const rv = await GET('/reviews');
+    const rep = await GET('/report');
+    const rows = rawRows();
+    return {
+      answered: st.totals.attempts, correct: st.totals.correct, evidence: st.totals.evidence, accuracy: st.totals.accuracy,
+      statsChapters: Object.fromEntries(st.chapters.filter(c => c.attempts).map(c => [c.id, [c.attempts, c.correct]])),
+      tableChapters: Object.fromEntries(yr10.subtopics.filter(c => c.attempts).map(c => [c.id, [c.attempts, c.correct]])),
+      reportChapters: Object.fromEntries(rep.chapters.filter(c => c.attempts).map(c => [c.id, c.attempts])),
+      reportTotals: rep.totals,
+      reviewsDue: rv.due.map(r => r.subtopic).sort(), reviewsUpcoming: rv.upcoming.map(r => r.subtopic).sort(), reviewsDueCount: st.reviewsDue,
+      reviewRows: Object.fromEntries(rows.reviews.filter(r => r.pid === pid).map(r => [r.subtopic, [r.reps, r.lapses]]).sort()),
+      reviewDue: Object.fromEntries(rows.reviews.filter(r => r.pid === pid).map(r => [r.subtopic, r.dueAt])),
+      ratingRows: Object.fromEntries(rows.ratings.filter(r => r.pid === pid).map(r => [r.subtopic, [r.attempts, r.correct]]).sort()),
+      days: Object.fromEntries(rows.activity.filter(r => r.pid === pid).map(r => [r.date, [r.questions, r.correct]])),
+      streak: st.streak, today: (await GET('/me')).user.today.questions,
+      repeats: rows.attempts.filter(a => a.pid === pid && a.repeat === true).map(a => [a.subtopic, a.mode, a.correct]).sort(),
+      modes: Object.entries(rows.attempts.filter(a => a.pid === pid).reduce((m, a) => ({ ...m, [a.mode]: (m[a.mode] || 0) + 1 }), {})).sort(),
+      examCount: st.examCount, bestRush: st.bestRush
+    };
+  };
+  const original = await snapshot(asha.id);
+  ok('the original device holds the seeded repeat, and it is not evidence there', original.repeats.length >= 1 && original.evidence.attempts < original.answered, show(original.repeats));
+  const originalPid = asha.id;
+  resetStorage();
+  eq('the fresh device starts with nothing', [rawRows().attempts.length, rawRows().ratings.length, rawRows().profiles.length], [0, 0, 0]);
+  const again = (await POST('/profiles', { name: 'Asha', year: 10, course: 'in', indiaTrack: 'cbse' })).user;
+  await online.linkExisting(again.id, originalPid, { entitlement: 'premium' });
+  const restore1 = await syncNow(again.id).then(r => r, err => ({ threw: err?.code || String(err) }));
+  ok('the fresh device restores the account from the real server', !restore1?.threw && restore1.restoredEvents >= original.answered, show(restore1));
+  const restored = await snapshot(again.id);
+  eq('restored: the seeded repeat is still a repeat (B1)', restored.repeats, original.repeats);
+  eq('restored: questions answered and correct', [restored.answered, restored.correct], [original.answered, original.correct]);
+  eq('restored: the same answers in the same modes', restored.modes, original.modes);
+  eq('restored: learning evidence — the repeat is not counted', [restored.evidence.attempts, restored.evidence.correct], [original.evidence.attempts, original.evidence.correct]);
+  eq('restored: accuracy', restored.accuracy, original.accuracy);
+  eq('restored: every chapter on /stats', restored.statsChapters, original.statsChapters);
+  eq('restored: every chapter row of the progress table', restored.tableChapters, original.tableChapters);
+  eq('restored: every chapter on the report', [restored.reportChapters, restored.reportTotals], [original.reportChapters, original.reportTotals]);
+  eq('restored: rating-row attempts and correct per chapter', restored.ratingRows, original.ratingRows);
+  eq('restored: the review schedule holds the same chapters, each with the same reps and lapses', restored.reviewRows, original.reviewRows);
+  // The server's event does not certify how much help an answer had (hints and
+  // tutor levels are observed by the device), so it files every restored
+  // answer as supported. A restored device may therefore claim LESS than the
+  // original — never more: no independent success it cannot vouch for, and no
+  // review due later than the original device has it.
+  eq('restored: correct answers are all there, split no more generously than the original',
+    [restored.evidence.independentCorrect + restored.evidence.supportedCorrect, restored.evidence.independentCorrect <= original.evidence.independentCorrect],
+    [original.evidence.correct, true]);
+  eq('restored: no review is due later than on the original device',
+    Object.keys(original.reviewDue).filter(ch => !(restored.reviewDue[ch] <= original.reviewDue[ch])), []);
+  ok('restored: every review due on the original device is due here too', original.reviewsDue.every(ch => restored.reviewsDue.includes(ch)), show([original.reviewsDue, restored.reviewsDue]));
+  eq('restored: answers and correct answers per day — a repeat is a question of its day, never a correct one (M3)', restored.days, original.days);
+  eq('restored: streak and today', [restored.streak, restored.today], [original.streak, original.today]);
+  eq('restored: exam and Rapid Fire history', [restored.examCount, restored.bestRush], [original.examCount, original.bestRush]);
+  // The restored device against its own raw rows, by the same oracle.
+  const R = expectedFor(again.id);
+  eq('restored: the totals are what the restored attempt rows say', [restored.answered, restored.correct, restored.evidence], [R.answered, R.correct, R.evidence]);
+  const repeatDays = rawRows().attempts.filter(a => a.pid === again.id && a.repeat === true && a.correct).map(a => dateOf(a.createdAt));
+  ok('restored: on the day of a correct repeat the day\'s correct count is below the day\'s correct answers by exactly the repeats',
+    repeatDays.length > 0 && [...new Set(repeatDays)].every(d => restored.days[d][1] === R.atts.filter(a => dateOf(a.createdAt) === d && a.correct).length - repeatDays.filter(x => x === d).length), show(repeatDays));
+  const restore2 = await syncNow(again.id).then(r => r, err => ({ threw: err?.code || String(err) }));
+  ok('pulling again restores nothing twice', !restore2?.threw && restore2.restoredEvents === 0, show(restore2));
+  eq('…and every number is unchanged', await snapshot(again.id), restored);
 }
 
 try {
