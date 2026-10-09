@@ -196,6 +196,53 @@ function onlineSession(platform, ctx, page) {
   /** POSTs to /v1/practice/… matching `re`, with their replies read. */
   const practiceCalls = async (re) => { await settled(); return calls.filter(c => c.method === 'POST' && re.test(c.path)); };
 
+  /** The linked account ids this device holds, read back from IndexedDB. */
+  const linkedAccounts = () => page.evaluate(() => new Promise(done => {
+    const open = indexedDB.open('pri-learning');
+    open.onerror = () => done(null);
+    open.onsuccess = () => {
+      const db = open.result;
+      const req = db.transaction('device').objectStore('device').getAll();
+      req.onsuccess = () => { db.close(); done(req.result.filter(r => String(r.id).startsWith('pri-cloud-account-link-v1:')).map(r => String(r.accountId))); };
+      req.onerror = () => { db.close(); done(null); };
+    };
+  }));
+
+  /**
+   * Fill and send the account panel's sign-in form inside `scope` (Settings,
+   * or the panel a question card opens in place), then prove the link by
+   * readback. Selectors, not wording: the Hindi flow signs in with this too.
+   */
+  async function completeSignIn(scope, who) {
+    const form = scope.locator('form', { has: page.locator('#cloud-password') });
+    await form.waitFor({ state: 'visible', timeout: 30000 });
+    await form.locator('button.btn-sm').first().click();
+    await form.locator('#cloud-email').fill(who.email);
+    await form.locator('#cloud-password').fill(who.password);
+    const answered = page.waitForResponse(r => new URL(r.url()).pathname === '/v1/account/login', { timeout: 30000 });
+    await form.locator('button[type="submit"]').click();
+    const login = await answered;
+    if (login.status() !== 200) throw new Error(`online-session: sign-in answered ${login.status()}`);
+    let linked = null;
+    for (let i = 0; i < 100; i++) {
+      linked = await linkedAccounts();
+      if (linked?.includes(who.id)) break;
+      await page.waitForTimeout(100);
+    }
+    if (!linked?.includes(who.id)) throw new Error(`online-session: the profile is not linked to the account it signed in to (${JSON.stringify(linked)})`);
+  }
+
+  /**
+   * Sign in WITHOUT leaving the page: `scope` is where the app has already
+   * opened its account panel in place (a question card, the Exams page).
+   */
+  async function signInHere(scope, { name = 'Online Student', account = null } = {}) {
+    const who = account || await platform.newAccount({ name });
+    await completeSignIn(scope, who);
+    session.account = who;
+    return who;
+  }
+
   /**
    * Sign this context's active local profile in to a fresh verified account,
    * through Settings → Pri account → Sign in, and come back linked. This is
@@ -205,30 +252,11 @@ function onlineSession(platform, ctx, page) {
   async function signIn({ name = 'Online Student', account = null } = {}) {
     const who = account || await platform.newAccount({ name });
     await page.goto(`${platform.origin}/settings`, { waitUntil: 'domcontentloaded' });
-    // Selectors, not wording: the same sign-in is used by the Hindi flow.
     const panel = page.locator('section', { has: page.locator('#cloud-account-title') });
     await panel.waitFor({ state: 'visible', timeout: 30000 });
-    const form = panel.locator('form', { has: page.locator('#cloud-password') });
-    await form.locator('button.btn-sm').first().click();
-    await form.locator('#cloud-email').fill(who.email);
-    await form.locator('#cloud-password').fill(who.password);
-    const answered = page.waitForResponse(r => new URL(r.url()).pathname === '/v1/account/login', { timeout: 30000 });
-    await form.locator('button[type="submit"]').click();
-    const login = await answered;
-    if (login.status() !== 200) throw new Error(`online-session: sign-in answered ${login.status()}`);
+    await completeSignIn(panel, who);
     // The form goes away once the panel holds a linked, verified session.
-    await form.waitFor({ state: 'detached', timeout: 30000 });
-    const linked = await page.evaluate(() => new Promise(done => {
-      const open = indexedDB.open('pri-learning');
-      open.onerror = () => done(null);
-      open.onsuccess = () => {
-        const db = open.result;
-        const req = db.transaction('device').objectStore('device').getAll();
-        req.onsuccess = () => { db.close(); done(req.result.filter(r => String(r.id).startsWith('pri-cloud-account-link-v1:')).map(r => String(r.accountId))); };
-        req.onerror = () => { db.close(); done(null); };
-      };
-    }));
-    if (!linked?.includes(who.id)) throw new Error(`online-session: the profile is not linked to the account it signed in to (${JSON.stringify(linked)})`);
+    await panel.locator('form', { has: page.locator('#cloud-password') }).waitFor({ state: 'detached', timeout: 30000 });
     session.account = who;
     return who;
   }
@@ -297,7 +325,7 @@ function onlineSession(platform, ctx, page) {
 
   const session = {
     platform, origin: platform.origin, reader: platform.reader, sms: platform.sms, calls, account: null,
-    settled, practiceCalls, signIn, shownRow, answerOf, disconnect, reconnect,
+    settled, practiceCalls, signIn, signInHere, linkedAccounts, shownRow, answerOf, disconnect, reconnect,
     ledger: (serverQuestionId = null) => platform.ledger(session.account?.id, serverQuestionId)
   };
   return session;
