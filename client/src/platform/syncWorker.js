@@ -18,7 +18,7 @@ import {
 } from './syncContract.js';
 import { historicalSupplementalEvents } from './syncHistorical.js';
 import { remoteEventPrefix, syncStateId } from './syncReplicaState.js';
-import { applyRemoteLearningEvents, isRestoredRow } from './cloudSyncRestore.js';
+import { applyRemoteLearningEvents, isRestoredRow, reconcileDeferredGrades } from './cloudSyncRestore.js';
 
 const MAX_REMOTE_EVENT_CACHE = 2000;
 // The profile outbox's own ceiling. Asking for fewer than it can hold would let
@@ -456,6 +456,9 @@ async function pullAll(pid, deviceId, state, unpublished, { fromCursor = null } 
       const restored = await applyRemoteLearningEvents(pid, foreign);
       restoredEvents += restored.applied;
     }
+    // Server-marked attempts held back while this device's own submit was in
+    // flight are recorded once that submit is known not to have done it.
+    restoredEvents += await reconcileDeferredGrades(pid);
     for (const entity of raw.entities) {
       await applyRemoteEntity(pid, entity, state, unpublished);
       pulledEntities++;

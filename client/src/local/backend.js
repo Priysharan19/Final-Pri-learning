@@ -65,6 +65,7 @@ import { requestTutorHelp } from './tutorBridge.js';
 import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
 import { cloud } from '../platform/cloudTransport.js';
+import { registerIssuedAttemptRecorder } from '../platform/cloudSyncRestore.js';
 import { publicQuestionFields } from '../engine/publicQuestion.js';
 import { rasterizeInk } from '../ink/cloudRaster.js';
 import { preparePhoto } from '../ink/photoRaster.js';
@@ -5399,7 +5400,9 @@ async function gradeOnServer(row, body, submissionId, requestDigest) {
         submissionId, answer: String(body.answer), mode, steps: body.steps,
         ms: body.ms, ...(receipt ? { transcriptionReceipt: receipt } : {})
       };
-  row.pendingGrade = { submissionId, digest: requestDigest, mode, receipt: receipt || null, payload };
+  // `at` lets a sync pull tell a grade in flight from one abandoned after the
+  // server committed it (cloudSyncRestore: issued-here events).
+  row.pendingGrade = { submissionId, digest: requestDigest, mode, receipt: receipt || null, payload, at: Date.now() };
   await put('questions', row);
   const acknowledged = await viaServer(() => cloud.gradePractice(row.serverQuestionId, payload));
   if (acknowledged?.authoritative !== true || acknowledged.questionId !== row.serverQuestionId ||
@@ -5412,6 +5415,54 @@ async function gradeOnServer(row, body, submissionId, requestDigest) {
   certifiedPracticeMarks(acknowledged);
   return acknowledged;
 }
+
+// The sync pull hands a server-marked attempt on a question this device was
+// issued to the same resolution routine a submit uses (see cloudSyncRestore).
+registerIssuedAttemptRecorder((pid, rowId, event) => withMutationLock(`question:${rowId}`, async () => {
+  // Under the question's own lock, the one a submit holds from before it reads
+  // the row until its last write: a pull and a submit on the same question
+  // never interleave, and the row is read only once the lock is held.
+  const profile = await get('profiles', pid).catch(() => null);
+  const row = await get('questions', rowId).catch(() => null);
+  if (!profile || !row || row.pid !== pid || row.serverQuestionId !== String(event.entityId || '')) return 'unsupported';
+  if (row.answered) return 'duplicate';
+  // A submit that got in first and is still waiting on the server records the
+  // attempt itself; keep the event with the row in case it never does.
+  if (row.pendingGrade && Date.now() - (Number(row.pendingGrade.at) || 0) < 2 * 60 * 1000) {
+    if (row.deferredGrade?.event?.id !== event.id) await put('questions', { ...row, deferredGrade: { event, at: Date.now() } });
+    return 'deferred';
+  }
+  const p = event.payload || {};
+  // The receipt this device never received, rebuilt from the server's own
+  // event. It carries the verdict and the marks; the solution was only in the
+  // reply, so it is absent until the student opens the question again online.
+  const receipt = {
+    authoritative: true, questionId: row.serverQuestionId, attemptId: String(event.id), resolved: true,
+    correct: p.correct === true, ...(p.revealed === true ? { revealed: true } : {}),
+    marksEarned: p.marksEarned, marksPossible: p.marksPossible,
+    serverAcknowledgedAt: Number(p.serverAcknowledgedAt) || Number(event.occurredAt) || Date.now(),
+    ...(p.repeat === true ? { repeat: true } : {}), fromServerEvent: true
+  };
+  try { certifiedPracticeMarks(receipt); } catch { return 'unsupported'; }
+  const pending = row.pendingGrade || null;
+  row.serverReceipt = receipt;
+  row.pendingGrade = null;
+  delete row.deferredGrade;
+  if (!receipt.correct) row.tries = Math.max(row.tries || 0, 1);
+  try {
+    await resolve(profile, row, row.payload, receipt.correct, receipt.revealed ? 'revealed' : String(pending?.payload?.answer ?? ''),
+      Math.max(0, Number(pending?.payload?.ms) || 0), row.mode, pending?.mode === 'ink', {
+        // The submission that was in flight when the reply was lost: a replay
+        // of it now finds this verdict instead of colliding with the claim.
+        submission: pending?.submissionId ? { submissionId: pending.submissionId, requestDigest: pending.digest, trapHit: null } : null,
+        syncQueue: false
+      });
+  } catch (error) {
+    if (error?.code === 'ALREADY_RESOLVED') return 'duplicate';
+    throw error;
+  }
+  return { applied: true, xp: 0 };
+}));
 
 const mutationQueues = new Map();
 

@@ -44,9 +44,9 @@ import { execFileSync, execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { engineeringPackage } from './apple-shipping-target.mjs';
+import { openServerDesk } from './journey-oracle.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
@@ -322,30 +322,12 @@ let markingNotMeasured = null;
     server = Object.fromEntries(readFileSync(out, 'utf8').trim().split('\n').map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
     if (server.PRI_CLOUD_READER !== 'synthetic') throw new Error('the local server is not running the synthetic reader');
     writeFileSync(server.PRI_CLOUD_READER_SCRIPT, JSON.stringify({ text: READER_TEXT, confidence: 0.6 }));
-    // The server's own database, read-only: the "teacher's desk".
-    const Database = createRequire(join(ROOT, 'server/package.json'))('better-sqlite3');
-    const db = new Database(server.PRI_CLOUD_DB, { readonly: true, fileMustExist: true });
-    const account = db.prepare('SELECT id FROM accounts WHERE email=?').get(server.PRI_CLOUD_EMAIL);
-    if (!account) throw new Error('the fixture account is missing from the local server');
-    const rows = (scope, extra = '', ...args) => db.prepare(`SELECT key,response_json,created_at FROM idempotency_keys WHERE account_id=? AND scope=? ${extra} ORDER BY created_at, rowid`).all(account.id, scope, ...args);
-
+    // The server's own database, read-only: the "teacher's desk" (shared with
+    // the Android journey's relay, scripts/journey-oracle.mjs).
+    const desk = openServerDesk({ dbPath: server.PRI_CLOUD_DB, email: server.PRI_CLOUD_EMAIL, avoid: [READER_TEXT, WRONG] });
+    const { db, rows, completed } = desk;
     /** The sealed answer of the question this account was issued last. */
-    const sealedAnswer = () => {
-      const issued = rows('practice-question').at(-1);
-      if (!issued) return { supported: false, reason: 'nothing issued' };
-      const question = JSON.parse(issued.response_json);
-      const a = question.answer || {};
-      let text = null;
-      if (question.answerType === 'numeric') {
-        if (a.canonicalInput) text = String(a.canonicalInput);
-        else if (a.simplestFraction) text = `${a.simplestFraction.n}/${a.simplestFraction.d}`;
-        else if (a.value !== undefined) text = String(a.value);
-      }
-      const fromPrepared = rows('practice-prepared').some(r => JSON.parse(r.response_json)?.question?.id === issued.key);
-      // A statable answer the stand-in reader and the scripted miss cannot be mistaken for.
-      const supported = typeof text === 'string' && text.length > 0 && text.length <= 40 && text !== READER_TEXT && text !== WRONG;
-      return { supported, text: supported ? text : null, answerType: question.answerType, serverQuestionId: issued.key, fromPrepared, readerText: READER_TEXT };
-    };
+    const sealedAnswer = () => ({ ...desk.sealedAnswer(), readerText: READER_TEXT });
     const oracleDir = mkdtempSync(join(tmpdir(), 'pri-oracle-'));
     const answered = new Set();
     const tick = () => {
@@ -377,12 +359,6 @@ let markingNotMeasured = null;
       console.log(`  ${markingLines.at(-1).replace(/^PRIJOURNEY\s*/, '')}`);
     };
     const requests = () => readFileSync(server.PRI_CLOUD_SERVER_LOG, 'utf8').split('\n').filter(l => l.includes('"http_request"')).map(l => { try { return JSON.parse(l); } catch { return {}; } });
-    const completed = () => rows('practice-completion').map(c => {
-      const question = JSON.parse(rows('practice-question', 'AND key=?', c.key)[0].response_json);
-      const grades = rows('practice-grade', "AND key LIKE ? || ':%'", c.key).map(g => JSON.parse(g.response_json));
-      const event = db.prepare("SELECT payload_json FROM learning_events WHERE account_id=? AND kind='graded-attempt' AND entity_id=?").get(account.id, c.key);
-      return { id: c.key, prompt: String(question.prompt || ''), grades, inputMode: event ? JSON.parse(event.payload_json).inputMode : null };
-    });
     verdict('serverPreparedThenBound', () => {
       const log = requests();
       const prepared = log.filter(r => r.method === 'POST' && r.route === '/v1/practice/prepare' && r.status === 200).length;

@@ -2,6 +2,10 @@
 # the fail-closed floor screen on the minimum API, and the shell journey (with a
 # real process death) on a floor-meeting older API and the current API, phone + tablet,
 # then the cloud journey through the real UI against a real Pri server (CP-07).
+# Grading is online-only and server-authoritative (ADR-0001, 2026-10-10): the
+# shell journey (no server) asserts a check is refused and nothing is marked;
+# the cloud journey asserts the server's marks, with the right answer read from
+# the server's sealed copy of the question by scripts/journey-oracle.mjs.
 # SYNTHETIC / EMULATOR evidence only — never a physical-device result.
 name: Android Shell
 
@@ -23,6 +27,7 @@ on:
       - 'client/src/components/GooglePlayBilling.jsx'
       - 'client/src/ink/**'
       - 'scripts/cloud-fixture-server.mjs'
+      - 'scripts/journey-oracle.mjs'
       - 'scripts/release-matrix.mjs'
       - 'release/metadata.json'
       - '.github/workflows/android-shell.yml'

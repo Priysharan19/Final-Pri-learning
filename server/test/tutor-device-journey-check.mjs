@@ -104,7 +104,6 @@ if (typeof globalThis.document === 'undefined') {
 const { api } = await import('../../client/src/api.js');
 const idb = await import('../../client/src/local/idb.js');
 const { loadAllBanks } = await import('../../client/src/engine/generators/index.js');
-const { subtopicsForYear } = await import('../../client/src/engine/curriculum.js');
 const { loginCloudAccount } = await import('../../client/src/platform/cloudAccount.js');
 const { syncNow } = await import('../../client/src/platform/syncWorker.js');
 await loadAllBanks();

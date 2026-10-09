@@ -20,7 +20,6 @@
 import { readFileSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
-import cookieParser from 'cookie-parser';
 import { createPlatformDb } from '../platform/db.js';
 import {
   CONSENT_METHOD, CONSENT_NOTICE_VERSION, confirmConsent, consentBlockerCode, consentState,
@@ -96,7 +95,14 @@ ok((await consentState(db, 'acct-child')).row.requested_at > 0 && (await consent
 // ── 4 · The gate, over HTTP ──────────────────────────────────────────────────
 const app = express();
 app.use(express.json());
-app.use(cookieParser());
+// The stand-in reads its two cookies itself. The real app's cookie parsing and
+// CSRF guard are exercised through the real router in the other suites; here
+// only the guardian gate is under test, behind the real guard below.
+app.use((req, _res, next) => {
+  req.cookies = Object.fromEntries(String(req.headers.cookie || '').split(';').map(part => part.trim().split('=')).filter(([k]) => k)
+    .map(([k, ...v]) => [k, decodeURIComponent(v.join('='))]));
+  next();
+});
 // The gate is mounted the way the platform router mounts it: behind the real
 // CSRF guard. A stand-in that parsed cookies with no guard after it would be a
 // shape of app this product never runs.
