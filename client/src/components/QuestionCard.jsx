@@ -584,17 +584,30 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       const file = item.getAsFile();
       if (!file) return;
       event.preventDefault();
-      // The FileReader can finish after a question switch, attachment removal
-      // or a different paste. Claim the generation BEFORE awaiting file bytes.
+      // Invalidate the previous recognised attachment as soon as the student
+      // pastes another image. Waiting for FileReader would leave the old
+      // transcript marked as submittable while new bytes were still loading.
       const generation = ++photoReadGeneration.current;
+      const live = () => mountedRef.current && generation === photoReadGeneration.current;
+      pendingPdf.current = null;
+      setPhoto(null);
+      setPdfUnread(null);
+      setPhotoSignInOpen(false);
+      setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
       const reader = new FileReader();
+      const fail = () => {
+        if (live()) setPhotoOCR({ phase: 'failed', text: '', confidence: 0,
+          error: tLater('verdict.imageUnopenable'), engine: null });
+      };
       reader.onload = () => {
-        if (!mountedRef.current || generation !== photoReadGeneration.current) return;
+        if (!live()) return;
         const dataURL = String(reader.result || '');
-        if (!dataURL.startsWith('data:image/')) return;
+        if (!dataURL.startsWith('data:image/')) { fail(); return; }
         setPhoto(dataURL);
         decodePhoto(dataURL);
       };
+      reader.onerror = fail;
+      reader.onabort = fail;
       reader.readAsDataURL(file);
     };
     window.addEventListener('paste', onPaste);
@@ -1498,12 +1511,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       photographs their exercise book first and picks the shot afterwards. */}
                   <input ref={photoInputRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
                     onChange={e => {
-                      // FileReader, image decode and PDF byte reads can all
-                      // finish after a new attachment or question is chosen.
-                      // Scope even the initial file load, before decodePhoto's
-                      // own provider request creates its next generation.
+                      // Cancelled file pickers keep the previously read image.
+                      if (!e.target.files?.length) return;
+                      // Invalidate the old OCR synchronously. An Image or PDF
+                      // FileReader may finish much later, and until then an old
+                      // phase='done' would otherwise enable stale submission.
                       const generation = ++photoReadGeneration.current;
                       const live = () => mountedRef.current && generation === photoReadGeneration.current;
+                      pendingPdf.current = null;
+                      setPhoto(null);
+                      setPdfUnread(null);
+                      setPhotoSignInOpen(false);
+                      setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
                       attachPhoto(e,
                         data => { if (live()) setPhoto(data); },
                         data => { if (live()) void decodePhoto(data); },
