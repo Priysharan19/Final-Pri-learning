@@ -33,7 +33,7 @@
 //
 // Nothing here marks an answer. The engine's checker is not imported.
 // ─────────────────────────────────────────────────────────────────────────────
-import { get, put } from './idb.js';
+import { get, put, byIndex } from './idb.js';
 import { cloud } from '../platform/cloudTransport.js';
 import { profileCloudAccountId } from './entitlementGate.js';
 import { checkUnavailable, withExamLock } from './backend.js';
@@ -114,6 +114,22 @@ export async function issueServerExam(pid, spec, signature, meta = null) {
     // Only an uncertain outcome is worth retrying under the same key.
     if (kind !== 'offline') await put('device', { id: startRowId(pid), pid, signature: null }).catch(() => {});
     if (kind) throw checkUnavailable(kind, cause);
+    // The server is the authority on the plan: its refusal (the free
+    // simulation is used, or the track is Premium) is shown as it stands, in
+    // the shape the paywall already reads, whatever this device had counted.
+    if (cause?.status === 402 && (cause.code === 'FREE_CAP_REACHED' || cause.code === 'PREMIUM_REQUIRED')) {
+      throw Object.assign(new Error(cause.message), {
+        status: 402, code: cause.code, capability: cause.capability || null, reason: 'server-refused', refreshRequired: true,
+        ...(cause.nextAt ? { nextAt: cause.nextAt, used: cause.used, limit: cause.limit, windowDays: cause.windowDays } : {})
+      });
+    }
+    // The account already holds its limit of open papers: say which, so the
+    // student can carry on with it instead.
+    if (cause?.code === 'EXAM_OPEN_PAPER_LIMIT') {
+      const exams = await byIndex('exams', 'pid', pid).catch(() => []);
+      const local = exams.find(e => e?.server?.examId === cause.openExamId && !e.finishedAt);
+      throw Object.assign(new Error(cause.message), { status: 409, code: cause.code, openExamId: local?.id || null, limit: cause.limit ?? null });
+    }
     throw Object.assign(new Error(cause?.message || 'This paper could not be started.'), { status: cause?.status || 502, code: cause?.code || 'EXAM_START_FAILED' });
   }
   await put('device', { id: startRowId(pid), pid, signature: null }).catch(() => {});

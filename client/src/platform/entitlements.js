@@ -14,6 +14,14 @@ export const ENTITLEMENTS = Object.freeze({
   EXTRA_AI: 'additional-ai-usage'
 });
 
+/**
+ * The free plan's exam-simulation allowance. ONE definition: the device reads
+ * it for its fast pre-check (local/entitlementGate.js) and the server enforces
+ * it when a paper is created (server/platform/exams.js), counting its own
+ * sealed papers for the account.
+ */
+export const FREE_EXAM_ALLOWANCE = Object.freeze({ examsPerWindow: 1, examWindowDays: 30 });
+
 export const PLAN_CAPABILITIES = Object.freeze({
   free: Object.freeze([]),
   premium: Object.freeze(Object.values(ENTITLEMENTS))

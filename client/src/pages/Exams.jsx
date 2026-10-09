@@ -41,6 +41,8 @@ export default function Exams() {
   // Why a paper could not start: a paper is marked work, so it needs a
   // signed-in eligible account and a connection, like checking an answer.
   const [refusal, setRefusal] = useState(null);
+  // A local paper the server says is still open, when that is why a start was refused.
+  const [stillOpen, setStillOpen] = useState(null);
   const nav = useNavigate();
   // Signed in on this page for this profile: the reason is gone. The student
   // starts the paper themselves; nothing starts on its own.
@@ -67,6 +69,7 @@ export default function Exams() {
     setBusy(true);
     setError('');
     setRefusal(null);
+    setStillOpen(null);
     try {
       const body = user.course === 'in' ? { year: user.year } : cfg;
       const r = await api.post('/exams', body);
@@ -74,6 +77,8 @@ export default function Exams() {
     } catch (err) {
       const kind = checkRefusal(err);
       if (checkRefusalCopy(kind, 'exam')) setRefusal(kind);
+      // The account already has its limit of papers open: point at one.
+      else if (err?.code === 'EXAM_OPEN_PAPER_LIMIT') { setStillOpen(err.openExamId || true); setError(tLater('exams.openPaperLimit')); }
       else setError(err.message || tLater('exams.formatNotReady'));
     } finally { setBusy(false); }
   }
@@ -89,7 +94,7 @@ export default function Exams() {
 
   if (user.course === 'in') {
     return <IndiaExams
-      user={user} exams={exams} blueprint={indiaBlueprint} busy={busy} error={error} startRefused={startRefused}
+      user={user} exams={exams} blueprint={indiaBlueprint} busy={busy} error={error} startRefused={startRefused} stillOpen={stillOpen}
       start={start} openPaper={openPaper} nav={nav} paper={paper} setPaper={setPaper}
     />;
   }
@@ -131,13 +136,15 @@ export default function Exams() {
 
       <PaperHistory exams={exams} openPaper={openPaper} nav={nav} />
       {startRefused}
-      {error && <div className="card" role="alert" style={{ gridColumn: '1 / -1' }}>{error}</div>}
+      {error && <div className="card" role="alert" style={{ gridColumn: '1 / -1' }}>{error}
+        {typeof stillOpen === 'string' && <div style={{ marginTop: 10 }}><button className="btn btn-ghost btn-sm" data-exam-resume-open onClick={() => nav(`/exams/${stillOpen}`)}>{t('exams.resume')}</button></div>}
+      </div>}
       {paper && <PrintPaper paper={paper} onClose={() => setPaper(null)} />}
     </div>
   );
 }
 
-function IndiaExams({ user, exams, blueprint, busy, error, startRefused, start, openPaper, nav, paper, setPaper }) {
+function IndiaExams({ user, exams, blueprint, busy, error, startRefused, stillOpen, start, openPaper, nav, paper, setPaper }) {
   const claim = indiaExamClaim(blueprint);
   const track = user.indiaTrack || 'cbse';
   const jeeMainReady = track === 'jee-main' && blueprint?.authenticity === 'official-mathematics-section';
@@ -181,7 +188,9 @@ function IndiaExams({ user, exams, blueprint, busy, error, startRefused, start, 
           </button>
         </>}
         {startRefused}
-        {error && <div role="alert" style={{ marginTop: 14, color: 'var(--bad)' }}>{error}</div>}
+        {error && <div role="alert" style={{ marginTop: 14, color: 'var(--bad)' }}>{error}
+          {typeof stillOpen === 'string' && <div style={{ marginTop: 10 }}><button className="btn btn-ghost btn-sm" data-exam-resume-open onClick={() => nav(`/exams/${stillOpen}`)}>{t('exams.resume')}</button></div>}
+        </div>}
       </div>
 
       <PaperHistory exams={exams} openPaper={openPaper} nav={nav} india />

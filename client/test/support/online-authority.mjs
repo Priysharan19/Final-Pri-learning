@@ -233,6 +233,53 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
           offlineUntil: now + 7 * 86400000, issuedAt: now, sourceVersion: 1 }
       : entitlement;
     await idb.put('device', { ...row, entitlement: snapshot });
+    // The server is the authority on the plan for anything it pays for or
+    // certifies (an exam paper, JEE Advanced): the account's SERVER entitlement
+    // is made to say the same thing the device snapshot now does.
+    const paying = !!snapshot && snapshot.plan === 'premium' && ['trialing', 'active', 'grace'].includes(snapshot.status);
+    await serverPlan(row.accountId, paying);
+  }
+
+  // ── The account's plan on the server ───────────────────────────────────────
+  // Premium is granted through the product's own audited support-grant route,
+  // by a real admin account with a real second factor. Going back to free is
+  // the grant having ended: its source row is removed and the snapshot reads
+  // free, which is what the server computes once a grant's period is over.
+  let admin = null;
+  async function serverPlan(accountId, premium) {
+    if (!premium) {
+      await app.db.run('DELETE FROM entitlement_support_grants WHERE account_id=?', [accountId]);
+      await app.db.run("UPDATE entitlement_snapshots SET plan='free',status='free',provider='none',current_period_end=NULL,grace_until=NULL,offline_until=NULL WHERE account_id=?", [accountId]);
+      return;
+    }
+    if (!keepRateLimits) await resetRateLimits();
+    if (!admin) {
+      const reg = await harness.registerAccount(app, { email: `${label}.admin@example.test`, password: PASSWORD, name: 'Suite Admin', deviceId: 'suite-admin-device' });
+      assert.equal(reg.status, 201, `register admin: ${reg.status} ${reg.text}`);
+      assert.equal((await harness.verifyEmail(app, reg.account.id)).status, 200, 'verify admin');
+      const mfa = await harness.promoteRole(app, reg.jar, reg.account.id, 'admin');
+      admin = { jar: reg.jar, secret: mfa.secret };
+    }
+    const grant = () => app.request('/v1/entitlements/admin/grant', { method: 'POST', jar: admin.jar, body: { accountId, durationMs: PREMIUM_DAYS * 86400000 } });
+    let granted = await grant();
+    if (granted.status === 403 && granted.data?.error?.code === 'MFA_STEP_UP_REQUIRED') {
+      // A suite that moves the clock outlives the step-up window.
+      const fresh = await harness.verifyMfa(app, admin.jar, admin.secret);
+      assert.equal(fresh.status, 200, `admin step-up: ${fresh.status} ${fresh.text}`);
+      granted = await grant();
+    }
+    assert.equal(granted.status, 200, `server Premium grant: ${granted.status} ${granted.text}`);
+  }
+
+  /**
+   * "Time passes" for the server's count of this profile's exam papers: every
+   * paper it has sealed for the account is back-dated by `ms`. For a suite
+   * whose clock is the entitlement gate's own, not Date.now.
+   */
+  async function ageExamPapers(pid, ms) {
+    const accountId = accounts.get(pid)?.accountId;
+    assert.ok(accountId, 'ageExamPapers() needs a linked profile');
+    await app.db.run("UPDATE idempotency_keys SET created_at=created_at-? WHERE account_id=? AND scope='exam-paper'", [Math.round(ms), accountId]);
   }
 
   /**
@@ -319,7 +366,7 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
 
   const authority = {
     app, origin: app.origin, db: app.db, traffic, reader,
-    link, setEntitlement, answerKey, sealedQuestion, examPaper, examResult, examSnapshot, resetRateLimits, close,
+    link, setEntitlement, ageExamPapers, answerKey, sealedQuestion, examPaper, examResult, examSnapshot, resetRateLimits, close,
     accountOf: pid => accounts.get(pid) || null,
     /** Pin the device session to `pid`'s account; `undefined` follows the selected profile again. */
     useSessionOf(pid) { pinnedPid = pid; },

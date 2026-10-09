@@ -21,7 +21,7 @@
 import { get, put, del, byIndex } from './idb.js';
 import { indiaScope, indiaChapter, cleanIndiaTrack } from '../engine/indiaProduct.js';
 import { pyqAbsenceFor, PYQ_MANIFEST } from '../engine/pyq/pyqCoverage.js';
-import { indiaPyqCells } from '../engine/indiaExamCells.js';
+import { indiaPyqCells, narrowCells } from '../engine/indiaExamCells.js';
 import { generateQuestion, loadBanksFor } from '../engine/generators/index.js';
 import { sanitizeFigure } from '../lib/sanitize.js';
 import {
@@ -126,16 +126,6 @@ async function pyqCellsByChapter(track, chapters) {
   return cells;
 }
 
-/** Cells inside a difficulty window, or the nearest rungs to it when none are. */
-function narrowCells(cells, { min = 1, max = 4 } = {}) {
-  if (!cells.length) return cells;
-  const inside = cells.filter(c => c.difficulty >= min && c.difficulty <= max);
-  if (inside.length) return inside;
-  const gap = c => Math.min(Math.abs(c.difficulty - min), Math.abs(c.difficulty - max));
-  const best = Math.min(...cells.map(gap));
-  return cells.filter(c => gap(c) === best);
-}
-
 /** The device's row for one server-issued question: the public payload and where it sits on the paper. */
 function rowOf(pid, track, examId, sq, now, id = String(sq.id)) {
   return {
@@ -195,7 +185,7 @@ async function createIndiaExam(profile, body = {}) {
     // What goes to the server is the recipe of each item; the server chooses the
     // questions, and no answer to any of them comes back until it has marked.
     try {
-      issued = await issueServerExam(profile.id, { ...paperSpecOf(paper, { track, grade, variant }), title },
+      issued = await issueServerExam(profile.id, paperSpecOf(paper, { track, grade, variant }),
         `india:${track}:${grade}:${variant}:${body.source === 'reviewed' ? 'reviewed' : 'any'}`,
         { seed, units: paper.units, composition: paper.composition, reducedPattern: paper.reducedPattern });
     } catch (err) {

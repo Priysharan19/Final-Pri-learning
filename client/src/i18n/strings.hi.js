@@ -1501,6 +1501,7 @@ export default {
   'exams.paperMeta': '{date} · {n} मिनट',
   'exams.paperMetaIndia': '{date} · खंड के लिए सुझाया गया समय {n} मिनट',
   'exams.inProgress': 'जारी है',
+  'exams.openPaperLimit': 'आपके कुछ पेपर अभी खुले हैं। नया पेपर शुरू करने से पहले किसी एक को पूरा करें या उसे जारी रखें।',
   'exams.waitingToBeMarked': 'जाँच की प्रतीक्षा में',
   'exams.openPending': 'खोलें',
   'exams.markedEarlier': 'ऐप के पुराने संस्करण ने अंक दिए',

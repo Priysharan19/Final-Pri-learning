@@ -226,6 +226,10 @@ export async function cloudRequest(path, {
       err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
       if (Number.isFinite(Number(data?.error?.resetAt))) err.resetAt = Number(data.error.resetAt);
       if (data?.error?.quota && typeof data.error.quota === 'object') err.quota = data.error.quota;
+      // An entitlement refusal names what it is about and when it lifts.
+      if (typeof data?.error?.capability === 'string') err.capability = data.error.capability.slice(0, 60);
+      for (const k of ['nextAt', 'used', 'limit', 'windowDays']) if (Number.isFinite(Number(data?.error?.[k]))) err[k] = Number(data.error[k]);
+      if (typeof data?.error?.openExamId === 'string' && SAFE_ID.test(data.error.openExamId)) err.openExamId = data.error.openExamId;
       err.requestId = result?.requestId || rid;
       throw err;
     }
@@ -278,6 +282,10 @@ export async function cloudRequest(path, {
       err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
       if (Number.isFinite(Number(data?.error?.resetAt))) err.resetAt = Number(data.error.resetAt);
       if (data?.error?.quota && typeof data.error.quota === 'object') err.quota = data.error.quota;
+      // An entitlement refusal names what it is about and when it lifts.
+      if (typeof data?.error?.capability === 'string') err.capability = data.error.capability.slice(0, 60);
+      for (const k of ['nextAt', 'used', 'limit', 'windowDays']) if (Number.isFinite(Number(data?.error?.[k]))) err[k] = Number(data.error[k]);
+      if (typeof data?.error?.openExamId === 'string' && SAFE_ID.test(data.error.openExamId)) err.openExamId = data.error.openExamId;
       err.requestId = response.headers.get('x-pri-request-id') || rid;
       throw err;
     }

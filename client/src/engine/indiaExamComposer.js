@@ -529,7 +529,7 @@ export function marking(section) {
   };
 }
 
-function buildItem(ctx, spec, section, slot, chapter, others, range, composition, choice) {
+export function buildItem(ctx, spec, section, slot, chapter, others, range, composition, choice) {
   const sectionRange = section.difficulty ? { min: section.difficulty[0], max: section.difficulty[1] } : range;
   const types = section.types || [section.type];
   const extra = ctx.pyqCellsFor(chapter, sectionRange);
@@ -540,7 +540,12 @@ function buildItem(ctx, spec, section, slot, chapter, others, range, composition
     // tried first and every other chapter after it before the slot degrades to
     // a plain MCQ (which composeIndiaPaper then reports as a reduction).
     const built = assertionReason(ctx, chapter, others, sectionRange)
-      || shuffle(ctx.rng, others.filter(c => c.id !== chapter.id)).reduce((found, c) => found || assertionReason(ctx, c, others, sectionRange), null);
+      || shuffle(ctx.rng, others.filter(c => c.id !== chapter.id)).reduce((found, c) => {
+        if (found) return found;
+        const elsewhere = assertionReason(ctx, c, others, sectionRange);
+        // The item is filed under the chapter its assertion actually came from.
+        return elsewhere && { ...elsewhere, fromChapter: c };
+      }, null);
     if (built) return built;
   }
   const single = drawn => ({ kind: 'single', cell: drawn.cell, alt: null });
@@ -576,6 +581,29 @@ function buildItem(ctx, spec, section, slot, chapter, others, range, composition
   return { ...drawn, item, recipe };
 }
 
+/** The difficulty window a blueprint sets for the whole paper. */
+export const paperRange = spec => ({ min: spec.difficulty?.min ?? 1, max: spec.difficulty?.max ?? 4 });
+/** The window one section draws inside: its own, else the paper's. */
+export const sectionRangeOf = (spec, section) => (section.difficulty ? { min: section.difficulty[0], max: section.difficulty[1] } : paperRange(spec));
+
+/**
+ * What a seed decides before any question is drawn: which chapter every slot
+ * is allotted (unit weightage or the seeded cycle) and which slots offer an
+ * internal choice. Pure and cheap, so the server recomputes it from the seed a
+ * paper spec carries and holds the spec to it. Returns the rng positioned
+ * exactly where composition continues.
+ */
+export function paperLayout(spec, chapters, seed) {
+  const rng = makeRng((Number(seed) >>> 0) || 1);
+  const { slots, units } = allocateUnits(spec, chapters, rng);
+  const choiceSlots = {};
+  for (const section of spec.sections) {
+    if (!section.internalChoice) continue;
+    choiceSlots[section.id] = new Set(shuffle(rng, [...Array(section.questions).keys()]).slice(0, section.internalChoice));
+  }
+  return { rng, slots, units, choiceSlots };
+}
+
 /**
  * Compose a whole paper. `draw(generator, difficulty, seed)` is the engine's
  * synchronous generateQuestion; `chapters` is the track scope for the profile;
@@ -585,18 +613,12 @@ function buildItem(ctx, spec, section, slot, chapter, others, range, composition
 export function composeIndiaPaper(spec, { seed, draw, chapters, pyqCellsFor = () => [] }) {
   if (!spec?.sections?.length) throw new Error('A paper needs a blueprint with sections.');
   if (!chapters?.length) throw new Error('A paper needs a chapter scope.');
-  const rng = makeRng((Number(seed) >>> 0) || 1);
+  const { rng, slots, units, choiceSlots } = paperLayout(spec, chapters, seed);
   const ctx = { rng, draw, seen: new Set(), pyqCellsFor };
-  const range = { min: spec.difficulty?.min ?? 1, max: spec.difficulty?.max ?? 4 };
-  const { slots, units } = allocateUnits(spec, chapters, rng);
+  const range = paperRange(spec);
   const composition = { pyq: 0, authored: 0, nativeMcq: 0, numericToMcq: 0, assertionReason: 0, caseStudy: 0, multiCorrect: 0, matrixMatch: 0, writtenAsObjective: 0, chapterSubstituted: 0, internalChoice: 0 };
   const reduced = [];
   const chapterOf = id => chapters.find(c => c.id === id);
-  const choiceSlots = {};
-  for (const section of spec.sections) {
-    if (!section.internalChoice) continue;
-    choiceSlots[section.id] = new Set(shuffle(rng, [...Array(section.questions).keys()]).slice(0, section.internalChoice));
-  }
 
   const questions = [];
   for (const slot of slots) {
@@ -611,6 +633,11 @@ export function composeIndiaPaper(spec, { seed, draw, chapters, pyqCellsFor = ()
         built = buildItem(ctx, spec, section, slot, candidate, chapters, range, composition, choice);
         if (built) { composition.chapterSubstituted++; reduced.push(`Section ${section.id} question ${slot.index + 1}: ${chapter.name} could not supply a ${section.types?.[0] || section.type} item, so ${candidate.name} was used.`); chapter = candidate; break; }
       }
+    }
+    if (built?.fromChapter && built.fromChapter.id !== chapter.id) {
+      composition.chapterSubstituted++;
+      reduced.push(`Section ${section.id} question ${slot.index + 1}: ${chapter.name} could not supply an assertion-reason item, so ${built.fromChapter.name} was used.`);
+      chapter = built.fromChapter;
     }
     if (!built) {
       throw Object.assign(new Error(`The authored banks cannot compose Section ${section.id} (${(section.types || [section.type]).join('/')}) of ${spec.label}.`), { status: 503, code: 'INDIA_EXAM_COMPOSITION_FAILED' });
@@ -627,6 +654,8 @@ export function composeIndiaPaper(spec, { seed, draw, chapters, pyqCellsFor = ()
       order: questions.length + 1,
       section: section.id, sectionLabel: section.label || `Section ${section.id}`,
       item: built.item, chapterId: chapter.id, chapterName: chapter.name,
+      // The chapter the layout allotted this slot, before any substitution.
+      allottedChapterId: slot.chapterId,
       generator: built.generator, difficulty: built.difficulty, seed: built.seed, altSeed: built.altSeed || null,
       pyq: built.pyq, conversion: built.conversion || null,
       recipe: built.recipe,
@@ -794,6 +823,15 @@ export function paperSpecOf(paper, { track, grade, variant = 'standard' }) {
   return {
     kind: 'india',
     blueprint: { track, grade: Number(grade), variant },
-    slots: paper.questions.map(q => ({ section: String(q.section), chapter: q.chapterId, recipe: q.recipe }))
+    // The seed of the LAYOUT (which chapter each slot is allotted, which slots
+    // offer a choice). It is not a question seed: the server draws those.
+    layoutSeed: paper.seed,
+    // A slot always names the chapter the layout allotted it. Where the device
+    // had to take the item from another chapter it sends no recipe: the server
+    // composes that slot itself, by the composer's own rule.
+    slots: paper.questions.map(q => ({
+      section: String(q.section), chapter: q.allottedChapterId,
+      recipe: q.chapterId === q.allottedChapterId ? q.recipe : null
+    }))
   };
 }
