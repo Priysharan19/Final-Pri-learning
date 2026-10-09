@@ -20,7 +20,7 @@ import {
 } from '../engine/curriculum.js';
 import {
   cleanIndiaTrack, indiaTrack, indiaCourseLabel, indiaScope, indiaChapter,
-  indiaChapterGrade, indiaDotpointIndex, resolveIndiaTarget, indiaProductSections,
+  indiaChapterGrade, indiaDotpointIndex, resolveIndiaTarget, indiaRequestableDifficulties, indiaProductSections,
   indiaDotpointKey, indiaNameOf, indiaDifficultyWindow, clampToIndiaWindow,
   indiaPracticeScope, indiaAheadUnlocked, indiaDotpointsInWindow, indiaChaptersForGenerator,
   indiaPyqAlternatives
@@ -1186,7 +1186,11 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   // library's D1–D4 buttons, a ?difficulty= link) is held to the track window
   // like every other request (adaptive-08) — and said so when it had to move —
   // and the dot point is then chosen among those authored closest to it.
-  const namedDifficulty = choice.explicit && difficulty != null && difficulty !== '' && Number.isFinite(Number(difficulty));
+  // The same holds when the optimiser chose the chapter but the student named
+  // the rung (smart practice with a difficulty set): the dot point is chosen
+  // among those authored at it, so the rung asked for is served wherever the
+  // chapter has it (issue #408).
+  const namedDifficulty = difficulty != null && difficulty !== '' && Number.isFinite(Number(difficulty));
   const namedRung = namedDifficulty ? clampToIndiaWindow(Number(difficulty), trackId, grade) : null;
   if (asked == null && !pyqOnly) {
     let dpPool = indiaDotpointStates(c, chapterRow, trackId, grade, ratings, now);
@@ -1309,6 +1313,26 @@ function indiaChapterForRequest(subtopic, trackId, grade) {
     || users.find(c => scope.has(c.id))
     || users.find(c => indiaChapterGrade(c) === Number(grade))
     || users[0];
+}
+
+/**
+ * What a practice reply says about a difficulty the request named (issue #408).
+ *
+ * A rung that was asked for is not always the rung that can be served: a dot
+ * point may have no authored form there, and a track holds practice inside its
+ * own window. The question is never relabelled — its own `difficulty` and
+ * `diffLabel` are always the rung the bank generated it at — and the reply
+ * carries both numbers so the page can say "no questions at D4 for this topic
+ * yet — showing D3" before the question instead of letting a D3 question stand
+ * in silently for the D4 that was asked for. A request that named no difficulty
+ * (adaptive practice) gets no fields at all.
+ */
+export function difficultyDisclosure(requested, served) {
+  if (requested == null || requested === '' || !Number.isFinite(Number(requested))) return {};
+  const asked = Math.min(4, Math.max(1, Math.round(Number(requested))));
+  const got = Number(served);
+  if (!Number.isInteger(got)) return {};
+  return { difficultyRequested: asked, difficultyServed: got, difficultyHonoured: asked === got };
 }
 
 /**
@@ -2941,7 +2965,12 @@ const routes = {
       const trackId = cleanIndiaTrack(p.indiaTrack, p.year);
       const { own, aheadIds, aheadUnlocked } = indiaPool(trackId, p.year, ratings, now);
       const ownIds = new Set(own.map(c => c.id));
-      const decorate = chapter => {
+      // `requestable` is the difficulty rungs this section can serve EXACTLY for
+      // the chapter and for each dot point, on the section's own track. The
+      // picker offers only these, so a student is never invited to ask for a
+      // level the bank cannot produce here (issue #408).
+      const decorate = (chapter, section) => {
+        const scope = { track: section.track, grade: section.year ?? indiaChapterGrade(chapter) ?? p.year };
         const state = indiaState(chapter, ratings, now);
         const chapterRow = ratings[chapter.id] || null;
         const dotpoints = chapter.dotpoints.map((text, ordinal) => {
@@ -2949,12 +2978,13 @@ const routes = {
           const forms = [...new Set(covers.flatMap(c => c.diff || []))].sort((a, b) => a - b);
           const d = indiaDotpointState(chapter, ordinal, chapterRow, ratings, now);
           const m = d.attempts ? masteryOf(d.rating, d.attempts, d.last_at, now) : 0;
-          return { id: `${chapter.id}#${ordinal}`, key: String(ordinal), text, difficulties: forms, mastery: Math.round(m * 100), band: d.attempts ? masteryBand(m) : 'unseen', attempts: d.attempts, correct: d.correct, generated: forms.length > 0 };
+          return { id: `${chapter.id}#${ordinal}`, key: String(ordinal), text, difficulties: forms, requestable: indiaRequestableDifficulties(chapter, { ...scope, dotpoint: ordinal }), mastery: Math.round(m * 100), band: d.attempts ? masteryBand(m) : 'unseen', attempts: d.attempts, correct: d.correct, generated: forms.length > 0 };
         });
         const ahead = aheadIds.has(chapter.id);
         return {
           id: chapter.id, name: chapter.name, strand: chapter.strand, weight: chapter.weight, code: null, dotpoints,
           year: indiaChapterGrade(chapter),
+          requestable: indiaRequestableDifficulties(chapter, scope),
           mastery: Math.round(state.mastery * 100), band: state.attempts ? masteryBand(state.mastery) : 'unseen',
           attempts: state.attempts, correct: state.correct,
           due: due.has(chapter.id) || (state.legacy && indiaGeneratorIds(chapter).some(id => due.has(id))),
@@ -2967,11 +2997,11 @@ const routes = {
       };
       const years = product.years.map(section => ({
         year: section.year, key: section.key, track: section.track, title: section.title, caption: section.caption,
-        courseLabel: section.label, difficultyFloor: section.difficultyFloor, difficultyCeiling: section.difficultyCeiling, subtopics: section.chapters.map(decorate)
+        courseLabel: section.label, difficultyFloor: section.difficultyFloor, difficultyCeiling: section.difficultyCeiling, subtopics: section.chapters.map(ch => decorate(ch, section))
       }));
       const streams = product.streams.map(section => ({
         year: section.year, allYears: !!section.allYears, key: section.key, track: section.track, title: section.title, caption: section.caption,
-        courseLabel: section.label, difficultyFloor: section.difficultyFloor, difficultyCeiling: section.difficultyCeiling, subtopics: section.chapters.map(decorate)
+        courseLabel: section.label, difficultyFloor: section.difficultyFloor, difficultyCeiling: section.difficultyCeiling, subtopics: section.chapters.map(ch => decorate(ch, section))
       }));
       return { country: 'in', years, streams, userYear: p.year, pathway: null, course: 'in', indiaTrack: trackId, aheadUnlocked, window: indiaDifficultyWindow(trackId, p.year) };
     }
@@ -3065,7 +3095,14 @@ const routes = {
   'POST /practice/next': async (body) => {
     const p = await requireProfile();
     const unfinished = await resumableQuestion(p, body);
-    if (unfinished) return resumedQuestionResponse(unfinished);
+    // A resumed question is the one already on the student's desk; when the
+    // request names a difficulty it does not sit at, the reply says so too.
+    if (unfinished) {
+      return {
+        ...resumedQuestionResponse(unfinished),
+        ...(body?.taskId || unfinished.answered ? {} : difficultyDisclosure(body?.difficulty, unfinished.payload?.difficulty ?? unfinished.difficulty))
+      };
+    }
     const { mode = 'smart', subtopic, difficulty, dotpoint, taskId, track, pyqOnly = false } = body || {};
     // Task-driven question
     if (taskId) {
@@ -3099,7 +3136,8 @@ const routes = {
         return {
           question: sanitize(payload, row), reason: 'task', repeat: !!repeat,
           why: `Task: ${task.title} — question ${done + 1} of ${task.count}.`,
-          dotpoint: resolved.dotpointIndex, target: state.mastery, misconception: null
+          dotpoint: resolved.dotpointIndex, target: state.mastery, misconception: null,
+          ...difficultyDisclosure(target.difficulty, payload.difficulty ?? row.difficulty)
         };
       }
       if (!task.subtopics?.length) throw Object.assign(new Error('That task has no topics to practise.'), { status: 409 });
@@ -3132,7 +3170,8 @@ const routes = {
         dotpoint: pick.target.dotpointIndex, target: pick.successTarget ?? null,
         misconception: trapKey ? pick.trap?.label || null : null,
         windowed: pick.target.windowed !== false, aheadUnlocked: pick.aheadUnlocked,
-        pyq: !!pick.target.pyq, repeat: !!repeat
+        pyq: !!pick.target.pyq, repeat: !!repeat,
+        ...difficultyDisclosure(difficulty, payload.difficulty ?? row.difficulty)
       };
     }
     let choice;
@@ -3215,7 +3254,8 @@ const routes = {
       question: sanitize(payload, row), reason: choice.reason, repeat,
       why: served || !choice.dotpoint ? choice.why : choice.whyPlain,
       dotpoint: served, target: choice.target ?? null,
-      misconception: trapKey ? choice.trap?.label || null : null
+      misconception: trapKey ? choice.trap?.label || null : null,
+      ...difficultyDisclosure(difficulty, payload.difficulty ?? row.difficulty)
     };
   },
 
