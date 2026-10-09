@@ -361,6 +361,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     if (plain(body) && body.account !== undefined && String(body.account) !== String(accountId)) {
       return reject(res, 409, 'PRACTICE_ACCOUNT_MISMATCH', 'This device is signed in to a different account.');
     }
+    // A prepared question is bound once. The request that binds it must say
+    // whose it is, so a shared device cannot spend it under the wrong account.
+    if (plain(body) && body.prepared !== undefined && body.account === undefined) {
+      return reject(res, 400, 'PRACTICE_ISSUE_INVALID', 'A prepared question names the account it is for.');
+    }
     await ensureBanks();
     let q, practiceMode, repeat = false, trapDelivered = false, preparedNonce = null, preparedExpiry = 0, seedGiven = false;
     if (plain(body) && body.prepared !== undefined) {
@@ -591,6 +596,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const completed = await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-completion' AND key=?", [accountId, qid]);
       if (completed) return { status: 409, code: 'QUESTION_ALREADY_GRADED' };
       const q = JSON.parse(escrow.response_json);
+      // Decided now, not only at issue: copies issued before the first of them
+      // was resolved are repeats the moment its solution has been shown.
+      if (await contentSeen(db, accountId, q)) q._repeat = true;
       await markContentSeen(db, accountId, q, now);
       const attemptId = randomUUID();
       const response = { authoritative: true, revealed: true, resolved: true, correct: false,
@@ -672,6 +680,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (complete) return { status: 409, code: 'QUESTION_ALREADY_GRADED' };
 
       const q = JSON.parse(sealed.response_json);
+      // Decided now, not only at issue: several copies of one question can be
+      // issued before any is resolved, and once one of them has shown its
+      // solution the others are no longer new work.
+      if (await contentSeen(db, accountId, q)) q._repeat = true;
       const result = checkAnswer(q, body.answer);
       // Only after submission may authored misconception feedback be revealed.
       // Never trust a caller-supplied explanation or make the device infer
@@ -694,7 +706,12 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // marks. This prevents rewarding a mere copy of the question.
       const workingOnlyCredit = result.invalid === true && body.answer.trim() === '' &&
         Number.isInteger(partial?.awarded) && partial.awarded > 0;
-      const invalid = Boolean(result.invalid && !workingOnlyCredit);
+      // Working sent without a final answer is an attempt whether or not its
+      // lines are right, and spends a try either way. Were only true working
+      // an attempt, a false line would be refused for free and each refusal
+      // would say "this step is wrong" — an unlimited check of every guess.
+      const workingOnly = result.invalid === true && body.answer.trim() === '' && working.trim() !== '';
+      const invalid = Boolean(result.invalid && !workingOnly);
       const marksEarned = invalid ? 0 : result.correct
         ? marksPossible
         : Math.max(0, Math.min(marksPossible - 1, partial?.awarded ?? 0));
@@ -708,7 +725,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         correct: result.correct === true, invalid, resolved,
         marksEarned, marksPossible,
         triesLeft: resolved ? 0 : 1,
-        feedback: workingOnlyCredit ? partial.note : feedback, trapWhy,
+        feedback: workingOnlyCredit ? partial.note : workingOnly ? (partial?.note || 'There is no final answer here, and this working does not earn a mark yet.') : feedback, trapWhy,
         contentId: opaqueContentId(q.contentId), serverAcknowledgedAt: now,
         ...(q._repeat === true ? { repeat: true } : {}),
         // An entry that is not an attempt costs nothing, so it may not return

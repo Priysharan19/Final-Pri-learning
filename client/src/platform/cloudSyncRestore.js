@@ -197,6 +197,17 @@ async function applyPracticeEvent(pid, profile, event) {
     }
   }
 
+  // As on the device that sat it: a repeat earns nothing, but a review that
+  // already exists has been sat and is rescheduled as a helped recall at best.
+  if (!isGame && isRepeat && owner !== 'custom' && LEARNING_MODES.has(mode)) {
+    const key = `${pid}:${owner}`;
+    const rev = await get('reviews', key).catch(() => null);
+    if (rev) {
+      const grade = gradeFor({ correct, hintsUsed: Math.max(1, help), tries, ms: attempt.ms, difficulty: attempt.difficulty });
+      ops.push({ type: 'put', store: 'reviews', value: { ...rev, key, pid, subtopic: owner, ...scheduleReview(rev, grade, at) } });
+    }
+  }
+
   const tz = timezoneOf(profile || 'nsw');
   const date = dayKey(at, tz);
   const activityKey = `${pid}:${date}`;

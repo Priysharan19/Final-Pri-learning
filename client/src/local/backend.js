@@ -2137,15 +2137,19 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
   }
 
   let reviewNext = null;
-  if ((mode === 'practice' || mode === 'review' || mode === 'task') && !isCustom) {
+  if ((mode === 'practice' || mode === 'review' || mode === 'task') && !q.custom) {
     const key = `${pid}:${owner}`;
     const rev = await get('reviews', key);
+    // A repeat earns nothing, but a review that was due has still been sat: it
+    // is rescheduled as if help had been used (never as an easy recall), so a
+    // chapter whose few questions have all been seen does not stay due for
+    // ever. A repeat never starts a review schedule.
     const grade = gradeFor({
-      correct, hintsUsed: helpUsed, tries: row.tries || 0,
+      correct, hintsUsed: isRepeat ? Math.max(1, helpUsed) : helpUsed, tries: row.tries || 0,
       ms: ms || 0, difficulty: q.difficulty || 2
     });
     if (rev) reviewNext = { ...rev, subtopic: owner, ...scheduleReview(rev, grade, now) };
-    else if (st.attempts + 1 >= 3) reviewNext = { key, pid, subtopic: owner, ...scheduleReview(null, grade, now) };
+    else if (!isRepeat && st.attempts + 1 >= 3) reviewNext = { key, pid, subtopic: owner, ...scheduleReview(null, grade, now) };
   }
 
   const xp = isRepeat ? 0 : isRush ? (correct ? 6 : 0) : xpFor(q.difficulty, correct, 0, effHints);

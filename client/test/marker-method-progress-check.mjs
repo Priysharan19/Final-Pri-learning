@@ -15,6 +15,7 @@
 // Every case is authored. Nothing here is generated.
 // ─────────────────────────────────────────────────────────────────
 import { methodMarks, stepCheck } from '../src/engine/checker.js';
+import { parseNumericInput } from '../src/engine/checker-core.js';
 
 let pass = 0;
 const failures = [];
@@ -150,6 +151,36 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   ok(run(ineq, 'Solve $3x+5>11$', '3x+6>12\n3x+7>13\nx>99') === 0, 'inequality: shifting both sides earns nothing');
   ok(run(linear, '$6m+15=7m+29$', '15-29=7m-6m\n-14=7m-6m\nm=9') === 2, 'evaluating one side is still a step');
   ok(run(linear, '$6m+15=7m+29$', '15-29=7m-6m\n15-29+1-1=7m-6m\nm=9') === 1, 'padding a credited line earns nothing more');
+
+  // True arithmetic that has nothing to do with the question, and lines true
+  // for every value of the unknown, earn nothing — alone, stacked, or mixed in.
+  for (const line of ['3+4=7', '10-2=8', '5*5=25', '2^3=8', '1/2+1/2=1', '7=7', '3+4', 'm+1=1+m', '2(m+3)=2m+6', 'm=m', '0m=0']) {
+    ok(run(linear, '$6m+15=7m+29$', `${line}\nm=9`) === 0, `unrelated line "${line}" earns nothing`);
+  }
+  ok(run(linear, '$6m+15=7m+29$', '3+4=7\n10-2=8\n5*5=25\nm=9', 4) === 0, 'stacked unrelated arithmetic earns nothing');
+  ok(run(linear, '$6m+15=7m+29$', '3+4=7\n15-29=7m-6m\n10-2=8\n-14=7m-6m\n5*5=25\nm=9', 4) === 2, 'unrelated arithmetic between genuine steps neither adds nor takes away');
+  ok(run(quad, '$x^2-5x+6=0$', '3+4=7\n10-2=8\nx=99', 4) === 0, 'quadratic: unrelated arithmetic earns nothing');
+  // Checking a root in the question's own equation is working; a sum that merely
+  // lands on a number the question shows is not.
+  const checked = { kind: 'equation', variable: 'x', solutions: [-2], source: '2x-7=-11' };
+  ok(run(checked, '$2x-7=-11$', '2x=-4\n2*(-2)-7=-11\nx=99', 4) === 2, 'substituting the root into the question is a step');
+  ok(run(checked, '$2x-7=-11$', '2x=-4\n2(-2)-7=-11\n2*(-2)-7=-11\nx=99', 4) === 2, 'the same check written twice is one step');
+  for (const line of ['-11=-11', '5-16=-11', '-10-1=-11', '-4-7=-11', '2*(-2)=-4']) {
+    ok(run(checked, '$2x-7=-11$', `${line}\nx=99`, 4) === 0, `a sum that only reaches a number in the question, "${line}", earns nothing`);
+  }
+  ok(run(quad, '$x^2-5x+6=0$', '(x-1)^2=x^2-2x+1\nx=99', 4) === 0, 'quadratic: an identity in the unknown earns nothing');
+  ok(run(quad, '$x^2-5x+6=0$', '(x-2)(x-3)=0\nx=99', 4) === 1, 'quadratic: factorising is still a step');
+}
+
+// ── A list of digits is not a number ─────────────────────────────────────────
+// "1,2,3" was read as 123, so a list of guesses could be marked as the answer.
+{
+  const read = text => { try { return parseNumericInput(text).value; } catch { return null; } };
+  for (const text of ['1,2,3', '0,1,2,3', '0 1 2 3', '1,23', '12 3', '1,2', '12,3456']) ok(read(text) === null, `"${text}" is not read as one number`);
+  for (const [text, value] of [['123', 123], ['1,234', 1234], ['1,000,000', 1000000], ['12,34,567', 1234567], ['1 234 567', 1234567], ['10 000', 10000],
+    ['1,234.5', 1234.5], ['$1,200', 1200], ['2 1/2', 2.5], ['-2 1/2', -2.5], ['2 (1)/(2)', 2.5], ['3 + 4', 7], ['3/4', 0.75]]) {
+    ok(read(text) === value, `"${text}" is still ${value}`);
+  }
 }
 
 console.log(failures.length

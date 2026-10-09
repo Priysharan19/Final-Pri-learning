@@ -169,6 +169,9 @@ export function createSyncRouter(db) {
     if (body.schemaVersion !== SCHEMA) return res.status(409).json({ error: { code: 'SYNC_SCHEMA_UNSUPPORTED', message: `Expected sync schema ${SCHEMA}.` } });
     const deviceId = String(body.deviceId || '');
     if (!ID.test(deviceId) || deviceId !== req.platformSession.device_id) return res.status(400).json({ error: { code: 'SYNC_DEVICE_MISMATCH', message: 'Sync device does not match this session.' } });
+    // The server's own grader writes under this id. A device that took it
+    // would share, and could exhaust, the sequence the account's marks use.
+    if (deviceId === 'server-grader') return res.status(400).json({ error: { code: 'SYNC_DEVICE_RESERVED', message: 'This device id is reserved.' } });
     const eventsRaw = Array.isArray(body.events) ? body.events : [];
     const entitiesRaw = Array.isArray(body.entities) ? body.entities : [];
     if (eventsRaw.length + entitiesRaw.length > MAX_PUSH) return res.status(413).json({ error: { code: 'SYNC_BATCH_TOO_LARGE', message: `At most ${MAX_PUSH} sync items are accepted per push.` } });

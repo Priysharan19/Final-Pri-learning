@@ -1254,6 +1254,71 @@ function rescalesBothSides(line, reference, variable) {
   return (shifted && !numsClose(shift, 0)) || (scaled && !numsClose(scale, 1));
 }
 
+// Does this line say anything about the unknown? Not when no letter appears in
+// it at all, and not when it holds for every value of the unknown.
+const UNKNOWN_PROBES = [1.37, -2.11, 5.03, 0.29];
+// Is `line` the tree `given` with every occurrence of the unknown replaced by
+// one and the same number? Brackets around the number are the student's to add.
+function substitutedInto(given, line, variable, bound) {
+  const g = unwrapGroup(given);
+  if (g?.t === 'var' && g.v === variable) {
+    let value;
+    try { value = evaluate(line, {}); } catch { return false; }
+    if (!Number.isFinite(value) || variablesOf(line).size) return false;
+    if (bound.length && !numsClose(bound[0], value)) return false;
+    bound[0] = value;
+    return true;
+  }
+  const l = unwrapGroup(line);
+  if (!g || !l || typeof g !== 'object' || typeof l !== 'object') return false;
+  if (g.t !== l.t || g.op !== l.op || g.fn !== l.fn) return false;
+  if (g.t === 'num') return numsClose(g.v, l.v);
+  for (const key of new Set([...Object.keys(g), ...Object.keys(l)])) {
+    const a = g[key], b = l[key];
+    if (Array.isArray(a) || Array.isArray(b)) {
+      if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+      if (!a.every((item, i) => substitutedInto(item, b[i], variable, bound))) return false;
+    } else if ((a && typeof a === 'object') || (b && typeof b === 'object')) {
+      if (!substitutedInto(a, b, variable, bound)) return false;
+    } else if (key === 'v' && a !== b) return false;
+  }
+  return true;
+}
+
+// A line with no letter in it that is the question's own equation with a number
+// put in for the unknown: the student checking a root. That is working. Any
+// other sum without the unknown is not about this question.
+function substitutionCheck(claim, given, variable) {
+  if (claim?.kind !== 'equation') return false;
+  const [l, r] = claimSides(claim);
+  return given.some(g => {
+    if (g?.kind !== 'equation') return false;
+    const [gl, gr] = claimSides(g);
+    return [[gl, gr], [gr, gl]].some(([a, b]) => {
+      const bound = [];
+      return substitutedInto(a, l, variable, bound) && substitutedInto(b, r, variable, bound) && bound.length === 1;
+    });
+  });
+}
+
+function silentOnUnknown(claim, variable, given = []) {
+  const sides = claimSides(claim);
+  if (!sides) return false;
+  const names = new Set();
+  for (const side of sides) variablesOf(side, names);
+  if (!names.size) return !substitutionCheck(claim, given, variable);
+  if (claim.kind !== 'equation' || names.size !== 1 || !names.has(variable)) return false;
+  let seen = 0;
+  for (const x of UNKNOWN_PROBES) {
+    let l, r;
+    try { l = evaluate(sides[0], { [variable]: x }); r = evaluate(sides[1], { [variable]: x }); } catch { continue; }
+    if (!Number.isFinite(l) || !Number.isFinite(r)) continue;
+    if (!numsClose(l, r)) return false;
+    seen++;
+  }
+  return seen >= 3;
+}
+
 /**
  * Method marks for a wrong final answer, from the student's working.
  * Returns null when nothing in the working could be verified; otherwise
@@ -1304,6 +1369,14 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
       if (counted.some(c => isolatedFinalAnswer(c, meta))) { row.reason = 'repeat'; return row; }
     }
     if (claim && counted.some(c => methodProgressDuplicate(claim, c))) { row.reason = 'repeat'; return row; }
+    // Solving an equation is work on its unknown. A line that never mentions
+    // it (3 + 4 = 7), or is true whatever it is (x + 1 = 1 + x), is true and
+    // moves nothing on: any amount of it could otherwise fill the method marks.
+    // Putting a number into the question's own equation to check it is the
+    // exception: that is about the unknown.
+    if (meta.kind === 'equation' && meta.variable && claim && silentOnUnknown(claim, meta.variable, given)) {
+      row.reason = 'unrelated'; return row;
+    }
     // An evidence plan (creditPerStage) carries one mark per verified stage:
     // a second line inside a stage already credited is the same criterion
     // shown again, however differently it is written.

@@ -64,7 +64,62 @@ try {
   const other = await issue(b.jar, 4242);
   eq([other.status, other.data.repeat ?? false], [201, false], 'another account\'s first sitting of that content is not a repeat');
 
-  console.log(`REPEAT CREDIT: PASS — ${count}/${count} checks — content an account has been shown the solution of is marked as a repeat however it is issued again.`);
+  // ── copies issued up front, before any of them is resolved ───────────────
+  // None is a repeat when issued. Once one has shown its solution the others
+  // are no longer new work, and the server says so when it marks them.
+  const c = await registerAccount(h, { email: 'repeat.c@example.test', deviceId: 'ipad-repeat-c' });
+  eq((await verifyEmail(h, c.account.id)).status, 200, 'a third verified account');
+  const copies = [];
+  for (let i = 0; i < 4; i++) copies.push(await issue(c.jar, 31337));
+  eq(copies.map(x => [x.status, x.data.repeat ?? false]), copies.map(() => [201, false]), 'four copies of one question issued before any is resolved: none is a repeat yet');
+  const key = (await sealedAnswer(copies[0].data.question.id)).value;
+  const opened = await post(`/v1/practice/${copies[0].data.question.id}/reveal`, {}, c.jar);
+  eq([opened.status, opened.data.repeat ?? false], [200, false], 'the first is revealed, as new work');
+  const second = await grade(c.jar, copies[1].data.question.id, key);
+  eq([second.data.correct, second.data.repeat], [true, true], 'a copy issued earlier and answered after the reveal is marked as a repeat');
+  eq((await eventOf(copies[1].data.question.id)).repeat, true, 'and its graded-attempt event says repeat');
+  const third2 = await post(`/v1/practice/${copies[2].data.question.id}/reveal`, {}, c.jar);
+  eq(third2.data.repeat, true, 'revealing another earlier copy is a repeat too');
+  eq((await eventOf(copies[2].data.question.id)).repeat, true, 'in its event as well');
+  const wrongFirst = await grade(c.jar, copies[3].data.question.id, '987654');
+  eq([wrongFirst.data.resolved, wrongFirst.data.repeat], [false, true], 'a first wrong try on the last copy already says repeat');
+
+  // ── working with no final answer is an attempt, right or wrong ───────────
+  const d = await registerAccount(h, { email: 'repeat.d@example.test', deviceId: 'ipad-repeat-d' });
+  eq((await verifyEmail(h, d.account.id)).status, 200, 'a fourth verified account');
+  const sub = (jar, id, answer, steps) => { const sid = `repeat-credit-${String(++n).padStart(4, '0')}`; return post(`/v1/practice/${id}/submit`, { submissionId: sid, answer, mode: 'typed', steps }, jar, { 'Idempotency-Key': sid }); };
+  const probe = await issue(d.jar, 2024);
+  const guess1 = await sub(d.jar, probe.data.question.id, '', ['x = 123456']);
+  eq([guess1.status, guess1.data.invalid, guess1.data.resolved, guess1.data.triesLeft, guess1.data.marksEarned], [200, false, false, 1, 0], 'a false line with no final answer spends a try');
+  const guess2 = await sub(d.jar, probe.data.question.id, '', ['x = 123457']);
+  eq([guess2.status, guess2.data.resolved, guess2.data.correct, guess2.data.marksEarned], [200, true, false, 0], 'and a second one resolves the question: there is no free third check');
+  eq((await sub(d.jar, probe.data.question.id, '', ['x = 1'])).status, 409, 'after which nothing more is checked');
+  const empty = await issue(d.jar, 2025);
+  const nothing = await sub(d.jar, empty.data.question.id, '', []);
+  eq([nothing.data.invalid, nothing.data.triesLeft, nothing.data.stepReport, nothing.data.partial], [true, 1, null, null], 'a submission with neither answer nor working is still not an attempt, and says nothing');
+
+  // ── true arithmetic that is not about the question earns nothing ─────────
+  const padded = await issue(d.jar, 2026);
+  const paddedGrade = await sub(d.jar, padded.data.question.id, '987654', ['3 + 4 = 7', '10 - 2 = 8', '5 * 5 = 25']);
+  eq([paddedGrade.data.correct, paddedGrade.data.marksEarned, paddedGrade.data.partial?.awarded ?? 0], [false, 0, 0], 'a wrong answer with unrelated true arithmetic as working earns no method mark');
+
+  // ── a prepared question names its account ────────────────────────────────
+  const prep = await post('/v1/practice/prepare', { generator: 'c8-linear-equations-both-sides', difficulty: 2, curriculum: 'in' });
+  eq(prep.status, 200, 'a prepared question');
+  eq((await post('/v1/practice/issue', { prepared: prep.data.prepared }, d.jar)).status, 400, 'binding it without naming the account is refused');
+  eq((await post('/v1/practice/issue', { prepared: prep.data.prepared, account: String(d.account.id) }, d.jar)).status, 201, 'and it is still there to bind for the account it names');
+
+  // ── the grader's device id is not a device's to use ──────────────────────
+  const g = await registerAccount(h, { email: 'repeat.g@example.test', deviceId: 'server-grader' });
+  eq((await verifyEmail(h, g.account.id)).status, 200, 'an account whose device calls itself the grader');
+  const taken = await post('/v1/sync/push', { schemaVersion: 1, deviceId: 'server-grader', events: [{ id: 'evt-grader-1', kind: 'practice-attempt', deviceId: 'server-grader', deviceSeq: 9007199254740991, entityId: 'q-grader-1', occurredAt: Date.now(), payload: {} }], entities: [] }, g.jar, { 'Idempotency-Key': 'grader-push-1' });
+  eq([taken.status, taken.data?.error?.code], [400, 'SYNC_DEVICE_RESERVED'], 'cannot push events under it');
+  for (const seed of [51, 52]) {
+    const q = await issue(g.jar, seed);
+    eq((await grade(g.jar, q.data.question.id, (await sealedAnswer(q.data.question.id)).value)).status, 200, `and that account's own answers are still marked (${seed})`);
+  }
+
+  console.log(`REPEAT CREDIT: PASS — ${count}/${count} checks — content an account has been shown the solution of is a repeat however and whenever it was issued; working without an answer always spends a try; unrelated arithmetic earns nothing.`);
 } finally {
   await h.close();
   rmSync(scratch, { recursive: true, force: true });

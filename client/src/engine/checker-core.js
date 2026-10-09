@@ -111,6 +111,25 @@ function percentAnswerWanted(question, ans) {
   return ASKS_PERCENT.test(String(question?.prompt ?? ''));
 }
 
+const GROUPED = /^\d{1,3}(?:,\d{3})+$|^\d{1,2}(?:,\d{2})*,\d{3}$|^\d{1,3}(?: \d{3})+$/;
+function brokenDigitGroups(s) {
+  // Outside brackets only: nCr(5, 2) and log(2, 8) separate arguments.
+  let depth = 0, top = '';
+  for (const ch of s) {
+    if ('([{'.includes(ch)) depth++;
+    else if (')]}'.includes(ch)) depth = Math.max(0, depth - 1);
+    top += depth === 0 && !')]}'.includes(ch) ? ch : '#';
+  }
+  for (const run of top.match(/\d[\d, ]*\d/g) || []) {
+    if (/[, ]/.test(run) && !GROUPED.test(run.replace(/ +/g, ' ').replace(/ ?, ?/g, ','))) {
+      // "2 1/2" is a mixed numeral, read below.
+      if (/^\d+ +\d+$/.test(run) && new RegExp(run.replace(/ +/g, ' +') + '\\s*/\\s*\\d').test(top)) continue;
+      return true;
+    }
+  }
+  return false;
+}
+
 /** Parse a numeric-ish student answer: "2 1/2", "3/4", "50%", "$1,200", "sqrt(2)+1". */
 export function parseNumericInput(raw) {
   let s = cleanInput(raw);
@@ -118,6 +137,10 @@ export function parseNumericInput(raw) {
   const roster = bracedInner(s);
   if (roster !== null && !roster.includes(',')) s = cleanInput(roster);
   if (!s) throw new Error('Empty answer');
+  // Digits broken up by commas or spaces are one number only when they are
+  // grouped the way numbers are written — 1,234,567 · 12,34,567 · 1 234 567.
+  // "1,2,3" and "0 1 2 3" are lists, not 123.
+  if (brokenDigitGroups(s)) throw new Error('Not a single number');
   const meta = { isPercent: /%\s*$/.test(s), text: s };
 
   // mixed numeral: "2 1/2" or "-2 1/2" — also the handwritten form "2 (1)/(2)"

@@ -41,10 +41,12 @@ const isGame = a => GAME_MODES.includes(String(a?.mode || ''));
 /**
  * Whether one attempt is evidence about a chapter: a marked answer in practice,
  * review, an assignment or an exam, on a curriculum question (a teacher's
- * custom question belongs to no chapter).
+ * custom question belongs to no chapter). A repeat of a question whose solution
+ * the student has already been shown is recorded, and is not evidence: it
+ * moves no rating, so it may not move an accuracy or a chapter count either.
  */
 export function isLearningEvidence(a) {
-  if (!a || isGame(a)) return false;
+  if (!a || isGame(a) || a.repeat === true) return false;
   const s = String(a.subtopic || '');
   return !!s && s !== 'custom';
 }

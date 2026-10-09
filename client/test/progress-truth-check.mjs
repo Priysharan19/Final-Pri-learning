@@ -276,7 +276,8 @@ async function run() {
 
   function expectedFor(pid) {
     const atts = rawRows().attempts.filter(a => a.pid === pid).sort((a, b) => a.createdAt - b.createdAt || (a.id > b.id ? 1 : -1));
-    const isEvidence = a => a.mode !== 'rush' && a.mode !== 'match' && a.subtopic && a.subtopic !== 'custom';
+    // A repeat (the server's word for it, kept on the attempt) is recorded and is not evidence.
+    const isEvidence = a => a.mode !== 'rush' && a.mode !== 'match' && a.subtopic && a.subtopic !== 'custom' && a.repeat !== true;
     const ev = atts.filter(isEvidence);
     const byCh = {};
     for (const a of ev) {
@@ -284,6 +285,8 @@ async function run() {
       c.attempts++; if (a.correct) { c.correct++; if (a.support !== 'supported') c.independent++; }
       c.last = Math.max(c.last, a.createdAt); c.rows.push(a);
     }
+    // Repeats sat in a chapter, for the review replay only.
+    for (const a of atts) if (a.repeat === true && byCh[a.subtopic]) (byCh[a.subtopic].repeats ||= []).push(a);
     const days = {};
     for (const a of atts) { const d = dateOf(a.createdAt); days[d] = (days[d] || 0) + 1; }
     const prev = d => new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) - DAY).toISOString().slice(0, 10);
@@ -304,12 +307,16 @@ async function run() {
     const out = {};
     for (const [ch, c] of Object.entries(byCh)) {
       let rev = null;
-      c.rows.forEach((a, i) => {
+      // A repeat reschedules a review that already exists, as a helped recall
+      // at best; it never starts one and is not one of the three answers that do.
+      const timeline = [...c.rows.map((a, i) => ({ a, i })), ...(c.repeats || []).map(a => ({ a, i: -1 }))]
+        .sort((x, y) => x.a.createdAt - y.a.createdAt || (x.a.id > y.a.id ? 1 : -1));
+      timeline.forEach(({ a, i }) => {
         if (!['practice', 'review', 'task'].includes(a.mode)) return;
-        const supported = a.support === 'supported';
+        const supported = a.support === 'supported' || a.repeat === true;
         const grade = A.gradeFor({ correct: !!a.correct, hintsUsed: supported ? 1 : 0, ms: a.ms || 0, difficulty: a.difficulty || 2 });
         if (rev) rev = A.scheduleReview(rev, grade, a.createdAt);
-        else if (i + 1 >= 3) rev = A.scheduleReview(null, grade, a.createdAt);
+        else if (a.repeat !== true && i + 1 >= 3) rev = A.scheduleReview(null, grade, a.createdAt);
       });
       if (rev) out[ch] = rev;
     }
