@@ -62,7 +62,8 @@ function examPayload(exam, occurredAt) {
     finishedAt: Number(exam.finishedAt) || null,
     indiaExam: exam.indiaExam && typeof exam.indiaExam === 'object' && !Array.isArray(exam.indiaExam)
       ? { ...exam.indiaExam }
-      : null
+      : null,
+    ...(exam.server?.examId ? { serverExamId: String(exam.server.examId) } : {})
   };
 }
 

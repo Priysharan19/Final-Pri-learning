@@ -14,6 +14,7 @@ import { createReportRouter } from './reports.js';
 import { createSyncRouter } from './sync.js';
 import { createHandwritingRouter } from './handwriting.js';
 import { createPracticeRouter, createPracticePrepareRoute } from './practice.js';
+import { createExamRouter } from './exams.js';
 import { createWorkingRouter } from './working.js';
 import { createQuestionPhotoRouter } from './questionPhoto.js';
 import { createTutorRouter } from './tutor.js';
@@ -202,6 +203,10 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // account later goes through the guarded /practice/issue below.
   router.post('/practice/prepare', ...createPracticePrepareRoute(db));
   router.use('/practice', requireGuardianConsent(db), createPracticeRouter(db));
+  // An examination paper is issued, collected and marked here: the same
+  // eligibility as checking one answer (session, verified email, student,
+  // guardian consent), for the whole life of the paper.
+  router.use('/exams', requireGuardianConsent(db), createExamRouter(db));
   router.use('/handwriting', requireGuardianConsent(db), createHandwritingRouter(db));
   router.use('/working', requireGuardianConsent(db), createWorkingRouter(db));
   router.use('/question-photo', requireGuardianConsent(db), createQuestionPhotoRouter(db));

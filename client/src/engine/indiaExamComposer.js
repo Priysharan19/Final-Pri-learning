@@ -261,7 +261,10 @@ function drawQuestion(ctx, chapter, need, range, extraCells = []) {
     ctx.seen.add(signature);
     return {
       payload: shaped.payload, generator: cell.generator,
-      difficulty: q.difficulty || cell.difficulty, seed, pyq: !!cell.pyq, conversion: shaped.conversion
+      difficulty: q.difficulty || cell.difficulty, seed, pyq: !!cell.pyq, conversion: shaped.conversion,
+      // Which authored cell produced it and what was asked of it: the recipe a
+      // paper spec carries to the server, which draws its own question from it.
+      cell: { generator: cell.generator, difficulty: cell.difficulty, need }
     };
   }
   return null;
@@ -290,6 +293,10 @@ function assertionReason(ctx, chapter, others, range) {
   const otherChapter = pool.length ? pick(ctx.rng, pool) : chapter;
   const other = drawQuestion(ctx, otherChapter, 'facts', range) || drawQuestion(ctx, chapter, 'facts', range);
   if (!other) return null;
+  return assembleAssertionReason(ctx, main, other);
+}
+
+function assembleAssertionReason(ctx, main, other) {
   const qa = main.payload, qo = other.payload;
   const stepA = keyStep(qa), stepO = keyStep(qo);
   if (!stepA) return null;
@@ -312,6 +319,7 @@ function assertionReason(ctx, chapter, others, range) {
   ];
   return {
     item: 'assertion-reason', generator: main.generator, difficulty: main.difficulty, seed: main.seed, pyq: false, conversion: 'assertion-reason',
+    recipe: { kind: 'assertion-reason', cells: [main.cell, other.cell] },
     payload: {
       subtopic: qa.subtopic, difficulty: qa.difficulty, dotpoints: qa.dotpoints,
       prompt: `**Assertion (A):** ${A}\n\n**Reason (R):** ${R}\n\nSelect the correct option.`,
@@ -331,23 +339,28 @@ function partFrom(q, key, marks) {
 
 function caseStudy(ctx, chapter, section, range, withChoice, composition) {
   const marksList = section.caseStudyParts || [1, 1, 2];
-  const parts = [];
-  let primary = null;
+  const drawn = [];
   for (let i = 0; i < marksList.length; i++) {
-    const marks = marksList[i];
-    const drawn = fillSlot(ctx, chapter, ['written', 'any'], range);
-    if (!drawn) return null;
-    if (drawn.need === 'any') composition.writtenAsObjective++;
-    primary = primary || drawn;
-    const part = partFrom(drawn.payload, PART_KEYS[i], marks);
-    if (marks >= 2 && withChoice) {
-      const alt = fillSlot(ctx, chapter, ['written', 'any'], range);
-      if (alt) part.alt = partFrom(alt.payload, PART_KEYS[i], marks);
-    }
-    parts.push(part);
+    const main = fillSlot(ctx, chapter, ['written', 'any'], range);
+    if (!main) return null;
+    if (main.need === 'any') composition.writtenAsObjective++;
+    const alt = marksList[i] >= 2 && withChoice ? fillSlot(ctx, chapter, ['written', 'any'], range) : null;
+    drawn.push({ main, alt });
   }
+  return assembleCaseStudy(chapter.name, marksList, drawn, withChoice);
+}
+
+function assembleCaseStudy(chapterName, marksList, drawn, withChoice) {
+  const parts = drawn.map(({ main, alt }, i) => {
+    const part = partFrom(main.payload, PART_KEYS[i], marksList[i]);
+    if (alt) part.alt = partFrom(alt.payload, PART_KEYS[i], marksList[i]);
+    return part;
+  });
+  const primary = drawn[0].main;
+  const chapter = { name: chapterName };
   return {
     item: 'case-study', generator: primary.generator, difficulty: primary.difficulty, seed: primary.seed, pyq: false, conversion: 'chaptered-sub-questions',
+    recipe: { kind: 'case-study', choice: !!withChoice, parts: drawn.map(({ main, alt }) => ({ cell: main.cell, alt: alt ? alt.cell : null })) },
     payload: {
       multipart: true, title: `Case study · ${chapter.name}`,
       stem: `The parts below are drawn from ${chapter.name}. Answer every part${withChoice ? '; where two versions of a part are shown, attempt either one' : ''}.`,
@@ -362,6 +375,10 @@ function multiCorrect(ctx, chapter, range) {
   const one = drawQuestion(ctx, chapter, 'factsNoFigure', range);
   const two = drawQuestion(ctx, chapter, 'factsNoFigure', range);
   if (!one || !two) return null;
+  return assembleMultiCorrect(ctx, one, two);
+}
+
+function assembleMultiCorrect(ctx, one, two) {
   const statements = [];
   for (const [label, drawn] of [['I', one], ['II', two]]) {
     const q = drawn.payload;
@@ -384,6 +401,7 @@ function multiCorrect(ctx, chapter, range) {
   const prefixed = (label, q) => (q.steps || []).map(s => ({ h: `(${label}) ${s.h || 'Step'}`, d: s.d }));
   return {
     item: 'multi-correct', generator: one.generator, difficulty: Math.max(one.difficulty, two.difficulty), seed: one.seed, pyq: false, conversion: 'paired-claims',
+    recipe: { kind: 'multi-correct', cells: [one.cell, two.cell] },
     payload: {
       subtopic: one.payload.subtopic, difficulty: Math.max(one.difficulty, two.difficulty), dotpoints: one.payload.dotpoints,
       prompt: `Consider the two problems below.\n\n(I) ${one.payload.prompt}\n\n(II) ${two.payload.prompt}\n\nWhich of the following statements is/are correct? Select every correct option.`,
@@ -407,6 +425,10 @@ function matrixMatch(ctx, chapter, range) {
     if (!drawn) return null;
     draws.push(drawn);
   }
+  return assembleMatrixMatch(ctx, draws);
+}
+
+function assembleMatrixMatch(ctx, draws) {
   const texts = draws.map(d => answerText(d.payload));
   if (new Set(texts).size !== texts.length) return null;
   const extra = numericDistractors(draws[3].payload, 4).map(w => formatLike(draws[3].payload, w.value)).find(t => !texts.includes(t)) || null;
@@ -423,6 +445,7 @@ function matrixMatch(ctx, chapter, range) {
   const options = shuffle(ctx.rng, [{ text: mapText(correctMap), ok: true }, ...wrongMaps.map(m => ({ text: mapText(m), ok: false }))]);
   return {
     item: 'matrix-match', generator: draws[0].generator, difficulty: Math.max(...draws.map(d => d.difficulty)), seed: draws[0].seed, pyq: false, conversion: 'matching-list',
+    recipe: { kind: 'matrix-match', cells: draws.map(d => d.cell) },
     payload: {
       subtopic: draws[0].payload.subtopic, difficulty: Math.max(...draws.map(d => d.difficulty)), dotpoints: draws[0].payload.dotpoints,
       prompt: 'Match each problem in List-I with its answer in List-II, then choose the option that gives the correct matching.',
@@ -497,7 +520,7 @@ export function composerNotes(spec) {
   return notes;
 }
 
-function marking(section) {
+export function marking(section) {
   return {
     correct: Number(section.marksEach ?? section.correct ?? 1),
     incorrect: Number(section.incorrect ?? 0),
@@ -520,17 +543,18 @@ function buildItem(ctx, spec, section, slot, chapter, others, range, composition
       || shuffle(ctx.rng, others.filter(c => c.id !== chapter.id)).reduce((found, c) => found || assertionReason(ctx, c, others, sectionRange), null);
     if (built) return built;
   }
+  const single = drawn => ({ kind: 'single', cell: drawn.cell, alt: null });
   if (types.includes('mcq') || types.includes('single-correct')) {
     const drawn = fillSlot(ctx, chapter, ['mcq'], sectionRange, extra);
-    return drawn && { ...drawn, item: drawn.payload.mcqFrom === 'numeric' ? 'mcq' : 'mcq' };
+    return drawn && { ...drawn, item: 'mcq', recipe: single(drawn) };
   }
   if (types.includes('numerical-value')) {
     const drawn = fillSlot(ctx, chapter, ['numerical'], sectionRange, extra);
-    return drawn && { ...drawn, item: 'numerical-value' };
+    return drawn && { ...drawn, item: 'numerical-value', recipe: single(drawn) };
   }
   if (types.includes('integer-00-99')) {
     const drawn = fillSlot(ctx, chapter, ['integer99'], sectionRange, extra);
-    return drawn && { ...drawn, item: 'integer-00-99' };
+    return drawn && { ...drawn, item: 'integer-00-99', recipe: single(drawn) };
   }
   if (types.includes('multi-correct')) return multiCorrect(ctx, chapter, sectionRange);
   if (types.includes('matrix-match')) return matrixMatch(ctx, chapter, sectionRange);
@@ -539,15 +563,17 @@ function buildItem(ctx, spec, section, slot, chapter, others, range, composition
   if (!drawn) return null;
   if (drawn.need === 'any') composition.writtenAsObjective++;
   const item = types[0] || 'written';
+  const recipe = single(drawn);
   if (choice) {
     const alt = fillSlot(ctx, chapter, ['written', 'any'], sectionRange, extra);
     if (alt) {
       if (alt.need === 'any') composition.writtenAsObjective++;
       drawn.payload = { ...drawn.payload, alt: alt.payload };
       drawn.altSeed = alt.seed;
+      recipe.alt = alt.cell;
     }
   }
-  return { ...drawn, item };
+  return { ...drawn, item, recipe };
 }
 
 /**
@@ -603,6 +629,7 @@ export function composeIndiaPaper(spec, { seed, draw, chapters, pyqCellsFor = ()
       item: built.item, chapterId: chapter.id, chapterName: chapter.name,
       generator: built.generator, difficulty: built.difficulty, seed: built.seed, altSeed: built.altSeed || null,
       pyq: built.pyq, conversion: built.conversion || null,
+      recipe: built.recipe,
       marking: marking(section),
       payload: { ...built.payload, examItem: built.item }
     });
@@ -640,4 +667,133 @@ export function composeIndiaPaper(spec, { seed, draw, chapters, pyqCellsFor = ()
 
   const totalMarks = questions.reduce((n, q) => n + q.marking.correct, 0);
   return { spec, seed: (Number(seed) >>> 0) || 1, questions, units, composition, reducedPattern: reduced, totalMarks };
+}
+
+// ── Issuing a composed paper somewhere else ─────────────────────────────────
+// A device composes a paper to find out what the banks can supply, then sends
+// only the RECIPE of each item — which authored cell(s), asked for what — to
+// the server (server/platform/exams.js). The server draws its own questions
+// from those cells with seeds the device never learns and assembles each item
+// with exactly the functions above, so the paper a student sits and the key
+// it is marked against exist only there.
+
+const RECIPE_NEEDS = {
+  mcq: ['mcq'], 'single-correct': ['mcq'], 'numerical-value': ['numerical'], 'integer-00-99': ['integer99']
+};
+const SINGLE_ITEM = { mcq: 'mcq', numerical: 'numerical-value', integer99: 'integer-00-99' };
+
+const validCell = (cell, needs) => !!cell && typeof cell === 'object' && typeof cell.generator === 'string'
+  && Number.isInteger(cell.difficulty) && cell.difficulty >= 1 && cell.difficulty <= 4 && needs.includes(cell.need);
+
+/**
+ * Whether `recipe` is an item this blueprint section can hold. The mirror of
+ * buildItem's branch order: a section that sets case studies takes nothing
+ * else, an assertion-reason item needs a section that sets them, and so on.
+ */
+export function recipeFitsSection(section, recipe) {
+  if (!section || !recipe || typeof recipe !== 'object') return false;
+  const types = section.types || [section.type];
+  if (types.includes('case-study')) {
+    const marksList = section.caseStudyParts || [1, 1, 2];
+    return recipe.kind === 'case-study' && Array.isArray(recipe.parts) && recipe.parts.length === marksList.length
+      && recipe.parts.every((part, i) => validCell(part?.cell, ['written', 'any'])
+        && (part.alt == null || (marksList[i] >= 2 && validCell(part.alt, ['written', 'any']))));
+  }
+  if (recipe.kind === 'assertion-reason') {
+    return types.includes('assertion-reason') && Array.isArray(recipe.cells) && recipe.cells.length === 2
+      && recipe.cells.every(cell => validCell(cell, ['facts']));
+  }
+  for (const [type, needs] of Object.entries(RECIPE_NEEDS)) {
+    if (!types.includes(type)) continue;
+    return recipe.kind === 'single' && validCell(recipe.cell, needs) && recipe.alt == null;
+  }
+  if (types.includes('multi-correct')) {
+    return recipe.kind === 'multi-correct' && Array.isArray(recipe.cells) && recipe.cells.length === 2
+      && recipe.cells.every(cell => validCell(cell, ['factsNoFigure']));
+  }
+  if (types.includes('matrix-match')) {
+    return recipe.kind === 'matrix-match' && Array.isArray(recipe.cells) && recipe.cells.length === LIST_KEYS.length
+      && recipe.cells.every(cell => validCell(cell, ['factsNoFigure']));
+  }
+  return recipe.kind === 'single' && validCell(recipe.cell, ['written', 'any'])
+    && (recipe.alt == null || validCell(recipe.alt, ['written', 'any']));
+}
+
+/** Every authored cell a recipe draws from. */
+export function recipeCells(recipe) {
+  if (recipe?.kind === 'single') return [recipe.cell, ...(recipe.alt ? [recipe.alt] : [])];
+  if (recipe?.kind === 'case-study') return (recipe.parts || []).flatMap(part => [part.cell, ...(part.alt ? [part.alt] : [])]);
+  return [...(recipe?.cells || [])];
+}
+
+function issueCell(ctx, cell) {
+  for (let attempt = 0; attempt < MAX_DRAWS_PER_SLOT; attempt++) {
+    let q;
+    try { q = ctx.draw(cell.generator, cell.difficulty); } catch (err) { if (err?.bankMissing) throw err; continue; }
+    if (!q?.prompt) continue;
+    const shaped = shapeFor(q, cell.need, ctx.rng);
+    if (!shaped) continue;
+    const signature = `${cell.generator}|${String(q.prompt).replace(/\s+/g, ' ').trim()}`;
+    if (ctx.seen.has(signature)) continue;
+    ctx.seen.add(signature);
+    return {
+      payload: shaped.payload, generator: cell.generator, difficulty: q.difficulty || cell.difficulty,
+      seed: q.seed, pyq: !!ctx.isPyq?.(cell), conversion: shaped.conversion, cell, need: cell.need
+    };
+  }
+  return null;
+}
+
+/**
+ * Issue one item from its recipe. `ctx` is { rng, draw(generator, difficulty),
+ * seen, isPyq(cell) }: `draw` returns a freshly chosen full question and `seen`
+ * deduplicates prompts across the paper. Returns the same shape buildItem
+ * does, or null when these draws could not make the item (the caller retries).
+ */
+export function issueIndiaItem(section, recipe, ctx, { chapterName = '' } = {}) {
+  if (!recipeFitsSection(section, recipe)) return null;
+  const types = section.types || [section.type];
+  if (recipe.kind === 'case-study') {
+    const drawn = [];
+    for (const part of recipe.parts) {
+      const main = issueCell(ctx, part.cell);
+      if (!main) return null;
+      const alt = part.alt ? issueCell(ctx, part.alt) : null;
+      if (part.alt && !alt) return null;
+      drawn.push({ main, alt });
+    }
+    return assembleCaseStudy(chapterName, section.caseStudyParts || [1, 1, 2], drawn, recipe.choice === true);
+  }
+  if (recipe.kind === 'single') {
+    const drawn = issueCell(ctx, recipe.cell);
+    if (!drawn) return null;
+    if (recipe.alt) {
+      const alt = issueCell(ctx, recipe.alt);
+      if (!alt) return null;
+      drawn.payload = { ...drawn.payload, alt: alt.payload };
+    }
+    return { ...drawn, item: SINGLE_ITEM[recipe.cell.need] || types[0] || 'written' };
+  }
+  const draws = [];
+  for (const cell of recipe.cells) {
+    const drawn = issueCell(ctx, cell);
+    if (!drawn) return null;
+    draws.push(drawn);
+  }
+  if (recipe.kind === 'assertion-reason') return assembleAssertionReason(ctx, draws[0], draws[1]);
+  if (recipe.kind === 'multi-correct') return assembleMultiCorrect(ctx, draws[0], draws[1]);
+  return assembleMatrixMatch(ctx, draws);
+}
+
+/**
+ * The spec a device sends to have a composed paper issued: the blueprint
+ * selection and, per question in paper order, its section, its chapter and its
+ * recipe. No question text, answer, seed or mark travels in it.
+ */
+export function paperSpecOf(paper, { track, grade, variant = 'standard' }) {
+  return {
+    kind: 'india',
+    blueprint: { track, grade: Number(grade), variant },
+    slots: paper.questions.map(q => ({ section: String(q.section), chapter: q.chapterId, recipe: q.recipe }))
+  };
 }

@@ -27,6 +27,11 @@
 import { installBrowserEnv } from './backend-check.mjs';
 
 installBrowserEnv();
+// Papers are issued and marked by the server (owner decision 2026-10-10), so
+// the section that sits a paper runs against the real /v1 app, in-process, as
+// real verified accounts (support/online-authority.mjs).
+const { startOnlineAuthority } = await import('./support/online-authority.mjs');
+const online = await startOnlineAuthority({ label: 'india-pyq' });
 const { PYQ_RECORDS, buildPyqBank, pyqArchiveSnapshot, pyqGenerator } = await import('../src/engine/pyq/pyqArchive.js');
 const { PYQ_COVERAGE, PYQ_MANIFEST, PYQ_ABSENT_EXAMS, hasPyqGenerator, pyqCellsFor, pyqGeneratorId, pyqAbsenceFor } =
   await import('../src/engine/pyq/pyqCoverage.js');
@@ -247,18 +252,9 @@ ok(dotpointTarget && dotpointTarget.pyq === false, 'a dot-point request stays on
 // ── 7. Papers: a PYQ reaches a composed paper, and marks there ───────────────
 async function premiumProfile(spec) {
   const created = await dispatch('POST', '/profiles', spec);
-  const { cloudLinkRowId } = await import('../src/platform/cloudAccount.js');
-  const idb = await import('../src/local/idb.js');
-  const now = Date.now();
-  await idb.put('device', {
-    id: cloudLinkRowId(created.user.id), accountId: `acct-${created.user.id}`, role: 'student',
-    emailVerified: true, linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
-    entitlement: {
-      plan: 'premium', status: 'active', provider: 'web',
-      currentPeriodEnd: now + 30 * 86400000, offlineUntil: now + 7 * 86400000,
-      issuedAt: now, sourceVersion: 1
-    }
-  });
+  // A real, email-verified account holding a Premium snapshot: the free tier's
+  // one simulation a month is not what is under test here.
+  await online.link(created.user.id, { name: spec.name, entitlement: 'premium' });
   return created.user;
 }
 
@@ -304,6 +300,7 @@ for (const [label, profile] of [
     else answers[q.id] = q.mcqOptions?.length ? '0' : '1';
   }
   const result = await dispatchIndiaExam(user, 'POST', `/exams/${full.id}/submit`, { answers, ms: 60_000 });
+  eq(result.markedBy, 'server', `${label}: the sat paper is marked by the server`);
   const pyqRows = (result.detail || []).filter(row => row.sourceKind === 'reviewed-jee-pyq');
   ok(pyqRows.every(row => typeof row.awarded === 'number' && !Number.isNaN(row.awarded)),
     `${label}: every past-paper question in the sat paper received a mark`);
@@ -319,9 +316,10 @@ const archiveText = JSON.stringify(PYQ_RECORDS.map(r => ({ e: r.examId, s: r.pyq
 ok(!/jee-main/.test(archiveText), 'no record is labelled JEE Main');
 ok(pyqAbsenceFor('jee-main').reason.includes('candidate portal'), 'the JEE Main gap names the reason it exists');
 
+await online.close();
 const snapshot = pyqArchiveSnapshot();
 const summary = Object.entries(snapshot.byExam).map(([exam, n]) => `${n} ${PYQ_EXAMS[exam].label}`).join(', ');
 console.log(failures.length
   ? `INDIA PYQ: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `INDIA PYQ: PASS — ${pass}/${pass} checks — ${snapshot.records} source-cited previous-year questions (${summary}) across ${snapshot.chapters} chapters, every one provenance-complete, marked by the real marker and reachable in a composed paper.`);
+  : `INDIA PYQ: PASS — ${pass}/${pass} checks — ${snapshot.records} source-cited previous-year questions (${summary}) across ${snapshot.chapters} chapters, every one provenance-complete, marked by the real marker and reachable in a server-issued paper.`);
 process.exit(failures.length ? 1 : 0);

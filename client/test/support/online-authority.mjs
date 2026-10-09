@@ -119,7 +119,7 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
   let pinnedPid;                      // undefined = follow the selected profile
   let signedOut = false;
   let offline = false;
-  const traffic = { total: 0, issue: 0, bind: 0, prepare: 0, repeat: 0, seedsSent: 0, grade: 0, reveal: 0, recognize: 0, refusedOffline: 0 };
+  const traffic = { total: 0, issue: 0, bind: 0, prepare: 0, repeat: 0, seedsSent: 0, grade: 0, reveal: 0, recognize: 0, refusedOffline: 0, examCreate: 0, examSave: 0, examFinish: 0, examRead: 0 };
 
   const selectedPid = () => {
     try { return globalThis.localStorage?.getItem('pri-current-profile') || null; } catch { return null; }
@@ -167,6 +167,10 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
     else if (/^\/v1\/practice\/[^/]+\/submit$/.test(path)) traffic.grade += 1;
     else if (/^\/v1\/practice\/[^/]+\/reveal$/.test(path)) traffic.reveal += 1;
     else if (/^\/v1\/practice\/[^/]+\/recognize$/.test(path)) traffic.recognize += 1;
+    else if (path === '/v1/exams') traffic.examCreate += 1;
+    else if (/^\/v1\/exams\/[^/]+\/answers$/.test(path)) traffic.examSave += 1;
+    else if (/^\/v1\/exams\/[^/]+\/finish$/.test(path)) traffic.examFinish += 1;
+    else if (/^\/v1\/exams\/[^/]+$/.test(path)) traffic.examRead += 1;
     return response;
   };
   // Node has no document. The CSRF pair is attached above from the jar, so
@@ -248,6 +252,15 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
   async function answerKey(rowOrId) {
     const row = typeof rowOrId === 'string' ? await idb.get('questions', rowOrId) : rowOrId;
     assert.ok(row, 'answerKey() needs a stored question row');
+    // A question on a server-issued paper: the server's sealed paper holds it.
+    if (row.examServer) {
+      const local = await idb.get('exams', row.examId);
+      const paper = await examPaper(local);
+      const at = (local.questionIds || []).indexOf(row.id);
+      const q = paper.questions[at]?.payload;
+      assert.ok(q, `the server's sealed paper holds no question for ${row.id}`);
+      return q;
+    }
     if (!row.serverQuestionId) {
       // A legacy device row (a restored backup, an exam or a game question) still carries its own key.
       if (row.payload?.answer !== undefined || row.payload?.multipart) return row.payload;
@@ -256,6 +269,32 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
     const q = await sealedQuestion(row.serverQuestionId);
     assert.equal(q.prompt, row.payload.prompt, 'the server\'s sealed question is not the one on screen');
     return q;
+  }
+
+  /**
+   * The server's sealed copy of a paper (every question with its answer key
+   * and marking grid), read from its store. `exam` is the local exam row or
+   * its id. A test oracle: the product never reads this.
+   */
+  async function examPaper(examOrId) {
+    const local = typeof examOrId === 'string' ? await idb.get('exams', examOrId) : examOrId;
+    const serverId = local?.server?.examId;
+    assert.ok(serverId, 'examPaper() needs a server-issued paper');
+    const sealed = await app.db.get("SELECT response_json FROM idempotency_keys WHERE scope='exam-paper' AND key=?", [serverId]);
+    assert.ok(sealed, `the server holds no paper ${serverId}`);
+    return JSON.parse(sealed.response_json);
+  }
+  /** The server's stored result for a paper, or null while it is unmarked. */
+  async function examResult(examOrId) {
+    const local = typeof examOrId === 'string' ? await idb.get('exams', examOrId) : examOrId;
+    const stored = await app.db.get("SELECT response_json FROM idempotency_keys WHERE scope='exam-result' AND key=?", [local?.server?.examId || '']);
+    return stored ? JSON.parse(stored.response_json) : null;
+  }
+  /** The latest answer snapshot the server holds for a paper, or null. */
+  async function examSnapshot(examOrId) {
+    const local = typeof examOrId === 'string' ? await idb.get('exams', examOrId) : examOrId;
+    const stored = await app.db.get("SELECT response_json FROM idempotency_keys WHERE scope='exam-answers' AND key=?", [local?.server?.examId || '']);
+    return stored ? JSON.parse(stored.response_json) : null;
   }
 
   async function scoped(set, restore, fn) {
@@ -280,7 +319,7 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
 
   const authority = {
     app, origin: app.origin, db: app.db, traffic, reader,
-    link, setEntitlement, answerKey, sealedQuestion, resetRateLimits, close,
+    link, setEntitlement, answerKey, sealedQuestion, examPaper, examResult, examSnapshot, resetRateLimits, close,
     accountOf: pid => accounts.get(pid) || null,
     /** Pin the device session to `pid`'s account; `undefined` follows the selected profile again. */
     useSessionOf(pid) { pinnedPid = pid; },

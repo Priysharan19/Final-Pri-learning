@@ -65,10 +65,10 @@ jobs:
           grep -Fq 'Pri Reason V2 curriculum integration gate: PASS' suites.log
           grep -Fq 'INDIA NATIVE BANKS: PASS — 313/313 checks — 19 chapters rewired onto 20 NCERT-native generators' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 419/419 checks' suites.log
-          grep -Fq 'INDIA EXAM FLOW: PASS — 129/129 checks' suites.log
-          grep -Fq 'EXAM SESSION: PASS — 88/88 checks' suites.log
+          grep -Fq 'INDIA EXAM FLOW: PASS — 163/163 checks' suites.log
+          grep -Fq 'EXAM SESSION: PASS — 169/169 checks' suites.log
           grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
-          grep -Fq 'INDIA PYQ: PASS — 1079/1079 checks — 45 source-cited previous-year questions' suites.log
+          grep -Fq 'INDIA PYQ: PASS — 1082/1082 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
           grep -Fq 'INDIA ADAPTIVE: PASS — 305/305 checks' suites.log
           grep -Fq 'ADAPTIVE SIMULATION: PASS — 77/77 checks' suites.log
@@ -104,11 +104,11 @@ jobs:
           grep -Eq 'INSTALL BUDGET: PASS — 48/48 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under' suites.log
           grep -Fq 'nothing emitted left uncovered.' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
-          grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 59/59 checks' suites.log
+          grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 61/61 checks' suites.log
           grep -Fq 'JEE ADVANCED GATE: PASS — 27/27 checks' suites.log
           grep -Fq 'RESTORE FIDELITY: PASS — 45/45 checks' suites.log
           grep -Fq 'STREAK CALENDAR: PASS — 19/19 checks' suites.log
-          grep -Fq 'BAD INPUT: PASS — 38/38 checks' suites.log
+          grep -Fq 'BAD INPUT: PASS — 44/44 checks' suites.log
           grep -Fq 'CLOUD SYNC ACK: PASS — 44/44 checks' suites.log
           grep -Fq 'PASS — §09 submission lifecycle: 16 groups' suites.log
           grep -Fq 'PASS — §22 submission sync durability: 13 groups' suites.log
@@ -306,6 +306,11 @@ jobs:
           node server/test/security-acceptance-check.mjs
           node server/test/abuse-limits-check.mjs
           node server/test/security-production-mode-check.mjs
+      - name: Server-authoritative examination papers (SQLite)
+        run: |
+          set -o pipefail
+          node server/test/exam-authority-check.mjs 2>&1 | tee exam-authority.log
+          grep -Fq 'EXAM AUTHORITY: PASS — 146/146 checks' exam-authority.log
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
       - name: Supabase migrations are self-contained transactions (supabase db push)
@@ -327,6 +332,7 @@ jobs:
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
+          grep -Fq '✓ exam-authority-check.mjs' platform-postgres.log
           grep -Fq '✓ method-progress-http-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-seed-reissue-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-server-question-check.mjs' platform-postgres.log
