@@ -4,8 +4,10 @@
 // tutor-help-check.mjs proves the server contract with the router mounted
 // alone and the model call stubbed in-process; tour-ai-tutor.js proves the
 // browser wiring with /v1 intercepted. Nothing proved the two halves meet. This
-// suite runs the shipped local backend (client/src, on the in-memory IndexedDB
-// the client suites use) against the whole shipped /v1 app with
+// suite runs an authenticated student and the shipped local backend against
+// the whole shipped /v1 app with an actual server-issued India question. The
+// public question deliberately omits secret worked-solution steps; the Tutor
+// must be grounded on the trusted server, not on a leaked client answer key.
 // PRI_FEATURE_TUTOR=1, and the provider endpoint pointed at a local fake of the
 // Responses API. No model, no key, no network beyond 127.0.0.1, no spend.
 //
@@ -107,7 +109,7 @@ const { loginCloudAccount } = await import('../../client/src/platform/cloudAccou
 const { syncNow } = await import('../../client/src/platform/syncWorker.js');
 await loadAllBanks();
 
-const YEAR10 = subtopicsForYear(10).map(t => t.id);
+const YEAR10 = ['c8-linear-equations-both-sides'];
 let turn = 0;
 
 /** A practice question the tutor can be grounded in: verified steps and a hint. */
@@ -115,13 +117,18 @@ async function tutorable() {
   for (let i = 0; i < 80; i++) {
     const s = await api.post('/practice/next', { mode: 'topic', subtopic: YEAR10[turn++ % YEAR10.length], resume: false });
     const q = (await idb.get('questions', s.question.id)).payload;
-    if (Array.isArray(q.steps) && q.steps.length && Array.isArray(q.hints) && q.hints.length) {
+    if (Array.isArray(q.hints) && q.hints.length) {
       const before = providerCalls.length;
       nextReply = null;
       const first = await api.post(`/practice/${s.question.id}/tutor`, { level: 1, locale: 'en' });
       // Some questions are refused upstream as ungrounded (too long, not
       // maths): those fall back without a model call. Keep looking.
-      if (first.source === 'tutor') return { id: s.question.id, q, first, calls: providerCalls.length - before };
+      // A model that never receives authorised grounding has no right to
+      // claim premium tutoring; the old all-local fixture could pass by
+      // reading q.steps, but this public issued question has none.
+      c.eq(first.source, 'tutor',
+        'a real server-issued student question must reach server-grounded tutor help');
+      return { id: s.question.id, q, first, calls: providerCalls.length - before };
     }
     await api.post(`/practice/${s.question.id}/discard`, {}).catch(() => {});
   }
@@ -133,7 +140,7 @@ async function fallsBackWith(code) {
   for (let i = 0; i < 80; i++) {
     const s = await api.post('/practice/next', { mode: 'topic', subtopic: YEAR10[turn++ % YEAR10.length], resume: false });
     const q = (await idb.get('questions', s.question.id)).payload;
-    if (Array.isArray(q.steps) && q.steps.length && Array.isArray(q.hints) && q.hints.length) {
+    if (Array.isArray(q.hints) && q.hints.length) {
       const first = await api.post(`/practice/${s.question.id}/tutor`, { level: 1, locale: 'en' });
       if (first.source === 'tutor') throw new Error('the provider answered while it was meant to be unreachable');
       if (first.code === code) return { id: s.question.id, q, first };
@@ -154,7 +161,7 @@ try {
   const accountId = reg.account.id;
   c.ok((await verifyEmail(app, accountId)).status === 200, 'its email is verified');
 
-  const me = (await api.post('/profiles', { name, year: 10 })).user;
+  const me = (await api.post('/profiles', { name, year: 8, course: 'in', indiaTrack: 'cbse' })).user;
   await loginCloudAccount(me.id, { email, password });
   await syncNow(me.id);
 
