@@ -1777,6 +1777,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               )}
               {inkAccountBlocked && (
                 <div className="ink-account-recovery" data-ink-account-recovery role="group" aria-label={inkRecoveryCopy.action}>
+                  {/* The generic reader sentence is hidden while an account
+                      action is pending (it carries an unverified save claim),
+                      so the blocker itself is named here. */}
+                  {inkRecoveryCopy.blocker[inkReaderState?.blocker] && (
+                    <p data-ink-blocker-reason={inkReaderState.blocker}>{inkRecoveryCopy.blocker[inkReaderState.blocker]}</p>
+                  )}
                   <p role="status" aria-live="polite">{inkRecoveryCopy.detail}</p>
                   {saveState === 'failed' && (
                     <button type="button" className="btn btn-secondary btn-sm" data-ink-save-retry
