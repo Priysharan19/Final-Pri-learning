@@ -158,8 +158,19 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     // letting the page wait on the (slow) log read.
     if (tick) { for (let k = 0; k < 4; k++) { execSync('sleep 0.5'); tick(); } } else execSync('sleep 2');
     if (!duringDone && Date.now() - t0 >= duringAfterMs) { duringDone = true; during(); }
-    const log = run('xcrun', ['simctl', 'spawn', udid, 'log', 'show', '--start', started,
-      '--predicate', 'eventMessage CONTAINS "PRIJOURNEY"', '--style', 'compact']);
+    // One read is bounded: on a loaded machine `log show` inside a simulator
+    // has hung for many minutes, and an unbounded read then hangs the whole
+    // journey with nothing reported. A read that does not come back is not a
+    // result — the next pass reads again, and a phase whose summary is never
+    // read is reported "not reported" and fails the journey.
+    let log;
+    try {
+      log = run('xcrun', ['simctl', 'spawn', udid, 'log', 'show', '--start', started,
+        '--predicate', 'eventMessage CONTAINS "PRIJOURNEY"', '--style', 'compact'], { timeout: 90_000, killSignal: 'SIGKILL' });
+    } catch (e) {
+      console.log(`  (log read ${i + 1} of ${phase} did not come back: ${String(e.code || e.signal || e.message).slice(0, 60)})`);
+      continue;
+    }
     lines = log.split('\n').filter(l => l.includes('PRIJOURNEY') && !l.includes("'log'")).map(l => l.slice(l.indexOf('PRIJOURNEY')));
     // Only this launch: everything after its own "started <phase>" line.
     const start = lines.lastIndexOf(`PRIJOURNEY started ${phase}`);
