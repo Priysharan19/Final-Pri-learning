@@ -76,7 +76,16 @@ const { loadAllBanks } = await import('../src/engine/generators/index.js');
 await loadAllBanks();
 
 const call = (method, path, body) => dispatch(method, path, body);
-await call('POST', '/profiles', { name: 'Aarav', year: 10, course: 'in', indiaTrack: 'cbse' });
+// A timed game is marked answer by answer by the server, so it starts only for
+// a signed-in account that can reach it. The rounds below are dealt by the real
+// in-process server to a real linked account.
+const { startOnlineAuthority } = await import('./support/online-authority.mjs');
+const online = await startOnlineAuthority({ label: 'india-native-surfaces' });
+const refusedWith = async run => { try { await run(); return null; } catch (e) { return e?.code || String(e?.message); } };
+const aarav = (await call('POST', '/profiles', { name: 'Aarav', year: 10, course: 'in', indiaTrack: 'cbse' })).user;
+eq(await refusedWith(() => call('POST', '/rush/start', {})), 'SIGN_IN_TO_CHECK', 'signed out, Rapid Fire does not start');
+eq(await refusedWith(() => call('POST', '/match/start', { rival: 'rookie' })), 'SIGN_IN_TO_CHECK', 'and neither does Match');
+await online.link(aarav.id, { name: 'Aarav' });
 
 const rush = await call('POST', '/rush/start', {});
 eq(rush.questions.length, 20, 'Rapid Fire still deals a full round');
@@ -108,11 +117,14 @@ ok(nswOnly.length > 0, 'the NSW scope does contain subtopics India never declare
 // An Australian profile must still get the Australian scope — this is a pivot,
 // not a deletion, and those courses still ship.
 await resetStorage();
-await call('POST', '/profiles', { name: 'Mia', year: 10, course: 'nsw', pathway: 'advanced' });
+const mia = (await call('POST', '/profiles', { name: 'Mia', year: 10, course: 'nsw', pathway: 'advanced' })).user;
+await online.link(mia.id, { name: 'Mia' });
 const auRush = await call('POST', '/rush/start', {});
 const auIds = [...new Set(auRush.questions.map(q => q.subtopic))];
 ok(auIds.some(id => !declared.has(id)),
   'an Australian profile still draws from the Australian scope, so this narrowed nothing');
+
+await online.close();
 
 console.log(failures.length
   ? `INDIA NATIVE SURFACES: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
