@@ -9,7 +9,8 @@ export function photoEligibleForGrading({
   if (!photo || ocrPhase !== 'done' || unreadPages) return false;
   // Until the server accepts every page in a single bound receipt, fail shut.
   if (pdfPageCount > 1) return false;
-  if (reattachRequired && !photo) return false;
+  // A recovered Photo attempt that still needs its image re-attached has no
+  // `photo`, so the first check above already refuses it.
   return true;
 }
 
