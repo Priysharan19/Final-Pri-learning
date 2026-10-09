@@ -1263,7 +1263,15 @@ async function run() {
     await online.withSessionOf(grace.id, () => rejects('and it is not checked under that session',
       POST(`/practice/${misfiled.question.id}/submit`, { answer: '1', ms: 3000 }), { status: 401, code: 'SIGN_IN_TO_CHECK' }));
     ok('the wrong account did not take the token up', !(await idb.get('questions', misfiled.question.id)).serverQuestionId);
-    await POST(`/practice/${misfiled.question.id}/discard`, {});
+    // …on the server either: back under her own session the SAME question is
+    // bound and marked. (The device used to send the bind first and compare
+    // accounts afterwards, which spent the prepared question on the other
+    // account and left her work unmarkable.)
+    const ownAgain = await POST(`/practice/${misfiled.question.id}/submit`, { answer: '1', ms: 3000, submissionId: `misfiled-${Date.now()}` })
+      .then(value => ({ value }), error => ({ error }));
+    eq('under her own session the same prepared question is bound and marked by the server',
+      [ownAgain.error?.code ?? null, ownAgain.value?.authoritative, !!(await idb.get('questions', misfiled.question.id)).serverQuestionId], [null, true, true]);
+    if (!(await idb.get('questions', misfiled.question.id)).answered) await POST(`/practice/${misfiled.question.id}/discard`, {});
 
     // 6 · A submission with no stable key cannot be graded: the server grades
     // under the key, so there is nothing to recover it by.
@@ -2014,9 +2022,18 @@ async function run() {
         ok('— as a new question the server issued again, tied to the one it repeats',
           typeof retriedRow.serverQuestionId === 'string' && retriedRow.serverQuestionId !== row.serverQuestionId && retriedRow.repeatOf === item.id, show([retriedRow.serverQuestionId, retriedRow.repeatOf]));
         const retried = await answerKeyOf(again.value.question.id);
+        const meBefore = (await GET('/me')).user;
+        const ratingsBefore = JSON.stringify(rawRows().ratings.filter(r => r.pid === meBefore.id).map(r => [r.key, r.rating, r.attempts]).sort());
         const marked = await POST(`/practice/${again.value.question.id}/submit`, { answer: canonicalInput(retried) ?? '0', ms: 2000 })
           .then(value => ({ value }), error => ({ error }));
         ok('the retried question can be checked', !!marked.value, `refused ${marked.error?.status} ${marked.error?.code}: ${marked.error?.message}`);
+        // The student has already been shown this question's solution: getting
+        // it right again is history, not progress.
+        if (marked.value?.resolved) {
+          const meAfter = (await GET('/me')).user;
+          eq('a repeat earns no XP', [marked.value.xp, meAfter.xp], [0, meBefore.xp]);
+          eq('— and moves no rating', JSON.stringify(rawRows().ratings.filter(r => r.pid === meAfter.id).map(r => [r.key, r.rating, r.attempts]).sort()), ratingsBefore);
+        }
         eq('— by the server', marked.value?.authoritative, true);
         const stored = await idb.get('questions', again.value.question.id);
         const receipt = stored.serverReceipt || stored.lastTry?.serverReceipt;

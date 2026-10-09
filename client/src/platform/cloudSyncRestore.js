@@ -166,9 +166,12 @@ async function applyPracticeEvent(pid, profile, event) {
   const isGame = GAME_MODES.has(mode);
 
   const ops = [{ type: 'add', store: 'attempts', value: attempt }];
-  let xp = isGame ? (correct ? 6 : 0) : xpFor(attempt.difficulty, correct, 0, effHints);
+  // A repeat of content the account had already been shown the solution of is
+  // history, not progress: the server flags it and it earns nothing here.
+  const isRepeat = p.repeat === true;
+  let xp = isRepeat ? 0 : isGame ? (correct ? 6 : 0) : xpFor(attempt.difficulty, correct, 0, effHints);
 
-  if (!isGame && owner !== 'custom') {
+  if (!isGame && !isRepeat && owner !== 'custom') {
     const st = (await get('ratings', `${pid}:${owner}`).catch(() => null))
       || { key: `${pid}:${owner}`, pid, subtopic: owner, rating: START_RATING, attempts: 0, correct: 0, last_at: null, dp: {}, traps: {}, recent: [] };
     const ratingNext = {

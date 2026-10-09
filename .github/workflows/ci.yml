@@ -263,11 +263,13 @@ jobs:
           node server/test/method-progress-http-check.mjs 2>&1 | tee practice-http.log
           node server/test/practice-seed-reissue-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-server-question-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/practice-repeat-credit-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/india-bank-issue-coverage-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1143/1143 checks' practice-http.log
           grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
-          grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 29/29 checks' practice-http.log
+          grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 34/34 checks' practice-http.log
+          grep -Fq 'REPEAT CREDIT: PASS — 12/12 checks' practice-http.log
       - name: Account, origin, CMS and classroom contracts
         run: |
           node server/test/account-deletion-reauth-check.mjs
@@ -328,7 +330,7 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 42/42 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 43/43 suites' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
@@ -336,6 +338,7 @@ jobs:
           grep -Fq '✓ method-progress-http-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-seed-reissue-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-server-question-check.mjs' platform-postgres.log
+          grep -Fq '✓ practice-repeat-credit-check.mjs' platform-postgres.log
           grep -Fq '✓ security-acceptance-check.mjs' platform-postgres.log
           grep -Fq '✓ abuse-limits-check.mjs' platform-postgres.log
           grep -Fq '✓ google-billing-check.mjs' platform-postgres.log

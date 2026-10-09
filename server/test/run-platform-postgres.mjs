@@ -47,6 +47,7 @@ export const ENGINE_SUITES = [
   // The server chooses the seed and a prepared question is bound once by one
   // account: the one-account claim and the sealed copy must hold on Postgres.
   'practice-server-question-check.mjs',
+  'practice-repeat-credit-check.mjs',
   'account-lifecycle-contract-check.mjs',
   'account-lifecycle-journey-check.mjs',
   'account-deletion-reauth-check.mjs',
