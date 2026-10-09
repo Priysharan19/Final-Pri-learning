@@ -99,3 +99,8 @@ try {
   }
 }
 console.log('ONLINE MARKING AUTHORITY PASS — ' + count + ' checks against a real Pri ' + h.engine + ' server.');
+
+// All 80 transaction-backed adversarial cases are mandatory whenever the
+// online authority suite is invoked; keep the test-owned provider-independent
+// replay, ownership and progress checks alongside the 32 issuer checks.
+await import('./online-marking-adversarial-local.mjs');
