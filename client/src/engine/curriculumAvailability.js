@@ -34,3 +34,17 @@ export function practiceTargetAvailable(topic, dotpointOrdinal = null) {
   if (!Number.isInteger(index) || index < 0) return false;
   return dotpointAvailable(topic?.dotpoints?.[index]);
 }
+
+/**
+ * The difficulty buttons a selector may show for a chapter or dot point: the
+ * levels the track allows, narrowed to those the curriculum response says a
+ * question really exists at for that selection (`requestable`). A selection
+ * that carries no such list — nothing chosen yet, or a curriculum that does not
+ * publish one — keeps the track's levels, and the practice reply then states
+ * any difference between the level asked for and the level served.
+ */
+export function selectableDifficulties(trackLevels, selection) {
+  const levels = Array.isArray(trackLevels) ? trackLevels : [];
+  const real = selection && typeof selection === 'object' && Array.isArray(selection.requestable) ? selection.requestable : null;
+  return real ? levels.filter(d => real.includes(d)) : [...levels];
+}

@@ -293,6 +293,33 @@ export function resolveIndiaTarget(chapter, {
 }
 
 /**
+ * The difficulty rungs a student can be given EXACTLY for a selection — a
+ * chapter, or one of its dot points — on a track. A rung is listed only when an
+ * authored form sits at that rung inside the track's window, so a surface that
+ * offers these and nothing else can never have "D4" answered with a D3
+ * question (issue #408). resolveIndiaTarget still serves the nearest form to a
+ * request outside this list — an old link, a teacher's task — and the practice
+ * reply then names both the rung asked for and the rung served.
+ *
+ * A chapter-level request is answered through one of the chapter's dot points
+ * (the practice route picks one authored at the rung), so its rungs are the
+ * union of its dot points'; a chapter with no dot points is asked directly.
+ */
+export function indiaRequestableDifficulties(chapter, { dotpoint = null, track: rawTrack = 'cbse', grade = indiaChapterGrade(chapter) || 12 } = {}) {
+  if (!chapter) return [];
+  const { floor, ceiling } = indiaDifficultyWindow(rawTrack, grade);
+  const ordinal = indiaDotpointIndex(chapter, dotpoint);
+  const ordinals = ordinal != null ? [ordinal] : (chapter.dotpoints || []).length ? chapter.dotpoints.map((_, i) => i) : [null];
+  const exact = (d, dp) => {
+    const t = resolveIndiaTarget(chapter, { dotpoint: dp, difficulty: d, track: rawTrack, grade, random: () => 0 });
+    return !!t && t.windowed !== false && t.difficulty === d;
+  };
+  const out = [];
+  for (let d = floor; d <= ceiling; d++) if (ordinals.some(dp => exact(d, dp))) out.push(d);
+  return out;
+}
+
+/**
  * Chapters near `chapter` whose previous-year archive can actually serve a
  * "past papers only" request for this track and class — what the empty state
  * offers instead of a dead end. Only chapters the student's own practice scope
