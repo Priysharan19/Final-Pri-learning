@@ -24,7 +24,6 @@ import { handwrite, readLines, turnOnServerReading } from './fakeServerReader.js
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
 const TOPIC = 'y7-equations';
-const SURELY_WRONG = '-987654';
 const MAX_QUESTIONS = 8;
 
 const SUBMIT = { name: 'Submit Answer' };

@@ -17,7 +17,7 @@ import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import { IN_CURRICULUM, IN_CHAPTER_BY_ID } from '../engine/curriculum-in.js';
-import { NOTES_GRADES, gradeOfChapter, loadNotesForGrade, notesPracticeHref, notesSearchText } from '../notes/notesIndex.js';
+import { NOTES_GRADES, gradeOfChapter, loadNotesForGrade, notesSearchText } from '../notes/notesIndex.js';
 import { studyHref, selectedStudyContext, selectedStudyPracticeHref } from '../lib/studyJourney.js';
 import '../notes/Notes.css';
 import { notesBookmarkKey } from './notesBookmarkScope.js';

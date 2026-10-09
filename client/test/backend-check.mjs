@@ -1294,7 +1294,6 @@ async function run() {
     const { getRating, putRating } = await import(`${SRC}local/store.js`);
     const { misconceptionKey, START_RATING, TRAP_ACTIVE_AT, activeTraps } = await import(`${SRC}engine/adaptive.js`);
     const { misconceptionIdForTrap, mappedIdForTrap, AUTHORED_TRAP_SHAPES } = await import(`${SRC}engine/misconceptions.js`);
-    const { cloudLinkRowId } = await import(`${SRC}platform/cloudAccount.js`);
 
     const noether = (await POST('/profiles', { name: 'Emmy Noether', year: 10 })).user;
     eq('a fresh learner is selected for this group', (await GET('/me')).user.id, noether.id);

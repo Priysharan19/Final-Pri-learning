@@ -51,7 +51,6 @@ const { api } = await import('../src/api.js');
 const idb = await import('../src/local/idb.js');
 const { checkAnswer } = await import('../src/engine/checker.js');
 const { loadAllBanks } = await import('../src/engine/generators/index.js');
-const { cloudLinkRowId } = await import('../src/platform/cloudAccount.js');
 const { subtopicsForYear } = await import('../src/engine/curriculum.js');
 const YEAR10 = subtopicsForYear(10).map(t => t.id);
 let topicTurn = 0;

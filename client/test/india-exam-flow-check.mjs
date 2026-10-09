@@ -12,7 +12,7 @@
 // JEE Main's +4/−1/0 with an unanswered question scoring zero, and JEE
 // Advanced's partial credit on multiple-correct questions.
 // ─────────────────────────────────────────────────────────────────────────────
-import { installBrowserEnv, resetStorage } from './backend-check.mjs';
+import { installBrowserEnv } from './backend-check.mjs';
 
 installBrowserEnv();
 // Owner decision 2026-10-10: examination papers are issued and marked by the

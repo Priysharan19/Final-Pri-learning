@@ -55,7 +55,6 @@ const { multipartForYear } = await import('../../client/src/engine/generators/mu
 const { FREE_EXAM_ALLOWANCE } = await import('../../client/src/platform/entitlements.js');
 const { contentHashOf } = await import('../../client/src/engine/contentIdentity.js');
 const { MAX_OPEN_PAPERS } = await import('../platform/exams.js');
-const { solveLinearPrompt } = await import('./support/linear-equation.mjs');
 
 const engine = requestedEngine();
 

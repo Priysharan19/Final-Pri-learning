@@ -450,7 +450,6 @@ async function certifyIssuedExams(seeds, online) {
   const { dispatch } = await import('../src/local/backend.js');
   const { dispatchIndiaExam } = await import('../src/local/indiaExamBackend.js');
   const idb = await import('../src/local/idb.js');
-  const { cloudLinkRowId } = await import('../src/platform/cloudAccount.js');
   const rows = [];
   for (const sel of V1_EXAMS) {
     const spec = indiaExamPaperSpec(sel);
