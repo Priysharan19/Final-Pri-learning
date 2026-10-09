@@ -64,21 +64,94 @@ function dimension(c) {
   return kind ? kind + power : null;
 }
 
-// the trailing unit of an answer: letters, ², ³, ^2, /, ° and spaces after the number
-const TRAIL = /(?:\d|\)|π|pi)\s*((?:square|sq\.?|cubic|cu\.?)?\s*[a-zA-Z°][a-zA-Z°.\s]*(?:\^?[23]|[²³])?(?:\s*(?:\/|per)\s*[a-zA-Z]+\.?(?:\^?[23]|[²³])?)?)\s*$/;
+// The trailing unit of an answer: letters, ², ³, ^2, /, ° and spaces after the
+// number. Until this was a hand-written reader it was the pattern
+//
+//   /(?:\d|\)|π|pi)\s*((?:square|sq\.?|cubic|cu\.?)?\s*[a-zA-Z°][a-zA-Z°.\s]*
+//     (?:\^?[23]|[²³])?(?:\s*(?:\/|per)\s*[a-zA-Z]+\.?(?:\^?[23]|[²³])?)?)\s*$/
+//
+// in which five runs can each take the same space, so a long run of spaces
+// that is not followed by a unit was re-read every possible way. `trailingUnit`
+// returns what that pattern's match returned — where the match starts, and the
+// unit text it captured — by reading each character once.
+//
+// What the pattern accepts after its lead (a digit, ")", "π" or "pi") is:
+// whitespace, then a unit that begins with a letter or "°" and runs on through
+// letters, "°", full stops and whitespace; then optionally a power; then
+// optionally a rate — "/" or "per", letters, one full stop, a power — and
+// finally whitespace to the end. The "square"/"cubic" prefix is itself letters,
+// so it never changes what is accepted or captured.
+const isSpace = (ch) => /\s/.test(ch);
+const isLetter = (ch) => /[a-zA-Z]/.test(ch);
+const isUnitStart = (ch) => /[a-zA-Z°]/.test(ch);
+const isUnitBody = (ch) => /[a-zA-Z°.\s]/.test(ch);
+const skipSpace = (s, at) => { while (at < s.length && isSpace(s[at])) at++; return at; };
+/** Where a power written at `at` ends ("^2", "3", "²"), or `at` if there is none. */
+function powerEnd(s, at) {
+  const c = s[at];
+  if (c === '²' || c === '³' || c === '2' || c === '3') return at + 1;
+  if (c === '^' && (s[at + 1] === '2' || s[at + 1] === '3')) return at + 2;
+  return at;
+}
+/** The end of a rate's denominator starting at `at`, or -1 if it does not run to the end of the answer. */
+function rateEnd(s, at) {
+  const from = skipSpace(s, at);
+  let end = from;
+  while (end < s.length && isLetter(s[end])) end++;
+  if (end === from) return -1;
+  if (s[end] === '.') end++;
+  end = powerEnd(s, end);
+  return skipSpace(s, end) === s.length ? end : -1;
+}
+/** The end of the unit whose body stops at `at` (the first character a body cannot hold), or -1. */
+function unitEnd(s, at) {
+  if (at === s.length) return at;                    // the body ran to the end, trailing spaces included
+  if (s[at] === '/') return rateEnd(s, at + 1);
+  const afterPower = powerEnd(s, at);
+  if (afterPower === at) return -1;
+  const next = skipSpace(s, afterPower);
+  if (next === s.length) return afterPower;
+  if (s[next] === '/') return rateEnd(s, next + 1);
+  if (s.startsWith('per', next)) return rateEnd(s, next + 3);
+  return -1;
+}
+/** `{ index, unit }` for the leftmost lead a unit follows to the end of the answer, or null. */
+export function trailingUnit(s) {
+  let bodyFrom = -1, bodyStop = -1;                  // the last unit body scanned: [bodyFrom, bodyStop)
+  let endFor = -2, end = -1;                         // unitEnd() of the last body stop asked about
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    let after;
+    if ((c >= '0' && c <= '9') || c === ')' || c === 'π') after = i + 1;
+    else if (c === 'p' && s[i + 1] === 'i') after = i + 2;
+    else continue;
+    const start = skipSpace(s, after);
+    if (start === s.length) return null;             // only whitespace is left: no later lead can match either
+    if (!isUnitStart(s[start])) continue;
+    if (start < bodyFrom || start >= bodyStop) {
+      bodyFrom = start;
+      bodyStop = start + 1;
+      while (bodyStop < s.length && isUnitBody(s[bodyStop])) bodyStop++;
+    }
+    if (endFor !== bodyStop) { endFor = bodyStop; end = unitEnd(s, bodyStop); }
+    if (end >= 0) return { index: i, unit: s.slice(start, end) };
+  }
+  return null;
+}
 
 /** The canonical unit written after an answer's number, or null if none or unknown. */
 export function writtenUnit(answerText) {
-  const m = String(answerText ?? '').trim().match(TRAIL);
-  return m ? canonicalUnit(m[1]) : null;
+  const m = trailingUnit(String(answerText ?? '').trim());
+  return m ? canonicalUnit(m.unit) : null;
 }
 
 /** The answer with a trailing unit this module reads removed ("12 metres" → "12"). */
 export function withoutUnit(answerText) {
   const s = String(answerText ?? '').trim();
-  const m = s.match(TRAIL);
-  if (!m || !canonicalUnit(m[1])) return s;
-  return s.slice(0, s.length - m[0].length + m[0].indexOf(m[1])).trim();
+  const m = trailingUnit(s);
+  if (!m || !canonicalUnit(m.unit)) return s;
+  // the first place the unit text appears at or after the lead, as before
+  return s.slice(0, s.indexOf(m.unit, m.index)).trim();
 }
 
 /**

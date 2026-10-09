@@ -6,7 +6,7 @@ import { resolveHomeRecommendation, actionOpenable } from '../home/recommendatio
 import { cacheAssignments, cachedAssignments, loadSavedFilters, saveFilters } from '../home/homeCache.js';
 import Icon from '../components/Icon.jsx';
 import { useApp } from '../App.jsx';
-import { dotpointAvailable, practiceTargetAvailable, topicAvailability } from '../engine/curriculumAvailability.js';
+import { dotpointAvailable, practiceTargetAvailable, selectableDifficulties, topicAvailability } from '../engine/curriculumAvailability.js';
 import { dayKey, formatWeekday } from '../lib/locale.js';
 import { useT, useTx } from '../i18n/index.js';
 import { practiceDifficulties, practiceHref } from '../lib/practiceLinks.js';
@@ -141,11 +141,10 @@ export default function Home() {
   // The difficulty buttons this context may offer: never D4 to a CBSE student
   // (CBSE practice is held to D1–D3), and never above the section's ceiling. A
   // remembered D4 from an earlier filter is dropped rather than sent.
-  const offeredDifficulties = practiceDifficulties({
+  const trackDifficulties = practiceDifficulties({
     course: user.course, track: section?.track || (user.course === 'in' ? user.indiaTrack || 'cbse' : null),
     grade: section?.year ?? user.year, ceiling: section?.difficultyCeiling || null
   });
-  const chosenDifficulty = difficulty != null && offeredDifficulties.includes(difficulty) ? difficulty : null;
 
   // Indian students type Hindi words in Latin letters and English words in
   // half: "trikonmiti", "trig", "quadratic", "समुच्चय". The matcher folds all
@@ -171,6 +170,14 @@ export default function Home() {
   }, [subtopic, section]);
 
   const selectedDotpoint = dotpoint != null ? selSub?.dotpoints?.[dotpoint] || null : null;
+  // Only the levels a question really exists at for THIS chapter / dot point
+  // are offered (issue #408): a dot point authored only at D3 does not show a
+  // D4 button, so "Extension" can never be answered with an easier question.
+  // The curriculum response names those levels per selection (`requestable`);
+  // a level the track allows but this selection lacks is listed as unavailable.
+  const offeredDifficulties = selectableDifficulties(trackDifficulties, selectedDotpoint || selSub);
+  const missingDifficulties = trackDifficulties.filter(d => !offeredDifficulties.includes(d));
+  const chosenDifficulty = difficulty != null && offeredDifficulties.includes(difficulty) ? difficulty : null;
   // Notes are published only when the existing reviewed chapter actually has
   // content. The grade bundle is loaded on demand; a syllabus listing alone
   // must never become an empty or invented "Study Notes" promise.
@@ -422,12 +429,19 @@ export default function Home() {
                     <div className="gen-pane-title">{t('home.pickDifficulty')}</div>
                     <div className="gen-opts">
                       {offeredDifficulties.map(d => (
-                        <button key={d} className={`gen-opt ${difficulty === d ? 'on' : ''}`} aria-pressed={difficulty === d}
-                          onClick={() => setDifficulty(difficulty === d ? null : d)}>
+                        <button key={d} className={`gen-opt ${chosenDifficulty === d ? 'on' : ''}`} aria-pressed={chosenDifficulty === d}
+                          onClick={() => setDifficulty(chosenDifficulty === d ? null : d)}>
                           {`D${d}`} · {t(DIFF_KEYS[d])}
                         </button>
                       ))}
                     </div>
+                    {selSub && missingDifficulties.length > 0 && (
+                      <p className="muted" data-difficulty-unavailable style={{ margin: '10px 0 0' }}>
+                        {t(selectedDotpoint ? 'home.difficultyMissingDotpoint' : 'home.difficultyMissingTopic', {
+                          levels: missingDifficulties.map(d => `D${d} · ${t(DIFF_KEYS[d])}`).join(', ')
+                        })}
+                      </p>
+                    )}
                   </>
                 )}
               </div>

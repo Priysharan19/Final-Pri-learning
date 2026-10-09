@@ -64,18 +64,26 @@ function ok(name, cond, detail = '') {
 }
 const eq = (name, actual, expected) => ok(name, show(actual) === show(expected), `expected ${show(expected)}, got ${show(actual)}`);
 
-// ── Network: offline until a test says otherwise ─────────────────────────────
-globalThis.__PRI_CLOUD_ORIGIN__ = 'https://pri.example.test';
-let online = false;
+// ── Network ──────────────────────────────────────────────────────────────────
+// Marking is online-only and server-authoritative (owner decision 2026-10-10),
+// so the real /v1 app runs behind this suite (support/online-authority.mjs) and
+// every practice mark below is the server's.
+//
+// One leg still needs a server that misbehaves on purpose: a sync endpoint
+// that replays the same remote events on every pull, including counterfeits.
+// The real server cannot be asked to do that, so while `syncStandIn` is on —
+// and only then, and only for /v1/sync/* — this stand-in answers instead. It
+// never sees a question or an answer and never produces a mark. It is
+// installed under the authority's own fetch wrapper, so sign-in, issuing,
+// marking and entitlements always reach the real server.
+let syncStandIn = false;
 const serverEvents = new Map();   // id → event (the server's UNIQUE(account_id, id))
 let remoteFeed = [];               // what a pull hands back, every time
 const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } });
-const account = { id: 'acct-sync', email: 's@example.test', name: 'S', role: 'student', emailVerified: true };
+const trueFetch = globalThis.fetch;
 globalThis.fetch = async (url, options = {}) => {
-  if (!online) throw new TypeError('Failed to fetch');
-  const path = new URL(url).pathname;
-  if (path === '/v1/account/login' || path === '/v1/account/me') return json({ account });
-  if (path === '/v1/entitlements') return json({ entitlement: { plan: 'free', status: 'free', provider: 'none', sourceVersion: 0 } });
+  const path = new URL(String(url)).pathname;
+  if (!syncStandIn || !path.startsWith('/v1/sync/')) return trueFetch(url, options);
   if (path.startsWith('/v1/sync/pull/')) {
     // A replaying server: every pull returns the same remote events.
     return json({ schemaVersion: 1, cursor: 900, hasMore: false, events: remoteFeed, entities: [] });
@@ -95,6 +103,7 @@ globalThis.fetch = async (url, options = {}) => {
   }
   return json({ error: { code: 'NOT_FOUND' } }, 404);
 };
+let online = null;
 
 // ── Answer helpers (canonical forms, as india-adaptive-check derives them) ───
 function canonicalInput(q) {
@@ -133,6 +142,8 @@ function wrongInput(q) {
 async function run() {
   installBrowserEnv();
   resetStorage();
+  const { startOnlineAuthority, nextSubmissionId } = await import('./support/online-authority.mjs');
+  online = await startOnlineAuthority({ label: 'progress-truth' });
   const { dispatch } = await import(`${SRC}local/backend.js`);
   const idb = await import(`${SRC}local/idb.js`);
   const { checkAnswer } = await import(`${SRC}engine/checker.js`);
@@ -141,20 +152,14 @@ async function run() {
   const A = await import(`${SRC}engine/adaptive.js`);
   const { PROGRESS_THRESHOLDS, accuracyClaim } = await import(`${SRC}engine/progressTruth.js`);
   const { dispatchIndiaExam } = await import(`${SRC}local/indiaExamBackend.js`);
-  const { cloudLinkRowId, loginCloudAccount } = await import(`${SRC}platform/cloudAccount.js`);
   const { syncNow, remoteLearningSummary } = await import(`${SRC}platform/syncWorker.js`);
 
   const GET = (path, body) => dispatch('GET', path, body);
   const POST = (path, body) => dispatch('POST', path, body);
 
-  async function liftFreeCap(pid) {
-    const now = Date.now();
-    await idb.put('device', {
-      id: cloudLinkRowId(pid), accountId: `acct-${pid}`, role: 'student',
-      emailVerified: true, linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
-      entitlement: { plan: 'premium', status: 'active', provider: 'web', currentPeriodEnd: now + 60 * DAY, offlineUntil: now + 60 * DAY, issuedAt: now, sourceVersion: 1 }
-    });
-  }
+  // Each profile signs in to its own verified account; the Premium snapshot on
+  // the real link row keeps the free daily cap (not this suite's subject) away.
+  const liftFreeCap = pid => online.link(pid, { entitlement: 'premium' });
 
   // What the test did to each question, so the expected rating step can be
   // computed without reading anything the backend wrote about help.
@@ -163,7 +168,10 @@ async function run() {
   async function serve(body = {}) {
     const res = await POST('/practice/next', { ...body, resume: false });
     const row = await idb.get('questions', res.question.id);
-    return { res, row, q: row.payload };
+    // `q` is the test oracle's copy of the question (the device row of a
+    // server-issued question holds no answer). It chooses what to type; the
+    // server marks.
+    return { res, row, q: await online.answerKey(row) };
   }
 
   /** Play one served question in a given style; returns what happened. */
@@ -176,7 +184,7 @@ async function run() {
     const canWrong = !!wc && !wc.correct && !wc.invalid;
     const help = { hints: 0, tutor: 0, tries: 0 };
     helpLog.set(row.id, help);
-    const submit = (answer, ms) => POST(`/practice/${row.id}/submit`, { answer, ms });
+    const submit = (answer, ms) => POST(`/practice/${row.id}/submit`, { answer, ms, submissionId: nextSubmissionId('sub_progress') });
     if (style === 'reveal' || (!canRight && style !== 'wrong2') || (!canWrong && (style === 'retry' || style === 'wrong2'))) {
       await POST(`/practice/${row.id}/reveal`, { ms: 20000 });
       return 'reveal';
@@ -227,7 +235,7 @@ async function run() {
   let rushCorrect = 0;
   for (const q of rush.questions.slice(0, 6)) {
     const row = await idb.get('questions', q.id);
-    const right = canonicalInput(row.payload);
+    const right = canonicalInput(await online.answerKey(row));
     const r = await POST('/rush/answer', { id: q.id, answer: right ?? '0' });
     if (r.correct) rushCorrect++;
     tick(4000);
@@ -242,7 +250,7 @@ async function run() {
   for (const [i, q] of (paper.questions || []).entries()) {
     if (i % 2) continue;
     const row = await idb.get('questions', q.id);
-    const right = row?.payload ? canonicalInput(row.payload) : null;
+    const right = row?.payload ? canonicalInput(await online.answerKey(row)) : null;
     if (right !== null) answers[q.id] = right;
   }
   tick(30 * MIN);
@@ -459,6 +467,7 @@ async function run() {
   // ── Low-sample honesty ─────────────────────────────────────────────────────
   section('low sample');
   const nova = (await POST('/profiles', { name: 'Nova', year: 9, course: 'in', indiaTrack: 'cbse' })).user;
+  await online.link(nova.id, { name: 'Nova' });
   let nstats = await GET('/stats');
   eq('a new profile has no accuracy', nstats.totals.accuracy.value, null);
   eq('…and says how many answers it needs', nstats.totals.accuracy.needed, PROGRESS_THRESHOLDS.overallAccuracy);
@@ -485,18 +494,47 @@ async function run() {
   await POST('/profiles/select', { id: asha.id });
   eq('the original is untouched by both restores', (await GET('/stats')).totals.attempts, X.answered);
 
-  // ── Offline, then synced (twice), then another device's events pulled twice ─
+  // ── Signed out and offline nothing is checked; marked online, then synced
+  //    (twice), then another device's events pulled twice ────────────────────
   section('offline then synced');
   const sita = (await POST('/profiles', { name: 'Sita', year: 8, course: 'in', indiaTrack: 'cbse' })).user;
-  online = false;
-  for (let i = 0; i < 6; i++) { const s = await serve(); await play(s, STYLES[i]); tick(MIN); }
+  const sitaLedger = () => show({
+    attempts: rawRows().attempts.filter(a => a.pid === sita.id).length,
+    ratings: rawRows().ratings.filter(r => r.pid === sita.id).length,
+    reviews: rawRows().reviews.filter(r => r.pid === sita.id).length,
+    activity: rawRows().activity.filter(r => r.pid === sita.id).length,
+    xp: rawRows().profiles.find(r => r.id === sita.id)?.xp || 0
+  });
+  const emptyLedger = sitaLedger();
+  const refusal = fn => fn().then(() => 'checked', err => err?.code || String(err));
+  const firstServed = await serve();
+  const firstRight = canonicalInput(firstServed.q) ?? '0';
+  const gradedBefore = online.traffic.grade;
+  // Before signing in: the question can be read, but not checked.
+  eq('signed out, an answer is not checked', await refusal(() => POST(`/practice/${firstServed.row.id}/submit`, { answer: firstRight, ms: 9000, submissionId: nextSubmissionId('sub_progress_out') })), 'SIGN_IN_TO_CHECK');
+  eq('…and nothing is counted: no attempt, rating, review, activity or XP', sitaLedger(), emptyLedger);
+  await online.link(sita.id, { name: 'Sita' });
+  // Signed in but with no connection: still nothing is checked.
+  await online.offline(async () => {
+    eq('offline, an answer is not checked', await refusal(() => POST(`/practice/${firstServed.row.id}/submit`, { answer: firstRight, ms: 9000, submissionId: nextSubmissionId('sub_progress_off') })), 'RECONNECT_TO_CHECK');
+    eq('offline, the solution is not shown either', await refusal(() => POST(`/practice/${firstServed.row.id}/reveal`, { ms: 9000 })), 'RECONNECT_TO_CHECK');
+    eq('offline practice counts nothing locally', (await GET('/stats')).totals.attempts, 0);
+  });
+  eq('…no attempt, rating, review, activity or XP was written', sitaLedger(), emptyLedger);
+  eq('the server marked nothing while signed out or offline', online.traffic.grade, gradedBefore);
+  const kept = await idb.get('questions', firstServed.row.id);
+  ok('the refused question is still there, unanswered, with no try spent', !!kept && !kept.answered && (kept.tries || 0) === 0 && kept.payload.prompt === firstServed.q.prompt, show({ answered: kept?.answered, tries: kept?.tries }));
+  // Back online, that same question is checked, and five more after it.
+  await play(firstServed, STYLES[0]); tick(MIN);
+  for (let i = 1; i < 6; i++) { const s = await serve(); await play(s, STYLES[i]); tick(MIN); }
+  ok('once reconnected the refused question was marked by the server', (await idb.get('questions', firstServed.row.id))?.serverReceipt?.authoritative === true);
   const offline = await GET('/stats');
   const S = expectedFor(sita.id);
-  eq('offline practice counts locally at once', offline.totals.attempts, S.answered);
-  online = true;
-  await loginCloudAccount(sita.id, { email: account.email, password: 'test-password-only' });
+  eq('practice marked online counts locally at once', offline.totals.attempts, S.answered);
+  eq('…as six answers', S.answered, 6);
+  syncStandIn = true;
   const first = await syncNow(sita.id);
-  ok('the first sync published the offline answers', first.pushedEvents >= S.answered, show(first));
+  ok('the first sync published the answers', first.pushedEvents >= S.answered, show(first));
   const practiceEvents = () => [...serverEvents.values()].filter(e => e.kind === 'practice-progress').length;
   eq('the server holds one practice event per local answer', practiceEvents(), S.answered);
   await syncNow(sita.id);
@@ -589,7 +627,27 @@ async function run() {
   eq('…and none of its rows is marked remote', rawRows().attempts.filter(a => a.pid === asha.id && a.remoteEventId).length, 0);
   const otherProfile = await remoteLearningSummary(asha.id);
   eq('one profile\'s pulled events are invisible to another', otherProfile.attempts, 0);
-  online = false;
+  syncStandIn = false;
+
+  // ── Every mark in this history is the server's ─────────────────────────────
+  section('server authority');
+  // The four profiles that practised on this device (a restored backup copy is
+  // history, not a marking: it carries neither a server question nor a receipt).
+  const live = new Set([asha.id, kabir.id, nova.id, sita.id]);
+  const allPractice = rawRows().questions.filter(r => r.answered && ['practice', 'review', 'task'].includes(r.mode));
+  const practiceRows = allPractice.filter(r => live.has(r.pid));
+  ok('every practice question resolved on this device carries the server\'s authoritative receipt', practiceRows.length >= 50 && practiceRows.every(r => r.serverQuestionId && r.serverReceipt?.authoritative === true),
+    `${practiceRows.filter(r => !r.serverReceipt?.authoritative).length}/${practiceRows.length} without a receipt`);
+  ok('no resolved practice question kept an answer on the device', allPractice.every(r => !('answer' in (r.payload || {}))));
+  // A real sync with the real server: the server already holds the canonical
+  // graded attempt for every answer it marked. Pulling them back must not
+  // count any answer a second time.
+  await POST('/profiles/select', { id: asha.id });
+  const realBefore = [(await GET('/stats')).totals, rawRows().attempts.filter(a => a.pid === asha.id).length];
+  const real1 = await syncNow(asha.id).then(r => r, err => ({ threw: err?.code || String(err) }));
+  const real2 = await syncNow(asha.id).then(r => r, err => ({ threw: err?.code || String(err) }));
+  ok('a sync with the real server completes', !real1?.threw && !real2?.threw, show([real1, real2]));
+  eq('syncing with the real server double-counts no server-marked answer', [(await GET('/stats')).totals, rawRows().attempts.filter(a => a.pid === asha.id).length], realBefore);
 }
 
 try {
@@ -597,6 +655,7 @@ try {
 } catch (err) {
   failures.push(`${group} · threw: ${err?.stack || err}`);
 }
+await online?.close().catch(() => {});
 if (failures.length) {
   console.error(`PROGRESS TRUTH: FAIL — ${failures.length} failed, ${pass} passed`);
   for (const f of failures) console.error(`  ✘ ${f}`);

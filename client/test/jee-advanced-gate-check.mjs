@@ -28,6 +28,13 @@ import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 
 installBrowserEnv();
 resetStorage();
+// Online-only grading (owner decision 2026-10-10): showing a solution needs a
+// real signed-in account and a server-issued question. The paywall is still
+// decided on the device from the entitlement snapshot on the cloud link row,
+// so the profiles that reveal a question here are real verified accounts
+// (never a made-up accountId) whose snapshot the suite sets.
+const { startOnlineAuthority } = await import('./support/online-authority.mjs');
+const online = await startOnlineAuthority({ label: 'jee-advanced-gate' });
 
 const { dispatch } = await import('../src/local/backend.js');
 const { dispatchIndiaExam } = await import('../src/local/indiaExamBackend.js');
@@ -102,22 +109,29 @@ async function allowed(name, promise, check = value => !!value) {
   }
 }
 
+// What the server filed on the link row at sign-in is the account's own free
+// snapshot. Premium is granted by replacing it, and lapses by putting it back:
+// the student stays signed in throughout.
+const serverFree = new Map();
+async function signIn(pid) {
+  await online.link(pid);
+  const row = await idb.get('device', cloudLinkRowId(pid));
+  if (!row?.accountId || row.accountId !== online.accountOf(pid).accountId) throw new Error('the profile is not linked to its real account');
+  serverFree.set(pid, row.entitlement ?? null);
+}
 async function grantPremium(pid) {
   const now = Date.now();
-  await idb.put('device', {
-    id: cloudLinkRowId(pid), accountId: `acct-${pid}`, role: 'student', emailVerified: true,
-    linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
-    entitlement: {
-      plan: 'premium', status: 'active', provider: 'web',
-      currentPeriodEnd: now + 30 * DAY, offlineUntil: now + 7 * DAY, issuedAt: now, sourceVersion: 3
-    }
+  await online.setEntitlement(pid, {
+    plan: 'premium', status: 'active', provider: 'web',
+    currentPeriodEnd: now + 30 * DAY, offlineUntil: now + 7 * DAY, issuedAt: now, sourceVersion: 3
   });
 }
-const revokePremium = pid => idb.del('device', cloudLinkRowId(pid));
+const revokePremium = pid => online.setEntitlement(pid, serverFree.get(pid));
 
 // ── A free profile on the JEE Advanced track ─────────────────────────────────
 
 const vik = (await POST('/profiles', { name: 'Vik', year: 12, course: 'in', indiaTrack: 'jee-advanced' })).user;
+await signIn(vik.id); // a signed-in account on the free plan
 ok('the profile starts on the free plan', (await GET('/me')).user.plan.tier === 'free', (await GET('/me')).user.plan.tier);
 
 /** A Class 12 chapter id, so a task target names something the resolver knows. */
@@ -166,6 +180,7 @@ await refused('retrying a jee-advanced question after Premium lapses is refused'
 // ── The same routes on the free tracks, so the gate is not blanket ───────────
 
 const asha = (await POST('/profiles', { name: 'Asha', year: 12, course: 'in', indiaTrack: 'jee-main' })).user;
+await signIn(asha.id); // signed in and free: its question is revealed below
 await allowed('smart practice on jee-main is allowed on the free plan',
   POST('/practice/next', { mode: 'smart' }), value => value?.question?.indiaTrack === 'jee-main');
 
@@ -183,6 +198,7 @@ await allowed('a jee-main exam simulation is allowed on the free plan',
   dispatchIndiaExam((await GET('/me')).user, 'POST', '/exams', {}), value => value?.exam?.questions?.length > 0);
 
 const ravi = (await POST('/profiles', { name: 'Ravi', year: 10, course: 'in', indiaTrack: 'cbse' })).user;
+// Ravi has no account at all: the free tracks are served signed out too.
 await allowed('smart practice on cbse is allowed on the free plan',
   POST('/practice/next', { mode: 'smart' }), value => !!value?.question?.id);
 ok('a free CBSE profile is still on the free plan', (await GET('/me')).user.plan.tier === 'free', String(ravi.id));
@@ -212,6 +228,7 @@ ok('the enforcement note names the retry route', /history\/:id\/retry/.test(decl
 ok('the enforcement note names the India exam route', /\/exams/.test(declared), declared);
 ok('the enforcement note says the resolved track is what decides', /resolved/i.test(declared), declared);
 
+await online.close();
 console.log(`\nJEE Advanced gate — ${pass}/${pass + fail} checks`);
 if (failures.length) {
   console.log('\nfailures:');

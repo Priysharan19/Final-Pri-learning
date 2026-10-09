@@ -34,27 +34,15 @@ const DAY = 86400000;
 
 /**
  * This suite drives dozens of questions through one profile to watch the
- * adaptive engine move. The free tier allows twenty a day, which is the
- * subject of entitlement-enforcement-check.mjs, not of this one — so every
- * profile here is given a server-issued Premium snapshot and the cap stays out
- * of the way. Without this the suite would be measuring the cap.
+ * adaptive engine move. Every answer is marked by the real server (owner
+ * decision 2026-10-10: online-only grading), so each profile signs in to its
+ * own verified account. The free tier allows twenty a day, which is the
+ * subject of entitlement-enforcement-check.mjs, not of this one — so the real
+ * link row is given a Premium snapshot and the cap stays out of the way.
+ * Without this the suite would be measuring the cap.
  */
-async function liftFreeCap(pid) {
-  const [{ cloudLinkRowId }, idb] = await Promise.all([
-    import(`${SRC}platform/cloudAccount.js`),
-    import(`${SRC}local/idb.js`)
-  ]);
-  const now = Date.now();
-  await idb.put('device', {
-    id: cloudLinkRowId(pid), accountId: `acct-${pid}`, role: 'student',
-    emailVerified: true, linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
-    entitlement: {
-      plan: 'premium', status: 'active', provider: 'web',
-      currentPeriodEnd: now + 30 * DAY, offlineUntil: now + 7 * DAY,
-      issuedAt: now, sourceVersion: 1
-    }
-  });
-}
+let online = null;
+const liftFreeCap = pid => online.link(pid, { entitlement: 'premium' });
 
 // ── Determinism ──────────────────────────────────────────────────────────────
 
@@ -128,6 +116,8 @@ function wrongInput(q) {
 async function run() {
   installBrowserEnv();
   resetStorage();
+  const { startOnlineAuthority, nextSubmissionId } = await import('./support/online-authority.mjs');
+  online = await startOnlineAuthority({ label: 'india-adaptive' });
   const { dispatch } = await import(`${SRC}local/backend.js`);
   const idb = await import(`${SRC}local/idb.js`);
   const { checkAnswer } = await import(`${SRC}engine/checker.js`);
@@ -143,13 +133,22 @@ async function run() {
   const { INDIA_REASON_TAGS } = await import(`${SRC}engine/indiaProgress.js`);
 
   const GET = (path, body) => dispatch('GET', path, body);
-  const POST = (path, body) => dispatch('POST', path, body);
+  // The card names every tap with a stable submission key; the server marks under it.
+  const SUBMIT = /^\/practice\/[^/]+\/submit$/;
+  const POST = (path, body) => dispatch('POST', path,
+    SUBMIT.test(path) && body && body.submissionId === undefined ? { ...body, submissionId: nextSubmissionId('sub_india') } : body);
   const TAGS = new Set(INDIA_REASON_TAGS);
 
+  const unissued = [];
   async function serve(body = {}) {
     const res = await POST('/practice/next', body);
     const row = await idb.get('questions', res.question.id);
-    return { ...res, payload: row.payload, row };
+    // A linked India profile is served a server-issued question: the device
+    // row holds no answer, steps or traps. `payload` is the test oracle's
+    // regeneration of the issued question — used to choose what to type, never
+    // to mark. Marks come back from the server.
+    if (!row.serverQuestionId || 'answer' in row.payload || 'traps' in row.payload) unissued.push(row.id);
+    return { ...res, payload: await online.answerKey(row), row };
   }
 
   /** Resolve a served question with the wanted outcome where the form allows it; returns what actually happened. */
@@ -520,6 +519,15 @@ async function run() {
   ok('four profiles hold four separate evidence sets', new Set(all.map(r => r.pid)).size === 5);
   ok('a shared generator never merged two students\' chapters', all.every(r => IN_CHAPTER_BY_ID[r.subtopic]));
 
+  // ── Server authority ──────────────────────────────────────────────────────
+  section('server authority');
+  eq('every question served to a signed-in profile was server-issued, with no answer or trap list on the device', unissued.slice(0, 3), []);
+  const resolvedRows = rawRows().questions.filter(r => r.answered);
+  ok('every resolved question carries the server\'s authoritative receipt', resolvedRows.length > 300 && resolvedRows.every(r => r.serverQuestionId && r.serverReceipt?.authoritative === true),
+    `${resolvedRows.filter(r => !r.serverReceipt?.authoritative).length}/${resolvedRows.length} without a receipt`);
+  ok('the server marked or revealed every one of them', online.traffic.grade + online.traffic.reveal >= resolvedRows.length, show(online.traffic));
+  await online.close();
+
   // ── Verdict ───────────────────────────────────────────────────────────────
   const total = pass + failures.length;
   if (failures.length) {
@@ -532,8 +540,9 @@ async function run() {
   return 0;
 }
 
-run().then(code => process.exit(code)).catch(err => {
+run().then(code => process.exit(code)).catch(async err => {
   console.error(err?.stack || err);
+  await online?.close().catch(() => {});
   console.log(`\nINDIA ADAPTIVE: FAIL — crashed in "${group}" after ${pass} passing checks`);
   process.exit(1);
 });

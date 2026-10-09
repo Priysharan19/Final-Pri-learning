@@ -56,6 +56,7 @@ function ok(name, condition, detail = '') {
 }
 const eq = (name, actual, expected) => ok(name, JSON.stringify(actual) === JSON.stringify(expected), `expected ${show(expected)}, got ${show(actual)}`);
 const measured = [];
+let online = null;
 
 function canonicalInput(q) {
   const a = q.answer;
@@ -273,6 +274,11 @@ async function run() {
   // ── 3 · the local backend ──────────────────────────────────────────────────
   installBrowserEnv();
   resetStorage();
+  // Owner decision 2026-10-10: a practice answer is marked only by the real
+  // server, for a signed-in account. The engine modules imported above are
+  // pure; nothing that talks to the cloud has been loaded yet.
+  const { startOnlineAuthority, nextSubmissionId } = await import('./support/online-authority.mjs');
+  online = await startOnlineAuthority({ label: 'placement' });
   const { dispatch } = await import(`${SRC}local/backend.js`);
   const { loadAllBanks } = await import(`${SRC}engine/generators/index.js`);
   const { checkAnswer } = await import(`${SRC}engine/checker.js`);
@@ -431,12 +437,20 @@ async function run() {
     const xpBefore = row.xp || 0;
     const q2 = (await GET('/placement')).question;
     ok('the check is still running for the XP race', !!q2?.id);
+    // The practice answer in this race is marked by the real server, so the
+    // profile signs in to its own verified account first.
+    await online.link(meera.id, { name: 'Meera Rao' });
     const smart = await POST('/practice/next', {});
-    const right = canonicalInput((await idbGet('questions', smart.question.id)).payload);
+    const smartRow = await idbGet('questions', smart.question.id);
+    ok('a signed-in India profile is served a server-issued question with no answer on the device',
+      !!smartRow.serverQuestionId && !('answer' in smartRow.payload), show(Object.keys(smartRow.payload)));
+    const right = canonicalInput(await online.answerKey(smartRow));
+    const gradedBefore = online.traffic.grade;
     const [placed2, practised] = await Promise.all([
       POST(`/placement/${q2.id}/answer`, { skip: true }),
-      POST(`/practice/${smart.question.id}/submit`, { answer: right ?? '0', ms: 5000 })
+      POST(`/practice/${smart.question.id}/submit`, { answer: right ?? '0', ms: 5000, submissionId: nextSubmissionId('sub_placement') })
     ]);
+    eq('the concurrent practice answer was marked by the server', online.traffic.grade, gradedBefore + 1);
     const after = storedProfile(meera.id);
     const gained = practised.resolved ? (practised.xp || 0) : 0;
     eq('XP from a concurrent practice answer is not lost', after.xp || 0, xpBefore + gained);
@@ -475,6 +489,7 @@ async function run() {
   }
 
   // ── Verdict ────────────────────────────────────────────────────────────────
+  await online.close();
   for (const m of measured) console.log(`  measured · ${m}`);
   const total = pass + failures.length;
   if (failures.length) {
@@ -487,8 +502,9 @@ async function run() {
   return 0;
 }
 
-run().then(code => process.exit(code)).catch(err => {
+run().then(code => process.exit(code)).catch(async err => {
   console.error(err?.stack || err);
+  await online?.close().catch(() => {});
   console.log(`\nPLACEMENT: FAIL — crashed in "${group}" after ${pass} passing checks`);
   process.exit(1);
 });

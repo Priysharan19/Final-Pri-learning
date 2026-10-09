@@ -20,7 +20,7 @@ import {
 } from '../engine/curriculum.js';
 import {
   cleanIndiaTrack, indiaTrack, indiaCourseLabel, indiaScope, indiaChapter,
-  indiaChapterGrade, indiaDotpointIndex, resolveIndiaTarget, indiaProductSections,
+  indiaChapterGrade, indiaDotpointIndex, resolveIndiaTarget, indiaRequestableDifficulties, indiaProductSections,
   indiaDotpointKey, indiaNameOf, indiaDifficultyWindow, clampToIndiaWindow,
   indiaPracticeScope, indiaAheadUnlocked, indiaDotpointsInWindow, indiaChaptersForGenerator,
   indiaPyqAlternatives
@@ -65,6 +65,7 @@ import { requestTutorHelp } from './tutorBridge.js';
 import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
 import { cloud } from '../platform/cloudTransport.js';
+import { publicQuestionFields } from '../engine/publicQuestion.js';
 import { rasterizeInk } from '../ink/cloudRaster.js';
 import { preparePhoto } from '../ink/photoRaster.js';
 
@@ -1009,40 +1010,34 @@ function indiaDotpointStates(chapter, chapterRow, trackId, grade, ratings, now =
 async function createIndiaQuestion(pid, chapter, target, mode, trackId, examId = null, taskId = null, trapKey = null, retarget = null) {
   if (!chapter || !target) throw Object.assign(new Error('That India syllabus target has no authored question form yet.'), { status: 409, code: 'INDIA_TARGET_UNCOVERED' });
   const springs = cand => carriesTrap(chapter.id, cand, trapKey);
-  // Candidate 0 is the resolved target; later candidates re-resolve it when the
-  // caller can, so a chapter-level request is not stuck on one small cell.
-  const targetOf = new Map();
-  const seedOf = new WeakMap();
-  const picked = drawDistinct(k => {
-    const t = (k > 0 && typeof retarget === 'function' && retarget()) || target;
-    const seed = Math.floor(Math.random() * 0x80000000);
-    const cand = generateQuestion(t.generator, t.difficulty, seed);
-    seedOf.set(cand, seed);
-    targetOf.set(cand, t);
-    return cand;
-  }, recentlyServedContent(pid), { tries: trapKey ? Math.max(TRAP_SEEK_TRIES, CONTENT_DEDUP_TRIES) : CONTENT_DEDUP_TRIES, accept: trapKey ? springs : null });
-  const selected = picked.q;
-  const delivered = trapKey && picked.accepted && springs(selected) ? trapKey : null;
-  const served = targetOf.get(selected) || target;
-  // Selection remains adaptive on device. A signed-in account that can reach
-  // the server has this exact question issued there straight away. Otherwise
-  // the student can still read it, type and write, and `issue` records how the
-  // server issues the identical question when the answer is checked. Only the
-  // server marks: nothing is checked signed out or offline.
-  const issue = {
-    generator: served.generator, difficulty: served.difficulty,
-    seed: seedOf.get(selected), curriculum: 'in', mode
+  // Only used with no connection: the device draws its own draft, re-resolving
+  // the target when the caller can so a chapter is not stuck on one small cell.
+  let draftTarget = target;
+  const localDraft = () => {
+    const targetOf = new Map();
+    const picked = drawDistinct(k => {
+      const t = (k > 0 && typeof retarget === 'function' && retarget()) || target;
+      const cand = generateQuestion(t.generator, t.difficulty);
+      targetOf.set(cand, t);
+      return cand;
+    }, recentlyServedContent(pid), { tries: trapKey ? Math.max(TRAP_SEEK_TRIES, CONTENT_DEDUP_TRIES) : CONTENT_DEDUP_TRIES, accept: trapKey ? springs : null });
+    draftTarget = targetOf.get(picked.q) || target;
+    return { q: picked.q, repeat: picked.repeat };
   };
-  const issued = (await issueOnServer(pid, issue, selected)).question || null;
-  const q = issued || selected;
+  const out = await serveQuestion(pid, {
+    generator: target.generator, difficulty: target.difficulty, mode,
+    trap: trapKey ? { owner: chapter.id, key: trapKey } : null
+  }, localDraft);
+  const q = out.q;
+  const served = out.fields.draftOnly ? draftTarget : target;
+  const delivered = trapKey && out.trapDelivered ? trapKey : null;
+  const picked = { repeat: out.repeat };
   const row = {
-    id: uuid(), ...(issued ? { serverQuestionId: issued.id } : { issue }), pid, subtopic: q.subtopic,
+    id: uuid(), ...out.fields, pid, subtopic: q.subtopic,
     difficulty: q.difficulty || served.difficulty, payload: q,
     // The generator is stored alongside the subtopic because they are not
     // always the same id: a previous-year question's payload names the chapter
-    // it belongs to, while the bank that produced it is the archive. Retry
-    // regenerates from this, so "the same question again" really is the same
-    // past-paper question rather than an authored one from the same chapter.
+    // it belongs to, while the bank that produced it is the archive.
     generator: served.generator,
     india: { chapterId: chapter.id, track: trackId, dotpointIndex: served.dotpointIndex },
     mode, examId, taskId, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now()
@@ -1185,7 +1180,11 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   // library's D1–D4 buttons, a ?difficulty= link) is held to the track window
   // like every other request (adaptive-08) — and said so when it had to move —
   // and the dot point is then chosen among those authored closest to it.
-  const namedDifficulty = choice.explicit && difficulty != null && difficulty !== '' && Number.isFinite(Number(difficulty));
+  // The same holds when the optimiser chose the chapter but the student named
+  // the rung (smart practice with a difficulty set): the dot point is chosen
+  // among those authored at it, so the rung asked for is served wherever the
+  // chapter has it (issue #408).
+  const namedDifficulty = difficulty != null && difficulty !== '' && Number.isFinite(Number(difficulty));
   const namedRung = namedDifficulty ? clampToIndiaWindow(Number(difficulty), trackId, grade) : null;
   if (asked == null && !pyqOnly) {
     let dpPool = indiaDotpointStates(c, chapterRow, trackId, grade, ratings, now);
@@ -1308,6 +1307,26 @@ function indiaChapterForRequest(subtopic, trackId, grade) {
     || users.find(c => scope.has(c.id))
     || users.find(c => indiaChapterGrade(c) === Number(grade))
     || users[0];
+}
+
+/**
+ * What a practice reply says about a difficulty the request named (issue #408).
+ *
+ * A rung that was asked for is not always the rung that can be served: a dot
+ * point may have no authored form there, and a track holds practice inside its
+ * own window. The question is never relabelled — its own `difficulty` and
+ * `diffLabel` are always the rung the bank generated it at — and the reply
+ * carries both numbers so the page can say "no questions at D4 for this topic
+ * yet — showing D3" before the question instead of letting a D3 question stand
+ * in silently for the D4 that was asked for. A request that named no difficulty
+ * (adaptive practice) gets no fields at all.
+ */
+export function difficultyDisclosure(requested, served) {
+  if (requested == null || requested === '' || !Number.isFinite(Number(requested))) return {};
+  const asked = Math.min(4, Math.max(1, Math.round(Number(requested))));
+  const got = Number(served);
+  if (!Number.isInteger(got)) return {};
+  return { difficultyRequested: asked, difficultyServed: got, difficultyHonoured: asked === got };
 }
 
 /**
@@ -1681,6 +1700,9 @@ function stepMetaFor(q) {
 // Figures render as raw markup, so every one is put back through the allowlist
 // on the way out as well as on the way in: a device may already be holding a
 // row that was stored before the import boundary was closed.
+// A row whose payload is the public form: issued, prepared, or an offline draft.
+const publicShaped = row => !!(row.serverQuestionId || row.prepared || row.draftOnly);
+
 function sanitize(q, row) {
   if (q.multipart) {
     return {
@@ -1723,8 +1745,11 @@ function sanitize(q, row) {
     // Who marks this question as it stands: the server (issued there, its
     // answer key never on this device) or the bundled deterministic engine.
     serverIssued: !!row.serverQuestionId,
-    supportsSteps: row.serverQuestionId ? q.supportsSteps === true : !!stepMetaFor(q),
-    criteria: row.serverQuestionId
+    // issued: the server's, markable now. prepared: markable once an account
+    // binds it. draft: opened with no connection, never markable.
+    checkState: row.serverQuestionId ? 'issued' : row.prepared ? 'prepared' : row.draftOnly ? 'draft' : 'legacy',
+    supportsSteps: publicShaped(row) ? q.supportsSteps === true : !!stepMetaFor(q),
+    criteria: publicShaped(row)
       ? Array.from({ length: Math.min(4, Math.max(1, Number(q.criteriaCount) || 1)) },
         (_, i) => ({ mark: 1, text: 'Method or final-answer criterion ' + (i + 1) }))
       : criteriaFor(q),
@@ -1762,22 +1787,40 @@ function generateFocused(subtopic, difficulty, { dotpointId = null, trapKey = nu
 }
 
 async function createQuestion(pid, subtopic, difficulty, mode, examId = null, taskId = null, customQ = null, focus = null) {
-  const made = customQ ? null : generateFocused(subtopic, difficulty, { ...(focus || {}), recent: recentlyServedContent(pid) });
-  const q = customQ ? { ...customQ, custom: true } : made.q;
-  // A generated practice question can be issued by the server from its
-  // generator, difficulty and seed. An exam paper is marked as one sitting and
-  // a teacher's own question has no server copy; neither is issued here.
-  const issue = !customQ && !examId && Number.isSafeInteger(q.seed)
-    ? { generator: q.subtopic, difficulty: q.difficulty, seed: q.seed, curriculum: 'in', mode: ['review', 'task', 'rush', 'match'].includes(mode) ? mode : 'practice' }
-    : null;
+  // An exam paper is one sitting and a teacher's own question has no server
+  // copy; both stay device rows. Every other generated question is the
+  // server's (see serveQuestion).
+  if (customQ || examId) {
+    const made = customQ ? null : generateFocused(subtopic, difficulty, { ...(focus || {}), recent: recentlyServedContent(pid) });
+    const q = customQ ? { ...customQ, custom: true } : made.q;
+    const row = {
+      id: uuid(), pid, subtopic: q.subtopic || 'custom', difficulty: q.difficulty || 2, payload: q,
+      mode, examId, taskId, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now()
+    };
+    await put('questions', row);
+    if (!customQ) noteServedContent(pid, q);
+    return { row, payload: q, dotpoint: made?.dotpoint || null, trapKey: made?.trapKey || null, repeat: !!made?.repeat };
+  }
+  const want = dotpointIsGeneratable(dotpointOf(subtopic, focus?.dotpointId)) ? focus.dotpointId : null;
+  const out = await serveQuestion(pid, {
+    generator: subtopic, difficulty, mode, dotpoint: want,
+    trap: focus?.trapKey ? { owner: subtopic, key: focus.trapKey } : null
+  }, () => generateFocused(subtopic, difficulty, { ...(focus || {}), recent: recentlyServedContent(pid) }));
+  const q = out.q;
   const row = {
-    id: uuid(), pid, subtopic: q.subtopic || 'custom', difficulty: q.difficulty || 2, payload: q,
-    ...(issue ? { issue } : {}),
+    id: uuid(), ...out.fields, pid, subtopic: q.subtopic || subtopic, difficulty: q.difficulty || 2, payload: q,
     mode, examId, taskId, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now()
   };
   await put('questions', row);
-  if (!customQ) noteServedContent(pid, q);
-  return { row, payload: q, dotpoint: made?.dotpoint || null, trapKey: made?.trapKey || null, repeat: !!made?.repeat };
+  noteServedContent(pid, q);
+  return {
+    row, payload: q,
+    // `dotpointExact` is the bank's own word for whether the question really
+    // exercises what was asked for; only that may say a dot point was practised.
+    dotpoint: want && q.dotpointExact ? want : null,
+    trapKey: focus?.trapKey && out.trapDelivered ? focus.trapKey : null,
+    repeat: out.repeat
+  };
 }
 
 function displayAnswer(q) {
@@ -2936,7 +2979,12 @@ const routes = {
       const trackId = cleanIndiaTrack(p.indiaTrack, p.year);
       const { own, aheadIds, aheadUnlocked } = indiaPool(trackId, p.year, ratings, now);
       const ownIds = new Set(own.map(c => c.id));
-      const decorate = chapter => {
+      // `requestable` is the difficulty rungs this section can serve EXACTLY for
+      // the chapter and for each dot point, on the section's own track. The
+      // picker offers only these, so a student is never invited to ask for a
+      // level the bank cannot produce here (issue #408).
+      const decorate = (chapter, section) => {
+        const scope = { track: section.track, grade: section.year ?? indiaChapterGrade(chapter) ?? p.year };
         const state = indiaState(chapter, ratings, now);
         const chapterRow = ratings[chapter.id] || null;
         const dotpoints = chapter.dotpoints.map((text, ordinal) => {
@@ -2944,12 +2992,13 @@ const routes = {
           const forms = [...new Set(covers.flatMap(c => c.diff || []))].sort((a, b) => a - b);
           const d = indiaDotpointState(chapter, ordinal, chapterRow, ratings, now);
           const m = d.attempts ? masteryOf(d.rating, d.attempts, d.last_at, now) : 0;
-          return { id: `${chapter.id}#${ordinal}`, key: String(ordinal), text, difficulties: forms, mastery: Math.round(m * 100), band: d.attempts ? masteryBand(m) : 'unseen', attempts: d.attempts, correct: d.correct, generated: forms.length > 0 };
+          return { id: `${chapter.id}#${ordinal}`, key: String(ordinal), text, difficulties: forms, requestable: indiaRequestableDifficulties(chapter, { ...scope, dotpoint: ordinal }), mastery: Math.round(m * 100), band: d.attempts ? masteryBand(m) : 'unseen', attempts: d.attempts, correct: d.correct, generated: forms.length > 0 };
         });
         const ahead = aheadIds.has(chapter.id);
         return {
           id: chapter.id, name: chapter.name, strand: chapter.strand, weight: chapter.weight, code: null, dotpoints,
           year: indiaChapterGrade(chapter),
+          requestable: indiaRequestableDifficulties(chapter, scope),
           mastery: Math.round(state.mastery * 100), band: state.attempts ? masteryBand(state.mastery) : 'unseen',
           attempts: state.attempts, correct: state.correct,
           due: due.has(chapter.id) || (state.legacy && indiaGeneratorIds(chapter).some(id => due.has(id))),
@@ -2962,11 +3011,11 @@ const routes = {
       };
       const years = product.years.map(section => ({
         year: section.year, key: section.key, track: section.track, title: section.title, caption: section.caption,
-        courseLabel: section.label, difficultyFloor: section.difficultyFloor, difficultyCeiling: section.difficultyCeiling, subtopics: section.chapters.map(decorate)
+        courseLabel: section.label, difficultyFloor: section.difficultyFloor, difficultyCeiling: section.difficultyCeiling, subtopics: section.chapters.map(ch => decorate(ch, section))
       }));
       const streams = product.streams.map(section => ({
         year: section.year, allYears: !!section.allYears, key: section.key, track: section.track, title: section.title, caption: section.caption,
-        courseLabel: section.label, difficultyFloor: section.difficultyFloor, difficultyCeiling: section.difficultyCeiling, subtopics: section.chapters.map(decorate)
+        courseLabel: section.label, difficultyFloor: section.difficultyFloor, difficultyCeiling: section.difficultyCeiling, subtopics: section.chapters.map(ch => decorate(ch, section))
       }));
       return { country: 'in', years, streams, userYear: p.year, pathway: null, course: 'in', indiaTrack: trackId, aheadUnlocked, window: indiaDifficultyWindow(trackId, p.year) };
     }
@@ -3060,7 +3109,14 @@ const routes = {
   'POST /practice/next': async (body) => {
     const p = await requireProfile();
     const unfinished = await resumableQuestion(p, body);
-    if (unfinished) return resumedQuestionResponse(unfinished);
+    // A resumed question is the one already on the student's desk; when the
+    // request names a difficulty it does not sit at, the reply says so too.
+    if (unfinished) {
+      return {
+        ...resumedQuestionResponse(unfinished),
+        ...(body?.taskId || unfinished.answered ? {} : difficultyDisclosure(body?.difficulty, unfinished.payload?.difficulty ?? unfinished.difficulty))
+      };
+    }
     const { mode = 'smart', subtopic, difficulty, dotpoint, taskId, track, pyqOnly = false } = body || {};
     // Task-driven question
     if (taskId) {
@@ -3094,7 +3150,8 @@ const routes = {
         return {
           question: sanitize(payload, row), reason: 'task', repeat: !!repeat,
           why: `Task: ${task.title} — question ${done + 1} of ${task.count}.`,
-          dotpoint: resolved.dotpointIndex, target: state.mastery, misconception: null
+          dotpoint: resolved.dotpointIndex, target: state.mastery, misconception: null,
+          ...difficultyDisclosure(target.difficulty, payload.difficulty ?? row.difficulty)
         };
       }
       if (!task.subtopics?.length) throw Object.assign(new Error('That task has no topics to practise.'), { status: 409 });
@@ -3127,7 +3184,8 @@ const routes = {
         dotpoint: pick.target.dotpointIndex, target: pick.successTarget ?? null,
         misconception: trapKey ? pick.trap?.label || null : null,
         windowed: pick.target.windowed !== false, aheadUnlocked: pick.aheadUnlocked,
-        pyq: !!pick.target.pyq, repeat: !!repeat
+        pyq: !!pick.target.pyq, repeat: !!repeat,
+        ...difficultyDisclosure(difficulty, payload.difficulty ?? row.difficulty)
       };
     }
     let choice;
@@ -3210,7 +3268,8 @@ const routes = {
       question: sanitize(payload, row), reason: choice.reason, repeat,
       why: served || !choice.dotpoint ? choice.why : choice.whyPlain,
       dotpoint: served, target: choice.target ?? null,
-      misconception: trapKey ? choice.trap?.label || null : null
+      misconception: trapKey ? choice.trap?.label || null : null,
+      ...difficultyDisclosure(difficulty, payload.difficulty ?? row.difficulty)
     };
   },
 
@@ -4240,24 +4299,32 @@ const routes = {
     const q = row.payload;
     if (q.custom) throw Object.assign(new Error('Custom questions can’t be regenerated'), { status: 400 });
     if (q.multipart) throw Object.assign(new Error('Structured exam questions live in exam review'), { status: 400 });
-    const same = (body?.variant || 'same') === 'same';
-    // Regenerate from the bank that made this question. For almost every
-    // question that is its subtopic; for a previous-year question it is the
-    // archive, whose payload names the chapter instead.
+    const wantSame = (body?.variant || 'same') === 'same';
+    // The bank that made this question: its subtopic, or for a previous-year
+    // question the archive whose payload names the chapter instead.
     const generator = row.generator || row.subtopic;
-    // "The same question again" regenerates from the seed only while the bank
-    // is still the version that made it. A question stamped with an older
-    // content version is re-served from its stored payload, because
-    // regenerating it would hand the student a different question. A row from
-    // before versioning (no stamp) keeps the behaviour it always had.
-    const version = contentRefOf(q).contentVersion;
-    const reproducible = version === CONTENT_VERSION || version === LEGACY_CONTENT_VERSION;
-    const payload = same && !reproducible ? { ...q } : generateQuestion(generator, row.difficulty, same ? q.seed : undefined);
+    // Only the server can hand a question back to be marked. "The same
+    // question again" is the server re-issuing the question it holds, as a
+    // repeat; a question the server never issued (an earlier app version, an
+    // offline draft) cannot be reproduced by it, so the student gets a fresh
+    // one from the same place and is told so.
+    let out = null;
+    if (wantSame && row.serverQuestionId && await profileCloudAccountId(p.id).catch(() => null)) {
+      try {
+        const again = await cloud.repeatPractice(row.serverQuestionId);
+        if (again?.question?.id) out = { q: again.question, fields: { serverQuestionId: again.question.id, repeatOf: row.id }, same: true };
+      } catch { out = null; }
+    }
+    if (!out) {
+      const fresh = await serveQuestion(p.id, { generator, difficulty: row.difficulty, mode: 'practice' },
+        () => ({ q: generateQuestion(generator, row.difficulty), repeat: false }));
+      out = { q: fresh.q, fields: fresh.fields, same: false };
+    }
     // A retried Indian question keeps its chapter, or its evidence would fall
     // onto the generator id instead of the chapter the student is working on.
-    const newRow = { id: uuid(), pid: p.id, subtopic: row.subtopic, difficulty: row.difficulty, payload, generator, india: row.india || undefined, mode: 'practice', examId: null, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now() };
+    const newRow = { id: uuid(), ...out.fields, pid: p.id, subtopic: row.subtopic, difficulty: row.difficulty, payload: out.q, generator, india: row.india || undefined, mode: 'practice', examId: null, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now() };
     await put('questions', newRow);
-    return { question: sanitize(payload, newRow), variant: same ? 'same' : 'fresh' };
+    return { question: sanitize(out.q, newRow), variant: out.same ? 'same' : 'fresh' };
   },
 
   'GET /history/:id/detail': async (body, params) => {
@@ -4271,7 +4338,13 @@ const routes = {
       question: sanitize(q, row),
       solution: q.multipart
         ? { parts: partsOf(q).map(pt => ({ key: pt.key, answerText: displayAnswer({ answerType: pt.answerType, answer: pt.answer, mcqOptions: pt.mcqOptions }), steps: pt.steps })) }
-        : { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q) },
+        // A server-marked question's solution is the one its receipt carried;
+        // the device never held the answer. An unresolved one has none to show.
+        : publicShaped(row)
+          ? (row.serverReceipt?.solution
+            ? { steps: row.serverReceipt.solution.steps || [], answerText: row.serverReceipt.solution.answerText ?? '', solutionText: row.serverReceipt.solution.solutionText, criteria: row.serverReceipt.solution.criteria || [] }
+            : null)
+          : { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q) },
       ink: ink ? { strokes: ink.strokes || [], recognized: ink.recognized, scribble: ink.scribble || null, photo: safePhoto(ink.photo) } : null
     };
   },
@@ -5031,7 +5104,10 @@ function checkUnavailable(reason, cause = null) {
   const known = {
     'sign-in': [401, 'SIGN_IN_TO_CHECK', 'Sign in to check this answer. Your working is kept.'],
     offline: [503, 'RECONNECT_TO_CHECK', 'Pri could not reach the server. Your working is kept — reconnect and try again.'],
-    unavailable: [503, 'QUESTION_CHECK_UNAVAILABLE', 'This question cannot be checked right now. Your working is kept — try again, or move to the next question.']
+    unavailable: [503, 'QUESTION_CHECK_UNAVAILABLE', 'This question cannot be checked right now. Your working is kept — try again, or move to the next question.'],
+    // Opened with no connection: it was never the server's question.
+    draft: [409, 'QUESTION_NOT_SERVER_ISSUED', 'This question was opened without a connection, so it cannot be marked. Your working is kept — open a new question to be marked.'],
+    expired: [409, 'QUESTION_PREPARED_EXPIRED', 'This question was opened too long ago to be marked. Your working is kept — open a new question to be marked.']
   };
   // An eligibility refusal (email not verified, guardian consent pending,
   // account restricted) keeps the server's own code so the card names it.
@@ -5042,46 +5118,78 @@ function checkUnavailable(reason, cause = null) {
   return Object.assign(new Error(message), { status, code });
 }
 
-/**
- * Ask the server to issue exactly the question the device selected.
- *
- * The request names a generator, a difficulty and a seed — never an answer —
- * and the server regenerates the question from its own engine. The reply is
- * accepted only when it is the same question the student is looking at, issued
- * under the account THIS profile is linked to (the session on a shared iPad
- * may belong to another profile). Returns { question } or { reason, cause }.
- */
-async function issueOnServer(pid, issue, shown) {
-  if (!issue) return { reason: 'unavailable' };
-  const linkedAccount = await profileCloudAccountId(pid).catch(() => null);
-  if (!linkedAccount) return { reason: 'sign-in' };
-  let issuance;
-  try { issuance = await cloud.issuePractice(issue); } catch (cause) {
-    if (cause?.status === 401) return { reason: 'sign-in', cause };
-    if (cause?.status === 403 || cause?.status === 426) return { reason: 'refused', cause };
-    if (cause?.code === 'CLOUD_DISABLED' || !cause?.status || cause.status >= 500 || cause.status === 429) return { reason: 'offline', cause };
-    return { reason: 'unavailable', cause };
-  }
-  if (String(issuance?.accountId || '') !== linkedAccount) return { reason: 'sign-in' };
-  const q = issuance?.question;
-  if (!q?.id || q.prompt !== shown.prompt || q.answerType !== shown.answerType ||
-      (shown.contentId && q.contentId !== shown.contentId)) return { reason: 'unavailable' };
-  return { question: q };
+const SERVER_MODES = ['practice', 'review', 'task', 'rush', 'match'];
+
+/** A locally generated question reduced to what a student may see unmarked. */
+function draftQuestion(q) {
+  return { ...publicQuestionFields(q), supportsSteps: !!stepMetaFor(q), criteriaCount: criteriaFor(q).length };
 }
 
 /**
- * A question shown before the server issued it (signed out, offline, or the
- * student signed in on the card) is issued the moment it has to be checked.
- * The row, its id and its saved ink are unchanged; the device's own copy of
- * the answer is dropped. Throws the reason when it cannot be issued.
+ * Get the next question from the only place that can mark it.
+ *
+ * The device decides WHAT to practise (generator, difficulty, the dot point,
+ * the misconception being worked on, what was seen recently); the server
+ * decides WHICH question, with a seed the device never learns.
+ *  · A signed-in account that reaches the server is issued the question.
+ *  · Otherwise, if the server is reachable, the student is shown a prepared
+ *    question and holds a sealed token the account binds after signing in.
+ *  · With no connection the device shows one of its own as a draft to work
+ *    on. A draft was never the server's, so it cannot be marked later.
+ * Returns { q, fields, trapDelivered, repeat }; `fields` go on the row.
+ */
+async function serveQuestion(pid, { generator, difficulty, mode, dotpoint = null, trap = null }, localDraft) {
+  const body = {
+    generator, difficulty, curriculum: 'in', mode: SERVER_MODES.includes(mode) ? mode : 'practice',
+    avoid: recentlyServedContent(pid).filter(h => typeof h === 'string' && /^[a-zA-Z0-9:_-]{6,96}$/.test(h)).slice(0, 40),
+    ...(dotpoint ? { dotpoint: String(dotpoint) } : {})
+  };
+  const usable = q => q && typeof q.prompt === 'string' && q.prompt && typeof q.answerType === 'string';
+  const linkedAccount = await profileCloudAccountId(pid).catch(() => null);
+  if (linkedAccount) {
+    try {
+      const out = await cloud.issuePractice({ ...body, ...(trap ? { trap } : {}) });
+      if (String(out?.accountId || '') === linkedAccount && out?.question?.id && usable(out.question)) {
+        return { q: out.question, fields: { serverQuestionId: out.question.id }, trapDelivered: out.trapDelivered === true, repeat: out.repeat === true };
+      }
+    } catch { /* not issuable right now: prepared or draft below */ }
+  }
+  try {
+    const out = await cloud.preparePractice(body);
+    if (usable(out?.question) && typeof out.prepared === 'string' && out.prepared) {
+      return { q: out.question, fields: { prepared: out.prepared, preparedExpiresAt: Number(out.expiresAt) || null }, trapDelivered: false, repeat: out.repeat === true };
+    }
+  } catch { /* no server: an offline draft */ }
+  const local = localDraft();
+  return { q: draftQuestion(local.q), fields: { draftOnly: true }, trapDelivered: false, repeat: !!local.repeat, local };
+}
+
+/**
+ * A prepared question becomes an issued one the moment it has to be checked:
+ * the account the profile is linked to binds the sealed token, once. The row,
+ * its id and its saved ink are unchanged. Throws the reason when it cannot be
+ * issued; a draft made without a connection never can be.
  */
 async function requireServerIssue(row) {
   if (row.serverQuestionId) return;
-  const outcome = await issueOnServer(row.pid, row.issue, row.payload);
-  if (!outcome.question) throw checkUnavailable(outcome.reason, outcome.cause);
-  row.serverQuestionId = outcome.question.id;
-  row.payload = outcome.question;
-  delete row.issue;
+  const linkedAccount = await profileCloudAccountId(row.pid).catch(() => null);
+  if (!row.prepared) throw checkUnavailable(row.draftOnly ? 'draft' : 'unavailable');
+  if (!linkedAccount) throw checkUnavailable('sign-in');
+  let out;
+  try { out = await cloud.issuePractice({ prepared: row.prepared }); } catch (cause) {
+    if (cause?.status === 401) throw checkUnavailable('sign-in', cause);
+    if (cause?.status === 403 || cause?.status === 426) throw checkUnavailable('refused', cause);
+    if (cause?.code === 'CLOUD_DISABLED' || !cause?.status || cause.status >= 500 || cause.status === 429) throw checkUnavailable('offline', cause);
+    throw checkUnavailable(cause?.status === 410 || cause?.status === 409 ? 'expired' : 'unavailable', cause);
+  }
+  // The session may belong to another profile's account on a shared iPad.
+  if (String(out?.accountId || '') !== linkedAccount) throw checkUnavailable('sign-in');
+  const q = out?.question;
+  if (!q?.id || q.prompt !== row.payload?.prompt || q.answerType !== row.payload?.answerType) throw checkUnavailable('unavailable');
+  row.serverQuestionId = q.id;
+  row.payload = q;
+  delete row.prepared;
+  delete row.preparedExpiresAt;
   await put('questions', row);
 }
 

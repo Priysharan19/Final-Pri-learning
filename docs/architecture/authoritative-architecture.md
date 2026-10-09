@@ -6,7 +6,7 @@ This document is the concise production architecture authority for `Priysharan19
 
 Pri Learning is online-first (see [ADR-0001](adr-0001-online-first-runtime.md)). The target student experience is a signed-in account served by the `/v1` server hosted on Railway, with Supabase Postgres in the Mumbai region (`ap-south-1`) and server-side OpenAI providers for vision handwriting, working review, tutoring and explanation. Each part becomes current authority only when its ADR-0001 migration phase lands; this document does not assert that any of it is deployed today.
 
-The deterministic learning engine under `client/src/local/` and `client/src/engine/` stays bundled in the client. It decides every mark (AI proposes, the deterministic engine decides), gives an instant result while a cloud call is in flight, and keeps practice usable when the connection drops. It is a resilience path, not a marketed offline mode.
+The deterministic learning engine under `client/src/local/` and `client/src/engine/` stays bundled in the client. The same engine, run by the `/v1` server on a question the server issued, decides every mark (AI proposes, the deterministic engine decides). In the client it selects and generates questions, previews notation and reads attempts recorded by earlier versions; it does not mark new work (ADR-0001 amendment, 2026-10-10: online-only grading).
 
 `client/src/local/backend.js` is the current learning backend until ADR-0001 phase 5 moves learning records server-side. Any historical document that describes the legacy Express `/api` stack as the production learning backend is non-authoritative.
 
@@ -36,6 +36,6 @@ Production builds fail release verification if the SHA or timestamp is missing/m
 
 ## Historical documentation
 
-Handwriting and photo answers are read only by the server reader (ADR-0001 amendment, 2026-10): `client/src/ink/InkAnswer.jsx` sends the student's strokes, answer-blind, through `client/src/ink/cloudReader.js`; the on-device recogniser is not in the marking path. Without a usable server the ink is kept and read when the reason clears, and typed answers mark offline with the deterministic engine.
+Handwriting and photo answers are read only by the server reader (ADR-0001 amendment, 2026-10): `client/src/ink/InkAnswer.jsx` sends the student's strokes, answer-blind, through `client/src/ink/cloudReader.js`; the on-device recogniser is not in the marking path. Without a usable server the ink is kept and read when the reason clears. Typed answers are kept the same way: grading is online-only and server-authoritative (ADR-0001 amendment, 2026-10-10), so nothing is marked signed out or offline.
 
 Detailed older release, handwriting and project documents remain valid only for the subsystem and date they explicitly describe. Where they conflict with this document, this document and the current code on `main` govern production architecture.

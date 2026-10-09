@@ -49,8 +49,28 @@ The server-side OpenAI providers already exist (`server/platform/handwritingProv
    under-18 account waits for guardian consent). The on-device recogniser is not in the marking
    path or the "I'm reading:" panel. When the server cannot read (offline, not signed in, reader
    down) the ink stays on the page, the student is told the real reason, and it is read
-   automatically when the reason clears; typed answers still mark offline. The transcription is
+   automatically when the reason clears. The transcription is
    still only a proposal — the deterministic engine decides the mark from it.
+   **Amendment (2026-10-10, owner decision): grading is online-only and server-authoritative.**
+   In the owner's words: "Do NOT allow signed-out or offline mathematical checking, even when
+   labelled 'marked on this device'." This supersedes the connection-loss marking clause of item 5.
+   - Checking an answer, awarding marks and showing the solution require a verified, eligible,
+     signed-in account, a connection, and a question the server issued. The server runs the same
+     deterministic engine; a model still never sets a mark (item 4).
+   - Before that, a student may read the question, type, write, preview notation and save drafts.
+     All of it is kept on the device. When the answer is checked the server issues the identical
+     question from its generator, difficulty and seed — never from a client-supplied answer or id —
+     so the question, typed steps and ink the student already has are the ones that get marked.
+   - Without an account or a connection the app says so in the question itself (sign in / reconnect)
+     and marks nothing. No result is labelled as marked on the device.
+   - The engine stays bundled in the client for question selection and generation, notation preview,
+     and reading attempts recorded by earlier versions. It does not mark new work.
+   - Known open work, not hidden: exam papers and the placement diagnostic are still marked by the
+     bundled engine. An exam can only be started by a signed-in account that can reach the server;
+     server marking of exam papers is tracked in `docs/release/V1_COMPLETION_LEDGER.md`.
+   - `.pri-os/fleet.json` keeps the principle key `deterministic_marking_fallback` (the fleet
+     validator pins the key name). From this amendment it means: the deterministic engine, not a
+     model, decides every mark — on the server.
 6. **Answer-blind handwriting is unchanged.** Vision transcription receives the ink image only —
    never the question's expected answer, solution or marks.
 7. **Secrets live only on the server.** `OPENAI_API_KEY` and Supabase service-role credentials live

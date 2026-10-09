@@ -11,10 +11,13 @@
 // their offline grades as server grades. The client transport integration is
 // a separate mandatory release gate.
 import { createHash, randomInt, randomUUID } from 'node:crypto';
-import { asyncRouter } from './asyncRouter.js';
+import { asyncRouter, asyncHandler } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { nextSyncCursor, syncLockKey } from './db.js';
-import { requireSession, requireVerifiedEmail, requireRole, rateLimit, sessionFromRequest } from './security.js';
+import { requireSession, requireVerifiedEmail, requireRole, rateLimit, consumeRateLimit, sessionFromRequest } from './security.js';
+import { encryptDeliveryToken, decryptDeliveryToken } from './deliveryCrypto.js';
+import { misconceptionIdForTrap } from '../../client/src/engine/misconceptions.js';
+import { PUBLIC_QUESTION_FIELDS } from '../../client/src/engine/publicQuestion.js';
 import { consentState, consentBlockerCode } from './guardianConsent.js';
 import { loadAllBanks, generateQuestion } from '../../client/src/engine/generators/index.js';
 import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
@@ -31,13 +34,27 @@ const INDIA_BANK = /^c(?:[7-9]|1[0-2])-[a-z0-9][a-z0-9-]{2,95}$/;
 // grading a question the server refuses to issue could never be checked. The
 // name is only a lookup key; an unknown one fails generation with 422.
 const AUTHORED_BANK = /^[a-z][a-z0-9]{0,11}-[a-z0-9][a-z0-9-]{1,95}$/;
-const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum', 'mode']);
+const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum', 'mode', 'prepared', 'avoid', 'trap', 'dotpoint']);
+const PREPARE_FIELDS = new Set(['generator', 'difficulty', 'curriculum', 'mode', 'avoid', 'dotpoint']);
+const PRACTICE_MODES = ['practice', 'review', 'task', 'rush', 'match'];
+// A prepared question is shown to a student who has not signed in yet. Its
+// seed travels only inside an encrypted, expiring token that one account can
+// bind once; the device never learns the seed and so cannot compute the answer
+// from the bundled generators any faster than by solving the question.
+const PREPARED_TTL = 12 * 60 * 60 * 1000;
+const PREPARED_CONTEXT = 'practice-prepared-v1';
+const SEEK_TRIES = 12;
+const CONTENT_HASH = /^[a-zA-Z0-9:_-]{6,96}$/;
+const DOTPOINT = /^[a-zA-Z0-9._:-]{1,80}$/;
+// A caller-chosen seed makes a question predictable, so the product never
+// sends one: the server picks it. Fixed seeds exist only for the test suites,
+// which need the same question twice; they are honoured in NODE_ENV=test and
+// nowhere else, and a suite can switch them off to exercise the real contract.
+const fixedSeedsAllowed = env => env.NODE_ENV === 'test' && env.PRI_PRACTICE_SERVER_SEEDS_ONLY !== '1';
 const GRADE_FIELDS = new Set(['submissionId', 'answer', 'mode', 'steps', 'transcriptionReceipt', 'ms']);
 const RECOGNITION_FIELDS = new Set(['image', 'mode']);
 const CORRECTION_FIELDS = new Set(['text']);
-const PUBLIC_Q = ['prompt', 'answerType', 'options', 'mcqOptions', 'inputHint', 'answerPrefix', 'answerSuffix',
-  'hints', 'pyq', 'pyqSource', 'pyqYear', 'pyqExam', 'archive',
-  'subtopic', 'difficulty', 'dotpoint', 'dotpoints', 'contentId', 'contentVersion', 'contentHash', 'figure'];
+const PUBLIC_Q = PUBLIC_QUESTION_FIELDS;
 
 const digest = input => createHash('sha256').update(JSON.stringify(input)).digest('hex');
 const reject = (res, status, code, message) => res.status(status).json({ error: { code, message } });
@@ -198,6 +215,101 @@ export async function issuedQuestionForTutor(db, accountId, questionId, now = Da
   };
 }
 
+const carriesTrap = (owner, q, key) => (Array.isArray(q?.traps) ? q.traps : [])
+  .concat(Object.values(q?.answer?.optionTraps || {}).map(why => ({ why })))
+  .some(t => t && misconceptionIdForTrap(owner, t.why) === key);
+
+/** Validate what a client may ask for. Returns { error } or the cleaned request. */
+function readQuestionRequest(body, fields) {
+  if (!plain(body) || unknown(body, fields).length) {
+    return { error: [400, 'PRACTICE_ISSUE_INVALID', 'Only an authored generator, difficulty and practice mode may be requested.'] };
+  }
+  const generator = typeof body.generator === 'string' ? body.generator : '';
+  const difficulty = typeof body.difficulty === 'number' || typeof body.difficulty === 'string' ? Number(body.difficulty) : NaN;
+  if (body.curriculum !== 'in' || !AUTHORED_BANK.test(generator) || !Number.isInteger(difficulty) || difficulty < 1 || difficulty > 4) {
+    return { error: [400, 'PRACTICE_GENERATOR_INVALID', 'Choose an authored question and difficulty 1–4.'] };
+  }
+  const mode = body.mode ?? 'practice';
+  if (!PRACTICE_MODES.includes(mode)) return { error: [400, 'PRACTICE_MODE_INVALID', 'Invalid practice mode.'] };
+  const avoid = body.avoid === undefined ? [] : body.avoid;
+  if (!Array.isArray(avoid) || avoid.length > 60 || !avoid.every(h => typeof h === 'string' && CONTENT_HASH.test(h))) {
+    return { error: [400, 'PRACTICE_ISSUE_INVALID', 'Invalid recently-seen list.'] };
+  }
+  if (body.dotpoint !== undefined && (typeof body.dotpoint !== 'string' || !DOTPOINT.test(body.dotpoint))) {
+    return { error: [400, 'PRACTICE_ISSUE_INVALID', 'Invalid dot point.'] };
+  }
+  let trap = null;
+  if (body.trap !== undefined) {
+    const t = body.trap;
+    if (!plain(t) || unknown(t, new Set(['owner', 'key'])).length || !limitedText(t.owner, 120) || !limitedText(t.key, 200) || !t.owner || !t.key) {
+      return { error: [400, 'PRACTICE_ISSUE_INVALID', 'Invalid misconception target.'] };
+    }
+    trap = { owner: t.owner, key: t.key };
+  }
+  return { generator, difficulty, mode, avoid: new Set(avoid), dotpoint: body.dotpoint, trap };
+}
+
+/**
+ * The server picks the question: a fresh random seed, re-drawn a few times to
+ * avoid content the student has just seen and, when a misconception is being
+ * worked on, to find a form that can spring it. `seed` is given only by the
+ * test suites. Throws when the generator has no such form.
+ */
+function chooseQuestion({ generator, difficulty, dotpoint, avoid, trap }, seed = null) {
+  if (seed !== null) {
+    const q = generateQuestion(generator, difficulty, seed, dotpoint);
+    return { q, repeat: false, trapDelivered: !!(trap && carriesTrap(trap.owner, q, trap.key)) };
+  }
+  let fallback = null;
+  for (let i = 0; i < SEEK_TRIES; i++) {
+    const q = generateQuestion(generator, difficulty, randomInt(0x80000000), dotpoint);
+    const fresh = !avoid.has(q.contentHash);
+    const springs = !trap || carriesTrap(trap.owner, q, trap.key);
+    if (fresh && springs) return { q, repeat: false, trapDelivered: !!trap };
+    if (!fallback || (fresh && !fallback.fresh)) fallback = { q, fresh };
+  }
+  return { q: fallback.q, repeat: !fallback.fresh, trapDelivered: !!(trap && carriesTrap(trap.owner, fallback.q, trap.key)) };
+}
+
+/**
+ * Signed-out preparation. No account, no escrow row: the question a student
+ * may start working on before signing in, and the sealed token that lets one
+ * account turn it into an issued question later.
+ */
+export function createPracticePrepareRoute(db) {
+  db = asStore(db);
+  return [rateLimit(db, 'practice-prepare', { limit: 90, windowMs: 60 * 60 * 1000 }), asyncHandler(async (req, res) => {
+    const request = readQuestionRequest(req.body, PREPARE_FIELDS);
+    if (request.error) return reject(res, ...request.error);
+    await ensureBanks();
+    let chosen;
+    try { chosen = chooseQuestion(request); }
+    catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
+    const now = Date.now();
+    let prepared;
+    try {
+      prepared = encryptDeliveryToken(JSON.stringify({
+        g: request.generator, d: request.difficulty, s: chosen.q.seed, m: request.mode,
+        ...(request.dotpoint ? { p: request.dotpoint } : {}), x: now + PREPARED_TTL, n: randomUUID()
+      }), PREPARED_CONTEXT);
+    } catch { return reject(res, 503, 'PRACTICE_PREPARE_UNAVAILABLE', 'Questions cannot be prepared right now.'); }
+    const question = safeQuestion(null, chosen.q);
+    delete question.id;
+    res.set('Cache-Control', 'no-store');
+    return res.status(200).json({ question, prepared, expiresAt: now + PREPARED_TTL, repeat: chosen.repeat });
+  })];
+}
+
+function readPrepared(token) {
+  if (typeof token !== 'string' || token.length > 2000) return null;
+  try {
+    const v = JSON.parse(decryptDeliveryToken(token, PREPARED_CONTEXT));
+    if (!plain(v) || !AUTHORED_BANK.test(String(v.g)) || !Number.isInteger(v.d) || !Number.isSafeInteger(v.s) ||
+        !PRACTICE_MODES.includes(v.m) || !Number.isFinite(v.x) || typeof v.n !== 'string' || !UUID.test(v.n)) return null;
+    return v;
+  } catch { return null; }
+}
+
 export function createPracticeRouter(db, { transcribe = transcribeHandwriting, env = process.env } = {}) {
   db = asStore(db);
   const router = asyncRouter();
@@ -205,41 +317,58 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
 
   router.post('/issue', rateLimit(db, 'practice-issue', { limit: 200, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const body = req.body;
-    if (!plain(body) || unknown(body, ISSUE_FIELDS).length) {
-      return reject(res, 400, 'PRACTICE_ISSUE_INVALID', 'Only a canonical generator, difficulty and optional seed may be requested.');
-    }
-    const generator = typeof body.generator === 'string' ? body.generator : '';
-    const difficulty = typeof body.difficulty === 'number' || typeof body.difficulty === 'string' ? Number(body.difficulty) : NaN;
-    if (body.curriculum !== 'in' || !AUTHORED_BANK.test(generator) || !Number.isInteger(difficulty) || difficulty < 1 || difficulty > 4) {
-      return reject(res, 400, 'PRACTICE_GENERATOR_INVALID', 'Choose an authored India curriculum question and difficulty 1–4.');
-    }
-    const seed = body.seed === undefined ? randomInt(0x80000000) :
-      (typeof body.seed === 'number' || typeof body.seed === 'string' ? Number(body.seed) : NaN);
-    if (!Number.isSafeInteger(seed) || seed < 0 || seed >= 0x80000000) {
-      return reject(res, 400, 'PRACTICE_SEED_INVALID', 'Invalid question seed.');
-    }
-    const practiceMode = body.mode ?? 'practice';
-    if (!['practice', 'review', 'task', 'rush', 'match'].includes(practiceMode)) {
-      return reject(res, 400, 'PRACTICE_MODE_INVALID', 'Invalid practice mode.');
-    }
     const accountId = req.platformSession.account_id;
+    const now = Date.now();
+    await ensureBanks();
+    let q, practiceMode, repeat = false, trapDelivered = false, preparedNonce = null, seedGiven = false;
+    if (plain(body) && body.prepared !== undefined) {
+      // Binding a question the student started signed out. Nothing else in the
+      // body is honoured: the sealed token is the whole request.
+      if (unknown(body, new Set(['prepared'])).length) {
+        return reject(res, 400, 'PRACTICE_ISSUE_INVALID', 'A prepared question is bound on its own.');
+      }
+      const sealed = readPrepared(body.prepared);
+      if (!sealed) return reject(res, 400, 'PRACTICE_PREPARED_INVALID', 'This prepared question is not valid.');
+      if (sealed.x < now) return reject(res, 410, 'PRACTICE_PREPARED_EXPIRED', 'This prepared question has expired.');
+      // The same account retrying after a lost reply gets the same issue back.
+      const mine = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-prepared' AND key=? AND expires_at>?",
+        [accountId, sealed.n, now]);
+      if (mine) return res.status(201).json({ ...JSON.parse(mine.response_json), accountId: String(accountId) });
+      // One account, once: a token passed to a second account is refused.
+      const claim = await consumeRateLimit(db, 'practice-prepared-claim:' + sealed.n, { limit: 1, windowMs: PREPARED_TTL * 2 }, now);
+      if (!claim.allowed) return reject(res, 409, 'PRACTICE_PREPARED_USED', 'This prepared question has already been taken up.');
+      try { q = generateQuestion(sealed.g, sealed.d, sealed.s, sealed.p); }
+      catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
+      practiceMode = sealed.m;
+      preparedNonce = sealed.n;
+    } else {
+      const request = readQuestionRequest(body, ISSUE_FIELDS);
+      if (request.error) return reject(res, ...request.error);
+      let seed = null;
+      if (body.seed !== undefined) {
+        if (!fixedSeedsAllowed(env)) return reject(res, 400, 'PRACTICE_SEED_NOT_ALLOWED', 'The server chooses the question.');
+        seed = typeof body.seed === 'number' || typeof body.seed === 'string' ? Number(body.seed) : NaN;
+        if (!Number.isSafeInteger(seed) || seed < 0 || seed >= 0x80000000) {
+          return reject(res, 400, 'PRACTICE_SEED_INVALID', 'Invalid question seed.');
+        }
+        seedGiven = true;
+      }
+      try { ({ q, repeat, trapDelivered } = chooseQuestion(request, seed)); }
+      catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
+      practiceMode = request.mode;
+    }
     // Optional issue idempotency: normal practice may request a fresh question;
     // network retries can opt into the same server question with a stable key.
     const idem = String(req.get('idempotency-key') || '');
     if (idem && !ID.test(idem)) return reject(res, 400, 'IDEMPOTENCY_INVALID', 'Invalid issuance idempotency key.');
-    const requestDigest = digest({ generator, difficulty, seed: body.seed === undefined ? null : seed, curriculum: body.curriculum, mode: practiceMode });
-    await ensureBanks();
-    let q;
-    try { q = generateQuestion(generator, difficulty, seed); }
-    catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
+    const requestDigest = digest({ generator: q.subtopic, difficulty: q.difficulty, seed: seedGiven ? q.seed : null, prepared: preparedNonce, curriculum: 'in', mode: practiceMode });
     // The issuance mode is escrowed with the answer. A later submission cannot
     // falsely claim or downgrade the one-try Rush/Match policy.
     q._practiceMode = practiceMode;
     // Serialize once: nothing client-provided can replace the stored answer.
     const payload = JSON.stringify(q);
     const id = randomUUID();
-    const publicResponse = { question: safeQuestion(id, q) };
-    const now = Date.now();
+    const publicResponse = { question: safeQuestion(id, q), ...(repeat ? { repeat: true } : {}), ...(trapDelivered ? { trapDelivered: true } : {}) };
     const response = await db.transaction(async () => {
       if (idem) {
         const before = await db.get("SELECT response_json,request_digest FROM idempotency_keys WHERE account_id=? AND scope='practice-issue' AND key=? AND expires_at>?", [accountId, idem, now]);
@@ -252,12 +381,40 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         [accountId, id, payload, digest(payload), now, now + MAX_AGE]);
       if (idem) await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-issue',?,?,?,?,?)",
         [accountId, idem, JSON.stringify(publicResponse), requestDigest, now, now + MAX_AGE]);
+      if (preparedNonce) await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-prepared',?,?,?,?,?)",
+        [accountId, preparedNonce, JSON.stringify(publicResponse), requestDigest, now, now + PREPARED_TTL * 2]);
       return publicResponse;
     }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
     if (response.conflict) return reject(res, 409, 'IDEMPOTENCY_KEY_REUSED', 'This key already issued a different question.');
     // The account that owns this issue, so a device holding several profiles
     // can refuse a question issued under another profile's session.
     return res.status(201).json({ ...response, accountId: String(accountId) });
+  });
+
+  // "The same question again" from History. The account has already been shown
+  // this question's solution, so the copy is marked as a repeat: it is checked
+  // by the server like any other, and its attempt is recorded as a repeat so
+  // it can never be counted as new credit.
+  router.post('/:id/repeat', rateLimit(db, 'practice-repeat', { limit: 120, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    const qid = req.params.id;
+    if (!UUID.test(qid)) return reject(res, 404, 'QUESTION_NOT_FOUND', 'This question does not belong to this account.');
+    if (req.body !== undefined && (!plain(req.body) || Object.keys(req.body).length)) {
+      return reject(res, 400, 'PRACTICE_ISSUE_INVALID', 'A repeat takes no parameters.');
+    }
+    const accountId = req.platformSession.account_id;
+    const now = Date.now();
+    const sealed = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?", [accountId, qid, now]);
+    if (!sealed) return reject(res, 404, 'QUESTION_NOT_FOUND', 'This question does not belong to this account.');
+    const done = await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-completion' AND key=?", [accountId, qid]);
+    if (!done) return reject(res, 409, 'QUESTION_NOT_RESOLVED', 'Finish this question before repeating it.');
+    const q = JSON.parse(sealed.response_json);
+    q._practiceMode = 'practice';
+    q._repeat = true;
+    const payload = JSON.stringify(q);
+    const id = randomUUID();
+    await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
+      [accountId, id, payload, digest(payload), now, now + MAX_AGE]);
+    return res.status(201).json({ question: safeQuestion(id, q), repeat: true, accountId: String(accountId) });
   });
 
   // Recognition is issued by this server only after a live provider response.
@@ -386,7 +543,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const attemptId = randomUUID();
       const response = { authoritative: true, revealed: true, resolved: true, correct: false,
         marksEarned: 0, marksPossible: marksPossibleFor(q),
-        questionId: qid, attemptId, serverAcknowledgedAt: now, solution: solutionFor(q) };
+        questionId: qid, attemptId, serverAcknowledgedAt: now, solution: solutionFor(q),
+        ...(q._repeat === true ? { repeat: true } : {}) };
       const hash = digest({ qid, operation: 'reveal' });
       for (const [scope, value] of [['practice-reveal', response], ['practice-completion', { attemptId, revealed: true }]]) {
         await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)",
@@ -397,6 +555,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?, 'server-grader',?,'graded-attempt',?,?,?,?)",
         [cursor, attemptId, accountId, Number(last?.n || 0) + 1, qid, now, JSON.stringify({ attemptId, questionId: qid, correct: false,
           revealed: true, marksEarned: 0, marksPossible: response.marksPossible,
+          ...(q._repeat === true ? { repeat: true } : {}),
           contentId: q.contentId || null,
           subtopic: q.subtopic || null, difficulty: Number(q.difficulty) || 2,
           mode: q._practiceMode || 'practice', hintsUsed: 1, support: 'supported',
@@ -498,6 +657,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         triesLeft: resolved ? 0 : 1,
         feedback: workingOnlyCredit ? partial.note : feedback, trapWhy,
         contentId: q.contentId || null, serverAcknowledgedAt: now,
+        ...(q._repeat === true ? { repeat: true } : {}),
         stepReport, partial, ...(resolved ? {
           solution: solutionFor(q),
           // Only a committed resolution may disclose opportunity explanations.
@@ -519,6 +679,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
           [cursor, attemptId, accountId, seq, qid, now, JSON.stringify({
             attemptId, submissionId, questionId: qid, correct: response.correct,
             marksEarned: response.marksEarned, marksPossible: response.marksPossible,
+            ...(q._repeat === true ? { repeat: true } : {}),
             contentId: response.contentId,
             subtopic: q.subtopic || null, difficulty: Number(q.difficulty) || 2,
             mode: q._practiceMode || 'practice', inputMode: mode,

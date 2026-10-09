@@ -22,7 +22,50 @@ const UNIT_TAIL = /(cm³|m³|mm³|cm²|m²|mm²|km²|km\/h|m\/s|cm|mm|km|kg|ml|l
 // normalize(). The sign carries no value, so it is stripped before parsing —
 // but it can never rescue a wrong number, because the number is still compared.
 const CURRENCY_LEAD = /^\s*(?:[₹$]|Rs\.?|INR|रु\.?|₨)\s*/i;
-const CURRENCY_TAIL = /\s*(?:\b(?:rupees?|paise|rs)\.?|₹)\s*$/i;
+// The trailing currency word or sign, with the whitespace around it:
+// "9.75 rupees", "9.75 Rs.", "50 paise", "9.75 ₹". It was the pattern
+//   /\s*(?:\b(?:rupees?|paise|rs)\.?|₹)\s*$/i
+// which rescans every run of spaces from each of its positions when no
+// currency word follows. This reads the same tail from the end of the string
+// in one pass: the word (ASCII letters, either case) must start on a word
+// boundary, may carry one full stop, and takes the whitespace on both sides.
+const CURRENCY_WORDS = ['rupees', 'rupee', 'paise', 'rs'];
+const isSpace = (ch) => /\s/.test(ch);
+const isWordChar = (ch) => /\w/.test(ch);
+const asciiLower = (text) => text.replace(/[A-Z]/g, (c) => c.toLowerCase());
+export function stripCurrencyTail(s) {
+  let end = s.length;
+  while (end > 0 && isSpace(s[end - 1])) end--;
+  let start = -1;
+  if (end > 0 && s[end - 1] === '₹') start = end - 1;
+  else {
+    const wordEnd = end > 0 && s[end - 1] === '.' ? end - 1 : end;
+    for (const word of CURRENCY_WORDS) {
+      const at = wordEnd - word.length;
+      if (at < 0 || asciiLower(s.slice(at, wordEnd)) !== word) continue;
+      if (at === 0 || !isWordChar(s[at - 1])) start = at;
+      break;
+    }
+  }
+  if (start < 0) return s;
+  while (start > 0 && isSpace(s[start - 1])) start--;
+  return s.slice(0, start);
+}
+
+/**
+ * The inside of a string wrapped in one pair of braces, trimmed — or null when
+ * it is not wrapped. With `nested` off, a brace inside disqualifies it, which
+ * is the one-element roster "{5}"; with it on, anything may sit inside, which
+ * is the solution set "{10, 12}". These were /^\{\s*([^{}]*?)\s*\}$/ and
+ * /^\{\s*([\s\S]*?)\s*\}$/: a lazy run between two `\s*` that also match
+ * whitespace, quadratic on "{" followed by spaces.
+ */
+export function bracedInner(s, { nested = false } = {}) {
+  if (s.length < 2 || s[0] !== '{' || s[s.length - 1] !== '}') return null;
+  const inner = s.slice(1, -1);
+  if (!nested && (inner.includes('{') || inner.includes('}'))) return null;
+  return inner.trim();
+}
 
 /**
  * Light clean: trim, strip currency/units/thousands separators, unify symbols.
@@ -40,7 +83,7 @@ export function cleanInput(raw, { stripUnits = true } = {}) {
   // "3sqrt(2)." — it never carries value. A run of dots is left alone, because
   // "0.333..." means something else.
   s = s.replace(/(?<!\.)\.\s*$/, '').trim();
-  s = s.replace(CURRENCY_TAIL, '');
+  s = stripCurrencyTail(s);
   if (stripUnits) s = s.replace(UNIT_TAIL, '');
   return s.trim();
 }
@@ -72,8 +115,8 @@ function percentAnswerWanted(question, ans) {
 export function parseNumericInput(raw) {
   let s = cleanInput(raw);
   // A single value written as a one-element roster: "{5}"
-  const roster = s.match(/^\{\s*([^{}]*?)\s*\}$/);
-  if (roster && !roster[1].includes(',')) s = cleanInput(roster[1]);
+  const roster = bracedInner(s);
+  if (roster !== null && !roster.includes(',')) s = cleanInput(roster);
   if (!s) throw new Error('Empty answer');
   const meta = { isPercent: /%\s*$/.test(s), text: s };
 
@@ -107,8 +150,8 @@ function splitList(raw) {
     .replace(/^[a-zA-Z]\s*(?:∈|\\in)\s*/, '')          // "x ∈ {…}"
     .replace(/^[A-Za-z]\s*=\s*(?=\{)/, '')            // "S = {…}"
     .replace(/^(∅|\\emptyset|\\varnothing|phi|φ)$/i, '{}');
-  const braced = s.match(/^\{\s*([\s\S]*?)\s*\}$/);
-  if (braced) s = braced[1];
+  const braced = bracedInner(s, { nested: true });
+  if (braced !== null) s = braced;
   s = cleanInput(s)
     .replace(/\bor\b/gi, ',')
     .replace(/\band\b/gi, ',')

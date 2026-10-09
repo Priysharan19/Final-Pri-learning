@@ -33,6 +33,11 @@ jobs:
         run: node client/test/native-shell-csp-check.mjs
       - name: Install client dependencies
         run: npm ci --prefix client
+      # Grading is online-only and server-authoritative, so the suites that
+      # check an answer or start an exam through the local backend boot the
+      # real platform server in-process (client/test/support/online-authority.mjs).
+      - name: Install server dependencies
+        run: npm ci --prefix server
       - name: Runtime dependency security floor
         run: node tools/runtime-audit-floor.mjs client
       - name: Every deterministic suite
@@ -46,6 +51,8 @@ jobs:
           grep -Fq '1704000/1704000 self-checks passed across 213 subtopics' suites.log
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
           grep -Fq '✔ INDIA SUITE PASSED — 1832/1832 checks' suites.log
+          grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 23249/23249 checks' suites.log
+          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 102244 prompts, 362 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
           grep -Fq '44000 questions from 440 declared (generator, difficulty) pairs × 100 draws — 44000 marked correct by their own marker, 44000 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 419/419 checks' suites.log
@@ -63,10 +70,10 @@ jobs:
           grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1079/1079 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
-          grep -Fq 'INDIA ADAPTIVE: PASS — 302/302 checks' suites.log
+          grep -Fq 'INDIA ADAPTIVE: PASS — 305/305 checks' suites.log
           grep -Fq 'ADAPTIVE SIMULATION: PASS — 77/77 checks' suites.log
-          grep -Fq 'PROGRESS TRUTH: PASS — 92/92 checks' suites.log
-          grep -Fq 'PLACEMENT: PASS — 268/268 checks' suites.log
+          grep -Fq 'PROGRESS TRUTH: PASS — 106/106 checks' suites.log
+          grep -Fq 'PLACEMENT: PASS — 270/270 checks' suites.log
           grep -Fq 'IOS BUNDLE FEATURES: PASS — 20/20 checks' suites.log
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
@@ -82,7 +89,7 @@ jobs:
           grep -Fq 'STUDY PLAN: PASS — 211/211 checks' suites.log
           grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
           grep -Fq 'I18N: PASS — 189/189 checks' suites.log
-          grep -Fq 'I18N COVERAGE: PASS — 89/89 checks — 62 files scanned, 0 hard-coded strings' suites.log
+          grep -Fq 'I18N COVERAGE: PASS — 89/89 checks — 63 files scanned, 0 hard-coded strings' suites.log
           # Chapter notes: every curriculum chapter, every worked answer engine-verified.
           grep -Fq 'NOTES CONTENT CHECK PASSED — 77/77 chapters' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
@@ -103,14 +110,14 @@ jobs:
           grep -Fq 'STREAK CALENDAR: PASS — 19/19 checks' suites.log
           grep -Fq 'BAD INPUT: PASS — 38/38 checks' suites.log
           grep -Fq 'CLOUD SYNC ACK: PASS — 44/44 checks' suites.log
-          grep -Fq 'PASS — §09 submission lifecycle: 14 groups' suites.log
+          grep -Fq 'PASS — §09 submission lifecycle: 15 groups' suites.log
           grep -Fq 'PASS — §22 submission sync durability: 13 groups' suites.log
           grep -Fq 'PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual).' suites.log
           grep -Fq 'PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified.' suites.log
           # §06 content runtime certification: every V1 launch path (CBSE/NCERT
           # 7–12, JEE Main, JEE Advanced) served, validated, versioned and
           # end-to-end through the local backend; the path count may only grow.
-          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 142/142 checks' suites.log
+          grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 144/144 checks' suites.log
           grep -Fq 'CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — ' suites.log
           grep -Fq '8/8 exam selections' suites.log
           paths=$(grep -Eo 'CONTENT CERTIFICATION [(]fast, 4/path/difficulty[)]: PASS — [0-9]+' suites.log | grep -Eo '[0-9]+$')

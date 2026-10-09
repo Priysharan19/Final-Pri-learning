@@ -592,6 +592,20 @@ function ProfilePractice() {
 
       {serve && !assignmentCompleteLocally && (
         <>
+          {/* The level asked for is not always a level a question exists at.
+              When they differ the page says so before the question, in words —
+              the card's own difficulty tag is always the level really served,
+              never the level requested (issue #408). */}
+          {Number.isInteger(serve.difficultyRequested) && Number.isInteger(serve.difficultyServed)
+            && serve.difficultyRequested !== serve.difficultyServed && (
+            <div className="notice" role="status" data-difficulty-substituted
+              data-difficulty-requested={serve.difficultyRequested} data-difficulty-served={serve.difficultyServed}>
+              {t(dotpoint != null ? 'practice.difficultySubstitutedDotpoint' : 'practice.difficultySubstituted', {
+                requested: `D${serve.difficultyRequested} · ${t(`difficulty.${serve.difficultyRequested}`)}`,
+                served: `D${serve.difficultyServed} · ${t(`difficulty.${serve.difficultyServed}`)}`
+              })}
+            </div>
+          )}
           <QuestionCard
             key={`${user.id}:${serve.question.id}`}
             question={serve.question}

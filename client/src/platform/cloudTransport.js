@@ -397,9 +397,12 @@ export const cloud = Object.freeze({
   // the authenticated server. Transport failures are propagated, not converted
   // into local answers or queued pseudo-receipts.
   issuePractice: body => cloudRequest('/v1/practice/issue', { method: 'POST', body }),
+  // Needs no session: the question a signed-out student may start working on.
+  preparePractice: body => cloudRequest('/v1/practice/prepare', { method: 'POST', body }),
   gradePractice: (questionId, body) => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/submit', {
     method: 'POST', body, idempotencyKey: body.submissionId
   }),
+  repeatPractice: questionId => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/repeat', { method: 'POST', body: {} }),
   revealPractice: questionId => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/reveal', { method: 'POST', body: {} }),
   recognizePractice: (questionId, mode, image) =>
     cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/recognize', {

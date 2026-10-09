@@ -132,15 +132,28 @@ function pointDiagnosis(expected, got) {
   };
 }
 
+// Every "(x, y)" on a line, as the two coordinate texts. This was
+//   /\(\s*([^,()]+?)\s*,\s*([^()]+?)\s*\)/g
+// whose lazy groups and the `\s*` on either side of them all match a space,
+// so "(" followed by spaces was read every possible way. Here each bracket is
+// matched once with nothing optional inside it, and the padding is taken off
+// afterwards. A coordinate that is nothing but whitespace keeps its last
+// character, exactly as the lazy group had to take one.
+const COORDINATE_PAIR = /\(([^,()]+),([^()]+)\)/g;
+const coordinateText = (raw) => raw.trim() || raw.slice(-1);
+export function coordinatePairs(text) {
+  return [...String(text).matchAll(COORDINATE_PAIR)].map((m) => [coordinateText(m[1]), coordinateText(m[2])]);
+}
+
 /** Verify a final Cartesian point without guessing from prose. */
 export function assessPointLine({ text, meta = null } = {}) {
   const ex = Number(meta?.x), ey = Number(meta?.y);
   if (!Number.isFinite(ex) || !Number.isFinite(ey)) {
     return { status: 'note', trusted: false, note: 'Pri needs exact authored coordinates before it can verify a point.' };
   }
-  const matches = [...cleanText(text).matchAll(/\(\s*([^,()]+?)\s*,\s*([^()]+?)\s*\)/g)];
+  const matches = coordinatePairs(cleanText(text));
   if (!matches.length) return { status: 'note', trusted: false, note: 'Skipped — I couldn’t read a coordinate pair on this line.' };
-  const [, xText, yText] = matches[matches.length - 1];
+  const [xText, yText] = matches[matches.length - 1];
   const x = finiteValue(astFor(xText), {}), y = finiteValue(astFor(yText), {});
   if (x === null || y === null) return { status: 'note', trusted: false, note: 'Skipped — I couldn’t evaluate both coordinates safely.' };
   if (numsClose(x, ex, 1e-9) && numsClose(y, ey, 1e-9)) return { status: 'ok', trusted: true, point: { x, y } };
