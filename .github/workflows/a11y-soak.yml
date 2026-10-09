@@ -1,0 +1,82 @@
+# Manual soak for the accessibility walk. Runs client/test/a11y-gate.mjs
+# several times on the same runner class as ci.yml's browser job so a rare
+# boot stall can be caught WITH the evidence the suite now prints, instead of
+# waiting for it to hit an unrelated pull request. Read-only: it builds and
+# tests, nothing else, and it is only ever started by hand.
+name: Accessibility soak (manual)
+
+on:
+  # A pull request that touches the walk or this file runs the soak as well,
+  # because a workflow_dispatch cannot be started until the file is on main.
+  pull_request:
+    paths:
+      - .github/workflows/a11y-soak.yml
+      - client/test/a11y-check.mjs
+      - client/test/a11y-gate.mjs
+  workflow_dispatch:
+    inputs:
+      runs_per_job:
+        description: Suite runs per job
+        default: '3'
+      jobs:
+        description: Parallel jobs (1-8)
+        default: '6'
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - id: m
+        run: |
+          n=$(( ${{ inputs.jobs || 6 }} )); [ "$n" -ge 1 ] && [ "$n" -le 8 ] || n=6
+          echo "matrix=$(seq -s, 1 $n | sed 's/^/[/; s/$/]/')" >> "$GITHUB_OUTPUT"
+  soak:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      PRI_FEATURE_PLACEMENT: '1'
+      PRI_FEATURE_EXTENDED_TRACKS: '1'
+      PRI_FEATURE_AUSTRALIA: '1'
+      PRI_A11Y_EVIDENCE_DIR: ${{ github.workspace }}/a11y-evidence
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci --prefix client
+      - run: npx playwright install --with-deps chromium
+        working-directory: client
+      - name: Run the accessibility suite repeatedly
+        run: |
+          set -o pipefail
+          fails=0
+          for i in $(seq 1 ${{ inputs.runs_per_job || 3 }}); do
+            echo "::group::run $i"
+            start=$(date +%s)
+            if npm run test:a11y 2>&1 | tee "a11y-run-$i.log"; then r=pass; else r=FAIL; fails=$((fails+1)); fi
+            echo "run $i: $r in $(( $(date +%s) - start ))s" | tee -a soak-summary.txt
+            echo "::endgroup::"
+          done
+          cat soak-summary.txt
+          test "$fails" -eq 0
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: a11y-soak-lane-${{ matrix.lane }}
+          path: |
+            a11y-run-*.log
+            soak-summary.txt
+            a11y-evidence/
+          if-no-files-found: warn

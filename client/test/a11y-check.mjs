@@ -60,7 +60,7 @@
 import { chromium } from '@playwright/test';
 import { createServer } from 'node:http';
 import { spawnSync } from 'node:child_process';
-import { readFileSync, existsSync, statSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, existsSync, statSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -517,6 +517,103 @@ async function reachAnswerModeQuestion(page, base, { attempts = 20 } = {}) {
   throw new Error('no Type/Write/Photo practice question reachable within the bounded search');
 }
 
+// ── Evidence when a view does not open ───────────────────────────────────────
+// A step that times out used to leave one line: "waitForSelector: Timeout".
+// That is not enough to tell a slow boot from a crashed one, a stale service
+// worker from a wedged document. So on a step failure the page is asked what
+// state it is in — without changing any expectation or any timeout — and the
+// answer is printed into the suite's own log and a screenshot is written to
+// the evidence directory (PRI_A11Y_EVIDENCE_DIR, which CI uploads).
+//
+// Every read is bounded: a document that is wedged must not hang the suite
+// twice, so the whole collection races a short clock and whatever came back by
+// then is what is reported.
+
+const EVIDENCE_DIR = process.env.PRI_A11Y_EVIDENCE_DIR || join(tmpdir(), 'pri-a11y-evidence');
+const CONSOLE_TAIL = 30;
+const EVIDENCE_BUDGET_MS = 8000;
+
+function describeDocument() {
+  const root = document.getElementById('root');
+  const sw = navigator.serviceWorker;
+  const nav = performance.getEntriesByType('navigation')[0];
+  return {
+    href: location.href,
+    readyState: document.readyState,
+    visibility: document.visibilityState,
+    rootChildren: root ? root.childElementCount : null,
+    rootFirst: root?.firstElementChild ? `${root.firstElementChild.tagName.toLowerCase()}.${root.firstElementChild.className || ''}`.slice(0, 80) : null,
+    bodyClasses: (document.body?.className || '').slice(0, 120),
+    shell: !!document.querySelector('.shell'),
+    authWrap: !!document.querySelector('.auth-wrap'),
+    crashCard: !!document.querySelector('[id^="crash-title-"], .crash-card'),
+    // main.jsx sets this at module top level: false means the entry module
+    // never evaluated (a failed static import leaves no pageerror behind).
+    mainEvaluated: '__PRI_BUILD_FEATURES__' in window,
+    failedResources: performance.getEntriesByType('resource')
+      .filter(r => /\.(?:js|css)(?:\?|$)/.test(r.name) && (r.responseStatus === 0 || (r.transferSize === 0 && r.decodedBodySize === 0)))
+      .map(r => `${new URL(r.name).pathname}${r.responseStatus !== undefined ? ` status=${r.responseStatus}` : ''}`)
+      .slice(0, 12),
+    controller: sw?.controller ? { url: sw.controller.scriptURL, state: sw.controller.state } : null,
+    cloudOrigin: window.__PRI_CLOUD_ORIGIN__ ?? null,
+    msSinceNavigationStart: nav ? Math.round(performance.now()) : null,
+    domContentLoadedMs: nav ? Math.round(nav.domContentLoadedEventEnd) : null,
+    loadEventMs: nav ? Math.round(nav.loadEventEnd) : null,
+    transfer: nav ? { type: nav.type, swStart: Math.round(nav.workerStart || 0), responseEnd: Math.round(nav.responseEnd) } : null
+  };
+}
+
+async function describeRegistrations() {
+  if (!navigator.serviceWorker) return null;
+  const regs = await navigator.serviceWorker.getRegistrations();
+  return regs.map(r => ({
+    scope: r.scope,
+    installing: r.installing?.state || null,
+    waiting: r.waiting?.state || null,
+    active: r.active?.state || null
+  }));
+}
+
+const withBudget = (promise, ms, fallback) => Promise.race([
+  promise.catch(e => ({ error: String(e?.message || e) })),
+  new Promise(resolve => setTimeout(() => resolve(fallback), ms))
+]);
+
+async function collectEvidence(page, { view, err, consoleTail, pageErrors, failedRequests }) {
+  const started = Date.now();
+  const lines = [];
+  const say = (s) => lines.push(`      ${s}`);
+  say(`view: ${view}`);
+  say(`error: ${String(err?.message || err).split('\n')[0]}`);
+  say(`page.url(): ${(() => { try { return page.url(); } catch { return '(unavailable)'; } })()}`);
+
+  const doc = await withBudget(page.evaluate(describeDocument), EVIDENCE_BUDGET_MS / 2, { timedOut: true });
+  say(`document: ${JSON.stringify(doc)}`);
+  const regs = await withBudget(page.evaluate(describeRegistrations), EVIDENCE_BUDGET_MS / 4, { timedOut: true });
+  say(`service worker registrations: ${JSON.stringify(regs)}`);
+
+  const tail = consoleTail.slice(-CONSOLE_TAIL);
+  say(`console (last ${tail.length} of ${consoleTail.length}):`);
+  for (const c of tail) say(`  [${c.at}] ${c.type}: ${c.text.slice(0, 300)}`);
+  say(`pageerrors (${pageErrors.length}):`);
+  for (const e of pageErrors.slice(-10)) say(`  ${String(e).slice(0, 300)}`);
+  say(`failed requests (last ${Math.min(failedRequests.length, 10)} of ${failedRequests.length}):`);
+  for (const r of failedRequests.slice(-10)) say(`  [${r.at}] ${r.method} ${r.url} — ${r.reason}`);
+
+  try {
+    mkdirSync(EVIDENCE_DIR, { recursive: true });
+    const slug = view.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase();
+    const shot = join(EVIDENCE_DIR, `${slug}.png`);
+    await withBudget(page.screenshot({ path: shot, fullPage: false, timeout: EVIDENCE_BUDGET_MS / 4 }), EVIDENCE_BUDGET_MS / 4, null);
+    writeFileSync(join(EVIDENCE_DIR, `${slug}.txt`), lines.map(l => l.trimStart()).join('\n') + '\n');
+    say(`screenshot: ${shot}`);
+  } catch (e) {
+    say(`screenshot failed: ${String(e?.message || e).split('\n')[0]}`);
+  }
+  say(`evidence collected in ${Date.now() - started} ms`);
+  console.log(`\n  ✖ view did not open — evidence\n${lines.join('\n')}\n`);
+}
+
 // ── The suite ────────────────────────────────────────────────────────────────
 
 async function run() {
@@ -542,6 +639,18 @@ async function run() {
     const page = await ctx.newPage();
     const pageErrors = [];
     page.on('pageerror', e => pageErrors.push(e.message));
+    // A rolling tail of the console: the evidence a failed step prints. Kept
+    // bounded so a chatty view cannot grow it without limit over 60+ views.
+    const consoleTail = [];
+    const failedRequests = [];
+    page.on('requestfailed', req => {
+      failedRequests.push({ at: new Date().toISOString().slice(11, 23), method: req.method(), url: req.url().slice(0, 200), reason: req.failure()?.errorText || 'unknown' });
+      if (failedRequests.length > 40) failedRequests.splice(0, failedRequests.length - 20);
+    });
+    page.on('console', msg => {
+      consoleTail.push({ at: new Date().toISOString().slice(11, 23), type: msg.type(), text: msg.text() });
+      if (consoleTail.length > CONSOLE_TAIL * 4) consoleTail.splice(0, consoleTail.length - CONSOLE_TAIL * 2);
+    });
     const cdp = await ctx.newCDPSession(page);
     await cdp.send('Accessibility.enable');
     await cdp.send('DOM.enable');
@@ -594,6 +703,9 @@ async function run() {
         await audit(view, route);
       } catch (err) {
         skipped.push(`${view} — ${String(err.message || err).split('\n')[0].slice(0, 130)}`);
+        await collectEvidence(page, { view, err, consoleTail, pageErrors, failedRequests }).catch(e => {
+          console.log(`  (evidence collection itself failed: ${String(e?.message || e).split('\n')[0]})`);
+        });
       }
     };
 
