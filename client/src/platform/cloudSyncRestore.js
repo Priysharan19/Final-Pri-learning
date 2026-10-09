@@ -25,7 +25,6 @@
 //     Match). Shared class/assignment records never enter through here.
 
 import { add, atomicBatch, byIndex, get, put } from '../local/idb.js';
-import { blindHash } from '../local/auth.js';
 import { dayKey, timezoneOf } from '../lib/locale.js';
 import { START_RATING, gradeFor, scheduleReview, updateRating, xpFor } from '../engine/adaptive.js';
 
@@ -148,20 +147,12 @@ async function alreadyRestored(store, id) {
  * the activity row for the day it happened and the XP it earned. Returns
  * 'applied' or 'duplicate'.
  */
-async function applyPracticeEvent(pid, profile, event, issuedRow = null) {
-  // A question this device was issued is recorded under the SAME exactly-once
-  // claim its own resolution uses (backend.js resolve()). Whichever of the two
-  // writes first wins the exclusive add; the other is a duplicate. So an
-  // answer is never counted twice, and one the server marked but this device
-  // never wrote (a lost reply, then the student moved on) is not lost either.
-  const id = issuedRow
-    ? `${pid}:resolved:${await blindHash(`practice-resolution:${issuedRow.id}`)}`
-    : restoredRowId(pid, event.id);
-  const taken = async () => (issuedRow ? !!(await get('attempts', id).catch(() => null)) : alreadyRestored('attempts', id));
-  if (await taken()) return 'duplicate';
+async function applyPracticeEvent(pid, profile, event) {
+  const id = restoredRowId(pid, event.id);
+  if (await alreadyRestored('attempts', id)) return 'duplicate';
   const p = event.payload;
   const at = eventTime(event) || Date.now();
-  const attempt = { ...attemptRowFrom(pid, event, at), ...(issuedRow ? { id, questionId: issuedRow.id, serverAttemptId: event.id } : {}) };
+  const attempt = attemptRowFrom(pid, event, at);
   const owner = attempt.subtopic;
   const correct = !!p.correct;
   const mode = attempt.mode;
@@ -218,9 +209,8 @@ async function applyPracticeEvent(pid, profile, event, issuedRow = null) {
     await atomicBatch(ops);
   } catch (error) {
     // The exclusive `add` is the exactly-once claim: a collision means another
-    // pull (or this device's own resolution) already recorded it, and the
-    // whole batch was rolled back.
-    if (await taken()) return 'duplicate';
+    // pull already restored this event, and the whole batch was rolled back.
+    if (await alreadyRestored('attempts', id)) return 'duplicate';
     throw error;
   }
   return { applied: true, xp };
@@ -299,25 +289,52 @@ async function creditXp(pid, xp) {
 const GRADE_IN_FLIGHT_MS = 2 * 60 * 1000;
 const gradeInFlight = row => !row.answered && !!row.pendingGrade && Date.now() - num(row.pendingGrade.at, 0) < GRADE_IN_FLIGHT_MS;
 
+// A server-marked attempt on a question THIS device was issued is settled by
+// the device's own resolution routine, which the local backend registers here:
+// the attempt (under the same exactly-once claim a submit uses), the rating,
+// review and activity, the question row and any task progress are one write.
+// A partial copy written from here would leave the question open, so that a
+// replayed submit collides with the claim instead of returning the verdict.
+let recordIssuedAttempt = null;
+export function registerIssuedAttemptRecorder(fn) { recordIssuedAttempt = typeof fn === 'function' ? fn : null; }
+
 /**
- * Record server-marked attempts that were deferred because this device's own
- * submit was in flight, once it is clear that submit never recorded them.
- * Run on every sync pass, with or without new events.
+ * Settle an issued question from its server event. Returns the usual outcome,
+ * or 'deferred' when it must wait: the device's own submit is in flight, or
+ * the recorder is not loaded yet. A deferred event is kept on the row.
+ */
+async function settleIssued(pid, rowId, event) {
+  const row = await get('questions', rowId).catch(() => null);
+  if (!row || row.answered) return 'duplicate';
+  if (gradeInFlight(row) || !recordIssuedAttempt) {
+    if (!row.deferredGrade || row.deferredGrade.event?.id !== event.id) await put('questions', { ...row, deferredGrade: { event, at: Date.now() } });
+    return 'deferred';
+  }
+  return recordIssuedAttempt(pid, rowId, event);
+}
+
+/**
+ * Settle server-marked attempts that were held back while this device's own
+ * submit was in flight, once that submit is no longer running. Run on every
+ * sync pass, with or without new events.
  */
 export async function reconcileDeferredGrades(pid) {
   let applied = 0;
-  const profile = await get('profiles', pid).catch(() => null);
-  if (!profile) return applied;
-  for (const row of await byIndex('questions', 'pid', pid)) {
-    if (!row.deferredGrade) continue;
-    if (!row.answered && Date.now() - num(row.deferredGrade.at, 0) < GRADE_IN_FLIGHT_MS && gradeInFlight(row)) continue;
+  for (const listed of await byIndex('questions', 'pid', pid)) {
+    if (!listed.deferredGrade) continue;
+    // Decide on the row as it is now, not as it was listed: a retry may have
+    // started, or the submit may have finished, since.
+    const row = await get('questions', listed.id).catch(() => null);
+    if (!row?.deferredGrade || gradeInFlight(row)) continue;
     const event = row.deferredGrade.event;
-    const { deferredGrade: _dropped, ...rest } = row;
-    if (!row.answered && plain(event) && event.kind === 'graded-attempt') {
-      const outcome = await applyPracticeEvent(pid, profile, { ...event, payload: plain(event.payload) ? event.payload : {} }, row);
-      if (outcome && outcome !== 'duplicate' && outcome !== 'unsupported') applied++;
-    }
-    await put('questions', rest);
+    if (!row.answered && plain(event) && event.kind === 'graded-attempt' && recordIssuedAttempt) {
+      const outcome = await recordIssuedAttempt(pid, row.id, { ...event, payload: plain(event.payload) ? event.payload : {} });
+      if (outcome && outcome.applied) applied++;
+    } else if (!row.answered && !recordIssuedAttempt) continue;
+    // Whatever happened, the copy kept with the row is no longer needed. Strip
+    // it from the row as it stands after that write.
+    const after = await get('questions', row.id).catch(() => null);
+    if (after?.deferredGrade) { const { deferredGrade: _dropped, ...rest } = after; await put('questions', rest); }
   }
   return applied;
 }
@@ -364,14 +381,6 @@ export async function applyRemoteLearningEvents(pid, events) {
         summary.duplicates++;
         continue;
       }
-      if (issuedRow && gradeInFlight(issuedRow)) {
-        // The submit that produced this event is still running here and will
-        // record it itself. Keep the event on the row: if that write never
-        // happens, reconcileDeferredGrades() records it on a later pass.
-        await put('questions', { ...(await get('questions', issuedRow.id).catch(() => issuedRow) || issuedRow), deferredGrade: { event, at: Date.now() } });
-        summary.duplicates++;
-        continue;
-      }
       // A client cannot publish graded-attempt through /sync/push: it is
       // excluded from server APPEND_EVENT. The server alone writes it, using
       // the reserved device identity in the same DB transaction as the grade.
@@ -383,7 +392,12 @@ export async function applyRemoteLearningEvents(pid, events) {
           // local resolve() already records it, so restore must not omit it.
           (event.payload?.revealed !== true || event.payload?.correct === false) &&
           safeId(event.payload?.subtopic)
-        ? await applyPracticeEvent(pid, profile, event, issuedRow) : 'unsupported';
+        ? (issuedRow ? await settleIssued(pid, issuedRow.id, event) : await applyPracticeEvent(pid, profile, event)) : 'unsupported';
+      // An issued question whose event cannot be settled through the device's
+      // own routine (an event from before marks were carried) is restored as
+      // any other device's attempt would be.
+      if (issuedRow && outcome === 'unsupported' && event.deviceId === 'server-grader') outcome = await applyPracticeEvent(pid, profile, event);
+      if (outcome === 'deferred') { summary.duplicates++; continue; }
     }
     else if (event.kind === 'exam-attempt') outcome = await applyExamEvent(pid, event);
     else if (event.kind === 'rush-history') outcome = await applyRunEvent(pid, event, 'rushRuns', ['score', 'correct', 'total', 'bestCombo', 'createdAt']);

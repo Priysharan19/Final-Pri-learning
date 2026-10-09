@@ -13,6 +13,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const SHIPPING_BUNDLE = 'com.prilearning.app';
 
@@ -92,7 +93,7 @@ export function checkArchive(path, { sha = null } = {}) {
   return { problems, info, releaseSha };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2);
   const shaAt = args.indexOf('--sha');
   const sha = shaAt >= 0 ? args[shaAt + 1] : null;

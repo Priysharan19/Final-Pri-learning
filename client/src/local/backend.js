@@ -65,6 +65,7 @@ import { requestTutorHelp } from './tutorBridge.js';
 import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
 import { cloud } from '../platform/cloudTransport.js';
+import { registerIssuedAttemptRecorder } from '../platform/cloudSyncRestore.js';
 import { publicQuestionFields } from '../engine/publicQuestion.js';
 import { rasterizeInk } from '../ink/cloudRaster.js';
 import { preparePhoto } from '../ink/photoRaster.js';
@@ -5414,6 +5415,45 @@ async function gradeOnServer(row, body, submissionId, requestDigest) {
   certifiedPracticeMarks(acknowledged);
   return acknowledged;
 }
+
+// The sync pull hands a server-marked attempt on a question this device was
+// issued to the same resolution routine a submit uses (see cloudSyncRestore).
+registerIssuedAttemptRecorder(async (pid, rowId, event) => {
+  const profile = await get('profiles', pid).catch(() => null);
+  const row = await get('questions', rowId).catch(() => null);
+  if (!profile || !row || row.pid !== pid || row.serverQuestionId !== String(event.entityId || '')) return 'unsupported';
+  if (row.answered) return 'duplicate';
+  const p = event.payload || {};
+  // The receipt this device never received, rebuilt from the server's own
+  // event. It carries the verdict and the marks; the solution was only in the
+  // reply, so it is absent until the student opens the question again online.
+  const receipt = {
+    authoritative: true, questionId: row.serverQuestionId, attemptId: String(event.id), resolved: true,
+    correct: p.correct === true, ...(p.revealed === true ? { revealed: true } : {}),
+    marksEarned: p.marksEarned, marksPossible: p.marksPossible,
+    serverAcknowledgedAt: Number(p.serverAcknowledgedAt) || Number(event.occurredAt) || Date.now(),
+    ...(p.repeat === true ? { repeat: true } : {}), fromServerEvent: true
+  };
+  try { certifiedPracticeMarks(receipt); } catch { return 'unsupported'; }
+  const pending = row.pendingGrade || null;
+  row.serverReceipt = receipt;
+  row.pendingGrade = null;
+  delete row.deferredGrade;
+  if (!receipt.correct) row.tries = Math.max(row.tries || 0, 1);
+  try {
+    await resolve(profile, row, row.payload, receipt.correct, receipt.revealed ? 'revealed' : String(pending?.payload?.answer ?? ''),
+      Math.max(0, Number(pending?.payload?.ms) || 0), row.mode, pending?.mode === 'ink', {
+        // The submission that was in flight when the reply was lost: a replay
+        // of it now finds this verdict instead of colliding with the claim.
+        submission: pending?.submissionId ? { submissionId: pending.submissionId, requestDigest: pending.digest, trapHit: null } : null,
+        syncQueue: false
+      });
+  } catch (error) {
+    if (error?.code === 'ALREADY_RESOLVED') return 'duplicate';
+    throw error;
+  }
+  return { applied: true, xp: 0 };
+});
 
 const mutationQueues = new Map();
 

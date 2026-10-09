@@ -40,6 +40,9 @@ const claimOf = async q => `${me.id}:resolved:${await blindHash(`practice-resolu
   const row = attemptsOf()[0];
   eq([row.id, row.serverAttemptId, row.questionId], [await claimOf(q), `attempt-${q.id}`, q.id], 'under the device\'s own exactly-once claim, linked to the server attempt and the local question');
   ok(await xp() > before, 'and its progress reaches this device');
+  const settled = await idb.get('questions', q.id);
+  eq([settled.answered, !!settled.resolvedAt, settled.serverReceipt?.attemptId, settled.pendingGrade ?? null, 'deferredGrade' in settled],
+    [1, true, `attempt-${q.id}`, null, false], 'and the question itself is settled in the same write, with the server receipt');
   const again = await applyRemoteLearningEvents(me.id, [eventFor(q)]);
   eq([again.applied, attemptsOf().length], [0, 1], 'pulling it again records nothing more');
 }
@@ -73,8 +76,39 @@ const claimOf = async q => `${me.id}:resolved:${await blindHash(`practice-resolu
   const held = await idb.get('questions', q.id);
   await idb.put('questions', { ...held, pendingGrade: { ...held.pendingGrade, at: Date.now() - 10 * 60 * 1000 }, deferredGrade: { ...held.deferredGrade, at: Date.now() - 10 * 60 * 1000 } });
   eq([await reconcileDeferredGrades(me.id), attemptsOf().length], [1, count + 1], 'a deferred event whose submit never finished is recorded on a later pass');
+  const settled = await idb.get('questions', q.id);
+  eq([settled.answered, settled.resolution?.submissionId, settled.pendingGrade ?? null, 'deferredGrade' in settled], [1, 's-abandoned-0001', null, false],
+    'the question is settled under the submission that was in flight, so a replay of it finds the verdict');
   eq(attemptsOf().find(a => a.questionId === q.id)?.id, await claimOf(q), 'under the same claim');
   eq([await reconcileDeferredGrades(me.id), attemptsOf().length], [0, count + 1], 'and only once');
+}
+
+// 3c · a retry starts after the window: the deferred copy must wait for it
+{
+  const q = await question({ pendingGrade: { submissionId: 's-retried-000001', at: Date.now() } });
+  const count = attemptsOf().length;
+  await applyRemoteLearningEvents(me.id, [eventFor(q)]);
+  const held = await idb.get('questions', q.id);
+  // the deferred copy is old, but the student has just pressed Retry
+  await idb.put('questions', { ...held, deferredGrade: { ...held.deferredGrade, at: Date.now() - 10 * 60 * 1000 }, pendingGrade: { submissionId: 's-retried-000001', at: Date.now(), marker: 'retry' } });
+  eq([await reconcileDeferredGrades(me.id), attemptsOf().length], [0, count], 'while a retry is in flight an old deferred event is not recorded');
+  const after = await idb.get('questions', q.id);
+  eq([after.pendingGrade?.marker, !!after.deferredGrade, after.answered], ['retry', true, 0], 'and the running submit\'s state is left exactly as it was');
+}
+
+// 3d · the reply was lost, the pull settled it, and THEN the card replays the submit
+{
+  const { submissionDigest } = await import('../src/local/backend.js');
+  const submissionId = 's-replayed-00001';
+  const q = await question({ pendingGrade: { submissionId, digest: submissionDigest('42', undefined), mode: 'typed', payload: { submissionId, answer: '42', mode: 'typed', ms: 900 }, at: Date.now() - 10 * 60 * 1000 } });
+  const count = attemptsOf().length;
+  await applyRemoteLearningEvents(me.id, [eventFor(q)]);
+  eq(attemptsOf().length, count + 1, 'an abandoned submit\'s server attempt is recorded by the pull');
+  let replay = null, refused = null;
+  try { replay = await dispatch('POST', `/practice/${q.id}/submit`, { answer: '42', submissionId, ms: 900 }); } catch (e) { refused = e?.code || String(e?.message); }
+  eq([refused, replay?.correct, replay?.resolved, replay?.authoritative, replay?.attemptId], [null, true, true, true, `attempt-${q.id}`],
+    'replaying that submission returns the server\'s verdict, not "already finished"');
+  eq(attemptsOf().length, count + 1, 'and records nothing more');
 }
 
 // 4 · another device's attempt (no local question) is imported as before
