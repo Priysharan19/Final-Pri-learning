@@ -5399,7 +5399,9 @@ async function gradeOnServer(row, body, submissionId, requestDigest) {
         submissionId, answer: String(body.answer), mode, steps: body.steps,
         ms: body.ms, ...(receipt ? { transcriptionReceipt: receipt } : {})
       };
-  row.pendingGrade = { submissionId, digest: requestDigest, mode, receipt: receipt || null, payload };
+  // `at` lets a sync pull tell a grade in flight from one abandoned after the
+  // server committed it (cloudSyncRestore: issued-here events).
+  row.pendingGrade = { submissionId, digest: requestDigest, mode, receipt: receipt || null, payload, at: Date.now() };
   await put('questions', row);
   const acknowledged = await viaServer(() => cloud.gradePractice(row.serverQuestionId, payload));
   if (acknowledged?.authoritative !== true || acknowledged.questionId !== row.serverQuestionId ||
