@@ -960,6 +960,61 @@ function isolatedFinalAnswer(claim, meta) {
 }
 
 /**
+ * A single straightforward linear operation can transform a *shown* authored
+ * equation directly into its root, without an intermediate line:
+ *   2t = t - 3 -> t = -3          (subtract t)
+ *   x + 2 = 4 -> x = 2           (subtract 2)
+ *   3x = 6 -> x = 2              (divide by 3)
+ * This is ONE verified method step, not an extra award for saying the answer.
+ * Arbitrary solutions, e.g. 6m+15=7m+29 -> m=-14, demand more than one
+ * operation and must show genuine intermediate progress for method credit.
+ *
+ * The calculation only recognises exact affine arithmetic from a single
+ * variable; unsupported/nonlinear/domain-sensitive equations fail closed.
+ */
+function oneStepLinearRoot(meta, originals) {
+  if (meta?.kind !== 'equation' || !meta.variable || uniqueNumeric(meta.solutions).length !== 1) return false;
+  const linear = node => {
+    const n = unwrapGroup(node);
+    if (!n) return null;
+    if (n.t === 'num') return { a: 0, b: Number(n.v) };
+    if (n.t === 'var') return n.v === meta.variable ? { a: 1, b: 0 } : null;
+    if (n.t === 'neg') {
+      const v = linear(n.v);
+      return v ? { a: -v.a, b: -v.b } : null;
+    }
+    if (n.t !== 'bin') return null;
+    const l = linear(n.l), r = linear(n.r);
+    if (!l || !r) return null;
+    if (n.op === '+') return { a: l.a + r.a, b: l.b + r.b };
+    if (n.op === '-') return { a: l.a - r.a, b: l.b - r.b };
+    if (n.op === '*') {
+      if (l.a && r.a) return null;
+      return { a: l.a * r.b + l.b * r.a, b: l.b * r.b };
+    }
+    if (n.op === '/' && r.a === 0 && r.b !== 0) return { a: l.a / r.b, b: l.b / r.b };
+    return null;
+  };
+  for (const source of originals) {
+    if (source?.kind !== 'equation') continue;
+    const l = linear(source.ast.l), r = linear(source.ast.r);
+    if (!l || !r || ![l.a,l.b,r.a,r.b].every(Number.isFinite)) continue;
+    const a = l.a - r.a, b = r.b - l.b;
+    if (!a || !numsClose(b / a, Number(meta.solutions[0]))) continue;
+    // One step: remove a variable term when the other side's coefficient
+    // becomes 1 and one side has no constant to also collect.
+    const subtractVariable = Math.abs(a) === 1 && (l.b === 0 || r.b === 0);
+    // Or operate once on an already isolated single variable: subtract a
+    // constant, or divide a single coefficient (not BOTH).
+    const singleSide = (l.a === 0) !== (r.a === 0);
+    const singleOperation = singleSide &&
+      (Math.abs(a) === 1 || (l.b === 0 && r.b === 0));
+    if (subtractVariable || singleOperation) return true;
+  }
+  return false;
+}
+
+/**
  * Method marks for a wrong final answer, from the student's working.
  * Returns null when nothing in the working could be verified; otherwise
  * { okLines, progressLines, awarded, note, report }.
@@ -976,6 +1031,7 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
   const given = questionClaims(meta, prompt);
   const counted = [];
   let restated = 0;
+  let shownAuthoredEquation = false;
   const total = Math.max(1, Number(marks) || 1);
   const cap = Math.max(0, total - 1);
   // The per-line mark vector: one entry per written line, in order, saying
@@ -985,7 +1041,11 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
     const row = { index, text: String(l.text ?? ''), status: l.status, mark: 0, reason: l.status === 'ok' ? 'progress' : l.status };
     if (l.status !== 'ok') return row;
     const claim = readClaim(l.text);
-    if (claim && given.some(c => methodProgressDuplicate(claim, c))) { restated++; row.reason = 'restated'; return row; }
+    if (claim && given.some(c => methodProgressDuplicate(claim, c))) {
+      restated++;
+      if (claim.kind === 'equation') shownAuthoredEquation = true;
+      row.reason = 'restated'; return row;
+    }
     // A final answer in a different spelling is still the same final answer,
     // not two independently demonstrated method criteria. This applies only
     // to single-root equations; branch and multi-root work retain their
@@ -995,7 +1055,9 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
       // After a genuine preceding method step, however, the first isolated
       // root can complete an authored step criterion exactly once. Retelling
       // that same root as +0, *1 or another arithmetic spelling earns nothing.
-      if (!counted.length) { row.reason = 'final-answer'; return row; }
+      if (!counted.length && !(shownAuthoredEquation && oneStepLinearRoot(meta, given))) {
+        row.reason = 'final-answer'; return row;
+      }
       if (counted.length >= cap) { row.reason = 'cap'; return row; }
       if (counted.some(c => isolatedFinalAnswer(c, meta))) { row.reason = 'repeat'; return row; }
     }
