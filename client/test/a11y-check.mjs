@@ -489,7 +489,24 @@ async function signInToDemo(page, base) {
 
 async function goTo(page, base, path) {
   await page.goto(base + path, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('.shell, .auth-wrap', { timeout: 20000 });
+  // A route that never shows the app (seen once in CI on the second visit to
+  // /exams, never locally) must say what WAS on screen: the root error
+  // boundary, an empty root, or a page still loading are three different
+  // faults, and "Timeout 20000ms exceeded" names none of them. No retry: a
+  // second load would hide a real crash.
+  await page.waitForSelector('.shell, .auth-wrap', { timeout: 20000 }).catch(async err => {
+    const seen = await page.evaluate(() => ({
+      url: location.pathname + location.search,
+      readyState: document.readyState,
+      rootChildren: document.getElementById('root')?.childElementCount ?? null,
+      crash: [...document.querySelectorAll('.crash-card')].map(el => el.innerText.replace(/\s+/g, ' ').slice(0, 240)),
+      alerts: [...document.querySelectorAll('[role="alert"]')].map(el => el.innerText.replace(/\s+/g, ' ').slice(0, 160)),
+      text: (document.body?.innerText || '').replace(/\s+/g, ' ').slice(0, 160),
+      serviceWorker: !!navigator.serviceWorker?.controller,
+      online: navigator.onLine
+    })).catch(e => ({ unreadable: String(e.message).split('\n')[0] }));
+    throw new Error(`${String(err.message).split('\n')[0]} · ${path} never showed the app · ${JSON.stringify(seen)}`);
+  });
   await wait(page, 700);
 }
 
