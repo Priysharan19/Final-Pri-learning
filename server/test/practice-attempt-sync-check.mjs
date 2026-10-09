@@ -1,21 +1,19 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · one practice attempt, one cloud learning event (§09/§22)
 //
-// End to end across the device/server boundary, in one process: the shipped
-// local backend, profile outbox and sync worker (client/src, on the in-memory
-// IndexedDB the client suites use) push to the shipped /v1 server (this
-// harness, SQLite by default, `--engine=postgres` on a migrated Postgres).
-// Nothing on either side is stubbed except the transport's cookie jar.
+// End to end across the device/server boundary: the shipped local backend,
+// the browser IndexedDB, the actual verified student session and the real /v1
+// question/grading middleware. SQLite by default, disposable Postgres via
+// --engine=postgres. No local grade or answer-key substitution is permitted.
 //
-// The production bug: the local commit of an attempt and its cloud-queue entry
-// were two writes, so an app killed between them left an attempt the server
-// never received — and the replay that recovered the submission did not queue
-// it either. Each case below ends with the server's own count of learning
-// events for the question: exactly one.
-//   1. killed after the commit, before the API layer queued it → replay → sync
-//   2. a crash inside the commit itself → replay marks it → sync
-//   3. a first wrong try, then the resolving try, then a replay → sync
-//   4. syncing again sends nothing twice
+// The updated server-first contract commits an authoritative receipt and
+// exactly-one graded-attempt event BEFORE a device database write. Interruptions
+// or crashes during that write must not lose, invent or duplicate the server
+// grade. The published question is solved independently in the test fixture.
+//   1. server grade committed, device API acknowledgement lost -> same receipt
+//   2. client IndexedDB write fails AFTER server COMMIT -> safe replay
+//   3. wrong try, resolving try, same-key replays -> one server progress event
+//   4. further syncing cannot create another authoritative grade
 // ─────────────────────────────────────────────────────────────────────────────
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -62,9 +60,7 @@ if (typeof globalThis.document === 'undefined') {
 const { api } = await import('../../client/src/api.js');
 const { dispatch } = await import('../../client/src/local/backend.js');
 const idb = await import('../../client/src/local/idb.js');
-const { checkAnswer } = await import('../../client/src/engine/checker.js');
 const { loadAllBanks } = await import('../../client/src/engine/generators/index.js');
-const { subtopicsForYear } = await import('../../client/src/engine/curriculum.js');
 const { loginCloudAccount } = await import('../../client/src/platform/cloudAccount.js');
 const { syncNow } = await import('../../client/src/platform/syncWorker.js');
 await loadAllBanks();
@@ -99,32 +95,88 @@ database.transaction = (stores, mode) => {
   return tr;
 };
 
-const YEAR10 = subtopicsForYear(10).map(t => t.id);
-let turn = 0;
-function canonical(q) {
-  const a = q?.answer; if (!a) return null;
-  if (a.canonicalInput !== undefined) return String(a.canonicalInput);
-  if (q.answerType === 'numeric') return a.surdForm || a.simplestFraction || a.requireExact ? null : String(a.value);
-  if (q.answerType === 'mcq') return String(a.correctIndex);
-  return null;
-}
-function wrongFor(q) {
-  if (q.answerType === 'numeric') return String((Number(q.answer.value) || 0) + 7);
-  if (q.answerType === 'mcq') return String(((q.answer.correctIndex || 0) + 1) % Math.max(2, q.mcqOptions?.length || 4));
-  return null;
+// Solve the PUBLIC one-variable linear equation independently of hidden server
+// answers. No solution, grading key or deterministic grader is read by the client.
+function solvePublishedLinear(prompt) {
+  // An independent elementary algebra oracle from the visible prompt only.
+  // Understand the published equation, not its server-secret answer key.
+  const equation = String(prompt || '').match(/\$([^$]+)\$/)?.[1];
+  if (!equation || equation.split('=').length !== 2) return null;
+  function parse(raw) {
+    // LaTeX fractions are plain rational factors. These generated equations
+    // use constant denominators; a variable denominator is not linear.
+    const expression = raw.replace(/\\frac\{([^{}]+)\}\{([^{}]+)\}/g, '(($1)/($2))')
+      .replace(/\s+/g, '');
+    const token = expression.match(/(?:\d+(?:\.\d*)?|\.\d+|[a-z]|[()+*/-])/gi);
+    if (!token || token.join('') !== expression) return null;
+    let cursor = 0;
+    const value = (c, x=0) => ({c,x});
+    function plus(a,b){return value(a.c+b.c,a.x+b.x);}
+    function multiply(a,b){
+      if (Math.abs(a.x*b.x)>1e-10) throw Error('nonlinear term');
+      return value(a.c*b.c,a.c*b.x+a.x*b.c);
+    }
+    function factor() {
+      const t=token[cursor++];
+      if(t==='-'){const v=factor();return value(-v.c,-v.x);}
+      if(t==='+') return factor();
+      if(t==='('){const v=sum();if(token[cursor++]!==')')throw Error('brackets');return v;}
+      if(t && (/^\d/.test(t) || /^\.\d/.test(t))) return value(Number(t));
+      if(t && /^[a-z]$/i.test(t)) return value(0,1);
+      throw Error('bad token');
+    }
+    function product(){
+      let v=factor();
+      while(cursor<token.length){
+        const t=token[cursor];
+        if(t==='*' || t==='/'){
+          cursor++;
+          const b=factor();
+          if(t==='*')v=multiply(v,b);
+          else{
+            if(Math.abs(b.x)>1e-10 || Math.abs(b.c)<1e-10)throw Error('not linear fraction');
+            v=value(v.c/b.c,v.x/b.c);
+          }
+        } else if(t==='(' || /^(?:\d|[a-z]|\.)/i.test(t)){
+          v=multiply(v,factor()); // implicit multiplication such as 3x, 2(x+1)
+        } else break;
+      }
+      return v;
+    }
+    function sum(){
+      let v=product();
+      while(token[cursor]==='+' || token[cursor]==='-'){
+        const sign=token[cursor++]==='+'?1:-1;
+        const b=product();
+        v=plus(v,value(b.c*sign,b.x*sign));
+      }
+      return v;
+    }
+    try{
+      const solved=sum();
+      return cursor===token.length?solved:null;
+    }catch{return null;}
+  }
+  const [left,right]=equation.split('=').map(parse);
+  if(!left || !right || Math.abs(left.x-right.x)<1e-10)return null;
+  const answer=(right.c-left.c)/(left.x-right.x);
+  return Number.isFinite(answer) ? String(Number(answer.toFixed(9))) : null;
 }
 async function markable() {
   for (let i = 0; i < 60; i++) {
-    const s = await api.post('/practice/next', { mode: 'topic', subtopic: YEAR10[turn++ % YEAR10.length], resume: false });
-    const q = (await idb.get('questions', s.question.id)).payload;
-    const right = canonical(q), wrong = wrongFor(q);
-    if (right !== null && wrong !== null && checkAnswer(q, right).correct && !checkAnswer(q, wrong).correct
-      && !checkAnswer(q, wrong).invalid && !(q.answerType === 'mcq' && q.answer.optionTraps?.[Number(wrong)])) {
-      return { id: s.question.id, right, wrong };
+    const s = await api.post('/practice/next', {
+      mode:'topic', subtopic:'c8-linear-equations-both-sides',
+      difficulty:2, dotpoint:1, track:'cbse', resume:false
+    });
+    const local = await idb.get('questions', s.question.id);
+    const right = solvePublishedLinear(s.question.prompt);
+    const wrong = right === null ? null : String(Number(right)+7);
+    if (s.question.answerType === 'numeric' && right !== null && wrong !== null && local.serverQuestionId) {
+      return { id:s.question.id, serverId:local.serverQuestionId, right, wrong };
     }
-    await api.post(`/practice/${s.question.id}/discard`, {});
+    await api.post('/practice/'+s.question.id+'/discard',{});
   }
-  throw new Error('no markable question was served');
+  throw new Error('no server-issued markable public linear question was served');
 }
 
 try {
@@ -137,16 +189,20 @@ try {
   const verified = await verifyEmail(app, accountId);
   c.ok(verified.status === 200, `its email is verified (${verified.status})`);
 
-  const me = (await api.post('/profiles', { name: 'Attempt Sync', year: 10 })).user;
+  const me = (await api.post('/profiles', { name: 'Attempt Sync', year: 8, course: 'in', indiaTrack: 'cbse' })).user;
   await loginCloudAccount(me.id, { email, password });
   const first = await syncNow(me.id);
   c.eq(first.requiresFullRescan, false, 'the first sync reconciles the new profile');
 
-  const serverEvents = async (qid) => (await db.all(
-    'SELECT id, kind FROM learning_events WHERE account_id=? AND entity_id=?', [accountId, qid]
-  ));
+  const serverEvents = async (localId) => {
+    const local = await idb.get('questions', localId);
+    return db.all(
+      "SELECT id, kind FROM learning_events WHERE account_id=? AND entity_id=? AND kind='graded-attempt'",
+      [accountId, local.serverQuestionId]
+    );
+  };
 
-  // ── 1 · killed after the commit, before the API layer ran ──────────────────
+  // ── 1 · server committed, device loses acknowledgement ──────────────────
   const a = await markable();
   const committed = await dispatch('POST', `/practice/${a.id}/submit`, { answer: a.right, ms: 600, submissionId: 'sub_sync_case_one_01' });
   c.eq(committed.resolved, true, 'the attempt committed on the device');
@@ -155,15 +211,15 @@ try {
   await syncNow(me.id);
   const eventsA = await serverEvents(a.id);
   c.eq(eventsA.length, 1, `the server holds exactly one learning event for it (${eventsA.length})`);
-  c.eq(eventsA[0]?.kind, 'practice-progress', 'a practice-progress event');
+  c.eq(eventsA[0]?.kind, 'graded-attempt', 'a server-attested graded-attempt event');
 
-  // ── 2 · a crash inside the commit ──────────────────────────────────────────
+  // ── 2 · client-side IndexedDB crash after the server committed ──────────────────────────────────────────
   const b = await markable();
   crashQueueWrite = true;
   const crashed = await api.post(`/practice/${b.id}/submit`, { answer: b.right, ms: 600, submissionId: 'sub_sync_case_two_02' }).then(() => null, e => e);
   c.ok(crashed && /simulated crash/.test(crashed.message), 'the commit died mid-transaction');
   await syncNow(me.id);
-  c.eq((await serverEvents(b.id)).length, 0, 'nothing reached the server for a commit that never happened');
+  c.eq((await serverEvents(b.id)).length, 1, 'server grade was committed before the interrupted device write');
   const replayB = await api.post(`/practice/${b.id}/submit`, { answer: b.right, ms: 600, submissionId: 'sub_sync_case_two_02' });
   c.eq(replayB.resolved, true, 'the relaunch marks it now');
   await syncNow(me.id);
