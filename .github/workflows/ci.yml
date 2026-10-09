@@ -239,9 +239,23 @@ jobs:
           node server/test/question-photo-check.mjs
           node server/test/tutor-help-check.mjs
           node server/test/tutor-device-journey-check.mjs
+          node server/test/tutor-issued-grounding-check.mjs
           node server/test/tutor-stream-check.mjs
           node server/test/spend-ceiling-check.mjs
           node server/test/guardian-consent-check.mjs
+      # Real HTTP against the shipped app, no mocked receipts. Method marks need
+      # progress (neutral working earns 0, one genuine step earns partial marks,
+      # replays are identical, the persisted attempt carries the same marks), and
+      # issuing by seed is deterministic, answer-free and per-account — which is
+      # what lets the server adopt a question a device started. Both also run on
+      # Postgres below.
+      - name: Server-issued practice over HTTP (method progress, seed re-issue, tutor grounding negatives)
+        run: |
+          set -o pipefail
+          node server/test/method-progress-http-check.mjs 2>&1 | tee practice-http.log
+          node server/test/practice-seed-reissue-check.mjs 2>&1 | tee -a practice-http.log
+          grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1143/1143 checks' practice-http.log
+          grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
       - name: Account, origin, CMS and classroom contracts
         run: |
           node server/test/account-deletion-reauth-check.mjs
@@ -297,8 +311,12 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 36/36 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 40/40 suites' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
+          grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
+          grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
+          grep -Fq '✓ method-progress-http-check.mjs' platform-postgres.log
+          grep -Fq '✓ practice-seed-reissue-check.mjs' platform-postgres.log
           grep -Fq '✓ security-acceptance-check.mjs' platform-postgres.log
           grep -Fq '✓ abuse-limits-check.mjs' platform-postgres.log
           grep -Fq '✓ google-billing-check.mjs' platform-postgres.log
