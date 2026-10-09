@@ -3528,7 +3528,11 @@ const routes = {
       return { ...certified,
         correct: false, resolved: false,
         triesLeft: authoritative ? authoritative.triesLeft : Math.max(0, 1 - (row.tries || 0)),
-        invalid: true, feedback, stepReport };
+        invalid: true, feedback, stepReport,
+        // The card matches a server receipt to the submission it sent. Without
+        // this an unreadable answer on a server-issued question was shown as
+        // "the server response did not match this submission".
+        ...(submissionId ? { submissionId } : {}) };
     }
     if (authoritative) {
       // The persisted server receipt—not an inferred local grade—is the
