@@ -757,13 +757,21 @@ ok(!/^\s*import\s/m.test(read('src/i18n/ncertTerms.js')), 'and the glossary impo
 // ─────────────────────────────────────────────────────────────────────────────
 installBrowserEnv();
 resetStorage();
+// Checking an answer is online-only and server-authoritative (owner decision
+// 2026-10-10), so the "real work" below is marked by the real server: the
+// shipped /v1 app in-process, and a real verified account for the student.
+const { startOnlineAuthority, nextSubmissionId } = await import('./support/online-authority.mjs');
+const online = await startOnlineAuthority({ label: 'i18n' });
 const { dispatch } = await import(`${SRC}local/backend.js`);
 // In the app the UI loads the question banks before it asks for a question.
 // This suite talks to dispatch() directly, so it does that job itself.
 const { loadAllBanks } = await import(`${SRC}engine/generators/index.js`);
 await loadAllBanks();
 const GET = (path, body) => dispatch('GET', path, body);
-const POST = (path, body) => dispatch('POST', path, body);
+// One tap is one submission: each submit carries a fresh idempotency key, the
+// way the card mints one, unless the caller names its own.
+const POST = (path, body) => dispatch('POST', path,
+  /^\/practice\/[^/]+\/submit$/.test(path) && body && !body.submissionId ? { ...body, submissionId: nextSubmissionId() } : body);
 const PATCH = (path, body) => dispatch('PATCH', path, body);
 
 const made = (await POST('/profiles', { name: 'Aarav Sharma', year: 10, course: 'in' })).user;
@@ -780,6 +788,7 @@ ok(read('src/pages/Login.jsx').includes('language: signInLanguage()'),
 const junk = (await POST('/profiles', { name: 'Nobody', year: 9, language: 'zz' })).user;
 eq(junk.language, 'en', 'and an unrecognised language on the way in is cleaned, not stored');
 await POST('/profiles/select', { id: made.id });
+await online.link(made.id);
 
 // Real work: questions served and answered through the same path a student uses.
 // A wrong answer buys a retry on most question types and resolves immediately on
@@ -870,6 +879,7 @@ const exported = await GET('/data/export');
 ok(JSON.stringify(exported).includes('"language":"hi"'), 'a backup carries the profile’s language');
 
 // ─────────────────────────────────────────────────────────────────────────────
+await online.close();
 console.log(failures.length
   ? `I18N: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `I18N: PASS — ${pass}/${pass} checks — ${enKeys.length} interface strings translated to Hindi with ${SAME_IN_BOTH.size} reasoned exceptions; ${textNodesSeen} JSX text nodes, ${expressionsSeen} literals drawn from expressions and ${attributesSeen} spoken attributes across ${CONVERTED.length} screens carry no English literal; ${ncertTerms.length} NCERT terms glossed beside their English, never in place of it; both off by default and out of the install precache; switching either loses no work.`);
