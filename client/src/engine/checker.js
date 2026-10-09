@@ -1100,7 +1100,9 @@ function affineSide(node, variable) {
  * tell a step from a restatement. What a step changes is how much isolating
  * is still to do. Each side is read as written (a·v + b, never moved across
  * the equals sign), and the state is ordered by:
- *   left  — isolating moves still owed: the variable's coefficient is not 1,
+ *   left  — isolating moves still owed: the variable's coefficient is not 1
+ *           (a coefficient of 1 counts as done only once the variable is gone
+ *           from the other side — in `3m+12=m+8` the lone `m` is not isolated),
  *           a constant still sits beside the variable, the variable still
  *           appears on the other side;
  *   fractional — coefficients that are not whole numbers (clearing them is a step);
@@ -1115,7 +1117,7 @@ function linearState(claim, variable) {
   const l = affineSide(claim.ast.l, variable), r = affineSide(claim.ast.r, variable);
   if (!l || !r || ![l.a, l.b, r.a, r.b].every(Number.isFinite)) return null;
   if (numsClose(l.a, r.a)) return null;
-  const owed = (own, other) => (numsClose(own.a, 1) ? 0 : 1) + (numsClose(own.b, 0) ? 0 : 1) + (numsClose(other.a, 0) ? 0 : 1);
+  const owed = (own, other) => (numsClose(own.a, 1) && numsClose(other.a, 0) ? 0 : 1) + (numsClose(own.b, 0) ? 0 : 1) + (numsClose(other.a, 0) ? 0 : 1);
   const whole = x => numsClose(x, Math.round(x));
   let brackets = 0, terms = 0, symbols = 0;
   const walk = node => {

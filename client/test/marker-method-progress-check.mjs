@@ -79,6 +79,29 @@ for (const [source, variable, root, step, name] of STEPS.slice(0, 4)) {
   ok(got === 0, `${name} undone: "${step}" → "${source}" earns nothing (got ${got})`);
 }
 
+// A unit coefficient on one side is not an isolating move already made while
+// the unknown still stands on the other side. Counting it as one left
+// `3m+12=m+8` scored as though it were as far on as `2m+12=8`, so a genuine
+// collecting step earned nothing on every issued equation with a lone `m` or
+// `x` term (about one in nine `c8-linear-equations-both-sides` questions).
+const UNIT_COEFFICIENT = [
+  ['3m+12=m+8', 'm', -2, '2m+12=8', 'collecting the unknown on the left'],
+  ['3m+12=m+8', 'm', -2, '12=-2m+8', 'collecting the unknown on the right'],
+  ['3m+12=m+8', 'm', -2, '3m=m-4', 'collecting the constants first'],
+  ['5x-9=x-13', 'x', -1, '4x-9=-13', 'collecting the unknown on the left'],
+  ['x+7=4x-8', 'x', 5, '7=3x-8', 'collecting the unknown on the right'],
+];
+for (const [source, variable, root, step, name] of UNIT_COEFFICIENT) {
+  const got = award(source, variable, root, `${step}\n${variable}=424242`);
+  ok(got === 1, `unit coefficient, ${name}: "${source}" → "${step}" earns its mark (got ${got})`);
+  const undone = award(step, variable, root, `${source}\n${variable}=424242`);
+  ok(undone === 0, `unit coefficient, ${name} undone: "${step}" → "${source}" earns nothing (got ${undone})`);
+  for (const neutral of [`${source.replace('=', '+1-1=')}`, `2(${source.split('=')[0]})=2(${source.split('=')[1]})`, `${source.split('=')[0]}+5=${source.split('=')[1]}+5`]) {
+    const padded = award(source, variable, root, `${neutral}\n${variable}=424242`);
+    ok(padded === 0, `unit coefficient: neutral "${neutral}" on "${source}" still earns nothing (got ${padded})`);
+  }
+}
+
 // Full correct working keeps every method mark it had.
 ok(award('6m+15=7m+29', 'm', -14, '15-29=7m-6m\n-14=m\nm=-14') === 2, 'full working on 6m+15=7m+29 keeps 2 method marks');
 ok(award('3x-14=2x-5', 'x', 9, '3x-2x=14-5\nx=9') === 2, 'full working on 3x-14=2x-5 keeps 2 method marks');
