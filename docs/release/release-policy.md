@@ -19,6 +19,40 @@ Production branch: `main`
 
 `Main Integrity` remains a post-merge provenance alarm. It is intentionally not a required pre-merge context because it runs on pushes to `main`, not on the pull-request head.
 
+## Staging first, production by promotion (2026-10-10)
+
+`main` is the only release authority. It is not what production deploys from.
+
+- **Staging** (Railway service `pri-learning-staging`) deploys every push to `main`.
+- **Production** (Railway service `Final-Pri-learning`) deploys the branch `deploy/production`. That
+  branch is a pointer, not a second authority: it is only ever fast-forwarded to an exact `main` SHA
+  that has been certified on staging. It never receives a commit of its own, and it is never ahead of
+  `main`.
+
+Until this change both services deployed `main`, so every merge reached production unverified. The
+production service's source was changed with
+`railway service source connect --repo Priysharan19/Final-Pri-learning --branch deploy/production --service Final-Pri-learning --environment production`
+after `deploy/production` was created at the SHA production was already running
+(`4d34439622176b5e2060ca7a549cb64090382944`), so the change itself shipped no new code.
+
+Promote (needs the approval that the release record names for that SHA):
+
+```bash
+git fetch origin
+git merge-base --is-ancestor <approved-sha> origin/main          # must succeed
+git merge-base --is-ancestor origin/deploy/production <approved-sha>   # fast-forward only
+git push origin <approved-sha>:refs/heads/deploy/production
+curl -s https://final-pri-learning-production.up.railway.app/v1/health   # releaseSha == <approved-sha>
+```
+
+Roll back: Railway keeps the previous deployment; redeploy it from the service's deployment list.
+Moving the pointer backwards needs a force-push and is a break-glass action (below).
+
+Undo this arrangement: connect the production service back to `main` with the same command.
+
+A production database migration, a secret rotation or a billing change is not covered by a
+promotion; each keeps its own approval (`docs/operations/postgres-cutover.md`, AGENTS.md).
+
 ## Main protection
 
 Ordinary direct pushes, force pushes and deletion of `main` are not part of the release workflow. PRI-01 configures GitHub protection to require a pull request and the four CI contexts above with strict/up-to-date checking, applies the rule to administrators, requires conversation resolution, and blocks force-push/deletion. The rule deliberately requires no approval count, because this owner-operated repository must enforce the PR/check path without creating an impossible self-review deadlock.
