@@ -23,6 +23,12 @@
 import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 
 installBrowserEnv();
+// Online-only grading (owner decision 2026-10-10): a paper starts only for a
+// real signed-in account that can reach the server. The in-process server
+// shares this suite's Date.now; both students sign in at offset 0 and the
+// clock never moves more than a paper's length from real time.
+const { startOnlineAuthority } = await import('./support/online-authority.mjs');
+const online = await startOnlineAuthority({ label: 'exam-session' });
 const { dispatch } = await import('../src/local/backend.js');
 const { dispatchIndiaExam } = await import('../src/local/indiaExamBackend.js');
 const { loadAllBanks } = await import('../src/engine/generators/index.js');
@@ -47,14 +53,10 @@ let offset = 0;
 Date.now = () => realNow() + offset;
 const MIN = 60000;
 
+// A real verified account, linked the way the product links one, holding a
+// Premium snapshot so the suite can sit more than one paper in 30 days.
 async function premium(user) {
-  const { cloudLinkRowId } = await import('../src/platform/cloudAccount.js');
-  const now = Date.now();
-  await idb.put('device', {
-    id: cloudLinkRowId(user.id), accountId: `acct-${user.id}`, role: 'student',
-    emailVerified: true, linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
-    entitlement: { plan: 'premium', status: 'active', provider: 'web', currentPeriodEnd: now + 30 * 86400000, offlineUntil: now + 7 * 86400000, issuedAt: now, sourceVersion: 1 }
-  });
+  await online.link(user.id, { entitlement: 'premium' });
 }
 
 resetStorage();
@@ -327,6 +329,7 @@ ok(rtRow.clockOffsetMs >= 30 * MIN - 1000 && rtRow.final.clockRolledBack === tru
 ok(rtRow.finishedAt >= rtRow.deadlineAt + 27 * MIN, 'the finalisation time is the paper\'s real time, not the wound-back device time');
 
 Date.now = realNow;
+await online.close();
 console.log(failures.length
   ? `EXAM SESSION: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `EXAM SESSION: PASS — ${pass}/${pass} checks — absolute deadline, autosave with handwriting, no writes after time or finalisation, late submits mark only saved work, idempotent frozen finalisation.`);

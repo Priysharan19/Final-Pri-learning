@@ -37,11 +37,18 @@ import { installBrowserEnv, resetStorage, rawRows } from './backend-check.mjs';
 installBrowserEnv();
 resetStorage();
 
+// Checking an answer and showing a solution are online-only and
+// server-authoritative (owner decision 2026-10-10). The History this suite
+// backs up is therefore made by the real server: the shipped /v1 app
+// in-process, a real verified account per profile, and — because the pages are
+// handwritten — the server's own reading path (`ink`).
+const { startOnlineAuthority, nextSubmissionId } = await import('./support/online-authority.mjs');
+const online = await startOnlineAuthority({ label: 'restore-fidelity', ink: true });
+
 const { dispatch } = await import('../src/local/backend.js');
 const { dispatchIndiaExam } = await import('../src/local/indiaExamBackend.js');
 const { restoreBackupSafely } = await import('../src/local/restoreGuard.js');
 const idb = await import('../src/local/idb.js');
-const { cloudLinkRowId } = await import('../src/platform/cloudAccount.js');
 // This suite talks to dispatch() directly, so it loads the question banks the
 // way src/api.js does before a request reaches the backend.
 const { loadAllBanks } = await import('../src/engine/generators/index.js');
@@ -60,7 +67,6 @@ const eq = (name, actual, expected) => ok(name, JSON.stringify(actual) === JSON.
 
 const POST = (path, body = {}) => dispatch('POST', path, body);
 const GET = path => dispatch('GET', path);
-const DAY = 86_400_000;
 
 /** Rows of one store owned by one profile, read straight off the fake disk. */
 const owned = (store, pid) => (rawRows()[store] || []).filter(r => r?.pid === pid);
@@ -73,28 +79,27 @@ const owned = (store, pid) => (rawRows()[store] || []).filter(r => r?.pid === pi
  * reliable way to finish a question this suite does not choose.
  */
 async function answerWrongly(questionId, strokes = null) {
-  const body = { answer: 'definitely-not-the-answer', ms: 1000 };
-  if (strokes) body.ink = { strokes, recognized: 'definitely-not-the-answer' };
+  // One tap, one submission key. A page of handwriting is a handwritten
+  // submission: the server reads it before it marks it.
+  const body = { answer: 'definitely-not-the-answer', ms: 1000, submissionId: nextSubmissionId() };
+  if (strokes) { body.viaInk = true; body.ink = { strokes, recognized: 'definitely-not-the-answer' }; }
   try { await POST(`/practice/${questionId}/submit`, body); } catch { /* the reveal below settles it */ }
   try { await POST(`/practice/${questionId}/reveal`, { ms: 1000 }); } catch { /* already resolved */ }
 }
 
-/** A server-issued Premium snapshot, so the India exam module will compose. */
+/**
+ * A Premium snapshot on the profile's real account link, so the India exam
+ * module will compose. The account is a real verified one; only the snapshot
+ * is filed by hand, as it was before.
+ */
 async function grantPremium(pid) {
-  const now = Date.now();
-  await idb.put('device', {
-    id: cloudLinkRowId(pid), accountId: `acct-${pid}`, role: 'student', emailVerified: true,
-    linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
-    entitlement: {
-      plan: 'premium', status: 'active', provider: 'web',
-      currentPeriodEnd: now + 30 * DAY, offlineUntil: now + 7 * DAY, issuedAt: now, sourceVersion: 1
-    }
-  });
+  await online.link(pid, { entitlement: 'premium' });
 }
 
 // ── The device the backup came from ──────────────────────────────────────────
 
 const source = (await POST('/profiles', { name: 'Aarav', year: 10, course: 'in', indiaTrack: 'cbse' })).user;
+await online.link(source.id);
 const strokes = [{ points: [{ x: 1, y: 2 }, { x: 3, y: 4 }] }];
 for (let i = 0; i < 3; i++) {
   const { question } = await POST('/practice/next', { mode: 'smart' });
@@ -258,6 +263,7 @@ ok('a track this build does not know falls back to a real one',
   craftedRows.every(r => !r.india || ['cbse', 'jee-main', 'jee-advanced', 'olympiad'].includes(r.india.track)),
   JSON.stringify(craftedRows.map(r => r.india?.track)));
 
+await online.close();
 console.log(`\nRestore fidelity — ${pass}/${pass + fail} checks`);
 if (failures.length) {
   console.log('\nfailures:');
