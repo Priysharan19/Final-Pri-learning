@@ -508,8 +508,12 @@ export default {
   'practice.pyqOnlyLabel': 'केवल पिछले पेपर',
   'practice.pyqOnlyLabelOn': 'केवल पिछले पेपर · चालू',
   'practice.pyqOnlyTitle': 'केवल JEE और CBSE के पिछले पेपरों के असली प्रश्नों का अभ्यास करें',
-  'practice.difficultySubstituted': 'इस विषय के लिए {requested} स्तर के प्रश्न अभी उपलब्ध नहीं हैं — {served} स्तर का प्रश्न दिखाया जा रहा है।',
-  'practice.difficultySubstitutedDotpoint': 'इस बिंदु के लिए {requested} स्तर के प्रश्न अभी उपलब्ध नहीं हैं — {served} स्तर का प्रश्न दिखाया जा रहा है।',
+  'practice.levelUnavailableTopic': 'इस विषय के लिए {requested} स्तर के प्रश्न अभी उपलब्ध नहीं हैं।',
+  'practice.levelUnavailableDotpoint': 'इस बिंदु के लिए {requested} स्तर के प्रश्न अभी उपलब्ध नहीं हैं।',
+  'practice.levelUnavailableChoose': 'कोई प्रश्न नहीं दिया गया है। इन स्तरों पर प्रश्न उपलब्ध हैं — अभ्यास के लिए एक चुनें।',
+  'practice.levelUnavailableNone': 'कोई प्रश्न नहीं दिया गया है, और यहाँ किसी अन्य निश्चित स्तर पर अभी प्रश्न नहीं हैं।',
+  'practice.levelPractiseAt': '{level} पर अभ्यास करें',
+  'practice.levelLetPriChoose': 'स्तर Pri को चुनने दें',
   'practice.pyqOnlyNote': 'नीचे का हर प्रश्न किसी असली परीक्षा में पूछा गया था और अपने पेपर का नाम साथ रखता है।',
   'practice.pyqBadge': 'पिछले वर्ष का प्रश्न',
   'practice.pyqTranscribedFrom': 'स्रोत',
@@ -2683,5 +2687,7 @@ export default {
   'check.accountTitle': 'यह खाता अभी यह नहीं कर सकता',
   'check.accountHint': 'खाता सेटिंग्स में दिखता है कि खाते में अभी क्या बाकी है।',
   'check.questionTitle': 'यह प्रश्न अभी जाँचा नहीं जा सकता',
-  'check.questionHint': 'दोबारा कोशिश करें, या अगले प्रश्न पर जाएँ।'
+  'check.questionHint': 'दोबारा कोशिश करें, या अगले प्रश्न पर जाएँ।',
+  'check.newQuestionTitle': 'इस प्रश्न को अंक नहीं दिए जा सकते',
+  'check.newQuestionHint': 'यह प्रश्न Pri से जुड़े बिना, या बहुत पहले खोला गया था। अपने उत्तर की जाँच के लिए अगले प्रश्न पर जाएँ।'
 };

@@ -12,7 +12,11 @@ export const CHECK_REFUSAL = Object.freeze({
   GUARDIAN: 'guardian',
   UPDATE: 'update',
   ACCOUNT: 'account',
-  QUESTION: 'question'
+  QUESTION: 'question',
+  // Opened with no connection, or prepared too long ago: this copy of the
+  // question was never (or is no longer) the server's, so only a new one can
+  // be marked. Retrying cannot help.
+  NEW_QUESTION: 'new-question'
 });
 
 // The server answered, but not with a receipt this device can trust. That is
@@ -37,6 +41,7 @@ export function checkRefusal(error) {
   if (code === 'SIGN_IN_TO_CHECK' || code === 'AUTH_REQUIRED') return CHECK_REFUSAL.SIGN_IN;
   if (code === 'RECONNECT_TO_CHECK' || code === 'CLOUD_DISABLED') return CHECK_REFUSAL.RECONNECT;
   if (code === 'QUESTION_CHECK_UNAVAILABLE') return CHECK_REFUSAL.QUESTION;
+  if (code === 'QUESTION_NOT_SERVER_ISSUED' || code === 'QUESTION_PREPARED_EXPIRED') return CHECK_REFUSAL.NEW_QUESTION;
   if (code === 'EMAIL_UNVERIFIED') return CHECK_REFUSAL.VERIFY_EMAIL;
   // A failed consent lookup is server trouble, not evidence that this student
   // needs a guardian.
@@ -58,7 +63,8 @@ const COPY = Object.freeze({
   [CHECK_REFUSAL.GUARDIAN]: { titleKey: 'check.guardianTitle', hintKey: 'check.guardianHint', action: 'account' },
   [CHECK_REFUSAL.UPDATE]: { titleKey: 'check.updateTitle', hintKey: 'check.updateHint', action: 'retry' },
   [CHECK_REFUSAL.ACCOUNT]: { titleKey: 'check.accountTitle', hintKey: 'check.accountHint', action: 'account' },
-  [CHECK_REFUSAL.QUESTION]: { titleKey: 'check.questionTitle', hintKey: 'check.questionHint', action: 'retry' }
+  [CHECK_REFUSAL.QUESTION]: { titleKey: 'check.questionTitle', hintKey: 'check.questionHint', action: 'retry' },
+  [CHECK_REFUSAL.NEW_QUESTION]: { titleKey: 'check.newQuestionTitle', hintKey: 'check.newQuestionHint', action: 'next' }
 });
 
 /**

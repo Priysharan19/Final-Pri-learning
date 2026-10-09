@@ -70,9 +70,9 @@ lines.push('track is named after. A cell that is not listed below has *a* form a
 lines.push('single routine template.');
 lines.push('');
 lines.push('**What the product does with a gap.** The picker does not offer a level that has no authored form for');
-lines.push('the chosen chapter or dot point, and a request that still names one (an old link, a task) is answered');
-lines.push('with the nearest authored level, labelled as that level, under a notice that says the requested level');
-lines.push('is not available.');
+lines.push('the chosen chapter or dot point. A request that still names one (an old link, a typed URL, a task) is');
+lines.push('refused: no question is served at another level. The page says the level is unavailable, lists the');
+lines.push('levels that do exist, and serves a question only after the student chooses one.');
 lines.push('');
 lines.push('## Summary');
 lines.push('');

@@ -440,8 +440,12 @@ export default {
   'practice.pyqOnlyLabel': 'Past papers only',
   'practice.pyqOnlyLabelOn': 'Past papers only · on',
   'practice.pyqOnlyTitle': 'Practise only real questions from past JEE and CBSE papers',
-  'practice.difficultySubstituted': 'No questions at {requested} for this topic yet — showing {served}.',
-  'practice.difficultySubstitutedDotpoint': 'No questions at {requested} for this dot point yet — showing {served}.',
+  'practice.levelUnavailableTopic': 'There are no questions at {requested} for this topic yet.',
+  'practice.levelUnavailableDotpoint': 'There are no questions at {requested} for this dot point yet.',
+  'practice.levelUnavailableChoose': 'Nothing has been served. These are the levels that do have questions — choose one to practise at.',
+  'practice.levelUnavailableNone': 'Nothing has been served, and no other fixed level has questions here yet.',
+  'practice.levelPractiseAt': 'Practise at {level}',
+  'practice.levelLetPriChoose': 'Let Pri choose the level',
   'practice.pyqOnlyNote': 'Every question below was set in a real exam and carries the paper it came from.',
   'practice.pyqBadge': 'Previous year question',
   'practice.pyqTranscribedFrom': 'Transcribed from',
@@ -2613,5 +2617,7 @@ export default {
   'check.accountTitle': 'This account cannot do this yet',
   'check.accountHint': 'Account settings shows what the account still needs.',
   'check.questionTitle': 'This question cannot be checked right now',
-  'check.questionHint': 'Try again, or go to the next question.'
+  'check.questionHint': 'Try again, or go to the next question.',
+  'check.newQuestionTitle': 'This question cannot be marked',
+  'check.newQuestionHint': 'It was opened without a connection to Pri, or too long ago. Go to the next question to have your answer marked.'
 };

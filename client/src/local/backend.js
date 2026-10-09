@@ -1135,9 +1135,27 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   // archive can actually serve; choosing over the whole track first refused
   // most requests with INDIA_PYQ_UNAVAILABLE for a chapter the student never
   // picked (content certification, §06).
-  const pool = pyqOnly && !chapter
+  let pool = pyqOnly && !chapter
     ? scoped.pool.filter(c => resolveIndiaTarget(c, { track: trackId, grade, pyqOnly: true, random: () => 0 }))
     : scoped.pool;
+  // A named difficulty is a condition on what may be served, never a wish
+  // (issue #408). On a chapter or dot point the student chose, a level with no
+  // authored form there is refused with the levels that do exist. When the
+  // optimiser chooses the chapter, it chooses among the chapters that have the
+  // level. A selection nothing can serve at all keeps its own refusal below.
+  const askedLevel = namedDifficultyOf(difficulty);
+  const levelsOf = (c, dp = null) => indiaLevelsFor(c, { dotpoint: dp, track: trackId, grade, pyqOnly });
+  if (askedLevel != null && chapter) {
+    const dp = pyqOnly ? null : indiaDotpointIndex(chapter, dotpoint);
+    const servable = resolveIndiaTarget(chapter, { dotpoint: dp, track: trackId, grade, pyqOnly, random: () => 0 });
+    const levels = levelsOf(chapter, dp);
+    if (servable && !levels.includes(askedLevel)) throw difficultyUnavailable(askedLevel, levels, { subtopic: chapter.id, dotpoint: dp, track: trackId });
+  }
+  if (askedLevel != null && !chapter && pool.length) {
+    const atLevel = pool.filter(c => levelsOf(c).includes(askedLevel));
+    if (!atLevel.length) throw difficultyUnavailable(askedLevel, pool.flatMap(c => levelsOf(c)), { track: trackId });
+    pool = atLevel;
+  }
   if (pyqOnly && !chapter && scoped.pool.length && !pool.length) {
     throw Object.assign(
       new Error(`Pri's previous-year archive has no ${trackName} past-paper question for your class yet. Turn the past-papers-only filter off to practise authored questions.`),
@@ -1247,9 +1265,10 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   if (target.pyq) why += ' This one is a real previous-year question.';
   if (target.dotpointIndex != null) why += ` Dot point: ${c.dotpoints[target.dotpointIndex]}`;
   if (target.windowed === false) why += ` (Served at D${target.difficulty} — this dot point has no authored form at ${trackName} depth yet.)`;
-  if (namedDifficulty && Math.round(Number(difficulty)) !== namedRung) {
-    const { floor, ceiling } = indiaDifficultyWindow(trackId, grade);
-    why += ` (You asked for D${Math.round(Number(difficulty))}; ${trackName} practice is held to D${floor}–D${ceiling}.)`;
+  // Last line of defence: whatever chose the target, a named level is served
+  // at exactly that level inside the track's window or not at all.
+  if (askedLevel != null && (target.difficulty !== askedLevel || target.windowed === false)) {
+    throw difficultyUnavailable(askedLevel, levelsOf(c, asked), { subtopic: c.id, dotpoint: asked, track: trackId });
   }
   if (diagnosticStart) why += ' Your placement check suggested starting here — that was diagnostic evidence, not a mark.';
   return {
@@ -1310,23 +1329,59 @@ function indiaChapterForRequest(subtopic, trackId, grade) {
 }
 
 /**
- * What a practice reply says about a difficulty the request named (issue #408).
- *
- * A rung that was asked for is not always the rung that can be served: a dot
- * point may have no authored form there, and a track holds practice inside its
- * own window. The question is never relabelled — its own `difficulty` and
- * `diffLabel` are always the rung the bank generated it at — and the reply
- * carries both numbers so the page can say "no questions at D4 for this topic
- * yet — showing D3" before the question instead of letting a D3 question stand
- * in silently for the D4 that was asked for. A request that named no difficulty
- * (adaptive practice) gets no fields at all.
+ * The level a request named, as a whole number D1–D4, or null when it named
+ * none (adaptive practice).
  */
-export function difficultyDisclosure(requested, served) {
-  if (requested == null || requested === '' || !Number.isFinite(Number(requested))) return {};
-  const asked = Math.min(4, Math.max(1, Math.round(Number(requested))));
-  const got = Number(served);
-  if (!Number.isInteger(got)) return {};
-  return { difficultyRequested: asked, difficultyServed: got, difficultyHonoured: asked === got };
+export function namedDifficultyOf(requested) {
+  if (requested == null || requested === '' || !Number.isFinite(Number(requested))) return null;
+  return Math.min(4, Math.max(1, Math.round(Number(requested))));
+}
+
+/**
+ * The refusal for a named difficulty that has no authored form (issue #408).
+ *
+ * A level that was asked for and does not exist for the chapter / dot point /
+ * track is never answered with a question at another level — not even under a
+ * notice. Nothing is generated, no question row is written and no allowance is
+ * spent. The refusal carries the level asked for and the levels that genuinely
+ * exist for the same selection, so the page can name them and the student can
+ * choose one; a question is served only after that choice.
+ */
+export function difficultyUnavailable(requested, available, scope = {}) {
+  const levels = [...new Set((available || []).map(Number).filter(d => Number.isInteger(d) && d !== requested))].sort((a, b) => a - b);
+  return Object.assign(
+    new Error(`There are no questions at ${DIFF_LABELS[requested] || `D${requested}`} for this ${scope.dotpoint != null ? 'dot point' : 'topic'} yet.`),
+    {
+      status: 409, code: 'DIFFICULTY_UNAVAILABLE',
+      detail: {
+        difficultyRequested: requested, requestedLabel: DIFF_LABELS[requested] || `D${requested}`,
+        available: levels.map(d => ({ difficulty: d, label: DIFF_LABELS[d] || `D${d}` })),
+        subtopic: scope.subtopic ?? null, dotpoint: scope.dotpoint ?? null, track: scope.track ?? null
+      }
+    }
+  );
+}
+
+/** What a served reply says about the level the request named: always the level served. */
+function difficultyServedAs(requested, served) {
+  const asked = namedDifficultyOf(requested);
+  return asked == null ? {} : { difficultyRequested: asked, difficultyServed: Number(served) };
+}
+
+/**
+ * The levels an India selection can be served at exactly on a track: the
+ * authored forms inside the track's window, or — under "past papers only" —
+ * the levels the previous-year archive holds for the chapter.
+ */
+function indiaLevelsFor(chapter, { dotpoint = null, track, grade, pyqOnly = false }) {
+  if (!pyqOnly) return indiaRequestableDifficulties(chapter, { dotpoint, track, grade });
+  const { floor, ceiling } = indiaDifficultyWindow(track, grade);
+  const out = [];
+  for (let d = floor; d <= ceiling; d++) {
+    const t = resolveIndiaTarget(chapter, { difficulty: d, track, grade, pyqOnly: true, random: () => 0 });
+    if (t && t.windowed !== false && t.difficulty === d) out.push(d);
+  }
+  return out;
 }
 
 /**
@@ -3109,13 +3164,17 @@ const routes = {
   'POST /practice/next': async (body) => {
     const p = await requireProfile();
     const unfinished = await resumableQuestion(p, body);
-    // A resumed question is the one already on the student's desk; when the
-    // request names a difficulty it does not sit at, the reply says so too.
+    // A resumed question is the one already on the student's desk. It comes
+    // back under a request that names a difficulty only when it sits at that
+    // level; otherwise the request is answered afresh (or refused) below, so an
+    // unfinished D3 question is never handed back as the answer to "D4". An
+    // answered row is a verdict being replayed, not a question being served.
     if (unfinished) {
-      return {
-        ...resumedQuestionResponse(unfinished),
-        ...(body?.taskId || unfinished.answered ? {} : difficultyDisclosure(body?.difficulty, unfinished.payload?.difficulty ?? unfinished.difficulty))
-      };
+      const level = Number(unfinished.payload?.difficulty ?? unfinished.difficulty);
+      const named = namedDifficultyOf(body?.difficulty);
+      if (unfinished.answered || named == null || named === level) {
+        return { ...resumedQuestionResponse(unfinished), ...(unfinished.answered ? {} : difficultyServedAs(body?.difficulty, level)) };
+      }
     }
     const { mode = 'smart', subtopic, difficulty, dotpoint, taskId, track, pyqOnly = false } = body || {};
     // Task-driven question
@@ -3143,15 +3202,23 @@ const routes = {
         const trackId = cleanIndiaTrack(target.track || p.indiaTrack, grade);
         const ratings = await ratingsFor(p.id);
         const state = indiaState(chapter, ratings, nowMs);
-        const want = target.difficulty != null ? Number(target.difficulty) : pickDifficulty(state.rating, state.attempts, { state, nowMs });
+        // A task that names a level is held to it like any other request. The
+        // student's own choice among the levels that exist (sent after a
+        // DIFFICULTY_UNAVAILABLE refusal) takes the place of the task's.
+        const namedLevel = namedDifficultyOf(difficulty) ?? namedDifficultyOf(target.difficulty);
+        const want = namedLevel != null ? namedLevel : pickDifficulty(state.rating, state.attempts, { state, nowMs });
         const resolved = resolveIndiaTarget(chapter, { dotpoint: target.dotpoint, difficulty: want, track: trackId, grade });
+        if (namedLevel != null && resolved && (resolved.difficulty !== namedLevel || resolved.windowed === false)) {
+          const dp = indiaDotpointIndex(chapter, target.dotpoint);
+          throw difficultyUnavailable(namedLevel, indiaLevelsFor(chapter, { dotpoint: dp, track: trackId, grade }), { subtopic: chapter.id, dotpoint: dp, track: trackId });
+        }
         const retarget = resolved ? sameTerms(resolved, () => resolveIndiaTarget(chapter, { dotpoint: target.dotpoint, difficulty: want, track: trackId, grade })) : null;
         const { row, payload, repeat } = await createIndiaQuestion(p.id, chapter, resolved, 'task', trackId, null, taskId, null, retarget);
         return {
           question: sanitize(payload, row), reason: 'task', repeat: !!repeat,
           why: `Task: ${task.title} — question ${done + 1} of ${task.count}.`,
           dotpoint: resolved.dotpointIndex, target: state.mastery, misconception: null,
-          ...difficultyDisclosure(target.difficulty, payload.difficulty ?? row.difficulty)
+          ...difficultyServedAs(namedLevel, payload.difficulty ?? row.difficulty)
         };
       }
       if (!task.subtopics?.length) throw Object.assign(new Error('That task has no topics to practise.'), { status: 409 });
@@ -3185,7 +3252,7 @@ const routes = {
         misconception: trapKey ? pick.trap?.label || null : null,
         windowed: pick.target.windowed !== false, aheadUnlocked: pick.aheadUnlocked,
         pyq: !!pick.target.pyq, repeat: !!repeat,
-        ...difficultyDisclosure(difficulty, payload.difficulty ?? row.difficulty)
+        ...difficultyServedAs(difficulty, payload.difficulty ?? row.difficulty)
       };
     }
     let choice;
@@ -3209,6 +3276,10 @@ const routes = {
       // deliver it, so the choice is snapped into that set rather than sent as
       // a wish the generator has to talk itself out of.
       if (real && !difficulty) d = nearestForm(asked.forms, d);
+      // A level the student named that this dot point has no form at is
+      // refused with the levels it does have (issue #408): the generator would
+      // otherwise snap it to the nearest one.
+      if (real && difficulty && !asked.forms.includes(d)) throw difficultyUnavailable(d, asked.forms, { subtopic, dotpoint: asked.ordinal });
       // "Practise this topic" with no dot point named still gets practised at
       // dot-point resolution: the one inside it with the least behind it wins.
       let auto = null;
@@ -3269,7 +3340,7 @@ const routes = {
       why: served || !choice.dotpoint ? choice.why : choice.whyPlain,
       dotpoint: served, target: choice.target ?? null,
       misconception: trapKey ? choice.trap?.label || null : null,
-      ...difficultyDisclosure(difficulty, payload.difficulty ?? row.difficulty)
+      ...difficultyServedAs(difficulty, payload.difficulty ?? row.difficulty)
     };
   },
 
@@ -3897,12 +3968,23 @@ const routes = {
     const row = await get('questions', body.id);
     if (!row || row.pid !== p.id || row.mode !== 'rush' && row.mode !== 'match') throw Object.assign(new Error('Question not found'), { status: 404 });
     if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409 });
+    // One answer, marked by the server like any other question. The key is
+    // fixed to the row, so a retry after a lost reply returns the same receipt.
+    await requireServerIssue(row);
     const q = row.payload;
-    const result = checkAnswer(q, body.answer);
+    const answer = String(body.answer ?? '');
+    const submissionId = `fast-${row.id}`;
+    let receipt = await gradeOnServer(row, { answer, viaInk: false }, submissionId, submissionDigest(answer, undefined));
+    // An unreadable answer is not an attempt in practice; in a timed game it
+    // ends the question, which the server records as shown-the-answer.
+    if (receipt.resolved !== true) receipt = await revealOnServer(row);
+    row.serverReceipt = receipt;
+    row.pendingGrade = null;
+    const correct = receipt.correct === true;
     // Attempt and cloud queue entry in one transaction (§22): an app killed
     // mid-Rush can no longer leave an attempt the cloud never hears about.
-    await resolve(p, row, q, result.correct, body.answer, 0, row.mode, false, { syncQueue: true });
-    return { correct: result.correct, answerText: displayAnswer(q), syncQueued: true };
+    await resolve(p, row, q, correct, answer, 0, row.mode, false, { syncQueue: true });
+    return { correct, answerText: receipt.solution?.answerText ?? '', authoritative: true, attemptId: receipt.attemptId, ...certifiedPracticeMarks(receipt), syncQueued: true };
   },
   'POST /rush/finish': async (body) => {
     const p = await requireProfile();
@@ -4550,7 +4632,7 @@ const routes = {
     const { probe } = replayPlacement(cfg, []);
     // Generated before anything is written: a question bank that is not loaded
     // yet throws here, the API layer fetches it and re-runs this route.
-    const current = buildPlacementQuestion(cfg, probe, 0);
+    const current = await servePlacementQuestion(p.id, cfg, probe, 0);
     const now = Date.now();
     const placement = {
       v: 1, id: uuid(), config: { ...cfg }, status: 'active', startedAt: now, finishedAt: null,
@@ -4575,23 +4657,44 @@ const routes = {
     }
     const cur = pl.current;
     const q = cur.payload;
+    // A check begun by a version that marked on the device has no server
+    // question behind it and cannot be finished under online-only marking.
+    if (!cur.serverQuestionId) {
+      throw Object.assign(new Error('This placement check was started by an older version of Pri. Start it again.'), { status: 409, code: 'PLACEMENT_RESTART_REQUIRED' });
+    }
     const skipped = body?.skip === true;
     let correct = false;
     let feedback = '';
     let stepReport = null;
-    if (!skipped) {
-      // The deterministic marker decides, exactly as in practice. Nothing a
-      // model says reaches this verdict.
-      const result = checkAnswer(q, body?.answer);
-      if (result.invalid) {
-        return { correct: false, resolved: false, invalid: true, triesLeft: 1, feedback: result.feedback || 'That answer could not be read — check it and submit again.' };
+    let solution = null;
+    const settled = receipt => receipt?.authoritative === true && receipt.questionId === cur.serverQuestionId &&
+      typeof receipt.attemptId === 'string' && Number.isFinite(receipt.serverAcknowledgedAt);
+    const refused = cause => checkUnavailable(cause?.status === 401 ? 'sign-in' : cause?.status === 403 || cause?.status === 426 ? 'refused'
+      : !cause?.status || cause.status >= 500 || cause.status === 429 || cause?.code === 'CLOUD_DISABLED' ? 'offline' : 'unavailable', cause);
+    if (skipped) {
+      // Skipping shows the solution, which is the server's to show.
+      let receipt;
+      try { receipt = await cloud.revealPractice(cur.serverQuestionId); } catch (cause) { throw refused(cause); }
+      if (!settled(receipt) || receipt.revealed !== true) throw checkUnavailable('unavailable');
+      solution = receipt.solution || null;
+    } else {
+      // The server's deterministic marker decides, exactly as in practice.
+      // Nothing a model says reaches this verdict, and nothing is marked here.
+      const answer = String(body?.answer ?? '');
+      const steps = typeof body?.steps === 'string' && body.steps.trim() ? body.steps : undefined;
+      const submissionId = `placement-${cur.id}-${submissionDigest(answer, steps)}`.slice(0, 96);
+      let receipt;
+      try {
+        receipt = await cloud.gradePractice(cur.serverQuestionId, { submissionId, answer, mode: 'typed', ...(steps ? { steps } : {}), ms: Math.max(0, Math.min(36e5, Number(body?.ms) || 0)) });
+      } catch (cause) { throw refused(cause); }
+      if (!settled(receipt) || receipt.submissionId !== submissionId || typeof receipt.correct !== 'boolean') throw checkUnavailable('unavailable');
+      if (receipt.invalid) {
+        return { correct: false, resolved: false, invalid: true, triesLeft: 1, feedback: receipt.feedback || 'That answer could not be read — check it and submit again.' };
       }
-      correct = !!result.correct;
-      feedback = result.feedback || '';
-      if (!correct && q.answerType === 'mcq' && q.answer?.optionTraps) feedback = q.answer.optionTraps[Number(body?.answer)] || feedback;
-      const meta = stepMetaFor(q);
-      if (body?.steps && meta) { try { stepReport = stepCheck(meta, body.steps); } catch { stepReport = null; } }
-      if (!stepReport && result.stepReport) stepReport = result.stepReport;
+      correct = receipt.correct === true;
+      feedback = receipt.feedback || '';
+      stepReport = receipt.stepReport || null;
+      solution = receipt.solution || null;
     }
     const now = Date.now();
     const item = {
@@ -4610,7 +4713,7 @@ const routes = {
       throw Object.assign(new Error('This placement check was started by an older version of Pri. Start it again.'), { status: 409, code: 'PLACEMENT_RESTART_REQUIRED' });
     }
     const done = replay.done || items.length >= PLACEMENT_MAX;
-    const next = done ? null : buildPlacementQuestion(cfg, replay.probe, items.length);
+    const next = done ? null : await servePlacementQuestion(p.id, cfg, replay.probe, items.length);
     const result = done ? { ...summarisePlacement(cfg, items), finishedAt: now } : null;
     const placement = {
       ...pl, items, current: next,
@@ -4622,7 +4725,7 @@ const routes = {
     await writePlacement(p.id, { placement });
     return {
       correct, resolved: true, skipped, feedback, stepReport, diagnosis: stepReport?.diagnosis || null,
-      solution: { steps: q.steps, answerText: displayAnswer(q), criteria: criteriaFor(q), solutionText: q.solutionText },
+      solution, authoritative: true,
       progress: placementProgress(placement), done,
       next: next ? placementQuestionView(next) : null,
       result
@@ -4642,7 +4745,8 @@ const routes = {
 // trace a miss down the Pri-authored prerequisite graph to its plausible root.
 // The adaptive process and the summary live in engine/placement.js, which is
 // fetched only when a student opens the diagnostic: none of it is on the boot
-// path. Marking is the same deterministic checkAnswer() practice uses.
+// path. Every question is issued and marked by the server (online-only
+// grading); the check writes no attempt and counts as no progress.
 //
 // Storage. The whole session — configuration, the outcome of every answered
 // question and the one question on screen, exactly as it was generated — lives
@@ -4704,12 +4808,12 @@ function seededRandom(seed) {
 }
 
 /**
- * The question for one probe, generated deterministically from the session
- * seed and the probe's position. A handwritten answer is the point of the
+ * The question for one probe. The device picks the chapter and level from
+ * the session seed and the probe's position; the server picks the question. A handwritten answer is the point of the
  * diagnostic and a multiple-choice item can be guessed, so a few variants are
  * looked at and the first one with a written answer is preferred.
  */
-function buildPlacementQuestion(cfg, probe, index) {
+async function servePlacementQuestion(pid, cfg, probe, index) {
   const chapter = indiaChapter(probe?.chapterId);
   if (!chapter) throw Object.assign(new Error('The placement check asked for a chapter this app does not know.'), { status: 409, code: 'PLACEMENT_RESTART_REQUIRED' });
   const grade = indiaChapterGrade(chapter);
@@ -4722,14 +4826,23 @@ function buildPlacementQuestion(cfg, probe, index) {
   const target = (chapter.dotpoints?.length ? resolveIndiaTarget(chapter, { ...opts, dotpoint: 0 }) : null)
     || resolveIndiaTarget(chapter, opts);
   if (!target?.generator) throw Object.assign(new Error(`${chapter.name} has no authored question form for the placement check.`), { status: 409, code: 'INDIA_TARGET_UNCOVERED' });
-  let q = null;
-  for (let k = 0; k < 6; k++) {
-    const cand = generateQuestion(target.generator, target.difficulty, (base + k * 104729) % 2147483647);
-    if (!q) q = cand;
-    if (cand.answerType !== 'mcq' && !cand.multipart) { q = cand; break; }
+  // The check gives a verdict on every answer, so each question is the
+  // server's from the start: a signed-in eligible account, online. The server
+  // chooses it and prefers a form the student writes out.
+  const linkedAccount = await profileCloudAccountId(pid).catch(() => null);
+  if (!linkedAccount) throw checkUnavailable('sign-in');
+  let out;
+  try {
+    out = await cloud.issuePractice({ generator: target.generator, difficulty: target.difficulty, curriculum: 'in', mode: 'placement', written: true });
+  } catch (cause) {
+    throw checkUnavailable(cause?.status === 401 ? 'sign-in' : cause?.status === 403 || cause?.status === 426 ? 'refused'
+      : !cause?.status || cause.status >= 500 || cause.status === 429 || cause?.code === 'CLOUD_DISABLED' ? 'offline' : 'unavailable', cause);
   }
+  const q = out?.question;
+  if (String(out?.accountId || '') !== linkedAccount) throw checkUnavailable('sign-in');
+  if (!q?.id || typeof q.prompt !== 'string' || !q.prompt) throw checkUnavailable('unavailable');
   return {
-    id: uuid(), index, probe: { ...probe }, generator: target.generator,
+    id: uuid(), serverQuestionId: q.id, index, probe: { ...probe }, generator: target.generator,
     difficulty: q.difficulty || target.difficulty, dotpointIndex: target.dotpointIndex ?? null,
     payload: q, servedAt: Date.now()
   };
@@ -4737,7 +4850,7 @@ function buildPlacementQuestion(cfg, probe, index) {
 
 /** What the question card is shown: the practice sanitiser, with no help on offer. */
 function placementQuestionView(cur) {
-  const row = { id: cur.id, india: { chapterId: cur.probe.chapterId, track: 'cbse', dotpointIndex: cur.dotpointIndex }, hintsUsed: 0, tries: 0 };
+  const row = { id: cur.id, serverQuestionId: cur.serverQuestionId || null, india: { chapterId: cur.probe.chapterId, track: 'cbse', dotpointIndex: cur.dotpointIndex }, hintsUsed: 0, tries: 0 };
   return { ...sanitize(cur.payload, row), hintsAvailable: 0, triesLeft: 1, placement: true, phase: cur.probe.phase };
 }
 
@@ -4979,10 +5092,15 @@ async function resumableQuestion(profile, body = {}) {
   // the submission under its idempotency key and show the student the one
   // verdict it produced, rather than leaving them to wonder whether it went
   // (§09). Only this profile's own practice rows qualify; a skipped one does not.
+  // A request that names a difficulty resumes only a question at that level
+  // (issue #408); the entitlement gate and the route both read this, so they
+  // agree on whether the request is a resume.
+  const namedLevel = namedDifficultyOf(body.difficulty);
+  const atNamedLevel = r => namedLevel == null || Number(r.payload?.difficulty ?? r.difficulty) === namedLevel;
   if (body.pendingQuestionId) {
     const pending = await get('questions', String(body.pendingQuestionId)).catch(() => null);
     if (pending && pending.pid === profile.id && !pending.discardedAt && !pending.examId && !isExamRow(pending)
-      && pending.mode !== 'rush' && pending.mode !== 'match') return pending;
+      && pending.mode !== 'rush' && pending.mode !== 'match' && (pending.answered || atNamedLevel(pending))) return pending;
   }
   const rows = await byIndex('questions', 'pid', profile.id);
   const taskId = body.taskId ? String(body.taskId) : null;
@@ -4993,6 +5111,7 @@ async function resumableQuestion(profile, body = {}) {
   const scope = { track: body.track, pyqOnly: body.pyqOnly === true, explicit: !!subtopic };
   const candidates = rows.filter(r => {
     if (!r || r.answered || r.discardedAt || r.examId || r.mode === 'rush' || r.mode === 'match') return false;
+    if (!atNamedLevel(r)) return false;
     if (taskId) return String(r.taskId || '') === taskId;
     if (r.taskId) return false;
     if (!resumeInScope(profile, r, scope)) return false;

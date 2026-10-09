@@ -34,9 +34,14 @@ const INDIA_BANK = /^c(?:[7-9]|1[0-2])-[a-z0-9][a-z0-9-]{2,95}$/;
 // grading a question the server refuses to issue could never be checked. The
 // name is only a lookup key; an unknown one fails generation with 422.
 const AUTHORED_BANK = /^[a-z][a-z0-9]{0,11}-[a-z0-9][a-z0-9-]{1,95}$/;
-const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum', 'mode', 'prepared', 'avoid', 'trap', 'dotpoint']);
+const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum', 'mode', 'prepared', 'avoid', 'trap', 'dotpoint', 'written']);
 const PREPARE_FIELDS = new Set(['generator', 'difficulty', 'curriculum', 'mode', 'avoid', 'dotpoint']);
-const PRACTICE_MODES = ['practice', 'review', 'task', 'rush', 'match'];
+const PRACTICE_MODES = ['practice', 'review', 'task', 'rush', 'match', 'placement'];
+// One answer settles the question in these modes.
+const ONE_TRY_MODES = ['rush', 'match', 'placement'];
+// The placement check is diagnostic evidence, not practice: its verdicts are
+// the server's, but it writes no attempt, so it can never count as progress.
+const recordsProgress = q => q._practiceMode !== 'placement';
 // A prepared question is shown to a student who has not signed in yet. Its
 // seed travels only inside an encrypted, expiring token that one account can
 // bind once; the device never learns the seed and so cannot compute the answer
@@ -246,7 +251,10 @@ function readQuestionRequest(body, fields) {
     }
     trap = { owner: t.owner, key: t.key };
   }
-  return { generator, difficulty, mode, avoid: new Set(avoid), dotpoint: body.dotpoint, trap };
+  if (body.written !== undefined && typeof body.written !== 'boolean') {
+    return { error: [400, 'PRACTICE_ISSUE_INVALID', 'Invalid answer-form preference.'] };
+  }
+  return { generator, difficulty, mode, avoid: new Set(avoid), dotpoint: body.dotpoint, trap, written: body.written === true };
 }
 
 /**
@@ -255,7 +263,7 @@ function readQuestionRequest(body, fields) {
  * worked on, to find a form that can spring it. `seed` is given only by the
  * test suites. Throws when the generator has no such form.
  */
-function chooseQuestion({ generator, difficulty, dotpoint, avoid, trap }, seed = null) {
+function chooseQuestion({ generator, difficulty, dotpoint, avoid, trap, written = false }, seed = null) {
   if (seed !== null) {
     const q = generateQuestion(generator, difficulty, seed, dotpoint);
     return { q, repeat: false, trapDelivered: !!(trap && carriesTrap(trap.owner, q, trap.key)) };
@@ -264,7 +272,9 @@ function chooseQuestion({ generator, difficulty, dotpoint, avoid, trap }, seed =
   for (let i = 0; i < SEEK_TRIES; i++) {
     const q = generateQuestion(generator, difficulty, randomInt(0x80000000), dotpoint);
     const fresh = !avoid.has(q.contentHash);
-    const springs = !trap || carriesTrap(trap.owner, q, trap.key);
+    // `written` asks for a form the student writes out; a multiple-choice
+    // item can be guessed, which a diagnostic must avoid where it can.
+    const springs = (!trap || carriesTrap(trap.owner, q, trap.key)) && (!written || (q.answerType !== 'mcq' && !q.multipart));
     if (fresh && springs) return { q, repeat: false, trapDelivered: !!trap };
     if (!fallback || (fresh && !fallback.fresh)) fallback = { q, fresh };
   }
@@ -550,6 +560,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)",
           [accountId, scope, qid, JSON.stringify(value), hash, now, now + MAX_AGE]);
       }
+      if (!recordsProgress(q)) return { response };
       const last = await db.get("SELECT MAX(device_seq) AS n FROM learning_events WHERE account_id=? AND device_id='server-grader'", [accountId]);
       const cursor = await nextSyncCursor(db, accountId);
       await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?, 'server-grader',?,'graded-attempt',?,?,?,?)",
@@ -649,7 +660,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         [accountId, qid]);
       const tries = priorTry ? Number(JSON.parse(priorTry.response_json).tries) || 0 : 0;
       // Invalid input is not a failed mathematical attempt: do not consume a try or close the question.
-      const resolved = !invalid && Boolean(result.correct || tries >= 1 || ['rush', 'match'].includes(q._practiceMode));
+      const resolved = !invalid && Boolean(result.correct || tries >= 1 || ONE_TRY_MODES.includes(q._practiceMode));
       const attemptId = randomUUID();
       const response = { authoritative: true, questionId: qid, submissionId, attemptId,
         correct: result.correct === true, invalid, resolved,
@@ -670,6 +681,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (resolved) {
         await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-completion',?,?,?,?,?)",
           [accountId, qid, JSON.stringify({ attemptId, submissionId }), hash, now, now + MAX_AGE]);
+        if (!recordsProgress(q)) return { response };
         // For a resolved attempt progress is committed in the very same DB
         // transaction as its immutable response, with a server-issued ID.
         const last = await db.get("SELECT MAX(device_seq) AS n FROM learning_events WHERE account_id=? AND device_id='server-grader'", [accountId]);

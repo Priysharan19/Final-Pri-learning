@@ -230,6 +230,13 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
    * prepared row has no server id until an account binds it, and an offline
    * draft never has one, so neither has a key to read.
    */
+  /** The server's sealed copy of an issued question, by its server id. */
+  async function sealedQuestion(serverQuestionId) {
+    const sealed = await app.db.get("SELECT response_json FROM idempotency_keys WHERE scope='practice-question' AND key=?", [String(serverQuestionId)]);
+    assert.ok(sealed, `the server holds no issued question ${serverQuestionId}`);
+    return JSON.parse(sealed.response_json);
+  }
+
   async function answerKey(rowOrId) {
     const row = typeof rowOrId === 'string' ? await idb.get('questions', rowOrId) : rowOrId;
     assert.ok(row, 'answerKey() needs a stored question row');
@@ -238,9 +245,7 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
       if (row.payload?.answer !== undefined || row.payload?.multipart) return row.payload;
       assert.fail(`no answer key: the row is ${row.prepared ? 'prepared but not yet bound to an account' : row.draftOnly ? 'an offline draft' : 'not server-issued'}`);
     }
-    const sealed = await app.db.get("SELECT response_json FROM idempotency_keys WHERE scope='practice-question' AND key=?", [row.serverQuestionId]);
-    assert.ok(sealed, `the server holds no issued question ${row.serverQuestionId}`);
-    const q = JSON.parse(sealed.response_json);
+    const q = await sealedQuestion(row.serverQuestionId);
     assert.equal(q.prompt, row.payload.prompt, 'the server\'s sealed question is not the one on screen');
     return q;
   }
@@ -266,7 +271,7 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
 
   return {
     app, origin: app.origin, db: app.db, traffic, reader,
-    link, setEntitlement, answerKey, resetRateLimits, close,
+    link, setEntitlement, answerKey, sealedQuestion, resetRateLimits, close,
     accountOf: pid => accounts.get(pid) || null,
     /** Pin the device session to `pid`'s account; `undefined` follows the selected profile again. */
     useSessionOf(pid) { pinnedPid = pid; },
