@@ -2627,6 +2627,9 @@ const IMPORT_ROWS = {
     support: r.support === 'independent' ? 'independent' : (r.support === 'supported' ? 'supported' : undefined),
     viaInk: !!r.viaInk, ratingBefore: safeNum(r.ratingBefore, 0), ratingAfter: safeNum(r.ratingAfter, 0),
     createdAt: safeTime(r.createdAt) || Date.now(),
+    // A repeat stays a repeat: restored without the flag it would count as
+    // learning evidence the original device never gave it.
+    ...(r.repeat === true ? { repeat: true } : {}),
     // A backup written before content identity existed restores as legacy.
     ...attemptContentRef(r)
   }),

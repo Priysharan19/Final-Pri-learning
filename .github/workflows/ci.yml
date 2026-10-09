@@ -72,7 +72,7 @@ jobs:
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
           grep -Fq 'INDIA ADAPTIVE: PASS — 305/305 checks' suites.log
           grep -Fq 'ADAPTIVE SIMULATION: PASS — 77/77 checks' suites.log
-          grep -Fq 'PROGRESS TRUTH: PASS — 109/109 checks' suites.log
+          grep -Fq 'PROGRESS TRUTH: PASS — 110/110 checks' suites.log
           grep -Fq 'PLACEMENT: PASS — 291/291 checks' suites.log
           grep -Fq 'IOS BUNDLE FEATURES: PASS — 20/20 checks' suites.log
           grep -Fq 'INDIA EXAM WEIGHT: PASS — 628/628 checks' suites.log

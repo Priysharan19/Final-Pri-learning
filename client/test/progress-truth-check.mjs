@@ -140,6 +140,7 @@ function wrongInput(q) {
 }
 
 async function run() {
+  let seededRepeatQuestion = null;
   installBrowserEnv();
   resetStorage();
   const { startOnlineAuthority, nextSubmissionId } = await import('./support/online-authority.mjs');
@@ -231,6 +232,26 @@ async function run() {
   await session(3, 5, { subtopic: chosen });
   // Day 2: nothing. Day 3: practice, a game, and a full board paper.
   setIst(3, 16, 0); await session(6, 7);
+  // One deliberate repeat, so every run exercises the rule and not only the
+  // runs where the server happens to draw a question again: a finished
+  // practice question is retried as the same question and answered correctly.
+  {
+    const done = rawRows().questions.filter(r => r.pid === asha.id && r.serverQuestionId && r.answered && !r.examId && ['practice', 'review'].includes(r.mode));
+    let again = null;
+    for (const row of done) {
+      again = await POST(`/history/${row.id}/retry`, { variant: 'same' }).catch(() => null);
+      if (again?.question?.id) break;
+    }
+    const retried = again?.question?.id ? await idb.get('questions', again.question.id) : null;
+    const key = retried ? canonicalInput(await online.answerKey(retried)) : null;
+    if (retried) {
+      helpLog.set(retried.id, { hints: 0, tutor: 0, tries: 0 });
+      tick(30000);
+      if (key !== null) await POST(`/practice/${retried.id}/submit`, { answer: key, ms: 20000, submissionId: nextSubmissionId('sub_progress') });
+      else await POST(`/practice/${retried.id}/reveal`, { ms: 20000 });
+    }
+    seededRepeatQuestion = retried?.id || null;
+  }
   const rush = await POST('/rush/start', {});
   let rushCorrect = 0;
   for (const q of rush.questions.slice(0, 6)) {
@@ -267,6 +288,9 @@ async function run() {
   await POST('/profiles/select', { id: asha.id });
   setIst(4, 20, 0);
   const NOW = Date.now();
+  ok('the seeded history holds a repeat the server flagged, recorded and kept out of the evidence',
+    !!seededRepeatQuestion && rawRows().attempts.some(a => a.pid === asha.id && a.questionId === seededRepeatQuestion && a.repeat === true),
+    show(rawRows().attempts.filter(a => a.questionId === seededRepeatQuestion).map(a => [a.mode, a.repeat, a.correct])));
   ok('the seeded history is substantial', rawRows().attempts.filter(a => a.pid === asha.id).length >= 60, `${rawRows().attempts.filter(a => a.pid === asha.id).length}`);
 
   // ── Independent expectations, from raw attempt rows ────────────────────────
