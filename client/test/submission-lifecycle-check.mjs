@@ -362,9 +362,21 @@ await check('only a resolved submission queues a cloud practice-progress entry, 
   assert.deepEqual(classifyMutation('POST', '/practice/q-1/reveal', { resolved: true, revealed: true }),
     { kind: 'practice-progress', entityId: 'q-1', operation: 'upsert' });
 
-  const t = await markable();
-  await api.post(`/practice/${t.id}/submit`, { answer: t.wrong, submissionId: recovery.newSubmissionId() });
-  await api.post(`/practice/${t.id}/submit`, { answer: 'not maths at all ###', submissionId: recovery.newSubmissionId() }).catch(() => null);
+  // The server chooses the question. On a multiple-choice one an entry that
+  // is not an option is a wrong try, not an unreadable one, and a second wrong
+  // try resolves the question; this case needs a question where it is unreadable.
+  const UNREADABLE = 'not maths at all ###';
+  let t = await markable();
+  for (let i = 0; i < 40 && !checkAnswer(t.q, UNREADABLE).invalid; i++) {
+    await api.post(`/practice/${t.id}/discard`, {});
+    t = await markable();
+  }
+  assert.ok(checkAnswer(t.q, UNREADABLE).invalid, 'a question on which the entry is unreadable was served');
+  const firstTry = await api.post(`/practice/${t.id}/submit`, { answer: t.wrong, submissionId: recovery.newSubmissionId() });
+  assert.equal(firstTry.resolved, false, 'a first wrong try leaves the question open');
+  assert.equal((await outboxFor(me.id, t.id)).length, 0, 'a wrong first try queues nothing');
+  const unread = await api.post(`/practice/${t.id}/submit`, { answer: UNREADABLE, submissionId: recovery.newSubmissionId() }).catch(() => null);
+  assert.ok(!unread || unread.invalid === true, 'the unreadable entry is not a try');
   assert.equal((await outboxFor(me.id, t.id)).length, 0, 'an unresolved try queues nothing');
   const sid = recovery.newSubmissionId();
   await api.post(`/practice/${t.id}/submit`, { answer: t.right, submissionId: sid });
