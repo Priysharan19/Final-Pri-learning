@@ -66,7 +66,7 @@ Set Xcode user-defined build setting:
 PRI_CLOUD_ORIGIN=https://<approved-production-origin>
 ```
 
-The value is substituted into Info.plist key `PRICloudOrigin`. Production code accepts HTTPS only. Do not ship a localhost, arbitrary path, query-bearing or fragment-bearing origin. If the value is absent or invalid, native cloud requests fail closed with cloud-disabled behavior while the bundled offline-first learning runtime remains available.
+The value is substituted into Info.plist key `PRICloudOrigin`. Production code accepts HTTPS only. Do not ship a localhost, arbitrary path, query-bearing or fragment-bearing origin. If the value is absent or invalid, native cloud requests fail closed — and because grading is online-only (ADR-0001 amendment, 2026-10-10) such a build can never mark an answer: every question is an unmarkable draft. A release archive with no valid origin is unshippable; the archive gate in §6 enforces this.
 
 Never put credentials, session cookies, API keys or provider secrets into this build setting or the web bundle.
 
@@ -103,7 +103,8 @@ After the exact candidate SHA is merged/approved and preflight is green:
 1. open `ios/PriLearning.swiftpm` in the supported Xcode release environment;
 2. select the `PriLearning` scheme and a generic/eligible iOS device destination suitable for archiving;
 3. verify production signing team and bundle identifier;
-4. verify `PRI_CLOUD_ORIGIN` contains the approved HTTPS production origin;
+4. verify `PRI_CLOUD_ORIGIN` contains the approved HTTPS production origin, then prove it on the built product — grading is online-only, so an archive with an empty origin can show questions but can never mark one:
+   `npm run check:ios:archive -- <path to .xcarchive> --sha <release sha>` must print `NATIVE ARCHIVE GATE: PASS` (it refuses an empty, non-https, local, staging or path-bearing origin, a non-shipping bundle id, and a web bundle from another commit);
 5. confirm the intended marketing/build versions shown by the package;
 6. create a Release archive with Product → Archive;
 7. in Organizer, inspect the archive identity, version/build number, signing and bundled app icon;
