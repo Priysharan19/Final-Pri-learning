@@ -122,11 +122,21 @@ function protectArguments(s) {
   return out + s.slice(cursor);
 }
 
+// ⁿCᵣ / ⁵C₂ with unicode super/subscripts. The whole run of superscripts is
+// always consumed, and the "C₂" that makes it a counting form is optional: a
+// run that is not one is put back as it was. Requiring the tail outright, as
+// /([⁰-⁹]+)\s*([CP])\s*([₀-₉]+)/g did, retried every suffix of a long run of
+// "²" that no C follows — quadratic for the same rewrites.
+const SUPERSCRIPT_COUNTING = /([⁰¹²³⁴⁵⁶⁷⁸⁹]+)(?:\s*([CP])\s*([₀₁₂₃₄₅₆₇₈₉]+))?/g;
+export function rewriteSuperscriptCounting(s) {
+  return s.replace(SUPERSCRIPT_COUNTING, (whole, n, f, r) => (f === undefined ? whole
+    : `${f === 'C' ? 'ncr' : 'npr'}(${[...n].map(ch => SUPER[ch]).join('')};${[...r].map(ch => SUB[ch]).join('')})`));
+}
+
 /** The counting and summation notations NCERT students actually write. */
 function rewriteCounting(s) {
   // ⁿCᵣ / ⁵C₂ with unicode super/subscripts
-  s = s.replace(/([⁰¹²³⁴⁵⁶⁷⁸⁹]+)\s*([CP])\s*([₀₁₂₃₄₅₆₇₈₉]+)/g, (_, n, f, r) =>
-    `${f === 'C' ? 'ncr' : 'npr'}(${[...n].map(ch => SUPER[ch]).join('')};${[...r].map(ch => SUB[ch]).join('')})`);
+  s = rewriteSuperscriptCounting(s);
   // \binom{n}{r}
   s = s.replace(/\\binom\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, 'ncr($1;$2)');
   // nCr(n, r) / C(n, r) / nPr(n, r) / P(n, r) as function calls. The bare

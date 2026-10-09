@@ -484,13 +484,27 @@ export function assessEquationLine({ ast, previousAst = null, previousTrusted = 
 
 // ── Inequality transformations ───────────────────────────────────────────────
 
+// One line split at its first relational sign: what /^(.*?)(<=|>=|<|>)(.*)$/
+// captured. That pattern has no `s` flag, so a line terminator anywhere in the
+// text refused the match; with one near the end it also retried from every
+// "<" before giving up, which is quadratic. Found by index instead.
+const LINE_TERMINATOR = /[\n\r\u2028\u2029]/;
+export function splitAtRelation(src) {
+  if (LINE_TERMINATOR.test(src)) return null;
+  const lt = src.indexOf('<'), gt = src.indexOf('>');
+  const at = lt < 0 ? gt : gt < 0 ? lt : Math.min(lt, gt);
+  if (at < 0) return null;
+  const op = src[at + 1] === '=' ? `${src[at]}=` : src[at];
+  return { left: src.slice(0, at), op, right: src.slice(at + op.length) };
+}
+
 export function parseRelation(text) {
   let src = String(text || '').trim().replace(/≤/g, '<=').replace(/≥/g, '>=').replace(/[−–—]/g, '-');
-  const m = src.match(/^(.*?)(<=|>=|<|>)(.*)$/);
-  if (!m || !m[1].trim() || !m[3].trim()) return null;
-  if (/(<=|>=|<|>)/.test(m[3])) return null;
+  const m = splitAtRelation(src);
+  if (!m || !m.left.trim() || !m.right.trim()) return null;
+  if (/[<>]/.test(m.right)) return null;
   try {
-    return { t: 'relation', op: m[2], l: parse(normalize(m[1])), r: parse(normalize(m[3])), text: src };
+    return { t: 'relation', op: m.op, l: parse(normalize(m.left)), r: parse(normalize(m.right)), text: src };
   } catch { return null; }
 }
 function relationResidual(rel) { return B('-', rel.l, rel.r); }
