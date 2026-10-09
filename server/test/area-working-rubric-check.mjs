@@ -61,7 +61,12 @@ try {
   for (const key of ['answer', 'stepcheck', 'steps', 'solution', 'solutionText', 'traps', 'expected', 'correct', 'markScheme', 'criteria', '_practiceMode']) {
     ok(!(key in q), 'public question carries no ' + key);
   }
-  const publicText = JSON.stringify({ ...q, prompt: undefined, hints: undefined });
+  // The server's own identifiers (a random question id, keyed digests of the
+  // content) are opaque strings that can contain any digits by chance; they are
+  // checked for what they are, and the text scan covers everything else.
+  ok(/^[0-9a-f-]{36}$/i.test(q.id) && /^srv:[A-Za-z0-9_-]{20,}$/.test(q.contentId) && /^[0-9a-f]{16}$/.test(q.contentHash),
+    'the question id, content id and content hash are opaque server identifiers');
+  const publicText = JSON.stringify({ ...q, prompt: undefined, hints: undefined, id: undefined, contentId: undefined, contentHash: undefined });
   ok(!/343|57\.1|area-(limits|integrand|antiderivative|value)|7x\s*-\s*x\^2/.test(publicText),
     'no answer, rubric stage or integrand in any non-prompt public field (including the input hint)');
   ok(!String(q.inputHint || '').includes('343'), 'the input hint names a format, never this question’s answer');
@@ -80,7 +85,10 @@ try {
   eq([wrong.status, wrong.data.correct, wrong.data.invalid, wrong.data.marksEarned, wrong.data.resolved],
     [200, false, false, 0, false], '5 is incorrect for 0 and uses the first attempt');
   ok(!('solution' in wrong.data), 'an unresolved attempt discloses no solution');
-  ok(!/343/.test(JSON.stringify(wrong.data)), 'nor the answer anywhere in its receipt');
+  // Identifiers and the acknowledgement time are opaque or numeric by nature
+  // and can contain any digits; the scan is over what the receipt SAYS.
+  const said = ({ questionId, attemptId, submissionId, contentId, serverAcknowledgedAt, ...rest }) => JSON.stringify(rest);
+  ok(!/343/.test(said(wrong.data)), 'nor the answer anywhere in its receipt');
 
   // ── 4 · Wrong final + verified set-up: justified partial credit ───────────
   const partialCases = [
