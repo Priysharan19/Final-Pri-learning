@@ -927,7 +927,83 @@ function withoutNeutralArithmetic(node) {
   if (n.op === '*' && isNumber(r, 1)) return l;
   if (n.op === '*' && isNumber(l, 1)) return r;
   if (n.op === '/' && isNumber(r, 1)) return l;
-  return { ...n, l, r };
+  return cancelInsertedPairs({ ...n, l, r });
+}
+
+const literalValue = node => {
+  const p = unwrapGroup(node);
+  if (p?.t === 'num') return Number(p.v);
+  if (p?.t === 'neg') {
+    const v = unwrapGroup(p.v);
+    if (v?.t === 'num') return -Number(v.v);
+  }
+  return null;
+};
+
+/**
+ * `+1-1` and `*2/2` are the same non-step as `+0` and `*1`, spelt with two
+ * literals instead of one. Remove a numeric literal only together with its own
+ * exact inverse inside the same sum or the same product; every other term and
+ * factor stays exactly as written, so collecting, expanding and evaluating
+ * remain visible to the rubric.
+ */
+function cancelInsertedPairs(node) {
+  if (node.op === '+' || node.op === '-') {
+    const terms = [];
+    const walk = (part, sign) => {
+      const p = unwrapGroup(part);
+      if (p?.t === 'bin' && (p.op === '+' || p.op === '-')) {
+        walk(p.l, sign); walk(p.r, p.op === '-' ? -sign : sign);
+      } else terms.push({ sign, node: p });
+    };
+    walk(node, 1);
+    let cancelled = false;
+    for (let i = 0; i < terms.length; i++) {
+      const a = terms[i] && literalValue(terms[i].node);
+      if (a === null || a === undefined || a === 0) continue;
+      for (let j = i + 1; j < terms.length; j++) {
+        const b = terms[j] && literalValue(terms[j].node);
+        if (b === null || b === undefined) continue;
+        if (terms[i].sign * a + terms[j].sign * b === 0) {
+          terms[i] = terms[j] = null; cancelled = true; break;
+        }
+      }
+    }
+    if (!cancelled) return node;
+    const kept = terms.filter(Boolean);
+    if (!kept.length) return { t: 'num', v: 0 };
+    let acc = kept[0].sign < 0 ? { t: 'neg', v: kept[0].node } : kept[0].node;
+    for (const term of kept.slice(1)) acc = { t: 'bin', op: term.sign < 0 ? '-' : '+', l: acc, r: term.node };
+    return acc;
+  }
+  if (node.op === '*' || node.op === '/') {
+    const factors = [];
+    const walk = (part, power) => {
+      const p = unwrapGroup(part);
+      if (p?.t === 'bin' && (p.op === '*' || p.op === '/')) {
+        walk(p.l, power); walk(p.r, p.op === '/' ? -power : power);
+      } else factors.push({ power, node: p });
+    };
+    walk(node, 1);
+    let cancelled = false;
+    for (let i = 0; i < factors.length; i++) {
+      const a = factors[i] && literalValue(factors[i].node);
+      if (a === null || a === undefined || a === 0 || a === 1) continue;
+      for (let j = i + 1; j < factors.length; j++) {
+        const b = factors[j] && literalValue(factors[j].node);
+        if (b === a && factors[j].power === -factors[i].power) {
+          factors[i] = factors[j] = null; cancelled = true; break;
+        }
+      }
+    }
+    if (!cancelled) return node;
+    const top = factors.filter(f => f && f.power > 0), bottom = factors.filter(f => f && f.power < 0);
+    let acc = top.length ? top[0].node : { t: 'num', v: 1 };
+    for (const f of top.slice(1)) acc = { t: 'bin', op: '*', l: acc, r: f.node };
+    for (const f of bottom) acc = { t: 'bin', op: '/', l: acc, r: f.node };
+    return acc;
+  }
+  return node;
 }
 
 function methodProgressDuplicate(a, b) {
@@ -974,27 +1050,7 @@ function isolatedFinalAnswer(claim, meta) {
  */
 function oneStepLinearRoot(meta, originals) {
   if (meta?.kind !== 'equation' || !meta.variable || uniqueNumeric(meta.solutions).length !== 1) return false;
-  const linear = node => {
-    const n = unwrapGroup(node);
-    if (!n) return null;
-    if (n.t === 'num') return { a: 0, b: Number(n.v) };
-    if (n.t === 'var') return n.v === meta.variable ? { a: 1, b: 0 } : null;
-    if (n.t === 'neg') {
-      const v = linear(n.v);
-      return v ? { a: -v.a, b: -v.b } : null;
-    }
-    if (n.t !== 'bin') return null;
-    const l = linear(n.l), r = linear(n.r);
-    if (!l || !r) return null;
-    if (n.op === '+') return { a: l.a + r.a, b: l.b + r.b };
-    if (n.op === '-') return { a: l.a - r.a, b: l.b - r.b };
-    if (n.op === '*') {
-      if (l.a && r.a) return null;
-      return { a: l.a * r.b + l.b * r.a, b: l.b * r.b };
-    }
-    if (n.op === '/' && r.a === 0 && r.b !== 0) return { a: l.a / r.b, b: l.b / r.b };
-    return null;
-  };
+  const linear = node => affineSide(node, meta.variable);
   for (const source of originals) {
     if (source?.kind !== 'equation') continue;
     const l = linear(source.ast.l), r = linear(source.ast.r);
@@ -1010,6 +1066,92 @@ function oneStepLinearRoot(meta, originals) {
     const singleOperation = singleSide &&
       (Math.abs(a) === 1 || (l.b === 0 && r.b === 0));
     if (subtractVariable || singleOperation) return true;
+  }
+  return false;
+}
+
+/** `a·v + b` for one side of an equation, or null when the side is not affine in v. */
+function affineSide(node, variable) {
+  const n = unwrapGroup(node);
+  if (!n) return null;
+  if (n.t === 'num') return { a: 0, b: Number(n.v) };
+  if (n.t === 'var') return n.v === variable ? { a: 1, b: 0 } : null;
+  if (n.t === 'neg') {
+    const v = affineSide(n.v, variable);
+    return v ? { a: -v.a, b: -v.b } : null;
+  }
+  if (n.t !== 'bin') return null;
+  const l = affineSide(n.l, variable), r = affineSide(n.r, variable);
+  if (!l || !r) return null;
+  if (n.op === '+') return { a: l.a + r.a, b: l.b + r.b };
+  if (n.op === '-') return { a: l.a - r.a, b: l.b - r.b };
+  if (n.op === '*') {
+    if (l.a && r.a) return null;
+    return { a: l.a * r.b + l.b * r.a, b: l.b * r.b };
+  }
+  if (n.op === '/' && r.a === 0 && r.b !== 0) return { a: l.a / r.b, b: l.b / r.b };
+  return null;
+}
+
+/**
+ * Where a written linear equation stands on the way to `v = root`.
+ *
+ * Every equivalent equation has the same solution set, so equivalence cannot
+ * tell a step from a restatement. What a step changes is how much isolating
+ * is still to do. Each side is read as written (a·v + b, never moved across
+ * the equals sign), and the state is ordered by:
+ *   left  — isolating moves still owed: the variable's coefficient is not 1,
+ *           a constant still sits beside the variable, the variable still
+ *           appears on the other side;
+ *   fractional — coefficients that are not whole numbers (clearing them is a step);
+ *   written — undistributed brackets, then additive terms, then symbols, which
+ *           orders two lines whose sides are already the same (expanding,
+ *           collecting and evaluating are steps; padding is not).
+ * Adding the same number to both sides, doubling both sides, or inserting
+ * `+1-1` / `*2/2` leaves all of these where they were.
+ */
+function linearState(claim, variable) {
+  if (claim?.kind !== 'equation' || !variable) return null;
+  const l = affineSide(claim.ast.l, variable), r = affineSide(claim.ast.r, variable);
+  if (!l || !r || ![l.a, l.b, r.a, r.b].every(Number.isFinite)) return null;
+  if (numsClose(l.a, r.a)) return null;
+  const owed = (own, other) => (numsClose(own.a, 1) ? 0 : 1) + (numsClose(own.b, 0) ? 0 : 1) + (numsClose(other.a, 0) ? 0 : 1);
+  const whole = x => numsClose(x, Math.round(x));
+  let brackets = 0, terms = 0, symbols = 0;
+  const walk = node => {
+    const n = unwrapGroup(node);
+    if (!n || typeof n !== 'object') return;
+    symbols++;
+    if (n.t === 'neg') return walk(n.v);
+    if (n.t !== 'bin') return;
+    if (n.op === '+' || n.op === '-') terms++;
+    if (n.op === '*' || n.op === '/') {
+      for (const side of [n.l, n.r]) {
+        const inner = unwrapGroup(side);
+        if (inner?.t === 'bin' && (inner.op === '+' || inner.op === '-')) brackets++;
+      }
+    }
+    walk(n.l); walk(n.r);
+  };
+  walk(claim.ast.l); walk(claim.ast.r);
+  return {
+    sides: [l.a, l.b, r.a, r.b],
+    left: Math.min(owed(l, r), owed(r, l)),
+    fractional: [l.a, l.b, r.a, r.b].filter(x => !whole(x)).length,
+    written: [brackets, terms, symbols]
+  };
+}
+
+/** Is linear state `f` strictly further on than `g`? */
+function linearStateAdvances(f, g) {
+  if (f.left < g.left) return true;
+  if (f.left > g.left) return false;
+  if (f.fractional < g.fractional) return true;
+  const same = (x, y) => x.every((v, i) => numsClose(v, y[i]));
+  const [a, b, c, d] = g.sides;
+  if (!same(f.sides, g.sides) && !same(f.sides, [c, d, a, b])) return false;
+  for (let i = 0; i < f.written.length; i++) {
+    if (f.written[i] !== g.written[i]) return f.written[i] < g.written[i];
   }
   return false;
 }
@@ -1062,6 +1204,14 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
       if (counted.some(c => isolatedFinalAnswer(c, meta))) { row.reason = 'repeat'; return row; }
     }
     if (claim && counted.some(c => methodProgressDuplicate(claim, c))) { row.reason = 'repeat'; return row; }
+    // A linear equation line earns a mark only when it stands further on than
+    // the question and every line already credited. Equations that are not
+    // linear in the unknown keep the written-duplicate rule above.
+    const state = meta.kind === 'equation' ? linearState(claim, meta.variable) : null;
+    if (state) {
+      const before = [...given, ...counted].map(c => linearState(c, meta.variable)).filter(Boolean);
+      if (before.some(g => !linearStateAdvances(state, g))) { row.reason = 'repeat'; return row; }
+    }
     counted.push(claim || { kind: 'text', text: String(l.text).trim() });
     if (counted.length <= cap) row.mark = 1; else row.reason = 'cap';
     return row;
