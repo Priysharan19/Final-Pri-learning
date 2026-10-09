@@ -1066,6 +1066,9 @@ async function run() {
   section('online-only marking');
   try {
     await POST('/profiles/select', { id: ada.id });
+    // This group and the ones after it serve Ada far more than twenty
+    // questions; the free daily cap is entitlement-enforcement-check's subject.
+    await online.setEntitlement(ada.id, 'premium');
     const attemptsFor = async (pid, qid) => (await idb.byIndex('attempts', 'pid', pid)).filter(a => a.questionId === qid).length;
     const KEY_FIELDS = ['answer', 'steps', 'solutionText', 'seed', 'traps', 'stepcheck'];
     const keyOnDevice = row => KEY_FIELDS.filter(k => k in (row.payload || {}));
