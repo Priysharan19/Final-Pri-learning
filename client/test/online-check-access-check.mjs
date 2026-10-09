@@ -250,6 +250,15 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   eq([again?.status, again?.code], [401, 'SIGN_IN_TO_CHECK'], 'a retry under the same key is refused the same way');
   eq(JSON.stringify(await idb.get('questions', id)), rowBefore, 'and still spends nothing');
 
+  // Refused for want of a session, the submission is held, not in flight: its
+  // key and content stay for the student's own Submit, and nothing sends it.
+  eq(recovery.readPendingSubmission(id)?.refused, false, 'a submission in flight is not yet marked as refused');
+  ok(recovery.holdPendingSubmission(id, { label: 'draft' }), 'a sign-in refusal holds the submission');
+  eq([recovery.readPendingSubmission(id)?.refused, recovery.readPendingSubmission(id)?.submissionId, recovery.readPendingSubmission(id)?.answer], [true, submissionId, '343/6'], 'held: same key, same answer, flagged refused');
+  ok(recovery.savePendingSubmission(id, { submissionId, answer: '343/6', steps: 'x = 0, 7', viaInk: false, sourceMode: 'typed', ms: 4200, lines: null }, { label: 'draft' }), 'the student pressing Submit again puts it back in flight');
+  eq(recovery.readPendingSubmission(id)?.refused, false, 'and it is no longer held');
+  ok(recovery.holdPendingSubmission(id, { label: 'draft' }), 'held again for the checks below');
+
   const reveal = await refused(api.post(`/practice/${id}/reveal`, { ms: 5000 }));
   eq([reveal?.status, reveal?.code], [401, 'SIGN_IN_TO_CHECK'], 'Show solution signed out is refused the same way');
   eq(JSON.stringify(await idb.get('questions', id)), rowBefore, 'the solution is not revealed and the question is still open');
@@ -464,6 +473,8 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   }
 
   const card = read('src/components/QuestionCard.jsx');
+  ok(/else if \(e\?\.code === 'SIGN_IN_TO_CHECK' \|\| e\?\.status === 401\) holdPendingSubmission\(question\.id\)/.test(card), 'the card holds a submission refused for sign-in');
+  ok(/if \(pending\.refused\) \{[\s\S]{0,260}?return;\s*\}\s*if \(pending\.sourceMode === 'unknown'\)/.test(card), 'and relaunch recovery never delivers a held submission by itself');
   const replace = card.slice(card.indexOf('async function replaceQuestion()'), card.indexOf('async function dontKnow()'));
   ok(/if \(hasWork && !replaceArmed\) \{ setReplaceNote\(false\); setReplaceArmed\(true\); return; \}/.test(replace), 'with work on the page, leaving a draft takes a second, deliberate press');
   ok(/const hasWork = !!\(String\(answer\)\.trim\(\) \|\| String\(working\)\.trim\(\) \|\| inkHasStrokes \|\| photo \|\| mcqSel !== null\);/.test(card), 'work means a typed answer, typed working, ink, a photo or a chosen option');

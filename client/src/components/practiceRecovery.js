@@ -58,7 +58,8 @@ export function savePendingSubmission(questionId, rec, meta = {}) {
     // interrupted Photo request must never restart as a typed grade.
     sourceMode: rec.sourceMode === 'photo' ? 'photo' : rec.viaInk === true ? 'ink' : 'typed',
     ms: Math.max(0, Math.round(Number(rec.ms) || 0)),
-    lines: cleanLines(rec.lines)
+    lines: cleanLines(rec.lines),
+    ...(rec.refused === true ? { refused: true } : {})
   }, { label: meta.label || '', note: 'Answer being marked', path: '/practice' });
 }
 
@@ -77,8 +78,20 @@ export function readPendingSubmission(questionId) {
     sourceMode: ['photo', 'ink', 'typed'].includes(d.sourceMode)
       ? d.sourceMode : (d.viaInk === true ? 'ink' : 'unknown'),
     ms: Math.max(0, Number(d.ms) || 0),
-    lines: cleanLines(d.lines)
+    lines: cleanLines(d.lines),
+    refused: d.refused === true
   };
+}
+
+/**
+ * The submission was refused before anything could be marked (no account, an
+ * expired session). Its key and content are kept so the student's own next
+ * Submit is the same submission — but it is no longer "in flight": nothing may
+ * send it again on its own.
+ */
+export function holdPendingSubmission(questionId, meta = {}) {
+  const pending = readPendingSubmission(questionId);
+  return pending ? savePendingSubmission(questionId, { ...pending, sourceMode: pending.sourceMode, refused: true }, meta) : false;
 }
 
 export function clearPendingSubmission(questionId) {

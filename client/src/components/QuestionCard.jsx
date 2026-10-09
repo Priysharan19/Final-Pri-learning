@@ -14,7 +14,8 @@ import { sanitizeFigure } from '../lib/sanitize.js';
 import { clearDraft, queueDraft, readDraft, saveDraft } from './drafts.js';
 import {
   clearInkDraft, clearPendingSubmission, newSubmissionId, readInkDraft, readPendingSubmission,
-  saveInkDraft, savePendingSubmission, submissionContentKey
+  saveInkDraft, savePendingSubmission, submissionContentKey,
+  holdPendingSubmission
 } from './practiceRecovery.js';
 import { cloudReadingEnabled, INK_READER_STATE, photoReadingBlockedKey, readPhotoWithCloud, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
@@ -1030,6 +1031,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // timeout — is not: the pending record stays, so an identical retry or a
       // relaunch reuses the same key and still lands as one attempt.
       if (definitiveSubmissionRefusal(e)) { pendingRef.current = null; clearPendingSubmission(question.id); }
+      // Refused for want of a session: the server marked nothing. The answer
+      // waits for the student to press Submit again after signing in; a later
+      // visit to this question must not send it for them and spend a try.
+      else if (e?.code === 'SIGN_IN_TO_CHECK' || e?.status === 401) holdPendingSubmission(question.id);
       inkFrozenRef.current = false;
       if (recovering && e?.status === 409 && e?.code !== 'QUESTION_DISCARDED') {
         // Answered elsewhere under another submission: nothing here to recover.
@@ -1066,6 +1071,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const pending = readPendingSubmission(question.id);
     if (!pending) return;
     pendingRef.current = { submissionId: pending.submissionId, contentKey: submissionContentKey(pending.answer, pending.steps), sourceMode: pending.sourceMode, ms: pending.ms };
+    if (pending.refused) {
+      // Never sent to be marked: put the answer back and wait for Submit.
+      if (pending.sourceMode === 'typed') { setMode('type'); setAnswer(pending.answer); setWorking(pending.steps || ''); }
+      return;
+    }
     if (pending.sourceMode === 'unknown') {
       // Pre-provenance versions stored Photo and typed attempts identically.
       // Preserve the answer so the student can inspect and submit explicitly,
