@@ -120,7 +120,11 @@ const claimOf = async q => `${me.id}:resolved:${await blindHash(`practice-resolu
   await applyRemoteLearningEvents(me.id, [legacy]);
   const held = await idb.get('questions', q.id);
   await idb.put('questions', { ...held, pendingGrade: { ...held.pendingGrade, at: Date.now() - 10 * 60 * 1000 } });
+  const xpBefore = await xp();
+  const dayXp = () => rawRows().activity.filter(a => a.pid === me.id).reduce((t, a) => t + (Number(a.xp) || 0), 0);
+  const dayBefore = dayXp();
   eq([await reconcileDeferredGrades(me.id), attemptsOf().length], [1, count + 1], 'a deferred event without marks is restored as a remote attempt on a later pass');
+  ok(dayXp() > dayBefore && (await xp()) - xpBefore === dayXp() - dayBefore, 'and its XP reaches the profile total as well as the day\'s activity, by the same amount');
   ok(!(await idb.get('questions', q.id)).deferredGrade, 'and only then is the deferred copy dropped');
   eq([await reconcileDeferredGrades(me.id), attemptsOf().length], [0, count + 1], 'once');
 }

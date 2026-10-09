@@ -320,6 +320,9 @@ async function settleIssued(pid, rowId, event) {
  */
 export async function reconcileDeferredGrades(pid) {
   let applied = 0;
+  // XP from events restored by the fallback below; the device's own routine
+  // credits the profile itself and reports none.
+  let xp = 0;
   for (const listed of await byIndex('questions', 'pid', pid)) {
     if (!listed.deferredGrade) continue;
     // Decide on the row as it is now, not as it was listed: a retry may have
@@ -341,13 +344,14 @@ export async function reconcileDeferredGrades(pid) {
         if (!profile) continue;
         outcome = await applyPracticeEvent(pid, profile, held);
       }
-      if (outcome && outcome.applied) applied++;
+      if (outcome && outcome.applied) { applied++; xp += num(outcome.xp, 0); }
     } else if (!row.answered && !recordIssuedAttempt) continue;
     // Whatever happened, the copy kept with the row is no longer needed. Strip
     // it from the row as it stands after that write.
     const after = await get('questions', row.id).catch(() => null);
     if (after?.deferredGrade) { const { deferredGrade: _dropped, ...rest } = after; await put('questions', rest); }
   }
+  if (xp > 0) await creditXp(pid, xp);
   return applied;
 }
 
