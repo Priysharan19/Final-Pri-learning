@@ -32,6 +32,8 @@ import { blockedInkRecovery, canOpenInkSignIn, inkRecoveryWords, completeInkOtpR
 import './inkAccountRecovery.css';
 import { useFormFactor } from '../platform/formFactor.js';
 import Icon from './Icon.jsx';
+import TypedAnswerFields from './TypedAnswerFields.jsx';
+import { finalAnswerGuidance, moveToWorking, workingAreaMode } from './typedAnswerGuide.js';
 import '../workspace.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
 // True in a production build made with the tutor off (see src/tutor/flag.js).
@@ -420,6 +422,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const isMcq = question.answerType === 'mcq';
   const isWorking = question.answerType === 'working';
   const totalMarks = question.criteria?.length || 1;
+  // A question that carries method marks keeps its working area open, so
+  // working typed there is always part of the submission.
+  const workingOpen = showWorking || (!isMcq && !isWorking && workingAreaMode(question, totalMarks) === 'open');
   const hintsUsed = hints.length;
   // Each opened tutor level is charged like a hint (backend resolve()).
   const helpUsed = hintsUsed + tutorUsed;
@@ -918,7 +923,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     } else {
       given = answer;
       if (String(given).trim() === '') return;
-      steps = (showWorking || mode === 'photo') && working.trim() ? working : undefined;
+      steps = (workingOpen || mode === 'photo') && working.trim() ? working : undefined;
     }
     const sourceMode = viaInk ? 'ink' : (mode === 'photo' && photo ? 'photo' : 'typed');
     // The same answer through a different input authority is NOT a replay of
@@ -1373,7 +1378,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const answerLines = isMcq ? [] : writeMode
     ? (inkResult?.lines || [])
     : isWorking ? working.split('\n').filter(Boolean)
-      : [...(showWorking && working ? working.split('\n').filter(Boolean) : []), answer].filter(Boolean);
+      : [...(workingOpen && working ? working.split('\n').filter(Boolean) : []), answer].filter(Boolean);
 
   // ── Layout: a handwriting or full-working question gets the split
   // workspace (question beside a large page); a short answer or a choice stays
@@ -1382,6 +1387,16 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const split = !isMcq && (writeMode || isWorking);
   const invalidRetry = state.phase === 'retry' && state.res?.invalid && !state.res?.technical;
   const technicalRetry = state.phase === 'retry' && state.res?.technical;
+  // The text the engine last refused as unreadable. Guidance about it lasts
+  // only while that same text is still in the field.
+  const [rejectedAnswer, setRejectedAnswer] = useState(null);
+  useEffect(() => {
+    if (invalidRetry && !writeMode && !isMcq && !isWorking) setRejectedAnswer(answer);
+    else if (state.phase !== 'retry') setRejectedAnswer(null);
+  }, [state]); // eslint-disable-line
+  const answerGuidance = isMcq || isWorking || writeMode ? null : finalAnswerGuidance({
+    question, answer, totalMarks, rejected: rejectedAnswer !== null && rejectedAnswer === answer
+  });
 
   // ── What the status line may truthfully say ────────────────────────────────
   // It reports only what this device actually knows: a local write that
@@ -1712,43 +1727,22 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   rows={6}
                 />
               ) : (
-                <div className="answer-row">
-                  {question.answerPrefix && <span className="answer-prefix"><MathText text={question.answerPrefix} /></span>}
-                  <input
-                    ref={inputRef}
-                    className="answer-input"
-                    aria-label={question.answerSuffix ? t('verdict.answerAriaWithUnit', { unit: question.answerSuffix }) : t('verdict.answerAria')}
-                    placeholder={question.inputHint || t('verdict.answerPlaceholder')}
-                    value={answer}
-                    disabled={resolved}
-                    onChange={e => editAnswer(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') submit(); }}
-                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                    // Answers are expressions as often as numbers (x², 3/4, √2),
-                    // so a numeric keypad would block them: keep the full
-                    // keyboard and label its Enter key as the submit action.
-                    inputMode="text" enterKeyHint="go"
-                  />
-                  {question.answerSuffix && <span className="answer-suffix">{question.answerSuffix}</span>}
-                </div>
-              )}
-              {typedPreview && !resolved && !isWorking && (
-                <div className="typed-preview">{t('verdict.readsAs')}&nbsp; <MathText text={`$${typedPreview}$`} /></div>
-              )}
-              {question.supportsSteps && !resolved && !isWorking && mode === 'type' && (
-                <div style={{ marginTop: 14 }}>
-                  <button className="btn-disclose" aria-expanded={showWorking} onClick={() => setShowWorking(s => !s)}>
-                    <Icon name="chevronDown" size={16} />{t('verdict.showWorkingToggle')}
-                  </button>
-                  {showWorking && (
-                    <textarea
-                      className="input" style={{ marginTop: 8 }}
-                      aria-label={t('verdict.workingPartialAria')}
-                      placeholder={t('verdict.workingPartialPlaceholder')}
-                      value={working} onChange={e => editWorking(e.target.value)}
-                    />
-                  )}
-                </div>
+                <TypedAnswerFields
+                  question={question} totalMarks={totalMarks} inputRef={inputRef}
+                  answer={answer} working={working} onAnswer={editAnswer} onWorking={editWorking} onSubmit={submit}
+                  previewTex={typedPreview} resolved={resolved} offerWorking={mode === 'type'}
+                  showWorking={showWorking} onToggleWorking={() => setShowWorking(v => !v)}
+                  guidance={answerGuidance}
+                  onMoveToWorking={() => {
+                    // Nothing typed is dropped: the text leaves the final-answer
+                    // field only by arriving in the working, and both are
+                    // written to the draft in the same step.
+                    const moved = moveToWorking(answer, working);
+                    setAnswer(moved.answer); setWorking(moved.working); setShowWorking(true);
+                    stash(moved.answer, moved.working);
+                    setTimeout(() => inputRef.current?.focus(), 60);
+                  }}
+                />
               )}
             </div>
           </div>
@@ -1899,7 +1893,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               <TutorHelp
                 question={{ ...question, tutorLevel: tutorUsed }}
                 work={{
-                  lines: (isWorking || showWorking) && working ? working.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 40).map(l => l.slice(0, 400)) : [],
+                  lines: (isWorking || workingOpen) && working ? working.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 40).map(l => l.slice(0, 400)) : [],
                   typed: isMcq ? '' : String(answer || '').slice(0, 300)
                 }}
                 locale={language === 'hi' ? 'hi' : 'en'}
@@ -1930,6 +1924,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   ? <span className="muted">{state.res.feedback}</span>
                   : technicalRetry
                   ? <>{t('verdict.workIsSafe')} <span className="muted">{state.res.feedback}</span></>
+                  : invalidRetry && answerGuidance
+                  ? <span data-final-answer-verdict>{t(answerGuidance.titleKey)} {t(answerGuidance.bodyKey)}{answerGuidance.workingKey ? ' ' + t(answerGuidance.workingKey) : ''}</span>
                   : <MathText text={state.res.feedback || t('verdict.oneMoreGo')} />}
               </div>
               {state.res?.authRequired && (
