@@ -246,20 +246,28 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     }
     const accountId = req.platformSession.account_id;
     const now = Date.now();
-    const prior = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-recognition' AND key=? AND expires_at>?", [accountId, sourceId, now]);
-    if (!prior) return reject(res, 404, 'RECOGNITION_RECEIPT_INVALID', 'The recognition receipt is not available.');
-    const original = JSON.parse(prior.response_json);
-    if (original.questionId !== qid || !['ink', 'photo'].includes(original.mode)) {
-      return reject(res, 404, 'RECOGNITION_RECEIPT_INVALID', 'This receipt belongs to another question.');
-    }
-    const receipt = randomUUID();
-    const proof = { questionId: qid, mode: original.mode, text: body.text,
-      parentReceipt: sourceId, correctedByStudent: true, recognizedAt: now };
-    await db.transaction(async () => {
+    // A correction and a final mark must serialize under the same account
+    // lock. Checking completion before the transaction leaves a race where a
+    // correction can be written after the last grade commits.
+    const outcome = await db.transaction(async () => {
+      const prior = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-recognition' AND key=? AND expires_at>?", [accountId, sourceId, now]);
+      if (!prior) return { status: 404, code: 'RECOGNITION_RECEIPT_INVALID' };
+      const original = JSON.parse(prior.response_json);
+      if (original.questionId !== qid || !['ink', 'photo'].includes(original.mode)) {
+        return { status: 404, code: 'RECOGNITION_RECEIPT_INVALID' };
+      }
+      const completed = await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-completion' AND key=?", [accountId, qid]);
+      if (completed) return { status: 409, code: 'QUESTION_ALREADY_GRADED' };
+      const receipt = randomUUID();
+      const proof = { questionId: qid, mode: original.mode, text: body.text,
+        parentReceipt: sourceId, correctedByStudent: true, recognizedAt: now };
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-recognition',?,?,?,?,?)",
         [accountId, receipt, JSON.stringify(proof), digest(proof), now, now + MAX_AGE]);
+      return { receipt, mode: original.mode };
     }, { accountScope: accountId, lock: syncLockKey(accountId) });
-    return res.status(201).json({ receipt, questionId: qid, mode: original.mode, corrected: true });
+    if (outcome.status) return reject(res, outcome.status, outcome.code,
+      outcome.status === 409 ? 'This question has been completed.' : 'The recognition receipt is not available for this question.');
+    return res.status(201).json({ receipt: outcome.receipt, questionId: qid, mode: outcome.mode, corrected: true });
   });
 
   router.post('/:id/reveal', rateLimit(db, 'practice-reveal', { limit: 120, windowMs: 3600000 }), async (req, res) => {
