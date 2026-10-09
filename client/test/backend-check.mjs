@@ -2084,20 +2084,47 @@ async function run() {
     ok('rush shows the answer either way', typeof rushRes.answerText === 'string', show(rushRes.answerText));
     await rejects('a rush question cannot be answered twice',
       POST('/rush/answer', { id: rush.questions[0].id, answer: rushAnswer }), { status: 409 });
+    // The score is what the server marked in this run. The page's own count is
+    // not evidence: a body claiming thirteen after one marked answer scores
+    // what was marked (review 5, M2-2).
+    let rushMarked = rushRes.correct ? 1 : 0;
+    for (const q of rush.questions.slice(1, 5)) {
+      const key = canonicalInput(await answerKeyOf(q.id));
+      const r = await POST('/rush/answer', { id: q.id, answer: key ?? '0' });
+      if (r.correct) rushMarked++;
+    }
+    ok('the run has server-marked correct answers to count', rushMarked >= 1, `${rushMarked}`);
     const rushDone = await POST('/rush/finish', { correct: 13, total: 20, bestCombo: 6 });
-    eq('rush records the score', rushDone.score, 13);
-    eq('rush reports the personal best', rushDone.best, 13);
+    eq('rush records the score the server marked, not the count the page sent', rushDone.score, rushMarked);
+    eq('rush reports the personal best', rushDone.best, rushMarked);
+    const rushRow = rawRows().rushRuns.at(-1);
+    eq('the stored run is consistent: correct = score, total = answers marked, combo within the score', [rushRow.correct, rushRow.total, rushRow.bestCombo <= rushRow.score], [rushMarked, 5, true]);
+    const rushAgain = await POST('/rush/finish', { correct: 20, total: 20, bestCombo: 20 });
+    eq('finishing the same run again scores nothing', [rushAgain.score, rushAgain.best], [0, rushMarked]);
+    const badgesAfterRush = (await GET('/badges')).badges.filter(b => b.earned).map(b => b.id);
+    ok('a claimed score earns no Rapid Fire badge', !badgesAfterRush.includes('rush-15'), show(badgesAfterRush));
 
     const match = await POST('/match/start', { rival: 'pro' });
     eq('match deals ten questions', match.questions.length, 10);
     eq('match names the rival', match.rival.name, 'Captain Cosine');
-    const matchDone = await POST('/match/finish', { won: true, playerScore: 8, rivalScore: 6, rival: 'Captain Cosine', ms: 90000 });
+    // A win claimed with nothing marked is not a win.
+    const claimed = await POST('/match/finish', { won: true, playerScore: 10, rivalScore: 0, rival: 'Captain Cosine', ms: 90000 });
+    eq('a win claimed with no server-marked answer is not recorded as one', [claimed.won, claimed.wins, claimed.newBadges.map(b => b.id).includes('match-winner')], [false, 0, false]);
+    const match2 = await POST('/match/start', { rival: 'pro' });
+    let matchMarked = 0;
+    for (const q of match2.questions.slice(0, 8)) {
+      const key = canonicalInput(await answerKeyOf(q.id));
+      const r = await POST('/rush/answer', { id: q.id, answer: key ?? '0' });
+      if (r.correct) matchMarked++;
+    }
+    ok('the match has server-marked correct answers', matchMarked >= 1, `${matchMarked}`);
+    const matchDone = await POST('/match/finish', { won: true, playerScore: 99, rivalScore: 0, rival: 'Captain Cosine', ms: 90000 });
     eq('a win is recorded', matchDone.won, true);
     eq('the win count moves', matchDone.wins, 1);
-    eq('the played count moves', matchDone.played, 1);
+    eq('the played count moves', matchDone.played, 2);
     const matchHistory = await GET('/match/history');
-    eq('match history remembers the game', matchHistory.played, 1);
-    eq('match history keeps the scoreline', matchHistory.recent[0].playerScore, 8);
+    eq('match history remembers the games', matchHistory.played, 2);
+    eq('match history keeps the scoreline the server marked', matchHistory.recent[0].playerScore, matchMarked);
   } catch (err) { crashed(err); }
 
   // ── Curriculum, badges, report, reviews ────────────────────────────────────
@@ -2365,8 +2392,10 @@ async function run() {
       Object.values(reexport.stores).flat().filter(r => r.pid !== restored.id).length, 0);
 
     const restoredHistory = await POST('/history/list', { pageSize: 200 });
-    // Four more questions were answered between the History group and the backup.
-    eq('the restored profile can read its own history', restoredHistory.total, history.total + 4);
+    // Sixteen more questions were answered between the History group and the
+    // backup: four as before, plus the four Rapid Fire and eight Match answers
+    // the rush + match group now marks to have a real score to count.
+    eq('the restored profile can read its own history', restoredHistory.total, history.total + 16);
     eq('the restored stats match the source', (await GET('/stats')).totals.attempts, backup.stores.attempts.length);
 
     await POST('/profiles/select', { id: ada.id });

@@ -479,7 +479,9 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   const card = read('src/components/QuestionCard.jsx');
   const recovery5 = await import('../src/components/practiceRecovery.js');
   ok(/settleFailedSubmission\(question\.id, e, \{ definitive: definitiveSubmissionRefusal\(e\)/.test(card) &&
-    recovery5.refusedBeforeMarking(err(401, 'SIGN_IN_TO_CHECK')) && recovery5.refusedBeforeMarking(Object.assign(err(403, 'GUARDIAN_CONSENT_PENDING'), { beforeMarking: true })) &&
+    recovery5.refusedBeforeMarking(Object.assign(err(401, 'SIGN_IN_TO_CHECK'), { beforeMarking: true })) && recovery5.refusedBeforeMarking(Object.assign(err(403, 'GUARDIAN_CONSENT_PENDING'), { beforeMarking: true })) &&
+    // A bare 401 is not proof: the backend withholds the stamp when an earlier send of the key may have been marked.
+    !recovery5.refusedBeforeMarking(err(401, 'SIGN_IN_TO_CHECK')) &&
     !recovery5.refusedBeforeMarking(err(503, 'RECONNECT_TO_CHECK')) && !recovery5.refusedBeforeMarking(err(500, 'INTERNAL_ERROR')),
     'the card holds a submission refused for sign-in');
   ok(/const plan = recoveryPlan\(pending, [\s\S]{0,160}?\);\s*if \(plan\.action !== 'replay'\) \{[\s\S]{0,420}?return;\s*\}/.test(card) &&

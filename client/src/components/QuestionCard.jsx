@@ -15,13 +15,13 @@ import { clearDraft, flushDrafts, queueDraft, readDraft, saveDraft } from './dra
 import {
   clearInkDraft, clearPendingSubmission, newSubmissionId, readInkDraft, readPendingSubmission,
   saveInkDraft, savePendingSubmission, submissionContentKey,
-  noteSubmissionEdited, recoveryPlan, settleFailedSubmission
+  noteSubmissionEdited, recoveryPlan, settleFailedSubmission, submissionToSettleFirst
 } from './practiceRecovery.js';
 import { cloudReadingEnabled, INK_READER_STATE, photoReadingBlockedKey, readPhotoWithCloud, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
-import { canRetryPhotoReading, definitiveSubmissionRefusal, draftPersistenceWarning, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure, photoSupportedFormats, photoAwaitingOnlineReader, pdfReaderNeedsOnlineDownload } from './photoSubmissionGuard.js';
+import { canRetryPhotoReading, definitiveSubmissionRefusal, draftPersistenceWarning, earlierSubmissionNotice, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure, photoSupportedFormats, photoAwaitingOnlineReader, pdfReaderNeedsOnlineDownload } from './photoSubmissionGuard.js';
 import { plotSpecFor } from '../engine/plotSpec.js';
 import { attestedGrade, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable, showCommittedMethodAwardNote } from './authoritativeGrade.js';
 import { checkRefusalCopy, legacyDeviceReplay, needsAccountToCheck, refusalForQuestion, refusedCheckState, retryActionFor, serverRevealReceipt, unmarkableNotice } from './checkAccess.js';
@@ -751,7 +751,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // sends it by itself (practiceRecovery.js noteSubmissionEdited). `key` is
   // the content now on screen, or null when it is not known yet (new ink).
   const noteEdited = (key) => {
-    if (diagnostic || inFlightRef.current || attemptRef.current || !pendingRef.current) return;
+    // Also while the request is in flight (the fields stay editable): if it
+    // then times out, the record must already say that what is on screen is
+    // no longer what was sent.
+    if (diagnostic || attemptRef.current || !pendingRef.current) return;
     const kept = noteSubmissionEdited(question.id, key, { label: question.subtopicName });
     if (!kept) pendingRef.current = null;
   };
@@ -956,6 +959,17 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // The same answer through a different input authority is NOT a replay of
     // the same request. Never reuse a Photo idempotency key as a typed grade.
     const contentKey = submissionContentKey(given, steps);
+    // An earlier press whose outcome is unknown, for an answer the student has
+    // since changed: it may have been marked and spent the first try. It is
+    // settled first, under its own key, and its result shown; the changed
+    // answer goes with the next press (practiceRecovery: submissionToSettleFirst).
+    const earlier = diagnostic ? null : submissionToSettleFirst(question.id, contentKey, sourceMode);
+    if (earlier) {
+      pendingRef.current = { submissionId: earlier.submissionId, contentKey: submissionContentKey(earlier.answer, earlier.steps), sourceMode: earlier.sourceMode, ms: earlier.ms };
+      await deliver({ answer: earlier.answer, ms: earlier.ms, steps: earlier.steps, viaInk: earlier.viaInk, submissionId: earlier.submissionId },
+        { lines: earlier.lines, recovering: true, earlierAnswer: isMcq ? '' : earlier.answer });
+      return;
+    }
     const replay = pendingRef.current?.contentKey === contentKey && pendingRef.current?.sourceMode === sourceMode;
     const submissionId = replay ? pendingRef.current.submissionId : newSubmissionId();
     // Preserve the original timer alongside the idempotency key: a retry made
@@ -993,7 +1007,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
    * Send one submission and settle the card on its definitive answer. Used by
    * a tap and by relaunch recovery alike, so both take the same path.
    */
-  async function deliver(body, { lines = null, recovering = false } = {}) {
+  async function deliver(body, { lines = null, recovering = false, earlierAnswer = null } = {}) {
     inFlightRef.current = true;
     inkFrozenRef.current = !recovering || inkFrozenRef.current;
     setBusy(true);
@@ -1036,7 +1050,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         attemptRef.current = bound;
         if (live) {
           setAttempt(bound);
-          setState({ phase: 'resolved', res: r });
+          setState({ phase: 'resolved', res: earlierAnswer === null ? r : { ...r, earlierAnswer } });
           if (!diagnostic) {
             if (!r.replayed) celebrate(r);
             refreshUser(); refreshDue(); refreshRecent?.();
@@ -1049,7 +1063,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         onResolved?.(r);
       } else {
         inkFrozenRef.current = false;
-        if (live) setState({ phase: 'retry', res: r });
+        if (live) setState({ phase: 'retry', res: earlierAnswer === null ? r : { ...r, earlierAnswer } });
       }
     } catch (e) {
       if (!mountedRef.current) return;
@@ -2055,6 +2069,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         <div style={SR_ONLY} role="status" aria-live="polite" aria-atomic="true">{verdictSpeech}</div>
 
         {/* ── Feedback, attached to the work ── */}
+        {/* A result recovered for an earlier press: say which answer it is for. */}
+        {typeof state.res?.earlierAnswer === 'string' && !state.res?.technical && (
+          <div className="verdict-next" role="status" data-earlier-submission>{earlierSubmissionNotice(language, state.res.earlierAnswer, resolved)}</div>
+        )}
         {state.phase === 'retry' && (
           <div className={`verdict ${technicalRetry ? 'verdict-technical' : invalidRetry ? 'verdict-bad verdict-unsure' : 'verdict-bad'}`}>
             <span className="verdict-ico">

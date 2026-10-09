@@ -598,8 +598,16 @@ await check('QuestionCard and InkAnswer bind late results to the attempt', async
   assert.match(refused, /return;\s*$/, 'the refusal ends the submit path');
   const submitBody = card.slice(card.indexOf('async function submit('), card.indexOf('async function deliver('));
   assert.ok(submitBody.includes('savePendingSubmission(question.id,'), 'submit owns the pending write');
-  assert.equal((submitBody.match(/await deliver\(/g) || []).length, 1, 'submit has exactly one send, after the pending write');
-  assert.ok(submitBody.indexOf('savePendingSubmission(question.id,') < submitBody.indexOf('await deliver('), 'no send precedes the pending write');
+  // Two sends, each of a submission whose pending record is already on disk:
+  // the replay of an earlier record read back from the store (settle-first),
+  // and the new submission, after its own pending write.
+  const settleFirst = submitBody.slice(submitBody.indexOf('if (earlier) {'), submitBody.indexOf('const replay = '));
+  assert.equal((settleFirst.match(/await deliver\(/g) || []).length, 1, 'the earlier record is replayed once');
+  assert.match(settleFirst, /submissionId: earlier\.submissionId/, 'under the key already on disk');
+  assert.match(settleFirst, /return;\s*\}\s*$/, 'and that press sends nothing else');
+  const fresh = submitBody.slice(submitBody.indexOf('const replay = '));
+  assert.equal((fresh.match(/await deliver\(/g) || []).length, 1, 'a new submission has exactly one send, after the pending write');
+  assert.ok(fresh.indexOf('savePendingSubmission(question.id,') >= 0 && fresh.indexOf('savePendingSubmission(question.id,') < fresh.indexOf('await deliver('), 'no send precedes the pending write');
   assert.match(card, /attemptRef\.current\?\.submissionId !== bound\.submissionId\) return;/, 'a late working check for another attempt is dropped');
   assert.match(card, /misconception`, \{ \.\.\.proposal\.body, submissionId: sid \}/, 'a proposal names its submission');
   assert.match(card, /disabled=\{resolved \|\| busy\}/, 'the ink surface locks while marking');
@@ -617,15 +625,35 @@ await check('QuestionCard and InkAnswer bind late results to the attempt', async
   const serverGradeKeys = async qid => (await online.db.all("SELECT key FROM idempotency_keys WHERE scope='practice-grade' AND key LIKE ?", [`${qid}:%`])).map(r => r.key.split(':').pop());
   const serverIdOf = async id => (await rowOf(id)).serverQuestionId;
   const memo = new Map();   // question id → the card's pendingRef
-  async function press(t, answer, { steps, sourceMode = 'typed', during = fn => fn() } = {}) {
+  async function press(t, answer, { steps, sourceMode = 'typed', during = fn => fn(), whileInFlight = null } = {}) {
     const contentKey = recovery.submissionContentKey(answer, steps);
+    // An earlier press of unknown outcome for a different answer is settled first.
+    const earlier = recovery.submissionToSettleFirst(t.id, contentKey, sourceMode);
+    if (earlier) {
+      memo.set(t.id, { submissionId: earlier.submissionId, contentKey: recovery.submissionContentKey(earlier.answer, earlier.steps), sourceMode: earlier.sourceMode });
+      try {
+        const r = await during(() => api.post(`/practice/${t.id}/submit`, { answer: earlier.answer, steps: earlier.steps, ms: earlier.ms, viaInk: earlier.viaInk, submissionId: earlier.submissionId }));
+        memo.delete(t.id); recovery.clearPendingSubmission(t.id);
+        return { submissionId: earlier.submissionId, result: r, settledEarlier: earlier.answer };
+      } catch (error) {
+        const fate = recovery.settleFailedSubmission(t.id, error, { definitive: guard.definitiveSubmissionRefusal(error) });
+        if (fate === 'cleared') memo.delete(t.id);
+        return { submissionId: earlier.submissionId, error, fate, settledEarlier: earlier.answer };
+      }
+    }
     const held = memo.get(t.id);
     const replay = held?.contentKey === contentKey && held?.sourceMode === sourceMode;
     const submissionId = replay ? held.submissionId : recovery.newSubmissionId();
     memo.set(t.id, { submissionId, contentKey, sourceMode });
     assert.ok(recovery.savePendingSubmission(t.id, { submissionId, answer, steps, viaInk: sourceMode === 'ink', sourceMode, ms: 900, lines: null }), 'the pending record is on disk before the request leaves');
     try {
-      const r = await during(() => api.post(`/practice/${t.id}/submit`, { answer, steps, ms: 900, submissionId }));
+      const r = await during(async () => {
+        const sending = api.post(`/practice/${t.id}/submit`, { answer, steps, ms: 900, submissionId });
+        sending.catch(() => {});
+        // The fields stay editable while the request is out.
+        if (whileInFlight) whileInFlight();
+        return sending;
+      });
       memo.delete(t.id); recovery.clearPendingSubmission(t.id);
       return { submissionId, result: r };
     } catch (error) {
@@ -811,6 +839,85 @@ await check('QuestionCard and InkAnswer bind late results to the attempt', async
     await api.post(`/practice/${t.id}/discard`, {});
   });
 
+  await check('H4-1 · reply lost, then a 401 on the same key: not "held" — the first try\'s result is recovered and shown before any new attempt', async () => {
+    const t = await markable();
+    const serverId = await serverIdOf(t.id);
+    const lost = await press(t, t.wrong, { during: replyLost });
+    assert.equal(lost.fate, 'in-flight');
+    assert.deepEqual(await serverGradeKeys(serverId), [lost.submissionId], 'press 1 WAS marked: the first try is spent on the server');
+    // Press 2, same answer, same key — and the session has gone.
+    const out = await press(t, t.wrong, { during: fn => online.signedOut(fn) });
+    assert.deepEqual([out.error?.status, out.error?.code, out.submissionId], [401, 'SIGN_IN_TO_CHECK', lost.submissionId]);
+    assert.equal(out.error.beforeMarking, undefined, 'a 401 after an earlier send of the same key proves nothing about that send');
+    assert.equal(recovery.refusedBeforeMarking(out.error), false);
+    assert.equal(out.fate, 'in-flight', 'so the submission is not held as "never sent"');
+    assert.equal(recovery.readPendingSubmission(t.id)?.refused, false);
+    // The student changes the answer. The record is kept: its key may hold a result.
+    const second = `${t.wrong}1`;
+    edit(t, second);
+    const kept = recovery.readPendingSubmission(t.id);
+    assert.deepEqual([kept?.submissionId, kept?.answer, kept?.edited], [lost.submissionId, t.wrong, true], 'kept under its key, flagged as edited');
+    assert.equal(mount(t, { typed: second }).action, 'restore', 'a relaunch sends nothing by itself');
+    // Press 3, signed in again, with the CHANGED answer: the original is settled first.
+    const first = await press(t, second);
+    assert.equal(first.settledEarlier, t.wrong, 'what is sent is the ORIGINAL answer…');
+    assert.equal(first.submissionId, lost.submissionId, '…under the ORIGINAL key');
+    assert.deepEqual([first.result?.resolved, first.result?.triesLeft, first.result?.submissionId], [false, 1, lost.submissionId], 'and the student is shown the first try\'s stored result');
+    assert.deepEqual(await serverGradeKeys(serverId), [lost.submissionId], 'nothing new was spent: the server still holds one marked key');
+    assert.deepEqual([(await rowOf(t.id)).tries, !!(await rowOf(t.id)).answered], [1, false], 'the device now knows the first try');
+    assert.equal(recovery.readPendingSubmission(t.id), null);
+    // Only now does the changed answer go, as the second try the student knows it is.
+    const next = await press(t, second);
+    assert.equal(next.settledEarlier, undefined);
+    assert.notEqual(next.submissionId, lost.submissionId);
+    assert.equal(next.result?.resolved, true);
+    assert.deepEqual((await serverGradeKeys(serverId)).sort(), [lost.submissionId, next.submissionId].sort(), 'two tries, two keys, two results shown');
+    assert.equal((await attemptsOf(me.id, t.id)).length, 1);
+  });
+
+  await check('H4-1 · a 401 on a key that was never sent before is still held — and stays held on the next 401', async () => {
+    const t = await markable();
+    const a = await press(t, t.right, { during: fn => online.signedOut(fn) });
+    assert.deepEqual([a.error?.status, a.error?.beforeMarking, a.fate], [401, true, 'held'], 'the server\'s own refusal of the only send');
+    assert.equal((await rowOf(t.id)).pendingGrade?.notSent, true, 'the row records that this send is known not to have been marked');
+    const b = await press(t, t.right, { during: fn => online.signedOut(fn) });
+    assert.deepEqual([b.error?.beforeMarking, b.fate, b.submissionId], [true, 'held', a.submissionId], 'the same key refused again is still proven');
+    assert.equal(mount(t, { typed: t.right }).action, 'restore');
+    // …but once a send of it may have landed, a later 401 is no longer proof.
+    const c = await press(t, t.right, { during: replyLost });
+    assert.deepEqual([c.fate, c.submissionId], ['in-flight', a.submissionId]);
+    const d = await press(t, t.right, { during: fn => online.signedOut(fn) });
+    assert.deepEqual([d.error?.status, d.error?.beforeMarking, d.fate], [401, undefined, 'in-flight']);
+    const done = await press(t, t.right);
+    assert.deepEqual([done.result?.resolved, done.result?.correct, done.submissionId], [true, true, a.submissionId]);
+    assert.deepEqual(await serverGradeKeys(await serverIdOf(t.id)), [a.submissionId], 'one key, marked once');
+    assert.equal((await attemptsOf(me.id, t.id)).length, 1);
+  });
+
+  await check('H4-3 · an edit made while the request is in flight is recorded; added working is an edit too', async () => {
+    const t = await markable();
+    // The student changes the answer while the request is out; the reply is then lost.
+    const lost = await press(t, t.wrong, { during: replyLost, whileInFlight: () => edit(t, t.right) });
+    assert.equal(lost.fate, 'in-flight');
+    const rec = recovery.readPendingSubmission(t.id);
+    assert.deepEqual([rec?.edited, rec?.answer, rec?.submissionId], [true, t.wrong, lost.submissionId], 'flagged though the request was in flight');
+    assert.deepEqual(mount(t, { typed: t.right }), { action: 'restore', mode: null, fill: false, reattach: false }, 'a relaunch does not replay what is no longer on screen');
+    assert.deepEqual(mount(t, null), { action: 'restore', mode: null, fill: false, reattach: false }, 'even with no draft to compare (an MCQ choice is not kept)');
+    // The next press settles the original first (it WAS marked), then the changed answer goes.
+    const first = await press(t, t.right);
+    assert.deepEqual([first.settledEarlier, first.submissionId, first.result?.resolved], [t.wrong, lost.submissionId, false]);
+    const next = await press(t, t.right);
+    assert.equal(next.result?.correct, true);
+    assert.equal((await rowOf(t.id)).tries, 1);
+    // Working added after a submission that carried none.
+    const base = { submissionId: recovery.newSubmissionId(), answer: '5', viaInk: false, sourceMode: 'typed', ms: 1, lines: null, refused: false, edited: false };
+    assert.deepEqual(recovery.recoveryPlan(base, { typedDraft: { typed: '5' } }), { action: 'replay' });
+    assert.deepEqual(recovery.recoveryPlan(base, { typedDraft: { typed: '5', working: '   ' } }), { action: 'replay' }, 'blank working is no working');
+    assert.equal(recovery.recoveryPlan(base, { typedDraft: { typed: '5', working: 'x = 5' } }).action, 'restore', 'working added when none was sent');
+    assert.equal(recovery.recoveryPlan({ ...base, steps: 'x = 5' }, { typedDraft: { typed: '5', working: '' } }).action, 'restore', 'working removed');
+    assert.equal(recovery.recoveryPlan({ ...base, steps: 'x = 5' }, { typedDraft: { typed: '5', working: 'x = 5' } }).action, 'replay');
+  });
+
   await check('H4 · a held handwritten or photo submission restores the work and waits', async () => {
     const t = await markable();
     const strokes = [{ points: [{ x: 3, y: 4 }, { x: 5, y: 6 }] }];
@@ -825,7 +932,7 @@ await check('QuestionCard and InkAnswer bind late results to the attempt', async
     assert.equal(recovery.noteSubmissionEdited(t.id, null), null);
     assert.equal(recovery.readPendingSubmission(t.id), null);
     recovery.savePendingSubmission(t.id, { submissionId: sid, answer: t.right, steps: 'x = 1', viaInk: false, sourceMode: 'photo', ms: 900 });
-    assert.equal(recovery.settleFailedSubmission(t.id, Object.assign(new Error('x'), { status: 401, code: 'SIGN_IN_TO_CHECK' })), 'held');
+    assert.equal(recovery.settleFailedSubmission(t.id, Object.assign(new Error('x'), { status: 401, code: 'SIGN_IN_TO_CHECK', beforeMarking: true })), 'held');
     assert.deepEqual(mount(t), { action: 'restore', mode: 'photo', fill: true, reattach: true }, 'the transcript comes back and the photo is asked for again');
     // In flight, a Photo or a record of unknown provenance is never replayed as typed.
     recovery.savePendingSubmission(t.id, { submissionId: sid, answer: t.right, viaInk: false, sourceMode: 'photo', ms: 900 });
@@ -851,6 +958,12 @@ await check('QuestionCard and InkAnswer bind late results to the attempt', async
     assert.match(card, /const editWorking = \(v\) => \{ setWorking\(v\); stash\(answer, v\); if \(!writeMode\) noteEdited\(typedContentKey\(answer, v\)\); \};/, 'editing the working is reported');
     assert.match(card, /onClick=\{\(\) => chooseOption\(i\)\}/, 'and so is choosing another option');
     assert.match(card, /noteSubmissionEdited\(question\.id, null, \{ label: question\.subtopicName \}\)/, 'and new pen strokes');
+    const noted = card.slice(card.indexOf('const noteEdited = (key) => {'), card.indexOf('// What Submit would send for typed work'));
+    assert.doesNotMatch(noted, /inFlightRef/, 'an edit is recorded while a request is in flight too');
+    const submitFn = card.slice(card.indexOf('async function submit('), card.indexOf('async function deliver('));
+    assert.match(submitFn, /const earlier = diagnostic \? null : submissionToSettleFirst\(question\.id, contentKey, sourceMode\);\s*if \(earlier\) \{[\s\S]{0,700}?submissionId: earlier\.submissionId \},[\s\S]{0,160}?return;\s*\}/, 'an earlier submission of unknown outcome is settled before a changed answer is sent');
+    assert.ok(submitFn.indexOf('submissionToSettleFirst(') < submitFn.indexOf('newSubmissionId()'), 'before any new key is taken');
+    assert.match(card, /data-earlier-submission>\{earlierSubmissionNotice\(language, state\.res\.earlierAnswer, resolved\)\}/, 'and its result is labelled as the earlier answer\'s');
     assert.doesNotMatch(card, /onClick=\{\(\) => setMcqSel\(i\)\}/);
   });
 }

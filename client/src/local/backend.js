@@ -26,7 +26,7 @@ import {
   indiaPyqAlternatives
 } from '../engine/indiaProduct.js';
 import { indiaReasonLabel } from '../engine/indiaProgress.js';
-import { attemptTotals } from '../engine/progressTruth.js';
+import { attemptTotals, isCreditedCorrect, isRepeat as isRepeatAttempt, quotedTotals } from '../engine/progressTruth.js';
 import { indiaExamBlueprint } from '../engine/indiaExams.js';
 import { predictExamMark } from '../engine/markPredictor.js';
 import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
@@ -592,19 +592,23 @@ const safeId = (v) => {
   const s = sanitizeText(v, 80);
   return ID_RE.test(s) && !RESERVED_KEYS.has(s) ? s : null;
 };
-const safeNum = (v, dflt = 0) => { const n = Number(v); return Number.isFinite(n) ? n : dflt; };
+// A value from a file or from another device is never coerced: Number() and
+// String() of an object run that object's own valueOf/toString, and throw when
+// those are not functions. Only a primitive is read; anything else is absent.
+const primitive = v => (v === null || typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? v : undefined);
+const safeNum = (v, dflt = 0) => { const n = Number(primitive(v)); return Number.isFinite(n) ? n : dflt; };
 const safeInt = (v, lo, hi, dflt = lo) => {
-  const n = Math.round(Number(v));
+  const n = Math.round(Number(primitive(v) ?? NaN));
   return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : dflt;
 };
-const safeTime = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? Math.min(n, 4102444800000) : null; };
+const safeTime = (v) => { const n = Number(primitive(v)); return Number.isFinite(n) && n > 0 ? Math.min(n, 4102444800000) : null; };
 const safeFigure = (v) => sanitizeFigure(typeof v === 'string' ? v : '') || null;
 
 // Names, titles and provenance labels are never mathematical, so anything
 // tag-shaped in one came from a file rather than from a person and goes. Maths
 // text is left exactly as written — `x < 5` is a question, not an attack — and
 // is escaped by the renderer that shows it.
-const safeLabel = (v, max) => sanitizeText(String(v ?? '').replace(/<[^>]*>?/g, ' ').replace(/\s+/g, ' '), max);
+const safeLabel = (v, max) => sanitizeText(String(primitive(v) ?? '').replace(/<[^>]*>?/g, ' ').replace(/\s+/g, ' '), max);
 const safeSteps = (v) => (Array.isArray(v) ? v : []).slice(0, 40)
   .map(s => ({ h: sanitizeText(s?.h, 200), d: sanitizeText(s?.d, 2000) }));
 const safeOptions = (v) => (Array.isArray(v) ? v : []).slice(0, 6).map(o => sanitizeText(o, 200));
@@ -1310,7 +1314,7 @@ async function attemptsInOrder(pid) {
  */
 function statsTotals(attempts) {
   const t = attemptTotals(attempts);
-  return { attempts: t.answered, correct: t.correct, ms: t.ms, evidence: t.evidence, accuracy: t.accuracy };
+  return { attempts: t.answered, correct: t.correct, repeats: t.repeats, scored: t.scored, ms: t.ms, evidence: t.evidence, accuracy: t.accuracy };
 }
 
 /**
@@ -1449,8 +1453,9 @@ async function indiaStats(p, ratings, now) {
   const attempts = await attemptsInOrder(pid);
   const totals = statsTotals(attempts);
   const byDiff = [1, 2, 3, 4].map(d => {
-    const rows = attempts.filter(a => a.difficulty === d);
-    return { difficulty: d, n: rows.length, c: rows.filter(a => a.correct).length };
+    // An accuracy by difficulty: a repeat is in neither side of it.
+    const rows = attempts.filter(a => a.difficulty === d && !isRepeatAttempt(a));
+    return { difficulty: d, n: rows.length, c: rows.filter(isCreditedCorrect).length };
   }).filter(r => r.n);
   const rushRuns = await byIndex('rushRuns', 'pid', pid);
   const matchRuns = await byIndex('matchRuns', 'pid', pid);
@@ -1581,10 +1586,11 @@ function interventionFlags({ attempts, lastActiveAt, sinceMs, overdueTasks, weak
       reason: `Past due and unfinished: ${overdueTasks.map(t => `${t.title} (${t.done}/${t.count})`).join(', ')}.`
     });
   }
-  const recent = attempts.slice(-DROP_WINDOW);
+  // Accuracy over first sittings only: a run of repeats is neither a rise nor a drop.
+  const recent = attempts.filter(a => !isRepeatAttempt(a)).slice(-DROP_WINDOW);
   if (recent.length >= DROP_WINDOW) {
     const half = DROP_WINDOW / 2;
-    const acc = rows => Math.round(100 * rows.filter(a => a.correct).length / rows.length);
+    const acc = rows => Math.round(100 * rows.filter(isCreditedCorrect).length / rows.length);
     const before = acc(recent.slice(0, half));
     const after = acc(recent.slice(half));
     if (before - after >= DROP_POINTS) {
@@ -1615,13 +1621,16 @@ async function studentAnalyticsRow(prof, classTasks, now) {
   const india = (prof.course || 'nsw') === 'in';
   const trackId = india ? cleanIndiaTrack(prof.indiaTrack, prof.year) : null;
   const weaknesses = india ? indiaWeaknesses(ratings, now) : namedWeaknesses(ratings, now);
-  const correct = attempts.filter(a => a.correct).length;
+  // What a teacher is quoted: every sitting as an attempt, correct answers
+  // that were not repeats, and an accuracy over the sittings that were not.
+  const quoted = quotedTotals(attempts);
+  const correct = quoted.correct;
   const base = {
     id: pid, name: prof.name, avatar: prof.avatar, year: prof.year,
     course: prof.course || 'nsw', indiaTrack: trackId,
     courseLabel: courseLabel(prof.course || 'nsw', prof.year, pathwayOf(prof), trackId || 'cbse'),
-    attempts: attempts.length, correct,
-    accuracy: attempts.length ? Math.round(100 * correct / attempts.length) : null,
+    attempts: attempts.length, correct, repeats: quoted.repeats,
+    accuracy: quoted.scored ? Math.round(100 * correct / quoted.scored) : null,
     streak: await streakFor(pid, now, timezoneOf(prof)), activeDays: activeDaysIn(days, now, 28, timezoneOf(prof)), lastActiveAt,
     misconceptions: weaknesses.slice(0, 3),
     flags: interventionFlags({ attempts, lastActiveAt, sinceMs: prof.createdAt || null, overdueTasks: overdue, weaknesses, nowMs: now })
@@ -1646,13 +1655,15 @@ function importedAnalyticsRow(imp, now) {
   const ratings = d.ratings || {};
   const lastActiveAt = Object.values(ratings).reduce((m, r) => Math.max(m, r?.last_at || 0), 0) || null;
   const attempts = d.totals?.attempts || 0;
-  const correct = d.totals?.correct || 0;
+  const repeats = Math.min(attempts, d.totals?.repeats || 0);
+  // Never more correct answers than sittings an accuracy can be taken over.
+  const correct = Math.min(d.totals?.correct || 0, attempts - repeats);
   const weaknesses = india ? indiaWeaknesses(ratings, now) : [];
   const base = {
     id: `import-${imp.id}`, name: st.name || 'Imported student', avatar: st.avatar || '📄', year: st.year,
     course: india ? 'in' : 'nsw', indiaTrack: india ? cleanIndiaTrack(st.indiaTrack, st.year || 9) : null,
     courseLabel: india ? courseLabel('in', st.year || 9, null, cleanIndiaTrack(st.indiaTrack, st.year || 9)) : (st.year ? `Year ${st.year}` : '—'),
-    attempts, correct, accuracy: attempts ? Math.round(100 * correct / attempts) : null,
+    attempts, correct, repeats, accuracy: attempts - repeats > 0 ? Math.round(100 * correct / (attempts - repeats)) : null,
     streak: d.streak || 0, activeDays: null, lastActiveAt,
     misconceptions: weaknesses.slice(0, 3),
     // A file carries totals, not the attempt log, so only the flags a snapshot
@@ -2733,6 +2744,23 @@ const IMPORT_ROWS = {
 // a Match is ten questions (POST /match/start).
 const RUSH_MAX_SCORE = 20;
 const MATCH_QUESTIONS = 10;
+
+/**
+ * What the server marked in this profile's latest Rapid Fire or Match run:
+ * the questions /rush/start or /match/start stamped with one run id, joined to
+ * their attempt rows, of which only those carrying the server's attempt id
+ * count. A run that was already finished counts for nothing a second time.
+ */
+async function serverMarkedRun(pid, mode) {
+  const rows = (await byIndex('questions', 'pid', pid)).filter(r => r.mode === mode && typeof r.runId === 'string');
+  if (!rows.length) return { runId: null, correct: 0, answered: 0 };
+  const latest = rows.reduce((a, b) => ((b.createdAt || 0) >= (a.createdAt || 0) ? b : a));
+  const finished = (await byIndex(mode === 'rush' ? 'rushRuns' : 'matchRuns', 'pid', pid)).some(r => r.runId === latest.runId);
+  if (finished) return { runId: null, correct: 0, answered: 0 };
+  const ids = new Set(rows.filter(r => r.runId === latest.runId).map(r => r.id));
+  const marked = (await byIndex('attempts', 'pid', pid)).filter(a => ids.has(a.questionId) && typeof a.serverAttemptId === 'string' && a.serverAttemptId);
+  return { runId: latest.runId, correct: marked.filter(a => a.correct).length, answered: marked.length };
+}
 registerRestoreSanitisers({
   rushRuns: (r, pid) => {
     const row = IMPORT_ROWS.rushRuns(r, pid);
@@ -2848,7 +2876,7 @@ function importProgress(src) {
       band: band ? { scale: safeLabel(band.scale, 20), label: safeLabel(band.label, 20), desc: safeLabel(band.desc, 200) } : null
     } : null,
     streak: safeInt(src.streak, 0, 100000, 0),
-    totals: { attempts: safeInt(src.totals?.attempts, 0, 1e7, 0), correct: safeInt(src.totals?.correct, 0, 1e7, 0) },
+    totals: { attempts: safeInt(src.totals?.attempts, 0, 1e7, 0), correct: safeInt(src.totals?.correct, 0, 1e7, 0), repeats: safeInt(src.totals?.repeats, 0, 1e7, 0) },
     ratings,
     taskProgress: (Array.isArray(src.taskProgress) ? src.taskProgress : []).slice(0, 500)
       .map(t => {
@@ -4034,11 +4062,14 @@ const routes = {
     // should be the one surface that forgets which country they are in.
     const pool = await practicePoolFor(p);
     const questions = [];
+    // The run these questions belong to: its score is counted from them.
+    const runId = uuid();
     for (let guard = 0; questions.length < 20 && guard < 120; guard++) {
       const entry = pool.entries[Math.floor(Math.random() * pool.entries.length)];
       const target = practiceTargetFrom(pool, entry, Math.random() < 0.7 ? 1 : 2);
       if (!target) continue;
       const { row, payload } = await createQuestion(p.id, target.subtopic, target.difficulty, 'rush');
+      await put('questions', { ...(await get('questions', row.id)), runId });
       questions.push(sanitize(payload, row));
     }
     return { questions, seconds: 90 };
@@ -4068,9 +4099,15 @@ const routes = {
   },
   'POST /rush/finish': async (body) => {
     const p = await requireProfile();
-    const score = Math.max(0, Math.min(20, Number(body.correct) || 0));
+    // The score is what the server marked in this run, not what the page
+    // says: a body that claims more is ignored (review 5, M2-2).
+    const run = await serverMarkedRun(p.id, 'rush');
+    const score = Math.min(RUSH_MAX_SCORE, run.correct);
     const now = Date.now();
-    await add('rushRuns', { pid: p.id, score, correct: score, total: Math.max(score, Number(body.total) || 0), bestCombo: Number(body.bestCombo) || 0, createdAt: now });
+    await add('rushRuns', {
+      pid: p.id, score, correct: score, total: Math.max(score, run.answered),
+      bestCombo: safeInt(body?.bestCombo, 0, score, 0), createdAt: now, ...(run.runId ? { runId: run.runId } : {})
+    });
     const runs = await byIndex('rushRuns', 'pid', p.id);
     const best = Math.max(...runs.map(r => r.score));
     const newBadges = await checkBadges(p.id, { type: 'rush', score }, now, timezoneOf(p));
@@ -4095,11 +4132,13 @@ const routes = {
       if (filtered.length) entries = filtered;
     }
     const questions = [];
+    const runId = uuid();
     for (let guard = 0; questions.length < 10 && guard < 60; guard++) {
       const entry = entries[Math.floor(Math.random() * entries.length)];
       const target = practiceTargetFrom(pool, entry, Math.random() < 0.6 ? 1 : 2);
       if (!target) continue;
       const { row, payload } = await createQuestion(p.id, target.subtopic, target.difficulty, 'match');
+      await put('questions', { ...(await get('questions', row.id)), runId });
       questions.push(sanitize(payload, row));
     }
     return { questions, rival, total: 10 };
@@ -4107,8 +4146,18 @@ const routes = {
   'POST /match/finish': async (body) => {
     const p = await requireProfile();
     const now = Date.now();
-    const won = !!body.won;
-    await add('matchRuns', { pid: p.id, won, playerScore: Number(body.playerScore) || 0, rivalScore: Number(body.rivalScore) || 0, rival: String(body.rival || ''), ms: Number(body.ms) || 0, createdAt: now });
+    // The player's score is what the server marked in this match. The rival is
+    // a bot that runs on the device, so its score is the page's word, bounded;
+    // a win needs at least one marked correct answer and a score no lower than
+    // the rival's, whatever the body claims.
+    const run = await serverMarkedRun(p.id, 'match');
+    const playerScore = Math.min(MATCH_QUESTIONS, run.correct);
+    const rivalScore = safeInt(body?.rivalScore, 0, MATCH_QUESTIONS, 0);
+    const won = body?.won === true && playerScore >= 1 && playerScore >= rivalScore;
+    await add('matchRuns', {
+      pid: p.id, won, playerScore, rivalScore, rival: safeLabel(body?.rival, 40), ms: safeInt(body?.ms, 0, 1e9, 0),
+      createdAt: now, ...(run.runId ? { runId: run.runId } : {})
+    });
     const runs = await byIndex('matchRuns', 'pid', p.id);
     const newBadges = await checkBadges(p.id, { type: 'match', won }, now, timezoneOf(p));
     return { won, wins: runs.filter(r => r.won).length, played: runs.length, newBadges };
@@ -4148,8 +4197,9 @@ const routes = {
     const attempts = await attemptsInOrder(pid);
     const totals = statsTotals(attempts);
     const byDiff = [1, 2, 3, 4].map(d => {
-      const rows = attempts.filter(a => a.difficulty === d);
-      return { difficulty: d, n: rows.length, c: rows.filter(a => a.correct).length };
+      // An accuracy by difficulty: a repeat is in neither side of it.
+      const rows = attempts.filter(a => a.difficulty === d && !isRepeatAttempt(a));
+      return { difficulty: d, n: rows.length, c: rows.filter(isCreditedCorrect).length };
     }).filter(r => r.n);
     const rushRuns = await byIndex('rushRuns', 'pid', pid);
     const bestRush = rushRuns.length ? Math.max(...rushRuns.map(r => r.score)) : 0;
@@ -4195,7 +4245,7 @@ const routes = {
         strengths: [...rows].filter(r => r.attempts >= 3).sort((a, b) => b.mastery - a.mastery).slice(0, 3),
         focus: evidence.weakest,
         weekly: acts.slice(-28),
-        totals: { attempts: attempts.length, correct: attempts.filter(a => a.correct).length },
+        totals: quotedTotals(attempts),
         streak: await streakFor(p.id, now, timezoneOf(p)),
         activeDays: activeDaysIn(acts, now, 28, timezoneOf(p)),
         flags: interventionFlags({
@@ -4220,7 +4270,7 @@ const routes = {
       strengths: [...rows].filter(r => r.attempts >= 3).sort((a, b) => b.mastery - a.mastery).slice(0, 3),
       focus: [...rows].sort((a, b) => a.mastery - b.mastery).slice(0, 3),
       weekly: acts.slice(-28),
-      totals: { attempts: attempts.length, correct: attempts.filter(a => a.correct).length },
+      totals: quotedTotals(attempts),
       streak: await streakFor(p.id, now, timezoneOf(p))
     };
   },
@@ -4643,7 +4693,7 @@ const routes = {
       predicted: india ? null : predictMark(ratings, p.year, now, pathwayOf(p)),
       evidence: india ? indiaEvidence(indiaChapterRows(trackId, p.year, ratings, now)) : null,
       streak: await streakFor(p.id, now, timezoneOf(p)),
-      totals: { attempts: attempts.length, correct: attempts.filter(a => a.correct).length },
+      totals: quotedTotals(attempts),
       ratings: Object.fromEntries(Object.entries(ratings).map(([k, v]) => [k, { rating: v.rating, attempts: v.attempts, correct: v.correct, last_at: v.last_at, traps: trimTraps(v.traps || {}) }])),
       taskProgress: tps.map(tp => ({ taskId: tp.taskId, done: tp.done, correct: tp.correct, finished: !!tp.finishedAt }))
     };
@@ -5577,7 +5627,9 @@ async function gradeOnServer(row, body, submissionId, requestDigest) {
   const earlier = row.pendingGrade;
   // Whether a marking request under this key may already have left this
   // device. Once one has, no later failure proves the answer was not marked.
-  const sentBefore = earlier?.submissionId === submissionId;
+  // (A send the server answered with its own refusal to mark is recorded as
+  // `notSent` below: that one is known not to have been marked.)
+  const sentBefore = earlier?.submissionId === submissionId && earlier.notSent !== true;
   if (earlier?.submissionId === submissionId && earlier.digest !== requestDigest) {
     throw Object.assign(new Error('This submission key belongs to another answer.'), {
       status: 409, code: 'SUBMISSION_ID_REUSED'
@@ -5636,8 +5688,22 @@ async function gradeOnServer(row, body, submissionId, requestDigest) {
     // server origin is known not to have sent anything: the transport refuses
     // before it opens a connection. A timeout, a dropped connection or a 5xx
     // is left unstamped — the request may have been marked.
+    //
+    // None of that is proof once an EARLIER send of this key may have been
+    // marked (review 5, H4-1): the reply to press 1 was lost, press 2 meets a
+    // 401 — the 401 says nothing about press 1. Then the refusal is NOT
+    // stamped: the submission stays in flight under its key, and after
+    // sign-in the same key is replayed and the stored first result comes back.
     const refusal = unreachable(cause);
-    if (!sentBefore && cause?.code === 'CLOUD_DISABLED' && !cause?.status && !nativeCloudAvailable()) notMarked(refusal);
+    const proven = !sentBefore && (refusal?.beforeMarking === true ||
+      (cause?.code === 'CLOUD_DISABLED' && !cause?.status && !nativeCloudAvailable()));
+    if (proven) {
+      notMarked(refusal);
+      // This send is known not to have been marked; the reading receipt and
+      // the request bytes are kept for the student's own next Submit.
+      row.pendingGrade = { ...row.pendingGrade, notSent: true };
+      await put('questions', row).catch(() => {});
+    } else if (refusal && typeof refusal === 'object') delete refusal.beforeMarking;
     throw refusal;
   }
   if (acknowledged?.authoritative !== true || acknowledged.questionId !== row.serverQuestionId ||
@@ -5663,7 +5729,7 @@ registerIssuedAttemptRecorder((pid, rowId, event) => withMutationLock(`question:
   if (row.answered) return 'duplicate';
   // A submit that got in first and is still waiting on the server records the
   // attempt itself; keep the event with the row in case it never does.
-  if (row.pendingGrade && Date.now() - (Number(row.pendingGrade.at) || 0) < 2 * 60 * 1000) {
+  if (row.pendingGrade && row.pendingGrade.notSent !== true && Date.now() - (Number(row.pendingGrade.at) || 0) < 2 * 60 * 1000) {
     if (row.deferredGrade?.event?.id !== event.id) await put('questions', { ...row, deferredGrade: { event, at: Date.now() } });
     return 'deferred';
   }
