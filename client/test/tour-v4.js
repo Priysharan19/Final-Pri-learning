@@ -6,17 +6,16 @@
 // answers for eleven questions across a clock, and then marks the lot in a
 // single pass. Nothing outside a browser can drive that.
 //
-// HOW A CORRECT EXAM ANSWER IS KNOWN. A paper still being sat prints as a
-// question paper only — no answers, steps or criteria until it is submitted
-// (#230, assessment integrity) — so the flow first proves the in-progress sheet
-// states nothing. The answers come instead from the stored question payloads,
-// the same canonical form backend-check and selfcheck use. They are typed into
-// the room and must be marked right; after submission the printed sheet must
-// state an answer for every question, and must agree with what the marker
-// accepted for each one it was given. One question is answered with nonsense on purpose,
-// so the flow proves the marker can say no as well as yes, and the arithmetic
-// of the final score is checked against the per-question marks rather than
-// taken on trust.
+// WHO MARKS, AND HOW A CORRECT ANSWER IS KNOWN. The paper is issued by the
+// server to a signed-in account; the device stores only the public paper and
+// the server marks it once at the end. A paper still being sat prints as a
+// question paper only (#230) — the flow proves the in-progress sheet states
+// nothing and that no stored question holds an answer. The right answers come
+// from the server's sealed paper, read at the test's desk (never from the
+// page). They are typed into the room and must be marked right by the server;
+// after submission the printed sheet must state an answer for every question.
+// One question is answered with nonsense on purpose, and the arithmetic of the
+// final score is checked against the per-question marks.
 //
 // Run on its own:  node client/test/tour-v4.js
 // ─────────────────────────────────────────────────────────────────────────────
@@ -25,7 +24,7 @@ import { pathToFileURL } from 'node:url';
 const YEAR = 9;
 const LENGTH = 10;
 const NONSENSE = 'zzz-not-an-answer';
-const ANSWER_WITH_SOLUTION = 6;   // how many questions to answer from the stored solutions
+const ANSWER_WITH_SOLUTION = 6;   // how many questions to answer from the server's sealed paper
 
 // Every route in the sidebar, with the title the shell is supposed to set for
 // it. A page that renders the wrong route still renders; the title is what says
@@ -63,34 +62,6 @@ const paperAnswers = (page) => page.evaluate(() => {
   }
   return [...best.entries()];
 });
-
-/**
- * The canonical typed answer for each stored question on a paper, keyed by
- * question number — read from the device's own question store. The API never
- * hands answers back mid-paper, so this is the test's oracle, as in
- * backend-check.mjs (numeric/expression/set/point/ratio answers only).
- */
-const storedAnswers = (page, examId) => page.evaluate(async (examId) => {
-  const db = await new Promise((ok, no) => { const r = indexedDB.open('pri-learning'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
-  const get = (store, key) => new Promise((ok, no) => { const r = db.transaction(store).objectStore(store).get(key); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
-  const exam = await get('exams', examId);
-  const out = [];
-  for (const [i, qid] of (exam?.questionIds || []).entries()) {
-    const q = (await get('questions', qid))?.payload;
-    const a = q?.answer;
-    if (!q || !a || q.multipart) continue;
-    let typed = null;
-    if (a.canonicalInput !== undefined) typed = String(a.canonicalInput);
-    else if (q.answerType === 'numeric') typed = a.surdForm ? `${a.surdForm.k === 1 ? '' : a.surdForm.k === -1 ? '-' : a.surdForm.k}sqrt(${a.surdForm.r})` : a.simplestFraction ? `${a.simplestFraction.n}/${a.simplestFraction.d}` : a.requireExact ? null : String(a.value);
-    else if (q.answerType === 'expression') typed = a.expr;
-    else if (q.answerType === 'set') typed = a.values.join(', ');
-    else if (q.answerType === 'point') typed = `(${a.x}, ${a.y})`;
-    else if (q.answerType === 'ratio') typed = `${a.a}:${a.b}`;
-    if (typed) out.push([i + 1, typed]);
-  }
-  db.close();
-  return out;
-}, examId);
 
 /** The printed answer, less whatever the answer row already prints around the box. */
 async function stripFurniture(page, mathText, stated) {
@@ -194,9 +165,23 @@ export const flow = {
     await check('the printed paper of an unfinished exam has no worked solutions section',
       !/Marking criteria & worked solutions/.test(await page.locator('.paper-sheet').innerText()));
     await page.getByRole('button', { name: 'Close' }).click();
-    const stated = new Map(await storedAnswers(page, examId));
-    await check('the stored paper yields a typed answer for enough single questions',
-      stated.size >= ANSWER_WITH_SOLUTION, `${stated.size} stored answers for ${LENGTH} single questions`);
+    // The paper is the server's: the device stores only the public paper.
+    const heldOnDevice = await page.evaluate(async (examId) => {
+      const db = await new Promise((ok, no) => { const r = indexedDB.open('pri-learning'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+      const get = (store, key) => new Promise((ok, no) => { const r = db.transaction(store).objectStore(store).get(key); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+      const exam = await get('exams', examId);
+      let withAnswer = 0;
+      for (const qid of exam?.questionIds || []) { const row = await get('questions', qid); if (row?.payload?.answer !== undefined || /"answer"\s*:/.test(JSON.stringify(row?.payload?.parts || ''))) withAnswer++; }
+      db.close();
+      return { questions: (exam?.questionIds || []).length, withAnswer, serverId: exam?.server?.examId || null, version: exam?.paperVersion || null };
+    }, examId);
+    await check('the paper was issued by the server and the device holds only the public paper: no answer in any stored question',
+      !!heldOnDevice.serverId && heldOnDevice.questions === LENGTH + 1 && heldOnDevice.withAnswer === 0 && /^sv1-/.test(String(heldOnDevice.version)),
+      JSON.stringify(heldOnDevice));
+    // The oracle: the server's sealed paper, read at the test's desk.
+    const stated = new Map(await online.examAnswers(examId));
+    await check('the server\'s sealed paper yields a typed answer for enough single questions',
+      stated.size >= ANSWER_WITH_SOLUTION, `${stated.size} sealed answers for ${LENGTH} single questions`);
 
     // ── 4 · the paper is sat ─────────────────────────────────────────────────
     await page.goto(`${base}/exams/${examId}`, { waitUntil: 'domcontentloaded' });
@@ -232,7 +217,7 @@ export const flow = {
       nonsenseAt = i + 1;
     }
 
-    if (!await check(`${ANSWER_WITH_SOLUTION} questions were answered from the stored solutions`,
+    if (!await check(`${ANSWER_WITH_SOLUTION} questions were answered from the server's sealed paper`,
       answered.length === ANSWER_WITH_SOLUTION,
       `only ${answered.length} of the ${dots} questions took a typed stored answer`)) return;
     if (!await check('one question was answered with nonsense on purpose', nonsenseAt !== null)) return;
@@ -256,6 +241,14 @@ export const flow = {
     if (!await check('the result is stated in marks, not just a percentage', !!scored,
       `summary reads ${JSON.stringify(summary.replace(/\s+/g, ' ').slice(0, 160))}`)) return;
     const [, score, total] = scored.map(Number);
+
+    // Marked once, by the server; the room renders the server's result.
+    const finishes = (await online.practiceCalls(/^\/v1\/exams\/[^/]+\/finish$/));
+    const serverResult = await online.examResult(examId);
+    await check('the paper was marked by the server, once, and the score on screen is the server\'s',
+      finishes.filter(c => c.status === 200).length === 1 && !!serverResult && serverResult.accountId === online.account.id &&
+        JSON.stringify(serverResult).includes(`"score":${score}`) && JSON.stringify(serverResult).includes(`"total":${total}`),
+      `finish calls ${JSON.stringify(finishes.map(c => c.status))}; server result keys ${JSON.stringify(serverResult && Object.keys(serverResult))} ${String(JSON.stringify(serverResult && { score: serverResult.score, total: serverResult.total, late: serverResult.late })).slice(0, 200)}`);
 
     const rows = await reviewRows(page);
     await check('every question comes back marked', rows.length === dots,

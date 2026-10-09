@@ -732,24 +732,21 @@ export const games = {
   }
 };
 
-// ── 4 · Exams, signed out ────────────────────────────────────────────────────
+// ── 4 · Exams, signed out (NSW paper and India simulation) ──────────────────
 
-export const examSignedOut = {
-  id: 'exam-signed-out',
-  name: 'Exams · signed out: a paper does not start; sign in in place, then it does',
-  online: true,
-
+const examSignedOutFor = ({ id, name, profile, startName }) => ({
+  id, name, online: true,
   async run({ page, base, check, goto, createProfile, online }) {
     await goto('/');
-    await createProfile({ name: 'Signed Out Candidate', year: 9 });
+    await createProfile(profile);
     await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
-    const start = page.getByRole('button', { name: 'Start practice paper' });
+    const start = page.getByRole('button', { name: startName });
     await start.waitFor({ timeout: 30000 });
     await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
     await start.click();
     const refused = page.locator('[data-exam-start-refused]');
     await refused.waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
-    await check('signed out, Start practice paper is refused in place: "Starting a paper needs a Pri account"',
+    await check('signed out, the paper is refused in place: "Starting a paper needs a Pri account"',
       await refused.getAttribute('data-exam-start-refused').catch(() => null) === 'sign-in' && await refused.getAttribute('role') === 'alert' &&
         /Starting a paper needs a Pri account/.test(await refused.innerText()) && /has not started/i.test(await refused.innerText()),
       (await refused.innerText().catch(() => 'no refusal shown')).slice(0, 200));
@@ -758,19 +755,108 @@ export const examSignedOut = {
       open.onsuccess = () => { const db = open.result; const r = db.transaction('exams').objectStore('exams').count(); r.onsuccess = () => { db.close(); done(r.result); }; r.onerror = () => { db.close(); done(-1); }; };
       open.onerror = () => done(-1);
     }));
-    await check('no paper was generated and the exam room did not open',
-      exams === 0 && new URL(page.url()).pathname === '/exams' && await page.locator('.exam-timer').count() === 0, `${exams} stored paper(s); ${page.url()}`);
+    await check('no paper was generated on the device or issued by the server, and the exam room did not open',
+      exams === 0 && new URL(page.url()).pathname === '/exams' && await page.locator('.exam-timer').count() === 0 &&
+        (await online.practiceCalls(/^\/v1\/exams$/)).filter(c => c.status < 300).length === 0, `${exams} stored paper(s); ${page.url()}`);
     await refused.locator('[data-check-sign-in]').click();
-    await online.signInHere(refused, { name: 'Signed Out Candidate' });
+    await online.signInHere(refused, { name: profile.name });
     await check('sign-in completes on the Exams page: no navigation, no reload',
       new URL(page.url()).pathname === '/exams' && await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept', page.url());
-    await page.getByRole('button', { name: 'Start practice paper' }).click();
+    await page.getByRole('button', { name: startName }).click();
     await page.waitForSelector('.exam-timer', { timeout: 60000 }).catch(() => {});
-    await check('signed in, the same button starts the paper', await page.locator('.exam-timer').count() === 1 && /\/exams\/[^/]+$/.test(new URL(page.url()).pathname), page.url());
+    const issued = (await online.practiceCalls(/^\/v1\/exams$/)).filter(c => c.status < 300);
+    await check('signed in, the same button starts the paper — issued by the server, once',
+      await page.locator('.exam-timer').count() === 1 && /\/exams\/[^/]+$/.test(new URL(page.url()).pathname) && issued.length === 1, `${page.url()}; ${issued.length} paper(s) issued`);
+  }
+});
+
+export const examSignedOut = examSignedOutFor({
+  id: 'exam-signed-out', name: 'Exams · signed out: a paper does not start; sign in in place, then it does',
+  profile: { name: 'Signed Out Candidate', year: 9 }, startName: 'Start practice paper'
+});
+export const indiaExamSignedOut = examSignedOutFor({
+  id: 'india-exam-signed-out', name: 'India exam · signed out: a simulation does not start; sign in in place, then it does',
+  profile: { name: 'Signed Out Aspirant', year: 12, course: 'in', track: 'jee-main' }, startName: 'Start JEE Main Mathematics simulation'
+});
+
+// ── 5 · A paper finished offline is submitted, not marked, until the server marks it ─
+
+export const examOfflineFinish = {
+  id: 'exam-offline-finish',
+  name: 'Exam · finished offline: submitted, no score; reconnected: the server\'s result',
+  online: true,
+
+  async run({ page, base, check, goto, createProfile, settle, online }) {
+    await goto('/');
+    await createProfile({ name: 'Offline Finisher', year: 9 });
+    const account = await online.signIn({ name: 'Offline Finisher' });
+    await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Start practice paper' }).waitFor({ timeout: 30000 });
+    await page.getByRole('button', { name: 'Start practice paper' }).click();
+    await page.waitForSelector('.exam-timer', { timeout: 60000 });
+    const examId = new URL(page.url()).pathname.split('/').pop();
+    const sealed = new Map(await online.examAnswers(examId));
+    const answerBox = page.locator('.answer-row input.answer-input');
+    const dots = await page.locator('.exam-dot').count();
+    let answeredAt = null;
+    for (let i = 0; i < dots && answeredAt === null; i++) {
+      await page.locator('.exam-dot').nth(i).click();
+      await settle();
+      if ((await page.locator('.q-meta').innerText()).includes('Structured') || await answerBox.count() !== 1 || !sealed.get(i + 1)) continue;
+      await answerBox.fill(sealed.get(i + 1));
+      answeredAt = i + 1;
+    }
+    if (!await check('a server-issued paper is open and one question is answered from the server\'s sealed paper', answeredAt !== null, `${sealed.size} sealed answers`)) return;
+    // The answer reaches the server as a checkpoint while the paper is sat.
+    const checkpoints = () => online.calls.filter(c => c.method === 'PATCH' && /^\/v1\/exams\/[^/]+\/answers$/.test(c.path) && c.status < 300);
+    for (let w = 0; w < 60 && !checkpoints().length; w++) await page.waitForTimeout(250);
+    await check('answers are checkpointed to the server while the paper is sat', checkpoints().length >= 1,
+      JSON.stringify(online.calls.filter(c => /^\/v1\/exams/.test(c.path)).map(c => `${c.status} ${c.method}`)));
+
+    // ── the connection goes; the student submits ─────────────────────────────
+    await online.disconnect();
+    await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
+    await page.locator('.exam-head').getByRole('button', { name: 'Review and submit' }).click();
+    await page.locator('[role="dialog"]').getByRole('button', { name: 'Submit paper' }).click();
+    const pending = page.locator('[data-exam-pending]').first();
+    await pending.waitFor({ state: 'visible', timeout: 60000 }).catch(() => {});
+    const pendingText = (await pending.innerText().catch(() => '')).replace(/\s+/g, ' ');
+    await check('offline, the room says "Submitted. Not marked yet." as a status — with no score, percentage or marks',
+      /Submitted\. Not marked yet\./.test(pendingText) && await pending.getAttribute('role') === 'status' &&
+        await page.locator('.hero-num').count() === 0 && !/\d+\s*%|\d+ of \d+ marks/.test(pendingText),
+      JSON.stringify(pendingText.slice(0, 240)));
+    await check('and the server has marked nothing: no result is held for the paper',
+      (await online.examResult(examId)) === null && (await online.practiceCalls(/^\/v1\/exams\/[^/]+\/finish$/)).filter(c => c.status === 200).length === 0);
+    await check('nothing claims a mark made on this device', !/marked on this device|checked on this device/i.test(await page.locator('main, .shell').first().innerText()));
+    // The Exams list tells the same truth.
+    await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.prio-item', { timeout: 30000 });
+    await check('the Exams list shows the paper as waiting to be marked, with no score',
+      await page.locator('.prio-item [data-exam-pending]').count() === 1 && !/\d+\/\d+/.test((await page.locator('.prio-item').first().innerText()).replace(/\d{1,2}[:/]\d{2}/g, '')),
+      (await page.locator('.prio-item').first().innerText()).replace(/\s+/g, ' ').slice(0, 160));
+
+    // ── reconnected: the server marks it, once, and the room shows that result ─
+    await page.goto(`${base}/exams/${examId}`, { waitUntil: 'domcontentloaded' });
+    await page.locator('[data-exam-pending]').first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    await online.reconnect();
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
+    await page.waitForSelector('.hero-num', { timeout: 45000 }).catch(() => {});
+    const result = await online.examResult(examId);
+    const summary = (await page.locator('.card').first().innerText().catch(() => '')).replace(/\s+/g, ' ');
+    const scored = /(\d+) of (\d+) marks/.exec(summary);
+    await check('after reconnecting the paper is marked by the server without being sat again, and the room shows the server\'s score',
+      await page.locator('.hero-num').count() === 1 && !!result && result.accountId === account.id && !!scored &&
+        JSON.stringify(result).includes(`"score":${scored[1]}`) && JSON.stringify(result).includes(`"total":${scored[2]}`),
+      `summary ${JSON.stringify(summary.slice(0, 160))}; server result ${result ? 'held' : 'missing'}`);
+    await page.waitForTimeout(1500);
+    const finishes = (await online.practiceCalls(/^\/v1\/exams\/[^/]+\/finish$/)).filter(c => c.status === 200);
+    await check('marked exactly once: every accepted finish carries the same result, and the answer given offline earned its marks',
+      finishes.length >= 1 && new Set(finishes.map(c => JSON.stringify(c.json?.result?.score ?? c.json?.score ?? null))).size === 1 && Number(scored?.[1]) >= 1,
+      `${finishes.length} accepted finish call(s); score ${scored?.[1]}/${scored?.[2]}`);
   }
 };
 
-export const flows = [typeSignedOut, typeOffline, writeOffline, draftOffline, preparedTaken, syncOverlap, games, examSignedOut];
+export const flows = [typeSignedOut, typeOffline, writeOffline, draftOffline, preparedTaken, syncOverlap, games, examSignedOut, indiaExamSignedOut, examOfflineFinish];
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const { runFlows } = await import('./e2e.mjs');
