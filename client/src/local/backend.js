@@ -1140,9 +1140,27 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   // archive can actually serve; choosing over the whole track first refused
   // most requests with INDIA_PYQ_UNAVAILABLE for a chapter the student never
   // picked (content certification, §06).
-  const pool = pyqOnly && !chapter
+  let pool = pyqOnly && !chapter
     ? scoped.pool.filter(c => resolveIndiaTarget(c, { track: trackId, grade, pyqOnly: true, random: () => 0 }))
     : scoped.pool;
+  // A named difficulty is a condition on what may be served, never a wish
+  // (issue #408). On a chapter or dot point the student chose, a level with no
+  // authored form there is refused with the levels that do exist. When the
+  // optimiser chooses the chapter, it chooses among the chapters that have the
+  // level. A selection nothing can serve at all keeps its own refusal below.
+  const askedLevel = namedDifficultyOf(difficulty);
+  const levelsOf = (c, dp = null) => indiaLevelsFor(c, { dotpoint: dp, track: trackId, grade, pyqOnly });
+  if (askedLevel != null && chapter) {
+    const dp = pyqOnly ? null : indiaDotpointIndex(chapter, dotpoint);
+    const servable = resolveIndiaTarget(chapter, { dotpoint: dp, track: trackId, grade, pyqOnly, random: () => 0 });
+    const levels = levelsOf(chapter, dp);
+    if (servable && !levels.includes(askedLevel)) throw difficultyUnavailable(askedLevel, levels, { subtopic: chapter.id, dotpoint: dp, track: trackId });
+  }
+  if (askedLevel != null && !chapter && pool.length) {
+    const atLevel = pool.filter(c => levelsOf(c).includes(askedLevel));
+    if (!atLevel.length) throw difficultyUnavailable(askedLevel, pool.flatMap(c => levelsOf(c)), { track: trackId });
+    pool = atLevel;
+  }
   if (pyqOnly && !chapter && scoped.pool.length && !pool.length) {
     throw Object.assign(
       new Error(`Pri's previous-year archive has no ${trackName} past-paper question for your class yet. Turn the past-papers-only filter off to practise authored questions.`),
@@ -1252,9 +1270,10 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   if (target.pyq) why += ' This one is a real previous-year question.';
   if (target.dotpointIndex != null) why += ` Dot point: ${c.dotpoints[target.dotpointIndex]}`;
   if (target.windowed === false) why += ` (Served at D${target.difficulty} — this dot point has no authored form at ${trackName} depth yet.)`;
-  if (namedDifficulty && Math.round(Number(difficulty)) !== namedRung) {
-    const { floor, ceiling } = indiaDifficultyWindow(trackId, grade);
-    why += ` (You asked for D${Math.round(Number(difficulty))}; ${trackName} practice is held to D${floor}–D${ceiling}.)`;
+  // Last line of defence: whatever chose the target, a named level is served
+  // at exactly that level inside the track's window or not at all.
+  if (askedLevel != null && (target.difficulty !== askedLevel || target.windowed === false)) {
+    throw difficultyUnavailable(askedLevel, levelsOf(c, asked), { subtopic: c.id, dotpoint: asked, track: trackId });
   }
   if (diagnosticStart) why += ' Your placement check suggested starting here — that was diagnostic evidence, not a mark.';
   return {
@@ -1315,23 +1334,59 @@ function indiaChapterForRequest(subtopic, trackId, grade) {
 }
 
 /**
- * What a practice reply says about a difficulty the request named (issue #408).
- *
- * A rung that was asked for is not always the rung that can be served: a dot
- * point may have no authored form there, and a track holds practice inside its
- * own window. The question is never relabelled — its own `difficulty` and
- * `diffLabel` are always the rung the bank generated it at — and the reply
- * carries both numbers so the page can say "no questions at D4 for this topic
- * yet — showing D3" before the question instead of letting a D3 question stand
- * in silently for the D4 that was asked for. A request that named no difficulty
- * (adaptive practice) gets no fields at all.
+ * The level a request named, as a whole number D1–D4, or null when it named
+ * none (adaptive practice).
  */
-export function difficultyDisclosure(requested, served) {
-  if (requested == null || requested === '' || !Number.isFinite(Number(requested))) return {};
-  const asked = Math.min(4, Math.max(1, Math.round(Number(requested))));
-  const got = Number(served);
-  if (!Number.isInteger(got)) return {};
-  return { difficultyRequested: asked, difficultyServed: got, difficultyHonoured: asked === got };
+export function namedDifficultyOf(requested) {
+  if (requested == null || requested === '' || !Number.isFinite(Number(requested))) return null;
+  return Math.min(4, Math.max(1, Math.round(Number(requested))));
+}
+
+/**
+ * The refusal for a named difficulty that has no authored form (issue #408).
+ *
+ * A level that was asked for and does not exist for the chapter / dot point /
+ * track is never answered with a question at another level — not even under a
+ * notice. Nothing is generated, no question row is written and no allowance is
+ * spent. The refusal carries the level asked for and the levels that genuinely
+ * exist for the same selection, so the page can name them and the student can
+ * choose one; a question is served only after that choice.
+ */
+export function difficultyUnavailable(requested, available, scope = {}) {
+  const levels = [...new Set((available || []).map(Number).filter(d => Number.isInteger(d) && d !== requested))].sort((a, b) => a - b);
+  return Object.assign(
+    new Error(`There are no questions at ${DIFF_LABELS[requested] || `D${requested}`} for this ${scope.dotpoint != null ? 'dot point' : 'topic'} yet.`),
+    {
+      status: 409, code: 'DIFFICULTY_UNAVAILABLE',
+      detail: {
+        difficultyRequested: requested, requestedLabel: DIFF_LABELS[requested] || `D${requested}`,
+        available: levels.map(d => ({ difficulty: d, label: DIFF_LABELS[d] || `D${d}` })),
+        subtopic: scope.subtopic ?? null, dotpoint: scope.dotpoint ?? null, track: scope.track ?? null
+      }
+    }
+  );
+}
+
+/** What a served reply says about the level the request named: always the level served. */
+function difficultyServedAs(requested, served) {
+  const asked = namedDifficultyOf(requested);
+  return asked == null ? {} : { difficultyRequested: asked, difficultyServed: Number(served) };
+}
+
+/**
+ * The levels an India selection can be served at exactly on a track: the
+ * authored forms inside the track's window, or — under "past papers only" —
+ * the levels the previous-year archive holds for the chapter.
+ */
+function indiaLevelsFor(chapter, { dotpoint = null, track, grade, pyqOnly = false }) {
+  if (!pyqOnly) return indiaRequestableDifficulties(chapter, { dotpoint, track, grade });
+  const { floor, ceiling } = indiaDifficultyWindow(track, grade);
+  const out = [];
+  for (let d = floor; d <= ceiling; d++) {
+    const t = resolveIndiaTarget(chapter, { difficulty: d, track, grade, pyqOnly: true, random: () => 0 });
+    if (t && t.windowed !== false && t.difficulty === d) out.push(d);
+  }
+  return out;
 }
 
 /**
@@ -3090,13 +3145,17 @@ const routes = {
   'POST /practice/next': async (body) => {
     const p = await requireProfile();
     const unfinished = await resumableQuestion(p, body);
-    // A resumed question is the one already on the student's desk; when the
-    // request names a difficulty it does not sit at, the reply says so too.
+    // A resumed question is the one already on the student's desk. It comes
+    // back under a request that names a difficulty only when it sits at that
+    // level; otherwise the request is answered afresh (or refused) below, so an
+    // unfinished D3 question is never handed back as the answer to "D4". An
+    // answered row is a verdict being replayed, not a question being served.
     if (unfinished) {
-      return {
-        ...resumedQuestionResponse(unfinished),
-        ...(body?.taskId || unfinished.answered ? {} : difficultyDisclosure(body?.difficulty, unfinished.payload?.difficulty ?? unfinished.difficulty))
-      };
+      const level = Number(unfinished.payload?.difficulty ?? unfinished.difficulty);
+      const named = namedDifficultyOf(body?.difficulty);
+      if (unfinished.answered || named == null || named === level) {
+        return { ...resumedQuestionResponse(unfinished), ...(unfinished.answered ? {} : difficultyServedAs(body?.difficulty, level)) };
+      }
     }
     const { mode = 'smart', subtopic, difficulty, dotpoint, taskId, track, pyqOnly = false } = body || {};
     // Task-driven question
@@ -3124,15 +3183,23 @@ const routes = {
         const trackId = cleanIndiaTrack(target.track || p.indiaTrack, grade);
         const ratings = await ratingsFor(p.id);
         const state = indiaState(chapter, ratings, nowMs);
-        const want = target.difficulty != null ? Number(target.difficulty) : pickDifficulty(state.rating, state.attempts, { state, nowMs });
+        // A task that names a level is held to it like any other request. The
+        // student's own choice among the levels that exist (sent after a
+        // DIFFICULTY_UNAVAILABLE refusal) takes the place of the task's.
+        const namedLevel = namedDifficultyOf(difficulty) ?? namedDifficultyOf(target.difficulty);
+        const want = namedLevel != null ? namedLevel : pickDifficulty(state.rating, state.attempts, { state, nowMs });
         const resolved = resolveIndiaTarget(chapter, { dotpoint: target.dotpoint, difficulty: want, track: trackId, grade });
+        if (namedLevel != null && resolved && (resolved.difficulty !== namedLevel || resolved.windowed === false)) {
+          const dp = indiaDotpointIndex(chapter, target.dotpoint);
+          throw difficultyUnavailable(namedLevel, indiaLevelsFor(chapter, { dotpoint: dp, track: trackId, grade }), { subtopic: chapter.id, dotpoint: dp, track: trackId });
+        }
         const retarget = resolved ? sameTerms(resolved, () => resolveIndiaTarget(chapter, { dotpoint: target.dotpoint, difficulty: want, track: trackId, grade })) : null;
         const { row, payload, repeat } = await createIndiaQuestion(p.id, chapter, resolved, 'task', trackId, null, taskId, null, retarget);
         return {
           question: sanitize(payload, row), reason: 'task', repeat: !!repeat,
           why: `Task: ${task.title} — question ${done + 1} of ${task.count}.`,
           dotpoint: resolved.dotpointIndex, target: state.mastery, misconception: null,
-          ...difficultyDisclosure(target.difficulty, payload.difficulty ?? row.difficulty)
+          ...difficultyServedAs(namedLevel, payload.difficulty ?? row.difficulty)
         };
       }
       if (!task.subtopics?.length) throw Object.assign(new Error('That task has no topics to practise.'), { status: 409 });
@@ -3166,7 +3233,7 @@ const routes = {
         misconception: trapKey ? pick.trap?.label || null : null,
         windowed: pick.target.windowed !== false, aheadUnlocked: pick.aheadUnlocked,
         pyq: !!pick.target.pyq, repeat: !!repeat,
-        ...difficultyDisclosure(difficulty, payload.difficulty ?? row.difficulty)
+        ...difficultyServedAs(difficulty, payload.difficulty ?? row.difficulty)
       };
     }
     let choice;
@@ -3190,6 +3257,10 @@ const routes = {
       // deliver it, so the choice is snapped into that set rather than sent as
       // a wish the generator has to talk itself out of.
       if (real && !difficulty) d = nearestForm(asked.forms, d);
+      // A level the student named that this dot point has no form at is
+      // refused with the levels it does have (issue #408): the generator would
+      // otherwise snap it to the nearest one.
+      if (real && difficulty && !asked.forms.includes(d)) throw difficultyUnavailable(d, asked.forms, { subtopic, dotpoint: asked.ordinal });
       // "Practise this topic" with no dot point named still gets practised at
       // dot-point resolution: the one inside it with the least behind it wins.
       let auto = null;
@@ -3250,7 +3321,7 @@ const routes = {
       why: served || !choice.dotpoint ? choice.why : choice.whyPlain,
       dotpoint: served, target: choice.target ?? null,
       misconception: trapKey ? choice.trap?.label || null : null,
-      ...difficultyDisclosure(difficulty, payload.difficulty ?? row.difficulty)
+      ...difficultyServedAs(difficulty, payload.difficulty ?? row.difficulty)
     };
   },
 
@@ -4946,10 +5017,15 @@ async function resumableQuestion(profile, body = {}) {
   // the submission under its idempotency key and show the student the one
   // verdict it produced, rather than leaving them to wonder whether it went
   // (§09). Only this profile's own practice rows qualify; a skipped one does not.
+  // A request that names a difficulty resumes only a question at that level
+  // (issue #408); the entitlement gate and the route both read this, so they
+  // agree on whether the request is a resume.
+  const namedLevel = namedDifficultyOf(body.difficulty);
+  const atNamedLevel = r => namedLevel == null || Number(r.payload?.difficulty ?? r.difficulty) === namedLevel;
   if (body.pendingQuestionId) {
     const pending = await get('questions', String(body.pendingQuestionId)).catch(() => null);
     if (pending && pending.pid === profile.id && !pending.discardedAt && !pending.examId && !isExamRow(pending)
-      && pending.mode !== 'rush' && pending.mode !== 'match') return pending;
+      && pending.mode !== 'rush' && pending.mode !== 'match' && (pending.answered || atNamedLevel(pending))) return pending;
   }
   const rows = await byIndex('questions', 'pid', profile.id);
   const taskId = body.taskId ? String(body.taskId) : null;
@@ -4960,6 +5036,7 @@ async function resumableQuestion(profile, body = {}) {
   const scope = { track: body.track, pyqOnly: body.pyqOnly === true, explicit: !!subtopic };
   const candidates = rows.filter(r => {
     if (!r || r.answered || r.discardedAt || r.examId || r.mode === 'rush' || r.mode === 'match') return false;
+    if (!atNamedLevel(r)) return false;
     if (taskId) return String(r.taskId || '') === taskId;
     if (r.taskId) return false;
     if (!resumeInScope(profile, r, scope)) return false;
