@@ -92,7 +92,7 @@ export function makeInquiryVisual(kind,p){
  }
  if(kind==="piecewise"){
   const {left,right,mode="jump"}=p;if(!Number.isInteger(left)||!Number.isInteger(right)||left===right||Math.abs(left)>8||Math.abs(right)>8)throw Error("step function");
-  const figure={type:"piecewise",description:`Piecewise constant graph f(x)=${left} for x<0 with an open circle at (0,${left}), and f(x)=${right} for x≥0 with a filled circle at (0,${right}).`,left,right};
+  const figure={type:"piecewise",description:`Piecewise constant graph f(x)=${left} for negative x with an open circle at (0,${left}), and f(x)=${right} for x≥0 with a filled circle at (0,${right}).`,left,right};
   const answer=mode==="jump"?right-left:right;
   return done(`From the open and filled endpoints, find ${mode==="jump"?"the signed jump f(0+)−f(0−)":"the actual function value f(0)"}.`,[`As x approaches zero from the left, the graph tends to ${left}; the circle at x=0 is open there.`,`At x=0 and immediately to the right, the filled endpoint gives value ${right}.`,`The requested value is ${answer}.`],answer,V(mode==="jump"?`(${right})-(${left})`:`(${right})`,answer),figure);
  }
