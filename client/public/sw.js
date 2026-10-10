@@ -52,12 +52,29 @@ const CACHEABLE = /(?:^\/assets\/)|(?:\.(?:js|css|html|svg|png|webmanifest|woff2
 // the wrong bytes; the shell is the one name that outlives its contents.
 const hashed = (url) => url !== '/' && url !== SHELL;
 
+// A server that answers every path it does not know with the shell — ours
+// does, because an unknown path is usually an in-app route — answers a chunk
+// it no longer has with `200 text/html`. Kept under the chunk's name, that
+// page would be handed back as the chunk on every later load, and a module
+// that arrives as HTML never runs: the app would sit on its splash with no
+// failed request to show for it. So a script is only kept if it is a script,
+// a stylesheet if it is a stylesheet, and HTML only under an HTML name.
+function rightKind(pathname, res) {
+  const type = res.headers.get('content-type') || '';
+  const html = /text\/html/i.test(type);
+  if (pathname === '/' || /\.html$/.test(pathname)) return html;
+  if (/\.m?js$/.test(pathname)) return /javascript|ecmascript/i.test(type);
+  if (/\.css$/.test(pathname)) return /text\/css/i.test(type);
+  return !html;
+}
+
 async function fill(cache, urls) {
   const missed = [];
   await Promise.all(urls.map(async (url) => {
     try {
       const res = await fetch(new Request(url, { cache: hashed(url) ? 'default' : 'reload', credentials: 'same-origin' }));
       if (!res.ok) throw new Error(String(res.status));
+      if (!rightKind(url, res)) throw new Error('wrong kind');
       await cache.put(url, res);
     } catch {
       missed.push(url);
@@ -183,26 +200,47 @@ self.addEventListener('activate', (e) => {
 
 // ── Fetch ────────────────────────────────────────────────────────────────────
 
+// The API is not the worker's. Nothing under these paths is ever cached, so
+// answering them here bought nothing and put the worker — its start-up, its
+// cache lookup, its lifetime — between the app and every server call it makes,
+// the boot health probe included. They go straight to the network, exactly as
+// they would with no worker installed; offline they fail the same way.
+const API = /^\/(?:v1|api)\//;
+
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
+  if (API.test(url.pathname)) return;
   // The Google/Apple sign-in popup lands here; it is its own small page, not an
   // in-app route, and must never be answered with the app shell.
   if (url.pathname === '/auth/callback.html' || url.pathname === '/auth/callback.js') return;
-  e.respondWith(req.mode === 'navigate' ? shellFor(req) : assetFor(req, url));
+  e.respondWith(req.mode === 'navigate' ? shellFor(e) : assetFor(e, url));
 });
+
+// Keeping a copy is a convenience; the answer the page is waiting for is not.
+// The copy is written after the response has been handed back, and a write
+// that fails — a full disk, a body cut short, a quota — loses the copy and
+// nothing else. It used to be awaited inside the same try as the fetch, so a
+// failed write turned a good network response into a network error.
+function keep(e, key, res) {
+  const copy = res.clone();
+  e.waitUntil(caches.open(VERSION).then(cache => cache.put(key, copy)).catch(() => {}));
+}
 
 // Every in-app route renders from the one shell, and it has to be this build's
 // shell — an older one would name chunks this cache no longer holds.
-async function shellFor(req) {
-  const cache = await caches.open(VERSION);
-  const shell = (await cache.match(SHELL)) || (await cache.match('/'));
+async function shellFor(e) {
+  let shell = null;
+  try {
+    const cache = await caches.open(VERSION);
+    shell = (await cache.match(SHELL)) || (await cache.match('/'));
+  } catch { /* a cache that cannot be read is a cache miss */ }
   if (shell) return shell;
   try {
-    const res = await fetch(req);
-    if (res.ok) await cache.put(SHELL, res.clone());
+    const res = await fetch(e.request);
+    if (res.ok && res.type === 'basic' && rightKind(SHELL, res)) keep(e, SHELL, res);
     return res;
   } catch {
     return Response.error();
@@ -212,14 +250,14 @@ async function shellFor(req) {
 // Filenames carry a content hash, so a hit in the retained previous build is
 // the same bytes under the same name — that is what keeps a session that was
 // open across a redeploy able to reach the chunks it has not loaded yet.
-async function assetFor(req, url) {
-  const hit = await caches.match(req);
+async function assetFor(e, url) {
+  const req = e.request;
+  let hit = null;
+  try { hit = await caches.match(req); } catch { /* unreadable cache: ask the network */ }
   if (hit) return hit;
   try {
     const res = await fetch(req);
-    if (res.ok && res.type === 'basic' && CACHEABLE.test(url.pathname)) {
-      await (await caches.open(VERSION)).put(req, res.clone());
-    }
+    if (res.ok && res.type === 'basic' && CACHEABLE.test(url.pathname) && rightKind(url.pathname, res)) keep(e, req, res);
     return res;
   } catch {
     return Response.error();
