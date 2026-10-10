@@ -32,6 +32,7 @@ export function SignInChoices({ user, refreshUser, saved = true, onDone = null }
     <React.Suspense fallback={<p role="status">{t('cloud.stateChecking')}</p>}>
       <div className="inline-sign-in" data-inline-sign-in>
         <SignInCard variant="inline" initialName={user?.name || ''} knownYear={user?.year ?? null}
+          allowCreate={user?.cloudLinked !== true}
           onCancel={onDone ? () => onDone() : null}
           onFinish={async ({ account }) => {
             // A guardian-approved sign-in may finish twice while a slow
@@ -39,13 +40,24 @@ export function SignInChoices({ user, refreshUser, saved = true, onDone = null }
             if (!finishing.current) {
               finishing.current = (async () => {
                 const { cloudAccountLink, linkSignedInAccount } = await import('../platform/cloudAccount.js');
-                await completeInkOtpRecovery({
-                  localProfileId: user?.id,
-                  currentProfileId: mounted.current ? user?.id : null,
-                  account, verifiedSaved: saved === true,
-                  getLinked: cloudAccountLink, linkAccount: linkSignedInAccount,
-                  refreshProfile: refreshUser
-                });
+                try {
+                  await completeInkOtpRecovery({
+                    localProfileId: user?.id,
+                    currentProfileId: mounted.current ? user?.id : null,
+                    account, verifiedSaved: saved === true,
+                    getLinked: cloudAccountLink, linkAccount: linkSignedInAccount,
+                    refreshProfile: refreshUser
+                  });
+                } catch (err) {
+                  // The account that signed in is not this profile's. Its
+                  // session cannot be used here, so it is ended rather than
+                  // left signed in beside work that belongs to another account.
+                  if (['INK_ACCOUNT_MISMATCH', 'CLOUD_LINK_CONFLICT'].includes(err?.code)) {
+                    const { cloud } = await import('../platform/cloudTransport.js');
+                    await cloud.logout().catch(() => {});
+                  }
+                  throw err;
+                }
                 if (mounted.current) onDone?.();
               })().finally(() => { finishing.current = null; });
             }

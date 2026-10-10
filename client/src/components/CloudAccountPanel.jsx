@@ -607,7 +607,8 @@ export default function CloudAccountPanel() {
         <div style={{ marginTop: 16 }} data-cloud-sign-in>
           {link?.accountId && <p role="status" style={{ margin: '0 0 10px' }}>{t('cloud.factSignedOutAgain')}</p>}
           <React.Suspense fallback={<p role="status" className="muted">{t('cloud.stateChecking')}</p>}>
-            <SignInCard variant="inline" initialName={user?.name || ''} knownYear={user?.year ?? null} onFinish={cardSignedIn} />
+            <SignInCard variant="inline" initialName={user?.name || ''} knownYear={user?.year ?? null}
+              allowCreate={!link?.accountId} onFinish={cardSignedIn} />
           </React.Suspense>
         </div>
       )}

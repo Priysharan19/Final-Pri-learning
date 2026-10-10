@@ -228,7 +228,7 @@ ok(await sha256Hex('raw-nonce-1') === sha('raw-nonce-1'), 'the nonce digest is S
   const panel = read('../src/components/CloudAccountPanel.jsx');
   ok(/const appleEntry = appleOffered && /.test(login) && /export const appleSignInOffered = \(\) => appleSignInAvailable\(\) && cloudAvailable\(\);/.test(login),
     'the landing screen offers the button only when the shell advertises identity AND the cloud is configured');
-  ok(/const appleIdentity = appleSignInAvailable\(\);/.test(panel) && /\{appleIdentity && \(/.test(panel) && /\{appleIdentity && canSync && appleLinked === false && \(/.test(panel),
+  ok(/const appleIdentity = appleSignInAvailable\(\);/.test(panel) && /\{needsSignIn && appleIdentity && \(/.test(panel) && /\{appleIdentity && canSync && appleLinked === false && \(/.test(panel),
     'the account panel renders its sign-in and link buttons behind the same capability check');
   ok(!/localStorage|__PRI_HOST__|webkit/.test(read('../src/platform/native/appleSignIn.js')), 'the flow module reads no host internals of its own');
 
@@ -238,7 +238,7 @@ ok(await sha256Hex('raw-nonce-1') === sha('raw-nonce-1'), 'the nonce digest is S
   priNative.dispose();
   const browserHero = render({ initialStage: 'hero' });
   ok(!browserHero.includes('data-testid="apple-sign-in"'), 'a browser never sees Sign in with Apple on the landing screen');
-  ok(browserHero.includes('data-testid="hero-sign-in-code"') && !browserHero.includes('Sign in to your Pri cloud account'),
+  ok(browserHero.includes('data-testid="hero-sign-in"') && !browserHero.includes('Sign in to your Pri cloud account'),
     'a browser uses the account-first sign-in route and does not expose the legacy local-profile cloud route');
   const host = createFakeHost({ capabilities: { identity: { versions: [1], apple: true }, cloud: { versions: [1], configured: true } } });
   const shellHero = render({ initialStage: 'hero' });

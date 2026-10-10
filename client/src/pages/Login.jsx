@@ -534,7 +534,8 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     </div>
   );
 
-  /* ── the landing: one sign-in card ── */
+  /* ── hero ── */
+  /* The landing is one sign-in card. */
   if (stage === 'hero') {
     // The card keeps its own steps (email → code → a few questions) in place.
     // While it is past its first step the welcome copy and the side doors step

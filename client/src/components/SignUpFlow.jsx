@@ -14,6 +14,9 @@
 // only where an SMS provider exists (/v1/account/otp/channels), and a small
 // "Sign in with password" for accounts that already have one.
 //
+// `allowCreate={false}` is a profile that is already linked to an account and is
+// signing in again: the card signs in, and never makes a second account.
+//
 // Two variants, one component:
 //   page    the landing screen. Ends by handing { account, name, year, track }
 //           to the caller, which makes this device's profile and opens practice.
@@ -121,7 +124,7 @@ export function signInErrorCopy(error, { expired = false } = {}) {
 }
 
 export default function SignUpFlow({
-  variant = 'page', initialName = '', knownYear = null, knownTrack = null,
+  variant = 'page', initialName = '', knownYear = null, knownTrack = null, allowCreate = true,
   onCancel = null, onFinish, onStartOffline = null, onStep = null
 }) {
   const t = useT();
@@ -142,6 +145,9 @@ export default function SignUpFlow({
   const [year, setYear] = useState(knownYear == null ? null : Number(knownYear));
   const [track, setTrack] = useState(knownTrack || 'cbse');
   const [password, setPassword] = useState('');
+  // Asked where the account is made, as an action the student takes — never
+  // assumed from pressing Continue.
+  const [agreed, setAgreed] = useState(false);
   const [parentName, setParentName] = useState('');
   const [parentChannel, setParentChannel] = useState('email');
   const [parentDestination, setParentDestination] = useState('');
@@ -170,6 +176,10 @@ export default function SignUpFlow({
     // The landing screen keeps its own focus on first paint; every later step
     // moves focus to its heading so a screen reader hears where it is.
     if (firstRender.current) { firstRender.current = false; if (!inline) return; }
+    // The code step puts the caret in the first box instead (the keyboard and
+    // the code suggestion open there); the group it belongs to is labelled by
+    // this step's heading and lead, so it is announced on the way in.
+    if (step === 'code') return;
     headingRef.current?.focus({ preventScroll: true });
   }, [step, inline]);
   useEffect(() => {
@@ -281,8 +291,17 @@ export default function SignUpFlow({
       const body = { channel: challenge.channel, destination: challenge.destination, challengeId: challenge.id, code: submitted, deviceId };
       // Details already given (a ticket ran out and a new code was needed):
       // one request finishes the account instead of asking again.
-      if (detailsReady() && !account) body.profile = profile();
+      if (detailsReady() && agreed && !account) body.profile = profile();
       const result = await cloud.otpVerify(body);
+      if (result.status === 'profile-required' && !allowCreate) {
+        // This profile already belongs to an account and is only signing in
+        // again: an address with no account must not quietly become a second
+        // one. The ticket is dropped unused; nothing was created.
+        setBusy(''); setCode(''); setChallenge(null); setResendAt(0);
+        setDirection('back'); setStep('method');
+        setError(tLater('signup.noAccountForRelink'));
+        return;
+      }
       if (result.status === 'profile-required') {
         // The code is right and the address has no account yet. The ticket it
         // earned finishes sign-up once the few questions below are answered.
@@ -305,6 +324,7 @@ export default function SignUpFlow({
     if (verifying.current || busy) return;
     if (!name.trim()) { setError(tLater('signup.nameRequired')); return; }
     if (age === null) { setError(tLater('signup.ageRequired')); return; }
+    if (!agreed) { setError(tLater('signup.agreeRequired')); return; }
     if (!inline && year === null) { go('class'); return; }
     verifying.current = true;
     setBusy('verify'); setError('');
@@ -399,6 +419,7 @@ export default function SignUpFlow({
         await signedIn({ ...result, guardianConsent: state });
       } catch (err) {
         if (err?.code !== 'IDENTITY_NOT_REGISTERED') throw err;
+        if (!allowCreate) { setBusy(''); setError(tLater('signup.noAccountForRelink')); return; }
         setPendingSocial({ provider, token });
         setBusy('');
         go('age');
@@ -566,10 +587,13 @@ export default function SignUpFlow({
       <>
         {heading('signup.aboutTitle')}
         <p className="signup-lead">{t('signup.aboutLead')}</p>
-        <form className="signup-form" noValidate onSubmit={e => { e.preventDefault(); if (!inline && year === null) { if (!name.trim()) { setError(tLater('signup.nameRequired')); return; } if (age === null) { setError(tLater('signup.ageRequired')); return; } go('class'); } else void completeDetails(); }}>
+        <form className="signup-form" noValidate onSubmit={e => { e.preventDefault(); void completeDetails(); }}>
           <label className="label" htmlFor="signup-flow-name">{t('signup.nameLabel')}</label>
           <input className="input" id="signup-flow-name" autoComplete="given-name" value={name} maxLength={80}
             aria-describedby={error ? errorId : undefined}
+            // Prefilled from the profile: focusing selects it, so typing a
+            // name replaces it instead of being appended to it.
+            onFocus={e => { if (e.target.value && e.target.value === String(initialName || '')) e.target.select(); }}
             onChange={e => { setName(e.target.value); setError(''); }} />
           <p className="signup-sublabel" id="signup-age-label">{t('signup.ageTitle')}</p>
           <div className="signup-choices signup-choices-4" role="group" aria-labelledby="signup-age-label">
@@ -577,6 +601,17 @@ export default function SignUpFlow({
             {choice(age === 18, t('signup.ageAdult'), () => { setAge(18); setError(''); }, 'signup-age-18', ' signup-choice-wide')}
           </div>
           <p className="signup-hint">{t('signup.ageLead')}</p>
+          {/* The notice is reachable at the point consent is asked for, and
+              agreeing is an action: no account is made without it. */}
+          <label className="signup-agree">
+            <input type="checkbox" checked={agreed} data-testid="signup-agree" onChange={e => { setAgreed(e.target.checked); setError(''); }} />
+            <span>
+              {tx('cloud.consent', {
+                privacy: <a href="/privacy" target="_blank" rel="noreferrer">{t('cloud.privacyNotice')}</a>,
+                terms: <a href="/terms" target="_blank" rel="noreferrer">{t('cloud.terms')}</a>
+              })}
+            </span>
+          </label>
           <button type="submit" className="btn btn-primary btn-lg signup-next" disabled={!!busy} data-testid="signup-age-next">
             {busy === 'verify' ? t('signup.checking') : t('signup.continue')}
           </button>
