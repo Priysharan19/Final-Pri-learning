@@ -52,7 +52,7 @@ export function makeVisualExample(kind,p){
   }
   if(kind==='circleChord'){
     const {r,d}=p,half=Math.sqrt(r*r-d*d);if(!(r>d&&d>0&&Number.isInteger(half)))throw Error('needs Pythagorean pair');
-    const fig=diagram('geometry',`Circle centre O(0,0), radius ${r}; chord AB meets perpendicular OM=${d}, A(${d},${half}), B(${d},${-half})`,[pt('O',[0,0]),pt('M',[d,0]),pt('A',[d,half]),pt('B',[d,-half])],{circles:[{cx:0,cy:0,r}],segments:[['A','B'],['O','M'],['O','A']],sideLabels:[{a:'O',b:'M',text:String(d)},{a:'O',b:'A',text:String(r)}],rightAngles:['M']});
+    const fig=diagram('geometry',`Circle centre O(0,0), radius ${r}; chord AB meets perpendicular OM=${d}, A(${d},${half}), B(${d},${-half})`,[pt('O',[0,0]),pt('M',[d,0]),pt('A',[d,half]),pt('B',[d,-half])],{circles:[{cx:0,cy:0,r}],segments:[['A','B'],['O','M'],['O','A'],['M','A']],sideLabels:[{a:'O',b:'M',text:String(d)},{a:'O',b:'A',text:String(r)}],rightAngles:['M']});
     return done('The centre-to-chord segment OM is perpendicular to AB. Find the entire chord length using the marked dimensions.',[`Triangle OMA is right-angled with radius OA=${r} and distance OM=${d}.`,`Half the chord AM=sqrt(${r}²−${d}²)=${half}.`,`Therefore chord AB=${2*half}.`],`${2*half} units`,val(`2*sqrt(${r}^2-${d}^2)`,2*half),fig);
   }
   if(kind==='vectors'){
@@ -61,7 +61,7 @@ export function makeVisualExample(kind,p){
   }
   if(kind==='trapezoid'){
     const {bottom,top,height}=p;if(!(bottom>top&&top>0&&height>0))throw Error('trapezium');
-    const area=round((bottom+top)*height/2),fig=diagram('geometry',`Trapezium ABCD; AB=${bottom}, CD=${top} parallel, height DA=${height}`,[pt('A',[0,0]),pt('B',[bottom,0]),pt('C',[top,height]),pt('D',[0,height])],{polygons:[{vertices:['A','B','C','D'],shade:true}],sideLabels:[{a:'A',b:'B',text:String(bottom)},{a:'D',b:'C',text:String(top)},{a:'D',b:'A',text:String(height)}],rightAngles:['A']});
+    const area=round((bottom+top)*height/2),fig=diagram('geometry',`Trapezium ABCD; AB=${bottom}, CD=${top} parallel, height DA=${height}`,[pt('A',[0,0]),pt('B',[bottom,0]),pt('C',[top,height]),pt('D',[0,height])],{polygons:[{vertices:['A','B','C','D'],shade:true}],segments:[['A','B'],['B','C'],['C','D'],['D','A']],sideLabels:[{a:'A',b:'B',text:String(bottom)},{a:'D',b:'C',text:String(top)},{a:'D',b:'A',text:String(height)}],rightAngles:['A']});
     return done('Find the area of the shaded trapezium using the diagram labels.',[`Parallel edges are ${bottom} and ${top}.`,`The perpendicular height is ${height}.`,`Area=(${bottom}+${top})×${height}/2=${area}.`],`${area} square units`,val(`(${bottom}+${top})*${height}/2`,area),fig);
   }
   if(kind==='integralArea'){
