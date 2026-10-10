@@ -101,6 +101,16 @@ const VISUAL_INQUIRY_LOADERS = {
   12: () => import('./data/notes-visual-wave6-class12.js')
 };
 
+// Wave 7: a compact, original set of 120 additional figure-dependent tasks.
+const VISUAL_WAVE7_LOADERS = {
+  7: () => import('./data/notes-visual-wave7-class7.js'),
+  8: () => import('./data/notes-visual-wave7-class8.js'),
+  9: () => import('./data/notes-visual-wave7-class9.js'),
+  10: () => import('./data/notes-visual-wave7-class10.js'),
+  11: () => import('./data/notes-visual-wave7-class11.js'),
+  12: () => import('./data/notes-visual-wave7-class12.js')
+};
+
 function mergeOptionalComplexStudies(notes, extra) {
   for (const [id, section] of Object.entries(extra || {})) {
     if (!Object.hasOwn(notes,id) || !Array.isArray(section.examples) || !section.examples.every(x => x.question && Array.isArray(x.steps) && x.steps.length && x.answer && x.verify)) {
@@ -127,18 +137,21 @@ export function loadNotesForGrade(grade) {
       CHALLENGE_LOADERS[g] ? CHALLENGE_LOADERS[g]() : Promise.resolve({ default: {} }),
       VISUAL_LOADERS[g](),
       VISUAL_WAVE5_LOADERS[g](),
-      VISUAL_INQUIRY_LOADERS[g]()
+      VISUAL_INQUIRY_LOADERS[g](),
+      VISUAL_WAVE7_LOADERS[g]()
     ])
-      .then(([original, supplement, optional, challenges, visuals, extendedVisuals, inquiry]) => mergeOptionalComplexStudies(
+      .then(([original, supplement, optional, challenges, visuals, extendedVisuals, inquiry, wave7]) => mergeOptionalComplexStudies(
         mergeOptionalComplexStudies(
           mergeOptionalComplexStudies(
             mergeOptionalComplexStudies(
               mergeOptionalComplexStudies(
-                mergeStudySupplements(original.default || {}, supplement.default || {}), optional.default || {}
-              ), challenges.default || {}
-            ), visuals.default || {}
-          ), extendedVisuals.default || {}
-        ), inquiry.default || {}
+                mergeOptionalComplexStudies(
+                  mergeStudySupplements(original.default || {}, supplement.default || {}), optional.default || {}
+                ), challenges.default || {}
+              ), visuals.default || {}
+            ), extendedVisuals.default || {}
+          ), inquiry.default || {}
+        ), wave7.default || {}
       ))
       .catch(err => { cache.delete(g); throw err; }));
   }
