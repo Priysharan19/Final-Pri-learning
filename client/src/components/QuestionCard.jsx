@@ -1122,6 +1122,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     transcript: inkResult?.text ?? '', inkAnswer: isWorking ? '' : inkAnswer,
     answer, working, choice: isMcq ? mcqSel : null, photo
   });
+  // The same, for a result that lands outside a render (a relaunch replay).
+  const screenRef = useRef(null);
+  screenRef.current = {
+    revision: currentRevision, write: writeMode, lines: inkResult?.lines || null, inkStale,
+    inkAnswer: isWorking ? '' : inkAnswer, answer, working, choice: isMcq ? mcqSel : null
+  };
   const checkFocus = needsCheck && checking ? (doubt.weakest?.id || null) : null;
 
   useEffect(() => { if (!needsCheck && checking) setChecking(false); }, [needsCheck, checking]);
@@ -1291,6 +1297,21 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       hasWorking: isWorking ? Array.isArray(workingLines) && workingLines.length > 0 : typeof body.steps === 'string' && body.steps.trim() !== '',
       revision
     };
+    // A relaunch replay is sent only while the kept work still says what was
+    // submitted. Its result is a result of the page on screen exactly when the
+    // page, as it stands when the result lands, IS that submission — the same
+    // lines and the same answer. Otherwise it stays the earlier attempt's.
+    const landOnScreen = () => {
+      if (!recovering || earlierAnswer !== null) return;
+      const now = screenRef.current;
+      if (!now) return;
+      const same = (a, b) => String(a ?? '').trim() === String(b ?? '').trim();
+      const matches = submitted.viaInk
+        ? now.write && !now.inkStale && sameLines(submitted.lines, now.lines) && (isWorking || same(now.inkAnswer, submitted.answer))
+        : isMcq ? now.choice !== null && same(now.choice, submitted.answer)
+          : !now.write && same(isWorking ? now.working : now.answer, submitted.answer) && (isWorking || !body.steps || same(now.working, body.steps));
+      if (matches) submitted.revision = now.revision;
+    };
     inFlightRef.current = true;
     inkFrozenRef.current = !recovering || inkFrozenRef.current;
     setBusy(true);
@@ -1348,6 +1369,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       } else {
         inkFrozenRef.current = false;
         if (live) {
+          landOnScreen();
           setJudged(submitted); setJudgedStale(false);
           setState({ phase: 'retry', res: earlierAnswer === null ? r : { ...r, earlierAnswer } });
         }
