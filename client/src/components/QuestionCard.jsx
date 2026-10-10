@@ -1088,7 +1088,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (!inkResult?.kept && inkExtrasRef.current.reading && !inkResult) return;
     inkExtrasRef.current = next;
     if (resolved || inFlightRef.current || attemptRef.current || !writeMode) return;
-    if (latestInk.current?.length) saveInk(latestInk.current);
+    // Written at once, not on the coalescing timer: a transcript is the one
+    // thing on the page that cost a paid read to produce.
+    if (latestInk.current?.length) { saveInk(latestInk.current); void flushInkDrafts(); }
   }, [inkKeptKey, inkAnswerEdit]); // eslint-disable-line react-hooks/exhaustive-deps
   const inkAnswer = !inkProposal ? reading
     : inkAnswerEdit !== null ? inkAnswerEdit

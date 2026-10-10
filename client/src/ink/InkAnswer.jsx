@@ -72,7 +72,7 @@ function knownBlockOf(who, isOnline) {
 }
 // The content of the page, not only its size: two pages with the same number
 // of strokes and points are different pages.
-const strokeSignature = strokes => {
+export const strokeSignature = strokes => {
   let h = 0x811c9dc5, points = 0;
   for (const st of strokes) {
     h = Math.imul(h ^ 0x7c, 0x01000193) >>> 0;

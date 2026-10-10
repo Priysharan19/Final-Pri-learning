@@ -228,14 +228,19 @@ export const flow = {
     // Question ids are opaque [A-Za-z0-9-] tokens, safe inside a pattern.
     const kept = await inkKept(page, inkId);
     await check('the handwriting is kept in the sealed inkDrafts store before the reload', kept, 'no ink draft row was written');
+    await page.waitForFunction(() => document.querySelector('.ws-actions .status-line')?.getAttribute('data-work-state') !== 'saving', null, { timeout: 8000 }).catch(() => null);
+    const readerCallsBeforeReload = online.reader.requests.length;
     await reopen();
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 }).catch(() => null);
     await page.waitForFunction(() => document.querySelectorAll('.ink-line').length >= 1, null, { timeout: 15000 }).catch(() => null);
     await check('the same unanswered question comes back after the reload', await shownId(page) === inkId,
       `before ${inkId} after ${await shownId(page)}`);
-    await check('its handwriting is back on the page and read again',
-      before === 1 && await page.locator('.ink-line').count() === 1,
-      `lines before ${before}, after ${await page.locator('.ink-line').count()}`);
+    // Read on request: the transcript was kept with the ink, so it is back
+    // without the page being read — or paid for — a second time.
+    await page.waitForTimeout(1500);
+    await check('its handwriting is back on the page with its transcript, and was NOT read again (no new reader request)',
+      before === 1 && await page.locator('.ink-line').count() === 1 && await page.locator('[data-ink-stale]').count() === 0 && online.reader.requests.length === readerCallsBeforeReload,
+      `lines before ${before}, after ${await page.locator('.ink-line').count()}; reader requests +${online.reader.requests.length - readerCallsBeforeReload}`);
   }
 };
 

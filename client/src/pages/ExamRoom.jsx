@@ -493,7 +493,7 @@ export default function ExamRoom() {
     dirtyInk.current.add(key);
     setInks(x => {
       const next = { ...x };
-      if (strokes.length) next[key] = { ...(x[key] || {}), strokes, lines: x[key]?.lines || [], answerLine: x[key]?.answerLine || '', engine: x[key]?.engine || null };
+      if (strokes.length) next[key] = { ...(x[key] || {}), strokes, lines: x[key]?.lines || [], answerLine: x[key]?.answerLine || '', engine: x[key]?.engine || null, readSig: x[key]?.readSig || null };
       else delete next[key];
       return next;
     });
@@ -513,13 +513,13 @@ export default function ExamRoom() {
     const strokes = compactStrokes(reading.strokes || []);
     const sig = strokeSignature(strokes);
     const lines = (reading.lines || []).map(l => String(l || ''));
-    const record = strokes.length ? { strokes, lines, answerLine: reading.answerLine || '', engine: reading.engine || null } : null;
+    const record = strokes.length ? { strokes, lines, answerLine: reading.answerLine || '', engine: reading.engine || null, readSig: reading.kept?.signature || null } : null;
     // The first reading of restored ink re-reads the page that was saved. The
     // answer saved with it — which the student may have corrected by hand —
     // stands; only new writing replaces it.
     if (restoredSig.current[key] && restoredSig.current[key] === sig) {
       delete restoredSig.current[key];
-      setInks(x => (record ? { ...x, [key]: { ...(x[key] || {}), lines, answerLine: record.answerLine } } : x));
+      setInks(x => (record ? { ...x, [key]: { ...(x[key] || {}), lines, answerLine: record.answerLine, readSig: record.readSig || x[key]?.readSig || null } } : x));
       return;
     }
     delete restoredSig.current[key];
@@ -808,6 +808,13 @@ export default function ExamRoom() {
                   recognitionContext={item.answerType === 'numeric' ? { answerType: 'numeric', singleGlyphAlphabet: NUMERIC_SINGLE_GLYPH_ALPHABET } : null}
                   lineVerdicts={null}
                   onStrokes={strokes => onInkStrokes(key, strokes)}
+                  initialReading={saved?.readSig && saved?.lines?.length ? {
+                    // The transcript saved with the paper, for the strokes it was
+                    // read from: shown again after a reload without reading —
+                    // and paying for — the page a second time.
+                    signature: saved.readSig,
+                    reading: { lines: saved.lines.map(text => ({ text: String(text || ''), conf: 1 })), text: saved.lines.join('\n'), engine: saved.engine || null, cloud: true, confidence: 1, needsConfirmation: false }
+                  } : null}
                   onRecognized={r => onInk(key, item, r)} />
               ) : inkPhase === 'failed' ? (
                 <div role="alert" className="muted" style={{ fontSize: 13 }}>

@@ -181,6 +181,9 @@ export const flow = {
     await handwrite(page, box, '1');
     await pressRead(page);   // reading is asked for
     await readsAs(page, '7');
+    // The transcript is being kept with the ink (a short "Saving…"); the bar
+    // shows the answer once that has settled.
+    for (let i = 0; i < 40 && (await reading(page)).foot !== '7'; i++) await page.waitForTimeout(100);
     const early = await reading(page);
     if (!await check('control: the server reading is what the card shows and will submit',
       early.lines[0] === '7' && early.foot === '7', `read ${JSON.stringify(early)} after ${stub.transcribeAnswered} server readings`)) return;
