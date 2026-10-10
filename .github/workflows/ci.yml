@@ -243,6 +243,7 @@ jobs:
           node server/test/assignment-targeting-check.mjs
       - name: Server reading and step checking contracts
         run: |
+          set -o pipefail
           node server/test/handwriting-transcription-check.mjs
           node server/test/working-check-check.mjs
           node server/test/area-working-rubric-check.mjs
@@ -252,6 +253,10 @@ jobs:
           node server/test/tutor-issued-grounding-check.mjs
           node server/test/tutor-stream-check.mjs
           node server/test/spend-ceiling-check.mjs
+          # One paid read per unchanged picture: refresh, double click, two tabs,
+          # transcript-then-Submit; never shared across accounts.
+          node server/test/recognition-dedupe-check.mjs 2>&1 | tee recognition-dedupe.log
+          grep -Fq 'RECOGNITION DEDUPE: PASS — 201/201 checks' recognition-dedupe.log
           node server/test/guardian-consent-check.mjs
       # Real HTTP against the shipped app, no mocked receipts. Method marks need
       # progress (neutral working earns 0, one genuine step earns partial marks,
@@ -334,7 +339,7 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 44/44 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 45/45 suites' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
