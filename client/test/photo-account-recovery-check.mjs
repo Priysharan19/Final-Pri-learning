@@ -42,6 +42,11 @@ has(photo, /newSubmissionId\(\)/, 'Grading retains idempotent submission keys');
 has(photo, /savePendingSubmission\(question\.id/, 'Grading request is protected by existing submission recovery');
 has(account, /session\?\.reason === 'signed-out'\) && <form/, 'Expired linked session has an actual login form');
 has(account, /mode === 'register' && !link\?\.accountId/, 'Linked profile cannot silently start second registration');
-has(reader, /transport\.transcribeHandwriting\(prepared\.dataUrl/, 'Photo recognition remains server-authoritative');
-has(reader, /GUARDIAN_CONSENT/, 'Guardian restrictions remain understood by the reader');
+// The photo goes to the server reader through the single-flight sender
+// (one paid read per picture), which is the only caller of the transport.
+has(reader, /await transcribeOnce\(transport, prepared\.dataUrl, \{ signal \}\)/, 'Photo recognition remains server-authoritative');
+has(reader, /transport\.transcribeHandwriting\(image, \{ signal: controller\?\.signal \?\? null \}\)/, 'and the request carries the picture and a cancel signal, nothing else');
+// Refusals are named in one place (ink/readerFailure.js), which the reader uses.
+has(readFileSync(new URL('../src/ink/readerFailure.js', import.meta.url), 'utf8'), /GUARDIAN_CONSENT/, 'Guardian restrictions remain understood by the reader');
+has(reader, /classifyReaderFailure\(failure, \{ now \}\)/, 'and the reader names every refusal through that classification');
 console.log(`PHOTO ACCOUNT RECOVERY CONTRACT: PASS ${count}/${count} (source-level, not live-provider certification)`);

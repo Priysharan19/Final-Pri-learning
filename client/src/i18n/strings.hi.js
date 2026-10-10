@@ -530,8 +530,6 @@ export default {
   'verdict.readingWork': 'आपकी लिखावट पढ़ी जा रही है…',
   'verdict.readOnServer': 'सर्वर पर पढ़ा गया',
   'verdict.inkReadByServer': 'Pri के सर्वर रीडर ने पढ़ा',
-  'ink.cloudAllowanceUsed': 'आज की क्लाउड रीडिंग सीमा पूरी हो गई — यह डिवाइस पर पढ़ा गया उत्तर है',
-  'photo.cloudAllowanceUsed': 'आज की क्लाउड रीडिंग सीमा पूरी हो गई है, इसलिए यह फ़ोटो अभी नहीं पढ़ी जा सकती। अपना हल टाइप करें या बाद में फिर कोशिश करें।',
 
   // ── हैंडराइटिंग लिखने की जगह (ink/InkAnswer, InkCanvas, NativeInkCanvas) ──
   // Apple Pencil is the product's name and stays Latin; "Pencil" alone in the
@@ -558,7 +556,6 @@ export default {
   'verdict.removeAttachment': 'अटैचमेंट हटाएँ',
   'verdict.decodedOnDevice': 'इसी डिवाइस पर पढ़ा गया',
   'verdict.ocrConfidence': ' · {percent}% OCR भरोसा',
-  'verdict.filledFromLastLine': 'Pri ने पहचानी गई आख़िरी पंक्ति से उत्तर का खाना भर दिया है। जाँच से पहले इसे देख लीजिए या बदल लीजिए।',
   'verdict.workingAria': 'आपका हल — हर पंक्ति में एक चरण, हर पंक्ति जाँची जाती है',
   'verdict.workingPlaceholder': 'अपने हल की हर पंक्ति लिखिए — हर पंक्ति जाँची जाती है।\nअंत में वही परिणाम लिखिए जो पूछा गया था।',
   'verdict.answerAria': 'आपका उत्तर',
@@ -2773,10 +2770,7 @@ export default {
   'photo.lineCheckDoubt': "यह पंक्ति जाँचें: रीडर को पक्का नहीं था ({doubt})",
   'photo.lineCheckNote': "जाँचने के लिए चिह्नित पंक्ति का मतलब है कि पेज पढ़ने में संदेह था, आपके गणित में नहीं।",
   'photo.lineEdited': "आपने ठीक किया",
-  'photo.lineEditAction': "बदलें",
-  'photo.lineEditLabel': "पंक्ति {n} बदलें",
   'photo.lineFieldLabel': "पंक्ति {n}, जैसी पढ़ी गई",
-  'photo.lineDone': "हो गया",
   'photo.lineExclude': "इस उत्तर का हिस्सा नहीं",
   'photo.lineExcludeLabel': "पंक्ति {n} इस उत्तर का हिस्सा नहीं है",
   'photo.lineInclude': "शामिल करें",

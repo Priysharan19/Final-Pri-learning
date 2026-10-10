@@ -462,8 +462,6 @@ export default {
   'verdict.readingWork': 'Reading your handwriting…',
   'verdict.readOnServer': 'Read on the server',
   'verdict.inkReadByServer': 'Read by Pri’s server reader',
-  'ink.cloudAllowanceUsed': 'today’s cloud reading allowance is used — this is the on-device reading',
-  'photo.cloudAllowanceUsed': 'Today’s cloud reading allowance is used, so this photo can’t be read right now. Type your working, or try again later.',
 
   // ── Handwriting workspace (ink/InkAnswer, InkCanvas, NativeInkCanvas) ──────
   'ink.writingSpace': 'Writing space',
@@ -487,7 +485,6 @@ export default {
   'verdict.removeAttachment': 'Remove attachment',
   'verdict.decodedOnDevice': 'Decoded on-device',
   'verdict.ocrConfidence': ' · {percent}% OCR confidence',
-  'verdict.filledFromLastLine': 'Pri filled the answer box from the final recognised line. Check or edit it before marking.',
   'verdict.workingAria': 'Your working — one line per row, every line is marked',
   'verdict.workingPlaceholder': 'Show every line of your working — each line is marked.\nFinish with the result you were asked to reach.',
   'verdict.answerAria': 'Your answer',
@@ -2704,10 +2701,7 @@ export default {
   'photo.lineCheckDoubt': "Check this line: the reader was not sure ({doubt})",
   'photo.lineCheckNote': "A line marked to check is a doubt about how the page was read, not about your maths.",
   'photo.lineEdited': "Corrected by you",
-  'photo.lineEditAction': "Edit",
-  'photo.lineEditLabel': "Edit line {n}",
   'photo.lineFieldLabel': "Line {n} as read",
-  'photo.lineDone': "Done",
   'photo.lineExclude': "Not part of this answer",
   'photo.lineExcludeLabel': "Line {n} is not part of this answer",
   'photo.lineInclude': "Include",

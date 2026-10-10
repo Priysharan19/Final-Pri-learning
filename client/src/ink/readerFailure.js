@@ -51,9 +51,9 @@ const SHAPE = Object.freeze({
   [READER_FAILURE.GUARDIAN]: { action: 'guardian', autoRetry: false, manualRetry: false, pause: false, photoKey: 'verdict.photoReadingGuardian', inkKey: 'ink.waitingGuardian' },
   [READER_FAILURE.NOT_ALLOWED]: { action: 'type', autoRetry: false, manualRetry: false, pause: false, photoKey: 'verdict.photoReadingNotAllowed', inkKey: 'ink.waitingNotAllowed' },
   [READER_FAILURE.REQUEST]: { action: 'try-again', autoRetry: false, manualRetry: true, pause: false, photoKey: 'verdict.photoReadingRequest', inkKey: 'ink.waitingRequest' },
-  [READER_FAILURE.RATE_LIMITED]: { action: 'try-again', autoRetry: false, manualRetry: true, pause: true, photoKey: 'verdict.photoReadingRateLimited', inkKey: 'ink.waitingRateLimited', timed: true },
-  [READER_FAILURE.CAPACITY]: { action: 'try-again', autoRetry: false, manualRetry: true, pause: true, photoKey: 'verdict.photoReadingCapacity', inkKey: 'ink.waitingCapacity', timed: true },
-  [READER_FAILURE.ALLOWANCE]: { action: 'type', autoRetry: false, manualRetry: false, pause: true, photoKey: 'verdict.photoReadingAllowance', inkKey: 'ink.waitingAllowance', timed: true },
+  [READER_FAILURE.RATE_LIMITED]: { action: 'try-again', autoRetry: false, manualRetry: true, pause: true, photoKey: 'verdict.photoReadingRateLimited', inkKey: 'ink.waitingRateLimited', timed: true, photoKeyUntil: 'verdict.photoReadingRateLimitedUntil', inkKeyUntil: 'ink.waitingRateLimitedUntil' },
+  [READER_FAILURE.CAPACITY]: { action: 'try-again', autoRetry: false, manualRetry: true, pause: true, photoKey: 'verdict.photoReadingCapacity', inkKey: 'ink.waitingCapacity', timed: true, photoKeyUntil: 'verdict.photoReadingCapacityUntil', inkKeyUntil: 'ink.waitingCapacityUntil' },
+  [READER_FAILURE.ALLOWANCE]: { action: 'type', autoRetry: false, manualRetry: false, pause: true, photoKey: 'verdict.photoReadingAllowance', inkKey: 'ink.waitingAllowance', timed: true, photoKeyUntil: 'verdict.photoReadingAllowanceUntil', inkKeyUntil: 'ink.waitingAllowanceUntil' },
   [READER_FAILURE.NOT_AVAILABLE]: { action: 'type', autoRetry: false, manualRetry: false, pause: false, photoKey: 'verdict.photoReadingNotOnThisInstall', inkKey: 'ink.waitingNotOnThisInstall' },
   [READER_FAILURE.UNREACHABLE]: { action: 'try-again', autoRetry: true, manualRetry: true, pause: false, photoKey: 'verdict.photoReadingServiceDown', inkKey: 'ink.waitingServiceDown' }
 });
@@ -102,8 +102,8 @@ export function classifyReaderFailure(failure = null, { now = Date.now() } = {})
     retryAt,
     // Nothing is re-sent before this (a manual Try again excepted).
     pauseUntil: shape.pause ? (retryAt ?? now + DEFAULT_PAUSE_MS) : null,
-    photoKey: shape.timed && retryAt ? `${shape.photoKey}Until` : shape.photoKey,
-    inkKey: shape.timed && retryAt ? `${shape.inkKey}Until` : shape.inkKey
+    photoKey: shape.timed && retryAt ? shape.photoKeyUntil : shape.photoKey,
+    inkKey: shape.timed && retryAt ? shape.inkKeyUntil : shape.inkKey
   });
 }
 
