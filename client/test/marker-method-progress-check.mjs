@@ -526,6 +526,58 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
     'the value of x that the question gives, written three other ways, earns nothing');
 }
 
+// ── The stages of solving a quadratic are steps, however short the question ──
+// For one round a non-linear line earned only when it was written no longer
+// than the question and every line already credited. That made the marks
+// depend on how long the question happened to be: on `x^2 = 9` the standard
+// form `x^2 - 9 = 0` is longer than the question, so it and the factorisation
+// after it earned nothing. A stage is recognised by how it is built.
+{
+  const marks = (source, roots, working, total = 4) => {
+    const meta = { kind: 'equation', variable: 'x', solutions: roots, source };
+    try { return methodMarks({ meta, working: `${working}\nx = 424242`, marks: total, prompt: `$${source}$` })?.awarded ?? 0; } catch { return -1; }
+  };
+  const why = (source, roots, working) => (methodMarks({ meta: { kind: 'equation', variable: 'x', solutions: roots, source }, working: `${working}\nx = 424242`, marks: 4, prompt: `$${source}$` })?.lines ?? []).map(l => l.reason).slice(0, -1).join();
+  for (const [source, roots, working, expected, label] of [
+    ['x^2=9', [3, -3], 'x^2-9=0\n(x-3)(x+3)=0', 2, 'standard form and the factorisation of x^2 = 9'],
+    ['x^2=9', [3, -3], 'x^2-9=0', 1, 'standard form alone, though longer than x^2 = 9'],
+    ['x^2-5x=-6', [2, 3], 'x^2-5x+6=0\n(x-2)(x-3)=0', 2, 'standard form and the factorisation of x^2 - 5x = -6'],
+    ['x^2=5x', [0, 5], 'x^2-5x=0\nx(x-5)=0', 2, 'standard form and the factorisation of x^2 = 5x'],
+    ['x(x-5)=-6', [2, 3], 'x^2-5x=-6\nx^2-5x+6=0\n(x-2)(x-3)=0', 3, 'expanding, standard form and factorising a bracketed question'],
+    ['x^2-6x=7', [7, -1], 'x^2-6x+9=16\n(x-3)^2=16\nx-3=±4', 2, 'completing the square: the square and the root taken (adding 9 is one mark with the square)'],
+    ['x^2-6x=7', [7, -1], '(x-3)^2=16\nx-3=4\nx=7', 3, 'the square, one branch of its root, and the root read off'],
+    ['x^2-6x=7', [7, -1], '(x-3)^2=16\nx-3=4\nx-3=-4', 2, 'the two branches of a root count once'],
+    ['x + 6/x=5', [2, 3], 'x^2+6=5x\nx^2-5x+6=0\n(x-2)(x-3)=0', 3, 'clearing a denominator, standard form and the factorisation'],
+    ['x^2+4x-32=0', [4, -8], 'x = (-4 + sqrt(144))/2', 1, 'one branch of the quadratic formula, with the equation\'s discriminant under the root'],
+    ['x^2+4x-32=0', [4, -8], 'x = (-4 + sqrt(16 + 128))/2\nx = (-4 - sqrt(16 + 128))/2', 1, 'both branches of the formula are one stage'],
+    ['x^2+4x-32=0', [4, -8], '(x-4)(x+8)=0\nx=4\nx=-8', 2, 'a factorisation and the roots read off it'],
+    ['2x^2-10x+12=0', [2, 3], 'x^2-5x+6=0\n(x-2)(x-3)=0', 2, 'dividing a common factor out of a question already in standard form, then factorising'],
+    ['x^2+3x=4x+6', [3, -2], 'x^2-x-6=0\n(x-3)(x+2)=0', 2, 'standard form and the factorisation where the question is the longer line']
+  ]) {
+    const got = marks(source, roots, working);
+    ok(got === expected, `${label}: ${expected} mark(s) (got ${got}; ${why(source, roots, working)})`);
+  }
+  // What is not a stage still earns nothing, whatever the question's length.
+  for (const [source, roots, line] of [
+    ['x^2=9', [3, -3], '2x^2=18'], ['x^2=9', [3, -3], 'x^2+1=10'], ['x^2=9', [3, -3], 'x^2-9+x=x'], ['x^2=9', [3, -3], 'x^2+x^3=9+x^3'], ['x^2=9', [3, -3], '(x^2)/(9)=1'],
+    ['x^2=9', [3, -3], '(x^2-9)^3=0'], ['x^2=9', [3, -3], 'x^2-9+0=0'], ['x^2=9', [3, -3], 'x^2+x-x-9=0'], ['x^2=9', [3, -3], '2x^2-x^2-9=0'],
+    ['x^2+5x+6=0', [-2, -3], '2x^2+10x+12=0'], ['x^2+5x+6=0', [-2, -3], 'x^2+5x=-6'], ['x^2+5x+6=0', [-2, -3], 'x^2=-5x-6'], ['x^2+5x+6=0', [-2, -3], 'x^2+5x+6-(0)=0'],
+    ['x^2+5x+6=0', [-2, -3], '(x^2+5x+6)(x^2+1)=0'], ['x^2+5x+6=0', [-2, -3], '-x^2-5x-6=0'], ['x^2+5x+6=0', [-2, -3], '3x^2+15x+18=0'],
+    ['x^2+4x-32=0', [4, -8], 'x = 4'], ['x^2+4x-32=0', [4, -8], 'x = 8/2'], ['x^2+4x-32=0', [4, -8], 'x = sqrt(16)'], ['x^2+4x-32=0', [4, -8], 'x = (0 + sqrt(64))/2'],
+    ['x^2-6x=7', [7, -1], 'x^2-6x+9=16'], ['x^2-6x=7', [7, -1], 'x^2-6x+1=8']
+  ]) {
+    ok(marks(source, roots, line) === 0, `on "${source}", "${line}" is not a stage of solving it and earns nothing`);
+  }
+  ok(marks('x^2=9', [3, -3], 'x^2-9=0\n2x^2-18=0\nx^2=9+0\n(x-3)(x+3)=0\n(3-x)(x+3)=0\n(2x-6)(x+3)=0') === 2, 'each stage earns once, however many times it is rewritten');
+  // One branch written alone is true of its root: a note on the line, not the
+  // mistake after which nothing is credited.
+  const quad = { kind: 'equation', variable: 'x', solutions: [7, -1], source: 'x^2-6x=7' };
+  const lone = stepCheck(quad, '(x-3)^2=16\nx-3=4', { prompt: '$x^2-6x=7$' });
+  ok(lone.firstBreak === -1 && lone.lines[1].status === 'ok' && /other is still to find/.test(lone.lines[1].note || ''), 'x - 3 = 4 after (x - 3)^2 = 16 is one branch, not a mistake');
+  ok(stepCheck(quad, '(x-3)^2=16\nx-3=5', { prompt: '$x^2-6x=7$' }).firstBreak === 1, 'a branch that is true of no root is still the mistake');
+  ok(checkAnswer({ answerType: 'set', answer: { values: [7, -1] }, prompt: 'Solve $x^2-6x=7$.' }, '7').correct !== true, 'and one root is still not the answer');
+}
+
 // ── A comma with a space beside it is a list ─────────────────────────────────
 {
   const read = text => { try { return parseNumericInput(text).value; } catch { return null; } };

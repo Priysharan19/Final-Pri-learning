@@ -406,7 +406,7 @@ function namesAValue(text, meta) {
   } catch { return false; }
 }
 
-function stepCheckSingle(meta, workingText, system = null) {
+function stepCheckSingle(meta, workingText, system = null, { loneBranches = false } = {}) {
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   const out = [];
   let firstBreak = -1;
@@ -564,13 +564,22 @@ function stepCheckSingle(meta, workingText, system = null) {
           }
           if (ast.t === 'equation') {
             const wantedRoots = uniqueNumeric(meta.solutions);
-            const held = branchesOpen && wantedRoots.length > 1 ? solutionsSatisfying(ast, meta) : [];
+            // A line of lower degree than the equation — `x - 3 = 4` after
+            // `(x - 3)^2 = 16`, one branch of the quadratic formula — names
+            // one root and is true of it. It is a branch whether or not a
+            // product was written first.
+            const names = side => unwrapGroup(side)?.t === 'var' && unwrapGroup(side).v === meta.variable;
+            const valued = (names(ast.l) && !variablesOf(ast.r).size) || (names(ast.r) && !variablesOf(ast.l).size);
+            // (Only where the whole working is read at once: a stage of a plan
+            // is checked a line at a time, and one limit is not the pair.)
+            const lone = loneBranches && !branchesOpen && wantedRoots.length > 1 && (valued || !!linearState({ kind: 'equation', ast }, meta.variable));
+            const held = (branchesOpen || lone) && wantedRoots.length > 1 ? solutionsSatisfying(ast, meta) : [];
             if (held.length && held.length < wantedRoots.length) {
               // One branch of a factorisation already shown. It is true of the
               // roots it names; whether the working keeps the rest is settled
               // once every line has been read.
               status = 'ok';
-              branchLines.push({ index: i, covered: held });
+              branchLines.push({ index: i, covered: held, lone });
               out.push({ text: line, status, branch: true });
               return;
             }
@@ -634,7 +643,14 @@ function stepCheckSingle(meta, workingText, system = null) {
     const covered = uniqueNumeric(branchLines.flatMap(b => b.covered));
     const listedInFull = out.some(l => l.status === 'ok' && l.coversAll);
     const complete = covered.length === wanted.length && wanted.every(sol => covered.some(v => numsClose(v, sol)));
-    if (!listedInFull && !complete) {
+    if (!listedInFull && !complete && branchLines.every(b => b.lone)) {
+      // One branch written alone, with no product before it that promised
+      // the rest: a true statement about the root it names, not a mistake.
+      // The answer is still incomplete, and the final line is judged on that.
+      for (const b of branchLines) {
+        out[b.index].note = `True for ${meta.variable} = ${b.covered.join(' or ')} — the equation has ${wanted.length} solutions, and the other is still to find.`;
+      }
+    } else if (!listedInFull && !complete) {
       const { index } = branchLines[0];
       const diagnosis = lostRootDiagnosis(meta.variable, covered.join(' or ') || 'this branch', wanted.length);
       out[index] = { text: out[index].text, status: 'break', note: diagnosis.message, diagnosis };
@@ -898,7 +914,7 @@ function stepCheckPlan(meta, workingText) {
  */
 export function stepCheck(meta, workingText, options = null) {
   if (meta?.kind === 'plan') return stepCheckPlan(meta, workingText);
-  return stepCheckSingle(meta, workingText, pinnedSystem(meta, typeof options?.prompt === 'string' ? options.prompt : ''));
+  return stepCheckSingle(meta, workingText, pinnedSystem(meta, typeof options?.prompt === 'string' ? options.prompt : ''), { loneBranches: true });
 }
 
 // ── Method marks (marking-11) ────────────────────────────────────────────────
@@ -1573,6 +1589,178 @@ function checkedRoot(claim, given, meta) {
   return null;
 }
 
+// ── The stages of solving an equation that is not linear ─────────────────────
+// Anything can be done to both sides of an equation without solving it, so on
+// an equation that is not linear a line earns only as a recognised stage of
+// solving it, defined by how the line is built and never by how long the
+// question happened to be:
+//   standard    everything on one side, equal to 0, written as a polynomial
+//               with its like terms collected (`x^2 - 5x + 6 = 0`);
+//   expanded    a bracketed question multiplied out, each side collected;
+//   cleared     a question with the unknown in a denominator or under a root,
+//               written as a polynomial equation;
+//   factorised  a product of factors of lower degree, equal to 0;
+//   square      a completed square, `(x + a)^2 = b`.
+// Each earns once. A line of lower degree (`x - 3 = 4`, `x - 2 = 0`) is linear
+// and is marked as linear working. Everything else — the same thing added to
+// or applied to both sides, terms moved back and forth, a multiple — is the
+// equation written again.
+
+/** The coefficients of a polynomial in `variable`, lowest power first; null when it is not one. */
+function polynomialIn(node, variable) {
+  const n = unwrapGroup(node);
+  if (!n || typeof n !== 'object') return null;
+  const trim = p => { while (p.length > 1 && numsClose(p[p.length - 1], 0)) p.pop(); return p; };
+  if (n.t === 'num') return [Number(n.v)];
+  if (n.t === 'var') return n.v === variable ? [0, 1] : null;
+  if (n.t === 'neg') { const p = polynomialIn(n.v, variable); return p && p.map(c => -c); }
+  if (n.t !== 'bin') return null;
+  const a = polynomialIn(n.l, variable);
+  if (!a) return null;
+  if (n.op === '^') {
+    const k = literalValue(unwrapGroup(n.r));
+    if (!Number.isInteger(k) || k < 0 || k > 8) return null;
+    let out = [1];
+    for (let i = 0; i < k; i++) {
+      const next = Array(out.length + a.length - 1).fill(0);
+      out.forEach((x, p) => a.forEach((y, q) => { next[p + q] += x * y; }));
+      out = next;
+      if (out.length > 13) return null;
+    }
+    return out.length > 13 ? null : trim(out);
+  }
+  const b = polynomialIn(n.r, variable);
+  if (!b) return null;
+  if (n.op === '+' || n.op === '-') {
+    const sign = n.op === '-' ? -1 : 1;
+    return trim(Array.from({ length: Math.max(a.length, b.length) }, (_, i) => (a[i] || 0) + sign * (b[i] || 0)));
+  }
+  if (n.op === '*') {
+    if (a.length + b.length > 14) return null;
+    const out = Array(a.length + b.length - 1).fill(0);
+    a.forEach((x, i) => b.forEach((y, j) => { out[i + j] += x * y; }));
+    return trim(out);
+  }
+  if (n.op === '/' && b.length === 1 && !numsClose(b[0], 0)) return a.map(c => c / b[0]);
+  return null;
+}
+
+const samePolynomial = (p, q) => p.length === q.length && p.every((c, i) => numsClose(c, q[i]));
+
+/** One side written as a polynomial with its like terms collected: no brackets, no power twice. */
+function collectedSide(side, variable) {
+  const degrees = new Set();
+  for (const term of additiveTerms(side)) {
+    const p = polynomialIn(term.node, variable);
+    if (!p || p.filter(c => !numsClose(c, 0)).length !== 1) return false;       // one monomial, not zero
+    let sums = false, letters = 0;
+    JSON.stringify(term.node, (k, v) => {
+      if (v && v.t === 'bin' && (v.op === '+' || v.op === '-')) sums = true;
+      if (v && v.t === 'var') letters++;
+      return v;
+    });
+    if (sums || letters > 1 || degrees.has(p.length - 1)) return false;
+    degrees.add(p.length - 1);
+  }
+  return true;
+}
+
+/** The factors of a product, a power counted as its base repeated. */
+function productFactors(node, acc = []) {
+  const n = unwrapGroup(node);
+  if (n?.t === 'bin' && n.op === '*') { productFactors(n.l, acc); productFactors(n.r, acc); }
+  else if (n?.t === 'bin' && n.op === '^' && Number.isInteger(literalValue(unwrapGroup(n.r))) && literalValue(unwrapGroup(n.r)) >= 2 && literalValue(unwrapGroup(n.r)) <= 8) {
+    for (let i = 0; i < literalValue(unwrapGroup(n.r)); i++) acc.push(n.l);
+  } else if (n?.t === 'neg') productFactors(n.v, acc);
+  else acc.push(n);
+  return acc;
+}
+
+/** What the equation `claim` is in itself: 'standard', 'factorised', 'square', 'collected' or null. */
+function equationForm(claim, variable) {
+  if (claim?.kind !== 'equation') return null;
+  const [l, r] = claimSides(claim);
+  const pl = polynomialIn(l, variable), pr = polynomialIn(r, variable);
+  const zero = side => literalValue(unwrapGroup(side)) === 0;
+  for (const [side, other, poly] of [[l, r, pl], [r, l, pr]]) {
+    if (zero(other) && poly && poly.length >= 3) {
+      if (collectedSide(side, variable)) return 'standard';
+      const factors = productFactors(side).map(f => polynomialIn(f, variable));
+      const real = factors.filter(p => p && p.length >= 2);
+      if (factors.every(Boolean) && real.length >= 2 && real.every(p => p.length < poly.length)) return 'factorised';
+    }
+    // (x + a)^2 = b, with or without a number in front.
+    if (!variablesOf(other).size) {
+      const core = productFactors(side).filter(f => { const p = polynomialIn(f, variable); return !(p && p.length === 1); });
+      if (core.length === 2 && JSON.stringify(unwrapGroup(core[0])) === JSON.stringify(unwrapGroup(core[1])) && polynomialIn(core[0], variable)?.length === 2 &&
+          unwrapGroup(core[0])?.t === 'bin') return 'square';
+    }
+  }
+  if (pl && pr && Math.max(pl.length, pr.length) >= 3 && collectedSide(l, variable) && collectedSide(r, variable)) return 'collected';
+  return null;
+}
+
+/** Is the number under a square root in `value` the discriminant of a quadratic among `references`? */
+function usesDiscriminant(value, references, variable) {
+  const under = [];
+  JSON.stringify(value, (k, v) => {
+    if (v && v.t === 'call' && /^sqrt$/i.test(String(v.fn || v.name || ''))) under.push(v.arg ?? (Array.isArray(v.args) ? v.args[0] : null));
+    return v;
+  });
+  if (!under.length) return false;
+  const discriminants = [];
+  for (const c of references) {
+    if (c?.kind !== 'equation') continue;
+    const [l, r] = claimSides(c);
+    if (!polynomialIn(l, variable) || !polynomialIn(r, variable)) continue;
+    const p = polynomialIn({ t: 'bin', op: '-', l, r }, variable);
+    if (p && p.length === 3) discriminants.push(p[1] * p[1] - 4 * p[2] * p[0]);
+  }
+  return under.some(node => {
+    let d;
+    try { d = evaluate(node, {}); } catch { return false; }
+    return Number.isFinite(d) && discriminants.some(x => numsClose(x, d));
+  });
+}
+
+/**
+ * The stage of solving that `claim` is, given the equations the question
+ * gives in the unknown alone; null when it is none.
+ */
+function solvingStage(claim, variable, givenOwn) {
+  const form = equationForm(claim, variable);
+  if (!form) return null;
+  const givenForms = givenOwn.map(c => equationForm(c, variable));
+  const residual = c => {
+    const [l, r] = claimSides(c);
+    const pl = polynomialIn(l, variable), pr = polynomialIn(r, variable);
+    return pl && pr ? polynomialIn({ t: 'bin', op: '-', l, r }, variable) : null;
+  };
+  if (form === 'standard') {
+    if (!givenForms.includes('standard')) return 'standard';
+    // The question is already in standard form: only dividing a common factor out of it is a step.
+    const mine = residual(claim);
+    return givenOwn.some((c, i) => {
+      const theirs = givenForms[i] === 'standard' ? residual(c) : null;
+      if (!mine || !theirs || mine.length !== theirs.length) return false;
+      const k = theirs[theirs.length - 1] / mine[mine.length - 1];
+      return Number.isInteger(Math.round(k)) && numsClose(k, Math.round(k)) && Math.abs(k) > 1 && samePolynomial(theirs, mine.map(c2 => c2 * k)) &&
+        mine.every(c2 => numsClose(c2, Math.round(c2)));
+    }) ? 'standard' : null;
+  }
+  if (form === 'factorised') return givenForms.includes('factorised') ? null : 'factorised';
+  if (form === 'square') return givenForms.includes('square') ? null : 'square';
+  // Each side collected, but not yet standard form.
+  const mine = residual(claim);
+  if (!mine) return null;
+  // A question with the unknown in a denominator or under a root, cleared.
+  if (givenOwn.length && givenOwn.every(c => !residual(c))) return 'cleared';
+  // A bracketed question multiplied out: the same two sides, without the brackets.
+  const bracketed = c => { const f = equationForm(c, variable); return f !== 'standard' && f !== 'collected'; };
+  if (givenOwn.some(c => bracketed(c) && rescalesBothSides(claim, c, variable) === 'same')) return 'expanded';
+  return null;
+}
+
 /** Does an equation in the unknown alone hold whatever the unknown is? */
 function silentOnUnknown(claim, variable) {
   const sides = claimSides(claim);
@@ -1661,7 +1849,7 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
   const otherFound = new Set();      // the other unknowns whose value has already earned its mark
   let restated = 0;
   let shownAuthoredEquation = false;
-  let rescaled = false;
+  const solvedStages = new Set();    // the stages of a non-linear solution already credited
   let isolatedOther = false;
   const total = Math.max(1, Number(marks) || 1);
   const cap = Math.max(0, total - 1);
@@ -1681,7 +1869,8 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
   //    is false: one true substitution among false ones is the one that
   //    happened to balance.
   const firstBreak = meta.kind === 'equation' ? allLines.findIndex(l => l.status === 'break') : -1;
-  const singleRoot = uniqueNumeric(meta.solutions).length <= 1;
+  // More values than the equation has roots, and at least three.
+  const sweepSize = Math.max(3, uniqueNumeric(meta.solutions).length + 1);
   const contradicted = new Set();
   let falseArithmetic = false;
   {
@@ -1697,7 +1886,7 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
         } catch { /* unreadable arithmetic says nothing */ }
         return;
       }
-      if (names.length !== 1 || (names[0] === meta.variable && !singleRoot)) return;
+      if (names.length !== 1) return;
       const st = linearState(c, names[0]);
       if (!st) return;
       const [a, b, cc, d] = st.sides;
@@ -1712,13 +1901,12 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
     for (const seen of shapes.values()) {
       const values = [];
       for (const x of seen) if (!values.some(v => numsClose(v, x.root))) values.push(x.root);
-      if (values.length >= 3) for (const x of seen) contradicted.add(x.index);
+      if (values.length >= sweepSize) for (const x of seen) contradicted.add(x.index);
     }
   }
   // Does the question hand over an equation that is linear in the unknown
   // alone? Then every step towards the answer is linear in it too.
   const linearQuestion = !!meta.variable && given.some(c => !!linearState(c, meta.variable));
-  const claimSize = c => claimSides(c).reduce((t, side) => t + symbolCount(side), 0);
   // The per-line mark vector: one entry per written line, in order, saying
   // what that line earned and why. Its marks always sum to `awarded`, so a
   // multi-line answer can show the examiner's tick (or its absence) per line.
@@ -1784,6 +1972,27 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
       if (counted.length >= cap) { row.reason = 'cap'; return row; }
       if (counted.some(c => isolatedFinalAnswer(c, meta))) { row.reason = 'repeat'; return row; }
     }
+    // On an equation with several roots, a line that gives the unknown a value
+    // (`x = 4`, `x = (-4 + sqrt(144))/2`) names one root. Written with nothing
+    // before it, it is a statement; after working it is the root read off,
+    // once — unless it is the quadratic formula with the equation's own
+    // discriminant under the root, which is a stage of solving in itself.
+    if (claim?.kind === 'equation' && meta.kind === 'equation' && meta.variable && uniqueNumeric(meta.solutions).length > 1) {
+      const [vl, vr] = claimSides(claim);
+      const lone = side => unwrapGroup(side)?.t === 'var' && unwrapGroup(side).v === meta.variable;
+      const value = lone(vl) && !variablesOf(vr).size ? vr : lone(vr) && !variablesOf(vl).size ? vl : null;
+      if (value) {
+        if (usesDiscriminant(value, [...given, ...counted], meta.variable)) {
+          if (solvedStages.has('formula')) { row.reason = 'repeat'; return row; }
+          solvedStages.add('formula');
+          return credit();
+        }
+        if (!counted.length) { row.reason = 'final-answer'; return row; }
+        if (solvedStages.has('root')) { row.reason = 'repeat'; return row; }
+        solvedStages.add('root');
+        return credit();
+      }
+    }
     if (meta.kind === 'equation' && meta.variable && claim) {
       // Solving an equation is work on its unknown. A line that is true
       // whatever the unknown is (x + 1 = 1 + x) moves nothing on.
@@ -1821,24 +2030,17 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
       // On a linear equation it moves nothing on: `L + m^2 = R + m^2`,
       // `(L)/(R) = 1`, `(L)^3 = (R)^3` are the question dressed up.
       if (linearQuestion) { row.reason = 'restated'; return row; }
-      // Otherwise it must be written no longer than the equations it comes
-      // from. Anything can be done to both sides of an equation without
-      // solving it, and every such line is longer than what it restates;
-      // a step — standard form, a factorisation, a completed square — is not.
-      const own = [...given, ...counted].filter(c => {
+      // Otherwise it earns as a recognised stage of solving — see "The stages
+      // of solving an equation that is not linear" — and each stage once.
+      const givenOwn = given.filter(c => {
         if (c.kind !== 'equation') return false;
         const names = variablesOf(c.ast);
         return names.size === 1 && names.has(meta.variable);
       });
-      if (own.some(c => claimSize(claim) > claimSize(c))) { row.reason = 'restated'; return row; }
-      // One thing done to both sides of a line already there can be a step
-      // (a constant moved across), once. Rewriting a line as the same two
-      // functions (factorising it, writing it as a square) is not that.
-      if (!counted.some(c => rescalesBothSides(claim, c, meta.variable) === 'same') &&
-          [...given, ...counted].some(c => rescalesBothSides(claim, c, meta.variable) === true)) {
-        if (rescaled) { row.reason = 'repeat'; return row; }
-        rescaled = true;
-      }
+      const stage = solvingStage(claim, meta.variable, givenOwn);
+      if (!stage) { row.reason = 'restated'; return row; }
+      if (solvedStages.has(stage)) { row.reason = 'repeat'; return row; }
+      solvedStages.add(stage);
     }
     return credit();
   });
