@@ -371,6 +371,11 @@ jobs:
         run: node server/test/auth-delivery-worker-check.mjs
       - name: Production email delivery configuration
         run: node server/test/auth-delivery-config-check.mjs
+      - name: Auth email readiness probe and coded send failures
+        run: |
+          set -o pipefail
+          node server/test/auth-email-readiness-check.mjs 2>&1 | tee auth-email-ready.log
+          grep -Fq 'AUTH EMAIL READINESS: PASS — 174/174 checks' auth-email-ready.log
       - name: Razorpay billing lifecycle
         run: node server/test/razorpay-billing-check.mjs
       - name: Apple billing lifecycle

@@ -13,8 +13,33 @@
 //   database      reachable within READY_DB_TIMEOUT_MS and on exactly the schema
 //                 this build expects                         → required
 //   authEmail     a transport is configured (production: required — no
-//                 verification or password reset without it); recent send
-//                 failures make it `failing`, which degrades
+//                 verification or password reset without it). "Configured" is
+//                 not "works", so the credential and the sender domain are
+//                 PROBED (authDelivery.js probeAuthEmail: cached for minutes,
+//                 bounded, shared between concurrent checks, never waited for
+//                 beyond READY_PROBE_WAIT_MS):
+//                   failing   AUTH_EMAIL_KEY_INVALID        the provider refuses the key
+//                             AUTH_EMAIL_SENDER_UNVERIFIED  the From domain is not a
+//                                                           verified domain of the account
+//                             AUTH_EMAIL_SENDER_INVALID     the From value has no domain
+//                             AUTH_EMAIL_DELIVERY_FAILING   recent sends all failed
+//                   degraded  AUTH_EMAIL_TEST_SENDER        the provider's shared test
+//                                                           sender: reaches the account
+//                                                           owner's inbox and nobody else
+//                   unknown   the provider could not be reached or did not say
+//                             (timeout, 429, 5xx) — NOT reported ok
+//                   probing   AUTH_EMAIL_PROBE_PENDING      no answer yet
+//                   ok        credential valid; `sender` is `verified`, or
+//                             `unknown` when the key is sending-only and may
+//                             not list domains (a valid key, not a failure)
+//                 Every one of those DEGRADES (HTTP 200). Only "not configured
+//                 in production" is not_ready. That is deliberate: /v1/ready is
+//                 the deploy healthcheck, and a provider outage, a rate limit
+//                 or a revoked key must never fail a deploy or restart-loop a
+//                 replica that signed-in learners are using — it would also
+//                 block the very deploy that carries the repair. The truth is
+//                 in checks.authEmail and in `degraded`; whoever gates a
+//                 release reads it there (tools/verify-deployment.mjs).
 //   paidCeiling   PRI_PAID_CALLS_PER_HOUR/DAY present whenever a paid provider
 //                 key is                                     → required
 //   billing       a configured product has its provider credentials → required
@@ -40,6 +65,7 @@ import { probeHandwritingProvider, providerStaticStatus } from './handwritingPro
 import { providerConfig as workingConfig } from './workingProvider.js';
 import { spendCeilingMissing } from './spendCeiling.js';
 import { platformConfigStatus } from './config.js';
+import { authEmailStaticStatus, probeAuthEmail } from './authDelivery.js';
 import { mfaKeyConfigured, privilegedAccountExists } from './mfa.js';
 import { metrics } from './metrics.js';
 import { safeCode } from './observability.js';
@@ -82,14 +108,48 @@ async function databaseCheck(db, { timeoutMs }) {
   }
 }
 
-function authEmailCheck(env, production) {
-  const provider = String(env.PRI_AUTH_EMAIL_PROVIDER || '').trim().toLowerCase();
-  const configured = provider === 'resend' && !!String(env.PRI_RESEND_API_KEY || '').trim() && !!String(env.PRI_AUTH_EMAIL_FROM || '').trim();
-  if (!configured) return { state: 'not_configured', code: 'AUTH_EMAIL_NOT_CONFIGURED', required: production };
+const inFlightProbes = new Map();
+
+/**
+ * One provider probe shared by every readiness check that arrives while it is
+ * running (/v1/ready is unauthenticated: a burst must not fan out into provider
+ * calls). Resolves to the probe's answer, null when it threw, or 'pending' when
+ * it has not answered in waitMs — it keeps running and fills its own cache.
+ */
+function sharedProbe(probe, env, waitMs) {
+  let pending = inFlightProbes.get(probe);
+  if (!pending) {
+    pending = Promise.resolve().then(() => probe({ env })).catch(() => null)
+      .finally(() => inFlightProbes.delete(probe));
+    inFlightProbes.set(probe, pending);
+  }
+  return Promise.race([pending, new Promise(resolve => setTimeout(() => resolve('pending'), waitMs).unref?.())]);
+}
+
+const AUTH_EMAIL_CREDENTIALS = new Set(['valid', 'invalid', 'unknown']);
+const AUTH_EMAIL_SENDERS = new Set(['verified', 'unverified', 'test_sender', 'invalid', 'unknown']);
+
+async function authEmailCheck(env, production, probe, waitMs) {
+  if (!authEmailStaticStatus(env).configured) return { state: 'not_configured', code: 'AUTH_EMAIL_NOT_CONFIGURED', required: production };
+  const result = await sharedProbe(probe, env, waitMs);
+  const shape = (state, code, from = null) => ({
+    state,
+    code,
+    required: production,
+    credential: AUTH_EMAIL_CREDENTIALS.has(from?.credential) ? from.credential : 'unknown',
+    sender: AUTH_EMAIL_SENDERS.has(from?.sender) ? from.sender : 'unknown'
+  });
+  if (result === 'pending') return shape('probing', 'AUTH_EMAIL_PROBE_PENDING');
+  if (!result) return shape('unknown', 'AUTH_EMAIL_PROBE_FAILED');
+  if (result.credential === 'invalid') return shape('failing', 'AUTH_EMAIL_KEY_INVALID', result);
+  if (result.sender === 'unverified') return shape('failing', 'AUTH_EMAIL_SENDER_UNVERIFIED', result);
+  if (result.sender === 'invalid') return shape('failing', 'AUTH_EMAIL_SENDER_INVALID', result);
   const failed = metrics.sum('auth_email_total', { minutes: 15, where: { outcome: 'failed' } });
   const sent = metrics.sum('auth_email_total', { minutes: 15, where: { outcome: 'sent' } });
-  if (failed > 0 && sent === 0) return { state: 'failing', code: 'AUTH_EMAIL_DELIVERY_FAILING', required: production };
-  return { state: 'ok', code: null, required: production };
+  if (failed > 0 && sent === 0) return shape('failing', 'AUTH_EMAIL_DELIVERY_FAILING', result);
+  if (result.sender === 'test_sender') return shape('degraded', 'AUTH_EMAIL_TEST_SENDER', result);
+  if (result.credential !== 'valid') return shape('unknown', safeCode(result.code, 'AUTH_EMAIL_PROBE_FAILED'), result);
+  return shape('ok', null, result);
 }
 
 function paidCeilingCheck(env) {
@@ -108,8 +168,6 @@ function billingCheck() {
   return { state: 'ok', code: null };
 }
 
-const inFlightProbes = new Map();
-
 async function handwritingCheck(env, probe, waitMs) {
   const staticStatus = providerStaticStatus(env);
   if (!staticStatus.configured) return { state: 'not_configured', code: null };
@@ -117,16 +175,8 @@ async function handwritingCheck(env, probe, waitMs) {
   // The probe is cached for a minute inside handwritingProvider.js, so a busy
   // uptime checker costs at most one provider round-trip a minute. A probe that
   // has not answered in waitMs keeps running and fills the cache; readiness
-  // does not wait for it.
-  // Concurrent readiness checks during a cache miss share one probe, so a burst
-  // of /v1/ready (it is unauthenticated) cannot fan out into provider calls.
-  let pending = inFlightProbes.get(probe);
-  if (!pending) {
-    pending = Promise.resolve().then(() => probe({ env })).catch(() => null)
-      .finally(() => inFlightProbes.delete(probe));
-    inFlightProbes.set(probe, pending);
-  }
-  const result = await Promise.race([pending, new Promise(resolve => setTimeout(() => resolve('pending'), waitMs).unref?.())]);
+  // does not wait for it. Concurrent checks during a cache miss share one probe.
+  const result = await sharedProbe(probe, env, waitMs);
   if (result === 'pending') return { state: 'probing', code: 'HANDWRITING_PROBE_PENDING' };
   if (!result) return { state: 'degraded', code: 'HANDWRITING_PROVIDER_PROBE_FAILED' };
   if (result.usable && !result.degraded) return { state: 'ok', code: null };
@@ -147,19 +197,21 @@ async function staffMfaCheck(db, env, production, timeoutMs) {
 export async function readinessReport(db, {
   env = process.env,
   probe = probeHandwritingProvider,
+  authEmailProbe = probeAuthEmail,
   dbTimeoutMs = READY_DB_TIMEOUT_MS,
   probeWaitMs = READY_PROBE_WAIT_MS,
   releaseSha = 'unknown'
 } = {}) {
   const production = String(env.NODE_ENV || '') === 'production';
-  const [database, handwriting, staffMfa] = await Promise.all([
+  const [database, handwriting, authEmail, staffMfa] = await Promise.all([
     databaseCheck(db, { timeoutMs: dbTimeoutMs }),
     handwritingCheck(env, probe, probeWaitMs),
+    authEmailCheck(env, production, authEmailProbe, probeWaitMs),
     staffMfaCheck(db, env, production, dbTimeoutMs)
   ]);
   const checks = {
     database,
-    authEmail: authEmailCheck(env, production),
+    authEmail,
     paidCeiling: paidCeilingCheck(env),
     billing: billingCheck(),
     handwriting,
@@ -172,7 +224,10 @@ export async function readinessReport(db, {
   if (checks.paidCeiling.state === 'missing') failing.push(checks.paidCeiling.code);
   if (checks.billing.state === 'incomplete') failing.push(checks.billing.code);
   const degraded = [];
-  if (checks.authEmail.state === 'failing' || (!checks.authEmail.required && checks.authEmail.state === 'not_configured')) degraded.push(checks.authEmail.code);
+  // Every probed auth-email state other than `ok` degrades and none fails
+  // readiness: see the authEmail note at the top of this file.
+  if (['failing', 'degraded', 'unknown', 'probing'].includes(checks.authEmail.state)
+    || (!checks.authEmail.required && checks.authEmail.state === 'not_configured')) degraded.push(checks.authEmail.code);
   if (['degraded', 'unavailable', 'probing'].includes(handwriting.state)) degraded.push(handwriting.code);
   if (staffMfa.state === 'missing') degraded.push(staffMfa.code);
   const state = failing.length ? 'not_ready' : degraded.length ? 'degraded' : 'ready';
