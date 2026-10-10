@@ -1507,6 +1507,7 @@ export default {
   'exams.openPending': 'खोलें',
   'exams.markedEarlier': 'ऐप के पुराने संस्करण ने अंक दिए',
   'exams.markedBackup': 'बैकअप से, सर्वर ने अभी पुष्टि नहीं की',
+  'exams.provisional': { one: "{n} अंक अभी जाँचा नहीं गया", other: "{n} अंक अभी जाँचे नहीं गए" },
   'exams.openPrintable': 'प्रिंट करने योग्य प्रश्नपत्र खोलें',
   'exams.openPrintableAria': '“{title}” को प्रिंट करने योग्य प्रश्नपत्र के रूप में खोलें',
   'exams.resume': 'जारी रखें',

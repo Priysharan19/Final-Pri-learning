@@ -69,6 +69,7 @@ import {
   finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, finishedAtOf, fetchRemotePaper,
   markPendingLines, recoverHandwriting
 } from './serverExam.js';
+import { pendingSummary } from './examPages.js';
 import { rasterizeInk } from '../ink/cloudRaster.js';
 import { preparePhoto } from '../ink/photoRaster.js';
 
@@ -3922,7 +3923,9 @@ const routes = {
       id: e.id, title: e.title, year: e.year, duration_min: e.durationMin, created_at: e.createdAt, finished_at: e.finishedAt,
       deadline_at: Number.isFinite(e.deadlineAt) ? e.deadlineAt : null, score: e.score, total: e.total,
       // Who marked a finished paper, and whether one is still waiting to be.
-      marked_by: markedByOf(e), pending: !!e.pendingFinish
+      marked_by: markedByOf(e), pending: !!e.pendingFinish,
+      // Marks not yet decided: handwriting saved at the close and not read.
+      pending_marks: e.finishedAt ? pendingSummary(e.detail).marks : 0
     })) };
   },
   'GET /exams/:id': async (body, params) => {

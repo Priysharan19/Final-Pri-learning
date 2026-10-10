@@ -43,6 +43,7 @@ import {
   finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, localStartOf, finishedAtOf, fetchRemotePaper,
   markPendingLines, recoverHandwriting
 } from './serverExam.js';
+import { pendingSummary } from './examPages.js';
 
 function error(message, status = 400, code = 'INDIA_EXAM_ERROR') {
   return Object.assign(new Error(message), { status, code });
@@ -366,6 +367,8 @@ async function listExams(profile) {
       id: e.id, title: e.title, year: e.year, duration_min: e.durationMin,
       created_at: e.createdAt, finished_at: e.finishedAt, score: e.score, total: e.total,
       marked_by: markedByOf(e), pending: !!e.pendingFinish,
+      // Marks not yet decided: handwriting saved at the close and not read.
+      pending_marks: e.finishedAt ? pendingSummary(e.detail).marks : 0,
       indiaExam: e.indiaExam
     }))
   };

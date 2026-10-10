@@ -1441,6 +1441,7 @@ export default {
   'exams.openPending': 'Open',
   'exams.markedEarlier': 'marked by an earlier version of the app',
   'exams.markedBackup': 'from a backup, not yet confirmed by the server',
+  'exams.provisional': { one: "{n} mark not marked yet", other: "{n} marks not marked yet" },
   'exams.openPrintable': 'Open printable paper',
   'exams.openPrintableAria': 'Open “{title}” as a printable paper',
   'exams.resume': 'Resume',
