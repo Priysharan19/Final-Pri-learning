@@ -91,6 +91,16 @@ const VISUAL_WAVE5_LOADERS = {
   12: () => import('./data/notes-visual-wave5-class12.js')
 };
 
+// Third figure-led content wave: graph reasoning, distributions and combinatorics.
+const VISUAL_INQUIRY_LOADERS = {
+  7: () => import('./data/notes-visual-wave6-class7.js'),
+  8: () => import('./data/notes-visual-wave6-class8.js'),
+  9: () => import('./data/notes-visual-wave6-class9.js'),
+  10: () => import('./data/notes-visual-wave6-class10.js'),
+  11: () => import('./data/notes-visual-wave6-class11.js'),
+  12: () => import('./data/notes-visual-wave6-class12.js')
+};
+
 function mergeOptionalComplexStudies(notes, extra) {
   for (const [id, section] of Object.entries(extra || {})) {
     if (!Object.hasOwn(notes,id) || !Array.isArray(section.examples) || !section.examples.every(x => x.question && Array.isArray(x.steps) && x.steps.length && x.answer && x.verify)) {
@@ -116,16 +126,19 @@ export function loadNotesForGrade(grade) {
       g === 11 ? import('./data/notes-advanced-complex.js') : Promise.resolve({ default: {} }),
       CHALLENGE_LOADERS[g] ? CHALLENGE_LOADERS[g]() : Promise.resolve({ default: {} }),
       VISUAL_LOADERS[g](),
-      VISUAL_WAVE5_LOADERS[g]()
+      VISUAL_WAVE5_LOADERS[g](),
+      VISUAL_INQUIRY_LOADERS[g]()
     ])
-      .then(([original, supplement, optional, challenges, visuals, extendedVisuals]) => mergeOptionalComplexStudies(
+      .then(([original, supplement, optional, challenges, visuals, extendedVisuals, inquiry]) => mergeOptionalComplexStudies(
         mergeOptionalComplexStudies(
           mergeOptionalComplexStudies(
             mergeOptionalComplexStudies(
-              mergeStudySupplements(original.default || {}, supplement.default || {}), optional.default || {}
-            ), challenges.default || {}
-          ), visuals.default || {}
-        ), extendedVisuals.default || {}
+              mergeOptionalComplexStudies(
+                mergeStudySupplements(original.default || {}, supplement.default || {}), optional.default || {}
+              ), challenges.default || {}
+            ), visuals.default || {}
+          ), extendedVisuals.default || {}
+        ), inquiry.default || {}
       ))
       .catch(err => { cache.delete(g); throw err; }));
   }
