@@ -939,6 +939,9 @@ export function exprEquivalent(a, b, opts = {}) {
   return EQUIV_CACHE.get(key);
 }
 
+/** The most distinct letters two expressions may hold between them and still be compared. */
+export const EQUIVALENCE_LETTERS = 8;
+
 function exprEquivalentUncached(a, b, opts) {
   let astA, astB;
   try { astA = typeof a === 'string' ? parse(a) : a; astB = typeof b === 'string' ? parse(b) : b; }
@@ -950,6 +953,11 @@ function exprEquivalentUncached(a, b, opts) {
   // e is Euler's number, never a sampled variable: sampling it made ln(eˣ)
   // vs x (and even ln(e⁵) vs 5) disagree, a false negative on a correct answer
   vars.delete('e');
+  // Two expressions are compared over the letters of both, and the domain
+  // probe is paid once for each. No answer on any syllabus is written in more
+  // than a handful of letters; one written in more than EQUIVALENCE_LETTERS
+  // is not the same expression as the key, and is not sampled to find out.
+  if (vars.size > EQUIVALENCE_LETTERS) return false;
   const names = [...vars];
   const integers = new Set([...integerVarsOf(astA), ...integerVarsOf(astB)]);
   const domain = opts.domain || [-3.5, 3.5];
