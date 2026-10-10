@@ -101,7 +101,7 @@ function spent(resetAt) {
     // Reading and marking are online-only: nothing is read on the device, so
     // this must not say so. The work is not lost; it is not read until the
     // limit lifts (resetAt, also sent as RateLimit-Reset).
-    message: "Pri's reader has reached this service's reading limit for now. Your work has not been read or marked; try again after the limit resets, or type your answer.",
+    message: 'Handwriting and photo checking has reached its usage limit for now. Your work has not been read or marked; type your answer, or try again when the limit resets.',
     retryable: true,
     resetAt
   };
@@ -112,9 +112,5 @@ export function refusePaidCall(res, verdict) {
   if (verdict.resetAt) res.set('RateLimit-Reset', String(Math.ceil(verdict.resetAt / 1000)));
   const error = { code: verdict.code, message: verdict.message };
   if (verdict.retryable) error.retryable = true;
-  // The same instant as the RateLimit-Reset header, in the body, because the
-  // shipped client reads a refusal's time from the body (as it does for
-  // AI_ALLOWANCE_EXHAUSTED) and its native transports do not expose headers.
-  if (Number.isFinite(verdict.resetAt)) error.resetAt = verdict.resetAt;
   return res.status(verdict.status).json({ error });
 }

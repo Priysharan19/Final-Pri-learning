@@ -29,9 +29,15 @@ has(photo, /photoOCR\.blockedKey !== 'verdict\.photoReadingSignIn'/, 'Only an au
 has(photo, /!cloudReadingEnabled\(user\)/, 'A locally stored profile is not assumed to be authorised');
 has(photo, /await readOnePage\(dataURL\)/, 'Photo recovery uses real existing cloud reader');
 has(photo, /photoReadGeneration\.current/, 'Late recognition responses are generation guarded');
-has(photo, /data-photo-correct-transcript/, 'Recognition transcript is human editable');
-has(photo, /editAnswer\(lastLine\)/, 'Corrected photo answer reaches the answer submission value');
-has(photo, /editWorking\(corrected\)/, 'Corrected working reaches method marks');
+has(readFileSync(new URL('../src/components/PhotoLines.jsx', import.meta.url), 'utf8'), /data-photo-correct-transcript/, 'Recognition transcript is human editable');
+// The transcript is edited line by line (PhotoLines.jsx). A corrected line
+// reaches the working that is submitted, and the answer field holds the
+// proposal from the kept lines — never the last line copied in as a sentence.
+has(photo, /onEdit=\{\(i, text\) => changePhotoLines\(editLine\(photoLines, i, text\)\)\}/, 'A corrected photo line reaches the card');
+has(photo, /const wk = workingOf\(next\);[\s\S]{0,200}setWorking\(wk\)/, 'Corrected working reaches method marks');
+has(photo, /proposeFinalAnswer\(includedLines\(transcript\), publicAnswerShape\)/, 'The answer field is proposed from the kept lines for the public answer type');
+assert.doesNotMatch(photo, /setAnswer\(page\.markable\)|editAnswer\(lastLine\)/, 'The last recognised line is never copied into the answer field');
+count += 1;
 has(photo, /newSubmissionId\(\)/, 'Grading retains idempotent submission keys');
 has(photo, /savePendingSubmission\(question\.id/, 'Grading request is protected by existing submission recovery');
 has(account, /session\?\.reason === 'signed-out'\) && <form/, 'Expired linked session has an actual login form');

@@ -323,6 +323,45 @@ eq(block(linked, { reason: 'unavailable', readiness: { usable: false, lastFailur
   eq(sent, 2, 'and when that is refused too, the page waits again');
   reader.resumeReaderNow();
 }
+// One read per picture: two triggers for the same page share one request, and
+// a page that was just read is not paid for again.
+{
+  let sent = 0, release;
+  const gate = new Promise(r => { release = r; });
+  const seen = [];
+  const transport = {
+    handwritingStatus: async () => ({ configured: true, usable: true, available: true, state: 'ready' }),
+    transcribeHandwriting: async (image, options) => { sent += 1; seen.push(Object.keys(options || {})); await gate; return { transcription: { engine: 'cloud-test', lines: [{ text: '7', confidence: 0.95 }], text: '7', confidence: 0.95, needsConfirmation: false } }; }
+  };
+  const raster = strokes => ({ dataUrl: 'data:image/png;base64,' + Buffer.from(JSON.stringify(strokes)).toString('base64'), width: 1, height: 1, bytes: 3 });
+  const options = { user: linked, transport, available: () => true, rasterize: raster };
+  reader.resumeReaderNow(); reader.clearCloudHandwritingReadiness();
+  const page = [{ points: [{ x: 1, y: 1 }, { x: 9, y: 9 }] }];
+  const a = reader.readWithCloud(page, options), b = reader.readWithCloud(page, options);
+  await new Promise(r => setTimeout(r, 20));
+  eq(sent, 1, 'two reads of the same page at the same moment send ONE request (the reload race)');
+  release();
+  const [ra, rb] = await Promise.all([a, b]);
+  eq([ra.transcription?.text, rb.transcription?.text, sent], ['7', '7', 1], 'both get the one reading');
+  eq((await reader.readWithCloud(page, options)).transcription?.text, '7', 'a page that already has a reading gets it back');
+  eq(sent, 1, 'without a second paid read');
+  await reader.readWithCloud([{ points: [{ x: 2, y: 2 }, { x: 9, y: 9 }] }], options);
+  eq(sent, 2, 'different writing is a different page and is read');
+  eq(seen.every(keys => keys.join() === 'signal'), true, 'and each request still carries the picture and a cancel signal, nothing else');
+  reader.forgetCloudReads(transport);
+  await reader.readWithCloud(page, options);
+  eq(sent, 3, 'a change of account forgets remembered readings');
+  // A failed read is never remembered, and a lone caller's cancel still cancels.
+  let failures2 = 0, aborted = false;
+  const flaky = { handwritingStatus: transport.handwritingStatus, transcribeHandwriting: async (image, { signal }) => { failures2 += 1; if (failures2 === 1) throw Object.assign(new Error('down'), { status: 503, code: 'HANDWRITING_PROVIDER_5XX' }); await new Promise((_, no) => signal.addEventListener('abort', () => { aborted = true; no(Object.assign(new Error('gone'), { name: 'AbortError' })); })); } };
+  const o2 = { ...options, transport: flaky };
+  eq((await reader.readWithCloud(page, o2)).error?.code, 'HANDWRITING_PROVIDER_5XX', 'a failed read is reported');
+  const controller = new AbortController();
+  const pending = reader.readWithCloud(page, { ...o2, signal: controller.signal });
+  await new Promise(r => setTimeout(r, 20));
+  controller.abort();
+  eq([(await pending).error?.code, failures2, aborted], ['HANDWRITING_CANCELLED', 2, true], 'then asked again (never remembered), and cancelling the only waiter cancels the request');
+}
 // The reading before marking: which refusals are the reader's own.
 const at = (failure, more = {}) => guard.readerRefusalAtSubmit({ beforeMarking: true, readerFailure: failure, ...more });
 eq(at({ code: 'PAID_CAPACITY_REACHED', status: 503, resetAt: IN_AN_HOUR }), { code: 'PAID_CAPACITY_REACHED', status: 503, resetAt: IN_AN_HOUR }, 'a capacity refusal at Submit is the reader\'s');

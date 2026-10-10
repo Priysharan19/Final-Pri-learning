@@ -102,6 +102,86 @@ export function noteReaderRefusal(failure) { noteAllowance(failure || {}); }
 /** The student asked: the next read is sent whatever limit was last reported. */
 export function resumeReaderNow() { readerPause = null; }
 const pausedOutcome = pause => ({ reason: 'paused', failure: pause.failure, until: pause.until });
+
+// ── One read per picture ─────────────────────────────────────────────────────
+// Every read is a paid provider call against a ceiling shared by the whole
+// deployment. Two things on a page can ask for the same picture at the same
+// moment (after a reload the session announcement and the profile refresh both
+// say "read now"), and a remount asks again for a page that already has its
+// reading. Neither is a reason to pay twice: an identical picture that is
+// being read shares that request, and one that was read a moment ago gets the
+// same reading back. Failures are never remembered. The key is the picture
+// itself — nothing about the question exists at this layer.
+const READ_MEMORY_MS = 10 * 60 * 1000;
+const READ_MEMORY_MAX = 6;
+const readsByTransport = new WeakMap();   // transport → { flying: Map, done: Map }
+function pictureKey(image) {
+  const text = String(image);
+  let a = 0x811c9dc5, b = 0x01000193;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text.charCodeAt(i);
+    a = Math.imul(a ^ c, 0x01000193) >>> 0;
+    b = (Math.imul(b, 31) + c) >>> 0;
+  }
+  return `${text.length}:${a.toString(36)}:${b.toString(36)}`;
+}
+function readMemory(transport) {
+  let memory = readsByTransport.get(transport);
+  if (!memory) { memory = { flying: new Map(), done: new Map() }; readsByTransport.set(transport, memory); }
+  return memory;
+}
+/** Forget every remembered reading (the account changed: its reads are its own). */
+export function forgetCloudReads(transport = cloud) { readsByTransport.delete(transport); }
+/**
+ * Send one picture to the reader, once. Callers asking for the same picture
+ * share the request; it is cancelled only when every one of them has stopped
+ * waiting, so a single caller's cancel behaves exactly as it always did. The
+ * request carries the picture and a cancel signal, and nothing else.
+ */
+function transcribeOnce(transport, image, { signal = null, now = Date.now() } = {}) {
+  const memory = readMemory(transport);
+  const key = pictureKey(image);
+  const gone = () => Object.assign(new Error('The read was cancelled.'), { name: 'AbortError' });
+  if (signal?.aborted) return Promise.reject(gone());
+  const kept = memory.done.get(key);
+  if (kept && now - kept.at <= READ_MEMORY_MS) return Promise.resolve(kept.response);
+  let flight = memory.flying.get(key);
+  if (!flight) {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null;
+    flight = { waiters: 0, controller, promise: null };
+    flight.promise = Promise.resolve().then(() => transport.transcribeHandwriting(image, { signal: controller?.signal ?? null }))
+      .then(response => {
+        if (response?.transcription?.lines?.length) {
+          memory.done.set(key, { at: Date.now(), response });
+          while (memory.done.size > READ_MEMORY_MAX) memory.done.delete(memory.done.keys().next().value);
+        }
+        return response;
+      })
+      .finally(() => { if (memory.flying.get(key) === flight) memory.flying.delete(key); });
+    // A shared request nobody is waiting for any more must not surface as an
+    // unhandled rejection.
+    flight.promise.catch(() => {});
+    memory.flying.set(key, flight);
+  }
+  const shared = flight;
+  shared.waiters += 1;
+  if (!signal) return shared.promise;
+  return new Promise((resolve, reject) => {
+    let left = false;
+    const onAbort = () => {
+      if (left) return;
+      left = true;
+      shared.waiters -= 1;
+      if (shared.waiters <= 0) {
+        if (memory.flying.get(key) === shared) memory.flying.delete(key);
+        shared.controller?.abort();
+      }
+      reject(gone());
+    };
+    signal.addEventListener?.('abort', onAbort, { once: true });
+    shared.promise.then(resolve, reject).finally(() => { left = true; signal.removeEventListener?.('abort', onAbort); });
+  });
+}
 let listening = false;
 function listenForAccountChanges() {
   if (listening) return;
@@ -110,7 +190,7 @@ function listenForAccountChanges() {
     // switching account or a verification/consent change (all announced as a
     // session change) clears the readiness answer, which was for someone else.
     onEntitlementChange(() => { clearCloudAllowanceExhausted(); clearCloudHandwritingReadiness(); });
-    onCloudSessionChange(() => clearCloudHandwritingReadiness());
+    onCloudSessionChange(() => { clearCloudHandwritingReadiness(); forgetCloudReads(); });
     listening = typeof globalThis.addEventListener === 'function';
   } catch { /* non-browser runtimes */ }
 }
@@ -378,7 +458,7 @@ export async function readWithCloud(strokes, {
 
   const started = Date.now();
   try {
-    const response = await transport.transcribeHandwriting(raster.dataUrl, { signal });
+    const response = await transcribeOnce(transport, raster.dataUrl, { signal });
     const transcription = response?.transcription;
     recordCloudDiagnostics({
       available: true,
@@ -488,7 +568,7 @@ export async function readPhotoWithCloud(dataUrl, {
 
   const started = Date.now();
   try {
-    const response = await transport.transcribeHandwriting(prepared.dataUrl, { signal });
+    const response = await transcribeOnce(transport, prepared.dataUrl, { signal });
     const transcription = response?.transcription;
     recordCloudDiagnostics({
       available: true,

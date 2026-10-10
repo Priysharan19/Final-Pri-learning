@@ -109,9 +109,7 @@ try {
     'the refusal does not claim the work is being read on the device: nothing is');
   ok(/has not been read or marked/i.test(alsoWorking.json?.error?.message || ''),
     'and says plainly that the work has not been read or marked');
-  ok(Number.isFinite(sixth.json?.error?.resetAt) && sixth.json.error.resetAt > Date.now() &&
-    Math.ceil(sixth.json.error.resetAt / 1000) === Number(sixth.headers.get('ratelimit-reset')),
-    'and when the limit lifts is in the body as well as the RateLimit-Reset header');
+  ok(Number(sixth.headers.get('ratelimit-reset')) * 1000 > Date.now(), 'and RateLimit-Reset says when the limit lifts');
   ok(alsoWorking.json?.error?.retryable === true, 'a spent budget is temporary, and says so');
 
   // ── 3 · A malformed request cannot burn the budget ─────────────────────────

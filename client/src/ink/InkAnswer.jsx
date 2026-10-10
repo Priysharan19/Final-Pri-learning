@@ -70,7 +70,20 @@ const WAITING_WITHOUT_SAVE_CLAIM = {
 };
 
 const EMPTY_READING = { lines: [], text: '' };
-const strokeSignature = strokes => `${strokes.length}:${strokes.reduce((n, st) => n + (st?.points?.length || 0), 0)}`;
+// The content of the page, not only its size: two pages with the same number
+// of strokes and points are different pages.
+const strokeSignature = strokes => {
+  let h = 0x811c9dc5, points = 0;
+  for (const st of strokes) {
+    h = Math.imul(h ^ 0x7c, 0x01000193) >>> 0;
+    for (const p of st?.points || []) {
+      points += 1;
+      h = Math.imul(h ^ (Math.round(Number(p?.x) || 0) & 0xffff), 0x01000193) >>> 0;
+      h = Math.imul(h ^ (Math.round(Number(p?.y) || 0) & 0xffff), 0x01000193) >>> 0;
+    }
+  }
+  return `${strokes.length}:${points}:${h.toString(36)}`;
+};
 
 /**
  * lineVerdicts: optional array aligned with the read lines, e.g.
@@ -123,6 +136,9 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   const readSeqRef = useRef(0);
   const abortRef = useRef(null);
   const sentRef = useRef(null);
+  // The page being read right now, and the page the reading on screen is of.
+  const flyingRef = useRef(null);
+  const readRef = useRef(null);
   const strokesRef = useRef([]);
   // The page waited for the reader (offline, signed out, reader down). The
   // reading that eventually arrives is handed on as such, so the card can mark
@@ -216,9 +232,12 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     abortRef.current?.abort?.();
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     abortRef.current = controller;
-    sentRef.current = strokeSignature(strokes);
+    const signature = strokeSignature(strokes);
+    sentRef.current = signature;
+    flyingRef.current = signature;
+    const landed = () => { if (flyingRef.current === signature) flyingRef.current = null; };
     setStatus({ kind: 'reading' });
-    readWithCloud(strokes, { user: who, signal: controller?.signal, freshReadiness: fresh }).then(outcome => {
+    readWithCloud(strokes, { user: who, signal: controller?.signal, freshReadiness: fresh }).finally(landed).then(outcome => {
       // Newer writing replaced this read, or the page was submitted while the
       // server was reading it (§09: a late reading never rewrites the reading
       // a mark was given for).
@@ -239,6 +258,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
         retriesRef.current = 0;
         const afterWait = queuedRef.current;
         queuedRef.current = false;
+        readRef.current = signature;
         publish(reading, strokes, { afterWait });
         setStatus(null);
         return;
@@ -260,6 +280,14 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   sendToReaderRef.current = sendToReader;
 
   const scheduleRead = useCallback((strokes, { immediate = false, fresh = false } = {}) => {
+    // Single flight. After a reload the session announcement and the profile
+    // refresh both say "read now" within the same moment; the second used to
+    // abort the first after it had left and send the identical page again — a
+    // second paid read of the same strokes. A page that is being read is not
+    // sent again, and neither is one whose reading is already on screen.
+    const signature = strokes.length ? strokeSignature(strokes) : null;
+    if (signature && flyingRef.current === signature) return;
+    if (signature && readRef.current === signature && rec.lines.length) return;
     const seq = ++readSeqRef.current;
     clearRetry();
     if (settleRef.current) { clearTimeout(settleRef.current); settleRef.current = null; }

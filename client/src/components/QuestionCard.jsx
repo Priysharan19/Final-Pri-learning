@@ -1718,6 +1718,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const inkWaitingSignIn = inkAccountBlocked && inkReaderState?.blocker === 'ink.waitingSignIn';
   const photoWaitingSignIn = mode === 'photo' && !isMcq && !!photo && !resolved
     && photoOCR.phase === 'unavailable' && photoOCR.blockedKey === 'verdict.photoReadingSignIn';
+  // The reader cannot read this work right now, and why: the service's usage
+  // limit (or this account's allowance or rate limit), or a reader that is not
+  // there. Neither says anything about whether the work is saved — that is
+  // the status line's own, separate, readback-proven statement.
+  const LIMIT_BLOCKS = /^(ink\.waiting|verdict\.photoReading)(Capacity|Allowance|RateLimited)(Until)?$/;
+  const inkBlockKey = writeMode && !isMcq && inkHasStrokes && !resolved
+    && [INK_READER_STATE.READER_UNAVAILABLE, INK_READER_STATE.NETWORK_ERROR].includes(inkReaderState?.kind) ? String(inkReaderState.blocker || 'ink.waitingServiceDown') : null;
+  const photoBlockKey = mode === 'photo' && !isMcq && !!photo && !resolved && photoOCR.phase === 'unavailable' && !photoWaitingSignIn
+    ? String(photoOCR.blockedKey || 'verdict.photoReadingServiceDown') : null;
+  const submitBlockKey = state.phase === 'retry' && state.res?.readerBlock ? String(state.res.readerBlock.key) : null;
+  const readerLimit = [inkBlockKey, photoBlockKey, submitBlockKey].some(k => k && LIMIT_BLOCKS.test(k));
+  const readerDown = !readerLimit && [inkBlockKey, photoBlockKey, submitBlockKey].some(Boolean);
   // ONE state for the student's work, so the page can never say two things
   // about it at once. In order: a save that failed outranks everything but a
   // check in flight; "waiting for sign-in" is said for handwriting only once
@@ -1727,10 +1739,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       : saveState === 'failed' ? 'save-failed'
         : saveState === 'saving' ? 'saving'
           : (inkWaitingSignIn && saveState === 'saved') || photoWaitingSignIn ? 'waiting-sign-in'
+            : readerLimit ? 'usage-limit'
+            : readerDown ? 'reader-unavailable'
             : writeMode && !isMcq && inkReaderState?.kind === INK_READER_STATE.READING ? 'reading'
               : inkUnread ? 'read-failed'
                 : (writeMode && !isMcq && !!(isWorking ? inkResult?.lines?.length : inkResult?.answerLine)) || (mode === 'photo' && !!photo && photoOCR.phase === 'done') ? 'read'
                   : saveState === 'saved' ? 'saved'
+                    // A photo on the page that could not be kept on the device.
+                    : mode === 'photo' && !!photo && !isMcq ? 'unsaved'
                     : 'idle';
   const statusText = busy ? t('verdict.statusChecking')
     : cloudPending ? t('verdict.statusMethod')
