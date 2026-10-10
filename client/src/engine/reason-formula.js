@@ -17,6 +17,10 @@
 //     expected: 33, labels: ['T_n', 'a_n', …], name: 'the nth term of an AP',
 //     confusables: [{ source: 'n/2*(2*a + (n - 1)*d)', name: 'the sum of the first n terms', labels: ['S_n'] }] }
 //
+// A confusable marked `step: true` is also a legitimate step on the way (the
+// last term, on the way to a sum by n/2 × (a + l)): written under its own name
+// it is a true line, and it is the mistake only if the working ENDS there.
+//
 // and each line is then one of a small number of things, each decidable:
 //
 //   given          `d = 3` — the question's own value for that letter, or not
@@ -68,7 +72,7 @@ export function formulaPlan(meta) {
   if (Number.isFinite(Number(meta.expected)) && !close(main.value, Number(meta.expected))) return null;
   const confusables = (Array.isArray(meta.confusables) ? meta.confusables : []).map(c => {
     const compiled = compile(c?.source, env);
-    return compiled ? { ...compiled, name: String(c.name || 'a different formula'), labels: (c.labels || []).map(squash), why: c.why ? String(c.why) : null } : null;
+    return compiled ? { ...compiled, name: String(c.name || 'a different formula'), labels: (c.labels || []).map(squash), why: c.why ? String(c.why) : null, step: c.step === true } : null;
   }).filter(c => c && !close(c.value, main.value));
   return {
     env, names: new Set(Object.keys(env)), expected: main.value, source: main.text,
@@ -139,6 +143,7 @@ export function stepCheckFormula(meta, workingText) {
   let chain = { broken: false };   // the chain the next `=` line continues
   let final = null;
   const used = new Set();          // confused formulas already named: using one again is the same mistake
+  const steps = [];                // { index, other } — a confusable that may be a step: the mistake only if the working ends on it
   const tries = [];                // each different value the asked quantity is set equal to
   let blameGiven = false;          // a later line is right for the value the student copied, wrong for the question's
 
@@ -189,6 +194,10 @@ export function stepCheckFormula(meta, workingText) {
           try { same = exprEquivalent(side.source, plan.source, {}); } catch { same = false; }
           if (same) { marks.push({ kind: 'ok', role: 'formula' }); chain.value = values; chain.target = true; return; }
           const other = plan.confusables.find(c => { try { return exprEquivalent(side.source, c.text, {}); } catch { return false; } });
+          if (other && other.step && !isTargetLabel(label)) {
+            // True of the quantity it names, and possibly on the way: decided at the end.
+            steps.push({ index, other }); marks.push({ kind: 'ok', role: 'value' }); chain.value = values; chain.step = other; return;
+          }
           if (other) {
             marks.push(used.has(other) ? { kind: 'carried' } : { kind: 'break', diagnosis: wrongFormula(plan, other) });
             used.add(other); chain.broken = true; chain.value = values; return;
@@ -243,6 +252,9 @@ export function stepCheckFormula(meta, workingText) {
         const other = !side.bare ? plan.confusables.find(c => values.some(v => close(v, c.value))) : null;
         // By its value alone a line is called the confused formula only under
         // a name that says so: the asked quantity's, or the other formula's own.
+        if (other && other.step && !target) {
+          steps.push({ index, other }); marks.push({ kind: 'ok', role: 'value' }); chain.step = other; return;
+        }
         if (other && (target || (label && other.labels.includes(nameOf(label))))) {
           marks.push(used.has(other) ? { kind: 'carried' } : { kind: 'break', diagnosis: wrongFormula(plan, other, values[0]) });
           used.add(other); chain.broken = true; chain.target = true; return;
@@ -298,6 +310,20 @@ export function stepCheckFormula(meta, workingText) {
     const g = givenLines[0];
     const d = givenMisread(g.name, g.read, plan.env[g.name]);
     out[g.index] = { text: out[g.index].text, status: 'break', diagnosis: d, note: d.message };
+  }
+
+  // A step that was never built on: the working ends at the value of the
+  // confused formula, so choosing it was the mistake. What followed it in its
+  // own chain follows from it.
+  if (steps.length && final && !out.some(l => l.status === 'break')) {
+    const ended = steps.find(st => close(final.value, st.other.value));
+    if (ended) {
+      const d = wrongFormula(plan, ended.other, final.value);
+      out[ended.index] = { text: out[ended.index].text, status: 'break', diagnosis: d, note: d.message };
+      for (let i = ended.index + 1; i < out.length; i += 1) {
+        if (out[i].status === 'ok' && out[i].role !== 'given') out[i] = { text: out[i].text, status: 'note', carried: true, note: NOTES.carried };
+      }
+    }
   }
 
   // One first mistake. A later one that is independent of it is kept, as its

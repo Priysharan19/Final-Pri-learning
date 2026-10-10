@@ -57,7 +57,9 @@ function apSumCheck(a, d, n, sum) {
     kind: 'formula', source: AP_SUM, substitutions: { a, d, n }, expected: sum,
     labels: apSumLabels(n), name: 'the sum of the first n terms, n/2 × (2a + (n − 1)d)', quantity: `the sum of the first ${n} terms`,
     confusables: [
-      { source: AP_TERM, name: 'the nth term', labels: apTermLabels(n), why: 'That is the last term alone; the question asks for all the terms added together.' },
+      // The last term is also a step on the way (S = n/2 × (a + l)): it is the
+      // mistake only when the working ends there.
+      { source: AP_TERM, name: 'the nth term', labels: apTermLabels(n), step: true, why: 'That is the last term alone; the question asks for all the terms added together.' },
       { source: 'n*(a + (n - 1)*d)', name: 'n times the last term', labels: [] }
     ]
   };

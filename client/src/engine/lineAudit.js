@@ -197,6 +197,12 @@ function roundedFrom(actual, side) {
  *   confirm  a reading to confirm first             open     nothing decidable (a name, an equation, a doubt)
  */
 function judge(a, b, { inner, approx, vocabulary }) {
+  // `3 = 8` on a line of its own is what an equation with no solution comes
+  // down to — a contradiction reached, not a sum worked out wrongly. Arithmetic
+  // is judged only where some arithmetic was written.
+  if (!inner && a.kind === 'num' && b.kind === 'num' && a.bare && b.bare) {
+    return a.values.some(x => b.values.some(y => numsClose(x, y, 1e-9))) ? { verdict: 'ok', how: 'arithmetic', value: b.values[0] } : { verdict: 'open', why: 'statement' };
+  }
   if (a.kind === 'doubt' || b.kind === 'doubt') return { verdict: 'confirm', doubt: (b.kind === 'doubt' ? b : a).doubt };
   if (a.kind === 'bad' || b.kind === 'bad') return { verdict: 'open', why: 'unread' };
   if (a.kind === 'num' && b.kind === 'num') {
@@ -295,6 +301,9 @@ function auditWithinBudget(lines, vocabulary) {
     if (RELATION.test(text)) { tail = null; return; }            // an inequality is Step Check's to judge
 
     row.continuation = /^[=≈]/.test(text);
+    // "Is 2 a root? 4 - 10 + 7 = 0", "check: …", "if …": a line that asks or
+    // tests is not a line that claims, and a test that fails is not a slip.
+    const asks = /\?/.test(line) || /^(?:check|checking|verify|test|testing|try|trying|if|is|suppose|assume|let|whether|lhs|rhs)\b/i.test(text);
     const statements = row.continuation ? [text] : statementsOf(text);
     for (const statement of statements) {
       const continues = /^[=≈]/.test(statement);
@@ -323,6 +332,7 @@ function auditWithinBudget(lines, vocabulary) {
           link = judge(previous.side, side, { inner: position >= 2 || (continues && k === 0), approx: approxFlags[continues ? k : k - 1] === true, vocabulary });
           // Nothing under an unconfirmed reading is called a mistake.
           if (link.verdict === 'break' && unsure) link = { verdict: 'confirm', why: 'above' };
+          if (link.verdict === 'break' && asks) link = { verdict: 'open', why: 'question' };
           // Back to the value the chain had before its slip: the slip was not
           // carried on, and this side is not a second mistake.
           if (link.verdict === 'break' && chainBroken && side.kind === 'num' && sound && sound.some(x => side.values.some(y => numsClose(x, y, 1e-9)))) {

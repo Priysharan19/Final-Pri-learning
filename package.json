@@ -123,6 +123,8 @@
     "test:hints:leak": "node client/test/input-hint-leak-check.mjs",
     "test:marker:progress": "node client/test/marker-method-progress-check.mjs",
     "test:first-mistake": "node client/test/first-mistake-check.mjs",
+    "test:e2e:first-mistake": "node client/test/tour-first-mistake.js",
+    "test:photo:orientation": "node client/test/photo-orientation-check.mjs && node client/test/photo-orientation-check.mjs --browser=webkit",
     "test:marker:working": "node client/test/marker-working-branch-check.mjs",
     "test:typed:working": "node client/test/typed-answer-working-check.mjs",
     "test:online:check": "node client/test/online-check-access-check.mjs && node client/src/components/authoritativeGrade.test.mjs && node client/src/pages/practiceSessionReceipt.test.mjs",

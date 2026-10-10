@@ -466,6 +466,15 @@ jobs:
           # Read on request: what one handwritten answer costs the paid reader
           # (scripted reader), a double press, a second tab, and late readings.
           node client/test/tour-read-cost.js --no-build 2>&1 | tee -a browser.log
+          # Issue #430 (scripted reader): the owner's five lines as a photo and by
+          # hand — a key-free hint before submission, then four ticks and the
+          # first mistake on "= 35", spoken as well as drawn, 0 of 1 from the rubric.
+          node client/test/tour-first-mistake.js --no-build 2>&1 | tee -a browser.log
+          # A camera file's own orientation is applied before the photo is sent;
+          # a page photographed sideways is turned by the student. Simulated page,
+          # pixels only, in both engines.
+          node client/test/photo-orientation-check.mjs 2>&1 | tee -a browser.log
+          node client/test/photo-orientation-check.mjs --browser=webkit 2>&1 | tee -a browser.log
       - name: Accessibility suite
         if: always()
         run: |
@@ -531,6 +540,11 @@ jobs:
           grep -Eq 'E2E SUITE.*97/97.*10 flows' browser.log
           grep -Fq 'Pri Explain V8 · adaptive board-style reasoning playback' browser.log
           grep -Eq 'E2E SUITE.*18/18.*1 flows' browser.log
+          grep -Fq "First mistake · Photo: the owner's page — a key-free hint, then four ticks and the first mistake" browser.log
+          grep -Fq 'First mistake · Ink: the same five lines by hand — the same hint and the same panel' browser.log
+          grep -Eq 'E2E SUITE.*32/32.*2 flows' browser.log
+          grep -Fq 'PHOTO ORIENTATION (chromium): PASS — 42/42 checks' browser.log
+          grep -Fq 'PHOTO ORIENTATION (webkit): PASS — 42/42 checks' browser.log
           # The handwriting reader behind the real server is a scripted
           # stand-in in these suites; the log must say so.
           grep -Fq 'SYNTHETIC-READER EVIDENCE' browser.log

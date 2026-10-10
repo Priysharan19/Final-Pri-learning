@@ -261,6 +261,12 @@ const FLAGSHIP = ['a = 9, d = 3', 'T_n = a + (n - 1)d', 'T_9 = 9 + 8 × 3', '   
   const term = a + (n - 1) * d;
   eq(submit(SUM, String(term), ['T_n = a + (n - 1)d', `T = ${a} + ${n - 1} × ${d}`, `= ${term}`]).review.firstMistake?.cls, 'wrong-formula', 'the nth-term formula on a sum question is a wrong formula');
   eq(submit(SUM, '1', [`S_${n} = ${n}/2 × (${a} + ${n - 1} × ${d})`, '= 1']).review.firstMistake?.cls, 'substitution', 'the sum with 2a written as a is a wrong substitution, on that line');
+  // …but the last term is also a step towards the sum: S = n/2 × (a + l).
+  const sum = SUM.answer.value;
+  const viaLast = submit(SUM, String(sum), ['l = a + (n - 1)d', `l = ${a} + ${n - 1} × ${d} = ${term}`, `S = ${n}/2 × (${a} + ${term})`, `= ${sum}`]);
+  eq([viaLast.correct, mistakes(viaLast.review), checks(viaLast.review).includes('follows-through')], [true, 0, false], 'the sum by n/2 × (a + l), finding the last term first, is not flagged');
+  const viaLastSlip = submit(SUM, String(sum + 3), ['l = a + (n - 1)d', `l = ${a} + ${n - 1} × ${d} = ${term}`, `S = ${n}/2 × (${a} + ${term})`, `= ${sum + 3}`]);
+  eq([viaLastSlip.review.firstMistake?.index, viaLastSlip.review.firstMistake?.cls, viaLastSlip.earned], [3, 'arithmetic-slip', 1], 'and a slip at the end of that method is found there, with the substitution mark kept');
   const misread = submit(SUM, '1', [`a = ${a}, d = ${d + 1}`, `S_${n} = ${n}/2 × (2 × ${a} + ${n - 1} × ${d + 1})`, `= ${(n * (2 * a + (n - 1) * (d + 1))) / 2}`]);
   eq([misread.review.firstMistake?.cls, misread.review.firstMistake?.index], ['given-misread', 0], 'a given value copied wrongly is the first mistake, on the line it was copied');
   eq(checks(misread.review).slice(1), ['follows-through', 'follows-through'], 'and the correct work done with it follows through');
@@ -280,6 +286,11 @@ const FLAGSHIP = ['a = 9, d = 3', 'T_n = a + (n - 1)d', 'T_9 = 9 + 8 × 3', '   
   // Ambiguous notation is read both ways; when either reading fits, nothing is said.
   for (const line of ['-3^2 = 9', '-3^2 = -9', '6/2(1 + 2) = 9', '6/2(1 + 2) = 1', '3 1/2 = 3.5', '2 1/4 + 1/4 = 2.5']) eq(auditWorking([line]).lines[0].verdict, 'ok', `${line} is accepted`);
   for (const line of ['9 24 = 33', '1,000 + 5 = 1006', 'sin 30 = 0.6', 'log 100 = 3', '2^3^2 = 60']) ok(auditWorking([line]).breaks.length === 0, `${line} cannot be read safely, so it is not judged`);
+  // A contradiction reached, a test that fails and a question asked are not slips.
+  for (const lines of [['2x + 3 = 2x + 8', '3 = 8', 'no solution'], ['0 = 5'], ['Is 2 a root? 4 - 10 + 7 = 0'], ['check: 2(2) + 3 = 11'], ['if x = 2, 4 - 10 + 7 = 0', 'so 2 is not a root'], ['LHS = 4 - 10 + 7 = 1', 'RHS = 0'], ['verify 3 + 4 = 8']]) {
+    eq(auditWorking(lines, { vocabulary: ['x'] }).breaks, [], `not a slip: ${lines.join(' | ')}`);
+  }
+  eq(auditWorking(['T = 9 + 24', '= 33', '= 35']).firstBreak, 2, 'but a value that changes from one line of a chain to the next is one');
   eq(auditWorking(['7/2 = 3']).lines[0].verdict, 'approx', 'a value cut short is neither ticked nor crossed');
   eq(buildWorkingReview({ working: '7/2 = 3\n= 3', correct: false }).lines[0].check, 'not-checked', 'and the review says it was not checked exactly');
   eq(auditWorking(['8 x 3 = 25'], { vocabulary: [] }).lines[0].verdict, 'confirm', 'a slip that depends on reading x as × is a reading to confirm');
