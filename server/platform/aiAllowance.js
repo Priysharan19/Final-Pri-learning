@@ -94,7 +94,11 @@ export function refuseAiAllowance(res, verdict) {
         : 'The free daily cloud reading allowance is used up; it resets within 24 hours. On-device handwriting reading keeps working, and Premium includes more.',
       plan: verdict.plan,
       limit: verdict.limit,
-      resetAt: verdict.resetAt
+      resetAt: verdict.resetAt,
+      // Machine-readable, like the deployment ceiling's refusal: the request
+      // will succeed again at resetAt; the window is this account's rolling day.
+      retryable: true,
+      window: 'day'
     }
   });
 }

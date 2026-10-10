@@ -199,7 +199,7 @@
     "test:native:csp": "node client/test/native-shell-csp-check.mjs",
     "test:ci:policy": "node tools/ci-workflow-policy-check.mjs",
     "test:crossplatform": "node client/test/cross-platform-architecture-check.mjs",
-    "test:platform:spend": "node server/test/spend-ceiling-check.mjs",
+    "test:platform:spend": "node server/test/spend-ceiling-check.mjs && node server/test/recognition-dedupe-check.mjs",
     "test:platform:guardian": "node server/test/guardian-consent-check.mjs",
     "test:consent:signup": "node client/test/signup-consent-check.mjs",
     "test:release-authority": "node tools/pri01-release-authority-check.mjs && node server/test/release-identity-check.mjs",

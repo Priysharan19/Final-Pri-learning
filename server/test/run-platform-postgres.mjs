@@ -73,6 +73,10 @@ export const ENGINE_SUITES = [
   // must be account-scoped under Row-Level Security as pri_server too.
   'tutor-issued-grounding-check.mjs',
   'failure-drills-check.mjs',
+  // One paid read per unchanged picture: the ceiling reservation under
+  // concurrency (SERIALIZABLE retries), the refund, and the receipt minted from
+  // a reused transcript all have to hold on the Postgres store too.
+  'recognition-dedupe-check.mjs',
   'security-acceptance-check.mjs',
   'abuse-limits-check.mjs',
   // Staff second factor, identity sign-in age declaration, and the hardening

@@ -24,8 +24,7 @@ import { loadAllBanks, generateQuestion } from '../../client/src/engine/generato
 import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
 import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../../client/src/engine/answer-forms.js';
 import { transcribeHandwriting, validateImage, HandwritingProviderError } from './handwritingProvider.js';
-import { consumeAiAllowance, refundAiAllowance, refuseAiAllowance } from './aiAllowance.js';
-import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
+import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
 
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
 const ID = /^[a-zA-Z0-9_-]{8,100}$/;
@@ -531,17 +530,18 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     try { validateImage(body.image); }
     catch (error) { return reject(res, error.status || 400, error.code || 'RECOGNITION_IMAGE_INVALID', error.message || 'Invalid image.'); }
 
-    const allowance = await consumeAiAllowance(db, { accountId, kind: 'handwriting', env });
-    if (!allowance.allowed) return refuseAiAllowance(res, allowance);
-    const budget = await consumePaidCall(db, { env });
-    if (budget) { await refundAiAllowance(db, allowance); return refusePaidCall(res, budget); }
-
+    // One paid read per picture (recognitionOps.js). A transcript this account
+    // already paid for through /handwriting/transcribe — or a read of the same
+    // picture still in flight — is reused, so showing the transcript and
+    // minting this receipt cost one provider call. Only the read is shared:
+    // every authority check above and at commitment below still runs here.
     let result;
+    let reused = false;
     try {
-      result = await transcribe(body.image, { env, authorizeFallback: () => consumePaidCall(db, { env }) });
+      const read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId: req.requestId });
+      if (read.refusal) return sendRecognitionRefusal(res, read.refusal);
+      ({ result, reused } = read);
     } catch (error) {
-      if (/NOT_CONFIGURED|CONFIG_INVALID/.test(String(error?.code || ''))) await refundAiAllowance(db, allowance);
-      if (error?.paidCallVerdict) return refusePaidCall(res, error.paidCallVerdict);
       if (error instanceof HandwritingProviderError) return reject(res, error.status, error.code, error.message);
       return reject(res, 502, 'RECOGNITION_FAILED', 'The answer could not be read this time.');
     }
@@ -580,7 +580,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     if (committed.status !== 201) return reject(res, committed.status, committed.code,
       committed.status === 403 ? 'Guardian consent changed while this answer was being read.' :
       committed.status === 401 ? 'Sign in again before retrying recognition.' : 'This question has been completed.');
-    return res.status(201).json({ receipt, questionId: qid, mode: body.mode,
+    return res.status(201).json({ receipt, questionId: qid, mode: body.mode, reused,
       transcription: { text, lines: result.lines || [], confidence: result.confidence ?? null,
         needsConfirmation: result.needsConfirmation === true } });
   });

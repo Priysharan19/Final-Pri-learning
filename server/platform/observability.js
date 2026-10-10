@@ -33,7 +33,7 @@ const ROUTE_SEGMENT = /^(?:[a-z0-9][a-z0-9._-]*|:[A-Za-z][A-Za-z0-9]*|<[a-z-]+>|
 /** Every event this server logs. Anything else is logged as `unlisted_event`. */
 export const LOG_EVENTS = Object.freeze([
   'http_request', 'platform_error', 'server_error', 'provider_call_failed', 'auth_email_failed',
-  'auth_delivery_failed', 'auth_delivery_worker_error', 'platform_db_pool_error', 'housekeeping_error', 'unlisted_event'
+  'auth_delivery_failed', 'auth_delivery_worker_error', 'platform_db_pool_error', 'housekeeping_error', 'provider_usage', 'unlisted_event'
 ]);
 const PROVIDERS = new Set(['handwriting', 'working', 'web', 'apple', 'google', 'unsupported', 'resend']);
 const KINDS = new Set(['verify-email', 'reset-password', 'guardian-consent']);
@@ -70,6 +70,11 @@ const FIELD_SHAPES = Object.freeze({
   latencyMs: value => typeof value === 'number' && Number.isFinite(value) && value >= 0,
   count: value => Number.isInteger(value) && value >= 0,
   attempt: value => Number.isInteger(value) && value >= 0,
+  // What a paid provider reported it used, and how many ceiling units it took.
+  inputTokens: value => Number.isInteger(value) && value >= 0 && value <= 100_000_000,
+  outputTokens: value => Number.isInteger(value) && value >= 0 && value <= 100_000_000,
+  reasoningTokens: value => Number.isInteger(value) && value >= 0 && value <= 100_000_000,
+  paidUnits: value => Number.isInteger(value) && value >= 0 && value <= 100,
   code: value => typeof value === 'string' && CODE.test(value),
   dbCode: value => typeof value === 'string' && CODE.test(value),
   release: value => typeof value === 'string' && (SHA.test(value) || value === 'development-unknown' || value === 'unknown'),
