@@ -812,6 +812,21 @@ ok(stepCheck(meta, `${fill('(x+1)', 290, '')}+12345 = 0`, { prompt }).lines[0].u
     while (term.length < length) term += `+${body}`;
     for (const q of [numeric, set, expr]) time(`answer sum(${body}+… ${length} characters;k;1;10000)`, () => checkAnswer(q, `sum(${term};k;1;10000)`));
   }
+  // An upper bound below the lower one is the empty sum, and costs nothing —
+  // it used to be charged a negative amount, which refilled the budget for
+  // whatever followed (seventeen seconds from fifty-six characters).
+  for (const q of [numeric, set, expr]) {
+    time('answer negative-range sum, then a hundred million terms', () => checkAnswer(q, 'sum(1;k;1;-999999999999)+sum(sum(k;k;1;10000);j;1;10000)'));
+    time('answer three nested ten-thousand-term sums', () => checkAnswer(q, 'sum(sum(sum(k;k;1;10000);j;1;10000);i;1;10000)'));
+    // Calls nested inside calls: each level used to double the work of reading the answer.
+    for (const depth of [24, 42, 90]) {
+      time(`answer ncr nested ${depth} deep`, () => checkAnswer(q, 'ncr('.repeat(depth) + 'x' + ';2)'.repeat(depth)));
+      time(`answer sum nested ${depth} deep`, () => checkAnswer(q, 'sum('.repeat(depth) + 'x' + ';k;1;2)'.repeat(depth)));
+    }
+  }
+  time('working ncr nested 40 deep', () => { const working = 'ncr('.repeat(40) + 'n' + ';2)'.repeat(40) + ' = 10'; const report = stepCheck(meta, working, { prompt: mPrompt }); methodMarks({ meta, working, marks: 4, prompt: mPrompt, report }); });
+  ok(checkAnswer({ answerType: 'numeric', answer: { value: 0 }, prompt: 'Find the value.' }, 'sum(k;k;5;1)').correct === true, 'a sum whose upper bound is below its lower bound is 0');
+  ok(checkAnswer({ answerType: 'expression', answer: { expr: 'n(n+1)/2' }, prompt: 'Simplify.' }, 'sum(k;k;1;n)').correct === true, 'a sum to n is still recognised as n(n+1)/2');
   // Exact small values are untouched, and what is out of range is not a number.
   for (const text of ['nCr(10,3)', '10C3', '5!', 'nPr(6,3)', 'sum(k;k;1;15)', 'sum(sum(1;j;1;10);k;1;12)', 'ncr(120,1)', 'ncr(1000,999) - 880']) {
     ok(checkAnswer(numeric, text).correct === true, `${text} is still exactly 120`);
