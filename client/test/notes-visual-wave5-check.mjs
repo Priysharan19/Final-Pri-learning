@@ -6,7 +6,7 @@ import { evalNumeric } from '../src/engine/expr.js';
 import { loadNotesForGrade } from '../src/notes/notesIndex.js';
 
 const expected=Object.freeze({7:38,8:60,9:38,10:59,11:60,12:70});
-const expectedNotes=Object.freeze({7:127,8:141,9:100,10:139,11:163,12:146});
+const expectedNotes=Object.freeze({7:192,8:216,9:185,10:239,11:273,12:266});
 const loaders={
   7:()=>import('../src/notes/data/notes-visual-wave5-class7.js'),
   8:()=>import('../src/notes/data/notes-visual-wave5-class8.js'),
@@ -98,6 +98,6 @@ for(const group of IN_CURRICULUM) {
   }
 }
 assert.equal(inspected,325,'expected 325 exact new worked problems');
-assert.equal(allTotal,816,'491 previously authored examples plus 325 new visuals');
+assert.equal(allTotal,1371,'previous 816 plus Wave-6 435 verified inquiry visual studies');
 assert.ok(types.size>=12,'insufficient visual geometry diversity');
-console.log('VISUAL WAVE 5: PASS — '+inspected+'/325 figure-driven examples, 816 total, '+types.size+' distinct graphic families');
+console.log('VISUAL WAVE 5: PASS — '+inspected+'/325 historic Wave-5 diagram examples, 1371 total, '+types.size+' distinct graphic families');
