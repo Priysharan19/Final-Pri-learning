@@ -11,6 +11,7 @@ import { normalize, parse, evaluate, exprEquivalent, numsClose, variablesOf, wit
 // working is checked comes out of this — see "What an evaluation may cost" in expr.js.
 const EVALUATION_BUDGET = 50000;
 import { diagnoseStep } from './diagnose.js';
+import { answerTooLong } from './checker-core.js';
 import {
   assessEquationLine, sameEquationClaim, sameExpressionClaim,
   assessRelationLine, assessDerivativeLine, differentiateAst, parseRelation
@@ -37,6 +38,8 @@ export function checkAnswer(question, rawInput) {
 }
 function checkAnswerWithinBudget(question, rawInput) {
   if (question?.answerType === 'working') return checkWorking(question, String(rawInput ?? ''));
+  const long = answerTooLong(rawInput);
+  if (long) return long;
   if (question?.answerType === 'ratio' && malformedRatioInput(rawInput)) {
     return { correct: false, feedback: 'Write the ratio with exactly two parts, like 2 : 3.' };
   }
@@ -1151,7 +1154,7 @@ function withoutNeutralArithmetic(node) {
   if (n.t === 'neg') return { ...n, v: withoutNeutralArithmetic(n.v) };
   if (n.t === 'call') {
     return Array.isArray(n.args)
-      ? { ...n, args: n.args.map(withoutNeutralArithmetic), arg: n.arg && withoutNeutralArithmetic(n.arg) }
+      ? (() => { const args = n.args.map(withoutNeutralArithmetic); const call = { ...n, args }; Object.defineProperty(call, 'arg', { value: args[0], enumerable: false, writable: true, configurable: true }); return call; })()
       : { ...n, arg: withoutNeutralArithmetic(n.arg) };
   }
   if (n.t !== 'bin') return n;
@@ -1620,7 +1623,8 @@ function appliesLetter(node) {
   const n = node && typeof node === 'object' ? node : null;
   if (!n) return false;
   if (n.t === 'bin' && n.op === '*' && n.l?.t === 'var' && n.r?.t === 'group') return true;
-  return ['l', 'r', 'v', 'arg'].some(key => appliesLetter(n[key]))
+  // A call with several arguments names its first one twice; follow `args` then.
+  return (Array.isArray(n.args) ? ['l', 'r', 'v'] : ['l', 'r', 'v', 'arg']).some(key => appliesLetter(n[key]))
     || (Array.isArray(n.args) && n.args.some(appliesLetter));
 }
 

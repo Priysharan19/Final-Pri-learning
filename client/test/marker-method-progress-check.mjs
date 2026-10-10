@@ -14,6 +14,7 @@
 //
 // Every case is authored. Nothing here is generated.
 // ─────────────────────────────────────────────────────────────────
+import { ANSWER_LIMIT } from '../src/engine/checker-core.js';
 import { methodMarks, stepCheck, checkAnswer, WORKING_LIMITS } from '../src/engine/checker.js';
 import { parseNumericInput } from '../src/engine/checker-core.js';
 
@@ -801,9 +802,6 @@ ok(stepCheck(meta, `${fill('(x+1)', 290, '')}+12345 = 0`, { prompt }).lines[0].u
     for (const q of [numeric, set, expr]) time(`answer ${text}`, () => checkAnswer(q, text));
     for (const line of [`${text} = n`, `n = ${text}`, text]) time(`working ${line}`, () => { const working = Array(16).fill(line).join('\n'); const report = stepCheck(meta, working, { prompt: mPrompt }); methodMarks({ meta, working, marks: 4, prompt: mPrompt, report }); });
   }
-  // About 30 ms at worst on the development machine (the nested sums, which run to their budget);
-  // the bound asserted leaves room for a loaded machine, not for the seconds this used to take.
-  ok(inputs > 3000 && worst < 400, `${inputs} short answers and working lines built from huge numbers: the slowest takes ${worst.toFixed(0)} ms (${worstText})`);
   // A sum is charged for what each term is, not one unit a term: twelve
   // thousand characters of `170!+170!+…` summed ten thousand times took sixteen
   // seconds in the final-answer box, which the server accepts at that length.
@@ -827,6 +825,30 @@ ok(stepCheck(meta, `${fill('(x+1)', 290, '')}+12345 = 0`, { prompt }).lines[0].u
   time('working ncr nested 40 deep', () => { const working = 'ncr('.repeat(40) + 'n' + ';2)'.repeat(40) + ' = 10'; const report = stepCheck(meta, working, { prompt: mPrompt }); methodMarks({ meta, working, marks: 4, prompt: mPrompt, report }); });
   ok(checkAnswer({ answerType: 'numeric', answer: { value: 0 }, prompt: 'Find the value.' }, 'sum(k;k;5;1)').correct === true, 'a sum whose upper bound is below its lower bound is 0');
   ok(checkAnswer({ answerType: 'expression', answer: { expr: 'n(n+1)/2' }, prompt: 'Simplify.' }, 'sum(k;k;1;n)').correct === true, 'a sum to n is still recognised as n(n+1)/2');
+  // The domain probe behind an expression answer (`+0tan(1x)+0tan(2x)+…` agrees
+  // with the key wherever it is sampled) is paid for per term written, and is
+  // outside the sum budget. It is bounded by how long an answer may be: at the
+  // server's old 12,000 characters it took 2.8 s; at ANSWER_LIMIT it cannot.
+  for (const [lead, term] of [['5x', i => `+0tan(${i}x)`], ['5x', i => `+0/sin(x+${i})`], ['5x', i => `+0/(x^3-${i})`], ['5x', i => `+0sqrt(x+${i})`], ['5x', i => `+0log(x+${i})`]]) {
+    let text = lead;
+    for (let i = 1; (text + term(i)).length <= ANSWER_LIMIT; i++) text += term(i);
+    time(`answer ${text.slice(0, 24)}… at the ${ANSWER_LIMIT}-character limit`, () => checkAnswer(expr, text));
+    const line = text.slice(0, text.lastIndexOf('+', 290));
+    time(`working ${line.slice(0, 24)}… on a hundred full lines`, () => { const working = Array(100).fill(`${line} = n`).join('\n'); const report = stepCheck(meta, working, { prompt: mPrompt }); methodMarks({ meta, working, marks: 4, prompt: mPrompt, report }); });
+  }
+  {
+    let padded = '5x';
+    for (let i = 1; padded.length <= 12000; i++) padded += `+0tan(${i}x)`;
+    const at = process.hrtime.bigint();
+    const refused = checkAnswer(expr, padded.slice(0, 11990));
+    const ms = Number(process.hrtime.bigint() - at) / 1e6;
+    ok(refused.correct === false && refused.invalid === true && ms < 50, `an answer of 11,990 characters is refused unread, as unreadable, at once (${ms.toFixed(1)} ms)`);
+    ok(checkAnswer(expr, '5x' + ' '.repeat(ANSWER_LIMIT - 2)).correct === true && checkAnswer(expr, '5x' + ' '.repeat(ANSWER_LIMIT - 1)).invalid === true, `an answer is read up to ${ANSWER_LIMIT} characters and not beyond`);
+    ok(checkAnswer(set, Array(60).fill('2, 3').join(', ')).invalid !== true && checkAnswer(numeric, '120.' + '0'.repeat(200)).correct === true, 'a long list of roots and a long decimal are within it and still read');
+  }
+  // Every timed input above, the nested and negative-range sums, the nested calls and the padded answers included:
+  // the bound asserted leaves room for a loaded machine, not for the seconds this used to take.
+  ok(inputs > 3000 && worst < 400, `${inputs} short answers and working lines built from huge numbers: the slowest takes ${worst.toFixed(0)} ms (${worstText})`);
   // Exact small values are untouched, and what is out of range is not a number.
   for (const text of ['nCr(10,3)', '10C3', '5!', 'nPr(6,3)', 'sum(k;k;1;15)', 'sum(sum(1;j;1;10);k;1;12)', 'ncr(120,1)', 'ncr(1000,999) - 880']) {
     ok(checkAnswer(numeric, text).correct === true, `${text} is still exactly 120`);
