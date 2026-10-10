@@ -165,6 +165,7 @@ export const flow = {
       `${saved?.inkKeys?.length} ink keys, ${saved?.inkPoints} points`);
     const before = secondsOn(await page.locator('.exam-timer').innerText());
 
+    const readsBeforeExamReload = online.reader.requests.length;
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.exam-timer', { timeout: 30000 });
     await settle();
@@ -180,8 +181,13 @@ export const flow = {
     await page.locator('.exam-dot').nth(20).click();
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
     await page.waitForSelector('.ink-line', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(1500);
     const reread = await reading(page);
-    await check('the handwriting is redrawn and re-read after the reload', reread.length === 1 && reread[0] === '42', `read ${JSON.stringify(reread)}`);
+    // Read on request: the transcript saved with the paper is shown again; the
+    // page is not sent to the reader a second time.
+    await check('the handwriting is redrawn with its saved transcript after the reload, without a second read',
+      reread.length === 1 && reread[0] === '42' && await page.locator('[data-ink-stale]').count() === 0 && online.reader.requests.length === readsBeforeExamReload,
+      `read ${JSON.stringify(reread)}; reader requests +${online.reader.requests.length - readsBeforeExamReload}`);
     await check('the handwritten answer is still the answer', (await page.locator('.answer-row input.answer-input').inputValue()) === '42');
 
     // ── 5 · submit, and the section analysis ─────────────────────────────────
