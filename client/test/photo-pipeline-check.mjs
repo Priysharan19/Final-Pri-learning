@@ -358,6 +358,11 @@ eq(block(linked, { reason: 'unavailable', readiness: { usable: false, lastFailur
   reader.forgetCloudReads(transport);
   await reader.readWithCloud(page, options);
   eq(sent, 3, 'a change of account forgets remembered readings');
+  let doubtful = 0;
+  const unsure = { handwritingStatus: transport.handwritingStatus, transcribeHandwriting: async () => { doubtful += 1; return { transcription: { engine: 'cloud-test', lines: [{ text: '7', confidence: 0.6 }], text: '7', confidence: 0.6, needsConfirmation: true } }; } };
+  await reader.readWithCloud(page, { ...options, transport: unsure });
+  await reader.readWithCloud(page, { ...options, transport: unsure });
+  eq(doubtful, 2, 'a reading the reader doubted is not remembered: it may be asked for again');
   // A failed read is never remembered, and a lone caller's cancel still cancels.
   let failures2 = 0, aborted = false;
   const flaky = { handwritingStatus: transport.handwritingStatus, transcribeHandwriting: async (image, { signal }) => { failures2 += 1; if (failures2 === 1) throw Object.assign(new Error('down'), { status: 503, code: 'HANDWRITING_PROVIDER_5XX' }); await new Promise((_, no) => signal.addEventListener('abort', () => { aborted = true; no(Object.assign(new Error('gone'), { name: 'AbortError' })); })); } };

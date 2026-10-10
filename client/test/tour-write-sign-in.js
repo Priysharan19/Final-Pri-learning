@@ -920,6 +920,9 @@ export const photoFlow = {
     await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
     const thumb = await page.locator('.photo-thumb img').getAttribute('src').catch(() => null);
     const status = page.locator('.ws-actions .status-line');
+    // The photo is now kept on the device (sealed draft, confirmed by
+    // readback), so the line passes through "Saving…" before it settles.
+    await page.waitForFunction(() => document.querySelector('.ws-actions .status-line')?.getAttribute('data-work-state') !== 'saving', null, { timeout: 15000 }).catch(() => {});
     const settingsLinks = await page.evaluate(() => [...document.querySelectorAll('.qpage a[href$="/settings"]')].filter(el => el.getClientRects().length > 0).length);
     await check('beside the photo: a "Sign in to check this answer" button; no "Account settings" link; one state — waiting for sign-in, with no "saved" claim about the photo',
       await signIn.isVisible() && (await signIn.innerText()).trim() === 'Sign in to check this answer' &&
@@ -1114,6 +1117,9 @@ export const sessionEndedPhotoFlow = {
     const thumb = await page.locator('.photo-thumb img').getAttribute('src').catch(() => null);
     const seen = await cardText(page);
     const status = page.locator('.ws-actions .status-line');
+    // The photo is now kept on the device (sealed draft, confirmed by
+    // readback), so the line passes through "Saving…" before it settles.
+    await page.waitForFunction(() => document.querySelector('.ws-actions .status-line')?.getAttribute('data-work-state') !== 'saving', null, { timeout: 15000 }).catch(() => {});
     await check('with the session cookie gone the student is told: signed out, sign in again — not a reader outage, not "needs an account"',
       await page.locator('[data-photo-session-ended]').isVisible() && /You’ve been signed out\. Sign in again/i.test(seen) &&
         !OUTAGE_WORDS.test(seen) && !NEEDS_ACCOUNT_WORDS.test(seen) && await page.locator('[data-photo-retry-reading]').count() === 0,

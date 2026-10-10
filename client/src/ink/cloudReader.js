@@ -151,7 +151,9 @@ function transcribeOnce(transport, image, { signal = null, now = Date.now() } = 
     flight = { waiters: 0, controller, promise: null };
     flight.promise = Promise.resolve().then(() => transport.transcribeHandwriting(image, { signal: controller?.signal ?? null }))
       .then(response => {
-        if (response?.transcription?.lines?.length) {
+        // Remembered only when the reader stood behind it. A reading it
+        // doubted may be asked for again: a second look can be a better one.
+        if (response?.transcription?.lines?.length && response.transcription.needsConfirmation === false) {
           memory.done.set(key, { at: Date.now(), response });
           while (memory.done.size > READ_MEMORY_MAX) memory.done.delete(memory.done.keys().next().value);
         }
