@@ -154,6 +154,19 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
     if (jar.pri_csrf && (options.method || 'GET') !== 'GET') headers['X-Pri-CSRF'] = jar.pri_csrf;
     else if (!jar.pri_csrf) delete headers['X-Pri-CSRF'];
     const { credentials: _c, cache: _k, redirect: _r, ...rest } = options;
+    // Submit never starts a paid read (review 17, F3): it binds the read the
+    // student asked for with "Read my answer". These suites drive the backend
+    // below the card, so the student's own Read of the same picture is made
+    // here, as the card makes it, just before the Submit that binds it.
+    if (ink && /^\/v1\/practice\/[^/]+\/recognize$/.test(path)) {
+      let picture = null;
+      try { picture = JSON.parse(String(options.body || '{}')).image; } catch { picture = null; }
+      if (typeof picture === 'string') {
+        const readReply = await realFetch(app.origin + '/v1/handwriting/transcribe', { method: 'POST', headers, redirect: 'manual', body: JSON.stringify({ image: picture }) });
+        harness.absorbCookies(readReply, jar);
+        traffic.read = (traffic.read || 0) + 1;
+      }
+    }
     const response = await realFetch(url, { ...rest, headers, redirect: 'manual' });
     harness.absorbCookies(response, jar);
     if (path === '/v1/practice/issue') {

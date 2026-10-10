@@ -290,7 +290,7 @@ export function createRecognitionOps({
    *   { missing: true }                         `paid: false` and nothing kept.
    * Rejects with the provider's error; nothing is kept from a failure.
    */
-  async function read({ db, accountId, image, env = process.env, transcribe, requestId = null, paid = true }) {
+  async function read({ db, accountId, image, env = process.env, transcribe, requestId = null, paid = true, fresh = false }) {
     db = asStore(db);
     const id = operationId(accountId, image, env);
     // `paid: false` — the caller is not the student asking for a read (it is
@@ -310,7 +310,11 @@ export function createRecognitionOps({
     const running = inFlight.get(id);
     if (running) return joined(await running);
 
-    const kept = await recall(db, id, accountId);
+    // `fresh: true` — the student explicitly asked for this picture to be read
+    // AGAIN (an exam page whose earlier reading was uncertain). A kept read is
+    // not replayed to them; a read already in flight is still joined, and the
+    // new read replaces the kept one. It is a paid read, asked for by name.
+    const kept = fresh ? null : await recall(db, id, accountId);
     if (kept) {
       counters.storedHits += 1;
       recordRecognitionRead('cache');

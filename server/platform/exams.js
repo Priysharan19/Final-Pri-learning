@@ -1395,7 +1395,10 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
   // ── One bounded read (a kept read of the same picture is reused, free) ────
   let failure = null, read = null;
   try {
-    read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId });
+    // The one automatic read reuses a kept read of this picture (free). The
+    // student's own Retry checking asks for a new reading, not a replay of
+    // the uncertain one.
+    read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId, fresh: body.retry === true && reserved.attempts > 1 });
     if (read.refusal) {
       failure = { reason: 'capacity', code: safeCode(read.refusal.verdict?.code, 'CAPACITY_REFUSED'), retryAt: Number(read.refusal.verdict?.resetAt) || 0 };
     }
