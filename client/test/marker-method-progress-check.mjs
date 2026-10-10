@@ -484,6 +484,23 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   // Two roots: the branches of a factorisation are not candidates.
   const quad = { kind: 'equation', variable: 'x', solutions: [2, -3], source: 'x^2+x-6=0' };
   ok((methodMarks({ meta: quad, working: '(x-2)(x+3)=0\nx-2=0\nx+3=0', marks: 4, prompt: '$x^2+x-6=0$' })?.awarded ?? 0) === 3, 'the two branches of a factorisation are not a sweep: each root is read off once');
+  // A slip under working that was right does not take its marks back. In
+  // Write mode the wrong final answer IS the last line of the working, so
+  // this is every student who factorises, reads the roots off, and then
+  // writes the answer down wrong.
+  {
+    const q = (working, marks = 4) => methodMarks({ meta: quad, working, marks, prompt: '$x^2+x-6=0$' })?.awarded ?? 0;
+    ok(q('(x-2)(x+3)=0\nx-2=0\nx+3=0\nx=5') === 3, 'factorised, both branches, then a wrong last line: the three marks above it stand');
+    ok(q('(x-2)(x+3)=0\nx=2\nx=-3\nx=5') === 3, '…the same with the roots stated outright');
+    ok(q('(x-2)(x+3)=0\nx=2\nx=-3\nx=5') === q('(x-2)(x+3)=0\nx=2\nx=-3'), 'a wrong last line earns nothing itself and removes nothing');
+    ok(q('(x-2)(x+3)=0\nx=2\nx=-3\nx=4\nx=5\nx=6') === 1, 'but more wrong values after the break are a list of candidates: the stated roots lose their marks, the factorisation keeps its own');
+    ok(q('(x-2)(x+3)=0\nx=5\nx=2\nx=-3') === 1, 'a wrong value BEFORE the roots stops the working there: only the factorisation earns');
+    ok(q('x=2\nx=-3\nx=5') === 0 && q('x=2\nx=5') === 0 && q('x=5\nx=2\nx=-3') === 0, 'roots stated with no working earn nothing, with or without a wrong value among them');
+    ok(q('x=1\nx=2\nx=3\nx=-3') === 0 && q('x=2\nx=-3\nx=1\nx=3') === 0, 'and a sweep of values earns nothing in any order');
+    const hard = (working, marks = 3) => methodMarks({ meta: { kind: 'equation', variable: 'x', solutions: [4, -8], source: 'x^2+4x-32=0' }, working, marks, prompt: '$x^2+4x-32=0$' })?.awarded ?? 0;
+    ok(hard('x - 4 = 0\nx = 9') === 0 && hard('2x = 8\nx = -8\nx = 9') === 0 && hard('x = 4\nx = 9') === 0, 'a root in another spelling still earns nothing when a wrong value follows it');
+    ok(hard('(x+8)(x-4)=0\nx=4\nx=-8\nx=9') === hard('(x+8)(x-4)=0\nx=4\nx=-8') && hard('(x+2)^2=36\nx+2=6\nx=4\nx=5') === hard('(x+2)^2=36\nx+2=6\nx=4'), 'factorisation and completing the square keep their marks under a wrong last line');
+  }
   // A bare number on an equation states a value.
   ok(run('5t - 2t = 5 + 4\n3') === 1, 'a bare number after a step is a value stated, not a second step');
 }
@@ -726,7 +743,12 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   ok(marks(...Q, `(x+2)^2=36\nx + 2 = 6\nx = 4\nx + 2 = -6\nx = -8`) === 3, 'after the square, each root once, however many lines it takes to reach it');
   ok(marks(...Q, 'x = (-4 + sqrt(144))/2\nx = 4\n2x = 8') === 2, 'after the formula, the root it gives is read off once');
   ok(marks(...Q, 'x = (-4 ± 12)/2\nx = 4\nx = -8') === 3, 'after the formula written with ±, each root is read off it');
-  ok(marks(...Q, 'x = (-4 ± 12)/2\nx = 4\nx = 5') === 1, '…and not beside a value that is no root');
+  // One wrong value is where the working broke, not a list of candidates: the
+  // root read off the formula before it keeps its mark (this was 1 while the
+  // break itself was counted as a candidate). Two wrong values are a list.
+  ok(marks(...Q, 'x = (-4 ± 12)/2\nx = 4\nx = 5') === 2, '…and a wrong value after it is a slip: the formula and the root read off it stand');
+  ok(marks(...Q, 'x = (-4 ± 12)/2\nx = 4\nx = 5\nx = 6') === 1, '…but two wrong values after it are candidates, and the stated root loses its mark');
+  ok(marks(...Q, 'x = (-4 ± 12)/2\nx = 5\nx = 4') === 1, '…and a wrong value before the root stops the working at the formula');
   // A list of candidates, however each is spelt.
   ok(marks(...Q, '2x = 8\nx + 1 = 6') === 0, 'a true candidate and a false one, in different spellings, earn nothing');
   ok(marks(...Q, 'x + 1 = 6\n2x = 8') === 0, '…in either order');
