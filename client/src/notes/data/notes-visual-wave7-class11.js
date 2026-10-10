@@ -103,7 +103,7 @@ const specs=[
   {
     "chapterId": "c11-permutations-combinations",
     "kind": "latticePaths",
-    "east": 7,
+    "east": 6,
     "north": 5,
     "context": "Route order counting 6"
   },
