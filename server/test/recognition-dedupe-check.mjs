@@ -513,23 +513,67 @@ try {
     c.eq((await transcribe(a.jar, image)).data.reused, false, 'a read is kept');
     let offset = RECOGNITION_TTL_MS - 1000;
     ops.configure({ now: () => Date.now() + offset });
-    c.eq((await transcribe(a.jar, image)).data.reused, true, 'and is reused just inside the 24-hour lifetime');
+    c.eq((await transcribe(a.jar, image)).data.reused, true, 'and is reused just inside the 15-minute lifetime');
     offset = RECOGNITION_TTL_MS + 1000;
-    // Review 17, F3: once the kept read has expired, Submit pays for nothing.
-    // The transcript is still on the student's device; the server no longer
-    // holds the read; binding it is refused by name and the provider is not
-    // reached. Only the student's own Read again buys a read.
-    const lateQuestion = await issue(a.jar);
-    const atSubmit = await recognize(a.jar, lateQuestion.data.question.id, image);
-    c.deq([atSubmit.status, atSubmit.data?.error?.code, callsFor('expires')], [409, 'RECOGNITION_READ_EXPIRED', 1],
-      'Submit after the kept read has expired: a distinct retryable refusal and 0 provider calls');
-    c.deq([(await recognize(a.jar, lateQuestion.data.question.id, image)).status, callsFor('expires')], [409, 1], 'a second Submit, the same: still 0 provider calls');
+    // Reading and marking are separate (owner decision). Once the 15-minute
+    // kept read has gone, Submit still never buys a read:
+    //  · with the READ RECEIPT the student was given when the page was read,
+    //    Submit binds the text they were shown — 0 provider calls;
+    //  · with no receipt, or one that does not verify, the answer is the
+    //    distinct "read again" refusal — 0 provider calls.
+    const { issueReadReceipt, verifyReadReceipt, READ_RECEIPT_TTL_MS } = await import('../platform/readReceipt.js');
+    const forQ = await issue(a.jar);
+    const qid = forQ.data.question.id;
+    const otherQ = await issue(a.jar);
+    const page = picture('receipt page');
+    ops.configure({ now: () => Date.now() });
+    const shown = await h.request('/v1/handwriting/transcribe', { method: 'POST', jar: a.jar, body: { image: page, questionId: qid } });
+    const receipt = shown.data.receipt;
+    c.deq([shown.status, typeof receipt, callsFor('receipt page')], [200, 'string', 1], 'a read asked for a named, owned question returns a read receipt (one provider call)');
+    const inside = Buffer.from(receipt.split('.')[1], 'base64url').toString('utf8');
+    c.ok(!inside.includes('receipt page') && !receipt.includes(page.split(',')[1].slice(0, 24)) && Object.keys(JSON.parse(inside)).sort().join() === 'a,c,d,iat,n,q,t',
+      'the receipt holds digests and ids only: no transcript text and no image bytes');
+    c.eq((await h.request('/v1/handwriting/transcribe', { method: 'POST', jar: a.jar, body: { image: page, questionId: '00000000-0000-4000-8000-000000000000' } })).data.receipt, undefined,
+      'no receipt is issued for a question this account was not issued');
+    const text = shown.data.transcription.text;
+    const bind = (jar, question, body) => h.request(`/v1/practice/${question}/recognize`, { method: 'POST', jar, body: { mode: 'ink', ...body } });
+    offset = RECOGNITION_TTL_MS + 1000;
+    ops.configure({ now: () => Date.now() + offset });
+    const refusedAll = [];
+    const stranger = await student();
+    const strangerQ = await issue(stranger.jar);
+    for (const [why, jar, question, body] of [
+      ['no receipt', a.jar, qid, { image: page }],
+      ['the transcript text changed', a.jar, qid, { image: page, receipt, text: text + '1' }],
+      ['another question of the same account', a.jar, otherQ.data.question.id, { image: page, receipt, text }],
+      ['another account, on its own question', stranger.jar, strangerQ.data.question.id, { image: page, receipt, text }],
+      ['another picture', a.jar, qid, { image: picture('a different page'), receipt, text }],
+      ['a forged signature', a.jar, qid, { image: page, receipt: receipt.slice(0, -4) + (receipt.endsWith('AAAA') ? 'BBBB' : 'AAAA'), text }],
+      ['a forged payload', a.jar, qid, { image: page, receipt: receipt.split('.').map((part, i) => (i === 1 ? Buffer.from(inside.replace(/"n":(true|false)/, '"n":false').replace(a.id, stranger.id)).toString('base64url') : part)).join('.'), text }]
+    ]) {
+      const r = await bind(jar, question, body);
+      refusedAll.push([why, r.status, r.data?.error?.code]);
+    }
+    c.deq(refusedAll.map(([, status, code]) => [status, code]), refusedAll.map(() => [409, 'RECOGNITION_READ_EXPIRED']),
+      'after the kept read is gone, Submit with no receipt, a changed text, the wrong question, the wrong account, the wrong picture or a forged receipt is refused by the distinct read-again code: ' + refusedAll.map(r => r[0]).join('; '));
+    c.deq([callsFor('receipt page'), callsFor('a different page')], [1, 0], 'and none of those refusals reached the provider');
+    const bound = await bind(a.jar, qid, { image: page, receipt, text });
+    c.deq([bound.status, bound.data.reused, bound.data.transcription.text, callsFor('receipt page')], [201, true, text, 1],
+      'with the valid receipt Submit binds the text the student was shown — the server no longer holds the read — with 0 provider calls');
+    const again = await bind(a.jar, qid, { image: page, receipt, text });
+    c.deq([again.status, callsFor('receipt page')], [201, 1], 'a replayed Submit is answered the same way, still 0 provider calls');
+    const graded = await h.request(`/v1/practice/${qid}/submit`, { method: 'POST', jar: a.jar, headers: { 'Idempotency-Key': 'receipt-first-try' },
+      body: { submissionId: 'receipt-first-try', answer: text, mode: 'ink', transcriptionReceipt: bound.data.receipt } });
+    c.deq([graded.status, typeof graded.data.correct], [200, 'boolean'], 'and the answer is then marked by the engine through the same receipt path as ever');
+    const base = { accountId: 'acct', questionId: 'q-1', image: page, text: 'x = 9' };
+    const token = issueReadReceipt({ ...base, now: 1_000_000 });
+    c.deq([verifyReadReceipt(token, { ...base, now: 1_000_000 + READ_RECEIPT_TTL_MS }).ok, verifyReadReceipt(token, { ...base, now: 1_000_000 + READ_RECEIPT_TTL_MS + 1 }),
+      verifyReadReceipt(token, { ...base, now: 0 }).reason, READ_RECEIPT_TTL_MS],
+    [true, { ok: false, reason: 'expired' }, 'expired', 7 * 24 * 60 * 60 * 1000], 'a receipt is valid for a bounded time (7 days) and never from the future');
     const expired = await transcribe(a.jar, image);
-    c.eq(expired.data.reused, false, 'the student presses Read again: read afresh');
-    c.eq(callsFor('expires'), 2, 'Read again after expiry → exactly one provider call');
-    const bound = await recognize(a.jar, lateQuestion.data.question.id, image);
-    c.deq([bound.status, bound.data.reused, callsFor('expires')], [201, true, 2], 'and then Submit binds that read into a receipt with no further call');
-    c.eq(RECOGNITION_TTL_MS, 24 * 60 * 60 * 1000, 'the lifetime is the documented 24 hours');
+    c.eq(expired.data.reused, false, 'a picture read again after the kept read expired is read afresh');
+    c.eq(callsFor('expires'), 2, 'TTL expiry + the student\'s own Read → one new provider call');
+    c.eq(RECOGNITION_TTL_MS, 15 * 60 * 1000, 'the lifetime is the documented 15 minutes');
     ops.configure({ now: () => Date.now() });
     // Reuse does not extend the lifetime: it is measured from the paid read.
     c.eq((await transcribe(a.jar, image)).data.reused, true, 'the fresh read is kept in turn');

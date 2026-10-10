@@ -37,7 +37,7 @@
 //
 //   · Completed reads: the TRANSCRIPT ONLY, in the existing idempotency_keys
 //     table (scope 'recognition-read', key = the keyed digest above), for
-//     RECOGNITION_TTL_MS (24 hours). No schema change: the table is already per-account
+//     RECOGNITION_TTL_MS. No schema change: the table is already per-account
 //     (primary key account_id, scope, key; Row-Level Security by account on
 //     Postgres), already expires rows (housekeeping.js), already cascades on
 //     account deletion, and already holds reading receipts with their
@@ -72,18 +72,16 @@ import { timePhase } from './requestTiming.js';
 import { SYSTEM_INSTRUCTIONS, TRANSCRIPTION_SCHEMA, providerConfig } from './handwritingProvider.js';
 
 /**
- * How long a completed read is reusable: 24 hours. The transcript of a page is
- * kept on the student's own device with the page for as long as the page is,
- * and Submit binds that transcript into a receipt by looking the read up
- * here. A read that had expired by then used to be bought again, silently, at
- * Submit — a paid call nobody pressed anything for. So the kept read now
- * outlives a school day and a night, and when it IS gone Submit pays nothing
- * (see `paid: false` below): the student is asked to press Read again. A read
- * is a pure function of the picture and the configuration, so the lifetime is
- * not about staleness — it bounds how long the text is kept for this purpose.
- * Transcript only; the same table, row-level security and housekeeping.
+ * How long a completed read is reusable. One attempt at a question is: write,
+ * read, check the transcript, submit, see the verdict, perhaps a second try.
+ * That is minutes. 15 minutes covers a student who pauses mid-question or
+ * reloads, without keeping a transcript of a child's writing for longer than
+ * one sitting at one question. It is a cost guard only: Submit does NOT depend
+ * on it. A student who submits after it has gone presents the read receipt
+ * they were given (readReceipt.js) — and without one Submit asks them to read
+ * again; it never buys a read (`paid: false` below).
  */
-export const RECOGNITION_TTL_MS = 24 * 60 * 60 * 1000;
+export const RECOGNITION_TTL_MS = 15 * 60 * 1000;
 /** The scope of a kept read in idempotency_keys. */
 export const RECOGNITION_SCOPE = 'recognition-read';
 /**
