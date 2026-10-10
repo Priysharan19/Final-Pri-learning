@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { sha256Hex, pictureDigest, freezePage, unreadInkKeys, pendingSummary, dataUrlBytes } from '../src/local/examPages.js';
 import { saveExamResponses, examMarkingInputs, cleanPages } from '../src/local/examSession.js';
-import { markPendingLines, applyHandwritingAmendment, keepFrozenPages, resolveFrozenHandwriting, recoverHandwriting } from '../src/local/serverExam.js';
+import { markPendingLines, applyHandwritingAmendment, keepFrozenPages, resolveFrozenHandwriting, recoverHandwriting, retryHandwriting } from '../src/local/serverExam.js';
 
 let count = 0;
 const ok = (cond, name) => { assert.ok(cond, name); count++; };
@@ -87,7 +87,10 @@ eq(Object.keys(cleanPages({ q1: page('one'), q9: page('nine'), q2: { digest: 'sh
 // ── A pending answer on the device's own result ──────────────────────────────
 const serverLine = (id, extra = {}) => ({ id, serverQuestionId: id, marks: 2, awarded: 0, correct: false, unanswered: true, given: '', feedback: '', markingScheme: 'final-answer', outcome: 'unanswered', ...extra });
 const pendingLine = id => serverLine(id, { pending: true, outcome: 'pending', feedback: 'not read yet' });
-const pages = states => ({ handwriting: { pages: Object.fromEntries(Object.entries(states).map(([key, [state, reason]]) => [key, { digest: 'd'.repeat(64), state, reason, attempts: 0, nextAttemptAt: 0 }])) } });
+const pages = states => ({ handwriting: { pages: Object.fromEntries(Object.entries(states).map(([key, [state, reason, attempts = 0]]) => [key, {
+  digest: 'd'.repeat(64), state, reason, attempts, nextAttemptAt: 0,
+  triesLeft: state === 'resolved' ? 0 : 3 - attempts, canRetry: state !== 'resolved' && attempts >= 1 && attempts < 3, retryAt: null
+}])) } });
 {
   const result = {
     ...pages({ s2: ['awaiting-reading', 'not-read'], s3: ['needs-review', 'uncertain'], 's4::b': ['awaiting-reading', 'not-read'] }),
@@ -131,13 +134,12 @@ const pages = states => ({ handwriting: { pages: Object.fromEntries(Object.entri
 
 // ── Presenting frozen pages: once each, only while waiting, and bounded ──────
 {
-  const result = { authoritative: true, detail: [], ...pages({ a: ['awaiting-reading', 'not-read'], b: ['needs-review', 'uncertain'], c: ['awaiting-reading', 'reader-unavailable'], d: ['awaiting-reading', 'not-read'], e: ['resolved', null] }) };
-  result.handwriting.pages.c.nextAttemptAt = 10_000_000;                 // inside its backoff
+  const result = { authoritative: true, detail: [], ...pages({ a: ['awaiting-reading', 'not-read'], b: ['needs-review', 'uncertain', 1], c: ['awaiting-reading', 'reader-unavailable', 1], d: ['awaiting-reading', 'not-read'], e: ['resolved', null, 1] }) };
   const images = { a: png('a'), b: png('b'), c: png('c'), e: png('e') };  // no picture held for d
   const asked = [];
   const transport = { resolveExamHandwriting: async (examId, body) => { asked.push([examId, body.key, body.image]); const next = clone(result); next.handwriting.pages[body.key].state = 'resolved'; return { result: next, attempted: true }; } };
   const settled = await resolveFrozenHandwriting('exam-1', result, images, { now: 1_000, transport });
-  eq(asked, [['exam-1', 'a', png('a')]], 'only a page that is waiting, outside its backoff, and whose frozen picture this device holds is presented — once');
+  eq(asked, [['exam-1', 'a', png('a')]], 'only a page that has never had its one automatic read, and whose frozen picture this device holds, is presented — once; a page that has had it is never presented again by itself');
   eq(settled.handwriting.pages.a.state, 'resolved', 'and the server\'s reply is the result');
   const many = { authoritative: true, detail: [], ...pages(Object.fromEntries(Array.from({ length: 12 }, (_, i) => ['k' + i, ['awaiting-reading', 'not-read']]))) };
   let sent = 0;
@@ -161,6 +163,38 @@ const pages = states => ({ handwriting: { pages: Object.fromEntries(Object.entri
   eq([await recoverHandwriting(exam2, { transport: visit }), exam2.score, exam2.detail[0].correct, exam2.detail[0].pending, exam2.server.handwriting, gets, posts],
     [true, 2, true, undefined, undefined, 1, 1], 'on a later visit the frozen page is presented once, the pending line is marked, and its picture is forgotten');
   eq([await recoverHandwriting(exam2, { transport: visit, force: true }), gets, posts], [false, 1, 1], 'a paper with nothing waiting asks the server nothing');
+}
+
+// ── "Retry checking", the device-only warning, and a lost picture ────────────
+{
+  const state = pages({ a: ['needs-review', 'uncertain', 1], b: ['needs-review', 'uncertain', 1], c: ['needs-review', 'retries-exhausted', 3] });
+  const result = { authoritative: true, score: 0, total: 6, detail: [pendingLine('a'), pendingLine('b'), pendingLine('c')], ...state };
+  const exam = { id: 'e-retry', questionIds: ['a', 'b', 'c'], server: { examId: 'x', questionIds: ['a', 'b', 'c'], handwriting: { pages: { a: png('a'), c: png('c') } } }, finishedAt: 5, score: 0, total: 6, detail: [] };
+  exam.detail = markPendingLines(result, [pendingLine('a'), pendingLine('b'), pendingLine('c')], exam);
+  eq(exam.detail.map(d => [d.pendingKey, d.pictureHere, d.pendingCanRetry, d.pendingTriesLeft]), [['a', true, true, 2], ['b', false, false, 2], ['c', true, false, 0]],
+    'each pending answer says whether its saved page is on this device, whether Retry checking is offered, and how many tries are left: none without the picture, none at the limit');
+  const sent = [];
+  const done = clone(result);
+  done.score = 2;
+  done.detail[0] = serverLine('a', { awarded: 2, correct: true, unanswered: false, given: '4', outcome: 'correct', readAfterClose: true });
+  Object.assign(done.handwriting.pages.a, { state: 'resolved', attempts: 2, triesLeft: 0, canRetry: false });
+  const transport = { resolveExamHandwriting: async (examId, body) => { sent.push(body); return { result: done, attempted: true }; } };
+  let lost = null;
+  try { await retryHandwriting(exam, 'b', { transport }); } catch (error) { lost = error; }
+  eq([lost?.code, sent.length, exam.detail[1].pending, exam.detail[1].awarded], ['EXAM_PAGE_NOT_ON_DEVICE', 0, true, 0],
+    'when the saved page is not on this device, Retry checking says so plainly, sends nothing, and the answer stays pending with no invented mark');
+  const tried = await retryHandwriting(exam, 'a', { transport });
+  eq([tried.attempted, sent.length, sent[0].retry, sent[0].key, sent[0].image, Object.keys(sent[0]).sort()], [true, 1, true, 'a', png('a'), ['image', 'key', 'retry']],
+    'Retry checking sends the frozen picture, the answer key and that it is the student\'s retry — nothing else: no transcript, no answer, no edit');
+  eq([exam.detail[0].pending, exam.detail[0].given, exam.detail[0].correct, exam.score, Object.keys(exam.server.handwriting?.pages || {})], [undefined, '4', true, 2, []],
+    'and the line takes the server\'s mark; pictures of pages with nothing left to ask are forgotten');
+  // The server refuses a picture that is not the frozen one: it is dropped and the page says it cannot be checked here.
+  const exam2 = { id: 'e-changed', questionIds: ['a'], server: { examId: 'x', questionIds: ['a'], handwriting: { pages: { a: png('other') } } }, finishedAt: 5, score: 0, total: 2, detail: [] };
+  exam2.detail = markPendingLines({ detail: [pendingLine('a')], ...pages({ a: ['needs-review', 'uncertain', 1] }) }, [pendingLine('a')], exam2);
+  let refused = null;
+  try { await retryHandwriting(exam2, 'a', { transport: { resolveExamHandwriting: async () => { throw Object.assign(new Error('changed'), { status: 409, code: 'EXAM_HANDWRITING_CHANGED' }); } } }); } catch (error) { refused = error; }
+  eq([refused?.code, exam2.server.handwriting, exam2.detail[0].pictureHere, exam2.detail[0].pendingCanRetry, exam2.detail[0].pending], ['EXAM_HANDWRITING_CHANGED', undefined, false, false, true],
+    'a picture the server refuses as changed is dropped: the answer stays pending and is no longer offered for retry');
 }
 
 console.log(`EXAM UNREAD HANDWRITING (DEVICE): PASS — ${count}/${count} checks — a page is frozen by the server's own digest, only digests travel, nothing joins after the deadline, and only pending lines ever change. Synthetic pictures and scripted replies.`);

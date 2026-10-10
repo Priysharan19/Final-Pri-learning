@@ -172,9 +172,25 @@ export const flow = {
         for (const p of Object.values(row.value.handwriting.pages)) p.nextAttemptAt = 0;
         db.prepare("UPDATE idempotency_keys SET response_json=? WHERE scope='exam-result' AND account_id=? AND key=?").run(JSON.stringify(row.value), online.account.id, row.key);
       }
+      // Nothing reads by itself any more: the one automatic read was spent at the deadline.
+      await page.clock.fastForward('03:00');
+      await page.waitForTimeout(800);
+      const note1 = page.locator('[data-exam-pending-note]');
+      const retry = page.locator('[data-exam-retry-checking]');
+      await check('with the reader back and the wait over, minutes pass and nothing is sent by itself: the answer waits for the student',
+        reader.requests.length - before === afterDeadline && await page.locator('[data-exam-pending-line]').count() === 1, `provider calls ${reader.requests.length - before}`);
+      await check('the student is warned that the saved page exists only on this device',
+        await note1.getAttribute('data-picture-here') === 'true' && /kept only on this device/.test(await page.locator('[data-exam-device-only]').innerText()),
+        await page.locator('[data-exam-device-only]').count() ? await page.locator('[data-exam-device-only]').innerText() : 'no device-only warning');
+      await check('"Retry checking" is offered, saying that nothing can be changed and how many tries are left',
+        await retry.count() === 1 && /Retry checking/.test(await retry.innerText()) && (await page.locator('[data-exam-tries-left]').getAttribute('data-exam-tries-left')) === '2' &&
+          /Nothing on it can be changed/.test(await page.locator('[data-exam-tries-left]').innerText()) && /2 tries are left/.test(await page.locator('[data-exam-tries-left]').innerText()),
+        await page.locator('[data-exam-tries-left]').count() ? await page.locator('[data-exam-tries-left]').innerText() : 'no retry offered');
+      // An impatient double tap: one try.
+      await page.evaluate(() => { const b = document.querySelector('[data-exam-retry-checking]'); b.click(); b.click(); });
       let settledRow = null;
       for (let i = 0; i < 60; i++) {
-        await page.clock.fastForward('00:35');
+        await page.clock.runFor(500);
         await page.waitForTimeout(400);
         settledRow = await storedExam(page, examId);
         if (settledRow && !settledRow.pending.length) break;
@@ -184,7 +200,7 @@ export const flow = {
       const page2 = Object.values(result2?.handwriting?.pages || {})[0];
       const line = settledRow?.lines.find(l => l.id === frozen?.pending?.[0]?.id);
       const total = reader.requests.length - before;
-      await check(`when the reader is back the frozen page is read once and resolved on the server: exactly one more provider call [${EVIDENCE}]`,
+      await check(`a double tap on Retry checking reads the frozen page once and resolves it on the server: one try used, exactly one more provider call [${EVIDENCE}]`,
         page2?.state === 'resolved' && page2.attempts === 2 && page2.digest === sentDigest && total === afterDeadline + 1, `${JSON.stringify(page2)}; provider calls ${total} (${afterDeadline} at the deadline)`);
       await check('the answer is now marked by the server on what was written ("42"), flagged as read after the paper closed, and its picture is forgotten',
         !!line && line.pending === false && line.given === '42' && line.readAfterClose === true && line.unanswered === false && settledRow.heldPages.length === 0 && settledRow.score === result2.score,
@@ -201,7 +217,7 @@ export const flow = {
       await page.waitForSelector('.tag', { timeout: 30000 }).catch(() => {});
       await check('and once it is marked the list shows the score with no provisional marker', await page.locator('[data-exam-provisional]').count() === 0);
       await check('and nothing more is ever sent for it', reader.requests.length - before === total, `provider calls ${reader.requests.length - before}`);
-      note(`provider calls for the unread handwritten exam answer [${EVIDENCE}]: ${afterDeadline} while the reader was down at the deadline (one bounded read operation), then 1 when it was read`);
+      note(`provider calls for the unread handwritten exam answer [${EVIDENCE}]: ${afterDeadline} while the reader was down at the deadline (one bounded read operation), then 1 for the student's Retry checking (a double tap)`);
       await check('no provider was reached but the scripted reader', reader.refused.length === 0, JSON.stringify(reader.refused));
     } finally {
       reader.down = false; reader.gate = null; reader.lines = null; reader.text = '7'; reader.confidence = 0.6;

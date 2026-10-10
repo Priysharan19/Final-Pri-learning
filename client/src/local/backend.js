@@ -67,7 +67,7 @@ import { publicQuestionFields } from '../engine/publicQuestion.js';
 import {
   isServerPaper, markedByOf, issueServerExam, serverFieldOf, localStartOf, scheduleCheckpoint,
   finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, finishedAtOf, fetchRemotePaper,
-  markPendingLines, recoverHandwriting
+  markPendingLines, recoverHandwriting, retryHandwriting, confirmExamPagesSaved
 } from './serverExam.js';
 import { pendingSummary } from './examPages.js';
 import { rasterizeInk } from '../ink/cloudRaster.js';
@@ -4036,7 +4036,19 @@ const routes = {
     // Saved on the device; the server's copy follows a moment later and is
     // retried until it lands. It never delays or fails this save.
     if (isServerPaper(e)) scheduleCheckpoint(e.id, body?.urgent === true ? 0 : undefined);
-    return { saved: true, ...saved };
+    // A frozen page of handwriting is "saved" only once it has been read back.
+    return { saved: true, ...saved, pagesSaved: await confirmExamPagesSaved(e.id, e.responses?.pages) };
+  },
+  // "Retry checking" for one answer whose handwriting was saved at the close
+  // and is not marked: the frozen picture, no edits, the server's limits.
+  'POST /exams/:id/handwriting': async (body, params) => {
+    const p = await requireProfile();
+    return withMutationLock(`exam:${params.id}`, async () => {
+      const e = await get('exams', params.id);
+      if (!e || e.pid !== p.id) throw Object.assign(new Error('Exam not found'), { status: 404 });
+      try { return await retryHandwriting(e, String(body?.key || '')); }
+      finally { await put('exams', e); }
+    });
   },
   'POST /exams/:id/submit': async (body, params) => {
     const p = await requireProfile();
@@ -5255,7 +5267,7 @@ async function adoptPaperResult(p, e, serverResult, { record = true } = {}) {
     await put('questions', settled);
   }
   // An answer pending on handwriting that was not read says so on its line.
-  markPendingLines(result, detail);
+  markPendingLines(result, detail, e);
   Object.assign(e, { finishedAt: finishedAtOf(e, result), score: result.score, total: result.total, detail });
   e.final = serverFinal(e, { ...result, detail });
   delete e.responses;

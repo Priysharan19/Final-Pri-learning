@@ -41,7 +41,7 @@ import { analyseExam } from './examAnalysis.js';
 import {
   isServerPaper, markedByOf, requireExamAccount, issueServerExam, issueExamLayout, serverFieldOf, scheduleCheckpoint,
   finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, localStartOf, finishedAtOf, fetchRemotePaper,
-  markPendingLines, recoverHandwriting
+  markPendingLines, recoverHandwriting, retryHandwriting, confirmExamPagesSaved
 } from './serverExam.js';
 import { pendingSummary } from './examPages.js';
 
@@ -412,7 +412,11 @@ async function saveResponses(profile, id, body = {}) {
   // The device copy is saved; the server's follows a moment later and is
   // retried until it lands. It never delays or fails this save.
   if (isServerPaper(exam)) scheduleCheckpoint(exam.id, body.urgent === true ? 0 : undefined);
-  return { saved: true, ...saved, checkpoint: isServerPaper(exam) ? { savedRev: exam.server.savedRev || 0, savedAt: exam.server.savedAt || null } : null };
+  return {
+    saved: true, ...saved, checkpoint: isServerPaper(exam) ? { savedRev: exam.server.savedRev || 0, savedAt: exam.server.savedAt || null } : null,
+    // A frozen page of handwriting is "saved" only once it has been read back.
+    pagesSaved: await confirmExamPagesSaved(exam.id, exam.responses?.pages)
+  };
 }
 
 /**
@@ -470,7 +474,7 @@ async function adoptResult(exam, serverResult, { record = true } = {}) {
   exam.score = result.score;
   exam.total = result.total;
   // An answer pending on handwriting that was not read says so on its line.
-  markPendingLines(result, detail);
+  markPendingLines(result, detail, exam);
   exam.detail = detail;
   exam.summary = result.summary;
   exam.final = serverFinal(exam, { ...result, detail });
@@ -604,7 +608,7 @@ async function paper(profile, id) {
 
 export function indiaExamRoute(method, path) {
   if (path === '/exams' && (method === 'GET' || method === 'POST')) return true;
-  return /^\/exams\/[^/]+(?:\/paper|\/submit|\/responses)?$/.test(path) && (method === 'GET' || method === 'POST');
+  return /^\/exams\/[^/]+(?:\/paper|\/submit|\/responses|\/handwriting)?$/.test(path) && (method === 'GET' || method === 'POST');
 }
 
 export async function dispatchIndiaExam(profile, method, path, body = {}) {
@@ -633,13 +637,20 @@ export async function dispatchIndiaExam(profile, method, path, body = {}) {
     return { ...created, allowance: await examAllowance(profile) };
   }
 
-  const m = path.match(/^\/exams\/([^/]+)(?:\/(paper|submit|responses))?$/);
+  const m = path.match(/^\/exams\/([^/]+)(?:\/(paper|submit|responses|handwriting))?$/);
   if (!m) throw error('India exam route not found.', 404, 'INDIA_EXAM_ROUTE_NOT_FOUND');
   const [, id, action] = m;
   if (!action && method === 'GET') return getExam(profile, id);
   if (action === 'paper' && method === 'GET') return paper(profile, id);
   if (action === 'submit' && method === 'POST') return withExamLock(id, () => submitExam(profile, id, body || {}));
   if (action === 'responses' && method === 'POST') return withExamLock(id, () => saveResponses(profile, id, body || {}));
+  // "Retry checking" for one answer whose handwriting was saved at the close
+  // and is not marked: the frozen picture, no edits, the server's limits.
+  if (action === 'handwriting' && method === 'POST') return withExamLock(id, async () => {
+    const exam = await requireExam(profile, id);
+    try { return await retryHandwriting(exam, String(body?.key || '')); }
+    finally { await put('exams', exam); }
+  });
   throw error('India exam method is not allowed.', 405, 'INDIA_EXAM_METHOD_NOT_ALLOWED');
 }
 

@@ -307,6 +307,9 @@ export default function ExamRoom() {
       frozen = await freezeUnread(snap).catch(() => null);
       return api.post(`/exams/${id}/responses`, frozen ? { ...body, ...unreadBody(frozen) } : body);
     }).then(res => {
+      // A page of handwriting is "saved" only when the device store has read
+      // it back; otherwise this save failed, and says so.
+      if (res?.pagesSaved === false) throw Object.assign(new Error('page not saved'), { code: 'EXAM_PAGE_NOT_SAVED' });
       if (frozen) noteSent(frozen);
       learnClock(res?.now);
       setNow(clockNow());
@@ -520,6 +523,46 @@ export default function ExamRoom() {
     return () => { live = false; clearInterval(timer); window.removeEventListener('online', again); };
   }, [awaitingPages, id]);
 
+  // "Retry checking": the student's own request that ONE saved page be read
+  // again. The saved picture is sent as it is; nothing here can change it. A
+  // second tap while one is in flight does nothing.
+  const [retrying, setRetrying] = useState(null);
+  const retryingRef = useRef(false);
+  const retryChecking = useCallback(async (key) => {
+    if (retryingRef.current) return;
+    retryingRef.current = true;
+    setRetrying(key);
+    try { await api.post(`/exams/${id}/handwriting`, { key }); } catch { /* the line below says how the page stands now */ }
+    try {
+      const back = (await api.get(`/exams/${id}`)).exam;
+      if (back?.finishedAt && back.detail) { setExam(back); setResult(prev => ({ ...resultOf(back), final: resultOf(back).final || prev?.final || null, markedBy: resultOf(back).markedBy || prev?.markedBy || null })); }
+    } catch { /* what is on screen is still true */ }
+    retryingRef.current = false;
+    setRetrying(null);
+  }, [id]);
+  /** What is said under an answer whose handwriting was saved and is not marked. */
+  const pendingNote = item => (
+    <div style={{ marginTop: 6 }} data-exam-pending-note={item.pendingKey} data-picture-here={item.pictureHere ? 'true' : 'false'}>
+      <p className="sub" role="status">{t(item.pendingState === 'awaiting-reading' ? 'examRoom.pendingReading' : 'examRoom.pendingReview')}</p>
+      {item.pictureHere
+        ? <p className="muted" style={{ marginTop: 4, fontSize: 13 }} data-exam-device-only>{t('examRoom.pendingDeviceOnly')}</p>
+        : <p className="sub" style={{ marginTop: 4 }} role="status" data-exam-page-lost>{t('examRoom.pendingLost')}</p>}
+      {item.pictureHere && item.pendingCanRetry && (
+        <div style={{ marginTop: 8 }}>
+          <button type="button" className="btn btn-ghost btn-sm" data-exam-retry-checking={item.pendingKey} disabled={!!retrying}
+            aria-busy={retrying === item.pendingKey || undefined} onClick={() => retryChecking(item.pendingKey)}>{t('examRoom.retryChecking')}</button>
+          <p className="muted" style={{ marginTop: 4, fontSize: 13 }} data-exam-tries-left={item.pendingTriesLeft}>
+            {t('examRoom.retryExplain')} {t('examRoom.retryTriesLeft', { count: item.pendingTriesLeft, n: item.pendingTriesLeft })}
+            {item.pendingRetryAt ? <> {t('examRoom.retryAllowedAt', { time: new Date(item.pendingRetryAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })}</> : null}
+          </p>
+        </div>
+      )}
+      {item.pictureHere && !item.pendingCanRetry && item.pendingState === 'needs-review' && item.pendingTriesLeft === 0 && (
+        <p className="muted" style={{ marginTop: 4, fontSize: 13 }} data-exam-no-tries>{t('examRoom.retryNone')}</p>
+      )}
+    </div>
+  );
+
   // ── Handwriting ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!inkOpenKey || inkPhase === 'ready' || inkPhase === 'loading') return;
@@ -708,6 +751,7 @@ export default function ExamRoom() {
                     </span>
                   )}
                 </div>
+                {pt.pending && pendingNote(pt)}
                 <div className="row" style={{ flexWrap: 'wrap', gap: 16, fontSize: 14, marginTop: 4 }}>
                   <span>{tx('examRoom.yours', { answer: <b>{pt.answerType === 'mcq' ? (pt.given !== '' && pt.given != null ? 'ABCD'[Number(pt.given)] ?? '—' : '—') : (pt.given || '—')}</b> })}</span>
                   <span>{tx('examRoom.correctShort', { answer: <b><MathText text={pt.answerText} /></b> })}</span>
@@ -749,9 +793,7 @@ export default function ExamRoom() {
                 </span>
               )}
             </div>
-            {d.pending && (
-              <p className="sub" style={{ marginTop: 6 }} role="status">{t(d.pendingState === 'awaiting-reading' ? 'examRoom.pendingReading' : 'examRoom.pendingReview')}</p>
-            )}
+            {d.pending && pendingNote(d)}
             <div lang="en"><MathText block className="q-prompt" style={{ fontSize: 16 }} text={d.prompt} /></div>
             {d.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: d.figure }} />}
             {OBJECTIVE.has(d.answerType) && d.mcqOptions && (
