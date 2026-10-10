@@ -1,0 +1,1 @@
+import{n as e,r as t,t as n}from"./InkAnswer-BLMwA4Te.js";export{e as STILL_READING_MS,n as default,t as strokeSignature};
