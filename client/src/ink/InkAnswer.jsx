@@ -533,7 +533,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
               {!disabled && correcting?.index !== li && (
                 <button type="button" className="ink-correct-btn" aria-label={t('ink.iWroteAria', { n: li + 1 })}
                   data-line-doubt={isLowConfidence(line, lineConfidenceFloor) ? 'low' : undefined}
-                  onClick={() => setCorrecting({ index: li, text: line.text })}>{t(isLowConfidence(line, lineConfidenceFloor) ? 'ink.iWrote' : 'ink.editLine')}</button>
+                  onClick={() => setCorrecting({ index: li, text: line.text })}>{isLowConfidence(line, lineConfidenceFloor) ? t('ink.iWrote') : t('ink.editLine')}</button>
               )}
               {!disabled && correcting?.index === li && (
                 <form className="ink-correct" onSubmit={e => { e.preventDefault(); correctLine(li, correcting.text); }}>

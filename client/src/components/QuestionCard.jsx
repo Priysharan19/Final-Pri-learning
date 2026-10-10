@@ -754,7 +754,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // The work never left the page; this only tries the device store once more.
   const retrySave = () => {
     if (resolved || busy) return;
-    if (mode === 'write' && !isMcq && latestInk.current?.length) onInkStrokes(latestInk.current);
+    // Handwriting is saved again from the actual strokes on the page, never
+    // from blank data; anything else on screen is the typed draft.
+    if (mode === 'write' && !isMcq) { if (latestInk.current?.length && onInkStrokes) onInkStrokes(latestInk.current); }
     else stash(answer, working);
   };
   const noteEdited = (key) => {

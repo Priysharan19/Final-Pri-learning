@@ -242,4 +242,6 @@ export function pendingSubmissionQuestionId() {
 // names are kept here so the card and the practice page have one recovery
 // module to import; the reads are asynchronous now, which is why the card
 // mounts its ink surface only once the kept page has been looked for.
-export { compactStrokes, saveInkDraft, readInkDraft, clearInkDraft, confirmInkDraftSaved } from '../local/inkDrafts.js';
+export { compactStrokes, saveInkDraft, readInkDraft, clearInkDraft } from '../local/inkDrafts.js';
+// The readback a "Saved on this device" claim rests on (fresh IndexedDB connection).
+export { confirmInkDraftSaved } from '../local/inkDrafts.js';
