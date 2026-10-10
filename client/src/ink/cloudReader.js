@@ -97,6 +97,8 @@ export function readerPaused(now = Date.now()) {
   if (readerPause && now >= readerPause.until) readerPause = null;
   return readerPause;
 }
+/** A refusal met on another route (the reading before marking) pauses reads here too. */
+export function noteReaderRefusal(failure) { noteAllowance(failure || {}); }
 /** The student asked: the next read is sent whatever limit was last reported. */
 export function resumeReaderNow() { readerPause = null; }
 const pausedOutcome = pause => ({ reason: 'paused', failure: pause.failure, until: pause.until });
@@ -649,8 +651,9 @@ export function inkReadingBlockedKey(user, options = {}) {
 
 /**
  * How long to wait before asking a reader that did not answer again: 20 s,
- * then doubling, never more than five minutes apart, for as long as the page
- * waits. Never gives up while the student's working is still on the page.
+ * then doubling, never more than five minutes apart. The ink surface uses the
+ * first AUTO_RETRY_MAX of these and then stops until the student asks
+ * (readerFailure.js): a page never re-sends a read without end.
  */
 export const RETRY_MS = 20_000;
 export const RETRY_CAP_MS = 5 * 60_000;

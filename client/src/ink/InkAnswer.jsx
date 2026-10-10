@@ -24,7 +24,8 @@ import InkCanvas from './InkCanvas.jsx';
 import NativeInkCanvas from './NativeInkCanvas.jsx';
 import { nativeInkAvailable } from './native.js';
 import { exprToLatex } from './inkLatex.js';
-import { ACCOUNT_BLOCKED_KEYS, cloudReadingEnabled, inkReaderUiState, inkReadingBlockedKey, readinessIdentity, retryDelayMs, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
+import { ACCOUNT_BLOCKED_KEYS, cloudReadingEnabled, inkReaderUiState, readerBlock, readinessIdentity, resumeReaderNow, retryDelayMs, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
+import { AUTO_RETRY_MAX, retryClock, stoppedKey } from './readerFailure.js';
 import { Link, useInRouterContext } from 'react-router-dom';
 import { useApp } from '../App.jsx';
 import { feedbackGeometry } from './feedbackGeometry.js';
@@ -33,7 +34,7 @@ import { MathText } from '../lib/latex.jsx';
 import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { inkCanvasHeight, useFormFactor } from '../platform/formFactor.js';
-import { useT } from '../i18n/index.js';
+import { useLanguage, useT } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
 import './InkAnswer.css';
 import { priNative } from '../platform/native/index.js';
@@ -51,8 +52,12 @@ const inkDiagnosticsVisible = () => {
 const SETTLE_MS = 1100;
 // How long a server read runs before the note changes to "still reading".
 export const STILL_READING_MS = 5000;
-/** A reader that did not answer is tried again on its own, a few times. */
-// A focus or a return to the tab also tries again at once (see below).
+// A reader that did not answer is tried again on its own AUTO_RETRY_MAX times
+// (20 s, 40 s, 80 s) and then not again until the student asks: a page must
+// never keep re-sending a read nobody is watching. A refusal that is not "did
+// not answer" (the service's reading limit, this account's allowance or rate
+// limit, a request the server will not accept) is never re-sent by a timer.
+const PASSIVE_BLOCKS = new Set(['capacity', 'rate-limited', 'allowance', 'request', 'not-allowed', 'not-available', 'turned-off']);
 
 // The reader's "why this page is waiting" sentences were written with a save
 // claim in them ("Saved. It will be read…"). The reader does not know whether
@@ -84,6 +89,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
   const t = useT();
+  const { language } = useLanguage();
   const formFactor = useFormFactor();
   const fittedHeight = inkCanvasHeight(height, formFactor);
   const canvasRef = useRef(null);
@@ -105,7 +111,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   // A cleared page that can still be taken back for a few seconds (Clear sits
   // beside Undo, where a Pencil slips).
   const [cleared, setCleared] = useState(null);
-  // null | { kind: 'reading' } | { kind: 'waiting', key } | { kind: 'empty' } | { kind: 'allowance' }
+  // null | { kind: 'reading' } | { kind: 'waiting', key, block, stopped } | { kind: 'empty' } | { kind: 'allowance', key, block }
   const [status, setStatus] = useState(null);
   useEffect(() => {
     if (typeof onReaderState !== 'function') return;
@@ -175,6 +181,20 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     }, delay);
   };
   const sendToReaderRef = useRef(null);
+  /**
+   * The page was not read. Name the reason, keep the ink, and try again by
+   * itself only when the reason is a reader that did not answer — and only
+   * AUTO_RETRY_MAX times. After that the sentence stops promising a retry and
+   * the "Try again" button is the way forward.
+   */
+  const waitFor = (who, outcome, seq) => {
+    const block = readerBlock(who, { outcome });
+    if (block.kind === 'allowance') { setStatus({ kind: 'allowance', key: block.inkKey, block }); return; }
+    const auto = block.autoRetry && retriesRef.current < AUTO_RETRY_MAX;
+    const stopped = block.autoRetry && !auto;
+    setStatus({ kind: 'waiting', key: stopped ? stoppedKey(block.inkKey) : block.inkKey, block, stopped });
+    if (auto) scheduleRetry(seq); else clearRetry();
+  };
 
   /**
    * Send the page to the server reader. Its reading is the only reading.
@@ -190,7 +210,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
     if (offline || !cloudReadingEnabled(who)) {
       queuedRef.current = true;
-      setStatus({ kind: 'waiting', key: inkReadingBlockedKey(who) });
+      setStatus({ kind: 'waiting', key: readerBlock(who).inkKey, block: readerBlock(who) });
       return;
     }
     abortRef.current?.abort?.();
@@ -204,7 +224,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       // a mark was given for).
       if (seq !== readSeqRef.current || disabledRef.current) return;
       if (outcome?.reason === 'cancelled') return;
-      if (outcome?.reason === 'allowance') { sentRef.current = null; setStatus({ kind: 'allowance' }); return; }
+      if (outcome?.reason === 'allowance') { sentRef.current = null; waitFor(who, outcome, seq); return; }
       // Line geometry comes from the strokes themselves (no recognition), so
       // the ✓/✗ can be drawn on the student's own lines when the counts agree.
       let geometry = null;
@@ -227,17 +247,14 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       // Not read: say why, keep the ink, and try again by itself.
       sentRef.current = null;
       queuedRef.current = true;
-      setStatus({ kind: 'waiting', key: inkReadingBlockedKey(who, { outcome }) });
-      scheduleRetry(seq);
+      waitFor(who, outcome, seq);
     }).catch((error) => {
       if (seq !== readSeqRef.current || disabledRef.current) return;
       sentRef.current = null;
       queuedRef.current = true;
       // A refusal that escaped still names its reason (401 → sign in, 403
       // EMAIL_UNVERIFIED → verify); only an unknown throw is "not answering".
-      const outcome = { error: { code: error?.code, status: error?.status } };
-      setStatus({ kind: 'waiting', key: inkReadingBlockedKey(who, { outcome }) });
-      scheduleRetry(seq);
+      waitFor(who, { error: { code: error?.code, status: error?.status, resetAt: error?.resetAt } }, seq);
     });
   }, [publish]);
   sendToReaderRef.current = sendToReader;
@@ -292,9 +309,13 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       retriesRef.current = 0;
       scheduleRead(strokesRef.current, { immediate: true, fresh: true });
     };
+    // Coming back to the tab is not a reason to re-send a read the server
+    // refused for a limit, or one the page has stopped retrying: only a change
+    // in the account or the connection is.
+    const quiet = () => status?.kind === 'allowance' || status?.stopped === true || PASSIVE_BLOCKS.has(status?.block?.kind);
     const stopSession = onCloudSessionChange(retry);
-    const onOnline = () => retry();
-    const onVisible = () => { if (typeof document === 'undefined' || document.visibilityState !== 'hidden') retry(); };
+    const onOnline = () => { if (!PASSIVE_BLOCKS.has(status?.block?.kind) && status?.kind !== 'allowance') retry(); };
+    const onVisible = () => { if (quiet()) return; if (typeof document === 'undefined' || document.visibilityState !== 'hidden') retry(); };
     if (typeof window !== 'undefined') {
       window.addEventListener?.('online', onOnline);
       window.addEventListener?.('focus', onVisible);
@@ -318,6 +339,9 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     const identity = readinessIdentity(user);
     const changed = identity !== identityRef.current;
     identityRef.current = identity;
+    // A re-render with the same account is not news: a read the server refused
+    // for a limit, or that the page stopped retrying, is not re-sent by it.
+    if (!changed && (status?.stopped === true || PASSIVE_BLOCKS.has(status?.block?.kind))) return;
     if (status?.kind === 'waiting' && strokesRef.current.length && cloudReadingEnabled(user)) {
       scheduleRead(strokesRef.current, { immediate: true, fresh: changed });
     }
@@ -389,9 +413,9 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     : status?.kind === 'empty'
       ? t('ink.serverEmpty')
       : status?.kind === 'allowance'
-        ? t('ink.cloudAllowanceUsed')
+        ? t(status.key || 'ink.waitingAllowance', { time: retryClock(status.block?.retryAt, language) })
         : status?.kind === 'waiting'
-          ? t(draftSaved ? status.key : (WAITING_WITHOUT_SAVE_CLAIM[status.key] || status.key))
+          ? t(draftSaved ? status.key : (WAITING_WITHOUT_SAVE_CLAIM[status.key] || status.key), { time: retryClock(status.block?.retryAt, language) })
           : null;
 
   return (
@@ -493,11 +517,15 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           notice stays the one sentence it is announced as. */}
       {/* A reader that is not answering is tried again by itself; the
           student can also ask now instead of waiting for the next attempt. */}
-      {status?.kind === 'waiting' && !disabled && status.key === 'ink.waitingServiceDown' && (
+      {status?.kind === 'waiting' && !disabled && (status.block?.manualRetry === true || status.key === 'ink.waitingServiceDown') && (
         <div className="ink-status-action">
-          <button type="button" className="btn btn-ghost btn-sm" data-ink-retry-reading
+          <button type="button" className="btn btn-ghost btn-sm" data-ink-retry-reading data-reader-block={status.block?.kind || undefined}
             onClick={() => {
               if (!strokesRef.current.length) return;
+              // The student asked: exactly one new read is sent, whatever
+              // limit was last reported. If it is refused again the page
+              // waits again, without a timer.
+              resumeReaderNow();
               retriesRef.current = 0;
               scheduleRead(strokesRef.current, { immediate: true, fresh: true });
             }}>{t('common.tryAgain')}</button>

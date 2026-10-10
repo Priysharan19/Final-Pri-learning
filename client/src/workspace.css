@@ -37,6 +37,23 @@
 .photo-attach { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .photo-thumb { position: relative; border-radius: 4px; overflow: hidden; border: 1px solid var(--hairline-strong); }
 .photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+/* Photo mode: the lines read from the page. Same quiet rows as the ink
+   reading; a line left out is struck through, never removed. */
+.photo-lines { margin-top: 12px; }
+.photo-lines-help { font-size: 13px; margin: 2px 0 8px; }
+.photo-lines-note { font-size: 13.5px; margin: 0 0 8px; }
+.photo-lines-list { list-style: none; margin: 0; padding: 0; }
+.photo-line { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 4px 8px; padding: 4px 0; border-top: 1px solid var(--hairline); }
+.photo-line-n { font-size: 12px; color: var(--ink-3); text-align: right; font-variant-numeric: tabular-nums; }
+.photo-line-text { width: 100%; min-width: 0; }
+.photo-line-note { grid-column: 2 / -1; font-size: 12.5px; color: var(--ink-2); }
+.photo-line.is-check .photo-line-text { border-color: var(--hairline-strong); border-style: dashed; }
+.photo-line.is-check .photo-line-note { color: var(--ink); font-weight: 600; }
+.photo-line.is-out .photo-line-text { text-decoration: line-through; color: var(--ink-3); }
+@media (max-width: 520px) {
+  .photo-line { grid-template-columns: 20px minmax(0, 1fr); }
+  .photo-line-toggle { grid-column: 2; justify-self: start; }
+}
 .photo-thumb button { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 3px; border: none; cursor: pointer; font-size: 12px; line-height: 1; }
 .selfmark-row { display: flex; gap: 10px; align-items: flex-start; padding: 7px 0; font-size: 14.5px; cursor: pointer; }
 .selfmark-row input { width: 17px; height: 17px; accent-color: var(--gold); margin-top: 2px; }

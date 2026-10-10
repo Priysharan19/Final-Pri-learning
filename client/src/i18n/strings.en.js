@@ -2720,6 +2720,5 @@ export default {
   'photo.answerAmbiguous': "Your page gives more than one possible final answer ({candidates}). Type the one you mean in Final answer.",
   'photo.answerNone': "No final answer could be picked out from the lines you kept. Type it in Final answer.",
   'photo.statusSaved': "Photo and reading saved on this device",
-  'photo.statusNotKept': "This photo is too large to keep on this device — it stays on this page until you leave it",
   'photo.restored': "Your photo, its reading and your changes were restored from this device.",
 };
