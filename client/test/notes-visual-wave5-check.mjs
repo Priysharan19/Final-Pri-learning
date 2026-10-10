@@ -62,6 +62,9 @@ for(const group of IN_CURRICULUM) {
         assert.ok([f.l,f.w,f.h].every(n=>Number.isInteger(n)&&n>0));
       } else if(f.type==='tree'){
         assert.ok(f.a>0 && f.a<f.ad && f.sa>0 && f.sa<f.sad && f.sb>0 && f.sb<f.sbd);
+      } else if(f.type==='pascal'){
+        assert.ok(Number.isInteger(f.n)&&f.n>=3&&f.n<=8);
+        assert.ok(Number.isInteger(f.k)&&f.k>=0&&f.k<=f.n);
       } else if(f.type==='dots'){
         assert.ok(f.rows>=2&&f.rows<=10);
       } else if(f.type==='interval'){
