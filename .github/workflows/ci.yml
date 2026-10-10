@@ -257,6 +257,16 @@ jobs:
           # transcript-then-Submit; never shared across accounts.
           node server/test/recognition-dedupe-check.mjs 2>&1 | tee recognition-dedupe.log
           grep -Fq 'RECOGNITION DEDUPE: PASS — 201/201 checks' recognition-dedupe.log
+          # One press of Submit for a handwritten or photographed answer is one
+          # request: the picture is read (never twice), receipted and marked
+          # under the same refusals, limits, commit-time authority and
+          # idempotency as /recognize + /confirm + /submit.
+          node server/test/submit-with-picture-check.mjs 2>&1 | tee submit-with-picture.log
+          grep -Fq 'SUBMIT WITH PICTURE: PASS — 63/63 checks' submit-with-picture.log
+          # The database cost of the hot paths, pinned: statements, wire round
+          # trips and transactions per request, and requests per student action.
+          node server/test/hot-path-budget-check.mjs 2>&1 | tee hot-path-budget.log
+          grep -Fq 'HOT PATH BUDGET: PASS — 27/27 checks' hot-path-budget.log
           # A photographed page: the answer proposed is mathematics, never a sentence;
           # unrelated lines are left out by default and never break the working.
           node client/test/photo-pipeline-check.mjs 2>&1 | tee photo-pipeline.log
@@ -350,7 +360,7 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 46/46 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 48/48 suites' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
@@ -359,6 +369,8 @@ jobs:
           grep -Fq '✓ flagship-ap-working-http-check.mjs' platform-postgres.log
           grep -Fq '✓ marker-isolation-check.mjs' platform-postgres.log
           grep -Fq '✓ recognition-dedupe-check.mjs' platform-postgres.log
+          grep -Fq '✓ submit-with-picture-check.mjs' platform-postgres.log
+          grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-seed-reissue-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-server-question-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-repeat-credit-check.mjs' platform-postgres.log

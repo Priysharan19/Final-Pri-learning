@@ -92,6 +92,7 @@ server side refuses plaintext as well.
 | `PRI_DATABASE_STATEMENT_TIMEOUT_MS` | 15000 | 1000–600000 | Any statement, **including a wait for a row or advisory lock**, is cancelled after this. Answered as `503 PLATFORM_DB_TIMEOUT` + `Retry-After: 2`. |
 | `PRI_DATABASE_IDLE_TX_TIMEOUT_MS` | 30000 | 1000–3600000 | A session idle inside an open transaction is ended by Postgres; the request gets `503 PLATFORM_DB_TIMEOUT`, the connection is discarded. |
 | `PRI_DATABASE_LOCK_WAIT_MS` | 5000 | 100–60000 | How long a push may wait for its account's lock (queued in process, then `pg_try_advisory_lock` if another instance holds it) before `503 PLATFORM_DB_BUSY` + `Retry-After: 1`. One account's burst holds at most one connection per instance. |
+| `PRI_DATABASE_POOL_IDLE_MS` | 300000 | 1000–3600000 | How long an unused pooled connection is kept before it is closed (TCP keep-alive is on). A new connection costs several round trips (TCP, TLS, authentication, session setup) before its first statement; at the earlier fixed 30 s nearly every request after a pause paid them. Watch `dbAcquireMs` on the `http_request` log line. |
 | `PRI_DATABASE_POOL_MAX` | 10 | 1–50 | Connections per server replica. `POOL_MAX × replicas` must stay **below** the session-mode pool size (or `max_connections` minus Supabase's reserved/dashboard connections for a direct connection). |
 
 Exhausted serialization retries and a pool that cannot hand out a connection within 10 s are

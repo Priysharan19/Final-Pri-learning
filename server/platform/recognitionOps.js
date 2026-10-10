@@ -68,6 +68,7 @@ import { consumeAiAllowance, refundAiAllowance, refuseAiAllowance } from './aiAl
 import { refundPaidCall, refusePaidCall, reservePaidCall, spendCeilingMissing } from './spendCeiling.js';
 import { recordProviderUsage, recordRecognitionRead } from './metrics.js';
 import { logEvent } from './observability.js';
+import { timePhase } from './requestTiming.js';
 import { SYSTEM_INSTRUCTIONS, TRANSCRIPTION_SCHEMA, providerConfig } from './handwritingProvider.js';
 
 /**
@@ -237,12 +238,12 @@ export function createRecognitionOps({
 
   /** The one paid path: allowance, ceiling, provider, refunds. */
   async function paidRead({ db, accountId, image, env, transcribe, requestId }) {
-    const allowance = await consumeAiAllowance(db, { accountId, kind: 'handwriting', env });
+    const allowance = await timePhase('limit', () => consumeAiAllowance(db, { accountId, kind: 'handwriting', env }));
     if (!allowance.allowed) return { refusal: { kind: 'allowance', verdict: allowance } };
 
     // Counted before anything is sent, so a request can never spend past the
     // ceiling; each fallback escalation is a second unit, counted the same way.
-    const first = await reservePaidCall(db, { env });
+    const first = await timePhase('limit', () => reservePaidCall(db, { env }));
     if (first.verdict) {
       await refundAiAllowance(db, allowance);
       return { refusal: { kind: 'paid', verdict: first.verdict } };
@@ -253,7 +254,7 @@ export function createRecognitionOps({
     const started = Date.now();
     counters.providerReads += 1;
     try {
-      const result = await transcribe(image, {
+      const result = await timePhase('provider', () => transcribe(image, {
         env,
         fetchImpl: meter.fetchWithUsage,
         authorizeFallback: async () => {
@@ -261,7 +262,7 @@ export function createRecognitionOps({
           if (!next.verdict) reservations.push(next);
           return next.verdict;
         }
-      });
+      }));
       await meter.settled();
       reportUsage({ requestId, calls, paidUnits: reservations.length, ms: Date.now() - started });
       return { result, paidUnits: reservations.length, calls: calls.map(describeCall) };
