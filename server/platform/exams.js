@@ -93,20 +93,35 @@
 // picture this account has already paid to have read is not paid for again.
 //
 // Bounded, and owned by the account's result row (it survives a restart and
-// is the same on every replica): at most HANDWRITING_MAX_ATTEMPTS reads are
-// ever started for one page, each reserved in the row under the account's
-// lock BEFORE the reader is asked, never sooner than the backoff after the
-// last one, and none after HANDWRITING_RECOVERY_WINDOW_MS. States:
+// is the same on every replica). At most HANDWRITING_MAX_ATTEMPTS reads are
+// ever started for one page: ONE automatic read (the device presents the page
+// once when the paper closes), and after that only reads the student asks for
+// by name (`retry: true`, "Retry checking"). A request without `retry` for a
+// page that has already had its automatic read starts nothing, so nothing
+// fires silently or repeatedly. Every read is reserved in the row under the
+// account's lock BEFORE the reader is asked, never sooner than the backoff
+// after the last one, and none after HANDWRITING_RECOVERY_WINDOW_MS. States:
 //
 //   awaiting-reading   not read yet (not-read) or the last try failed
-//                      (reader-unavailable, capacity, marking-busy); may be
-//                      presented again after `nextAttemptAt`
+//                      (reader-unavailable, capacity, marking-busy)
 //   resolved           read with confidence and marked; the line is replaced,
 //                      the totals recomputed, one graded-attempt event written
-//   needs-review       terminal for automation: the reading was uncertain or
-//                      empty, the attempts are spent, or the window closed.
-//                      The answer stays preserved and unmarked for an
-//                      authorised person; no mark is ever invented for it.
+//   needs-review       the reading was uncertain or empty (the student may
+//                      retry while tries remain), or the tries are spent or
+//                      the window closed (retries-exhausted, window-closed:
+//                      nothing more can be asked here). The answer stays
+//                      preserved and unmarked; no mark is ever invented.
+//
+// Each page as read back says `triesLeft`, `canRetry` and `retryAt`.
+//
+// THE RECEIPT. `handwriting.pages[key]` is the server's record that
+// handwriting was captured for that answer: the question and answer key, the
+// digest of the picture, when the server RECEIVED that digest and on what
+// evidence (`submission-in-time`: the finish arrived by deadline + grace on
+// the server's clock; `snapshot-before-deadline`: the last checkpoint the
+// server saved before it, with its revision), and the status. It never holds
+// the picture. The server claims nothing about a page whose digest it did
+// not receive in time: such a page is not on the receipt at all.
 //
 // Every other line of the result, and `handwriting.submissionDigest` (the
 // digest of exactly the responses that were finalised), never change.
@@ -185,7 +200,7 @@ const CREATE_FIELDS = new Set(['kind', 'blueprint', 'paper', 'layoutSeed', 'slot
 const LAYOUT_FIELDS = new Set(['blueprint']);
 const SNAPSHOT_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'ink', 'cur', 'rev']);
 const FINISH_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'ink', 'ms', 'reason', 'submissionKey']);
-const HANDWRITING_FIELDS = new Set(['key', 'image']);
+const HANDWRITING_FIELDS = new Set(['key', 'image', 'retry']);
 
 // ── Handwriting not read when the paper closed (see the header) ─────────────
 /** How many reads are ever started for one frozen page. */
@@ -1206,7 +1221,12 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
         frozenAt: now, submissionDigest: digest(JSON.stringify(responses)),
         maxAttempts: HANDWRITING_MAX_ATTEMPTS, windowEndsAt: now + HANDWRITING_RECOVERY_WINDOW_MS,
         pages: Object.fromEntries(marked.pendingKeys.map(key => [key, {
-          digest: responses.ink[key], state: 'awaiting-reading', reason: 'not-read', attempts: 0, lastAttemptAt: null, nextAttemptAt: now, resolvedAt: null
+          key, questionId: key.split('::')[0], digest: responses.ink[key],
+          // When, and on what evidence, the server came to hold this digest.
+          evidence: inTime && !(body.ink === undefined || body.ink === null) ? 'submission-in-time' : 'snapshot-before-deadline',
+          receivedAt: inTime && !(body.ink === undefined || body.ink === null) ? now : (snapshot?.savedAt ?? null),
+          snapshotRev: inTime && !(body.ink === undefined || body.ink === null) ? null : (snapshot?.rev ?? null),
+          state: 'awaiting-reading', reason: 'not-read', attempts: 0, lastAttemptAt: null, nextAttemptAt: now, resolvedAt: null
         }]))
       } } : {})
     };
@@ -1240,9 +1260,16 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
 
 /** A frozen page as it stands now: past the recovery window it is a person's to resolve. */
 function pageView(page, handwriting, now) {
-  if (page.state === 'awaiting-reading' && now > Number(handwriting.windowEndsAt)) return { ...page, state: 'needs-review', reason: 'window-closed', nextAttemptAt: null };
-  return page;
+  if (page.state === 'resolved') return { ...page, triesLeft: 0, canRetry: false, retryAt: null };
+  const triesLeft = Math.max(0, HANDWRITING_MAX_ATTEMPTS - Number(page.attempts || 0));
+  if (now > Number(handwriting.windowEndsAt)) return { ...page, state: 'needs-review', reason: 'window-closed', nextAttemptAt: null, triesLeft: 0, canRetry: false, retryAt: null };
+  if (!triesLeft) return { ...page, state: 'needs-review', reason: 'retries-exhausted', nextAttemptAt: null, triesLeft: 0, canRetry: false, retryAt: null };
+  // The first read is the automatic one; every later one is the student's own.
+  return { ...page, triesLeft, canRetry: Number(page.attempts || 0) >= 1, retryAt: Number(page.nextAttemptAt) > now ? Number(page.nextAttemptAt) : null };
 }
+/** May a read be started for this page (as viewed) now, by this kind of request? */
+const mayAttempt = (page, now, retry) => page.state !== 'resolved' && page.triesLeft > 0 && now >= Number(page.nextAttemptAt || 0)
+  && (Number(page.attempts || 0) === 0 || retry === true);
 
 /**
  * The stored result as its owner reads it. A result with no pending
@@ -1308,7 +1335,8 @@ function answerFromReading(item, lines) {
  */
 async function resolveHandwriting(db, accountId, id, body, { env, transcribe, requestId = null, authorise = null }) {
   const now = Date.now();
-  if (!plain(body) || unknown(body, HANDWRITING_FIELDS).length || typeof body.key !== 'string' || body.key.length > 240 || typeof body.image !== 'string') {
+  if (!plain(body) || unknown(body, HANDWRITING_FIELDS).length || typeof body.key !== 'string' || body.key.length > 240 || typeof body.image !== 'string'
+      || (body.retry !== undefined && typeof body.retry !== 'boolean')) {
     return { status: 400, code: 'EXAM_HANDWRITING_INVALID', message: 'Send the answer the page belongs to and its picture.' };
   }
   try { validateImage(body.image); }
@@ -1327,7 +1355,7 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
   };
   const asItStands = state => ({
     result: resultView(state.result, now), attempted: false,
-    ...(state.page.state === 'awaiting-reading' && Number(state.page.nextAttemptAt) > now ? { retryAt: Number(state.page.nextAttemptAt) } : {})
+    ...(state.page.retryAt ? { retryAt: state.page.retryAt } : {})
   });
   const write = result => {
     const json = JSON.stringify(result);
@@ -1337,14 +1365,15 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
 
   const first = await load();
   if (first.status) return first;
-  if (first.page.state !== 'awaiting-reading') return asItStands(first);
+  if (first.page.state === 'resolved' || !first.page.triesLeft) return asItStands(first);
   // Only the picture frozen with the paper can be read: not a page written,
   // erased or photographed again afterwards.
   const presented = createHash('sha256').update(Buffer.from(body.image.slice(body.image.indexOf(',') + 1), 'base64')).digest('hex');
   if (presented !== first.page.digest) {
     return { status: 409, code: 'EXAM_HANDWRITING_CHANGED', message: 'This is not the handwriting that was saved when the paper closed. Only that page can be read.' };
   }
-  if (now < Number(first.page.nextAttemptAt)) return asItStands(first);
+  // Not yet allowed, or a second automatic read: nothing starts.
+  if (!mayAttempt(first.page, now, body.retry)) return asItStands(first);
 
   // ── Reserve the read, in the row, before the reader is asked ──────────────
   // Whoever gets here second (a second tap, a second tab, another replica)
@@ -1353,7 +1382,7 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
     if (authorise) { const refused = await authorise(); if (refused) return refused; }
     const state = await load();
     if (state.status) return state;
-    if (state.page.state !== 'awaiting-reading' || now < Number(state.page.nextAttemptAt)) return asItStands(state);
+    if (!mayAttempt(state.page, now, body.retry)) return asItStands(state);
     const attempts = Number(state.stored.attempts || 0) + 1;
     await write(withPage(state.result, {
       ...state.stored, attempts, lastAttemptAt: now,
@@ -1410,7 +1439,7 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
     const state = await load();
     if (state.status) return state;
     // Settled meanwhile, or this is not the attempt the row is waiting on.
-    if (state.stored.state !== 'awaiting-reading' || Number(state.stored.attempts) !== reserved.attempts) return asItStands(state);
+    if (state.stored.state === 'resolved' || Number(state.stored.attempts) !== reserved.attempts) return asItStands(state);
     let result = state.result;
     let page;
     if (failure) {
@@ -1422,7 +1451,10 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
       };
     } else if (terminal) {
       // Kept for the person who resolves it; never marked from here.
-      page = { ...state.stored, state: 'needs-review', reason: terminal, nextAttemptAt: null, transcript: lines, reused: read.reused === true };
+      // The student may ask again while tries remain — not before a kept read
+      // of this picture has expired, so a retry is a new reading, not a replay.
+      page = { ...state.stored, state: 'needs-review', reason: terminal, transcript: lines, reused: read.reused === true,
+        nextAttemptAt: now + HANDWRITING_BACKOFF_MS[HANDWRITING_BACKOFF_MS.length - 1] };
     } else {
       const { sq, job } = located;
       const index = result.detail.findIndex(d => d.id === sq.id);
@@ -1470,7 +1502,8 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
     }
     result = withPage(result, page);
     await write(result);
-    return { result: resultView(result, now), attempted: true, ...(page.state === 'awaiting-reading' && page.nextAttemptAt ? { retryAt: page.nextAttemptAt } : {}) };
+    const viewed = resultView(result, now);
+    return { result: viewed, attempted: true, ...(viewed.handwriting.pages[key].retryAt ? { retryAt: viewed.handwriting.pages[key].retryAt } : {}) };
   }, lock);
 }
 

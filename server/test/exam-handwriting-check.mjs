@@ -36,7 +36,7 @@ const picture = (label, behaviour = 'ok', filler = 'a') =>
   'data:image/png;base64,' + Buffer.from(`PICTURE|${behaviour}|${label}|` + filler.repeat(300)).toString('base64');
 const digestOf = image => createHash('sha256').update(Buffer.from(image.split(',')[1], 'base64')).digest('hex');
 
-const provider = { calls: new Map(), total: 0, held: new Map(), arrivals: new Map(), hanging: new Set() };
+const provider = { calls: new Map(), total: 0, held: new Map(), arrivals: new Map(), hanging: new Set(), doubting: new Set() };
 const callsFor = label => provider.calls.get(label) || 0;
 function arrived(label) {
   return new Promise((resolve, reject) => {
@@ -63,6 +63,7 @@ const fake = createServer((req, res) => {
     const read = { lines, confidence: 0.96, needs_confirmation: false };
     if (behaviour === 'blank') return reply(res, sent.model, { lines: [], confidence: 0, needs_confirmation: true });
     if (behaviour === 'unsure') return reply(res, sent.model, { lines: lines.map(l => ({ ...l, confidence: 0.4 })), confidence: 0.4, needs_confirmation: true });
+    if (behaviour === 'doubt' && provider.doubting.has(label)) return reply(res, sent.model, { lines: lines.map(l => ({ ...l, confidence: 0.4 })), confidence: 0.4, needs_confirmation: true });
     if (behaviour === 'fail') { res.writeHead(500, { 'content-type': 'application/json' }); return res.end('{}'); }
     if (behaviour === 'hang' && provider.hanging.has(label)) return; // never answers: the adapter's own timeout ends it
     if (behaviour === 'hold') {
@@ -147,7 +148,7 @@ const create = (jar, body) => h.request('/v1/exams', { method: 'POST', jar, body
 const save = (jar, id, body) => h.request(`/v1/exams/${id}/answers`, { method: 'PUT', jar, body });
 const finish = (jar, id, body = {}) => h.request(`/v1/exams/${id}/finish`, { method: 'POST', jar, body });
 const read = (jar, id) => h.request(`/v1/exams/${id}`, { jar });
-const present = (jar, id, key, image) => h.request(`/v1/exams/${id}/handwriting`, { method: 'POST', jar, body: { key, image } });
+const present = (jar, id, key, image, retry = false) => h.request(`/v1/exams/${id}/handwriting`, { method: 'POST', jar, body: { key, image, ...(retry ? { retry: true } : {}) } });
 const transcribe = (jar, image) => h.request('/v1/handwriting/transcribe', { method: 'POST', jar, body: { image } });
 const sealed = async id => JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE scope='exam-paper' AND key=?", [id])).response_json);
 const storedResult = async id => JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE scope='exam-result' AND key=?", [id])).response_json);
@@ -289,6 +290,11 @@ try {
       [[q2.id], digestOf(image), 'awaiting-reading', 'not-read', 0, HANDWRITING_MAX_ATTEMPTS, HANDWRITING_RECOVERY_WINDOW_MS],
       'the page is frozen in the result by the digest of its picture, awaiting reading, with its limits stated');
     eq(provider.total - before, 0, 'finalising read nothing and paid for nothing');
+    const receiptRow = (await h.db.get("SELECT response_json FROM idempotency_keys WHERE scope='exam-result' AND key=?", [s.exam.id])).response_json;
+    eq([page.key, page.questionId, page.evidence, page.receivedAt, page.snapshotRev, page.triesLeft, page.canRetry],
+      [q2.id, q2.id, 'submission-in-time', frozen.finishedAt, null, HANDWRITING_MAX_ATTEMPTS, false],
+      'that record is the receipt: which question, the digest, when the server received it and on what evidence, and its status');
+    ok(!/base64|data:image|PICTURE/.test(receiptRow) && !receiptRow.includes(image.split(',')[1].slice(0, 40)), 'the stored receipt holds no image bytes at all');
     const attemptsBefore = await events(s.id, 'graded-attempt');
     ok(!attemptsBefore.some(e => e.entityId === q2.id) && attemptsBefore.some(e => e.entityId === q3.id), 'no attempt is recorded for the pending answer (the blank one is, as a practice paper always has)');
     eq((await events(s.id, 'exam-result'))[0].payload.pendingHandwriting, 1, "the paper's own event says one answer is still waiting");
@@ -370,8 +376,8 @@ try {
     eq([l2.correct, l2.outcome === 'pending', l2.pending, l2.given, l2.awarded <= 0], [false, false, undefined, wrongAnswer(q2.payload), true],
       'the page that states a wrong answer is marked wrong — by the engine, on what was written');
     const doubted = after.handwriting.pages[q3.id];
-    eq([l3.pending, l3.outcome, l3.correct, l3.awarded, l3.attemptId, doubted.state, doubted.reason, doubted.transcript, doubted.nextAttemptAt],
-      [true, 'pending', false, Number(q3.marking.unanswered || 0), null, 'needs-review', 'uncertain', [rightAnswer(q3.payload)], null],
+    eq([l3.pending, l3.outcome, l3.correct, l3.awarded, l3.attemptId, doubted.state, doubted.reason, doubted.transcript, doubted.canRetry, doubted.triesLeft],
+      [true, 'pending', false, Number(q3.marking.unanswered || 0), null, 'needs-review', 'uncertain', [rightAnswer(q3.payload)], true, HANDWRITING_MAX_ATTEMPTS - 1],
       'the page the reader was unsure of is NOT marked: it stays pending, preserved with its unconfirmed transcript, for a person to resolve');
     eq([after.provisional, after.pendingMarks, after.score, sumAwarded(after)], [true, Number(q3.marking.correct), l1.awarded + l2.awarded, after.score],
       'the result stays provisional for exactly that answer');
@@ -380,7 +386,7 @@ try {
     skew += 2 * 60 * 60000;
     const retry = await present(s.jar, s.exam.id, q3.id, pages[q3.id]);
     eq([retry.status, retry.data.attempted, provider.total - before, lineOf(retry.data.result, q3).pending], [200, false, spentOnThree, true],
-      'an uncertain reading is never retried into a mark: presenting it again starts nothing');
+      'nothing retries by itself: a request that is not the student\'s own Retry starts no second read');
     ok(!(await events(s.id, 'graded-attempt')).some(e => e.entityId === q3.id), 'and no attempt exists for it');
     // An empty read states no answer either.
     const t = await sitting(1);
@@ -442,9 +448,10 @@ try {
     await restart();
     eq((await read(s.jar, s.exam.id)).data.result.handwriting.pages[q1.id], page, 'after a process restart the pending page, its attempt count and its backoff are exactly as they were');
     skew += HANDWRITING_BACKOFF_MS[0] + 1000;
-    const recovered = await present(s.jar, s.exam.id, q1.id, image);
+    eq([(await present(s.jar, s.exam.id, q1.id, image)).data.attempted, callsFor(label) - before], [false, firstOperation], 'after the backoff an automatic request still starts nothing: the one automatic read is spent');
+    const recovered = await present(s.jar, s.exam.id, q1.id, image, true);
     eq([recovered.data.attempted, lineOf(recovered.data.result, q1).correct, recovered.data.result.handwriting.pages[q1.id].state, recovered.data.result.handwriting.pages[q1.id].attempts, callsFor(label) - before],
-      [true, true, 'resolved', 2, firstOperation + 1], 'after the backoff the next authenticated visit resolves it: the second attempt, exactly one more provider call');
+      [true, true, 'resolved', 2, firstOperation + 1], 'the student\'s own Retry checking resolves it: the second attempt, exactly one more provider call');
     eq(frozenFacts(recovered.data.result), frozenFacts(frozen), 'on the same frozen submission');
     paidPerAnswer.afterOneTimeout = callsFor(label) - before;
   }
@@ -459,17 +466,18 @@ try {
     const frozen = (await finish(s.jar, s.exam.id, { ink: { [q1.id]: digestOf(image) }, reason: 'student' })).data;
     const tries = [];
     for (let n = 0; n < HANDWRITING_MAX_ATTEMPTS; n++) {
-      const tried = await present(s.jar, s.exam.id, q1.id, image);
+      const tried = await present(s.jar, s.exam.id, q1.id, image, n > 0);
       tries.push([tried.data.attempted, tried.data.result.handwriting.pages[q1.id].state, tried.data.result.handwriting.pages[q1.id].attempts]);
       skew += HANDWRITING_BACKOFF_MS[Math.min(n, HANDWRITING_BACKOFF_MS.length - 1)] + 1000;
     }
     eq(tries, [[true, 'awaiting-reading', 1], [true, 'awaiting-reading', 2], [true, 'needs-review', 3]], 'a reader that keeps failing is tried the fixed number of times and no more');
     skew += 24 * 60 * 60000;
     const callsBeforeLast = callsFor(label) - before;
-    const spent = await present(s.jar, s.exam.id, q1.id, image);
+    const spent = await present(s.jar, s.exam.id, q1.id, image, true);
     const final = spent.data.result;
     const sentInAll = callsFor(label) - before;
-    eq([spent.data.attempted, final.handwriting.pages[q1.id].reason, final.handwriting.pages[q1.id].nextAttemptAt], [false, 'retries-exhausted', null], 'after that the page is a person\'s to resolve');
+    eq([spent.data.attempted, final.handwriting.pages[q1.id].reason, final.handwriting.pages[q1.id].nextAttemptAt, final.handwriting.pages[q1.id].triesLeft, final.handwriting.pages[q1.id].canRetry],
+      [false, 'retries-exhausted', null, 0, false], 'at the limit even the student\'s own Retry starts nothing, and the page says no tries are left');
     ok(sentInAll >= HANDWRITING_MAX_ATTEMPTS && sentInAll <= 2 * HANDWRITING_MAX_ATTEMPTS && sentInAll === callsBeforeLast,
       `and nothing more is ever sent for it: ${sentInAll} provider calls in all for ${HANDWRITING_MAX_ATTEMPTS} read operations (each may include the adapter's one fallback call) [${EVIDENCE}]`);
     eq([lineOf(final, q1).pending, lineOf(final, q1).awarded, final.score, final.provisional, final.pendingMarks], [true, Number(q1.marking.unanswered || 0), frozen.score, true, Number(q1.marking.correct)],
@@ -496,7 +504,7 @@ try {
     process.env.PRI_PAID_CALLS_PER_HOUR = '10000';
     eq([(await present(s.jar, s.exam.id, q1.id, image)).data.attempted, callsFor(label) - before], [false, 0], 'raising nothing by hand: inside the wait nothing is sent even though capacity is back');
     skew += 61 * 60000;
-    const read2 = await present(s.jar, s.exam.id, q1.id, image);
+    const read2 = await present(s.jar, s.exam.id, q1.id, image, true);
     eq([read2.data.attempted, lineOf(read2.data.result, q1).correct, read2.data.result.handwriting.pages[q1.id].attempts, callsFor(label) - before],
       [true, true, 2, 1], 'when capacity has returned the frozen page is read: one provider call for the answer');
     eq(frozenFacts(read2.data.result), frozenFacts(frozen), 'on the frozen submission');
@@ -629,6 +637,42 @@ try {
     eq([tooLate.status, tooLate.data.attempted, callsFor(label) - before], [200, false, 0], 'and automation sends nothing for it any more');
   }
 
+  // ══ 13 · "Needs review" is not a dead end: the student's own Retry checking ═
+  {
+    const s = await sitting(1);
+    const [q1] = s.qs;
+    const label = rightAnswer(q1.payload);
+    const image = picture(label, 'doubt', 's');
+    const before = callsFor(label);
+    provider.doubting.add(label);
+    const frozen = (await finish(s.jar, s.exam.id, { ink: { [q1.id]: digestOf(image) }, reason: 'student' })).data;
+    const auto = await present(s.jar, s.exam.id, q1.id, image);
+    const doubted = auto.data.result.handwriting.pages[q1.id];
+    const autoCalls = callsFor(label) - before;
+    eq([auto.data.attempted, doubted.state, doubted.reason, doubted.attempts, doubted.triesLeft, doubted.canRetry, doubted.retryAt - doubted.lastAttemptAt, lineOf(auto.data.result, q1).pending],
+      [true, 'needs-review', 'uncertain', 1, HANDWRITING_MAX_ATTEMPTS - 1, true, HANDWRITING_BACKOFF_MS[1], true],
+      'the one automatic read was uncertain: the answer needs review, and the page says how many tries are left and when the next is allowed');
+    ok(autoCalls >= 1 && autoCalls <= 2, `that automatic read operation made ${autoCalls} provider call(s) [${EVIDENCE}]`);
+    const early = await Promise.all([present(s.jar, s.exam.id, q1.id, image, true), present(s.jar, s.exam.id, q1.id, image, true)]);
+    eq([early.map(r => r.data.attempted), early[0].data.retryAt, callsFor(label) - before, (await storedResult(s.exam.id)).handwriting.pages[q1.id].attempts],
+      [[false, false], doubted.retryAt, autoCalls, 1], 'Retry checking before the stated time starts nothing, uses no try, and says when it is allowed');
+    skew += HANDWRITING_BACKOFF_MS[1] + 1000;
+    provider.doubting.delete(label);
+    const changed = await present(s.jar, s.exam.id, q1.id, picture(label, 'ok', 't'), true);
+    eq([changed.status, changed.data.error.code, callsFor(label) - before, (await storedResult(s.exam.id)).handwriting.pages[q1.id].attempts],
+      [409, 'EXAM_HANDWRITING_CHANGED', autoCalls, 1], 'a retry with a changed picture is refused: no read, no try used, no mathematical edit possible');
+    eq([(await present(s.jar, s.exam.id, q1.id, image)).data.attempted, callsFor(label) - before], [false, autoCalls], 'and a request that is not the student\'s Retry still starts nothing');
+    const taps = await Promise.all([present(s.jar, s.exam.id, q1.id, image, true), present(s.jar, s.exam.id, q1.id, image, true)]);
+    await until(async () => (await storedResult(s.exam.id)).handwriting.pages[q1.id].state === 'resolved', 'the retried page to resolve');
+    const done = (await read(s.jar, s.exam.id)).data.result;
+    eq([taps.map(r => r.status), taps.filter(r => r.data.attempted).length, callsFor(label) - before - autoCalls, done.handwriting.pages[q1.id].attempts, done.handwriting.pages[q1.id].state, lineOf(done, q1).correct, lineOf(done, q1).given],
+      [[200, 200], 1, 1, 2, 'resolved', true, label],
+      `a double tap on Retry checking with the frozen picture is one try and one provider call, and the answer is marked by the engine [${EVIDENCE}]`);
+    eq([others(done, q1.id), frozenFacts(done), (await events(s.id, 'graded-attempt')).filter(e => e.entityId === q1.id).length],
+      [others(frozen, q1.id), frozenFacts(frozen), 1], 'on the frozen submission, with one graded attempt');
+    paidPerAnswer.retryFromNeedsReview = `${autoCalls}+1`;
+  }
+
   ok(provider.total > 0, 'the stand-in reader was the only reader reached');
 } finally {
   Date.now = realNow;
@@ -640,6 +684,6 @@ try {
   rmSync(scratch, { recursive: true, force: true });
   for (const name of vars) { if (previous[name] === undefined) delete process.env[name]; else process.env[name] = previous[name]; }
 }
-console.log(`provider calls per handwritten exam answer [${EVIDENCE}]: read before the deadline ${paidPerAnswer.readBeforeDeadline} · unread at the deadline ${paidPerAnswer.unreadAtDeadline} · slow provider ${paidPerAnswer.slowProvider} · after one timeout ${paidPerAnswer.afterOneTimeout} · after a capacity refusal ${paidPerAnswer.afterCapacityRefusal} · read, left unconfirmed, then closed ${paidPerAnswer.readThenUnconfirmed}`);
+console.log(`provider calls per handwritten exam answer [${EVIDENCE}]: read before the deadline ${paidPerAnswer.readBeforeDeadline} · unread at the deadline ${paidPerAnswer.unreadAtDeadline} · slow provider ${paidPerAnswer.slowProvider} · after one timeout ${paidPerAnswer.afterOneTimeout} · after a capacity refusal ${paidPerAnswer.afterCapacityRefusal} · read, left unconfirmed, then closed ${paidPerAnswer.readThenUnconfirmed} · uncertain automatic read then Retry checking ${paidPerAnswer.retryFromNeedsReview}`);
 console.log(`EXAM HANDWRITING: PASS — ${count}/${count} checks — unread handwriting is frozen, pending and read at most a bounded number of times on a real Pri ${engine} server with a synthetic reader.`);
 console.log('engine: ' + engine);
