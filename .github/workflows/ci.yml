@@ -57,7 +57,7 @@ jobs:
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 419/419 checks' suites.log
           grep -Fq 'METHOD MARKS: PASS — 53/53 checks' suites.log
-          grep -Fq 'METHOD PROGRESS: PASS — 623/623 checks' suites.log
+          grep -Fq 'METHOD PROGRESS: PASS — 584/584 checks' suites.log
           grep -Fq 'WORKING BRANCHES: PASS — 29/29 checks' suites.log
           grep -Fq 'Pri Reason V1 precision gate: PASS' suites.log
           grep -Fq 'Pri Reason V2 safety gate: PASS' suites.log
@@ -268,10 +268,10 @@ jobs:
           node server/test/practice-repeat-credit-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/india-bank-issue-coverage-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
-          grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1143/1143 checks' practice-http.log
+          grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1192/1192 checks' practice-http.log
           grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
           grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 34/34 checks' practice-http.log
-          grep -Fq 'REPEAT CREDIT: PASS — 141/141 checks' practice-http.log
+          grep -Fq 'REPEAT CREDIT: PASS — 236/236 checks' practice-http.log
       - name: Account, origin, CMS and classroom contracts
         run: |
           node server/test/account-deletion-reauth-check.mjs

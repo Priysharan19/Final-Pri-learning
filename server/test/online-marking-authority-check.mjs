@@ -95,15 +95,15 @@ try {
   // OR blank final answer. The numeric award must come from the same server
   // receipt across retries, never inferred from the device's transcript.
   //
-  // While the question is open, a line that only states the value of the
-  // unknown is not judged: `2t=t-3` then `t=-3` under a blank answer was told
-  // "one mark" exactly when the stated value was right, which checks a guess
-  // for the price of nothing. That working shows no mark on the first try; a
-  // step that moves the equation on still does.
+  // It is paid by the receipt that RESOLVES the question. While the question
+  // is open the server says nothing about the working — no marks, no report,
+  // no method evidence — because any verdict on a line tests a candidate
+  // answer: `2t=t-3` then `t=-3` under a blank answer was told "one mark"
+  // exactly when the stated value was right. The mark is deferred, not lost.
   const methodCases = [
-    { seed: 654321, answer: '17', steps: ['6t-1=-t-22', '7t-1=-22', '7t=-21', 't=-3'], root: '-3', shown: 1 },
-    { seed: 2, answer: '', steps: ['3m+12=m+8', '2m+12=8', '2m=-4'], root: '-2', shown: 1 },
-    { seed: 1234579, answer: '', steps: ['2t=t-3', 't=-3'], root: '-3', shown: 0 }
+    { seed: 654321, answer: '17', steps: ['6t-1=-t-22', '7t-1=-22', '7t=-21', 't=-3'], root: '-3', resolveBy: 'wrong' },
+    { seed: 2, answer: '', steps: ['3m+12=m+8', '2m+12=8', '2m=-4'], root: '-2', resolveBy: 'right' },
+    { seed: 1234579, answer: '', steps: ['2t=t-3', 't=-3'], root: '-3', resolveBy: 'wrong' }
   ];
   for (const sample of methodCases) {
     const beforeCredit = await eventCount(a.account.id);
@@ -116,28 +116,33 @@ try {
     eq(first.data.authoritative, true, 'method case: server owns mark authority');
     eq(first.data.correct, false, 'method case: final answer does not earn full credit');
     eq(first.data.marksPossible, 2, 'method case: server-owned two-mark rubric');
-    eq(first.data.marksEarned, sample.shown, sample.shown
-      ? 'method case: validated reasoning earns one mark'
-      : 'method case: a stated value earns nothing while the question is open');
-    eq(first.data.partial?.awarded, sample.shown, 'method case: method evidence agrees with awarded marks');
-    if (!first.data.resolved) {
-      eq(first.data.stepReport.lines.filter(l => /^[a-z]=-?\d+$/.test(l.text)).map(l => l.status),
-        first.data.stepReport.lines.filter(l => /^[a-z]=-?\d+$/.test(l.text)).map(() => 'note'),
-        'method case: no stated value is confirmed on an open question');
-    }
+    eq([first.data.resolved, first.data.triesLeft], [false, 1], 'method case: a wrong first try leaves the question open');
+    eq([first.data.marksEarned, first.data.partial, first.data.stepReport, first.data.trapWhy], [0, null, null, null],
+      'method case: an open question is told nothing about its working');
+    assertOk(/checked when this question is finished/.test(first.data.feedback), 'method case: and says the working is checked when the question is finished');
     const repeated = await grade(a.jar, mid, submission, sample.answer, 'typed', { steps: sample.steps });
     eq(repeated.status, 200, 'method case: same-key replay succeeds');
     eq(repeated.data, first.data, 'method case: lost-ack replay returns exact server receipt');
-    eq(await eventCount(a.account.id), beforeCredit + (first.data.resolved ? 1 : 0),
-      'method case: replay does not duplicate progress');
-    if (!first.data.resolved) {
+    eq(await eventCount(a.account.id), beforeCredit, 'method case: an open try and its replay record no progress');
+    if (sample.resolveBy === 'right') {
       const final = await grade(a.jar, mid, submission + '-resolve', sample.root);
       eq(final.status, 200, 'method case: second legitimate attempt accepted');
       eq(final.data.correct, true, 'method case: second verified final answer');
       eq(final.data.marksEarned, 2, 'method case: full credit after correct second answer');
-      eq(await eventCount(a.account.id), beforeCredit + 1,
-        'method case: resolved attempts commit exactly one progress event');
+    } else {
+      // The same wrong answer and the same working again: the question
+      // resolves wrong, and the deferred method mark is paid with the report.
+      const final = await grade(a.jar, mid, submission + '-resolve', sample.answer, 'typed', { steps: sample.steps });
+      eq([final.status, final.data.resolved, final.data.correct], [200, true, false], 'method case: the second wrong try resolves the question');
+      eq([final.data.marksEarned, final.data.partial?.awarded], [1, 1], 'method case: validated reasoning earns one mark, paid on resolution');
+      eq(final.data.stepReport.lines.map(l => l.status), sample.steps.map(() => 'ok'), 'method case: with the full line-by-line report');
+      eq(final.data.partial.lines.reduce((t, l) => t + l.mark, 0), 1, 'method case: and per-line marks that add up to it');
+      const stored = JSON.parse((await h.db.get("SELECT payload_json FROM learning_events WHERE account_id=? AND kind='graded-attempt' AND entity_id=?", [a.account.id, mid])).payload_json);
+      eq([stored.correct, stored.marksEarned, stored.marksPossible], [false, 1, 2], 'method case: the recorded attempt carries the method mark');
+      eq((await grade(a.jar, mid, submission + '-resolve', sample.answer, 'typed', { steps: sample.steps })).data, final.data, 'method case: the resolving receipt replays identically');
     }
+    eq(await eventCount(a.account.id), beforeCredit + 1,
+      'method case: resolved attempts commit exactly one progress event');
   }
 
   const fullBefore = await eventCount(a.account.id);

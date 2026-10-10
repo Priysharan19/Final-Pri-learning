@@ -98,16 +98,29 @@ try {
     [['A = ∫_0^7 (7x - x^2) dx', '[7x^2/2 - x^3/3]_0^7', '343/2 - 343/3'], 2, 'integrand, antiderivative, evaluation — capped below full'],
     [['x = 0 and x = 7', '7x^2/2 - x^3/3 + C'], 2, 'limits and an antiderivative with a constant']
   ];
+  // An open question is told nothing about its working — any verdict on a
+  // line would test a candidate answer. `settle` spends the first try,
+  // checks that its receipt is silent, and returns the receipt of the second
+  // identical try, which resolves the question and pays the method marks.
+  const settle = async (qid, answer, steps, label) => {
+    const open = await grade(a.jar, qid, answer, steps);
+    eq([open.status, open.data.correct, open.data.resolved, open.data.triesLeft], [200, false, false, 1], label + ': a wrong first try leaves the question open');
+    eq([open.data.marksEarned, open.data.partial, open.data.stepReport, 'solution' in open.data], [0, null, null, false],
+      label + ': and its receipt says nothing about the working — no marks, no method evidence, no report');
+    ok(!/343|57\.1/.test(said(open.data)), label + ': nor anything of the answer');
+    const closed = await grade(a.jar, qid, answer, steps);
+    eq(closed.data.resolved, true, label + ': the second try resolves it');
+    return closed;
+  };
   for (const [steps, expected, label] of partialCases) {
     const pq = await fresh();
-    const res = await grade(a.jar, pq.id, '5', steps);
+    const res = await settle(pq.id, '5', steps, label);
     eq([res.status, res.data.correct, res.data.invalid], [200, false, false], label + ': a wrong final answer is wrong');
     eq(res.data.marksEarned, expected, label + ': ' + expected + ' method mark(s)');
     ok(res.data.marksEarned > 0 && res.data.marksEarned < 3, label + ': partial, never full');
     eq(res.data.partial?.awarded, expected, label + ': the method evidence agrees with the award');
     eq(res.data.partial.lines.reduce((sum, line) => sum + line.mark, 0), expected, label + ': per-line marks sum to the award');
-    ok(!/343\/6|57\.16/.test(JSON.stringify({ ...res.data, partial: { ...res.data.partial, lines: undefined }, stepReport: { ...res.data.stepReport, lines: res.data.stepReport?.lines?.map(l => l.note) } })),
-      label + ': notes on an unresolved attempt never state the answer');
+    eq(res.data.stepReport?.lines?.length, steps.length, label + ': the resolving receipt carries the full report');
   }
 
   // ── 5 · Wrong final + irrelevant, neutral or restated lines: nothing ──────
@@ -125,7 +138,7 @@ try {
   ];
   for (const [steps, label] of emptyCases) {
     const eqn = await fresh();
-    const res = await grade(a.jar, eqn.id, '5', steps);
+    const res = await settle(eqn.id, '5', steps, label);
     eq([res.status, res.data.correct, res.data.marksEarned], [200, false, 0], label + ': 0 marks');
     eq(res.data.partial?.awarded ?? 0, 0, label + ': no method award');
   }
@@ -156,10 +169,14 @@ try {
       const integrand = sealed.stepcheck.stages.find(stage => stage.kind === 'area-integrand');
       const anti = sealed.stepcheck.stages.find(stage => stage.kind === 'area-antiderivative');
       const steps = [`∫_${integrand.lower}^${integrand.upper} (${integrand.expr}) dx`, `[${anti.antiderivative}]_${anti.lower}^${anti.upper}`];
-      const res = await grade(a.jar, fq.id, '987654', steps);
+      const res = await settle(fq.id, '987654', steps, `D${difficulty} seed ${seed}`);
       eq(res.data.correct, false, `D${difficulty} seed ${seed}: a wrong final answer is wrong`);
       eq(res.data.marksEarned, Math.min(fq.criteriaCount - 1, 2), `D${difficulty} seed ${seed}: verified set-up and integration earn every method mark, never the answer mark`);
-      const done = await grade(a.jar, fq.id, key);
+      // A second copy: the same working under a wrong first try, then the key.
+      const again = await fresh(difficulty, seed);
+      const openAgain = await grade(a.jar, again.id, '987654', steps);
+      eq([openAgain.data.resolved, openAgain.data.marksEarned, openAgain.data.partial, openAgain.data.stepReport], [false, 0, null, null], `D${difficulty} seed ${seed}: an open copy is told nothing about that working either`);
+      const done = await grade(a.jar, again.id, key);
       eq([done.data.correct, done.data.marksEarned], [true, fq.criteriaCount], `D${difficulty} seed ${seed}: the keyed answer is full marks`);
     }
   }

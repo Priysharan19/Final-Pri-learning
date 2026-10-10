@@ -75,8 +75,9 @@ try {
   /**
    * Issue the case afresh, submit `steps` with the wrong final answer, replay
    * it, then spend the second try on the same submission so the question
-   * resolves. Returns the first receipt after checking everything every
-   * receipt must satisfy; `expect(marksEarned, marksPossible)` judges the mark.
+   * resolves. Returns the resolving receipt after checking everything every
+   * receipt must satisfy; `expect(marksEarned, marksPossible)` judges the mark
+   * it pays. The first, open, receipt must say nothing about the working.
    */
   async function graded(sample, label, steps, wrong, expect) {
     const q = await issue(sample);
@@ -87,8 +88,10 @@ try {
     c.eq(first.data.correct, false, `${label}: the wrong final answer is not correct`);
     c.eq(first.data.invalid, false, `${label}: it is a readable wrong answer, not an unreadable one`);
     c.eq(first.data.marksPossible, q.criteriaCount, `${label}: out of the marks the issued question carries`);
-    c.ok(expect(first.data.marksEarned, first.data.marksPossible), `${label}: ${first.data.marksEarned}/${first.data.marksPossible} on "${sample.prompt}" with working ${JSON.stringify(steps)}`);
     c.eq(first.data.resolved, false, `${label}: a first wrong try leaves the question open`);
+    // An open question is told nothing about its working: any verdict on a
+    // line would test a candidate answer. The working is marked on resolution.
+    c.deq([first.data.marksEarned, first.data.stepReport, first.data.partial], [0, null, null], `${label}: and says nothing about the working yet — no marks, no report, no method evidence`);
     c.ok(!('solution' in first.data), `${label}: and discloses no solution`);
     c.eq((await events(q.id)).length, 0, `${label}: nor records progress yet`);
 
@@ -100,8 +103,9 @@ try {
     const second = await submit(q.id, `${id}-second`, wrong, steps);
     c.eq(second.status, 200, `${label}: the second try is graded`);
     c.eq(second.data.resolved, true, `${label}: and resolves the question`);
-    c.eq(second.data.marksEarned, first.data.marksEarned, `${label}: for the same marks as the first try`);
+    c.ok(expect(second.data.marksEarned, second.data.marksPossible), `${label}: ${second.data.marksEarned}/${second.data.marksPossible} on "${sample.prompt}" with working ${JSON.stringify(steps)}`);
     c.eq(second.data.marksPossible, first.data.marksPossible, `${label}: out of the same total`);
+    c.ok(Array.isArray(second.data.stepReport?.lines) && second.data.stepReport.lines.length === steps.length, `${label}: with the full report on every line`);
     c.deq((await submit(q.id, `${id}-second`, wrong, steps)).data, second.data, `${label}: and its replay is the identical receipt too`);
 
     const stored = await events(q.id);
@@ -111,7 +115,7 @@ try {
     c.eq(payload.marksEarned, second.data.marksEarned, `${label}: carrying the receipt's marks earned`);
     c.eq(payload.marksPossible, second.data.marksPossible, `${label}: and marks possible`);
     c.eq(payload.correct, false, `${label}: and not correct`);
-    return first.data;
+    return second.data;
   }
 
   for (const sample of CASES) {
