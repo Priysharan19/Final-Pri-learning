@@ -425,8 +425,8 @@ export const writeOffline = {
     await check('after reconnecting, Try again is marked by the server as handwriting — same question, no reload',
       await shownId(page) === qid && await mathText('.q-prompt') === prompt && await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' &&
         grades.at(-1)?.status === 200 && grades.at(-1).json?.authoritative === true && grades.at(-1).json.correct === true &&
-        grades.at(-1).body?.mode === 'ink' && typeof grades.at(-1).body?.transcriptionReceipt === 'string' && /^(\d+(?:\.\d)?) \/ \1 marks?\b/.test(marks),
-      `marks ${JSON.stringify(marks)}; ${String(JSON.stringify(grades.at(-1) && { body: { ...grades.at(-1).body, transcriptionReceipt: typeof grades.at(-1).body?.transcriptionReceipt }, json: grades.at(-1).json })).slice(0, 300)}`);
+        grades.at(-1).body?.mode === 'ink' && /^data:image\//.test(grades.at(-1).body?.image || '') && typeof grades.at(-1).json.reading?.receipt === 'string' && /^(\d+(?:\.\d)?) \/ \1 marks?\b/.test(marks),
+      `marks ${JSON.stringify(marks)}; ${String(JSON.stringify(grades.at(-1) && { body: { ...grades.at(-1).body, image: typeof grades.at(-1).body?.image }, json: grades.at(-1).json })).slice(0, 300)}`);
     await page.waitForTimeout(1500);
     const settledGrades = await online.practiceCalls(new RegExp(`^/v1/practice/${row?.serverQuestionId}/submit$`));
     const ledger = online.ledger(row?.serverQuestionId);

@@ -104,6 +104,14 @@ export function postgresSessionLimits(env = process.env) {
     // cannot hold row locks and a pooled connection indefinitely.
     idleInTransactionTimeoutMs: boundedInteger(env, 'PRI_DATABASE_IDLE_TX_TIMEOUT_MS', 30_000, 1_000, 3_600_000),
     poolMax: boundedInteger(env, 'PRI_DATABASE_POOL_MAX', 10, 1, 50),
+    // How long a pooled connection may sit unused before it is closed. A new
+    // connection is a TCP handshake, a TLS handshake, authentication and the
+    // session setup — several round trips before the first statement — and a
+    // student thinks for longer than 30 seconds between two requests, so at
+    // the old 30 s every such request paid for a fresh connection. Five
+    // minutes keeps the pool warm through a sitting; it never exceeds
+    // PRI_DATABASE_POOL_MAX connections either way.
+    poolIdleMs: boundedInteger(env, 'PRI_DATABASE_POOL_IDLE_MS', 300_000, 1_000, 3_600_000),
     // How long a request may wait for a per-account lock (queued in process,
     // then pg_try_advisory_lock across instances) before a retryable 503.
     lockWaitMs: boundedInteger(env, 'PRI_DATABASE_LOCK_WAIT_MS', 5_000, 100, 60_000)

@@ -736,11 +736,17 @@ export class PostgresStore {
       client.on('error', client.__priErrorListener);
     }
     if (!client.__priSchema) {
+      // Part of opening a connection, not of the request that happened to be
+      // first on it: metered as connection wait, so a request's round-trip
+      // count does not depend on whether its connection was new.
+      const setup = timingNow();
       try {
-        await this._send(client, this.sessionSetup());
+        await client.query(this.sessionSetup());
       } catch (error) {
         client.release(error);
         throw databaseOverload(error);
+      } finally {
+        noteAcquire(timingNow() - setup);
       }
       client.__priSchema = this.schema;
     }
@@ -914,7 +920,12 @@ export function postgresPoolOptions(connectionString, { max, env = process.env }
       connectionString: settings.connectionString,
       ssl: settings.ssl,
       max: poolMax,
-      idleTimeoutMillis: 30_000,
+      idleTimeoutMillis: settings.poolIdleMs,
+      // An idle connection kept for minutes must not be dropped silently by a
+      // NAT or pooler in between: TCP keep-alive notices, and the pool then
+      // discards the dead client instead of handing it to a request.
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 30_000,
       connectionTimeoutMillis: 10_000,
       application_name: 'pri-learning-v1'
     }

@@ -14,9 +14,9 @@ import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { asyncRouter, asyncHandler } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { nextSyncCursor, syncLockKey } from './db.js';
-import { requireSession, requireVerifiedEmail, requireRole, rateLimit, sessionFromRequest } from './security.js';
+import { requireSession, requireVerifiedEmail, requireRole, rateLimit, consumeRateLimit, sessionFromRequest, sha256 } from './security.js';
 import { encryptDeliveryToken, decryptDeliveryToken } from './deliveryCrypto.js';
-import { opaqueContentId, opaqueContentHash, contentSeen, markContentSeen, contentTried, markContentTried } from './contentSeen.js';
+import { opaqueContentId, opaqueContentHash, contentSeen, markContentSeen, markContentTried, seenAmong, seenKeysOf, triedKeyOf } from './contentSeen.js';
 import { misconceptionIdForTrap } from '../../client/src/engine/misconceptions.js';
 import { PUBLIC_QUESTION_FIELDS } from '../../client/src/engine/publicQuestion.js';
 import { consentState, consentBlockerCode } from './guardianConsent.js';
@@ -65,7 +65,11 @@ const DOTPOINT = /^[a-zA-Z0-9._:-]{1,80}$/;
 // which need the same question twice; they are honoured in NODE_ENV=test and
 // nowhere else, and a suite can switch them off to exercise the real contract.
 const fixedSeedsAllowed = env => env.NODE_ENV === 'test' && env.PRI_PRACTICE_SERVER_SEEDS_ONLY !== '1';
-const GRADE_FIELDS = new Set(['submissionId', 'answer', 'mode', 'steps', 'transcriptionReceipt', 'ms']);
+const GRADE_FIELDS = new Set(['submissionId', 'answer', 'mode', 'steps', 'transcriptionReceipt', 'ms', 'image']);
+// One reading per request to /recognize, and per submission that carries its
+// own picture: the two share this bucket, so the single-request Submit cannot
+// be used to read more pictures an hour than the receipt route allows.
+const RECOGNIZE_LIMIT = Object.freeze({ limit: 120, windowMs: 60 * 60 * 1000 });
 const RECOGNITION_FIELDS = new Set(['image', 'mode']);
 const CORRECTION_FIELDS = new Set(['text']);
 const PUBLIC_Q = PUBLIC_QUESTION_FIELDS;
@@ -243,14 +247,32 @@ export async function authorityAtCommit(db, req, accountId, consentBlockedBefore
     return { status: 401, code: 'AUTH_REQUIRED', message: 'Sign in again before retrying.' };
   }
   if (consentBlockedBefore) return null;
-  // A concurrent PostgreSQL guardian withdrawal updates this exact row. Lock
-  // it before the final consent check so it cannot commit between validation
-  // and the mark. SQLite transactions already serialize writers.
-  if (db.dialect === 'postgres') {
-    await db.get('SELECT account_id FROM guardian_consents WHERE account_id=? FOR UPDATE', [accountId]);
-  }
-  const blocker = consentBlockerCode(await consentState(db, accountId));
+  // A concurrent PostgreSQL guardian withdrawal updates this exact row. It is
+  // locked by the final consent check itself (consentState `lock`), so the
+  // withdrawal cannot commit between validation and the mark. SQLite
+  // transactions already serialize writers.
+  const blocker = consentBlockerCode(await consentState(db, accountId, { lock: true }));
   return blocker ? { status: 403, code: blocker, message: 'Guardian consent changed while this was being checked.' } : null;
+}
+
+/**
+ * Several of this account's own records, in ONE statement.
+ *
+ * Every decision on these routes starts by reading a handful of rows of
+ * idempotency_keys for one account — the sealed question, its completion, a
+ * reading receipt, an earlier reply, the tries. They were read one statement at
+ * a time, each a trip to the database; the same rows are now named in one
+ * WHERE. Each `want` is { scope, key, live }: `live` adds the expiry test that
+ * record's own lookup always had (a completion and a try count never expire by
+ * this test, exactly as before). Every clause is under `account_id = ?`, so no
+ * key can ever name another account's row. Returns a Map by scope; the scopes
+ * of one call are distinct.
+ */
+async function recordsOf(db, accountId, now, wants) {
+  const clauses = wants.map(want => (want.live ? '(scope=? AND key=? AND expires_at>?)' : '(scope=? AND key=?)'));
+  const rows = await db.all('SELECT scope,response_json,request_digest FROM idempotency_keys WHERE account_id=? AND (' + clauses.join(' OR ') + ')',
+    [accountId, ...wants.flatMap(want => (want.live ? [want.scope, want.key, now] : [want.scope, want.key]))]);
+  return new Map(rows.map(row => [row.scope, row]));
 }
 
 const carriesTrap = (owner, q, key) => (Array.isArray(q?.traps) ? q.traps : [])
@@ -422,11 +444,15 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     q._practiceMode = practiceMode;
     // Sealed with the question, so the receipt and the attempt carry it
     // whatever the device does or does not send.
-    if (await contentSeen(db, accountId, q, now)) { q._repeat = true; repeat = true; }
+    // (Seen and tried are records of one scope: one statement answers both.)
+    const seenKeys = seenKeysOf(q);
+    const triedKey = triedKeyOf(q);
+    const known = await seenAmong(db, accountId, [...seenKeys, triedKey], now);
+    if (seenKeys.some(key => known.has(key))) { q._repeat = true; repeat = true; }
     // A try already spent on another copy of this content is spent on this one
     // (decided again, authoritatively, when it is marked). Content that has
     // resolved is a repeat and starts over with both tries: it earns nothing.
-    const trySpent = !repeat && !ONE_TRY_MODES.includes(practiceMode) && await contentTried(db, accountId, q, now);
+    const trySpent = !repeat && !ONE_TRY_MODES.includes(practiceMode) && known.has(triedKey);
     // Serialize once: nothing client-provided can replace the stored answer.
     const payload = JSON.stringify(q);
     const id = randomUUID();
@@ -494,7 +520,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
   // Recognition is issued by this server only after a live provider response.
   // We send image data alone to the reader: no question, solution or answer key.
   // The token is an opaque reference to a per-account, per-question DB record.
-  router.post('/:id/recognize', rateLimit(db, 'practice-recognize', { limit: 120, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+  router.post('/:id/recognize', rateLimit(db, 'practice-recognize', RECOGNIZE_LIMIT), async (req, res) => {
     const qid = String(req.params.id || '');
     const body = req.body;
     if (!UUID.test(qid) || !plain(body) || unknown(body, RECOGNITION_FIELDS).length ||
@@ -503,10 +529,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     }
     const accountId = req.platformSession.account_id;
     const now = Date.now();
-    const sealed = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?", [accountId, qid, now]);
-    if (!sealed) return reject(res, 404, 'QUESTION_NOT_FOUND', 'This question does not belong to this account.');
-    const complete = await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-completion' AND key=?", [accountId, qid]);
-    if (complete) return reject(res, 409, 'QUESTION_ALREADY_GRADED', 'This question has been completed.');
+    const held = await recordsOf(db, accountId, now, [
+      { scope: 'practice-question', key: qid, live: true }, { scope: 'practice-completion', key: qid }]);
+    if (!held.get('practice-question')) return reject(res, 404, 'QUESTION_NOT_FOUND', 'This question does not belong to this account.');
+    if (held.get('practice-completion')) return reject(res, 409, 'QUESTION_ALREADY_GRADED', 'This question has been completed.');
     try { validateImage(body.image); }
     catch (error) { return reject(res, error.status || 400, error.code || 'RECOGNITION_IMAGE_INVALID', error.message || 'Invalid image.'); }
 
@@ -543,13 +569,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         return { status: 401, code: 'AUTH_REQUIRED' };
       }
       // A concurrent PostgreSQL guardian withdrawal updates this exact row.
-      // Lock it before the final consent check so it cannot commit between
-      // validation and the recognition receipt. SQLite transactions already
-      // serialize writers for this commit.
-      if (db.dialect === 'postgres') {
-        await db.get('SELECT account_id FROM guardian_consents WHERE account_id=? FOR UPDATE', [accountId]);
-      }
-      const blocker = consentBlockerCode(await consentState(db, accountId));
+      // The final consent check locks it (consentState `lock`), so it cannot
+      // commit between validation and the recognition receipt. SQLite
+      // transactions already serialize writers for this commit.
+      const blocker = consentBlockerCode(await consentState(db, accountId, { lock: true }));
       if (blocker) return { status: 403, code: blocker };
       const stillOpen = await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-completion' AND key=?", [accountId, qid]);
       if (stillOpen) return { status: 409, code: 'QUESTION_ALREADY_GRADED' };
@@ -581,14 +604,15 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // lock. Checking completion before the transaction leaves a race where a
     // correction can be written after the last grade commits.
     const outcome = await timePhase('commit', () => db.transaction(async () => {
-      const prior = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-recognition' AND key=? AND expires_at>?", [accountId, sourceId, now]);
+      const held = await recordsOf(db, accountId, now, [
+        { scope: 'practice-recognition', key: sourceId, live: true }, { scope: 'practice-completion', key: qid }]);
+      const prior = held.get('practice-recognition');
       if (!prior) return { status: 404, code: 'RECOGNITION_RECEIPT_INVALID' };
       const original = JSON.parse(prior.response_json);
       if (original.questionId !== qid || !['ink', 'photo'].includes(original.mode)) {
         return { status: 404, code: 'RECOGNITION_RECEIPT_INVALID' };
       }
-      const completed = await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-completion' AND key=?", [accountId, qid]);
-      if (completed) return { status: 409, code: 'QUESTION_ALREADY_GRADED' };
+      if (held.get('practice-completion')) return { status: 409, code: 'QUESTION_ALREADY_GRADED' };
       const receipt = randomUUID();
       const proof = { questionId: qid, mode: original.mode, text: body.text,
         parentReceipt: sourceId, correctedByStudent: true, recognizedAt: now };
@@ -665,8 +689,43 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     if (body.ms !== undefined && (!Number.isSafeInteger(body.ms) || body.ms < 0 || body.ms > 86_400_000)) {
       return reject(res, 400, 'PRACTICE_SUBMISSION_INVALID', 'Invalid answer duration.');
     }
+    // ── A handwritten or photographed answer may carry its own picture ──────
+    // Submit used to be three requests for one press: /recognize (mint a
+    // receipt for the picture), /recognition/:receipt/confirm (when the answer
+    // is not the whole transcript — the usual case: the answer is the last
+    // line of the page) and then this route. Each repeated the same session,
+    // consent, rate-limit and lock work. A submission may now send the picture
+    // instead of a receipt, and this one request does what the three did, in
+    // the same order and under the same checks:
+    //
+    //   · the picture is read through recognitionOps — the transcript the
+    //     student was just shown is reused, so this is never a second paid
+    //     read of an unchanged picture; a picture not read before (a photo) is
+    //     read once, under the same allowance and ceiling;
+    //   · the reader is sent the picture and nothing else. The answer in this
+    //     body never reaches it: reading stays answer-blind;
+    //   · the provider's receipt, and — when the submitted answer is not the
+    //     transcript, or the reader asked for confirmation — the student's
+    //     correction receipt, are written in the SAME transaction as the mark,
+    //     after the same live-session and locked-consent recheck;
+    //   · the same request rate limit as /recognize is counted.
+    //
+    // A receipt and a picture together are refused: a submission names one
+    // source of its reading.
+    const withPicture = body.image !== undefined;
+    if (withPicture && (typeof body.image !== 'string' || mode === 'typed' || body.transcriptionReceipt !== undefined)) {
+      return reject(res, 400, 'PRACTICE_SUBMISSION_INVALID', 'Send either a reading receipt or the picture of a handwritten or photographed answer.');
+    }
+    if (withPicture) {
+      try { validateImage(body.image); }
+      catch (error) { return reject(res, error.status || 400, error.code || 'RECOGNITION_IMAGE_INVALID', error.message || 'Invalid image.'); }
+    }
     const accountId = req.platformSession.account_id;
-    const hash = digest({ qid, submissionId, answer: body.answer, mode, steps: body.steps ?? [], transcriptionReceipt: body.transcriptionReceipt || null, ms: body.ms ?? null });
+    // The key remembers the request it answered, the picture included (by
+    // digest). A request without a picture hashes exactly as it always did, so
+    // a submission in flight across a deploy still replays.
+    const hash = digest({ qid, submissionId, answer: body.answer, mode, steps: body.steps ?? [], transcriptionReceipt: body.transcriptionReceipt || null, ms: body.ms ?? null,
+      ...(withPicture ? { picture: createHash('sha256').update(body.image).digest('hex') } : {}) });
     const now = Date.now();
     const idKey = qid + ':' + submissionId;
     const working = Array.isArray(body.steps) ? body.steps.join('\n') : String(body.steps || '');
@@ -693,21 +752,31 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // lock: the second sees the first's try (or its completion) in its own
     // locked read and can never also be accepted as the first try.
     const gate = async () => {
+      // Everything this decision reads about the submission — an earlier reply
+      // under this key, the sealed question, the reading receipt, a completion
+      // and the tries — is this account's own rows of one table, read in one
+      // statement (recordsOf) and judged in the order it always was.
+      const token = mode !== 'typed' && !withPicture && typeof body.transcriptionReceipt === 'string' && ID.test(body.transcriptionReceipt)
+        ? body.transcriptionReceipt : null;
+      const held = await recordsOf(db, accountId, now, [
+        { scope: 'practice-grade', key: idKey, live: true },
+        { scope: 'practice-question', key: qid, live: true },
+        ...(token ? [{ scope: 'practice-recognition', key: token, live: true }] : []),
+        { scope: 'practice-completion', key: qid },
+        { scope: 'practice-tries', key: qid }]);
       // Replay comes before the closed-question check: the reply to a request
       // that committed before a timeout remains available for safe recovery.
-      const prior = await db.get("SELECT response_json,request_digest FROM idempotency_keys WHERE account_id=? AND scope='practice-grade' AND key=? AND expires_at>?",
-        [accountId, idKey, now]);
+      const prior = held.get('practice-grade');
       if (prior) return prior.request_digest === hash ? { response: JSON.parse(prior.response_json) } : { status: 409, code: 'IDEMPOTENCY_KEY_REUSED' };
 
-      const sealed = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?",
-        [accountId, qid, now]);
+      const sealed = held.get('practice-question');
       if (!sealed) return { status: 404, code: 'QUESTION_NOT_FOUND' };
 
-      if (mode !== 'typed') {
-        const token = typeof body.transcriptionReceipt === 'string' ? body.transcriptionReceipt : '';
-        if (!ID.test(token)) return { status: 422, code: 'RECOGNITION_RECEIPT_REQUIRED' };
-        const evidence = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-recognition' AND key=? AND expires_at>?",
-          [accountId, token, now]);
+      // A submission that carries its own picture has no receipt yet: the
+      // picture is read below and its receipt is written with the mark.
+      if (mode !== 'typed' && !withPicture) {
+        if (!token) return { status: 422, code: 'RECOGNITION_RECEIPT_REQUIRED' };
+        const evidence = held.get('practice-recognition');
         if (!evidence) return { status: 422, code: 'RECOGNITION_RECEIPT_INVALID' };
         const proof = JSON.parse(evidence.response_json);
         if (proof.mode !== mode || proof.text !== body.answer || proof.questionId !== qid) {
@@ -715,23 +784,26 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         }
         if (proof.providerNeedsConfirmation === true) return { status: 422, code: 'RECOGNITION_CONFIRMATION_REQUIRED' };
       }
-      const complete = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-completion' AND key=?",
-        [accountId, qid]);
-      if (complete) return { status: 409, code: 'QUESTION_ALREADY_GRADED' };
+      if (held.get('practice-completion')) return { status: 409, code: 'QUESTION_ALREADY_GRADED' };
 
       const q = JSON.parse(sealed.response_json);
+      // Whether this content has been resolved before, and whether a try has
+      // been spent on any copy of it: both are records of one scope, asked for
+      // together (they were two statements).
+      const seenKeys = seenKeysOf(q);
+      const triedKey = triedKeyOf(q);
+      const known = await seenAmong(db, accountId, [...seenKeys, triedKey], now);
       // Decided now, not only at issue: several copies of one question can be
       // issued before any is resolved, and once one of them has shown its
       // solution the others are no longer new work.
-      if (await contentSeen(db, accountId, q, now)) q._repeat = true;
-      const priorTry = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-tries' AND key=?",
-        [accountId, qid]);
+      if (seenKeys.some(key => known.has(key))) q._repeat = true;
+      const priorTry = held.get('practice-tries') || null;
       const tries = priorTry ? Number(JSON.parse(priorTry.response_json).tries) || 0 : 0;
       // A try spent on ANY copy of this content is spent on this one: the
       // first try is not renewed by asking for the question again. Content
       // already resolved is a repeat, which earns nothing and keeps its own
       // two tries.
-      const spent = tries >= 1 || (q._repeat !== true && await contentTried(db, accountId, q, now));
+      const spent = tries >= 1 || (q._repeat !== true && known.has(triedKey));
       return { sealedJson: sealed.response_json, q, priorTry, tries, spent };
     };
     const refuse = outcome => reject(res, outcome.status, outcome.code,
@@ -743,16 +815,54 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // Evidence the commit turned out to need although step 1 forecast it would
     // not (another submission spent the first try meanwhile).
     let evidenceForced = false;
+    // The reading of a picture this submission carries (read once, kept across
+    // the rounds below).
+    let reading = null;
     for (let round = 0; round < 3; round++) {
       // ── 1. Read ──────────────────────────────────────────────────────────
-      const forecast = await gate();
+      // Three independent reads, asked for together rather than one after the
+      // other. Their answers are still used in the order they always were.
+      const [forecast, cooling, consentBlockedBefore] = await Promise.all([
+        gate(), markerCooldownUntil(db, accountId), consentBlockedNow(db, accountId)]);
       if (forecast.status) return refuse(forecast);
       if (forecast.response) return res.status(200).json(forecast.response);
       // An account that has just had several entries stopped at the deadline
       // waits (markerPool.js MARKER_COOLDOWN). A committed receipt is replayed
       // above regardless: recovering a reply costs no marking.
-      const [cooling, consentBlockedBefore] = await Promise.all([markerCooldownUntil(db, accountId), consentBlockedNow(db, accountId)]);
       if (cooling) return sendMarkerCooldown(res, cooling);
+
+      // ── 1b. Read the picture, when the submission carries one ───────────
+      // After the replay above, so recovering a committed reply never reads
+      // (or is rate limited or charged) again.
+      if (withPicture && !reading) {
+        const verdict = await timePhase('limit', () => consumeRateLimit(db, `practice-recognize:${sha256(accountId).slice(0, 24)}`, RECOGNIZE_LIMIT));
+        if (!verdict.allowed) {
+          res.set('RateLimit-Remaining', '0');
+          res.set('RateLimit-Reset', String(Math.ceil(verdict.resetAt / 1000)));
+          return reject(res, 429, 'RATE_LIMITED', 'Too many requests. Try again later.');
+        }
+        let read;
+        try {
+          read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId: req.requestId });
+          if (read.refusal) return sendRecognitionRefusal(res, read.refusal);
+        } catch (error) {
+          if (error instanceof HandwritingProviderError) return reject(res, error.status, error.code, error.message);
+          return reject(res, 502, 'RECOGNITION_FAILED', 'The answer could not be read this time.');
+        }
+        const text = String(read.result?.text || '');
+        if (!text || !limitedText(text, 12000)) {
+          return reject(res, 422, 'RECOGNITION_EMPTY', 'No reliable answer transcription was returned.');
+        }
+        const needsConfirmation = read.result.needsConfirmation === true;
+        // The student's own correction of the reading — exactly what
+        // /recognition/:receipt/confirm records, and under its rule: a
+        // correction is never blank.
+        const corrected = text !== body.answer || needsConfirmation;
+        if (corrected && !body.answer.trim()) {
+          return reject(res, 400, 'RECOGNITION_CORRECTION_INVALID', 'Provide corrected text for a valid server receipt.');
+        }
+        reading = { text, needsConfirmation, corrected, reused: read.reused === true, recognizedAt: Date.now() };
+      }
 
       // ── 2. Mark ──────────────────────────────────────────────────────────
       // One round trip: the answer, and the working only when the reply could
@@ -898,20 +1008,48 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
           // server-attested authored distractor explanations, not from an answer key.
           repairOpportunities: [...new Set(trapProbes.map(t => t?.why).filter(Boolean))].slice(0, 40)
         } : {}) };
-      await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-grade',?,?,?,?,?)",
-        [accountId, idKey, JSON.stringify(response), hash, now, now + MAX_AGE]);
+      // Everything this reply adds to the account's records goes in ONE
+      // statement: the immutable reply, the completion when it resolves, and —
+      // for a submission that carried its picture — the receipts /recognize
+      // and /confirm would have written (same fields, plus the submission they
+      // belong to).
+      const records = [];
+      if (reading) {
+        const providerReceipt = randomUUID();
+        const evidenceRow = { questionId: qid, mode, text: reading.text, recognizedAt: reading.recognizedAt,
+          providerNeedsConfirmation: reading.needsConfirmation, submissionId };
+        records.push(['practice-recognition', providerReceipt, JSON.stringify(evidenceRow), digest(evidenceRow)]);
+        let receipt = providerReceipt;
+        if (reading.corrected) {
+          receipt = randomUUID();
+          const proof = { questionId: qid, mode, text: body.answer, parentReceipt: providerReceipt,
+            correctedByStudent: true, recognizedAt: reading.recognizedAt, submissionId };
+          records.push(['practice-recognition', receipt, JSON.stringify(proof), digest(proof)]);
+        }
+        // What the mark rests on, as /recognize and /confirm reported it: the
+        // receipt, whether the student corrected the reading, and whether the
+        // read was one this account had already paid for.
+        response.reading = { receipt, corrected: reading.corrected, reused: reading.reused };
+      }
+      records.unshift(['practice-grade', idKey, JSON.stringify(response), hash]);
+      if (resolved) records.push(['practice-completion', qid, JSON.stringify({ attemptId, submissionId }), hash]);
+      await db.run('INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES '
+        + records.map(() => '(?,?,?,?,?,?,?)').join(','),
+      records.flatMap(([scope, key, json, requestDigest]) => [accountId, scope, key, json, requestDigest, now, now + MAX_AGE]));
       if (resolved) {
         await markContentSeen(db, accountId, q, now);
-        await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-completion',?,?,?,?,?)",
-          [accountId, qid, JSON.stringify({ attemptId, submissionId }), hash, now, now + MAX_AGE]);
         if (!recordsProgress(q)) return { response };
         // For a resolved attempt progress is committed in the very same DB
         // transaction as its immutable response, with a server-issued ID.
-        const last = await db.get("SELECT MAX(device_seq) AS n FROM learning_events WHERE account_id=? AND device_id='server-grader'", [accountId]);
-        const seq = Number(last?.n || 0) + 1;
+        // The next sequence number of the server's own event stream for this
+        // account is taken by the INSERT itself (it was a statement of its
+        // own). Safe for the reason it always was: this transaction holds the
+        // account's sync lock, so no other writer of this stream can run.
         const cursor = await nextSyncCursor(db, accountId);
-      await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?, 'server-grader',?,'graded-attempt',?,?,?,?)",
-          [cursor, attemptId, accountId, seq, qid, now, JSON.stringify({
+      await db.run(`INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at)
+          SELECT ?,?,?, 'server-grader', COALESCE(MAX(device_seq), 0) + 1, 'graded-attempt',?,?,?,?
+          FROM learning_events WHERE account_id=? AND device_id='server-grader'`,
+          [cursor, attemptId, accountId, qid, now, JSON.stringify({
             attemptId, submissionId, questionId: qid, correct: response.correct,
             marksEarned: response.marksEarned, marksPossible: response.marksPossible,
             ...(q._repeat === true ? { repeat: true } : {}),
@@ -923,7 +1061,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
             // claim independent mastery for a result whose help is unknown.
             hintsUsed: 1, support: 'supported', createdAt: now,
             serverAcknowledgedAt: now
-          }), now]);
+          }), now, accountId]);
       } else if (!invalid) {
         await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-tries',?,?,?,?,?) ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json",
           [accountId, qid, JSON.stringify({ tries: tries + 1, ...(ownTrap ? { trapWhy: ownTrap } : {}) }), hash, now, now + MAX_AGE]);

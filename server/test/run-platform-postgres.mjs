@@ -82,6 +82,13 @@ export const ENGINE_SUITES = [
   // concurrency (SERIALIZABLE retries), the refund, and the receipt minted from
   // a reused transcript all have to hold on the Postgres store too.
   'recognition-dedupe-check.mjs',
+  // One request reads, receipts and marks a handwritten or photographed answer:
+  // the locked consent read (a row lock taken inside a CTE), the single-
+  // statement rate limit and the batched record reads are Postgres SQL.
+  'submit-with-picture-check.mjs',
+  // The pinned statement / round-trip / transaction counts of the hot paths.
+  // Postgres has its own numbers (lock, scope and BEGIN/COMMIT are wire trips).
+  'hot-path-budget-check.mjs',
   'security-acceptance-check.mjs',
   'abuse-limits-check.mjs',
   // Staff second factor, identity sign-in age declaration, and the hardening

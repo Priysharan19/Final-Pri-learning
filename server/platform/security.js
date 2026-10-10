@@ -118,6 +118,34 @@ export async function sessionFromRequest(db, req, now = Date.now()) {
   return { ...row, rawToken: raw, slid };
 }
 
+// ── One session lookup per request ──────────────────────────────────────────
+// The guardian gate is mounted in front of each sub-router and has to resolve
+// the session itself (the sub-router's own requireSession has not run yet).
+// requireSession then looked the same cookie up again, a moment later, in the
+// same request: one redundant trip to the database on every gated route. The
+// gate now leaves what it found on the request and requireSession takes it —
+// once, from the same store, in the same request, and only a lookup that
+// SUCCEEDED (a missing session is always looked up afresh, and so is every
+// check made where something commits: those call sessionFromRequest directly).
+const RESOLVED_SESSION = Symbol('priResolvedSession');
+
+/** Resolve the request's session and leave it for requireSession (guardian gate). */
+export async function resolveSessionOnce(db, req, now = Date.now()) {
+  db = asStore(db);
+  const session = await sessionFromRequest(db, req, now);
+  if (session) req[RESOLVED_SESSION] = { store: db, session };
+  return session;
+}
+
+async function sessionForRequest(db, req, now) {
+  const resolved = req[RESOLVED_SESSION];
+  if (resolved) {
+    delete req[RESOLVED_SESSION];
+    if (resolved.store === db) return resolved.session;
+  }
+  return sessionFromRequest(db, req, now);
+}
+
 // The only routes an admin or support account may use before it has enrolled
 // a second factor: finding out who it is, signing out, and enrolling. Matched on
 // the normalised path (no query string), anchored at the account router's
@@ -135,7 +163,7 @@ export function requireSession(db) {
   db = asStore(db);
   return tagPolicy(timedMiddleware('auth', asyncHandler(async (req, res, next) => {
     const now = Date.now();
-    const session = await sessionFromRequest(db, req, now);
+    const session = await sessionForRequest(db, req, now);
     if (!session) return res.status(401).json({ error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
     // Keep the browser/native cookie lifetime in step with the slid server row.
     if (session.slid) setSessionCookies(res, session.rawToken, Math.max(1000, session.expires_at - now));
@@ -262,21 +290,42 @@ export function originGuard(req, res, next) {
   next();
 }
 
+/**
+ * Count one unit against `bucket`, or refuse it.
+ *
+ * ONE atomic statement. It used to be a transaction of its own — BEGIN, read
+ * the row, write the row, COMMIT — which is four trips to the database for a
+ * decision the database can make in one, on every rate-limited request (and
+ * ten for the two-window paid ceiling, which nested two of them). The rule is
+ * unchanged, and written once for both engines:
+ *
+ *   · no row, or the row's window has run out → the window restarts at `now`
+ *     with a count of 1, and the unit is allowed;
+ *   · a live window with room → the count goes up by one, allowed;
+ *   · a live window that is full → NOTHING is written (the upsert's WHERE is
+ *     false, so no row comes back) and the unit is refused.
+ *
+ * The upsert locks the bucket's row for the length of the statement, so two
+ * concurrent callers can never both take the last unit — on Postgres without
+ * the SERIALIZABLE retries the read-then-write version needed for the same
+ * guarantee. Inside a caller's own transaction it is simply one statement of
+ * that transaction.
+ */
 export async function consumeRateLimit(db, bucket, { limit, windowMs }, now = Date.now()) {
   db = asStore(db);
-  return db.transaction(async () => {
-    const row = await db.get('SELECT window_start, count FROM rate_limits WHERE bucket = ?', [bucket]);
-    if (!row || now - row.window_start >= windowMs) {
-      // rate_limits has no dependants, so this upsert is exactly the old
-      // INSERT OR REPLACE, written in the form both engines accept.
-      await db.run(`INSERT INTO rate_limits(bucket, window_start, count) VALUES (?, ?, 1)
-        ON CONFLICT(bucket) DO UPDATE SET window_start = excluded.window_start, count = excluded.count`, [bucket, now]);
-      return { allowed: true, remaining: Math.max(0, limit - 1), resetAt: now + windowMs };
-    }
-    if (row.count >= limit) return { allowed: false, remaining: 0, resetAt: row.window_start + windowMs };
-    await db.run('UPDATE rate_limits SET count = count + 1 WHERE bucket = ?', [bucket]);
-    return { allowed: true, remaining: Math.max(0, limit - row.count - 1), resetAt: row.window_start + windowMs };
-  });
+  const taken = await db.get(`INSERT INTO rate_limits(bucket, window_start, count) VALUES (?, ?, 1)
+    ON CONFLICT(bucket) DO UPDATE SET
+      window_start = CASE WHEN excluded.window_start - rate_limits.window_start >= ? THEN excluded.window_start ELSE rate_limits.window_start END,
+      count = CASE WHEN excluded.window_start - rate_limits.window_start >= ? THEN 1 ELSE rate_limits.count + 1 END
+    WHERE excluded.window_start - rate_limits.window_start >= ? OR rate_limits.count < ?
+    RETURNING window_start, count`, [bucket, now, windowMs, windowMs, windowMs, limit]);
+  if (taken) {
+    return { allowed: true, remaining: Math.max(0, limit - Number(taken.count)), resetAt: Number(taken.window_start) + windowMs };
+  }
+  // Refused: say when the window that refused it ends. (A bucket swept between
+  // the two statements has no window left to name; the caller may retry now.)
+  const row = await db.get('SELECT window_start FROM rate_limits WHERE bucket = ?', [bucket]);
+  return { allowed: false, remaining: 0, resetAt: (row ? Number(row.window_start) : now) + windowMs };
 }
 
 export function rateLimit(db, key, options) {

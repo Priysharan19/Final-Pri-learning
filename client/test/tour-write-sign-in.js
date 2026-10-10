@@ -191,6 +191,12 @@ const inkOnCanvas = page => page.evaluate(() => {
 });
 
 /** The canonical answer the server escrowed for a question it issued. */
+/** The reading receipts the server holds for one issued question (the reader's, and a student's correction on top of it). */
+function readingReceipts(h, serverQuestionId) {
+  return h.db.prepare("SELECT key,response_json FROM idempotency_keys WHERE scope='practice-recognition'").all()
+    .map(row => ({ key: row.key, ...JSON.parse(row.response_json) })).filter(row => row.questionId === serverQuestionId);
+}
+
 function serverAnswer(h, serverQuestionId) {
   const row = h.db.prepare("SELECT response_json FROM idempotency_keys WHERE scope='practice-question' AND key=?").get(serverQuestionId);
   if (!row) return null;
@@ -472,10 +478,15 @@ export const writeFlow = {
         await shownId(page) === qid && await mathText('.q-prompt') === prompt && !!escrow && escrow.prompt === issues[0]?.json?.question?.prompt,
         `on screen ${await shownId(page)} (was ${qid}); server question ${serverQid}`);
       const firstGrade = practiceCalls(calls, new RegExp(`^/v1/practice/${serverQid}/submit$`)).at(-1);
+      // One request reads, receipts and marks (no separate /recognize or
+      // /confirm): the receipts are read from the server's own records.
+      const heldReceipts = readingReceipts(h, serverQid);
+      const readerReceipt = heldReceipts.find(r => r.correctedByStudent !== true);
       await check('the correction was recorded by the server as the student\'s, on top of the reader\'s receipt',
-        practiceCalls(calls, new RegExp(`^/v1/practice/${serverQid}/recognize$`)).some(c => c.status === 201 && c.json?.transcription?.text === '7') &&
-          practiceCalls(calls, new RegExp(`^/v1/practice/${serverQid}/recognition/[^/]+/confirm$`)).some(c => c.status < 300 && c.body?.text === SURELY_WRONG),
-        JSON.stringify(practiceCalls(calls, /^\/v1\/practice\/.+/).map(c => `${c.status} ${c.path.replace(serverQid, ':id')}`)));
+        readerReceipt?.text === '7' && heldReceipts.some(r => r.correctedByStudent === true && r.text === SURELY_WRONG && r.parentReceipt === readerReceipt.key) &&
+          firstGrade?.json?.reading?.corrected === true && /^data:image\//.test(firstGrade.body?.image || '') &&
+          practiceCalls(calls, new RegExp(`^/v1/practice/${serverQid}/recogni`)).length === 0,
+        JSON.stringify({ receipts: heldReceipts.map(r => [r.text, r.correctedByStudent === true]), calls: practiceCalls(calls, /^\/v1\/practice\/.+/).map(c => `${c.status} ${c.path.replace(serverQid, ':id')}`) }));
       await check('a wrong answer: server-authoritative result, 0 of 1 marks, one try remaining',
         firstGrade?.status === 200 && firstGrade.json?.authoritative === true && firstGrade.json.correct === false &&
           firstGrade.json.resolved === false && firstGrade.json.triesLeft === 1 &&
@@ -992,9 +1003,10 @@ export const photoFlow = {
     const firstGrade = (await grades()).at(-1);
     await check('Submit sends the corrected transcript as a PHOTO answer under the reader\'s receipt, and the server marks it wrong: authoritative, 0 marks',
       firstGrade?.status === 200 && firstGrade.json?.authoritative === true && firstGrade.json.correct === false && firstGrade.json.marksEarned === 0 &&
-        firstGrade.body?.mode === 'photo' && firstGrade.body?.answer === SURELY_WRONG && typeof firstGrade.body?.transcriptionReceipt === 'string' &&
-        (await online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/recognition/[^/]+/confirm$`))).some(c => c.status < 300 && c.body?.text === SURELY_WRONG),
-      JSON.stringify(firstGrade && { status: firstGrade.status, body: { ...firstGrade.body, transcriptionReceipt: !!firstGrade.body?.transcriptionReceipt }, json: firstGrade.json }).slice(0, 500));
+        firstGrade.body?.mode === 'photo' && firstGrade.body?.answer === SURELY_WRONG && /^data:image\//.test(firstGrade.body?.image || '') &&
+        firstGrade.json.reading?.corrected === true &&
+        online.platform.readingReceipts(right.serverQuestionId).some(r => r.correctedByStudent === true && r.text === SURELY_WRONG && r.key === firstGrade.json.reading.receipt),
+      JSON.stringify(firstGrade && { status: firstGrade.status, body: { ...firstGrade.body, image: typeof firstGrade.body?.image }, json: firstGrade.json }).slice(0, 500));
     if (!await check('the question is still open for another try, and the right answer is known only from the server\'s sealed copy',
       firstGrade?.json?.resolved === false && typeof right.text === 'string' && right.text.length > 0 && await shownId(page) === qid,
       JSON.stringify({ resolved: firstGrade?.json?.resolved, kind: right.kind, detail: right.detail }))) return;
