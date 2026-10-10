@@ -77,7 +77,7 @@ export function makeAdvancedVisual(kind,p){
   const {a,b,lc=true,rc=false}=p;if(!Number.isInteger(a)||!Number.isInteger(b)||b-a<2||b-a>28)throw Error('integer interval');
   const answer=b-a-1+(lc?1:0)+(rc?1:0);
   const fig={type:'interval',description:`Number-line interval ${a} to ${b}, with ${lc?'closed':'open'} left endpoint and ${rc?'closed':'open'} right endpoint.`,a,b,lc,rc};
-  return done('How many integer points are included in the highlighted interval?', [`The interval endpoints are ${a} and ${b}.`,`There are ${b-a-1} integers strictly between the endpoints.`,`Including only filled endpoints brings the total to ${answer}.`],answer,V(`${b}-${a}-1+${lc?1:0}+${rc?1:0}`,answer),fig);
+  return done('How many integer points are included in the highlighted interval?', [`The interval endpoints are ${a} and ${b}.`,`There are ${b-a-1} integers strictly between the endpoints.`,`Including only filled endpoints brings the total to ${answer}.`],answer,V(`(${b})-(${a})-1+${lc?1:0}+${rc?1:0}`,answer),fig);
  }
  if(kind==='linesIntersection'){
   const {m1,m2,x,y}=p;if(![m1,m2,x,y].every(Number.isInteger)||m1===m2||x<-4||x>4)throw Error('intersection');
