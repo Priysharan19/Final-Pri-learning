@@ -336,18 +336,18 @@ const specs=[
     "context": "Arranged dots rule V"
   },
   {
-    "chapterId": "c9-circles",
+    "chapterId": "c9-coordinate-geometry",
     "kind": "parallel",
-    "angle": 8,
+    "angle": 28,
     "mode": "corresponding",
-    "context": "Parallel chord angle extension"
+    "context": "Transversal across two coordinate parallels"
   },
   {
-    "chapterId": "c9-circles",
+    "chapterId": "c9-coordinate-geometry",
     "kind": "parallel",
     "angle": 48,
     "mode": "supplementary",
-    "context": "Secant line deduction"
+    "context": "Comparing two parallel plotted lines"
   }
 ];
 const result={};for(const {chapterId,kind,...p} of specs)(result[chapterId]||={examples:[]}).examples.push(makeAdvancedVisual(kind,p));
