@@ -150,6 +150,15 @@ export const flow = {
         page1?.digest === sentDigest && page1.state === 'awaiting-reading' && page1.attempts === 1 && page1.reason === 'reader-unavailable' && result1.finalisedBy === 'deadline',
         JSON.stringify(page1));
       const afterDeadline = reader.requests.length - before;
+      // The list of papers says so too: a score with marks still undecided is not shown as final.
+      await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
+      const listed = page.locator('[data-exam-provisional]');
+      await listed.first().waitFor({ timeout: 30000 }).catch(() => {});
+      await check('the list of papers shows that score as provisional: marks "not marked yet" beside it',
+        await listed.count() === 1 && Number(await listed.getAttribute('data-exam-provisional')) > 0 && /not marked yet/.test(await listed.innerText()),
+        await listed.count() ? await listed.innerText() : 'no provisional marker in the list');
+      await page.goto(`${base}/exams/${examId}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.hero-num', { timeout: 30000 });
       await check('there is no canvas, no clock and no way to write on the paper any more',
         await page.locator('.ink-canvas-live').count() === 0 && await page.locator('.exam-timer').count() === 0 && await page.locator('[data-ink-read]').count() === 0);
 
@@ -188,6 +197,9 @@ export const flow = {
         result2?.finishedAt === result1?.finishedAt && result2?.handwriting?.submissionDigest === result1?.handwriting?.submissionDigest && result2?.deadline === result1?.deadline);
       await page.clock.fastForward('03:00');
       await page.waitForTimeout(600);
+      await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.tag', { timeout: 30000 }).catch(() => {});
+      await check('and once it is marked the list shows the score with no provisional marker', await page.locator('[data-exam-provisional]').count() === 0);
       await check('and nothing more is ever sent for it', reader.requests.length - before === total, `provider calls ${reader.requests.length - before}`);
       note(`provider calls for the unread handwritten exam answer [${EVIDENCE}]: ${afterDeadline} while the reader was down at the deadline (one bounded read operation), then 1 when it was read`);
       await check('no provider was reached but the scripted reader', reader.refused.length === 0, JSON.stringify(reader.refused));
