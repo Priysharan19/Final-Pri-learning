@@ -918,7 +918,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         // Marking took time on another thread. A student may have signed out,
         // the session may have expired, or a guardian may have withdrawn
         // consent meanwhile: authority is rechecked where the grade commits.
-        const refused = await authorityAtCommit(db, req, accountId, consentBlockedBefore);
+        // A submission that carries its picture also writes a reading receipt,
+        // and a receipt is never written for an account whose consent is
+        // blocked — /recognize refuses that unconditionally where it commits.
+        // So for a picture the consent check here is unconditional too.
+        const refused = await authorityAtCommit(db, req, accountId, withPicture ? false : consentBlockedBefore);
         if (refused) return refused;
         // The authoritative read. Whatever it finds decides; the forecast is
         // not consulted except to notice that the marked question changed.
