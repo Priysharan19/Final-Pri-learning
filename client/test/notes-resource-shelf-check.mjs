@@ -11,6 +11,11 @@ assert.ok(view.includes('data-testid="notes-study-resources"'), 'Study resources
 assert.ok(view.includes('target="_blank" rel="noopener noreferrer"'), 'External link must be isolated from opener');
 assert.ok(view.includes('aria-label={resource.title}'), 'External links require an accessible name');
 assert.ok(view.includes("t('nav.more')"), 'Resource heading must use existing localized copy');
+// A figure with an authored question is visible before any solution step is revealed.
+assert.ok(view.includes("import StudyDiagram from '../notes/StudyDiagram.jsx'"), 'diagram rendering module not wired');
+assert.ok(view.includes('<StudyDiagram figure={ex.figure} />'), 'diagram not in the problem statement');
+assert.ok(view.includes('const [shown, setShown] = useState(0)'), 'revealed solution step before student sees figure');
+assert.ok(!view.includes('dangerouslySetInnerHTML'), 'SVG must not permit raw HTML injection');
 assert.equal(STUDY_RESOURCE_LINKS.length, 23, 'unexpected source register count');
 const ids = new Set();
 for (const item of STUDY_RESOURCE_LINKS) {
