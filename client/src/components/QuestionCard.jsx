@@ -33,7 +33,9 @@ import { attestedGrade, gradingReceiptMismatch, matchingGradeResponse, numerical
 import { checkRefusalCopy, legacyDeviceReplay, needsAccountToCheck, refusalForQuestion, refusedCheckState, retryActionFor, serverRevealReceipt, unmarkableNotice } from './checkAccess.js';
 import { CheckRefusal, CheckSignIn, SignInChoices } from './CheckRefusal.jsx';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
-import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
+import { checkWorkingWithCloud, CLOUD_WORKING_ENGINE, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
+import { strokeSignature } from '../ink/strokeSignature.js';
+import { annotationsLive, inkLineVerdicts, revisionKey, sameLines, workingEvidence, workingEvidenceCopy } from './attemptEvidence.js';
 import { misconceptionById } from '../engine/misconceptions.js';
 import { tLater, translate, useLanguage, useT } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
@@ -369,6 +371,19 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // Whether the submission on screen (being marked, retried or resolved) was
   // handwritten: every handwritten verdict says who read it and who marked it.
   const [attemptViaInk, setAttemptViaInk] = useState(false);
+  // ── The judged revision ────────────────────────────────────────────────────
+  // What the last GRADED submission was made from: its id, the answer the
+  // student confirmed (which is what the server marked), the lines that went
+  // as working, and the revision of the page at the press. Every annotation
+  // on the card — the verdict card, the marks on the ink, the per-line notes,
+  // the spoken sentence — is of this revision and of nothing else. Once the
+  // page moves on (a stroke, an erase, a clear, a corrected reading, another
+  // answer, another input mode) the annotations are withdrawn at once and
+  // stay withdrawn until the NEW revision has itself been graded.
+  const [judged, setJudged] = useState(null);
+  const [judgedStale, setJudgedStale] = useState(false);
+  // The content of the ink on the page (not a reading of it).
+  const [inkSignature, setInkSignature] = useState(null);
   // The reading a submission was made from is frozen while it is marked and
   // after it is resolved: a reading that settles late cannot rewrite it.
   const inkFrozenRef = useRef(false);
@@ -408,6 +423,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false);
     ++photoSaveRevision.current;
     setChecking(false); setVouched(null); setPdfUnread(null); setPdfPageCount(0); setAttemptViaInk(false);
+    setJudged(null); setJudgedStale(false); setInkSignature(null);
     setSaveState(draft?.typed || draft?.working ? 'saved' : null);
     latestInk.current = null;
     ++inkSaveRevision.current;
@@ -973,6 +989,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // moment the pen lifts. The status line says "saved" only after the record
   // has been read back from the store, never on the strength of having asked.
   const onInkStrokes = useCallback((strokes) => {
+    // The page's content, whatever else is going on: an annotation of an
+    // earlier revision must not outlive a single new stroke.
+    setInkSignature(Array.isArray(strokes) && strokes.length ? strokeSignature(strokes) : null);
     if (inFlightRef.current || attemptRef.current) return;
     // New pen strokes after a submission was pressed are an edit of it. The
     // first report after a mount is the kept page being restored, not an edit.
@@ -1118,6 +1137,19 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     : inkAnswerEdit !== null ? inkAnswerEdit
       : inkProposal.status === 'proposed' ? inkProposal.answer : '';
   const needsCheck = !!doubt && !!reading && !inkStale && vouched !== reading;
+  // The page as it stands now. Submit records it; a graded result is shown as
+  // a result of what is on screen only while this has not changed since.
+  const currentRevision = revisionKey({
+    questionId: question.id, mode: isMcq ? 'mcq' : mode, inkSignature, inkStale,
+    transcript: inkResult?.text ?? '', inkAnswer: isWorking ? '' : inkAnswer,
+    answer, working, choice: isMcq ? mcqSel : null, photo
+  });
+  // The same, for a result that lands outside a render (a relaunch replay).
+  const screenRef = useRef(null);
+  screenRef.current = {
+    revision: currentRevision, write: writeMode, lines: inkResult?.lines || null, inkStale,
+    inkAnswer: isWorking ? '' : inkAnswer, answer, working, choice: isMcq ? mcqSel : null
+  };
   const checkFocus = needsCheck && checking ? (doubt.weakest?.id || null) : null;
 
   useEffect(() => { if (!needsCheck && checking) setChecking(false); }, [needsCheck, checking]);
@@ -1234,7 +1266,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (earlier) {
       pendingRef.current = { submissionId: earlier.submissionId, contentKey: submissionContentKey(earlier.answer, earlier.steps), sourceMode: earlier.sourceMode, ms: earlier.ms };
       await deliver({ answer: earlier.answer, ms: earlier.ms, steps: earlier.steps, viaInk: earlier.viaInk, submissionId: earlier.submissionId },
-        { lines: earlier.lines, recovering: true, earlierAnswer: isMcq ? '' : earlier.answer });
+        { lines: earlier.lines, recovering: true, earlierAnswer: isMcq ? '' : earlier.answer, sourceMode: earlier.sourceMode });
       return;
     }
     const replay = pendingRef.current?.contentKey === contentKey && pendingRef.current?.sourceMode === sourceMode;
@@ -1267,14 +1299,41 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
       ? compactInkStrokes(scribbleRef.current.getStrokes())
       : undefined;
-    await deliver({ answer: String(given), ms, steps, viaInk, ink, photo, scribble: scribbleStrokes, submissionId }, { lines });
+    await deliver({ answer: String(given), ms, steps, viaInk, ink, photo, scribble: scribbleStrokes, submissionId }, { lines, sourceMode, revision: currentRevision });
   }
 
   /**
    * Send one submission and settle the card on its definitive answer. Used by
    * a tap and by relaunch recovery alike, so both take the same path.
    */
-  async function deliver(body, { lines = null, recovering = false, earlierAnswer = null } = {}) {
+  async function deliver(body, { lines = null, recovering = false, earlierAnswer = null, sourceMode = null, revision = null } = {}) {
+    // What this submission was made from. A recovered one (relaunch, or an
+    // earlier press settled first) names no revision of this page: its result
+    // is shown as a result of that earlier submission, never pinned on the ink.
+    const workingLines = Array.isArray(lines) ? lines
+      : (typeof body.steps === 'string' && body.steps.trim() ? body.steps.split('\n').map(l => l.trim()).filter(Boolean) : null);
+    const submitted = {
+      questionId: String(question.id), submissionId: body.submissionId || null,
+      answer: String(body.answer ?? ''), lines: workingLines, viaInk: body.viaInk === true,
+      sourceMode: sourceMode || (body.viaInk === true ? 'ink' : 'typed'),
+      hasWorking: isWorking ? Array.isArray(workingLines) && workingLines.length > 0 : typeof body.steps === 'string' && body.steps.trim() !== '',
+      revision
+    };
+    // A relaunch replay is sent only while the kept work still says what was
+    // submitted. Its result is a result of the page on screen exactly when the
+    // page, as it stands when the result lands, IS that submission — the same
+    // lines and the same answer. Otherwise it stays the earlier attempt's.
+    const landOnScreen = () => {
+      if (!recovering || earlierAnswer !== null) return;
+      const now = screenRef.current;
+      if (!now) return;
+      const same = (a, b) => String(a ?? '').trim() === String(b ?? '').trim();
+      const matches = submitted.viaInk
+        ? now.write && !now.inkStale && sameLines(submitted.lines, now.lines) && (isWorking || same(now.inkAnswer, submitted.answer))
+        : isMcq ? now.choice !== null && same(now.choice, submitted.answer)
+          : !now.write && same(isWorking ? now.working : now.answer, submitted.answer) && (isWorking || !body.steps || same(now.working, body.steps));
+      if (matches) submitted.revision = now.revision;
+    };
     inFlightRef.current = true;
     inkFrozenRef.current = !recovering || inkFrozenRef.current;
     setBusy(true);
@@ -1317,6 +1376,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         attemptRef.current = bound;
         if (live) {
           setAttempt(bound);
+          setJudged(submitted); setJudgedStale(false);
           setState({ phase: 'resolved', res: earlierAnswer === null ? r : { ...r, earlierAnswer } });
           if (!diagnostic) {
             if (!r.replayed) celebrate(r);
@@ -1330,7 +1390,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         onResolved?.(r);
       } else {
         inkFrozenRef.current = false;
-        if (live) setState({ phase: 'retry', res: earlierAnswer === null ? r : { ...r, earlierAnswer } });
+        if (live) {
+          landOnScreen();
+          setJudged(submitted); setJudgedStale(false);
+          setState({ phase: 'retry', res: earlierAnswer === null ? r : { ...r, earlierAnswer } });
+        }
       }
     } catch (e) {
       if (!mountedRef.current) return;
@@ -1411,7 +1475,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         answer: pending.answer, ms: pending.ms, steps: pending.steps, viaInk: pending.viaInk,
         ink: kept ? { strokes: compactInkStrokes(kept), recognized: (pending.lines || []).join('\n') || null, engine: null } : undefined,
         submissionId: pending.submissionId
-      }, { lines: pending.lines, recovering: true });
+      }, { lines: pending.lines, recovering: true, sourceMode: pending.sourceMode });
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1484,6 +1548,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (!mountedRef.current) return;
       // Skipping shows the solution, which is the server's to show.
       if (r?.authoritative !== true || r.resolved !== true) throw new Error(gradingReceiptMismatch(language));
+      setJudged(null); setJudgedStale(false);
       setState({ phase: 'resolved', res: r });
       onResolved?.(r);
     } catch (e) {
@@ -1508,6 +1573,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     inkFrozenRef.current = true;
     attemptRef.current = { questionId: String(question.id), attemptId: r.attemptId, submissionId: null, lines: null, revealed: true };
     if (mountedRef.current) {
+      // A reveal is not a marked submission: nothing of an earlier try is shown as its result.
+      setJudged(null); setJudgedStale(false);
       setAttempt(attemptRef.current);
       setState({ phase: 'resolved', res: r });
       celebrate(r); refreshUser(); refreshDue(); refreshRecent?.();
@@ -1555,37 +1622,40 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   const verdictGood = resolved && res.correct;
   const activeReport = state.res?.stepReport;
-  // Teacher-style pin: per-line verdicts on the student's own ink. Step Check
-  // pinpoints the exact line where the maths breaks; if every line is
-  // consistent but the answer is still wrong, the final line gets the ✗ — the
-  // mistake is always pointed at, never just "incorrect".
+  // ── Whose result this is ──────────────────────────────────────────────────
+  // A graded "not yet" (a wrong first try, or an entry the engine could not
+  // read) is a result of the judged revision. It is shown as a result of what
+  // is on the page only while the page is still that revision.
+  const gradedRetry = state.phase === 'retry' && !state.res?.technical && !state.res?.conflict;
+  const revisionMoved = gradedRetry && !!judged && judged.revision !== currentRevision;
+  useEffect(() => { if (revisionMoved) setJudgedStale(true); }, [revisionMoved]);
+  const judgedLive = !gradedRetry || annotationsLive({ judged, currentKey: currentRevision, latched: judgedStale || !judged });
+  // The previous attempt's result, said as that and as nothing more. (A typed
+  // entry the engine could not read keeps its own guidance, which already
+  // lasts only while that same text is in the field.)
+  const previousAttempt = gradedRetry && !judgedLive && !(state.res?.invalid && judged?.sourceMode === 'typed');
+  // Teacher-style pin: per-line marks on the student's own ink — only what the
+  // server established about the lines that were submitted (attemptEvidence.js).
+  // A line is ✓ or ✗ from the server's step report of exactly those lines; the
+  // last line carries the verdict on the answer only when the answer that was
+  // submitted IS that line. A right final answer says nothing about the lines
+  // above it, and a reading the student did not submit is never marked.
+  const verdictOutcome = !writeMode ? null
+    : gradedRetry && !state.res?.invalid ? 'retry-wrong'
+      : resolved && !res?.revealed && !res?.invalid ? (res?.correct ? 'resolved-correct' : 'resolved-wrong') : null;
   const localLineVerdicts = useMemo(() => {
-    if (!writeMode) return null;
-    const n = inkResult?.lines?.length || 0;
-    let base = activeReport?.lines
-      ? activeReport.lines.map(l => ({ status: l.status, note: l.note }))
-      : null;
-    const wrongNow = (state.phase === 'retry' && !state.res?.invalid) || (resolved && !res?.correct && !res?.revealed);
-    if (wrongNow && n > 0) {
-      if (!base) base = Array.from({ length: n }, () => ({ status: 'unknown' }));
-      if (!base.some(v => v.status === 'break')) {
-        const idx = Math.min(n, base.length) - 1;
-        if (idx >= 0) base[idx] = {
-          status: 'wrong',
-          note: resolved && res?.solution?.answerText
-            ? `this line should conclude ${String(res.solution.answerText)}`
-            : 'this line doesn’t reach the right answer — rework it'
-        };
-      }
-    }
-    // Correct → the marked answer line earns its tick on the ink itself.
-    if (resolved && res?.correct && n > 0) {
-      if (!base) base = Array.from({ length: n }, () => ({ status: 'unknown' }));
-      const idx = Math.min(n, base.length) - 1;
-      if (idx >= 0 && base[idx].status !== 'break') base[idx] = { status: 'ok', note: base[idx]?.note };
-    }
-    return base;
-  }, [writeMode, activeReport, state.phase, state.res?.invalid, resolved, res, inkResult]);
+    const base = inkLineVerdicts({
+      outcome: verdictOutcome, res: state.res, submitted: judged, shownLines: inkResult?.lines || [],
+      live: judgedLive && inkResult?.stale !== true, answeredByWorking: isWorking
+    });
+    if (!base) return null;
+    return base.map(v => (v.noteKind ? {
+      status: v.status,
+      note: v.noteKind === 'conclude' && res?.solution?.answerText
+        ? `this line should conclude ${String(res.solution.answerText)}`
+        : 'this line doesn’t reach the right answer — rework it'
+    } : v));
+  }, [verdictOutcome, state.res, judged, inkResult, judgedLive, isWorking, res]);
 
   // ── A second read of the working ───────────────────────────────────────────
   // Asked for only when the answer is wrong and the on-device checker could not
@@ -1650,10 +1720,25 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const cloudCheck = cloudCheckFor && attempt?.submissionId && cloudCheckFor.submissionId === attempt.submissionId
     ? cloudCheckFor.result : null;
 
-  const lineVerdicts = useMemo(
-    () => mergeVerdicts(localLineVerdicts, cloudCheck, { lineCount: inkResult?.lines?.length || 0 }),
-    [localLineVerdicts, cloudCheck, inkResult]
+  const lineVerdicts = useMemo(() => {
+    // The second read was of the submitted lines: it is drawn only on them.
+    const ofShown = resolved && sameLines(judged?.lines, inkResult?.lines) && inkResult?.stale !== true;
+    const merged = mergeVerdicts(localLineVerdicts, ofShown ? cloudCheck : null, { lineCount: inkResult?.lines?.length || 0 });
+    if (!merged) return null;
+    // A tick is the engine's. The second read is a model's opinion: where it
+    // says the working breaks is shown, hedged, as before; where it finds
+    // nothing wrong it earns no tick on the page.
+    const out = merged.map(v => (!v || (v.status === 'ok' && v.source === CLOUD_WORKING_ENGINE) ? { status: 'unknown' } : v));
+    return out.some(v => v.status !== 'unknown' && v.status !== 'note') ? out : null;
+  }, [localLineVerdicts, cloudCheck, inkResult, judged, resolved]);
+  // What the server established about the working that was submitted, for a
+  // reading-based submission (handwriting or a photo), where the lines came
+  // from a reader and may not be what the student wrote.
+  const workEvidence = useMemo(
+    () => (resolved && judged && judged.sourceMode !== 'typed' ? workingEvidence({ res, submitted: judged }) : null),
+    [resolved, res, judged]
   );
+  const workEvidenceCopy = workingEvidenceCopy(workEvidence, { correct: res?.correct === true });
   const cloudWorkingNote = useMemo(() => workingNote(cloudCheck), [cloudCheck]);
 
   // The misconception the cloud check proposed, as the deterministic engine
@@ -1758,6 +1843,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (state.phase === 'retry') {
       const refused = checkRefusalCopy(state.res?.refusal);
       if (refused) return `${t(refused.contextKey)} ${t(refused.hintKey)}`;
+      // The page has moved on: nothing is announced as a verdict on it.
+      if (previousAttempt) return `${t(state.res?.invalid ? 'verdict.previousAttemptUnread' : 'verdict.previousAttemptWrong')} ${t('verdict.newWorkNotChecked')}`;
       return state.res?.invalid
         ? t('verdict.speechUnreadable', { feedback: state.res.feedback || '' })
         : t('verdict.speechRetry', { feedback: state.res?.feedback || t('verdict.oneMoreGo') });
@@ -1770,7 +1857,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (verdictGood) return marks ? t('verdict.speechCorrect', { marks }) : t('verdict.correct');
     return (marks ? t('verdict.speechIncorrect', { marks }) : t('verdict.notThisTime'))
       + (res.solution?.answerText ? t('verdict.speechExpected', { answer: res.solution.answerText }) : '');
-  }, [state.phase, state.res, resolved, res, verdictGood, shownGrade?.awarded, shownGrade?.possible, t]);
+  }, [state.phase, state.res, resolved, res, verdictGood, shownGrade?.awarded, shownGrade?.possible, previousAttempt, t]);
 
   const answerLines = isMcq ? [] : writeMode
     ? (inkResult?.lines || [])
@@ -1948,10 +2035,19 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const firstBad = inkComments?.find(c => c.kind === 'bad') || null;
   // Once submitted, the bar shows the answer the attempt was marked on; a
   // reading that lands later can redraw the panel but never this line.
-  const boundLines = (state.phase !== 'answering' && attempt?.lines?.length) ? attempt.lines : null;
-  const shownAnswerLine = boundLines
-    ? boundLines[boundLines.length - 1]
+  // It is the answer the student CONFIRMED and the server marked — never the
+  // last line of the reader's transcript, which may be something else (a
+  // misread page whose answer was typed into the Final answer field). While
+  // the page has moved on from the judged revision, the bar goes back to
+  // showing what Submit would send now.
+  const judgedShown = !!judged && judged.viaInk && (resolved || (gradedRetry && judgedLive));
+  const boundLines = judgedShown && judged.lines?.length ? judged.lines : null;
+  const shownAnswerLine = judgedShown
+    ? (isWorking ? (boundLines ? boundLines[boundLines.length - 1] : '') : judged.answer)
     : (inkResult?.answerLine ? (isWorking ? inkResult.lines[inkResult.lines.length - 1] : inkAnswer) : '');
+  // The reader's transcript ends in something other than the marked answer.
+  const transcriptDiffers = !!judged && judged.viaInk && !isWorking && !!judged.lines?.length
+    && String(judged.lines[judged.lines.length - 1]).trim() !== String(judged.answer).trim();
   const otherComments = (inkComments || []).filter(c => c !== firstBad && c.kind !== 'good');
 
   return (
@@ -2286,7 +2382,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             {/* data-marked starts the reading sweep (theme.css): it appears only
                 when the deterministic engine has actually marked this page. */}
             <div className={`editor-shell${inkAccountBlocked ? ' ink-account-waiting' : ''}${inkReaderState?.blocker === 'ink.waitingSignIn' && inkAccountBlocked ? ' ink-account-signin' : ''}`}
-              data-marked={(resolved && !res?.revealed) || (state.phase === 'retry' && !state.res?.invalid) ? 'yes' : undefined}>
+              data-marked={(resolved && !res?.revealed) || (gradedRetry && judgedLive && !state.res?.invalid) ? 'yes' : undefined}>
               {InkAnswer && restoredInk !== undefined && (
                 <InkAnswer onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
                   disabled={resolved || busy} focusSymbol={checkFocus} recognitionContext={recognitionContext}
@@ -2493,9 +2589,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <div className="verdict-next" role="status" data-earlier-submission>{earlierSubmissionNotice(language, state.res.earlierAnswer, resolved)}</div>
         )}
         {state.phase === 'retry' && (
-          <div className={`verdict ${technicalRetry ? 'verdict-technical' : invalidRetry ? 'verdict-bad verdict-unsure' : 'verdict-bad'}`}>
+          <div className={`verdict ${previousAttempt ? 'verdict-previous' : technicalRetry ? 'verdict-technical' : invalidRetry ? 'verdict-bad verdict-unsure' : 'verdict-bad'}`}
+            data-verdict-of={previousAttempt ? 'previous-attempt' : gradedRetry ? 'this-page' : undefined}>
             <span className="verdict-ico">
-              <Icon name={technicalRetry ? 'alert' : invalidRetry ? 'uncertain' : 'correction'} />
+              <Icon name={previousAttempt ? 'clock' : technicalRetry ? 'alert' : invalidRetry ? 'uncertain' : 'correction'} />
               {/* The state is said in words, not only by the icon's colour. */}
               {technicalRetry && <span className="sr-only">{t('verdict.notCheckedLabel')}</span>}
             </span>
@@ -2528,6 +2625,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     <button type="button" className="btn btn-quiet btn-sm" data-type-instead onClick={() => { setState({ phase: 'answering' }); flipMode('type'); }}>{t('verdict.typeInstead')}</button>
                   </div>
                 </div>
+              ) : previousAttempt ? (
+                /* The page has changed since this was marked. The earlier
+                   result is kept, said as the earlier attempt's, and nothing
+                   on the page now is described as checked. */
+                <>
+                  <div className="verdict-title">{t(state.res?.invalid ? 'verdict.previousAttemptUnread' : 'verdict.previousAttemptWrong')}</div>
+                  <div className="verdict-body" data-new-work-unchecked>{t('verdict.newWorkNotChecked')}</div>
+                </>
               ) : (
                 <>
                   <div className="verdict-title">{state.res?.conflict ? t('verdict.alreadyFinishedTitle') : t(technicalRetry ? 'verdict.notSubmittedTitle' : invalidRetry ? 'verdict.unreadable' : 'verdict.notQuite')}</div>
@@ -2543,10 +2648,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 </>
               )}
               {attemptViaInk && !checkRefused && <div className="eval-provenance" data-provenance="handwriting" style={{ padding: '6px 0 0', border: 0 }}>{t('verdict.readByAiMarkedByEngine')}</div>}
-              {state.res?.authoritative !== true && state.res?.partial &&
+              {!previousAttempt && state.res?.authoritative !== true && state.res?.partial &&
                 <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{state.res.partial.note}</div>}
-              {state.res.stepReport && <StepReport report={state.res.stepReport} />}
-              {!checkRefused && !state.res?.readerBlock && <div className="verdict-next">{state.res?.conflict ? t('verdict.nextAfterConflict') : t(technicalRetry ? 'verdict.nextTechnical' : invalidRetry ? 'verdict.nextUnreadable'
+              {!previousAttempt && state.res.stepReport && <StepReport report={state.res.stepReport} />}
+              {!previousAttempt && !checkRefused && !state.res?.readerBlock && <div className="verdict-next">{state.res?.conflict ? t('verdict.nextAfterConflict') : t(technicalRetry ? 'verdict.nextTechnical' : invalidRetry ? 'verdict.nextUnreadable'
                 : (state.res.stepReport?.lines?.some(l => l.status === 'break') || firstBad) ? 'verdict.nextFix' : 'verdict.nextTryAgain')}</div>}
             </div>
           </div>
@@ -2631,8 +2736,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {res.partial && !verdictGood &&
                   (!serverAuthoritative || showCommittedMethodAwardNote(res, committedGrade)) &&
                   <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{res.partial.note}</div>}
-                {verdictGood && writeMode && inkResult?.lines?.length > 1 && (
-                  <div>{t('verdict.everyLineChecked', { count: inkResult.lines.length, n: inkResult.lines.length })}</div>
+                {/* The answer that was marked is the one the student confirmed. */}
+                {judged?.viaInk && !isWorking && !res.revealed && String(judged.answer).trim() !== '' && (
+                  <div data-submitted-answer={judged.answer}>
+                    {t('verdict.yourAnswerIs')} <b><MathText text={`$${texOf(judged.answer)}$`} /></b>
+                    {transcriptDiffers && <div className="muted" data-transcript-not-answer style={{ fontSize: 13.5 }}>{t('verdict.transcriptNotAnswer')}</div>}
+                  </div>
+                )}
+                {/* Said only from the server's step report of the lines that
+                    were submitted. A right answer is never evidence about the
+                    working: with no report, the working was not checked. */}
+                {workEvidenceCopy && (
+                  <div data-working-evidence={workEvidence.kind}>{t(workEvidenceCopy.key, workEvidenceCopy.vars)}</div>
                 )}
                 {!verdictGood && res.solution && (
                   <div className="eval-expected">{t('verdict.expected')} <b><MathText text={res.solution.answerText} /></b></div>
@@ -2727,7 +2842,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         <div className="ws-actions editor-foot no-print">
           <span className="status-line" data-state={statusState} data-work-state={workState} role="status" aria-live="polite">
             {statusState !== 'idle' && <span className="dot" aria-hidden="true" />}
-            {writeMode && shownAnswerLine && !inkStale && !needsCheck && !cloudPending && !(resolved && !boundLines) && saveState !== 'failed' && saveState !== 'saving'
+            {writeMode && shownAnswerLine && !inkStale && !needsCheck && !cloudPending && !(resolved && !judgedShown) && saveState !== 'failed' && saveState !== 'saving'
               ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(shownAnswerLine)}$`} /></span>
               : statusText}
             {/* Handwriting is read only by the server reader (#316); say so where the work is submitted. */}

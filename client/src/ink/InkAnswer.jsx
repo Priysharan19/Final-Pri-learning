@@ -44,6 +44,7 @@ import { useLanguage, useT } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
 import './InkAnswer.css';
 import { priNative } from '../platform/native/index.js';
+import { strokeSignature } from './strokeSignature.js';
 import { applyLineCorrection, confidenceFloorOf, isLowConfidence, lowConfidenceLines } from './readingCorrection.js';
 
 // Engine names are for developers and evaluators, not students: shown in dev
@@ -76,20 +77,9 @@ function knownBlockOf(who, isOnline) {
   if (['turned-off', 'not-available', 'offline', 'session'].includes(block.kind)) return block;
   return paused ? block : null;
 }
-// The content of the page, not only its size: two pages with the same number
-// of strokes and points are different pages.
-export const strokeSignature = strokes => {
-  let h = 0x811c9dc5, points = 0;
-  for (const st of strokes) {
-    h = Math.imul(h ^ 0x7c, 0x01000193) >>> 0;
-    for (const p of st?.points || []) {
-      points += 1;
-      h = Math.imul(h ^ (Math.round(Number(p?.x) || 0) & 0xffff), 0x01000193) >>> 0;
-      h = Math.imul(h ^ (Math.round(Number(p?.y) || 0) & 0xffff), 0x01000193) >>> 0;
-    }
-  }
-  return `${strokes.length}:${points}:${h.toString(36)}`;
-};
+// (strokeSignature lives in its own module so the card can name a revision of
+// the page without loading the ink surface.)
+export { strokeSignature };
 
 /**
  * lineVerdicts: optional array aligned with the read lines, e.g.
