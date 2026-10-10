@@ -348,38 +348,43 @@ const specs=[
   },
   {
     "chapterId": "c11-permutations-combinations",
-    "kind": "dots",
-    "rows": 5,
-    "mode": "total",
-    "context": "Committee arrangement dots A"
+    "kind": "pascal",
+    "mode": "coefficient",
+    "context": "Combinatorial selection C(6,2)",
+    "n": 6,
+    "k": 2
   },
   {
     "chapterId": "c11-permutations-combinations",
-    "kind": "dots",
-    "rows": 6,
-    "mode": "next",
-    "context": "Selection sequence B"
+    "kind": "pascal",
+    "mode": "coefficient",
+    "context": "Combinatorial selection C(7,3)",
+    "n": 7,
+    "k": 3
   },
   {
     "chapterId": "c11-permutations-combinations",
-    "kind": "dots",
-    "rows": 7,
-    "mode": "total",
-    "context": "Handshakes construction C"
+    "kind": "pascal",
+    "mode": "coefficient",
+    "context": "Combinatorial selection C(8,2)",
+    "n": 8,
+    "k": 2
   },
   {
     "chapterId": "c11-binomial-theorem",
-    "kind": "dots",
-    "rows": 4,
-    "mode": "total",
-    "context": "Binomial coefficient triangular arrangement A"
+    "kind": "pascal",
+    "mode": "coefficient",
+    "context": "Pascal coefficients on a specific row",
+    "n": 5,
+    "k": 2
   },
   {
     "chapterId": "c11-binomial-theorem",
-    "kind": "dots",
-    "rows": 8,
-    "mode": "next",
-    "context": "Pascal-style dots B"
+    "kind": "pascal",
+    "mode": "rowSum",
+    "context": "Binomial row-sum identity",
+    "n": 7,
+    "k": 3
   },
   {
     "chapterId": "c11-sequences-series",
