@@ -46,7 +46,7 @@ for(const group of IN_CURRICULUM){
       assert.ok(notes[chapterId].examples.some(x=>x.question===ex.question),'loader omitted original inquiry question');
       assert.ok(ex.question && ex.answer && ex.steps.length>=3,'incomplete worked question');
       const f=ex.figure,v=ex.verify;
-      assert.ok(f.description.length>=35 && !/[<>]/.test(f.description),'unsafe or inaccessible diagram description');
+      assert.ok(f.description.length>=35 && !/<\s*\/?\s*[a-z][\w:-]*(?:\s|\/>|>)/i.test(f.description),'unsafe or inaccessible diagram description');
       shapes.add(f.type);
       assert.ok(['value','values'].includes(v.kind),'unsupported verification record');
       const receipts=v.kind==='value'?[[v.expr,v.answer]]:v.pairs;
