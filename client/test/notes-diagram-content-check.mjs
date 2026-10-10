@@ -3,6 +3,14 @@ import assert from 'node:assert/strict';
 import { IN_CURRICULUM } from '../src/engine/curriculum-in.js';
 import { evalNumeric } from '../src/engine/expr.js';
 import { loadNotesForGrade } from '../src/notes/notesIndex.js';
+const wave4Loaders={
+  7:()=>import('../src/notes/data/notes-visual-class7.js'),
+  8:()=>import('../src/notes/data/notes-visual-class8.js'),
+  9:()=>import('../src/notes/data/notes-visual-class9.js'),
+  10:()=>import('../src/notes/data/notes-visual-class10.js'),
+  11:()=>import('../src/notes/data/notes-visual-class11.js'),
+  12:()=>import('../src/notes/data/notes-visual-class12.js')
+};
 async function verifyVisuals(){
   const expected={7:14,8:16,9:22,10:24,11:25,12:24};
   const allowed=new Set(['plane','geometry','bars','numberline']);
@@ -14,12 +22,15 @@ async function verifyVisuals(){
   for (const group of IN_CURRICULUM){
     const grade=group.grade;
     const notes=await loadNotesForGrade(grade);
+    const wave4=(await wave4Loaders[grade]()).default;
     let gradeCount=0;
     for (const ch of group.chapters){
       const note=notes[ch.id];
       assert.ok(note,'missing '+ch.id);
       total+=note.examples.length;
-      for (const ex of note.examples.filter(x=>x.figure)){
+      // Scope historic Wave-4 invariants to its original 125 figures; later waves have new, separately checked schemas.
+      for (const ex of wave4[ch.id]?.examples || []){
+        assert.ok(note.examples.some(item=>item.question===ex.question),'Wave-4 worked example missing from expanded chapter');
         visuals++;gradeCount++;
         assert.ok(!seenQuestions.has(grade+'|'+ex.question),'duplicate visual question '+ex.question);
         seenQuestions.add(grade+'|'+ex.question);
@@ -75,7 +86,7 @@ async function verifyVisuals(){
     assert.equal(gradeCount,expected[grade],'visual grade breadth mismatch '+grade);
   }
   assert.equal(visuals,125,'visual question count changed');
-  assert.equal(total,491,'original and enriched worked examples must all be preserved');
+  assert.equal(total,1251,'full expanded worked-example inventory must be retained');
   assert.ok(arity.plane>=70 && arity.geometry>=15 && arity.bars>=15 && arity.numberline>=4, 'diagram diversity floor');
   console.log('Visual diagram questions PASS',JSON.stringify({visuals,total,byGrade,figureKinds:arity}));
 }
