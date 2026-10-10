@@ -58,15 +58,41 @@ export function draftPersistenceWarning(language) {
 // An unhandled rejection must never strand Photo at phase='reading' forever.
 // Keep error bytes/private handwriting out of student logs and UI.
 export function photoReadFailure() {
-  return { blocked: 'verdict.photoReadingServiceDown' };
+  return {
+    blocked: 'verdict.photoReadingServiceDown',
+    block: { kind: 'unreachable', action: 'try-again', key: 'verdict.photoReadingServiceDown', inkKey: 'ink.waitingServiceDown', autoRetry: false, manualRetry: true, retryAt: null }
+  };
+}
+
+// The reading that precedes marking (/v1/practice/:id/recognize) can be
+// refused for the reader's own reasons. Those are named to the student as
+// what they are. Account refusals (sign in, verify, guardian) and a question
+// the server will not accept keep the check's existing sign-in / conflict
+// flow; a device that is simply offline keeps "reconnect".
+const READER_OWN_CODES = /^(PAID_CAPACITY_(REACHED|NOT_CONFIGURED)|AI_ALLOWANCE_EXHAUSTED|RATE_LIMITED|HANDWRITING_[A-Z0-9_]+|RECOGNITION_FAILED)$/;
+export function readerRefusalAtSubmit(error) {
+  const failure = error?.readerFailure;
+  if (!failure || error?.beforeMarking !== true) return null;
+  const code = String(failure.code || '');
+  const status = Number(failure.status) || 0;
+  if ([401, 403].includes(status)) return null;
+  if (/^HANDWRITING_(IMAGE|BODY|NOT_ANSWER_BLIND)/.test(code)) return null;
+  if (READER_OWN_CODES.test(code) || status === 429 || status >= 500) {
+    return { code: code || null, status: status || null, resetAt: Number.isFinite(Number(failure.resetAt)) && Number(failure.resetAt) > 0 ? Number(failure.resetAt) : null };
+  }
+  return null;
 }
 
 // A recoverable connection failure should not force the learner to choose a
 // fresh image (or lose the original PDF). Auth/guardian refusal is not a
 // reason to offer a bypassing Retry button; those have their own account flow.
-export function canRetryPhotoReading(blockedKey, hasImage, hasPdf) {
-  return Boolean(hasImage || hasPdf) &&
-    ['verdict.photoReadingOffline', 'verdict.photoReadingServiceDown'].includes(blockedKey);
+export function canRetryPhotoReading(blockedKey, hasImage, hasPdf, block = null) {
+  if (!(hasImage || hasPdf)) return false;
+  // The classification decides when it is known: a retry is offered for a
+  // reader that did not answer, a lost connection, a request to send again,
+  // and a limit (one press sends one new request). Never for an account step.
+  if (block && typeof block.manualRetry === 'boolean') return block.manualRetry;
+  return ['verdict.photoReadingOffline', 'verdict.photoReadingServiceDown'].includes(blockedKey);
 }
 
 // These online-only student notices are temporary source-adjacent EN/HI copy.

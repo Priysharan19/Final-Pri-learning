@@ -5649,7 +5649,17 @@ async function gradeOnServer(row, body, submissionId, requestDigest) {
         status: 422, code: 'RECOGNITION_IMAGE_REQUIRED'
       });
     }
-    const read = await viaServer(() => cloud.recognizePractice(row.serverQuestionId, mode, image));
+    // The reader's own refusal (the service's reading limit, this account's
+    // allowance or rate limit, a reader that did not answer) is kept beside
+    // the "not checked" error, so the card can name it instead of saying
+    // "reconnect" for a limit that reconnecting does not lift.
+    const read = await cloud.recognizePractice(row.serverQuestionId, mode, image).catch(cause => {
+      const refusal = unreachable(cause);
+      if (refusal && typeof refusal === 'object') {
+        refusal.readerFailure = { code: cause?.code || null, status: cause?.status || null, resetAt: cause?.resetAt || null };
+      }
+      throw refusal;
+    });
     receipt = read?.receipt;
     if (!receipt || typeof read?.transcription?.text !== 'string') {
       throw Object.assign(new Error('The server did not issue a valid reading receipt.'), {

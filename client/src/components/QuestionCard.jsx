@@ -17,11 +17,17 @@ import {
   saveInkDraft, savePendingSubmission, submissionContentKey,
   noteSubmissionEdited, recoveryPlan, settleFailedSubmission, submissionToSettleFirst
 } from './practiceRecovery.js';
-import { cloudReadingEnabled, INK_READER_STATE, photoReadingBlockedKey, readPhotoWithCloud, takeCloudReadingNotice } from '../ink/cloudReader.js';
+import { cloudReadingEnabled, INK_READER_STATE, noteReaderRefusal, readerBlock, readPhotoWithCloud, resumeReaderNow, takeCloudReadingNotice } from '../ink/cloudReader.js';
+import { retryClock } from '../ink/readerFailure.js';
+import { preparePhoto } from '../ink/photoRaster.js';
+import { buildTranscript, editLine, includeAll, includedLines, reviveTranscript, setLineExcluded, unreadablePage, workingOf } from '../photo/transcript.js';
+import { proposeFinalAnswer } from '../photo/finalAnswer.js';
+import { clearPhotoDraft, confirmPhotoDraftSaved, readPhotoDraft, savePhotoDraft } from '../local/photoDrafts.js';
+import PhotoLines from './PhotoLines.jsx';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
-import { canRetryPhotoReading, definitiveSubmissionRefusal, draftPersistenceWarning, earlierSubmissionNotice, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure, photoSupportedFormats, photoAwaitingOnlineReader, pdfReaderNeedsOnlineDownload } from './photoSubmissionGuard.js';
+import { canRetryPhotoReading, readerRefusalAtSubmit, definitiveSubmissionRefusal, draftPersistenceWarning, earlierSubmissionNotice, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure, photoSupportedFormats, photoAwaitingOnlineReader, pdfReaderNeedsOnlineDownload } from './photoSubmissionGuard.js';
 import { plotSpecFor } from '../engine/plotSpec.js';
 import { attestedGrade, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable, showCommittedMethodAwardNote } from './authoritativeGrade.js';
 import { checkRefusalCopy, legacyDeviceReplay, needsAccountToCheck, refusalForQuestion, refusedCheckState, retryActionFor, serverRevealReceipt, unmarkableNotice } from './checkAccess.js';
@@ -321,6 +327,16 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // multi-page transcript is not evidence that the server saw every page.
   const [pdfPageCount, setPdfPageCount] = useState(0);
   const [photoOCR, setPhotoOCR] = useState({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
+  // The lines read from the photo (photo/transcript.js): the reader's text,
+  // the student's edits, and which lines are part of this answer.
+  const [photoLines, setPhotoLines] = useState(null);
+  // What the final-answer proposal said: { status, line?, candidates? }.
+  const [photoNote, setPhotoNote] = useState(null);
+  // 'proposed' while the field holds the proposal, 'student' once they typed.
+  const [photoAnswerSource, setPhotoAnswerSource] = useState(null);
+  const [photoRestored, setPhotoRestored] = useState(false);
+  const photoSaveRevision = useRef(0);
+  const [photoSaveTick, setPhotoSaveTick] = useState(0);
   // One quiet line, once per device, the first time a photo is read on the
   // server for a student who never chose either way in Settings.
   const [cloudNotice, setCloudNotice] = useState(false);
@@ -382,6 +398,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     pendingPdf.current = null;
     setPhoto(null); setPhotoSignInOpen(false); setInkSignInOpen(false); setInkOtpOpen(false); setPhotoReattachRequired(false); setBookmarked(false);
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
+    setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false);
+    ++photoSaveRevision.current;
     setChecking(false); setVouched(null); setPdfUnread(null); setPdfPageCount(0); setAttemptViaInk(false);
     setSaveState(draft?.typed || draft?.working ? 'saved' : null);
     latestInk.current = null;
@@ -434,6 +452,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     () => recognitionContextForQuestion(question),
     [question.answerType]
   );
+  // What the final-answer proposal for a photographed page may know of the
+  // question: the kind of answer its field takes. Public, and used only on
+  // the device after the page has been read; the reader is never sent it.
+  const publicAnswerShape = useMemo(
+    () => ({ answerType: question.answerType, answerSuffix: question.answerSuffix }),
+    [question.answerType, question.answerSuffix]
+  );
 
 
   // A photo of paper working is read only by Pri's server reader (owner
@@ -441,21 +466,48 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // text lands in an editable box and is never submitted on the reader's word
   // alone; when the server cannot read it the student is told the real reason.
   const readOnePage = useCallback(async (dataURL) => {
-    const lastLine = t => String(t || '').split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
     let cloudOutcome = null;
     if (cloudReadingEnabled(user)) {
       cloudOutcome = await readPhotoWithCloud(dataURL, { user });
-      if (cloudOutcome?.reason === 'allowance') return { allowance: true };
       if (cloudOutcome && !cloudOutcome.error && !cloudOutcome.reason) {
         const text = String(cloudOutcome.transcription.text || '').trim();
-        if (text) return { text, markable: lastLine(text), confidence: cloudOutcome.transcription.confidence, engine: cloudOutcome.transcription.engine };
+        // A blurred or cropped page comes back as lines of "[illegible]" at
+        // near-zero confidence: that is a photo to retake, not working.
+        if (unreadablePage(cloudOutcome.transcription)) return null;
+        if (text) return { text, transcription: cloudOutcome.transcription, confidence: cloudOutcome.transcription.confidence, engine: cloudOutcome.transcription.engine };
       }
     }
-    // The photo itself was the problem: say so. Anything else is the server
-    // route being unavailable, and the student is told the actual reason.
+    // The photo itself was the problem: say so. Anything else is a read that
+    // did not happen, and the student is told the actual reason (a session,
+    // this account's allowance, the service's reading limit, a reader that is
+    // not answering) with what they can do about it.
     if (cloudOutcome && ['unreadable', 'empty'].includes(cloudOutcome.reason)) return null;
-    return { blocked: photoReadingBlockedKey(user, { outcome: cloudOutcome }) };
+    const block = readerBlock(user, { outcome: cloudOutcome });
+    return { blocked: block.key, block };
   }, [user]);
+
+  // The reading goes onto the card as lines. Which of them belong to this
+  // question, and what the final answer is, are proposed here from the PUBLIC
+  // question on screen; the student sees every line and can change both.
+  const proposeFrom = useCallback((transcript) => {
+    if (isWorking || isMcq) return { status: 'not-applicable' };
+    return proposeFinalAnswer(includedLines(transcript), publicAnswerShape);
+  }, [isWorking, isMcq, publicAnswerShape]);
+  const showReading = useCallback((transcription) => {
+    const transcript = buildTranscript(transcription, { prompt: question.prompt, answerType: question.answerType });
+    const proposal = proposeFrom(transcript);
+    setPhotoLines(transcript);
+    setWorking(workingOf(transcript));
+    if (isWorking) setShowWorking(true);
+    else {
+      // Never a sentence in the answer field: the proposal, or nothing.
+      setAnswer(proposal.status === 'proposed' ? proposal.answer : '');
+      setPhotoAnswerSource(proposal.status === 'proposed' ? 'proposed' : null);
+    }
+    setPhotoNote(proposal);
+    setPhotoRestored(false);
+    return transcript;
+  }, [question.prompt, question.answerType, isWorking, proposeFrom]);
 
   const decodePhoto = useCallback(async (dataURL) => {
     if (!dataURL) return;
@@ -467,43 +519,38 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // provider response; authentication state cannot revive the old image.
     const generation = ++photoReadGeneration.current;
     if (!cloudReadingEnabled(user)) {
-      const blockedKey = photoReadingBlockedKey(user);
+      const block = readerBlock(user);
       setPhotoOCR({
         phase: 'unavailable', text: '', confidence: 0, engine: null,
-        error: tLater(blockedKey), blockedKey
+        error: tLater(block.key), blockedKey: block.key, block
       });
       return;
     }
     setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
     const page = await readOnePage(dataURL).catch(photoReadFailure);
     if (!mountedRef.current || generation !== photoReadGeneration.current) return;
-    if (page?.allowance) {
-      setPhotoOCR({
-        phase: 'failed', text: '', confidence: 0, engine: null,
-        error: tLater('photo.cloudAllowanceUsed')
-      });
-      return;
-    }
     if (page?.blocked) {
+      setPhotoLines(null); setPhotoNote(null);
       setPhotoOCR({
         phase: 'unavailable', text: '', confidence: 0, engine: null,
-        error: tLater(page.blocked), blockedKey: page.blocked
+        error: tLater(page.blocked), blockedKey: page.blocked, block: page.block || null
       });
       return;
     }
     if (!page) {
+      // An explicit reading problem with a retry: never a verdict on the work.
+      setPhotoLines(null); setPhotoNote(null);
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
-        error: tLater('verdict.photoUnreadable')
+        error: tLater('verdict.photoUnreadable'), unreadable: true
       });
       return;
     }
-    if (isWorking && page.text) { setWorking(page.text); setShowWorking(true); }
-    if (page.markable) setAnswer(page.markable);
+    const transcript = showReading(page.transcription);
     if (String(page.engine || '').startsWith('cloud') && takeCloudReadingNotice(user)) setCloudNotice(true);
     setPhotoSignInOpen(false);
-    setPhotoOCR({ phase: 'done', text: page.text, confidence: Number(page.confidence || 0), error: '', engine: page.engine });
-  }, [isWorking, user, readOnePage, t]);
+    setPhotoOCR({ phase: 'done', text: workingOf(transcript), confidence: Number(page.confidence || 0), error: '', engine: page.engine });
+  }, [user, readOnePage, showReading]);
 
   // Successful cloud authentication is announced by the existing account
   // service, not guessed from a device-local profile. Retry only the same
@@ -563,13 +610,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setPhoto(pages[0].dataUrl);
     if (pages.length === 1) { decodePhoto(pages[0].dataUrl); return; }
     if (!cloudReadingEnabled(user)) {
-      const blockedKey = photoReadingBlockedKey(user);
+      const block = readerBlock(user);
       setPhotoOCR({ phase: 'unavailable', text: '', confidence: 0, engine: null,
-        error: tLater(blockedKey), blockedKey });
+        error: tLater(block.key), blockedKey: block.key, block });
       return;
     }
 
     const texts = [];
+    const readLines = [];
     let worst = 1;
     let engine = null;
     let unread = 0;
@@ -581,17 +629,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (stale()) return;
       if (page1?.blocked) {
         setPhotoOCR({ phase: 'unavailable', text: '', confidence: 0, engine: null,
-          error: tLater(page1.blocked), blockedKey: page1.blocked });
-        return;
-      }
-      if (page1?.allowance) {
-        pendingPdf.current = null;
-        setPhotoOCR({ phase: 'failed', text: '', confidence: 0, engine: null,
-          error: tLater('photo.cloudAllowanceUsed') });
+          error: tLater(page1.blocked), blockedKey: page1.blocked, block: page1.block || null });
         return;
       }
       if (!page1) { unread += 1; continue; }
       if (page1.text) texts.push(page1.text);
+      readLines.push(...(page1.transcription?.lines || []).map((line, i) => (i === 0 && readLines.length ? { ...line, gapBefore: true } : line)));
       worst = Math.min(worst, Number(page1.confidence || 0));
       engine = page1.engine || engine;
     }
@@ -611,11 +654,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     }
     const joined = texts.join('\n');
     pendingPdf.current = null;
-    if (isWorking) { setWorking(joined); setShowWorking(true); }
-    const last = joined.split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
-    if (last) setAnswer(last);
+    showReading({ lines: readLines.length ? readLines : joined.split('\n').map(text => ({ text })) });
     setPhotoOCR({ phase: 'done', text: joined, confidence: worst, error: '', engine: engine || 'cloud-pdf' });
-  }, [decodePhoto, isWorking, readOnePage, t]);
+  }, [decodePhoto, readOnePage, showReading, t]);
 
   // Paste a photo straight in. On a laptop this is how a student moves a shot
   // from their phone: AirDrop or a screenshot, then ⌘V.
@@ -657,6 +698,68 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
   }, [mode, resolved, decodePhoto]);
+
+  // ── A photographed page, kept where a reload cannot reach it ───────────────
+  // The picture, the lines as read and as corrected, which lines are part of
+  // the answer, and the answer in the field go to the profile's sealed
+  // IndexedDB store (local/photoDrafts.js) on every change. "Saved" is said
+  // only after exactly this state has been read back through a fresh
+  // connection; a refused or unconfirmed write is said as a failed save.
+  useEffect(() => {
+    if (mode !== 'photo' || !photo || resolved || attemptRef.current || pendingPdf.current || pdfPageCount > 1) return undefined;
+    const revision = ++photoSaveRevision.current;
+    const read = photoOCR.phase === 'done' && !!photoLines;
+    const snapshot = {
+      photo, transcript: read ? photoLines : null, answer: read && !isWorking ? answer : '',
+      answerSource: read ? photoAnswerSource : null, engine: read ? photoOCR.engine : null, confidence: read ? photoOCR.confidence : null
+    };
+    const meta = { label: question.subtopicName };
+    const live = () => mountedRef.current && !attemptRef.current && photoSaveRevision.current === revision;
+    setSaveState('saving');
+    const timer = setTimeout(async () => {
+      let state = snapshot;
+      if (!savePhotoDraft(question.id, state, meta)) {
+        // A camera original too large to keep: keep the picture as it is sent
+        // to the reader instead. If even that cannot be kept, say so.
+        const smaller = await preparePhoto(photo).catch(() => null);
+        state = smaller?.dataUrl ? { ...snapshot, photo: smaller.dataUrl, reduced: true } : null;
+        if (!state || !savePhotoDraft(question.id, state, meta)) { if (live()) setSaveState('failed'); return; }
+      }
+      const outcome = await confirmPhotoDraftSaved(question.id, state).catch(() => ({ saved: false, reason: 'read' }));
+      if (!live() || outcome.reason === 'superseded') return;
+      setSaveState(outcome.saved ? 'saved' : 'failed');
+    }, 350);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, photo, photoLines, answer, photoAnswerSource, photoOCR.phase, pdfPageCount, resolved, question.id, photoSaveTick]);
+
+  // The kept page comes back after a reload: the same picture, the same lines
+  // with the student's corrections and exclusions, the same answer. A page
+  // that was kept before it could be read (signed out, offline, the reader
+  // refusing) is read now.
+  useEffect(() => {
+    let live = true;
+    readPhotoDraft(question.id).then(kept => {
+      if (!live || !mountedRef.current || !kept || attemptRef.current) return;
+      const generation = ++photoReadGeneration.current;
+      setMode('photo');
+      setPhoto(kept.photo);
+      const transcript = reviveTranscript(kept.transcript);
+      if (!transcript) { if (generation === photoReadGeneration.current) void decodePhoto(kept.photo); return; }
+      setPhotoLines(transcript);
+      setWorking(workingOf(transcript));
+      if (question.answerType === 'working') setShowWorking(true);
+      else { setAnswer(kept.answer || ''); setPhotoAnswerSource(kept.answerSource); }
+      // The note about where the answer came from is recomputed; the answer
+      // in the field is the one that was kept, never a fresh guess.
+      setPhotoNote(kept.answerSource === 'student' ? null : proposeFrom(transcript));
+      setPhotoOCR({ phase: 'done', text: workingOf(transcript), confidence: Number(kept.confidence || 0), error: '', engine: kept.engine });
+      setPhotoRestored(true);
+    }, () => {});
+    return () => { live = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [question.id]);
+  useEffect(() => { if (resolved) void clearPhotoDraft(question.id); }, [resolved, question.id]);
 
   useEffect(() => {
     if (!writeMode) return;
@@ -757,6 +860,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // Handwriting is saved again from the actual strokes on the page, never
     // from blank data; anything else on screen is the typed draft.
     if (mode === 'write' && !isMcq) { if (latestInk.current?.length && onInkStrokes) onInkStrokes(latestInk.current); }
+    else if (mode === 'photo' && photo) setPhotoSaveTick(n => n + 1);
     else stash(answer, working);
   };
   const noteEdited = (key) => {
@@ -774,6 +878,46 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const editAnswer = (v) => { setAnswer(v); stash(v, working); if (!writeMode) noteEdited(typedContentKey(v, working)); };
   const editWorking = (v) => { setWorking(v); stash(answer, v); if (!writeMode) noteEdited(typedContentKey(answer, v)); };
   const chooseOption = (i) => { setMcqSel(i); noteEdited(submissionContentKey(i, undefined)); };
+  // Photo mode: a change to the lines (an edit, a line left out or brought
+  // back) is a change to the working that would be submitted. The answer
+  // follows the lines only while it is still the proposal; once the student
+  // has typed their own it is theirs.
+  const changePhotoLines = (next) => {
+    if (resolved || !next) return;
+    const wk = workingOf(next);
+    let ans = answer;
+    setPhotoLines(next);
+    setWorking(wk);
+    setPhotoRestored(false);
+    if (!isWorking && photoAnswerSource !== 'student') {
+      const proposal = proposeFrom(next);
+      ans = proposal.status === 'proposed' ? proposal.answer : '';
+      setAnswer(ans);
+      setPhotoAnswerSource(proposal.status === 'proposed' ? 'proposed' : null);
+      setPhotoNote(proposal);
+    }
+    setPhotoOCR(v => ({ ...v, text: wk }));
+    noteEdited(typedContentKey(ans, wk));
+  };
+  const editPhotoAnswer = (v) => {
+    setAnswer(v);
+    setPhotoAnswerSource(String(v).trim() ? 'student' : null);
+    if (String(v).trim()) setPhotoNote(null);
+    setPhotoRestored(false);
+    noteEdited(typedContentKey(v, working));
+  };
+  /** The photo is taken off the page: nothing of it stays on screen or on the device. */
+  const dropPhoto = () => {
+    photoReadGeneration.current += 1;
+    ++photoSaveRevision.current;
+    pendingPdf.current = null;
+    setPdfUnread(null); setPdfPageCount(0); setPhoto(null); setPhotoSignInOpen(false);
+    setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false);
+    setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
+    setSaveState(null);
+    void clearPhotoDraft(question.id);
+  };
+  const photoInUse = mode === 'photo' && !!photo && !!photoLines && photoOCR.phase === 'done';
 
   useEffect(() => {
     if (!resolved) return;
@@ -908,6 +1052,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       setPhotoReattachRequired(false);
     }
     localStorage.setItem('pri-input-mode', m);
+    // Leaving Photo: the status line stops speaking for the photo draft. What
+    // is in the typed fields is saved as typed work, and said so only once
+    // that write has returned.
+    if (mode === 'photo' && m !== 'photo') {
+      ++photoSaveRevision.current;
+      if (m === 'type' && !resolved) stash(answer, working); else setSaveState(null);
+    }
     if (m === 'type') setTimeout(() => inputRef.current?.focus(), 60);
     if (m === 'photo' && !photo) setTimeout(() => photoInputRef.current?.click(), 120);
   };
@@ -1105,6 +1256,17 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // A refused check (no account, no connection, account not eligible, or
       // a question the server would not issue) marked nothing and spent
       // nothing; the card names the reason and offers the way through it.
+      // The reading that comes before marking was refused for a reason of the
+      // reader's own (the service's reading limit, this account's allowance,
+      // a reader that did not answer): said as that, never as "reconnect",
+      // and never as a verdict. Nothing was marked and no try was used.
+      const readerRefusal = readerRefusalAtSubmit(e);
+      if (readerRefusal) {
+        noteReaderRefusal(readerRefusal);
+        setState({ phase: 'retry', res: { feedback: '', invalid: true, technical: true, via: 'submit',
+          readerBlock: readerBlock(user, { outcome: { error: readerRefusal } }), viaInk: body.viaInk === true } });
+        return;
+      }
       refuseCheck(e, 'submit');
     } finally {
       inFlightRef.current = false;
@@ -1559,6 +1721,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const inkWaitingSignIn = inkAccountBlocked && inkReaderState?.blocker === 'ink.waitingSignIn';
   const photoWaitingSignIn = mode === 'photo' && !isMcq && !!photo && !resolved
     && photoOCR.phase === 'unavailable' && photoOCR.blockedKey === 'verdict.photoReadingSignIn';
+  // The reader cannot read this work right now, and why: the service's usage
+  // limit (or this account's allowance or rate limit), or a reader that is not
+  // there. Neither says anything about whether the work is saved — that is
+  // the status line's own, separate, readback-proven statement.
+  const LIMIT_BLOCKS = /^(ink\.waiting|verdict\.photoReading)(Capacity|Allowance|RateLimited)(Until)?$/;
+  const inkBlockKey = writeMode && !isMcq && inkHasStrokes && !resolved
+    && [INK_READER_STATE.READER_UNAVAILABLE, INK_READER_STATE.NETWORK_ERROR].includes(inkReaderState?.kind) ? String(inkReaderState.blocker || 'ink.waitingServiceDown') : null;
+  const photoBlockKey = mode === 'photo' && !isMcq && !!photo && !resolved && photoOCR.phase === 'unavailable' && !photoWaitingSignIn
+    ? String(photoOCR.blockedKey || 'verdict.photoReadingServiceDown') : null;
+  const submitBlockKey = state.phase === 'retry' && state.res?.readerBlock ? String(state.res.readerBlock.key) : null;
+  const readerLimit = [inkBlockKey, photoBlockKey, submitBlockKey].some(k => k && LIMIT_BLOCKS.test(k));
+  const readerDown = !readerLimit && [inkBlockKey, photoBlockKey, submitBlockKey].some(Boolean);
   // ONE state for the student's work, so the page can never say two things
   // about it at once. In order: a save that failed outranks everything but a
   // check in flight; "waiting for sign-in" is said for handwriting only once
@@ -1568,10 +1742,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       : saveState === 'failed' ? 'save-failed'
         : saveState === 'saving' ? 'saving'
           : (inkWaitingSignIn && saveState === 'saved') || photoWaitingSignIn ? 'waiting-sign-in'
+            : readerLimit ? 'usage-limit'
+            : readerDown ? 'reader-unavailable'
             : writeMode && !isMcq && inkReaderState?.kind === INK_READER_STATE.READING ? 'reading'
               : inkUnread ? 'read-failed'
                 : (writeMode && !isMcq && !!(isWorking ? inkResult?.lines?.length : inkResult?.answerLine)) || (mode === 'photo' && !!photo && photoOCR.phase === 'done') ? 'read'
                   : saveState === 'saved' ? 'saved'
+                    // A photo on the page that could not be kept on the device.
+                    : mode === 'photo' && !!photo && !isMcq ? 'unsaved'
                     : 'idle';
   const statusText = busy ? t('verdict.statusChecking')
     : cloudPending ? t('verdict.statusMethod')
@@ -1580,7 +1758,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           : resolved ? (serverAuthoritative ? t(verdictGood ? 'verdict.correct' : res?.revealed ? 'verdict.revealed' : 'verdict.notThisTime') : t('verdict.statusMarked'))
             : inkUnread ? t('verdict.statusInkUnread')
             : workState === 'waiting-sign-in' ? t(photoWaitingSignIn ? 'verdict.statusPhotoWaitingSignIn' : 'verdict.statusSavedWaitingSignIn')
-            : saveState === 'saved' ? t(offline ? 'verdict.statusSavedOffline' : 'verdict.statusSaved')
+            : saveState === 'saved' ? t(offline ? 'verdict.statusSavedOffline' : mode === 'photo' && photo ? 'photo.statusSaved' : 'verdict.statusSaved')
               : (writeMode && !isMcq ? t('verdict.statusWriteHint') : '');
 
   // ── The one dominant next move ─────────────────────────────────────────────
@@ -1811,6 +1989,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       setPdfUnread(null);
                       setPdfPageCount(0);
                       setPhotoSignInOpen(false);
+                      setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false);
                       setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
                       attachPhoto(e,
                         data => { if (live()) setPhoto(data); },
@@ -1827,8 +2006,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                             PDF failure message was unreachable and the screen simply did
                             not move. */}
                         {photo
-                          ? <div className="photo-thumb"><img src={photo} alt={t('history.paperWorking')} /><button aria-label={t('verdict.removePhoto')} onClick={() => { photoReadGeneration.current += 1; pendingPdf.current = null; setPdfUnread(null); setPdfPageCount(0); setPhoto(null); setPhotoSignInOpen(false); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>
-                          : <div className="photo-thumb" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}><span aria-hidden="true">▤</span><button aria-label={t('verdict.removeAttachment')} onClick={() => { photoReadGeneration.current += 1; pendingPdf.current = null; setPhoto(null); setPdfUnread(null); setPdfPageCount(0); setPhotoSignInOpen(false); setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); }}>✕</button></div>}
+                          ? <div className="photo-thumb"><img src={photo} alt={t('history.paperWorking')} /><button aria-label={t('verdict.removePhoto')} data-photo-remove onClick={dropPhoto}>✕</button></div>
+                          : <div className="photo-thumb" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}><span aria-hidden="true">▤</span><button aria-label={t('verdict.removeAttachment')} onClick={dropPhoto}>✕</button></div>}
                         <div style={{ flex: 1 }} role="status" aria-live="polite">
                           {photoOCR.phase === 'reading' && (
                             <span className="muted">{t('verdict.readingWork')}</span>
@@ -1841,18 +2020,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                                 <b>{String(photoOCR.engine || '').startsWith('cloud') ? t('verdict.readOnServer') : t('verdict.decodedOnDevice')}</b>
                                 {photoOCR.confidence ? t('verdict.ocrConfidence', { percent: Math.round(photoOCR.confidence * 100) }) : ''}
                               </div>
-                              <label className="sc-label" htmlFor="photo-recognition-correction">{t('verdict.readOnServer')}</label>
-                              <textarea id="photo-recognition-correction" className="working-input"
-                                data-photo-correct-transcript aria-label={t('verdict.readOnServer')}
-                                value={photoOCR.text} disabled={resolved} rows={Math.min(8, Math.max(3, photoOCR.text.split('\n').length + 1))}
-                                onChange={e => {
-                                  const corrected = e.target.value;
-                                  setPhotoOCR(v => ({ ...v, text: corrected }));
-                                  const lastLine = corrected.split(/\n+/).map(x => x.trim()).filter(Boolean).at(-1) || '';
-                                  if (isWorking) editWorking(corrected);
-                                  else { editAnswer(lastLine); }
-                                }} />
-                              <div className="muted" style={{ marginTop: 6 }}>{t('verdict.filledFromLastLine')}</div>
+                              {photoRestored && <div className="muted" data-photo-restored style={{ fontSize: 12.5 }}>{t('photo.restored')}</div>}
                               {pdfUnread && <div className="verdict-body" style={{ marginTop: 6 }}>{t('verdict.pdfPagesUnread', pdfUnread)}</div>}
                               {pdfPageCount > 1 && (
                                 <div className="verdict-body" data-pdf-receipt-blocked role="alert" style={{ marginTop: 6 }}>
@@ -1867,13 +2035,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                            {(photoOCR.phase === 'failed' || photoOCR.phase === 'unavailable') && (
                              photoOCR.phase === 'unavailable' && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && sessionEnded
                                ? <span className="verdict-body" data-photo-session-ended>{t('check.sessionEnded')}</span>
-                               : <span className="verdict-body">{photoOCR.error}</span>
+                               : <span className="verdict-body" data-photo-reading-problem={photoOCR.block?.kind || (photoOCR.unreadable ? 'unreadable' : 'failed')}>
+                                   {photoOCR.blockedKey ? t(photoOCR.blockedKey, { time: retryClock(photoOCR.block?.retryAt, language) }) : photoOCR.error}
+                                 </span>
                            )}
-                          {photoOCR.phase === 'unavailable' &&
-                            canRetryPhotoReading(photoOCR.blockedKey, !!photo, !!pendingPdf.current) && (
+                          {/* A reading problem is never a verdict: it comes with a retry
+                              that sends one new read, and typing stays one tap away. */}
+                          {((photoOCR.phase === 'unavailable' && canRetryPhotoReading(photoOCR.blockedKey, !!photo, !!pendingPdf.current, photoOCR.block))
+                            || (photoOCR.phase === 'failed' && photoOCR.unreadable && !!photo)) && (
                               <div style={{ marginTop: 8 }}>
                                 <button type="button" className="btn btn-ghost btn-sm" data-photo-retry-reading
                                   onClick={() => {
+                                    resumeReaderNow();
                                     if (pendingPdf.current) void decodePdf(pendingPdf.current);
                                     else if (photo) void decodePhoto(photo);
                                   }}>
@@ -1881,6 +2054,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                                 </button>
                               </div>
                             )}
+                          {(photoOCR.phase === 'failed' || (photoOCR.phase === 'unavailable' && photoOCR.blockedKey !== 'verdict.photoReadingSignIn')) && !resolved && (
+                            <div style={{ marginTop: 8 }}>
+                              <button type="button" className="btn btn-quiet btn-sm" data-type-instead onClick={() => flipMode('type')}>{t('verdict.typeInstead')}</button>
+                            </div>
+                          )}
                           {photoOCR.phase === 'unavailable' && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && (
                             <div style={{ marginTop: 10 }}>
                               <button className="btn btn-primary" type="button" data-photo-sign-in
@@ -1898,6 +2076,23 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     )}
                 </div>
               )}
+              {mode === 'photo' && photoOCR.phase === 'done' && photoLines && (
+                <>
+                  <PhotoLines transcript={photoLines} disabled={resolved || busy}
+                    onEdit={(i, text) => changePhotoLines(editLine(photoLines, i, text))}
+                    onExclude={(i, out) => changePhotoLines(setLineExcluded(photoLines, i, out))}
+                    onIncludeAll={() => changePhotoLines(includeAll(photoLines))} />
+                  {/* Where the answer in the field came from — or why the field
+                      is empty. Nothing is marked until Submit is pressed. */}
+                  {!isWorking && !resolved && photoNote && photoNote.status !== 'not-applicable' && (
+                    <p className="photo-lines-note" role="status" data-photo-answer-note={photoNote.status} style={{ marginTop: 10 }}>
+                      {photoNote.status === 'proposed' ? t('photo.answerProposed', { n: photoLineNumber(photoLines, photoNote.line) })
+                        : photoNote.status === 'ambiguous' ? t('photo.answerAmbiguous', { candidates: photoNote.candidates.join(', ') })
+                          : t('photo.answerNone')}
+                    </p>
+                  )}
+                </>
+              )}
               {photoSignInOpen && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && (
                 /* The same two ways in as the handwriting sign-in: the account
                    panel and a phone or email code. The photo, the question and
@@ -1906,7 +2101,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   <SignInChoices user={user} refreshUser={refreshUser} onDone={() => setPhotoSignInOpen(false)} />
                 </div>
               )}
-              {isWorking ? (
+              {isWorking && photoInUse ? null : isWorking ? (
                 <textarea
                   ref={inputRef}
                   className="working-input"
@@ -1920,7 +2115,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               ) : (
                 <TypedAnswerFields
                   question={question} totalMarks={totalMarks} inputRef={inputRef}
-                  answer={answer} working={working} onAnswer={editAnswer} onWorking={editWorking} onSubmit={submit}
+                  answer={answer} working={working} onAnswer={photoInUse ? editPhotoAnswer : editAnswer} onWorking={editWorking} onSubmit={submit}
                   previewTex={typedPreview} resolved={resolved} offerWorking={mode === 'type'}
                   showWorking={showWorking} onToggleWorking={() => setShowWorking(v => !v)}
                   guidance={answerGuidance}
@@ -1948,6 +2143,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   disabled={resolved || busy} focusSymbol={checkFocus} recognitionContext={recognitionContext}
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes}
                   draftSaved={saveState === 'saved'} />
+              )}
+              {/* The reader cannot read right now (a limit, an outage, no
+                  connection). The writing stays; typing is one tap away and
+                  is checked like any typed answer. */}
+              {!resolved && inkHasStrokes && !inkAccountBlocked
+                && [INK_READER_STATE.READER_UNAVAILABLE, INK_READER_STATE.NETWORK_ERROR].includes(inkReaderState?.kind) && (
+                <div className="ink-status-action">
+                  <button type="button" className="btn btn-quiet btn-sm" data-type-instead onClick={() => flipMode('type')}>{t('verdict.typeInstead')}</button>
+                </div>
               )}
               {inkAccountBlocked && (
                 <div className="ink-account-recovery" data-ink-account-recovery role="group" aria-label={inkRecoveryCopy.action}>
@@ -2133,6 +2337,23 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   onRestart={diagnostic?.onRestart || null}
                   nextLabel={replaceArmed ? t('check.draftConfirmAction') : null}
                   onNext={checkRefused === 'new-question' && !diagnostic ? replaceQuestion : onNext ? () => onNext() : null} />
+              ) : state.res?.readerBlock ? (
+                /* The page was not read, so it was not checked: the reader's
+                   own reason, when it lifts, and the two ways forward. */
+                <div data-reader-block={state.res.readerBlock.kind}>
+                  <div className="verdict-title">{t('verdict.readerNotCheckedTitle')}</div>
+                  <div className="verdict-body">
+                    {t(state.res.viaInk ? state.res.readerBlock.inkKey : state.res.readerBlock.key, { time: retryClock(state.res.readerBlock.retryAt, language) })}{' '}
+                    <span className="muted">{t('verdict.readerNotCheckedNote')}</span>
+                  </div>
+                  <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {state.res.readerBlock.manualRetry && (
+                      <button type="button" className="btn btn-ghost btn-sm" data-reader-retry disabled={busy}
+                        onClick={() => { resumeReaderNow(); submit(); }}>{t('common.tryAgain')}</button>
+                    )}
+                    <button type="button" className="btn btn-quiet btn-sm" data-type-instead onClick={() => { setState({ phase: 'answering' }); flipMode('type'); }}>{t('verdict.typeInstead')}</button>
+                  </div>
+                </div>
               ) : (
                 <>
                   <div className="verdict-title">{state.res?.conflict ? t('verdict.alreadyFinishedTitle') : t(technicalRetry ? 'verdict.notSubmittedTitle' : invalidRetry ? 'verdict.unreadable' : 'verdict.notQuite')}</div>
@@ -2151,7 +2372,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               {state.res?.authoritative !== true && state.res?.partial &&
                 <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{state.res.partial.note}</div>}
               {state.res.stepReport && <StepReport report={state.res.stepReport} />}
-              {!checkRefused && <div className="verdict-next">{state.res?.conflict ? t('verdict.nextAfterConflict') : t(technicalRetry ? 'verdict.nextTechnical' : invalidRetry ? 'verdict.nextUnreadable'
+              {!checkRefused && !state.res?.readerBlock && <div className="verdict-next">{state.res?.conflict ? t('verdict.nextAfterConflict') : t(technicalRetry ? 'verdict.nextTechnical' : invalidRetry ? 'verdict.nextUnreadable'
                 : (state.res.stepReport?.lines?.some(l => l.status === 'break') || firstBad) ? 'verdict.nextFix' : 'verdict.nextTryAgain')}</div>}
             </div>
           </div>
@@ -2447,6 +2668,12 @@ function Diagnosis({ d, line }) {
       {nameLine ? <div className="diagnosis-fix">{t(named.explain)}</div> : (d.fix && <div className="diagnosis-fix">{d.fix}</div>)}
     </div>
   );
+}
+
+/** The page line (1-based, counting every line) that an index into the kept lines points at. */
+function photoLineNumber(transcript, keptIndex) {
+  const kept = (transcript?.lines || []).map((l, i) => ({ l, i })).filter(x => !x.l.excluded && String(x.l.text).trim());
+  return (kept[keptIndex]?.i ?? kept.at(-1)?.i ?? 0) + 1;
 }
 
 function attachPhoto(e, setPhoto, onReady, onPdf, onFailed) {

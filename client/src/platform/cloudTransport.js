@@ -293,6 +293,12 @@ export async function cloudRequest(path, {
       err.status = response.status;
       err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
       if (Number.isFinite(Number(data?.error?.resetAt))) err.resetAt = Number(data.error.resetAt);
+      else {
+        // When a limit lifts: the body's resetAt (epoch ms) first; the
+        // standard RateLimit-Reset header (epoch seconds) when the body has none.
+        const reset = Number(response.headers?.get?.('ratelimit-reset'));
+        if ((response.status === 429 || response.status === 503) && Number.isFinite(reset) && reset > 0) err.resetAt = reset * 1000;
+      }
       if (data?.error?.quota && typeof data.error.quota === 'object') err.quota = data.error.quota;
       // An entitlement refusal names what it is about and when it lifts.
       if (typeof data?.error?.capability === 'string') err.capability = data.error.capability.slice(0, 60);

@@ -51,6 +51,8 @@ function safeCurrentPid() {
   try { return currentPid(); } catch { return null; }
 }
 const idFor = (questionId, who = pid()) => `${who}:${questionId}`;
+/** The profile a draft written now belongs to (shared with local/photoDrafts.js). */
+export const inkDraftProfileId = () => pid();
 const offlineNow = () => typeof navigator !== 'undefined' && navigator.onLine === false;
 
 /** Integer [x, y] points — the same compact shape a submission carries. */
@@ -222,7 +224,7 @@ export async function queuedInkDrafts() {
   try { rows = await byIndex(INK_DRAFT_STORE, 'pid', pid()); } catch { rows = []; }
   const now = Date.now();
   return rows
-    .filter(r => r && typeof r === 'object' && r.savedAt && now - r.savedAt <= MAX_AGE_MS && Array.isArray(r.strokes) && r.strokes.length)
+    .filter(r => r && typeof r === 'object' && r.kind !== 'photo' && r.savedAt && now - r.savedAt <= MAX_AGE_MS && Array.isArray(r.strokes) && r.strokes.length)
     .map(r => ({ questionId: String(r.questionId || String(r.id).slice(String(r.pid).length + 1)), label: r.label || '', savedAt: r.savedAt, queuedAt: r.queuedAt ?? null }))
     .sort((a, b) => b.savedAt - a.savedAt);
 }
