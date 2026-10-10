@@ -28,14 +28,19 @@
 // (`g + 24`): that last one is reported as a reading to confirm, never as a
 // mistake in the mathematics.
 //
-// Pure, deterministic, and key-free: no question, no answer, no clock beyond
-// the backstop the rest of the engine uses. The same lines always audit the
+// Pure, deterministic, and key-free: no question, no answer, no clock. The same lines always audit the
 // same way, on the device before anything is submitted and on the server after.
 // ─────────────────────────────────────────────────────────────────────────────
 import { normalize, parse, evaluate, variablesOf, numsClose, exprEquivalent, withEvaluationBudget } from './expr.js';
 
-/** The same bounds Step Check reads working under (checker.js WORKING_LIMITS). */
-export const AUDIT_LIMITS = Object.freeze({ lineChars: 200, lines: 100, work: 600000, backstopMs: 750 });
+/**
+ * The same bounds on the TEXT that Step Check reads working under (checker.js
+ * WORKING_LIMITS) — and no clock. What the audit says of a page depends on the
+ * page alone, never on how busy the machine is: a slow run is stopped from
+ * outside (the marker pool's deadline), which reports the working as not read.
+ * It is never a lower mark here, and never a mistake.
+ */
+export const AUDIT_LIMITS = Object.freeze({ lineChars: 200, lines: 100, work: 600000 });
 const AUDIT_BUDGET = 50000;
 
 const LEAD = /^(?:[∴∵•▪◦➤➔]|⇒|⟹|=>|→|⟶|->|i\.e\.|(?:so|hence|then|therefore|thus|or|and|now|also)\b[,:]?)\s*/i;
@@ -278,7 +283,6 @@ function auditWithinBudget(lines, vocabulary) {
     for (const ch of new Set(line.replace(SAFE_WORDS, '').match(/[A-Za-z]/g) || [])) seenOn.set(ch, (seenOn.get(ch) || 0) + 1);
   });
   vocabulary = new Set([...vocabulary, ...[...seenOn].filter(([, n]) => n >= 2).map(([ch]) => ch)]);
-  const started = Date.now();
   let spent = 0, closed = false, read = 0;
   let tail = null;                // the last side of the chain a `=` line would continue
   let chainBroken = false;        // has this chain already had its slip?
@@ -295,7 +299,7 @@ function auditWithinBudget(lines, vocabulary) {
     if (line.length > AUDIT_LIMITS.lineChars) { row.verdict = 'unread'; tail = null; return; }
     spent += line.length * line.length;
     read += 1;
-    if (closed || read > AUDIT_LIMITS.lines || spent > AUDIT_LIMITS.work || Date.now() - started > AUDIT_LIMITS.backstopMs) {
+    if (closed || read > AUDIT_LIMITS.lines || spent > AUDIT_LIMITS.work) {
       closed = true; row.verdict = 'unread'; tail = null; return;
     }
     if (RELATION.test(text)) { tail = null; return; }            // an inequality is Step Check's to judge

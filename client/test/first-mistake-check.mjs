@@ -371,7 +371,24 @@ const FLAGSHIP = ['a = 9, d = 3', 'T_n = a + (n - 1)d', 'T_9 = 9 + 8 × 3', '   
 
 // ── 7 · Resource bounds ──────────────────────────────────────────────────────
 {
-  eq({ ...AUDIT_LIMITS }, { ...WORKING_LIMITS }, 'the audit reads working under the same bounds as Step Check');
+  eq({ ...AUDIT_LIMITS }, { lineChars: WORKING_LIMITS.lineChars, lines: WORKING_LIMITS.lines, work: WORKING_LIMITS.work }, 'the audit reads working under the same bounds on the text as Step Check');
+  // …and under no clock: its verdicts depend on the page alone, however slow the machine.
+  {
+    const source = readFileSync(new URL('../src/engine/lineAudit.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+    ok(!/Date\.now|performance\.now|setTimeout|backstop/.test(source), 'the line audit reads no clock');
+    const formula = readFileSync(new URL('../src/engine/reason-formula.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '');
+    const review = readFileSync(new URL('../src/engine/workingReview.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '');
+    ok(!/Date\.now|performance\.now|setTimeout/.test(formula + review), 'nor do the formula check and the review');
+    const realNow = Date.now;
+    let tick = 0;
+    Date.now = () => (tick += 5000);                 // every reading of the clock is five seconds later
+    try {
+      const slow = submit(TERM, '35', FLAGSHIP);
+      eq([checks(slow.review), slow.review.firstMistake?.index, slow.earned], [['verified', 'verified', 'verified', 'verified', 'first-mistake'], 4, 0], 'with the clock racing, the owner\'s page is reviewed exactly as before');
+      const slowMarks = submit(SAVINGS, '1', ['S_n = n/2(2a + (n - 1)d)', `S = ${SAVINGS.stepcheck.substitutions.n}/2 × (2 × ${SAVINGS.stepcheck.substitutions.a} + ${SAVINGS.stepcheck.substitutions.n - 1} × ${SAVINGS.stepcheck.substitutions.d})`, '= 1']);
+      eq([slowMarks.earned, mistakes(slowMarks.review)], [2, 1], 'and the method marks of a formula question do not move with it');
+    } finally { Date.now = realNow; }
+  }
   const timed = (label, lines, ms, meta = TERM.stepcheck) => {
     const at = performance.now();
     const audit = auditWorking(lines);
