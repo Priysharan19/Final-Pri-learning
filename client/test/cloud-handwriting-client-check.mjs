@@ -459,6 +459,8 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   const linked = { cloudLinked: true, cloudHandwriting: null };
   const on = () => true;
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'EMAIL_UNVERIFIED', status: 403 } } }), 'ink.waitingVerifyEmail', 'EMAIL_UNVERIFIED from transcribe → verify-email copy');
+  eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { reason: 'unavailable', readiness: { usable: false, lastFailureCode: 'MFA_ENROLMENT_REQUIRED' } } }), 'ink.waitingMfa', 'MFA refusal on /status directs staff to authenticator setup, not a reader outage');
+  eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'MFA_REQUIRED', status: 403 } } }), 'ink.waitingMfa', 'MFA refusal on transcribe directs staff to security setup');
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { reason: 'unavailable', readiness: { usable: false, lastFailureCode: 'EMAIL_UNVERIFIED' } } }), 'ink.waitingVerifyEmail', 'EMAIL_UNVERIFIED from the status probe → verify-email copy');
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { reason: 'unavailable', readiness: { usable: false, lastFailureCode: 'AUTH_REQUIRED' } } }), 'ink.waitingSignIn', 'AUTH_REQUIRED (session expired on the server) → sign-in copy');
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { status: 401 } } }), 'ink.waitingSignIn', 'a bare 401 → sign-in copy');
@@ -468,13 +470,16 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'HANDWRITING_PROVIDER_5XX', status: 503 } } }), 'ink.waitingServiceDown', 'only a true 5xx/transport failure says the reader is down');
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'EMAIL_UNVERIFIED' }, readiness: { lastFailureCode: 'HANDWRITING_PROVIDER_5XX' } } }), 'ink.waitingVerifyEmail', 'the transcribe refusal wins over a stale probe code');
   const { ACCOUNT_BLOCKED_KEYS, INK_READER_STATE, inkReaderUiState } = await import('../src/ink/cloudReader.js');
-  ok(['ink.waitingSignIn', 'ink.waitingVerifyEmail', 'ink.waitingGuardian'].every(k => ACCOUNT_BLOCKED_KEYS.has(k)) && !ACCOUNT_BLOCKED_KEYS.has('ink.waitingServiceDown'),
+  ok(['ink.waitingSignIn', 'ink.waitingVerifyEmail', 'ink.waitingGuardian', 'ink.waitingMfa'].every(k => ACCOUNT_BLOCKED_KEYS.has(k)) && !ACCOUNT_BLOCKED_KEYS.has('ink.waitingServiceDown'),
     'sign-in, verify-email and guardian blockers offer the way to Account settings; an outage does not');
 
   eq(inkReaderUiState({ kind: 'reading' }), { kind: INK_READER_STATE.READING }, 'in-flight recognition is READING');
   eq(inkReaderUiState({ kind: 'waiting', key: 'ink.waitingGuardian' }),
     { kind: INK_READER_STATE.ACCOUNT_ACTION_REQUIRED, blocker: 'ink.waitingGuardian' },
     'guardian pending is ACCOUNT_ACTION_REQUIRED, never handwriting failure');
+  eq(inkReaderUiState({ kind: 'waiting', key: 'ink.waitingMfa' }),
+    { kind: INK_READER_STATE.ACCOUNT_ACTION_REQUIRED, blocker: 'ink.waitingMfa' },
+    'MFA restriction is ACCOUNT_ACTION_REQUIRED, never handwriting failure');
   eq(inkReaderUiState({ kind: 'waiting', key: 'ink.waitingVerifyEmail' }),
     { kind: INK_READER_STATE.ACCOUNT_ACTION_REQUIRED, blocker: 'ink.waitingVerifyEmail' },
     'email verification is ACCOUNT_ACTION_REQUIRED');
