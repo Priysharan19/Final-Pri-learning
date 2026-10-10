@@ -314,6 +314,7 @@ export default {
   'history.correctAnswerWas': 'सही उत्तर:',
   'history.yourHandwriting': 'आपकी हैंडराइटिंग',
   'history.readAs': 'आपकी हैंडराइटिंग — “{text}” पढ़ा गया',
+  'history.readAsNotAnswer': 'आपकी हैंडराइटिंग — रीडर ने इसे “{text}” पढ़ा। यह आपका उत्तर नहीं है: जो उत्तर जाँचा गया वह वही है जिसकी आपने पुष्टि की, और वह ऊपर दिखाया गया है।',
   'history.scribblePad': 'रफ़ पन्ना',
   'history.attachedWorking': 'कागज़ पर किया गया काम',
   'history.paperWorking': 'कागज़ पर किया गया काम',
@@ -469,10 +470,18 @@ export default {
   'verdict.revealed': 'हल दिखा दिया गया।',
   'verdict.notThisTime': 'इस बार नहीं।',
   'verdict.afterHints': { one: '{n} संकेत के बाद', other: '{n} संकेतों के बाद' },
-  'verdict.everyLineChecked': {
-    one: 'आपके हाथ से लिखे काम की हर पंक्ति जाँची गई — {n} चरण पढ़ा और सत्यापित किया गया, जो तर्क की एक कड़ी से सही परिणाम तक पहुँचता है।',
-    other: 'आपके हाथ से लिखे काम की हर पंक्ति जाँची गई — {n} चरण पढ़े और सत्यापित किए गए, जो तर्क की एक कड़ी से सही परिणाम तक पहुँचते हैं।'
+  'verdict.workingNotChecked': 'आपका अंतिम उत्तर जाँचा गया। आपके हल के चरण सत्यापित नहीं किए गए।',
+  'verdict.workingAllChecked': {
+    one: 'आपका हल जाँचा गया: आपकी भेजी {n} पंक्ति सही हल के अनुरूप है।',
+    other: 'आपका हल जाँचा गया: आपकी भेजी सभी {n} पंक्तियाँ सही हल के अनुरूप हैं।'
   },
+  'verdict.workingSomeChecked': 'आपके हल की {total} में से {ok} पंक्तियाँ जाँची गईं और सही हल के अनुरूप हैं। बाकी सत्यापित नहीं की गईं।',
+  'verdict.workingBreakButCorrect': 'आपका अंतिम उत्तर सही है, पर आपके हल की पंक्ति {line} सही नहीं बैठती। नीचे चरण-जाँच देखें।',
+  'verdict.workingBreak': 'आपके हल की पंक्ति {line} सही नहीं बैठती। नीचे चरण-जाँच देखें।',
+  'verdict.transcriptNotAnswer': 'यह वही उत्तर है जिसकी आपने पुष्टि की, और इसी को जाँचा गया। आपकी हैंडराइटिंग जैसी पढ़ी गई वैसी ही दिखाई गई है; वह आपका उत्तर नहीं है।',
+  'verdict.previousAttemptWrong': 'आपका पिछला प्रयास सही नहीं था।',
+  'verdict.previousAttemptUnread': 'आपका पिछला प्रयास उत्तर के रूप में पढ़ा नहीं जा सका।',
+  'verdict.newWorkNotChecked': 'अभी पन्ने पर जो है, वह अब तक जाँचा नहीं गया है। तैयार होने पर उसे जमा करें।',
   'verdict.expected': 'अपेक्षित:',
   'verdict.workedSolution': 'विस्तृत हल',
   'verdict.finalAnswer': 'अंतिम उत्तर',

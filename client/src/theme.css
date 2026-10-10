@@ -1757,6 +1757,10 @@ html.theme-switching, html.theme-switching * {
 /* A technical failure: the only red in a learning flow, and it says whether work is safe. */
 .verdict-technical { border-color: color-mix(in srgb, var(--bad) 40%, transparent); border-left: 3px solid var(--bad); background: var(--bad-soft); }
 .verdict-technical .verdict-ico { color: var(--bad); }
+/* The earlier attempt's result, once the page has changed: stated, not pinned
+   on the new work. No verdict colour — nothing on the page now is judged. */
+.verdict-previous { border-color: var(--hairline); border-left: 3px solid var(--hairline); background: transparent; }
+.verdict-previous .verdict-ico { color: inherit; opacity: 0.7; }
 
 /* Step report: the first meaningful break leads, every other line waits */
 .stepcheck { margin-top: 12px; display: grid; gap: 4px; }
