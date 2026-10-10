@@ -118,7 +118,8 @@
 // handwriting was captured for that answer: the question and answer key, the
 // digest of the picture, when the server RECEIVED that digest and on what
 // evidence (`submission-in-time`: the finish arrived by deadline + grace on
-// the server's clock; `snapshot-before-deadline`: the last checkpoint the
+// the server's clock; `snapshot-before-deadline` / `snapshot-within-grace`:
+// the last checkpoint, labelled by when the SERVER saved it; the last checkpoint the
 // server saved before it, with its revision), and the status. It never holds
 // the picture. The server claims nothing about a page whose digest it did
 // not receive in time: such a page is not on the receipt at all.
@@ -941,11 +942,12 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
           given: blank(answers[key]) ? '' : String(answers[key]), correct: r.correct, unanswered: r.unanswered,
           marks: part.marks, awarded: r.awarded, feedback: r.feedback, partial: r.partial, markingScheme: r.markingScheme,
           working: blank(workings[key]) ? null : String(workings[key]),
-          answerText: keyedAnswer(chosen), steps: chosen.steps || [], subtopic: synth.subtopic, difficulty: synth.difficulty, attemptId,
+          // Withheld while the part is pending on handwriting (see solution below).
+          ...(r.pending ? {} : { answerText: keyedAnswer(chosen), steps: chosen.steps || [] }), subtopic: synth.subtopic, difficulty: synth.difficulty, attemptId,
           ...(repeat ? { repeat: true } : {}),
           ...cutOffFlags(r),
           // Both versions of a part that offered a choice, now that it is marked.
-          ...(part.alt ? { choices: Object.fromEntries([['main', part], ['or', part.alt]].map(([name, it]) => [name, {
+          ...(part.alt && !r.pending ? { choices: Object.fromEntries([['main', part], ['or', part.alt]].map(([name, it]) => [name, {
             prompt: it.prompt, answerType: it.answerType, mcqOptions: it.mcqOptions || null, figure: it.figure || null,
             answerText: keyedAnswer(it), steps: it.steps || []
           }])) } : {})
@@ -981,17 +983,21 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
         given: blank(answers[key]) ? '' : String(answers[key]), correct: r.correct, unanswered: r.unanswered, feedback: r.feedback,
         marks, negativeMarks: Math.abs(Number(sq.marking.incorrect || 0)), awarded: r.awarded, partial: r.partial,
         working: blank(workings[key]) ? null : String(workings[key]), markingScheme: r.markingScheme, outcome: r.outcome,
-        solution: solutionOf(chosen, marks, sq.marking), attemptId,
+        // A pending answer is not finished: its handwriting may still be read
+        // (the student may yet choose to retry or not). Until it is resolved
+        // the result carries no solution, no keyed answer, no marking criteria
+        // and no distractor explanations for it — nothing to decide by.
+        ...(r.pending ? {} : { solution: solutionOf(chosen, marks, sq.marking) }), attemptId,
         ...(repeat ? { repeat: true } : {}),
         ...cutOffFlags(r),
         // Both questions of an internal choice, now that the paper is marked.
-        ...(q.alt ? { choices: Object.fromEntries([['main', q], ['or', q.alt]].map(([name, it]) => [name, {
+        ...(q.alt && !r.pending ? { choices: Object.fromEntries([['main', q], ['or', q.alt]].map(([name, it]) => [name, {
           prompt: it.prompt, answerType: it.answerType, mcqOptions: it.mcqOptions || null, matchList: it.matchList || null,
           figure: it.figure || null, solution: solutionOf(it, marks, sq.marking)
         }])) } : {}),
         // Authored distractor explanations, disclosed only now: the device
         // derives misconception identity from these, never from an answer key.
-        repairOpportunities: [...new Set([
+        repairOpportunities: r.pending ? [] : [...new Set([
           ...(Array.isArray(chosen.traps) ? chosen.traps : []).map(t => t?.why),
           ...Object.values(chosen.answer?.optionTraps || {})
         ].filter(why => typeof why === 'string' && why))].slice(0, 40)
@@ -1152,7 +1158,10 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
       modes: body.modes === undefined || body.modes === null ? saved.modes : carried.modes,
       // Which handwritten pages were captured and not read, by the digest of
       // their picture. Late: only the digests saved before deadline + grace.
-      ink: body.ink === undefined || body.ink === null ? saved.ink : carried.ink
+      // In time, the finish itself says which pages are unread — none, when
+      // it names none. An older snapshot's digest is never brought back: a
+      // page erased since the last autosave must not return as pending.
+      ink: carried.ink
     } : saved;
     // What was marked: the sealed paper and exactly these responses.
     const marking = digest(paperRow.response_json + '\n' + JSON.stringify(responses));
@@ -1223,9 +1232,12 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
         pages: Object.fromEntries(marked.pendingKeys.map(key => [key, {
           key, questionId: key.split('::')[0], digest: responses.ink[key],
           // When, and on what evidence, the server came to hold this digest.
-          evidence: inTime && !(body.ink === undefined || body.ink === null) ? 'submission-in-time' : 'snapshot-before-deadline',
-          receivedAt: inTime && !(body.ink === undefined || body.ink === null) ? now : (snapshot?.savedAt ?? null),
-          snapshotRev: inTime && !(body.ink === undefined || body.ink === null) ? null : (snapshot?.rev ?? null),
+          // Labelled by what the server observed, on its own clock: the finish
+          // arrived in time; or the snapshot was saved before the deadline; or
+          // the snapshot was saved after the deadline but inside the grace.
+          evidence: inTime ? 'submission-in-time' : Number(snapshot?.savedAt) <= paper.deadline ? 'snapshot-before-deadline' : 'snapshot-within-grace',
+          receivedAt: inTime ? now : (snapshot?.savedAt ?? null),
+          snapshotRev: inTime ? null : (snapshot?.rev ?? null),
           state: 'awaiting-reading', reason: 'not-read', attempts: 0, lastAttemptAt: null, nextAttemptAt: now, resolvedAt: null
         }]))
       } } : {})
@@ -1265,11 +1277,11 @@ function pageView(page, handwriting, now) {
   if (now > Number(handwriting.windowEndsAt)) return { ...page, state: 'needs-review', reason: 'window-closed', nextAttemptAt: null, triesLeft: 0, canRetry: false, retryAt: null };
   if (!triesLeft) return { ...page, state: 'needs-review', reason: 'retries-exhausted', nextAttemptAt: null, triesLeft: 0, canRetry: false, retryAt: null };
   // The first read is the automatic one; every later one is the student's own.
-  return { ...page, triesLeft, canRetry: Number(page.attempts || 0) >= 1, retryAt: Number(page.nextAttemptAt) > now ? Number(page.nextAttemptAt) : null };
+  return { ...page, triesLeft, canRetry: page.autoUsed === true, retryAt: Number(page.nextAttemptAt) > now ? Number(page.nextAttemptAt) : null };
 }
 /** May a read be started for this page (as viewed) now, by this kind of request? */
 const mayAttempt = (page, now, retry) => page.state !== 'resolved' && page.triesLeft > 0 && now >= Number(page.nextAttemptAt || 0)
-  && (Number(page.attempts || 0) === 0 || retry === true);
+  && (page.autoUsed !== true || retry === true);
 
 /**
  * The stored result as its owner reads it. A result with no pending
@@ -1385,10 +1397,11 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
     if (!mayAttempt(state.page, now, body.retry)) return asItStands(state);
     const attempts = Number(state.stored.attempts || 0) + 1;
     await write(withPage(state.result, {
-      ...state.stored, attempts, lastAttemptAt: now,
+      ...state.stored, attempts, autoUsed: true, lastAttemptAt: now,
       nextAttemptAt: now + HANDWRITING_BACKOFF_MS[Math.min(attempts, HANDWRITING_BACKOFF_MS.length) - 1]
     }));
-    return { attempts, paper: state.paper, result: state.result };
+    // Whether a reading of this page has already come back (uncertain or empty).
+    return { attempts, paper: state.paper, result: state.result, hadRead: Array.isArray(state.stored.transcript) };
   }, lock);
   if (!reserved.attempts) return reserved;
 
@@ -1398,7 +1411,7 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
     // The one automatic read reuses a kept read of this picture (free). The
     // student's own Retry checking asks for a new reading, not a replay of
     // the uncertain one.
-    read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId, fresh: body.retry === true && reserved.attempts > 1 });
+    read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId, fresh: body.retry === true && reserved.hadRead === true });
     if (read.refusal) {
       failure = { reason: 'capacity', code: safeCode(read.refusal.verdict?.code, 'CAPACITY_REFUSED'), retryAt: Number(read.refusal.verdict?.resetAt) || 0 };
     }
@@ -1446,9 +1459,13 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
     let result = state.result;
     let page;
     if (failure) {
-      const spent = reserved.attempts >= HANDWRITING_MAX_ATTEMPTS;
+      // A refusal that reached no provider (the spending ceiling or the
+      // account's allowance said no) does not use up one of the tries; it
+      // still sets when the next request may be made.
+      const refunded = failure.reason === 'capacity' ? 1 : 0;
+      const spent = reserved.attempts - refunded >= HANDWRITING_MAX_ATTEMPTS;
       page = {
-        ...state.stored, lastFailure: failure.code,
+        ...state.stored, attempts: reserved.attempts - refunded, lastFailure: failure.code,
         state: spent ? 'needs-review' : 'awaiting-reading', reason: spent ? 'retries-exhausted' : failure.reason,
         nextAttemptAt: spent ? null : Math.max(Number(state.stored.nextAttemptAt) || 0, failure.retryAt || 0)
       };

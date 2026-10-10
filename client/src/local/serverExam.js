@@ -391,8 +391,11 @@ export async function finishOnServer(exam, body = {}, now = Date.now(), { timeou
   const queued = exam.pendingFinish;
   queued.attempts = (Number(queued.attempts) || 0) + 1;
   try {
+    // A finish always states its unread handwriting, `{}` when there is none:
+    // the server then never falls back to an older snapshot's pages.
+    const wired = await wireResponses(exam, queued.inputs);
     const result = await cloud.finishExam(exam.server.examId, {
-      ...(await wireResponses(exam, queued.inputs)), ms: queued.inputs.ms, reason: queued.reason, submissionKey: queued.submissionKey
+      ...wired, ink: wired.ink || {}, ms: queued.inputs.ms, reason: queued.reason, submissionKey: queued.submissionKey
     }, queued.submissionKey, timeoutMs);
     if (result?.authoritative !== true || !Array.isArray(result.detail) || !Number.isFinite(Number(result.score)) || !Number.isFinite(Number(result.total))) {
       throw Object.assign(new Error('The server did not return a certified result.'), { status: 502 });
