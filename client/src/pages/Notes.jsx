@@ -346,10 +346,12 @@ function ChapterNotes({ chapterId }) {
   const [{ notes: all, failed }, retry] = useNotes(grade);
   const [marks, toggleMark] = useBookmarks();
   const [cards, setCards] = useState(false);
+  // Rendering 30+ SVG charts in one frame is expensive on tablets. Mount six at a time.
+  const [visibleExamples, setVisibleExamples] = useState(6);
   const root = useRef(null);
   const notes = all?.[chapterId];
-  useReveal(root, [chapterId, notes]);
-  useEffect(() => { window.scrollTo?.(0, 0); }, [chapterId]);
+  useReveal(root, [chapterId, notes, visibleExamples]);
+  useEffect(() => { setVisibleExamples(6); window.scrollTo?.(0, 0); }, [chapterId]);
 
   const group = IN_CURRICULUM.find(g => g.grade === grade);
   const number = group ? group.chapters.findIndex(c => c.id === chapterId) + 1 : 0;
@@ -439,7 +441,16 @@ function ChapterNotes({ chapterId }) {
           </Section>
 
           <Section id="examples" title={t('notes.sectionExamples')}>
-            {notes.examples.map((ex, i) => <Example key={i} ex={ex} n={i + 1} />)}
+            {notes.examples.slice(0, visibleExamples).map((ex, i) => <Example key={i} ex={ex} n={i + 1} />)}
+            {notes.examples.length > visibleExamples && (
+              <div className="nt-example-more">
+                <button type="button" className="btn btn-secondary"
+                  onClick={() => setVisibleExamples(v => Math.min(v + 6, notes.examples.length))}
+                  aria-label={t('nav.more') + ' ' + t('notes.sectionExamples')}>
+                  {t('nav.more')} ({Math.min(visibleExamples + 6, notes.examples.length)}/{notes.examples.length})
+                </button>
+              </div>
+            )}
           </Section>
 
           {linkedResources.length > 0 && (
