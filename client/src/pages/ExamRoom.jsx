@@ -513,7 +513,10 @@ export default function ExamRoom() {
     const strokes = compactStrokes(reading.strokes || []);
     const sig = strokeSignature(strokes);
     const lines = (reading.lines || []).map(l => String(l || ''));
-    const record = strokes.length ? { strokes, lines, answerLine: reading.answerLine || '', engine: reading.engine || null, readSig: reading.kept?.signature || null } : null;
+    // The signature is taken from the strokes exactly as the paper keeps them
+    // (the exam store rounds to a tenth of a pixel), so the transcript still
+    // matches its strokes after a reload.
+    const record = strokes.length ? { strokes, lines, answerLine: reading.answerLine || '', engine: reading.engine || null, readSig: reading.kept && lines.length ? (inkModule?.strokeSignature?.(expandStrokes(strokes) || []) || null) : null } : null;
     // The first reading of restored ink re-reads the page that was saved. The
     // answer saved with it — which the student may have corrected by hand —
     // stands; only new writing replaces it.
