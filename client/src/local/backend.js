@@ -1815,6 +1815,9 @@ function sanitize(q, row) {
     // Who marks this question as it stands: the server (issued there, its
     // answer key never on this device) or the bundled deterministic engine.
     serverIssued: !!row.serverQuestionId,
+    // The server's own id of the issued question: an opaque reference the
+    // card passes with a read so the read receipt is bound to this question.
+    serverQuestionId: row.serverQuestionId || null,
     // issued: the server's, markable now. prepared: markable once an account
     // binds it. draft: opened with no connection, never markable.
     checkState: row.serverQuestionId ? 'issued' : row.prepared ? 'prepared' : row.draftOnly ? 'draft' : 'legacy',
@@ -3925,7 +3928,8 @@ const routes = {
       // Who marked a finished paper, and whether one is still waiting to be.
       marked_by: markedByOf(e), pending: !!e.pendingFinish,
       // Marks not yet decided: handwriting saved at the close and not read.
-      pending_marks: e.finishedAt ? pendingSummary(e.detail).marks : 0
+      pending_marks: e.finishedAt ? pendingSummary(e.detail).marks : 0,
+      provisional: !!e.finishedAt && (e.provisional === true || pendingSummary(e.detail).any)
     })) };
   },
   'GET /exams/:id': async (body, params) => {
@@ -5678,7 +5682,8 @@ async function gradeOnServer(row, body, submissionId, requestDigest) {
     // allowance or rate limit, a reader that did not answer) is kept beside
     // the "not checked" error, so the card can name it instead of saying
     // "reconnect" for a limit that reconnecting does not lift.
-    const read = await cloud.recognizePractice(row.serverQuestionId, mode, image).catch(cause => {
+    const attested = mode === 'ink' ? body.ink?.attested : body.photoAttested;
+    const read = await cloud.recognizePractice(row.serverQuestionId, mode, image, attested && typeof attested === 'object' ? attested : null).catch(cause => {
       const refusal = unreachable(cause);
       if (refusal && typeof refusal === 'object') {
         refusal.readerFailure = { code: cause?.code || null, status: cause?.status || null, resetAt: cause?.resetAt || null };
