@@ -58,6 +58,7 @@
 // Usage: node client/test/a11y-check.mjs
 // ─────────────────────────────────────────────────────────────────────────────
 import { chromium } from '@playwright/test';
+import { watchBoot, bootFailure, bootRecovery } from './support/boot-diagnostics.mjs';
 import { createServer } from 'node:http';
 import { spawnSync } from 'node:child_process';
 import { readFileSync, existsSync, statSync, mkdtempSync, rmSync } from 'node:fs';
@@ -90,6 +91,8 @@ const groups = [];
 let group = null;
 const failures = [];
 const notes = [];
+// Loads that passed only after public/boot-guard.js reloaded the page once.
+const bootRecoveries = [];
 
 const section = (name) => { group = { name, pass: 0, fail: 0 }; groups.push(group); };
 
@@ -488,46 +491,23 @@ async function signInToDemo(page, base) {
 }
 
 async function goTo(page, base, path) {
-  // What the page asked for during this load, kept only to explain a route
-  // that never shows the app: requests still unanswered, and answers that
-  // were refusals. Paths only — never a body, a header or a query string.
-  const open = new Map(), refused = [];
-  const short = url => { try { const u = new URL(url); return u.pathname.slice(0, 80); } catch { return '?'; } };
-  const onRequest = r => open.set(r, short(r.url()));
-  const onDone = r => open.delete(r);
-  const onResponse = r => { if (r.status() >= 400) refused.push(`${r.status()} ${short(r.url())}`); };
-  const errors = [];
-  const onPageError = e => errors.push(String(e?.message || e).split('\n')[0].slice(0, 160));
-  const onConsole = m => { if (m.type() === 'error') errors.push(m.text().split('\n')[0].slice(0, 160)); };
-  page.on('request', onRequest); page.on('requestfinished', onDone); page.on('requestfailed', onDone); page.on('response', onResponse); page.on('pageerror', onPageError); page.on('console', onConsole);
-  const unhook = () => { page.off('request', onRequest); page.off('requestfinished', onDone); page.off('requestfailed', onDone); page.off('response', onResponse); page.off('pageerror', onPageError); page.off('console', onConsole); };
-  await page.goto(base + path, { waitUntil: 'domcontentloaded' });
-  // A route that never shows the app (seen once in CI on the second visit to
-  // /exams, never locally) must say what WAS on screen: the root error
-  // boundary, an empty root, or a page still loading are three different
-  // faults, and "Timeout 20000ms exceeded" names none of them. No retry: a
-  // second load would hide a real crash.
-  await page.waitForSelector('.shell, .auth-wrap', { timeout: 20000 }).catch(async err => {
-    const seen = await page.evaluate(() => ({
-      url: location.pathname + location.search,
-      readyState: document.readyState,
-      rootChildren: document.getElementById('root')?.childElementCount ?? null,
-      crash: [...document.querySelectorAll('.crash-card')].map(el => el.innerText.replace(/\s+/g, ' ').slice(0, 240)),
-      alerts: [...document.querySelectorAll('[role="alert"]')].map(el => el.innerText.replace(/\s+/g, ' ').slice(0, 160)),
-      text: (document.body?.innerText || '').replace(/\s+/g, ' ').slice(0, 160),
-      root: (document.getElementById('root')?.firstElementChild?.outerHTML || '').replace(/\s+/g, ' ').slice(0, 200),
-      moduleRan: !!window.__PRI_BUILD_FEATURES__,
-      cloudOrigin: typeof window.__PRI_CLOUD_ORIGIN__ === 'string',
-      serviceWorker: !!navigator.serviceWorker?.controller,
-      online: navigator.onLine
-    })).catch(e => ({ unreadable: String(e.message).split('\n')[0] }));
-    seen.unanswered = [...open.values()].slice(0, 12);
-    seen.refused = refused.slice(-12);
-    seen.errors = errors.slice(-8);
-    unhook();
-    throw new Error(`${String(err.message).split('\n')[0]} · ${path} never showed the app · ${JSON.stringify(seen)}`);
-  });
-  unhook();
+  // A route that never shows the app (seen in CI on a second visit to /exams
+  // and to /teach, never locally) must say what WAS happening: the bundle not
+  // running, a chunk that failed or came back as the wrong kind of file, the
+  // root error boundary, a page still loading — different faults that
+  // "Timeout 20000ms exceeded" does not tell apart. support/boot-diagnostics
+  // records them for this one load. No retry: a second load would hide it.
+  const watch = watchBoot(page);
+  try {
+    await page.goto(base + path, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.shell, .auth-wrap', { timeout: 20000 });
+  } catch (err) {
+    throw await bootFailure(err, watch, `${path} never showed the app`);
+  }
+  // A load that needed the page's one automatic reload passed, and says so.
+  const recovered = await bootRecovery(watch, page, path);
+  if (recovered) bootRecoveries.push(recovered);
+  watch.stop();
   await wait(page, 700);
 }
 
@@ -1447,6 +1427,7 @@ function finish(views) {
     for (const o of OUTSTANDING) console.log(`  ${o.file}\n      ${o.what}`);
   }
   for (const n of notes) console.log(`\n  not measured: ${n}`);
+  for (const n of bootRecoveries) console.log(`\n  note: ${n}`);
   console.log(`\n${failed ? '✖ ACCESSIBILITY SUITE FAILED' : '✔ ACCESSIBILITY SUITE PASSED'} — ${total - failed}/${total} checks across ${groups.length} groups`);
   return failed;
 }
