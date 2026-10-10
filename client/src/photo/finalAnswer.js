@@ -220,6 +220,9 @@ function withoutCondition(s) {
   const head = s.slice(0, m.index + m[1].length).trim().replace(/[(\[,]\s*$/, '').trim();
   const tail = s.slice(m.index + m[0].length);
   if (!head || !relations(tail).length) return s;
+  // "solving for x: x = 3" — the "for" names what is being solved, and no
+  // value stands in front of it: it is not a condition on an answer.
+  if (m[2].toLowerCase() === 'for' && !/\d/.test(head)) return s;
   // "x = 3 if y = 2" and "least value = 6 at x = -3" say what the answer is and
   // then where. "2x = 6 if x = 3" does not: the line is a step, and either
   // number could be meant. That one is left for the student.
@@ -355,7 +358,9 @@ function setFromLine(s, question) {
   const kinds = parts.map(part => {
     const at = part.lastIndexOf('=');
     if (at < 0) return { kind: 'value' };
-    const left = part.slice(0, at);
+    // What stands immediately before the last "=": in "answer = x = 2" and
+    // "= x = 2" that is the variable, not the lead-in.
+    const left = part.slice(part.lastIndexOf('=', at - 1) + 1, at);
     const named = /(^|[^\p{L}\p{N}^)\]}²³])([a-zA-Zθ])\s*$/u.exec(left);
     return named && !/[\d^()\[\]{}²³√+*/<>=-]/.test(left.slice(0, named.index + named[1].length)) ? { kind: 'root', name: named[2] } : { kind: 'step' };
   });
@@ -364,7 +369,10 @@ function setFromLine(s, question) {
     const sameVariable = roots.length > 0 && roots.every(k => k.name === roots[0].name);
     // Bare values ("x = 2 or -2") follow the root they are listed with.
     const firstRoot = kinds.findIndex(k => k.kind === 'root');
-    const kept = sameVariable ? parts.filter((_, i) => kinds[i].kind === 'root' || (kinds[i].kind === 'value' && i > firstRoot)) : [];
+    // A step AFTER a root ("x = 1 or x - 2 = 0") is an alternative the student
+    // has not solved: which values are meant is theirs to say.
+    const stepAfterRoot = firstRoot >= 0 && kinds.some((k, i) => k.kind === 'step' && i > firstRoot);
+    const kept = sameVariable && !stepAfterRoot ? parts.filter((_, i) => kinds[i].kind === 'root' || (kinds[i].kind === 'value' && i > firstRoot)) : [];
     const solved = kept.map(part => valueOf(part, NUMBER));
     if (kept.length && solved.every(Boolean)) {
       const answer = distinct(solved, NUMBER).join(', ');

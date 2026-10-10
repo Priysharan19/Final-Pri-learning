@@ -177,7 +177,15 @@ eq(proposeFinalAnswer(['a', 'b = 2', 'least value => 6.'], N).line, 2, 'the prop
     [['x^2 = 9 or x^2 = 16'], S, { status: 'ambiguous', candidates: ['9', '16'] }],
     [['x + 1 = 3, y = 2 or x = 5'], S, { status: 'ambiguous', candidates: ['3', '2', '5'] }],
     [['so x = 1 or x = 2'], S, { status: 'proposed', answer: '1, 2' }],
-    [['roots are {1, -2}'], S, { status: 'proposed', answer: '{1, -2}' }]
+    [['roots are {1, -2}'], S, { status: 'proposed', answer: '{1, -2}' }],
+    // Review 18, N4: a lead-in before the variable is not a step, a check line
+    // after the answer is not the answer, and an unsolved alternative is asked about.
+    [['answer = x = 2 or x = -8', 'verify: 9 = 9'], S, { status: 'proposed', answer: '2, -8' }],
+    [['= x = 2 or x = -2 or x = 3'], S, { status: 'proposed', answer: '2, -2, 3' }],
+    [['x = x = 2, x = -8'], S, { status: 'proposed', answer: '2, -8' }],
+    [['x = 1 or x - 2 = 0'], S, { status: 'ambiguous', candidates: ['1', '0'] }],
+    [['solving for x: x = 3'], { answerType: 'numeric' }, { status: 'proposed', answer: '3' }],
+    [['6 for x = -3'], { answerType: 'numeric' }, { status: 'proposed', answer: '6' }]
   ]) eq(strip(proposeFinalAnswer(lines, type)), want, `review 17: ${JSON.stringify(lines[0])} as ${type.answerType}`);
   // Whatever is proposed for a point reads, in the marker's own parser, as the pair that was written.
   ok(!/\(\s*\./.test(JSON.stringify(proposeFinalAnswer(['Ans. 4, 0'], P))), 'no proposal ever opens a pair with a stray stop');
