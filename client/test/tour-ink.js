@@ -180,7 +180,7 @@ export const flow = {
     await check('the kept strokes were restored and offered to the reader (one request, a picture, nothing else)',
       readsAfter.length === readsBeforeReload + 1 && providerCalls >= 1 && providerCalls <= 2 &&
         Object.keys(restoredSent?.body || {}).every(k => ['image', 'mode'].includes(k)) && /^data:image\//.test(restoredSent?.body?.image || ''),
-      `${readsAfter.length - readsBeforeReload} page request(s), ${providerCalls} provider call(s) after the reload; page sent ${JSON.stringify(Object.keys(restoredSent?.body || {}))} DEBUG ${JSON.stringify(await page.evaluate(() => globalThis.__INK_DEBUG__))} IMG ${JSON.stringify(readsAfter.slice(-2).map(r => [r.body?.image?.length, r.status]))}`);
+      `${readsAfter.length - readsBeforeReload} page request(s), ${providerCalls} provider call(s) after the reload; page sent ${JSON.stringify(Object.keys(restoredSent?.body || {}))}`);
     await page.waitForSelector('.ink-status', { timeout: 10000 }).catch(() => {});
     const downNote = (await page.locator('.ink-status').innerText().catch(() => '')) || '';
     await check('with the reader down the page waits, saved, and says so', /saved/i.test(downNote) && await page.locator('.eval-card').count() === 0, JSON.stringify(downNote));
