@@ -1,0 +1,160 @@
+// Wave 7: independently verifiable original vector-diagram practice.
+import { makeInquiryVisual } from '../visualInquiryFactory.js';
+const specs=[
+  {
+    "chapterId": "c11-trig-functions",
+    "kind": "trigWave",
+    "amp": 1,
+    "k": 2,
+    "mode": "peaks",
+    "context": "Phase-frequency waveform 1"
+  },
+  {
+    "chapterId": "c11-trig-functions",
+    "kind": "trigWave",
+    "amp": 2,
+    "k": 3,
+    "mode": "amplitude",
+    "context": "Phase-frequency waveform 2"
+  },
+  {
+    "chapterId": "c11-trig-functions",
+    "kind": "trigWave",
+    "amp": 3,
+    "k": 4,
+    "mode": "peaks",
+    "context": "Phase-frequency waveform 3"
+  },
+  {
+    "chapterId": "c11-trig-functions",
+    "kind": "trigWave",
+    "amp": 4,
+    "k": 5,
+    "mode": "amplitude",
+    "context": "Phase-frequency waveform 4"
+  },
+  {
+    "chapterId": "c11-trig-functions",
+    "kind": "trigWave",
+    "amp": 1,
+    "k": 2,
+    "mode": "peaks",
+    "context": "Phase-frequency waveform 5"
+  },
+  {
+    "chapterId": "c11-trig-functions",
+    "kind": "trigWave",
+    "amp": 2,
+    "k": 3,
+    "mode": "amplitude",
+    "context": "Phase-frequency waveform 6"
+  },
+  {
+    "chapterId": "c11-trig-functions",
+    "kind": "trigWave",
+    "amp": 3,
+    "k": 4,
+    "mode": "peaks",
+    "context": "Phase-frequency waveform 7"
+  },
+  {
+    "chapterId": "c11-trig-functions",
+    "kind": "trigWave",
+    "amp": 4,
+    "k": 5,
+    "mode": "amplitude",
+    "context": "Phase-frequency waveform 8"
+  },
+  {
+    "chapterId": "c11-permutations-combinations",
+    "kind": "latticePaths",
+    "east": 2,
+    "north": 3,
+    "context": "Route order counting 1"
+  },
+  {
+    "chapterId": "c11-permutations-combinations",
+    "kind": "latticePaths",
+    "east": 3,
+    "north": 4,
+    "context": "Route order counting 2"
+  },
+  {
+    "chapterId": "c11-permutations-combinations",
+    "kind": "latticePaths",
+    "east": 4,
+    "north": 5,
+    "context": "Route order counting 3"
+  },
+  {
+    "chapterId": "c11-permutations-combinations",
+    "kind": "latticePaths",
+    "east": 5,
+    "north": 3,
+    "context": "Route order counting 4"
+  },
+  {
+    "chapterId": "c11-permutations-combinations",
+    "kind": "latticePaths",
+    "east": 6,
+    "north": 4,
+    "context": "Route order counting 5"
+  },
+  {
+    "chapterId": "c11-permutations-combinations",
+    "kind": "latticePaths",
+    "east": 6,
+    "north": 5,
+    "context": "Route order counting 6"
+  },
+  {
+    "chapterId": "c11-limits-derivatives",
+    "kind": "piecewise",
+    "left": -7,
+    "right": 3,
+    "mode": "jump",
+    "context": "One-sided discontinuity task 1"
+  },
+  {
+    "chapterId": "c11-limits-derivatives",
+    "kind": "piecewise",
+    "left": -6,
+    "right": 4,
+    "mode": "function",
+    "context": "One-sided discontinuity task 2"
+  },
+  {
+    "chapterId": "c11-limits-derivatives",
+    "kind": "piecewise",
+    "left": -5,
+    "right": 5,
+    "mode": "jump",
+    "context": "One-sided discontinuity task 3"
+  },
+  {
+    "chapterId": "c11-limits-derivatives",
+    "kind": "piecewise",
+    "left": -4,
+    "right": 6,
+    "mode": "function",
+    "context": "One-sided discontinuity task 4"
+  },
+  {
+    "chapterId": "c11-limits-derivatives",
+    "kind": "piecewise",
+    "left": -3,
+    "right": 7,
+    "mode": "jump",
+    "context": "One-sided discontinuity task 5"
+  },
+  {
+    "chapterId": "c11-limits-derivatives",
+    "kind": "piecewise",
+    "left": -2,
+    "right": 8,
+    "mode": "function",
+    "context": "One-sided discontinuity task 6"
+  }
+];
+const data={};for(const {chapterId,kind,...p} of specs)(data[chapterId]||={examples:[]}).examples.push(makeInquiryVisual(kind,p));
+export default data;
