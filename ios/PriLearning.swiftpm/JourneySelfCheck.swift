@@ -455,6 +455,10 @@ enum JourneySelfCheck {
         at = 'write'; await writeMode();
         const echoed = await writeOnNativeSurface();
         at = 'saved'; await inkSavedTruthfully(id);
+        // Reading is asked for (owner decision): writing and saving send nothing.
+        at = 'unread'; await sleep(1500);
+        if (q('.ink-preview .ink-line')) throw new Error('the page was read without Read my answer being pressed');
+        at = 'read'; (await waitFor(() => q('[data-ink-read]'), 20000)).click();
         at = 'reading'; await waitFor(() => q('.ink-preview .ink-line'), 60000);
         const lines = [...document.querySelectorAll('.ink-preview .ink-line')].map(n => ({ text: n.getAttribute('data-text'), low: n.classList.contains('ink-line-low') }));
         if (lines.length !== 1 || lines[0].text !== escrow.readerText) throw new Error('transcript ' + JSON.stringify(lines) + ', the stand-in reader answered ' + JSON.stringify(escrow.readerText));
