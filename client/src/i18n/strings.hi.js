@@ -2699,6 +2699,8 @@ export default {
   // Online-only checking (owner decision 2026-10-10): what a refused check says.
   'check.needsAccount': 'उत्तर जाँचने के लिए Pri खाता चाहिए। आप काम जारी रख सकते हैं और जब जाँच करानी हो तब साइन इन कर सकते हैं।',
   'check.signInAction': 'इस उत्तर की जाँच के लिए साइन इन करें',
+  'check.signInAgainAction': 'इस उत्तर की जाँच के लिए फिर से साइन इन करें',
+  'check.sessionEnded': 'आपका साइन इन समाप्त हो गया है। इसे पढ़वाने और जँचवाने के लिए फिर से साइन इन करें; आपका काम इसी पेज पर रहेगा।',
   'check.signInActionPlain': 'जारी रखने के लिए साइन इन करें',
   'exams.notStartedLabel': 'शुरू नहीं हुआ',
   'check.signInTitle': 'इसकी जाँच के लिए साइन इन करें',

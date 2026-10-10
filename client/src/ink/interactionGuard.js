@@ -34,7 +34,10 @@ function syncSessionClass() {
   if (!r) return open;
   if (open) {
     r.classList.add(SESSION_CLASS);
-    clearSelection();
+    // Not while the student is typing in a real field (see typingInTextEntry):
+    // every keystroke re-renders, and each render would take the caret away.
+    if (!(activePointer === null && typeof Element !== 'undefined' && document.activeElement instanceof Element &&
+        document.activeElement.closest('input, textarea, select, [contenteditable="true"]') && !document.activeElement.closest('.ink-wrap'))) clearSelection();
   } else {
     r.classList.remove(SESSION_CLASS);
   }
@@ -80,13 +83,27 @@ function suppressPointerGesture(event) {
   clearSelection();
 }
 
+// A real text-entry control: the line-correction field under the page, the
+// sign-in form opened beside the work, the typed working. The invariant above
+// says these stay editable, and the stylesheet below already says so — but in
+// WebKit a caret IS a selection: cancelling `selectstart` on the field, or
+// clearing the document's ranges while it has focus, leaves it focused and
+// unable to take a single character (keydown arrives, no input follows). So
+// outside an actual pen stroke the guard leaves a focused text field alone.
+const TEXT_ENTRY = 'input, textarea, select, [contenteditable="true"]';
+const isTextEntry = (target) =>
+  typeof Element !== 'undefined' && target instanceof Element && Boolean(target.closest(TEXT_ENTRY)) && !target.closest('.ink-wrap');
+const typingInTextEntry = () => activePointer === null && isTextEntry(document.activeElement);
+
 function suppressSelectionGesture(event) {
   if (activePointer === null && !syncSessionClass()) return;
+  if (activePointer === null && (isTextEntry(event.target) || (event.type === 'selectstart' && typingInTextEntry()))) return;
   if (event.cancelable) event.preventDefault();
   clearSelection();
 }
 
 function clearSelectionDuringInkSession() {
+  if (typingInTextEntry()) return;
   if (activePointer !== null || syncSessionClass()) clearSelection();
 }
 

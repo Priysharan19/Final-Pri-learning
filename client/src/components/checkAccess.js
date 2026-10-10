@@ -46,7 +46,9 @@ export function checkRefusal(error) {
   const status = Number(error.status);
   // A session that belongs to another profile's account (a shared iPad) is,
   // for this profile, "sign in": the account panel offers its own sign-in.
-  if (code === 'SIGN_IN_TO_CHECK' || code === 'AUTH_REQUIRED' || code === 'PRACTICE_ACCOUNT_MISMATCH') return CHECK_REFUSAL.SIGN_IN;
+  // CSRF_REJECTED: the session's security token is missing or stale. Signing
+  // in again is the only thing that issues a new one, so that is what is asked.
+  if (code === 'SIGN_IN_TO_CHECK' || code === 'AUTH_REQUIRED' || code === 'PRACTICE_ACCOUNT_MISMATCH' || code === 'CSRF_REJECTED') return CHECK_REFUSAL.SIGN_IN;
   if (code === 'PLACEMENT_RESTART_REQUIRED') return CHECK_REFUSAL.RESTART;
   if (code === 'RECONNECT_TO_CHECK' || code === 'CLOUD_DISABLED') return CHECK_REFUSAL.RECONNECT;
   if (code === 'QUESTION_CHECK_UNAVAILABLE') return CHECK_REFUSAL.QUESTION;

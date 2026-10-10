@@ -2629,6 +2629,8 @@ export default {
   // Online-only checking (owner decision 2026-10-10): what a refused check says.
   'check.needsAccount': 'Checking your answer needs a Pri account. You can keep working and sign in when you are ready to check it.',
   'check.signInAction': 'Sign in to check this answer',
+  'check.signInAgainAction': 'Sign in again to check this answer',
+  'check.sessionEnded': 'You’ve been signed out. Sign in again to have this read and checked; your work stays on this page.',
   'check.signInActionPlain': 'Sign in to continue',
   'exams.notStartedLabel': 'Not started',
   'check.signInTitle': 'Sign in to have this checked',

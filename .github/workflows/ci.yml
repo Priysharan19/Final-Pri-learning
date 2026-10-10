@@ -80,7 +80,7 @@ jobs:
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
           grep -Fq 'LEGAL PAGES: PASS — 234/234 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 171/171 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 174/174 checks' suites.log
           grep -Fq 'BROWSER RUN FIXES: PASS — 23/23 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
@@ -95,7 +95,7 @@ jobs:
           grep -Fq 'NOTES CONTENT CHECK PASSED — 77/77 chapters' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
           grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 171/171 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 174/174 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
           grep -Fq 'MARK PREDICTOR: PASS — 42/42 checks' suites.log
@@ -478,7 +478,10 @@ jobs:
           grep -Fq 'Type · typed answer and working survive sign-in on the card, server-marked' browser.log
           grep -Fq 'Write · signed out: one true save state; ink survives reload, mode switch, resize, offline; a failed write says so and retries' browser.log
           grep -Fq 'Photo · signed out, sign in on the card, same photo read, transcript edited, server-marked on Submit' browser.log
-          grep -Eq 'E2E SUITE.*89/89.*4 flows' browser.log
+          grep -Fq 'Write · session ended before reading: "sign in again" beside the work, then read and marked; a real outage still says so, with a retry' browser.log
+          grep -Fq 'Photo · session ended before reading: "sign in again" beside the photo, then the same photo is read and marked' browser.log
+          grep -Fq 'Submit · session ended at Submit: work held, "sign in again", never a wrong-answer verdict; then marked exactly once' browser.log
+          grep -Eq 'E2E SUITE.*116/116.*7 flows' browser.log
           grep -Fq 'Type · signed out: kept, not checked; signed in on the card, server-marked' browser.log
           grep -Fq 'Type · offline: reconnect asked, work kept, Retry marked exactly once' browser.log
           grep -Fq 'Write · offline: reconnect asked, ink kept, Retry marked exactly once' browser.log
