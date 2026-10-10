@@ -296,6 +296,10 @@ try {
     };
     const flows = LEGACY_ONLY ? ['legacy'] : ['legacy', 'single'];
     for (let i = 0; i < BENCH; i++) {
+      // A long run makes more requests an hour than one student may (which the
+      // per-account request limits rightly refuse). The benchmark is not a
+      // student: its own buckets are cleared between rounds, by the suite.
+      await h.db.run("DELETE FROM rate_limits WHERE bucket LIKE 'practice-%' OR bucket LIKE 'handwriting-%'");
       const reads = await actions.reads(s);
       record('GET /v1/account/me', reads.me);
       record('GET /v1/account/guardian/state', reads.guardianState);
