@@ -51,6 +51,7 @@ const specs=[
       3,
       3,
       3,
+      3,
       4,
       5,
       5,
@@ -110,6 +111,7 @@ const specs=[
     "chapterId": "c7-number-play-current",
     "kind": "dotPlot",
     "values": [
+      1,
       1,
       1,
       1,
@@ -177,6 +179,7 @@ const specs=[
       4,
       4,
       4,
+      4,
       5,
       6,
       6,
@@ -236,6 +239,7 @@ const specs=[
     "chapterId": "c7-number-play-current",
     "kind": "dotPlot",
     "values": [
+      2,
       2,
       2,
       2,
@@ -303,6 +307,7 @@ const specs=[
       5,
       5,
       5,
+      5,
       6,
       7,
       7,
@@ -362,6 +367,7 @@ const specs=[
     "chapterId": "c7-number-play-current",
     "kind": "dotPlot",
     "values": [
+      3,
       3,
       3,
       3,
