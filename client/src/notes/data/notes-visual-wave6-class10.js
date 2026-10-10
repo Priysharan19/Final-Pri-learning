@@ -6,7 +6,7 @@ const specs=[
     "kind": "similarTriangles",
     "base": 6,
     "height": 8,
-    "num": 2,
+    "num": 1,
     "den": 2,
     "context": "Parallel segment similarity study 1"
   },
@@ -60,7 +60,7 @@ const specs=[
     "kind": "similarTriangles",
     "base": 18,
     "height": 24,
-    "num": 2,
+    "num": 1,
     "den": 2,
     "context": "Parallel segment similarity study 7"
   },
@@ -78,7 +78,7 @@ const specs=[
     "kind": "similarTriangles",
     "base": 12,
     "height": 16,
-    "num": 4,
+    "num": 3,
     "den": 4,
     "context": "Parallel segment similarity study 9"
   },
@@ -114,7 +114,7 @@ const specs=[
     "kind": "similarTriangles",
     "base": 6,
     "height": 8,
-    "num": 2,
+    "num": 1,
     "den": 2,
     "context": "Parallel segment similarity study 13"
   },
@@ -168,7 +168,7 @@ const specs=[
     "kind": "similarTriangles",
     "base": 18,
     "height": 24,
-    "num": 2,
+    "num": 1,
     "den": 2,
     "context": "Parallel segment similarity study 19"
   },
