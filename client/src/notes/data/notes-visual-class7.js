@@ -1,0 +1,188 @@
+// Visual NCERT middle-school supplementary problem data; all figures carry the values needed.
+import { makeVisualExample } from '../visualQuestionFactory.js';
+const specs = [
+  {
+    "chapterId": "c7-integer-operations-current",
+    "kind": "numberDistance",
+    "a": -7,
+    "b": 4,
+    "context": "Winter temperatures"
+  },
+  {
+    "chapterId": "c7-integer-operations-current",
+    "kind": "numberDistance",
+    "a": -12,
+    "b": -3,
+    "context": "Submarine depths"
+  },
+  {
+    "chapterId": "c7-integer-operations-current",
+    "kind": "numberDistance",
+    "a": -6,
+    "b": 9,
+    "context": "Elevator floors"
+  },
+  {
+    "chapterId": "c7-integer-operations-current",
+    "kind": "numberDistance",
+    "a": -15,
+    "b": 2,
+    "context": "Credit and debit"
+  },
+  {
+    "chapterId": "c7-common-ground-current",
+    "kind": "numberDistance",
+    "a": -4.5,
+    "b": 2.5,
+    "context": "Rational interval"
+  },
+  {
+    "chapterId": "c7-number-play-current",
+    "kind": "barSum",
+    "labels": [
+      "Blue",
+      "Green",
+      "Red",
+      "Gold"
+    ],
+    "values": [
+      4,
+      7,
+      3,
+      6
+    ],
+    "context": "Counters collected"
+  },
+  {
+    "chapterId": "c7-number-play-current",
+    "kind": "barDifference",
+    "labels": [
+      "A",
+      "B",
+      "C",
+      "D"
+    ],
+    "values": [
+      17,
+      11,
+      23,
+      14
+    ],
+    "context": "Library visits"
+  },
+  {
+    "chapterId": "c7-decimals-current",
+    "kind": "barMean",
+    "labels": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu"
+    ],
+    "values": [
+      5,
+      7,
+      6,
+      10
+    ],
+    "context": "Daily litres"
+  },
+  {
+    "chapterId": "c7-arithmetic-expressions-current",
+    "kind": "barSum",
+    "labels": [
+      "P",
+      "Q",
+      "R"
+    ],
+    "values": [
+      14,
+      19,
+      22
+    ],
+    "context": "Science fair entries"
+  },
+  {
+    "chapterId": "c7-fractions-current",
+    "kind": "barProb",
+    "labels": [
+      "Copper",
+      "Silver",
+      "Gold"
+    ],
+    "values": [
+      3,
+      5,
+      2
+    ],
+    "favourable": "Gold",
+    "context": "Coloured beads"
+  },
+  {
+    "chapterId": "c7-triangles-current",
+    "kind": "triangleArea",
+    "A": [
+      0,
+      0
+    ],
+    "B": [
+      8,
+      0
+    ],
+    "C": [
+      0,
+      5
+    ],
+    "context": "A triangular garden"
+  },
+  {
+    "chapterId": "c7-triangles-current",
+    "kind": "triangleArea",
+    "A": [
+      0,
+      0
+    ],
+    "B": [
+      10,
+      0
+    ],
+    "C": [
+      3,
+      6
+    ],
+    "context": "A triangular sail"
+  },
+  {
+    "chapterId": "c7-connecting-dots-current",
+    "kind": "triangleArea",
+    "A": [
+      1,
+      1
+    ],
+    "B": [
+      7,
+      1
+    ],
+    "C": [
+      4,
+      5
+    ],
+    "context": "A plotted triangular plot"
+  },
+  {
+    "chapterId": "c7-geometric-twins-current",
+    "kind": "midpoint",
+    "A": [
+      -4,
+      2
+    ],
+    "B": [
+      4,
+      2
+    ],
+    "context": "Mirror-line symmetry"
+  }
+];
+const output = {};
+for (const {chapterId,kind,...p} of specs) (output[chapterId] ||= {examples:[]}).examples.push(makeVisualExample(kind,p));
+export default output;
