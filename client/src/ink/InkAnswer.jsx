@@ -15,9 +15,15 @@
 //     nothing else (cloudReader.js / cloudRaster.js).
 //   · The ink is the student's and survives everything: it is handed to the
 //     caller the moment the pen lifts (onStrokes) whatever happens to reading.
-//   · When the server cannot be reached the student is told why in plain words,
-//     the working stays on the page, and it is read automatically as soon as
-//     the reason goes away (back online, signed in). Typing still works offline.
+//   · Reading is asked for (owner decision): the page is read when the student
+//     presses "Read my answer" — one recognition operation — and for no other
+//     reason. Not a pause, a stroke, a focus, a reload, coming back online or
+//     signing in. After a read, changing the ink makes the transcript stale:
+//     it stays visible, labelled, is never submitted, and "Read again" is
+//     offered.
+//   · When a read is not possible or is refused the student is told why in
+//     plain words with the action that clears it; the working stays on the
+//     page. Nothing is retried without their press. Typing still works.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import InkCanvas from './InkCanvas.jsx';
