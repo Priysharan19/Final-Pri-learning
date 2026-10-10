@@ -33,6 +33,9 @@ permissions:
 # flag-off (client/test/ios-bundle-features-check.mjs).
 env:
   PRI_FEATURE_AUSTRALIA: '1'
+  # Handwriting input in timed exams (off by default in a shipped build): the
+  # browser suites drive the gate-ON flow explicitly.
+  PRI_FEATURE_EXAM_HANDWRITING: '1'
   PRI_FEATURE_EXTENDED_TRACKS: '1'
 
 jobs:

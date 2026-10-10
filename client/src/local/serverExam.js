@@ -444,23 +444,23 @@ function frozenImages(exam, pages) {
  * Present every frozen page that is waiting and may be asked for now. Returns
  * the latest result the server gave; the one passed in when nothing changed.
  */
-export async function resolveFrozenHandwriting(examId, result, images, { now = Date.now(), limit = INLINE_PAGE_READS, transport = cloud } = {}) {
+export async function resolveFrozenHandwriting(examId, result, images, { now = Date.now(), limit = INLINE_PAGE_READS, transport = cloud, refused = null, refusedNow = null } = {}) {
   let latest = result;
   let asked = 0;
   for (const key of Object.keys(result?.handwriting?.pages || {})) {
     const page = latest.handwriting?.pages?.[key];
     // ONE automatic read per page, ever: a page that has had it is presented
     // again only by the student's own "Retry checking" (retryHandwriting).
-    if (!page || page.state === 'resolved' || Number(page.attempts) > 0 || !images?.[key] || asked >= limit) continue;
+    if (!page || page.state === 'resolved' || Number(page.attempts) > 0 || !images?.[key] || refused?.[key] || asked >= limit) continue;
     asked += 1;
     try {
       const reply = await transport.resolveExamHandwriting(examId, { key, image: images[key] });
       if (reply?.result?.authoritative === true && Array.isArray(reply.result.detail)) latest = reply.result;
     } catch (cause) {
       // The server will never read this picture for this answer (it is not
-      // the frozen one, or nothing is pending there): stop holding it, so it
-      // is not sent again on every visit.
-      if (cause?.status === 409 && (cause?.code === 'EXAM_HANDWRITING_CHANGED' || cause?.code === 'EXAM_HANDWRITING_NOT_PENDING')) { delete images[key]; continue; }
+      // the frozen one, or nothing is pending there). The picture is KEPT —
+      // it is the student's saved work — but it is not sent again.
+      if (cause?.status === 409 && (cause?.code === 'EXAM_HANDWRITING_CHANGED' || cause?.code === 'EXAM_HANDWRITING_NOT_PENDING')) { refusedNow?.add(key); continue; }
       // Offline, signed out or refused for the account: the page stays frozen
       // and pending, and a later visit asks again. Nothing is retried here.
       if (unavailableKind(cause)) break;
@@ -477,19 +477,32 @@ export async function resolveFrozenHandwriting(examId, result, images, { now = D
 async function settleFrozenPages(exam, result, pages) {
   if (!result?.handwriting?.pages) return result;
   const images = frozenImages(exam, pages);
-  const settled = await resolveFrozenHandwriting(exam.server.examId, result, images);
+  const refusedNow = new Set();
+  const settled = await resolveFrozenHandwriting(exam.server.examId, result, images, { refusedNow });
   keepFrozenPages(exam, settled, images);
+  noteRefused(exam, refusedNow);
   return settled;
 }
 
-/** Keep the pictures of pages that can still be read; forget the rest. */
+/** Remember which kept pictures the server has refused, so they are never sent again. */
+function noteRefused(exam, keys) {
+  if (!keys?.size || !exam.server.handwriting) return;
+  exam.server.handwriting.refused = { ...(exam.server.handwriting.refused || {}), ...Object.fromEntries([...keys].filter(key => exam.server.handwriting.pages[key]).map(key => [key, true])) };
+}
+
+/**
+ * Keep the picture of every page whose answer is not marked. Saved work is
+ * never erased because tries ran out or the recovery window closed: an
+ * unmarked answer keeps its page on the device. Only a page that has been
+ * read and marked is forgotten.
+ */
 export function keepFrozenPages(exam, result, images) {
   const waiting = {};
   for (const [key, page] of Object.entries(result?.handwriting?.pages || {})) {
-    // Kept while the page can still be read here: unresolved, with a try left.
-    if (page.state !== 'resolved' && Number(page.triesLeft) > 0 && images?.[key]) waiting[key] = images[key];
+    if (page.state !== 'resolved' && images?.[key]) waiting[key] = images[key];
   }
-  if (Object.keys(waiting).length) exam.server.handwriting = { pages: waiting };
+  const refused = Object.fromEntries(Object.entries(exam.server.handwriting?.refused || {}).filter(([key]) => waiting[key]));
+  if (Object.keys(waiting).length) exam.server.handwriting = { pages: waiting, ...(Object.keys(refused).length ? { refused } : {}) };
   else delete exam.server.handwriting;
 }
 
@@ -514,7 +527,7 @@ export function markPendingLines(result, detail, exam = null) {
       // device, and whether the student may ask for it to be checked again.
       target.pictureHere = typeof held[key] === 'string';
       target.pendingTriesLeft = Number(page?.triesLeft) || 0;
-      target.pendingCanRetry = page?.canRetry === true && target.pictureHere;
+      target.pendingCanRetry = page?.canRetry === true && target.pictureHere && !exam?.server?.handwriting?.refused?.[key];
       target.pendingRetryAt = Number(page?.retryAt) || null;
     }
     if (source.readAfterClose) target.readAfterClose = true;
@@ -584,9 +597,11 @@ export async function recoverHandwriting(exam, { force = false, transport = clou
   let remote;
   try { remote = await transport.getExam(exam.server.examId, RECONCILE_TIMEOUT_MS); } catch { return false; }
   if (remote?.state !== 'finished' || remote.result?.authoritative !== true || !Array.isArray(remote.result.detail)) return false;
-  const settled = await resolveFrozenHandwriting(exam.server.examId, remote.result, images, { transport });
+  const refusedNow = new Set();
+  const settled = await resolveFrozenHandwriting(exam.server.examId, remote.result, images, { transport, refused: exam.server.handwriting.refused, refusedNow });
   const before = JSON.stringify([exam.score, exam.detail, exam.server.handwriting]);
   keepFrozenPages(exam, settled, images);
+  noteRefused(exam, refusedNow);
   applyHandwritingAmendment(exam, settled);
   return JSON.stringify([exam.score, exam.detail, exam.server.handwriting]) !== before;
 }
@@ -608,9 +623,9 @@ export async function retryHandwriting(exam, key, { transport = cloud } = {}) {
   try { reply = await transport.resolveExamHandwriting(exam.server.examId, { key: String(key), image, retry: true }); }
   catch (cause) {
     if (cause?.status === 409 && (cause?.code === 'EXAM_HANDWRITING_CHANGED' || cause?.code === 'EXAM_HANDWRITING_NOT_PENDING')) {
-      delete images[String(key)];
-      if (!Object.keys(images).length) delete exam.server.handwriting;
-      for (const line of exam.detail || []) for (const item of [line, ...(line.parts || [])]) if (item.pendingKey === String(key)) { item.pictureHere = false; item.pendingCanRetry = false; }
+      // Kept, never erased; just not offered for another try.
+      noteRefused(exam, new Set([String(key)]));
+      for (const line of exam.detail || []) for (const item of [line, ...(line.parts || [])]) if (item.pendingKey === String(key)) item.pendingCanRetry = false;
     }
     throw cause;
   }

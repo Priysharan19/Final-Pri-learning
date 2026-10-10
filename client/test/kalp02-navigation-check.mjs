@@ -53,7 +53,7 @@ check('Teacher Studio is teacher-only', has(app, 'path="/teach" element={teacher
 // offered to a new profile only under PRI_FEATURE_EXTENDED_TRACKS. Each suite
 // must build the app under test with that flag itself (issue #355: test:a11y
 // on a plain checkout built without it and never reached /teach).
-const browserBuildFlags = "env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1' }";
+const browserBuildFlags = "env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' }";
 check('accessibility walk builds with the Teacher role on', has(read('client/test/a11y-check.mjs'), browserBuildFlags));
 check('end-to-end suite builds with the Teacher role on', has(read('client/test/e2e.mjs'), browserBuildFlags));
 
