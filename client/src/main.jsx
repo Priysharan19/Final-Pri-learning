@@ -117,7 +117,13 @@ if (GUARDIAN_MODE) {
   // cloud authority: settle that before the first render so account, billing
   // and sync controls do not first paint as "cloud disabled". The probe is
   // bounded (1.5 s) and offline learning never waits on its answer.
-  void discoverCloudOrigin().catch(() => null).then(() => {
+  // The first render waits for that answer, and for nothing else about it: if
+  // the probe's own time limit ever fails to end it (a request the browser or
+  // the service worker never settles), the app still starts — with the cloud
+  // not yet found, exactly as when the probe says no.
+  const probed = discoverCloudOrigin().catch(() => null);
+  const patience = new Promise(resolve => setTimeout(resolve, 2500));
+  void Promise.race([probed, patience]).then(() => {
     // The root boundary sits outside the router so that everything is covered —
     // the boot screen, the whole Login and cold-start path, the topbar, the account
     // menu, the sidebar, the toasts and the mobile nav, not only the routes.

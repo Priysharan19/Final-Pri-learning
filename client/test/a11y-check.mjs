@@ -496,8 +496,11 @@ async function goTo(page, base, path) {
   const onRequest = r => open.set(r, short(r.url()));
   const onDone = r => open.delete(r);
   const onResponse = r => { if (r.status() >= 400) refused.push(`${r.status()} ${short(r.url())}`); };
-  page.on('request', onRequest); page.on('requestfinished', onDone); page.on('requestfailed', onDone); page.on('response', onResponse);
-  const unhook = () => { page.off('request', onRequest); page.off('requestfinished', onDone); page.off('requestfailed', onDone); page.off('response', onResponse); };
+  const errors = [];
+  const onPageError = e => errors.push(String(e?.message || e).split('\n')[0].slice(0, 160));
+  const onConsole = m => { if (m.type() === 'error') errors.push(m.text().split('\n')[0].slice(0, 160)); };
+  page.on('request', onRequest); page.on('requestfinished', onDone); page.on('requestfailed', onDone); page.on('response', onResponse); page.on('pageerror', onPageError); page.on('console', onConsole);
+  const unhook = () => { page.off('request', onRequest); page.off('requestfinished', onDone); page.off('requestfailed', onDone); page.off('response', onResponse); page.off('pageerror', onPageError); page.off('console', onConsole); };
   await page.goto(base + path, { waitUntil: 'domcontentloaded' });
   // A route that never shows the app (seen once in CI on the second visit to
   // /exams, never locally) must say what WAS on screen: the root error
@@ -513,11 +516,14 @@ async function goTo(page, base, path) {
       alerts: [...document.querySelectorAll('[role="alert"]')].map(el => el.innerText.replace(/\s+/g, ' ').slice(0, 160)),
       text: (document.body?.innerText || '').replace(/\s+/g, ' ').slice(0, 160),
       root: (document.getElementById('root')?.firstElementChild?.outerHTML || '').replace(/\s+/g, ' ').slice(0, 200),
+      moduleRan: !!window.__PRI_BUILD_FEATURES__,
+      cloudOrigin: typeof window.__PRI_CLOUD_ORIGIN__ === 'string',
       serviceWorker: !!navigator.serviceWorker?.controller,
       online: navigator.onLine
     })).catch(e => ({ unreadable: String(e.message).split('\n')[0] }));
     seen.unanswered = [...open.values()].slice(0, 12);
     seen.refused = refused.slice(-12);
+    seen.errors = errors.slice(-8);
     unhook();
     throw new Error(`${String(err.message).split('\n')[0]} · ${path} never showed the app · ${JSON.stringify(seen)}`);
   });
