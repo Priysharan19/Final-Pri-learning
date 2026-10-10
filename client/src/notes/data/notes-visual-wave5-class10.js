@@ -478,6 +478,81 @@ const specs=[
     "x": 2,
     "y": -2,
     "context": "Oblique crossing"
+  },
+  {
+    "chapterId": "c10-real-numbers",
+    "kind": "primeBars",
+    "A": [
+      3,
+      1,
+      0
+    ],
+    "B": [
+      2,
+      2,
+      0
+    ],
+    "context": "LCM prime exponents A"
+  },
+  {
+    "chapterId": "c10-real-numbers",
+    "kind": "primeBars",
+    "A": [
+      2,
+      2,
+      1
+    ],
+    "B": [
+      4,
+      0,
+      1
+    ],
+    "context": "Prime factor LCM B"
+  },
+  {
+    "chapterId": "c10-real-numbers",
+    "kind": "primeBars",
+    "A": [
+      1,
+      3,
+      0
+    ],
+    "B": [
+      3,
+      1,
+      2
+    ],
+    "context": "Euclidean arithmetic C"
+  },
+  {
+    "chapterId": "c10-real-numbers",
+    "kind": "primeBars",
+    "A": [
+      4,
+      0,
+      1
+    ],
+    "B": [
+      2,
+      3,
+      1
+    ],
+    "context": "Common multiples D"
+  },
+  {
+    "chapterId": "c10-real-numbers",
+    "kind": "primeBars",
+    "A": [
+      1,
+      2,
+      2
+    ],
+    "B": [
+      2,
+      1,
+      3
+    ],
+    "context": "Fundamental theorem of arithmetic E"
   }
 ];
 const output={};for(const {chapterId,kind,...p} of specs)(output[chapterId]||={examples:[]}).examples.push(makeAdvancedVisual(kind,p));

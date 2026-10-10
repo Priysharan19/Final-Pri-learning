@@ -133,7 +133,7 @@ function NumberLine({fig}) {
 }
 export default function StudyDiagram({ figure }) {
   const instance=useId().replace(/:/g,'-');
-  const supported=['plane','geometry','bars','numberline','venn','placevalue','tape','parallel','matrix','unitcircle','sector','cuboid','tree','dots','interval','pascal'];
+  const supported=['plane','geometry','bars','numberline','venn','placevalue','tape','parallel','matrix','unitcircle','sector','cuboid','tree','dots','interval','pascal','square-grid','cube-grid','algebra-area','prime-bars','slope-field'];
   if (!figure || !supported.includes(figure.type) || !figure.description) return null;
   const arrowId='nt-diagram-arrow-'+instance;
   return <figure className="nt-diagram" data-testid="notes-math-diagram">
