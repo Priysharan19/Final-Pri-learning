@@ -424,6 +424,101 @@ const specs=[
     "h": 4,
     "mode": "surface",
     "context": "Mathematical model H"
+  },
+  {
+    "chapterId": "c8-squares-roots",
+    "kind": "squareGrid",
+    "n": 5,
+    "context": "Tiled courtyard"
+  },
+  {
+    "chapterId": "c8-squares-roots",
+    "kind": "squareGrid",
+    "n": 6,
+    "context": "Square lattice"
+  },
+  {
+    "chapterId": "c8-squares-roots",
+    "kind": "squareGrid",
+    "n": 7,
+    "context": "Consecutive square-count model"
+  },
+  {
+    "chapterId": "c8-squares-roots",
+    "kind": "squareGrid",
+    "n": 8,
+    "context": "Chessboard extension"
+  },
+  {
+    "chapterId": "c8-squares-roots",
+    "kind": "squareGrid",
+    "n": 9,
+    "context": "Area of a square garden"
+  },
+  {
+    "chapterId": "c8-cubes-roots",
+    "kind": "cubeGrid",
+    "n": 2,
+    "context": "Unit cube construction"
+  },
+  {
+    "chapterId": "c8-cubes-roots",
+    "kind": "cubeGrid",
+    "n": 3,
+    "context": "Building block cube"
+  },
+  {
+    "chapterId": "c8-cubes-roots",
+    "kind": "cubeGrid",
+    "n": 4,
+    "context": "Layered cube model"
+  },
+  {
+    "chapterId": "c8-cubes-roots",
+    "kind": "cubeGrid",
+    "n": 5,
+    "context": "Volume pattern"
+  },
+  {
+    "chapterId": "c8-cubes-roots",
+    "kind": "cubeGrid",
+    "n": 6,
+    "context": "Three-dimensional stack"
+  },
+  {
+    "chapterId": "c8-factorisation",
+    "kind": "algebraArea",
+    "a": 2,
+    "b": 3,
+    "context": "Algebraic tiling A"
+  },
+  {
+    "chapterId": "c8-factorisation",
+    "kind": "algebraArea",
+    "a": 1,
+    "b": 5,
+    "context": "Area decomposition B"
+  },
+  {
+    "chapterId": "c8-factorisation",
+    "kind": "algebraArea",
+    "a": 4,
+    "b": 6,
+    "context": "Rectangle method C"
+  },
+  {
+    "chapterId": "c8-factorisation",
+    "kind": "algebraArea",
+    "a": 3,
+    "b": 7,
+    "context": "Factoring the sum D"
+  },
+  {
+    "chapterId": "c8-factorisation",
+    "kind": "algebraArea",
+    "a": 5,
+    "b": 8,
+    "context": "Symbolic rectangle E"
   }
 ];
 const result={};for(const {chapterId,kind,...p} of specs)(result[chapterId]||={examples:[]}).examples.push(makeAdvancedVisual(kind,p));
