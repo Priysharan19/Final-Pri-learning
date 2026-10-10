@@ -105,7 +105,7 @@ export const flow = {
         const { canvas, right } = await fresh();
         const start = reader.requests.length;
         const n = Number(right.text);
-        const working = [`${n + 5} - 5`, `= ${n + 2} - 2`, `= ${n + 1} - 1`, `x = ${n}`];
+        const working = [`${n + 5} - 5`, `${n + 2} - 2`, `${n + 1} - 1`, `x = ${n}`];
         reader.lines = working.map(text => ({ text })); reader.confidence = 0.97;
         for (const [i, glyph] of ['1', '7', '1', '7'].entries()) {
           await handwrite(page, canvas, glyph, { x: 40 + i * 110 });
