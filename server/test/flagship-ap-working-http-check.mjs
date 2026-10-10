@@ -136,6 +136,27 @@ try {
     c.eq(long.data.correct, false, 'and is not correct');
     c.ok(ms < 1500, `in well under the seconds it used to take (${ms} ms)`);
   }
+  // Fifty-six characters that handed the budget back with a negative range
+  // held this request for seventeen seconds, and everyone else's behind it.
+  {
+    const q = await issue();
+    const at = Date.now();
+    const refill = await submit(q.id, 'ap-negative-range-sum', 'sum(1;k;1;-999999999999)+sum(sum(k;k;1;10000);j;1;10000)', []);
+    const ms = Date.now() - at;
+    c.deq([refill.status, refill.data.correct], [200, false], 'a negative-range sum in front of a huge one is answered, and is not correct');
+    c.ok(ms < 1500, `without holding the server (${ms} ms)`);
+  }
+  // On a question whose answer is an expression, calls nested twenty-four deep took eighteen seconds.
+  {
+    const r = await h.request('/v1/practice/issue', { method: 'POST', jar: a.jar, body: { generator: 'y7-algebra', difficulty: 2, seed: 1, curriculum: 'in' } });
+    assert.equal(r.status, 201, 'the server issues an expression-answer question');
+    const nested = 'ncr('.repeat(24) + 'x' + ';2)'.repeat(24);
+    const at = Date.now();
+    const deep = await submit(r.data.question.id, 'expr-nested-calls', nested, [nested]);
+    const ms = Date.now() - at;
+    c.deq([deep.status, deep.data.correct], [200, false], 'twenty-four nested calls as an expression answer are answered, and are not correct');
+    c.ok(ms < 1500, `without holding the server (${ms} ms)`);
+  }
 
   // The middle term of a quadratic split every way the coefficients allow:
   // from the printed question alone this used to collect a method mark.
