@@ -42,7 +42,7 @@ export function makeVisualExample(kind,p){
   if(kind==='parabolaVertex'){
     const {a,h,k}=p;if(!a)throw Error('not parabola');
     const b=-2*a*h,c=a*h*h+k;
-    return done('Read the vertex V and the axis of symmetry of the parabola.',[`The turning point on the graph is V=(${h},${k}).`,`In vertex form y=${a}(x−${h})²+(${k}), the square vanishes at x=${h}.`,`The symmetry axis is x=${h}; ${k} is the ${a>0?'minimum':'maximum'}.`],`V=(${h}, ${k}); axis x=${h}`,pairs([[`${a}*(${h}-${h})^2+(${k})`,k],[`${b}^2-4*(${a})*(${c})`,-4*a*k]]),diagram('plane',`Parabola y=${a}x²+(${b})x+(${c}), vertex V(${h},${k})`,[pt('V',[h,k])],{curves:[{type:'quadratic',a,b,c,xmin:h-3,xmax:h+3}]}));
+    return done('Read the vertex V and the axis of symmetry of the parabola.',[`The turning point on the graph is V=(${h},${k}).`,`In vertex form y=${a}(x−${h})²+(${k}), the square vanishes at x=${h}.`,`The symmetry axis is x=${h}; ${k} is the ${a>0?'minimum':'maximum'}.`],`V=(${h}, ${k}); axis x=${h}`,pairs([[`${a}*(${h}-${h})^2+(${k})`,k],[`(${b})^2-4*(${a})*(${c})`,-4*a*k]]),diagram('plane',`Parabola y=${a}x²+(${b})x+(${c}), vertex V(${h},${k})`,[pt('V',[h,k])],{curves:[{type:'quadratic',a,b,c,xmin:h-3,xmax:h+3}]}));
   }
   if(kind==='rightTriangle'){
     const {u,v}=p;if(!(u>0&&v>0))throw Error('legs');
