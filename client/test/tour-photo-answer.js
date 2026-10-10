@@ -42,7 +42,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
-import { handwrite } from './fakeServerReader.js';
+import { handwrite, pressRead } from './fakeServerReader.js';
 
 const EVIDENCE = 'SYNTHETIC-READER EVIDENCE';
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
@@ -347,12 +347,14 @@ export const usageLimitFlow = {
 
       // ── first read: inside the ceiling ─────────────────────────────────────
       await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '7');
-      await check(`the first read works: one request, and the reading is shown [${EVIDENCE}]`,
+      await pressRead(page);
+      await check(`the first read works: one press, one request, and the reading is shown [${EVIDENCE}]`,
         await until(page, async () => await page.locator('.ink-preview .ink-line').count() === 1, 20000) && transcribes.length === 1 && refusals.length === 0,
         `${transcribes.length} request(s), ${refusals.length} refusal(s)`);
 
       // ── second read: the server's ceiling ──────────────────────────────────
       await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '1', { x: 160 });
+      await pressRead(page);     // "Read again" for the changed page
       const inkStatus = page.locator('.ink-status-line');
       await check('the second read is refused by the server\'s own ceiling: 503 PAID_CAPACITY_REACHED, with when it resets',
         await until(page, async () => refusals.length === 1, 20000) && refusals[0].body?.error?.code === 'PAID_CAPACITY_REACHED' &&
@@ -374,8 +376,8 @@ export const usageLimitFlow = {
       await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '1', { x: 280 });   // more writing must not re-send either
       await page.evaluate(() => { window.dispatchEvent(new Event('focus')); document.dispatchEvent(new Event('visibilitychange')); });
       await page.waitForTimeout(5500);
-      await check('over ten seconds — with more writing and a return to the tab — not one more read is sent',
-        transcribes.length === sentAtRefusal && sentAtRefusal === 2, `${transcribes.length - sentAtRefusal} extra request(s); ${transcribes.length} in all`);
+      await check('over ten seconds — with more writing and a return to the tab — not one more read is sent, and no "Read again" is offered against a limit that has not lifted',
+        transcribes.length === sentAtRefusal && sentAtRefusal === 2 && await page.locator('[data-ink-read]').count() === 0, `${transcribes.length - sentAtRefusal} extra request(s); ${transcribes.length} in all`);
       await check('and the page still says usage limit, not "reading" and not a wrong answer',
         /usage limit/.test(await inkStatus.innerText()) && await page.locator('.verdict-bad').count() === 0);
 

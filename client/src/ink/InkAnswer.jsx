@@ -522,9 +522,12 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           <span className="muted ink-read-hint">{t(stale ? 'ink.readAgainHint' : 'ink.readMyAnswerHint')}</span>
         </div>
       )}
-      {/* After a refusal or an outage the student can ask again: one press
-          sends exactly one new read, and nothing is retried without it. */}
-      {shownStatus?.kind === 'waiting' && !disabled && shownStatus.block?.manualRetry === true && shownStatus.block?.kind !== 'offline' && (
+      {/* A refusal the server gave (verify your email, a guardian's
+          confirmation, a limit, an outage) has no "Read my answer" beside it,
+          so it carries its own way back: one press asks once more. A reason
+          the device already knows (signed out, offline, switched off) does
+          not — its own action is the way forward. */}
+      {status?.kind === 'waiting' && !disabled && status.block?.kind !== 'session' && status.block?.kind !== 'offline' && status.block?.kind !== 'turned-off' && status.block?.kind !== 'not-available' && (
         <div className="ink-status-action">
           <button type="button" className="btn btn-ghost btn-sm" data-ink-retry-reading data-reader-block={shownStatus.block?.kind || undefined}
             onClick={() => {
