@@ -81,6 +81,16 @@ const VISUAL_LOADERS = {
   12: () => import('./data/notes-visual-class12.js')
 };
 
+// Second large visual wave: 300 new original cases in 11 additional SVG diagram families.
+const VISUAL_WAVE5_LOADERS = {
+  7: () => import('./data/notes-visual-wave5-class7.js'),
+  8: () => import('./data/notes-visual-wave5-class8.js'),
+  9: () => import('./data/notes-visual-wave5-class9.js'),
+  10: () => import('./data/notes-visual-wave5-class10.js'),
+  11: () => import('./data/notes-visual-wave5-class11.js'),
+  12: () => import('./data/notes-visual-wave5-class12.js')
+};
+
 function mergeOptionalComplexStudies(notes, extra) {
   for (const [id, section] of Object.entries(extra || {})) {
     if (!Object.hasOwn(notes,id) || !Array.isArray(section.examples) || !section.examples.every(x => x.question && Array.isArray(x.steps) && x.steps.length && x.answer && x.verify)) {
@@ -105,14 +115,17 @@ export function loadNotesForGrade(grade) {
       EXPANSION_LOADERS[g](),
       g === 11 ? import('./data/notes-advanced-complex.js') : Promise.resolve({ default: {} }),
       CHALLENGE_LOADERS[g] ? CHALLENGE_LOADERS[g]() : Promise.resolve({ default: {} }),
-      VISUAL_LOADERS[g]()
+      VISUAL_LOADERS[g](),
+      VISUAL_WAVE5_LOADERS[g]()
     ])
-      .then(([original, supplement, optional, challenges, visuals]) => mergeOptionalComplexStudies(
+      .then(([original, supplement, optional, challenges, visuals, extendedVisuals]) => mergeOptionalComplexStudies(
         mergeOptionalComplexStudies(
           mergeOptionalComplexStudies(
-            mergeStudySupplements(original.default || {}, supplement.default || {}), optional.default || {}
-          ), challenges.default || {}
-        ), visuals.default || {}
+            mergeOptionalComplexStudies(
+              mergeStudySupplements(original.default || {}, supplement.default || {}), optional.default || {}
+            ), challenges.default || {}
+          ), visuals.default || {}
+        ), extendedVisuals.default || {}
       ))
       .catch(err => { cache.delete(g); throw err; }));
   }

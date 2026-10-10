@@ -3,6 +3,7 @@
 // All SVG nodes are from a fixed internal whitelist. No HTML injection or external assets.
 import React, { useId } from 'react';
 import './StudyDiagram.css';
+import StudyDiagramExtra from './StudyDiagramExtra.jsx';
 
 const W = 600;
 const H = 360;
@@ -132,13 +133,14 @@ function NumberLine({fig}) {
 }
 export default function StudyDiagram({ figure }) {
   const instance=useId().replace(/:/g,'-');
-  if (!figure || !['plane','geometry','bars','numberline'].includes(figure.type) || !figure.description) return null;
+  const supported=['plane','geometry','bars','numberline','venn','placevalue','tape','parallel','matrix','unitcircle','sector','cuboid','tree','dots','interval'];
+  if (!figure || !supported.includes(figure.type) || !figure.description) return null;
   const arrowId='nt-diagram-arrow-'+instance;
   return <figure className="nt-diagram" data-testid="notes-math-diagram">
     <svg viewBox="0 0 600 360" role="img" aria-label={figure.description} preserveAspectRatio="xMidYMid meet">
       <title>{figure.description}</title>
       <defs><marker id={arrowId} markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0 0 L8 4 L0 8 z" className="nt-diagram-arrow"/></marker></defs>
-      {figure.type==='bars'?<Bars fig={figure}/>:figure.type==='numberline'?<NumberLine fig={figure}/>:<Frame fig={figure} arrowId={arrowId}/>}
+      {figure.type==='bars'?<Bars fig={figure}/>:figure.type==='numberline'?<NumberLine fig={figure}/>:['plane','geometry'].includes(figure.type)?<Frame fig={figure} arrowId={arrowId}/>:<StudyDiagramExtra figure={figure}/>}
     </svg>
     <figcaption className="nt-sr">{figure.description}</figcaption>
   </figure>;
