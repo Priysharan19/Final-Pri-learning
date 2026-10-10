@@ -1,0 +1,777 @@
+// Original visual inquiry study problems — Class 7. Lattice paths explicitly optional exploration.
+import { makeInquiryVisual } from '../visualInquiryFactory.js';
+const specs=[
+  {
+    "chapterId": "c7-triangles-current",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        -2,
+        3
+      ]
+    ],
+    "context": "Triangular land plot 1"
+  },
+  {
+    "chapterId": "c7-triangles-current",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        5,
+        0
+      ],
+      [
+        -1,
+        3
+      ]
+    ],
+    "context": "Triangular land plot 2"
+  },
+  {
+    "chapterId": "c7-triangles-current",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        6,
+        0
+      ],
+      [
+        0,
+        4
+      ]
+    ],
+    "context": "Triangular land plot 3"
+  },
+  {
+    "chapterId": "c7-triangles-current",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        7,
+        0
+      ],
+      [
+        1,
+        4
+      ]
+    ],
+    "context": "Triangular land plot 4"
+  },
+  {
+    "chapterId": "c7-triangles-current",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        8,
+        0
+      ],
+      [
+        2,
+        5
+      ]
+    ],
+    "context": "Triangular land plot 5"
+  },
+  {
+    "chapterId": "c7-triangles-current",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        9,
+        0
+      ],
+      [
+        -2,
+        5
+      ]
+    ],
+    "context": "Triangular land plot 6"
+  },
+  {
+    "chapterId": "c7-triangles-current",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        10,
+        0
+      ],
+      [
+        -1,
+        6
+      ]
+    ],
+    "context": "Triangular land plot 7"
+  },
+  {
+    "chapterId": "c7-triangles-current",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        0,
+        6
+      ]
+    ],
+    "context": "Triangular land plot 8"
+  },
+  {
+    "chapterId": "c7-triangles-current",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        5,
+        0
+      ],
+      [
+        1,
+        7
+      ]
+    ],
+    "context": "Triangular land plot 9"
+  },
+  {
+    "chapterId": "c7-triangles-current",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        6,
+        0
+      ],
+      [
+        2,
+        7
+      ]
+    ],
+    "context": "Triangular land plot 10"
+  },
+  {
+    "chapterId": "c7-triangles-current",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        7,
+        0
+      ],
+      [
+        -2,
+        8
+      ]
+    ],
+    "context": "Triangular land plot 11"
+  },
+  {
+    "chapterId": "c7-triangles-current",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        8,
+        0
+      ],
+      [
+        -1,
+        8
+      ]
+    ],
+    "context": "Triangular land plot 12"
+  },
+  {
+    "chapterId": "c7-triangles-current",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        9,
+        0
+      ],
+      [
+        0,
+        3
+      ]
+    ],
+    "context": "Triangular land plot 13"
+  },
+  {
+    "chapterId": "c7-triangles-current",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        10,
+        0
+      ],
+      [
+        1,
+        3
+      ]
+    ],
+    "context": "Triangular land plot 14"
+  },
+  {
+    "chapterId": "c7-triangles-current",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        2,
+        4
+      ]
+    ],
+    "context": "Triangular land plot 15"
+  },
+  {
+    "chapterId": "c7-connecting-dots-current",
+    "kind": "transform",
+    "A": [
+      -6,
+      -4
+    ],
+    "B": [
+      -4,
+      -4
+    ],
+    "C": [
+      -5,
+      -2
+    ],
+    "dx": 1,
+    "dy": 1,
+    "mode": "area",
+    "context": "Translation of diagram 1"
+  },
+  {
+    "chapterId": "c7-geometric-twins-current",
+    "kind": "transform",
+    "A": [
+      -5,
+      -4
+    ],
+    "B": [
+      -2,
+      -4
+    ],
+    "C": [
+      -4,
+      -1
+    ],
+    "dx": -2,
+    "dy": -2,
+    "mode": "image",
+    "context": "Translation of diagram 2"
+  },
+  {
+    "chapterId": "c7-geometric-twins-current",
+    "kind": "transform",
+    "A": [
+      -4,
+      -4
+    ],
+    "B": [
+      0,
+      -4
+    ],
+    "C": [
+      -3,
+      0
+    ],
+    "dx": 3,
+    "dy": -1,
+    "mode": "image",
+    "context": "Translation of diagram 3"
+  },
+  {
+    "chapterId": "c7-connecting-dots-current",
+    "kind": "transform",
+    "A": [
+      -3,
+      -4
+    ],
+    "B": [
+      2,
+      -4
+    ],
+    "C": [
+      -2,
+      1
+    ],
+    "dx": -1,
+    "dy": 2,
+    "mode": "image",
+    "context": "Translation of diagram 4"
+  },
+  {
+    "chapterId": "c7-geometric-twins-current",
+    "kind": "transform",
+    "A": [
+      -2,
+      -4
+    ],
+    "B": [
+      0,
+      -4
+    ],
+    "C": [
+      -1,
+      2
+    ],
+    "dx": 2,
+    "dy": -1,
+    "mode": "area",
+    "context": "Translation of diagram 5"
+  },
+  {
+    "chapterId": "c7-geometric-twins-current",
+    "kind": "transform",
+    "A": [
+      -1,
+      -4
+    ],
+    "B": [
+      2,
+      -4
+    ],
+    "C": [
+      0,
+      -2
+    ],
+    "dx": -3,
+    "dy": -2,
+    "mode": "image",
+    "context": "Translation of diagram 6"
+  },
+  {
+    "chapterId": "c7-connecting-dots-current",
+    "kind": "transform",
+    "A": [
+      0,
+      -4
+    ],
+    "B": [
+      4,
+      -4
+    ],
+    "C": [
+      1,
+      -1
+    ],
+    "dx": 1,
+    "dy": 1,
+    "mode": "image",
+    "context": "Translation of diagram 7"
+  },
+  {
+    "chapterId": "c7-geometric-twins-current",
+    "kind": "transform",
+    "A": [
+      -6,
+      -3
+    ],
+    "B": [
+      -1,
+      -3
+    ],
+    "C": [
+      -5,
+      1
+    ],
+    "dx": -2,
+    "dy": -2,
+    "mode": "image",
+    "context": "Translation of diagram 8"
+  },
+  {
+    "chapterId": "c7-geometric-twins-current",
+    "kind": "transform",
+    "A": [
+      -5,
+      -3
+    ],
+    "B": [
+      -3,
+      -3
+    ],
+    "C": [
+      -4,
+      2
+    ],
+    "dx": 3,
+    "dy": -1,
+    "mode": "area",
+    "context": "Translation of diagram 9"
+  },
+  {
+    "chapterId": "c7-connecting-dots-current",
+    "kind": "transform",
+    "A": [
+      -4,
+      -3
+    ],
+    "B": [
+      -1,
+      -3
+    ],
+    "C": [
+      -3,
+      3
+    ],
+    "dx": -1,
+    "dy": 2,
+    "mode": "image",
+    "context": "Translation of diagram 10"
+  },
+  {
+    "chapterId": "c7-geometric-twins-current",
+    "kind": "transform",
+    "A": [
+      -3,
+      -3
+    ],
+    "B": [
+      1,
+      -3
+    ],
+    "C": [
+      -2,
+      -1
+    ],
+    "dx": 2,
+    "dy": -1,
+    "mode": "image",
+    "context": "Translation of diagram 11"
+  },
+  {
+    "chapterId": "c7-geometric-twins-current",
+    "kind": "transform",
+    "A": [
+      -2,
+      -3
+    ],
+    "B": [
+      3,
+      -3
+    ],
+    "C": [
+      -1,
+      0
+    ],
+    "dx": -3,
+    "dy": -2,
+    "mode": "image",
+    "context": "Translation of diagram 12"
+  },
+  {
+    "chapterId": "c7-connecting-dots-current",
+    "kind": "transform",
+    "A": [
+      -1,
+      -3
+    ],
+    "B": [
+      1,
+      -3
+    ],
+    "C": [
+      0,
+      1
+    ],
+    "dx": 1,
+    "dy": 1,
+    "mode": "area",
+    "context": "Translation of diagram 13"
+  },
+  {
+    "chapterId": "c7-geometric-twins-current",
+    "kind": "transform",
+    "A": [
+      0,
+      -3
+    ],
+    "B": [
+      3,
+      -3
+    ],
+    "C": [
+      1,
+      2
+    ],
+    "dx": -2,
+    "dy": -2,
+    "mode": "image",
+    "context": "Translation of diagram 14"
+  },
+  {
+    "chapterId": "c7-geometric-twins-current",
+    "kind": "transform",
+    "A": [
+      -6,
+      -2
+    ],
+    "B": [
+      -2,
+      -2
+    ],
+    "C": [
+      -5,
+      4
+    ],
+    "dx": 3,
+    "dy": -1,
+    "mode": "image",
+    "context": "Translation of diagram 15"
+  },
+  {
+    "chapterId": "c7-connecting-dots-current",
+    "kind": "transform",
+    "A": [
+      -5,
+      -2
+    ],
+    "B": [
+      0,
+      -2
+    ],
+    "C": [
+      -4,
+      0
+    ],
+    "dx": -1,
+    "dy": 2,
+    "mode": "image",
+    "context": "Translation of diagram 16"
+  },
+  {
+    "chapterId": "c7-geometric-twins-current",
+    "kind": "transform",
+    "A": [
+      -4,
+      -2
+    ],
+    "B": [
+      -2,
+      -2
+    ],
+    "C": [
+      -3,
+      1
+    ],
+    "dx": 2,
+    "dy": -1,
+    "mode": "area",
+    "context": "Translation of diagram 17"
+  },
+  {
+    "chapterId": "c7-number-play-current",
+    "kind": "histogram",
+    "counts": [
+      2,
+      8,
+      3,
+      13
+    ],
+    "width": 2,
+    "mode": "total",
+    "context": "Grouped-data bars 1"
+  },
+  {
+    "chapterId": "c7-number-play-current",
+    "kind": "histogram",
+    "counts": [
+      5,
+      11,
+      6,
+      3,
+      2
+    ],
+    "width": 3,
+    "mode": "total",
+    "context": "Grouped-data bars 2"
+  },
+  {
+    "chapterId": "c7-number-play-current",
+    "kind": "histogram",
+    "counts": [
+      8,
+      14,
+      9,
+      6,
+      5,
+      6
+    ],
+    "width": 4,
+    "mode": "total",
+    "context": "Grouped-data bars 3"
+  },
+  {
+    "chapterId": "c7-number-play-current",
+    "kind": "histogram",
+    "counts": [
+      11,
+      4,
+      12,
+      9
+    ],
+    "width": 2,
+    "mode": "total",
+    "context": "Grouped-data bars 4"
+  },
+  {
+    "chapterId": "c7-number-play-current",
+    "kind": "histogram",
+    "counts": [
+      14,
+      7,
+      2,
+      12,
+      11
+    ],
+    "width": 3,
+    "mode": "total",
+    "context": "Grouped-data bars 5"
+  },
+  {
+    "chapterId": "c7-number-play-current",
+    "kind": "histogram",
+    "counts": [
+      4,
+      10,
+      5,
+      2,
+      14,
+      2
+    ],
+    "width": 4,
+    "mode": "total",
+    "context": "Grouped-data bars 6"
+  },
+  {
+    "chapterId": "c7-number-play-current",
+    "kind": "histogram",
+    "counts": [
+      7,
+      13,
+      8,
+      5
+    ],
+    "width": 2,
+    "mode": "total",
+    "context": "Grouped-data bars 7"
+  },
+  {
+    "chapterId": "c7-number-play-current",
+    "kind": "histogram",
+    "counts": [
+      10,
+      3,
+      11,
+      8,
+      7
+    ],
+    "width": 3,
+    "mode": "total",
+    "context": "Grouped-data bars 8"
+  },
+  {
+    "chapterId": "c7-connecting-dots-current",
+    "kind": "latticePaths",
+    "east": 2,
+    "north": 2,
+    "context": "Optional shortest-grid path challenge 1"
+  },
+  {
+    "chapterId": "c7-connecting-dots-current",
+    "kind": "latticePaths",
+    "east": 3,
+    "north": 4,
+    "context": "Optional shortest-grid path challenge 2"
+  },
+  {
+    "chapterId": "c7-connecting-dots-current",
+    "kind": "latticePaths",
+    "east": 4,
+    "north": 2,
+    "context": "Optional shortest-grid path challenge 3"
+  },
+  {
+    "chapterId": "c7-connecting-dots-current",
+    "kind": "latticePaths",
+    "east": 2,
+    "north": 4,
+    "context": "Optional shortest-grid path challenge 4"
+  },
+  {
+    "chapterId": "c7-connecting-dots-current",
+    "kind": "latticePaths",
+    "east": 3,
+    "north": 2,
+    "context": "Optional shortest-grid path challenge 5"
+  }
+];
+const data={};for(const {chapterId,kind,...p} of specs)(data[chapterId]||={examples:[]}).examples.push(makeInquiryVisual(kind,p));
+export default data;
