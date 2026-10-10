@@ -115,7 +115,7 @@ export function stoppedKey(key) {
 
 /** "at about 4:35 pm", in the student's language; '' when there is no time to give. */
 export function retryClock(retryAt, language = 'en') {
-  if (!Number.isFinite(Number(retryAt))) return '';
+  if (retryAt === null || retryAt === undefined || !Number.isFinite(Number(retryAt)) || Number(retryAt) <= 0) return '';
   try {
     return new Intl.DateTimeFormat(String(language || 'en').toLowerCase().startsWith('hi') ? 'hi-IN' : 'en-IN', { hour: 'numeric', minute: '2-digit' }).format(new Date(Number(retryAt)));
   } catch { return ''; }

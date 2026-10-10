@@ -181,7 +181,8 @@ function valueOf(piece, question) {
   if (last) {
     // "x > 3" does not state a value: the last relation is an inequality.
     if (last.kind === 'inequality') return null;
-    const tail = stripSentence(s.slice(last.end));
+    // "Ans. 6": the stop belongs to the abbreviation, not to the value.
+    const tail = stripSentence(s.slice(last.end).replace(/^\s*[.:,]\s+/, ''));
     if (tail && readsAsAnswer(tail, question)) return tail;
     // "6 is the least value": the value stands in front of the words.
     const firstWord = words.sort((a, b) => a.at - b.at)[0];
