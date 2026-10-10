@@ -432,7 +432,7 @@ function namesAValue(text, meta) {
 // mistake nor credit, and nothing after the budget is spent is credited. The
 // bound is on the text, not the clock, so the same working is always marked
 // the same way; the clock is only a backstop that these bounds keep idle.
-export const WORKING_LIMITS = Object.freeze({ lineChars: 300, lines: 100, work: 1500000, backstopMs: 750 });
+export const WORKING_LIMITS = Object.freeze({ lineChars: 200, lines: 100, work: 600000, backstopMs: 750 });
 const UNREAD = {
   long: `Not checked — this line is longer than ${WORKING_LIMITS.lineChars} characters. Write one step per line.`,
   many: 'Not checked — this is more working than can be checked. Keep to the steps of your method.'

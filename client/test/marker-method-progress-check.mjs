@@ -641,19 +641,25 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   const meta = { kind: 'equation', variable: 'x', solutions: [-1], source: '3x + 15=2x + 14' };
   const prompt = '$3x + 15=2x + 14$';
   const fill = (unit, length, tail = ' = 0') => { let s = ''; while (s.length + unit.length + tail.length <= length) s += unit; return s + tail; };
-  ok(WORKING_LIMITS.lineChars === 300 && WORKING_LIMITS.lines === 100, 'a line is read up to 300 characters, and a page up to 100 lines');
-  const long = stepCheck(meta, `${fill('(x+1)', 290, '')}+123456 = 0`, { prompt });   // 301 characters
-  ok(long.lines[0].status === 'note' && long.lines[0].unread === true && /longer than 300 characters/.test(long.lines[0].note) && long.firstBreak === -1, 'a line over 300 characters is not read: a note, not a mistake');
-  ok(`${fill('(x+1)', 290, '')}+123456 = 0`.length === 301 && `${fill('(x+1)', 290, '')}+12345 = 0`.length === 300, '(those two lines are 301 and 300 characters)');
-ok(stepCheck(meta, `${fill('(x+1)', 290, '')}+12345 = 0`, { prompt }).lines[0].unread !== true, 'a line of exactly 300 characters is read');
+  const L = WORKING_LIMITS.lineChars;
+  ok(L === 200 && WORKING_LIMITS.lines === 100, 'a line is read up to 200 characters, and a page up to 100 lines');
+  const stem = fill('(x+1)', L - 20, '');
+  const sized = n => `${stem}+${'1'.repeat(n - stem.length - 5)} = 0`;
+  const exact = sized(L), over = sized(L + 1);
+  const long = stepCheck(meta, over, { prompt });
+  ok(long.lines[0].status === 'note' && long.lines[0].unread === true && new RegExp(`longer than ${L} characters`).test(long.lines[0].note) && long.firstBreak === -1, `a line over ${L} characters is not read: a note, not a mistake`);
+  ok(over.length === L + 1 && exact.length === L, `(those two lines are ${L + 1} and ${L} characters)`);
+  ok(stepCheck(meta, exact, { prompt }).lines[0].unread !== true, `a line of exactly ${L} characters is read`);
   const mixed = stepCheck(meta, `x + 15 = 14\n${fill('(x+1)', 400)}\nx = -1`, { prompt });
   ok(mixed.lines.map(l => l.status).join() === 'ok,note,ok', 'the lines round an unread one are read as usual');
   ok((methodMarks({ meta, working: `x + 15 = 14\n${fill('(x+1)', 400)}\nx = 9`, marks: 3, prompt })?.awarded ?? 0) === 1, 'and keep their marks');
   const page = stepCheck(meta, Array.from({ length: 130 }, (_, i) => `x + ${i} = ${i - 1}`).join('\n'), { prompt });
   ok(page.lines.slice(0, 100).every(l => !l.unread) && page.lines.slice(100).every(l => l.unread === true && l.status === 'note'), 'the hundred-and-first line onward is not read');
-  const heavy = stepCheck(meta, Array.from({ length: 26 }, (_, i) => fill('(x+1)', 300, ` = ${i}`)).join('\n'), { prompt });
-  ok(heavy.lines.slice(0, 16).every(l => !l.unread) && heavy.lines.slice(17).every(l => l.unread === true), 'sixteen lines of 300 characters are read, and no more after them');
-  ok((methodMarks({ meta, working: `${Array.from({ length: 26 }, (_, i) => fill('(x+1)', 300, ` = ${i}`)).join('\n')}\nx + 15 = 14`, marks: 3, prompt })?.awarded ?? 0) === 0, 'a true step after the working that could not be read earns nothing');
+  // The page budget is the sum of the squares of its line lengths: full lines run out first.
+  const full = Math.floor(WORKING_LIMITS.work / (L * L));
+  const heavy = stepCheck(meta, Array.from({ length: full + 10 }, (_, i) => fill('(x+1)', L, ` = ${i}`)).join('\n'), { prompt });
+  ok(full === 15 && heavy.lines.slice(0, full).every(l => !l.unread) && heavy.lines.slice(full + 1).every(l => l.unread === true), `${full} lines of ${L} characters are read, and no more after them`);
+  ok((methodMarks({ meta, working: `${Array.from({ length: full + 10 }, (_, i) => fill('(x+1)', L, ` = ${i}`)).join('\n')}\nx + 15 = 14`, marks: 3, prompt })?.awarded ?? 0) === 0, 'a true step after the working that could not be read earns nothing');
   // Every shape that is slow to check, at the largest size accepted, on every kind of question.
   const metas = [meta, { kind: 'equation', variable: 'x', solutions: [2, 3], source: 'x^2-5x+6=0' }, { kind: 'expression', canonical: '5x' },
     { kind: 'inequality', source: '-2x - 9 < -21', canonical: 'x > 6' }, { kind: 'derivative', variable: 'x', source: 'x^3 - 5x^2', canonical: '3x^2 - 10x' }];
@@ -664,7 +670,7 @@ ok(stepCheck(meta, `${fill('(x+1)', 290, '')}+12345 = 0`, { prompt }).lines[0].u
     'nested fractions': n => nest('1/(1+', ')', 'x', n), 'factorials': n => fill('(x+1)!+', n, '1 = 1'), 'big numbers': n => fill('99999999*', n, 'x = 1'), 'ninth powers': n => fill('(x+1)^9*', n, '1 = 0')
   };
   let worst = 0, worstName = '';
-  for (const [name, make] of Object.entries(shapes)) for (const [lines, length] of [[1, 7990], [1, 300], [26, 300], [100, 79], [8, 999]]) for (const m of metas) {
+  for (const [name, make] of Object.entries(shapes)) for (const [lines, length] of [[1, 7990], [1, 300], [1, 200], [26, 200], [40, 190], [100, 77], [8, 999]]) for (const m of metas) {
     const working = Array.from({ length: lines }, () => make(length)).join('\n').slice(0, 8000);
     const at = process.hrtime.bigint();
     let threw = false;
@@ -825,6 +831,27 @@ ok(stepCheck(meta, `${fill('(x+1)', 290, '')}+12345 = 0`, { prompt }).lines[0].u
   time('working ncr nested 40 deep', () => { const working = 'ncr('.repeat(40) + 'n' + ';2)'.repeat(40) + ' = 10'; const report = stepCheck(meta, working, { prompt: mPrompt }); methodMarks({ meta, working, marks: 4, prompt: mPrompt, report }); });
   ok(checkAnswer({ answerType: 'numeric', answer: { value: 0 }, prompt: 'Find the value.' }, 'sum(k;k;5;1)').correct === true, 'a sum whose upper bound is below its lower bound is 0');
   ok(checkAnswer({ answerType: 'expression', answer: { expr: 'n(n+1)/2' }, prompt: 'Simplify.' }, 'sum(k;k;1;n)').correct === true, 'a sum to n is still recognised as n(n+1)/2');
+  // Blank runs: four hundred spaces after `C(`, or after `Σk=`, sent a notation
+  // pattern into thirty-three seconds of backtracking — in an answer or in one line.
+  for (const blank of [' ', '\t', '\u00a0', ' \t\u00a0']) {
+    const run = n => blank.repeat(Math.ceil(n / blank.length)).slice(0, n);
+    for (const q of [numeric, set, expr]) {
+      time('answer C( then blanks, a comma, blanks', () => checkAnswer(q, `C(${run(56)},${run(56)}x`));
+      time('answer Σk= then blanks', () => checkAnswer(q, `Σk=${run(110)}^x`));
+    }
+    time('working C( then blanks on a hundred lines', () => { const working = Array(100).fill(`n=5+0C(${run(90)},${run(90)}x)`).join('\n'); const report = stepCheck(meta, working, { prompt: mPrompt }); methodMarks({ meta, working, marks: 4, prompt: mPrompt, report }); });
+    time('working Σk= then blanks on a hundred lines', () => { const working = Array(100).fill(`n=5+0Σk=${run(180)}^n`).join('\n'); const report = stepCheck(meta, working, { prompt: mPrompt }); methodMarks({ meta, working, marks: 4, prompt: mPrompt, report }); });
+  }
+  // A correct answer padded with zero-valued terms in twenty letters: the
+  // domain probe is paid per letter and per term, and took twenty-two seconds.
+  {
+    const letters = 'abcdefghjlmnpqrstuvwyz'.split('');
+    for (const count of [20, 12, 6]) {
+      let text = '5x';
+      for (let i = 1; ; i++) { const term = `+0sin(${i}(x+${letters.slice(0, count).join('+')}))^2`; if ((text + term).length > ANSWER_LIMIT) break; text += term; }
+      time(`answer padded with zero terms in ${count} letters`, () => checkAnswer(expr, text));
+    }
+  }
   // The domain probe behind an expression answer (`+0tan(1x)+0tan(2x)+…` agrees
   // with the key wherever it is sampled) is paid for per term written, and is
   // outside the sum budget. It is bounded by how long an answer may be: at the
@@ -844,7 +871,7 @@ ok(stepCheck(meta, `${fill('(x+1)', 290, '')}+12345 = 0`, { prompt }).lines[0].u
     const ms = Number(process.hrtime.bigint() - at) / 1e6;
     ok(refused.correct === false && refused.invalid === true && ms < 50, `an answer of 11,990 characters is refused unread, as unreadable, at once (${ms.toFixed(1)} ms)`);
     ok(checkAnswer(expr, '5x' + ' '.repeat(ANSWER_LIMIT - 2)).correct === true && checkAnswer(expr, '5x' + ' '.repeat(ANSWER_LIMIT - 1)).invalid === true, `an answer is read up to ${ANSWER_LIMIT} characters and not beyond`);
-    ok(checkAnswer(set, Array(60).fill('2, 3').join(', ')).invalid !== true && checkAnswer(numeric, '120.' + '0'.repeat(200)).correct === true, 'a long list of roots and a long decimal are within it and still read');
+    ok(checkAnswer(set, Array(15).fill('2, 3').join(', ')).invalid !== true && checkAnswer(numeric, '120.' + '0'.repeat(100)).correct === true, 'a long list of roots and a long decimal are within it and still read');
   }
   // Every timed input above, the nested and negative-range sums, the nested calls and the padded answers included:
   // the bound asserted leaves room for a loaded machine, not for the seconds this used to take.

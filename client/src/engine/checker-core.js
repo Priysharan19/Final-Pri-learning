@@ -293,9 +293,10 @@ const READ_HELP = {
 // box had no such bound, and the server accepts 12,000 characters there: every
 // cost in the marker that grows with what is written — sampling, domain probes,
 // root finding — grew forty times past what a line of working can ask of it.
-// No answer on any syllabus needs it. A longer one is not read at all, so it
+// The longest answer any generator keys is 43 characters; the bound is nearly
+// three times that. A longer one is not read at all, so it
 // is "unreadable": it spends no try, and it costs nothing to refuse.
-export const ANSWER_LIMIT = 400;
+export const ANSWER_LIMIT = 120;
 export function answerTooLong(rawInput) {
   const length = typeof rawInput === 'string' ? rawInput.length
     : Array.isArray(rawInput) ? rawInput.reduce((n, part) => n + String(part ?? '').length, 0) : 0;
