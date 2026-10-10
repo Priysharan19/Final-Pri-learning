@@ -79,7 +79,34 @@ const SAFE_ATTRS = new Set([
 const SCHEME = /(?:javascript|vbscript|livescript|mocha)\s*(?::|&#)|data\s*:\s*text\/html/i;
 const HANDLER = /\son[a-z]+\s*=/i;
 const RUNNABLE = /<\s*\/?\s*(script|iframe|object|embed|img|image|svg|math|foreignobject|use|animate|animatetransform|set|style|link|meta|base|form|input|button|video|audio|source|track|applet|marquee|frame|frameset|template|portal|body|html)\b/i;
-const TAG_IN = /<\/?([a-zA-Z][^\s/>]*)((?:"[^"]*"|'[^']*'|[^>])*)>/g;
+/**
+ * Every tag in a piece of text, as [name, attribute text], read the two ways a
+ * tag can end: at the first `>` outside a quoted value, and at the first `>` of
+ * any kind. A browser picks one; a finding under either reading is a finding.
+ * One pass over the text — a single pattern for this backtracks without bound
+ * on a long run of quotes.
+ */
+function tagsIn(text) {
+  const out = [];
+  const NAME = /[a-zA-Z][^\s/>]*/y;
+  for (let at = text.indexOf('<'); at !== -1; at = text.indexOf('<', at + 1)) {
+    NAME.lastIndex = text[at + 1] === '/' ? at + 2 : at + 1;
+    const name = NAME.exec(text)?.[0];
+    if (!name) continue;
+    const from = NAME.lastIndex;
+    const plain = text.indexOf('>', from);
+    if (plain === -1) continue;
+    let end = from;
+    while (end < text.length && text[end] !== '>') {
+      const q = text[end];
+      const close = q === '"' || q === "'" ? text.indexOf(q, end + 1) : -1;
+      end = close === -1 ? end + 1 : close + 1;
+    }
+    out.push([name, text.slice(from, plain)]);
+    if (end < text.length && end !== plain) out.push([name, text.slice(from, end)]);
+  }
+  return out;
+}
 const ATTR_IN = /([a-zA-Z_:][-\w:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
 
 /**
@@ -92,19 +119,17 @@ function violations(html) {
   const text = String(html ?? '');
   if (SCHEME.test(text)) found.push(`carries a scheme: ${show(text.match(SCHEME)[0])}`);
   if (HANDLER.test(text)) found.push(`carries an event handler: ${show(text.match(HANDLER)[0])}`);
-  TAG_IN.lastIndex = 0;
-  let m;
-  while ((m = TAG_IN.exec(text))) {
-    const tag = m[1].toLowerCase();
+  for (const [rawTag, attrs] of tagsIn(text)) {
+    const tag = rawTag.toLowerCase();
     if (!SAFE_TAGS.has(tag)) { found.push(`emits <${tag}>`); continue; }
     ATTR_IN.lastIndex = 0;
     let a;
-    while ((a = ATTR_IN.exec(m[2]))) {
+    while ((a = ATTR_IN.exec(attrs))) {
       const name = a[1].toLowerCase();
       if (!SAFE_ATTRS.has(name)) found.push(`<${tag}> keeps ${name}`);
     }
   }
-  return found;
+  return [...new Set(found)];
 }
 
 /**
@@ -118,13 +143,11 @@ function canRun(html) {
   const found = [];
   const text = String(html ?? '');
   if (RUNNABLE.test(text)) found.push(`carries a live ${show(text.match(RUNNABLE)[0])}`);
-  TAG_IN.lastIndex = 0;
-  let m;
-  while ((m = TAG_IN.exec(text))) {
-    if (HANDLER.test(` ${m[2]}`)) found.push(`<${m[1].toLowerCase()}> carries ${show(` ${m[2]}`.match(HANDLER)[0].trim())}`);
-    if (SCHEME.test(m[2])) found.push(`<${m[1].toLowerCase()}> navigates to ${show(m[2].match(SCHEME)[0])}`);
+  for (const [tag, attrs] of tagsIn(text)) {
+    if (HANDLER.test(` ${attrs}`)) found.push(`<${tag.toLowerCase()}> carries ${show(` ${attrs}`.match(HANDLER)[0].trim())}`);
+    if (SCHEME.test(attrs)) found.push(`<${tag.toLowerCase()}> navigates to ${show(attrs.match(SCHEME)[0])}`);
   }
-  return found;
+  return [...new Set(found)];
 }
 
 /**
