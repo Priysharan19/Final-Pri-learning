@@ -141,7 +141,7 @@ const specs=[
     "chapterId": "c12-continuity-differentiability",
     "kind": "piecewise",
     "left": -2,
-    "right": 9,
+    "right": 7,
     "mode": "jump",
     "context": "Jump-limit chart 5"
   },
@@ -149,7 +149,7 @@ const specs=[
     "chapterId": "c12-continuity-differentiability",
     "kind": "piecewise",
     "left": -1,
-    "right": 10,
+    "right": 8,
     "mode": "function",
     "context": "Jump-limit chart 6"
   },
