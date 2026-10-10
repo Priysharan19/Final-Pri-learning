@@ -306,7 +306,7 @@ try {
     const orAccount = async tag => { await h.db.run('DELETE FROM rate_limits'); const x = await registerAccount(h, { email: `oracle.${tag}@example.test`, deviceId: `ipad-oracle-${tag}` }); await verifyEmail(h, x.account.id); return x; };
     const orOk = (cond, name) => { assert.ok(cond, name); count++; };
     const said = ({ questionId, submissionId, attemptId, serverAcknowledgedAt, ...rest }) => rest;
-    const SILENT_KEYS = ['authoritative', 'contentId', 'correct', 'feedback', 'invalid', 'marksEarned', 'marksPossible', 'partial', 'resolved', 'stepReport', 'trapWhy', 'triesLeft'];
+    const SILENT_KEYS = ['authoritative', 'contentId', 'correct', 'feedback', 'invalid', 'marksEarned', 'marksPossible', 'partial', 'resolved', 'stepReport', 'trapWhy', 'triesLeft', 'workingReview'];   // workingReview (#430) is present and null while a try is left
     const knower = await orAccount('knower'), guesser = await orAccount('guesser');
     const ladder = (v, from) => Array.from({ length: 21 }, (_, i) => `abs(${v} - (${from + i})) = ${v} - (${from + i})`);
     // [label, answer, working when the candidate is k]
