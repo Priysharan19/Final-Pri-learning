@@ -63,6 +63,9 @@ function mergeStudySupplements(base, additions) {
 // Optional advanced study is separate from the CBSE core and the generated
 // exam/question bank. These are worked lessons, not server-issued questions.
 const CHALLENGE_LOADERS = {
+  7: () => import('./data/notes-challenges-class7.js'),
+  8: () => import('./data/notes-challenges-class8.js'),
+  9: () => import('./data/notes-challenges-class9.js'),
   10: () => import('./data/notes-challenges-class10.js'),
   11: () => import('./data/notes-challenges-class11.js'),
   12: () => import('./data/notes-challenges-class12.js')
