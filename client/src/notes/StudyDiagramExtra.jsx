@@ -156,6 +156,92 @@ function Pascal({f}){
   <T x="300" y="347" textAnchor="middle" fontSize="13">Row number begins at zero</T>
  </g>;
 }
+
+function SquareGrid({f}){
+ const n=f.n,sz=Math.min(24,260/n),start=300-n*sz/2,top=47;
+ return <g>
+  {Array.from({length:n*n},(_,i)=><rect key={i} x={start+(i%n)*sz} y={top+Math.floor(i/n)*sz} width={sz} height={sz} stroke={color} strokeWidth=".8" fill={(i+Math.floor(i/n))%2?'var(--nt-accent-soft)':'var(--nt-raised)'}/>)}
+  <T x="300" y={top+n*sz+27} textAnchor="middle">{n} columns × {n} rows = {n*n} unit squares</T>
+ </g>;
+}
+function CubeGrid({f}){
+ const n=f.n,cx=300,cy=192,z=118,ex=146,ey=70;
+ const top=[[cx,cy-z],[cx+ex,cy-z-ey],[cx,cy-z-2*ey],[cx-ex,cy-z-ey]];
+ const front=[[cx,cy-z],[cx+ex,cy-z-ey],[cx+ex,cy-ey],[cx,cy]];
+ const side=[[cx,cy-z],[cx-ex,cy-z-ey],[cx-ex,cy-ey],[cx,cy]];
+ const pol=(poly,key,opacity)=> <polygon key={key} points={poly.map(p=>p.join(',')).join(' ')} fill="var(--nt-accent-soft)" fillOpacity={opacity} stroke={color} strokeWidth="2"/>;
+ const interpolate=(a,b,t)=>[a[0]*(1-t)+b[0]*t,a[1]*(1-t)+b[1]*t];
+ const faceGrid=(poly,key)=>Array.from({length:n-1},(_,j)=>{
+  const t=(j+1)/n,a=interpolate(poly[0],poly[1],t),b=interpolate(poly[3],poly[2],t),c=interpolate(poly[0],poly[3],t),d=interpolate(poly[1],poly[2],t);
+  return <g key={key+j}>
+   <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={muted} strokeWidth=".85"/>
+   <line x1={c[0]} y1={c[1]} x2={d[0]} y2={d[1]} stroke={muted} strokeWidth=".85"/>
+  </g>;
+ });
+ return <g>
+  {pol(front,'front',0.9)}{pol(side,'side',0.5)}{pol(top,'top',0.7)}
+  {faceGrid(front,'f')}{faceGrid(side,'s')}{faceGrid(top,'t')}
+  <T x="459" y="225" fontWeight="bold">{n} per edge</T>
+  <T x="300" y="331" textAnchor="middle" fontSize="13">Visible grids indicate an {n} × {n} × {n} unit-cube solid</T>
+ </g>;
+}
+function AlgebraArea({f}){
+ const {a,b}=f,midX=340,midY=143,left=110,top=53,right=510,bottom=275;
+ const cells=[
+  {x:left,y:top,w:midX-left,h:midY-top,text:'x²'},
+  {x:midX,y:top,w:right-midX,h:midY-top,text:a+'x'},
+  {x:left,y:midY,w:midX-left,h:bottom-midY,text:b+'x'},
+  {x:midX,y:midY,w:right-midX,h:bottom-midY,text:String(a*b)}
+ ];
+ return <g>
+  {cells.map((c,i)=><g key={i}>
+   <rect x={c.x} y={c.y} width={c.w} height={c.h} fill={i===0?'var(--nt-raised)':'var(--nt-accent-soft)'} stroke={color} strokeWidth="2.0"/>
+   <T x={c.x+c.w/2} y={c.y+c.h/2+7} textAnchor="middle" fontSize="21" fontWeight="bold">{c.text}</T>
+  </g>)}
+  <T x={225} y={top-12} textAnchor="middle">x</T>
+  <T x={425} y={top-12} textAnchor="middle">{a}</T>
+  <T x={95} y={103} textAnchor="end">x</T>
+  <T x={95} y={216} textAnchor="end">{b}</T>
+  <T x="305" y="318" textAnchor="middle">Area = (x+{a})(x+{b})</T>
+ </g>;
+}
+function PrimeBars({f}){
+ const labels=['2','3','5'],max=6,baseY=291,bar=25;
+ return <g>
+  <T x="300" y="42" textAnchor="middle" fontWeight="bold">Prime exponents of A and B</T>
+  {Array.from({length:6},(_,i)=><g key={i}><line x1="85" x2="530" y1={baseY-i*37} y2={baseY-i*37} stroke={muted} strokeOpacity=".25"/><T x="65" y={baseY-i*37+5} textAnchor="end" fontSize="12">{i}</T></g>)}
+  {labels.map((name,i)=>{const x=150+i*145;
+   return <g key={name}>
+    <rect x={x} y={baseY-f.A[i]*37} width={bar} height={f.A[i]*37} fill={color}/>
+    <rect x={x+31} y={baseY-f.B[i]*37} width={bar} height={f.B[i]*37} fill="var(--nt-accent-soft)" stroke={color}/>
+    <T x={x+13} y={baseY-f.A[i]*37-6} textAnchor="middle" fontSize="12">{f.A[i]}</T>
+    <T x={x+44} y={baseY-f.B[i]*37-6} textAnchor="middle" fontSize="12">{f.B[i]}</T>
+    <T x={x+27} y="322" textAnchor="middle">p={name}</T>
+   </g>;
+  })}
+  <T x="534" y="76" fontSize="12">Dark A</T><T x="534" y="93" fontSize="12">Light B</T>
+ </g>;
+}
+function SlopeField({f}){
+ const cx=293,cy=223,sx=x=>cx+x*86,sy=y=>cy-y*15,m=f.m;
+ const xs=[-2,-1.5,-1,-.5,0,.5,1,1.5,2],ys=[-6,-4,-2,0,2,4,6,8];
+ const field=xs.flatMap(x=>ys.map(y=>{
+  const slope=m*x,len=Math.hypot(1,slope),dx=12/len,dy=12*slope/len;
+  return {x1:sx(x)-dx,y1:sy(y)+dy,x2:sx(x)+dx,y2:sy(y)-dy,key:x+'|'+y};
+ }));
+ const curve=Array.from({length:121},(_,i)=>{const x=-2.3+4.6*i/120,y=m*x*x/2+f.c;return (i?'L':'M')+sx(x)+' '+sy(y)}).join(' ');
+ const result=m*2+f.c;
+ return <g>
+  {[-2,-1,0,1,2].map(n=><g key={n}><line x1={sx(n)} x2={sx(n)} y1="20" y2="329" stroke={muted} strokeOpacity=".25"/><T x={sx(n)} y="349" textAnchor="middle" fontSize="12">{n}</T></g>)}
+  {[-4,0,4,8].map(n=><line key={n} x1="78" x2="520" y1={sy(n)} y2={sy(n)} stroke={muted} strokeOpacity=".25"/>)}
+  {field.map(line=><line key={line.key} {...line} stroke={muted} strokeWidth="1.5" strokeOpacity=".65"/>)}
+  <path d={curve} {...STROKE} strokeWidth="3"/>
+  <circle cx={sx(0)} cy={sy(f.c)} r="5" fill={color}/>
+  <circle cx={sx(2)} cy={sy(result)} r="5" fill={color}/>
+  <T x={sx(0)+10} y={sy(f.c)-10}>y(0)={f.c}</T>
+  <T x={Math.min(528,sx(2)+12)} y={sy(result)-10}>y(2)={result}</T>
+ </g>;
+}
 export default function StudyDiagramExtra({figure}) {
  switch(figure.type){
  case 'venn':return <Venn f={figure}/>;
@@ -170,6 +256,11 @@ export default function StudyDiagramExtra({figure}) {
  case 'dots':return <Dots f={figure}/>;
  case 'interval':return <Interval f={figure}/>;
  case 'pascal':return <Pascal f={figure}/>;
+ case 'square-grid':return <SquareGrid f={figure}/>;
+ case 'cube-grid':return <CubeGrid f={figure}/>;
+ case 'algebra-area':return <AlgebraArea f={figure}/>;
+ case 'prime-bars':return <PrimeBars f={figure}/>;
+ case 'slope-field':return <SlopeField f={figure}/>;
  default:return null;
  }
 }
