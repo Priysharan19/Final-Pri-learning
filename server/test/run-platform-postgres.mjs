@@ -49,6 +49,11 @@ export const ENGINE_SUITES = [
   // account: the one-account claim and the sealed copy must hold on Postgres.
   'practice-server-question-check.mjs',
   'practice-repeat-credit-check.mjs',
+  // The marker runs off the request thread under a hard deadline, and a
+  // submission is read → marked → committed with the state re-read under the
+  // account's lock. The re-check and the exactly-once guarantees under
+  // concurrency must hold on SERIALIZABLE Postgres as the pri_server role too.
+  'marker-isolation-check.mjs',
   'account-lifecycle-contract-check.mjs',
   'account-lifecycle-journey-check.mjs',
   'account-deletion-reauth-check.mjs',

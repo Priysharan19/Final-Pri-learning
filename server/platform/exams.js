@@ -86,12 +86,19 @@ import { nextSyncCursor, syncLockKey } from './db.js';
 import { displaceDeviceEvent } from './sync.js';
 import { logEvent, safeCode } from './observability.js';
 import { requireSession, requireVerifiedEmail, requireRole, rateLimit } from './security.js';
-import { ensureBanks, chooseQuestion, stepMetaFor, answerTextFor, opaqueContentId, opaqueContentHash } from './practice.js';
+import { ensureBanks, chooseQuestion, stepMetaFor, answerTextFor, opaqueContentId, opaqueContentHash, consentBlockedNow, authorityAtCommit } from './practice.js';
+// The marker runs in worker threads under a hard deadline (markerPool.js); this
+// thread never calls checkAnswer or methodMarks. One response is marked by
+// markerOps.js `markResponse`, in a worker, in two stages: the answer, then
+// the working of a wrong written answer.
+import {
+  markerPool, markerCooldownUntil, recordMarkerKills,
+  MARKING_BUSY, BUSY_MESSAGE, TOO_COMPLEX_MESSAGE, WORKING_NOT_READ_NOTE
+} from './markerPool.js';
 import { loadBanksFor } from '../../client/src/engine/generators/index.js';
 import { generateMultipart } from '../../client/src/engine/generators/multipart.js';
-import { checkAnswer, methodMarks } from '../../client/src/engine/checker.js';
 import { makeRng } from '../../client/src/engine/qhelpers.js';
-import { indiaExamPaperSpec, markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
+import { indiaExamPaperSpec, markObjective } from '../../client/src/engine/indiaExams.js';
 import { indiaIssuableCells, indiaPyqCells, narrowCells, chapterWindowCells, cellKeyOf } from '../../client/src/engine/indiaExamCells.js';
 import {
   issueIndiaItem, recipeFitsSection, recipeCells, marking as sectionMarking, answerText as examAnswerText,
@@ -651,53 +658,59 @@ function criteriaFor(q, marks, grid) {
 const keyedAnswer = q => (q.answerType === 'multi-mcq' ? examAnswerText(q) : (answerTextFor(q) || examAnswerText(q)));
 const solutionOf = (q, marks, grid) => ({ steps: q.steps || [], answerText: keyedAnswer(q), criteria: criteriaFor(q, marks, grid) });
 
+// ── A response the marker was stopped on ────────────────────────────────────
+// Each part of a paper is one pool operation with the hard deadline; the paper
+// as a whole has a marking budget (markerPool.js MARKER_LIMITS). A part that is
+// cut off is never given a verdict the engine did not reach:
+//
+// RULE (the part's ANSWER was not marked in time, or the paper's budget was
+// already spent) — the part is UNREADABLE: it earns the grid's unanswered
+// mark (never the negative mark of a wrong answer), it is not correct, it has
+// no method marks, it says the fixed sentence, it is flagged `unreadable`,
+// and NO attempt is recorded for it — it is not evidence of a wrong answer.
+// The rest of the paper is marked normally.
+const unreadableResponse = (q, grid) => ({
+  unanswered: true, correct: false, awarded: markObjective(grid, { unanswered: true }), feedback: TOO_COMPLEX_MESSAGE, partial: null,
+  markingScheme: OBJECTIVE.has(q.answerType) ? 'objective' : 'final-answer', outcome: 'unreadable', unreadable: true
+});
+// RULE (the answer was marked in time, its working was not) — the part is
+// marked on what completed: the answer's verdict and final-answer mark stand,
+// the working earns NO method marks and is flagged `workingNotRead`. Credit
+// is never invented for lines nobody read.
+const workingNotReadResponse = answered => ({
+  ...answered, feedback: (answered.feedback ? answered.feedback + ' ' : '') + WORKING_NOT_READ_NOTE, workingNotRead: true
+});
+const cutOffFlags = r => ({ ...(r.unreadable ? { unreadable: true } : {}), ...(r.workingNotRead ? { workingNotRead: true } : {}) });
+
 /**
- * Mark one response under a marking grid, with the deterministic engine only.
- * Blank earns the grid's unanswered mark. A wrong written answer that comes
- * with working earns method marks by the same rule practice uses
- * (methodMarks: a restated question earns nothing; capped one below full
- * marks). Objective and negatively marked items never earn method marks.
+ * Mark every response of a paper in the marker pool. Returns the responses in
+ * the exact order markPaper asks for them (it is markPaper itself that
+ * enumerates them, so the two cannot drift), how many operations were stopped
+ * at the deadline, or `{ busy: true }` when the pool refused one before it ran
+ * (then nothing is known and nothing may be committed).
  */
-export function markResponse(q, given, working, grid) {
-  const marks = Number(grid.correct);
-  const objective = OBJECTIVE.has(q.answerType);
-  if (blank(given)) {
-    return { unanswered: true, correct: false, awarded: markObjective(grid, { unanswered: true }), feedback: 'Not attempted.', partial: null,
-      markingScheme: objective ? 'objective' : 'final-answer', outcome: 'unanswered' };
+async function markResponsesIsolated(paper, responses, accountId, budgetMs = null) {
+  const jobs = [];
+  const placeholder = { unanswered: true, correct: false, awarded: 0, feedback: '', partial: null, markingScheme: 'objective', outcome: 'unanswered' };
+  markPaper(paper, responses, { now: 0, totalMs: 0, mark: (q, given, working, grid) => { jobs.push({ q, given, working, grid }); return placeholder; } });
+  const pool = markerPool();
+  let budget = budgetMs ?? pool.examPaperBudgetMs;
+  let kills = 0;
+  const results = [];
+  for (const job of jobs) {
+    if (budget <= 0) { results.push(unreadableResponse(job.q, job.grid)); continue; }
+    const allowed = Math.min(pool.deadlineMs, budget);
+    const out = await pool.run('exam', job, { key: accountId, deadlineMs: allowed });
+    if (!out.ok && out.code === MARKING_BUSY) return { busy: true, kills };
+    // A part that was stopped has used all the time it was allowed.
+    budget -= out.ok ? out.ms : Math.max(out.ms, allowed);
+    if (out.ok) { results.push(out.value.response); continue; }
+    kills++;
+    const answered = out.partials.find(part => part?.response);
+    // A stage-one response that was already final needed no working.
+    results.push(answered ? (answered.final ? answered.response : workingNotReadResponse(answered.response)) : unreadableResponse(job.q, job.grid));
   }
-  if (q.answerType === 'multi-mcq') {
-    const chosen = String(given).split(/[,\s]+/).map(s => s.trim()).filter(Boolean).map(Number).filter(Number.isInteger);
-    const r = markMultiCorrect(grid, chosen, q.answer?.correctIndices || []);
-    const note = r.outcome === 'partial'
-      ? `+${r.awarded}: every option you chose is correct, but not all correct options were chosen.`
-      : r.outcome === 'wrong' ? `${r.awarded}: at least one chosen option is wrong.` : '';
-    return { unanswered: false, correct: r.outcome === 'full', awarded: r.awarded, feedback: note,
-      partial: r.outcome === 'partial' ? { awarded: r.awarded, note } : null, markingScheme: 'objective-partial',
-      outcome: r.outcome === 'full' ? 'correct' : r.outcome };
-  }
-  let result;
-  try { result = checkAnswer(q, given); } catch { result = { correct: false }; }
-  const correct = result.correct === true;
-  let awarded = markObjective(grid, { unanswered: false, correct });
-  let feedback = String(result.feedback || '');
-  if (!correct && q.answerType === 'mcq' && q.answer?.optionTraps?.[Number(given)]) feedback = String(q.answer.optionTraps[Number(given)]);
-  let partial = null;
-  let markingScheme = objective || (grid.incorrect || 0) < 0 || marks <= 1 ? 'objective' : 'final-answer';
-  if (!correct && markingScheme === 'final-answer' && !blank(working)) {
-    const meta = stepMetaFor(q);
-    if (meta) {
-      try {
-        const method = methodMarks({ meta, working: String(working), marks, prompt: q.prompt });
-        if (method && method.awarded > 0) {
-          awarded = Math.max(0, Math.min(marks - 1, method.awarded));
-          partial = { okLines: method.okLines, awarded, note: method.note };
-        }
-        markingScheme = 'step-marked';
-      } catch { /* the final-answer mark stands */ }
-    }
-  }
-  return { unanswered: false, correct, awarded, feedback: feedback.slice(0, 3000), partial, markingScheme,
-    outcome: correct ? 'correct' : 'wrong' };
+  return { results, kills };
 }
 
 /**
@@ -706,8 +719,12 @@ export function markResponse(q, given, working, grid) {
  * already been shown the solution of before this paper was finalised: an item
  * among them is marked and scored like any other, and flagged `repeat: true`
  * on its result line and its attempt, so it earns no progress anywhere.
+ *
+ * `mark(q, given, working, grid)` supplies each response's marking. This
+ * function never runs the marker itself: finalise() gives it the responses the
+ * marker pool produced (markResponsesIsolated), in the order it asks for them.
  */
-export function markPaper(paper, responses, { now, totalMs, seen = null }) {
+export function markPaper(paper, responses, { now, totalMs, seen = null, mark }) {
   const { answers, workings, times, modes } = responses;
   const isRepeat = item => !!seen && seen.size > 0 && seenKeysOf(item).some(key => seen.has(key));
   const timed = Object.keys(times).length > 0;
@@ -768,7 +785,7 @@ export function markPaper(paper, responses, { now, totalMs, seen = null }) {
         const chosen = useAlt ? part.alt : part;
         const synth = { ...chosen, subtopic: chosen.subtopic || q.subtopic, difficulty: chosen.difficulty || q.difficulty || 2 };
         const grid = { correct: part.marks, incorrect: 0, unanswered: 0 };
-        const r = markResponse(synth, answers[key], workings[key], grid);
+        const r = mark(synth, answers[key], workings[key], grid);
         const repeat = isRepeat(chosen);
         if (repeat) repeatParts++;
         qMarks += part.marks; qAwarded += r.awarded;
@@ -792,6 +809,7 @@ export function markPaper(paper, responses, { now, totalMs, seen = null }) {
           working: blank(workings[key]) ? null : String(workings[key]),
           answerText: keyedAnswer(chosen), steps: chosen.steps || [], subtopic: synth.subtopic, difficulty: synth.difficulty, attemptId,
           ...(repeat ? { repeat: true } : {}),
+          ...cutOffFlags(r),
           // Both versions of a part that offered a choice, now that it is marked.
           ...(part.alt ? { choices: Object.fromEntries([['main', part], ['or', part.alt]].map(([name, it]) => [name, {
             prompt: it.prompt, answerType: it.answerType, mcqOptions: it.mcqOptions || null, figure: it.figure || null,
@@ -810,14 +828,16 @@ export function markPaper(paper, responses, { now, totalMs, seen = null }) {
       const useAlt = blank(answers[sq.id]) && q.alt && !blank(answers[`${sq.id}::or`]);
       const key = useAlt ? `${sq.id}::or` : sq.id;
       const chosen = useAlt ? { ...q.alt, subtopic: q.alt.subtopic || q.subtopic, difficulty: q.alt.difficulty || q.difficulty || 2 } : q;
-      const r = markResponse(chosen, answers[key], workings[key], sq.marking);
+      const r = mark(chosen, answers[key], workings[key], sq.marking);
       const marks = Number(sq.marking.correct);
       // The question answered (the alternative, when that is the one taken).
       const repeat = isRepeat(useAlt ? q.alt : q);
       // A blueprint paper leaves a question it never saw an answer to out of
       // the evidence: not attempted is not wrong. A practice paper has always
       // counted a blank as a wrong attempt, and still does.
-      const attemptId = r.unanswered && paper.kind === 'india' ? null : attempt(sq, chosen, r, { marks, repeat, inputMode: inputMode(key), ms });
+      // An answer the marker was stopped on is recorded on no paper as an
+      // attempt: unreadable is not wrong.
+      const attemptId = r.unreadable || (r.unanswered && paper.kind === 'india') ? null : attempt(sq, chosen, r, { marks, repeat, inputMode: inputMode(key), ms });
       schemes[r.markingScheme] = (schemes[r.markingScheme] || 0) + 1;
       out = {
         ...base, prompt: chosen.prompt, answerType: chosen.answerType, mcqOptions: chosen.mcqOptions || null, matchList: chosen.matchList || null,
@@ -827,6 +847,7 @@ export function markPaper(paper, responses, { now, totalMs, seen = null }) {
         working: blank(workings[key]) ? null : String(workings[key]), markingScheme: r.markingScheme, outcome: r.outcome,
         solution: solutionOf(chosen, marks, sq.marking), attemptId,
         ...(repeat ? { repeat: true } : {}),
+        ...cutOffFlags(r),
         // Both questions of an internal choice, now that the paper is marked.
         ...(q.alt ? { choices: Object.fromEntries([['main', q], ['or', q.alt]].map(([name, it]) => [name, {
           prompt: it.prompt, answerType: it.answerType, mcqOptions: it.mcqOptions || null, matchList: it.matchList || null,
@@ -933,25 +954,37 @@ async function readRecord(db, accountId, scope, key, now) {
 }
 
 /**
- * The one finalisation, in one transaction under the account's sync lock.
+ * The one finalisation: the paper is marked in the marker pool with no
+ * transaction open, and its result is committed in one transaction under the
+ * account's sync lock, which re-reads what was marked before it writes.
  * `body` is a device's finish request, or null when the server is finalising a
  * paper nobody finished (its time and grace have passed): then, and for any
  * finish that arrives late, only the last snapshot the server holds is marked.
  * Whoever gets here second is given the stored result; nothing is marked twice.
  * Returns { result, written? } | { status, code?, message? } | { open: true }
  * (an unattended call on a paper that is still inside its time). `written` is
- * true only for the call that wrote the result.
+ * true only for the call that wrote the result. `authorise(consentBlockedBefore)`
+ * is the device route's commit-time session/consent recheck; the server's own
+ * unattended finalisation has none. A finalisation the pool refused before it
+ * could mark answers { status: 503, code: MARKING_BUSY } and writes nothing.
  */
-async function finalise(db, accountId, id, body, fixedNow = null) {
-  return db.transaction(async () => {
-    const now = fixedNow ?? Date.now();
-    const paper = await readRecord(db, accountId, 'exam-paper', id, now);
-    if (!paper) return { status: 404 };
+async function finalise(db, accountId, id, body, fixedNow = null, authorise = null) {
+  // One instant for the whole finalisation: the moment the request arrived
+  // (or the sweep ran). A finish that arrived inside the paper's time is not
+  // made late by the time its own marking takes.
+  const now = fixedNow ?? Date.now();
+  const unattended = body === null;
+  // Everything the marking depends on. Called twice: outside any transaction
+  // to know what to mark, and again inside the committing transaction, under
+  // the account's lock, where it alone decides.
+  const read = async () => {
+    const paperRow = await db.get(SELECT, [accountId, 'exam-paper', id, now]);
+    if (!paperRow) return { status: 404 };
+    const paper = JSON.parse(paperRow.response_json);
     // Replay first: the reply to a finish that committed before a timeout
     // stays available, whatever the retry carries.
     const stored = await readRecord(db, accountId, 'exam-result', id, now);
     if (stored) return { result: stored };
-    const unattended = body === null;
     const inTime = now <= paper.deadline + FINISH_GRACE_MS;
     if (unattended && inTime) return { open: true };
     let carried = { answers: {}, workings: {}, times: {}, modes: {} };
@@ -977,14 +1010,56 @@ async function finalise(db, accountId, id, body, fixedNow = null) {
       times: body.times === undefined || body.times === null ? saved.times : carried.times,
       modes: body.modes === undefined || body.modes === null ? saved.modes : carried.modes
     } : saved;
+    // What was marked: the sealed paper and exactly these responses.
+    const marking = digest(paperRow.response_json + '\n' + JSON.stringify(responses));
+    return { paper, inTime, snapshot, responses, marking };
+  };
+
+  // ── Mark first, with no transaction open; then commit under the lock ──────
+  // The marker is awaited work on another thread (markerPool.js) and may not
+  // be awaited inside a store transaction. So: read → mark in the pool →
+  // open the transaction, READ AGAIN and commit only if what was marked is
+  // still exactly what must be marked. A finish that lost a race reads the
+  // stored result there and returns it; nothing is marked into the record
+  // twice. If a newer answer snapshot arrived in between and changes the
+  // responses, nothing is written and the paper is marked again.
+  for (let round = 0; round < 3; round++) {
+    const forecast = await read();
+    if (forecast.status || forecast.result || forecast.open) return forecast;
+    // An account that is cooling down after several stopped entries gets one
+    // deadline's worth of marking for the paper instead of the whole budget.
+    const [consentBlockedBefore, cooling] = await Promise.all([
+      authorise ? consentBlockedNow(db, accountId) : null, markerCooldownUntil(db, accountId)]);
+    const marked = await markResponsesIsolated(forecast.paper, forecast.responses, accountId, cooling ? markerPool().deadlineMs : null);
+    if (marked.kills) await recordMarkerKills(db, accountId, marked.kills);
+    // Refused before a part ran: nothing is known about it, so nothing is
+    // committed. A device retries; the sweep counts it and comes back.
+    if (marked.busy) return { status: 503, code: MARKING_BUSY, message: BUSY_MESSAGE };
+    const outcome = await commit(forecast, marked.results, consentBlockedBefore);
+    if (!outcome.again) return outcome;
+  }
+  return { status: 503, code: MARKING_BUSY, message: BUSY_MESSAGE };
+
+  function commit(forecast, results, consentBlockedBefore) { return db.transaction(async () => {
+    if (authorise) {
+      const refused = await authorise(consentBlockedBefore);
+      if (refused) return refused;
+    }
+    const state = await read();
+    if (state.status || state.result || state.open) return state;
+    if (state.marking !== forecast.marking) return { again: true };
+    const { paper, inTime, snapshot, responses } = state;
     const elapsed = Math.max(0, Math.min(now, paper.deadline) - paper.startedAt);
     const totalMs = inTime && body.ms > 0 ? Math.min(Math.round(body.ms), MAX_MS) : elapsed;
     // What this account had been shown the solution of BEFORE this paper is
     // marked: those items are repeats. Then every item of this paper joins
-    // them, because the result below discloses all of its solutions.
+    // them, because the result below discloses all of its solutions. Read
+    // here, under the lock: which items are repeats does not affect any mark,
+    // so it needs no second marking.
     const contentKeys = paper.questions.flatMap(sq => examItemsOf(sq.payload).flatMap(seenKeysOf));
     const seen = await seenAmong(db, accountId, contentKeys);
-    const marked = markPaper(paper, responses, { now, totalMs, seen });
+    let next = 0;
+    const marked = markPaper(paper, responses, { now, totalMs, seen, mark: () => results[next++] });
     const result = {
       authoritative: true, examId: id, kind: paper.kind, title: paper.title,
       blueprint: paper.blueprint, paper: paper.paper, paperVersion: paper.paperVersion,
@@ -1029,7 +1104,7 @@ async function finalise(db, accountId, id, body, fixedNow = null) {
       } : null
     });
     return { result, written: true };
-  }, { accountScope: accountId, lock: syncLockKey(accountId) });
+  }, { accountScope: accountId, lock: syncLockKey(accountId) }); }
 }
 
 /**
@@ -1255,8 +1330,13 @@ export function createExamRouter(db) {
   router.post('/:id/finish', rateLimit(db, 'exam-finish', { limit: 120, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const id = String(req.params.id || '');
     if (!UUID.test(id)) return notFound(res);
-    const outcome = await finalise(db, req.platformSession.account_id, id, req.body ?? {});
+    const accountId = req.platformSession.account_id;
+    // Marking takes time on another thread: the session (and a guardian's
+    // consent, if it was in place) is rechecked where the result commits.
+    const outcome = await finalise(db, accountId, id, req.body ?? {}, null,
+      blockedBefore => authorityAtCommit(db, req, accountId, blockedBefore));
     if (outcome.status === 404) return notFound(res);
+    if (outcome.status === 503) res.set('Retry-After', '2');
     if (outcome.status) return reject(res, outcome.status, outcome.code, outcome.message);
     return res.status(200).json(outcome.result);
   });
