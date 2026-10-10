@@ -15,7 +15,7 @@
 //
 // Every case is authored. Nothing here is generated.
 // ─────────────────────────────────────────────────────────────────────────────
-import { stepCheck, checkAnswer } from '../src/engine/checker.js';
+import { stepCheck, checkAnswer, checkWorking } from '../src/engine/checker.js';
 
 let pass = 0;
 const failures = [];
@@ -91,7 +91,15 @@ const rootDroppedWithoutFactorising = stepCheck(quadratic, [
   'x^2 + 9x + 18 = 0',
   'x = -3'
 ].join('\n'));
-ok(rootDroppedWithoutFactorising.firstBreak !== -1, 'lost root: naming one root with no factorisation above is still a break');
+// One root written alone, with no product above it that promised both, is a
+// true statement about that root — not a mistake, and so not the point after
+// which nothing else is credited. It is still not the complete answer.
+ok(rootDroppedWithoutFactorising.firstBreak === -1 && rootDroppedWithoutFactorising.lines[1].status === 'ok',
+  'one root named with no factorisation above is true of that root, not a mistake');
+ok(/2 solutions, and the other is still to find/.test(rootDroppedWithoutFactorising.lines[1].note || ''), '…and the line says a root is still to find');
+ok(checkWorking({ answerType: 'working', answer: { stepMeta: quadratic } }, 'x^2 + 9x + 18 = 0\nx = -3').correct === false,
+  '…and as an answer given by its working it is still not correct: a root is missing');
+ok(stepCheck(quadratic, 'x^2 + 9x + 18 = 0\nx = -4').firstBreak === 1, 'a value that is not a root is still the mistake');
 
 const wrongFactorisation = stepCheck(quadratic, [
   '(x + 3)(x + 5) = 0'
@@ -215,5 +223,5 @@ ok(checkAnswer(zeroesQuestion, [
 
 console.log(failures.length
   ? `WORKING BRANCHES: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `WORKING BRANCHES: PASS — ${pass}/${pass} checks — the zero-product branch and substituting the answer back are the method, and an incomplete branch or an unbalanced check is still a break.`);
+  : `WORKING BRANCHES: PASS — ${pass}/${pass} checks — the zero-product branch and substituting the answer back are the method, an unbalanced check or a branch that drops a root a product promised is still a break, and one root named alone is true of that root.`);
 process.exit(failures.length ? 1 : 0);
