@@ -138,6 +138,9 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   const statusRef = useRef(null);
   const readingTitleRef = useRef(null);
   const focusAfterRead = useRef(false);
+  // The page whose reading had to be read again (same ink): the student's own
+  // corrections to it are carried onto the fresh reading, never lost.
+  const expiredSigRef = useRef(null);
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine !== false);
   // What is said about reading: a refusal the reader gave, or — before any
   // read is asked for — a reason this device already knows makes one
@@ -278,7 +281,15 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
         }
         readRef.current = signature;
         setExpired(false);
-        publish(reading, now, { stale: nowSignature !== signature });
+        // Read again on the SAME ink (the earlier read had lapsed): what the
+        // student said each line reads still stands on the fresh reading.
+        let landed = reading;
+        const before = recRef.current;
+        if (expiredSigRef.current === signature && before.lines.length === reading.lines.length) {
+          before.lines.forEach((line, i) => { if (line.corrected === true) landed = applyLineCorrection(landed, i, line.text); });
+        }
+        expiredSigRef.current = null;
+        publish(landed, now, { stale: nowSignature !== signature });
         setStatus(null);
         return;
       }
@@ -365,6 +376,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   // submitted; "Read again" is offered. Undoing cannot make it current again.
   useEffect(() => {
     if (!readExpired || !rec.lines.length) return;
+    expiredSigRef.current = readRef.current;
     readRef.current = null;
     setExpired(true);
     publish(rec, strokesRef.current, { stale: true });

@@ -341,10 +341,15 @@ export const flow = {
       {
         const { canvas, right } = await fresh();
         const start = reader.requests.length;
-        reader.lines = null; reader.text = right.text; reader.confidence = 0.97;
+        // The reader misreads the line; the student says what it reads.
+        reader.lines = null; reader.text = String(Number(right.text) + 6); reader.confidence = 0.97;
         await handwrite(page, canvas, '7');
         await pressRead(page);
         await lines(1);
+        await page.locator('.ink-line .ink-correct-btn').first().click();
+        await page.locator('.ink-line form.ink-correct input').fill(right.text);
+        await page.locator('.ink-line form.ink-correct button[type="submit"]').click();
+        await page.waitForFunction(t => document.querySelector('.ink-line[data-corrected="true"]')?.getAttribute('data-text') === t, right.text, { timeout: 10000 }).catch(() => {});
         await page.waitForTimeout(1500);
         online.forgetKeptReads();
         // Desk step: the receipt is damaged in transit (one character of its signature).
@@ -379,6 +384,9 @@ export const flow = {
         await pressRead(page);
         await lines(1);
         const afterReadAgain = reader.requests.length - start;
+        const kept = await page.locator('.ink-line').first().evaluate(n => [n.getAttribute('data-text'), n.getAttribute('data-corrected')]).catch(() => null);
+        await check('10 · the forced Read again does not undo the student\'s correction: the line still reads what they said, marked as corrected by them',
+          !!kept && kept[0] === right.text && kept[1] === 'true', JSON.stringify(kept));
         await submitAndSettle();
         const grade = (await gradesOf(right.serverQuestionId)).at(-1);
         costs.expiredRead = reader.requests.length - start;
