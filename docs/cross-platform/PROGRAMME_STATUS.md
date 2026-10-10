@@ -28,7 +28,8 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 | CP-09 Android Handwriting Input | SOFTWARE IMPLEMENTATION: COMPLETE | `e1236678` | `9729b8db` | [#287](https://github.com/Priysharan19/Final-Pri-learning/pull/287) | `59f62144` | DEFERRED |
 | CP-10 Android Automated Product QA | SOFTWARE IMPLEMENTATION: COMPLETE | `59f62144` | `061596f4` | [#294](https://github.com/Priysharan19/Final-Pri-learning/pull/294) | `c8835831` | DEFERRED |
 | SEC-COMM-01 Server-Enforced Premium Entitlement | SOFTWARE IMPLEMENTATION: COMPLETE | `c8835831` | `c3f8cee8` | [#297](https://github.com/Priysharan19/Final-Pri-learning/pull/297) | `4dbfbf34` | n/a (server) |
-| CP-11 Cross-Platform Release Matrix | SOFTWARE IMPLEMENTATION: COMPLETE once merged | `4dbfbf34` | recorded by the next CP | this PR | recorded by the next CP | n/a (release tooling) |
+| CP-11 Cross-Platform Release Matrix | SOFTWARE IMPLEMENTATION: COMPLETE | `4dbfbf34` | `d0fa816e` | [#303](https://github.com/Priysharan19/Final-Pri-learning/pull/303) | `4c4f4c98` | n/a (release tooling) |
+| CP-12 Store Readiness | SOFTWARE IMPLEMENTATION: COMPLETE once merged; STORE SUBMISSION: BLOCKED_EXTERNAL | `4c4f4c98` | recorded by the closing audit | this PR | recorded by the closing audit | DEFERRED |
 
 ## CP-02 — Platform Bridge Foundation
 
@@ -531,3 +532,42 @@ Causes found:
 - Merging `main` surfaced its architecture rule that only `security.js` reads `X-Pri-Client`. The floor now gets the id through `declaredNativeClientId()`.
 - The release matrix runs in `ci.yml` (Apple) and `android-shell.yml` (Android).
 - Independent review found one blocker: old shells could not sign in, so they could not reach export or delete. It is fixed, along with the major and minor findings: client 426 handling, health visibility, vacuous matrix rows, the HEAD tie, router wiring, both Apple packages, HEAD /health, case, the Upgrade header and the path filters.
+
+**CP-11 exact-head evidence (recorded by CP-12):**
+- Candidate `d0fa816e`. All four required checks pass, including the release matrix in the client build job (`--require-native-apple`).
+- Android Shell: tablet ✅, floor ✅; phone images ❌ (BLOCKED_AUTOMATION, above).
+- Merged as `4c4f4c98` with `--match-head-commit`.
+
+## CP-12 — Store Readiness
+
+**Delivered:** see [STORE_READINESS.md](../release/STORE_READINESS.md).
+- **Apple privacy manifest** (`Resources/PrivacyInfo.xcprivacy`, both packages, copied to the bundle root):
+  - no tracking and no tracking domains;
+  - 11 collected data types, all linked and all mapped to code;
+  - `UserDefaults` / `CA92.1`, the only required-reason API the Swift code uses.
+- **Android:** upload signing from environment variables only, all four or none. A partial set fails the build. Never the debug key. No keystore in git.
+- `STORE_READINESS.md` holds:
+  - the App Privacy / Data safety answers taken from the code;
+  - children, age rating and families (an owner decision);
+  - account deletion on the web;
+  - the owner action list.
+  - It also flags that `docs/legal/privacy.md` §Children is stale against the guardian-email confirmation, which is an owner + legal fix and is **not** verifiable parental consent.
+- `npm run release:store` (`scripts/store-readiness-check.mjs`, 38 checks, run in CI) holds the manifest, the permissions (source and merged), signing and the record to the code.
+
+**Evidence (S0 / local build, synthetic):**
+- `xcodebuild` places the manifest at the `.app` root.
+- `bundleRelease -Ppri.versionCode=N` builds an unsigned AAB.
+- `plutil -lint` OK.
+- Mutation tests: debug-key signing, a variable password, a keystore under `androidTest`, a wrong required-reason category, data-type drift, an unlinked photo, and affirmative false claims all fail the guard.
+- Independent review found no blockers. Its majors (missing data types, contradictions, merged permissions, a guard that could not fail) are fixed.
+
+**BLOCKED_EXTERNAL (owner):**
+- App Store Connect and Play Console records, products, server notifications and RTDN;
+- App Privacy and Data safety entries;
+- age rating and target audience;
+- the account-deletion URL;
+- the upload key and Play App Signing;
+- physical screenshots;
+- review notes with an owner-made demo account;
+- legal review of `docs/legal/*`.
+No store submission has been made.

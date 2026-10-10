@@ -76,10 +76,35 @@ android {
 
     sourceSets["main"].assets.srcDir(generatedWeb)
 
+    // Upload-key signing for release builds comes only from the environment
+    // (Play App Signing holds the app signing key). Nothing secret is in the repo.
+    // All four variables or none: a partial set is a configuration mistake and
+    // fails the build rather than silently producing an unsigned bundle. A
+    // relative keystore path resolves against android/app. Never the debug key.
+    val uploadVars = listOf(
+        "PRI_ANDROID_UPLOAD_KEYSTORE", "PRI_ANDROID_UPLOAD_STORE_PASSWORD",
+        "PRI_ANDROID_UPLOAD_KEY_ALIAS", "PRI_ANDROID_UPLOAD_KEY_PASSWORD"
+    ).associateWith { System.getenv(it)?.takeIf(String::isNotBlank) }
+    val uploadSet = uploadVars.values.count { it != null }
+    if (uploadSet in 1..3) {
+        throw GradleException("release signing needs all of ${uploadVars.keys} (missing: ${uploadVars.filterValues { it == null }.keys})")
+    }
+    val keystore = uploadVars["PRI_ANDROID_UPLOAD_KEYSTORE"]
+    signingConfigs {
+        if (keystore != null) {
+            create("upload") {
+                storeFile = file(keystore)
+                storePassword = System.getenv("PRI_ANDROID_UPLOAD_STORE_PASSWORD")
+                keyAlias = System.getenv("PRI_ANDROID_UPLOAD_KEY_ALIAS")
+                keyPassword = System.getenv("PRI_ANDROID_UPLOAD_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Signing comes from CI secrets / Play App Signing, never the repo.
+            if (keystore != null) signingConfig = signingConfigs.getByName("upload")
         }
     }
 

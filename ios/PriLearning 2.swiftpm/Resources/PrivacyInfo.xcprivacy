@@ -1,27 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Pri Learning · App privacy manifest (CP-12). Package.swift copies it to the
+  app bundle root (.copy("Resources/PrivacyInfo.xcprivacy"));
+  ios/PriLearning 2.swiftpm/Resources/PrivacyInfo.xcprivacy must stay byte-identical.
+  Every entry must stay true to the code and to docs/legal/privacy.md; if either
+  changes, change this file in the same PR.
+  Without a cloud account nothing leaves the device. With one (optional), the
+  server receives, all linked to the account and none used for tracking:
+  email, name and account id; a per-install device id (sessions, sync); the
+  profile's class/year, course and settings (other data types); synced learning
+  records, handwriting images and lines of working sent for cloud reading or
+  step checking (other user content; images and working are processed, not
+  stored); a photo of working when cloud reading is on (photos); subscription
+  state (purchase history); allow-listed telemetry (product interaction for app
+  functionality and analytics; diagnostics; performance). No tracking, no
+  tracking domains. docs/release/STORE_READINESS.md maps each entry to its
+  source; scripts/store-readiness-check.mjs holds this file to that list.
+-->
 <plist version="1.0">
 <dict>
-    <!--
-      Pri Learning privacy manifest. Every entry must stay true to the code and to
-      docs/legal/privacy.md; if either changes, change this file in the same PR.
-      Copied to the app bundle root by Package.swift (.copy("Resources/PrivacyInfo.xcprivacy")).
-      ios/PriLearning 2.swiftpm/Resources/PrivacyInfo.xcprivacy must stay byte-identical.
-    -->
     <key>NSPrivacyTracking</key>
     <false/>
     <key>NSPrivacyTrackingDomains</key>
     <array/>
-
-    <!--
-      Data the app sends off the device, and only with a cloud account that the person
-      creates (docs/legal/privacy.md "What we receive if you create a cloud account").
-      Without an account nothing leaves the device. Nothing is used for tracking or
-      advertising; nothing is sold.
-    -->
     <key>NSPrivacyCollectedDataTypes</key>
     <array>
-        <!-- Email address: sign-in, verification and password-reset links; a guardian's email for a child's account. -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeEmailAddress</string>
@@ -34,7 +38,6 @@
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
             </array>
         </dict>
-        <!-- Name as typed at registration; a guardian's name for a child's account. -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeName</string>
@@ -47,7 +50,6 @@
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
             </array>
         </dict>
-        <!-- Account id, session and the random app-generated device identifier that keeps the person signed in (not the device's own id). -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeUserID</string>
@@ -60,10 +62,9 @@
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
             </array>
         </dict>
-        <!-- Learning events synced to the account: that a question was answered, its chapter, right or wrong, time taken (client/src/platform/syncContract.js). -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>
-            <string>NSPrivacyCollectedDataTypeOtherUsageData</string>
+            <string>NSPrivacyCollectedDataTypeDeviceID</string>
             <key>NSPrivacyCollectedDataTypeLinked</key>
             <true/>
             <key>NSPrivacyCollectedDataTypeTracking</key>
@@ -73,10 +74,9 @@
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
             </array>
         </dict>
-        <!-- Only when the person switches on server reading / working check: an image of their handwriting or photographed working, and the lines of working with the question text. Passed to the reading service through the server, which keeps no copy; the mark is decided on the device. -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>
-            <string>NSPrivacyCollectedDataTypeOtherUserContent</string>
+            <string>NSPrivacyCollectedDataTypeOtherDataTypes</string>
             <key>NSPrivacyCollectedDataTypeLinked</key>
             <true/>
             <key>NSPrivacyCollectedDataTypeTracking</key>
@@ -86,7 +86,6 @@
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
             </array>
         </dict>
-        <!-- Subscription status, verified from Apple's signed transaction data; card details never reach Pri. -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypePurchaseHistory</string>
@@ -99,7 +98,43 @@
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
             </array>
         </dict>
-        <!-- Allow-listed operational telemetry (event type, surface, duration, status, provider, network, version), kept 90 days (server/platform/telemetry.js). -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeOtherUserContent</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypePhotosorVideos</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeProductInteraction</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+            </array>
+        </dict>
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeOtherDiagnosticData</string>
@@ -109,7 +144,18 @@
             <false/>
             <key>NSPrivacyCollectedDataTypePurposes</key>
             <array>
-                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypePerformanceData</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
             </array>
         </dict>
@@ -122,6 +168,7 @@
                        reads only its own defaults.
       Not used, so not declared: file timestamp APIs (PKStrokePath(creationDate:) is a PencilKit
       initialiser, not a file attribute read), system boot time, disk space, active keyboards.
+      scripts/store-readiness-check.mjs re-derives this list from the Swift sources.
     -->
     <key>NSPrivacyAccessedAPITypes</key>
     <array>
