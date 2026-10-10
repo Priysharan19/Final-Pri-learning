@@ -2,6 +2,7 @@ import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from
 import { asyncHandler } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { tagPolicy } from './routePolicy.js';
+import { timedMiddleware } from './requestTiming.js';
 
 export const SESSION_COOKIE = 'pri_cloud_session';
 export const CSRF_COOKIE = 'pri_csrf';
@@ -132,7 +133,7 @@ export async function mfaEnrolled(db, accountId) {
 
 export function requireSession(db) {
   db = asStore(db);
-  return tagPolicy(asyncHandler(async (req, res, next) => {
+  return tagPolicy(timedMiddleware('auth', asyncHandler(async (req, res, next) => {
     const now = Date.now();
     const session = await sessionFromRequest(db, req, now);
     if (!session) return res.status(401).json({ error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
@@ -148,7 +149,7 @@ export function requireSession(db) {
     }
     req.platformSession = session;
     next();
-  }), { session: true });
+  })), { session: true });
 }
 
 /** How recently a second factor must have been presented for a step-up action. */
@@ -280,12 +281,12 @@ export async function consumeRateLimit(db, bucket, { limit, windowMs }, now = Da
 
 export function rateLimit(db, key, options) {
   db = asStore(db);
-  return tagPolicy(asyncHandler(async (req, res, next) => {
+  return tagPolicy(timedMiddleware('limit', asyncHandler(async (req, res, next) => {
     const identity = req.platformSession?.account_id || req.ip || 'unknown';
     const verdict = await consumeRateLimit(db, `${key}:${sha256(identity).slice(0, 24)}`, options);
     res.set('RateLimit-Remaining', String(verdict.remaining));
     res.set('RateLimit-Reset', String(Math.ceil(verdict.resetAt / 1000)));
     if (!verdict.allowed) return res.status(429).json({ error: { code: 'RATE_LIMITED', message: 'Too many requests. Try again later.' } });
     next();
-  }), { rateLimit: { key, limit: options.limit, windowMs: options.windowMs } });
+  })), { rateLimit: { key, limit: options.limit, windowMs: options.windowMs } });
 }

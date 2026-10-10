@@ -34,6 +34,7 @@ import {
 import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../../client/src/engine/answer-forms.js';
 import { transcribeHandwriting, validateImage, HandwritingProviderError } from './handwritingProvider.js';
 import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
+import { timePhase } from './requestTiming.js';
 
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
 const ID = /^[a-zA-Z0-9_-]{8,100}$/;
@@ -532,7 +533,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const acknowledgedAt = Date.now();
     const evidence = { questionId: qid, mode: body.mode, text, recognizedAt: acknowledgedAt,
       providerNeedsConfirmation: result.needsConfirmation === true };
-    const committed = await db.transaction(async () => {
+    const committed = await timePhase('commit', () => db.transaction(async () => {
       // The provider runs outside the transaction. During that wait a student
       // may sign out, a session may expire, or a guardian may withdraw consent.
       // The initial middleware gate is no longer sufficient authority to
@@ -555,7 +556,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-recognition',?,?,?,?,?)",
         [accountId, receipt, JSON.stringify(evidence), digest(evidence), acknowledgedAt, acknowledgedAt + MAX_AGE]);
       return { status: 201 };
-    }, { accountScope: accountId, lock: syncLockKey(accountId) });
+    }, { accountScope: accountId, lock: syncLockKey(accountId) }));
     if (committed.status !== 201) return reject(res, committed.status, committed.code,
       committed.status === 403 ? 'Guardian consent changed while this answer was being read.' :
       committed.status === 401 ? 'Sign in again before retrying recognition.' : 'This question has been completed.');
@@ -579,7 +580,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // A correction and a final mark must serialize under the same account
     // lock. Checking completion before the transaction leaves a race where a
     // correction can be written after the last grade commits.
-    const outcome = await db.transaction(async () => {
+    const outcome = await timePhase('commit', () => db.transaction(async () => {
       const prior = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-recognition' AND key=? AND expires_at>?", [accountId, sourceId, now]);
       if (!prior) return { status: 404, code: 'RECOGNITION_RECEIPT_INVALID' };
       const original = JSON.parse(prior.response_json);
@@ -594,7 +595,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-recognition',?,?,?,?,?)",
         [accountId, receipt, JSON.stringify(proof), digest(proof), now, now + MAX_AGE]);
       return { receipt, mode: original.mode };
-    }, { accountScope: accountId, lock: syncLockKey(accountId) });
+    }, { accountScope: accountId, lock: syncLockKey(accountId) }));
     if (outcome.status) return reject(res, outcome.status, outcome.code,
       outcome.status === 409 ? 'This question has been completed.' : 'The recognition receipt is not available for this question.');
     return res.status(201).json({ receipt: outcome.receipt, questionId: qid, mode: outcome.mode, corrected: true });
@@ -756,10 +757,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // ── 2. Mark ──────────────────────────────────────────────────────────
       // One round trip: the answer, and the working only when the reply could
       // use it (the answer is right, or a wrong answer resolves the question).
-      const marked = await markerPool().run('practice', {
+      const marked = await timePhase('marker', () => markerPool().run('practice', {
         q: forecast.q, answer: body.answer, working,
         evidenceIfWrong: evidenceForced || forecast.spent || ONE_TRY_MODES.includes(forecast.q._practiceMode)
-      }, { key: accountId });
+      }, { key: accountId }));
       // Refused before it ran: nothing marked, nothing spent, same key retries.
       if (!marked.ok && marked.code === MARKING_BUSY) return sendMarkerBusy(res);
       let result, evidence, workingNotRead = false;
@@ -803,7 +804,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       }
 
       // ── 3. Commit ────────────────────────────────────────────────────────
-      const outcome = await db.transaction(async () => {
+      const outcome = await timePhase('commit', () => db.transaction(async () => {
         // Marking took time on another thread. A student may have signed out,
         // the session may have expired, or a guardian may have withdrawn
         // consent meanwhile: authority is rechecked where the grade commits.
@@ -929,7 +930,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         if (q._repeat !== true) await markContentTried(db, accountId, q, now);
       }
       return { response };
-      }, { accountScope: accountId, lock: syncLockKey(accountId) });
+      }, { accountScope: accountId, lock: syncLockKey(accountId) }));
       if (outcome.again) { evidenceForced = evidenceForced || outcome.needEvidence === true; continue; }
       if (outcome.status) return refuse(outcome);
       return res.status(200).json(outcome.response);

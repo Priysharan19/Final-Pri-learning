@@ -29,6 +29,7 @@ import { asyncHandler } from './asyncRouter.js';
 import { asStore, isDatabaseOverload } from './store.js';
 import { tagPolicy } from './routePolicy.js';
 import { clipText } from './text.js';
+import { timedMiddleware } from './requestTiming.js';
 
 /**
  * The version of the notice a guardian agreed to. Bump it whenever the privacy
@@ -218,7 +219,7 @@ export async function withdrawConsent(db, accountId, now = Date.now()) {
  */
 export function requireGuardianConsent(db) {
   db = asStore(db);
-  return tagPolicy(asyncHandler(async (req, res, next) => {
+  return tagPolicy(timedMiddleware('eligibility', asyncHandler(async (req, res, next) => {
     // The session is resolved here rather than read off the request, because
     // each sub-router establishes its own session INSIDE itself — so a gate
     // mounted in front of one runs before req.platformSession exists, and
@@ -259,7 +260,7 @@ export function requireGuardianConsent(db) {
         'A parent or guardian has withdrawn permission for this account to sync. Your work stays on this device.');
     }
     return refuse(res, blocker, 'This account cannot sync right now.');
-  }), { guardianConsent: true });
+  })), { guardianConsent: true });
 }
 
 function refuse(res, code, message) {
