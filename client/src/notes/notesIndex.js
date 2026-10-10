@@ -60,6 +60,27 @@ function mergeStudySupplements(base, additions) {
   }));
 }
 
+// Optional advanced study is separate from the CBSE core and the generated
+// exam/question bank. These are worked lessons, not server-issued questions.
+const CHALLENGE_LOADERS = {
+  7: () => import('./data/notes-challenges-class7.js'),
+  8: () => import('./data/notes-challenges-class8.js'),
+  9: () => import('./data/notes-challenges-class9.js'),
+  10: () => import('./data/notes-challenges-class10.js'),
+  11: () => import('./data/notes-challenges-class11.js'),
+  12: () => import('./data/notes-challenges-class12.js')
+};
+
+function mergeOptionalComplexStudies(notes, extra) {
+  for (const [id, section] of Object.entries(extra || {})) {
+    if (!Object.hasOwn(notes,id) || !Array.isArray(section.examples) || !section.examples.every(x => x.question && Array.isArray(x.steps) && x.steps.length && x.answer && x.verify)) {
+      throw new Error(`Invalid optional mathematics study section: ${id}`);
+    }
+    notes = { ...notes, [id]: { ...notes[id], examples: [...notes[id].examples, ...section.examples] } };
+  }
+  return notes;
+}
+
 export const NOTES_GRADES = Object.freeze(Object.keys(LOADERS).map(Number));
 
 const cache = new Map();
@@ -69,8 +90,17 @@ export function loadNotesForGrade(grade) {
   const g = Number(grade);
   if (!LOADERS[g]) return Promise.resolve({});
   if (!cache.has(g)) {
-    cache.set(g, Promise.all([LOADERS[g](), EXPANSION_LOADERS[g]()])
-      .then(([original, supplement]) => mergeStudySupplements(original.default || {}, supplement.default || {}))
+    cache.set(g, Promise.all([
+      LOADERS[g](),
+      EXPANSION_LOADERS[g](),
+      g === 11 ? import('./data/notes-advanced-complex.js') : Promise.resolve({ default: {} }),
+      CHALLENGE_LOADERS[g] ? CHALLENGE_LOADERS[g]() : Promise.resolve({ default: {} })
+    ])
+      .then(([original, supplement, optional, challenges]) => mergeOptionalComplexStudies(
+        mergeOptionalComplexStudies(
+          mergeStudySupplements(original.default || {}, supplement.default || {}), optional.default || {}
+        ), challenges.default || {}
+      ))
       .catch(err => { cache.delete(g); throw err; }));
   }
   return cache.get(g);

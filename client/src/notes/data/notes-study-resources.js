@@ -333,6 +333,180 @@ export const STUDY_RESOURCE_LINKS = Object.freeze([
     "access": "external-link-only",
     "requiresNetwork": true,
     "licensedForEmbedding": false
+  },
+  {
+    "id": "ncert-exemplar",
+    "title": "NCERT Exemplar Mathematics problem collections",
+    "issuer": "NCERT",
+    "url": "https://ncert.nic.in/exemplar-problems.php?ln=en",
+    "type": "official-challenge-index",
+    "grades": [
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "tracks": [
+      "cbse"
+    ],
+    "focus": "Official extra conceptual problems; view source pages without redistributing protected question text",
+    "region": "global",
+    "lastChecked": "2026-10-10",
+    "access": "external-link-only",
+    "requiresNetwork": true,
+    "licensedForEmbedding": false
+  },
+  {
+    "id": "cbse-archive",
+    "title": "CBSE sample paper archive",
+    "issuer": "CBSE",
+    "url": "https://cbseacademic.nic.in/sqp_archive.html",
+    "type": "official-archive",
+    "grades": [
+      10,
+      12
+    ],
+    "tracks": [
+      "cbse"
+    ],
+    "focus": "Historical sample paper and marking scheme links for timed external study",
+    "region": "global",
+    "lastChecked": "2026-10-10",
+    "access": "external-link-only",
+    "requiresNetwork": true,
+    "licensedForEmbedding": false
+  },
+  {
+    "id": "jee-main-documents",
+    "title": "JEE Main official documents and answer-key index",
+    "issuer": "NTA",
+    "url": "https://jeemain.nta.nic.in/documents/",
+    "type": "official-exam-index",
+    "grades": [
+      11,
+      12
+    ],
+    "tracks": [
+      "jee-main"
+    ],
+    "focus": "Primary-source JEE Main notices, syllabus references and final answer-key links",
+    "region": "global",
+    "lastChecked": "2026-10-10",
+    "access": "external-link-only",
+    "requiresNetwork": true,
+    "licensedForEmbedding": false
+  },
+  {
+    "id": "jee-advanced-2026",
+    "title": "JEE Advanced 2026 official examination papers",
+    "issuer": "JAB",
+    "url": "https://jeeadv.ac.in/",
+    "type": "official-2026-paper-index",
+    "grades": [
+      11,
+      12
+    ],
+    "tracks": [
+      "jee-advanced"
+    ],
+    "focus": "2026 official examination homepage with English/Hindi paper links",
+    "region": "global",
+    "lastChecked": "2026-10-10",
+    "access": "external-link-only",
+    "requiresNetwork": true,
+    "licensedForEmbedding": false
+  },
+  {
+    "id": "openstax-precalculus",
+    "title": "OpenStax Precalculus 2e: optional external reference",
+    "issuer": "OpenStax",
+    "url": "https://openstax.org/books/precalculus-2e/pages/preface",
+    "type": "external-book",
+    "grades": [
+      11,
+      12
+    ],
+    "tracks": [
+      "cbse",
+      "jee-main",
+      "jee-advanced"
+    ],
+    "focus": "Independent deeper coverage of functions, trig and sequences; not Indian syllabus certified; CC-BY-NC-SA, link only",
+    "region": "global",
+    "lastChecked": "2026-10-10",
+    "access": "external-link-only",
+    "requiresNetwork": true,
+    "licensedForEmbedding": false
+  },
+  {
+    "id": "openstax-calculus1",
+    "title": "OpenStax Calculus Volume 1: optional external reference",
+    "issuer": "OpenStax",
+    "url": "https://openstax.org/books/calculus-volume-1/pages/preface",
+    "type": "external-book",
+    "grades": [
+      11,
+      12
+    ],
+    "tracks": [
+      "cbse",
+      "jee-main",
+      "jee-advanced"
+    ],
+    "focus": "Calculus theory, worked illustrations and conceptual diagrams; not exam syllabus certified; CC-BY-NC-SA, link only",
+    "region": "global",
+    "lastChecked": "2026-10-10",
+    "access": "external-link-only",
+    "requiresNetwork": true,
+    "licensedForEmbedding": false
+  },
+  {
+    "id": "geogebra-3d",
+    "title": "GeoGebra 3D calculator",
+    "issuer": "GeoGebra",
+    "url": "https://mat.geogebra.org/3d",
+    "type": "external-visualisation",
+    "grades": [
+      11,
+      12
+    ],
+    "tracks": [
+      "cbse",
+      "jee-main",
+      "jee-advanced"
+    ],
+    "focus": "Explore vectors, planes and 3D geometry; not an examination-approved calculator",
+    "region": "global",
+    "lastChecked": "2026-10-10",
+    "access": "external-link-only",
+    "requiresNetwork": true,
+    "licensedForEmbedding": false
+  },
+  {
+    "id": "phet-math",
+    "title": "PhET interactive mathematics and statistics simulations",
+    "issuer": "University of Colorado Boulder",
+    "url": "https://phet.colorado.edu/en/simulations/filter?view=list",
+    "type": "external-visualisation",
+    "grades": [
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "tracks": [
+      "cbse"
+    ],
+    "focus": "Interactive mathematical models and data visualizations; select mathematics filters at source",
+    "region": "global",
+    "lastChecked": "2026-10-10",
+    "access": "external-link-only",
+    "requiresNetwork": true,
+    "licensedForEmbedding": false
   }
 ]);
 
