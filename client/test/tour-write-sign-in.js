@@ -799,6 +799,9 @@ export const saveTruthFlow = {
     await page.waitForTimeout(300);
     await page.getByRole('button', { name: 'Answer by handwriting' }).click();
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+    // Coming back to the pen re-saves the page (saving → saved): wait for the
+    // state after that write, not the one carried over from before the switch.
+    await page.waitForTimeout(900);
     await waitWorkState(page, 'waiting-sign-in');
     const afterModes = await saveTruth(page, qid);
     await check('Type → Photo → Write: the same strokes are on the page and in the store',
