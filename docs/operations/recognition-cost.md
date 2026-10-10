@@ -24,7 +24,7 @@ One provider call = one unit of the deployment ceiling.
 | Second try, ink rewritten | +2 | **+1** | a changed picture is always read afresh |
 | Student edits the transcript text | +0 | +0 | `/recognition/:receipt/confirm` never calls the provider |
 | Blank or unreadable page | 2 per send (4 if it was also submitted) | **2 once**, then 0 for the same picture | an empty read escalates to the fallback model; the empty result is kept like any other |
-| Reload re-sending identical restored strokes | +1 or +2 | **+0** | byte-identical picture; also true after a server restart, inside 15 minutes |
+| Reload re-sending identical restored strokes | +1 or +2 | **+0** | byte-identical picture; also true after a server restart, inside 24 hours |
 | Double click, two tabs, ten concurrent identical requests | one call each | **1 in total** | they join one read in flight |
 | Photo: same rows as Write | same | same | the read does not depend on the input mode |
 
@@ -110,7 +110,7 @@ At those prices (MODELLED from §3):
 
 Per handwritten answer, clean first try: one read. For 100 / 1,000 / 10,000 answers at the mean call: **$0.50 / $4.98 / $49.78** (MODELLED); at the most expensive call observed: $0.95 / $9.47 / $94.66. Before this change the same answers cost at least twice that.
 
-Retries and corrections: editing the transcript costs nothing; rewriting the ink costs one more read; re-sending the same picture costs nothing for 15 minutes.
+Retries and corrections: editing the transcript costs nothing; rewriting the ink costs one more read; re-sending the same picture costs nothing for 24 hours.
 
 **Refund rule.** A unit is given back only when this server certainly sent the provider nothing: `HANDWRITING_NOT_CONFIGURED` and `HANDWRITING_PROVIDER_CONFIG_INVALID`. It is kept for our own timeout, a 5xx, an unreachable provider, a 429, a rejection and a malformed reply. Reason: the ceiling exists to bound the bill; after a timeout or a 5xx the provider may have run the model, and "unreachable" does not distinguish a refused connection from one dropped after the request was received. Whether the provider bills a 4xx/429 is NOT VERIFIED, so those keep their unit too. The cost of being conservative is that an outage consumes ceiling units without producing reads.
 
@@ -193,13 +193,13 @@ Per-account quotas and abuse protections, recommended: keep the per-account requ
 
 ## 7. Where kept reads live: invariants, privacy, restart
 
-**Storage.** A completed read is one row in the existing `idempotency_keys` table: `scope = 'recognition-read'`, `key` = HMAC-SHA-256 (server key derived from `PRI_AUTH_DELIVERY_KEY`) over the account id, the image type, the SHA-256 of the decoded image bytes and the reader configuration; `response_json` = the transcript record; `expires_at` = paid read + 15 minutes. No schema change and no migration. The table could be reused because it already has: a per-account primary key `(account_id, scope, key)`; Row-Level Security by account for the server role on Postgres; an `expires_at` that housekeeping deletes on (startup and every six hours); `ON DELETE CASCADE` from `accounts`; and it already holds reading receipts, with their transcripts, for 90 days.
+**Storage.** A completed read is one row in the existing `idempotency_keys` table: `scope = 'recognition-read'`, `key` = HMAC-SHA-256 (server key derived from `PRI_AUTH_DELIVERY_KEY`) over the account id, the image type, the SHA-256 of the decoded image bytes and the reader configuration; `response_json` = the transcript record; `expires_at` = paid read + 24 hours. No schema change and no migration. The table could be reused because it already has: a per-account primary key `(account_id, scope, key)`; Row-Level Security by account for the server role on Postgres; an `expires_at` that housekeeping deletes on (startup and every six hours); `ON DELETE CASCADE` from `accounts`; and it already holds reading receipts, with their transcripts, for 90 days.
 
 **What is stored.** The transcript only (lines, text, confidences, engine label, flags), at most 64 kB. Never the image, and never its plain digest — a database reader cannot test whether an account submitted a known picture without the server key. Who can read it: the server role, and only for the owning account; it is returned only to a live, verified, consented session of that account.
 
-**How long.** Reusable for 15 minutes from the paid read; reuse does not extend it. The row is deleted at the same account's next paid read or at the next housekeeping pass, whichever is first — so up to about six hours physically, 15 minutes usefully. Account deletion removes the rows at once (cascade; asserted in the suite, and the table is in the account-deletion journey's zero-rows list). Guardian-consent withdrawal does not delete them, but the routes that could return them are refused from that moment (tested), and they expire.
+**How long.** Reusable for 24 hours from the paid read; reuse does not extend it. The row is deleted at the same account's next paid read or at the next housekeeping pass, whichever is first — so up to about six hours physically, 24 hours usefully. Account deletion removes the rows at once (cascade; asserted in the suite, and the table is in the account-deletion journey's zero-rows list). Guardian-consent withdrawal does not delete them, but the routes that could return them are refused from that moment (tested), and they expire.
 
-**Why 15 minutes.** One attempt at a question — write, read, check the transcript, submit, second try — is minutes. Fifteen covers a pause or a reload without keeping a child's transcript for this purpose longer than one sitting. A read is a pure function of the picture and the configuration, so the TTL is not about staleness.
+**Why 24 hours.** The transcript of a page is kept on the student's device with the page, and Submit binds it into a receipt by looking the read up here. With a 15-minute lifetime a student who read a page, left and submitted later bought a second read at Submit without pressing anything. The kept read now outlives a school day and a night; and when it is gone, Submit pays nothing — `/v1/practice/:id/recognize` never starts a provider call (`RECOGNITION_READ_EXPIRED`, 409) and the student presses Read again. It is the transcript only; the lifetime bounds how long that text is kept for this purpose, not staleness.
 
 **Restart.** Completed reads survive a restart (they are in the database). A read that was in flight when the process died is lost; its unit was counted and is not refunded; the retry is a new paid read.
 

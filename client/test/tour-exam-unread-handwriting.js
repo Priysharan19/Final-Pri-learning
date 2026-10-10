@@ -225,7 +225,110 @@ export const flow = {
   }
 };
 
+/** A JEE Main paper with question 21 open for handwriting; "42" is written on it. */
+async function writeFortyTwo({ page, base, goto, createProfile, settle, online }, name) {
+  await goto('/');
+  await createProfile({ name, year: 12, course: 'in', track: 'jee-main' });
+  await online.signIn({ name });
+  await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
+  const start = page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' });
+  await start.waitFor({ timeout: 30000 });
+  await start.click();
+  await page.waitForSelector('.exam-timer', { timeout: 60000 });
+  const examId = new URL(page.url()).pathname.split('/').pop();
+  await page.locator('.exam-dot').nth(20).click();
+  await settle();
+  await page.getByRole('button', { name: '✍ Write by hand' }).click();
+  await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+  const box = await page.locator('.ink-canvas-live').boundingBox();
+  await handwrite(page, box, '42');
+  return { examId, box };
+}
+const submitPaper = async (page) => {
+  await page.locator('.exam-head').getByRole('button', { name: 'Review and submit' }).click();
+  const dialog = page.locator('[role="dialog"]');
+  const text = (await dialog.innerText()).replace(/\s+/g, ' ');
+  const unread = await dialog.locator('[data-exam-confirm-unread]').getAttribute('data-exam-confirm-unread').catch(() => null);
+  await dialog.getByRole('button', { name: 'Submit paper' }).click();
+  await page.waitForSelector('.hero-num', { timeout: 90000 }).catch(() => {});
+  return { text, unread };
+};
+const inkLine = async (page, examId) => (await storedExam(page, examId))?.lines.find(l => l.readAfterClose || l.pending) || null;
+
+// Review 17, F1 — the reviewer's repro, exactly: write 42 on Q21, never press
+// Read, Review and submit → Submit paper. It used to be sent as a blank
+// ("answered 0 of 25") with no word of warning.
+export const flowSubmitUnread = {
+  id: 'exam-unread-submit',
+  name: 'India exam · handwriting never read, then Submit paper: told in the dialog, read once, never blank',
+  online: true,
+  async run(ctx) {
+    const { page, check, note, online } = ctx;
+    const { reader } = online;
+    try {
+      reader.lines = null; reader.text = '42'; reader.confidence = 0.97; reader.down = false;
+      const before = reader.requests.length;
+      const { examId } = await writeFortyTwo(ctx, 'Nikhil Rao');
+      await page.waitForTimeout(2500);
+      const head = (await page.locator('.exam-head').innerText()).replace(/\s+/g, ' ');
+      const whileSitting = reader.requests.length - before;
+      const { text, unread } = await submitPaper(page);
+      await check('written, never read: nothing was sent to the reader while the paper was open', whileSitting === 0, `reader +${whileSitting}; head ${head.slice(0, 80)}`);
+      await check('Review and submit tells the student one handwritten answer has not been read, before they submit',
+        unread === '1' && /1 handwritten answer has not been read/.test(text), text.slice(0, 240));
+      const line = await inkLine(page, examId);
+      const result = await online.examResult(examId);
+      const pages = Object.values(result?.handwriting?.pages || {});
+      await check(`the handwritten answer is NOT submitted blank: the frozen page was read once at Submit and "42" is what the server marked — one provider call [${EVIDENCE}]`,
+        !!line && line.pending === false && line.given === '42' && line.unanswered === false && line.readAfterClose === true &&
+          pages.length === 1 && pages[0].state === 'resolved' && pages[0].attempts === 1 && reader.requests.length - before === 1,
+        JSON.stringify({ line, page: pages[0], provider: reader.requests.length - before }));
+      await check('the marked paper shows that answer as answered, with no provisional note left',
+        await page.locator('[data-exam-provisional]').count() === 0 && await page.locator('[data-exam-pending-line]').count() === 0);
+      note(`provider calls, unread handwriting then Submit paper [${EVIDENCE}]: ${reader.requests.length - before}`);
+    } finally { reader.down = false; reader.lines = null; reader.text = '7'; reader.confidence = 0.6; }
+  }
+};
+
+// Review 17, F1 — read, then one more stroke, then submit: the transcript on
+// screen is of earlier writing, so the page as it now stands is what is frozen
+// and read, never the stale transcript and never a blank.
+export const flowSubmitStale = {
+  id: 'exam-stale-submit',
+  name: 'India exam · read, one more stroke, then Submit paper: the page as it stands is read once, never blank',
+  online: true,
+  async run(ctx) {
+    const { page, check, note, online } = ctx;
+    const { reader } = online;
+    try {
+      reader.lines = null; reader.text = '42'; reader.confidence = 0.97; reader.down = false;
+      const before = reader.requests.length;
+      const { examId, box } = await writeFortyTwo(ctx, 'Sana Kapoor');
+      await page.locator('[data-ink-read]').first().click();
+      await page.waitForSelector('.ink-line', { timeout: 20000 }).catch(() => {});
+      const readOnce = reader.requests.length - before;
+      reader.text = '427';
+      await handwrite(page, box, '7', { x: 190 });
+      await page.waitForSelector('[data-ink-stale]', { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(2500);
+      const stale = await page.locator('[data-ink-stale]').count();
+      const { text, unread } = await submitPaper(page);
+      await check('after one more stroke the transcript is marked as from earlier writing, and Review and submit says the answer has not been read',
+        readOnce === 1 && stale === 1 && unread === '1' && /1 handwritten answer has not been read/.test(text), `reads ${readOnce}; stale ${stale}; dialog ${text.slice(0, 160)}`);
+      const line = await inkLine(page, examId);
+      const result = await online.examResult(examId);
+      const pages = Object.values(result?.handwriting?.pages || {});
+      await check(`the answer is NOT blank and NOT the stale "42": the page as it stood at Submit was read once ("427") and marked — two provider calls in all, both for pages the student wrote [${EVIDENCE}]`,
+        !!line && line.pending === false && line.given === '427' && line.unanswered === false && pages.length === 1 && pages[0].state === 'resolved' && reader.requests.length - before === 2,
+        JSON.stringify({ line, page: pages[0], provider: reader.requests.length - before }));
+      note(`provider calls, read then one more stroke then Submit paper [${EVIDENCE}]: ${reader.requests.length - before}`);
+    } finally { reader.down = false; reader.lines = null; reader.text = '7'; reader.confidence = 0.6; }
+  }
+};
+
+export const flows = [flow, flowSubmitUnread, flowSubmitStale];
+
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
-  const { runOne } = await import('./e2e.mjs');
-  process.exit(await runOne(flow) ? 1 : 0);
+  const { runFlows } = await import('./e2e.mjs');
+  process.exit(await runFlows(flows) ? 1 : 0);
 }

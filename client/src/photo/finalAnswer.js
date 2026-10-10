@@ -306,7 +306,9 @@ function pointFromLine(s, question) {
   const lead = [...rel, ...words].sort((a, b) => a.end - b.end);
   // Drop a lead-in ("so the point is", "∴", "vertex:") but never a coordinate name.
   for (const cut of lead.reverse()) {
-    const rest = text.slice(cut.end).trim();
+    // "Ans. 4, 0": the stop belongs to the abbreviation, not to the first
+    // coordinate (the same rule valueOf applies) — never "(. 4, 0)".
+    const rest = text.slice(cut.end).replace(/^\s*[.:,]\s+/, '').trim();
     if (segments(rest).length === 2) { text = rest; break; }
   }
   const parts = segments(text);
@@ -314,12 +316,21 @@ function pointFromLine(s, question) {
   const read = parts.map(part => {
     const m = part.match(/^([a-zA-Z])\s*=\s*(.+)$/);
     const value = stripSentence(m ? m[2] : part);
+    // A coordinate is a plain number as written. A piece that starts with a
+    // stray stop (". 4") or is a zero-padded group ("000" — the tail of
+    // "1, 000", one number written with a separator) is not one.
+    if (/^\.\s/.test(value) || /^[-+−]?0\d/.test(value) || /=/.test(value)) return null;
     return readsAsAnswer(value, NUMBER) ? { name: m ? m[1].toLowerCase() : null, value } : null;
   });
   if (read.some(r => !r)) return { status: 'none' };
   const names = read.map(r => r.name);
   let ordered = null;
-  if (names[0] === null && names[1] === null) ordered = read;
+  // Two bare numbers are a pair only when written as one: "4, 0". "1,234" is
+  // one number, and "7 and 9" lists two things that need not be coordinates.
+  if (names[0] === null && names[1] === null) {
+    if (/\d,\d{3}(?!\d)/.test(text) || /(^|[^\p{L}])(and|तथा)(?=[^\p{L}]|$)/iu.test(text)) return { status: 'none' };
+    ordered = read;
+  }
   else if (names[0] === 'x' && names[1] === 'y') ordered = read;
   else if (names[0] === 'y' && names[1] === 'x') ordered = [read[1], read[0]];
   if (!ordered) return { status: 'none' };
@@ -338,6 +349,32 @@ function setFromLine(s, question) {
   if (!whole) return { status: 'none' };
   const parts = segments(whole);
   if (parts.length < 2) return null;
+  // Only values of the solved variable belong in the set. "x² = 4, x = 2 or
+  // x = -2" states one equation and two roots: the 4 is a step. A piece whose
+  // "=" has anything but a bare variable on its left is a step, not a value.
+  const kinds = parts.map(part => {
+    const at = part.lastIndexOf('=');
+    if (at < 0) return { kind: 'value' };
+    const left = part.slice(0, at);
+    const named = /(^|[^\p{L}\p{N}^)\]}²³])([a-zA-Zθ])\s*$/u.exec(left);
+    return named && !/[\d^()\[\]{}²³√+*/<>=-]/.test(left.slice(0, named.index + named[1].length)) ? { kind: 'root', name: named[2] } : { kind: 'step' };
+  });
+  if (kinds.some(k => k.kind === 'step')) {
+    const roots = kinds.filter(k => k.kind === 'root');
+    const sameVariable = roots.length > 0 && roots.every(k => k.name === roots[0].name);
+    // Bare values ("x = 2 or -2") follow the root they are listed with.
+    const firstRoot = kinds.findIndex(k => k.kind === 'root');
+    const kept = sameVariable ? parts.filter((_, i) => kinds[i].kind === 'root' || (kinds[i].kind === 'value' && i > firstRoot)) : [];
+    const solved = kept.map(part => valueOf(part, NUMBER));
+    if (kept.length && solved.every(Boolean)) {
+      const answer = distinct(solved, NUMBER).join(', ');
+      if (readsAsAnswer(answer, question)) return { status: 'proposed', answer };
+    }
+    // Steps only, or roots of different variables: which numbers are meant is
+    // the student's to say.
+    const candidates = distinct(parts.map(part => valueOf(part, NUMBER)).filter(Boolean), NUMBER);
+    return candidates.length ? { status: 'ambiguous', candidates } : { status: 'none' };
+  }
   const values = parts.map(part => valueOf(part, NUMBER));
   if (values.some(v => !v)) {
     // "roots are {1, -2}" and the like are read whole by the ordinary rules.

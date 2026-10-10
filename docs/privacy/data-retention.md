@@ -173,7 +173,7 @@ What is true in the code today:
   request (≤ 750,000 decoded bytes), forwarded to the configured provider, and dropped. It is not
   written to the database, to disk, to a bucket or to any log. The **image** is never stored.
   The **transcription text** is returned to the device and is kept server-side in two places,
-  both in `idempotency_keys`, both per account and both deleted with the account: for 15 minutes
+  both in `idempotency_keys`, both per account and both deleted with the account: for 24 hours
   under scope `recognition-read` (keyed by a keyed digest of the picture, so the same picture is
   not sent to the provider twice — `docs/operations/recognition-cost.md` §7), and, when the
   student submits a written answer, inside the reading receipt (`practice-recognition`).

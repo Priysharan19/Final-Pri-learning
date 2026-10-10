@@ -152,6 +152,37 @@ eq(stripSentence('3. x = 6.'), 'x = 6', 'a list number in front of a line is dro
 eq(answerFromLine('x = 6.', N), proposed('6'), 'one line, one value');
 eq(proposeFinalAnswer(['a', 'b = 2', 'least value => 6.'], N).line, 2, 'the proposal names the line it came from');
 
+// ── Review 17 · a correct page is never mis-proposed ─────────────────────────
+// F2: the stop of "Ans." is not part of the first coordinate, and a number
+// written with a separator is not a pair.
+{
+  const P = { answerType: 'point' }, S = { answerType: 'set' };
+  const strip = r => ({ status: r.status, ...(r.answer !== undefined ? { answer: r.answer } : {}), ...(r.candidates ? { candidates: r.candidates } : {}) });
+  for (const [lines, type, want] of [
+    [['Ans. 4, 0'], P, { status: 'proposed', answer: '(4, 0)' }],
+    [['Ans: 4, 0'], P, { status: 'proposed', answer: '(4, 0)' }],
+    [['Answer. x = 4, y = 0'], P, { status: 'proposed', answer: '(4, 0)' }],
+    [['1, 000'], P, { status: 'none' }],
+    [['12, 050'], P, { status: 'none' }],
+    [['1,234'], P, { status: 'none' }],
+    [['7 and 9'], P, { status: 'none' }],
+    [['x = 7 and y = 9'], P, { status: 'proposed', answer: '(7, 9)' }],
+    [['1, 0'], P, { status: 'proposed', answer: '(1, 0)' }],
+    [['0.5, 0'], P, { status: 'proposed', answer: '(0.5, 0)' }],
+    // F5: only values of the solved variable belong in the set.
+    [['x^2 = 4, x = 2 or x = -2'], S, { status: 'proposed', answer: '2, -2' }],
+    [['x² = 4, x = 2 or -2'], S, { status: 'proposed', answer: '2, -2' }],
+    [['(x-1)(x-2) = 0, x = 1 or x = 2'], S, { status: 'proposed', answer: '1, 2' }],
+    [['2x = 2 or 2x = 4'], S, { status: 'ambiguous', candidates: ['2', '4'] }],
+    [['x^2 = 9 or x^2 = 16'], S, { status: 'ambiguous', candidates: ['9', '16'] }],
+    [['x + 1 = 3, y = 2 or x = 5'], S, { status: 'ambiguous', candidates: ['3', '2', '5'] }],
+    [['so x = 1 or x = 2'], S, { status: 'proposed', answer: '1, 2' }],
+    [['roots are {1, -2}'], S, { status: 'proposed', answer: '{1, -2}' }]
+  ]) eq(strip(proposeFinalAnswer(lines, type)), want, `review 17: ${JSON.stringify(lines[0])} as ${type.answerType}`);
+  // Whatever is proposed for a point reads, in the marker's own parser, as the pair that was written.
+  ok(!/\(\s*\./.test(JSON.stringify(proposeFinalAnswer(['Ans. 4, 0'], P))), 'no proposal ever opens a pair with a stray stop');
+}
+
 // ── 1b · handwriting (Write mode) uses the same module ───────────────────────
 // Owner case A3: working whose last line is an equation, "38.5 - 24.5 = 14".
 // The last line was sent verbatim and refused as unreadable. The card's rule,
