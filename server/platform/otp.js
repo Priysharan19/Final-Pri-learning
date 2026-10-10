@@ -121,6 +121,15 @@ export function createOtpRouter(db, {
     throw error;
   }
 
+  // Which code channels this deployment can actually send on, so the sign-in
+  // card offers only what works (an email code; a phone code only where an SMS
+  // provider is configured). Deployment configuration and nothing else: the
+  // same answer for every caller, no account, address or session is read.
+  router.get('/channels', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({ channels: { email: !!sendEmail, sms: !!sms } });
+  });
+
   router.post('/request', rateLimit(db, 'otp-request', { limit: 20, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const channel = req.body?.channel === 'sms' ? 'sms' : req.body?.channel === 'email' ? 'email' : null;
     const destination = channel ? normalizeDestination(channel, req.body?.destination) : null;

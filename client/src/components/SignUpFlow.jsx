@@ -1,22 +1,37 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · account sign-up and sign-in
+// Pri Learning · the one sign-in card
 //
-//   who → age → class & track → how (phone · email · Google · Apple) → code
-//       → a parent's approval if under 18 → the first question
+//   email → Continue with email → six-digit code, in this same card
+//        → signed in                      (the address already has an account)
+//        → name & age → class → signed in (a new address: the account is made
+//                                          and verified by the code just typed)
+//        → a parent's approval, explained where it is needed, if under 18
 //
-// One step on screen at a time, moving forward or back with a short slide that
-// collapses to nothing under prefers-reduced-motion. Each step's heading takes
-// focus when it arrives, so a screen reader hears where it is.
+// New and returning students take the same road; nobody chooses "sign up" or
+// "sign in" first, and nobody types an email twice. Below the email field the
+// card offers only what the server says it can do: Google / Apple when the
+// deployment configures them (/v1/account/identity/providers), a phone code
+// only where an SMS provider exists (/v1/account/otp/channels), and a small
+// "Sign in with password" for accounts that already have one.
+//
+// Two variants, one component:
+//   page    the landing screen. Ends by handing { account, name, year, track }
+//           to the caller, which makes this device's profile and opens practice.
+//   inline  inside a page the student is already working on (a question, the
+//           account panel). The profile exists, so the class is never asked
+//           again; the caller links the account and closes the card. Nothing
+//           here navigates, reloads, reads handwriting or submits anything.
 //
 // The server decides everything that matters (server/platform/otp.js): codes
-// are checked there, a child's account is created limited, and only a parent's
-// code or emailed link lifts the limit. This file only asks the questions.
+// are checked there, expire there, are single-use there; a child's account is
+// created limited and only a parent's own approval lifts the limit. This file
+// asks the questions and says plainly what happened.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { cloudDeviceId } from '../platform/cloudAccount.js';
 import { requestIdentityToken, socialProviderConfig } from '../platform/socialSignIn.js';
-import { tLater, useT } from '../i18n/index.js';
+import { tLater, useT, useTx } from '../i18n/index.js';
 import OtpInput, { OTP_LENGTH } from './OtpInput.jsx';
 import './SignUpFlow.css';
 
@@ -29,15 +44,11 @@ const TRACKS = [
   { key: 'jee-advanced', label: 'JEE Advanced' }
 ];
 const RESEND_SECONDS = 30;
+const CODE_LIFETIME_MS = 10 * 60 * 1000;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Must equal CONSENT_NOTICE_VERSION in server/platform/guardianConsent.js; the
 // server refuses an approval that names any other notice.
 export const GUARDIAN_NOTICE_VERSION = '2026-10-02';
-
-function stepsFor({ mode, role, minor }) {
-  if (role === 'parent') return ['role', 'parent-home'];
-  if (mode === 'signin') return ['method', 'code', 'age', 'class', ...(minor ? ['parent', 'parent-wait'] : [])];
-  return ['role', 'age', 'class', 'method', 'code', ...(minor ? ['parent', 'parent-wait'] : [])];
-}
 
 /** Read an SMS code through WebOTP where the browser offers it (Android Chrome). */
 function listenForSmsCode(onCode) {
@@ -49,52 +60,138 @@ function listenForSmsCode(onCode) {
   return () => controller.abort();
 }
 
-export default function SignUpFlow({ initialMode = 'signup', initialName = '', onCancel, onFinish, onStartOffline }) {
+/**
+ * True when the request never reached the server: offline, a dropped
+ * connection, a timeout. fetch reports these as a bare TypeError or a
+ * DOMException (whose legacy numeric `code` is not one of ours); every answer
+ * the server gave, and every refusal raised in this app, carries a status or a
+ * string code. Nothing was spent by a request that never arrived.
+ */
+export function isNetworkFailure(error) {
+  if (!error || Number(error.status) > 0) return false;
+  if (typeof error.code === 'string' && error.code) return false;
+  return true;
+}
+
+/**
+ * The words for a refused or failed request, as a catalogue key. Pure: the
+ * card's whole error vocabulary is in this one table, and it is tested without
+ * a browser (client/test/sign-in-card-check.mjs).
+ *
+ * `OTP_INVALID` is the server's single answer for a wrong, expired, spent or
+ * unknown code — it deliberately does not say which. The card adds only what
+ * it knows itself: the tries the server reported, and its own clock.
+ */
+export function signInErrorCopy(error, { expired = false } = {}) {
+  const code = typeof error?.code === 'string' ? error.code : '';
+  const status = Number(error?.status) || 0;
+  if (isNetworkFailure(error)) return { key: 'signup.offlineError', kind: 'network' };
+  if (code === 'OTP_INVALID') {
+    if (expired) return { key: 'signup.codeExpired', kind: 'expired' };
+    const left = Number.isFinite(error?.attemptsRemaining) ? Number(error.attemptsRemaining) : null;
+    if (left === 0) return { key: 'signup.codeLocked', kind: 'locked' };
+    if (left !== null) return { key: 'signup.codeWrongLeft', vars: { count: left, n: left }, kind: 'wrong' };
+    return { key: 'signup.codeWrongOrExpired', kind: 'wrong' };
+  }
+  if (code === 'OTP_RATE_LIMITED' || status === 429) {
+    if (code === 'ACCOUNT_LOCKED') return { key: 'signup.passwordLocked', kind: 'locked' };
+    const seconds = Number.isFinite(error?.retryAfterMs) ? Math.max(1, Math.ceil(error.retryAfterMs / 1000)) : null;
+    return seconds && seconds <= 120
+      ? { key: 'signup.rateLimited', vars: { n: seconds }, kind: 'rate' }
+      : { key: 'signup.rateLimitedPlain', kind: 'rate' };
+  }
+  if (code === 'OTP_DESTINATION_INVALID') return { key: 'signup.emailInvalid', kind: 'input' };
+  if (code === 'OTP_EMAIL_NOT_CONFIGURED' || code === 'OTP_SMS_NOT_CONFIGURED') return { key: 'signup.codesOff', kind: 'outage' };
+  if (code === 'OTP_DELIVERY_FAILED') return { key: 'signup.deliveryFailed', kind: 'outage' };
+  if (code === 'BAD_CREDENTIALS') return { key: 'signup.passwordWrong', kind: 'wrong' };
+  if (code === 'PROFILE_NAME_REQUIRED') return { key: 'signup.nameRequired', kind: 'input' };
+  if (code === 'AGE_DECLARATION_REQUIRED' || code === 'CONSENT_DECLARATION_REQUIRED') return { key: 'signup.ageRequired', kind: 'input' };
+  if (code === 'GUARDIAN_SAME_AS_STUDENT' || code === 'GUARDIAN_EMAIL_SAME_AS_STUDENT') return { key: 'signup.parentNotYou', kind: 'input' };
+  if (code === 'GUARDIAN_CONSENT_WITHDRAWN') return { key: 'cloud.guardianDeclined', kind: 'blocked' };
+  if (code === 'IDENTITY_LINK_REQUIRED') return { key: 'signup.socialUseEmail', kind: 'blocked' };
+  if (code === 'OIDC_NONCE_INVALID') return { key: 'signup.socialStartAgain', kind: 'expired' };
+  if (code === 'OIDC_PROVIDER_NOT_CONFIGURED' || code === 'SOCIAL_PROVIDER_ERROR') return { key: 'signup.socialFailed', kind: 'outage' };
+  if (code === 'SOCIAL_POPUP_BLOCKED') return { key: 'cloud.socialPopupBlocked', kind: 'blocked' };
+  if (code === 'SOCIAL_TIMEOUT') return { key: 'cloud.socialTimedOut', kind: 'expired' };
+  if (code === 'CLOUD_LINK_CONFLICT' || code === 'INK_ACCOUNT_MISMATCH') return { key: 'signup.otherAccount', kind: 'blocked' };
+  if (code === 'INK_PROFILE_CHANGED') return { key: 'signup.profileChanged', kind: 'blocked' };
+  if (code === 'INK_DRAFT_NOT_SAVED') return { key: 'signup.saveFirst', kind: 'blocked' };
+  if (status >= 500 || code === 'CLOUD_DISABLED') return { key: 'signup.serverDown', kind: 'outage' };
+  return { key: 'signup.genericError', kind: 'unknown' };
+}
+
+export default function SignUpFlow({
+  variant = 'page', initialName = '', knownYear = null, knownTrack = null,
+  onCancel = null, onFinish, onStartOffline = null, onStep = null
+}) {
   const t = useT();
-  const [mode, setMode] = useState(initialMode);
-  const [role, setRole] = useState(initialMode === 'signin' ? 'student' : '');
-  const [age, setAge] = useState(null);           // number, or 18 for "18 or older"
-  const [year, setYear] = useState(null);
-  const [track, setTrack] = useState('cbse');
-  const [name, setName] = useState(() => String(initialName || '').slice(0, 80));
-  const [channel, setChannel] = useState('sms');
+  const tx = useTx();
+  const inline = variant === 'inline';
+  const [step, setStep] = useState('method');
+  const [direction, setDirection] = useState('forward');
+  const [channel, setChannel] = useState('email');
   const [destination, setDestination] = useState('');
-  const [challenge, setChallenge] = useState(null);
+  const [challenge, setChallenge] = useState(null);     // { id, channel, destination, expiresAt }
   const [code, setCode] = useState('');
   const [ticket, setTicket] = useState('');
+  const [pendingSocial, setPendingSocial] = useState(null);
   const [account, setAccount] = useState(null);
   const [consent, setConsent] = useState(null);
+  const [name, setName] = useState(() => String(initialName || '').slice(0, 80));
+  const [age, setAge] = useState(null);                 // number, or 18 for "18 or older"
+  const [year, setYear] = useState(knownYear == null ? null : Number(knownYear));
+  const [track, setTrack] = useState(knownTrack || 'cbse');
+  const [password, setPassword] = useState('');
   const [parentName, setParentName] = useState('');
-  const [parentChannel, setParentChannel] = useState('sms');
+  const [parentChannel, setParentChannel] = useState('email');
   const [parentDestination, setParentDestination] = useState('');
   const [resendAt, setResendAt] = useState(0);
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [invalid, setInvalid] = useState(false);
   const [providers, setProviders] = useState({ google: null, apple: null });
-  const [index, setIndex] = useState(0);
-  const [direction, setDirection] = useState('forward');
+  const [channels, setChannels] = useState({ email: true, sms: false });
   const headingRef = useRef(null);
+  const firstRender = useRef(true);
+  // Synchronous guards: React state is too late to stop a double tap, an
+  // auto-submit racing the button, or two pastes in one tick.
+  const verifying = useRef(false);
+  const sending = useRef(false);
+  const finishing = useRef(false);
   const available = cloudAvailable();
 
-  const minor = role !== 'parent' && age !== null && age < 18;
-  const steps = useMemo(() => stepsFor({ mode, role, minor }), [mode, role, minor]);
-  const step = steps[Math.min(index, steps.length - 1)];
+  const needsParent = !!consent?.required && consent.state !== 'given';
+  const newAccount = !!ticket || !!pendingSocial;
 
-  useEffect(() => { headingRef.current?.focus({ preventScroll: true }); }, [step]);
+  useEffect(() => { onStep?.(step); }, [step, onStep]);
   useEffect(() => {
-    if (resendAt <= now) return undefined;
+    // The landing screen keeps its own focus on first paint; every later step
+    // moves focus to its heading so a screen reader hears where it is.
+    if (firstRender.current) { firstRender.current = false; if (!inline) return; }
+    headingRef.current?.focus({ preventScroll: true });
+  }, [step, inline]);
+  useEffect(() => {
+    if (resendAt <= now && !(step === 'code' && challenge)) return undefined;
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [resendAt, now]);
+  }, [resendAt, now, step, challenge]);
   useEffect(() => {
     if (!available) return undefined;
     let live = true;
     socialProviderConfig().then(config => { if (live) setProviders(config); }).catch(() => {});
+    // An older server without the route, or a moment offline: keep the email
+    // default — asking for a code then says whatever is true.
+    cloud.otpChannels().then(result => {
+      if (!live || !result?.channels) return;
+      setChannels({ email: result.channels.email !== false, sms: result.channels.sms === true });
+    }).catch(() => {});
     return () => { live = false; };
   }, [available]);
-  // WebOTP: on the code steps for an SMS, offer the incoming code to the boxes.
+  // A deployment with no email sender has only the password road.
+  useEffect(() => { if (!channels.email && !channels.sms && step === 'method') setStep('password'); }, [channels, step]);
+  // WebOTP: on the code step for an SMS, offer the incoming code to the boxes.
   useEffect(() => {
     if (step === 'code' && channel === 'sms') return listenForSmsCode(c => { setCode(c); void verify(c); });
     return undefined;
@@ -117,110 +214,199 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
-  const go = (to) => {
-    setError(''); setInvalid(false);
-    const target = typeof to === 'number' ? to : steps.indexOf(to);
-    setDirection(target < index ? 'back' : 'forward');
-    setIndex(Math.max(0, target));
+  const go = (to, dir = 'forward') => {
+    setError(''); setInvalid(false); setNotice('');
+    setDirection(dir);
+    setStep(to);
   };
-  const next = () => go(index + 1);
-  const back = () => {
-    if (index === 0) { onCancel?.(); return; }
-    // Once an account exists, going back past the code would re-ask for it.
-    if (account && steps[index - 1] === 'code') { go(index - 2 >= 0 ? index - 2 : 0); return; }
-    go(index - 1);
-  };
-  const fail = (err) => {
-    setError(err?.message || tLater('signup.genericError'));
+  const say = (copy) => setError(tLater(copy.key, copy.vars));
+  const fail = (err, options) => {
+    const copy = signInErrorCopy(err, options);
+    say(copy);
     setBusy('');
+    return copy;
   };
 
-  const profile = () => ({ name: name.trim(), year: year == null ? undefined : String(year), isAdult: age === null ? undefined : age >= 18, role });
+  const cleanDestination = () => (channel === 'email' ? destination.trim().toLowerCase() : destination.trim());
+  const shownDestination = () => (channel === 'sms' ? `+91 ${destination.trim()}` : destination.trim());
+  const profile = () => ({ name: name.trim(), year: year == null ? undefined : String(year), isAdult: age === null ? undefined : age >= 18, role: 'student' });
+  const detailsReady = () => !!name.trim() && age !== null && (inline || year !== null);
 
-  async function sendCode() {
-    if (busy) return;
-    if (mode === 'signup' && !name.trim()) { setError(tLater('signup.nameRequired')); return; }
-    setBusy('send'); setError('');
+  async function sendCode({ resend = false } = {}) {
+    if (sending.current || busy) return;
+    const to = cleanDestination();
+    if (channel === 'email' && !EMAIL_RE.test(to)) { setError(tLater('signup.emailInvalid')); return; }
+    if (!to) return;
+    // The same address again while its code is still live and the cooldown has
+    // not passed (back from "Change email" without changing it): the code that
+    // was sent still works, so show its boxes rather than a rate-limit notice.
+    if (!resend && challenge && challenge.channel === channel && challenge.destination === to
+      && Date.now() < challenge.expiresAt && Date.now() < resendAt) {
+      go('code');
+      return;
+    }
+    sending.current = true;
+    setBusy('send'); setError(''); setNotice('');
     try {
-      const sent = await cloud.otpRequest({ channel, destination });
-      setChallenge(sent.challengeId);
-      setCode('');
-      setResendAt(Date.now() + (sent.resendAfterMs || RESEND_SECONDS * 1000));
-      setNow(Date.now());
+      const sent = await cloud.otpRequest({ channel, destination: to });
+      const at = Date.now();
+      setChallenge({ id: sent.challengeId, channel, destination: to, expiresAt: at + (Number(sent.expiresInMs) || CODE_LIFETIME_MS) });
+      setCode(''); setInvalid(false); setTicket('');
+      setResendAt(at + (Number(sent.resendAfterMs) || RESEND_SECONDS * 1000));
+      setNow(at);
       setBusy('');
       if (step !== 'code') go('code');
-    } catch (err) { fail(err); }
+      if (resend) setNotice(tLater('signup.codeResent', { to: shownDestination() }));
+    } catch (err) {
+      const copy = fail(err);
+      if (copy.kind === 'rate' && Number.isFinite(err?.retryAfterMs)) { setResendAt(Date.now() + err.retryAfterMs); setNow(Date.now()); }
+    } finally { sending.current = false; }
   }
 
   async function verify(submitted = code) {
-    if (busy === 'verify' || submitted.length !== OTP_LENGTH) return;
-    setBusy('verify'); setError(''); setInvalid(false);
+    if (verifying.current) return;
+    if (submitted.length !== OTP_LENGTH) { setError(tLater('signup.codeIncomplete')); return; }
+    if (!challenge) return;
+    // The card's own clock: a code past its ten minutes is said as expired,
+    // with the way forward, without spending a request on it.
+    if (Date.now() >= challenge.expiresAt) {
+      setInvalid(true); setCode('');
+      say({ key: 'signup.codeExpired' });
+      return;
+    }
+    verifying.current = true;
+    setBusy('verify'); setError(''); setNotice(''); setInvalid(false);
     try {
       const deviceId = await cloudDeviceId();
-      const body = { channel, destination, challengeId: challenge, code: submitted, deviceId };
-      if (mode === 'signup') body.profile = profile();
+      const body = { channel: challenge.channel, destination: challenge.destination, challengeId: challenge.id, code: submitted, deviceId };
+      // Details already given (a ticket ran out and a new code was needed):
+      // one request finishes the account instead of asking again.
+      if (detailsReady() && !account) body.profile = profile();
       const result = await cloud.otpVerify(body);
       if (result.status === 'profile-required') {
-        // A sign-in for an address with no account: ask the sign-up questions,
-        // then finish with the ticket the code earned.
+        // The code is right and the address has no account yet. The ticket it
+        // earned finishes sign-up once the few questions below are answered.
         setTicket(result.signupTicket);
-        setMode('signup');
-        setRole('student');
         setBusy('');
-        setDirection('forward');
-        setIndex(stepsFor({ mode: 'signup', role: 'student', minor: false }).indexOf('role'));
+        go('age');
         return;
       }
       await signedIn(result);
     } catch (err) {
-      setInvalid(err?.code === 'OTP_INVALID');
-      setCode('');
-      const left = err?.code === 'OTP_INVALID' && Number.isFinite(err?.attemptsRemaining) ? err.attemptsRemaining : null;
-      fail(left === 0 ? { message: tLater('signup.codeLocked') } : err);
-    }
+      // A request that never reached the server spent nothing: keep the digits
+      // so "Verify and continue" can send the same code again.
+      if (!isNetworkFailure(err)) { setInvalid(err?.code === 'OTP_INVALID'); setCode(''); }
+      fail(err, { expired: Date.now() >= (challenge?.expiresAt || 0) });
+    } finally { verifying.current = false; }
   }
 
-  async function completeWithTicket() {
+  /** The questions are answered: make the account with what the code (or the provider) earned. */
+  async function completeDetails() {
+    if (verifying.current || busy) return;
+    if (!name.trim()) { setError(tLater('signup.nameRequired')); return; }
+    if (age === null) { setError(tLater('signup.ageRequired')); return; }
+    if (!inline && year === null) { go('class'); return; }
+    verifying.current = true;
     setBusy('verify'); setError('');
     try {
       const deviceId = await cloudDeviceId();
-      const result = await cloud.otpVerify({ channel, destination, signupTicket: ticket, deviceId, profile: profile() });
+      if (pendingSocial) {
+        const p = profile();
+        const result = await cloud.socialSignIn(pendingSocial.provider, {
+          ...pendingSocial.token, deviceId, createAccount: true, name: p.name, year: p.year, isAdult: p.isAdult, guardianLater: true
+        });
+        setPendingSocial(null);
+        await signedIn({ ...result, guardianConsent: result.guardianConsentRequired ? { required: true, state: 'pending' } : { required: false, state: 'not-required' } });
+        return;
+      }
+      const result = await cloud.otpVerify({ channel: challenge.channel, destination: challenge.destination, signupTicket: ticket, deviceId, profile: profile() });
+      setTicket('');
       await signedIn(result);
-    } catch (err) { fail(err); }
+    } catch (err) {
+      if (err?.code === 'OTP_INVALID' || err?.code === 'OIDC_NONCE_INVALID') {
+        // The ticket lives only as long as the code did. The answers stay in
+        // this card; a fresh code finishes the account in one step.
+        setTicket(''); setPendingSocial(null); setCode(''); setChallenge(null); setResendAt(0);
+        setBusy('');
+        setDirection('back'); setStep('method'); setInvalid(false);
+        setError(tLater(err.code === 'OTP_INVALID' ? 'signup.ticketExpired' : 'signup.socialStartAgain'));
+      } else fail(err);
+    } finally { verifying.current = false; }
   }
 
   async function signedIn(result) {
     setAccount(result.account);
-    setConsent(result.guardianConsent || null);
+    const state = result.guardianConsent || null;
+    setConsent(state);
     if (!name.trim() && result.account?.name) setName(result.account.name);
     setBusy('');
-    const needsParent = result.guardianConsent?.required && result.guardianConsent.state !== 'given';
-    if (mode === 'signin' && !result.created) {
-      // Returning learner on a new device: we still need the class to set up
-      // this device's profile; age only matters if a parent is still pending.
-      setAge(needsParent ? 15 : 18);
-      setDirection('forward');
-      setIndex(stepsFor({ mode: 'signin', role: 'student', minor: needsParent }).indexOf('class'));
-      return;
-    }
-    if (needsParent) { go('parent'); return; }
+    const parent = !!state?.required && state.state !== 'given';
+    // A returning student on a device with no profile yet: the class sets up
+    // this device, and is the only thing asked. Inside a page the profile
+    // exists, so nothing more is asked at all.
+    if (!inline && year === null) { go('class'); return; }
+    if (parent) { go('parent'); return; }
     await finish(result.account);
   }
 
+  async function signInWithPassword() {
+    if (verifying.current || busy) return;
+    const to = destination.trim().toLowerCase();
+    if (!EMAIL_RE.test(to)) { setError(tLater('signup.emailInvalid')); return; }
+    if (!password) { setError(tLater('signup.passwordRequired')); return; }
+    verifying.current = true;
+    setBusy('password'); setError(''); setNotice('');
+    try {
+      const deviceId = await cloudDeviceId();
+      const result = await cloud.login({ email: to, password, deviceId });
+      setPassword('');
+      // The login answer does not carry the guardian state; the account's own
+      // session can read it. A failure here only means the question is asked
+      // later, where the server enforces it anyway.
+      const state = await cloud.guardianState().then(s => ({ required: !!s?.required, state: s?.state || 'not-required' })).catch(() => null);
+      await signedIn({ account: result.account, created: false, guardianConsent: state });
+    } catch (err) { fail(err); }
+    finally { verifying.current = false; }
+  }
+
+  async function requestReset() {
+    if (busy) return;
+    const to = destination.trim().toLowerCase();
+    if (!EMAIL_RE.test(to)) { setError(tLater('cloud.enterEmailFirst')); return; }
+    setBusy('reset'); setError(''); setNotice('');
+    try {
+      await cloud.requestPasswordReset({ email: to });
+      // The server answers the same whether or not an account exists; so does this.
+      setNotice(tLater('cloud.resetQueued'));
+      setBusy('');
+    } catch (err) { fail(err); }
+  }
+
+  // Runs straight from the click: requestIdentityToken opens its popup before
+  // anything awaits, or the browser would block it.
   async function social(provider) {
     if (!providers[provider] || busy) return;
-    if (mode === 'signup' && !name.trim() && provider === 'apple') { setError(tLater('signup.nameRequired')); return; }
-    setBusy(`social-${provider}`); setError('');
+    setBusy(`social-${provider}`); setError(''); setNotice('');
     try {
       const token = await requestIdentityToken(provider, providers[provider]);
       const deviceId = await cloudDeviceId();
-      const p = profile();
-      const body = { ...token, deviceId, createAccount: mode === 'signup' };
-      if (mode === 'signup') Object.assign(body, { name: p.name, year: p.year, isAdult: p.isAdult, guardianLater: true });
-      const result = await cloud.socialSignIn(provider, body);
-      const state = result.created && minor ? { required: true, state: 'pending' } : null;
-      await signedIn({ ...result, guardianConsent: state });
-    } catch (err) { fail(err); }
+      try {
+        // Sign in first. A provider identity with no account is told so, and
+        // never silently given one: the age question comes first, then the
+        // same token (its nonce is still unspent) creates the account.
+        const result = await cloud.socialSignIn(provider, { ...token, deviceId, createAccount: false });
+        const state = await cloud.guardianState().then(s => ({ required: !!s?.required, state: s?.state || 'not-required' })).catch(() => null);
+        await signedIn({ ...result, guardianConsent: state });
+      } catch (err) {
+        if (err?.code !== 'IDENTITY_NOT_REGISTERED') throw err;
+        setPendingSocial({ provider, token });
+        setBusy('');
+        go('age');
+      }
+    } catch (err) {
+      if (err?.code === 'SOCIAL_CANCELLED') { setBusy(''); setNotice(tLater('cloud.socialCancelled')); }
+      else fail(err);
+    }
   }
 
   async function askParent() {
@@ -238,54 +424,168 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
   }
 
   async function finish(signedInAccount = account) {
+    if (finishing.current) return finishing.current;
     setBusy('finish');
-    try {
-      await onFinish({ account: signedInAccount, name: name.trim() || signedInAccount?.name || '', year: year || 9, track });
-    } catch (err) { fail(err); }
+    finishing.current = (async () => {
+      try {
+        await onFinish({ account: signedInAccount, name: name.trim() || signedInAccount?.name || '', year: year || 9, track });
+      } catch (err) { fail(err); }
+    })().finally(() => { finishing.current = null; });
+    return finishing.current;
   }
 
   const waitSeconds = Math.max(0, Math.ceil((resendAt - now) / 1000));
-  const progress = Math.round(((index + 1) / steps.length) * 100);
+  const codeExpired = step === 'code' && !!challenge && now >= challenge.expiresAt;
   const heading = (key, vars) => (
     <h2 className="signup-title" tabIndex={-1} ref={headingRef} id="signup-step-title">{t(key, vars)}</h2>
   );
   const choice = (selected, label, onClick, testId, extra = '') => (
-    <button type="button" className={`signup-choice${selected ? ' is-selected' : ''}${extra}`} aria-pressed={selected}
+    <button key={testId} type="button" className={`signup-choice${selected ? ' is-selected' : ''}${extra}`} aria-pressed={selected}
       onClick={onClick} data-testid={testId}>{label}</button>
   );
+  const errorId = 'signup-error';
+  const isSms = channel === 'sms';
 
   let body = null;
-  if (step === 'role') {
+  if (step === 'method') {
     body = (
       <>
-        {heading('signup.roleTitle')}
-        <p className="signup-lead">{t('signup.roleLead')}</p>
-        <div className="signup-choices signup-choices-2">
-          {choice(role === 'student', t('signup.roleStudent'), () => { setRole('student'); setDirection('forward'); setIndex(1); }, 'signup-role-student')}
-          {choice(role === 'parent', t('signup.roleParent'), () => { setRole('parent'); setDirection('forward'); setIndex(1); }, 'signup-role-parent')}
+        {/* On the landing screen the page's own heading ("Welcome to Pri
+            Learning") is this card's title; inside a page it names itself. */}
+        {inline
+          ? <>{heading('signup.signinTitle')}<p className="signup-lead">{t('signup.inlineLead')}</p></>
+          : <h2 className="sr-only" tabIndex={-1} ref={headingRef} id="signup-step-title">{t('signup.signinTitle')}</h2>}
+        {!available && <p className="signup-hint" role="status">{t('signup.cloudUnavailable')}</p>}
+        <form className="signup-form" noValidate onSubmit={e => { e.preventDefault(); void sendCode(); }}>
+          <label className="label" htmlFor="signup-destination">{isSms ? t('signup.phoneLabel') : t('signup.emailLabel')}</label>
+          <div className={isSms ? 'signup-phone' : ''}>
+            {isSms && <span className="signup-cc" aria-hidden="true">+91</span>}
+            <input className="input" id="signup-destination" value={destination} disabled={!available}
+              type={isSms ? 'tel' : 'email'} inputMode={isSms ? 'tel' : 'email'} autoCapitalize="none" autoCorrect="off" spellCheck={false}
+              autoComplete={isSms ? 'tel-national' : 'email'} maxLength={isSms ? 16 : 254}
+              placeholder={isSms ? '98765 43210' : 'you@example.com'}
+              aria-invalid={!!error || undefined} aria-describedby={error ? errorId : undefined}
+              onChange={e => { setDestination(e.target.value); setError(''); }} />
+          </div>
+          <button type="submit" className="btn btn-primary btn-lg signup-next" disabled={!available || !destination.trim() || !!busy} data-testid="signup-send-code">
+            {busy === 'send' ? t('signup.sending') : t(isSms ? 'signup.continuePhone' : 'signup.continueEmail')}
+          </button>
+        </form>
+        {(providers.google || providers.apple) && (
+          <>
+            <div className="signup-or"><span>{t('signup.or')}</span></div>
+            <div className="signup-social" data-social-sign-in>
+              {providers.google && <button type="button" className="btn btn-ghost" data-provider="google" disabled={!!busy} onClick={() => social('google')}>
+                {busy === 'social-google' ? t('cloud.socialWaiting') : t('signup.withGoogle')}</button>}
+              {providers.apple && <button type="button" className="btn btn-ghost" data-provider="apple" disabled={!!busy} onClick={() => social('apple')}>
+                {busy === 'social-apple' ? t('cloud.socialWaiting') : t('signup.withApple')}</button>}
+            </div>
+          </>
+        )}
+        <div className="signup-alt">
+          <button type="button" className="linklike" data-testid="signup-use-password" disabled={!!busy}
+            onClick={() => { setChannel('email'); go('password'); }}>{t('signup.withPassword')}</button>
+          {channels.sms && (
+            <button type="button" className="linklike" data-testid={isSms ? 'signup-channel-email' : 'signup-channel-sms'} disabled={!!busy}
+              onClick={() => { setChannel(isSms ? 'email' : 'sms'); setDestination(''); setError(''); }}>
+              {t(isSms ? 'signup.useEmail' : 'signup.usePhone')}
+            </button>
+          )}
+        </div>
+        <p className="signup-hint signup-agree-note">
+          {tx('signup.agreeNote', {
+            terms: <a href="/terms" target="_blank" rel="noreferrer">{t('cloud.terms')}</a>,
+            privacy: <a href="/privacy" target="_blank" rel="noreferrer">{t('cloud.privacyNotice')}</a>
+          })}
+        </p>
+        {!inline && (
+          <div className="signup-alt signup-alt-quiet">
+            <button type="button" className="linklike" data-testid="signup-parent-link" onClick={() => go('parent-home')}>{t('signup.parentLink')}</button>
+          </div>
+        )}
+      </>
+    );
+  } else if (step === 'password') {
+    body = (
+      <>
+        {heading('signup.passwordTitle')}
+        <p className="signup-lead">{t('signup.passwordLead')}</p>
+        <form className="signup-form" noValidate onSubmit={e => { e.preventDefault(); void signInWithPassword(); }}>
+          <label className="label" htmlFor="signup-password-email">{t('signup.emailLabel')}</label>
+          <input className="input" id="signup-password-email" type="email" inputMode="email" autoComplete="username" autoCapitalize="none" spellCheck={false}
+            maxLength={254} value={destination} aria-describedby={error ? errorId : undefined}
+            onChange={e => { setDestination(e.target.value); setError(''); }} />
+          <label className="label" htmlFor="signup-password">{t('login.password')}</label>
+          <input className="input" id="signup-password" type="password" autoComplete="current-password" maxLength={200} value={password}
+            aria-describedby={error ? errorId : undefined}
+            onChange={e => { setPassword(e.target.value); setError(''); }} />
+          <button type="submit" className="btn btn-primary btn-lg signup-next" disabled={!available || !!busy} data-testid="signup-password-submit">
+            {busy === 'password' ? t('signup.checking') : t('signup.passwordSubmit')}
+          </button>
+        </form>
+        <div className="signup-alt">
+          {(channels.email || channels.sms) && (
+            <button type="button" className="linklike" data-testid="signup-use-code" disabled={!!busy}
+              onClick={() => { setPassword(''); go('method', 'back'); }}>{t('signup.useCodeInstead')}</button>
+          )}
+          <button type="button" className="linklike" data-testid="signup-forgot-password" disabled={!!busy} onClick={requestReset}>
+            {busy === 'reset' ? t('cloud.requesting') : t('cloud.forgotPassword')}
+          </button>
         </div>
       </>
     );
-  } else if (step === 'parent-home') {
-    body = <ParentHome t={t} heading={heading} onStartChild={() => { setRole('student'); setDirection('forward'); setIndex(1); }} />;
+  } else if (step === 'code') {
+    body = (
+      <>
+        {heading(challenge?.channel === 'sms' ? 'signup.codeTitlePhone' : 'signup.codeTitle')}
+        <p className="signup-lead" id="signup-code-lead">
+          {tx('signup.codeSentTo', { to: <strong className="signup-destination">{shownDestination()}</strong> })} {t('signup.codeExpiry')}
+        </p>
+        <form className="signup-form" noValidate onSubmit={e => { e.preventDefault(); void verify(); }}>
+          <OtpInput value={code} onChange={c => { setCode(c); setInvalid(false); setError(''); }} onComplete={c => verify(c)}
+            disabled={busy === 'verify'} invalid={invalid} idPrefix="signup-code" labelledBy="signup-step-title signup-code-lead"
+            describedBy={error ? errorId : undefined} />
+          <button type="submit" className="btn btn-primary btn-lg signup-next" data-testid="signup-verify"
+            disabled={!!busy || codeExpired} aria-busy={busy === 'verify' || undefined}>
+            {busy === 'verify' ? t('signup.checking') : t('signup.verify')}
+          </button>
+        </form>
+        {codeExpired && !error && <p className="signup-hint" role="status" data-testid="signup-code-expired">{t('signup.codeExpired')}</p>}
+        <div className="signup-alt">
+          <button type="button" className="linklike" disabled={waitSeconds > 0 || !!busy} onClick={() => sendCode({ resend: true })} data-testid="signup-resend">
+            {busy === 'send' ? t('signup.sending') : waitSeconds > 0 ? t('signup.resendIn', { n: waitSeconds }) : t('signup.resend')}
+          </button>
+          <button type="button" className="linklike" disabled={busy === 'verify'} data-testid="signup-change-destination"
+            onClick={() => { setCode(''); go('method', 'back'); }}>{t(challenge?.channel === 'sms' ? 'signup.changeNumber' : 'signup.changeEmail')}</button>
+        </div>
+        <p className="signup-hint">{t(challenge?.channel === 'sms' ? 'signup.codeHelpPhone' : 'signup.codeHelp')}</p>
+      </>
+    );
   } else if (step === 'age') {
     body = (
       <>
-        {heading('signup.ageTitle')}
-        <p className="signup-lead">{t('signup.ageLead')}</p>
-        <div className="signup-choices signup-choices-4">
-          {AGES.map(a => choice(age === a, String(a), () => { setAge(a); next(); }, `signup-age-${a}`))}
-          {choice(age === 18, t('signup.ageAdult'), () => { setAge(18); next(); }, 'signup-age-18', ' signup-choice-wide')}
-        </div>
+        {heading('signup.aboutTitle')}
+        <p className="signup-lead">{t('signup.aboutLead')}</p>
+        <form className="signup-form" noValidate onSubmit={e => { e.preventDefault(); if (!inline && year === null) { if (!name.trim()) { setError(tLater('signup.nameRequired')); return; } if (age === null) { setError(tLater('signup.ageRequired')); return; } go('class'); } else void completeDetails(); }}>
+          <label className="label" htmlFor="signup-flow-name">{t('signup.nameLabel')}</label>
+          <input className="input" id="signup-flow-name" autoComplete="given-name" value={name} maxLength={80}
+            aria-describedby={error ? errorId : undefined}
+            onChange={e => { setName(e.target.value); setError(''); }} />
+          <p className="signup-sublabel" id="signup-age-label">{t('signup.ageTitle')}</p>
+          <div className="signup-choices signup-choices-4" role="group" aria-labelledby="signup-age-label">
+            {AGES.map(a => choice(age === a, String(a), () => { setAge(a); setError(''); }, `signup-age-${a}`))}
+            {choice(age === 18, t('signup.ageAdult'), () => { setAge(18); setError(''); }, 'signup-age-18', ' signup-choice-wide')}
+          </div>
+          <p className="signup-hint">{t('signup.ageLead')}</p>
+          <button type="submit" className="btn btn-primary btn-lg signup-next" disabled={!!busy} data-testid="signup-age-next">
+            {busy === 'verify' ? t('signup.checking') : t('signup.continue')}
+          </button>
+        </form>
       </>
     );
   } else if (step === 'class') {
     const jee = track !== 'cbse';
-    // A code for an address with no account earns a sign-up ticket, and the
-    // account it creates needs a name. The name is normally asked on the
-    // method step, which a sign-in has already passed, so it is asked here.
-    const namePending = !!ticket && !account;
-    const ready = year && (!jee || year >= 11) && (!namePending || !!name.trim());
+    const ready = year && (!jee || year >= 11);
     body = (
       <>
         {heading('signup.classTitle')}
@@ -306,107 +606,38 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
           })}
         </div>
         {jee && <p className="signup-hint">{t('signup.trackJeeHint')}</p>}
-        {namePending && (
-          <>
-            <label className="label" htmlFor="signup-flow-name">{t('signup.nameLabel')}</label>
-            <input className="input" id="signup-flow-name" autoComplete="given-name" value={name} maxLength={80}
-              onChange={e => { setName(e.target.value); setError(''); }} />
-          </>
-        )}
         <button type="button" className="btn btn-primary btn-lg signup-next" disabled={!ready || !!busy}
-          onClick={() => (account ? (minor && consent?.state !== 'given' ? go('parent') : finish()) : ticket ? completeWithTicket() : next())}
+          onClick={() => (account ? (needsParent ? go('parent') : finish()) : completeDetails())}
           data-testid="signup-class-next">
-          {t('signup.continue')}
+          {busy === 'verify' ? t('signup.checking') : t('signup.continue')}
         </button>
       </>
     );
-  } else if (step === 'method') {
-    const isSms = channel === 'sms';
-    body = (
-      <>
-        {heading(mode === 'signin' ? 'signup.signinTitle' : 'signup.methodTitle')}
-        {!available && <p className="signup-hint" role="status">{t('signup.cloudUnavailable')}</p>}
-        {mode === 'signup' && (
-          <>
-            <label className="label" htmlFor="signup-flow-name">{t('signup.nameLabel')}</label>
-            <input className="input" id="signup-flow-name" autoComplete="given-name" value={name} maxLength={80}
-              onChange={e => { setName(e.target.value); setError(''); }} />
-          </>
-        )}
-        <div className="signup-segment signup-channel" role="radiogroup" aria-label={t('signup.channelLabel')}>
-          <button type="button" role="radio" aria-checked={isSms} className={`signup-seg${isSms ? ' is-selected' : ''}`}
-            onClick={() => { setChannel('sms'); setDestination(''); setError(''); }} data-testid="signup-channel-sms">{t('signup.channelPhone')}</button>
-          <button type="button" role="radio" aria-checked={!isSms} className={`signup-seg${!isSms ? ' is-selected' : ''}`}
-            onClick={() => { setChannel('email'); setDestination(''); setError(''); }} data-testid="signup-channel-email">{t('signup.channelEmail')}</button>
-        </div>
-        <form className="signup-form" onSubmit={e => { e.preventDefault(); void sendCode(); }}>
-          <label className="label" htmlFor="signup-destination">{isSms ? t('signup.phoneLabel') : t('signup.emailLabel')}</label>
-          <div className={isSms ? 'signup-phone' : ''}>
-            {isSms && <span className="signup-cc" aria-hidden="true">+91</span>}
-            <input className="input" id="signup-destination" value={destination} disabled={!available}
-              type={isSms ? 'tel' : 'email'} inputMode={isSms ? 'tel' : 'email'}
-              autoComplete={isSms ? 'tel-national' : 'email'} maxLength={isSms ? 16 : 254}
-              placeholder={isSms ? '98765 43210' : ''}
-              onChange={e => { setDestination(e.target.value); setError(''); }} />
-          </div>
-          <button type="submit" className="btn btn-primary btn-lg signup-next" disabled={!available || !destination.trim() || !!busy} data-testid="signup-send-code">
-            {busy === 'send' ? t('signup.sending') : t('signup.sendCode')}
-          </button>
-        </form>
-        {(providers.google || providers.apple) && (
-          <>
-            <div className="signup-or"><span>{t('signup.or')}</span></div>
-            <div className="signup-social">
-              {providers.google && <button type="button" className="btn btn-ghost" disabled={!!busy} onClick={() => social('google')}>{t('signup.withGoogle')}</button>}
-              {providers.apple && <button type="button" className="btn btn-ghost" disabled={!!busy} onClick={() => social('apple')}>{t('signup.withApple')}</button>}
-            </div>
-          </>
-        )}
-        <div className="signup-alt">
-          {mode === 'signup'
-            ? <button type="button" className="linklike" onClick={() => { setMode('signin'); setRole('student'); setDirection('forward'); setIndex(0); }}>{t('signup.haveAccount')}</button>
-            : <button type="button" className="linklike" onClick={() => { setMode('signup'); setRole(''); setDirection('back'); setIndex(0); }}>{t('signup.newHere')}</button>}
-          {onStartOffline && <button type="button" className="linklike" onClick={onStartOffline}>{t('signup.offline')}</button>}
-        </div>
-      </>
-    );
-  } else if (step === 'code') {
-    body = (
-      <>
-        {heading('signup.codeTitle')}
-        <p className="signup-lead" id="signup-code-lead">{t(channel === 'sms' ? 'signup.codeSentPhone' : 'signup.codeSentEmail', { to: channel === 'sms' ? `+91 ${destination.trim()}` : destination.trim() })}</p>
-        <OtpInput value={code} onChange={c => { setCode(c); setInvalid(false); setError(''); }} onComplete={c => verify(c)}
-          disabled={busy === 'verify'} invalid={invalid} idPrefix="signup-code" labelledBy="signup-step-title signup-code-lead" />
-        {busy === 'verify' && <p className="signup-hint" role="status">{t('signup.checking')}</p>}
-        <div className="signup-alt">
-          <button type="button" className="linklike" disabled={waitSeconds > 0 || !!busy} onClick={() => sendCode()} data-testid="signup-resend">
-            {waitSeconds > 0 ? t('signup.resendIn', { n: waitSeconds }) : t('signup.resend')}
-          </button>
-          <button type="button" className="linklike" onClick={() => go('method')}>{t(channel === 'sms' ? 'signup.changeNumber' : 'signup.changeEmail')}</button>
-        </div>
-      </>
-    );
   } else if (step === 'parent') {
-    const isSms = parentChannel === 'sms';
+    const parentSms = parentChannel === 'sms';
     body = (
       <>
         {heading('signup.parentTitle')}
         <p className="signup-lead">{t('signup.parentLead')}</p>
-        <form className="signup-form" onSubmit={e => { e.preventDefault(); void askParent(); }}>
+        <form className="signup-form" noValidate onSubmit={e => { e.preventDefault(); void askParent(); }}>
           <label className="label" htmlFor="signup-parent-name">{t('signup.parentNameLabel')}</label>
           <input className="input" id="signup-parent-name" value={parentName} maxLength={80} autoComplete="off"
+            aria-describedby={error ? errorId : undefined}
             onChange={e => { setParentName(e.target.value); setError(''); }} />
-          <div className="signup-segment signup-channel" role="radiogroup" aria-label={t('signup.parentChannelLabel')}>
-            <button type="button" role="radio" aria-checked={isSms} className={`signup-seg${isSms ? ' is-selected' : ''}`}
-              onClick={() => { setParentChannel('sms'); setParentDestination(''); }} data-testid="signup-parent-sms">{t('signup.channelPhone')}</button>
-            <button type="button" role="radio" aria-checked={!isSms} className={`signup-seg${!isSms ? ' is-selected' : ''}`}
-              onClick={() => { setParentChannel('email'); setParentDestination(''); }} data-testid="signup-parent-email">{t('signup.channelEmail')}</button>
-          </div>
-          <label className="label" htmlFor="signup-parent-destination">{isSms ? t('signup.parentPhoneLabel') : t('signup.parentEmailLabel')}</label>
-          <div className={isSms ? 'signup-phone' : ''}>
-            {isSms && <span className="signup-cc" aria-hidden="true">+91</span>}
+          {channels.sms && (
+            <div className="signup-segment signup-channel" role="radiogroup" aria-label={t('signup.parentChannelLabel')}>
+              <button type="button" role="radio" aria-checked={!parentSms} className={`signup-seg${!parentSms ? ' is-selected' : ''}`}
+                onClick={() => { setParentChannel('email'); setParentDestination(''); }} data-testid="signup-parent-email">{t('signup.channelEmail')}</button>
+              <button type="button" role="radio" aria-checked={parentSms} className={`signup-seg${parentSms ? ' is-selected' : ''}`}
+                onClick={() => { setParentChannel('sms'); setParentDestination(''); }} data-testid="signup-parent-sms">{t('signup.channelPhone')}</button>
+            </div>
+          )}
+          <label className="label" htmlFor="signup-parent-destination">{parentSms ? t('signup.parentPhoneLabel') : t('signup.parentEmailLabel')}</label>
+          <div className={parentSms ? 'signup-phone' : ''}>
+            {parentSms && <span className="signup-cc" aria-hidden="true">+91</span>}
             <input className="input" id="signup-parent-destination" value={parentDestination}
-              type={isSms ? 'tel' : 'email'} inputMode={isSms ? 'tel' : 'email'} autoComplete="off" maxLength={isSms ? 16 : 254}
+              type={parentSms ? 'tel' : 'email'} inputMode={parentSms ? 'tel' : 'email'} autoComplete="off" autoCapitalize="none" maxLength={parentSms ? 16 : 254}
+              aria-describedby={error ? errorId : undefined}
               onChange={e => { setParentDestination(e.target.value); setError(''); }} />
           </div>
           <button type="submit" className="btn btn-primary btn-lg signup-next" disabled={!parentDestination.trim() || !!busy} data-testid="signup-parent-send">
@@ -414,7 +645,7 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
           </button>
         </form>
         <div className="signup-alt">
-          <button type="button" className="linklike" onClick={() => finish()} data-testid="signup-parent-later">{t('signup.parentLater')}</button>
+          <button type="button" className="linklike" disabled={!!busy} onClick={() => finish()} data-testid="signup-parent-later">{t('signup.parentLater')}</button>
         </div>
       </>
     );
@@ -430,33 +661,49 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
           <button type="button" className="linklike" disabled={waitSeconds > 0 || !!busy} onClick={askParent} data-testid="signup-parent-resend">
             {waitSeconds > 0 ? t('signup.resendIn', { n: waitSeconds }) : t('signup.resend')}
           </button>
-          <button type="button" className="linklike" onClick={() => finish()} data-testid="signup-parent-continue">{t('signup.parentLater')}</button>
+          <button type="button" className="linklike" disabled={busy === 'finish'} onClick={() => finish()} data-testid="signup-parent-continue">{t('signup.parentContinue')}</button>
         </div>
       </>
     );
+  } else if (step === 'parent-home') {
+    body = <ParentHome t={t} heading={heading} />;
   }
 
+  // Back never crosses a verified code: once the account exists (or a ticket
+  // is held) the only way back is forward, or closing the card.
+  const backTarget = step === 'password' || step === 'parent-home' ? 'method'
+    : step === 'class' && !account && newAccount ? 'age'
+      : step === 'parent-wait' ? 'parent' : null;
+  const showBack = !!backTarget || (step === 'method' && !!onCancel);
+
   return (
-    <div className="signup-flow" data-signup-step={step}>
-      <div className="signup-top">
-        <button type="button" className="signup-back" onClick={back} aria-label={t('signup.back')} disabled={busy === 'verify' || busy === 'finish'}>
-          <span aria-hidden="true">←</span>
-        </button>
-        <div className="signup-progress" role="progressbar" aria-label={t('signup.progress')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}>
-          <span style={{ transform: `scaleX(${progress / 100})` }} />
+    <div className={`signup-flow signup-${variant}`} data-signup-step={step} data-signin-card={variant} data-testid="signin-card">
+      {showBack && (
+        <div className="signup-top">
+          <button type="button" className="signup-back" aria-label={t(step === 'method' ? 'signup.close' : 'signup.back')}
+            disabled={busy === 'verify' || busy === 'finish'}
+            onClick={() => (backTarget ? go(backTarget, 'back') : onCancel?.())}>
+            <span aria-hidden="true">{step === 'method' ? '×' : '←'}</span>
+          </button>
         </div>
-      </div>
+      )}
       <div key={step} className={`signup-step signup-dir-${direction}`}>
         {body}
-        {error && <div className="error-box signup-error" role="alert">{error}</div>}
-        {busy === 'finish' && <p className="signup-hint" role="status">{t('signup.settingUp')}</p>}
+        {notice && <p className="signup-hint signup-notice-line" role="status" data-testid="signup-notice">{notice}</p>}
+        {error && <div className="error-box signup-error" role="alert" id={errorId} data-testid="signup-error">{error}</div>}
+        {busy === 'finish' && <p className="signup-hint" role="status">{t(inline ? 'signup.signingIn' : 'signup.settingUp')}</p>}
       </div>
+      {step === 'method' && onStartOffline && (
+        <div className="signup-alt signup-alt-quiet">
+          <button type="button" className="linklike" onClick={onStartOffline}>{t('signup.offline')}</button>
+        </div>
+      )}
     </div>
   );
 }
 
 /** A parent's own screen: what Pri asks of them, and how to withdraw. */
-function ParentHome({ t, heading, onStartChild }) {
+function ParentHome({ t, heading }) {
   const [phone, setPhone] = useState('');
   const [challenge, setChallenge] = useState(null);
   const [code, setCode] = useState('');
@@ -471,7 +718,7 @@ function ParentHome({ t, heading, onStartChild }) {
       const sent = await cloud.guardianWithdrawRequest({ destination: phone });
       setChallenge(sent.challengeId);
       setMessage(tLater('signup.withdrawSent'));
-    } catch (err) { setError(err?.message || tLater('signup.genericError')); }
+    } catch (err) { setError(tLater(signInErrorCopy(err).key, signInErrorCopy(err).vars)); }
     finally { setBusy(false); }
   }
 
@@ -482,7 +729,7 @@ function ParentHome({ t, heading, onStartChild }) {
       const result = await cloud.guardianWithdrawByPhone({ destination: phone, challengeId: challenge, code: value });
       setMessage(tLater('signup.withdrawDone', { n: result.withdrawn }));
       setChallenge(null);
-    } catch (err) { setError(err?.message || tLater('signup.genericError')); setCode(''); }
+    } catch (err) { setError(tLater(signInErrorCopy(err).key, signInErrorCopy(err).vars)); setCode(''); }
     finally { setBusy(false); }
   }
 
@@ -495,7 +742,6 @@ function ParentHome({ t, heading, onStartChild }) {
         <li>{t('signup.parentHome2')}</li>
         <li>{t('signup.parentHome3')}</li>
       </ol>
-      <button type="button" className="btn btn-primary btn-lg signup-next" onClick={onStartChild}>{t('signup.parentSetUpChild')}</button>
       <h3 className="signup-subhead">{t('signup.withdrawTitle')}</h3>
       {!challenge ? (
         <form className="signup-form" onSubmit={request}>

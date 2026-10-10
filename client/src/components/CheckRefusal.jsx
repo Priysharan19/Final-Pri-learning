@@ -9,29 +9,30 @@ import { checkRefusalCopy } from './checkAccess.js';
 import { completeInkOtpRecovery, inkRecoveryWords } from './signedOutInkRecovery.js';
 
 // Fetched only when a student asks to sign in.
-const AccountPanel = React.lazy(() => import('./CloudAccountPanel.jsx'));
-const CodeSignIn = React.lazy(() => import('./SignUpFlow.jsx'));
+const SignInCard = React.lazy(() => import('./SignUpFlow.jsx'));
 
 /**
- * The two ways to sign in, on the page the work is on: the account panel and
- * the phone or email code. Shared by every in-context sign-in (a refused
- * check, handwriting, a photo) so each of them offers the same legitimate
- * flow. `saved` is whether the work on screen is proven kept on this device;
+ * The one sign-in card, on the page the work is on: an emailed six-digit code
+ * (or a configured provider, or the account's password), in place. Shared by
+ * every in-context sign-in (a refused check, handwriting, a photo, the exam
+ * page) so each of them is the same card. It never navigates, reloads, reads
+ * handwriting or submits anything: when the code is accepted the account is
+ * linked to THIS profile and the card closes, leaving the page as it was.
+ * `saved` is whether the work on screen is proven kept on this device;
  * linking an account to the profile is refused without it.
  */
 export function SignInChoices({ user, refreshUser, saved = true, onDone = null }) {
   const t = useT();
   const { language } = useLanguage();
-  const [byCode, setByCode] = useState(false);
   const finishing = useRef(null);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const words = inkRecoveryWords(language);
   return (
     <React.Suspense fallback={<p role="status">{t('cloud.stateChecking')}</p>}>
-      {byCode ? (
-        <CodeSignIn initialMode="signin" initialName={user?.name || ''}
-          onCancel={() => setByCode(false)}
+      <div className="inline-sign-in" data-inline-sign-in>
+        <SignInCard variant="inline" initialName={user?.name || ''} knownYear={user?.year ?? null}
+          onCancel={onDone ? () => onDone() : null}
           onFinish={async ({ account }) => {
             // A guardian-approved sign-in may finish twice while a slow
             // profile refresh runs. One verified account link is enough.
@@ -45,27 +46,21 @@ export function SignInChoices({ user, refreshUser, saved = true, onDone = null }
                   getLinked: cloudAccountLink, linkAccount: linkSignedInAccount,
                   refreshProfile: refreshUser
                 });
-                if (mounted.current) { setByCode(false); onDone?.(); }
+                if (mounted.current) onDone?.();
               })().finally(() => { finishing.current = null; });
             }
             return finishing.current;
           }}
         />
-      ) : (
-        <>
-          <AccountPanel />
-          <p className="muted" style={{ marginTop: 8 }}>{words.otpNotice}</p>
-          <button type="button" className="btn btn-secondary" data-check-code-sign-in
-            onClick={() => setByCode(true)}>{words.otpAction}</button>
-        </>
-      )}
+        <p className="muted inline-sign-in-note">{words.otpNotice}</p>
+      </div>
     </React.Suspense>
   );
 }
 
 /**
- * Sign in on the page the work is on. The same account panel and code flow the
- * handwriting recovery uses; the profile, the question and everything typed or
+ * Sign in on the page the work is on: the same sign-in card the handwriting
+ * recovery uses; the profile, the question and everything typed or
  * written stay mounted around it. `ready` is false while the work on screen is
  * still being written to this device, and `waitText` says so.
  */

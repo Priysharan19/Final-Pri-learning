@@ -302,7 +302,7 @@ function SecuritySection({ toast }) {
       <h2 style={{ marginBottom: 8 }}>{t('settings.secSecurity')}</h2>
       <div className="set-row">
         <span className="set-k">{t('settings.accountType')}</span>
-        <span className="set-v">{t('settings.accountTypeValue')}</span>
+        <span className="set-v" data-account-type={user.cloudLinked ? 'signed-in' : 'local'}>{t(user.cloudLinked ? 'settings.accountTypeSignedIn' : 'settings.accountTypeLocal')}</span>
       </div>
       <div className="set-row">
         <span className="set-k">{t('settings.email')}</span>

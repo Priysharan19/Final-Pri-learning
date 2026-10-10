@@ -1,7 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Landing + profile entry
-// Pri has one normal account flow on this screen: create/sign in to the Pri
-// account, then bind it to this device's local profile before entering Practice.
+// Pri has one normal account flow on this screen: the sign-in card (an emailed
+// six-digit code for new and returning students alike), which then binds the
+// account to this device's local profile before entering Practice.
 // Device-only profiles still exist for explicit offline use, but are labelled as
 // such and are never presented as a signed-in account.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -9,7 +10,7 @@ import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } fro
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
-import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLanguage, useT, useTx } from '../i18n/index.js';
+import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLanguage, useT } from '../i18n/index.js';
 import { featureEnabled } from '../platform/features.js';
 import { cloudAvailable } from '../platform/cloudTransport.js';
 import { appleSignInAvailable, rememberAppleSignInIntent } from '../platform/native/appleSignIn.js';
@@ -254,7 +255,6 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
   const { setUser, refreshDue } = useApp();
   const nav = useNavigate();
   const t = useT();
-  const tx = useTx();
   // Resolved per render, not at module load, so a development override of the
   // flag (features.js) is honoured; a production build compiles it to a constant.
   const extended = featureEnabled('extendedTracks');
@@ -262,8 +262,8 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
   const roles = useMemo(() => roleOptions(extended), [extended]);
   const appleOffered = appleSignInOffered();
   const [profiles, setProfiles] = useState(null);
-  const [stage, setStage] = useState(initialStage);   // hero | pick | create | account
-  const [accountMode, setAccountMode] = useState('signup');
+  const [stage, setStage] = useState(initialStage);   // hero | pick | create
+  const [cardStep, setCardStep] = useState('method');
   const [createStep, setCreateStep] = useState(initialStep);
   const [form, setForm] = useState(freshProfileDraft);
   const [australia, setAustralia] = useState(false);
@@ -517,13 +517,6 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     refreshDue();
   };
 
-  const openAccount = (mode) => {
-    localStorage.setItem('pri-seen-hero', '1');
-    setAccountMode(mode);
-    setError('');
-    setStage('account');
-  };
-
   const cloudNote = cloudIntent && (
     <p className="muted cloud-intent" role="status" style={{ fontSize: 12.5, marginBottom: 12 }}>
       {t('login.cloudIntent')}
@@ -541,64 +534,52 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     </div>
   );
 
-  /* ── hero ── */
+  /* ── the landing: one sign-in card ── */
   if (stage === 'hero') {
+    // The card keeps its own steps (email → code → a few questions) in place.
+    // While it is past its first step the welcome copy and the side doors step
+    // back, so the code boxes are the only thing asking for attention.
+    const atStart = cardStep === 'method';
     return (
       <div className="auth-wrap">
         <MathField />
         <div className="auth-col fade-in">
           <Logo large />
-          <div className="hero-kicker">{featureEnabled('extendedTracks') ? 'CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD' : 'CBSE · NCERT · JEE MAIN · JEE ADVANCED'}</div>
-          {/* The gold word is a slot, not a tail fragment: Hindi puts the verb
-              last, so "marked" cannot be the last word of the sentence there. */}
-          <h1 className="hero-title">{tx('login.heroTitle', {
-            br: <br />,
-            marked: <span className="gold">{t('login.heroMarked')}</span>
-          })}</h1>
-          <p className="hero-sub">{t('login.heroSub')}</p>
-          <div className="row" style={{ marginTop: 34 }}>
-            <button className="btn btn-primary btn-lg" data-testid="hero-create-account" onClick={() => openAccount('signup')}>{t('login.createAccount')}</button>
+          {atStart && (
+            <>
+              <div className="hero-kicker">{featureEnabled('extendedTracks') ? 'CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD' : 'CBSE · NCERT · JEE MAIN · JEE ADVANCED'}</div>
+              <h1 className="hero-title">{t('login.welcomeTitle')}</h1>
+              <p className="hero-sub">{t('login.welcomeSub')}</p>
+            </>
+          )}
+          <div className="card signin-landing" data-testid="hero-sign-in">
+            <React.Suspense fallback={<p className="signup-hint" role="status">{t('common.loading')}</p>}>
+              <SignUpFlow variant="page" onFinish={finishAccount} onStep={setCardStep} />
+            </React.Suspense>
           </div>
-          <div style={{ textAlign: 'center', marginTop: 14 }}>
-            <button className="linklike" type="button" data-testid="hero-sign-in-code" onClick={() => openAccount('signin')}>{t('login.signInWithCode')}</button>
-          </div>
-          <div style={{ textAlign: 'center', marginTop: 14 }}>
-            <button className="linklike" type="button" data-testid="hero-try-demo" disabled={busy} onClick={tryDemo}>
-              {t('login.tryDemoIndia')}
-            </button>
-          </div>
-          <div style={{ textAlign: 'center', marginTop: 12 }}>
-            <button className="linklike" type="button" data-testid="hero-offline" onClick={enter}>{t('signup.offline')}</button>
-          </div>
-          {error && <div className="error-box" role="alert" style={{ marginTop: 12 }}>{error}</div>}
-          <p className="muted" style={{ marginTop: 26, textAlign: 'center' }}>{t('login.heroPrivacy')}</p>
-          {appleEntry}
-          <LanguagePicker />
-          {/* A store reviewer, a payment provider and a parent all look for
-              these, and each is required of us before the app can be sold. */}
-          <p className="muted" style={{ marginTop: 22, textAlign: 'center', fontSize: 12.5 }}>
-            <Link to="/privacy">{t('login.privacy')}</Link> · <Link to="/terms">{t('login.terms')}</Link> ·{' '}
-            <Link to="/refund-policy">{t('login.refunds')}</Link> · <Link to="/grievance">{t('login.grievances')}</Link>
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  /* ── account: phone / email / Google / Apple, then a parent if needed ── */
-  if (stage === 'account') {
-    return (
-      <div className="auth-wrap">
-        <div className="auth-col">
-          <React.Suspense fallback={<p className="muted" role="status">{t('common.loading')}</p>}>
-          <SignUpFlow
-            key={accountMode}
-            initialMode={accountMode}
-            onCancel={() => setStage('hero')}
-            onStartOffline={() => beginCreate(false)}
-            onFinish={finishAccount}
-          />
-          </React.Suspense>
+          {atStart && (
+            <>
+              <div style={{ textAlign: 'center', marginTop: 16 }}>
+                <button className="linklike" type="button" data-testid="hero-try-demo" disabled={busy} onClick={tryDemo}>
+                  {t('login.tryDemoIndia')}
+                </button>
+              </div>
+              <div style={{ textAlign: 'center', marginTop: 12 }}>
+                <button className="linklike" type="button" data-testid="hero-offline" onClick={enter}>{t('signup.offline')}</button>
+              </div>
+              {error && <div className="error-box" role="alert" style={{ marginTop: 12 }}>{error}</div>}
+              <p className="muted" style={{ marginTop: 26, textAlign: 'center' }}>{t('login.heroPrivacy')}</p>
+              <p className="muted" style={{ marginTop: 10, textAlign: 'center', fontSize: 13 }}>{t('login.heroSub')}</p>
+              {appleEntry}
+              <LanguagePicker />
+              {/* A store reviewer, a payment provider and a parent all look for
+                  these, and each is required of us before the app can be sold. */}
+              <p className="muted" style={{ marginTop: 22, textAlign: 'center', fontSize: 12.5 }}>
+                <Link to="/privacy">{t('login.privacy')}</Link> · <Link to="/terms">{t('login.terms')}</Link> ·{' '}
+                <Link to="/refund-policy">{t('login.refunds')}</Link> · <Link to="/grievance">{t('login.grievances')}</Link>
+              </p>
+            </>
+          )}
         </div>
       </div>
     );

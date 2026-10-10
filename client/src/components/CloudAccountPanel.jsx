@@ -2,12 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../App.jsx';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import {
-  cloudAccountLink, cloudDeviceId, disconnectCloudAccount, loginCloudAccount,
-  refreshCloudEntitlement, registerCloudAccount, signInWithProvider, verifyCloudSession
+  cloudAccountLink, cloudDeviceId, disconnectCloudAccount, linkSignedInAccount,
+  refreshCloudEntitlement, verifyCloudSession
 } from '../platform/cloudAccount.js';
 import { announceCloudSessionChange } from '../platform/cloudSession.js';
 import { appleSignInAvailable, signInWithApple, takeAppleSignInIntent } from '../platform/native/appleSignIn.js';
-import { requestIdentityToken, socialProviderConfig } from '../platform/socialSignIn.js';
 import { AppleSignInButton } from '../pages/Login.jsx';
 import { cloudSyncStatus, syncNow } from '../platform/syncWorker.js';
 import { SYNC_EVENT, autoSyncStatus, noteManualSync } from '../platform/cloudSyncScheduler.js';
@@ -21,6 +20,10 @@ import CloudAccountSecurity from './CloudAccountSecurity.jsx';
 import { tLater, useT, useTx } from '../i18n/index.js';
 import { priNative } from '../platform/native/index.js';
 import { cloudErrorCopy } from '../platform/cloudErrorCopy.js';
+
+// The one sign-in card (email code · configured providers · password), fetched
+// only when this profile has no live session to show.
+const SignInCard = React.lazy(() => import('./SignUpFlow.jsx'));
 
 function when(value, t) {
   if (!value) return t('cloud.never');
@@ -54,7 +57,7 @@ function pricingText(config, t) {
 }
 
 export default function CloudAccountPanel() {
-  const { user } = useApp();
+  const { user, refreshUser } = useApp();
   const t = useT();
   const tx = useTx();
   const enabled = cloudAvailable();
@@ -73,14 +76,9 @@ export default function CloudAccountPanel() {
   const [appleBootstrap, setAppleBootstrap] = useState(null);
   const [appleProducts, setAppleProducts] = useState([]);
   const [appleStoreError, setAppleStoreError] = useState('');
-  const [mode, setMode] = useState('login');
-  // When a linked account's cookie expires, this is reauthentication, not
-  // registration of a second identity on the existing student profile.
-  useEffect(() => {
-    if (link?.accountId && mode === 'register') setMode('login');
-  }, [link?.accountId, mode]);
+  // The age declaration a NEW account made with the native Apple sheet owes
+  // (the sign-in card asks its own; this is only the shell's Apple road).
   const [form, setForm] = useState({
-    name: user?.name || '', email: '', password: '',
     // Declared, not inferred. The class a student picked already implies a
     // child, and the server treats silence as one — this asks so the student
     // knows it was asked, and so an adult can say so.
@@ -102,9 +100,6 @@ export default function CloudAccountPanel() {
   const [appleLinked, setAppleLinked] = useState(null);
   const [linkLoaded, setLinkLoaded] = useState(false);
   const appleIntentTaken = useRef(false);
-  // Google / Apple sign-in, offered only when this deployment configures it.
-  const [providers, setProviders] = useState({ google: null, apple: null });
-  const socialAbort = useRef(null);
 
   const entitlement = link?.entitlement;
   const premium = !!entitlement?.active;
@@ -185,15 +180,6 @@ export default function CloudAccountPanel() {
       });
     return () => { live = false; };
   }, [enabled]);
-
-  useEffect(() => {
-    let live = true;
-    if (!enabled || link?.accountId) return () => { live = false; };
-    socialProviderConfig()
-      .then(config => { if (live) setProviders(config); })
-      .catch(() => { if (live) setProviders({ google: null, apple: null }); });
-    return () => { live = false; };
-  }, [enabled, link?.accountId]);
 
   // The server mints the opaque appAccountToken and decides which product ids
   // this deployment sells. StoreKit then supplies localized storefront names and
@@ -314,7 +300,6 @@ export default function CloudAccountPanel() {
       if (outcome.status === 'consent-required') {
         // A new account: the same age/guardian step as password sign-up, then
         // the sheet once more (the nonce was spent; Apple only re-confirms).
-        setMode('register');
         setAppleStep('consent');
         setMessage(tLater('cloud.appleConsentNeeded'));
         return;
@@ -327,7 +312,6 @@ export default function CloudAccountPanel() {
       });
       await refreshCloudEntitlement(user.id).catch(() => {});
       setAppleStep(null);
-      setForm(v => ({ ...v, password: '' }));
       setMessage(outcome.guardianConsentRequired ? tLater('cloud.guardianPending', { safe: tLater('cloud.guardianPendingSafe') }) : tLater(outcome.created ? 'cloud.created' : 'cloud.connected'));
       await reload();
     } catch (err) {
@@ -360,86 +344,26 @@ export default function CloudAccountPanel() {
     if (takeAppleSignInIntent()) void startAppleSignIn();
   }, [linkLoaded, enabled, appleIdentity, link?.accountId]);
 
-  async function submit(e) {
-    e.preventDefault();
-    if (!enabled) return;
-    setBusy(mode);
+  /**
+   * The sign-in card signed in (a code, a provider or the account's password).
+   * The session cookie is device-wide; this records which local profile it
+   * belongs to, exactly as every other sign-in on this panel does, and tells
+   * the rest of the app. A profile already linked to a different account is
+   * refused (cloudAccount.js) and the session that cannot be used here is
+   * ended rather than left signed in beside the wrong profile.
+   */
+  async function cardSignedIn({ account }) {
     setError('');
     setMessage('');
     try {
-      if (mode === 'register' && !link?.accountId) {
-        await registerCloudAccount(user.id, {
-          name: form.name || user.name, email: form.email, password: form.password,
-          year: user?.year, isAdult: form.isAdult,
-          guardianName: form.guardianName, guardianEmail: form.guardianEmail
-        });
-        setMessage(tLater('cloud.created'));
-      } else {
-        await loginCloudAccount(user.id, { email: form.email, password: form.password });
-        setMessage(tLater('cloud.connected'));
-      }
-      setForm(v => ({ ...v, password: '' }));
-      await reload();
-    } catch (err) { const copy = cloudErrorCopy(err); setError(copy ? tLater(copy.key, copy.vars) : (err.message || tLater('cloud.connectFailed'))); }
-    finally { setBusy(''); }
-  }
-
-  // Runs straight from the click: requestIdentityToken opens its popup before
-  // anything awaits, or the browser would block it.
-  async function startSocial(provider) {
-    if (!enabled || !providers[provider] || busy) return;
-    const creating = mode === 'register';
-    // A new account asks the same questions as the email form, before the
-    // provider is ever opened: the server will not make a child's account
-    // without a guardian to ask.
-    if (creating && !agreed) { setError(tLater('cloud.socialAgreeFirst')); return; }
-    if (creating && !form.isAdult && (!form.guardianName.trim() || !form.guardianEmail.trim())) {
-      setError(tLater('cloud.socialGuardianFirst'));
-      return;
-    }
-    const controller = new AbortController();
-    socialAbort.current = controller;
-    setBusy(`social-${provider}`);
-    setError('');
-    setMessage('');
-    try {
-      const token = await requestIdentityToken(provider, providers[provider], { signal: controller.signal });
-      await signInWithProvider(user.id, provider, {
-        ...token,
-        createAccount: creating,
-        name: form.name || user.name, year: user?.year, isAdult: form.isAdult,
-        guardianName: form.guardianName, guardianEmail: form.guardianEmail
-      });
-      setMessage(tLater(creating ? 'cloud.created' : 'cloud.connected'));
-      await reload();
+      await linkSignedInAccount(user.id, account);
     } catch (err) {
-      if (err?.code === 'SOCIAL_CANCELLED') setMessage(tLater('cloud.socialCancelled'));
-      else if (err?.code === 'SOCIAL_POPUP_BLOCKED') setError(tLater('cloud.socialPopupBlocked'));
-      else if (err?.code === 'SOCIAL_TIMEOUT') setError(tLater('cloud.socialTimedOut'));
-      else if (err?.code === 'SOCIAL_PROVIDER_ERROR') setError(tLater('cloud.socialFailed'));
-      else { const copy = cloudErrorCopy(err); setError(copy ? tLater(copy.key, copy.vars) : (err.message || tLater('cloud.socialFailed'))); }
-    } finally {
-      socialAbort.current = null;
-      setBusy('');
+      if (err?.code === 'CLOUD_LINK_CONFLICT') await cloud.logout().catch(() => {});
+      throw err;
     }
-  }
-
-  async function requestReset() {
-    if (!enabled) return;
-    if (!form.email.trim()) {
-      setError(tLater('cloud.enterEmailFirst'));
-      return;
-    }
-    setBusy('reset');
-    setError('');
-    setMessage('');
-    try {
-      await cloud.requestPasswordReset({ email: form.email });
-      // The server deliberately gives the same response whether or not an account
-      // exists, so the UI must preserve that enumeration-safe contract.
-      setMessage(tLater('cloud.resetQueued'));
-    } catch (err) { setError(err.message || tLater('cloud.resetFailed')); }
-    finally { setBusy(''); }
+    setMessage(tLater('cloud.connected'));
+    await refreshUser?.().catch(() => {});
+    await reload();
   }
 
   async function doSync() {
@@ -611,6 +535,34 @@ export default function CloudAccountPanel() {
     return t('cloud.stateConnected');
   }, [link, enabled, session, t]);
   const cloudOffline = !!(enabled && link?.accountId && session && !session.connected && session.reason === 'offline');
+  const needsSignIn = enabled && (!link?.accountId || session?.reason === 'signed-out');
+
+  // ── The plain facts a student reads ────────────────────────────────────────
+  // Each line says only what this device can show to be true right now.
+  const accountLine = (() => {
+    if (!link?.accountId) return t('cloud.factSignedOut');
+    if (session?.connected) return liveAccount?.email ? t('cloud.factSignedInAs', { email: liveAccount.email }) : t('cloud.factSignedIn');
+    if (session?.reason === 'signed-out') return t('cloud.factSignedOutAgain');
+    if (session?.reason === 'offline') return t('cloud.stateOffline');
+    if (!session || session.reason === 'not-verified') return t('cloud.stateChecking');
+    return t('cloud.stateUnavailable');
+  })();
+  const studyLine = user?.course === 'in'
+    ? `${t('common.classNumber', { n: user.year })} · ${user.indiaTrack === 'jee-main' ? 'JEE Main' : user.indiaTrack === 'jee-advanced' ? 'JEE Advanced' : user.indiaTrack === 'olympiad' ? t('login.olympiadTrack') : 'CBSE'}`
+    : `${t('common.yearNumber', { n: user?.year })} · ${String(user?.course || '').toUpperCase()}`;
+  // "Progress synced" is a claim, so it is made only when every part of it
+  // holds: a live session, a sync that has actually completed, nothing left in
+  // the outbox, and no error from the last attempt. Anything less says what is
+  // true instead.
+  const synced = canSync && !!status?.lastSyncAt && pending === 0 && !status?.lastError;
+  const progressLine = !link?.accountId ? null
+    : synced ? t('cloud.factSynced')
+      : pending > 0 ? t('cloud.factPending', { count: pending, n: pending })
+        : status?.lastError ? t('cloud.factSyncProblem')
+          : !canSync ? t('cloud.factSyncWaiting')
+            : t('cloud.factNotSyncedYet');
+  const planLine = premium ? t('cloud.factPremium') : t('cloud.factFree');
+  const staffRole = ['teacher', 'support', 'admin'].includes(liveAccount?.role || link?.role) ? (liveAccount?.role || link?.role) : null;
 
   return (
     <section className="card" aria-labelledby="cloud-account-title" style={{ marginTop: 18 }}>
@@ -621,7 +573,7 @@ export default function CloudAccountPanel() {
             {t('cloud.intro')}
           </p>
         </div>
-        <span className={`tag ${session?.connected ? 'tag-brand' : ''}`}>{stateLabel}</span>
+        <span className={`tag ${session?.connected ? 'tag-brand' : ''}`} data-cloud-state>{stateLabel}</span>
       </div>
 
       {!enabled && <div style={{ marginTop: 14 }} className="muted">
@@ -647,37 +599,26 @@ export default function CloudAccountPanel() {
           {t('cloud.offlineNote')}
         </div>
       )}
-      {enabled && (!link?.accountId || session?.reason === 'signed-out') && <form onSubmit={submit} style={{ marginTop: 16 }}>
-        {appleStep === 'consent' ? (
+
+      {/* Not signed in (or signed out by the server): the one sign-in card, in
+          place. A profile whose session ended signs in again here and keeps
+          everything on this device exactly as it was. */}
+      {needsSignIn && appleStep !== 'consent' && (
+        <div style={{ marginTop: 16 }} data-cloud-sign-in>
+          {link?.accountId && <p role="status" style={{ margin: '0 0 10px' }}>{t('cloud.factSignedOutAgain')}</p>}
+          <React.Suspense fallback={<p role="status" className="muted">{t('cloud.stateChecking')}</p>}>
+            <SignInCard variant="inline" initialName={user?.name || ''} knownYear={user?.year ?? null} onFinish={cardSignedIn} />
+          </React.Suspense>
+        </div>
+      )}
+
+      {needsSignIn && appleStep === 'consent' && (
+        <div style={{ marginTop: 16 }}>
           <div role="status" style={{ marginBottom: 12 }}>
             <div className="sc-label">{t('cloud.appleConsentTitle')}</div>
             <p className="muted" style={{ fontSize: 13, marginTop: 4, maxWidth: 560 }}>{t('cloud.appleConsentSub')}</p>
           </div>
-        ) : (
-          <div className="row" style={{ gap: 8, marginBottom: 12 }}>
-            <button type="button" className={`btn btn-sm ${mode === 'login' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMode('login')}>{t('cloud.signIn')}</button>
-            {!link?.accountId && <button type="button" className={`btn btn-sm ${mode === 'register' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setMode('register')}>{t('cloud.createAccount')}</button>}
-          </div>
-        )}
-        {appleStep !== 'consent' && <div className="grid cols-2" style={{ gap: 12 }}>
-          {mode === 'register' && <div className="field">
-            <label className="label" htmlFor="cloud-name">{t('cloud.yourName')}</label>
-            <input className="input" id="cloud-name" autoComplete="name" maxLength={80} value={form.name} onChange={e => setForm(v => ({ ...v, name: e.target.value }))}
-              // Prefilled from the profile: focusing selects it, so typing a
-              // name replaces it instead of being appended to it.
-              onFocus={e => { if (e.target.value && e.target.value === (user?.name || '')) e.target.select(); }} required />
-          </div>}
-          <div className="field">
-            <label className="label" htmlFor="cloud-email">{t('cloud.yourEmail')}</label>
-            <input className="input" id="cloud-email" type="email" autoComplete="email" maxLength={254} value={form.email} onChange={e => setForm(v => ({ ...v, email: e.target.value }))} required />
-          </div>
-          <div className="field">
-            <label className="label" htmlFor="cloud-password">{t('login.password')}</label>
-            <input className="input" id="cloud-password" type="password" autoComplete={mode === 'register' ? 'new-password' : 'current-password'} minLength={10} maxLength={200} value={form.password} onChange={e => setForm(v => ({ ...v, password: e.target.value }))} required />
-          </div>
-        </div>}
-        {mode === 'register' && (
-          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--hairline)' }}>
+          <div style={{ paddingTop: 12, borderTop: '1px solid var(--hairline)' }}>
             {/* Asked before the account exists, not after. Under the DPDP Act a
                 child is anyone under 18, so this is nearly every student here,
                 and the server will not sync a child's account until a guardian
@@ -720,63 +661,61 @@ export default function CloudAccountPanel() {
               </span>
             </label>
           </div>
-        )}
+        </div>
+      )}
 
-        {appleStep !== 'consent' && <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-          <button className="btn btn-primary" type="submit" disabled={!!busy || (mode === 'register' && !agreed)}>
-            {busy === mode ? t('cloud.connecting') : mode === 'register' ? t('cloud.createAndConnect') : t('cloud.connectAccount')}
-          </button>
-          {mode === 'login' && <button className="btn btn-quiet" type="button" onClick={requestReset} disabled={!!busy}>
-            {busy === 'reset' ? t('cloud.requesting') : t('cloud.forgotPassword')}
-          </button>}
-        </div>}
-        {(providers.google || providers.apple) && <div data-social-sign-in style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line, rgba(128,128,128,.22))' }}>
-          <div className="muted" style={{ fontSize: 12.5, marginBottom: 8 }}>
-            {mode === 'register' ? t('cloud.socialCreateNote') : t('cloud.socialSignInNote')}
-          </div>
-          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-            {providers.google && <button className="btn btn-ghost" type="button" data-provider="google" disabled={!!busy} onClick={() => startSocial('google')}>
-              {busy === 'social-google' ? t('cloud.socialWaiting') : t('cloud.continueGoogle')}
-            </button>}
-            {providers.apple && <button className="btn btn-ghost" type="button" data-provider="apple" disabled={!!busy} onClick={() => startSocial('apple')}>
-              {busy === 'social-apple' ? t('cloud.socialWaiting') : t('cloud.continueApple')}
-            </button>}
-            {busy.startsWith('social-') && <button className="btn btn-quiet" type="button" onClick={() => socialAbort.current?.abort()}>
-              {t('cloud.socialCancel')}
-            </button>}
-          </div>
-        </div>}
+      {needsSignIn && appleIdentity && (
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line, rgba(128,128,128,.22))' }}>
+          {/* The declaration travels with the request only once the server has
+              asked for it (CONSENT_DECLARATION_REQUIRED, a new account); a
+              sign-in sends none. */}
+          <AppleSignInButton
+            label={t(appleStep === 'consent' ? 'cloud.continueWithApple' : 'login.signInWithApple')}
+            busy={busy === 'apple-sign-in'}
+            disabled={!!busy || (appleStep === 'consent' && !agreed)}
+            onClick={() => startAppleSignIn({ declaration: appleStep === 'consent' ? appleDeclaration() : null })} />
+          <p className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>
+            {t(appleStep === 'consent' ? 'cloud.appleConsentRetryNote' : 'cloud.appleNote')}
+          </p>
+          {appleStep === 'consent' && (
+            <button type="button" className="linklike" disabled={!!busy} onClick={() => { setAppleStep(null); setMessage(''); }}>
+              {t('cloud.appleConsentBack')}
+            </button>
+          )}
+        </div>
+      )}
 
-        {appleIdentity && (
-          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--line, rgba(128,128,128,.22))' }}>
-            {/* The declaration travels with the first request when the person is
-                creating an account here; a sign-in sends none, and the server
-                asks for it (CONSENT_DECLARATION_REQUIRED) only for a new account. */}
-            <AppleSignInButton
-              label={t(appleStep === 'consent' ? 'cloud.continueWithApple' : 'login.signInWithApple')}
-              busy={busy === 'apple-sign-in'}
-              disabled={!!busy || (mode === 'register' && !agreed)}
-              onClick={() => startAppleSignIn({ declaration: mode === 'register' ? appleDeclaration() : null })} />
-            <p className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>
-              {t(appleStep === 'consent' ? 'cloud.appleConsentRetryNote' : 'cloud.appleNote')}
-            </p>
-            {appleStep === 'consent' && (
-              <button type="button" className="linklike" disabled={!!busy} onClick={() => { setAppleStep(null); setMessage(''); }}>
-                {t('cloud.appleConsentBack')}
-              </button>
-            )}
+      {/* Signed in: the four things a student wants to know, in plain words. */}
+      {link?.accountId && (
+        <div style={{ marginTop: 14 }} data-cloud-facts>
+          <div className="set-row" data-cloud-fact="account">
+            <span className="set-k">{t('cloud.factAccount')}</span>
+            <span className="set-v">{accountLine}</span>
           </div>
-        )}
-      </form>}
-
-      {link?.accountId && <div className="grid cols-2" style={{ gap: 14, marginTop: 16 }}>
-        <div className="card" style={{ boxShadow: 'none' }}>
-          <div className="sc-label">{t('cloud.identity')}</div>
-          <div style={{ fontWeight: 680, marginTop: 4 }}>{liveAccount?.name || user.name}</div>
-          <div className="muted" style={{ fontSize: 13 }}>{liveAccount?.email || t('cloud.detailsAfterSignIn')}</div>
-          <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-            <span className="tag">{liveAccount?.role || link.role}</span>
-            <span className="tag">{(liveAccount?.emailVerified ?? link.emailVerified) ? t('cloud.emailVerified') : t('cloud.emailPending')}</span>
+          <div className="set-row" data-cloud-fact="study">
+            <span className="set-k">{t('cloud.factStudy')}</span>
+            <span className="set-v">{studyLine}</span>
+          </div>
+          <div className="set-row" data-cloud-fact="progress" data-cloud-synced={synced ? 'yes' : 'no'}>
+            <span className="set-k">{t('cloud.factProgress')}</span>
+            <span className="set-v" role="status">{progressLine}</span>
+          </div>
+          <div className="set-row" data-cloud-fact="plan">
+            <span className="set-k">{t('cloud.factPlan')}</span>
+            <span className="set-v">{planLine}</span>
+          </div>
+          {staffRole && (
+            <div className="set-row" data-cloud-fact="role">
+              <span className="set-k">{t('cloud.factRole')}</span>
+              <span className="set-v">{staffRole}</span>
+            </div>
+          )}
+          {status?.lastError === 'CLIENT_UPGRADE_REQUIRED'
+            && <div role="status" data-cloud-upgrade style={{ color: 'var(--bad)', fontSize: 12, marginTop: 8 }}>{t('cloud.upgradeRequired')}</div>}
+          {status?.lastError === 'SYNC_QUOTA_EXCEEDED'
+            && <div role="status" style={{ color: 'var(--bad)', fontSize: 12, marginTop: 8 }}>{t('cloudError.syncQuota')}</div>}
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+            <button className="btn btn-quiet" type="button" data-cloud-sign-out onClick={disconnect} disabled={!!busy}>{t('cloud.disconnect')}</button>
           </div>
           {appleIdentity && canSync && appleLinked === false && (
             <div style={{ marginTop: 12 }}>
@@ -786,13 +725,15 @@ export default function CloudAccountPanel() {
             </div>
           )}
         </div>
-        <div className="card" style={{ boxShadow: 'none' }}>
-          <div className="sc-label">{t('cloud.premiumAuthority')}</div>
+      )}
+
+      {link?.accountId && (
+        <div className="card" style={{ boxShadow: 'none', marginTop: 14 }} data-cloud-plan>
+          <div className="sc-label">{t('cloud.factPlan')}</div>
           <div style={{ fontWeight: 680, marginTop: 4 }}>{premium ? t('cloud.premiumActive') : t('cloud.free')}</div>
           <div className="muted" style={{ fontSize: 13 }}>
             {premium ? `${entitlement.status} · ${entitlement.provider}` : entitlement?.stale ? t('cloud.cacheExpired') : t('cloud.noEntitlement')}
           </div>
-          {entitlement?.offlineUntil && <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t('cloud.offlineUntil', { when: when(entitlement.offlineUntil, t) })}</div>}
 
           {canUseWebBilling && <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
             {!premium && pricing?.monthly && <button className="btn btn-sm btn-primary" type="button" disabled={!!busy} onClick={() => startWebCheckout('monthly')}>
@@ -836,32 +777,7 @@ export default function CloudAccountPanel() {
             {t('cloud.noStoreBilling')}
           </div>}
         </div>
-      </div>}
-
-      {link?.accountId && <div className="card" style={{ boxShadow: 'none', marginTop: 14 }}>
-        <div className="spread" style={{ gap: 12, flexWrap: 'wrap' }}>
-          <div>
-            <div className="sc-label">{t('cloud.syncStatus')}</div>
-            <div style={{ fontWeight: 650, marginTop: 3 }}>{pending ? t('cloud.pendingChanges', { count: pending, n: pending }) : t('cloud.outboxClear')}</div>
-            <div className="muted" style={{ fontSize: 12 }}>{t('cloud.lastSync', { when: when(status?.lastSyncAt, t) })}</div>
-            <div className="muted" style={{ fontSize: 12 }} data-cloud-auto-sync>
-              {autoSync?.lastAutoSyncAt
-                ? t('cloud.autoSyncLast', { when: when(autoSync.lastAutoSyncAt, t) })
-                : autoSync?.paused ? t('cloud.autoSyncPaused') : t('cloud.autoSyncOn')}
-            </div>
-            {status?.lastError === 'CLIENT_UPGRADE_REQUIRED'
-              ? <div role="status" data-cloud-upgrade style={{ color: 'var(--bad)', fontSize: 12 }}>{t('cloud.upgradeRequired')}</div>
-              : status?.lastError === 'SYNC_QUOTA_EXCEEDED'
-                ? <div role="status" style={{ color: 'var(--bad)', fontSize: 12 }}>{t('cloudError.syncQuota')}</div>
-                : status?.lastError && <div style={{ color: 'var(--bad)', fontSize: 12 }}>{t('cloud.lastError', { error: status.lastError })}</div>}
-          </div>
-          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn btn-primary" type="button" onClick={doSync} disabled={!canSync || !!busy}>{busy === 'sync' ? t('cloud.syncing') : t('cloud.syncNow')}</button>
-            <button className="btn btn-ghost" type="button" onClick={() => refreshCloudEntitlement(user.id).then(() => reload({ verify: false })).catch(err => setError(err.message))} disabled={!canSync || !!busy}>{t('cloud.refreshPremium')}</button>
-            <button className="btn btn-quiet" type="button" onClick={disconnect} disabled={!!busy}>{t('cloud.disconnect')}</button>
-          </div>
-        </div>
-      </div>}
+      )}
 
       {session?.connected && liveAccount && <CloudAccountSecurity
         pid={user.id}
@@ -869,6 +785,33 @@ export default function CloudAccountPanel() {
         onChanged={() => reload()}
         onDeleted={securityDisconnected}
       />}
+
+      {/* How this device keeps and sends work: true, and of interest to few.
+          Kept out of the way of the four lines above. */}
+      {link?.accountId && (
+        <details className="card cloud-advanced" style={{ boxShadow: 'none', marginTop: 14 }} data-cloud-advanced>
+          <summary className="sc-label" style={{ cursor: 'pointer' }}>{t('cloud.advancedTitle')}</summary>
+          <p className="muted" style={{ fontSize: 12.5, margin: '10px 0 0', maxWidth: 640 }}>{t('cloud.advancedIntro')}</p>
+          <div className="spread" style={{ gap: 12, flexWrap: 'wrap', marginTop: 10 }}>
+            <div>
+              <div style={{ fontWeight: 650, marginTop: 3 }}>{pending ? t('cloud.pendingChanges', { count: pending, n: pending }) : t('cloud.outboxClear')}</div>
+              <div className="muted" style={{ fontSize: 12 }}>{t('cloud.lastSync', { when: when(status?.lastSyncAt, t) })}</div>
+              <div className="muted" style={{ fontSize: 12 }} data-cloud-auto-sync>
+                {autoSync?.lastAutoSyncAt
+                  ? t('cloud.autoSyncLast', { when: when(autoSync.lastAutoSyncAt, t) })
+                  : autoSync?.paused ? t('cloud.autoSyncPaused') : t('cloud.autoSyncOn')}
+              </div>
+              {entitlement?.offlineUntil && <div className="muted" style={{ fontSize: 12 }}>{t('cloud.offlineUntil', { when: when(entitlement.offlineUntil, t) })}</div>}
+              {status?.lastError && !['CLIENT_UPGRADE_REQUIRED', 'SYNC_QUOTA_EXCEEDED'].includes(status.lastError)
+                && <div style={{ color: 'var(--bad)', fontSize: 12 }}>{t('cloud.lastError', { error: status.lastError })}</div>}
+            </div>
+            <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+              <button className="btn btn-ghost" type="button" onClick={doSync} disabled={!canSync || !!busy}>{busy === 'sync' ? t('cloud.syncing') : t('cloud.syncNow')}</button>
+              <button className="btn btn-ghost" type="button" onClick={() => refreshCloudEntitlement(user.id).then(() => reload({ verify: false })).catch(err => setError(err.message))} disabled={!canSync || !!busy}>{t('cloud.refreshPremium')}</button>
+            </div>
+          </div>
+        </details>
+      )}
 
       {(() => {
         const note = nativeStoreKit && appleProducts.length
