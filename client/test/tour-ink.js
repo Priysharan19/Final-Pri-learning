@@ -424,6 +424,113 @@ export const flow = {
     await check('and whichever way it went, the handwritten verdict carries the honesty line',
       /Read by AI, marked by Pri’s engine/.test(anyProvenance), JSON.stringify(anyProvenance));
     reader.confidence = null;
+
+    // ── 8 · working that ENDS IN AN EQUATION: the answer is proposed, shown ──
+    // Owner case A3 (real reader, 2026-10-10): three lines of working ending
+    // "38.5 - 24.5 = 14" were transcribed correctly, the last line was sent
+    // verbatim as the answer, and the numeric parser refused it — "I couldn't
+    // read that as a maths answer". The value after the "=" is now proposed by
+    // the same key-less module Photo uses, shown in an editable field, and
+    // sent only by the student's Submit, with the lines as working.
+    const openFresh = async () => {
+      await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.q-prompt', { timeout: 30000 });
+      await settle();
+      // A question that already had a try (section 7 leaves one open after a
+      // wrong first answer) is not a fresh one: move on to the next.
+      for (let moved = 0; moved < 4; moved++) {
+        const row = await online.shownRow();
+        const tried = row?.serverQuestionId ? await online.practiceCalls(new RegExp(`^/v1/practice/${row.serverQuestionId}/submit$`)) : [];
+        if (!tried.length) break;
+        const leaving = await page.locator('.qpage').first().getAttribute('data-question-id');
+        await page.locator('.ctx-next').click();
+        await page.waitForFunction(id => {
+          const el = document.querySelector('.qpage[data-question-id]');
+          return el && el.getAttribute('data-question-id') !== id && el.querySelector('.q-prompt');
+        }, leaving, { timeout: 30000 });
+        await settle();
+      }
+      const tab = page.getByRole('button', { name: 'Answer by handwriting' });
+      if (await tab.count()) await tab.click();
+      await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+      return page.locator('.ink-canvas-live').boundingBox();
+    };
+    const workingEndingIn = value => {
+      const n = Number(value);
+      const top = Number.isFinite(n) ? String(Math.round((n + 24.5) * 10) / 10) : '38.5';
+      return Number.isFinite(n) ? [top, '24.5', `${top}-24.5=${value}`] : ['38.5', '24.5', `1*(${value})=${value}`];
+    };
+    const proposalCase = async ({ label, glyphs, wrongBy }) => {
+      const canvas = await openFresh();
+      const right = await online.answerOf();
+      if (!await check(`${label}: a numeric question is on the card and its answer is known only at the desk`,
+        right.answerType === 'numeric' && Number.isFinite(Number(right.text)), JSON.stringify({ type: right.answerType, kind: right.kind }))) return null;
+      const final = wrongBy ? String(Number(right.text) + wrongBy) : right.text;
+      const written = workingEndingIn(final);
+      online.forgetKeptReads();           // re-scripted stand-in: a different reader now (desk only)
+      reader.lines = written.map(text => ({ text }));
+      reader.confidence = 0.97;
+      const callsBefore = reader.requests.length;
+      await handwrite(page, canvas, glyphs);
+      await page.waitForFunction(n => document.querySelectorAll('.ink-line').length === n, 3, { timeout: 20000 }).catch(() => {});
+      const shown = await reading(page);
+      await check(`${label}: the three lines of working are read and shown, the last one an equation [SYNTHETIC-READER EVIDENCE]`,
+        shown.length === 3 && shown[2] === written[2] && reader.requests.length === callsBefore + 1, JSON.stringify(shown));
+      const field = page.locator('[data-ink-final-answer]');
+      const noteText = (await page.locator('.ink-final-answer [role="status"]').innerText().catch(() => '')).replace(/\s+/g, ' ');
+      await check(`${label}: the value after "=" is proposed in an editable Final answer field, and the student is told where it came from`,
+        await field.inputValue().catch(() => null) === final && await field.isEditable() &&
+          await page.locator('[data-ink-answer-proposal="proposed"]').count() === 1 && noteText.includes(`Pri took ${final} as your answer from line 3`) && /Change it here/.test(noteText),
+        `field ${JSON.stringify(await field.inputValue().catch(() => null))}; note ${JSON.stringify(noteText)}`);
+      await check(`${label}: nothing is marked by the reading or the proposal — no recognise, no grade, no verdict before Submit`,
+        await page.locator('.eval-card, .verdict-bad').count() === 0 &&
+          (await online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/(recognize|submit)$`))).length === 0);
+      return { right, final, written, field };
+    };
+
+    // 8a · the proposal is right: Submit as it stands.
+    {
+      const made = await proposalCase({ label: 'equation last line', glyphs: '717' });
+      if (made) {
+        const { right, final, written } = made;
+        const callsBeforeSubmit = reader.requests.length;
+        await page.getByRole('button', SUBMIT).click();
+        await page.waitForSelector('.eval-card, .verdict-bad', { timeout: 30000 }).catch(() => {});
+        const of = suffix => online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/${suffix}$`));
+        const [receipts, confirms, grades] = [await of('recognize'), await of('recognition/[^/]+/confirm'), await of('submit')];
+        await check('equation last line: Submit sends the proposed value as the answer and all three recognised lines as working, in ink mode',
+          grades.length === 1 && grades[0].body?.answer === final && grades[0].body.mode === 'ink' && grades[0].body.steps === written.join('\n') &&
+            typeof grades[0].body.transcriptionReceipt === 'string', JSON.stringify(grades.map(g => g.body)));
+        await check('equation last line: the answer goes through the same confirm path as a hand-corrected line — one reused receipt read, one confirm of the value, +0 provider calls',
+          receipts.length === 1 && receipts[0].status === 201 && receipts[0].json?.reused === true && confirms.length === 1 && confirms[0].status < 300 &&
+            confirms[0].body?.text === final && reader.requests.length === callsBeforeSubmit,
+          `recognize ${JSON.stringify(receipts.map(c => [c.status, c.json?.reused]))}; confirm ${JSON.stringify(confirms.map(c => c.body))}; provider +${reader.requests.length - callsBeforeSubmit}`);
+        await check('equation last line: the server marks it correct with every mark, on the first try — not "I couldn\'t read that"',
+          grades[0]?.status === 200 && grades[0].json?.authoritative === true && grades[0].json.invalid === false && grades[0].json.correct === true &&
+            grades[0].json.resolved === true && grades[0].json.marksEarned === grades[0].json.marksPossible && await page.locator('.eval-card').count() === 1,
+          JSON.stringify({ status: grades[0]?.status, invalid: grades[0]?.json?.invalid, correct: grades[0]?.json?.correct, marks: [grades[0]?.json?.marksEarned, grades[0]?.json?.marksPossible] }));
+      }
+    }
+    // 8b · the proposal is not what the student meant: they change it first.
+    {
+      const made = await proposalCase({ label: 'proposal changed', glyphs: '171', wrongBy: 1 });
+      if (made) {
+        const { right, final, written, field } = made;
+        await field.fill(right.text);
+        await check('proposal changed: the field takes the student\'s own answer and says it is theirs',
+          await field.inputValue() === right.text && await page.locator('[data-ink-answer-proposal="student"]').count() === 1);
+        await page.getByRole('button', SUBMIT).click();
+        await page.waitForSelector('.eval-card, .verdict-bad', { timeout: 30000 }).catch(() => {});
+        const of = suffix => online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/${suffix}$`));
+        const [confirms, grades] = [await of('recognition/[^/]+/confirm'), await of('submit')];
+        await check('proposal changed: what is sent and marked is the student\'s answer, not the proposed one; the working is still attached; marked correct',
+          grades.length === 1 && grades[0].body?.answer === right.text && grades[0].body.answer !== final && grades[0].body.steps === written.join('\n') &&
+            confirms.length === 1 && confirms[0].body?.text === right.text && grades[0].json?.correct === true && grades[0].json.resolved === true,
+          JSON.stringify({ sent: grades[0]?.body?.answer, proposed: final, confirm: confirms.map(c => c.body), correct: grades[0]?.json?.correct }));
+      }
+    }
+    reader.lines = null;
+    reader.confidence = null;
   }
 };
 

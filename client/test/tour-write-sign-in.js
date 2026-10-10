@@ -206,6 +206,7 @@ function serverAnswer(h, serverQuestionId) {
 }
 
 const practiceCalls = (calls, re) => calls.filter(c => c.method === 'POST' && re.test(c.path));
+const browserNameOf = page => { try { return page.context().browser()?.browserType().name() || 'browser'; } catch { return 'browser'; } };
 
 /**
  * Open India Class 12 practice signed out, in one chapter, and stop on a 1-mark
@@ -493,13 +494,37 @@ export const writeFlow = {
       await page.waitForFunction(() => document.querySelectorAll('.ink-line').length === 0, null, { timeout: 10000 }).catch(() => {});
       // This time the stand-in is CONFIDENT. A confident reading is still the
       // student's to correct before Submit.
+      // The stand-in is re-scripted for a "7" this account has already had
+      // read (doubtfully, a moment ago). The server keeps a completed read per
+      // account and picture (recognitionOps.js), and the ink raster is cropped
+      // to the strokes at whole pixels, so the rewritten "7" can be the very
+      // same picture — in which case the server rightly answers with the read
+      // it kept, doubt and all. (Seen as a CI-only failure: whether the two
+      // pictures are byte-identical depends on where the pointer samples land
+      // on that platform.) A real reader does not change its mind about one
+      // picture, so the desk says "a different reader now": a harness-only
+      // reset of the kept reads, through the test's own database handle.
+      const keptReads = () => Number(h.db.prepare("SELECT COUNT(*) AS n FROM idempotency_keys WHERE scope='recognition-read' AND account_id=? AND expires_at>?").get(account.id, Date.now()).n);
+      const transcribes = () => calls.filter(c => c.method === 'POST' && c.path === '/v1/handwriting/transcribe' && c.status === 200);
+      const earlier = transcribes();
+      const keptBefore = keptReads();
+      const forgotten = Number(h.db.prepare("DELETE FROM idempotency_keys WHERE scope='recognition-read' AND account_id=?").run(account.id).changes || 0);
+      await check('the server was keeping the doubtful read of the first "7"; the desk reset it for the re-scripted reader',
+        keptBefore >= 1 && forgotten === keptBefore && keptReads() === 0, `kept ${keptBefore}, forgotten ${forgotten}`);
       reader.confidence = 0.97;
       const box2 = await page.locator('.ink-canvas-live').boundingBox();
       await handwrite(page, box2, '7');
       await page.waitForSelector('.ink-line .ink-correct-btn', { timeout: 20000 }).catch(() => {});
       const sure = await page.locator('.ink-line').first().evaluate(n => ({ low: n.classList.contains('ink-line-low'), edit: n.querySelector('.ink-correct-btn')?.innerText.trim() || null })).catch(() => null);
+      const second = transcribes().at(-1);
+      const samePicture = earlier.some(c => c.body?.image === second?.body?.image);
       await check(`a confident transcript is shown and is editable before Submit too [${EVIDENCE}]`,
-        sure?.low === false && sure.edit === 'Edit' && await page.locator('.ws-actions .status-line').getAttribute('data-work-state') === 'read', JSON.stringify(sure));
+        sure?.low === false && sure.edit === 'Edit' && await page.locator('.ws-actions .status-line').getAttribute('data-work-state') === 'read',
+        JSON.stringify({ ...sure, scriptedConfidence: reader.confidence, reused: second?.json?.reused ?? null, readConfidence: second?.json?.transcription?.confidence ?? null,
+          needsConfirmation: second?.json?.transcription?.needsConfirmation ?? null, samePictureAsAnEarlierRead: samePicture, keptReadsBefore: keptBefore, keptReadsNow: keptReads(), transcribeRequests: transcribes().length }));
+      // Recorded so the mechanism is visible on every platform: is the
+      // rewritten "7" the same picture as the first one here?
+      note(`Write flow: the rewritten "7" was ${samePicture ? 'THE SAME picture as' : 'a different picture from'} the first one on this platform (${browserNameOf(page)}); reused=${second?.json?.reused}; kept reads before the reset ${keptBefore}.`);
       await correctReading(page, escrow.text);
       await pressSubmit(page);
       await page.waitForSelector('.eval-card', { timeout: 30000 }).catch(() => {});

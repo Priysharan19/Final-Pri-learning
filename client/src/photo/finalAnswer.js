@@ -95,7 +95,8 @@ function answerWords(s) {
 /** Runs of letters that are not a function name are words, and words are not an expression. */
 function hasProse(s) {
   for (const run of String(s).match(/\p{L}{3,}/gu) || []) if (!WORD_NAMES.has(run) && !WORD_NAMES.has(run.toLowerCase())) return true;
-  return false;
+  // "so x = 3", "it is 6": two-letter words are words too, not s·o or i·t.
+  return /(^|[^\p{L}])(so|is|if|as|we|to|at|by|an|it|of|on)(?=\s|$)/iu.test(String(s));
 }
 
 /**
@@ -144,6 +145,27 @@ export function readsAsAnswer(text, question = {}) {
   } catch { return false; }
 }
 
+/**
+ * Does this line read, exactly as written, in the typed field's parser for
+ * this answer type? The Write surface sends such a last line verbatim, as it
+ * always has. For an expression answer that includes a whole equation
+ * ("2x + 3y = 6"): an equation can BE the answer there.
+ */
+export function readsAsWritten(text, question = {}) {
+  if (readsAsAnswer(text, question)) return true;
+  return (question?.answerType || 'numeric') === 'expression' && isEquationAnswer(String(text ?? '').trim());
+}
+
+/** A whole equation that is not just a name being given a value ("y = …", "f(x) = …", "dy/dx = …"). */
+function isEquationAnswer(s) {
+  if (!s || s.length > 200 || hasProse(s) || relations(s).some(r => r.kind !== 'equals')) return false;
+  const at = s.lastIndexOf('=');
+  if (at <= 0 || s.indexOf('=') !== at) return false;
+  const left = s.slice(0, at).trim();
+  if (/^[a-zA-Zθ]['′]?(\s*\(\s*[a-zA-Zθ]\s*\))?$/.test(left) || /^d\s*[a-zA-Z]\s*\/\s*d\s*[a-zA-Z]$/.test(left)) return false;
+  try { return parse(normalize(cleanInput(s, { stripUnits: false })))?.t === 'equation'; } catch { return false; }
+}
+
 // Types whose answer may itself contain a comma, "or" or an inequality sign.
 const LIST_TYPES = new Set(['set', 'point', 'interval', 'matrix', 'vector']);
 
@@ -176,6 +198,17 @@ function valueOf(piece, question) {
   // For a list-shaped answer the whole line may be the answer ("x > 3",
   // "(2, -3)", "{1, 2}"); try it before cutting anything off.
   if (LIST_TYPES.has(type) && readsAsAnswer(s, question)) return s;
+  // An expression answer can be a whole equation ("x^2 + y^2 = 25"): its
+  // right-hand side alone is not the answer, so nothing is cut off it.
+  if (type === 'expression' && isEquationAnswer(s)) return s;
+  // "the line is 2x + 3y = 6", "so x^2 + y^2 = 25": what follows the words is
+  // a whole equation, and for an expression answer that equation is kept.
+  if (type === 'expression') {
+    for (const word of [...words].sort((a, b) => b.end - a.end)) {
+      const rest = stripSentence(s.slice(word.end));
+      if (isEquationAnswer(rest)) return rest;
+    }
+  }
   const cuts = [...rel.filter(r => LIST_TYPES.has(type) ? r.kind !== 'inequality' : true), ...words].sort((a, b) => a.end - b.end);
   const last = cuts.at(-1);
   if (last) {

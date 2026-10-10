@@ -188,6 +188,7 @@ export const flow = {
     await page.locator('.ink-tool[title="Clear"]').click();
     await settle();
     let glyph = '4';
+    online.forgetKeptReads();   // re-scripted stand-in (desk only)
     stub.text = glyph;
     const sentBefore = stub.transcribed;
     await handwrite(page, box, glyph);
@@ -206,6 +207,7 @@ export const flow = {
       await page.locator('.ink-tool[title="Clear"]').click();
       await settle();
       glyph = '9';
+      online.forgetKeptReads();   // re-scripted stand-in (desk only)
       stub.text = glyph;
       await handwrite(page, box, glyph);
       await readsAs(page, glyph);
@@ -228,6 +230,10 @@ export const flow = {
     // Two lines on the question on screen, submitted until it resolves.
     const writeTwoLinesAndResolve = async () => {
       stub.transcribeDelay = 100;
+      // Re-scripted stand-in: earlier in this flow a lone "1" was scripted to
+      // read as "7". The server keeps a read per account and picture, so the
+      // desk says "a different reader now" (harness-only; online-session.mjs).
+      online.forgetKeptReads();
       stub.text = '1\n2';
       if (await page.getByRole('button', { name: 'Answer by handwriting' }).count()) {
         await page.getByRole('button', { name: 'Answer by handwriting' }).click();

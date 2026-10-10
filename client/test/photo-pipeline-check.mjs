@@ -22,7 +22,7 @@ import { readFileSync } from 'node:fs';
 import { installBrowserEnv, rawRows, resetStorage } from './backend-check.mjs';
 
 installBrowserEnv(); resetStorage();
-const { answerFromLine, proposeFinalAnswer, readsAsAnswer, stripSentence } = await import('../src/photo/finalAnswer.js');
+const { answerFromLine, proposeFinalAnswer, readsAsAnswer, readsAsWritten, stripSentence } = await import('../src/photo/finalAnswer.js');
 const T = await import('../src/photo/transcript.js');
 const F = await import('../src/ink/readerFailure.js');
 const reader = await import('../src/ink/cloudReader.js');
@@ -141,6 +141,69 @@ eq(stripSentence('0.333...'), '0.333...', 'a run of dots is kept: it says someth
 eq(stripSentence('3. x = 6.'), 'x = 6', 'a list number in front of a line is dropped');
 eq(answerFromLine('x = 6.', N), proposed('6'), 'one line, one value');
 eq(proposeFinalAnswer(['a', 'b = 2', 'least value => 6.'], N).line, 2, 'the proposal names the line it came from');
+
+// ── 1b · handwriting (Write mode) uses the same module ───────────────────────
+// Owner case A3: working whose last line is an equation, "38.5 - 24.5 = 14".
+// The last line was sent verbatim and refused as unreadable. The card's rule,
+// reproduced here: a last line that reads AS WRITTEN is sent exactly as it
+// always was; otherwise the answer is proposed from the lines, or not guessed.
+const inkAnswer = (lines, question) => {
+  const last = lines.at(-1);
+  if (readsAsWritten(last, question)) return { sent: last, how: 'as written' };
+  const p = proposeFinalAnswer(lines, question);
+  return p.status === 'proposed' ? { sent: p.answer, how: 'proposed' } : { sent: null, how: p.status, ...(p.candidates ? { candidates: p.candidates } : {}) };
+};
+const E = { answerType: 'expression' };
+const INK = [
+  // a single-line answer that already parses is untouched
+  [['5'], N, { sent: '5', how: 'as written' }],
+  [['24'], N, { sent: '24', how: 'as written' }],
+  [['-3/4'], N, { sent: '-3/4', how: 'as written' }],
+  [['x = 6'], N, { sent: 'x = 6', how: 'as written' }],
+  [['n = 24'], N, { sent: 'n = 24', how: 'as written' }],
+  [['12 cm'], N, { sent: '12 cm', how: 'as written' }],
+  [['(2, -3)'], { answerType: 'point' }, { sent: '(2, -3)', how: 'as written' }],
+  [['x > 3'], { answerType: 'interval' }, { sent: 'x > 3', how: 'as written' }],
+  [['2 < x <= 5'], { answerType: 'interval' }, { sent: '2 < x <= 5', how: 'as written' }],
+  [['{1, -2}'], { answerType: 'set' }, { sent: '{1, -2}', how: 'as written' }],
+  [['1, -2'], { answerType: 'set' }, { sent: '1, -2', how: 'as written' }],
+  [['2:3'], { answerType: 'ratio' }, { sent: '2:3', how: 'as written' }],
+  [['3x + 2'], E, { sent: '3x + 2', how: 'as written' }],
+  [['y = 3x + 2'], E, { sent: 'y = 3x + 2', how: 'as written' }],
+  // working whose last line already parses is untouched too
+  [['38.5', '24.5', '14'], N, { sent: '14', how: 'as written' }],
+  [['-122 = 16 - 6(n-1)', '23 = n-1', 'n = 24'], N, { sent: 'n = 24', how: 'as written' }],
+  // the owner's case, and its relatives: the value is proposed
+  [['38.5', '24.5', '38.5 - 24.5 = 14'], N, { sent: '14', how: 'proposed' }],
+  [['38.5', '24.5', '38.5-24.5=14'], N, { sent: '14', how: 'proposed' }],
+  [['38.5 - 24.5 = 14'], N, { sent: '14', how: 'proposed' }],
+  [['area = 1/2 * 7 * 4', '= 14'], N, { sent: '= 14', how: 'as written' }],
+  [['1/2 * 7 * 4 = 14 cm'], N, { sent: '14 cm', how: 'proposed' }],
+  [['∴ area = 14 cm'], N, { sent: '14 cm', how: 'proposed' }],
+  [['area is 14'], N, { sent: '14', how: 'proposed' }],
+  [['so the answer is 14.'], N, { sent: '14', how: 'proposed' }],
+  [['a + 23d = -122', 'therefore n = 24'], N, { sent: '24', how: 'proposed' }],
+  // a sentence with no value, an inequality, two candidates: no guess
+  [['38.5', 'it is the difference'], N, { sent: null, how: 'none' }],
+  [['x + 3 > 7'], N, { sent: null, how: 'none' }],
+  [['x = 2 or x = 6'], N, { sent: null, how: 'ambiguous', candidates: ['2', '6'] }],
+  [['answer = 14', 'so total = 15'], N, { sent: null, how: 'ambiguous', candidates: ['15', '14'] }],
+  // an answer that IS an equation is never cut down to its right-hand side
+  [['x^2 + y^2 = 25'], E, { sent: 'x^2 + y^2 = 25', how: 'as written' }],
+  [['2x + 3y = 6'], E, { sent: '2x + 3y = 6', how: 'as written' }],
+  [['centre (0,0), radius 5', 'so x^2 + y^2 = 25'], E, { sent: 'x^2 + y^2 = 25', how: 'proposed' }],
+  [['the line is 2x + 3y = 6.'], E, { sent: '2x + 3y = 6', how: 'proposed' }],
+  [['dy/dx = 2x + 3'], E, { sent: '2x + 3', how: 'proposed' }],
+  [['so f(x) = x^2 - 1'], E, { sent: 'x^2 - 1', how: 'proposed' }]
+];
+for (const [lines, question, want] of INK) eq(inkAnswer(lines, question), want, `ink answer of ${JSON.stringify(lines.join(' ⏎ '))} as ${question.answerType}`);
+for (const [lines, question, want] of INK) {
+  if (want.how !== 'proposed') continue;
+  ok(readsAsWritten(want.sent, question), `the proposed ${JSON.stringify(want.sent)} reads in the typed field's parser for ${question.answerType}`);
+  ok(!readsAsWritten(lines.at(-1), question), `and the last line ${JSON.stringify(lines.at(-1))} itself did not — which is why it was refused`);
+}
+eq(only(proposeFinalAnswer(['x^2 + y^2 = 25'], E)), proposed('x^2 + y^2 = 25'), 'Photo too: an equation-typed answer is kept whole');
+eq(only(proposeFinalAnswer(['x^2 + y^2 = 25'], N)), proposed('25'), 'while a numeric question takes the value after the equals sign');
 
 // Unrelated numbers elsewhere on the page never become the answer.
 const OWNER_NOTES = ['b = {40,50,60}.', 'b = {100,50,60}.', 'final:', 'a = {10,99,30}.', 'b = {100,50,60}.'];

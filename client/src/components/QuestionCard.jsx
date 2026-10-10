@@ -21,7 +21,7 @@ import { cloudReadingEnabled, INK_READER_STATE, noteReaderRefusal, readerBlock, 
 import { retryClock } from '../ink/readerFailure.js';
 import { preparePhoto } from '../ink/photoRaster.js';
 import { buildTranscript, editLine, includeAll, includedLines, reviveTranscript, setLineExcluded, unreadablePage, workingOf } from '../photo/transcript.js';
-import { proposeFinalAnswer } from '../photo/finalAnswer.js';
+import { proposeFinalAnswer, readsAsWritten } from '../photo/finalAnswer.js';
 import { clearPhotoDraft, confirmPhotoDraftSaved, readPhotoDraft, savePhotoDraft } from '../local/photoDrafts.js';
 import PhotoLines from './PhotoLines.jsx';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
@@ -1019,6 +1019,29 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     [writeMode, resolved, inkResult]
   );
   const reading = inkResult?.answerLine || '';
+  // ── The final answer inside handwritten working ────────────────────────────
+  // A student ends their working with "38.5 - 24.5 = 14" or "∴ n = 24". The
+  // last line is then not an answer the field's parser reads, and sending it
+  // verbatim was refused as unreadable (owner case A3, the same failure as
+  // Photo's "least value ⇒ 6"). A last line that already reads as an answer
+  // of this question's type is sent exactly as it always was. Otherwise the
+  // answer is PROPOSED from the lines by the same pure, key-less module Photo
+  // uses, shown in an editable field, and never substituted silently; with two
+  // candidates or none there is no guess and the student types it.
+  const inkLastLineIsAnswer = useMemo(
+    () => !!reading && readsAsWritten(reading, publicAnswerShape),
+    [reading, publicAnswerShape]
+  );
+  const inkProposal = useMemo(() => {
+    if (!writeMode || isMcq || isWorking || !inkResult?.lines?.length || inkLastLineIsAnswer) return null;
+    return proposeFinalAnswer(inkResult.lines, publicAnswerShape);
+  }, [writeMode, isMcq, isWorking, inkResult, inkLastLineIsAnswer, publicAnswerShape]);
+  // What the student typed over the proposal; null while the field follows it.
+  const [inkAnswerEdit, setInkAnswerEdit] = useState(null);
+  useEffect(() => { if (!inkFrozenRef.current) setInkAnswerEdit(null); }, [inkResult?.text, question.id]);
+  const inkAnswer = !inkProposal ? reading
+    : inkAnswerEdit !== null ? inkAnswerEdit
+      : inkProposal.status === 'proposed' ? inkProposal.answer : '';
   const needsCheck = !!doubt && !!reading && vouched !== reading;
   const checkFocus = needsCheck && checking ? (doubt.weakest?.id || null) : null;
 
@@ -1107,9 +1130,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         if (!given.trim()) return;
       }
     } else if (writeMode) {
-      if (!inkResult?.answerLine) return;
-      given = inkResult.answerLine;
-      steps = inkResult.lines.length > 1 ? inkResult.lines.join('\n') : undefined;
+      if (!inkResult?.answerLine || !String(inkAnswer).trim()) return;
+      // The last line as written when it is itself an answer; otherwise the
+      // answer shown in the field (the proposal, or what the student typed).
+      // Either way the recognised lines go as working, and an answer that is
+      // not the receipt's own text is confirmed by the student through
+      // /recognition/:receipt/confirm — the same path as a hand-corrected line.
+      given = String(inkAnswer).trim();
+      steps = inkResult.lines.length > 1 || inkProposal ? inkResult.lines.join('\n') : undefined;
       viaInk = true;
       lines = inkResult.lines.slice();
       ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null };
@@ -1588,7 +1616,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         question: { ...question, marks: totalMarks, steps: res?.solution?.steps || question.steps },
         workingLines: shown,
         stepReport: activeReport,
-        answerText: writeMode ? (inkResult?.answerLine || '') : String(answer || ''),
+        answerText: writeMode ? (inkAnswer || '') : String(answer || ''),
         correct: !!res?.correct
       });
     } catch { return null; }
@@ -1617,7 +1645,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const photoAwaitingValidReading = !photoEligibleForGrading({ mode, photo,
     ocrPhase: photoOCR.phase, unreadPages: pdfUnread, pdfPageCount,
     reattachRequired: photoReattachRequired });
-  const canSubmit = (isMcq ? mcqSel !== null : isWorking ? (writeMode ? !!inkResult?.lines?.length : !!working.trim()) : writeMode ? !!inkResult?.answerLine : !!answer.trim()) &&
+  const canSubmit = (isMcq ? mcqSel !== null : isWorking ? (writeMode ? !!inkResult?.lines?.length : !!working.trim()) : writeMode ? (!!inkResult?.answerLine && !!String(inkAnswer).trim()) : !!answer.trim()) &&
     !photoAwaitingValidReading;
   // Reader refused by authentication is not a handwriting error or a
   // server-issued grading receipt. Keep original ink and its verified local
@@ -1828,7 +1856,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const boundLines = (state.phase !== 'answering' && attempt?.lines?.length) ? attempt.lines : null;
   const shownAnswerLine = boundLines
     ? boundLines[boundLines.length - 1]
-    : (inkResult?.answerLine ? (isWorking ? inkResult.lines[inkResult.lines.length - 1] : inkResult.answerLine) : '');
+    : (inkResult?.answerLine ? (isWorking ? inkResult.lines[inkResult.lines.length - 1] : inkAnswer) : '');
   const otherComments = (inkComments || []).filter(c => c !== firstBad && c.kind !== 'good');
 
   return (
@@ -2146,6 +2174,28 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   disabled={resolved || busy} focusSymbol={checkFocus} recognitionContext={recognitionContext}
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes}
                   draftSaved={saveState === 'saved'} />
+              )}
+              {/* The answer taken from handwritten working: shown, editable,
+                  and only ever sent by the student's own Submit. */}
+              {inkProposal && !resolved && (
+                <div className="ink-final-answer" data-ink-answer-proposal={inkAnswerEdit !== null ? 'student' : inkProposal.status}>
+                  <label className="sc-label" style={{ display: 'block' }} htmlFor={`ink-final-${question.id}`}>{t('verdict.finalAnswer')}</label>
+                  <div className="answer-row">
+                    {question.answerPrefix && <span className="answer-prefix"><MathText text={question.answerPrefix} /></span>}
+                    <input id={`ink-final-${question.id}`} className="answer-input" data-ink-final-answer
+                      aria-describedby={`ink-final-note-${question.id}`}
+                      value={inkAnswer} disabled={busy}
+                      onChange={e => { setInkAnswerEdit(e.target.value); noteEdited(submissionContentKey(String(e.target.value).trim(), inkResult.lines.join('\n'))); }}
+                      autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="text" enterKeyHint="go" />
+                    {question.answerSuffix && <span className="answer-suffix">{question.answerSuffix}</span>}
+                  </div>
+                  <p className="photo-lines-note" id={`ink-final-note-${question.id}`} role="status" style={{ marginTop: 8 }}>
+                    {inkProposal.status === 'proposed'
+                      ? t('ink.answerProposed', { answer: inkProposal.answer, n: (inkProposal.line ?? inkResult.lines.length - 1) + 1 })
+                      : inkProposal.status === 'ambiguous' ? t('ink.answerAmbiguous', { candidates: inkProposal.candidates.join(', ') })
+                        : t('ink.answerNone')}
+                  </p>
+                </div>
               )}
               {/* The reader cannot read right now (a limit, an outage, no
                   connection). The writing stays; typing is one tap away and
