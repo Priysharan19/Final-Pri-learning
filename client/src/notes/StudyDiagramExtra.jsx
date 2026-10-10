@@ -44,15 +44,15 @@ function Tape({f}){
  </g>;
 }
 function Parallel({f}){
- const degrees=f.angle*Math.PI/180,tan=Math.tan(degrees),x1=300-90*tan,x2=300+90*tan;
+ const degrees=f.angle*Math.PI/180,dx=90/Math.tan(degrees),x1=300-dx,x2=300+dx;
  return <g>
   <line x1="70" y1="92" x2="530" y2="92" {...STROKE}/>
   <line x1="70" y1="272" x2="530" y2="272" {...STROKE}/>
-  <line x1={x1} y1="2" x2={x2} y2="362" {...STROKE}/>
+  <line x1={x1} y1="92" x2={x2} y2="272" {...STROKE}/>
   <T x="80" y="75" fontStyle="italic">l</T><T x="80" y="258" fontStyle="italic">m</T>
-  <T x={x1+18} y="81" fontWeight="bold">{f.angle}°</T>
+  <T x={x1+43} y="123" fontWeight="bold">{f.angle}°</T>
   <T x={x2+18} y="255" fontSize="13">?</T>
-  <path d={'M '+(x1+40)+' 92 A 40 40 0 0 0 '+(x1+40*Math.cos(degrees))+' '+(92-40*Math.sin(degrees))} fill="none" stroke={color} strokeWidth="1.5"/>
+  <path d={'M '+(x1+40)+' 92 A 40 40 0 0 1 '+(x1+40*Math.cos(degrees))+' '+(92+40*Math.sin(degrees))} fill="none" stroke={color} strokeWidth="1.5"/>
   <text x="320" y="332" textAnchor="middle" fill={muted} fontSize="13">l ∥ m</text>
  </g>;
 }
