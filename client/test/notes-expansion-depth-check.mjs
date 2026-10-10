@@ -27,7 +27,8 @@ for (const group of IN_CURRICULUM) {
   }
 }
 const c11 = await loadNotesForGrade(11);
-assert.equal(c11['c11-complex-numbers'].examples.length, 10, 'Complex Numbers should have 2 existing + 8 supplemental examples');
+assert.equal(c11['c11-complex-numbers'].examples.length, 26, 'Complex Numbers should have 2 existing + 8 JEE bridge + 16 original deeper studies');
 assert.equal(c11['c11-complex-numbers'].examples.filter(x => x.question.startsWith('Optional JEE')).length, 8, 'JEE extension labels are required');
+assert.equal(c11['c11-complex-numbers'].examples.filter(x => x.question.startsWith('Optional Complex Numbers') || x.question.startsWith('Optional Argand') || x.question.startsWith('Optional roots of unity') || x.question.startsWith('Optional triangle inequality') || x.question.startsWith('Optional geometric transform') || x.question.startsWith('Optional argument branches') || x.question.startsWith('Optional reverse triangle inequality')).length, 16, 'Deep complex studies must be visible');
 assert.equal(count, 77, 'total chapter count changed unexpectedly');
 console.log(`Notes expansion breadth PASS: ${count}/77 existing chapters, >=3 examples per chapter, 8 labelled JEE bridge studies`);
