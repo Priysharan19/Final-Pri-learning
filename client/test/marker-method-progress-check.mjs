@@ -766,6 +766,19 @@ ok(stepCheck(meta, `${fill('(x+1)', 290, '')}+12345 = 0`, { prompt }).lines[0].u
   ok(marks(zeroes, zp, 'x = (-11 + sqrt(121 - 120))/2\nx = -5') === 2, '…and its root is then read off');
   ok(marks(zeroes, zp, 'x = (-11 + sqrt(4))/2') === 0 && marks(zeroes, zp, 'x = -5') === 0, 'a root under some other square root, or stated alone, earns nothing');
   ok(marks(zeroes, zp, 'x^2+6x+5x+30=0\n(x+6)(x+5)=0') === 2, 'split and factorise on a named polynomial keep both marks');
+  // Every split of the middle term adds back to it, so a wrong split is never
+  // a false line: thirty-nine of them, in two term orders so that no three
+  // share a shape, used to walk into the one that factorises and collect its mark.
+  ok(marks(quad, qp, 'x^2+5x-x-32=0\nx^2+6x-2x-32=0\nx^2+8x-4x-32=0') === 0, 'the middle term split three ways is a search, and earns nothing');
+  ok(marks(quad, qp, 'x^2+6x-2x-32=0\nx^2+8x-4x-32=0') === 0, '…nor split two ways');
+  {
+    const sweep = [];
+    for (let m = -20; m <= 20; m++) { if (m === 0 || m === 4) continue; sweep.push((m % 2 ? `x^2+${4 - m}x+${m}x-32=0` : `${m}x+x^2+${4 - m}x-32=0`).replace(/\+-/g, '-')); }
+    ok(marks(quad, qp, sweep.join('\n')) === 0, `a sweep of ${sweep.length} splits in two term orders, from the question's coefficients alone, earns nothing`);
+    ok(marks(quad, qp, [...sweep, 'x=97'].join('\n')) === 0, '…with a guessed root after it too');
+  }
+  ok(marks(quad, qp, 'x^2+8x-4x-32=0\nx^2-4x+8x-32=0') === 1, 'the same split written in the other order is still one split, one mark');
+  ok(marks(quad, qp, 'x^2+6x-2x-32=0\nx^2+8x-4x-32=0\n(x+8)(x-4)=0') === 1, 'after a search for the split, the factorisation itself still earns its mark');
 }
 
 // ── The cost of an answer does not depend on the numbers in it ───────────────
@@ -791,8 +804,16 @@ ok(stepCheck(meta, `${fill('(x+1)', 290, '')}+12345 = 0`, { prompt }).lines[0].u
   // About 30 ms at worst on the development machine (the nested sums, which run to their budget);
   // the bound asserted leaves room for a loaded machine, not for the seconds this used to take.
   ok(inputs > 3000 && worst < 400, `${inputs} short answers and working lines built from huge numbers: the slowest takes ${worst.toFixed(0)} ms (${worstText})`);
+  // A sum is charged for what each term is, not one unit a term: twelve
+  // thousand characters of `170!+170!+…` summed ten thousand times took sixteen
+  // seconds in the final-answer box, which the server accepts at that length.
+  for (const body of ['170!', 'x^k', 'ncr(k,2)']) for (const length of [300, 3000, 11800]) {
+    let term = body;
+    while (term.length < length) term += `+${body}`;
+    for (const q of [numeric, set, expr]) time(`answer sum(${body}+… ${length} characters;k;1;10000)`, () => checkAnswer(q, `sum(${term};k;1;10000)`));
+  }
   // Exact small values are untouched, and what is out of range is not a number.
-  for (const [text, value] of [['nCr(10,3)', 120], ['10C3', 120], ['5!', 120], ['nPr(6,3)', 120], ['sum(k;k;1;15)', 120], ['sum(sum(1;j;1;10);k;1;12)', 120], ['ncr(120,1)', 120], ['ncr(1000,999) - 880', 120]]) {
+  for (const text of ['nCr(10,3)', '10C3', '5!', 'nPr(6,3)', 'sum(k;k;1;15)', 'sum(sum(1;j;1;10);k;1;12)', 'ncr(120,1)', 'ncr(1000,999) - 880']) {
     ok(checkAnswer(numeric, text).correct === true, `${text} is still exactly 120`);
   }
   ok(checkAnswer({ answerType: 'numeric', answer: { value: 137846528820 }, prompt: '' }, 'nCr(40,20)').correct === true, 'nCr(40, 20) is still exact');

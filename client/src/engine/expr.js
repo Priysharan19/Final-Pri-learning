@@ -74,7 +74,21 @@ const spend = units => {
   return evaluationBudget >= 0;
 };
 
-/** Run `fn` with at most `units` sum terms and counting-loop turns in total. An enclosing budget is kept. */
+/** How many nodes an expression has; counted once per expression. */
+const sizes = new WeakMap();
+function sizeOf(node) {
+  if (!node || typeof node !== 'object') return 0;
+  if (sizes.has(node)) return sizes.get(node);
+  let size = 1;
+  for (const child of Object.values(node)) {
+    if (Array.isArray(child)) for (const each of child) size += sizeOf(each);
+    else if (child && typeof child === 'object') size += sizeOf(child);
+  }
+  sizes.set(node, size);
+  return size;
+}
+
+/** Run `fn` with at most `units` evaluated sum-term nodes and counting-loop turns in total. An enclosing budget is kept. */
 export function withEvaluationBudget(units, fn) {
   if (evaluationBudget !== null) return fn();
   evaluationBudget = units;
@@ -460,7 +474,9 @@ export function evaluate(ast, env = {}, opts) {
           const lo = evaluate(ast.args[2], env, opts), hi = evaluate(ast.args[3], env, opts);
           if (!Number.isInteger(lo) || !Number.isInteger(hi) || hi - lo > SUM_LIMIT) return NaN;
           // One budget for every sum in the check, however they are nested.
-          if (!spend(hi - lo + 1)) return NaN;
+          // A term costs what it is: `sum(170! + 170! + …; k; 1; 10000)` is
+          // ten thousand terms of a thousand nodes each, not ten thousand units.
+          if (!spend((hi - lo + 1) * sizeOf(ast.args[0]))) return NaN;
           let total = 0;
           for (let k = lo; k <= hi; k++) {
             const scope = Object.assign(Object.create(null), env);
