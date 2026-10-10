@@ -14,7 +14,7 @@
 //
 // Every case is authored. Nothing here is generated.
 // ─────────────────────────────────────────────────────────────────
-import { methodMarks, stepCheck, checkAnswer, unresolvedWorkingView } from '../src/engine/checker.js';
+import { methodMarks, stepCheck, checkAnswer } from '../src/engine/checker.js';
 import { parseNumericInput } from '../src/engine/checker-core.js';
 
 let pass = 0;
@@ -74,8 +74,10 @@ const STEPS = [
   ['3m+12=m+8', 'm', -2, '2m+12=8', 'collecting the unknown away from a unit coefficient'],
 ];
 for (const [source, variable, root, step, name] of STEPS) {
+  const isValue = new RegExp(`^${variable}=-?\\d+$`).test(step);
   const got = award(source, variable, root, `${source}\n${step}\n${variable}=424242`);
   ok(got === 1, `${name}: "${source}" → "${step}" earns its mark (got ${got})`);
+  if (isValue) ok(award(source, variable, root, `${source}\n${step}\n${variable}=424242\n${variable}=424243`) === 0, `${name}: "${step}" at the head of a list of values for ${variable} is one candidate among several and earns nothing`);
 }
 // …and undoing each of them is not a step.
 for (const [source, variable, root, step, name] of STEPS.slice(0, 4)) {
@@ -143,7 +145,7 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   ok(run(quad, '$x^2-5x+6=0$', 'x^2-5x+6+x-x=0\nx=99', 4) === 0, 'quadratic: +x-x earns nothing');
   ok(run(quad, '$x^2-5x+6=0$', '2x^2-10x+12=0\n3x^2-15x+18=0\nx=99', 4) <= 1, 'quadratic: rescaling twice is at most one step');
   ok(run(quad, '$x^2-5x+6=0$', 'x^2-5x+7=1\nx^2-5x+8=2\nx=99', 4) <= 1, 'quadratic: shifting twice is at most one step');
-  ok(run({ kind: 'equation', variable: 'x', solutions: [-1, 7], source: 'x^2-6x=7' }, '$x^2-6x=7$', 'x^2-6x+9=16\n(x-3)^2=16\nx=99', 4) === 2, 'completing the square keeps both its steps');
+  ok(run({ kind: 'equation', variable: 'x', solutions: [-1, 7], source: 'x^2-6x=7' }, '$x^2-6x=7$', 'x^2-6x+9=16\n(x-3)^2=16\nx=99', 4) === 1, 'completing the square: the square itself is the step — adding 9 to both sides is longer than the question and could be any number');
   ok(run(expr, 'Simplify $2(x+3)+4x$', '2(x+3)+4x+1-1\n7x') === 0, 'expression: +1-1 earns nothing');
   ok(run(expr, 'Simplify $2(x+3)+4x$', '2(x+3)+4x+0\n7x') === 0, 'expression: +0 earns nothing');
   ok(run(expr, 'Simplify $2(x+3)+4x$', '2x+6+4x\n7x') === 1, 'expression: expanding earns its mark');
@@ -400,9 +402,13 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   ok(run('4x + 10=-2x + 46', 'x', 6, '2x + 5 = -x + 23') === 1, 'dividing through by 2, carried out, is a step');
   ok(run('0.4f-0.7=0.1f-2.5', 'f', -6, '4f - 7 = f - 25') === 1, 'clearing the decimals, carried out, is a step');
   ok(run('4x + 10=-2x + 46', 'x', 6, '(4x + 10)/2 = (-2x + 46)/2\n2x + 5 = -x + 23') === 1, 'announcing the division and then carrying it out is one step');
-  // Adding the number that removes a constant is the isolating move itself.
-  ok(run('7(t+2)-4=2t - 5', 't', -3, '7(t+2)-4 + 5 = 2t - 5 + 5') === 1, 'adding 5 to both sides to remove the -5 is a step');
-  ok(run('2x-7=-11', 'x', -2, '2x - 7 + 7 = -11 + 7') === 1, 'adding 7 to both sides to remove the -7 is a step');
+  // Adding a number to both sides is announced until it is carried out,
+  // whichever number it is: the step is the line that has done it.
+  ok(run('7(t+2)-4=2t - 5', 't', -3, '7(t+2)-4 + 5 = 2t - 5 + 5') === 0, 'adding 5 to both sides, written beside each, has not yet removed the -5');
+  ok(run('2x-7=-11', 'x', -2, '2x - 7 + 7 = -11 + 7') === 0, 'adding 7 to both sides, written beside each, has not yet removed the -7');
+  ok(run('2x-7=-11', 'x', -2, '2x - 7 + 7 = -11 + 7\n2x = -4') === 1, 'carried out, it is the step');
+  ok(run('2x-7=-11', 'x', -2, '2x = -11 + 7') === 1, 'the constant moved across is a step');
+  ok(run('7(t+2)-4=2t - 5', 't', -3, '7(t+2)-4 + 5 = 2t') === 1, 'added on one side and worked out on the other is a step');
 }
 
 // ── The other unknown is found once ──────────────────────────────────────────
@@ -447,72 +453,77 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   ok(run('3x + 6=21', 'x', 5, 'x + 2 = 7') === 1, 'dividing 3x + 6 = 21 through by 3, carried out, is a step');
 }
 
-// ── What a wrong first try is told about its working ─────────────────────────
-// A question allows two tries. A page of `t = -45` … `t = 45` under a wrong
-// answer came back with exactly the true line marked right, and one false line
-// came back with a diagnosis that named the answer. `unresolvedWorkingView` is
-// what a server may return while the question is open.
+// ── Working is a derivation, not a list of guesses ───────────────────────────
+// With a wrong final answer, a page of `2v = 2k` and `v = k` for k = -24…24
+// earned every method mark on 462 of 501 India questions: one of the lines is
+// true, and each true line was credited however many false ones stood round it.
 {
-  const meta = { kind: 'equation', variable: 't', solutions: [37], source: '3t - 1=110' };
-  const prompt = '$3t - 1=110$';
-  const view = working => unresolvedWorkingView({ meta, working, marks: 4, prompt });
-  const shape = v => JSON.stringify([v.stepReport.lines.map(l => [l.status, l.note ?? null, l.diagnosis?.code ?? null]), v.stepReport.firstBreak,
-    v.stepReport.diagnosis, v.partial && [v.partial.awarded, v.partial.okLines, v.partial.note, v.partial.lines.map(l => [l.status, l.mark, l.reason])]]);
-  const guesses = [];
-  for (let k = -45; k <= 45; k++) guesses.push(`t = ${k}`);
-  const page = view(guesses.join('\n'));
-  ok(page.stepReport.lines.length === 91 && page.stepReport.lines.every(l => l.status === 'note'), 'ninety-one guessed values: not one is confirmed or refuted');
-  ok(new Set(page.stepReport.lines.map(l => l.note)).size === 1, '…and the true one carries the same note as the ninety false ones');
-  ok(page.stepReport.firstBreak === -1 && page.partial === null, '…with no first mistake and no method evidence');
-  // The full report, by contrast, picks the root out — which is why it waits.
-  ok(stepCheck(meta, guesses.join('\n'), { prompt }).lines.filter(l => l.status === 'ok').map(l => l.text).join() === 't = 37', '(the full report does single out t = 37)');
-
-  // Every way of stating or checking a value comes back the same, right or wrong.
-  for (const [right, wrong] of [['t = 37', 't = 36'], ['37 = t', '36 = t'], ['t = 111/3', 't = 110/3'], ['t = 37 + 0', 't = 36 + 0'], ['37', '36'],
-    ['3(37) - 1 = 110', '3(36) - 1 = 110'], ['110 = 3(37) - 1', '110 = 3(36) - 1'], ['so t = 37', 'so t = 36'], ['∴ t = 37', '∴ t = 36']]) {
-    ok(shape(view(right)) === shape(view(wrong)), `"${right}" and "${wrong}" come back identically`);
-    for (const before of ['3t = 111', '3t - 1 = 110\n3t = 111']) for (const after of ['', '\n3t = 111', '\n3t = 112', '\n6t = 222']) {
-      ok(shape(view(`${before}\n${right}${after}`)) === shape(view(`${before}\n${wrong}${after}`)),
-        `…and so does everything around them: "${before.replace(/\n/g, ' ; ')} ; ${right}${after.replace(/\n/g, ' ; ')}"`);
-    }
-  }
-
-  // Genuine working is still judged, and still shows its marks.
-  const genuine = view('3t - 1 = 110\n3t = 111\nt = 37');
-  ok(genuine.stepReport.lines.map(l => l.status).join() === 'ok,ok,note', 'working towards the answer is verified line by line; the value it ends on is not');
-  ok(genuine.partial.awarded === 1 && genuine.partial.lines.map(l => l.mark).join() === '0,1,0', 'the collecting step shows its method mark');
-  ok(genuine.partial.lines[2].reason === 'withheld' && genuine.stepReport.lines[2].withheld === true, 'the stated value is marked as not yet checked');
-  ok(/not checked until this question is finished/.test(genuine.partial.note), 'and the note says a line is waiting');
-  ok(genuine.partial.lines.reduce((t, l) => t + l.mark, 0) === genuine.partial.awarded, 'the per-line marks add up to the marks shown');
-
-  // The first mistake is marked; what the line should have been is not said,
-  // and nothing after it is judged.
-  const slip = view('3t = 112\n3t = 111\nt = 37\n6t = 222');
-  ok(slip.stepReport.firstBreak === 0 && slip.stepReport.lines.map(l => l.status).join() === 'break,note,note,note', 'after the first mistake nothing is judged');
-  const fullSlip = stepCheck(meta, '3t = 112\n3t = 111\nt = 37\n6t = 222', { prompt });
-  ok(/111|37/.test(JSON.stringify([fullSlip.diagnosis, fullSlip.lines[0].note])), '(the full diagnosis of that slip names the number the line should have had)');
-  const said = JSON.stringify([slip.stepReport.diagnosis, slip.stepReport.lines.map(l => [l.note, l.diagnosis]), slip.partial?.note]);
-  ok(!/\d/.test(said.replace(/"confidence":"[a-z]+"/g, '')), 'no number at all appears in what the unresolved report says about the mistake');
-  ok(slip.stepReport.diagnosis?.code && slip.stepReport.diagnosis.title && !('detail' in slip.stepReport.diagnosis), 'the kind of mistake is still named');
-  ok((slip.partial?.awarded ?? 0) === 0, 'a line after the mistake shows no mark yet');
-  const later = view('3t = 111\n3t = 112\n6t = 222');
-  ok(later.stepReport.lines.map(l => l.status).join() === 'ok,break,note' && later.partial.awarded === 1, 'a step before the mistake keeps its mark');
-
-  // Other unknowns, and equations with more than one root.
-  const pair = { kind: 'equation', variable: 'y', solutions: [-6] };
-  const pairPrompt = 'Solve by elimination: $6x + 3y = -60$ and $4x - y = -22$. Find the value of $y$.';
-  const pairView = working => unresolvedWorkingView({ meta: pair, working, marks: 3, prompt: pairPrompt });
-  for (const [right, wrong] of [['x = -7', 'x = -8'], ['y = -6', 'y = 6'], ['6(-7) + 3(-6) = -60', '6(-7) + 3(-5) = -60'], ['4(-7) - (-6) = -22', '4(-6) - (-6) = -22']]) {
-    ok(shape(pairView(`18x = -126\n${right}\n9y = -54`)) === shape(pairView(`18x = -126\n${wrong}\n9y = -54`)), `pair: "${right}" and "${wrong}" come back identically`);
-  }
-  ok(pairView('18x = -126\nx = -7\n9y = -54').stepReport.lines.map(l => l.status).join() === 'ok,note,ok', 'pair: the eliminations are verified, the stated value of x is not');
+  const meta = { kind: 'equation', variable: 't', solutions: [3], source: '5t - 4=2t + 5' };
+  const prompt = '$5t - 4=2t + 5$';
+  const run = (working, marks = 4) => { try { return methodMarks({ meta, working, marks, prompt })?.awarded ?? 0; } catch { return -1; } };
+  const reasons = working => methodMarks({ meta, working, marks: 4, prompt }).lines.map(l => l.reason);
+  const K = Array.from({ length: 49 }, (_, i) => i - 24);
+  ok(run([...K.map(k => `2t = ${2 * k}`), ...K.map(k => `t = ${k}`)].join('\n')) === 0, 'a sweep of 2t = 2k and t = k over forty-nine values earns nothing');
+  ok(run(K.map(k => `3t = ${3 * k}`).join('\n')) === 0, 'a sweep of 3t = 3k earns nothing');
+  ok(run(['3t = 9', ...K.filter(k => k !== 3).map(k => `3t = ${3 * k}`)].join('\n')) === 0, '…nor when the true line happens to stand first');
+  ok(run(K.map(k => `5(${k}) - 4 = 2(${k}) + 5`).join('\n')) === 0, 'substituting forty-nine values into the question earns nothing');
+  ok(run(['5(3) - 4 = 2(3) + 5', '5(4) - 4 = 2(4) + 5'].join('\n')) === 0, 'a true substitution beside a false one is the one that happened to balance');
+  ok(run('5(3) - 4 = 2(3) + 5\n15 - 4 = 6 + 5') === 1, 'one root checked two ways is one mark');
+  // Honest working with one slip keeps what came before the slip, and only that.
+  ok(run('5t - 2t = 5 + 4\n3t = 9\nt = 4') === 2, 'two true steps and a wrong last line keep both marks');
+  ok(run('5t - 2t = 5 + 4\n3t = 10\n3t = 9') === 1, 'after a mistake, the line that would have been right earns nothing');
+  ok(reasons('5t - 2t = 5 + 4\n3t = 10\n3t = 9').join() === 'progress,break,after-mistake', '…and says why');
+  ok(run('3t = 10\n5t - 2t = 5 + 4\n3t = 9') === 0, 'a mistake on the first line leaves nothing before it to credit');
+  ok(run('5t - 2t = 5 + 4\n3t = 9\n3t = 12') === 2, 'a slip after the working, in the shape of a line already written, voids nothing before it');
+  ok(run('5t - 2t = 5 + 4\n3t = 9\n3t = 12\n3t = 15') === 1, 'three values for 3t are a list of candidates: the line among them loses its mark, the step before keeps its own');
+  // Two roots: the branches of a factorisation are not candidates.
   const quad = { kind: 'equation', variable: 'x', solutions: [2, -3], source: 'x^2+x-6=0' };
-  const quadView = working => unresolvedWorkingView({ meta: quad, working, marks: 3, prompt: '$x^2+x-6=0$' });
-  for (const [right, wrong] of [['x = 2', 'x = 5'], ['x = 2 or x = -3', 'x = 2 or x = 3'], ['x = 2, -3', 'x = 2, 5'], ['x = -3', 'x = 3']]) {
-    ok(shape(quadView(`(x - 2)(x + 3) = 0\n${right}`)) === shape(quadView(`(x - 2)(x + 3) = 0\n${wrong}`)), `two roots: "${right}" and "${wrong}" come back identically`);
+  ok((methodMarks({ meta: quad, working: '(x-2)(x+3)=0\nx-2=0\nx+3=0\nx=5', marks: 4, prompt: '$x^2+x-6=0$' })?.awarded ?? 0) === 2, 'the two branches of a factorisation are not a sweep');
+  // A bare number on an equation states a value.
+  ok(run('5t - 2t = 5 + 4\n3') === 1, 'a bare number after a step is a value stated, not a second step');
+}
+
+// ── Doing one thing to both sides, without solving anything ──────────────────
+// `6m+11=3m+20` with `6m + 11 - (3m + 20) = 0`, `… + m^2 = … + m^2`,
+// `… + m^3 = …`, `… + m^4 = …` earned 3 of 4. Every one of those lines can be
+// written by someone who cannot solve the equation.
+{
+  const run = (source, variable, roots, working, marks = 4) => {
+    const meta = { kind: 'equation', variable, solutions: roots, source };
+    try { return methodMarks({ meta, working: `${working}\n${variable} = 424242`, marks, prompt: `$${source}$` })?.awarded ?? 0; } catch { return -1; }
+  };
+  const L = '6m + 11', R = '3m + 20';
+  const lin = working => run('6m + 11=3m + 20', 'm', [3], working);
+  for (const line of [`${L} - (${R}) = 0`, `(${R}) - (${L}) = 0`, `0 = ${L} - (${R})`, `${L} + m^2 = ${R} + m^2`, `${L} + m^3 = ${R} + m^3`, `${L} + sin(m) = ${R} + sin(m)`,
+    `(${L})*(m^2+1) = (${R})*(m^2+1)`, `2^(${L}) = 2^(${R})`, `(${L})^3 = (${R})^3`, `(${L})/(${R}) = 1`, `(${R})/(${L}) = 1`, `(${L})/(${R}) - 1 = 0`, `(${L} - (${R}))^2 = 0`,
+    `(${L} - (${R}))^3 = 0`, `sqrt(${L}) = sqrt(${R})`, `${L} - 3m = ${R} - 3m`, `${L} - 11 = ${R} - 11`, `${L} - (${R}) + 1 = 1`, `2(${L} - (${R})) = 0`, `(${L} - (${R}))/3 = 0`]) {
+    ok(lin(line) === 0, `on a linear equation "${line}" has moved nothing on`);
   }
-  ok(quadView('(x - 2)(x + 3) = 0\nx = 2\nx = -3').stepReport.lines.map(l => l.status).join() === 'ok,note,note', 'two roots: the factorisation is verified, the roots read off it are not');
-  ok(unresolvedWorkingView({ meta, working: '   \n ', marks: 3, prompt }).stepReport === null, 'no working, no report');
+  ok(lin([`${L} - (${R}) = 0`, `${L} + m^2 = ${R} + m^2`, `${L} + m^3 = ${R} + m^3`, `${L} + m^4 = ${R} + m^4`, `(${L})/(${R}) = 1`, `(${R})/(${L}) = 1`].join('\n')) === 0, 'a page of them earns nothing');
+  // The same moves carried out are the method.
+  ok(lin('3m + 11 = 20') === 1, 'the unknown collected is a step');
+  ok(lin('6m - 3m = 20 - 11') === 1, 'both terms moved across is a step');
+  ok(lin('3m - 9 = 0') === 1, 'everything on one side AND collected is a step');
+  ok(lin('3m + 11 = 20\n3m = 9') === 2, 'collecting and then moving the constant are two steps');
+  ok(lin(`${L} - 3m = ${R} - 3m\n3m + 11 = 20`) === 1, 'announced and then carried out is one step');
+  // An equation that is not linear: a step is written no longer than what it comes from.
+  const P = 'x^2 + 5x + 6';
+  const quad = working => run(`${P}=0`, 'x', [-2, -3], working);
+  for (const line of [`2(${P}) = 2(0)`, `(${P})/0.5 = (0)/0.5`, `${P} + x^2 = x^2`, `${P} + sin(x) = sin(x)`, `(${P})^3 = 0`, `${P} + 1 = 1`, `-(${P}) = 0`, `(${P})(x^2 + 1) = 0`]) {
+    ok(quad(line) === 0, `on a quadratic "${line}" has moved nothing on`);
+  }
+  ok(quad(`2(${P}) = 2(0)\n(${P})/0.5 = (0)/0.5\n(${P})^3 = 0`) === 0, 'a page of them earns nothing');
+  ok(quad('(x + 2)(x + 3) = 0') === 1, 'the factorisation is a step');
+  ok(quad('(x + 2)(x + 3) = 0\nx + 2 = 0\nx + 3 = 0') === 2, 'the factorisation and its branches keep the two marks they had (the second branch counts with the first)');
+  const moved = working => run('x^2 + 3x=4x + 6', 'x', [3, -2], working);
+  ok(moved('x^2 + 3x - (4x + 6) = 0') === 0, 'everything moved to one side, nothing collected, is the question written round the other way');
+  ok(moved('x^2 - x - 6 = 0') === 1, 'standard form is the first step of a quadratic');
+  ok(moved('x^2 - x - 6 = 0\n(x - 3)(x + 2) = 0') === 2, 'standard form and then the factorisation are two steps');
+  ok(moved('x^2 - x - 6 = 0\nx^2 - x = 6\nx^2 = x + 6\nx^2 - 6 = x') === 1, 'moving its terms back and forth afterwards earns nothing more');
+  // A value the question prints for another letter is not found by rewriting it.
+  const table = { kind: 'equation', variable: 'y', solutions: [-24] };
+  ok((methodMarks({ meta: table, working: 'x - (5) = 0\nx - 5 = 0\n2x = 10\ny = 9', marks: 3, prompt: 'A table of values is being built to graph $y = -5x + 1$. What is the value of $y$ when $x = 5$?' })?.awarded ?? 0) === 0,
+    'the value of x that the question gives, written three other ways, earns nothing');
 }
 
 // ── A comma with a space beside it is a list ─────────────────────────────────
@@ -523,6 +534,7 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
     ok(read(text) === null, `${JSON.stringify(text)} is two things written, not one number`);
     const got = marked(Number(text.replace(/[^0-9]/g, '')), text);
     ok(got.correct !== true && got.invalid === true, `…so ${JSON.stringify(text)} is unreadable, never the digits run together`);
+    ok(/1,512 or 1 512/.test(got.feedback) && !/\b1234\b|\b1234567\b/.test(got.feedback), `…and ${JSON.stringify(text)} is told how one number is written, not what the number was`);
   }
   // The spaces typesetting puts between digit groups group like a plain space.
   for (const [name, space] of [['no-break', ' '], ['thin', ' '], ['narrow no-break', ' '], ['en', ' '], ['figure', ' '], ['punctuation', ' ']]) {
@@ -539,5 +551,5 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
 
 console.log(failures.length
   ? `METHOD PROGRESS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `METHOD PROGRESS: PASS — ${pass}/${pass} checks — identity padding, both-sides restatements and arithmetic built from the question's numbers earn nothing, every genuine step keeps its mark, and an unresolved try is told nothing that confirms a value.`);
+  : `METHOD PROGRESS: PASS — ${pass}/${pass} checks — identity padding, both-sides restatements and arithmetic built from the question's numbers earn nothing and every genuine step keeps its mark.`);
 process.exit(failures.length ? 1 : 0);

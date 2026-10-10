@@ -21,7 +21,7 @@ import { misconceptionIdForTrap } from '../../client/src/engine/misconceptions.j
 import { PUBLIC_QUESTION_FIELDS } from '../../client/src/engine/publicQuestion.js';
 import { consentState, consentBlockerCode } from './guardianConsent.js';
 import { loadAllBanks, generateQuestion } from '../../client/src/engine/generators/index.js';
-import { checkAnswer, stepCheck, methodMarks, unresolvedWorkingView } from '../../client/src/engine/checker.js';
+import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
 import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../../client/src/engine/answer-forms.js';
 import { transcribeHandwriting, validateImage, HandwritingProviderError } from './handwritingProvider.js';
 import { consumeAiAllowance, refundAiAllowance, refuseAiAllowance } from './aiAllowance.js';
@@ -135,31 +135,41 @@ function stepEvidence(q, answer, steps, result) {
   return { stepReport: report, partial };
 }
 
-// A wrong first try leaves the question open, so its report may not hand over
-// the answer. The engine decides what may be shown (`unresolvedWorkingView`):
-// lines that state or check a value are not judged, the first mistake is
-// marked without saying what the line should have been, nothing after it is
-// judged, and the method marks shown are those of the judged lines alone. The
-// full report and the full method marks are returned when the question
-// resolves. The stored reply is this one, so a replay says the same.
-function unresolvedEvidence(q, answer, steps, result, evidence) {
-  const marks = marksPossibleFor(q);
-  // A question answered BY its working is reported on the answer itself.
-  const reported = result.stepReport
-    ? { meta: q.answer?.stepMeta, working: answer }
-    : { meta: stepMetaFor(q), working: steps };
-  let stepReport = null, partial = null;
-  if (evidence.stepReport && reported.meta) {
-    try {
-      stepReport = unresolvedWorkingView({ ...reported, marks, prompt: q.prompt, withMarks: false }).stepReport;
-    } catch { stepReport = null; }
+// ── What an open question may be told about its working ─────────────────────
+// A practice question allows two tries. Until it resolves, the reply to a
+// wrong try carries NOTHING derived from the answer key about the working:
+// no step report, no first mistake, no diagnosis, no per-line marks, no method
+// marks, and no feedback that depends on the lines. Any verdict on any line is
+// a test of a candidate answer — `2t = 6` is right exactly when t is 3, and a
+// ladder of `abs(t - c) = t - c` lines breaks one line after the answer — so
+// no choice of which lines to judge is safe, and none is judged. The working
+// is not even checked: it is checked, and its method marks are paid, by the
+// reply that resolves the question (a correct answer or the second try).
+// Nothing is lost by waiting; an unresolved try commits no mark.
+const OPEN_WORKING = 'Your working is checked when this question is finished.';
+const OPEN_FEEDBACK = {
+  workingOnly: `There is no final answer here. ${OPEN_WORKING}`,
+  working: OPEN_WORKING
+};
+
+// Working arrives as one text or as lines. Either way it is at most this many
+// characters in all: the lines are checked inside the account's transaction,
+// and an array of 100 lines of 1000 characters was 92 KB of polynomial to
+// expand while every other request waited.
+const MAX_WORKING_CHARS = 8000;
+const MAX_WORKING_LINES = 100;
+const MAX_WORKING_LINE_CHARS = 1000;
+function acceptableWorking(steps) {
+  if (steps === undefined || steps === null) return true;
+  if (typeof steps === 'string') return limitedText(steps, MAX_WORKING_CHARS);
+  if (!Array.isArray(steps) || steps.length > MAX_WORKING_LINES) return false;
+  let total = Math.max(0, steps.length - 1);          // the line breaks that join them
+  for (const line of steps) {
+    if (!limitedText(line, MAX_WORKING_LINE_CHARS)) return false;
+    total += line.length;
+    if (total > MAX_WORKING_CHARS) return false;
   }
-  if (evidence.partial) {
-    try {
-      partial = unresolvedWorkingView({ meta: stepMetaFor(q), working: steps, marks, prompt: q.prompt }).partial;
-    } catch { partial = null; }
-  }
-  return { stepReport, partial };
+  return true;
 }
 
 // What a device may know a question by (`opaqueContentId`, `opaqueContentHash`)
@@ -666,9 +676,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const mode = body.mode ?? 'typed';
     if (!ID.test(submissionId) || !['typed', 'ink', 'photo'].includes(mode) ||
         !limitedText(body.answer, 12000) ||
-        !(body.steps === undefined || body.steps === null ||
-          limitedText(body.steps, 8000) ||
-          (Array.isArray(body.steps) && body.steps.length <= 100 && body.steps.every(s => limitedText(s, 1000))))) {
+        !acceptableWorking(body.steps)) {
       return reject(res, 400, 'PRACTICE_SUBMISSION_INVALID', 'Supply a valid stable submission key and limited mathematical working.');
     }
     if (req.get('idempotency-key') && req.get('idempotency-key') !== submissionId) {
@@ -723,11 +731,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       ];
       const optionWhy = !result.correct && q.answerType === 'mcq'
         ? q.answer?.optionTraps?.[Number(body.answer)] : null;
-      const feedback = String(optionWhy || result.feedback || '').slice(0, 3000);
-      const trapWhy = !result.correct
-        ? trapProbes.find(t => t?.why && String(t.why) === feedback)?.why || null : null;
       const working = Array.isArray(body.steps) ? body.steps.join('\n') : String(body.steps || '');
-      const evidence = stepEvidence(q, body.answer, working, result);
       const marksPossible = marksPossibleFor(q);
       // Working sent without a final answer is an attempt whether or not its
       // lines are right, and spends a try either way. Were only true working
@@ -745,15 +749,27 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const spent = tries >= 1 || (q._repeat !== true && await contentTried(db, accountId, q, now));
       // Invalid input is not a failed mathematical attempt: do not consume a try or close the question.
       const resolved = !invalid && Boolean(result.correct || spent || ONE_TRY_MODES.includes(q._practiceMode));
-      // While the question is open, the report and the marks are those of the
-      // lines that may be judged without confirming a value of the unknown.
-      const { stepReport, partial } = resolved ? evidence : unresolvedEvidence(q, body.answer, working, result, evidence);
+      // The working is checked once, and only by the reply that resolves the
+      // question — see "What an open question may be told about its working".
+      const { stepReport, partial } = resolved
+        ? stepEvidence(q, body.answer, working, result)
+        : { stepReport: null, partial: null };
+      // A question answered BY its working (the answer is the lines) has a
+      // marker's verdict that is itself a verdict on the lines.
+      const answeredByWorking = q.answerType === 'working' || Boolean(result.stepReport);
+      const answerFeedback = String(optionWhy || result.feedback || '').slice(0, 3000);
+      const feedback = resolved || invalid
+        ? answerFeedback
+        : workingOnly ? OPEN_FEEDBACK.workingOnly
+          : answeredByWorking ? OPEN_FEEDBACK.working
+            : answerFeedback || (working.trim() ? OPEN_FEEDBACK.working : '');
+      const trapWhy = !result.correct && !(answeredByWorking && !resolved)
+        ? trapProbes.find(t => t?.why && String(t.why) === answerFeedback)?.why || null : null;
       // Blank final answers are not automatically attempts: verified positive
       // method evidence alone makes an otherwise blank response gradable.
       // Unreadable working or an invalid NONBLANK answer still cannot earn
       // marks. This prevents rewarding a mere copy of the question.
-      const workingOnlyCredit = result.invalid === true && body.answer.trim() === '' &&
-        Number.isInteger(partial?.awarded) && partial.awarded > 0;
+      const workingOnlyCredit = workingOnly && Number.isInteger(partial?.awarded) && partial.awarded > 0;
       const marksEarned = invalid ? 0 : result.correct
         ? marksPossible
         : Math.max(0, Math.min(marksPossible - 1, partial?.awarded ?? 0));
@@ -762,7 +778,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         correct: result.correct === true, invalid, resolved,
         marksEarned, marksPossible,
         triesLeft: resolved ? 0 : 1,
-        feedback: workingOnlyCredit ? partial.note : workingOnly ? (partial?.note || 'There is no final answer here, and this working does not earn a mark yet.') : feedback, trapWhy,
+        feedback: !resolved ? feedback : workingOnlyCredit ? partial.note : workingOnly ? (partial?.note || 'There is no final answer here, and this working does not earn a mark.') : feedback, trapWhy,
         contentId: opaqueContentId(q.contentId), serverAcknowledgedAt: now,
         ...(q._repeat === true ? { repeat: true } : {}),
         // An entry that is not an attempt costs nothing, so it may not return

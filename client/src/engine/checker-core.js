@@ -496,6 +496,10 @@ export function checkAnswer(question, rawInput) {
         return { correct: false, feedback: 'Unknown answer type.' };
     }
   } catch (err) {
+    // Digits broken apart in a way no single number is written: say how one is.
+    if (err?.message === 'Not a single number') {
+      return { correct: false, invalid: true, feedback: 'I couldn’t read that as one number. Write it without gaps (1512), or grouped in the usual way (1,512 or 1 512) — a comma followed by a space reads as two numbers.' };
+    }
     return { correct: false, invalid: true, feedback: "I couldn't read that as a maths answer — check for typos (e.g. write 3/4, 0.75, sqrt(2), 2pi, or (2, -3))." };
   }
 }

@@ -290,83 +290,139 @@ try {
   eq([listedBind.status, listedBind.data?.error?.code], [409, 'PRACTICE_ACCOUNT_MISMATCH'], 'nor does it bind a prepared question');
   eq((await post('/v1/practice/issue', { prepared: prep2.data.prepared, account: String(named.account.id) }, named.jar)).status, 201, 'which is still there for the account named properly');
 
-  // ══ a wrong first try is not told the answer through its working ═════════
+  // ══ an open question is told nothing about its working ═══════════════════
   // A page of ninety-one guessed values under a wrong final answer came back
   // with exactly the true one marked right; the second try then earned full
-  // marks as new work. One false line came back with a diagnosis naming the
-  // answer. While a question is open, a line that states or checks a value is
-  // not judged, the first mistake is marked without saying what it should have
-  // been, and nothing after it is judged. Resolution returns the full report.
-  const work = (jar, id, answer, steps) => { const sid = `repeat-credit-${String(++n).padStart(4, '0')}`; return { sid, sent: post(`/v1/practice/${id}/submit`, { submissionId: sid, answer: String(answer), mode: 'typed', steps }, jar, { 'Idempotency-Key': sid }) }; };
-  const lineStatuses = report => (report?.lines || []).map(l => l.status);
-  const guesser = await account('guess');
-  const or_g0 = await issue(guesser.jar, 21);
-  const gKey = Number((await sealedAnswer(or_g0.data.question.id)).value);
-  const gLetter = or_g0.data.question.prompt.match(/[a-z]/i)[0];
-  const guesses = [];
-  for (let k = gKey - 45; k <= gKey + 45; k++) guesses.push(`${gLetter} = ${k}`);
-  const or_g1 = work(guesser.jar, or_g0.data.question.id, '987654', guesses);
-  const or_g1r = await or_g1.sent;
-  eq([or_g1r.status, or_g1r.data.correct, or_g1r.data.resolved, or_g1r.data.triesLeft, or_g1r.data.solution], [200, false, false, 1, undefined], 'ninety-one guessed values under a wrong answer: a wrong first try, still open');
-  eq([or_g1r.data.stepReport.lines.length, [...new Set(lineStatuses(or_g1r.data.stepReport))]], [91, ['note']], 'not one of the ninety-one lines is confirmed or refuted');
-  const trueLine = or_g1r.data.stepReport.lines[45], falseLine = or_g1r.data.stepReport.lines[44];
-  eq([trueLine.text, { ...trueLine, text: null }], [`${gLetter} = ${gKey}`, { ...falseLine, text: null }], 'the line that states the true value comes back exactly as a false one does');
-  eq([or_g1r.data.marksEarned, or_g1r.data.partial, or_g1r.data.stepReport.firstBreak, or_g1r.data.stepReport.diagnosis], [0, null, -1, null], 'and there are no marks, no per-line marks and no first mistake to read it from');
-  eq((await post(`/v1/practice/${or_g0.data.question.id}/submit`, { submissionId: or_g1.sid, answer: '987654', mode: 'typed', steps: guesses }, guesser.jar, { 'Idempotency-Key': or_g1.sid })).data, or_g1r.data, 'the stored reply is the same one');
-  const or_g2r = await work(guesser.jar, or_g0.data.question.id, '987654', guesses).sent;
-  eq([or_g2r.data.resolved, or_g2r.data.correct, typeof or_g2r.data.solution], [true, false, 'object'], 'the second wrong try resolves the question');
-  eq(or_g2r.data.stepReport.lines.filter(l => l.status === 'ok').map(l => l.text), [`${gLetter} = ${gKey}`], 'and the full report is then returned: the true value is the one line verified');
-  eq(or_g2r.data.stepReport.withheld ?? false, false, 'nothing in it is withheld');
+  // marks as new work. Withholding the lines that LOOK like a stated value did
+  // not close it: any judged line is a test of a candidate. A ladder of
+  // `abs(t - c) = t - c` broke one line after the answer; `2t = 6`, a cubed
+  // product, `floor(t/4) = 0`, the diagnosis code and the method marks each
+  // said whether a candidate was right. So while a question is open its reply
+  // carries nothing derived from the key about the working — and two tries
+  // that differ only in whether the candidate is the true one are answered
+  // identically, byte for byte, apart from their ids and the time.
+  {
+    const orWork = (jar, id, answer, steps) => { const sid = `repeat-credit-${String(++n).padStart(4, '0')}`; return post(`/v1/practice/${id}/submit`, { submissionId: sid, answer: String(answer), mode: 'typed', steps }, jar, { 'Idempotency-Key': sid }).then(r => Object.assign(r, { sid })); };
+    const orAccount = async tag => { await h.db.run('DELETE FROM rate_limits'); const x = await registerAccount(h, { email: `oracle.${tag}@example.test`, deviceId: `ipad-oracle-${tag}` }); await verifyEmail(h, x.account.id); return x; };
+    const orOk = (cond, name) => { assert.ok(cond, name); count++; };
+    const said = ({ questionId, submissionId, attemptId, serverAcknowledgedAt, ...rest }) => rest;
+    const SILENT_KEYS = ['authoritative', 'contentId', 'correct', 'feedback', 'invalid', 'marksEarned', 'marksPossible', 'partial', 'resolved', 'stepReport', 'trapWhy', 'triesLeft'];
+    const knower = await orAccount('knower'), guesser = await orAccount('guesser');
+    const ladder = (v, from) => Array.from({ length: 21 }, (_, i) => `abs(${v} - (${from + i})) = ${v} - (${from + i})`);
+    // [label, answer, working when the candidate is k]
+    const FORMS = [
+      ['the bare value', '987654', (v, k) => [`${v} = ${k}`]],
+      ['a page of ninety-one values', '987654', (v, k) => Array.from({ length: 91 }, (_, i) => `${v} = ${k - 45 + i}`)],
+      ['a doubled value', '987654', (v, k) => [`2${v} = ${2 * k}`]],
+      ['a shifted value', '987654', (v, k) => [`${v} + 1 = ${k + 1}`, `${v} - (${k}) = 0`, `-${v} = ${-k}`]],
+      ['a ladder of range tests', '987654', (v, k) => ladder(v, k - 10)],
+      ['a cubed product of candidates', '987654', (v, k) => [`((${v} - (${k}))(${v} - (${k + 2}))(${v} - (${k + 4})))^3 = 0`]],
+      ['a floor', '987654', (v, k) => [`floor(${v}/4) = ${Math.floor(k / 4)}`, `floor(${v}) = ${k}`]],
+      ['a product with one root too many', '987654', (v, k) => [`(${v} - (${k}))(${v} - (${k + 1})) = 0`]],
+      ['a reciprocal and a root', '987654', (v, k) => [`1/(${v} + 100) = 1/${k + 100}`, `sqrt(${v} + 100) = sqrt(${k + 100})`]],
+      ['a substitution into the question', '987654', (v, k, prompt) => [prompt.replace(/\$/g, '').replace(new RegExp(v, 'g'), `(${k})`)]],
+      ['working with no final answer', '', (v, k) => [`${v} = ${k}`]],
+      ['a genuine first step beside a value', '987654', (v, k, prompt) => [prompt.replace(/\$/g, ''), `${v} = ${k}`]]
+    ];
+    let seed = 7001;
+    for (const [label, answer, lines] of FORMS) {
+      seed += 1;
+      const kq = await issue(knower.jar, seed), gq = await issue(guesser.jar, seed);
+      const key = Number((await sealedAnswer(kq.data.question.id)).value);
+      const letter = kq.data.question.prompt.match(/[a-z]/i)[0];
+      // The second account's candidate is one off — and its ladder, page and
+      // product are the first account's moved along by one.
+      const right = await orWork(knower.jar, kq.data.question.id, answer, lines(letter, key, kq.data.question.prompt));
+      const wrong = await orWork(guesser.jar, gq.data.question.id, answer, lines(letter, key + 1, gq.data.question.prompt));
+      eq([right.status, wrong.status, kq.data.question.prompt], [200, 200, gq.data.question.prompt], `${label}: two accounts spend a first try on the same question`);
+      eq(said(wrong.data), said(right.data), `${label}: the try built on the true value and the one built on a false value are answered identically`);
+      eq([Object.keys(said(right.data)).sort(), right.data.resolved, right.data.triesLeft, right.data.correct, right.data.invalid],
+        [SILENT_KEYS, false, 1, false, false], `${label}: an open wrong try, and nothing in its reply but the fixed fields`);
+      eq([right.data.marksEarned, right.data.stepReport, right.data.partial, right.data.trapWhy], [0, null, null, null], `${label}: no marks, no report, no method evidence, no misconception`);
+      eq(right.data.feedback, answer === '' ? 'There is no final answer here. Your working is checked when this question is finished.' : 'Your working is checked when this question is finished.',
+        `${label}: the feedback is the same fixed sentence whatever the lines say`);
+      eq((await post(`/v1/practice/${kq.data.question.id}/submit`, { submissionId: right.sid, answer, mode: 'typed', steps: lines(letter, key, kq.data.question.prompt) }, knower.jar, { 'Idempotency-Key': right.sid })).data, right.data,
+        `${label}: the stored reply is that same one`);
+      // Resolution is where the working is judged — and there the two differ.
+      const rightDone = await orWork(knower.jar, kq.data.question.id, answer, lines(letter, key, kq.data.question.prompt));
+      const wrongDone = await orWork(guesser.jar, gq.data.question.id, answer, lines(letter, key + 1, gq.data.question.prompt));
+      eq([rightDone.data.resolved, wrongDone.data.resolved, typeof rightDone.data.solution, Array.isArray(rightDone.data.stepReport?.lines), Array.isArray(wrongDone.data.stepReport?.lines)],
+        [true, true, 'object', true, true], `${label}: the second try resolves the question and returns the full report`);
+      orOk(JSON.stringify(rightDone.data.stepReport.lines.map(l => [l.status, l.note, l.diagnosis?.code])) !== JSON.stringify(wrongDone.data.stepReport.lines.map(l => [l.status, l.note, l.diagnosis?.code])),
+        `${label}: which, now that nothing is left to guess, does tell the true value from the false one`);
+    }
 
-  // Genuine working is still judged on the first try, and shows its marks —
-  // whatever values are stated beside it.
-  const PAIR = { generator: 'c10-linear-pair-methods', difficulty: 2, seed: 7, curriculum: 'in' };
-  const elimination = (y, x) => ['12x + 6y = -120', '12x - 3y = -66', '9y = -54', `y = ${y}`, `x = ${x}`, `6(${x}) + 3(${y}) = -60`];
-  const solver = await account('solver'), bluffer = await account('bluffer');
-  const or_s0 = await post('/v1/practice/issue', PAIR, solver.jar), or_b0 = await post('/v1/practice/issue', PAIR, bluffer.jar);
-  eq([or_s0.data.question.prompt, or_b0.data.question.prompt, (await sealedAnswer(or_s0.data.question.id)).value],
-    Array(2).fill('Solve by elimination: $6x + 3y = -60$ and $4x - y = -22$. Find the value of $y$.').concat(-6), 'two accounts sit the same pair of equations');
-  const or_s1r = await work(solver.jar, or_s0.data.question.id, '5', elimination(-6, -7)).sent;
-  const or_b1r = await work(bluffer.jar, or_b0.data.question.id, '5', elimination(6, 7)).sent;
-  eq(lineStatuses(or_s1r.data.stepReport), ['ok', 'ok', 'ok', 'note', 'note', 'note'], 'the eliminations are verified line by line; the values stated after them and the check are not');
-  eq([or_s1r.data.resolved, or_s1r.data.marksEarned, or_s1r.data.marksPossible, or_s1r.data.partial.awarded, or_s1r.data.partial.lines.map(l => l.mark)], [false, 1, 2, 1, [0, 0, 1, 0, 0, 0]], 'the step that eliminates x shows its method mark');
-  const unsent = r => ({ report: { ...r.data.stepReport, lines: r.data.stepReport.lines.map(l => ({ ...l, text: null })) }, partial: { ...r.data.partial, lines: r.data.partial.lines.map(l => ({ ...l, text: null })) }, marks: [r.data.marksEarned, r.data.marksPossible], feedback: r.data.feedback });
-  eq(unsent(or_b1r), unsent(or_s1r), 'the same working with the wrong values stated comes back identically, line for line and mark for mark');
-  const or_s2r = await work(solver.jar, or_s0.data.question.id, '5', elimination(-6, -7)).sent;
-  eq([or_s2r.data.resolved, lineStatuses(or_s2r.data.stepReport), or_s2r.data.marksEarned], [true, ['ok', 'ok', 'ok', 'ok', 'ok', 'ok'], 1], 'on resolution every line is judged, and the marks earned are the ones shown');
-  const or_b2r = await work(bluffer.jar, or_b0.data.question.id, '5', elimination(6, 7)).sent;
-  eq([or_b2r.data.resolved, lineStatuses(or_b2r.data.stepReport).slice(0, 4), or_b2r.data.stepReport.firstBreak], [true, ['ok', 'ok', 'ok', 'break'], 3], 'and the wrong value is then the first mistake');
+    // The marks an open try could not show are paid when the question resolves.
+    const PAIR = { generator: 'c10-linear-pair-methods', difficulty: 2, seed: 7, curriculum: 'in' };
+    const elimination = ['12x + 6y = -120', '12x - 3y = -66', '9y = -54'];
+    const p0 = await post('/v1/practice/issue', PAIR, knower.jar);
+    eq([p0.data.question.prompt, (await sealedAnswer(p0.data.question.id)).value], ['Solve by elimination: $6x + 3y = -60$ and $4x - y = -22$. Find the value of $y$.', -6], 'a pair of equations');
+    const p1 = await orWork(knower.jar, p0.data.question.id, '5', elimination);
+    eq([p1.data.resolved, p1.data.marksEarned, p1.data.marksPossible, p1.data.stepReport, p1.data.partial], [false, 0, 2, null, null], 'a genuine elimination under a wrong answer: the open try shows no mark for it yet');
+    eq(await eventOf(p0.data.question.id), null, 'and records nothing');
+    const p2 = await orWork(knower.jar, p0.data.question.id, '5', elimination);
+    eq([p2.data.resolved, p2.data.correct, p2.data.marksEarned, p2.data.partial.awarded, p2.data.partial.lines.map(l => l.mark), p2.data.stepReport.lines.map(l => l.status)],
+      [true, false, 1, 1, [0, 0, 1], ['ok', 'ok', 'ok']], 'the wrong resolution pays the deferred method mark, with the per-line marks and the full report');
+    const pEvent = await eventOf(p0.data.question.id);
+    eq([pEvent.correct, pEvent.marksEarned, pEvent.marksPossible], [false, 1, 2], 'and the recorded attempt carries it');
+    // …and a right second answer is simply full marks.
+    const r0 = await post('/v1/practice/issue', PAIR, guesser.jar);
+    const r1 = await orWork(guesser.jar, r0.data.question.id, '5', elimination);
+    const r2 = await orWork(guesser.jar, r0.data.question.id, '-6', elimination);
+    eq([r1.data.marksEarned, r2.data.correct, r2.data.marksEarned, r2.data.repeat ?? false], [0, true, 2, false], 'the same open try followed by the right answer is full marks, as new work');
 
-  // One false line: the first mistake is marked, the answer is not given away.
-  const slipper = guesser;   // a pair of equations is new content to this account
-  const or_sl0 = await post('/v1/practice/issue', PAIR, slipper.jar);
-  const or_sl1r = await work(slipper.jar, or_sl0.data.question.id, '5', ['9y = -50', '9y = -54', '18x = -126']).sent;
-  eq([or_sl1r.data.resolved, lineStatuses(or_sl1r.data.stepReport), or_sl1r.data.stepReport.firstBreak, or_sl1r.data.marksEarned], [false, ['break', 'note', 'note'], 0, 0], 'a false line is the first mistake, and nothing after it is judged');
-  const told = JSON.stringify([or_sl1r.data.stepReport.diagnosis, or_sl1r.data.stepReport.lines.map(l => [l.note, l.diagnosis]), or_sl1r.data.partial, or_sl1r.data.feedback, or_sl1r.data.trapWhy]);
-  eq(/-\s?6|-\s?7|54|126/.test(told), false, 'nothing said about that mistake contains the solution of the pair or the number the line should have had');
-  const or_sl2r = await work(slipper.jar, or_sl0.data.question.id, '5', ['9y = -50', '9y = -54', '18x = -126']).sent;
-  eq([or_sl2r.data.resolved, or_sl2r.data.stepReport.withheld ?? false, /-6|-54/.test(JSON.stringify([or_sl2r.data.stepReport.diagnosis, or_sl2r.data.stepReport.lines[0].note]))], [true, false, true], 'the full diagnosis, which does name it, is returned once the question is resolved');
+    // One false line: nothing is said about it until the question resolves.
+    const s0 = await post('/v1/practice/issue', { ...PAIR, seed: 531 }, knower.jar);
+    const s1 = await orWork(knower.jar, s0.data.question.id, '1', ['9y = -50']);
+    eq([s1.data.stepReport, s1.data.partial, /\d/.test(s1.data.feedback)], [null, null, false], 'a false line on an open question: no first mistake, no diagnosis, not a digit in the feedback');
+    // Arithmetic folded from the question's own numbers is not a method.
+    const folded = ['5 + 4 = 9', '3 + 2 = 5', '2 + 2 = 4', '9 - 5 = 4', '4 + 4 = 8'];
+    const f0 = await post('/v1/practice/issue', { ...PAIR, seed: 531 }, guesser.jar);
+    eq([f0.data.question.prompt, (await sealedAnswer(f0.data.question.id)).value], ['Solve by elimination: $5x + 4y = -3$ and $2x + 2y = 2$. Find the value of $y$.', 8], 'a second pair of equations');
+    const f1 = await orWork(guesser.jar, f0.data.question.id, '1', folded);
+    const f2 = await orWork(guesser.jar, f0.data.question.id, '2', folded);
+    eq([f1.data.marksEarned, f2.data.marksEarned, f2.data.resolved, (await eventOf(f0.data.question.id)).marksEarned], [0, 0, true, 0], 'five true sums on the six numbers of a pair of equations that end on y earn nothing, on either try or on record');
 
-  // A mark that IS the stated value waits for resolution, and is then earned.
-  const oneStep = solver;
-  const os0 = await issue(oneStep.jar, 1234579);
-  const osKey = Number((await sealedAnswer(os0.data.question.id)).value);
-  const osLetter = os0.data.question.prompt.match(/[a-z]/i)[0];
-  const osWork = value => [os0.data.question.prompt.replace(/\$/g, ''), `${osLetter} = ${value}`];
-  const os1r = await work(oneStep.jar, os0.data.question.id, '987654', osWork(osKey)).sent;
-  eq([os0.data.question.prompt, os1r.data.resolved, os1r.data.marksEarned, os1r.data.partial?.awarded, lineStatuses(os1r.data.stepReport)], ['$2t=t - 3$', false, 0, 0, ['ok', 'note']],
-    'the question copied out and its root stated: on the open question the root is not confirmed and shows no mark');
-  const os2r = await work(oneStep.jar, os0.data.question.id, '987654', osWork(osKey)).sent;
-  eq([os2r.data.resolved, os2r.data.marksEarned, os2r.data.partial?.awarded, lineStatuses(os2r.data.stepReport)], [true, 1, 1, ['ok', 'ok']],
-    'on resolution the one-step solution earns its method mark');
-
-  // Arithmetic folded from the question's own numbers is not a method.
-  const or_f0 = await post('/v1/practice/issue', { ...PAIR, seed: 531 }, bluffer.jar);
-  const folded = ['5 + 4 = 9', '3 + 2 = 5', '2 + 2 = 4', '9 - 5 = 4', '4 + 4 = 8'];
-  eq([or_f0.data.question.prompt, (await sealedAnswer(or_f0.data.question.id)).value], ['Solve by elimination: $5x + 4y = -3$ and $2x + 2y = 2$. Find the value of $y$.', 8], 'a second pair of equations');
-  const or_f1r = await work(bluffer.jar, or_f0.data.question.id, '1', folded).sent;
-  const or_f2r = await work(bluffer.jar, or_f0.data.question.id, '2', folded).sent;
-  eq([or_f1r.data.marksEarned, or_f2r.data.marksEarned, or_f2r.data.resolved, (await eventOf(or_f0.data.question.id)).marksEarned], [0, 0, true, 0], 'five true sums on the six numbers of a pair of equations that end on y earn nothing, on either try or on record');
+    // ── working is bounded, and checked once ────────────────────────────────
+    // As lines, working was allowed 100 × 1000 characters where the text form
+    // is allowed 8000, and it is expanded inside the account's transaction: one
+    // such submit held every other request for two seconds.
+    const big = await issue(knower.jar, 7101);
+    const v = big.data.question.prompt.match(/[a-z]/i)[0];
+    // A readable polynomial equation of exactly `length` characters.
+    const poly = (k, length) => {
+      let line = '1';
+      for (let i = 0; line.length + 4 <= length - 5; i++) line += `+${v}^${(i + k) % 7}`;
+      const pad = length - 4 - line.length;
+      return `${line}${'+1'.repeat(Math.floor(pad / 2))}${pad % 2 ? '1' : ''} = 3`;
+    };
+    const oversized = Array.from({ length: 100 }, (_, k) => poly(k, 1000));
+    const refusedAt = Date.now();
+    const refused = await orWork(knower.jar, big.data.question.id, '987654', oversized);
+    eq([refused.status, refused.data?.error?.code], [400, 'PRACTICE_SUBMISSION_INVALID'], 'a hundred lines of a thousand characters are refused');
+    orOk(Date.now() - refusedAt < 1500, 'and refused before any of it is read as mathematics');
+    for (const [steps, label] of [[Array.from({ length: 9 }, (_, k) => poly(k, 1000)), 'nine lines of a thousand characters'], [Array.from({ length: 100 }, (_, k) => poly(k, 80)), 'a hundred lines over eight thousand characters in all'],
+      [[poly(0, 1001)], 'one line over a thousand characters'], [Array.from({ length: 101 }, () => `${v} = 1`), 'a hundred and one lines'], [poly(0, 1000).repeat(9), 'nine thousand characters of text']]) {
+      eq((await orWork(knower.jar, big.data.question.id, '987654', steps)).status, 400, `${label} are refused`);
+    }
+    eq((await issue(knower.jar, 7101)).data.triesLeft, undefined, 'none of the refused submissions spent a try');
+    // The largest working accepted, on the try that resolves (the only one
+    // that checks it), against the same two tries with no working at all.
+    const largest = Array.from({ length: 8 }, (_, k) => poly(k, 999));
+    eq(largest.join('\n').length, 7999, 'eight lines of 999 characters are the most working a submission may carry');
+    const timed = async (jar, sd, steps) => {
+      const q = await issue(jar, sd);
+      await orWork(jar, q.data.question.id, '987654', steps);
+      const at = process.hrtime.bigint();
+      const done = await orWork(jar, q.data.question.id, '987654', steps);
+      return { ms: Number(process.hrtime.bigint() - at) / 1e6, done };
+    };
+    const bare = await timed(knower.jar, 7102, undefined);
+    const heavy = await timed(knower.jar, 7103, largest);
+    eq([heavy.done.status, heavy.done.data.resolved, heavy.done.data.stepReport.lines.length], [200, true, 8], 'the largest accepted working is checked on resolution');
+    orOk(heavy.ms < Math.max(1500, bare.ms * 200), `and costs a bounded amount: ${heavy.ms.toFixed(0)} ms against ${bare.ms.toFixed(0)} ms with no working`);
+    console.log(`  largest accepted working: resolved in ${heavy.ms.toFixed(0)} ms (no working: ${bare.ms.toFixed(0)} ms)`);
+  }
 
   // ══════════════════════════════════════════════════════════════════════════
   // R4 SERVER STREAM (H3) — a figure is content only when the answer is read
