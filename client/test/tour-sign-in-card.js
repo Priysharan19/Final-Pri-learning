@@ -331,7 +331,8 @@ export const returningFlow = {
     // must not send a second code.
     let release; const held = new Promise(r => { release = r; });
     const slow = async route => { await held; await route.continue(); };
-    await ctx.route(u => u.pathname === '/v1/account/otp/request', slow);
+    const toRequest = u => u.pathname === '/v1/account/otp/request';
+    await ctx.route(toRequest, slow);
     await card.locator('#signup-destination').fill(who.email);
     await card.getByTestId('signup-send-code').click();
     await page.waitForFunction(() => document.querySelector('[data-testid="signup-send-code"]')?.textContent?.trim() === 'Sending…', null, { timeout: 10000 }).catch(() => {});
@@ -340,7 +341,7 @@ export const returningFlow = {
     await card.locator('#signup-destination').press('Enter').catch(() => {});
     release();
     await card.locator('#signup-code-0').waitFor({ state: 'visible', timeout: 20000 });
-    await ctx.unroute(u => u.pathname === '/v1/account/otp/request', slow);
+    await ctx.unroute(toRequest, slow);
     await online.settled();
     await check('a slow send shows "Sending…" on a disabled button, and pressing again does not ask for a second code',
       sendingState.label === 'Sending…' && sendingState.disabled && calls(online, '/v1/account/otp/request').length === sendsBefore + 1 && mailCount(online, who.email) === 1,
@@ -402,14 +403,14 @@ export const returningFlow = {
 
     // ── the send fails ───────────────────────────────────────────────────────
     const outage = route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'OTP_DELIVERY_FAILED', message: 'The code could not be sent. Try again in a moment.' } }) });
-    await ctx.route(u => u.pathname === '/v1/account/otp/request', outage);
+    await ctx.route(toRequest, outage);
     await card.locator('#signup-destination').fill(address('outage'));
     await card.getByTestId('signup-send-code').click();
     await card.getByTestId('signup-error').waitFor({ timeout: 15000 });
     await check('when the code cannot be sent the card says so and stays where it is, with the address kept and the password option still there [network-layer stand-in]',
       await errorText(card) === 'We couldn’t send the code just now. Try again in a moment.' && await stepOf(card) === 'method'
         && await card.getByTestId('signup-use-password').isVisible());
-    await ctx.unroute(u => u.pathname === '/v1/account/otp/request', outage);
+    await ctx.unroute(toRequest, outage);
 
     // ── an expired code ──────────────────────────────────────────────────────
     clearCooldown(online);
@@ -570,7 +571,7 @@ export const inlineInkFlow = {
     const graded = await online.practiceCalls(/^\/v1\/practice\/[^/]+\/grade$/);
     await check('Submit then binds this same prepared question to the new account and the server marks it: one issue, one grade, same question on screen',
       issued.length === 1 && issued[0].status < 300 && graded.length === 1 && graded[0].status === 200 && await shownId(page) === qid,
-      `issue ${issued.map(c => c.status)}; grade ${graded.map(c => c.status)}`);
+      `issue ${issued.map(c => c.status)}; grade ${graded.map(c => c.status)}; all ${(await online.practiceCalls(/^\/v1\/practice\//)).map(c => `${c.status} ${c.path.replace(/q_[^/]+|pq_[^/]+/, ':id')}`).join(', ')}`);
     await check('no outbound request was refused: nothing tried to reach a real provider', reader.refused.length === 0, JSON.stringify(reader.refused));
   }
 };
@@ -811,18 +812,22 @@ export const minorFlow = {
     await card.getByTestId('signup-parent-send').click();
     await card.getByTestId('signup-parent-waiting').waitFor({ state: 'visible', timeout: 20000 });
     const parentMail = mail(online, parent, 'guardian-consent');
-    await check('the parent\'s mailbox gets the approval code with the address of THEIR page on this same origin, and nothing is approved yet',
-      /^\d{6}$/.test(parentMail?.code || '') && parentMail.body.includes(`${online.origin}/guardian/consent`) && consent().confirmed_at === null,
+    // This harness configures no public origin, so the mail names the parent's
+    // page in words; it must never name some other host. (The link's origin
+    // rules are proved in server/test/otp-sign-in-check.mjs.)
+    await check('the parent\'s mailbox gets the approval code, told to open the parent page themselves — with no link to any other host — and nothing is approved yet',
+      /^\d{6}$/.test(parentMail?.code || '') && /read what you are agreeing to/.test(parentMail.body) && !/https?:\/\/(?!127\.0\.0\.1|localhost)/.test(parentMail.body) && consent().confirmed_at === null,
       JSON.stringify(parentMail && { purpose: parentMail.purpose }));
+    const childSide = { codeBoxes: await card.locator('input[autocomplete="one-time-code"]').count(), approve: await page.getByRole('button', { name: 'Approve' }).count(), step: await stepOf(card) };
     await check('the child\'s screen only waits: no code box, no approve button — a child cannot approve their own account',
-      await card.locator('input[autocomplete="one-time-code"]').count() === 0 && await page.getByRole('button', { name: 'Approve' }).count() === 0);
+      childSide.codeBoxes === 0 && childSide.approve === 0 && childSide.step === 'parent-wait', JSON.stringify(childSide));
 
     const parentCtx = await ctx.browser().newContext({ viewport: PHONE, reducedMotion: 'reduce' });
     try {
       const parentPage = await parentCtx.newPage();
       await parentPage.goto(`${online.origin}/guardian/consent`, { waitUntil: 'domcontentloaded' });
       await parentPage.getByRole('heading', { name: 'What you are agreeing to' }).waitFor({ timeout: 20000 });
-      await parentPage.getByTestId('guardian-channel-email').click().catch(() => {});
+      await parentPage.getByRole('radio', { name: 'Email' }).click();
       await parentPage.locator('#guardian-destination').fill(parent);
       await parentPage.getByTestId('guardian-agree').check();
       await parentPage.locator('#guardian-code-0').focus();
