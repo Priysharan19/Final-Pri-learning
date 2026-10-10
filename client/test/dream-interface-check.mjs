@@ -431,7 +431,10 @@ check('the explanation player never case-transforms mathematics, and shows no en
 });
 
 check('the reading line runs once, only on a page the engine marked, and not under reduced motion', () => {
-  assert.match(card, /data-marked=\{\(resolved && !res\?\.revealed\) \|\| \(state\.phase === 'retry' && !state\.res\?\.invalid\) \? 'yes' : undefined\}/);
+  // A graded "not yet" marks the page only while the page is still the revision
+  // that was graded (judgedLive): new, unsubmitted ink is not a marked page.
+  assert.match(card, /data-marked=\{\(resolved && !res\?\.revealed\) \|\| \(gradedRetry && judgedLive && !state\.res\?\.invalid\) \? 'yes' : undefined\}/);
+  assert.match(card, /const gradedRetry = state\.phase === 'retry' && !state\.res\?\.technical && !state\.res\?\.conflict;/);
   assert.match(themeCss, /\.editor-shell\[data-marked="yes"\] \.ink-stage::after \{[^}]*animation: reading-sweep 640ms var\(--ease-standard\) 1;/);
   assert.match(themeCss, /@media \(prefers-reduced-motion: reduce\) \{\s*\.editor-shell\[data-marked="yes"\] \.ink-stage::after \{ animation: none; display: none; \}/);
 });
