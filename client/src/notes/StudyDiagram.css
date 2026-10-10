@@ -1,0 +1,91 @@
+/* Mathematics diagrams are native SVG: no bitmap scaling, external chart dependency or canvas state. */
+.nt-diagram {
+  margin: 12px 0 16px;
+  background: var(--nt-raised);
+  border: 1px solid var(--nt-rule);
+  border-radius: var(--nt-r);
+  padding: 8px 10px;
+  max-width: 100%;
+  overflow: hidden;
+}
+.nt-diagram svg {
+  width: 100%;
+  height: auto;
+  max-height: 360px;
+  display: block;
+  color: var(--nt-ink);
+  overflow: visible;
+}
+.nt-diagram-grid line {
+  stroke: var(--nt-rule-strong, var(--nt-rule));
+  stroke-width: 0.75;
+  opacity: 0.52;
+}
+.nt-diagram-axes line {
+  stroke: var(--nt-ink-3);
+  stroke-width: 1.45;
+}
+.nt-diagram-axes text,
+.nt-diagram-ticks,
+.nt-diagram-bar-label {
+  font: 12px var(--font, system-ui, sans-serif);
+  fill: var(--nt-ink-3);
+}
+.nt-diagram-primary {
+  fill: none;
+  stroke: var(--nt-accent);
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.nt-diagram-region {
+  fill: var(--nt-accent-soft);
+  fill-opacity: 0.7;
+  stroke: var(--nt-accent);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+.nt-diagram-dot,
+.nt-diagram-arrow { fill: var(--nt-accent); }
+.nt-diagram-point-label,
+.nt-diagram-side,
+.nt-diagram-bar-value {
+  font: 600 12.5px var(--font, system-ui, sans-serif);
+  fill: var(--nt-ink);
+  paint-order: stroke;
+  stroke: var(--nt-raised);
+  stroke-width: 3.6;
+  stroke-linejoin: round;
+}
+.nt-diagram-side { font-size: 15px; }
+.nt-diagram-bar {
+  fill: var(--nt-accent);
+  fill-opacity: 0.78;
+  stroke: var(--nt-accent);
+  stroke-width: 1.4;
+}
+.nt-diagram-tick {
+  stroke: var(--nt-ink-3);
+  stroke-width: 1.5;
+}
+.nt-diagram-angle {
+  fill: none;
+  stroke: var(--nt-copper, var(--nt-accent));
+  stroke-width: 1.6;
+  stroke-linejoin: miter;
+}
+@media (max-width: 540px) {
+  .nt-diagram { padding: 3px; margin-inline: -8px; }
+  .nt-diagram svg { max-height: none; }
+}
+@media print {
+  .nt-diagram { break-inside: avoid; background: white; border-color: #999; }
+  .nt-diagram-grid line { stroke: #d1d1d1; }
+  .nt-diagram-axes line, .nt-diagram-tick { stroke: #555; }
+  .nt-diagram-primary, .nt-diagram-angle { stroke: #111; }
+  .nt-diagram-dot { fill: #111; }
+  .nt-diagram-bar { fill: #999; stroke: #111; }
+  .nt-diagram-region { fill: #ddd; stroke: #111; }
+  .nt-diagram-point-label, .nt-diagram-side, .nt-diagram-bar-value,
+  .nt-diagram-axes text, .nt-diagram-ticks, .nt-diagram-bar-label { fill: #111; stroke: white; }
+}

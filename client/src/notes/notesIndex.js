@@ -71,6 +71,16 @@ const CHALLENGE_LOADERS = {
   12: () => import('./data/notes-challenges-class12.js')
 };
 
+// Per-grade diagram-question chunks; diagram data does not ride in other grades.
+const VISUAL_LOADERS = {
+  7: () => import('./data/notes-visual-class7.js'),
+  8: () => import('./data/notes-visual-class8.js'),
+  9: () => import('./data/notes-visual-class9.js'),
+  10: () => import('./data/notes-visual-class10.js'),
+  11: () => import('./data/notes-visual-class11.js'),
+  12: () => import('./data/notes-visual-class12.js')
+};
+
 function mergeOptionalComplexStudies(notes, extra) {
   for (const [id, section] of Object.entries(extra || {})) {
     if (!Object.hasOwn(notes,id) || !Array.isArray(section.examples) || !section.examples.every(x => x.question && Array.isArray(x.steps) && x.steps.length && x.answer && x.verify)) {
@@ -94,12 +104,15 @@ export function loadNotesForGrade(grade) {
       LOADERS[g](),
       EXPANSION_LOADERS[g](),
       g === 11 ? import('./data/notes-advanced-complex.js') : Promise.resolve({ default: {} }),
-      CHALLENGE_LOADERS[g] ? CHALLENGE_LOADERS[g]() : Promise.resolve({ default: {} })
+      CHALLENGE_LOADERS[g] ? CHALLENGE_LOADERS[g]() : Promise.resolve({ default: {} }),
+      VISUAL_LOADERS[g]()
     ])
-      .then(([original, supplement, optional, challenges]) => mergeOptionalComplexStudies(
+      .then(([original, supplement, optional, challenges, visuals]) => mergeOptionalComplexStudies(
         mergeOptionalComplexStudies(
-          mergeStudySupplements(original.default || {}, supplement.default || {}), optional.default || {}
-        ), challenges.default || {}
+          mergeOptionalComplexStudies(
+            mergeStudySupplements(original.default || {}, supplement.default || {}), optional.default || {}
+          ), challenges.default || {}
+        ), visuals.default || {}
       ))
       .catch(err => { cache.delete(g); throw err; }));
   }
