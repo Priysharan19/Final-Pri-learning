@@ -2078,6 +2078,8 @@ async function replaySubmission(p, row, q, submissionId, requestDigest, answer, 
     diagnosis: diagnosis || null,
     misconception: await namedTrap(p.id, owner, recorded.trapHit || null),
     solution: row.serverQuestionId ? row.serverReceipt.solution || null : solutionOf(q),
+    // Reload and replay show the review the server committed with the grade.
+    workingReview: row.serverQuestionId ? row.serverReceipt.workingReview || null : null,
     ...(row.serverQuestionId ? {
       ...replayMarks,
       authoritative: true, attemptId: row.serverReceipt.attemptId,
@@ -3797,6 +3799,8 @@ const routes = {
       diagnosis: stepReport?.diagnosis || null,
       misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit),
       solution: authoritative.solution || null,
+      // The server's per-line review of the submitted working, as it sent it.
+      workingReview: authoritative.workingReview || null,
       ...meta,
       ...certified,
       syncQueued: true,

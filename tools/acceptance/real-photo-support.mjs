@@ -93,9 +93,10 @@ export async function enrol(http, dbPath, label, secrets) {
  * The app's own image code, in Chromium: client/src/ink/photoRaster.js turns a
  * camera file into what Photo mode sends. Nothing is fetched from the network.
  */
-export async function openStudio() {
-  const { chromium } = requireClient('playwright');
-  const browser = await chromium.launch();
+export async function openStudio({ engine = 'chromium' } = {}) {
+  const playwright = requireClient('playwright');
+  if (!['chromium', 'webkit', 'firefox'].includes(engine)) throw new Error(`unknown browser engine ${engine}`);
+  const browser = await playwright[engine].launch();
   const page = await browser.newPage();
   const ORIGIN = 'http://pri-acceptance.invalid';
   const modules = { '/ink/photoRaster.js': join(REPO, 'client', 'src', 'ink', 'photoRaster.js') };
@@ -110,6 +111,37 @@ export async function openStudio() {
   await page.goto(ORIGIN + '/');
   return {
     close: () => browser.close(),
+    /** The app's own quarter-turn (client rotatePhoto), from the original. */
+    rotatePhoto: (dataUrl, turns) => page.evaluate(async ([d, n]) => {
+      const { rotatePhoto } = await import('/ink/photoRaster.js');
+      const out = await rotatePhoto(d, n);
+      return out ? { dataUrl: out.dataUrl, width: out.width, height: out.height } : null;
+    }, [dataUrl, turns]),
+    /** The size a browser decodes a picture at — after it has applied the file's own orientation. */
+    sizeOf: dataUrl => page.evaluate(d => new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = () => reject(new Error('undecodable'));
+      img.src = d;
+    }), dataUrl),
+    /**
+     * How unlike two pictures are: the mean absolute difference of their grey
+     * levels (0–255) after both are drawn into the same small box. A few units
+     * is JPEG noise; the same page a quarter turn round is tens of units.
+     */
+    unlikeness: (a, b) => page.evaluate(async ([x, y]) => {
+      const load = d => new Promise((resolve, reject) => { const i = new Image(); i.onload = () => resolve(i); i.onerror = () => reject(new Error('undecodable')); i.src = d; });
+      const grey = async d => {
+        const img = await load(d);
+        const c = document.createElement('canvas'); c.width = 96; c.height = 120;
+        const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0, 96, 120);
+        const px = ctx.getImageData(0, 0, 96, 120).data, out = [];
+        for (let i = 0; i < px.length; i += 4) out.push(0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]);
+        return out;
+      };
+      const [p, q] = [await grey(x), await grey(y)];
+      return p.reduce((sum, v, i) => sum + Math.abs(v - q[i]), 0) / p.length;
+    }, [a, b]),
     /** A camera file → what the app's Photo mode sends (client preparePhoto). */
     preparePhoto: dataUrl => page.evaluate(async d => {
       const { preparePhoto } = await import('/ink/photoRaster.js');
@@ -187,6 +219,24 @@ export async function openStudio() {
       return out.toDataURL('image/jpeg', 0.9);
     }, { lines, seed, degrees, damage, quarterTurns })
   };
+}
+
+/**
+ * The same JPEG with an EXIF orientation tag (1–8) written into it, the way a
+ * phone camera held sideways writes one. The pixels are untouched.
+ */
+export function withExifOrientation(dataUrl, orientation) {
+  const jpeg = bytesOf(dataUrl);
+  if (jpeg[0] !== 0xff || jpeg[1] !== 0xd8) throw new Error('not a JPEG');
+  const tiff = Buffer.from([
+    0x49, 0x49, 0x2a, 0x00, 0x08, 0x00, 0x00, 0x00,        // little-endian TIFF, first IFD at 8
+    0x01, 0x00,                                            // one entry
+    0x12, 0x01, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, orientation & 0xff, 0x00, 0x00, 0x00,   // 0x0112 Orientation, SHORT
+    0x00, 0x00, 0x00, 0x00                                 // no further IFD
+  ]);
+  const body = Buffer.concat([Buffer.from('Exif\0\0', 'latin1'), tiff]);
+  const app1 = Buffer.concat([Buffer.from([0xff, 0xe1, (body.length + 2) >> 8, (body.length + 2) & 0xff]), body]);
+  return 'data:image/jpeg;base64,' + Buffer.concat([jpeg.subarray(0, 2), app1, jpeg.subarray(2)]).toString('base64');
 }
 
 export const bytesOf = dataUrl => Buffer.from(String(dataUrl).slice(String(dataUrl).indexOf(',') + 1), 'base64');

@@ -43,6 +43,16 @@ ok(!shouldCheckWorking({ correct: false, invalid: true, lines: WORKING, localRep
   'an unreadable submission is not a marking question');
 ok(!shouldCheckWorking({ correct: false, revealed: true, lines: WORKING, localReport: localSilent }),
   'once the answer has been revealed there is nothing to diagnose');
+// The server's deterministic review of the submitted lines settles it (#430):
+// a first mistake it found, or lines it verified, need no paid second opinion.
+ok(!shouldCheckWorking({ correct: false, lines: WORKING, localReport: localSilent, review: { firstMistake: { index: 1 }, unexplained: false } }),
+  'a first mistake the deterministic review already found is not sent for a second opinion');
+ok(!shouldCheckWorking({ correct: false, lines: WORKING, localReport: localSilent, review: { firstMistake: null, unexplained: false } }),
+  'nor is working whose every line the review verified');
+ok(shouldCheckWorking({ correct: false, lines: WORKING, localReport: localSilent, review: { firstMistake: null, unexplained: true } }),
+  'working the review could not explain is — and only that');
+ok(!shouldCheckWorking({ correct: true, lines: WORKING, localReport: localSilent, review: { firstMistake: null, unexplained: true } }),
+  'never for a correct answer, whatever the review says');
 ok(!shouldCheckWorking({ correct: false, lines: ['x = 7'], localReport: localSilent }),
   'a single line is not working');
 ok(!shouldCheckWorking({ correct: false, lines: WORKING, localReport: { lines: [{ status: 'ok' }, { status: 'break' }] } }),

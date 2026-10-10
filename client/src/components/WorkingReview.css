@@ -1,0 +1,32 @@
+/* The marked working, line by line (WorkingReview.jsx). Paper, not a dashboard:
+   one hairline rule per line, colour only on the mark and on the first mistake. */
+.working-review { margin-top: 14px; display: grid; gap: 10px; }
+.wr-lines { list-style: none; margin: 0; padding: 0; display: grid; }
+.wr-line { display: grid; grid-template-columns: 18px 22px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 7px 8px; border-bottom: 1px solid var(--hairline); font-size: 14px; color: var(--ink-2); }
+.wr-line:last-child { border-bottom: 0; }
+.wr-mark { font-weight: 600; text-align: center; color: var(--ink-3); }
+.wr-n { color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.wr-body { display: grid; gap: 2px; min-width: 0; }
+.wr-text { font-family: var(--font); color: var(--ink); overflow-wrap: anywhere; }
+.wr-reason { font-size: 12.5px; color: var(--ink-3); }
+.wr-flag { font-size: 12.5px; font-weight: 600; color: var(--correction); }
+.wr-credit { font-size: 12px; color: var(--good); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wr-ok .wr-mark { color: var(--good); }
+.wr-carried .wr-mark { color: var(--uncertain); }
+.wr-confirm .wr-mark { color: var(--uncertain); }
+.wr-confirm .wr-reason { color: var(--ink-2); }
+.wr-break { background: var(--correction-soft); box-shadow: inset 2px 0 0 var(--correction); border-radius: var(--radius-xs); }
+.wr-break .wr-mark { color: var(--correction); }
+.wr-break .wr-reason { color: var(--ink); }
+.wr-card { border: 1px solid var(--hairline); border-left: 2px solid var(--correction); border-radius: var(--radius-sm); padding: 10px 12px; background: var(--surface-raised); }
+.wr-card-label { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.wr-card-title { margin-top: 4px; font-weight: 600; color: var(--ink); }
+.wr-card-body { margin-top: 2px; color: var(--ink); }
+.wr-block ul { margin: 4px 0 0; padding-left: 18px; }
+.wr-block p { margin: 4px 0 0; }
+.wr-block { font-size: 14px; color: var(--ink-2); }
+.wr-notice { margin: 0; font-size: 13.5px; color: var(--ink-2); }
+.wr-good { color: var(--good); }
+.wr-marks { margin: 0; font-size: 13.5px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.wr-foot { margin: 0; font-size: 12px; }
+.wr-hint { margin: 10px 0 0; padding: 8px 12px; border: 1px solid var(--hairline); border-left: 2px dashed var(--uncertain); border-radius: var(--radius-sm); background: var(--surface-raised); font-size: 13.5px; color: var(--ink); }

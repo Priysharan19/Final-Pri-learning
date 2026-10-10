@@ -35,15 +35,21 @@ export function workingCheckEnabled(user, { available = cloudAvailable } = {}) {
 /**
  * Is there anything here worth asking about?
  *
- * Only when the student got it wrong and the local checker could not say where.
- * A correct answer needs no diagnosis, and a local break is already the answer
- * to "which line". Spending a reasoning call on either is spending a student's
- * allowance on something they already have.
+ * Only when the student got it wrong and the deterministic checker could not say
+ * where. A correct answer needs no diagnosis, and a break the engine found —
+ * against the question, or by plain arithmetic between two of the student's own
+ * lines — is already the answer to "which line". Spending a reasoning call on
+ * either is spending a student's allowance on something they already have.
  */
-export function shouldCheckWorking({ correct, invalid, revealed, lines, localReport } = {}) {
+export function shouldCheckWorking({ correct, invalid, revealed, lines, localReport, review = null } = {}) {
   if (correct || invalid || revealed) return false;
   if (!Array.isArray(lines) || lines.filter(l => String(l || '').trim()).length < 2) return false;
   if (localReport?.lines?.some(l => l.status === 'break')) return false;
+  // The server's deterministic review of these lines, when there is one,
+  // settles it: a first mistake it found needs no second opinion, and neither
+  // does working whose every line it verified. Only working that is wrong with
+  // lines nobody could judge (`unexplained`) is worth a reasoning call.
+  if (review && typeof review === 'object') return review.unexplained === true && !review.firstMistake;
   return true;
 }
 

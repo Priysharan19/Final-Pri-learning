@@ -421,6 +421,66 @@ for (const field of ['expected', 'answer', 'solution', 'marks']) {
 }
 ok(validateRequestBody({ image: 'data:image/png;base64,AAAA', requestId: 'r1' }).ok === true, 'an image-only body is accepted');
 
+// ── 4 · the working review and the key-free hint stay on their side ──────────
+// Issue #430 added a per-line review built FROM the answer key (server side,
+// engine/workingReview.js) and a pre-submission hint built WITHOUT it (device
+// side, engine/lineAudit.js). Neither may become a channel to a reader:
+//   · no reader, provider or recognition module imports the marker, the review
+//     or the formula checker;
+//   · the recognise route says nothing of the question's key between receiving
+//     the picture and minting the receipt;
+//   · the hint's module imports the expression engine only, and the hint is
+//     mounted with the lines and the public prompt and nothing else;
+//   · the optional model check of the working is sent the prompt and the lines
+//     — never a review, a mark or a correction — and the server refuses more.
+const importsOf = source => [...source.matchAll(/^\s*import\s[^;]*?from\s+['"]([^'"]+)['"]/gm)].map(m => m[1]);
+const KEYED = /markerOps|workingReview|lineAudit|reason-formula|engine\/checker|markerPool|markerWorker/;
+for (const file of ['handwriting.js', 'handwritingProvider.js', 'recognitionOps.js', 'questionPhoto.js', 'questionPhotoProvider.js', 'working.js', 'workingProvider.js']) {
+  const source = readFileSync(join(ROOT, 'server/platform', file), 'utf8');
+  const keyed = importsOf(source).filter(spec => KEYED.test(spec));
+  ok(keyed.length === 0, `server/platform/${file} imports no marker, review or checker module (${keyed.join(', ') || 'none'})`);
+}
+{
+  const practice = readFileSync(join(ROOT, 'server/platform/practice.js'), 'utf8');
+  const from = practice.indexOf("router.post('/:id/recognize'"), to = practice.indexOf("router.post('/:id/recognition/:receipt/confirm'");
+  ok(from > 0 && to > from, 'the recognise route is where this check expects it');
+  const route = practice.slice(from, to).replace(/\/\/.*$/gm, '');
+  for (const word of ['workingReview', 'stepcheck', 'stepMetaFor', 'answerTextFor', 'solutionFor', 'marksPossibleFor', 'markerPool', 'q.answer', 'q.steps', 'q.prompt']) {
+    ok(!route.includes(word), `the recognise route never touches ${word}`);
+  }
+  ok(/recognitionOpsFor\(db\)\.read\(\{ db, accountId, image: body\.image, env, transcribe, requestId: req\.requestId \}\)/.test(route), 'and hands the reader the picture, and nothing of the question');
+  const open = practice.indexOf('const review = resolved ? evidence.review || null : null;');
+  ok(open > 0, 'the per-line review exists only on the reply that resolves the question');
+  ok(/workingReview: invalid \|\| !review \? null :/.test(practice), 'and never on an entry that is not an attempt');
+}
+{
+  const audit = readFileSync(join(SRC, 'engine/lineAudit.js'), 'utf8');
+  ok(JSON.stringify(importsOf(audit)) === JSON.stringify(['./expr.js']), 'engine/lineAudit.js (the pre-submission hint) imports the expression engine and nothing else');
+  const panel = readFileSync(join(SRC, 'components/WorkingReview.jsx'), 'utf8');
+  ok(JSON.stringify(importsOf(panel).sort()) === JSON.stringify(['../engine/lineAudit.js', '../engine/workingReview.js', '../i18n/index.js', '../photo/transcript.js', 'react'].sort()),
+    `components/WorkingReview.jsx imports only what it draws with (${importsOf(panel).join(', ')})`);
+  ok(!/\b(fetch|cloud|api)\s*[.(]/.test(panel.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')), 'and makes no request of its own');
+  const card = readFileSync(join(SRC, 'components/QuestionCard.jsx'), 'utf8');
+  const hints = card.split('<WorkingHint ').slice(1).map(rest => rest.slice(0, rest.indexOf('/>')));
+  ok(hints.length === 2, `the hint is mounted twice on the card — handwriting and photo (${hints.length})`);
+  for (const props of hints) {
+    const names = [...props.matchAll(/\b([A-Za-z]+)=\{/g)].map(m => m[1]).sort();
+    ok(names.every(name => ['lines', 'prompt', 'lineNumber'].includes(name)), `a hint is given the lines and the public prompt only (${names.join(', ')})`);
+    ok(!/\bres\b|solution|answerText|stepReport|workingReview|partial|marks/.test(props), 'and nothing from a marked reply');
+  }
+  const cloudWorking = readFileSync(join(SRC, 'ink/cloudWorking.js'), 'utf8');
+  ok(/transport\.checkWorking\(String\(prompt \|\| ''\), clean, \{ signal \}\)/.test(cloudWorking), 'the model check of the working is sent the prompt and the lines, and nothing else');
+  ok((card.match(/checkWorkingWithCloud\(lines, \{\s*user,\s*prompt: question\?\.prompt \|\| '',\s*signal: controller\?\.signal\s*\}\)/) || []).length === 1, 'and the card calls it with exactly those');
+  const working = await import('../../server/platform/working.js');
+  for (const field of ['workingReview', 'review', 'firstMistake', 'correction', 'stepReport', 'partial']) {
+    const verdict = working.validateRequestBody({ prompt: 'p', lines: ['1 = 1', '2 = 2'], [field]: {} });
+    ok(verdict.ok === false, `the working route refuses a body carrying "${field}"`);
+  }
+  for (const field of ['answer', 'solution', 'marks', 'expected', 'criteria']) {
+    ok(working.validateRequestBody({ prompt: 'p', lines: ['1 = 1'], [field]: 1 }).code === 'WORKING_NOT_ANSWER_BLIND', `and names "${field}" as not answer-blind`);
+  }
+}
+
 // ── report ───────────────────────────────────────────────────────────────────
 if (failures.length) {
   console.log(`INK ANSWER-BLIND STATIC: FAIL — ${pass}/${pass + failures.length} checks`);

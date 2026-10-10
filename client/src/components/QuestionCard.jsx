@@ -19,7 +19,7 @@ import {
 } from './practiceRecovery.js';
 import { cloudReadingEnabled, INK_READER_STATE, noteReaderRefusal, readerBlock, readPhotoWithCloud, resumeReaderNow, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { retryClock } from '../ink/readerFailure.js';
-import { preparePhoto } from '../ink/photoRaster.js';
+import { preparePhoto, rotatePhoto } from '../ink/photoRaster.js';
 import { buildTranscript, editLine, includeAll, includedLines, reviveTranscript, setLineExcluded, unreadablePage, workingOf } from '../photo/transcript.js';
 import { proposeFinalAnswer, readsAsWritten } from '../photo/finalAnswer.js';
 import { clearPhotoDraft, confirmPhotoDraftSaved, readPhotoDraft, savePhotoDraft } from '../local/photoDrafts.js';
@@ -41,6 +41,7 @@ import { blockedInkRecovery, canOpenInkSignIn, inkRecoveryWords, completeInkOtpR
 import './inkAccountRecovery.css';
 import { useFormFactor } from '../platform/formFactor.js';
 import Icon from './Icon.jsx';
+import WorkingReview, { WorkingHint } from './WorkingReview.jsx';
 import TypedAnswerFields from './TypedAnswerFields.jsx';
 import { finalAnswerGuidance, moveToWorking, workingAreaMode } from './typedAnswerGuide.js';
 import '../workspace.css';
@@ -939,6 +940,27 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     void clearPhotoDraft(question.id);
   };
   const photoInUse = mode === 'photo' && !!photo && !!photoLines && photoOCR.phase === 'done';
+  /**
+   * Turn the photographed page a quarter turn. The original is kept and every
+   * turn is made from it. A turned page is a different picture: a reading of
+   * the earlier one is not shown for it, and it is read again only when asked.
+   */
+  const photoTurnRef = useRef({ original: null, shown: null, turns: 0 });
+  const [photoTurning, setPhotoTurning] = useState(false);
+  const turnPhoto = async () => {
+    if (!photo || resolved || busy || photoTurning || pendingPdf.current || pdfPageCount > 1) return;
+    const kept = photoTurnRef.current.shown === photo ? photoTurnRef.current : { original: photo, shown: photo, turns: 0 };
+    const turns = (kept.turns + 1) % 4;
+    setPhotoTurning(true);
+    const turned = turns === 0 ? { dataUrl: kept.original } : await rotatePhoto(kept.original, turns).catch(() => null);
+    if (mountedRef.current) setPhotoTurning(false);
+    if (!turned?.dataUrl || !mountedRef.current || attemptRef.current) return;
+    photoTurnRef.current = { original: kept.original, shown: turned.dataUrl, turns };
+    photoReadGeneration.current += 1;
+    setPhoto(turned.dataUrl);
+    setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false);
+    setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
+  };
 
   useEffect(() => {
     if (!resolved) return;
@@ -1582,15 +1604,20 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // is cancelled only when the card goes away.
   useEffect(() => () => { cloudCheckAbortRef.current?.abort?.(); }, []);
   useEffect(() => {
-    if (!writeMode || !resolved) return;
+    // Handwriting and a photographed page are treated alike. The server's
+    // per-line review carries the exact lines it judged, so a photo's lines
+    // are taken from it rather than from whatever the transcript shows now.
+    const review = res?.workingReview || null;
+    if (!resolved || (!writeMode && !(mode === 'photo' && review))) return;
     // The lines checked are the lines that were submitted and marked — not
     // whatever the ink surface reads now.
     const bound = attempt;
-    const lines = bound?.lines || [];
+    const lines = bound?.lines || (review ? review.lines.filter(l => l.read === 'submitted').map(l => l.text) : []);
     if (!bound?.submissionId || !lines.length) return;
+    // Never a paid call for what the deterministic review already explains.
     if (!shouldCheckWorking({
       correct: res?.correct, invalid: res?.invalid, revealed: res?.revealed,
-      lines, localReport: activeReport
+      lines, localReport: activeReport, review
     })) return;
 
     const key = `${question?.id}:${bound.submissionId}`;
@@ -1618,7 +1645,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // is genuinely in flight for the attempt on screen.
       .finally(() => { if (mountedRef.current && attemptRef.current?.submissionId === bound.submissionId) setCloudPending(false); });
     setCloudPending(cloudReadingEnabled(user));
-  }, [writeMode, resolved, res?.correct, res?.invalid, res?.revealed, attempt, activeReport, user, question?.id, question?.prompt]);
+  }, [writeMode, mode, resolved, res?.correct, res?.invalid, res?.revealed, res?.workingReview, attempt, activeReport, user, question?.id, question?.prompt]);
 
   const cloudCheck = cloudCheckFor && attempt?.submissionId && cloudCheckFor.submissionId === attempt.submissionId
     ? cloudCheckFor.result : null;
@@ -2178,6 +2205,16 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                               <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t('photo.readMyPhotoHint')}</p>
                             </div>
                           ) : <span className="muted">{photoAwaitingOnlineReader(language)}</span>)}
+                          {/* A page photographed sideways: the student turns it,
+                              before it is read or to have it read again. */}
+                          {photo && !resolved && pdfPageCount <= 1 && photoOCR.phase !== 'reading' && (
+                            <div style={{ marginTop: 8 }}>
+                              <button type="button" className="btn btn-quiet btn-sm" data-photo-rotate disabled={busy || photoTurning}
+                                aria-label={t('photo.rotateLabel')} onClick={() => { void turnPhoto(); }}>
+                                {t('photo.rotate')}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -2189,6 +2226,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     onEdit={(i, text) => changePhotoLines(editLine(photoLines, i, text))}
                     onExclude={(i, out) => changePhotoLines(setLineExcluded(photoLines, i, out))}
                     onIncludeAll={() => changePhotoLines(includeAll(photoLines))} />
+                  {/* Before anything is marked: a line of the student's own
+                      arithmetic that is not true of the line before it. Found
+                      on the device from the lines alone; it holds no key. */}
+                  {!resolved && <WorkingHint lines={includedLines(photoLines)} prompt={question.prompt}
+                    lineNumber={n => photoLineNumber(photoLines, n)} />}
                   {/* Where the answer in the field came from — or why the field
                       is empty. Nothing is marked until Submit is pressed. */}
                   {!isWorking && !resolved && photoNote && photoNote.status !== 'not-applicable' && (
@@ -2252,6 +2294,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   initialReading={inkExtrasRef.current.reading || restoredReading || null}
                   draftSaved={saveState === 'saved'} />
               )}
+              {!resolved && !inkStale && inkResult?.lines?.length > 0 && state.phase === 'answering' &&
+                <WorkingHint lines={inkResult.lines} prompt={question.prompt} />}
               {/* The answer taken from handwritten working: shown, editable,
                   and only ever sent by the student's own Submit. */}
               {inkProposal && !resolved && (
@@ -2593,7 +2637,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {!verdictGood && res.solution && (
                   <div className="eval-expected">{t('verdict.expected')} <b><MathText text={res.solution.answerText} /></b></div>
                 )}
-                {res.stepReport && <StepReport report={res.stepReport} />}
+                {/* The server's per-line review of the submitted lines — the same
+                    for typed, ink and photo working. Where there is none, the
+                    step report alone is shown as before. */}
+                {res.workingReview && !res.revealed
+                  ? <WorkingReview review={res.workingReview} lines={attempt?.lines || null}
+                      lineNumber={mode === 'photo' && photoLines ? n => photoLineNumber(photoLines, n) : null} />
+                  : res.stepReport && <StepReport report={res.stepReport} />}
                 {boardAward && (
                   <div className="board-award" style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--hairline)' }}>
                     {/* The header above already states the total. It is repeated here

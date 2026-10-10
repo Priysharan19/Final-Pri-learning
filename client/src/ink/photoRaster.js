@@ -112,3 +112,40 @@ export async function preparePhoto(dataUrl, {
   }
   return null;
 }
+
+/**
+ * Turn a photo by quarter turns clockwise (1 = 90°, 2 = 180°, 3 = 270°).
+ *
+ * A camera file that says which way up it is (EXIF orientation) is already
+ * drawn upright by the browser. A page that was simply photographed sideways
+ * says nothing, and no reader should be left to guess: the student turns it.
+ * Always turn the ORIGINAL by the total number of turns — never a turned copy —
+ * so the picture is re-encoded once however often the button is pressed.
+ *
+ * Returns { dataUrl, width, height } or null when the photo cannot be opened.
+ */
+export async function rotatePhoto(dataUrl, quarterTurns = 1, {
+  quality = 0.92,
+  loadImage = defaultLoadImage,
+  createCanvas = defaultCanvas
+} = {}) {
+  if (!isSupportedPhoto(dataUrl)) return null;
+  const turns = ((Math.round(Number(quarterTurns) || 0) % 4) + 4) % 4;
+  let img;
+  try { img = await loadImage(dataUrl); }
+  catch { return null; }
+  const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  if (!w || !h) return null;
+  if (turns === 0) return { dataUrl, width: w, height: h };
+  const canvas = createCanvas(turns % 2 ? h : w, turns % 2 ? w : h);
+  const ctx = canvas?.getContext('2d');
+  if (!ctx) return null;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // A quarter turn is an exact matrix (0, ±1): about the centre, no resampling blur.
+  const cos = [1, 0, -1, 0][turns], sin = [0, 1, 0, -1][turns];
+  ctx.setTransform(cos, sin, -sin, cos, canvas.width / 2, canvas.height / 2);
+  ctx.drawImage(img, -w / 2, -h / 2, w, h);
+  const out = canvas.toDataURL('image/jpeg', quality);
+  return String(out).startsWith('data:image/') ? { dataUrl: out, width: canvas.width, height: canvas.height } : null;
+}
