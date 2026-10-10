@@ -391,7 +391,13 @@ class Parser {
           const args = [arg];
           while (this.peek() && this.peek().t === 'sep') { this.next(); args.push(this.parseExpression(0)); }
           this.expect('rp');
-          return this.maybePower({ t: 'call', fn: tok.v, arg, args });
+          // `arg` is the first argument under its single-argument name, kept for
+          // code that reads it — but not enumerable: it is the same subtree as
+          // `args[0]`, and anything that copies, counts or serialises a node by
+          // its keys would otherwise take that subtree twice at every level.
+          const call = { t: 'call', fn: tok.v, args };
+          Object.defineProperty(call, 'arg', { value: arg, enumerable: false, writable: true, configurable: true });
+          return this.maybePower(call);
         }
         this.expect('rp');
       } else if (this.peek() && this.peek().t === 'op' && this.peek().v === '*' && this.peek().implicit) {

@@ -288,7 +288,25 @@ const READ_HELP = {
  *  vector     { components: [x, y, z], tol? }   — "(1, 2, 3)", "i − 2j + 3k", "1i−2j+3k"
  * Returns { correct, feedback?, normalized? }
  */
+// ── How long a final answer may be ───────────────────────────────────────────
+// Working is read a line at a time, 300 characters a line. The final-answer
+// box had no such bound, and the server accepts 12,000 characters there: every
+// cost in the marker that grows with what is written — sampling, domain probes,
+// root finding — grew forty times past what a line of working can ask of it.
+// No answer on any syllabus needs it. A longer one is not read at all, so it
+// is "unreadable": it spends no try, and it costs nothing to refuse.
+export const ANSWER_LIMIT = 400;
+export function answerTooLong(rawInput) {
+  const length = typeof rawInput === 'string' ? rawInput.length
+    : Array.isArray(rawInput) ? rawInput.reduce((n, part) => n + String(part ?? '').length, 0) : 0;
+  return length > ANSWER_LIMIT
+    ? { correct: false, invalid: true, feedback: `That is longer than an answer can be (${ANSWER_LIMIT} characters). Write only the final answer here; working goes in the working space.` }
+    : null;
+}
+
 export function checkAnswer(question, rawInput) {
+  const long = answerTooLong(rawInput);
+  if (long) return long;
   return withEvaluationBudget(EVALUATION_BUDGET, () => checkAnswerWithinBudget(question, rawInput));
 }
 function checkAnswerWithinBudget(question, rawInput) {

@@ -157,6 +157,22 @@ try {
     c.deq([deep.status, deep.data.correct], [200, false], 'twenty-four nested calls as an expression answer are answered, and are not correct');
     c.ok(ms < 1500, `without holding the server (${ms} ms)`);
   }
+  // An answer that agrees with the key wherever it is sampled, padded with
+  // `+0tan(kx)` to the 12,000 characters the route accepts, took 2.8 s in a
+  // probe no budget covers. An answer that long is not read at all.
+  {
+    const r = await h.request('/v1/practice/issue', { method: 'POST', jar: a.jar, body: { generator: 'y7-algebra', difficulty: 2, seed: 1, curriculum: 'in' } });
+    assert.equal(r.status, 201, 'the server issues an expression-answer question');
+    let padded = '3x + 3';
+    for (let i = 1; padded.length < 11900; i++) padded += `+0tan(${i}x)`;
+    const at = Date.now();
+    const long = await submit(r.data.question.id, 'expr-padded-answer', padded, []);
+    const ms = Date.now() - at;
+    c.deq([long.status, long.data.correct, long.data.invalid, long.data.resolved], [200, false, true, false], 'an 11,900-character answer is refused as unreadable and spends no try');
+    c.ok(ms < 1500, `without holding the server (${ms} ms)`);
+    const short = await submit(r.data.question.id, 'expr-short-padded-answer', '3x + 3+0tan(1x)+0tan(2x)', []);
+    c.eq(short.status, 200, 'and a short answer on the same question is still marked');
+  }
 
   // The middle term of a quadratic split every way the coefficients allow:
   // from the printed question alone this used to collect a method mark.
