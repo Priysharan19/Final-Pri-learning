@@ -1,0 +1,358 @@
+// Grade 7 additional original graph/diagram scenarios (extended wave).
+import { makeAdvancedVisual } from '../visualAdvancedFactory.js';
+const specs=[
+  {
+    "chapterId": "c7-large-numbers-current",
+    "kind": "placevalue",
+    "digits": [
+      4,
+      0,
+      5,
+      1,
+      7,
+      2
+    ],
+    "index": 2,
+    "context": "Village census"
+  },
+  {
+    "chapterId": "c7-large-numbers-current",
+    "kind": "placevalue",
+    "digits": [
+      7,
+      1,
+      2,
+      3,
+      0,
+      9,
+      4
+    ],
+    "index": 1,
+    "context": "National library holdings"
+  },
+  {
+    "chapterId": "c7-large-numbers-current",
+    "kind": "placevalue",
+    "digits": [
+      9,
+      0,
+      4,
+      7,
+      6,
+      2
+    ],
+    "index": 3,
+    "context": "Festival attendance"
+  },
+  {
+    "chapterId": "c7-large-numbers-current",
+    "kind": "placevalue",
+    "digits": [
+      2,
+      8,
+      0,
+      4,
+      0,
+      5,
+      1
+    ],
+    "index": 4,
+    "context": "Regional grain production"
+  },
+  {
+    "chapterId": "c7-large-numbers-current",
+    "kind": "placevalue",
+    "digits": [
+      6,
+      3,
+      8,
+      2,
+      0,
+      1
+    ],
+    "index": 0,
+    "context": "Water metering records"
+  },
+  {
+    "chapterId": "c7-large-numbers-current",
+    "kind": "placevalue",
+    "digits": [
+      5,
+      0,
+      0,
+      6,
+      9,
+      2
+    ],
+    "index": 5,
+    "context": "Archives digitisation"
+  },
+  {
+    "chapterId": "c7-connecting-dots-current",
+    "kind": "dots",
+    "rows": 5,
+    "mode": "total",
+    "context": "First triangular artwork"
+  },
+  {
+    "chapterId": "c7-letter-numbers-current",
+    "kind": "dots",
+    "rows": 6,
+    "mode": "next",
+    "context": "Second triangular artwork"
+  },
+  {
+    "chapterId": "c7-connecting-dots-current",
+    "kind": "dots",
+    "rows": 7,
+    "mode": "total",
+    "context": "Seating arrangement"
+  },
+  {
+    "chapterId": "c7-letter-numbers-current",
+    "kind": "dots",
+    "rows": 8,
+    "mode": "next",
+    "context": "Tile staircase"
+  },
+  {
+    "chapterId": "c7-connecting-dots-current",
+    "kind": "dots",
+    "rows": 9,
+    "mode": "total",
+    "context": "Square-grid staircase"
+  },
+  {
+    "chapterId": "c7-letter-numbers-current",
+    "kind": "dots",
+    "rows": 4,
+    "mode": "next",
+    "context": "Library display"
+  },
+  {
+    "chapterId": "c7-fractions-current",
+    "kind": "tape",
+    "a": 2,
+    "b": 3,
+    "total": 25,
+    "mode": "first",
+    "context": "Fraction bar division"
+  },
+  {
+    "chapterId": "c7-decimal-operations-current",
+    "kind": "tape",
+    "a": 3,
+    "b": 2,
+    "total": 45,
+    "mode": "second",
+    "context": "Kitchen recipe shares"
+  },
+  {
+    "chapterId": "c7-common-ground-current",
+    "kind": "tape",
+    "a": 5,
+    "b": 3,
+    "total": 64,
+    "mode": "difference",
+    "context": "Mixed decimals allocation"
+  },
+  {
+    "chapterId": "c7-decimals-current",
+    "kind": "tape",
+    "a": 4,
+    "b": 5,
+    "total": 81,
+    "mode": "first",
+    "context": "Common denominator strip"
+  },
+  {
+    "chapterId": "c7-constructions-tilings-current",
+    "kind": "tape",
+    "a": 1,
+    "b": 4,
+    "total": 50,
+    "mode": "second",
+    "context": "Part-whole model"
+  },
+  {
+    "chapterId": "c7-fractions-current",
+    "kind": "tape",
+    "a": 3,
+    "b": 4,
+    "total": 70,
+    "mode": "first",
+    "context": "Field sections"
+  },
+  {
+    "chapterId": "c7-decimal-operations-current",
+    "kind": "tape",
+    "a": 7,
+    "b": 3,
+    "total": 100,
+    "mode": "difference",
+    "context": "Percentage split"
+  },
+  {
+    "chapterId": "c7-common-ground-current",
+    "kind": "tape",
+    "a": 2,
+    "b": 5,
+    "total": 56,
+    "mode": "second",
+    "context": "Tiles counted"
+  },
+  {
+    "chapterId": "c7-decimals-current",
+    "kind": "tape",
+    "a": 6,
+    "b": 5,
+    "total": 88,
+    "mode": "first",
+    "context": "Tiling pieces"
+  },
+  {
+    "chapterId": "c7-constructions-tilings-current",
+    "kind": "tape",
+    "a": 3,
+    "b": 7,
+    "total": 100,
+    "mode": "second",
+    "context": "Two types of cards"
+  },
+  {
+    "chapterId": "c7-parallel-intersecting-lines-current",
+    "kind": "parallel",
+    "angle": 35,
+    "mode": "corresponding",
+    "context": "Transversal A"
+  },
+  {
+    "chapterId": "c7-parallel-intersecting-lines-current",
+    "kind": "parallel",
+    "angle": 58,
+    "mode": "supplementary",
+    "context": "Transversal B"
+  },
+  {
+    "chapterId": "c7-parallel-intersecting-lines-current",
+    "kind": "parallel",
+    "angle": 42,
+    "mode": "corresponding",
+    "context": "Street intersection"
+  },
+  {
+    "chapterId": "c7-parallel-intersecting-lines-current",
+    "kind": "parallel",
+    "angle": 73,
+    "mode": "supplementary",
+    "context": "Railway crossings"
+  },
+  {
+    "chapterId": "c7-parallel-intersecting-lines-current",
+    "kind": "parallel",
+    "angle": 26,
+    "mode": "corresponding",
+    "context": "Fence braces"
+  },
+  {
+    "chapterId": "c7-parallel-intersecting-lines-current",
+    "kind": "parallel",
+    "angle": 67,
+    "mode": "supplementary",
+    "context": "Two parallel strips"
+  },
+  {
+    "chapterId": "c7-parallel-intersecting-lines-current",
+    "kind": "parallel",
+    "angle": 51,
+    "mode": "corresponding",
+    "context": "Notebook parallel rulings"
+  },
+  {
+    "chapterId": "c7-integer-operations-current",
+    "kind": "interval",
+    "a": -4,
+    "b": 6,
+    "lc": true,
+    "rc": false,
+    "context": "Integer displacement"
+  },
+  {
+    "chapterId": "c7-finding-unknown-current",
+    "kind": "interval",
+    "a": -7,
+    "b": 3,
+    "lc": false,
+    "rc": true,
+    "context": "Unknown range"
+  },
+  {
+    "chapterId": "c7-integer-operations-current",
+    "kind": "interval",
+    "a": 2,
+    "b": 11,
+    "lc": true,
+    "rc": true,
+    "context": "Experimental scale"
+  },
+  {
+    "chapterId": "c7-finding-unknown-current",
+    "kind": "interval",
+    "a": -9,
+    "b": -1,
+    "lc": false,
+    "rc": false,
+    "context": "Signed-number inequality"
+  },
+  {
+    "chapterId": "c7-integer-operations-current",
+    "kind": "interval",
+    "a": 0,
+    "b": 10,
+    "lc": true,
+    "rc": false,
+    "context": "Positive solutions"
+  },
+  {
+    "chapterId": "c7-arithmetic-expressions-current",
+    "kind": "venn",
+    "a": 8,
+    "b": 7,
+    "ab": 3,
+    "out": 2,
+    "mode": "union",
+    "context": "Overlap of clubs"
+  },
+  {
+    "chapterId": "c7-number-play-current",
+    "kind": "venn",
+    "a": 14,
+    "b": 10,
+    "ab": 5,
+    "out": 3,
+    "mode": "aTotal",
+    "context": "Two activities"
+  },
+  {
+    "chapterId": "c7-arithmetic-expressions-current",
+    "kind": "venn",
+    "a": 5,
+    "b": 9,
+    "ab": 2,
+    "out": 4,
+    "mode": "overlap",
+    "context": "Card collections"
+  },
+  {
+    "chapterId": "c7-number-play-current",
+    "kind": "venn",
+    "a": 10,
+    "b": 8,
+    "ab": 4,
+    "out": 1,
+    "mode": "neither",
+    "context": "Reading groups"
+  }
+];
+const result={};for(const {chapterId,kind,...p} of specs)(result[chapterId]||={examples:[]}).examples.push(makeAdvancedVisual(kind,p));
+export default result;
