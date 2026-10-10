@@ -567,7 +567,7 @@ export const flow = {
         // kept with the ink. A reload brings both back — it does not read the
         // page again, and it does not bring back the proposal that was overridden.
         const status = page.locator('.ws-actions .status-line');
-        await page.waitForFunction(() => /Saved on this device/.test(document.querySelector('.ws-actions .status-line')?.innerText || ''), null, { timeout: 10000 }).catch(() => {});
+        await page.waitForFunction(() => document.querySelector('.ws-actions .status-line')?.getAttribute('data-state') === 'saved', null, { timeout: 10000 }).catch(() => {});
         const callsBeforeReload = reader.requests.length;
         const readsBeforeReload = (await readCalls()).length;
         await page.reload({ waitUntil: 'domcontentloaded' });
@@ -583,7 +583,7 @@ export const flow = {
           await restoredField.inputValue().catch(() => null) === right.text && await restoredField.inputValue().catch(() => null) !== final &&
             await page.locator('[data-ink-answer-proposal="student"]').count() === 1,
           `field ${JSON.stringify(await restoredField.inputValue().catch(() => null))}; proposed was ${JSON.stringify(final)}`);
-        await check('the save line says saved again only after its own readback', await page.waitForFunction(() => /Saved on this device/.test(document.querySelector('.ws-actions .status-line')?.innerText || ''), null, { timeout: 10000 }).then(() => true, () => false),
+        await check('the save state is "saved" again only after its own readback of strokes, transcript and typed answer', await page.waitForFunction(() => document.querySelector('.ws-actions .status-line')?.getAttribute('data-state') === 'saved', null, { timeout: 10000 }).then(() => true, () => false),
           await status.innerText().catch(() => ''));
         await page.getByRole('button', SUBMIT).click();
         await page.waitForSelector('.eval-card, .verdict-bad', { timeout: 30000 }).catch(() => {});
