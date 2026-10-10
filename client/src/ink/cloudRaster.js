@@ -25,9 +25,15 @@ function pointsOf(stroke) {
   return [];
 }
 
+// Whole pixels, the same rounding the kept draft and the submission use
+// (local/inkDrafts.js compactStrokes). One page therefore makes ONE picture,
+// byte for byte, whether it is read as it is written, after a reload from the
+// draft, or again at Submit — so a read of a page that has already been read
+// can be recognised as the same read and not paid for twice.
 function coord(point) {
-  if (Array.isArray(point)) return { x: Number(point[0]), y: Number(point[1]) };
-  return { x: Number(point?.x), y: Number(point?.y) };
+  const whole = value => (Number.isFinite(Number(value)) && value !== null && value !== '' ? Math.round(Number(value)) : NaN);
+  if (Array.isArray(point)) return { x: whole(point[0]), y: whole(point[1]) };
+  return { x: whole(point?.x), y: whole(point?.y) };
 }
 
 /** The tight box around every mark, or null when there is nothing written. */

@@ -158,10 +158,19 @@ export const flow = {
     // Online again, but the reader is not answering yet: the kept page must be
     // restored from the store, offered to the reader (which proves the strokes
     // came back), and go on waiting — no mark, nothing lost.
-    const requestsBeforeReload = reader.requests.length;
-    const readsBeforeReload = (await readCalls()).length;
     reader.down = true;
     await ctx.setOffline(false);
+    // Coming back online is itself a reason for the page that is still open to
+    // offer its work to the reader, and it does. That request belongs to the
+    // page BEFORE the reload; it used to race the reload and was sometimes
+    // counted as a second read by the restored page (1 run in 7–10: "2 page
+    // request(s)", two different pictures from two page lifetimes). Let it
+    // land, then count what the restored page sends on its own.
+    const readsWhileOffline = (await readCalls()).length;
+    for (let i = 0; i < 25 && (await readCalls()).length === readsWhileOffline; i++) await page.waitForTimeout(100);
+    await page.waitForTimeout(300);
+    const requestsBeforeReload = reader.requests.length;
+    const readsBeforeReload = (await readCalls()).length;
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
     await check('after the reload the same question is back', await mathText('.q-prompt') === prompt,
