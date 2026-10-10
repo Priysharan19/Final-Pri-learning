@@ -8,8 +8,8 @@
 // PRI_RESEND_API_KEY, PRI_AUTH_EMAIL_FROM). The raw code exists only in this
 // call; it is never stored or logged.
 // ─────────────────────────────────────────────────────────────────────────────
-import { consentPage, recordTestMessage, testModeAllowed } from './smsProvider.js';
-import { postResendEmail } from './authDelivery.js';
+import { recordTestMessage, testModeAllowed } from './smsProvider.js';
+import { cleanPublicOrigin, postResendEmail } from './authDelivery.js';
 import { recordAuthEmail } from './metrics.js';
 import { logEvent, safeCode } from './observability.js';
 
@@ -19,9 +19,45 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 }
 
-export function otpEmailMessage(code, purpose, origin = process.env.PRI_PUBLIC_ORIGIN, { intent = null } = {}) {
+/**
+ * The parent's page on THIS deployment, or null. The origin is the server's
+ * own validated PRI_PUBLIC_ORIGIN (authDelivery.js cleanPublicOrigin: a clean
+ * https origin, http only for localhost outside production) and the path is
+ * fixed, so a mail can never carry a link to another environment's host, to a
+ * caller-chosen address, or to anything a request supplied.
+ */
+export function otpEmailConsentLink(origin = process.env.PRI_PUBLIC_ORIGIN) {
+  try { return `${cleanPublicOrigin(origin)}/guardian/consent`; } catch { return null; }
+}
+
+/**
+ * One layout for every code email: the name, one sentence, the code, how long
+ * it lasts, and what to do if it was not asked for. Tables and inline styles
+ * because that is what mail clients render; a single 480px column that a phone
+ * shows without zooming; no image, no tracking pixel, no remote font. Sign-in
+ * and deletion codes carry NO link at all — a code is typed, never clicked.
+ */
+function codeEmailHtml({ preheader, lead, code, expiry, tail, link = null }) {
   const digits = escapeHtml(String(code));
-  const big = `<p style="font-size:28px;letter-spacing:6px;font-family:monospace">${digits}</p>`;
+  const spaced = `${digits.slice(0, 3)}&nbsp;${digits.slice(3)}`;
+  const linkRow = link
+    ? `<tr><td style="padding:0 28px 18px;font:15px/1.5 -apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#48463f">Their page: <a href="${escapeHtml(link)}" style="color:#0b6e69">${escapeHtml(link)}</a></td></tr>`
+    : '';
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>Pri Learning</title></head>`
+    + `<body style="margin:0;padding:0;background:#f0ede6">`
+    + `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${escapeHtml(preheader)}</div>`
+    + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f0ede6"><tr><td align="center" style="padding:24px 12px">`
+    + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#fdfcf9;border:1px solid #d9d5cb;border-radius:12px">`
+    + `<tr><td style="padding:24px 28px 6px;font:600 17px/1.3 Georgia,'Times New Roman',serif;color:#1c1b18">Pri Learning</td></tr>`
+    + `<tr><td style="padding:6px 28px 4px;font:16px/1.5 -apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1c1b18">${escapeHtml(lead)}</td></tr>`
+    + `<tr><td align="center" style="padding:18px 28px 10px"><div aria-label="Code ${digits.split('').join(' ')}" style="display:inline-block;padding:14px 22px;border:1px solid #1c1b18;border-radius:10px;font:700 34px/1.1 'SF Mono',Menlo,Consolas,'Courier New',monospace;letter-spacing:6px;color:#1c1b18;background:#ffffff">${spaced}</div></td></tr>`
+    + `<tr><td align="center" style="padding:0 28px 18px;font:14px/1.5 -apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#48463f">${escapeHtml(expiry)}</td></tr>`
+    + linkRow
+    + `<tr><td style="padding:14px 28px 24px;border-top:1px solid #e6e2d9;font:13px/1.5 -apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#6b675e">${escapeHtml(tail)}</td></tr>`
+    + `</table></td></tr></table></body></html>`;
+}
+
+export function otpEmailMessage(code, purpose, origin = process.env.PRI_PUBLIC_ORIGIN, { intent = null } = {}) {
   // A deletion code must never read like a sign-in code: the public
   // /account/delete-request page can be asked for by anyone who knows the
   // address, so the mail itself has to say what entering the code does.
@@ -31,21 +67,37 @@ export function otpEmailMessage(code, purpose, origin = process.env.PRI_PUBLIC_O
     return {
       subject: `${code} is the code to delete your Pri Learning account`,
       text: `${code}\n\n${body}\n\n${tail}`,
-      html: `${big}<p>${body}</p><p>${tail}</p>`
+      html: codeEmailHtml({ preheader: 'This code deletes a Pri Learning account.', lead: body, code, expiry: 'This code works for 10 minutes and only once.', tail: 'If you did not ask for this, ignore this email: your account stays exactly as it is.' })
     };
   }
   if (purpose === 'guardian-consent') {
-    const body = `Your child is setting up Pri Learning and has asked you to approve their account. Open ${escapeHtml(consentPage(origin))} yourself, read what you are agreeing to, and enter this code there.`;
+    const link = otpEmailConsentLink(origin);
+    const where = link || 'the Pri Learning parent page';
+    const body = `Your child is setting up Pri Learning and has asked you to approve their account. Open ${where} yourself, read what you are agreeing to, and enter this code there.`;
     const tail = 'The code is valid for 10 minutes. If you did not expect this, ignore this email and nothing will sync.';
     return {
       subject: `${code} is the code to approve your child’s Pri Learning account`,
       text: `${code}\n\n${body}\n\n${tail}`,
-      html: `${big}<p>${body}</p><p>${tail}</p>`
+      html: codeEmailHtml({
+        preheader: 'Your child asked you to approve their Pri Learning account.',
+        lead: 'Your child is setting up Pri Learning and has asked you to approve their account. Open the parent page yourself, read what you are agreeing to, and enter this code there.',
+        code, expiry: 'This code works for 10 minutes and only once.', link,
+        tail: 'If you did not expect this, ignore this email and nothing will sync.'
+      })
     };
   }
   const body = 'Enter this code in Pri Learning to continue. It is valid for 10 minutes. Do not share it with anyone.';
   const tail = 'If you did not ask for it, you can ignore this email.';
-  return { subject: `${code} is your Pri Learning code`, text: `${code}\n\n${body}\n\n${tail}`, html: `${big}<p>${body}</p><p>${tail}</p>` };
+  return {
+    subject: `${code} is your Pri Learning code`,
+    text: `${code}\n\n${body}\n\n${tail}`,
+    html: codeEmailHtml({
+      preheader: 'Your six-digit Pri Learning code. It works for 10 minutes.',
+      lead: 'Enter this code in Pri Learning to continue.', code,
+      expiry: 'This code works for 10 minutes and only once. Do not share it with anyone.',
+      tail: 'If you did not ask for this code, you can ignore this email. Nobody can sign in without it.'
+    })
+  };
 }
 
 export function createResendOtpEmailSender({ apiKey, from, fetchImpl = globalThis.fetch } = {}) {
