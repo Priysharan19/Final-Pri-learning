@@ -850,6 +850,7 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
       let text = '5x';
       for (let i = 1; ; i++) { const term = `+0sin(${i}(x+${letters.slice(0, count).join('+')}))^2`; if ((text + term).length > ANSWER_LIMIT) break; text += term; }
       time(`answer padded with zero terms in ${count} letters`, () => checkAnswer(expr, text));
+      ok(checkAnswer(expr, text).correct === (count <= 6), count <= 6 ? `an answer with ${count} extra letters that cancel is still compared, and is equal` : `an answer written in ${count} extra letters is not compared with the key: it is not the key`);
     }
   }
   // The domain probe behind an expression answer (`+0tan(1x)+0tan(2x)+…` agrees
