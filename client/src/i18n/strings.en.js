@@ -2715,4 +2715,7 @@ export default {
   'photo.answerNone': "No final answer could be picked out from the lines you kept. Type it in Final answer.",
   'photo.statusSaved': "Photo and reading saved on this device",
   'photo.restored': "Your photo, its reading and your changes were restored from this device.",
+  'ink.answerProposed': "Pri took {answer} as your answer from line {n} of your writing. Change it here if that is not what you meant.",
+  'ink.answerAmbiguous': "Your writing gives more than one possible final answer ({candidates}). Type the one you mean; your lines are kept as working.",
+  'ink.answerNone': "No final answer could be picked out of your writing. Type it here; your lines are kept as working.",
 };
