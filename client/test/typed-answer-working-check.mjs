@@ -307,7 +307,15 @@ const publicQ = { id: 'q-area', answerType: 'numeric', supportsSteps: true, prom
 {
   const card = read('src/components/QuestionCard.jsx');
   ok(/import TypedAnswerFields from '\.\/TypedAnswerFields\.jsx'/.test(card) && /<TypedAnswerFields/.test(card), 'the card renders the typed fields');
-  ok(/answer=\{answer\} working=\{working\} onAnswer=\{editAnswer\} onWorking=\{editWorking\}/.test(card), 'through the draft-saving edit handlers');
+  // A typed answer is kept by `editAnswer` (which stashes the draft). The answer
+  // beside a photographed page is kept with the page: `editPhotoAnswer` changes
+  // it, and the photo draft's save takes `answer` in its snapshot and re-runs on it.
+  ok(/answer=\{answer\} working=\{working\} onAnswer=\{photoInUse \? editPhotoAnswer : editAnswer\} onWorking=\{editWorking\}/.test(card)
+    && /const editAnswer = \(v\) => \{ setAnswer\(v\); stash\(v, working\);/.test(card)
+    && /const editWorking = \(v\) => \{ setWorking\(v\); stash\(answer, v\);/.test(card)
+    && /const editPhotoAnswer = \(v\) => \{\s*setAnswer\(v\);/.test(card)
+    && /answer: read && !isWorking \? answer : ''/.test(card)
+    && /\}, \[mode, photo, photoLines, answer, photoAnswerSource,/.test(card), 'through the draft-saving edit handlers');
   ok(/steps = \(workingOpen \|\| mode === 'photo'\) && working\.trim\(\) \? working : undefined/.test(card), 'an open working area is always part of the submission');
   ok(/const draft = readDraft\('question', question\.id\);\s*setAnswer\(draft\?\.typed \|\| ''\)/.test(card) && /setWorking\(draft\?\.working \|\| ''\)/.test(card), 'a remounted card restores the typed answer and working from the draft');
   const flip = /const flipMode = \(m\) => \{[\s\S]*?\n  \};/.exec(card)?.[0] || '';
