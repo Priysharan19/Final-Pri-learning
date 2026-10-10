@@ -543,13 +543,13 @@ jobs:
           grep -Fq 'SYNTHETIC-READER EVIDENCE' browser.log
           # The accessibility walk must have reached the refused-check states.
           grep -Eq 'online-only checking +9/9' browser.log
-          grep -Eq 'ACCESSIBILITY SUITE.*PIN_X.*PIN_G groups' browser.log
+          grep -Eq 'ACCESSIBILITY SUITE.*51/51.*14 groups' browser.log
           grep -Fq 'BOOT RESILIENCE: PASS — 61/61 checks' browser.log
           grep -Fq 'Reader · usage limit reached' browser.log
-          grep -Eq 'Read on request · provider calls per handwritten answer, first stroke to verdict +PIN_R' browser.log
-          grep -Eq 'India exam · unread handwriting at the deadline: warned, frozen, pending, read once +PIN_A' browser.log
-          grep -Eq 'India exam · handwriting never read, then Submit paper: told in the dialog, read once, never blank +PIN_B' browser.log
-          grep -Eq 'India exam · read, one more stroke, then Submit paper: the page as it stands is read once, never blank +PIN_C' browser.log
+          grep -Eq 'Read on request · provider calls per handwritten answer, first stroke to verdict +12/12' browser.log
+          grep -Eq 'India exam · unread handwriting at the deadline: warned, frozen, pending, read once +26/26' browser.log
+          grep -Eq 'India exam · handwriting never read, then Submit paper: told in the dialog, read once, never blank +5/5' browser.log
+          grep -Eq 'India exam · read, one more stroke, then Submit paper: the page as it stands is read once, never blank +3/3' browser.log
           grep -Eq 'E2E SUITE.*38/38.*2 flows' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
