@@ -17,8 +17,22 @@
 //   @@marker-test:oom@@         in the ANSWER  → allocates until the worker's heap limit
 //   @@marker-test:exit@@        in the ANSWER  → the worker thread exits
 //   @@marker-test:throw@@       in the ANSWER  → the operation throws
+//   @@marker-test:clock:3@@     in the ANSWER or the WORKING → the ENGINE'S OWN
+//                               backstop clock (checker.js) reads 0 three
+//                               times and then far past the backstop, for this
+//                               one operation: the engine stops its check of
+//                               the working at an exact line, on any machine
 import { parentPort } from 'node:worker_threads';
 import { MARKER_OPS, serveMarker } from '../../platform/markerOps.js';
+import { setBackstopClockForTests, WORKING_LIMITS } from '../../../client/src/engine/checker.js';
+
+const CLOCK = /\s*@@marker-test:clock:(\d+)@@/;
+/** Run `fn` with the engine's backstop clock running out after `reads` readings. */
+function underClock(reads, fn) {
+  let n = 0;
+  const previous = setBackstopClockForTests(() => (n++ < reads ? 0 : 10 * WORKING_LIMITS.backstopMs));
+  try { return fn(); } finally { setBackstopClockForTests(previous); }
+}
 
 const MAGIC = /@@marker-test:(spin|oom|exit|throw)(?::(\d+))?@@/;
 export const magic = (kind, ms) => `@@marker-test:${kind}${ms === undefined ? '' : ':' + ms}@@`;
@@ -47,6 +61,12 @@ function misbehave(text) {
  * nothing, as it would not in the real worker.
  */
 const wrap = (run, answerField, workingField, continues) => (args, emit) => {
+  const text = String(args[answerField] ?? '') + '\n' + String(Array.isArray(args[workingField]) ? args[workingField].join('\n') : args[workingField] ?? '');
+  const clock = CLOCK.exec(text);
+  if (clock) {
+    const clean = value => (Array.isArray(value) ? value.map(line => String(line).replace(CLOCK, '')) : typeof value === 'string' ? value.replace(CLOCK, '') : value);
+    return underClock(Number(clock[1]), () => run({ ...args, [answerField]: clean(args[answerField]), [workingField]: clean(args[workingField]) }, emit));
+  }
   const answer = misbehave(args[answerField]);
   let working = args[workingField];
   const joined = Array.isArray(working) ? working.join('\n') : working;

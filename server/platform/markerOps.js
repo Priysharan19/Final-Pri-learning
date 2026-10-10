@@ -58,6 +58,17 @@ export function marksPossibleFor(q) {
   return Math.max(1, Math.min(maxMarks, keySteps.length || 1));
 }
 
+// ── A check the engine's clock stopped has no result ────────────────────────
+// The engine reads a page of working under a 750 ms wall-clock backstop
+// (checker.js WORKING_LIMITS.backstopMs). How long a line takes depends on
+// what else the machine is doing, so a check the clock stopped says nothing
+// about the working: the engine returns `unverified: true` and no mark. Every
+// operation below passes that on as `{ unverified: true }` for the WHOLE
+// submission — never as a verdict, a mark, or a report with lines missing —
+// and the request handlers answer it exactly as they answer a worker stopped
+// at its deadline: not an attempt, nothing spent, nothing written, send again.
+export const UNVERIFIED = Object.freeze({ unverified: true });
+
 export function stepEvidence(q, answer, steps, result) {
   const meta = stepMetaFor(q);
   let report = result.stepReport || null;
@@ -66,6 +77,7 @@ export function stepEvidence(q, answer, steps, result) {
     // verified against the system it gives, instead of being left unjudged.
     try { report = stepCheck(meta, steps, { prompt: q.prompt }); } catch { report = null; }
   }
+  if (report?.unverified === true) return { stepReport: null, partial: null, unverified: true };
   let partial = null;
   // A blank final-answer box may still carry verified mathematical method
   // evidence. Invalid nonblank expressions do not become creditable merely
@@ -77,6 +89,7 @@ export function stepEvidence(q, answer, steps, result) {
       const method = methodMarks({
         meta, working: steps, marks: marksPossibleFor(q), prompt: q.prompt, report
       });
+      if (method?.unverified === true) return { stepReport: null, partial: null, unverified: true };
       if (method) partial = { okLines: method.okLines, awarded: method.awarded, note: method.note, lines: method.lines };
     } catch { partial = null; }
   }
@@ -112,6 +125,7 @@ export function examAnswerStage(q, given, working, grid) {
   }
   let result;
   try { result = checkAnswer(q, given); } catch { result = { correct: false }; }
+  if (result.unverified === true) return { final: true, unverified: true, response: null };
   const correct = result.correct === true;
   const awarded = markObjective(grid, { unanswered: false, correct });
   let feedback = String(result.feedback || '');
@@ -130,6 +144,9 @@ export function examWorkingStage(q, working, grid, stage) {
   const response = { ...stage.response };
   try {
     const method = methodMarks({ meta: stage.meta, working: String(working), marks, prompt: q.prompt });
+    // The clock stopped the check of the working: there is no method mark to
+    // report, and "none" would be a mark. The caller is told so instead.
+    if (method?.unverified === true) return null;
     if (method && method.awarded > 0) {
       response.awarded = Math.max(0, Math.min(marks - 1, method.awarded));
       response.partial = { okLines: method.okLines, awarded: response.awarded, note: method.note };
@@ -147,7 +164,9 @@ export function examWorkingStage(q, working, grid, stage) {
  * marks). Objective and negatively marked items never earn method marks.
  */
 export function markResponse(q, given, working, grid) {
-  return examWorkingStage(q, working, grid, examAnswerStage(q, given, working, grid));
+  const stage = examAnswerStage(q, given, working, grid);
+  if (stage.unverified) return { unverified: true };
+  return examWorkingStage(q, working, grid, stage) || { unverified: true };
 }
 
 /** The tutor's Step Check on a student's own lines (practice.js issuedQuestionForTutor). */
@@ -156,7 +175,10 @@ export function tutorEvidence(q, lines) {
   const meta = stepMetaFor(q);
   if (!meta || !Array.isArray(lines) || !lines.length) return evidence;
   try {
-    const judged = stepCheck(meta, lines.join('\n'), { prompt: q.prompt })?.lines || [];
+    const report = stepCheck(meta, lines.join('\n'), { prompt: q.prompt });
+    // A check the clock stopped is silence, not "no line verified".
+    if (report?.unverified === true) return evidence;
+    const judged = report?.lines || [];
     const at = judged.findIndex(line => line?.status === 'break');
     if (at >= 0 && at < lines.length) evidence.firstBreak = at;
     while (evidence.verifiedLines < judged.length && evidence.verifiedLines < lines.length &&
@@ -168,9 +190,11 @@ export function tutorEvidence(q, lines) {
 // ── The operations a worker serves ──────────────────────────────────────────
 // Each takes its plain-data arguments and `emit`, which reports a completed
 // stage to the request thread BEFORE the next stage starts. If the deadline
-// then stops the worker, the stages already reported are still known: an
-// answer that was marked in time keeps its verdict when only the working ran
-// out of time.
+// then stops the worker, the stages already reported are still known. What a
+// handler may do with them is narrow: a practice submission that was stopped
+// is not an attempt whatever had been reported, and a paper uses them only at
+// its documented ceiling (exams.js). When the ENGINE's clock stopped a check,
+// the operation returns UNVERIFIED and nothing else.
 export const MARKER_OPS = Object.freeze({
   /**
    * A practice submission: the answer, then (only when the reply could need
@@ -181,15 +205,20 @@ export const MARKER_OPS = Object.freeze({
    */
   practice({ q, answer, working, evidenceIfWrong }, emit) {
     const result = checkAnswer(q, answer);
+    if (result.unverified === true) return UNVERIFIED;
     emit({ result });
     const wanted = result.correct || evidenceIfWrong || !String(working || '').trim();
-    return { result, evidence: wanted ? stepEvidence(q, answer, working, result) : null };
+    const evidence = wanted ? stepEvidence(q, answer, working, result) : null;
+    if (evidence?.unverified === true) return UNVERIFIED;
+    return { result, evidence };
   },
   /** One examination response: the answer stage, then the working stage. */
   exam({ q, given, working, grid }, emit) {
     const stage = examAnswerStage(q, given, working, grid);
+    if (stage.unverified) return UNVERIFIED;
     emit({ response: stage.response, final: stage.final });
-    return { response: examWorkingStage(q, working, grid, stage) };
+    const response = examWorkingStage(q, working, grid, stage);
+    return response ? { response } : UNVERIFIED;
   },
   tutor({ q, lines }) {
     return { evidence: tutorEvidence(q, lines) };

@@ -57,7 +57,7 @@ jobs:
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 419/419 checks' suites.log
           grep -Fq 'METHOD MARKS: PASS — 53/53 checks' suites.log
-          grep -Fq 'METHOD PROGRESS: PASS — 965/965 checks' suites.log
+          grep -Fq 'METHOD PROGRESS: PASS — 1047/1047 checks' suites.log
           grep -Fq 'WORKING BRANCHES: PASS — 32/32 checks' suites.log
           grep -Fq 'Pri Reason V1 precision gate: PASS' suites.log
           grep -Fq 'Pri Reason V2 safety gate: PASS' suites.log
@@ -289,7 +289,7 @@ jobs:
         run: |
           set -o pipefail
           node server/test/marker-isolation-check.mjs 2>&1 | tee marker-isolation.log
-          grep -Fq 'MARKER ISOLATION: PASS — 152/152 checks' marker-isolation.log
+          grep -Fq 'MARKER ISOLATION: PASS — 212/212 checks' marker-isolation.log
       - name: Account, origin, CMS and classroom contracts
         run: |
           node server/test/account-deletion-reauth-check.mjs

@@ -34,7 +34,7 @@ function malformedRatioInput(rawInput) {
 }
 
 export function checkAnswer(question, rawInput) {
-  return withEvaluationBudget(EVALUATION_BUDGET, () => checkAnswerWithinBudget(question, rawInput));
+  return unlessStopped(() => withEvaluationBudget(EVALUATION_BUDGET, () => checkAnswerWithinBudget(question, rawInput)), unverifiedAnswer);
 }
 function checkAnswerWithinBudget(question, rawInput) {
   if (question?.answerType === 'working') return checkWorking(question, String(rawInput ?? ''));
@@ -195,7 +195,7 @@ function readSolutionList(raw, meta) {
 }
 
 export function checkWorking(q, workingText) {
-  return withEvaluationBudget(EVALUATION_BUDGET, () => checkWorkingWithinBudget(q, workingText));
+  return unlessStopped(() => withEvaluationBudget(EVALUATION_BUDGET, () => checkWorkingWithinBudget(q, workingText)), unverifiedAnswer);
 }
 function checkWorkingWithinBudget(q, workingText) {
   const ans = q.answer;
@@ -432,21 +432,68 @@ function namesAValue(text, meta) {
 // mistake nor credit, and nothing after the budget is spent is credited. The
 // bound is on the text, not the clock, so the same working is always marked
 // the same way; the clock is only a backstop that these bounds keep idle.
+//
+// WHEN THE CLOCK DOES STOP A CHECK. How long a line takes depends on what else
+// the machine is doing, so a line the clock skipped is not a fact about the
+// working. It used to be returned as an ordinary unread line, which earns
+// nothing — and a short, valid page of working marked on a busy machine lost
+// marks it earns on an idle one (`(x-1)(x+3)=0`, `x-1=0`, `x+3=0` read 1 of 3).
+// A mark must be a function of what was written. So a check the clock stopped
+// has NO result: every public entry of this file says so, with
+// `unverified: true`, and gives no mark, no verdict and no line-by-line
+// report to read one from —
+//   · stepCheck:   { unverified: true, firstBreak: -1, lines: every line a note }
+//   · methodMarks: { unverified: true, awarded: 0, lines: [] }  (never a count of what happened to finish)
+//   · checkAnswer / checkWorking: { correct: false, invalid: true, unverified: true }
+// `invalid` is this engine's existing word for "not an attempt": no try is
+// spent and nothing is recorded, so the same entry can simply be sent again.
+// The 750 ms ceiling itself is unchanged.
 export const WORKING_LIMITS = Object.freeze({ lineChars: 200, lines: 100, work: 600000, backstopMs: 750 });
 const UNREAD = {
   long: `Not checked — this line is longer than ${WORKING_LIMITS.lineChars} characters. Write one step per line.`,
   many: 'Not checked — this is more working than can be checked. Keep to the steps of your method.'
 };
+/** What a check the clock stopped says: nothing was marked. */
+export const UNVERIFIED_NOTE = 'This could not be checked this time, so nothing was marked. Send it again.';
+// The clock the backstop reads. A test puts its own here to stop a check at a
+// chosen line; nothing else may (`setBackstopClockForTests`).
+let backstopClock = () => Date.now();
+export function setBackstopClockForTests(clock) {
+  const previous = backstopClock;
+  backstopClock = typeof clock === 'function' ? clock : () => Date.now();
+  return previous;
+}
+// How many times the clock has stopped a line since this module loaded. A
+// public entry compares it before and after: any change means its result is
+// not a result.
+let backstopTrips = 0;
+const unverifiedReport = (workingText, report = null) => ({
+  unverified: true, firstBreak: -1,
+  lines: (report?.lines?.length ? report.lines.map(l => String(l?.text ?? '')) : String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean))
+    .map(text => ({ text, status: 'note', note: UNVERIFIED_NOTE, unread: true }))
+});
+const unverifiedAnswer = () => ({ correct: false, invalid: true, unverified: true, feedback: UNVERIFIED_NOTE });
+const unverifiedMethod = report => ({ unverified: true, okLines: 0, progressLines: 0, restatedLines: 0, awarded: 0, note: UNVERIFIED_NOTE, lines: [], report });
+/** Run a check; if the clock stopped any line of it, return `whenStopped()` instead of what it produced. */
+function unlessStopped(check, whenStopped) {
+  const before = backstopTrips;
+  const out = check();
+  return backstopTrips === before ? out : whenStopped(out);
+}
 
 /** For each line of working, null when it is to be read, or the note saying why it is not. */
 function unreadLines(rawLines) {
   let spent = 0, closed = false;
-  const started = Date.now();
+  const started = backstopClock();
   return rawLines.map((line, index) => {
     if (line.length > WORKING_LIMITS.lineChars) return UNREAD.long;
     spent += line.length * line.length;
     if (closed || index >= WORKING_LIMITS.lines || spent > WORKING_LIMITS.work) { closed = true; return UNREAD.many; }
-    return () => (Date.now() - started > WORKING_LIMITS.backstopMs ? UNREAD.many : null);
+    return () => {
+      if (!(backstopClock() - started > WORKING_LIMITS.backstopMs)) return null;
+      backstopTrips += 1;
+      return UNREAD.many;
+    };
   });
 }
 const unreadNote = entry => (typeof entry === 'function' ? entry() : entry);
@@ -981,7 +1028,8 @@ function stepCheckPlan(meta, workingText) {
  * equations the question gives; without it, such a line is a note.
  */
 export function stepCheck(meta, workingText, options = null) {
-  return withEvaluationBudget(EVALUATION_BUDGET, () => stepCheckWithinBudget(meta, workingText, options));
+  return unlessStopped(() => withEvaluationBudget(EVALUATION_BUDGET, () => stepCheckWithinBudget(meta, workingText, options)),
+    report => unverifiedReport(workingText, report));
 }
 function stepCheckWithinBudget(meta, workingText, options = null) {
   if (meta?.kind === 'plan') return stepCheckPlan(meta, workingText);
@@ -2011,7 +2059,10 @@ const letterFree = claim => {
  * { okLines, progressLines, awarded, note, report }.
  */
 export function methodMarks(input = {}) {
-  return withEvaluationBudget(EVALUATION_BUDGET, () => methodMarksWithinBudget(input));
+  // A report the clock stopped is not evidence of anything, whoever made it.
+  if (input?.report?.unverified === true) return unverifiedMethod(input.report);
+  return unlessStopped(() => withEvaluationBudget(EVALUATION_BUDGET, () => methodMarksWithinBudget(input)),
+    () => unverifiedMethod(unverifiedReport(input?.working)));
 }
 function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = null } = {}) {
   if (!meta || working == null || !String(working).trim()) return null;

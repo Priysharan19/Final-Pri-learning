@@ -29,7 +29,7 @@ import { loadAllBanks, generateQuestion } from '../../client/src/engine/generato
 import { stepMetaFor, marksPossibleFor } from './markerOps.js';
 import {
   markerPool, markerCooldownUntil, recordMarkerKills, sendMarkerCooldown, sendMarkerBusy,
-  MARKING_TOO_COMPLEX, MARKING_BUSY, TOO_COMPLEX_MESSAGE, WORKING_NOT_READ_NOTE
+  MARKING_TOO_COMPLEX, MARKING_BUSY, TOO_COMPLEX_MESSAGE
 } from './markerPool.js';
 import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../../client/src/engine/answer-forms.js';
 import { transcribeHandwriting, validateImage, HandwritingProviderError } from './handwritingProvider.js';
@@ -762,45 +762,44 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       }, { key: accountId });
       // Refused before it ran: nothing marked, nothing spent, same key retries.
       if (!marked.ok && marked.code === MARKING_BUSY) return sendMarkerBusy(res);
-      let result, evidence, workingNotRead = false;
-      if (marked.ok) ({ result, evidence } = marked.value);
-      else {
-        // MARKING_TOO_COMPLEX: the worker was stopped at its deadline (or
-        // died). What it had finished before that is a complete result of the
-        // same deterministic code; what it had not finished is unknown, and
-        // unknown is never turned into a verdict.
+      // ── Two outcomes only ───────────────────────────────────────────────
+      // VERIFIED GRADE: the marker finished everything this reply needs — the
+      // answer, and the working when the reply reports on it. Its marks are a
+      // function of what was written and nothing else.
+      // UNABLE TO VERIFY: a controlled limit stopped the check — the worker
+      // was stopped at its deadline (or died), or the engine's own clock
+      // stopped a line of the working (markerOps.js UNVERIFIED). How long
+      // marking takes depends on what else this machine is doing, so a check
+      // that was stopped says nothing about the entry. The WHOLE submission is
+      // then not an attempt: 200, invalid, no try spent, no marks, no step
+      // report, nothing about the key — and nothing is written, not even a
+      // receipt, so the same submission key simply marks it again. (The reply
+      // has the shape of every grade reply, `attemptId` included, because the
+      // shipped client refuses a reply without one; as for any unreadable
+      // entry, that id names no recorded attempt.)
+      //
+      // There is deliberately no third outcome. An answer marked in time
+      // whose working was not used to stand with "working not read, no method
+      // marks", and was committed: the same page of working earned its method
+      // marks on an idle machine and none on a busy one. A stopped check is
+      // never turned into a lower mark — and it is not turned into a higher
+      // one either: a right answer whose working could not be read is also
+      // sent back, so what this reply says never depends on whether the
+      // answer was right, and a slow page of working cannot be used to test
+      // answers without spending tries.
+      const stopped = !marked.ok || marked.value?.unverified === true;
+      if (stopped) {
+        // Counted towards the cooldown either way: each costs marker time
+        // that no try pays for.
         await recordMarkerKills(db, accountId);
-        const answered = marked.partials.find(part => part?.result)?.result;
-        // RULE (answer not marked in time) — the entry is UNREADABLE. Exactly
-        // like an entry the marker cannot parse: 200, invalid, no try spent,
-        // no marks, no step report, nothing about the key — and nothing is
-        // written, not even a receipt, so it is no attempt of any kind. (The
-        // reply has the shape of every grade reply, `attemptId` included,
-        // because the shipped client refuses a reply without one; as for any
-        // unreadable entry, that id names no recorded attempt.)
-        // RULE (blank answer, working not read in time) — the working WAS the
-        // whole entry, so there is no verdict to stand on: unreadable too. It
-        // is never recorded as a working-only attempt that earned nothing.
-        if (!answered || (answered.invalid === true && body.answer.trim() === '')) {
-          return res.status(200).json({ authoritative: true, questionId: qid, submissionId, attemptId: randomUUID(),
-            correct: false, invalid: true, resolved: false, tooComplex: true, code: MARKING_TOO_COMPLEX,
-            marksEarned: 0, marksPossible: marksPossibleFor(forecast.q),
-            triesLeft: 1, feedback: TOO_COMPLEX_MESSAGE, trapWhy: null,
-            contentId: opaqueContentId(forecast.q.contentId), serverAcknowledgedAt: now,
-            stepReport: null, partial: null });
-        }
-        // RULE (answer marked in time, working not) — the answer's verdict
-        // stands; the working is reported as NOT READ and earns nothing. A
-        // right answer has its full marks whatever the working says, so it
-        // loses nothing; a wrong answer gets no method marks from lines nobody
-        // read. This mirrors what the engine itself does with a line too long
-        // to check, and it cannot be used to test an answer for free: the
-        // reply depends on the working's cost, never on whether the answer is
-        // right, and the try is spent exactly as it would have been.
-        result = answered;
-        evidence = { stepReport: result.stepReport || null, partial: null };
-        workingNotRead = true;
+        return res.status(200).json({ authoritative: true, questionId: qid, submissionId, attemptId: randomUUID(),
+          correct: false, invalid: true, resolved: false, tooComplex: true, code: MARKING_TOO_COMPLEX,
+          marksEarned: 0, marksPossible: marksPossibleFor(forecast.q),
+          triesLeft: 1, feedback: TOO_COMPLEX_MESSAGE, trapWhy: null,
+          contentId: opaqueContentId(forecast.q.contentId), serverAcknowledgedAt: now,
+          stepReport: null, partial: null });
       }
+      const { result, evidence } = marked.value;
 
       // ── 3. Commit ────────────────────────────────────────────────────────
       const outcome = await db.transaction(async () => {
@@ -840,7 +839,6 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // is retried — never guessed, and never skipped.
       if (resolved && !evidence) return { again: true, needEvidence: true };
       const { stepReport, partial } = resolved ? evidence : { stepReport: null, partial: null };
-      const notRead = resolved && workingNotRead && working.trim() !== '';
       // A question answered BY its working (the answer is the lines) has a
       // marker's verdict that is itself a verdict on the lines.
       const answeredByWorking = q.answerType === 'working' || Boolean(result.stepReport);
@@ -883,8 +881,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         correct: result.correct === true, invalid, resolved,
         marksEarned, marksPossible,
         triesLeft: resolved ? 0 : 1,
-        feedback: said + (notRead ? (said ? ' ' : '') + WORKING_NOT_READ_NOTE : ''), trapWhy,
-        ...(notRead ? { workingNotRead: true } : {}),
+        feedback: said, trapWhy,
         ...(resolved && deferredTrap ? { firstTryTrapWhy: deferredTrap } : {}),
         contentId: opaqueContentId(q.contentId), serverAcknowledgedAt: now,
         ...(q._repeat === true ? { repeat: true } : {}),
