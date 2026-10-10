@@ -39,7 +39,7 @@ import { pathToFileURL } from 'node:url';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { handwrite } from './fakeServerReader.js';
+import { handwrite, pressRead } from './fakeServerReader.js';
 
 const SERVER_ORIGIN_SEEN = 'http://localhost:5173';
 const SURELY_WRONG = '-987654';
@@ -424,6 +424,15 @@ export const writeFlow = {
         /^\d{6}$/.test(sent?.code || ''), JSON.stringify(sent && { purpose: sent.purpose }));
       await check('a new number is asked for the account\'s name on the card, pre-filled from this profile',
         sent.nameOffered === 'Write Journey', JSON.stringify(sent.nameOffered));
+      // Read on request (owner decision): signing in makes a read possible; it
+      // does not send one. The sign-in notice goes and "Read my answer" is
+      // offered for the kept ink.
+      await page.locator('[data-ink-read]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+      await page.waitForTimeout(2000);
+      await check('signing in sends no read by itself: no provider request, no transcript, and "Read my answer" is offered beside the kept ink',
+        reader.requests.length === 0 && await page.locator('.ink-line').count() === 0 && await page.locator('[data-ink-read="first"]').isVisible(),
+        `${reader.requests.length} provider request(s)`);
+      await pressRead(page);
       await page.waitForSelector('.ink-line', { timeout: 30000 }).catch(() => {});
       const account = h.db.prepare("SELECT a.id FROM account_phones p JOIN accounts a ON a.id=p.account_id WHERE p.phone_e164=?").get(E164);
       await check('the account was created and verified on the real server',
@@ -444,8 +453,8 @@ export const writeFlow = {
 
       // ── 3 · the reader's transcript, corrected, then server-marked ─────────
       const lines = await page.locator('.ink-line').evaluateAll(nodes => nodes.map(n => ({ text: n.getAttribute('data-text'), low: n.classList.contains('ink-line-low') })));
-      await check(`the kept ink is read by itself after sign-in and the transcript is shown [${EVIDENCE}]`,
-        lines.length === 1 && lines[0].text === '7', JSON.stringify(lines));
+      await check(`one press of Read my answer after sign-in reads the kept ink — one provider request — and the transcript is shown [${EVIDENCE}]`,
+        lines.length === 1 && lines[0].text === '7' && reader.requests.length === 1, `${JSON.stringify(lines)}; ${reader.requests.length} provider request(s)`);
       await check('the reader was sent the picture and nothing about the question (answer-blind)',
         reader.requests.length >= 1 && reader.requests.every(r => {
           const parts = (r.input || []).flatMap(m => m.content || []);
@@ -514,7 +523,9 @@ export const writeFlow = {
       reader.confidence = 0.97;
       const box2 = await page.locator('.ink-canvas-live').boundingBox();
       await handwrite(page, box2, '7');
+      await pressRead(page);
       await page.waitForSelector('.ink-line .ink-correct-btn', { timeout: 20000 }).catch(() => {});
+      await page.waitForFunction(() => document.querySelector('.ws-actions .status-line')?.getAttribute('data-work-state') !== 'saving', null, { timeout: 10000 }).catch(() => {});   // the transcript is being kept with the ink
       const sure = await page.locator('.ink-line').first().evaluate(n => ({ low: n.classList.contains('ink-line-low'), edit: n.querySelector('.ink-correct-btn')?.innerText.trim() || null })).catch(() => null);
       const second = transcribes().at(-1);
       const samePicture = earlier.some(c => c.body?.image === second?.body?.image);
@@ -967,13 +978,22 @@ export const photoFlow = {
         await panel.locator('[data-check-code-sign-in]').count() === 1);
     const account = await online.signInHere(panel, { name: 'Photo Journey' });
     const transcript = page.locator('[data-photo-correct-transcript]');
+    // Signing in does not read the photo. "Read my photo" is offered; one
+    // press sends the one read.
+    const readPhoto = page.locator('[data-photo-read]');
+    await readPhoto.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(1500);
+    await check('signing in sends no read of the photo by itself: "Read my photo" is offered, no provider request yet',
+      await readPhoto.isVisible() && (await readPhoto.innerText()).trim() === 'Read my photo' && reader.requests.length === readsBefore && await transcript.count() === 0,
+      `${reader.requests.length - readsBefore} provider request(s)`);
+    await readPhoto.click();
     await transcript.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     await check('signed in without leaving: same page, same question, the SAME photo still attached',
       new URL(page.url()).pathname === '/practice' && await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' &&
         await shownId(page) === qid && await mathText('.q-prompt') === prompt &&
         await page.locator('.photo-thumb img').getAttribute('src').catch(() => null) === thumb, page.url());
     const sent = reader.requests.slice(readsBefore);
-    await check(`the photo is then read by itself, answer-blind, and the transcript is shown in an editable box [${EVIDENCE}]`,
+    await check(`the photo is then read once because the student asked, answer-blind, and the transcript is shown in an editable box [${EVIDENCE}]`,
       await transcript.inputValue().catch(() => null) === '12' && await transcript.isEditable() && sent.length >= 1 &&
         sent.every(r => {
           const parts = (r.input || []).flatMap(m => m.content || []);
@@ -1050,6 +1070,7 @@ export const sessionEndedWriteFlow = {
     // ── a REAL reader outage, signed in ──────────────────────────────────────
     reader.down = true;
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '5');
+    await pressRead(page);
     const retry = page.locator('[data-ink-retry-reading]');
     await retry.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     const outage = await cardText(page);
@@ -1068,6 +1089,7 @@ export const sessionEndedWriteFlow = {
     const ended = endServerSession(online);
     const readsBefore = reader.requests.length;
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '2', { x: 140 });
+    await pressRead(page);     // "Read again": the ink changed, and the read is the student's own press
     const recovery = page.locator('[data-ink-account-recovery]');
     const signIn = recovery.locator('[data-ink-sign-in]');
     await signIn.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
@@ -1093,13 +1115,18 @@ export const sessionEndedWriteFlow = {
     // ── sign in again, on the card ───────────────────────────────────────────
     await signIn.click();
     await online.signInHere(recovery, { account });
-    await page.waitForSelector('.ink-line', { timeout: 30000 }).catch(() => {});
+    await page.locator('[data-ink-read]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(1500);
+    await check('signing in again sends no read by itself; "Read again" is offered for the changed page', reader.requests.length === readsBefore && await page.locator('[data-ink-read]').isVisible(),
+      `${reader.requests.length - readsBefore} provider request(s)`);
     await check('signed in again without leaving: same page, same question, same strokes, and the sign-in notice is gone',
       await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' && new URL(page.url()).pathname === '/practice' &&
         await shownId(page) === qid && await mathText('.q-prompt') === prompt && await inkOnCanvas(page) === inkBefore &&
         await page.locator('[data-ink-account-recovery]').count() === 0, page.url());
-    await check(`the kept page is then read by itself and the transcript is shown, editable [${EVIDENCE}]`,
-      await page.locator('.ink-line').count() >= 1 && await page.locator('.ink-line .ink-correct-btn').count() >= 1 && reader.requests.length > readsBefore,
+    await pressRead(page);
+    await page.waitForFunction(() => !document.querySelector('[data-ink-stale]') && document.querySelectorAll('.ink-line .ink-correct-btn').length >= 1, null, { timeout: 30000 }).catch(() => {});
+    await check(`the kept page is then read once, because the student asked, and the transcript is shown, editable [${EVIDENCE}]`,
+      await page.locator('.ink-line').count() >= 1 && await page.locator('.ink-line .ink-correct-btn').count() >= 1 && reader.requests.length === readsBefore + 1,
       `${await page.locator('.ink-line').count()} lines; ${reader.requests.length - readsBefore} provider requests`);
     const right = await online.answerOf();
     if (!await check('the right answer is known only from the server\'s sealed copy', typeof right.text === 'string' && right.text.length > 0, JSON.stringify({ kind: right.kind }))) return;
@@ -1158,8 +1185,13 @@ export const sessionEndedPhotoFlow = {
     await signIn.click();
     await online.signInHere(page.locator('[data-photo-account-recovery]'), { account });
     const transcript = page.locator('[data-photo-correct-transcript]');
+    await page.locator('[data-photo-read]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(1500);
+    await check('signing in again does not read the photo by itself: "Read my photo" is offered and no provider request was made',
+      await page.locator('[data-photo-read]').isVisible() && reader.requests.length === readsBefore && await transcript.count() === 0, `${reader.requests.length - readsBefore} provider request(s)`);
+    await page.locator('[data-photo-read]').click();
     await transcript.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
-    await check(`signed in again in place: same question, the SAME photo, now read by itself with an editable transcript [${EVIDENCE}]`,
+    await check(`signed in again in place: same question, the SAME photo, read once when asked, with an editable transcript [${EVIDENCE}]`,
       await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' && await shownId(page) === qid && await mathText('.q-prompt') === prompt &&
         await page.locator('.photo-thumb img').getAttribute('src').catch(() => null) === thumb &&
         await transcript.inputValue().catch(() => null) === '12' && await transcript.isEditable() && reader.requests.length > readsBefore,
@@ -1197,6 +1229,7 @@ export const sessionEndedSubmitFlow = {
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
     await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '5');
+    await pressRead(page);
     await page.waitForSelector('.ink-line .ink-correct-btn', { timeout: 30000 }).catch(() => {});
     const right = await online.answerOf();
     if (!await check(`signed in, the page is read and the right answer is known only from the server's sealed copy [${EVIDENCE}]`,
@@ -1221,6 +1254,7 @@ export const sessionEndedSubmitFlow = {
         !/not quite|incorrect|not this time/i.test(seen) && !OUTAGE_WORDS.test(seen),
       seen.slice(0, 500));
     const signIn = page.locator('.verdict [data-check-sign-in]');
+    await page.waitForFunction(() => document.querySelector('.ws-actions .status-line')?.getAttribute('data-work-state') !== 'saving', null, { timeout: 10000 }).catch(() => {});   // the transcript is being kept with the ink
     const held = await saveTruth(page, qid);
     await check('the work is held: same question, strokes on the page and in the store, the corrected reading still shown, sign-in button beside it',
       await shownId(page) === qid && await inkOnCanvas(page) === inkBefore && held.kept &&
