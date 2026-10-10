@@ -30,11 +30,13 @@ const SHA = /^[0-9a-f]{40}$/;
 const REQUEST_TIMEOUT_MS = 15_000;
 
 export function parseArgs(argv) {
-  const args = { origin: null, sha: null, engine: null, allowHttp: false, persistentStorageProven: false };
+  const args = { origin: null, sha: null, engine: null, allowHttp: false, persistentStorageProven: false, authEmailProven: false };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     if (flag === '--allow-http') { args.allowHttp = true; continue; }
     if (flag === '--persistent-storage-proven') { args.persistentStorageProven = true; continue; }
+    // A real deployment (staging, production): email must be proven, not merely configured.
+    if (flag === '--auth-email-proven') { args.authEmailProven = true; continue; }
     if (!['--origin', '--sha', '--engine'].includes(flag)) throw new Error(`Unknown argument: ${flag}`);
     const value = argv[i + 1];
     if (value === undefined || value.startsWith('--')) throw new Error(`${flag} needs a value`);
@@ -68,7 +70,7 @@ async function getJson(fetchImpl, url) {
  * Returns { ok, results: [{ ok, label, detail? }] }. Never throws for a failed
  * check; a network error becomes a failed check with its message.
  */
-export async function verifyDeployment({ origin, sha, engine = null, allowHttp = false, persistentStorageProven = false, fetchImpl = globalThis.fetch }) {
+export async function verifyDeployment({ origin, sha, engine = null, allowHttp = false, persistentStorageProven = false, authEmailProven = false, fetchImpl = globalThis.fetch }) {
   const results = [];
   const check = (ok, label, detail) => { results.push({ ok: !!ok, label, ...(detail ? { detail } : {}) }); return !!ok; };
 
@@ -119,6 +121,11 @@ export async function verifyDeployment({ origin, sha, engine = null, allowHttp =
   check(String(schemaVersion) === String(SCHEMA_VERSION), `schema_version is ${SCHEMA_VERSION}`, `running ${schemaVersion}`);
   check(String(billingSchemaVersion) === String(BILLING_SCHEMA_VERSION), `billing_schema_version is ${BILLING_SCHEMA_VERSION}`, `running ${billingSchemaVersion}`);
   check(authEmailConfigured, 'verification email provider configured');
+  if (authEmailProven) {
+    check(readyAuth.state === 'ok' && readyAuth.credential === 'valid' && readyAuth.sender !== 'unverified' && readyAuth.sender !== 'invalid',
+      'verification email proven: the provider accepts the key and does not report the sender unverified',
+      `state ${readyAuth.state}, code ${readyAuth.code ?? 'none'}, credential ${readyAuth.credential ?? 'unknown'}, sender ${readyAuth.sender ?? 'unknown'}`);
+  }
 
   check(web.status === 200 && isDeepStrictEqual(web.body, h.releaseIdentity), 'web client release.json equals server release identity',
     web.status === 200 ? `web ${web.body?.releaseSha || 'unknown'}` : `status ${web.status}`);
@@ -132,7 +139,7 @@ export async function verifyDeployment({ origin, sha, engine = null, allowHttp =
 
 async function main() {
   let args;
-  const usage = 'Usage: node tools/verify-deployment.mjs --origin https://… --sha <40-hex> [--engine postgres|sqlite] [--persistent-storage-proven]';
+  const usage = 'Usage: node tools/verify-deployment.mjs --origin https://… --sha <40-hex> [--engine postgres|sqlite] [--persistent-storage-proven] [--auth-email-proven]';
   let report;
   try {
     args = parseArgs(process.argv.slice(2));
