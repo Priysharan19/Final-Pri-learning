@@ -94,7 +94,8 @@ export function makeInvestigation(kind,p) {
    {labels:'A→C→D→E',sum:ac+cd+de},
    {labels:'A→B→C→E',sum:ab+bc+ce},
    {labels:'A→B→C→D→E',sum:ab+bc+cd+de},
-   {labels:'A→C→B→D→E',sum:ac+bc+bd+de}
+   {labels:'A→C→B→D→E',sum:ac+bc+bd+de},
+   {labels:'A→B→D→C→E',sum:ab+bd+cd+ce}
   ];
   const best=Math.min(...paths.map(p=>p.sum)),winners=paths.filter(p=>p.sum===best);
   if(winners.length!==1)throw Error('nonunique shortest route; regenerate case');
