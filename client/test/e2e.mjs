@@ -38,6 +38,7 @@ import { tmpdir } from 'node:os';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { chromium, webkit } from '@playwright/test';
 import { onlinePlatform, closeOnlinePlatform } from './support/online-session.mjs';
+import { watchBoot, bootFailure, bootRecovery } from './support/boot-diagnostics.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DIST = join(ROOT, 'client', 'dist');
@@ -227,8 +228,21 @@ function helpers(page, base, flowId) {
 
   /** Load a route and wait for the app to have decided who is signed in. */
   const goto = async (path = '/') => {
-    await page.goto(base + path, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.auth-wrap .hero-title, .auth-card, .signup-flow, .shell', { timeout: 30000 });
+    // A load that never shows the app must say why (support/boot-diagnostics):
+    // whether the bundle ran, which files failed or came back as the wrong
+    // kind, what the service worker was doing, what the console said. It is
+    // reported in the failure and never retried — a second load would hide it.
+    const watch = watchBoot(page);
+    try {
+      await page.goto(base + path, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.auth-wrap .hero-title, .auth-card, .signup-flow, .shell', { timeout: 30000 });
+    } catch (err) {
+      throw await bootFailure(err, watch, `${path} never showed the app`);
+    }
+    // A load that needed the page's one automatic reload passed, and says so.
+    const recovered = await bootRecovery(watch, page, `${flowId} ${path}`);
+    if (recovered) note(recovered);
+    watch.stop();
     // Routes are lazily loaded now, so the shell paints before the page inside
     // it does and Suspense shows "Loading…" in between. Without this wait the
     // next assertion races the chunk over the network and fails on a slow CI
