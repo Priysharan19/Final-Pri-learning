@@ -562,7 +562,33 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
     // them does not make them less of one.
     const lin = marker({ kind: 'equation', variable: 't', solutions: [3], source: '5t - 4=2t + 5' }, '$5t - 4=2t + 5$');
     ok(lin('t+1=4\nt+2=5\nt+3=6') === 0 && lin('t+1=4\nt+2=5\nt+3=6\nt+4=9') === 0, 'three true lines of one shape stay a sweep, and a slip under them rescues nothing');
-    ok(lin('t+1=4\nt+2=5\nt+3=7') === lin('t+1=4\nt+2=5') && lin('t+1=4\nt+2=5\nt+3=7') === 1, 'two true lines and one slip earn what the two true lines earn: one step, said twice');
+    // The slip is not set aside on a linear equation. A line that pins the
+    // unknown (`x + 1 = 6`) stands as far on as the answer, so two of them left
+    // standing beside a slip made every genuine step written after them a
+    // `repeat`: `x+1=6`, `x+2=7`, `6x-2x=28-8`, `4x+8=28`, `4x=20`, then a slip
+    // `x+9=16`, fell from two marks to one. The three lines of one shape are
+    // candidates, as they were, and the steps keep their marks.
+    {
+      const L = [{ kind: 'equation', variable: 'x', solutions: [5], source: '6x + 8 = 2x + 28' }, 'Solve $6x + 8 = 2x + 28$'];
+      const q = marker(...L);
+      ok(q('x+1=6\nx+2=7\n6x-2x=28-8\n4x+8=28\n4x=20\nx+9=16') === 2, 'linear: the root disguised twice, then genuine steps, then a slip in the disguise — the genuine steps keep their two marks');
+      ok(why(...L, 'x+1=6\nx+2=7\n6x-2x=28-8\n4x+8=28\n4x=20\nx+9=16') === 'contradicted,contradicted,progress,repeat,progress,break', '…the disguised lines are the candidates, not the steps');
+      ok(q('x+1=6\nx+2=7\n6x-2x=28-8\n4x+8=28\n4x=20\nx=5\nx+9=16') === 3, '…and with the root read off before the slip, three');
+      ok(lin('t+1=4\nt+2=5\n5t-2t=9\n3t=9\nt+3=7') === 2 && why({ kind: 'equation', variable: 't', solutions: [3], source: '5t - 4=2t + 5' }, '$5t - 4=2t + 5$', 't+1=4\nt+2=5\n5t-2t=9\n3t=9\nt+3=7') === 'contradicted,contradicted,progress,progress,break', 'linear: the same on 5t - 4 = 2t + 5 — both genuine steps earn');
+      ok(lin('t+1=4\nt+2=5\nt+3=7') === 0 && q('x+1=6\nx+2=7\nx+9=16') === 0, 'linear: the root disguised twice and a slip, with no step at all, earn nothing');
+      ok(q('6x-2x=28-8\n4x=20\nx+1=6\nx+2=7\nx+9=16') === q('6x-2x=28-8\n4x=20') && q('6x-2x=28-8\n4x=20') === 2, 'linear: genuine steps written first keep their marks under the same three lines');
+    }
+    // On a quadratic a disguised root earns nothing until something is solved,
+    // so it takes nothing from the working written after it, slip or no slip.
+    ok(pos('x+1=4\nx+1=6\n(x-3)(x-5)=0\nx=3\nx=5\nx+1=8') === 3 && pos('x+1=4\nx+1=6\n(x-3)(x-5)=0\nx=3\nx=5') === 3, 'quadratic: roots disguised before the factorisation leave its three marks alone, with or without a slip in the disguise');
+    ok(why(...POS, 'x+1=4\nx+1=6\n(x-3)(x-5)=0\nx=3\nx=5\nx+1=8') === 'final-answer,final-answer,progress,progress,progress,break', '…they are answers stated before any working');
+    ok(pos('(x-3)(x-5)=0\nx+1=4\nx+1=6\nx=3\nx=5\nx+1=8') === 3 && pos('(x-3)(x-5)=0\nx+1=4\nx+1=6\nx=3\nx=5\nx+1=8\nx+1=9') === 1, 'quadratic: each root is read off once however it is spelt, and a second wrong value is still a list of candidates');
+    // A factorisation that shares one root with the question is not refuted by
+    // the line check, but it is not true either: it is not what sets a false
+    // line beside it aside.
+    ok(pos('(x-3)(x-5)=0\n(x-3)(x-4)=0\n(x-1)(x-2)=0\nx=3\nx=5') === 0 && pos('(x-3)(x-5)=0\n(x-3)(x-4)=0\n(x-1)(x-2)=0') === 0, 'three factorisations tried are a sweep even when the second shares a root with the question: none earns, nor the roots after them');
+    ok(why(...POS, '(x-3)(x-5)=0\n(x-3)(x-4)=0\n(x-1)(x-2)=0\nx=3\nx=5') === 'contradicted,contradicted,break,note,note', '…line by line');
+    ok(pos('(x-3)(x-4)=0\n(x-3)(x-5)=0\n(x-1)(x-2)=0') === 0 && pos('(x-3)(x-4)=0\n(x-1)(x-2)=0\n(x-3)(x-5)=0') === 0, '…in any order');
     ok(lin('3t=9\n3t=12\n3t=15') === 0 && lin('5t-2t=5+4\n3t=9\n3t=12\n3t=15') === 1 && lin('t=3\nt=4\nt=5') === 0, 'on a linear equation a true line and two wrong values of its shape are still candidates');
     // The slip is never worth anything: with it, never more than without it.
     for (const [q, clean, slips] of [

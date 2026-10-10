@@ -246,6 +246,31 @@ try {
     c.eq((await resolved('sweep', Array.from({ length: 21 }, (_, k) => `x=${k - 10}`))).marksEarned, 0, `seed ${seed}: twenty-one candidate values earn nothing`);
     c.eq((await resolved('sweep-under-factorisation', [factorised, ...Array.from({ length: 21 }, (_, k) => `x=${k - 10}`)])).marksEarned, 1, `seed ${seed}: and under a factorisation only the factorisation earns`);
   }
+
+  // On a linear equation the same three lines of one shape are still
+  // candidates: the root disguised twice (`m + 1 = -13`, `m + 2 = -12`) and a
+  // slip in the disguise are voided together, so the genuine steps written
+  // between them are paid, exactly as they are with nothing round them.
+  {
+    const sample = { generator: 'c8-linear-equations-both-sides', difficulty: 3, seed: 1, curriculum: 'in' };
+    const resolved = async (label, steps) => {
+      const r = await h.request('/v1/practice/issue', { method: 'POST', jar: a.jar, body: sample });
+      assert.equal(r.status, 201, 'the server issues a linear equation');
+      assert.equal(r.data.question.prompt, '$6m + 15=7m + 29$', 'the issued linear equation is the expected one');
+      const first = await submit(r.data.question.id, `linear-${label}-one`, '999', steps);
+      c.deq([first.status, first.data.correct, first.data.resolved, first.data.marksEarned], [200, false, false, 0], `linear ${label}: a first wrong try leaves the question open`);
+      const second = await submit(r.data.question.id, `linear-${label}-two`, '999', steps);
+      c.deq([second.status, second.data.correct, second.data.resolved, second.data.marksPossible], [200, false, true, 3], `linear ${label}: the second wrong try resolves it out of three marks`);
+      return second.data;
+    };
+    const steps = ['15-29=7m-6m', '-14=7m-6m'];
+    const plain = await resolved('steps', steps);
+    c.eq(plain.marksEarned, 2, 'linear: two genuine steps under a wrong answer earn 2 of 3');
+    const disguised = await resolved('disguised-then-steps-then-slip', ['m+1=-13', 'm+2=-12', ...steps, 'm+3=-5']);
+    c.eq(disguised.marksEarned, 2, 'linear: the root disguised twice before them and a slip after them take nothing from the steps');
+    c.deq(disguised.partial?.lines?.map(line => line.reason), ['contradicted', 'contradicted', 'progress', 'progress', 'break'], 'linear: the disguised lines are the candidates, and the steps are what is paid');
+    c.eq((await resolved('disguised-and-slip', ['m+1=-13', 'm+2=-12', 'm+3=-5'])).marksEarned, 0, 'linear: the disguised root and a slip with no step earn nothing');
+  }
 } finally {
   await h.close();
   rmSync(scratch, { recursive: true, force: true });
