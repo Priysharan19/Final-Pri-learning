@@ -442,13 +442,12 @@ function ChapterNotes({ chapterId }) {
           </Section>
 
           {linkedResources.length > 0 && (
-            <Section id="resources" title="Further study resources">
-              <p className="nt-quiet">These links open independent educational websites. They are references, not Pri Learning-graded questions; access requires an internet connection.</p>
+            <Section id="resources" title={t('nav.more')}>
               <ul className="nt-chapters" data-testid="notes-study-resources">
                 {linkedResources.map(resource => (
                   <li key={resource.id}>
                     <a className="nt-chapter" href={resource.url} target="_blank" rel="noopener noreferrer"
-                      aria-label={`${resource.title} — external link, opens a new tab`}>
+                      aria-label={resource.title}>
                       <span className="nt-chapter-n" aria-hidden="true">↗</span>
                       <span className="nt-chapter-body">
                         <strong className="nt-chapter-name">{resource.title}</strong>
