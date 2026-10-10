@@ -501,11 +501,14 @@ try {
   ok(statusLimited?.body?.error?.code === 'RATE_LIMITED' && statusLimited.i === 120,
     `status refuses past its per-account limit (${statusLimited?.i})`);
 
+  // A different picture each call: the same picture would be read once and
+  // then served from memory (recognitionOps.js), spending nothing further.
+  let budgetPictures = 0;
   const budgetCall = async () => {
     const res = await fetch(`${budgetBase}/handwriting/transcribe`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=raw-acct-budget` },
-      body: JSON.stringify({ image: PNG })
+      body: JSON.stringify({ image: PNG + Buffer.from(`budget-picture-${budgetPictures += 1}`.padEnd(18, '.')).toString('base64') })
     });
     return { status: res.status, json: await res.json().catch(() => null) };
   };

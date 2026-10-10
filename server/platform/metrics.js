@@ -255,6 +255,25 @@ export function recordProviderCall(provider, { ok, code = null, ms = null }) {
   if (Number.isFinite(ms)) metrics.observe('provider_latency_ms', { provider }, ms);
 }
 
+/**
+ * Token counts one provider response reported, as numbers, by the model id the
+ * provider says it ran (a label from a fixed alphabet; anything else is
+ * `other`). Never content, never an id of a person or a request.
+ */
+export function recordProviderUsage(provider, { calls = 0, model = null, inputTokens = null, outputTokens = null, reasoningTokens = null, imageInputTokens = null } = {}) {
+  const who = { provider, model: model || 'unreported' };
+  metrics.inc('provider_http_calls_total', who, calls);
+  if (Number.isFinite(inputTokens)) metrics.inc('provider_tokens_total', { ...who, kind: 'input' }, inputTokens);
+  if (Number.isFinite(imageInputTokens)) metrics.inc('provider_tokens_total', { ...who, kind: 'input_image' }, imageInputTokens);
+  if (Number.isFinite(outputTokens)) metrics.inc('provider_tokens_total', { ...who, kind: 'output' }, outputTokens);
+  if (Number.isFinite(reasoningTokens)) metrics.inc('provider_tokens_total', { ...who, kind: 'reasoning' }, reasoningTokens);
+}
+
+/** How a picture was read: by the provider (paid), from memory, or by joining a read in flight. */
+export function recordRecognitionRead(source) {
+  metrics.inc('recognition_reads_total', { source: ['provider', 'cache', 'inflight'].includes(source) ? source : 'other' });
+}
+
 export function recordAuthEmail({ ok, code = null }) {
   metrics.inc('auth_email_total', { outcome: ok ? 'sent' : 'failed' });
   if (!ok) metrics.inc('auth_email_failures_total', { code: safeCode(code, 'DELIVERY_FAILED') });

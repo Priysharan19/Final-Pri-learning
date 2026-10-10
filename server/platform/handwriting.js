@@ -17,8 +17,8 @@
 import { asyncRouter } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { rateLimit, requireSession, requireVerifiedEmail } from './security.js';
-import { consumeAiAllowance, refundAiAllowance, refuseAiAllowance } from './aiAllowance.js';
-import { consumePaidCall, refusePaidCall, spendCeilingMissing } from './spendCeiling.js';
+import { spendCeilingMissing } from './spendCeiling.js';
+import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
 import { cachedServerReleaseIdentity } from './releaseIdentity.js';
 import { recordProviderCall } from './metrics.js';
 import { logEvent } from './observability.js';
@@ -170,28 +170,24 @@ export function createHandwritingRouter(db, {
         return res.status(error.status || 400).json({ error: { code: error.code, message: error.message } });
       }
 
-      // This account's daily allowance, from the SERVER's entitlement record
-      // only (SEC-COMM-01): Premium's additional-ai-usage raises it; nothing
-      // the device claims does.
-      const allowance = await consumeAiAllowance(db, { accountId: req.platformSession.account_id, kind: 'handwriting', env });
-      if (!allowance.allowed) return refuseAiAllowance(res, allowance);
-
-      // Counted here, after the request has been shown to be a real one and
-      // before anything is sent, so a malformed request cannot spend from a
-      // budget shared by every student on this deployment.
-      const overBudget = await consumePaidCall(db, { env });
-      if (overBudget) { await refundAiAllowance(db, allowance); return refusePaidCall(res, overBudget); }
-
+      // One paid read per picture (recognitionOps.js): the account's daily
+      // allowance (from the SERVER's entitlement record only, SEC-COMM-01) and
+      // the deployment ceiling are counted there, after the request has been
+      // shown to be a real one and before anything is sent — and not at all
+      // when this account's same picture has just been read or is being read.
       const started = Date.now();
+      let reused = false;
       try {
-        // The fallback model is a second paid call and is counted as one, before
-        // it is sent, so a request can never spend past the ceiling.
-        const result = await transcribe(req.body.image, {
-          env,
-          authorizeFallback: () => consumePaidCall(db, { env })
+        const read = await recognitionOpsFor(db).read({
+          db, accountId: req.platformSession.account_id, image: req.body.image, env, transcribe, requestId: req.requestId
         });
-        recordProviderCall('handwriting', { ok: true, ms: Date.now() - started });
+        if (read.refusal) return sendRecognitionRefusal(res, read.refusal);
+        const result = read.result;
+        reused = read.reused;
+        if (!reused) recordProviderCall('handwriting', { ok: true, ms: Date.now() - started });
         res.json({
+          // true: served from a read this account already paid for; no provider call.
+          reused,
           transcription: {
             engine: result.engine,
             lines: result.lines,
@@ -217,8 +213,6 @@ export function createHandwritingRouter(db, {
           }
         });
       } catch (error) {
-        if (error?.paidCallVerdict) return refusePaidCall(res, error.paidCallVerdict);
-        if (/NOT_CONFIGURED|CONFIG_INVALID/.test(String(error?.code || ''))) await refundAiAllowance(db, allowance);
         const code = error instanceof HandwritingProviderError ? error.code : 'HANDWRITING_FAILED';
         // A cancelled request is the student's choice, not a provider failure.
         if (code !== 'HANDWRITING_CANCELLED') {
