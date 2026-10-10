@@ -801,7 +801,11 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   const shapes = [(a, b) => `ncr(${a},${b})`, (a, b) => `npr(${a},${b})`, (a, b) => `${a}C${b}`, (a, b) => `${a}P${b}`, a => `${a}!`, a => `sum(k;k;1;${a})`, (a, b) => `sum(sum(k;k;1;${b});j;1;${a})`,
     () => 'sum(sum(sum(k;k;1;300);j;1;300);i;1;300)', (a, b) => `sum(ncr(${a},k);k;0;${b})`, (a, b) => `${a}^${b}`, a => `${a}^${a}^${a}`, (a, b) => `ncr(ncr(${a},2),${b})`, a => `sum(k!;k;1;${a})`, (a, b) => `\\binom{${a}}{${b}}`];
   let worst = 0, worstText = '', inputs = 0;
-  const time = (label, run) => { const at = process.hrtime.bigint(); try { run(); } catch { failures.push(`${label} threw`); } const ms = Number(process.hrtime.bigint() - at) / 1e6; inputs++; if (ms > worst) { worst = ms; worstText = label; } };
+  // What is bounded is the work the marker does, so it is the processor time
+  // this process spent that is measured, not the time on the wall: on a runner
+  // busy with other jobs the same 20 ms of work has been seen to take 1.4 s to
+  // come back, which says nothing about the marker.
+  const time = (label, run) => { const at = process.cpuUsage(); try { run(); } catch { failures.push(`${label} threw`); } const spent = process.cpuUsage(at); const ms = (spent.user + spent.system) / 1000; inputs++; if (ms > worst) { worst = ms; worstText = label; } };
   for (const shape of shapes) for (const a of big) for (const b of big) {
     const text = shape(a, b);
     if (text.length > 40) continue;
