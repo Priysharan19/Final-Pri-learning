@@ -311,7 +311,7 @@ const specs=[
     "ab": 3,
     "out": 2,
     "mode": "union",
-    "context": "union"
+    "context": "Mean-data overlapping classes"
   },
   {
     "chapterId": "c10-statistics",
@@ -321,7 +321,7 @@ const specs=[
     "ab": 4,
     "out": 1,
     "mode": "overlap",
-    "context": "overlap"
+    "context": "Two statistical categories"
   },
   {
     "chapterId": "c10-statistics",
@@ -331,7 +331,7 @@ const specs=[
     "ab": 5,
     "out": 4,
     "mode": "aTotal",
-    "context": "aTotal"
+    "context": "Class attendance"
   },
   {
     "chapterId": "c10-statistics",
@@ -341,7 +341,7 @@ const specs=[
     "ab": 2,
     "out": 3,
     "mode": "neither",
-    "context": "neither"
+    "context": "Dual-score classification"
   },
   {
     "chapterId": "c10-statistics",
@@ -351,7 +351,7 @@ const specs=[
     "ab": 7,
     "out": 6,
     "mode": "union",
-    "context": "union"
+    "context": "Survey datasets"
   },
   {
     "chapterId": "c10-probability",
