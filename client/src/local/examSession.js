@@ -203,7 +203,11 @@ function cleanInk(value) {
     strokes,
     lines,
     answerLine: sanitizeText(value.answerLine, 400),
-    engine: sanitizeText(value.engine, 60) || null
+    engine: sanitizeText(value.engine, 60) || null,
+    // Which strokes the saved lines were read from (a content signature, no
+    // content): lets a reload show the transcript without reading again, and
+    // tells a transcript of earlier writing from a current one.
+    readSig: /^[0-9a-z:]{3,48}$/.test(String(value.readSig || '')) ? String(value.readSig) : null
   };
 }
 
