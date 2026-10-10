@@ -136,7 +136,7 @@ function buildApp() {
     // signs up a Teacher and audits /teach; the Teacher role is offered to a
     // new profile only under EXTENDED_TRACKS, so without it here the suite
     // only passes where the CI job happens to export the variable.
-    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1' } });
+    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' } });
   if (r.status !== 0) throw new Error(`the build failed:\n${r.stdout || ''}${r.stderr || ''}`);
   if (!existsSync(join(out, 'index.html'))) throw new Error('the build emitted no index.html');
   return out;

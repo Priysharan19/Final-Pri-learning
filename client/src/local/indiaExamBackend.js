@@ -369,6 +369,7 @@ async function listExams(profile) {
       marked_by: markedByOf(e), pending: !!e.pendingFinish,
       // Marks not yet decided: handwriting saved at the close and not read.
       pending_marks: e.finishedAt ? pendingSummary(e.detail).marks : 0,
+      provisional: !!e.finishedAt && (e.provisional === true || pendingSummary(e.detail).any),
       indiaExam: e.indiaExam
     }))
   };

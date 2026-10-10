@@ -36,6 +36,7 @@ import { clearDraft, queueDraft, readDraft } from '../components/drafts.js';
 import ExamAnalysis from '../components/ExamAnalysis.jsx';
 import { compactStrokes, expandStrokes } from '../local/examSession.js';
 import { freezePage, pendingSummary, unreadInkKeys } from '../local/examPages.js';
+import { featureEnabled } from '../platform/features.js';
 import { tLater, useT, useTx } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
 import { CheckSignIn } from '../components/CheckRefusal.jsx';
@@ -582,8 +583,13 @@ export default function ExamRoom() {
     return key.endsWith('::or') ? q.choice : q;
   }
 
+  // Handwriting in a timed exam is behind PRI_FEATURE_EXAM_HANDWRITING (off by
+  // default). With it off every written answer is typed: there is no writing
+  // surface on a paper, so no handwriting can be left unread on one.
+  const inkAllowed = featureEnabled('examHandwriting');
   function modeFor(key, item) {
     if (!writtenItem(item)) return 'native';
+    if (!inkAllowed) return 'type';
     if (modes[key]) return modes[key];
     // Written answers on a board paper, and full-working answers anywhere, are
     // handwritten by default; numerical entry keeps its keyboard by default.
@@ -593,6 +599,7 @@ export default function ExamRoom() {
 
   function setMode(key, mode) {
     setModes(m => ({ ...m, [key]: mode }));
+    if (mode === 'ink' && !inkAllowed) return;
     if (mode === 'ink') setInkOpenKey(key);
     else if (inkOpenKey === key) setInkOpenKey(null);
   }
@@ -931,12 +938,14 @@ export default function ExamRoom() {
     return (
       <div className="exam-answer" data-answer-key={key}>
         {matchList}
+        {inkAllowed && (
         <div className="row" role="group" aria-label={t('examRoom.modeGroup', { label })} style={{ gap: 6, marginBottom: 8 }}>
           <button type="button" className={`btn btn-sm ${mode === 'ink' ? 'btn-primary' : 'btn-ghost'}`} aria-pressed={mode === 'ink'} disabled={locked}
             onClick={() => setMode(key, 'ink')}>{t('examRoom.writeByHand')}</button>
           <button type="button" className={`btn btn-sm ${mode === 'type' ? 'btn-primary' : 'btn-ghost'}`} aria-pressed={mode === 'type'} disabled={locked}
             onClick={() => setMode(key, 'type')}>{t('examRoom.typeMode')}</button>
         </div>
+        )}
         {mode === 'ink' ? (
           <>
             {inkOpenKey === key ? (

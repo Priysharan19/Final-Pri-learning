@@ -150,8 +150,19 @@ const pages = states => ({ handwriting: { pages: Object.fromEntries(Object.entri
   ok(tries <= 2 && offline === many, 'with no connection nothing is settled and nothing loops: the pages stay frozen and pending');
   const refusedImages = { k0: png('not the frozen page'), k1: png('k1') };
   let presented = 0;
-  await resolveFrozenHandwriting('exam-1', many, refusedImages, { now: 1_000, transport: { resolveExamHandwriting: async (id, body) => { presented++; if (body.key === 'k0') throw Object.assign(new Error('changed'), { status: 409, code: 'EXAM_HANDWRITING_CHANGED' }); return { result: many }; } } });
-  eq([presented, Object.keys(refusedImages)], [2, ['k1']], 'a picture the server says is not the frozen page is dropped, so it is never sent again; the other pages are still presented');
+  const refusedNow = new Set();
+  const refusing = { resolveExamHandwriting: async (id, body) => { presented++; if (body.key === 'k0') throw Object.assign(new Error('changed'), { status: 409, code: 'EXAM_HANDWRITING_CHANGED' }); return { result: many }; } };
+  await resolveFrozenHandwriting('exam-1', many, refusedImages, { now: 1_000, transport: refusing, refusedNow });
+  eq([presented, Object.keys(refusedImages), [...refusedNow]], [2, ['k0', 'k1'], ['k0']], 'a picture the server says is not the frozen page is KEPT (it is saved work) and noted as refused; the other pages are still presented');
+  presented = 0;
+  await resolveFrozenHandwriting('exam-1', many, refusedImages, { now: 1_000, transport: refusing, refused: { k0: true } });
+  eq(presented, 1, 'and a refused picture is never sent again');
+  // The recovery window closing, or the tries running out, never erases the saved page.
+  const closedExam = { id: 'e-closed', server: { examId: 'x' } };
+  const closed = pages({ w: ['needs-review', 'window-closed', 0], x: ['needs-review', 'retries-exhausted', 3], y: ['resolved', null, 1] });
+  closed.handwriting.pages.w.triesLeft = 0;
+  keepFrozenPages(closedExam, closed, { w: png('w'), x: png('x'), y: png('y') });
+  eq(Object.keys(closedExam.server.handwriting.pages), ['w', 'x'], 'after the window closes or the tries are spent the unmarked answer keeps its saved page on the device; only a marked page is forgotten');
 
   // A later visit: the server is asked how each page stands, then the same bounded presentation.
   const exam2 = { id: 'e-late', questionIds: ['a'], server: { examId: 'x', questionIds: ['a'], handwriting: { pages: { a: png('a') } } }, finishedAt: 5, score: 0, total: 2,
@@ -186,15 +197,37 @@ const pages = states => ({ handwriting: { pages: Object.fromEntries(Object.entri
   const tried = await retryHandwriting(exam, 'a', { transport });
   eq([tried.attempted, sent.length, sent[0].retry, sent[0].key, sent[0].image, Object.keys(sent[0]).sort()], [true, 1, true, 'a', png('a'), ['image', 'key', 'retry']],
     'Retry checking sends the frozen picture, the answer key and that it is the student\'s retry — nothing else: no transcript, no answer, no edit');
-  eq([exam.detail[0].pending, exam.detail[0].given, exam.detail[0].correct, exam.score, Object.keys(exam.server.handwriting?.pages || {})], [undefined, '4', true, 2, []],
-    'and the line takes the server\'s mark; pictures of pages with nothing left to ask are forgotten');
+  eq([exam.detail[0].pending, exam.detail[0].given, exam.detail[0].correct, exam.score, Object.keys(exam.server.handwriting?.pages || {})], [undefined, '4', true, 2, ['c']],
+    'and the line takes the server\'s mark; the marked page is forgotten, while the unmarked one with no tries left keeps its saved page');
   // The server refuses a picture that is not the frozen one: it is dropped and the page says it cannot be checked here.
   const exam2 = { id: 'e-changed', questionIds: ['a'], server: { examId: 'x', questionIds: ['a'], handwriting: { pages: { a: png('other') } } }, finishedAt: 5, score: 0, total: 2, detail: [] };
   exam2.detail = markPendingLines({ detail: [pendingLine('a')], ...pages({ a: ['needs-review', 'uncertain', 1] }) }, [pendingLine('a')], exam2);
   let refused = null;
   try { await retryHandwriting(exam2, 'a', { transport: { resolveExamHandwriting: async () => { throw Object.assign(new Error('changed'), { status: 409, code: 'EXAM_HANDWRITING_CHANGED' }); } } }); } catch (error) { refused = error; }
-  eq([refused?.code, exam2.server.handwriting, exam2.detail[0].pictureHere, exam2.detail[0].pendingCanRetry, exam2.detail[0].pending], ['EXAM_HANDWRITING_CHANGED', undefined, false, false, true],
-    'a picture the server refuses as changed is dropped: the answer stays pending and is no longer offered for retry');
+  eq([refused?.code, Object.keys(exam2.server.handwriting.pages), exam2.server.handwriting.refused, exam2.detail[0].pictureHere, exam2.detail[0].pendingCanRetry, exam2.detail[0].pending],
+    ['EXAM_HANDWRITING_CHANGED', ['a'], { a: true }, true, false, true],
+    'a picture the server refuses as changed is kept, the answer stays pending, and it is no longer offered for retry');
+}
+
+// ── The feature gate: handwriting in timed exams is OFF unless a build asks ──
+{
+  const { featureStates, featureDefines, FEATURE_FLAGS, PENDING_FEATURE_FLAGS } = await import('../vite.config.js');
+  eq([featureStates('build', {}).examHandwriting, featureStates('build', { PRI_FEATURE_EXAM_HANDWRITING: '1' }).examHandwriting, featureStates('build', { PRI_FEATURE_EXAM_HANDWRITING: 'true' }).examHandwriting],
+    [false, true, false], 'a production build has exam handwriting OFF by default; only PRI_FEATURE_EXAM_HANDWRITING=1 turns it on');
+  eq([featureDefines('build', {}).__PRI_FEATURE_EXAM_HANDWRITING__, featureDefines('build', { PRI_FEATURE_EXAM_HANDWRITING: '1' }).__PRI_FEATURE_EXAM_HANDWRITING__, [...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].includes('EXAM_HANDWRITING')],
+    ['false', 'true', true], 'and the build constant the exam room reads says so');
+  const room = (await import('node:fs')).readFileSync(new URL('../src/pages/ExamRoom.jsx', import.meta.url), 'utf8');
+  ok(/const inkAllowed = featureEnabled\('examHandwriting'\);/.test(room) && /if \(!inkAllowed\) return 'type';/.test(room) &&
+    /if \(mode === 'ink' && !inkAllowed\) return;/.test(room) && /\{inkAllowed && \(\s*<div className="row" role="group" aria-label=\{t\('examRoom\.modeGroup'/.test(room),
+    'gate off: every written exam answer is typed, the Write by hand switch is not rendered and cannot be set — no writing surface exists on a paper, so none can be left unread');
+  // The same module, as a gate-off and a gate-on production build resolve it.
+  const resolve = async built => {
+    globalThis.__PRI_FEATURE_EXAM_HANDWRITING__ = built;
+    const mod = await import(`../src/platform/features.js?gate=${built}`);
+    return mod.featureEnabled('examHandwriting');
+  };
+  eq([await resolve(false), await resolve(true)], [false, true], 'featureEnabled("examHandwriting") follows the build: off, then on');
+  delete globalThis.__PRI_FEATURE_EXAM_HANDWRITING__;
 }
 
 console.log(`EXAM UNREAD HANDWRITING (DEVICE): PASS — ${count}/${count} checks — a page is frozen by the server's own digest, only digests travel, nothing joins after the deadline, and only pending lines ever change. Synthetic pictures and scripted replies.`);
