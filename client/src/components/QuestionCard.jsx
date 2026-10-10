@@ -2041,8 +2041,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                            )}
                           {/* A reading problem is never a verdict: it comes with a retry
                               that sends one new read, and typing stays one tap away. */}
-                          {((photoOCR.phase === 'unavailable' && canRetryPhotoReading(photoOCR.blockedKey, !!photo, !!pendingPdf.current, photoOCR.block))
-                            || (photoOCR.phase === 'failed' && photoOCR.unreadable && !!photo)) && (
+                          {/* Not offered for a photo that WAS read and could not be made
+                              out: the server keeps that reading for the same picture, so
+                              sending it again changes nothing. The way forward there is a
+                              better photo (✕, then attach) or typing. */}
+                          {(photoOCR.phase === 'unavailable' && canRetryPhotoReading(photoOCR.blockedKey, !!photo, !!pendingPdf.current, photoOCR.block)) && (
                               <div style={{ marginTop: 8 }}>
                                 <button type="button" className="btn btn-ghost btn-sm" data-photo-retry-reading
                                   onClick={() => {

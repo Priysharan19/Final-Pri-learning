@@ -180,7 +180,27 @@ export async function startOnlinePlatform({ dist = DIST } = {}) {
     return { status: bound.status, accountId: other.id, questionId: bound.data?.question?.id || null };
   }
 
-  const platform = { origin: h.origin, h, db, sms, reader, newAccount, ledger, bindPreparedElsewhere, close };
+  /**
+   * TEST DESK ONLY. The server keeps a completed read per account for a few
+   * minutes (server/platform/recognitionOps.js), so an identical picture is
+   * never paid for twice — and a real reader does not change its mind about
+   * the same picture inside that time. The stand-in does, whenever a flow
+   * re-scripts it. A flow that re-scripts the reader for a picture it has
+   * already had read says so here: "this is a different reader now". It
+   * deletes the kept reads through the desk's own database handle; no product
+   * route, setting or environment switch exists for this, and none is used.
+   * Returns how many kept reads were forgotten.
+   */
+  function forgetKeptReads(accountId = null) {
+    const run = accountId
+      ? h.db.prepare("DELETE FROM idempotency_keys WHERE scope='recognition-read' AND account_id=?").run(accountId)
+      : h.db.prepare("DELETE FROM idempotency_keys WHERE scope='recognition-read'").run();
+    return Number(run?.changes || 0);
+  }
+  /** How many completed reads the server is keeping for an account right now. */
+  const keptReads = accountId => Number(h.db.prepare("SELECT COUNT(*) AS n FROM idempotency_keys WHERE scope='recognition-read' AND account_id=? AND expires_at>?").get(accountId, Date.now()).n);
+
+  const platform = { origin: h.origin, h, db, sms, reader, newAccount, ledger, bindPreparedElsewhere, forgetKeptReads, keptReads, close };
   platform.session = (ctx, page) => onlineSession(platform, ctx, page);
   return platform;
 }
@@ -407,7 +427,10 @@ function onlineSession(platform, ctx, page) {
   const session = {
     platform, origin: platform.origin, reader: platform.reader, sms: platform.sms, calls, account: null,
     settled, practiceCalls, examServerId, examAnswers, examResult, signIn, signInHere, linkedAccounts, shownRow, answerOf, disconnect, reconnect,
-    ledger: (serverQuestionId = null) => platform.ledger(session.account?.id, serverQuestionId)
+    ledger: (serverQuestionId = null) => platform.ledger(session.account?.id, serverQuestionId),
+    /** Test desk only: the stand-in reader was re-scripted — forget this account's kept reads. */
+    forgetKeptReads: () => platform.forgetKeptReads(session.account?.id),
+    keptReads: () => platform.keptReads(session.account?.id)
   };
   return session;
 }

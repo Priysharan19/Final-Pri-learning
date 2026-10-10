@@ -220,9 +220,19 @@ export const ownerPageFlow = {
 
       // ── Submit ─────────────────────────────────────────────────────────────
       const ledgerBefore = online.platform.ledger(account.id);
+      const callsBeforeSubmit = reader.requests.length;
       await pressSubmit(page);
       await page.waitForSelector('.eval-card', { timeout: 40000 }).catch(() => {});
       const graded = (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).at(-1);
+      // The receipt read at Submit is of the same picture: the server reuses
+      // the read it kept, with every per-line doubt intact, and pays nothing.
+      const receipt = (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/recognize$/)).at(-1);
+      const kept = receipt?.json?.transcription?.lines || [];
+      await check('the receipt read at Submit reuses the kept read — +0 provider calls — and the kept read still carries each line\'s doubt, layout gap and confidence',
+        receipt?.status === 201 && receipt.json?.reused === true && reader.requests.length === callsBeforeSubmit && kept.length === 9 &&
+          kept[6].text === '(x+3)^2 > 0' && kept[6].uncertain === true && kept[6].doubt === '>= or >' && kept[7].uncertain === false && kept[7].doubt === null &&
+          kept[5].gapBefore === true && kept[4].gapBefore === false && kept.every(l => l.confidence === 0.88) && receipt.json.transcription.needsConfirmation === true,
+        JSON.stringify({ status: receipt?.status, reused: receipt?.json?.reused, calls: reader.requests.length - callsBeforeSubmit, l6: kept[6], l5: kept[5] }));
       await check('Submit sends the answer "6" in Photo mode with the four kept lines as working — the corrected line, and none of the set notes',
         graded?.body?.answer === '6' && graded.body.mode === 'photo' &&
           graded.body.steps === 'f(x) = (x+3)^2 + 6\n(x+3)^2 >= 0\n(x+3)^2 + 6 > 6\nleast value => 6.' && !/40,50,60|final:/.test(graded.body.steps),
