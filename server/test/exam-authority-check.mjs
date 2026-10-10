@@ -1178,6 +1178,14 @@ try {
       eq([refused.status, refused.data?.error?.code], [400, 'SYNC_EVENT_ID_RESERVED'], `a device event pushed under ${what} is refused`);
     }
     eq((await eventRows(squat.account.id)).length, 0, 'and nothing was stored');
+    // An id, kind or entity id that is not a string is a bad request, never a
+    // server error; a clock far out of range is stored as unknown.
+    for (const [bad, what] of [[{ id: { toString: 1 } }, 'an object for an id'], [{ id: ['evt-1'] }, 'an array for an id'], [{ id: 17 }, 'a number for an id'],
+      [{ kind: { toString: 1 } }, 'an object for a kind'], [{ entityId: { toString: 1 } }, 'an object for an entity id']]) {
+      const refused = await push(squat.jar, squat.deviceId, [{ id: `evt-${squat.deviceId}-bad`, deviceId: squat.deviceId, deviceSeq: 1, kind: 'rush-history', payload: { score: 1 }, ...bad }]);
+      eq([refused.status, refused.data?.error?.code], [400, 'SYNC_EVENT_INVALID'], `a device event with ${what} is refused as invalid`);
+    }
+    eq((await eventRows(squat.account.id)).length, 0, 'and still nothing was stored');
     for (const id of [`evt-${squat.deviceId}-1`, `hist:${squat.deviceId}:rush:17`, `hist:${squat.deviceId}:3f2b8c1e-5a4d-4e6f-9a7b-0c1d2e3f4a5b`]) {
       const seq = (await eventRows(squat.account.id)).length + 1;
       const accepted = await push(squat.jar, squat.deviceId, [{ id, deviceId: squat.deviceId, deviceSeq: seq, kind: 'rush-history', payload: { score: 1 } }]);

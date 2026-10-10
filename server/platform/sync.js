@@ -60,8 +60,14 @@ function parseJson(value, fallback = {}) {
   try { return value ? JSON.parse(value) : fallback; } catch { return fallback; }
 }
 
+// A device clock later than the year 2100 is not a time; it is stored as unknown.
+const MAX_EVENT_TIME = 4102444800000;
 function cleanEvent(raw, deviceId) {
-  if (!plain(raw) || !ID.test(String(raw.id || '')) || !ID.test(String(raw.kind || '')) || !APPEND_EVENT.has(raw.kind)) throw Object.assign(new Error('Invalid learning event.'), { status: 400, code: 'SYNC_EVENT_INVALID' });
+  // Ids and kinds are strings. Anything else is refused before it is read:
+  // an object here used to throw inside String() and answer 500.
+  const idText = v => typeof v === 'string' && ID.test(v);
+  if (!plain(raw) || !idText(raw.id) || !idText(raw.kind) || !APPEND_EVENT.has(raw.kind) || typeof raw.deviceId !== 'string' ||
+      (raw.entityId != null && !idText(raw.entityId))) throw Object.assign(new Error('Invalid learning event.'), { status: 400, code: 'SYNC_EVENT_INVALID' });
   if (isServerEventId(raw.id)) throw Object.assign(new Error('This event id is reserved for the server.'), { status: 400, code: 'SYNC_EVENT_ID_RESERVED' });
   if (String(raw.deviceId || '') !== deviceId) throw Object.assign(new Error('Event device does not match sync device.'), { status: 400, code: 'SYNC_DEVICE_MISMATCH' });
   if (!Number.isSafeInteger(raw.deviceSeq) || raw.deviceSeq <= 0) throw Object.assign(new Error('Event sequence is invalid.'), { status: 400, code: 'SYNC_SEQUENCE_INVALID' });
@@ -69,7 +75,7 @@ function cleanEvent(raw, deviceId) {
   if (!plain(raw.payload || {})) throw Object.assign(new Error('Event payload is invalid.'), { status: 400, code: 'SYNC_EVENT_INVALID' });
   const payload = JSON.stringify(raw.payload || {});
   if (Buffer.byteLength(payload) > 256 * 1024) throw Object.assign(new Error('Event payload is too large.'), { status: 413, code: 'SYNC_EVENT_TOO_LARGE' });
-  return { id: String(raw.id), deviceId, deviceSeq: raw.deviceSeq, kind: raw.kind, entityId: raw.entityId == null ? null : String(raw.entityId), occurredAt: Number.isFinite(raw.occurredAt) ? Math.max(0, Math.floor(raw.occurredAt)) : null, payload };
+  return { id: String(raw.id), deviceId, deviceSeq: raw.deviceSeq, kind: raw.kind, entityId: raw.entityId == null ? null : String(raw.entityId), occurredAt: typeof raw.occurredAt === 'number' && Number.isFinite(raw.occurredAt) && raw.occurredAt <= MAX_EVENT_TIME ? Math.max(0, Math.floor(raw.occurredAt)) : null, payload };
 }
 
 function cleanEntity(raw) {
