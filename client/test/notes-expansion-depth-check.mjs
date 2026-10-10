@@ -35,7 +35,7 @@ assert.equal(c11['c11-complex-numbers'].examples.length, 30, 'Complex Numbers sh
 assert.equal(c11['c11-complex-numbers'].examples.filter(x => x.question.startsWith('Optional JEE')).length, 8, 'JEE extension labels are required');
 assert.ok(c11['c11-complex-numbers'].examples.slice(10,26).every(x => x.question.startsWith('Optional ')), 'Previously-authored 16 optional studies must remain distinct');
 assert.ok(c11['c11-complex-numbers'].examples.slice(-4).every(x => x.question.startsWith('Optional Argand rotation')), 'Additional complex plane rotation figures must remain labelled optional');
-assert.deepEqual(Object.fromEntries(gradeWorked), { 7: 127, 8: 126, 9: 100, 10: 134, 11: 163, 12: 141 }, 'Class-by-class authored depth must be retained');
-assert.equal(totalWorked, 791, 'expected 491 prior and 300 newly authored diagram-first studies');
+assert.deepEqual(Object.fromEntries(gradeWorked), { 7: 127, 8: 141, 9: 100, 10: 139, 11: 163, 12: 146 }, 'Class-by-class authored depth must be retained');
+assert.equal(totalWorked, 816, 'expected 491 prior and 325 newly authored diagram-first studies');
 assert.equal(count, 77, 'total chapter count changed unexpectedly');
 console.log(`Notes expansion breadth PASS: ${count}/77 existing chapters, at least 5 examples for Class 7–9 and 4 for Class 10–12, 8 JEE bridges and 16 deeper Complex Numbers studies`);
