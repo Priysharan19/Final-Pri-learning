@@ -2380,6 +2380,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                                 {t('photo.readMyPhoto')}
                               </button>
                               <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t('photo.readMyPhotoHint')}</p>
+                              {heldPdf && <p className="muted" style={{ fontSize: 12, marginTop: 4 }} data-photo-pdf-cost>{t('photo.readPdfHint')}</p>}
                             </div>
                           ) : <span className="muted">{photoAwaitingOnlineReader(language)}</span>)}
                         </div>

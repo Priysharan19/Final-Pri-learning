@@ -285,6 +285,9 @@ try {
       [true, 'pending', false, true, Number(q2.marking.unanswered || 0), '', null, PENDING_MESSAGE],
       'the unread handwritten answer is PENDING: not correct, not wrong, not given an invented mark, with the fixed sentence and no attempt');
     eq([l3.pending, l3.outcome, l3.unanswered], [undefined, 'unanswered', true], 'a question with no answer and no handwriting is unanswered, as ever — a different state');
+    eq(['solution' in l2, (l2.repairOpportunities || []).length, 'choices' in l2, typeof l3.solution?.answerText, JSON.stringify(l2).includes(String(right2)) && String(right2).length > 2],
+      [false, 0, false, 'string', false],
+      'while it is pending the result carries NO solution, keyed answer, criteria or distractor notes for that answer (the others have theirs): nothing to decide a retry by');
     const page = frozen.handwriting.pages[q2.id];
     eq([Object.keys(frozen.handwriting.pages), page.digest, page.state, page.reason, page.attempts, frozen.handwriting.maxAttempts, frozen.handwriting.windowEndsAt - frozen.handwriting.frozenAt],
       [[q2.id], digestOf(image), 'awaiting-reading', 'not-read', 0, HANDWRITING_MAX_ATTEMPTS, HANDWRITING_RECOVERY_WINDOW_MS],
@@ -324,8 +327,8 @@ try {
     const r2 = lineOf(after, q2);
     eq([resolved.status, resolved.data.attempted, provider.total - before, callsFor(right2)], [200, true, 1, 1],
       `the frozen page is read after the deadline with exactly one provider call [${EVIDENCE}]`);
-    eq([r2.pending, r2.outcome, r2.correct, r2.awarded, r2.given, r2.readAfterClose, typeof r2.attemptId],
-      [undefined, 'correct', true, Number(q2.marking.correct), right2, true, 'string'],
+    eq([r2.pending, r2.outcome, r2.correct, r2.awarded, r2.given, r2.readAfterClose, typeof r2.attemptId, typeof r2.solution?.answerText],
+      [undefined, 'correct', true, Number(q2.marking.correct), right2, true, 'string', 'string'],
       'and the answer it states is marked by the deterministic engine: correct, full marks, flagged as read after the paper closed');
     eq([after.score, after.provisional, after.pendingMarks, after.handwriting.pages[q2.id].state, after.handwriting.pages[q2.id].attempts],
       [frozen.score + Number(q2.marking.correct), false, 0, 'resolved', 1], 'the score now includes it and the result is no longer provisional');
@@ -499,14 +502,15 @@ try {
     const refused = await present(s.jar, s.exam.id, q1.id, image);
     const page = refused.data.result.handwriting.pages[q1.id];
     eq([refused.status, refused.data.attempted, page.state, page.reason, page.attempts, callsFor(label) - before, lineOf(refused.data.result, q1).pending],
-      [200, true, 'awaiting-reading', 'capacity', 1, 0, true], 'with the spending ceiling reached the page is not read and not paid for; the answer stays pending, saying why');
+      [200, true, 'awaiting-reading', 'capacity', 0, 0, true], 'with the spending ceiling reached the page is not read, not paid for and NO try is used; the answer stays pending, saying why');
+    eq([page.triesLeft, page.canRetry], [HANDWRITING_MAX_ATTEMPTS, true], 'all three tries remain, and the next one is the student\'s to ask for (the automatic request has been made)');
     ok(refused.data.retryAt >= page.lastAttemptAt + HANDWRITING_BACKOFF_MS[0], 'and it is not tried again before the backoff or the ceiling resets');
     process.env.PRI_PAID_CALLS_PER_HOUR = '10000';
     eq([(await present(s.jar, s.exam.id, q1.id, image)).data.attempted, callsFor(label) - before], [false, 0], 'raising nothing by hand: inside the wait nothing is sent even though capacity is back');
     skew += 61 * 60000;
     const read2 = await present(s.jar, s.exam.id, q1.id, image, true);
     eq([read2.data.attempted, lineOf(read2.data.result, q1).correct, read2.data.result.handwriting.pages[q1.id].attempts, callsFor(label) - before],
-      [true, true, 2, 1], 'when capacity has returned the frozen page is read: one provider call for the answer');
+      [true, true, 1, 1], 'when capacity has returned the student\'s Retry reads the frozen page: one provider call for the answer, one try used');
     eq(frozenFacts(read2.data.result), frozenFacts(frozen), 'on the frozen submission');
     paidPerAnswer.afterCapacityRefusal = callsFor(label) - before;
   }
@@ -555,6 +559,22 @@ try {
     const goneImage = picture(rightAnswer(gone.qs[0].payload), 'ok', 'n');
     await save(gone.jar, gone.exam.id, { rev: 1, ink: { [gone.qs[0].id]: digestOf(goneImage) } });
     skew += PAPER_MS + FINISH_GRACE_MS + 60000;
+    // A snapshot saved after the deadline but inside the grace is labelled as that — never as before-deadline proof.
+    const graceSit = await sitting(1);
+    const graceImage = picture(rightAnswer(graceSit.qs[0].payload), 'ok', 'u');
+    skew += PAPER_MS + 30000;
+    eq((await save(graceSit.jar, graceSit.exam.id, { rev: 1, ink: { [graceSit.qs[0].id]: digestOf(graceImage) } })).data.saved, true, 'a snapshot inside the grace is accepted');
+    skew += FINISH_GRACE_MS + 60000;
+    const graceClosed = (await read(graceSit.jar, graceSit.exam.id)).data.result;
+    const gracePage = graceClosed.handwriting.pages[graceSit.qs[0].id];
+    eq([gracePage.evidence, gracePage.receivedAt > graceClosed.deadline, frozen.handwriting.pages[q2.id].evidence, frozen.handwriting.pages[q2.id].receivedAt <= frozen.deadline],
+      ['snapshot-within-grace', true, 'snapshot-before-deadline', true], 'the receipt says what the server observed, on its own clock: saved within the grace, or saved before the deadline');
+    // Erased after the last autosave, then submitted in time: the finish names no unread page, so none comes back.
+    const erased = await sitting(1);
+    await save(erased.jar, erased.exam.id, { rev: 1, ink: { [erased.qs[0].id]: digestOf(graceImage) } });
+    const cleared = await finish(erased.jar, erased.exam.id, { answers: {}, reason: 'student' });
+    eq(['handwriting' in cleared.data, lineOf(cleared.data, erased.qs[0]).pending, lineOf(cleared.data, erased.qs[0]).outcome], [false, undefined, 'unanswered'],
+      'a page erased after the last autosave does not return as pending: an in-time finish that names no unread page has none');
     const closed = (await read(gone.jar, gone.exam.id)).data;
     eq([closed.state, closed.result.unattended, lineOf(closed.result, gone.qs[0]).pending, closed.result.handwriting.pages[gone.qs[0].id].state],
       ['finished', true, true, 'awaiting-reading'], 'a paper the server closes unattended keeps its unread handwriting pending too');

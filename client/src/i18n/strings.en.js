@@ -1579,7 +1579,7 @@ export default {
   'examRoom.oneMinuteLeft': 'One minute left.',
   'examRoom.unreadWarning': { one: "{n} handwritten answer has not been read. Press Read my answer on it before time runs out. At the deadline unread handwriting is kept exactly as written and read once afterwards if it can be; it is not marked until then.", other: "{n} handwritten answers have not been read. Press Read my answer on each before time runs out. At the deadline unread handwriting is kept exactly as written and read once afterwards if it can be; it is not marked until then." },
   'examRoom.unreadGoTo': 'Go to question {n}',
-  'examRoom.provisional': { one: "{n} mark is not decided yet: a handwritten answer was saved but has not been read. Your score may rise; it will not fall.", other: "{n} marks are not decided yet: handwriting was saved but has not been read. Your score may rise; it will not fall." },
+  'examRoom.provisional': { one: "{n} mark is not decided yet: a handwritten answer was saved but has not been read. Your score is not final and may change when it is read.", other: "{n} marks are not decided yet: handwriting was saved but has not been read. Your score is not final and may change when it is read." },
   'examRoom.tagPending': 'Not marked yet · out of {n}',
   'examRoom.pendingReading': "Your handwriting for this answer was saved exactly as you left it. It has not been read yet, so it has not been marked. Only that saved page can be read; nothing written now can change it.",
   'examRoom.pendingReview': "Your handwriting for this answer was saved exactly as you left it, but Pri could not read it reliably. It has not been marked, and it has not been counted as wrong or as blank.",
@@ -2862,5 +2862,6 @@ export default {
   'ink.readExpiredHint': "This page was read some time ago. Your writing and the text below are kept; press Read again so it can be submitted.",
   'ink.submitReadExpired': "This page was read a while ago and has to be read again before you submit. Nothing is lost — press Read again.",
   'photo.readExpired': "This photo was read a while ago and has to be read again before you submit. Your photo and the lines below are kept.",
+  'photo.readPdfHint': "A PDF is read one page at a time: pressing Read my photo sends each page to the AI reading service once — one read per page.",
   'photo.readMyPhotoHint': "The photo is kept on this device and has not been sent anywhere. When you press Read my photo it is sent once to Pri’s AI reading service to be read.",
 };

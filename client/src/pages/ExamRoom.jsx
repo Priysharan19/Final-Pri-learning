@@ -437,7 +437,9 @@ export default function ExamRoom() {
     await saveChain.current.catch(() => {});
     const snap = latest.current;
     // Unread handwriting is frozen as it stands now and named in the submit.
-    const frozen = await freezeUnread(snap).catch(() => null);
+    // The submit ALWAYS says which answers are unread handwriting — none, when
+    // there is none — so a page erased since the last autosave cannot return.
+    const frozen = await freezeUnread(snap).catch(() => null) || { unread: unreadInkKeys(snap.inks, snap.answers), pages: {} };
     try {
       const r = await api.post(`/exams/${id}/submit`, {
         answers: snap.answers, workings: snap.workings, times: timesRef.current,
@@ -761,7 +763,7 @@ export default function ExamRoom() {
                 {pt.pending && pendingNote(pt)}
                 <div className="row" style={{ flexWrap: 'wrap', gap: 16, fontSize: 14, marginTop: 4 }}>
                   <span>{tx('examRoom.yours', { answer: <b>{pt.answerType === 'mcq' ? (pt.given !== '' && pt.given != null ? 'ABCD'[Number(pt.given)] ?? '—' : '—') : (pt.given || '—')}</b> })}</span>
-                  <span>{tx('examRoom.correctShort', { answer: <b><MathText text={pt.answerText} /></b> })}</span>
+                  {!pt.pending && pt.answerText !== undefined && <span>{tx('examRoom.correctShort', { answer: <b><MathText text={pt.answerText} /></b> })}</span>}
                 </div>
                 {!pt.correct && pt.steps && (
                   <details style={{ marginTop: 6 }}>
@@ -810,7 +812,8 @@ export default function ExamRoom() {
             )}
             <div className="row" style={{ flexWrap: 'wrap', gap: 16, fontSize: 14 }}>
               <span>{t('history.yourAnswerWas')} <b>{givenText(d)}</b></span>
-              <span>{t('history.correctAnswerWas')} <b><MathText text={d.solution.answerText} /></b></span>
+              {/* A pending answer carries no solution: nothing is shown to decide a retry by. */}
+              {d.solution && <span>{t('history.correctAnswerWas')} <b><MathText text={d.solution.answerText} /></b></span>}
             </div>
             {d.partial && (
               <div className="verdict" style={{ marginTop: 8, background: 'var(--brand-soft)', border: '1px solid var(--brand-1)' }}>
@@ -818,7 +821,7 @@ export default function ExamRoom() {
                 <div style={{ fontSize: 13.5 }}>{d.partial.note}</div>
               </div>
             )}
-            {!d.correct && (
+            {!d.correct && d.solution && (
               <details style={{ marginTop: 10 }}>
                 <summary style={{ cursor: 'pointer', color: 'var(--brand-1)', fontWeight: 600, fontSize: 14 }}>{t('examRoom.showSolutionCriteria')}</summary>
                 {d.solution.criteria && (
