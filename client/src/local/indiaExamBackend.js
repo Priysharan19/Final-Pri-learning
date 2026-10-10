@@ -40,7 +40,8 @@ import {
 import { analyseExam } from './examAnalysis.js';
 import {
   isServerPaper, markedByOf, requireExamAccount, issueServerExam, issueExamLayout, serverFieldOf, scheduleCheckpoint,
-  finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, localStartOf, finishedAtOf, fetchRemotePaper
+  finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, localStartOf, finishedAtOf, fetchRemotePaper,
+  markPendingLines, recoverHandwriting
 } from './serverExam.js';
 
 function error(message, status = 400, code = 'INDIA_EXAM_ERROR') {
@@ -295,6 +296,15 @@ async function examView(profile, id) {
     await hydrateRemote(profile, id);
     exam = await requireExam(profile, id);
   }
+  // Handwriting that was not read when the paper closed is still pending: its
+  // frozen page is presented again (the server bounds how often).
+  if (isServerPaper(exam) && exam.finishedAt && exam.server.handwriting) {
+    await withExamLock(id, async () => {
+      const fresh = await requireExam(profile, id);
+      if (await recoverHandwriting(fresh)) await put('exams', fresh);
+    });
+    exam = await requireExam(profile, id);
+  }
   // An open paper the server owns is brought up to date with it first: a
   // queued finish is sent, a result produced on another device is adopted, a
   // newer snapshot replaces the local one. Unreachable server: local state stands.
@@ -456,6 +466,8 @@ async function adoptResult(exam, serverResult, { record = true } = {}) {
   exam.finishedAt = finishedAtOf(exam, result);
   exam.score = result.score;
   exam.total = result.total;
+  // An answer pending on handwriting that was not read says so on its line.
+  markPendingLines(result, detail);
   exam.detail = detail;
   exam.summary = result.summary;
   exam.final = serverFinal(exam, { ...result, detail });
