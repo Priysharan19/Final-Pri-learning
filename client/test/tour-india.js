@@ -56,7 +56,9 @@ export const flow = {
         await page.locator(`.auth-col a[href="${href}"]`).count() === 1, `${label} -> ${href}`);
     }
     await check('the landing screen offers the real account sign-in',
-      await page.getByRole('button', { name: 'I already have an account' }).count() === 1);
+      // The landing screen IS the sign-in card: one email field, one action.
+      await page.locator('[data-testid="hero-sign-in"]').count() === 1 &&
+        await page.getByRole('button', { name: 'Continue with email' }).waitFor({ state: 'visible', timeout: 15000 }).then(() => true, () => false));
     await check('the tab is titled after the app', (await page.title()) === 'Pri Learning',
       `title reads ${JSON.stringify(await page.title())}`);
     const description = (await page.locator('meta[name="description"]').getAttribute('content')) || '';

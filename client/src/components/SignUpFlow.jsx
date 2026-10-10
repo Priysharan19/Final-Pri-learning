@@ -461,12 +461,16 @@ export default function SignUpFlow({
             </button>
           )}
         </div>
-        <p className="signup-hint signup-agree-note">
+{/* Inside a page the terms are not otherwise on screen; the landing
+            screen already carries them in its footer, once. */}
+        {inline && (
+                <p className="signup-hint signup-agree-note">
           {tx('signup.agreeNote', {
             terms: <a href="/terms" target="_blank" rel="noreferrer">{t('cloud.terms')}</a>,
             privacy: <a href="/privacy" target="_blank" rel="noreferrer">{t('cloud.privacyNotice')}</a>
           })}
         </p>
+        )}
         {!inline && (
           <div className="signup-alt signup-alt-quiet">
             <button type="button" className="linklike" data-testid="signup-parent-link" onClick={() => go('parent-home')}>{t('signup.parentLink')}</button>
