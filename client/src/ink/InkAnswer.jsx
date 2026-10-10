@@ -232,6 +232,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     abortRef.current = controller;
     const signature = strokeSignature(strokes);
+    try { (globalThis.__INK_DEBUG__ ||= []).push(['send', Date.now() % 100000, signature]); } catch {}
     sentRef.current = signature;
     flyingRef.current = signature;
     const landed = () => { if (flyingRef.current === signature) flyingRef.current = null; };
@@ -279,6 +280,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   sendToReaderRef.current = sendToReader;
 
   const scheduleRead = useCallback((strokes, { immediate = false, fresh = false } = {}) => {
+    try { (globalThis.__INK_DEBUG__ ||= []).push(['schedule', Date.now() % 100000, strokes.length ? strokeSignature(strokes) : null, immediate, flyingRef.current, readRef.current, new Error().stack.split('\n').slice(2, 5).map(x => x.trim().slice(0, 60)).join(' < ')]); } catch {}
     // Single flight. After a reload the session announcement and the profile
     // refresh both say "read now" within the same moment; the second used to
     // abort the first after it had left and send the identical page again — a
