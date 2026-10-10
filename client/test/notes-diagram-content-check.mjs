@@ -86,7 +86,7 @@ async function verifyVisuals(){
     assert.equal(gradeCount,expected[grade],'visual grade breadth mismatch '+grade);
   }
   assert.equal(visuals,125,'visual question count changed');
-  assert.equal(total,1251,'full expanded worked-example inventory must be retained');
+  assert.equal(total,1371,'full expanded worked-example inventory must be retained');
   assert.ok(arity.plane>=70 && arity.geometry>=15 && arity.bars>=15 && arity.numberline>=4, 'diagram diversity floor');
   console.log('Visual diagram questions PASS',JSON.stringify({visuals,total,byGrade,figureKinds:arity}));
 }
