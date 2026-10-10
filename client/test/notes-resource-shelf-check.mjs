@@ -9,7 +9,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const view = readFileSync(join(__dirname, '../src/pages/Notes.jsx'), 'utf8');
 assert.ok(view.includes('data-testid="notes-study-resources"'), 'Study resources missing from student Notes');
 assert.ok(view.includes('target="_blank" rel="noopener noreferrer"'), 'External link must be isolated from opener');
-assert.ok(view.includes('external link, opens a new tab'), 'External navigation must be communicated');
+assert.ok(view.includes('aria-label={resource.title}'), 'External links require an accessible name');
+assert.ok(view.includes("t('nav.more')"), 'Resource heading must use existing localized copy');
 assert.equal(STUDY_RESOURCE_LINKS.length, 15, 'unexpected source register count');
 const ids = new Set();
 for (const item of STUDY_RESOURCE_LINKS) {
