@@ -563,6 +563,28 @@ export const flow = {
         await field.fill(right.text);
         await check('proposal changed: the field takes the student\'s own answer and says it is theirs',
           await field.inputValue() === right.text && await page.locator('[data-ink-answer-proposal="student"]').count() === 1);
+        // Durable: the transcript and the answer typed over the proposal are
+        // kept with the ink. A reload brings both back — it does not read the
+        // page again, and it does not bring back the proposal that was overridden.
+        const status = page.locator('.ws-actions .status-line');
+        await page.waitForFunction(() => /Saved on this device/.test(document.querySelector('.ws-actions .status-line')?.innerText || ''), null, { timeout: 10000 }).catch(() => {});
+        const callsBeforeReload = reader.requests.length;
+        const readsBeforeReload = (await readCalls()).length;
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+        await page.waitForFunction(n => document.querySelectorAll('.ink-line').length === n, 3, { timeout: 20000 }).catch(() => {});
+        await page.waitForTimeout(2600);
+        const restoredField = page.locator('[data-ink-final-answer]');
+        await check('after a reload the three-line transcript is back as it was read, current (not stale), with no read sent',
+          JSON.stringify(await reading(page)) === JSON.stringify(written) && await page.locator('[data-ink-stale]').count() === 0 &&
+            reader.requests.length === callsBeforeReload && (await readCalls()).length === readsBeforeReload && await page.locator('[data-ink-read]').count() === 0,
+          `${JSON.stringify(await reading(page))}; provider calls +${reader.requests.length - callsBeforeReload}`);
+        await check('and the answer the student typed over the proposal is restored — the overridden proposal does not come back',
+          await restoredField.inputValue().catch(() => null) === right.text && await restoredField.inputValue().catch(() => null) !== final &&
+            await page.locator('[data-ink-answer-proposal="student"]').count() === 1,
+          `field ${JSON.stringify(await restoredField.inputValue().catch(() => null))}; proposed was ${JSON.stringify(final)}`);
+        await check('the save line says saved again only after its own readback', await page.waitForFunction(() => /Saved on this device/.test(document.querySelector('.ws-actions .status-line')?.innerText || ''), null, { timeout: 10000 }).then(() => true, () => false),
+          await status.innerText().catch(() => ''));
         await page.getByRole('button', SUBMIT).click();
         await page.waitForSelector('.eval-card, .verdict-bad', { timeout: 30000 }).catch(() => {});
         const of = suffix => online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/${suffix}$`));
@@ -571,6 +593,39 @@ export const flow = {
           grades.length === 1 && grades[0].body?.answer === right.text && grades[0].body.answer !== final && grades[0].body.steps === written.join('\n') &&
             confirms.length === 1 && confirms[0].body?.text === right.text && grades[0].json?.correct === true && grades[0].json.resolved === true,
           JSON.stringify({ sent: grades[0]?.body?.answer, proposed: final, confirm: confirms.map(c => c.body), correct: grades[0]?.json?.correct }));
+      }
+    }
+    // 8c · no confirmed answer: Submit is not available, and says why.
+    {
+      const canvas = await openFresh();
+      const right = await online.answerOf();
+      online.forgetKeptReads();           // re-scripted stand-in (desk only)
+      reader.lines = [{ text: '2 + 3 = 5' }, { text: 'so x = 1 or x = 2' }];
+      reader.confidence = 0.97;
+      await handwrite(page, canvas, '17');
+      await pressRead(page);
+      await page.waitForFunction(n => document.querySelectorAll('.ink-line').length === n, 2, { timeout: 20000 }).catch(() => {});
+      const field = page.locator('[data-ink-final-answer]');
+      const submit = page.getByRole('button', SUBMIT);
+      const reason = page.locator('[data-submit-reason="verdict.submitNeedsAnswer"]');
+      await check('two candidate answers on the last line: nothing is guessed — the Final answer field is empty and names both',
+        await field.inputValue().catch(() => null) === '' && await page.locator('[data-ink-answer-proposal="ambiguous"]').count() === 1 &&
+          /more than one possible final answer \(1, 2\)/.test(await page.locator('.ink-final-answer [role="status"]').innerText().catch(() => '')),
+        JSON.stringify(await field.inputValue().catch(() => null)));
+      await check('Submit is disabled with the reason shown — "Type your final answer first." — so no attempt can be spent on a guess',
+        await submit.isDisabled() && await reason.isVisible() && /Type your final answer first/.test(await reason.innerText()) &&
+          (await submit.getAttribute('aria-describedby')) === await reason.getAttribute('id') &&
+          (await online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/(recognize|submit)$`))).length === 0,
+        `disabled ${await submit.isDisabled()}; reason ${JSON.stringify(await reason.innerText().catch(() => ''))}`);
+      if (right.answerType === 'numeric' && right.text) {
+        await field.fill(right.text);
+        await check('typing the answer enables Submit and the reason goes', await submit.isEnabled() && await reason.count() === 0);
+        await submit.click();
+        await page.waitForSelector('.eval-card, .verdict-bad', { timeout: 30000 }).catch(() => {});
+        const graded = (await online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/submit$`))).at(-1);
+        await check('and the student\'s typed answer is what the server marks, correct, with the two lines as working',
+          graded?.body?.answer === right.text && graded.body.steps === '2 + 3 = 5\nso x = 1 or x = 2' && graded.json?.correct === true,
+          JSON.stringify({ body: graded?.body, correct: graded?.json?.correct }));
       }
     }
     reader.lines = null;
