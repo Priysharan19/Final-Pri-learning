@@ -981,7 +981,240 @@ export const photoFlow = {
   }
 };
 
-export const flows = [writeFlow, typedFlow, saveTruthFlow, photoFlow];
+// ── Journeys 5–7 · a session that ended ──────────────────────────────────────
+// The owner's production report: a device that had signed in two hours earlier
+// was told "Pri's handwriting reader isn't answering right now" while the
+// server was answering 401 AUTH_REQUIRED to it. The reader was fine; the
+// session was gone. These journeys sign in, end the session (the server's row
+// is deleted, or the browser's cookies are cleared), and hold the card to the
+// truth: "sign in again", beside the work, with everything kept — and a real
+// reader outage still says the reader is not answering, with a retry.
+
+/** End this account's session on the server: every later request is a 401. */
+const endServerSession = online => online.platform.h.db.prepare('DELETE FROM account_sessions WHERE account_id=?').run(online.account.id).changes;
+const OUTAGE_WORDS = /isn’t answering right now|isn't answering right now|Photo reading isn’t working/i;
+const NEEDS_ACCOUNT_WORDS = /needs a Pri account/i;
+const cardText = page => visibleText(page, '.qpage .ws-work');
+
+export const sessionEndedWriteFlow = {
+  id: 'write-session-ended',
+  online: true,
+  name: 'Write · session ended before reading: "sign in again" beside the work, then read and marked; a real outage still says so, with a retry',
+
+  async run({ page, base, check, goto, createProfile, mathText, settle, note, online, browserName }) {
+    note(`${EVIDENCE}: "Write · session ended…" [${browserName || 'chromium'}] ends a real server session (its row is deleted from the server's SQLite) and scripts the stand-in reader up and down; server, sign-in, recognise and grade routes are real. Not real-provider, real-handwriting, production or real-device evidence.`);
+    const { reader } = online;
+    reader.text = '12'; reader.confidence = 0.97; reader.down = false;
+    await goto('/');
+    await createProfile({ name: 'Session Write', course: 'in', year: 10 });
+    const account = await online.signIn({ name: 'Session Write' });
+    if (!await check('signed in, India Class 10 practice (Arithmetic Progressions) serves a written-answer question',
+      await openWrittenAPQuestion(page, base, settle), `${MAX_SKIPS} questions and none took a written answer`)) return;
+    const qid = await shownId(page);
+    const prompt = await mathText('.q-prompt');
+    await page.getByRole('button', { name: 'Answer by handwriting' }).click();
+    await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+    await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
+
+    // ── a REAL reader outage, signed in ──────────────────────────────────────
+    reader.down = true;
+    await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '5');
+    const retry = page.locator('[data-ink-retry-reading]');
+    await retry.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    const outage = await cardText(page);
+    await check(`a reader that really is down is said as that — "isn’t answering right now" — with Try again, and is NOT called a sign-in problem [${EVIDENCE}]`,
+      OUTAGE_WORDS.test(outage) && await retry.isVisible() && await page.locator('[data-ink-account-recovery]').count() === 0 &&
+        !/sign in again|signed out/i.test(outage) && await page.locator('.ink-line, .eval-card, .verdict-bad').count() === 0,
+      outage.slice(0, 400));
+    reader.down = false;
+    await retry.click();
+    await page.waitForSelector('.ink-line', { timeout: 30000 }).catch(() => {});
+    await check(`and Try again reads the page once the reader is back [${EVIDENCE}]`,
+      await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null) === '12' && !OUTAGE_WORDS.test(await cardText(page)),
+      (await cardText(page)).slice(0, 300));
+
+    // ── the session ends; the student writes more ────────────────────────────
+    const ended = endServerSession(online);
+    const readsBefore = reader.requests.length;
+    await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '2', { x: 140 });
+    const recovery = page.locator('[data-ink-account-recovery]');
+    const signIn = recovery.locator('[data-ink-sign-in]');
+    await signIn.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    await waitWorkState(page, 'waiting-sign-in');
+    const seen = await cardText(page);
+    const refusals = (await online.settled(), online.calls.filter(c => /^\/v1\/handwriting\//.test(c.path) && c.status === 401));
+    await check('the server refused the read with 401 AUTH_REQUIRED (the session is gone), and the reader was not asked',
+      ended >= 1 && refusals.length >= 1 && refusals.some(c => c.json?.error?.code === 'AUTH_REQUIRED') && refusals.every(c => !c.json || c.json.error?.code === 'AUTH_REQUIRED') && reader.requests.length === readsBefore,
+      JSON.stringify(online.calls.slice(-4).map(c => `${c.path} ${c.status}`)));
+    await check('the student is told the truth: signed out, sign in again — NOT that the reader is not answering, and not that they need an account',
+      await recovery.locator('[data-ink-session-ended]').isVisible() && /You’ve been signed out\. Sign in again/i.test(seen) &&
+        !OUTAGE_WORDS.test(seen) && !NEEDS_ACCOUNT_WORDS.test(seen) && await page.locator('[data-ink-retry-reading]').count() === 0,
+      seen.slice(0, 500));
+    const truth = await saveTruth(page, qid);
+    await check('the sign-in is a button beside the work — "Sign in again to check this answer"; the strokes are saved, the question is the same, Submit waits',
+      (await signIn.innerText()).trim() === 'Sign in again to check this answer' && await signIn.isEnabled() &&
+        await signIn.evaluate(el => el.tagName === 'BUTTON' && el.classList.contains('btn-primary')) &&
+        truth.kept && truth.state === 'waiting-sign-in' && !truth.notSaved && await shownId(page) === qid &&
+        await page.locator('.ws-actions .btn-primary').isDisabled() && await page.locator('.eval-card, .verdict-bad').count() === 0,
+      JSON.stringify({ state: truth.state, shown: truth.shown }));
+    const inkBefore = await inkOnCanvas(page);
+
+    // ── sign in again, on the card ───────────────────────────────────────────
+    await signIn.click();
+    await online.signInHere(recovery, { account });
+    await page.waitForSelector('.ink-line', { timeout: 30000 }).catch(() => {});
+    await check('signed in again without leaving: same page, same question, same strokes, and the sign-in notice is gone',
+      await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' && new URL(page.url()).pathname === '/practice' &&
+        await shownId(page) === qid && await mathText('.q-prompt') === prompt && await inkOnCanvas(page) === inkBefore &&
+        await page.locator('[data-ink-account-recovery]').count() === 0, page.url());
+    await check(`the kept page is then read by itself and the transcript is shown, editable [${EVIDENCE}]`,
+      await page.locator('.ink-line').count() >= 1 && await page.locator('.ink-line .ink-correct-btn').count() >= 1 && reader.requests.length > readsBefore,
+      `${await page.locator('.ink-line').count()} lines; ${reader.requests.length - readsBefore} provider requests`);
+    const right = await online.answerOf();
+    if (!await check('the right answer is known only from the server\'s sealed copy', typeof right.text === 'string' && right.text.length > 0, JSON.stringify({ kind: right.kind }))) return;
+    await correctReading(page, right.text);
+    await pressSubmit(page);
+    await page.waitForSelector('.eval-card', { timeout: 30000 }).catch(() => {});
+    const grade = (await online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/submit$`))).at(-1);
+    await check('Submit then works: the server marks it — authoritative, correct, resolved once',
+      grade?.status === 200 && grade.json?.authoritative === true && grade.json.correct === true && grade.json.resolved === true &&
+        await page.locator('.eval-card[data-outcome="correct"]').count() === 1 && online.ledger(right.serverQuestionId).thisDone === 1,
+      JSON.stringify(grade && { status: grade.status, json: grade.json }).slice(0, 300));
+    await check('no outbound request was refused: nothing tried to reach a real provider', reader.refused.length === 0, JSON.stringify(reader.refused));
+  }
+};
+
+export const sessionEndedPhotoFlow = {
+  id: 'photo-session-ended',
+  online: true,
+  name: 'Photo · session ended before reading: "sign in again" beside the photo, then the same photo is read and marked',
+
+  async run({ page, ctx, base, check, goto, createProfile, mathText, settle, note, online, browserName }) {
+    note(`${EVIDENCE}: "Photo · session ended…" [${browserName || 'chromium'}] ends the session by clearing the browser's cookies; the image is a 1×1 test PNG and the reader is the scripted stand-in. Not real-provider, real-photo, production or real-device evidence.`);
+    const { reader } = online;
+    reader.text = '12'; reader.confidence = 0.97; reader.down = false;
+    await goto('/');
+    await createProfile({ name: 'Session Photo', course: 'in', year: 10 });
+    const account = await online.signIn({ name: 'Session Photo' });
+    if (!await check('signed in, India Class 10 practice (Arithmetic Progressions) serves a written-answer question',
+      await openWrittenAPQuestion(page, base, settle), `${MAX_SKIPS} questions and none took a written answer`)) return;
+    const qid = await shownId(page);
+    const prompt = await mathText('.q-prompt');
+    await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
+
+    await ctx.clearCookies();
+    const readsBefore = reader.requests.length;
+    await page.getByRole('button', { name: /answer with a photo/i }).click();
+    await page.locator('.editor-body input[type="file"]').setInputFiles({ name: 'working.png', mimeType: 'image/png', buffer: PNG });
+    const signIn = page.locator('[data-photo-sign-in]');
+    await signIn.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    const thumb = await page.locator('.photo-thumb img').getAttribute('src').catch(() => null);
+    const seen = await cardText(page);
+    const status = page.locator('.ws-actions .status-line');
+    await check('with the session cookie gone the student is told: signed out, sign in again — not a reader outage, not "needs an account"',
+      await page.locator('[data-photo-session-ended]').isVisible() && /You’ve been signed out\. Sign in again/i.test(seen) &&
+        !OUTAGE_WORDS.test(seen) && !NEEDS_ACCOUNT_WORDS.test(seen) && await page.locator('[data-photo-retry-reading]').count() === 0,
+      seen.slice(0, 500));
+    await check('beside the photo: "Sign in again to check this answer"; the photo is still attached, nothing was read, Submit waits',
+      (await signIn.innerText()).trim() === 'Sign in again to check this answer' && /^data:image\//.test(thumb || '') &&
+        await status.getAttribute('data-work-state') === 'waiting-sign-in' && reader.requests.length === readsBefore &&
+        await page.locator('[data-photo-correct-transcript]').count() === 0 && await page.locator('.ws-actions .btn-primary').isDisabled(),
+      `state ${await status.getAttribute('data-work-state')}`);
+
+    await signIn.click();
+    await online.signInHere(page.locator('[data-photo-account-recovery]'), { account });
+    const transcript = page.locator('[data-photo-correct-transcript]');
+    await transcript.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    await check(`signed in again in place: same question, the SAME photo, now read by itself with an editable transcript [${EVIDENCE}]`,
+      await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' && await shownId(page) === qid && await mathText('.q-prompt') === prompt &&
+        await page.locator('.photo-thumb img').getAttribute('src').catch(() => null) === thumb &&
+        await transcript.inputValue().catch(() => null) === '12' && await transcript.isEditable() && reader.requests.length > readsBefore,
+      `transcript ${JSON.stringify(await transcript.inputValue().catch(() => null))}`);
+    const right = await online.answerOf();
+    if (!await check('the right answer is known only from the server\'s sealed copy', typeof right.text === 'string' && right.text.length > 0, JSON.stringify({ kind: right.kind }))) return;
+    await transcript.fill(right.text);
+    await pressSubmit(page);
+    await page.waitForSelector('.eval-card', { timeout: 30000 }).catch(() => {});
+    const grade = (await online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/submit$`))).at(-1);
+    await check('Submit then works: marked by the server as a photo answer — authoritative, correct, resolved once',
+      grade?.status === 200 && grade.json?.authoritative === true && grade.json.correct === true && grade.json.resolved === true && grade.body?.mode === 'photo' &&
+        await page.locator('.eval-card[data-outcome="correct"]').count() === 1 && online.ledger(right.serverQuestionId).thisDone === 1,
+      JSON.stringify(grade && { status: grade.status, json: grade.json }).slice(0, 300));
+  }
+};
+
+export const sessionEndedSubmitFlow = {
+  id: 'submit-session-ended',
+  online: true,
+  name: 'Submit · session ended at Submit: work held, "sign in again", never a wrong-answer verdict; then marked exactly once',
+
+  async run({ page, base, check, goto, createProfile, mathText, settle, note, online, browserName }) {
+    note(`${EVIDENCE}: "Submit · session ended…" [${browserName || 'chromium'}] ends a real server session between the reading and Submit; the reader is the scripted stand-in. Not real-provider, real-handwriting, production or real-device evidence.`);
+    const { reader } = online;
+    reader.text = '12'; reader.confidence = 0.97; reader.down = false;
+    await goto('/');
+    await createProfile({ name: 'Session Submit', course: 'in', year: 10 });
+    const account = await online.signIn({ name: 'Session Submit' });
+    if (!await check('signed in, India Class 10 practice (Arithmetic Progressions) serves a written-answer question',
+      await openWrittenAPQuestion(page, base, settle), `${MAX_SKIPS} questions and none took a written answer`)) return;
+    const qid = await shownId(page);
+    const prompt = await mathText('.q-prompt');
+    await page.getByRole('button', { name: 'Answer by handwriting' }).click();
+    await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+    await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
+    await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '5');
+    await page.waitForSelector('.ink-line .ink-correct-btn', { timeout: 30000 }).catch(() => {});
+    const right = await online.answerOf();
+    if (!await check(`signed in, the page is read and the right answer is known only from the server's sealed copy [${EVIDENCE}]`,
+      await page.locator('.ink-line').count() === 1 && typeof right.text === 'string' && right.text.length > 0, JSON.stringify({ kind: right.kind }))) return;
+    await correctReading(page, right.text);
+    const inkBefore = await inkOnCanvas(page);
+    const submits = () => online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/submit$`));
+
+    // ── the session ends, then Submit is pressed ─────────────────────────────
+    endServerSession(online);
+    await pressSubmit(page);
+    const refusal = page.locator('[data-check-refusal="sign-in"]');
+    await refusal.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    const seen = await cardText(page);
+    const refused = (await online.settled(), online.calls.filter(c => new RegExp(`^/v1/practice/${right.serverQuestionId}/`).test(c.path) && c.status === 401));
+    await check('the server refused with 401 before anything was marked: no grade was committed',
+      refused.length >= 1 && refused.some(c => c.json?.error?.code === 'AUTH_REQUIRED') && refused.every(c => !c.json || c.json.error?.code === 'AUTH_REQUIRED') && (await submits()).every(c => c.status !== 200) &&
+        online.ledger(right.serverQuestionId).thisDone === 0, JSON.stringify(online.calls.slice(-3).map(c => `${c.path.replace(right.serverQuestionId, ':id')} ${c.status}`)));
+    await check('the card says NOT CHECKED and "sign in again" — never a wrong-answer verdict, marks, or a solution',
+      await refusal.isVisible() && /has not been checked/i.test(seen) && /You’ve been signed out\. Sign in again/i.test(seen) &&
+        await page.locator('.verdict.verdict-technical').count() === 1 && await page.locator('.verdict-bad, .eval-card, .solution-panel').count() === 0 &&
+        !/not quite|incorrect|not this time/i.test(seen) && !OUTAGE_WORDS.test(seen),
+      seen.slice(0, 500));
+    const signIn = page.locator('.verdict [data-check-sign-in]');
+    const held = await saveTruth(page, qid);
+    await check('the work is held: same question, strokes on the page and in the store, the corrected reading still shown, sign-in button beside it',
+      await shownId(page) === qid && await inkOnCanvas(page) === inkBefore && held.kept &&
+        await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null) === right.text &&
+        (await signIn.innerText().catch(() => '')).trim() === 'Sign in again to check this answer' && await signIn.isEnabled().catch(() => false),
+      JSON.stringify({ kept: held.kept, state: held.state, line: await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null) }));
+
+    // ── sign in again on the card, press Submit ──────────────────────────────
+    await signIn.click();
+    await online.signInHere(page.locator('.verdict'), { account });
+    await page.waitForFunction(() => !document.querySelector('[data-check-refusal]'), null, { timeout: 30000 }).catch(() => {});
+    await check('signed in again in place: the refusal is gone, nothing was sent by itself, and the same reading waits for the student\'s own Submit',
+      await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' && await shownId(page) === qid && await mathText('.q-prompt') === prompt &&
+        await page.locator('[data-check-refusal]').count() === 0 && await page.locator('.eval-card').count() === 0 &&
+        (await submits()).every(c => c.status !== 200) && await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null) === right.text,
+      `refusals ${await page.locator('[data-check-refusal]').count()}`);
+    await pressSubmit(page);
+    await page.waitForSelector('.eval-card', { timeout: 30000 }).catch(() => {});
+    const done = (await submits()).filter(c => c.status === 200);
+    const ledger = online.ledger(right.serverQuestionId);
+    await check('Submit is then marked by the server exactly once: authoritative, correct, one completion',
+      done.length === 1 && done[0].json?.authoritative === true && done[0].json.correct === true && done[0].json.resolved === true &&
+        await page.locator('.eval-card[data-outcome="correct"]').count() === 1 && ledger.thisDone === 1 && ledger.completions === 1,
+      `${done.length} graded; ${JSON.stringify(ledger)}`);
+  }
+};
+
+export const flows = [writeFlow, typedFlow, saveTruthFlow, photoFlow, sessionEndedWriteFlow, sessionEndedPhotoFlow, sessionEndedSubmitFlow];
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const { runFlows } = await import('./e2e.mjs');

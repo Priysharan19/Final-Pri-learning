@@ -78,6 +78,7 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   eq(checkRefusal(SIGN_IN), 'sign-in', 'SIGN_IN_TO_CHECK is "sign in"');
   eq(checkRefusal(err(401, 'AUTH_REQUIRED')), 'sign-in', 'the server\'s own AUTH_REQUIRED is "sign in"');
   eq(checkRefusal(err(401, undefined)), 'sign-in', 'a 401 whose body lost its code is still "sign in"');
+  eq(checkRefusal(err(403, 'CSRF_REJECTED')), 'sign-in', 'a stale session security token is "sign in" (again), not an account restriction');
   eq(checkRefusal(RECONNECT), 'reconnect', 'RECONNECT_TO_CHECK is "reconnect"');
   eq(checkRefusal(err(500, 'CLOUD_DISABLED')), 'reconnect', 'no cloud configured is "could not reach the server"');
   eq(checkRefusal(err(500, 'INTERNAL_ERROR')), 'reconnect', 'a failed request to an issued question is "reconnect"');
@@ -107,7 +108,7 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
 {
   const kinds = Object.values(CHECK_REFUSAL);
   eq(kinds.length, 10, 'ten reasons are named');
-  const used = new Set(['check.needsAccount', 'check.signInAction', 'check.signInActionPlain', 'check.draftNotice', 'check.legacyNotice', 'check.teacherNotice', 'check.draftAction', 'check.draftConfirm', 'check.draftConfirmAction', 'check.draftKeep', 'check.draftStillUnmarkable', 'check.restartAction']);
+  const used = new Set(['check.needsAccount', 'check.signInAction', 'check.signInAgainAction', 'check.sessionEnded', 'check.signInActionPlain', 'check.draftNotice', 'check.legacyNotice', 'check.teacherNotice', 'check.draftAction', 'check.draftConfirm', 'check.draftConfirmAction', 'check.draftKeep', 'check.draftStillUnmarkable', 'check.restartAction']);
   // A timed game (Rapid Fire, Match) is refused at its start with the same reasons.
   for (const context of ['answer', 'exam', 'game', 'placement']) {
     for (const kind of kinds) {

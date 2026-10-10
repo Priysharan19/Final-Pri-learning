@@ -223,6 +223,25 @@ eq(throwingCalls, 2, 'a status request that failed outright is never cached');
   const signedOutAgain = await cloudHandwritingReadiness({ user: signedOutProfile, transport: gate, available: there, now: T1 + 3 });
   ok(signedOutAgain.usable === false && probes === 3, 'a ready answer cached for the signed-in state is not served to the signed-out one');
 
+  // An ended session is never "the reader isn't answering" (owner report,
+  // 2026-10-10: production answered 401 to a linked device and the page blamed
+  // the reader). The status probe keeps the HTTP status of its refusal, so a
+  // 401 whose body carried no code this build knows is still "sign in"; so is
+  // a stale session security token. A real outage keeps its own sentence.
+  const linked = { id: 'p-ended', cloudLinked: true };
+  const env = { available: there, online: () => true };
+  const codeless = await cloudHandwritingReadiness({ user: linked, available: there, cache: false,
+    transport: { handwritingStatus: async () => { throw Object.assign(new Error('Cloud request failed (401)'), { status: 401, code: 'CLOUD_REQUEST_FAILED' }); } } });
+  ok(codeless.lastFailureStatus === 401 && inkReadingBlockedKey(linked, { outcome: { reason: 'unavailable', readiness: codeless }, ...env }) === 'ink.waitingSignIn',
+    `a 401 from the status probe with no recognised code is the sign-in blocker for a linked profile, not a reader outage (${codeless.lastFailureCode}/${codeless.lastFailureStatus})`);
+  eq(inkReadingBlockedKey(linked, { outcome: { error: { code: 'CSRF_REJECTED', status: 403 } }, ...env }), 'ink.waitingSignIn',
+    'a stale session security token (CSRF_REJECTED) on the read is "sign in again" too');
+  const down = await cloudHandwritingReadiness({ user: linked, available: there, cache: false,
+    transport: { handwritingStatus: async () => { throw Object.assign(new Error('Cloud request failed (503)'), { status: 503, code: 'HANDWRITING_PROVIDER_5XX' }); } } });
+  ok(inkReadingBlockedKey(linked, { outcome: { reason: 'unavailable', readiness: down }, ...env }) === 'ink.waitingServiceDown' &&
+      inkReadingBlockedKey(linked, { outcome: { error: { code: 'HANDWRITING_TIMEOUT' } }, ...env }) === 'ink.waitingServiceDown',
+    'while a 5xx from the probe and a timed-out read are still the reader not answering');
+
   // A session change (register, sign in, sign out, verified, consent) drops
   // whatever is cached even when the profile view has not caught up yet.
   signedIn = true;
