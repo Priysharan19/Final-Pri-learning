@@ -8,8 +8,7 @@ import {
   ENCRYPTED_STORES, setDataKey, dataKeyFor, hasDataKey, dropDataKeys, sealField, openField
 } from './idb.js';
 import {
-  streakFor, bumpActivity, setPredictedToday,
-  ratingsFor, getRating, putRating, currentPid, setCurrentPid, activityFor
+  streakFor, bumpActivity, ratingsFor, getRating, putRating, currentPid, setCurrentPid, activityFor
 } from './store.js';
 import { cleanTimezone, dayKey, defaultTimezone, timezoneOf, localeOf } from '../lib/locale.js';
 import { cleanLanguage } from '../i18n/languages.js';
@@ -39,15 +38,14 @@ import {
 } from '../engine/misconceptions.js';
 import {
   START_RATING, updateRating, masteryOf, masteryBand, pickDifficulty, pickNext, pickNextAmong,
-  predictMark, priorities, prioritiesAmong, xpFor, levelFromXp, bandFor,
-  pickDotpoint, scheduleReview, migrateReview, gradeFor,
+  predictMark, priorities, prioritiesAmong, xpFor, levelFromXp, pickDotpoint, scheduleReview, migrateReview, gradeFor,
   retrievability, misconceptionLabel, activeTraps, trapPressureOf,
   TRAP_ACTIVE_AT, TRAP_CREDIT_FORGET
 } from '../engine/adaptive.js';
 import { BADGES, checkBadges } from './badges.js';
 import {
   hashPassword, verifyPassword, needsRehash,
-  createVault, openVault, rewrapVault, blindHash, sealValue, openValue
+  createVault, openVault, rewrapVault, blindHash
 } from './auth.js';
 import { sanitizeFigure, sanitizeText } from '../lib/sanitize.js';
 import {
