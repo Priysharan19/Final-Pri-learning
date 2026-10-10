@@ -107,6 +107,16 @@ const FINALS = [
   [['y = 3x + 2.'], { answerType: 'expression' }, proposed('3x + 2')],
   [['derivative is 2x + 3'], { answerType: 'expression' }, proposed('2x + 3')],
   [['dy/dx = 2x + 3'], { answerType: 'expression' }, proposed('2x + 3')],
+  // a function or derivative label on the left is a label, however it is written:
+  // the card itself prints `f⁻¹(x) =` before the answer box on inverse questions
+  [['x = 4y + 4', 'y = (x - 4)/4', 'f⁻¹(x) = (x - 4)/4'], { answerType: 'expression' }, proposed('(x - 4)/4')],
+  [['f^-1(x) = (x - 4)/4'], { answerType: 'expression' }, proposed('(x - 4)/4')],
+  [['f^(-1)(x) = (x - 4)/4'], { answerType: 'expression' }, proposed('(x - 4)/4')],
+  [['∴ f^-1(x) = (x - 4)/4'], { answerType: 'expression' }, proposed('(x - 4)/4')],
+  [['so f⁻¹(x) = (x - 4)/4'], { answerType: 'expression' }, proposed('(x - 4)/4')],
+  [['(f o g)^-1(x) = (x - 4)/4'], { answerType: 'expression' }, proposed('(x - 4)/4')],
+  [['d/dx (4x+3)^4 = 16(4x + 3)^3'], { answerType: 'expression' }, proposed('16(4x + 3)^3')],
+  [["f '(x) = 2x + 3"], { answerType: 'expression' }, proposed('2x + 3')],
   [['least value'], { answerType: 'expression' }, { status: 'none' }],
   [['x >= 3'], { answerType: 'expression' }, { status: 'none' }],
   [['solution: x > 3'], { answerType: 'interval' }, proposed('x > 3')],
@@ -194,7 +204,10 @@ const INK = [
   [['centre (0,0), radius 5', 'so x^2 + y^2 = 25'], E, { sent: 'x^2 + y^2 = 25', how: 'proposed' }],
   [['the line is 2x + 3y = 6.'], E, { sent: '2x + 3y = 6', how: 'proposed' }],
   [['dy/dx = 2x + 3'], E, { sent: '2x + 3', how: 'proposed' }],
-  [['so f(x) = x^2 - 1'], E, { sent: 'x^2 - 1', how: 'proposed' }]
+  [['so f(x) = x^2 - 1'], E, { sent: 'x^2 - 1', how: 'proposed' }],
+  [['f⁻¹(x) = (x - 4)/4'], E, { sent: '(x - 4)/4', how: 'proposed' }],
+  [['d/dx (4x+3)^4 = 16(4x + 3)^3'], E, { sent: '16(4x + 3)^3', how: 'proposed' }],
+  [['y - 3 = 2(x - 1)'], E, { sent: 'y - 3 = 2(x - 1)', how: 'as written' }]
 ];
 for (const [lines, question, want] of INK) eq(inkAnswer(lines, question), want, `ink answer of ${JSON.stringify(lines.join(' ⏎ '))} as ${question.answerType}`);
 for (const [lines, question, want] of INK) {

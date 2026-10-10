@@ -156,13 +156,34 @@ export function readsAsWritten(text, question = {}) {
   return (question?.answerType || 'numeric') === 'expression' && isEquationAnswer(String(text ?? '').trim());
 }
 
+/** Does this side add or subtract terms outside any brackets (a leading sign and a sign in an exponent do not count)? */
+function isSumOfTerms(side) {
+  let depth = 0, seen = false;
+  for (let i = 0; i < side.length; i += 1) {
+    const ch = side[i];
+    if ('([{'.includes(ch)) depth += 1;
+    else if (')]}'.includes(ch)) depth = Math.max(0, depth - 1);
+    else if (depth === 0 && (ch === '+' || ch === '-' || ch === '−')) {
+      const before = side.slice(0, i).trimEnd().slice(-1);
+      if (seen && before && !'^*/×·('.includes(before)) return true;
+    }
+    if (ch.trim()) seen = true;
+  }
+  return false;
+}
+
 /** A whole equation that is not just a name being given a value ("y = …", "f(x) = …", "dy/dx = …"). */
 function isEquationAnswer(s) {
   if (!s || s.length > 200 || hasProse(s) || relations(s).some(r => r.kind !== 'equals')) return false;
   const at = s.lastIndexOf('=');
   if (at <= 0 || s.indexOf('=') !== at) return false;
   const left = s.slice(0, at).trim();
-  if (/^[a-zA-Zθ]['′]?(\s*\(\s*[a-zA-Zθ]\s*\))?$/.test(left) || /^d\s*[a-zA-Z]\s*\/\s*d\s*[a-zA-Z]$/.test(left)) return false;
+  // A left side that is one term — `y`, `f(x)`, `f⁻¹(x)`, `(f ∘ g)^-1(x)`,
+  // `dy/dx`, `d/dx (4x+3)^4` — is a label for what follows, however it is
+  // written: the answer is the right-hand side, as it was before equations
+  // were kept whole. Only a left side that is itself a sum or difference of
+  // terms (`x^2 + y^2`, `2x + 3y`, `y - 3`) makes the equation the answer.
+  if (!isSumOfTerms(left)) return false;
   try { return parse(normalize(cleanInput(s, { stripUnits: false })))?.t === 'equation'; } catch { return false; }
 }
 
