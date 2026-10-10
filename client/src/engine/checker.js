@@ -1817,6 +1817,60 @@ function solvingStage(claim, variable, givenOwn) {
   return null;
 }
 
+/** The one value a line that is linear in `variable` alone pins it to; null when it is not such a line. */
+function statedRootOf(claim, variable) {
+  if (claim?.kind !== 'equation') return null;
+  const names = variablesOf(claim.ast);
+  if (names.size !== 1 || !names.has(variable)) return null;
+  const [l, r] = claimSides(claim);
+  const lone = side => unwrapGroup(side)?.t === 'var' && unwrapGroup(side).v === variable;
+  try {
+    if (lone(l) && !variablesOf(r).size) { const v = evaluate(r, {}); return Number.isFinite(v) ? v : null; }
+    if (lone(r) && !variablesOf(l).size) { const v = evaluate(l, {}); return Number.isFinite(v) ? v : null; }
+  } catch { return null; }
+  const state = linearState(claim, variable);
+  if (!state) return null;
+  const [a, b, c, d] = state.sides;
+  const value = (d - b) / (a - c);
+  return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Is `claim` — an equation in one letter of a pair — what elimination leaves:
+ * a sum of whole multiples of the question's two-letter equations (each
+ * equation taken as written, or with its common factor divided out)?
+ */
+function eliminatedFromGiven(claim, given, letters) {
+  if (claim?.kind !== 'equation' || !Array.isArray(letters) || letters.length !== 2) return false;
+  const [p, q] = letters;
+  const coefficients = c => {
+    const names = variablesOf(c.ast);
+    if (![...names].every(n => n === p || n === q)) return null;
+    const f = (x, y) => evaluate(c.ast.l, { [p]: x, [q]: y }) - evaluate(c.ast.r, { [p]: x, [q]: y });
+    try {
+      const k = f(0, 0), a = f(1, 0) - k, b = f(0, 1) - k;
+      if (![a, b, k].every(Number.isFinite) || !numsClose(f(2, 3), 2 * a + 3 * b + k)) return null;
+      return [a, b, k];
+    } catch { return null; }
+  };
+  const line = coefficients(claim);
+  if (!line) return false;
+  const whole = x => numsClose(x, Math.round(x));
+  const gcd = (x, y) => { x = Math.abs(Math.round(x)); y = Math.abs(Math.round(y)); while (y) [x, y] = [y, x % y]; return x || 1; };
+  const system = given.filter(c => c.kind === 'equation' && variablesOf(c.ast).has(p) && variablesOf(c.ast).has(q)).map(coefficients).filter(Boolean);
+  for (let i = 0; i < system.length; i++) for (let j = i + 1; j < system.length; j++) {
+    const [a1, b1, k1] = system[i], [a2, b2, k2] = system[j];
+    const det = a1 * b2 - a2 * b1;
+    if (numsClose(det, 0)) continue;
+    // line = s·(first) + t·(second)
+    const s2 = (line[0] * b2 - line[1] * a2) / det, t2 = (a1 * line[1] - b1 * line[0]) / det;
+    if (!numsClose(s2 * k1 + t2 * k2, line[2])) continue;
+    const g1 = [a1, b1, k1].every(whole) ? gcd(gcd(a1, b1), k1) : 1, g2 = [a2, b2, k2].every(whole) ? gcd(gcd(a2, b2), k2) : 1;
+    if (whole(s2 * g1) && whole(t2 * g2)) return true;
+  }
+  return false;
+}
+
 /** Is this line the answer itself — the solved inequality, or the expression as the answer writes it? */
 function statesTheAnswer(claim, meta, unknown) {
   try {
@@ -1993,6 +2047,37 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
     return letters.length === 1 ? letters[0] : null;
   })();
   const linearQuestion = !!unknown && given.some(c => !!linearState(c, unknown));
+  // The question's own equations in the unknown alone, and whether stated
+  // roots are to be read as such: a polynomial equation of degree two or
+  // more, or any equation with several roots.
+  const givenOwnAll = meta.kind === 'equation' && meta.variable ? given.filter(c => {
+    if (c.kind !== 'equation') return false;
+    const names = variablesOf(c.ast);
+    return names.size === 1 && names.has(meta.variable);
+  }) : [];
+  const degreeOf = c => {
+    const [l, r] = claimSides(c);
+    const pl = polynomialIn(l, meta.variable), pr = polynomialIn(r, meta.variable);
+    return pl && pr ? polynomialIn({ t: 'bin', op: '-', l, r }, meta.variable).length - 1 : -1;
+  };
+  const statedRoots = meta.kind === 'equation' && !!meta.variable && !linearQuestion &&
+    (uniqueNumeric(meta.solutions).length > 1 || givenOwnAll.some(c => degreeOf(c) >= 2));
+  const givenSolved = givenOwnAll.some(c => ['factorised', 'square'].includes(equationForm(c, meta.variable)));
+  const rootsRead = [];
+  // Stated roots are one shape whatever their spelling: a working that gives
+  // the unknown two or more different values, not all of them roots, is a
+  // list of candidates, and none of its stated roots earns.
+  let rootSweep = false;
+  if (statedRoots) {
+    const wanted = uniqueNumeric(meta.solutions);
+    const values = [];
+    for (const l of allLines) {
+      const c = readClaim(l.text);
+      const v = c?.kind === 'equation' ? statedRootOf(c, meta.variable) : null;
+      if (v !== null && !values.some(x => numsClose(x, v))) values.push(v);
+    }
+    rootSweep = values.length >= 2 && values.some(v => !wanted.some(w => numsClose(w, v)));
+  }
   // The per-line mark vector: one entry per written line, in order, saying
   // what that line earned and why. Its marks always sum to `awarded`, so a
   // multi-line answer can show the examiner's tick (or its absence) per line.
@@ -2040,6 +2125,11 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
       if (given.map(c => linearState(c, names[0])).filter(Boolean).some(g => !linearStateAdvances(state, g))) { row.reason = 'restated'; return row; }
       if (otherFound.has(names[0])) { row.reason = 'repeat'; return row; }
       if (state.left === 0 && !counted.length) { row.reason = 'other-unknown'; return row; }
+      // With nothing before it, a line in that letter alone must be what
+      // eliminating leaves — whole multiples of the question's equations
+      // added together. `2x = -14` on `6x + 3y = -60`, `4x - y = -22` is not:
+      // it is the value of x doubled, as bare as `x = -7`.
+      if (!counted.length && system && !eliminatedFromGiven(claim, given, system.variables)) { row.reason = 'other-unknown'; return row; }
       otherFound.add(names[0]);
       return credit();
     }
@@ -2058,24 +2148,40 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
       if (counted.length >= cap) { row.reason = 'cap'; return row; }
       if (counted.some(c => isolatedFinalAnswer(c, meta))) { row.reason = 'repeat'; return row; }
     }
-    // On an equation with several roots, a line that gives the unknown a value
-    // (`x = 4`, `x = (-4 + sqrt(144))/2`) names one root. Written with nothing
-    // before it, it is a statement; after working it is the root read off,
-    // once — unless it is the quadratic formula with the equation's own
-    // discriminant under the root, which is a stage of solving in itself.
-    if (claim?.kind === 'equation' && meta.kind === 'equation' && meta.variable && uniqueNumeric(meta.solutions).length > 1) {
+    // A stated root. On a polynomial equation of degree two or more, a line
+    // that is linear in the unknown pins it to one value, however it is
+    // spelt: `x = 4`, `x - 4 = 0`, `2x = 8`, `8 = 2x`, `x/2 = 2`, `-x = -4`.
+    // It is a root read off, and earns as one: only after the equation has
+    // been solved — a factorisation, a completed square or the formula is
+    // credited, or the question is itself given in one of those forms — and
+    // once for each root. With nothing solved before it, it is a statement.
+    // The quadratic formula with the equation's own discriminant under the
+    // root is itself a stage of solving, once.
+    // A verified `±` line gives every root at once (`x = (-15 ± 1)/2`): the
+    // formula applied. The roots written out after it are read off it.
+    if (statedRoots && !claim && l.coversAll === true && /±/.test(String(l.text))) {
+      solvedStages.add('formula');
+      row.stage = 'formula';
+      return credit();
+    }
+    if (statedRoots && claim?.kind === 'equation') {
       const [vl, vr] = claimSides(claim);
       const lone = side => unwrapGroup(side)?.t === 'var' && unwrapGroup(side).v === meta.variable;
       const value = lone(vl) && !variablesOf(vr).size ? vr : lone(vr) && !variablesOf(vl).size ? vl : null;
-      if (value) {
-        if (usesDiscriminant(value, [...given, ...counted], meta.variable)) {
-          if (solvedStages.has('formula')) { row.reason = 'repeat'; return row; }
-          solvedStages.add('formula');
-          return credit();
-        }
-        if (!counted.length) { row.reason = 'final-answer'; return row; }
-        if (solvedStages.has('root')) { row.reason = 'repeat'; return row; }
-        solvedStages.add('root');
+      if (value && usesDiscriminant(value, [...given, ...counted], meta.variable)) {
+        if (solvedStages.has('formula')) { row.reason = 'repeat'; return row; }
+        solvedStages.add('formula');
+        row.stage = 'formula';
+        return credit();
+      }
+      const pinned = statedRootOf(claim, meta.variable);
+      if (pinned !== null) {
+        if (rootSweep) { row.reason = 'contradicted'; return row; }
+        const solved = ['factorised', 'square', 'formula'].some(stage => solvedStages.has(stage)) || givenSolved;
+        if (!solved) { row.reason = 'final-answer'; return row; }
+        if (rootsRead.some(x => numsClose(x, pinned))) { row.reason = 'repeat'; return row; }
+        rootsRead.push(pinned);
+        row.stage = 'root';
         return credit();
       }
     }
@@ -2113,6 +2219,11 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
     // question, as `x = 2` is under `3x = 6`.)
     if (!counted.length && !restated && claim && statesTheAnswer(claim, meta, unknown)) { row.reason = 'final-answer'; return row; }
     const state = unknown ? linearState(claim, unknown) : null;
+    // The same for the asked unknown of a pair: `y + 6 = 0` with nothing
+    // before it is the answer stated, not y found by elimination.
+    if (state && system && claim?.kind === 'equation' && !counted.length && !eliminatedFromGiven(claim, given, system.variables)) {
+      row.reason = 'final-answer'; return row;
+    }
     if (state) {
       const before = [...given, ...counted].map(c => linearState(c, unknown)).filter(Boolean);
       if (before.some(g => !linearStateAdvances(state, g))) { row.reason = 'repeat'; return row; }

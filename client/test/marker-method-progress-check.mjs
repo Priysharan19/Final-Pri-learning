@@ -349,7 +349,8 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   ok(marksFor('-31x = -155\nx = 5\ny = 99', 4, stepCheck(meta, '-31x = -155\nx = 5\ny = 99')) === 1, '…the same when the caller\'s report was made without the prompt');
   ok(marksFor('-31x = -155\nx = 5\n3(5) + 5y = 5\n5y = -10\ny = 99', 5) === 3, 'the whole elimination: one mark for finding x, one for each step in y');
   ok(marksFor('x = 5\ny = 99') === 0, 'the other unknown stated with no working is not a step');
-  ok(marksFor('2x = 10\n3x = 15\n4x = 20\n10 = 2x\ny = 99') === 1, 'the same value of x written four ways is one step');
+  ok(marksFor('2x = 10\n3x = 15\n4x = 20\n10 = 2x\ny = 99') === 0, 'the value of x written four ways, none of them what eliminating y leaves, is x stated');
+  ok(marksFor('31x = 155\n-31x = -155\n62x = 310\ny = 99') === 1, 'what eliminating y leaves, written three ways, is one step');
   ok(marksFor('-31x = -155\nx = 5\n2x = 10\n-31x = -155\ny = 99') === 1, 'going back over x after finding it earns nothing more');
   ok(marksFor('6x + 10y = 10\n9x + 15y = 15\n8x + 3y = 34\nx + y = 3\ny = 99') === 0, 'lines still in both unknowns have eliminated nothing');
   ok(marksFor('x = (5 - 5y)/3\ny = 99') === 1, 'making x the subject is the first step of substitution');
@@ -421,18 +422,21 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   const run = (working, marks = 4) => {
     try { return methodMarks({ meta, working: `${working}\nx = 987654`, marks, prompt })?.awarded ?? 0; } catch { return -1; }
   };
-  ok(run('6y = 12\n3y = 6\ny = 2') === 1, 'the other unknown reached by halving twice is one mark');
+  ok(run('6y = 12\n3y = 6\ny = 2') === 0, 'y = 2 written as 6y = 12 and halved twice is still y stated: no elimination leaves 6y = 12');
+  ok(run('5y = 10\n10y = 20\ny = 2') === 1, 'the other unknown eliminated to 5y = 10, then rewritten, is one mark');
   ok(run('5y = 10\ny = 2') === 1, 'an equation in y alone and then its value are one finding');
-  ok(run('6y = 12') === 1, 'an equation in y alone is that finding');
+  ok(run('5y = 10') === 1, 'the equation in y alone that elimination leaves is that finding');
+  for (const line of ['6y = 12', '2y = 4', 'y + 1 = 3', 'y - 2 = 0', '0 = y - 2', 'y/2 = 1', '-y = -2', '4 = 2y']) ok(run(line) === 0, `the other unknown's value disguised as "${line}" earns nothing`);
   ok(run('y = 2') === 0, 'the bare value of the other unknown, with no working, is still not a step');
-  ok(run('6y = 12\n3y = 6\n2y = 4\ny = 2\ny + 1 = 3\ny - 1 = 1\ny/2 = 1\n-y = -2') === 1, 'eight ways of writing y = 2 are one mark');
+  ok(run('6y = 12\n3y = 6\n2y = 4\ny = 2\ny + 1 = 3\ny - 1 = 1\ny/2 = 1\n-y = -2') === 0, 'eight ways of writing y = 2 earn nothing');
+  ok(run('5y = 10\n6y = 12\ny = 2\ny + 1 = 3\ny/2 = 1\n-y = -2') === 1, 'after the elimination, five more ways of writing y = 2 add nothing');
   // Making a letter the subject is a step only as a rearrangement of an
   // equation the question gives — not for being true at the solution.
   ok(run('y = 10 - x') === 1, 'y made the subject of the first equation is the first step of substitution');
   ok(run('y = 4x - 30') === 1, '…and so is y made the subject of the second');
   ok(run('y = x - 6') === 0, 'a line in both letters that is true only at the solution has rearranged nothing');
   ok(run('x = y + 6') === 0, '…whichever letter it is written for');
-  ok(run('6y = 12\n3y = 6\ny = 2\ny = x - 6\nx = y + 6') === 1, 'a stack of restatements of the solution earns the one mark for finding y');
+  ok(run('6y = 12\n3y = 6\ny = 2\ny = x - 6\nx = y + 6') === 0, 'a stack of restatements of the solution earns nothing');
   ok(run('y = 10 - x\n4x - (10 - x) = 30\n5x - 10 = 30\n5x = 40') === 3, 'genuine substitution keeps a mark for each step');
   ok(run('5y = 10\ny = 2\nx + 2 = 10') === 2, 'finding y and putting it back are two steps');
 }
@@ -478,7 +482,7 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   ok(run('5t - 2t = 5 + 4\n3t = 9\n3t = 12\n3t = 15') === 1, 'three values for 3t are a list of candidates: the line among them loses its mark, the step before keeps its own');
   // Two roots: the branches of a factorisation are not candidates.
   const quad = { kind: 'equation', variable: 'x', solutions: [2, -3], source: 'x^2+x-6=0' };
-  ok((methodMarks({ meta: quad, working: '(x-2)(x+3)=0\nx-2=0\nx+3=0\nx=5', marks: 4, prompt: '$x^2+x-6=0$' })?.awarded ?? 0) === 2, 'the two branches of a factorisation are not a sweep');
+  ok((methodMarks({ meta: quad, working: '(x-2)(x+3)=0\nx-2=0\nx+3=0', marks: 4, prompt: '$x^2+x-6=0$' })?.awarded ?? 0) === 3, 'the two branches of a factorisation are not a sweep: each root is read off once');
   // A bare number on an equation states a value.
   ok(run('5t - 2t = 5 + 4\n3') === 1, 'a bare number after a step is a value stated, not a second step');
 }
@@ -490,7 +494,9 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
 {
   const run = (source, variable, roots, working, marks = 4) => {
     const meta = { kind: 'equation', variable, solutions: roots, source };
-    try { return methodMarks({ meta, working: `${working}\n${variable} = 424242`, marks, prompt: `$${source}$` })?.awarded ?? 0; } catch { return -1; }
+    // The wrong final answer is the answer box. Written into the working of a
+    // quadratic it would be one more value for the unknown beside its roots.
+    try { return methodMarks({ meta, working: roots.length > 1 ? working : `${working}\n${variable} = 424242`, marks, prompt: `$${source}$` })?.awarded ?? 0; } catch { return -1; }
   };
   const L = '6m + 11', R = '3m + 20';
   const lin = working => run('6m + 11=3m + 20', 'm', [3], working);
@@ -514,7 +520,7 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   }
   ok(quad(`2(${P}) = 2(0)\n(${P})/0.5 = (0)/0.5\n(${P})^3 = 0`) === 0, 'a page of them earns nothing');
   ok(quad('(x + 2)(x + 3) = 0') === 1, 'the factorisation is a step');
-  ok(quad('(x + 2)(x + 3) = 0\nx + 2 = 0\nx + 3 = 0') === 2, 'the factorisation and its branches keep the two marks they had (the second branch counts with the first)');
+  ok(quad('(x + 2)(x + 3) = 0\nx + 2 = 0\nx + 3 = 0') === 3, 'the factorisation, and each root read off it once');
   const moved = working => run('x^2 + 3x=4x + 6', 'x', [3, -2], working);
   ok(moved('x^2 + 3x - (4x + 6) = 0') === 0, 'everything moved to one side, nothing collected, is the question written round the other way');
   ok(moved('x^2 - x - 6 = 0') === 1, 'standard form is the first step of a quadratic');
@@ -535,9 +541,9 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
 {
   const marks = (source, roots, working, total = 4) => {
     const meta = { kind: 'equation', variable: 'x', solutions: roots, source };
-    try { return methodMarks({ meta, working: `${working}\nx = 424242`, marks: total, prompt: `$${source}$` })?.awarded ?? 0; } catch { return -1; }
+    try { return methodMarks({ meta, working, marks: total, prompt: `$${source}$` })?.awarded ?? 0; } catch { return -1; }
   };
-  const why = (source, roots, working) => (methodMarks({ meta: { kind: 'equation', variable: 'x', solutions: roots, source }, working: `${working}\nx = 424242`, marks: 4, prompt: `$${source}$` })?.lines ?? []).map(l => l.reason).slice(0, -1).join();
+  const why = (source, roots, working) => (methodMarks({ meta: { kind: 'equation', variable: 'x', solutions: roots, source }, working, marks: 4, prompt: `$${source}$` })?.lines ?? []).map(l => l.reason).join();
   for (const [source, roots, working, expected, label] of [
     ['x^2=9', [3, -3], 'x^2-9=0\n(x-3)(x+3)=0', 2, 'standard form and the factorisation of x^2 = 9'],
     ['x^2=9', [3, -3], 'x^2-9=0', 1, 'standard form alone, though longer than x^2 = 9'],
@@ -545,12 +551,12 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
     ['x^2=5x', [0, 5], 'x^2-5x=0\nx(x-5)=0', 2, 'standard form and the factorisation of x^2 = 5x'],
     ['x(x-5)=-6', [2, 3], 'x^2-5x=-6\nx^2-5x+6=0\n(x-2)(x-3)=0', 3, 'expanding, standard form and factorising a bracketed question'],
     ['x^2-6x=7', [7, -1], 'x^2-6x+9=16\n(x-3)^2=16\nx-3=±4', 2, 'completing the square: the square and the root taken (adding 9 is one mark with the square)'],
-    ['x^2-6x=7', [7, -1], '(x-3)^2=16\nx-3=4\nx=7', 3, 'the square, one branch of its root, and the root read off'],
-    ['x^2-6x=7', [7, -1], '(x-3)^2=16\nx-3=4\nx-3=-4', 2, 'the two branches of a root count once'],
+    ['x^2-6x=7', [7, -1], '(x-3)^2=16\nx-3=4\nx=7', 2, 'the square and one root read off it — x - 3 = 4 and x = 7 are the same root'],
+    ['x^2-6x=7', [7, -1], '(x-3)^2=16\nx-3=4\nx-3=-4', 3, 'the square and each of its two roots'],
     ['x + 6/x=5', [2, 3], 'x^2+6=5x\nx^2-5x+6=0\n(x-2)(x-3)=0', 3, 'clearing a denominator, standard form and the factorisation'],
     ['x^2+4x-32=0', [4, -8], 'x = (-4 + sqrt(144))/2', 1, 'one branch of the quadratic formula, with the equation\'s discriminant under the root'],
     ['x^2+4x-32=0', [4, -8], 'x = (-4 + sqrt(16 + 128))/2\nx = (-4 - sqrt(16 + 128))/2', 1, 'both branches of the formula are one stage'],
-    ['x^2+4x-32=0', [4, -8], '(x-4)(x+8)=0\nx=4\nx=-8', 2, 'a factorisation and the roots read off it'],
+    ['x^2+4x-32=0', [4, -8], '(x-4)(x+8)=0\nx=4\nx=-8', 3, 'a factorisation and each root read off it'],
     ['2x^2-10x+12=0', [2, 3], 'x^2-5x+6=0\n(x-2)(x-3)=0', 2, 'dividing a common factor out of a question already in standard form, then factorising'],
     ['x^2+3x=4x+6', [3, -2], 'x^2-x-6=0\n(x-3)(x+2)=0', 2, 'standard form and the factorisation where the question is the longer line']
   ]) {
@@ -585,7 +591,7 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
 {
   const marks = (source, roots, working, total = 4) => {
     const meta = { kind: 'equation', variable: 'x', solutions: roots, source };
-    try { return methodMarks({ meta, working: `${working}\nx = 424242`, marks: total, prompt: `$${source}$` })?.awarded ?? 0; } catch { return -1; }
+    try { return methodMarks({ meta, working, marks: total, prompt: `$${source}$` })?.awarded ?? 0; } catch { return -1; }
   };
   for (const working of ['x^2 - 11x = -28', 'x(x - 11) = -28', 'x^2 - 11x = -28\nx(x - 11) = -28', 'x^2 = 11x - 28\nx^2 - 11x = -28\nx(x - 11) = -28\nx^2 + 28 = 11x', 'x(x - 11) + 28 = 0']) {
     ok(marks('x^2 - 11x + 28=0', [4, 7], working) === 0, `a quadratic already in standard form: "${working.replace(/\n/g, ' ; ')}" rearranges it and earns nothing`);
@@ -687,6 +693,58 @@ ok(stepCheck(meta, `${fill('(x+1)', 290, '')}+12345 = 0`, { prompt }).lines[0].u
   ok(stepCheck({ kind: 'equation', variable: 'x', solutions: [5] }, 'x = 5\nx^2 = 25').firstBreak === 1, 'squaring a solved equation, which adds a root, is still the mistake');
   ok(stepCheck({ kind: 'equation', variable: 'x', solutions: [5] }, '3x = 15\n(x - 5)(x - 100) = 0').firstBreak === 1, 'a root injected after a verified line is still the mistake');
   ok(stepCheck(meta, 'a^2 = 9', { prompt }).firstBreak === 0, 'and a line that is false for the answer is the mistake');
+}
+
+// ── A root stated in another spelling is still a root stated ─────────────────
+// When one branch written alone stopped being called a mistake, `x - 4 = 0`
+// and `2x = 8` on `x^2 + 4x - 32 = 0` began to earn a method mark with nothing
+// before them, where `x = 4` earned none: a root stated, in disguise.
+{
+  const marks = (source, roots, working, total = 4) => {
+    const meta = { kind: 'equation', variable: 'x', solutions: roots, source };
+    try { return methodMarks({ meta, working, marks: total, prompt: `$${source}$` })?.awarded ?? 0; } catch { return -1; }
+  };
+  const Q = ['x^2+4x-32=0', [4, -8]];
+  const four = ['x = 4', 'x - 4 = 0', '2x = 8', 'x + 1 = 5', '8 = 2x', 'x/2 = 2', '-x = -4', '0 = x - 4'];
+  const eight = ['x = -8', 'x + 8 = 0', '2x = -16', 'x + 1 = -7', '-16 = 2x', 'x/2 = -4', '-x = 8', '0 = x + 8'];
+  for (const line of [...four, ...eight]) ok(marks(...Q, line) === 0, `"${line}" on x^2 + 4x - 32 = 0, with nothing before it, is a root stated and earns nothing`);
+  for (let i = 0; i < four.length; i++) ok(marks(...Q, `${four[i]}\n${eight[(i + 3) % eight.length]}`) === 0, `both roots stated as "${four[i]}" and "${eight[(i + 3) % eight.length]}" earn nothing`);
+  ok(marks(...Q, [...four, ...eight].join('\n')) === 0, 'every spelling of both roots, with nothing solved, earns nothing');
+  // After the equation has been solved, each root is read off once, in any spelling.
+  for (let i = 0; i < four.length; i++) {
+    ok(marks(...Q, `(x-4)(x+8)=0\n${four[i]}\n${eight[i]}`) === 3, `after the factorisation, "${four[i]}" and "${eight[i]}" each read off a root`);
+    ok(marks(...Q, `(x-4)(x+8)=0\n${four[i]}`) === 1, `…and "${four[i]}" alone, the other branch of the product dropped, is still the mistake it was`);
+  }
+  ok(marks(...Q, `(x-4)(x+8)=0\n${four.join('\n')}\nx + 8 = 0`) === 3, 'one root in eight spellings is read off once');
+  ok(marks(...Q, `(x+2)^2=36\nx + 2 = 6\nx = 4\nx + 2 = -6\nx = -8`) === 3, 'after the square, each root once, however many lines it takes to reach it');
+  ok(marks(...Q, 'x = (-4 + sqrt(144))/2\nx = 4\n2x = 8') === 2, 'after the formula, the root it gives is read off once');
+  ok(marks(...Q, 'x = (-4 ± 12)/2\nx = 4\nx = -8') === 3, 'after the formula written with ±, each root is read off it');
+  ok(marks(...Q, 'x = (-4 ± 12)/2\nx = 4\nx = 5') === 1, '…and not beside a value that is no root');
+  // A list of candidates, however each is spelt.
+  ok(marks(...Q, '2x = 8\nx + 1 = 6') === 0, 'a true candidate and a false one, in different spellings, earn nothing');
+  ok(marks(...Q, 'x + 1 = 6\n2x = 8') === 0, '…in either order');
+  ok(marks(...Q, '(x-4)(x+8)=0\nx - 4 = 0\nx/2 = 3') === 1, 'after a factorisation, a root beside a value that is no root: the factorisation keeps its mark, the stated values earn none');
+  ok(marks(...Q, '(x-4)(x+8)=0\nx - 4 = 0\nx + 8 = 0\n2x = 8\n-x = 8') === 3, 'the roots restated, all of them roots, void nothing');
+  // A repeated root, and a cubic.
+  ok(marks('x^2-6x+9=0', [3], '2x = 6') === 0, 'a repeated root stated as 2x = 6 earns nothing');
+  ok(marks('x^2-6x+9=0', [3], '(x-3)^2=0\nx - 3 = 0') === 2, 'the square found, and its root read off');
+  ok(marks('(x-3)^2=0', [3], 'x - 3 = 0') === 1, 'a question given as a square: its root read off is the step');
+  ok(marks('x^3-6x^2+11x-6=0', [1, 2, 3], '2x = 4\nx - 1 = 0\n3 = x') === 0, 'three roots of a cubic stated in three spellings earn nothing');
+  ok(marks('x^3-6x^2+11x-6=0', [1, 2, 3], '(x-1)(x-2)(x-3)=0\n2x = 4\nx - 1 = 0\n3 = x', 5) === 4, 'after the factorisation, each of the three is read off once');
+  ok(marks('(x-2)(x+3)=0', [2, -3], 'x - 2 = 0\nx + 3 = 0') === 2, 'a question given factorised: its two roots read off are the two steps');
+  // The verdict is unchanged: one branch alone is true of its root, and is not the first mistake.
+  const lone = stepCheck({ kind: 'equation', variable: 'x', solutions: [4, -8], source: 'x^2+4x-32=0' }, '2x = 8\nx^2 + 4x = 32', { prompt: '$x^2+4x-32=0$' });
+  ok(lone.firstBreak === -1 && lone.lines[0].status === 'ok', '2x = 8 alone is still not called a mistake');
+  // The pair of equations: the asked unknown, and the other one, disguised.
+  const pair = { kind: 'equation', variable: 'y', solutions: [-6] };
+  const pairPrompt = 'Solve by elimination: $6x + 3y = -60$ and $4x - y = -22$. Find the value of $y$.';
+  const pairMarks = working => { try { return methodMarks({ meta: pair, working, marks: 4, prompt: pairPrompt })?.awarded ?? 0; } catch { return -1; } };
+  for (const line of ['y + 6 = 0', '2y = -12', '0 = y + 6', 'y/2 = -3', '-y = 6', 'x + 7 = 0', '2x = -14', 'x/7 = -1', '-x = 7', 'y - 3 = -9']) ok(pairMarks(line) === 0, `pair: "${line}" is a value stated in disguise and earns nothing`);
+  ok(pairMarks('2x = -14\ny + 6 = 0') === 0, 'pair: both values in disguise earn nothing');
+  ok(pairMarks('18x = -126') === 1 && pairMarks('9y = -54') === 1 && pairMarks('-9y = 54') === 1, 'pair: what eliminating a letter leaves is the step');
+  ok(pairMarks('12x + 6y = -120\n12x - 3y = -66\n9y = -54\n3y = -18') === 2, 'pair: the elimination, and dividing it through, keep their marks');
+  ok(pairMarks('y = 4x + 22\n6x + 3(4x + 22) = -60\n18x + 66 = -60\n18x = -126') === 2, 'pair: substitution keeps its marks');
+  ok(pairMarks('18x = -126\nx = -7\n4(-7) - y = -22\n-28 - y = -22') === 3, 'pair: elimination, then the value put back and simplified, keep their marks');
 }
 
 // ── A comma with a space beside it is a list ─────────────────────────────────
