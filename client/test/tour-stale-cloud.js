@@ -21,6 +21,7 @@
 // returns an expected answer.
 // Run on its own:  node client/test/tour-stale-cloud.js
 // ─────────────────────────────────────────────────────────────────────────────
+import { pressRead } from './fakeServerReader.js';
 import { pathToFileURL } from 'node:url';
 import { TEMPLATES } from '../src/ink/templates.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
@@ -178,6 +179,7 @@ export const flow = {
     stub.transcribeDelay = 100;
     stub.text = '7';
     await handwrite(page, box, '1');
+    await pressRead(page);   // reading is asked for
     await readsAs(page, '7');
     const early = await reading(page);
     if (!await check('control: the server reading is what the card shows and will submit',
@@ -192,6 +194,7 @@ export const flow = {
     stub.text = glyph;
     const sentBefore = stub.transcribed;
     await handwrite(page, box, glyph);
+    await pressRead(page);   // reading is asked for
     const until = Date.now() + 15000;
     while (stub.transcribed === sentBefore && Date.now() < until) await page.waitForTimeout(50);
     const inFlight = await reading(page);
@@ -210,6 +213,7 @@ export const flow = {
       online.forgetKeptReads();   // re-scripted stand-in (desk only)
       stub.text = glyph;
       await handwrite(page, box, glyph);
+      await pressRead(page);   // reading is asked for
       await readsAs(page, glyph);
       await submitInk();
     }
@@ -244,6 +248,7 @@ export const flow = {
       box = await page.locator('.ink-canvas-live').boundingBox();
       await handwrite(page, box, '1');
       await handwrite(page, box, '2', { y: 230 });
+      await pressRead(page);   // reading is asked for
       await page.waitForFunction(() => document.querySelectorAll('.ink-line').length === 2, null, { timeout: 15000 }).catch(() => null);
       await submitInk();
       await page.waitForSelector('.verdict-bad, .eval-card', { timeout: 20000 });

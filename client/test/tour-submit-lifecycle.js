@@ -19,7 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
 import { TEMPLATES } from '../src/ink/templates.js';
-import { turnOnServerReading } from './fakeServerReader.js';
+import { pressRead, turnOnServerReading } from './fakeServerReader.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
 const TOPIC = 'y7-equations';
@@ -214,6 +214,7 @@ export const flow = {
     const inkId = await shownId(page);
     const box = await page.locator('.ink-canvas-live').boundingBox();
     await handwrite(page, box, '1');
+    await pressRead(page);   // reading is asked for: nothing is read because ink was drawn
     await page.waitForFunction(() => document.querySelectorAll('.ink-line').length === 1, null, { timeout: 15000 }).catch(() => null);
     const before = await page.locator('.ink-line').count();
     // Readable mouse strokes produce an answer line, and an answer line is
