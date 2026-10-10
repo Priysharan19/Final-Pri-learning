@@ -210,11 +210,13 @@ export const flow = {
         // Two presses in one task: the second lands before the page has re-rendered.
         await page.evaluate(() => { const b = document.querySelector('[data-ink-read]'); b.click(); b.click(); });
         await page.waitForTimeout(1200);
-        const whileSlow = { provider: reader.requests.length - start, page: (await readCalls()).length - pageStart, button: await page.locator('[data-ink-read]').count() };
+        // (A page request is counted when its reply lands, so the page's own count is taken after the read.)
+        const whileSlow = { provider: reader.requests.length - start, button: await page.locator('[data-ink-read]').count() };
         release(); reader.gate = null;
         await lines(1);
         await page.waitForTimeout(2500);              // the transcript's own save and readback
         const afterRead = reader.requests.length - start;
+        const pageRequests = (await readCalls()).length - pageStart;
         // The same account opens the same question in a second tab: the kept
         // page comes back with its transcript, and nothing is read for it.
         const tab = await page.context().newPage();
@@ -232,10 +234,10 @@ export const flow = {
         const grade = (await gradesOf(right.serverQuestionId)).at(-1);
         costs.doublePress = reader.requests.length - start;
         await check(`6 · a double press on a slow reader, then the same page in a second tab: 1 provider call in all — one page request for two presses, none for the second tab, none for Submit [${EVIDENCE}]`,
-          whileSlow.provider === 1 && whileSlow.page === 1 && whileSlow.button === 0 && afterRead === 1 &&
+          whileSlow.provider === 1 && whileSlow.button === 0 && afterRead === 1 && pageRequests === 1 &&
             sameQuestion && tabLines.length === 1 && tabLines[0] === right.text && afterTab === 1 &&
             costs.doublePress === 1 && grade?.json?.correct === true,
-          `while the reader was slow ${JSON.stringify(whileSlow)}; after the read ${afterRead}; second tab same question ${sameQuestion} lines ${JSON.stringify(tabLines)} calls ${afterTab}; total ${costs.doublePress}; correct ${grade?.json?.correct}`);
+          `while the reader was slow ${JSON.stringify(whileSlow)}; after the read ${afterRead} provider, ${pageRequests} page request(s); second tab same question ${sameQuestion} lines ${JSON.stringify(tabLines)} calls ${afterTab}; total ${costs.doublePress}; correct ${grade?.json?.correct}`);
       }
 
       // ── 7 · a late reading never replaces newer ink or a hand-corrected line ─
@@ -309,7 +311,7 @@ export const flow = {
             costs.wroteWhileReading === 2 && grade?.json?.correct === true,
           `when the late reading landed ${JSON.stringify(late)}; total ${costs.wroteWhileReading}; correct ${grade?.json?.correct}`);
       }
-      note(`provider calls per completed handwritten answer [${EVIDENCE}]: one line right first time ${costs.oneLine} · four lines with pauses, read once ${costs.fourLines} · read, edit, read again ${costs.editAndReread} · second try, ink unchanged ${costs.secondTrySameInk} · second try after rewriting ${costs.secondTryRewritten}`);
+      note(`provider calls per completed handwritten answer [${EVIDENCE}]: one line right first time ${costs.oneLine} · four lines with pauses, read once ${costs.fourLines} · read, edit, read again ${costs.editAndReread} · second try, ink unchanged ${costs.secondTrySameInk} · second try after rewriting ${costs.secondTryRewritten} · double press then a second tab ${costs.doublePress} · late reading against a corrected transcript ${costs.lateReading} · ink written while reading ${costs.wroteWhileReading}`);
       await check('no provider was reached but the scripted reader', reader.refused.length === 0, JSON.stringify(reader.refused));
     } finally {
       reader.gate = null;
