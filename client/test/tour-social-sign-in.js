@@ -133,7 +133,7 @@ export const flow = {
       deletionBody.provider === 'google' && deletionBody.idToken === ID_TOKEN && deletionBody.nonce === NONCE &&
         authorizeUrl?.searchParams.get('nonce') === NONCE, JSON.stringify(deletionBody));
     await check('after deletion the local profile is disconnected and stays on this device',
-      await panel.getByText('Not connected', { exact: true }).isVisible());
+      await panel.locator('[data-cloud-state]', { hasText: /^Not signed in$/ }).isVisible());
   }
 };
 
