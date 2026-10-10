@@ -2132,6 +2132,14 @@ export default {
   'errorScreen.stuckNote': 'Trying again did not clear it, so the fault is in code that is already loaded — a reload is the only reset left. Reloading keeps every profile and everything saved.',
   'errorScreen.reloadSafe': 'Reloading is safe: it re-reads the app from this device and keeps every profile and everything saved. It works with no internet connection.',
   'errorScreen.technicalDetails': 'Technical details',
+  // Drawn by public/boot-guard.js before the app (and this catalogue) has
+  // loaded, so that file carries copies; boot-resilience-check keeps them equal.
+  'boot.loadFailedTitle': 'Pri Learning could not load',
+  'boot.loadFailedBody': 'Part of the app did not download. Check your connection, then reload.',
+  'boot.notStartedTitle': 'Pri Learning did not start',
+  'boot.notStartedBody': 'The app loaded but did not open. Reloading keeps every profile and everything saved on this device.',
+  'boot.slowTitle': 'Still loading Pri Learning',
+  'boot.slowBody': 'This is taking longer than it should. You can keep waiting, or reload.',
   'charts.notEnoughHistory': 'Not enough history yet — keep practising and your trend will appear here.',
   'charts.dayTip': { one: '{n} question · {correct} correct', other: '{n} questions · {correct} correct' },
   'charts.noPractice': 'No practice',

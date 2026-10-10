@@ -66,6 +66,11 @@ export async function readReleaseIdentityManifest({ timeoutMs = 1500 } = {}) {
  * Probe the serving origin once for the platform health signature and, when it
  * answers, make that origin the cloud authority. Resolves to the origin or
  * null; never throws, never delays boot for more than `timeoutMs`.
+ *
+ * That last promise is kept here and not by the request: the time limit both
+ * aborts the request and settles the probe. Aborting alone left the bound in
+ * the hands of whatever was answering the request — a service worker, a
+ * captive portal, an in-app browser — and the first render waits on this.
  */
 export function discoverCloudOrigin({ timeoutMs = 1500 } = {}) {
   if (discovery) return discovery;
@@ -76,8 +81,14 @@ export function discoverCloudOrigin({ timeoutMs = 1500 } = {}) {
     const loc = globalThis.location;
     if (!loc || !/^https?:$/.test(String(loc.protocol || '')) || typeof fetch !== 'function') return null;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), Math.max(200, Math.min(10_000, Number(timeoutMs) || 1500)));
-    try {
+    let timer;
+    const limit = new Promise(resolve => {
+      timer = setTimeout(() => {
+        resolve(null);
+        try { controller.abort(new DOMException('Timed out', 'TimeoutError')); } catch { /* nothing left to abort */ }
+      }, Math.max(200, Math.min(10_000, Number(timeoutMs) || 1500)));
+    });
+    const asked = (async () => {
       const response = await fetch(`${loc.origin}/v1/health`, {
         method: 'GET',
         headers: { Accept: 'application/json', 'X-Pri-Client': 'web-v1' },
@@ -94,8 +105,9 @@ export function discoverCloudOrigin({ timeoutMs = 1500 } = {}) {
       const origin = normalizeCloudOrigin(loc.origin);
       globalThis.__PRI_CLOUD_ORIGIN__ = origin;
       return origin;
-    } catch {
-      return null;
+    })().catch(() => null);
+    try {
+      return await Promise.race([asked, limit]);
     } finally {
       clearTimeout(timer);
     }
