@@ -8,6 +8,14 @@ const DEFAULT_BATCH = 20;
 const DEFAULT_INTERVAL_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 10_000;
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
+const RESEND_DOMAINS_ENDPOINT = 'https://api.resend.com/domains?limit=100';
+/** The shared Resend onboarding sender: it delivers only to the account owner's own address. */
+export const RESEND_TEST_SENDER_DOMAIN = 'resend.dev';
+export const AUTH_EMAIL_PROBE_TIMEOUT_MS = 4_000;
+/** A definite answer (key valid/invalid, domain verified or not) is kept this long. */
+export const AUTH_EMAIL_PROBE_TTL_MS = 5 * 60_000;
+/** An answer that is only "could not tell" (timeout, 429, 5xx) is retried sooner. */
+export const AUTH_EMAIL_PROBE_RETRY_TTL_MS = 30_000;
 
 function nonEmpty(value) {
   return String(value || '').trim();
@@ -122,6 +130,167 @@ export function authEmailMessage(kind, actionUrl) {
   throw new Error('Unsupported auth delivery kind');
 }
 
+// ── What a Resend refusal means ──────────────────────────────────────────────
+// Resend answers a refused call with { statusCode, name, message }. The message
+// is read here to be CLASSIFIED and is never stored, logged or returned: it can
+// quote the account owner's address or the sender domain. Only the code below
+// leaves this function. A refusal with no recognised cause keeps the historical
+// RESEND_<status> code, so 5xx/429 handling and its alerts are unchanged.
+export function classifyResendRejection(status, body) {
+  const name = typeof body?.name === 'string' ? body.name.toLowerCase() : '';
+  const message = typeof body?.message === 'string' ? body.message.toLowerCase() : '';
+  if (name === 'restricted_api_key') return 'AUTH_EMAIL_KEY_RESTRICTED';
+  if (name === 'missing_api_key' || name === 'invalid_api_key' || /api key is invalid/.test(message)) return 'AUTH_EMAIL_KEY_INVALID';
+  if (/only send testing emails/.test(message)) return 'AUTH_EMAIL_TEST_SENDER_RECIPIENT_REFUSED';
+  if (/domain is not verified|verify (a|your) domain/.test(message)) return 'AUTH_EMAIL_SENDER_UNVERIFIED';
+  if (name === 'daily_quota_exceeded' || name === 'monthly_quota_exceeded') return 'AUTH_EMAIL_QUOTA_EXCEEDED';
+  if (name === 'invalid_from_address') return 'AUTH_EMAIL_SENDER_INVALID';
+  const n = Number(status);
+  return Number.isInteger(n) && n >= 100 && n <= 599 ? `RESEND_${n}` : 'RESEND_BAD_RESPONSE';
+}
+
+/** The code for a call that never got an answer: our own timeout, or the network. */
+export function resendTransportFailureCode(error, signal) {
+  if (typeof error?.code === 'string' && /^(AUTH_EMAIL_|RESEND_)[A-Z0-9_]{1,60}$/.test(error.code)) return error.code;
+  return signal?.aborted ? 'AUTH_EMAIL_PROVIDER_TIMEOUT' : 'AUTH_EMAIL_PROVIDER_UNREACHABLE';
+}
+
+async function readJsonBody(response) {
+  try {
+    const text = typeof response?.text === 'function' ? await response.text() : '';
+    return text ? JSON.parse(text) : null;
+  } catch { return null; /* a provider body is not trusted */ }
+}
+
+/** One POST to Resend. Resolves to the message id (or null); throws an error carrying only a code. */
+export async function postResendEmail({ key, payload, idempotencyKey, fetchImpl, requireMessageId = false }) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error('Auth email provider timed out')), REQUEST_TIMEOUT_MS);
+  try {
+    let response;
+    try {
+      response = await fetchImpl(RESEND_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
+          'Idempotency-Key': String(idempotencyKey).slice(0, 256),
+          'User-Agent': 'Pri-Learning-Auth/1.0'
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+    } catch (error) {
+      throw Object.assign(new Error('Auth email provider could not be reached'), { code: resendTransportFailureCode(error, controller.signal) });
+    }
+    const data = await readJsonBody(response);
+    if (!response.ok) {
+      throw Object.assign(new Error('Auth email provider rejected the request'), { code: classifyResendRejection(response.status, data) });
+    }
+    const providerMessageId = String(data?.id || '').slice(0, 160) || null;
+    if (!providerMessageId && requireMessageId) {
+      throw Object.assign(new Error('Auth email provider returned no message id'), { code: 'RESEND_BAD_RESPONSE' });
+    }
+    return providerMessageId;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ── Readiness probe ──────────────────────────────────────────────────────────
+// "The variables are set" is not "email can be sent": a revoked key and an
+// unverified sender domain both look configured. This asks Resend one cheap
+// authenticated question (list domains) and reduces the answer to coded states:
+//
+//   credential  valid | invalid | unknown
+//   keyScope    full | sending | unknown     a sending-only key is VALID; it
+//                                            just may not read the domain list
+//   sender      verified | unverified | test_sender | invalid | unknown
+//
+// It is called only from /v1/ready (readiness.js), never from a request a
+// learner makes and never at boot. The answer is cached (5 minutes when
+// definite, 30 seconds when Resend could not be reached) and bounded by
+// AUTH_EMAIL_PROBE_TIMEOUT_MS. Nothing it returns carries the key, the sender
+// address, the domain or any provider text.
+let authEmailProbeCache = { key: '', expiresAt: 0, value: null };
+export function resetAuthEmailProbeCache() { authEmailProbeCache = { key: '', expiresAt: 0, value: null }; }
+
+/** The domain of a From header (`Name <a@b.c>` or `a@b.c`), lower-cased, or null. */
+export function authEmailSenderDomain(from) {
+  const text = nonEmpty(from);
+  const bracket = text.match(/<([^<>\s]+)>\s*$/);
+  const address = (bracket ? bracket[1] : text).trim();
+  const match = address.match(/^[^@\s<>]+@([a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+)$/i);
+  return match ? match[1].toLowerCase() : null;
+}
+
+export function authEmailStaticStatus(env = process.env) {
+  const provider = nonEmpty(env.PRI_AUTH_EMAIL_PROVIDER).toLowerCase();
+  const configured = provider === 'resend' && !!nonEmpty(env.PRI_RESEND_API_KEY) && !!nonEmpty(env.PRI_AUTH_EMAIL_FROM);
+  return { configured, senderDomain: configured ? authEmailSenderDomain(env.PRI_AUTH_EMAIL_FROM) : null };
+}
+
+export async function probeAuthEmail({
+  env = process.env,
+  fetchImpl = globalThis.fetch,
+  now = Date.now(),
+  cache = true,
+  timeoutMs = AUTH_EMAIL_PROBE_TIMEOUT_MS
+} = {}) {
+  const { configured, senderDomain } = authEmailStaticStatus(env);
+  if (!configured) return Object.freeze({ configured: false, credential: 'unknown', keyScope: 'unknown', sender: 'unknown', code: 'AUTH_EMAIL_NOT_CONFIGURED' });
+  const key = nonEmpty(env.PRI_RESEND_API_KEY);
+  const cacheKey = `${key}|${nonEmpty(env.PRI_AUTH_EMAIL_FROM)}`;
+  if (cache && authEmailProbeCache.key === cacheKey && authEmailProbeCache.expiresAt > now && authEmailProbeCache.value) return authEmailProbeCache.value;
+
+  const testSender = senderDomain === RESEND_TEST_SENDER_DOMAIN;
+  const finish = (fields, ttl = AUTH_EMAIL_PROBE_TTL_MS) => {
+    const value = Object.freeze({ configured: true, ...fields });
+    if (cache) authEmailProbeCache = { key: cacheKey, expiresAt: now + ttl, value };
+    return value;
+  };
+  // What is known about the sender without asking anyone.
+  const staticSender = !senderDomain ? 'invalid' : testSender ? 'test_sender' : 'unknown';
+  const staticCode = !senderDomain ? 'AUTH_EMAIL_SENDER_INVALID' : testSender ? 'AUTH_EMAIL_TEST_SENDER' : null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error('Auth email probe timed out')), timeoutMs);
+  let response;
+  let data;
+  try {
+    response = await fetchImpl(RESEND_DOMAINS_ENDPOINT, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${key}`, 'User-Agent': 'Pri-Learning-Auth/1.0' },
+      signal: controller.signal
+    });
+    data = await readJsonBody(response);
+  } catch (error) {
+    return finish({ credential: 'unknown', keyScope: 'unknown', sender: staticSender, code: resendTransportFailureCode(error, controller.signal) }, AUTH_EMAIL_PROBE_RETRY_TTL_MS);
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!response.ok) {
+    const code = classifyResendRejection(response.status, data);
+    if (code === 'AUTH_EMAIL_KEY_INVALID') return finish({ credential: 'invalid', keyScope: 'unknown', sender: staticSender, code });
+    // A sending-only key may not list domains. That refusal PROVES the key is
+    // valid; whether the sender domain is verified simply cannot be asked.
+    if (code === 'AUTH_EMAIL_KEY_RESTRICTED') return finish({ credential: 'valid', keyScope: 'sending', sender: staticSender, code: staticCode });
+    // 429, 5xx, or anything unrecognised: Resend did not tell us either way.
+    return finish({ credential: 'unknown', keyScope: 'unknown', sender: staticSender, code }, AUTH_EMAIL_PROBE_RETRY_TTL_MS);
+  }
+
+  const full = { credential: 'valid', keyScope: 'full' };
+  if (staticCode) return finish({ ...full, sender: staticSender, code: staticCode });
+  const list = Array.isArray(data?.data) ? data.data : null;
+  if (!list) return finish({ credential: 'valid', keyScope: 'unknown', sender: 'unknown', code: 'RESEND_BAD_RESPONSE' }, AUTH_EMAIL_PROBE_RETRY_TTL_MS);
+  const domain = list.find(item => typeof item?.name === 'string' && item.name.toLowerCase() === senderDomain);
+  if (domain && String(domain.status).toLowerCase() === 'verified') return finish({ ...full, sender: 'verified', code: null });
+  // Not in the first page of a longer list: unknown, not "unverified".
+  if (!domain && data?.has_more === true) return finish({ ...full, sender: 'unknown', code: null });
+  return finish({ ...full, sender: 'unverified', code: 'AUTH_EMAIL_SENDER_UNVERIFIED' });
+}
+
 export function createResendAuthEmailTransport({
   apiKey = process.env.PRI_RESEND_API_KEY,
   from = process.env.PRI_AUTH_EMAIL_FROM,
@@ -134,45 +303,21 @@ export function createResendAuthEmailTransport({
   return async ({ outboxId, to, kind, actionUrl }) => {
     assertNoOpenTransaction('Sending an auth email');
     const message = authEmailMessage(kind, actionUrl);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(new Error('Auth email provider timed out')), REQUEST_TIMEOUT_MS);
-    try {
-      const response = await fetchImpl(RESEND_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${key}`,
-          'Content-Type': 'application/json',
-          'Idempotency-Key': `pri-auth/${outboxId}`.slice(0, 256),
-          'User-Agent': 'Pri-Learning-Auth/1.0'
-        },
-        body: JSON.stringify({
-          from: sender,
-          to: [String(to)],
-          subject: message.subject,
-          text: message.text,
-          html: message.html,
-          tags: [{ name: 'category', value: kind.replace(/-/g, '_') }]
-        }),
-        signal: controller.signal
-      });
-      const text = await response.text();
-      let data = null;
-      try { data = text ? JSON.parse(text) : null; } catch { /* provider body is not trusted */ }
-      if (!response.ok) {
-        const err = new Error('Auth email provider rejected the request');
-        err.code = `RESEND_${response.status}`;
-        throw err;
+    const providerMessageId = await postResendEmail({
+      key,
+      fetchImpl,
+      idempotencyKey: `pri-auth/${outboxId}`,
+      requireMessageId: true,
+      payload: {
+        from: sender,
+        to: [String(to)],
+        subject: message.subject,
+        text: message.text,
+        html: message.html,
+        tags: [{ name: 'category', value: kind.replace(/-/g, '_') }]
       }
-      const providerMessageId = String(data?.id || '').slice(0, 160);
-      if (!providerMessageId) {
-        const err = new Error('Auth email provider returned no message id');
-        err.code = 'RESEND_BAD_RESPONSE';
-        throw err;
-      }
-      return { providerMessageId };
-    } finally {
-      clearTimeout(timer);
-    }
+    });
+    return { providerMessageId };
   };
 }
 

@@ -223,9 +223,11 @@ try {
   delete process.env.PRI_MFA_KEY;
   c.eq((await readinessReport(db, { env: { ...process.env, NODE_ENV: 'test' } })).checks.staffMfa.state, 'development_key', 'outside production the development key stands in and readiness says so');
   const productionEnv = { ...process.env, NODE_ENV: 'production', PRI_AUTH_EMAIL_PROVIDER: 'resend', PRI_RESEND_API_KEY: 'x', PRI_AUTH_EMAIL_FROM: 'x@y.z' };
-  const missing = await readinessReport(db, { env: productionEnv });
+  // Readiness probes the email provider; this suite answers for it (no network).
+  const authEmailProbe = async () => ({ configured: true, credential: 'valid', keyScope: 'full', sender: 'verified', code: null });
+  const missing = await readinessReport(db, { env: productionEnv, authEmailProbe });
   c.deq([missing.checks.staffMfa.state, missing.checks.staffMfa.code, missing.degraded.includes('MFA_KEY_MISSING')], ['missing', 'MFA_KEY_MISSING', true], 'production with staff accounts and no PRI_MFA_KEY is degraded with MFA_KEY_MISSING');
-  const keyed = await readinessReport(db, { env: { ...productionEnv, PRI_MFA_KEY: 'cd'.repeat(32) } });
+  const keyed = await readinessReport(db, { env: { ...productionEnv, PRI_MFA_KEY: 'cd'.repeat(32) }, authEmailProbe });
   c.eq(keyed.checks.staffMfa.state, 'ok', 'with the key configured the check is ok');
   for (const [name, value] of Object.entries(savedEnv)) { if (value === undefined) delete process.env[name]; else process.env[name] = value; }
   const empty = createPlatformDb(':memory:');
