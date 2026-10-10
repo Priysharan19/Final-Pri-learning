@@ -289,7 +289,7 @@ const READ_HELP = {
  * Returns { correct, feedback?, normalized? }
  */
 // ── How long a final answer may be ───────────────────────────────────────────
-// Working is read a line at a time, 300 characters a line. The final-answer
+// Working is read a line at a time, 200 characters a line. The final-answer
 // box had no such bound, and the server accepts 12,000 characters there: every
 // cost in the marker that grows with what is written — sampling, domain probes,
 // root finding — grew forty times past what a line of working can ask of it.
