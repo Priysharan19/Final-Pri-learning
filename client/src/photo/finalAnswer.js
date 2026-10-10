@@ -148,43 +148,16 @@ export function readsAsAnswer(text, question = {}) {
 /**
  * Does this line read, exactly as written, in the typed field's parser for
  * this answer type? The Write surface sends such a last line verbatim, as it
- * always has. For an expression answer that includes a whole equation
- * ("2x + 3y = 6"): an equation can BE the answer there.
+ * always has.
+ *
+ * An equation is never kept whole as an expression answer. No keyed
+ * expression answer in the bank contains "=", so a line such as
+ * "6x - 6 - 3x + 9 = 3x + 3" or "x^2 - 5x - 14 = (x + 2)(x - 7)" is the
+ * student restating what they were asked to simplify or factorise: the answer
+ * is what follows the "=", and that is what is proposed.
  */
 export function readsAsWritten(text, question = {}) {
-  if (readsAsAnswer(text, question)) return true;
-  return (question?.answerType || 'numeric') === 'expression' && isEquationAnswer(String(text ?? '').trim());
-}
-
-/** Does this side add or subtract terms outside any brackets (a leading sign and a sign in an exponent do not count)? */
-function isSumOfTerms(side) {
-  let depth = 0, seen = false;
-  for (let i = 0; i < side.length; i += 1) {
-    const ch = side[i];
-    if ('([{'.includes(ch)) depth += 1;
-    else if (')]}'.includes(ch)) depth = Math.max(0, depth - 1);
-    else if (depth === 0 && (ch === '+' || ch === '-' || ch === '−')) {
-      const before = side.slice(0, i).trimEnd().slice(-1);
-      if (seen && before && !'^*/×·('.includes(before)) return true;
-    }
-    if (ch.trim()) seen = true;
-  }
-  return false;
-}
-
-/** A whole equation that is not just a name being given a value ("y = …", "f(x) = …", "dy/dx = …"). */
-function isEquationAnswer(s) {
-  if (!s || s.length > 200 || hasProse(s) || relations(s).some(r => r.kind !== 'equals')) return false;
-  const at = s.lastIndexOf('=');
-  if (at <= 0 || s.indexOf('=') !== at) return false;
-  const left = s.slice(0, at).trim();
-  // A left side that is one term — `y`, `f(x)`, `f⁻¹(x)`, `(f ∘ g)^-1(x)`,
-  // `dy/dx`, `d/dx (4x+3)^4` — is a label for what follows, however it is
-  // written: the answer is the right-hand side, as it was before equations
-  // were kept whole. Only a left side that is itself a sum or difference of
-  // terms (`x^2 + y^2`, `2x + 3y`, `y - 3`) makes the equation the answer.
-  if (!isSumOfTerms(left)) return false;
-  try { return parse(normalize(cleanInput(s, { stripUnits: false })))?.t === 'equation'; } catch { return false; }
+  return readsAsAnswer(text, question);
 }
 
 // Types whose answer may itself contain a comma, "or" or an inequality sign.
@@ -219,17 +192,6 @@ function valueOf(piece, question) {
   // For a list-shaped answer the whole line may be the answer ("x > 3",
   // "(2, -3)", "{1, 2}"); try it before cutting anything off.
   if (LIST_TYPES.has(type) && readsAsAnswer(s, question)) return s;
-  // An expression answer can be a whole equation ("x^2 + y^2 = 25"): its
-  // right-hand side alone is not the answer, so nothing is cut off it.
-  if (type === 'expression' && isEquationAnswer(s)) return s;
-  // "the line is 2x + 3y = 6", "so x^2 + y^2 = 25": what follows the words is
-  // a whole equation, and for an expression answer that equation is kept.
-  if (type === 'expression') {
-    for (const word of [...words].sort((a, b) => b.end - a.end)) {
-      const rest = stripSentence(s.slice(word.end));
-      if (isEquationAnswer(rest)) return rest;
-    }
-  }
   const cuts = [...rel.filter(r => LIST_TYPES.has(type) ? r.kind !== 'inequality' : true), ...words].sort((a, b) => a.end - b.end);
   const last = cuts.at(-1);
   if (last) {
