@@ -316,6 +316,10 @@ export const returningFlow = {
   async run({ page, ctx, check, goto, note, online, browserName }) {
     note(`${EVIDENCE}: "Sign-in card · returning student" [${browserName || 'chromium'}] — codes from the test mail sink; expiry and the resend countdown advanced with the page clock; the "could not send" case is answered at the network layer (the server's own outage path is proved in server/test/otp-sign-in-check.mjs).`);
     clearLimits(online);
+    // This flow holds, cuts and answers requests at the network layer. A
+    // service worker's own fetches are outside that layer in WebKit, so the
+    // worker is not registered here; every request then leaves the page itself.
+    await page.addInitScript(() => { if (navigator.serviceWorker) navigator.serviceWorker.register = () => new Promise(() => {}); });
     await page.clock.install();
     const who = await online.platform.newAccount({ name: 'Returning Student' });
     const accountsBefore = accountCount(online);

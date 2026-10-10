@@ -88,6 +88,7 @@ export default function CloudAccountPanel() {
   // Where this account stands with its guardian. Shown to the student so a
   // pending account reads as "waiting for a parent" rather than as a fault.
   const [guardian, setGuardian] = useState(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -790,10 +791,12 @@ export default function CloudAccountPanel() {
       {/* How this device keeps and sends work: true, and of interest to few.
           Kept out of the way of the four lines above. */}
       {link?.accountId && (
-        <details className="card cloud-advanced" style={{ boxShadow: 'none', marginTop: 14 }} data-cloud-advanced>
+        <details className="card cloud-advanced" style={{ boxShadow: 'none', marginTop: 14 }} data-cloud-advanced
+          open={advancedOpen} onToggle={e => setAdvancedOpen(e.currentTarget.open)}>
           <summary className="sc-label" style={{ cursor: 'pointer' }}>{t('cloud.advancedTitle')}</summary>
-          <p className="muted" style={{ fontSize: 12.5, margin: '10px 0 0', maxWidth: 640 }}>{t('cloud.advancedIntro')}</p>
-          <div className="spread" style={{ gap: 12, flexWrap: 'wrap', marginTop: 10 }}>
+          {/* Rendered only while open: a closed section holds no hidden buttons. */}
+          {advancedOpen && <p className="muted" style={{ fontSize: 12.5, margin: '10px 0 0', maxWidth: 640 }}>{t('cloud.advancedIntro')}</p>}
+          {advancedOpen && <div className="spread" style={{ gap: 12, flexWrap: 'wrap', marginTop: 10 }}>
             <div>
               <div style={{ fontWeight: 650, marginTop: 3 }}>{pending ? t('cloud.pendingChanges', { count: pending, n: pending }) : t('cloud.outboxClear')}</div>
               <div className="muted" style={{ fontSize: 12 }}>{t('cloud.lastSync', { when: when(status?.lastSyncAt, t) })}</div>
@@ -810,7 +813,7 @@ export default function CloudAccountPanel() {
               <button className="btn btn-ghost" type="button" onClick={doSync} disabled={!canSync || !!busy}>{busy === 'sync' ? t('cloud.syncing') : t('cloud.syncNow')}</button>
               <button className="btn btn-ghost" type="button" onClick={() => refreshCloudEntitlement(user.id).then(() => reload({ verify: false })).catch(err => setError(err.message))} disabled={!canSync || !!busy}>{t('cloud.refreshPremium')}</button>
             </div>
-          </div>
+          </div>}
         </details>
       )}
 

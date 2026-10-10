@@ -35,11 +35,15 @@ function publicDetail(detail = {}) {
 
 function sessionRelay() {
   if (relay) return relay;
-  // A real page only: Node has a BroadcastChannel too, and one opened there
-  // would hold a test process open.
-  if (typeof window === 'undefined' || typeof document === 'undefined' || typeof globalThis.BroadcastChannel !== 'function') return null;
+  // A real page only. Node has a global BroadcastChannel too, and one opened
+  // there holds the process open for ever — which is exactly what happened to
+  // a suite that fakes `window` and `document` (it hung, at 0% CPU). So the
+  // constructor is taken from the page's own window, never from globalThis,
+  // and a channel that can be unref'd is, so it can never keep a process alive.
+  if (typeof window === 'undefined' || typeof document === 'undefined' || typeof window.BroadcastChannel !== 'function') return null;
   try {
-    relay = new globalThis.BroadcastChannel(CLOUD_SESSION_CHANNEL);
+    relay = new window.BroadcastChannel(CLOUD_SESSION_CHANNEL);
+    relay.unref?.();
     relay.onmessage = event => {
       const data = event?.data;
       if (!data || typeof data !== 'object') return;

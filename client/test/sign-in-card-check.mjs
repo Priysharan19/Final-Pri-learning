@@ -139,11 +139,27 @@ ok(/<SignInChoices user=\{user\} refreshUser=\{refreshUser\} saved=\{saveState =
   'the question card only mounts the shared sign-in; it carries no sign-in UI of its own');
 ok(/data-cloud-synced=\{synced \? 'yes' : 'no'\}/.test(panel) && /const synced = canSync && !!status\?\.lastSyncAt && pending === 0 && !status\?\.lastError;/.test(panel),
   '"Progress synced" is derived from a live session, a completed sync, an empty outbox and no error — all four');
-ok(/<details className="card cloud-advanced"/.test(panel) && panel.indexOf("t('cloud.outboxClear')") > panel.indexOf('<details className="card cloud-advanced"'),
-  'outbox and sync internals sit inside the Advanced section');
+ok(/<details className="card cloud-advanced"/.test(panel) && panel.indexOf("t('cloud.outboxClear')") > panel.indexOf('<details className="card cloud-advanced"')
+  && /useState\(false\);\n  const \[busy/.test(panel) && /\{advancedOpen && <div className="spread"/.test(panel),
+  'outbox and sync internals sit inside the Advanced section, closed by default and not rendered until opened');
 ok(!('settings.accountTypeValue' in en) && !/no sign-in service/i.test(JSON.stringify(en)), 'the "no sign-in service" line is gone from the catalogue');
 const session = read('platform/cloudSession.js');
-ok(/new globalThis\.BroadcastChannel\(CLOUD_SESSION_CHANNEL\)/.test(session) && /postMessage\(publicDetail\(detail\)\)/.test(session), 'sign-in and sign-out are relayed to other tabs');
+ok(/new window\.BroadcastChannel\(CLOUD_SESSION_CHANNEL\)/.test(session) && /postMessage\(publicDetail\(detail\)\)/.test(session), 'sign-in and sign-out are relayed to other tabs');
+// Regression: a Node process with a faked window/document must not open a
+// channel (Node's own BroadcastChannel would hold it open — a suite hung on it).
+{
+  const had = { window: globalThis.window, document: globalThis.document };
+  globalThis.window = { addEventListener() {}, removeEventListener() {} };
+  globalThis.document = {};
+  const mod = await import(`${pathToFileURL(join(SRC, 'platform/cloudSession.js')).href}?fake-page`);
+  const stop = mod.onCloudSessionChange(() => {});
+  mod.announceCloudSessionChange({ localProfileId: 'p', connected: true, accountId: 'a', role: 'student' });
+  stop();
+  ok(!/typeof globalThis\.BroadcastChannel|new globalThis\.BroadcastChannel/.test(session) && /relay\.unref\?\.\(\);/.test(session),
+    'the relay is built only from a real page\'s window.BroadcastChannel and is unref\'d: a faked window in Node opens nothing that could hold the process open');
+  if (had.window === undefined) delete globalThis.window; else globalThis.window = had.window;
+  if (had.document === undefined) delete globalThis.document; else globalThis.document = had.document;
+}
 ok(!/token|cookie|email|password/i.test(/function publicDetail[\s\S]*?\n\}/.exec(session)?.[0] || 'missing'), 'and the relayed message carries no token, cookie, email or password');
 
 if (failures.length) {
