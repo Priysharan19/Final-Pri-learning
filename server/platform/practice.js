@@ -21,7 +21,16 @@ import { misconceptionIdForTrap } from '../../client/src/engine/misconceptions.j
 import { PUBLIC_QUESTION_FIELDS } from '../../client/src/engine/publicQuestion.js';
 import { consentState, consentBlockerCode } from './guardianConsent.js';
 import { loadAllBanks, generateQuestion } from '../../client/src/engine/generators/index.js';
-import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
+// The marker itself (checkAnswer, stepCheck, methodMarks) is never called on
+// this thread: markerOps.js holds the operations and markerPool.js runs them in
+// worker threads under a hard deadline. Only the two pure rubric helpers
+// below, which read the server's own question and run no student text through
+// the engine, are used directly here.
+import { stepMetaFor, marksPossibleFor } from './markerOps.js';
+import {
+  markerPool, markerCooldownUntil, recordMarkerKills, sendMarkerCooldown, sendMarkerBusy,
+  MARKING_TOO_COMPLEX, MARKING_BUSY, TOO_COMPLEX_MESSAGE, WORKING_NOT_READ_NOTE
+} from './markerPool.js';
 import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../../client/src/engine/answer-forms.js';
 import { transcribeHandwriting, validateImage, HandwritingProviderError } from './handwritingProvider.js';
 import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
@@ -67,72 +76,6 @@ const unknown = (value, allowed) => Object.keys(value).filter(key => !allowed.ha
 const limitedText = (s, n) => typeof s === 'string' && s.length <= n && !/[\u0000-\u0008\u000b\u000e-\u001f]/.test(s);
 let banksReady;
 const ensureBanks = () => { if (!banksReady) banksReady = loadAllBanks().catch(e => { banksReady = null; throw e; }); return banksReady; };
-
-// Mirrors the shared deterministic checker input used by local practice;
-// questions, answer keys and stage meta remain server-private.
-function stepMetaFor(q) {
-  if (q.stepcheck) return q.stepcheck;
-  const a = q.answer;
-  if (!a) return null;
-  if (q.answerType === 'expression' && a.expr) return { kind: 'expression', canonical: a.expr };
-  if (q.answerType === 'numeric' && a.value !== undefined) {
-    const m = (q.answerPrefix || '').match(/^([a-z])\s*=$/i);
-    // The letter as the question writes it: an angle $A$ is not the side $a$.
-    if (m) return { kind: 'equation', variable: m[1], solutions: [a.value] };
-    // Some authored Class 8 algebra forms print only `$6m+15=7m+29$`
-    // and omit answerPrefix. Derive the variable ONLY from that entire,
-    // single-variable, plain algebraic equation. Other numeric prompts
-    // (evaluation, geometry, scientific units, multi-equation systems) must
-    // not acquire method-credit authority from a guessed letter.
-    const source = String(q.prompt || '').match(/^\s*\$([^$]+)\$\s*$/);
-    const equation = source?.[1]?.trim();
-    if (equation && /^[0-9a-z\s+*/().=\-]+$/i.test(equation) &&
-        equation.split('=').length === 2 && Number.isFinite(Number(a.value))) {
-      const symbols = [...new Set((equation.match(/[a-z]/gi) || []).map(v => v.toLowerCase()))];
-      if (symbols.length === 1) return {
-        kind: 'equation', variable: symbols[0], solutions: [a.value], source: equation
-      };
-    }
-  }
-  if (q.answerType === 'set' && Array.isArray(a.values) && a.values.length) {
-    return { kind: 'equation', variable: 'x', solutions: a.values };
-  }
-  return null;
-}
-
-// An issued question and every committed grade must use the SAME server-owned
-// rubric. Difficulty alone is not marks; the authored non-auxiliary criteria
-// define the total, bounded by the question's four-mark practice contract.
-function marksPossibleFor(q) {
-  const keySteps = (q.steps || []).filter(step => !/^(check|note|bonus)/i.test(step.h));
-  const maxMarks = Math.min(4, Math.max(1, Number(q.difficulty) || 1));
-  return Math.max(1, Math.min(maxMarks, keySteps.length || 1));
-}
-
-function stepEvidence(q, answer, steps, result) {
-  const meta = stepMetaFor(q);
-  let report = result.stepReport || null;
-  if (meta && steps && !report) {
-    // The prompt lets a true line about another unknown of the question be
-    // verified against the system it gives, instead of being left unjudged.
-    try { report = stepCheck(meta, steps, { prompt: q.prompt }); } catch { report = null; }
-  }
-  let partial = null;
-  // A blank final-answer box may still carry verified mathematical method
-  // evidence. Invalid nonblank expressions do not become creditable merely
-  // because working was attached; only an actually empty final-answer field
-  // can be graded by method alone.
-  const blankFinal = typeof answer === 'string' && answer.trim() === '';
-  if (meta && steps && !result.correct && (!result.invalid || blankFinal)) {
-    try {
-      const method = methodMarks({
-        meta, working: steps, marks: marksPossibleFor(q), prompt: q.prompt, report
-      });
-      if (method) partial = { okLines: method.okLines, awarded: method.awarded, note: method.note, lines: method.lines };
-    } catch { partial = null; }
-  }
-  return { stepReport: report, partial };
-}
 
 // ── What an open question may be told about its working ─────────────────────
 // A practice question allows two tries. Until it resolves, the reply to a
@@ -260,20 +203,53 @@ export async function issuedQuestionForTutor(db, accountId, questionId, now = Da
     steps: (q.steps || []).map(step => ({ h: String(step?.h ?? ''), d: String(step?.d ?? '') })),
     answerText: String(answerTextFor(q) ?? ''),
     hints: Array.isArray(q.hints) ? q.hints.filter(h => typeof h === 'string') : [],
-    workEvidence(lines) {
-      const evidence = { firstBreak: -1, verifiedLines: 0, misconception: null };
-      const meta = stepMetaFor(q);
-      if (!meta || !Array.isArray(lines) || !lines.length) return evidence;
-      try {
-        const judged = stepCheck(meta, lines.join('\n'), { prompt: q.prompt })?.lines || [];
-        const at = judged.findIndex(line => line?.status === 'break');
-        if (at >= 0 && at < lines.length) evidence.firstBreak = at;
-        while (evidence.verifiedLines < judged.length && evidence.verifiedLines < lines.length &&
-          judged[evidence.verifiedLines]?.status === 'ok') evidence.verifiedLines += 1;
-      } catch { /* the checker's silence is not evidence */ }
-      return evidence;
+    // Runs in the marker pool, never on this thread. A Step Check that is cut
+    // off at its deadline, refused because the pool is busy, or skipped
+    // because the account is cooling down says nothing: no line is verified
+    // and no line is the first mistake — "the checker's silence is not
+    // evidence", exactly as when the engine threw.
+    async workEvidence(lines) {
+      const silent = { firstBreak: -1, verifiedLines: 0, misconception: null };
+      if (!stepMetaFor(q) || !Array.isArray(lines) || !lines.length) return silent;
+      if (await markerCooldownUntil(db, accountId)) return silent;
+      let outcome;
+      try { outcome = await markerPool().run('tutor', { q, lines }, { key: accountId }); } catch { return silent; }
+      if (outcome.ok) return outcome.value.evidence;
+      if (outcome.code === MARKING_TOO_COMPLEX) await recordMarkerKills(db, accountId);
+      return silent;
     }
   };
+}
+
+// ── Authority where a mark commits ──────────────────────────────────────────
+// Marking is awaited on another thread, between the request's own session
+// check and the transaction that commits the mark. During that wait a student
+// may sign out, a session may expire or be revoked, or a guardian may withdraw
+// consent. The practice submission and the examination finish both read the
+// consent state before marking (`consentBlockedNow`) and call
+// `authorityAtCommit` first thing INSIDE the committing transaction: no live
+// session of this account → 401; consent that was in place and is now blocked
+// → 403. Either way nothing is written. (Consent that was already blocked
+// before marking is not newly enforced here: these routes did not refuse on
+// it before marking moved off the request thread, and still do not.)
+export async function consentBlockedNow(db, accountId) {
+  return consentBlockerCode(await consentState(asStore(db), accountId));
+}
+export async function authorityAtCommit(db, req, accountId, consentBlockedBefore) {
+  db = asStore(db);
+  const liveSession = await sessionFromRequest(db, req);
+  if (!liveSession || liveSession.account_id !== accountId) {
+    return { status: 401, code: 'AUTH_REQUIRED', message: 'Sign in again before retrying.' };
+  }
+  if (consentBlockedBefore) return null;
+  // A concurrent PostgreSQL guardian withdrawal updates this exact row. Lock
+  // it before the final consent check so it cannot commit between validation
+  // and the mark. SQLite transactions already serialize writers.
+  if (db.dialect === 'postgres') {
+    await db.get('SELECT account_id FROM guardian_consents WHERE account_id=? FOR UPDATE', [accountId]);
+  }
+  const blocker = consentBlockerCode(await consentState(db, accountId));
+  return blocker ? { status: 403, code: blocker, message: 'Guardian consent changed while this was being checked.' } : null;
 }
 
 const carriesTrap = (owner, q, key) => (Array.isArray(q?.traps) ? q.traps : [])
@@ -378,6 +354,9 @@ function readPrepared(token) {
 
 export function createPracticeRouter(db, { transcribe = transcribeHandwriting, env = process.env } = {}) {
   db = asStore(db);
+  // Start the marker workers now, so the first submission does not wait for
+  // them to import the engine.
+  markerPool();
   const router = asyncRouter();
   router.use(requireSession(db), requireVerifiedEmail, requireRole('student'));
 
@@ -688,8 +667,31 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const accountId = req.platformSession.account_id;
     const hash = digest({ qid, submissionId, answer: body.answer, mode, steps: body.steps ?? [], transcriptionReceipt: body.transcriptionReceipt || null, ms: body.ms ?? null });
     const now = Date.now();
-    const outcome = await db.transaction(async () => {
-      const idKey = qid + ':' + submissionId;
+    const idKey = qid + ':' + submissionId;
+    const working = Array.isArray(body.steps) ? body.steps.join('\n') : String(body.steps || '');
+
+    // ── Mark first, with no transaction open; then commit under the lock ────
+    // The marker runs in a worker thread (markerPool.js) and is awaited, so it
+    // cannot run inside the account's transaction: on SQLite one connection
+    // serves every request, and an open transaction held across an await lets
+    // other requests' statements into it. So a submission is three steps:
+    //
+    //   1. READ, outside any transaction, everything that says whether this
+    //      submission may be marked at all and what it would need (`gate`).
+    //   2. MARK in the pool: a pure function of the sealed question, the answer
+    //      and the working. Nothing is written.
+    //   3. COMMIT in the account's transaction under its lock — and there
+    //      `gate` is read AGAIN from scratch. Every decision the transaction
+    //      makes (replay, 409, 404, receipt, closed question, repeat, tries,
+    //      resolution) is made from that second, locked read, exactly as it
+    //      was before marking moved out; step 1 is only a forecast. If the
+    //      state moved in between so that the commit needs something step 2
+    //      did not compute, nothing is written and the steps run again.
+    //
+    // So two submissions racing on one question are still ordered by the
+    // lock: the second sees the first's try (or its completion) in its own
+    // locked read and can never also be accepted as the first try.
+    const gate = async () => {
       // Replay comes before the closed-question check: the reply to a request
       // that committed before a timeout remains available for safe recovery.
       const prior = await db.get("SELECT response_json,request_digest FROM idempotency_keys WHERE account_id=? AND scope='practice-grade' AND key=? AND expires_at>?",
@@ -721,7 +723,98 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // issued before any is resolved, and once one of them has shown its
       // solution the others are no longer new work.
       if (await contentSeen(db, accountId, q, now)) q._repeat = true;
-      const result = checkAnswer(q, body.answer);
+      const priorTry = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-tries' AND key=?",
+        [accountId, qid]);
+      const tries = priorTry ? Number(JSON.parse(priorTry.response_json).tries) || 0 : 0;
+      // A try spent on ANY copy of this content is spent on this one: the
+      // first try is not renewed by asking for the question again. Content
+      // already resolved is a repeat, which earns nothing and keeps its own
+      // two tries.
+      const spent = tries >= 1 || (q._repeat !== true && await contentTried(db, accountId, q, now));
+      return { sealedJson: sealed.response_json, q, priorTry, tries, spent };
+    };
+    const refuse = outcome => reject(res, outcome.status, outcome.code,
+      outcome.code === 'QUESTION_NOT_FOUND' ? 'This question does not belong to this account.'
+        : outcome.code === 'AUTH_REQUIRED' ? 'Sign in again before retrying this answer.'
+          : outcome.status === 403 ? 'Guardian consent changed while this answer was being checked.'
+            : 'The submission cannot be accepted.');
+
+    // Evidence the commit turned out to need although step 1 forecast it would
+    // not (another submission spent the first try meanwhile).
+    let evidenceForced = false;
+    for (let round = 0; round < 3; round++) {
+      // ── 1. Read ──────────────────────────────────────────────────────────
+      const forecast = await gate();
+      if (forecast.status) return refuse(forecast);
+      if (forecast.response) return res.status(200).json(forecast.response);
+      // An account that has just had several entries stopped at the deadline
+      // waits (markerPool.js MARKER_COOLDOWN). A committed receipt is replayed
+      // above regardless: recovering a reply costs no marking.
+      const [cooling, consentBlockedBefore] = await Promise.all([markerCooldownUntil(db, accountId), consentBlockedNow(db, accountId)]);
+      if (cooling) return sendMarkerCooldown(res, cooling);
+
+      // ── 2. Mark ──────────────────────────────────────────────────────────
+      // One round trip: the answer, and the working only when the reply could
+      // use it (the answer is right, or a wrong answer resolves the question).
+      const marked = await markerPool().run('practice', {
+        q: forecast.q, answer: body.answer, working,
+        evidenceIfWrong: evidenceForced || forecast.spent || ONE_TRY_MODES.includes(forecast.q._practiceMode)
+      }, { key: accountId });
+      // Refused before it ran: nothing marked, nothing spent, same key retries.
+      if (!marked.ok && marked.code === MARKING_BUSY) return sendMarkerBusy(res);
+      let result, evidence, workingNotRead = false;
+      if (marked.ok) ({ result, evidence } = marked.value);
+      else {
+        // MARKING_TOO_COMPLEX: the worker was stopped at its deadline (or
+        // died). What it had finished before that is a complete result of the
+        // same deterministic code; what it had not finished is unknown, and
+        // unknown is never turned into a verdict.
+        await recordMarkerKills(db, accountId);
+        const answered = marked.partials.find(part => part?.result)?.result;
+        // RULE (answer not marked in time) — the entry is UNREADABLE. Exactly
+        // like an entry the marker cannot parse: 200, invalid, no try spent,
+        // no marks, no step report, nothing about the key — and nothing is
+        // written, not even a receipt, so it is no attempt of any kind. (The
+        // reply has the shape of every grade reply, `attemptId` included,
+        // because the shipped client refuses a reply without one; as for any
+        // unreadable entry, that id names no recorded attempt.)
+        // RULE (blank answer, working not read in time) — the working WAS the
+        // whole entry, so there is no verdict to stand on: unreadable too. It
+        // is never recorded as a working-only attempt that earned nothing.
+        if (!answered || (answered.invalid === true && body.answer.trim() === '')) {
+          return res.status(200).json({ authoritative: true, questionId: qid, submissionId, attemptId: randomUUID(),
+            correct: false, invalid: true, resolved: false, tooComplex: true, code: MARKING_TOO_COMPLEX,
+            marksEarned: 0, marksPossible: marksPossibleFor(forecast.q),
+            triesLeft: 1, feedback: TOO_COMPLEX_MESSAGE, trapWhy: null,
+            contentId: opaqueContentId(forecast.q.contentId), serverAcknowledgedAt: now,
+            stepReport: null, partial: null });
+        }
+        // RULE (answer marked in time, working not) — the answer's verdict
+        // stands; the working is reported as NOT READ and earns nothing. A
+        // right answer has its full marks whatever the working says, so it
+        // loses nothing; a wrong answer gets no method marks from lines nobody
+        // read. This mirrors what the engine itself does with a line too long
+        // to check, and it cannot be used to test an answer for free: the
+        // reply depends on the working's cost, never on whether the answer is
+        // right, and the try is spent exactly as it would have been.
+        result = answered;
+        evidence = { stepReport: result.stepReport || null, partial: null };
+        workingNotRead = true;
+      }
+
+      // ── 3. Commit ────────────────────────────────────────────────────────
+      const outcome = await db.transaction(async () => {
+        // Marking took time on another thread. A student may have signed out,
+        // the session may have expired, or a guardian may have withdrawn
+        // consent meanwhile: authority is rechecked where the grade commits.
+        const refused = await authorityAtCommit(db, req, accountId, consentBlockedBefore);
+        if (refused) return refused;
+        // The authoritative read. Whatever it finds decides; the forecast is
+        // not consulted except to notice that the marked question changed.
+        const state = await gate();
+        if (state.status || state.response) return state;
+        if (state.sealedJson !== forecast.sealedJson) return { again: true };
+        const { q, priorTry, tries, spent } = state;
       // Only after submission may authored misconception feedback be revealed.
       // Never trust a caller-supplied explanation or make the device infer
       // correctness from a withheld canonical answer.
@@ -731,7 +824,6 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       ];
       const optionWhy = !result.correct && q.answerType === 'mcq'
         ? q.answer?.optionTraps?.[Number(body.answer)] : null;
-      const working = Array.isArray(body.steps) ? body.steps.join('\n') : String(body.steps || '');
       const marksPossible = marksPossibleFor(q);
       // Working sent without a final answer is an attempt whether or not its
       // lines are right, and spends a try either way. Were only true working
@@ -739,21 +831,16 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // would say "this step is wrong" — an unlimited check of every guess.
       const workingOnly = result.invalid === true && body.answer.trim() === '' && working.trim() !== '';
       const invalid = Boolean(result.invalid && !workingOnly);
-      const priorTry = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-tries' AND key=?",
-        [accountId, qid]);
-      const tries = priorTry ? Number(JSON.parse(priorTry.response_json).tries) || 0 : 0;
-      // A try spent on ANY copy of this content is spent on this one: the
-      // first try is not renewed by asking for the question again. Content
-      // already resolved is a repeat, which earns nothing and keeps its own
-      // two tries.
-      const spent = tries >= 1 || (q._repeat !== true && await contentTried(db, accountId, q, now));
       // Invalid input is not a failed mathematical attempt: do not consume a try or close the question.
       const resolved = !invalid && Boolean(result.correct || spent || ONE_TRY_MODES.includes(q._practiceMode));
       // The working is checked once, and only by the reply that resolves the
       // question — see "What an open question may be told about its working".
-      const { stepReport, partial } = resolved
-        ? stepEvidence(q, body.answer, working, result)
-        : { stepReport: null, partial: null };
+      // It was computed in step 2; if this locked read resolves a question the
+      // forecast did not expect to resolve, it is computed now and the commit
+      // is retried — never guessed, and never skipped.
+      if (resolved && !evidence) return { again: true, needEvidence: true };
+      const { stepReport, partial } = resolved ? evidence : { stepReport: null, partial: null };
+      const notRead = resolved && workingNotRead && working.trim() !== '';
       // A question answered BY its working (the answer is the lines) has a
       // marker's verdict that is itself a verdict on the lines.
       const answeredByWorking = q.answerType === 'working' || Boolean(result.stepReport);
@@ -790,12 +877,14 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const marksEarned = invalid ? 0 : result.correct
         ? marksPossible
         : Math.max(0, Math.min(marksPossible - 1, partial?.awarded ?? 0));
+      const said = !resolved ? feedback : workingOnlyCredit ? partial.note : workingOnly ? (partial?.note || 'There is no final answer here, and this working does not earn a mark.') : feedback;
       const attemptId = randomUUID();
       const response = { authoritative: true, questionId: qid, submissionId, attemptId,
         correct: result.correct === true, invalid, resolved,
         marksEarned, marksPossible,
         triesLeft: resolved ? 0 : 1,
-        feedback: !resolved ? feedback : workingOnlyCredit ? partial.note : workingOnly ? (partial?.note || 'There is no final answer here, and this working does not earn a mark.') : feedback, trapWhy,
+        feedback: said + (notRead ? (said ? ' ' : '') + WORKING_NOT_READ_NOTE : ''), trapWhy,
+        ...(notRead ? { workingNotRead: true } : {}),
         ...(resolved && deferredTrap ? { firstTryTrapWhy: deferredTrap } : {}),
         contentId: opaqueContentId(q.contentId), serverAcknowledgedAt: now,
         ...(q._repeat === true ? { repeat: true } : {}),
@@ -840,10 +929,14 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         if (q._repeat !== true) await markContentTried(db, accountId, q, now);
       }
       return { response };
-    }, { accountScope: accountId, lock: syncLockKey(accountId) });
-    if (outcome.status) return reject(res, outcome.status, outcome.code,
-      outcome.code === 'QUESTION_NOT_FOUND' ? 'This question does not belong to this account.' : 'The submission cannot be accepted.');
-    return res.status(200).json(outcome.response);
+      }, { accountScope: accountId, lock: syncLockKey(accountId) });
+      if (outcome.again) { evidenceForced = evidenceForced || outcome.needEvidence === true; continue; }
+      if (outcome.status) return refuse(outcome);
+      return res.status(200).json(outcome.response);
+    }
+    // The question kept changing under three attempts to commit one mark.
+    // Nothing was written; the same submission key retries safely.
+    return sendMarkerBusy(res);
   });
 
   return router;

@@ -164,7 +164,13 @@ export async function groundIssued(db, accountId, request, at = Date.now()) {
   // An issued question the tutor cannot be grounded in (no authored steps, no
   // answer text, too long) is the server's own content gap, not a bad body.
   if (!checked.ok) return invalid('This question has no verified solution the tutor can be grounded in.', 'TUTOR_UNGROUNDED', 422);
-  const evidence = issued.workEvidence(request.studentWork.lines);
+  // The Step Check runs in the marker pool (off this thread, under a hard
+  // deadline). Its verdict is withheld below until the question is resolved,
+  // so it is not run at all before then: nothing is lost, and an unresolved
+  // question cannot be used to spend marking time.
+  const evidence = issued.resolved
+    ? await issued.workEvidence(request.studentWork.lines)
+    : { firstBreak: -1, verifiedLines: 0, misconception: null };
   return {
     ok: true,
     request: {

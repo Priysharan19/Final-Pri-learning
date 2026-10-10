@@ -125,6 +125,26 @@ await stagedMaths.loadAllBanks();
 const canonical = stagedMaths.generateQuestion('c11-complex-numbers', 3, 56);
 c.ok(canonical?.answer && canonical?.prompt, 'canonical generator executes with ONLY packaged runtime sources');
 c.eq(canonical.answer.value, 135, 'private generated maths key stays available to the server');
+// The marker runs in worker threads (server/platform/markerPool.js). The worker
+// entry and the operations it serves ship with the platform directory, and the
+// worker must find the engine from the IMAGE's layout — proved by starting the
+// staged pool, in production mode, and marking the staged question with it.
+for (const required of ['server/platform/markerPool.js', 'server/platform/markerWorker.js', 'server/platform/markerOps.js']) {
+  c.ok(existsSync(join(stage, required)), `${required} is in the image`);
+}
+c.ok(!existsSync(join(stage, 'server', 'test')), 'no test worker entry can be loaded: server/test is not in the image');
+const stagedMarker = await import(pathToFileURL(join(stage, 'server', 'platform', 'markerPool.js')));
+const stagedPool = stagedMarker.createMarkerPool({ size: 1, env: { NODE_ENV: 'production' } });
+try {
+  const marked = await stagedPool.run('practice', { q: canonical, answer: String(canonical.answer.value), working: '', evidenceIfWrong: false });
+  c.ok(marked.ok === true && marked.value.result.correct === true, 'the staged marker worker starts and marks with ONLY packaged runtime sources');
+  const wrong = await stagedPool.run('practice', { q: canonical, answer: String(canonical.answer.value + 1), working: '', evidenceIfWrong: false });
+  c.ok(wrong.ok === true && wrong.value.result.correct === false, 'and marks a wrong answer wrong');
+} finally {
+  await stagedPool.close();
+}
+assert.throws(() => stagedMarker.createMarkerPool({ inline: true, env: { NODE_ENV: 'production' } }), { code: 'MARKER_POOL_CONFIG_INVALID' });
+c.ok(true, 'the staged pool refuses to mark on the request thread in production');
 for (const legacy of ['server/auth.js', 'server/routes', 'server/db.js', 'server/badges.js', 'server/seed.js', 'server/engine']) {
   c.ok(!existsSync(join(stage, legacy)), `${legacy} is not in the image`);
 }
