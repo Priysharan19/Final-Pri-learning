@@ -86,6 +86,9 @@ jobs:
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
           grep -Fq 'TUTOR UI: PASS — 71/71 checks' suites.log
           grep -Fq 'APPLE SIGN IN: PASS — 66/66 checks' suites.log
+          # The one sign-in card: code entry, every refusal in words, one request
+          # per code, no account without age and agreement, no navigation, no read.
+          grep -Fq 'SIGN-IN CARD: PASS — 85/85 checks' suites.log
           grep -Fq 'ONBOARDING SCOPE: PASS — 40/40 checks' suites.log
           grep -Fq 'STUDY PLAN: PASS — 211/211 checks' suites.log
           grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
@@ -220,6 +223,13 @@ jobs:
         run: node tools/runtime-audit-floor.mjs server
       - name: Platform security floor
         run: |
+          set -o pipefail
+          # One-time codes: the core lifecycle, and the sign-in card's contract
+          # (existing accounts, limits, sessions, the guardian gate, the email).
+          node server/test/otp-lifecycle-check.mjs 2>&1 | tee otp.log
+          node server/test/otp-sign-in-check.mjs 2>&1 | tee -a otp.log
+          grep -Fq 'OTP lifecycle: 108/108 checks passed' otp.log
+          grep -Fq "OTP SIGN-IN (the sign-in card's server contract): 123/123 checks passed" otp.log
           node server/test/security-headers-check.mjs
           node server/test/login-lockout-check.mjs
           node server/test/admin-bootstrap-check.mjs
@@ -462,6 +472,12 @@ jobs:
           # Read on request: what one handwritten answer costs the paid reader
           # (scripted reader), a double press, a second tab, and late readings.
           node client/test/tour-read-cost.js --no-build 2>&1 | tee -a browser.log
+          # The one sign-in card (codes from the server's test mail sink; no
+          # email is sent): new and returning students, every way a code goes
+          # wrong, sign-in inside practice with ink and with a photo at a phone
+          # viewport, sessions, the guardian gate — in both engines.
+          node client/test/tour-sign-in-card.js --no-build 2>&1 | tee -a browser.log
+          node client/test/tour-sign-in-card.js --no-build --browser=webkit 2>&1 | tee -a browser.log
       - name: Accessibility suite
         if: always()
         run: |

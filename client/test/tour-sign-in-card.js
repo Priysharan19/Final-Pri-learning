@@ -396,6 +396,7 @@ export const returningFlow = {
     await card.locator('#signup-destination').fill(who.email);
     await card.getByTestId('signup-send-code').click();
     await card.getByTestId('signup-error').waitFor({ timeout: 15000 });
+    await online.settled();
     const limited = calls(online, '/v1/account/otp/request').at(-1);
     await check('asking for the same address again inside the cooldown: the server answers 429 and the card says how long to wait',
       limited.status === 429 && limited.json?.error?.code === 'OTP_RATE_LIMITED' && /^Please wait \d+ s before asking for another code\.$/.test(await errorText(card)),

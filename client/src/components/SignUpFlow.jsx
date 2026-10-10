@@ -36,6 +36,9 @@ import { cloudDeviceId } from '../platform/cloudAccount.js';
 import { requestIdentityToken, socialProviderConfig } from '../platform/socialSignIn.js';
 import { tLater, useT, useTx } from '../i18n/index.js';
 import OtpInput, { OTP_LENGTH } from './OtpInput.jsx';
+import { isNetworkFailure, signInErrorCopy } from './signInErrors.js';
+
+export { isNetworkFailure, signInErrorCopy };
 import './SignUpFlow.css';
 
 const CLASSES = [7, 8, 9, 10, 11, 12];
@@ -61,66 +64,6 @@ function listenForSmsCode(onCode) {
     .then(credential => { if (credential?.code) onCode(String(credential.code)); })
     .catch(() => { /* dismissed, aborted or unsupported: the boxes still work */ });
   return () => controller.abort();
-}
-
-/**
- * True when the request never reached the server: offline, a dropped
- * connection, a timeout. fetch reports these as a bare TypeError or a
- * DOMException (whose legacy numeric `code` is not one of ours); every answer
- * the server gave, and every refusal raised in this app, carries a status or a
- * string code. Nothing was spent by a request that never arrived.
- */
-export function isNetworkFailure(error) {
-  if (!error || Number(error.status) > 0) return false;
-  if (typeof error.code === 'string' && error.code) return false;
-  return true;
-}
-
-/**
- * The words for a refused or failed request, as a catalogue key. Pure: the
- * card's whole error vocabulary is in this one table, and it is tested without
- * a browser (client/test/sign-in-card-check.mjs).
- *
- * `OTP_INVALID` is the server's single answer for a wrong, expired, spent or
- * unknown code — it deliberately does not say which. The card adds only what
- * it knows itself: the tries the server reported, and its own clock.
- */
-export function signInErrorCopy(error, { expired = false } = {}) {
-  const code = typeof error?.code === 'string' ? error.code : '';
-  const status = Number(error?.status) || 0;
-  if (isNetworkFailure(error)) return { key: 'signup.offlineError', kind: 'network' };
-  if (code === 'OTP_INVALID') {
-    if (expired) return { key: 'signup.codeExpired', kind: 'expired' };
-    const left = Number.isFinite(error?.attemptsRemaining) ? Number(error.attemptsRemaining) : null;
-    if (left === 0) return { key: 'signup.codeLocked', kind: 'locked' };
-    if (left !== null) return { key: 'signup.codeWrongLeft', vars: { count: left, n: left }, kind: 'wrong' };
-    return { key: 'signup.codeWrongOrExpired', kind: 'wrong' };
-  }
-  if (code === 'OTP_RATE_LIMITED' || status === 429) {
-    if (code === 'ACCOUNT_LOCKED') return { key: 'signup.passwordLocked', kind: 'locked' };
-    const seconds = Number.isFinite(error?.retryAfterMs) ? Math.max(1, Math.ceil(error.retryAfterMs / 1000)) : null;
-    return seconds && seconds <= 120
-      ? { key: 'signup.rateLimited', vars: { n: seconds }, kind: 'rate' }
-      : { key: 'signup.rateLimitedPlain', kind: 'rate' };
-  }
-  if (code === 'OTP_DESTINATION_INVALID') return { key: 'signup.emailInvalid', kind: 'input' };
-  if (code === 'OTP_EMAIL_NOT_CONFIGURED' || code === 'OTP_SMS_NOT_CONFIGURED') return { key: 'signup.codesOff', kind: 'outage' };
-  if (code === 'OTP_DELIVERY_FAILED') return { key: 'signup.deliveryFailed', kind: 'outage' };
-  if (code === 'BAD_CREDENTIALS') return { key: 'signup.passwordWrong', kind: 'wrong' };
-  if (code === 'PROFILE_NAME_REQUIRED') return { key: 'signup.nameRequired', kind: 'input' };
-  if (code === 'AGE_DECLARATION_REQUIRED' || code === 'CONSENT_DECLARATION_REQUIRED') return { key: 'signup.ageRequired', kind: 'input' };
-  if (code === 'GUARDIAN_SAME_AS_STUDENT' || code === 'GUARDIAN_EMAIL_SAME_AS_STUDENT') return { key: 'signup.parentNotYou', kind: 'input' };
-  if (code === 'GUARDIAN_CONSENT_WITHDRAWN') return { key: 'cloud.guardianDeclined', kind: 'blocked' };
-  if (code === 'IDENTITY_LINK_REQUIRED') return { key: 'signup.socialUseEmail', kind: 'blocked' };
-  if (code === 'OIDC_NONCE_INVALID') return { key: 'signup.socialStartAgain', kind: 'expired' };
-  if (code === 'OIDC_PROVIDER_NOT_CONFIGURED' || code === 'SOCIAL_PROVIDER_ERROR') return { key: 'signup.socialFailed', kind: 'outage' };
-  if (code === 'SOCIAL_POPUP_BLOCKED') return { key: 'cloud.socialPopupBlocked', kind: 'blocked' };
-  if (code === 'SOCIAL_TIMEOUT') return { key: 'cloud.socialTimedOut', kind: 'expired' };
-  if (code === 'CLOUD_LINK_CONFLICT' || code === 'INK_ACCOUNT_MISMATCH') return { key: 'signup.otherAccount', kind: 'blocked' };
-  if (code === 'INK_PROFILE_CHANGED') return { key: 'signup.profileChanged', kind: 'blocked' };
-  if (code === 'INK_DRAFT_NOT_SAVED') return { key: 'signup.saveFirst', kind: 'blocked' };
-  if (status >= 500 || code === 'CLOUD_DISABLED') return { key: 'signup.serverDown', kind: 'outage' };
-  return { key: 'signup.genericError', kind: 'unknown' };
 }
 
 export default function SignUpFlow({
@@ -457,8 +400,13 @@ export default function SignUpFlow({
 
   const waitSeconds = Math.max(0, Math.ceil((resendAt - now) / 1000));
   const codeExpired = step === 'code' && !!challenge && now >= challenge.expiresAt;
+  // On the landing screen the page's own <h1> ("Welcome to Pri Learning")
+  // gives way to the card once it is past its first step, so each later step's
+  // heading is the page's one <h1>. Inside another page the card is a section
+  // of it and its headings stay at <h2>.
+  const Heading = inline ? 'h2' : 'h1';
   const heading = (key, vars) => (
-    <h2 className="signup-title" tabIndex={-1} ref={headingRef} id="signup-step-title">{t(key, vars)}</h2>
+    <Heading className="signup-title" tabIndex={-1} ref={headingRef} id="signup-step-title">{t(key, vars)}</Heading>
   );
   const choice = (selected, label, onClick, testId, extra = '') => (
     <button key={testId} type="button" className={`signup-choice${selected ? ' is-selected' : ''}${extra}`} aria-pressed={selected}
