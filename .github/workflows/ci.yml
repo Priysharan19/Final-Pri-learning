@@ -470,6 +470,9 @@ jobs:
           # Read on request: what one handwritten answer costs the paid reader
           # (scripted reader), a double press, a second tab, and late readings.
           node client/test/tour-read-cost.js --no-build 2>&1 | tee -a browser.log
+          # The clock runs out with handwriting nobody read (scripted reader):
+          # warned, frozen by digest, pending — never blank — then read once.
+          node client/test/tour-exam-unread-handwriting.js --no-build 2>&1 | tee -a browser.log
       - name: Accessibility suite
         if: always()
         run: |
@@ -544,6 +547,7 @@ jobs:
           grep -Fq 'BOOT RESILIENCE: PASS — 61/61 checks' browser.log
           grep -Fq 'Reader · usage limit reached' browser.log
           grep -Eq 'Read on request · provider calls per handwritten answer, first stroke to verdict +10/10' browser.log
+          grep -Eq 'India exam · unread handwriting at the deadline: warned, frozen, pending, read once +21/21' browser.log
           grep -Eq 'E2E SUITE.*38/38.*2 flows' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
