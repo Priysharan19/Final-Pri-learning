@@ -248,7 +248,7 @@ check('status only claims what the device actually knows', () => {
   // Stronger than the read through the writing handle it replaces: the row is
   // read back through a FRESH IndexedDB connection (never the cached handle,
   // never the in-memory queue) and compared stroke for stroke.
-  assert.match(card, /confirmInkDraftSaved\(question\.id, strokes\)/);
+  assert.match(card, /confirmInkDraftSaved\(question\.id, strokes, extras\)/);
   assert.match(card, /setSaveState\(outcome\.saved \? 'saved' : 'failed'\)/);
   assert.doesNotMatch(card, /readInkDraft\(question\.id\)\)\.then\(\s*kept => \{[^}]*setSaveState\([^)]*'saved'/);
   const inkDrafts = readFileSync(new URL('../src/local/inkDrafts.js', import.meta.url), 'utf8');

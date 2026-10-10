@@ -151,11 +151,11 @@ const reading = ({
   const card = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
 
   const correctionStart = inkAnswer.indexOf('const correctLine = useCallback(');
-  const correctionEnd = inkAnswer.indexOf('}, [rec, publish]);', correctionStart);
+  const correctionEnd = inkAnswer.indexOf('}, [rec, publish, stale]);', correctionStart);
   const correctionHandler = inkAnswer.slice(correctionStart, correctionEnd);
   ok(/applyLineCorrection\(rec, index, text\)/.test(correctionHandler)
-      && /publish\(next, strokesRef\.current\)/.test(correctionHandler)
-      && !/readWithCloud|sendToReader|api\.post|mark|grade/.test(correctionHandler),
+      && /publish\(next, strokesRef\.current, \{ stale \}\)/.test(correctionHandler)
+      && !/readWithCloud|readNow|sendToReader|api\.post|mark|grade/.test(correctionHandler),
     'CASE 5: correction only republishes student-authored text; it neither calls AI again nor decides a mark');
 
   const submitStart = card.indexOf('async function submit(');
