@@ -15,7 +15,9 @@
 //   · a root written another way (`n - 24 = 0`, `2n = 48`), a sweep of guesses
 //     and a false set-up cannot reach full marks under a wrong answer, and a
 //     sweep or a false set-up earns nothing;
-//   · while the question is open the reply says nothing about the working.
+//   · while the question is open the reply says nothing about the working;
+//   · a twelve-thousand-character sum is marked in well under a second, and a
+//     sweep of middle-term splits on a quadratic earns nothing.
 // ─────────────────────────────────────────────────────────────────────────────
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -119,6 +121,45 @@ try {
   c.eq((await wrong('sweep', '23', ['n = 22', 'n = 23', 'n = 24'])).marksEarned, 0, 'a sweep of guesses earns nothing');
   c.eq((await wrong('false-set-up', '23', ['16 - 6n = -122', 'n = 23'])).marksEarned, 0, 'a false set-up earns nothing');
   c.eq((await wrong('padding', '23', ['16 = 16', '-122 = -122', '24 - 1 = 23'])).marksEarned, 0, 'arithmetic with no unknown earns nothing');
+
+  // What an answer costs to mark does not depend on what is written in it: a
+  // sum of ten thousand terms, each twelve thousand characters long, took
+  // three to four seconds here and, being unreadable, spent no try.
+  {
+    const q = await issue();
+    let term = '170!';
+    while (term.length < 11800) term += '+170!';
+    const at = Date.now();
+    const long = await submit(q.id, 'ap-long-sum-answer', `sum(${term};k;1;10000)`, []);
+    const ms = Date.now() - at;
+    c.eq(long.status, 200, 'a twelve-thousand-character sum is answered');
+    c.eq(long.data.correct, false, 'and is not correct');
+    c.ok(ms < 1500, `in well under the seconds it used to take (${ms} ms)`);
+  }
+
+  // The middle term of a quadratic split every way the coefficients allow:
+  // from the printed question alone this used to collect a method mark.
+  for (const seed of [7000, 7001, 7002]) {
+    const r = await h.request('/v1/practice/issue', { method: 'POST', jar: a.jar, body: { generator: 'c10-quadratic-roots', difficulty: 3, seed, curriculum: 'in' } });
+    assert.equal(r.status, 201, `seed ${seed}: the server issues a quadratic`);
+    const q = r.data.question;
+    const m = String(q.prompt).replace(/[−–]/g, '-').replace(/\s+/g, '').match(/(\d*)x\^2([+-]\d*)x([+-]\d+)=0/);
+    assert.ok(m, `seed ${seed}: the printed equation is a quadratic in x (${q.prompt})`);
+    const lead = m[1] === '' ? 1 : Number(m[1]);
+    const b = m[2] === '+' ? 1 : m[2] === '-' ? -1 : Number(m[2]);
+    const cst = Number(m[3]);
+    const signed = n => (n < 0 ? '-' : '+') + (Math.abs(n) === 1 ? '' : Math.abs(n));
+    const sweep = [];
+    for (let k = -20; k <= 20; k++) {
+      if (k === 0 || k === b) continue;
+      const square = `${lead === 1 ? '' : lead}x^2`, one = `${signed(b - k)}x`, two = `${signed(k)}x`, tail = `${signed(cst).replace(/^([+-])$/, '$11')}=0`;
+      sweep.push(k % 2 ? `${square}${one}${two}${tail}` : `${two.replace(/^\+/, '')}+${square}${one}${tail}`);
+    }
+    const first = await submit(q.id, `split-sweep-${seed}-one`, '97, 98', sweep);
+    c.deq([first.status, first.data.correct, first.data.resolved], [200, false, false], `seed ${seed}: a sweep of ${sweep.length} splits under a wrong answer leaves the question open`);
+    const second = await submit(q.id, `split-sweep-${seed}-two`, '97, 98', sweep);
+    c.deq([second.status, second.data.resolved, second.data.marksEarned], [200, true, 0], `seed ${seed}: and resolves at 0 of ${second.data.marksPossible} on "${q.prompt}"`);
+  }
 } finally {
   await h.close();
   rmSync(scratch, { recursive: true, force: true });
@@ -129,4 +170,4 @@ try {
 }
 
 console.log(`engine: ${h.engine}`);
-console.log(`FLAGSHIP AP WORKING OVER HTTP: PASS — ${c.count()}/${c.count()} checks — the server issues the term-number question, marks 5 and a bare 23 at 0 of 3, 24 at 3 of 3 once, pays method marks for correct working under a wrong last line, and pays nothing for a sweep, a false set-up or padding.`);
+console.log(`FLAGSHIP AP WORKING OVER HTTP: PASS — ${c.count()}/${c.count()} checks — the server issues the term-number question, marks 5 and a bare 23 at 0 of 3, 24 at 3 of 3 once, pays method marks for correct working under a wrong last line, and pays nothing for a sweep, a false set-up or padding; a huge sum is marked quickly and a sweep of middle-term splits earns nothing.`);

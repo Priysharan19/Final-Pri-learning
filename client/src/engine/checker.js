@@ -1753,16 +1753,21 @@ function productFactors(node, acc = []) {
  * or the common factor taken out of each half (`x(x + 8) - 4(x + 8)`). Neither
  * can be written without finding the factor pair.
  */
+/** The two coefficients a middle term was split into (`x^2 + 8x - 4x - 32`: [-4, 8]), or null. */
+function middleTermSplit(side, variable) {
+  const terms = additiveTerms(side).map(term => ({ ...term, poly: polynomialIn(term.node, variable) }));
+  // Four monomials: one square, two in the unknown, one constant.
+  if (terms.length !== 4 || terms.some(term => !term.poly || term.poly.filter(x => !numsClose(x, 0)).length !== 1)) return null;
+  const linear = terms.filter(term => term.poly.length === 2).map(term => term.sign * term.poly[1]);
+  if (linear.length !== 2 || terms.filter(term => term.poly.length === 3).length !== 1 || terms.filter(term => term.poly.length === 1).length !== 1) return null;
+  return linear.sort((x, y) => x - y);
+}
 function groupedQuadratic(side, variable, poly) {
+  const [c, , a] = poly;
+  const split = middleTermSplit(side, variable);
+  if (split) return numsClose(split[0] * split[1], a * c) && !numsClose(split[0], 0) && !numsClose(split[1], 0);
   const terms = additiveTerms(side).map(term => ({ ...term, poly: polynomialIn(term.node, variable) }));
   if (terms.some(term => !term.poly)) return false;
-  const [c, , a] = poly;
-  // Four monomials: one square, two in the unknown, one constant.
-  if (terms.length === 4 && terms.every(term => term.poly.filter(x => !numsClose(x, 0)).length === 1)) {
-    const linear = terms.filter(term => term.poly.length === 2).map(term => term.sign * term.poly[1]);
-    return linear.length === 2 && terms.filter(term => term.poly.length === 3).length === 1 && terms.filter(term => term.poly.length === 1).length === 1 &&
-      numsClose(linear[0] * linear[1], a * c) && !numsClose(linear[0], 0) && !numsClose(linear[1], 0);
-  }
   // Two products sharing a linear factor.
   if (terms.length === 2) {
     const [first, second] = terms.map(term => productFactors(term.node).filter(f => { const n = unwrapGroup(f); return n?.t === 'bin' && (n.op === '+' || n.op === '-') && polynomialIn(f, variable)?.length === 2; }).map(f => polynomialIn(f, variable)));
@@ -2081,6 +2086,21 @@ function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = n
     });
     for (const seen of shapes.values()) {
       if (seen.values.size >= sweepSize) for (const index of seen.lines) contradicted.add(index);
+    }
+    // The middle term split more than one way is a search for the pair, not
+    // the pair found: every split of `bx` adds back to `bx`, so a wrong one
+    // is never false, and only one of them factorises. None of them earns.
+    if (meta.variable) {
+      const splits = new Map();
+      allLines.forEach((l, index) => {
+        const c = readClaim(l.text);
+        if (c?.kind !== 'equation') return;
+        for (const side of claimSides(c)) {
+          const pair = middleTermSplit(side, meta.variable);
+          if (pair) { const key = pair.map(x => x.toFixed(6)).join(','); splits.set(key, [...(splits.get(key) || []), index]); }
+        }
+      });
+      if (splits.size > 1) for (const lines of splits.values()) for (const index of lines) contradicted.add(index);
     }
   }
   // Does the question hand over an equation that is linear in the unknown
