@@ -1,0 +1,210 @@
+// Original Class 8 diagram-bearing supplementary maths questions.
+import { makeVisualExample } from '../visualQuestionFactory.js';
+const specs = [
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "barSum",
+    "labels": [
+      "Lion",
+      "Tiger",
+      "Fox",
+      "Deer"
+    ],
+    "values": [
+      12,
+      8,
+      15,
+      5
+    ],
+    "context": "Wildlife survey"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "barMean",
+    "labels": [
+      "Week1",
+      "Week2",
+      "Week3",
+      "Week4"
+    ],
+    "values": [
+      12,
+      16,
+      8,
+      20
+    ],
+    "context": "Practice sessions"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "barDifference",
+    "labels": [
+      "Spring",
+      "Summer",
+      "Autumn",
+      "Winter"
+    ],
+    "values": [
+      9,
+      25,
+      18,
+      11
+    ],
+    "context": "Rainfall records"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "barProb",
+    "labels": [
+      "Bus",
+      "Walk",
+      "Cycle"
+    ],
+    "values": [
+      12,
+      18,
+      6
+    ],
+    "favourable": "Cycle",
+    "context": "Commute choices"
+  },
+  {
+    "chapterId": "c8-mensuration",
+    "kind": "trapezoid",
+    "bottom": 12,
+    "top": 8,
+    "height": 5,
+    "context": "School garden"
+  },
+  {
+    "chapterId": "c8-mensuration",
+    "kind": "trapezoid",
+    "bottom": 18,
+    "top": 12,
+    "height": 6,
+    "context": "Bridge deck"
+  },
+  {
+    "chapterId": "c8-mensuration",
+    "kind": "trapezoid",
+    "bottom": 14,
+    "top": 5,
+    "height": 8,
+    "context": "Festival banner"
+  },
+  {
+    "chapterId": "c8-graphs",
+    "kind": "midpoint",
+    "A": [
+      -6,
+      0
+    ],
+    "B": [
+      4,
+      0
+    ],
+    "context": "Two railway stations"
+  },
+  {
+    "chapterId": "c8-graphs",
+    "kind": "midpoint",
+    "A": [
+      2,
+      -4
+    ],
+    "B": [
+      6,
+      8
+    ],
+    "context": "Map reference"
+  },
+  {
+    "chapterId": "c8-graphs",
+    "kind": "gradient",
+    "A": [
+      0,
+      1
+    ],
+    "B": [
+      4,
+      9
+    ],
+    "context": "Height versus time"
+  },
+  {
+    "chapterId": "c8-quadrilaterals",
+    "kind": "triangleArea",
+    "A": [
+      1,
+      1
+    ],
+    "B": [
+      8,
+      1
+    ],
+    "C": [
+      3,
+      7
+    ],
+    "context": "Half a plotted quadrilateral"
+  },
+  {
+    "chapterId": "c8-quadrilaterals",
+    "kind": "triangleArea",
+    "A": [
+      0,
+      0
+    ],
+    "B": [
+      6,
+      0
+    ],
+    "C": [
+      2,
+      4
+    ],
+    "context": "A diagonal subdivision"
+  },
+  {
+    "chapterId": "c8-rational-numbers",
+    "kind": "numberDistance",
+    "a": -2.5,
+    "b": 4.5,
+    "context": "A rational interval"
+  },
+  {
+    "chapterId": "c8-rational-numbers",
+    "kind": "numberDistance",
+    "a": -7.5,
+    "b": -0.5,
+    "context": "Number-line offsets"
+  },
+  {
+    "chapterId": "c8-proportions",
+    "kind": "barProb",
+    "labels": [
+      "North",
+      "South",
+      "East",
+      "West"
+    ],
+    "values": [
+      8,
+      16,
+      4,
+      12
+    ],
+    "favourable": "South",
+    "context": "Proportional routes"
+  },
+  {
+    "chapterId": "c8-algebraic-identities",
+    "kind": "rightTriangle",
+    "u": 6,
+    "v": 8,
+    "context": "Square-area dissection"
+  }
+];
+const data={};
+for (const {chapterId,kind,...p} of specs) (data[chapterId] ||= {examples:[]}).examples.push(makeVisualExample(kind,p));
+export default data;
