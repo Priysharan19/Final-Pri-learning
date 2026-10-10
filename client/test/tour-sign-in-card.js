@@ -555,7 +555,7 @@ export const inlineInkFlow = {
       reader.requests.length === readsBefore && paidAfter === paidBefore && await page.locator('.ink-line').count() === 0,
       `provider ${reader.requests.length - readsBefore}; server ${paidAfter - paidBefore}`);
     await check('signing in issued and marked nothing either: the question waits for the student\'s own Submit',
-      (await online.practiceCalls(/^\/v1\/practice\/(issue|[^/]+\/grade)/)).length === 0);
+      (await online.practiceCalls(/^\/v1\/practice\/(issue|[^/]+\/(?:submit|grade))/)).length === 0);
     await check('"Read my answer" is offered for the kept ink — the read stays the student\'s choice',
       await page.locator('[data-ink-read]').isVisible());
 
@@ -568,8 +568,8 @@ export const inlineInkFlow = {
     await page.waitForFunction(() => document.querySelector('.eval-card, .verdict-title'), null, { timeout: 30000 }).catch(() => {});
     await online.settled();
     const issued = await online.practiceCalls(/^\/v1\/practice\/issue$/);
-    const graded = await online.practiceCalls(/^\/v1\/practice\/[^/]+\/grade$/);
-    await check('Submit then binds this same prepared question to the new account and the server marks it: one issue, one grade, same question on screen',
+    const graded = await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/);
+    await check('the read bound this same prepared question to the new account (one issue) and Submit is then marked by the server (one submit): same question on screen',
       issued.length === 1 && issued[0].status < 300 && graded.length === 1 && graded[0].status === 200 && await shownId(page) === qid,
       `issue ${issued.map(c => c.status)}; grade ${graded.map(c => c.status)}; all ${(await online.practiceCalls(/^\/v1\/practice\//)).map(c => `${c.status} ${c.path.replace(/q_[^/]+|pq_[^/]+/, ':id')}`).join(', ')}`);
     await check('no outbound request was refused: nothing tried to reach a real provider', reader.refused.length === 0, JSON.stringify(reader.refused));
@@ -628,7 +628,7 @@ export const inlinePhotoFlow = {
     await check('PAID-CALL COUNTER: signing in triggered ZERO reads of the photo — "Read my photo" is offered, no provider request, no transcript',
       reader.requests.length === readsBefore && await readPhoto.isVisible() && await page.locator('[data-photo-correct-transcript]').count() === 0,
       `${reader.requests.length - readsBefore} provider request(s)`);
-    await check('and nothing was issued or marked by signing in', (await online.practiceCalls(/^\/v1\/practice\/(issue|[^/]+\/grade)/)).length === 0);
+    await check('and nothing was issued or marked by signing in', (await online.practiceCalls(/^\/v1\/practice\/(issue|[^/]+\/(?:submit|grade))/)).length === 0);
     await readPhoto.click();
     await page.locator('[data-photo-correct-transcript]').first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     await check('one press then reads it once [SYNTHETIC-READER EVIDENCE]', reader.requests.length === readsBefore + 1, `${reader.requests.length - readsBefore} provider request(s)`);
@@ -735,7 +735,7 @@ export const sessionsFlow = {
       await check('signing in again with the account\'s own email: the card closes, the answer is still there, same question, nothing was submitted by itself',
         await answerBox.inputValue() === '41' && await tab.locator('.qpage').first().getAttribute('data-question-id') === tabQuestion
           && await tab.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'tab-kept' && await meStatus(tab) === 200
-          && (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/grade$/)).filter(c => c.status === 200).length === 0);
+          && (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).filter(c => c.status === 200).length === 0);
     } else {
       await check('a typed-answer question was available for the expiry journey', false, 'the served question took no typed answer');
     }
@@ -818,7 +818,7 @@ export const minorFlow = {
     await check('the parent\'s mailbox gets the approval code, told to open the parent page themselves — with no link to any other host — and nothing is approved yet',
       /^\d{6}$/.test(parentMail?.code || '') && /read what you are agreeing to/.test(parentMail.body) && !/https?:\/\/(?!127\.0\.0\.1|localhost)/.test(parentMail.body) && consent().confirmed_at === null,
       JSON.stringify(parentMail && { purpose: parentMail.purpose }));
-    const childSide = { codeBoxes: await card.locator('input[autocomplete="one-time-code"]').count(), approve: await page.getByRole('button', { name: 'Approve' }).count(), step: await stepOf(card) };
+    const childSide = { codeBoxes: await card.locator('input[autocomplete="one-time-code"]').count(), approve: await page.getByRole('button', { name: 'Approve', exact: true }).count(), step: await stepOf(card) };
     await check('the child\'s screen only waits: no code box, no approve button — a child cannot approve their own account',
       childSide.codeBoxes === 0 && childSide.approve === 0 && childSide.step === 'parent-wait', JSON.stringify(childSide));
 
