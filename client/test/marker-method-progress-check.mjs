@@ -792,7 +792,7 @@ ok(stepCheck(meta, `${fill('(x+1)', 290, '')}+12345 = 0`, { prompt }).lines[0].u
   // the bound asserted leaves room for a loaded machine, not for the seconds this used to take.
   ok(inputs > 3000 && worst < 400, `${inputs} short answers and working lines built from huge numbers: the slowest takes ${worst.toFixed(0)} ms (${worstText})`);
   // Exact small values are untouched, and what is out of range is not a number.
-  for (const [text, value] of [['nCr(10,3)', 120], ['10C3', 120], ['5!', 120], ['nPr(6,3)', 120], ['sum(k;k;1;15)', 120], ['sum(sum(1;j;1;10);k;1;12)', 120], ['ncr(120,1)', 120], ['ncr(1000,999) - 880', 120]]) {
+  for (const text of ['nCr(10,3)', '10C3', '5!', 'nPr(6,3)', 'sum(k;k;1;15)', 'sum(sum(1;j;1;10);k;1;12)', 'ncr(120,1)', 'ncr(1000,999) - 880']) {
     ok(checkAnswer(numeric, text).correct === true, `${text} is still exactly 120`);
   }
   ok(checkAnswer({ answerType: 'numeric', answer: { value: 137846528820 }, prompt: '' }, 'nCr(40,20)').correct === true, 'nCr(40, 20) is still exact');

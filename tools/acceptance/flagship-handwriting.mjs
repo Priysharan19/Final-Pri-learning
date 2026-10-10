@@ -29,7 +29,7 @@
 // 3 nothing failed but something could not be verified · 2 dependency missing.
 // ─────────────────────────────────────────────────────────────────────────────
 import { randomBytes } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -39,8 +39,9 @@ import { writeLines, writeScribble, withExifOrientation } from './simulated-ink.
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '..', '..');
 const RENDER_ONLY = process.argv.includes('--render-only');
-const OUT = resolve(process.env.PRI_ACCEPT_OUT || join(tmpdir(), `pri-flagship-${Date.now()}`));
-mkdirSync(OUT, { recursive: true });
+// A private directory of its own: nothing else on the machine can have put a file there first.
+const OUT = process.env.PRI_ACCEPT_OUT ? resolve(process.env.PRI_ACCEPT_OUT) : mkdtempSync(join(tmpdir(), 'pri-flagship-'));
+mkdirSync(OUT, { recursive: true, mode: 0o700 });
 const SEED = Number(process.env.PRI_ACCEPT_SEED) || 20261010;
 const ISSUE_BOUND = Math.max(10, Math.min(120, Number(process.env.PRI_ACCEPT_ISSUE_BOUND) || 40));
 const PROVIDER_CALL_BUDGET = 60;
