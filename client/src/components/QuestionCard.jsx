@@ -13,7 +13,7 @@ import { flushInkDrafts } from '../local/inkDrafts.js';
 import { sanitizeFigure } from '../lib/sanitize.js';
 import { clearDraft, flushDrafts, queueDraft, readDraft, saveDraft } from './drafts.js';
 import {
-  clearInkDraft, clearPendingSubmission, newSubmissionId, readInkDraft, readPendingSubmission,
+  clearInkDraft, clearPendingSubmission, confirmInkDraftSaved, newSubmissionId, readInkDraft, readPendingSubmission,
   saveInkDraft, savePendingSubmission, submissionContentKey,
   noteSubmissionEdited, recoveryPlan, settleFailedSubmission, submissionToSettleFirst
 } from './practiceRecovery.js';
@@ -25,7 +25,7 @@ import { canRetryPhotoReading, definitiveSubmissionRefusal, draftPersistenceWarn
 import { plotSpecFor } from '../engine/plotSpec.js';
 import { attestedGrade, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable, showCommittedMethodAwardNote } from './authoritativeGrade.js';
 import { checkRefusalCopy, legacyDeviceReplay, needsAccountToCheck, refusalForQuestion, refusedCheckState, retryActionFor, serverRevealReceipt, unmarkableNotice } from './checkAccess.js';
-import { CheckRefusal, CheckSignIn } from './CheckRefusal.jsx';
+import { CheckRefusal, CheckSignIn, SignInChoices } from './CheckRefusal.jsx';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
 import { misconceptionById } from '../engine/misconceptions.js';
@@ -750,6 +750,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // sent is dropped, one whose outcome is unknown is flagged so no relaunch
   // sends it by itself (practiceRecovery.js noteSubmissionEdited). `key` is
   // the content now on screen, or null when it is not known yet (new ink).
+  // "Save again": the same write, asked for by the student after it failed.
+  // The work never left the page; this only tries the device store once more.
+  const retrySave = () => {
+    if (resolved || busy) return;
+    if (mode === 'write' && !isMcq && latestInk.current?.length) onInkStrokes(latestInk.current);
+    else stash(answer, working);
+  };
   const noteEdited = (key) => {
     // Also while the request is in flight (the fields stay editable): if it
     // then times out, the record must already say that what is on screen is
@@ -793,17 +800,20 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // Its boolean acknowledges only acceptance into a write queue, not disk.
     if (!saveInkDraft(question.id, strokes, { label: question.subtopicName })) { setSaveState('failed'); return; }
     if (!Array.isArray(strokes) || !strokes.length) { setSaveState(null); return; }
-    const expected = JSON.stringify(compactInkStrokes(strokes));
     setSaveState('saving');
     inkSaveTimer.current = setTimeout(() => {
       inkSaveTimer.current = null;
-      // Await the sealed store's actual write, then read the same question back.
-      // A storage rejection is swallowed by the store (ink remains on canvas),
-      // so only an exact durable stroke match can justify saying "Saved".
-      flushInkDrafts().then(() => readInkDraft(question.id)).then(
-        kept => {
+      // "Saved" is said only after these exact strokes have been read back
+      // through a FRESH IndexedDB connection (inkDrafts.confirmInkDraftSaved):
+      // never from the write queue, and never from the handle that wrote
+      // them. A refused write, a missing row or a different page is a failed
+      // save, said as one, with the strokes still on the canvas and a retry.
+      confirmInkDraftSaved(question.id, strokes).then(
+        outcome => {
           if (!mountedRef.current || attemptRef.current || inkSaveRevision.current !== revision) return;
-          setSaveState(kept && JSON.stringify(compactInkStrokes(kept)) === expected ? 'saved' : 'failed');
+          // Newer strokes are already queued: their own readback will answer.
+          if (outcome.reason === 'superseded') return;
+          setSaveState(outcome.saved ? 'saved' : 'failed');
         },
         () => {
           if (mountedRef.current && !attemptRef.current && inkSaveRevision.current === revision) setSaveState('failed');
@@ -1538,12 +1548,32 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const inkUnread = writeMode && !isMcq && inkHasStrokes && !needsCheck
     && inkReaderState?.kind === INK_READER_STATE.READ_FAILED
     && (isWorking ? !inkResult?.lines?.length : !inkResult?.answerLine);
+  // Waiting for an account, and nothing else: the work is here, it has not
+  // been read, and the sign-in beside it is the way forward.
+  const inkWaitingSignIn = inkAccountBlocked && inkReaderState?.blocker === 'ink.waitingSignIn';
+  const photoWaitingSignIn = mode === 'photo' && !isMcq && !!photo && !resolved
+    && photoOCR.phase === 'unavailable' && photoOCR.blockedKey === 'verdict.photoReadingSignIn';
+  // ONE state for the student's work, so the page can never say two things
+  // about it at once. In order: a save that failed outranks everything but a
+  // check in flight; "waiting for sign-in" is said for handwriting only once
+  // the page is proven saved; "read" only when a reading is on screen.
+  const workState = busy ? 'checking'
+    : resolved ? 'submitted'
+      : saveState === 'failed' ? 'save-failed'
+        : saveState === 'saving' ? 'saving'
+          : (inkWaitingSignIn && saveState === 'saved') || photoWaitingSignIn ? 'waiting-sign-in'
+            : writeMode && !isMcq && inkReaderState?.kind === INK_READER_STATE.READING ? 'reading'
+              : inkUnread ? 'read-failed'
+                : (writeMode && !isMcq && !!(isWorking ? inkResult?.lines?.length : inkResult?.answerLine)) || (mode === 'photo' && !!photo && photoOCR.phase === 'done') ? 'read'
+                  : saveState === 'saved' ? 'saved'
+                    : 'idle';
   const statusText = busy ? t('verdict.statusChecking')
     : cloudPending ? t('verdict.statusMethod')
       : saveState === 'failed' ? t('verdict.statusNotSaved')
         : saveState === 'saving' ? t('verdict.statusSaving')
           : resolved ? (serverAuthoritative ? t(verdictGood ? 'verdict.correct' : res?.revealed ? 'verdict.revealed' : 'verdict.notThisTime') : t('verdict.statusMarked'))
             : inkUnread ? t('verdict.statusInkUnread')
+            : workState === 'waiting-sign-in' ? t(photoWaitingSignIn ? 'verdict.statusPhotoWaitingSignIn' : 'verdict.statusSavedWaitingSignIn')
             : saveState === 'saved' ? t(offline ? 'verdict.statusSavedOffline' : 'verdict.statusSaved')
               : (writeMode && !isMcq ? t('verdict.statusWriteHint') : '');
 
@@ -1845,7 +1875,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                             <div style={{ marginTop: 10 }}>
                               <button className="btn btn-primary" type="button" data-photo-sign-in
                                 aria-expanded={photoSignInOpen} onClick={() => setPhotoSignInOpen(v => !v)}>
-                                {t('cloud.signIn')}
+                                {t('check.signInAction')}
                               </button>
                               <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
                                 {photoAwaitingOnlineReader(language)}
@@ -1859,9 +1889,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 </div>
               )}
               {photoSignInOpen && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && (
-                <React.Suspense fallback={<p role="status">{t('cloud.stateChecking')}</p>}>
-                  <PhotoAccountRecovery />
-                </React.Suspense>
+                /* The same two ways in as the handwriting sign-in: the account
+                   panel and a phone or email code. The photo, the question and
+                   anything typed stay mounted around it. */
+                <div data-photo-account-recovery>
+                  <SignInChoices user={user} refreshUser={refreshUser} onDone={() => setPhotoSignInOpen(false)} />
+                </div>
               )}
               {isWorking ? (
                 <textarea
@@ -1903,7 +1936,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               {InkAnswer && restoredInk !== undefined && (
                 <InkAnswer onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
                   disabled={resolved || busy} focusSymbol={checkFocus} recognitionContext={recognitionContext}
-                  initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes} />
+                  initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes}
+                  draftSaved={saveState === 'saved'} />
               )}
               {inkAccountBlocked && (
                 <div className="ink-account-recovery" data-ink-account-recovery role="group" aria-label={inkRecoveryCopy.action}>
@@ -1914,12 +1948,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     <p data-ink-blocker-reason={inkReaderState.blocker}>{inkRecoveryCopy.blocker[inkReaderState.blocker]}</p>
                   )}
                   <p role="status" aria-live="polite">{inkRecoveryCopy.detail}</p>
-                  {saveState === 'failed' && (
-                    <button type="button" className="btn btn-secondary btn-sm" data-ink-save-retry
-                      onClick={() => latestInk.current?.length && onInkStrokes(latestInk.current)}>
-                      {t('common.tryAgain')}
-                    </button>
-                  )}
                   {inkReaderState?.blocker === 'ink.waitingSignIn' && (
                     <>
                       <button type="button" className="btn btn-primary" data-ink-sign-in
@@ -2283,9 +2311,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
         {/* ── One obvious next move; everything else stays reachable and quiet ── */}
         <div className="ws-actions editor-foot no-print">
-          <span className="status-line" data-state={statusState} role="status" aria-live="polite">
+          <span className="status-line" data-state={statusState} data-work-state={workState} role="status" aria-live="polite">
             {statusState !== 'idle' && <span className="dot" aria-hidden="true" />}
-            {writeMode && shownAnswerLine && !needsCheck && !cloudPending && !(resolved && !boundLines)
+            {writeMode && shownAnswerLine && !needsCheck && !cloudPending && !(resolved && !boundLines) && saveState !== 'failed' && saveState !== 'saving'
               ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(shownAnswerLine)}$`} /></span>
               : statusText}
             {/* Handwriting is read only by the server reader (#316); say so where the work is submitted. */}
@@ -2294,6 +2322,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             )}
           </span>
           <div className="ws-actions-btns">
+            {/* A save that failed is said as one and can be tried again here,
+                whatever the input mode. The work itself is still on the page. */}
+            {workState === 'save-failed' && (
+              <button type="button" className="btn btn-quiet" data-save-retry data-ink-save-retry={writeMode ? '' : undefined}
+                onClick={retrySave}>{t('verdict.saveRetry')}</button>
+            )}
             {!resolved && diagnostic && (
               <button className="btn btn-quiet" onClick={dontKnow} disabled={busy}>{t('placement.dontKnow')}</button>
             )}

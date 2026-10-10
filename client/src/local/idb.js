@@ -1326,6 +1326,35 @@ export async function get(store, key) {
   if (row === undefined && at !== key) row = await readKey(store, key);
   return unseal(store, row);
 }
+/**
+ * One row, read through a NEW IndexedDB connection — never the cached handle
+ * this module writes through. A request on the writing connection can succeed
+ * and its transaction still abort at commit (quota, eviction, a browser that
+ * drops the write); the handle that made the write is the last place to learn
+ * that. A second connection's read is scheduled behind the write's transaction
+ * and sees only what was committed, so this is the read a "saved" claim may
+ * rest on. Opened without a version: it can never trigger an upgrade or ask
+ * the working connection to close. Rejects when the store cannot be opened or
+ * read; resolves undefined when the row is not there or cannot be unsealed.
+ */
+export async function getFresh(store, key) {
+  await ready();
+  const at = await storedKey(store, key);
+  const db = await new Promise((resolve, reject) => {
+    let req;
+    try { req = indexedDB.open(DB_NAME); } catch (err) { reject(err); return; }
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('IndexedDB open failed'));
+    req.onblocked = () => reject(new Error('IndexedDB open blocked'));
+  });
+  try {
+    let row = await wrap(tx(db, store).get(at));
+    if (row === undefined && at !== key) row = await wrap(tx(db, store).get(key));
+    return await unseal(store, row);
+  } finally {
+    try { db.close?.(); } catch { /* already closed */ }
+  }
+}
 export async function put(store, value) {
   await ready();
   const row = await seal(store, value);
