@@ -60,6 +60,14 @@ const calls = (online, path, method = 'POST') => online.calls.filter(c => c.meth
 const shownId = page => page.locator('.qpage').first().getAttribute('data-question-id');
 const meStatus = page => page.evaluate(async () => (await fetch('/v1/account/me', { credentials: 'include', cache: 'no-store' })).status);
 
+/**
+ * Let the page's own requests finish before the test navigates it away. A
+ * request cut off by a navigation is reported by WebKit as a page error
+ * ("…due to access control checks"), which would be this test's doing, not the
+ * app's. Nothing is asserted here and no assertion is relaxed by it.
+ */
+const quiet = page => page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
 async function typeCode(page, card, code) {
   await card.locator('#signup-code-0').focus();
   await page.keyboard.type(code, { delay: 15 });
@@ -276,6 +284,7 @@ export const newStudentFlow = {
         { channel: 'email', destination: email, challengeId: calls(online, '/v1/account/otp/request').at(-1)?.json?.challengeId, code: sent.code })) === 400);
 
     // ── Settings says it plainly ─────────────────────────────────────────────
+    await quiet(page);
     await page.goto(`${online.origin}/settings`, { waitUntil: 'domcontentloaded' });
     const panel = page.locator('section', { has: page.locator('#cloud-account-title') });
     await panel.locator('[data-cloud-fact="account"]').waitFor({ state: 'visible', timeout: 30000 });
@@ -453,6 +462,7 @@ export const returningFlow = {
     await check('and lands in practice with one live session for that account', liveSessions(online, who.id) === 1);
 
     // ── the password option, for an account that has one ─────────────────────
+    await quiet(page);
     await page.goto(`${online.origin}/settings`, { waitUntil: 'domcontentloaded' });
     const panel = page.locator('section', { has: page.locator('#cloud-account-title') });
     await panel.locator('[data-cloud-sign-out]').click();
@@ -654,6 +664,7 @@ export const sessionsFlow = {
     const email = address('session');
     await goto('/');
     await createProfile({ name: 'Session Student', course: 'in', year: 10 });
+    await quiet(page);
     await page.goto(`${online.origin}/settings`, { waitUntil: 'domcontentloaded' });
     const panel = page.locator('section', { has: page.locator('#cloud-account-title') });
     const card = cardOf(panel);
@@ -747,6 +758,7 @@ export const sessionsFlow = {
 
     // ── sign out everywhere ──────────────────────────────────────────────────
     await page.bringToFront();
+    await quiet(page);
     await page.goto(`${online.origin}/settings`, { waitUntil: 'domcontentloaded' });
     await page.getByTestId('cloud-sign-out-everywhere').waitFor({ state: 'visible', timeout: 30000 });
     // A second device's session, made at the desk with a code.
