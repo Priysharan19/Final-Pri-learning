@@ -256,7 +256,11 @@ check('status only claims what the device actually knows', () => {
   assert.match(confirm, /await flushInkDrafts\(\)/);
   assert.match(confirm, /if \(pending\.has\(id\)\) return \{ saved: false, reason: 'superseded' \}/);
   assert.match(confirm, /row = await getFresh\(INK_DRAFT_STORE, id\)/);
-  assert.match(confirm, /JSON\.stringify\(compactStrokes\(row\.strokes\)\) === expected \? \{ saved: true \}/);
+  // Stroke for stroke first; then, when a transcript or typed answer was kept
+  // with them, those too — only then "saved".
+  assert.match(confirm, /if \(JSON\.stringify\(compactStrokes\(row\.strokes\)\) !== expected\) return \{ saved: false, reason: 'mismatch' \}/);
+  assert.match(confirm, /JSON\.stringify\(inkExtras\(row\)\) !== JSON\.stringify\(inkExtras\(extras\)\)\) return \{ saved: false, reason: 'mismatch' \}/);
+  assert.match(confirm, /return \{ saved: true \};/);
   const idb = readFileSync(new URL('../src/local/idb.js', import.meta.url), 'utf8');
   const fresh = idb.slice(idb.indexOf('export async function getFresh'), idb.indexOf('export async function put'));
   assert.match(fresh, /indexedDB\.open\(DB_NAME\)/);
