@@ -1458,6 +1458,7 @@ export default {
   'exams.markedEarlier': 'marked by an earlier version of the app',
   'exams.markedBackup': 'from a backup, not yet confirmed by the server',
   'exams.provisional': { one: "{n} mark not marked yet", other: "{n} marks not marked yet" },
+  'exams.provisionalScore': "provisional — not fully marked yet",
   'exams.openPrintable': 'Open printable paper',
   'exams.openPrintableAria': 'Open “{title}” as a printable paper',
   'exams.resume': 'Resume',
@@ -2861,5 +2862,5 @@ export default {
   'ink.readExpiredHint': "This page was read some time ago. Your writing and the text below are kept; press Read again so it can be submitted.",
   'ink.submitReadExpired': "This page was read a while ago and has to be read again before you submit. Nothing is lost — press Read again.",
   'photo.readExpired': "This photo was read a while ago and has to be read again before you submit. Your photo and the lines below are kept.",
-  'photo.readMyPhotoHint': "The photo is kept on this device. A photo you attach is read once, straight away; a photo that was kept unread is read only when you press Read my photo.",
+  'photo.readMyPhotoHint': "The photo is kept on this device and has not been sent anywhere. When you press Read my photo it is sent once to Pri’s AI reading service to be read.",
 };

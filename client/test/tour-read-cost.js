@@ -312,9 +312,10 @@ export const flow = {
           `when the late reading landed ${JSON.stringify(late)}; total ${costs.wroteWhileReading}; correct ${grade?.json?.correct}`);
       }
 
-      // ── 9 · read long ago: the server's kept read has expired by Submit ────
-      // (Review 17, F3.) The transcript is still on the device; Submit must
-      // not buy a read nobody pressed for.
+      // ── 9 · read long ago: the server's 15-minute kept read has gone by Submit
+      // Reading and marking are separate (owner decision). The student was
+      // given a read receipt when the page was read; Submit presents it, the
+      // server verifies it, and the confirmed answer is marked. No second read.
       {
         const { canvas, right } = await fresh();
         const start = reader.requests.length;
@@ -323,22 +324,55 @@ export const flow = {
         await pressRead(page);
         await lines(1);
         await page.waitForTimeout(1500);
-        // Desk step: the kept read is deleted, exactly as its 24-hour lifetime ending does.
+        // Desk step: the kept read is deleted, exactly as its 15-minute lifetime ending does.
+        const forgotten = online.forgetKeptReads();
+        await submitAndSettle();
+        const grade = (await gradesOf(right.serverQuestionId)).at(-1);
+        const receipt = (await receiptsOf(right.serverQuestionId)).at(-1);
+        costs.expiredWithReceipt = reader.requests.length - start;
+        await check(`9 · Submit after the server's kept read has gone, with the read receipt from when the page was read: marked with 0 further provider calls — 1 in all, and no "read again" [${EVIDENCE}]`,
+          forgotten >= 1 && costs.expiredWithReceipt === 1 && receipt?.status === 201 && typeof receipt.body?.receipt === 'string' && typeof receipt.body?.text === 'string' &&
+            grade?.json?.correct === true && await page.locator('[data-ink-stale]').count() === 0,
+          `kept reads forgotten ${forgotten}; provider calls ${costs.expiredWithReceipt}; recognise ${receipt?.status}; sent a receipt ${typeof receipt?.body?.receipt}; correct ${grade?.json?.correct}`);
+      }
+
+      // ── 10 · the same, but no valid receipt reaches the server ─────────────
+      // Then, and only then, the student is asked to Read again. Never a silent read.
+      {
+        const { canvas, right } = await fresh();
+        const start = reader.requests.length;
+        reader.lines = null; reader.text = right.text; reader.confidence = 0.97;
+        await handwrite(page, canvas, '7');
+        await pressRead(page);
+        await lines(1);
+        await page.waitForTimeout(1500);
         online.forgetKeptReads();
-        await page.waitForFunction(() => { const b = document.querySelector('.ws-actions .btn-primary'); return !!b && !b.disabled; }, null, { timeout: 15000 }).catch(() => {});
-        await page.getByRole('button', SUBMIT).click();
-        await page.waitForSelector('[data-ink-stale="expired"]', { timeout: 20000 }).catch(() => {});
-        const prompted = {
-          provider: reader.requests.length - start,
-          label: await page.locator('[data-ink-stale="expired"]').count(),
-          reason: await page.locator('[data-submit-reason]').getAttribute('data-submit-reason').catch(() => null),
-          transcript: await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null),
-          readAgain: await page.locator('[data-ink-read="again"]').count(),
-          submitDisabled: await page.getByRole('button', SUBMIT).isDisabled().catch(() => null),
-          grades: (await gradesOf(right.serverQuestionId)).length,
-          verdict: await page.locator('.eval-card, .verdict-bad').count()
+        // Desk step: the receipt is damaged in transit (one character of its signature).
+        const damage = async route => {
+          let body = null;
+          try { body = JSON.parse(route.request().postData() || 'null'); } catch { body = null; }
+          if (body && typeof body.receipt === 'string') body.receipt = body.receipt.slice(0, -2) + (body.receipt.endsWith('AA') ? 'BB' : 'AA');
+          await route.continue({ postData: JSON.stringify(body) });
         };
-        await check(`9 · Submit after the server's kept read has expired: 0 provider calls at Submit, nothing marked, no try used; the transcript and the ink stay and the student is asked to Read again [${EVIDENCE}]`,
+        const pattern = url => /\/v1\/practice\/[^/]+\/recognize$/.test(new URL(url).pathname);
+        await page.context().route(pattern, damage);
+        let prompted = null;
+        try {
+          await page.waitForFunction(() => { const b = document.querySelector('.ws-actions .btn-primary'); return !!b && !b.disabled; }, null, { timeout: 15000 }).catch(() => {});
+          await page.getByRole('button', SUBMIT).click();
+          await page.waitForSelector('[data-ink-stale="expired"]', { timeout: 20000 }).catch(() => {});
+          prompted = {
+            provider: reader.requests.length - start,
+            label: await page.locator('[data-ink-stale="expired"]').count(),
+            reason: await page.locator('[data-submit-reason]').getAttribute('data-submit-reason').catch(() => null),
+            transcript: await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null),
+            readAgain: await page.locator('[data-ink-read="again"]').count(),
+            submitDisabled: await page.getByRole('button', SUBMIT).isDisabled().catch(() => null),
+            grades: (await gradesOf(right.serverQuestionId)).length,
+            verdict: await page.locator('.eval-card, .verdict-bad').count()
+          };
+        } finally { await page.context().unroute(pattern, damage); }
+        await check(`10 · the kept read gone and the receipt not valid: 0 provider calls at Submit, nothing marked, no try used; the transcript and the ink stay and the student is asked to Read again [${EVIDENCE}]`,
           prompted.provider === 1 && prompted.label === 1 && prompted.reason === 'ink.submitReadExpired' && prompted.transcript === right.text &&
             prompted.readAgain === 1 && prompted.submitDisabled === true && prompted.grades === 0 && prompted.verdict === 0,
           JSON.stringify(prompted));
@@ -348,11 +382,11 @@ export const flow = {
         await submitAndSettle();
         const grade = (await gradesOf(right.serverQuestionId)).at(-1);
         costs.expiredRead = reader.requests.length - start;
-        await check(`9 · then Read again is one provider call, and Submit marks the answer with no further call: 2 in all, each one pressed for [${EVIDENCE}]`,
+        await check(`10 · then Read again is one provider call, and Submit marks the answer with no further call: 2 in all, each one pressed for [${EVIDENCE}]`,
           afterReadAgain === 2 && costs.expiredRead === 2 && grade?.json?.correct === true && (await gradesOf(right.serverQuestionId)).length === 1,
           `after Read again ${afterReadAgain}; total ${costs.expiredRead}; correct ${grade?.json?.correct}`);
       }
-      note(`provider calls per completed handwritten answer [${EVIDENCE}]: one line right first time ${costs.oneLine} · four lines with pauses, read once ${costs.fourLines} · read, edit, read again ${costs.editAndReread} · second try, ink unchanged ${costs.secondTrySameInk} · second try after rewriting ${costs.secondTryRewritten} · double press then a second tab ${costs.doublePress} · late reading against a corrected transcript ${costs.lateReading} · ink written while reading ${costs.wroteWhileReading} · kept read expired before Submit ${costs.expiredRead} (0 at Submit, 1 for Read again)`);
+      note(`provider calls per completed handwritten answer [${EVIDENCE}]: one line right first time ${costs.oneLine} · four lines with pauses, read once ${costs.fourLines} · read, edit, read again ${costs.editAndReread} · second try, ink unchanged ${costs.secondTrySameInk} · second try after rewriting ${costs.secondTryRewritten} · double press then a second tab ${costs.doublePress} · late reading against a corrected transcript ${costs.lateReading} · ink written while reading ${costs.wroteWhileReading} · kept read gone before Submit, read receipt valid ${costs.expiredWithReceipt} (0 at Submit) · kept read gone, no valid receipt ${costs.expiredRead} (0 at Submit, 1 for Read again)`);
       await check('no provider was reached but the scripted reader', reader.refused.length === 0, JSON.stringify(reader.refused));
     } finally {
       reader.gate = null;

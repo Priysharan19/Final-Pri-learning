@@ -533,6 +533,10 @@ export const sessionEndedPhotoFlow = {
     const readsBefore = reader.requests.length;
     await page.getByRole('button', { name: /answer with a photo/i }).click();
     await page.locator('.editor-body input[type="file"]').setInputFiles({ name: 'working.png', mimeType: 'image/png', buffer: PNG });
+    // Attaching sends nothing (owner decision): the student asks for the read,
+    // and it is that request the server answers "signed out".
+    await page.locator('[data-photo-read]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    await page.locator('[data-photo-read]').click().catch(() => {});
     const signIn = page.locator('[data-photo-sign-in]');
     await signIn.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     const thumb = await page.locator('.photo-thumb img').getAttribute('src').catch(() => null);

@@ -194,6 +194,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       needsConfirmation: r.needsConfirmation === true,
       confidenceFloor: confidenceFloorOf(r),
       corrected: r.corrected === true,
+      attested: r.attested || null,
       afterWait: afterWait && r.lines.length > 0,
       readKey: r.lines.length ? `${strokeSignature(strokes)}|${r.text}` : null,
       // The reading is of EARLIER writing: shown, labelled, never submitted.
@@ -260,6 +261,9 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       const reading = outcome?.transcription
         ? toReading(outcome.transcription, geometry, { confidenceFloor: outcome?.readiness?.confidenceFloor })
         : null;
+      // The server's proof that this page was read (and the text it covers),
+      // kept with the reading so Submit can present it. Never shown, never edited.
+      if (reading && outcome.attested) reading.attested = outcome.attested;
       if (reading) {
         // The student may have gone on writing while the page was being
         // read: the reading that lands is then already of earlier writing.

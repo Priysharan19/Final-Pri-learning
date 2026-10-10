@@ -17,7 +17,7 @@ import {
   saveInkDraft, savePendingSubmission, submissionContentKey,
   noteSubmissionEdited, recoveryPlan, settleFailedSubmission, submissionToSettleFirst
 } from './practiceRecovery.js';
-import { cloudReadingEnabled, forgetCloudReads, INK_READER_STATE, noteReaderRefusal, readerBlock, readPhotoWithCloud, resumeReaderNow, takeCloudReadingNotice } from '../ink/cloudReader.js';
+import { cloudReadingEnabled, forgetCloudReads, setReadingQuestion, INK_READER_STATE, noteReaderRefusal, readerBlock, readPhotoWithCloud, resumeReaderNow, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { retryClock } from '../ink/readerFailure.js';
 import { preparePhoto } from '../ink/photoRaster.js';
 import { buildTranscript, editLine, includeAll, includedLines, reviveTranscript, setLineExcluded, unreadablePage, workingOf } from '../photo/transcript.js';
@@ -344,6 +344,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // 'proposed' while the field holds the proposal, 'student' once they typed.
   const [photoAnswerSource, setPhotoAnswerSource] = useState(null);
   const [photoRestored, setPhotoRestored] = useState(false);
+  // The server's read receipt for the photo on the card (and the text it
+  // covers), kept with the draft and presented at Submit.
+  const [photoAttested, setPhotoAttested] = useState(null);
+  // A PDF that has been attached and not yet read (it has no thumbnail until
+  // its pages are rendered, which happens when the student asks for the read).
+  const [heldPdf, setHeldPdf] = useState(false);
+  const photoReadStarting = useRef(false);
+  // A read is asked for THIS issued question: the server binds its receipt to it.
+  useEffect(() => {
+    setReadingQuestion(question.serverQuestionId || null);
+    return () => setReadingQuestion(null);
+  }, [question.serverQuestionId]);
   const photoSaveRevision = useRef(0);
   const [photoSaveTick, setPhotoSaveTick] = useState(0);
   // One quiet line, once per device, the first time a photo is read on the
@@ -506,7 +518,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         // A blurred or cropped page comes back as lines of "[illegible]" at
         // near-zero confidence: that is a photo to retake, not working.
         if (unreadablePage(cloudOutcome.transcription)) return null;
-        if (text) return { text, transcription: cloudOutcome.transcription, confidence: cloudOutcome.transcription.confidence, engine: cloudOutcome.transcription.engine };
+        if (text) return { attested: cloudOutcome.attested || null, text, transcription: cloudOutcome.transcription, confidence: cloudOutcome.transcription.confidence, engine: cloudOutcome.transcription.engine };
       }
     }
     // The photo itself was the problem: say so. Anything else is a read that
@@ -579,6 +591,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       return;
     }
     const transcript = showReading(page.transcription);
+    setPhotoAttested(page.attested || null);
     if (String(page.engine || '').startsWith('cloud') && takeCloudReadingNotice(user)) setCloudNotice(true);
     setPhotoSignInOpen(false);
     setPhotoOCR({ phase: 'done', text: workingOf(transcript), confidence: Number(page.confidence || 0), error: '', engine: page.engine });
@@ -693,6 +706,24 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setPhotoOCR({ phase: 'done', text: joined, confidence: worst, error: '', engine: engine || 'cloud-pdf' });
   }, [decodePhoto, readOnePage, showReading, t]);
 
+  // Attaching is not asking for a read (owner decision). A photo or PDF that
+  // has just been attached is shown and kept on the device; it is sent to the
+  // AI reading service only when the student presses "Read my photo" — never
+  // by attaching, replacing, reloading, signing in or reconnecting. Replacing
+  // the photo has already dropped the previous reading (the attach handler
+  // clears it), so the new one needs its own deliberate read. When reading is
+  // not available to this account the reason is shown exactly as before;
+  // that path sends nothing.
+  const holdAttachment = useCallback((dataURL, kind) => {
+    if (!cloudReadingEnabled(user)) { if (kind === 'pdf') void decodePdf(dataURL); else void decodePhoto(dataURL); return; }
+    photoReadGeneration.current += 1;
+    pendingPdf.current = kind === 'pdf' ? dataURL : null;
+    setHeldPdf(kind === 'pdf');
+    setPdfUnread(null); setPdfPageCount(0);
+    setPhotoLines(null); setPhotoNote(null); setPhotoAttested(null);
+    setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
+  }, [user, decodePhoto, decodePdf]);
+
   // Paste a photo straight in. On a laptop this is how a student moves a shot
   // from their phone: AirDrop or a screenshot, then ⌘V.
   useEffect(() => {
@@ -724,7 +755,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         const dataURL = String(reader.result || '');
         if (!dataURL.startsWith('data:image/')) { fail(); return; }
         setPhoto(dataURL);
-        decodePhoto(dataURL);
+        holdAttachment(dataURL, 'photo');
       };
       reader.onerror = fail;
       reader.onabort = fail;
@@ -732,7 +763,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     };
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
-  }, [mode, resolved, decodePhoto]);
+  }, [mode, resolved, holdAttachment]);
 
   // ── A photographed page, kept where a reload cannot reach it ───────────────
   // The picture, the lines as read and as corrected, which lines are part of
@@ -746,7 +777,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const read = photoOCR.phase === 'done' && !!photoLines;
     const snapshot = {
       photo, transcript: read ? photoLines : null, answer: read && !isWorking ? answer : '',
-      answerSource: read ? photoAnswerSource : null, engine: read ? photoOCR.engine : null, confidence: read ? photoOCR.confidence : null
+      answerSource: read ? photoAnswerSource : null, engine: read ? photoOCR.engine : null, confidence: read ? photoOCR.confidence : null,
+      attested: read ? photoAttested : null
     };
     const meta = { label: question.subtopicName };
     const live = () => mountedRef.current && !attemptRef.current && photoSaveRevision.current === revision;
@@ -766,7 +798,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     }, 350);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, photo, photoLines, answer, photoAnswerSource, photoOCR.phase, pdfPageCount, resolved, question.id, photoSaveTick]);
+  }, [mode, photo, photoLines, answer, photoAnswerSource, photoAttested, photoOCR.phase, pdfPageCount, resolved, question.id, photoSaveTick]);
 
   // The kept page comes back after a reload: the same picture, the same lines
   // with the student's corrections and exclusions, the same answer. A page
@@ -785,6 +817,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // never sends a read.
       if (!transcript) { setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); return; }
       setPhotoLines(transcript);
+      setPhotoAttested(kept.attested || null);
       setWorking(workingOf(transcript));
       if (question.answerType === 'working') setShowWorking(true);
       else { setAnswer(kept.answer || ''); setPhotoAnswerSource(kept.answerSource); }
@@ -949,8 +982,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     photoReadGeneration.current += 1;
     ++photoSaveRevision.current;
     pendingPdf.current = null;
-    setPdfUnread(null); setPdfPageCount(0); setPhoto(null); setPhotoSignInOpen(false);
-    setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false);
+    setPdfUnread(null); setPdfPageCount(0); setPhoto(null); setPhotoSignInOpen(false); setHeldPdf(false);
+    setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false); setPhotoAttested(null);
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
     setSaveState(null);
     void clearPhotoDraft(question.id);
@@ -1238,7 +1271,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         given = inkResult.lines.join('\n');
         viaInk = true;
         lines = inkResult.lines.slice();
-        ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null };
+        ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null, attested: inkResult.attested || null };
       } else {
         given = working;
         if (!given.trim()) return;
@@ -1255,7 +1288,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       steps = inkResult.lines.length > 1 || inkProposal ? inkResult.lines.join('\n') : undefined;
       viaInk = true;
       lines = inkResult.lines.slice();
-      ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null };
+      ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null, attested: inkResult.attested || null };
     } else {
       given = answer;
       if (String(given).trim() === '') return;
@@ -1306,7 +1339,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
       ? compactInkStrokes(scribbleRef.current.getStrokes())
       : undefined;
-    await deliver({ answer: String(given), ms, steps, viaInk, ink, photo, scribble: scribbleStrokes, submissionId }, { lines, sourceMode, revision: currentRevision });
+    await deliver({ answer: String(given), ms, steps, viaInk, ink, photo, ...(photo && photoAttested ? { photoAttested } : {}), scribble: scribbleStrokes, submissionId }, { lines, sourceMode, revision: currentRevision });
   }
 
   /**
@@ -2234,15 +2267,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       setPdfUnread(null);
                       setPdfPageCount(0);
                       setPhotoSignInOpen(false);
-                      setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false);
-                      setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
+                      setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false); setPhotoAttested(null); setHeldPdf(false);
+                      setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
                       attachPhoto(e,
                         data => { if (live()) setPhoto(data); },
-                        data => { if (live()) void decodePhoto(data); },
-                        data => { if (live()) void decodePdf(data); },
+                        data => { if (live()) holdAttachment(data, 'photo'); },
+                        data => { if (live()) holdAttachment(data, 'pdf'); },
                         message => { if (live()) setPhotoOCR({ phase: 'failed', text: '', confidence: 0, engine: null, error: message }); });
                     }} />
-                  {!photo && photoOCR.phase === 'idle'
+                  {!photo && !heldPdf && photoOCR.phase === 'idle'
                     ? <button className="btn btn-ghost photo-pick" onClick={() => photoInputRef.current?.click()}>
                         <Icon name="photo" size={18} />
                         <span className="photo-pick-text">
@@ -2336,7 +2369,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                           {photoOCR.phase === 'idle' && (cloudReadingEnabled(user) && !offline && !resolved ? (
                             <div data-photo-unread>
                               <button type="button" className="btn btn-primary" data-photo-read
-                                onClick={() => { if (pendingPdf.current) void decodePdf(pendingPdf.current); else if (photo) void decodePhoto(photo); }}>
+                                onClick={() => {
+                                  // One press, one read: a second press in the same moment finds the read started.
+                                  if (photoReadStarting.current) return;
+                                  photoReadStarting.current = true;
+                                  setTimeout(() => { photoReadStarting.current = false; }, 0);
+                                  setHeldPdf(false);
+                                  if (pendingPdf.current) void decodePdf(pendingPdf.current); else if (photo) void decodePhoto(photo);
+                                }}>
                                 {t('photo.readMyPhoto')}
                               </button>
                               <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t('photo.readMyPhotoHint')}</p>
