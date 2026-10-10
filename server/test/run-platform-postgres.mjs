@@ -44,6 +44,7 @@ export const ENGINE_SUITES = [
   // per-account — through the same real HTTP routes, on the Postgres store.
   'method-progress-http-check.mjs',
   'flagship-ap-working-http-check.mjs',
+  'first-mistake-http-check.mjs',
   'practice-seed-reissue-check.mjs',
   // The server chooses the seed and a prepared question is bound once by one
   // account: the one-account claim and the sealed copy must hold on Postgres.

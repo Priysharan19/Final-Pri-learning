@@ -35,6 +35,34 @@ function exact(f, suffix) {
 const TRIPLES = [[3, 4, 5], [5, 12, 13], [8, 15, 17], [6, 8, 10], [9, 12, 15], [7, 24, 25], [20, 21, 29]];
 const RADII = [7, 14, 21, 28];
 
+
+// What a student calls the nth term and the sum, with and without the number.
+const AP_TERM = 'a + (n - 1)*d';
+const AP_SUM = 'n/2*(2*a + (n - 1)*d)';
+const apNames = (letters, n) => letters.flatMap(l => [`${l}_n`, `${l}n`, `${l}_${n}`, `${l}${n}`]);
+const apTermLabels = n => [...apNames(['T', 't', 'a', 'A', 'u', 'U'], n), 'l', 'nth term', `${n}th term`, 'term'];
+const apSumLabels = n => [...apNames(['S', 's'], n), 'S', 'sum', 'total'];
+function apTermCheck(a, d, n, term) {
+  return {
+    kind: 'formula', source: AP_TERM, substitutions: { a, d, n }, expected: term,
+    labels: apTermLabels(n), name: 'the nth term, a + (n − 1)d', quantity: `the ${n}th term`,
+    confusables: [
+      { source: AP_SUM, name: 'the sum of the first n terms', labels: apSumLabels(n) },
+      { source: 'a + n*d', name: 'the term after the one asked for', labels: [], why: `The first term needs no steps, so the ${n}th term is ${n - 1} steps along, not ${n}.` }
+    ]
+  };
+}
+function apSumCheck(a, d, n, sum) {
+  return {
+    kind: 'formula', source: AP_SUM, substitutions: { a, d, n }, expected: sum,
+    labels: apSumLabels(n), name: 'the sum of the first n terms, n/2 × (2a + (n − 1)d)', quantity: `the sum of the first ${n} terms`,
+    confusables: [
+      { source: AP_TERM, name: 'the nth term', labels: apTermLabels(n), why: 'That is the last term alone; the question asks for all the terms added together.' },
+      { source: 'n*(a + (n - 1)*d)', name: 'n times the last term', labels: [] }
+    ]
+  };
+}
+
 export const indiaClass10 = {
 
   // ── Class 10 · Polynomials: zeroes and coefficients ───────────────────────
@@ -125,6 +153,11 @@ export const indiaClass10 = {
   },
 
   // ── Class 10 · Arithmetic Progressions ────────────────────────────────────
+  // The term and the sum are each "put the given values into a formula", so
+  // their working is checked as one (engine/reason-formula.js): the formula
+  // written any equivalent way, the substitution, and each line of arithmetic
+  // against the line before it. Each names the other as the formula it is
+  // confused with, so choosing the wrong one is found as that mistake.
   'c10-arithmetic-progressions': (rng, diff) => {
     const a = nz(rng, -12, 20), d = nz(rng, -9, 9);
     if (diff === 1) {
@@ -133,6 +166,7 @@ export const indiaClass10 = {
       return {
         prompt: `An arithmetic progression has first term $${a}$ and common difference $${d}$. Find its $${n}$th term.`,
         answerType: 'numeric', answer: { value: term },
+        stepcheck: apTermCheck(a, d, n, term),
         traps: [{ value: a + n * d, why: `The formula is $a + (n-1)d$: the first term needs no steps, so the $${n}$th term is $${n - 1}$ steps along, not $${n}$.` }].filter(t => t.value !== term),
         hints: [
           'Each term is the one before it plus the common difference.',
@@ -153,6 +187,7 @@ export const indiaClass10 = {
       return {
         prompt: `An arithmetic progression has first term $${a}$ and common difference $${d}$. Find the sum of its first $${n}$ terms.`,
         answerType: 'numeric', answer: { value: sum },
+        stepcheck: apSumCheck(a, d, n, sum),
         traps: [{ value: n * (a + (n - 1) * d), why: `That is $n$ times the *last* term. The sum uses the average of the first and last: $S_n = \\dfrac{n}{2}(a + a_n)$.` }].filter(t => t.value !== sum),
         hints: [
           'Pairing terms from the two ends gives the same total each time.',
@@ -197,6 +232,7 @@ export const indiaClass10 = {
     return {
       prompt: `Priya saves $₹${first}$ in the first month and increases her saving by $₹${step}$ every month after that. How much has she saved in total after $${months}$ months?`,
       answerType: 'numeric', answer: { value: total },
+      stepcheck: apSumCheck(first, step, months, total),
       traps: [
         { value: first + (months - 1) * step, why: 'That is what she saves in the last month alone — the question asks for the total across all the months.' },
         { value: first * months, why: 'The monthly amount is not constant; it grows by a fixed step, which makes it an arithmetic progression.' }

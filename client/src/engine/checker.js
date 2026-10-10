@@ -19,6 +19,7 @@ import {
 import { assessEvaluationLine, assessPointLine } from './reason-v3.js';
 import { assessRelationChainLine, assessModulusInequalityLine } from './reason-v4.js';
 import { assessAreaLine, AREA_STAGE_KINDS } from './reason-area.js';
+import { stepCheckFormula, formulaMethodMarks } from './reason-formula.js';
 import { cleanInput, parseNumericInput, checkAnswer as coreCheckAnswer } from './checker-core.js';
 
 export { cleanInput, parseNumericInput };
@@ -985,6 +986,8 @@ export function stepCheck(meta, workingText, options = null) {
 }
 function stepCheckWithinBudget(meta, workingText, options = null) {
   if (meta?.kind === 'plan') return stepCheckPlan(meta, workingText);
+  // A value found by putting given numbers into a formula: see reason-formula.js.
+  if (meta?.kind === 'formula') return stepCheckFormula(meta, workingText);
   return stepCheckSingle(meta, workingText, pinnedSystem(meta, typeof options?.prompt === 'string' ? options.prompt : ''), { loneBranches: true });
 }
 
@@ -2015,6 +2018,11 @@ export function methodMarks(input = {}) {
 }
 function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = null } = {}) {
   if (!meta || working == null || !String(working).trim()) return null;
+  // The rubric of a formula question is the formula, the substitution and the
+  // answer; its lines are credited by the criterion they are evidence of.
+  if (meta.kind === 'formula') {
+    try { return formulaMethodMarks({ meta, working: String(working), marks, report }); } catch { return null; }
+  }
   let rep = report;
   if (!rep) {
     try { rep = stepCheck(meta, String(working), { prompt }); } catch { return null; }

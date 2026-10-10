@@ -16,6 +16,7 @@
 // must never import a server module: the worker has no store and no secrets.
 import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
+import { buildWorkingReview } from '../../client/src/engine/workingReview.js';
 
 // Mirrors the shared deterministic checker input used by local practice;
 // questions, answer keys and stage meta remain server-private.
@@ -80,7 +81,24 @@ export function stepEvidence(q, answer, steps, result) {
       if (method) partial = { okLines: method.okLines, awarded: method.awarded, note: method.note, lines: method.lines };
     } catch { partial = null; }
   }
-  return { stepReport: report, partial };
+  return { stepReport: report, partial, review: workingReview(q, steps, result, report, partial) };
+}
+
+/**
+ * The per-line review of the working (engine/workingReview.js): the same object
+ * whichever way the lines arrived — typed, ink or photo. It reads the evidence
+ * above and the line audit; it decides no mark. A question with no step
+ * metadata is still audited line against line, so an arithmetic slip is found
+ * on it too. Built only where the evidence is: for the reply that resolves.
+ */
+export function workingReview(q, steps, result, report, partial) {
+  if (!steps || !String(steps).trim()) return null;
+  try {
+    return buildWorkingReview({
+      meta: stepMetaFor(q), prompt: q.prompt, working: String(steps), report,
+      method: partial, correct: result?.correct === true
+    });
+  } catch { return null; }
 }
 
 // ── Examination marking, in the two stages the pool can tell apart ──────────

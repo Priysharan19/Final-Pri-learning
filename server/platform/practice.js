@@ -840,6 +840,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // is retried — never guessed, and never skipped.
       if (resolved && !evidence) return { again: true, needEvidence: true };
       const { stepReport, partial } = resolved ? evidence : { stepReport: null, partial: null };
+      // The per-line review is evidence too: built from the answer key, so it
+      // exists only on the reply that resolves the question — never while a
+      // try is left. The same object for typed, ink and photo working.
+      const review = resolved ? evidence.review || null : null;
       const notRead = resolved && workingNotRead && working.trim() !== '';
       // A question answered BY its working (the answer is the lines) has a
       // marker's verdict that is itself a verdict on the lines.
@@ -890,7 +894,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         ...(q._repeat === true ? { repeat: true } : {}),
         // An entry that is not an attempt costs nothing, so it may not return
         // line-by-line verdicts either: they would be a free answer oracle.
-        stepReport: invalid ? null : stepReport, partial: invalid ? null : partial, ...(resolved ? {
+        stepReport: invalid ? null : stepReport, partial: invalid ? null : partial,
+        // The marks are the ones decided above; the review only reports them.
+        workingReview: invalid || !review ? null : { ...review,
+          marks: { earned: marksEarned, possible: marksPossible, method: result.correct ? 0 : marksEarned } },
+        ...(resolved ? {
           solution: solutionFor(q),
           // Only a committed resolution may disclose opportunity explanations.
           // Their ontology identity is derived by the client from these

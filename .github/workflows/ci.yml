@@ -58,6 +58,7 @@ jobs:
           grep -Fq 'NCERT ANSWER FORMS: PASS — 419/419 checks' suites.log
           grep -Fq 'METHOD MARKS: PASS — 53/53 checks' suites.log
           grep -Fq 'METHOD PROGRESS: PASS — 954/954 checks' suites.log
+          grep -Fq 'FIRST MISTAKE: PASS — 501/501 checks' suites.log
           grep -Fq 'WORKING BRANCHES: PASS — 32/32 checks' suites.log
           grep -Fq 'Pri Reason V1 precision gate: PASS' suites.log
           grep -Fq 'Pri Reason V2 safety gate: PASS' suites.log
@@ -275,6 +276,7 @@ jobs:
           set -o pipefail
           node server/test/method-progress-http-check.mjs 2>&1 | tee practice-http.log
           node server/test/flagship-ap-working-http-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/first-mistake-http-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-seed-reissue-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-server-question-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-repeat-credit-check.mjs 2>&1 | tee -a practice-http.log
@@ -282,6 +284,7 @@ jobs:
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1192/1192 checks' practice-http.log
           grep -Fq 'FLAGSHIP AP WORKING OVER HTTP: PASS — 239/239 checks' practice-http.log
+          grep -Fq 'FIRST MISTAKE OVER HTTP: PASS — 105/105 checks' practice-http.log
           grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
           grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 34/34 checks' practice-http.log
           grep -Fq 'REPEAT CREDIT: PASS — 295/295 checks' practice-http.log
@@ -357,6 +360,7 @@ jobs:
           grep -Fq '✓ exam-authority-check.mjs' platform-postgres.log
           grep -Fq '✓ method-progress-http-check.mjs' platform-postgres.log
           grep -Fq '✓ flagship-ap-working-http-check.mjs' platform-postgres.log
+          grep -Fq '✓ first-mistake-http-check.mjs' platform-postgres.log
           grep -Fq '✓ marker-isolation-check.mjs' platform-postgres.log
           grep -Fq '✓ recognition-dedupe-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-seed-reissue-check.mjs' platform-postgres.log
