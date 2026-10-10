@@ -167,7 +167,7 @@ export const flow = {
     await check('opening a profile lands in Settings', new URL(page.url()).pathname === '/settings', `landed on ${page.url()}`);
     // innerText is the RENDERED text, and the card title is uppercased in CSS.
     const cloudTitle = await page.locator('#cloud-account-title').innerText();
-    await check('at the cloud account panel', /Account & cross-device sync/i.test(cloudTitle), `heading reads ${JSON.stringify(cloudTitle)}`);
+    await check('at the Pri account panel', /Your Pri account/i.test(cloudTitle), `heading reads ${JSON.stringify(cloudTitle)}`);
     const inView = await page.evaluate(() => {
       const el = document.getElementById('cloud-account-title');
       if (!el) return false;

@@ -817,7 +817,7 @@ async function run() {
       const button = page.locator('.verdict [data-check-sign-in]');
       await button.focus();
       await page.keyboard.press('Enter');
-      await page.waitForSelector('.qpage #cloud-password', { timeout: 20000 });
+      await page.waitForSelector('.qpage [data-signin-card] #signup-destination', { timeout: 20000 });
       await wait(page, 500);
       // Focus order: from the button that opened it, Tab goes into the panel
       // it opened (inside the card), not on past it to the rest of the page.
@@ -837,7 +837,7 @@ async function run() {
     // signed in on the card (the real server, a real verified account)
     try {
       await online.signInHere(page.locator('.qpage'), { name: 'Accessibility Student' });
-      await page.waitForFunction(() => !document.querySelector('.qpage #cloud-password'), null, { timeout: 30000 }).catch(() => { });
+      await page.waitForFunction(() => !document.querySelector('.qpage [data-signin-card]'), null, { timeout: 30000 }).catch(() => { });
       refusals.signedIn = true;
     } catch (err) {
       skipped.push(`practice · signing in on the card — ${String(err.message || err).split('\n')[0].slice(0, 130)}`);
