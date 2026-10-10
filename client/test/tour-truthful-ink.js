@@ -46,7 +46,7 @@ export const flow = {
   name: 'Ink · a marked attempt says only what the server established',
   online: true,
 
-  async run({ page, ctx, base, check, note, goto, createProfile, settle, online }) {
+  async run({ page, base, check, note, goto, createProfile, settle, online }) {
     const reader = online.reader;
     Object.assign(reader, { text: '1', lines: null, confidence: 0.97, down: false, gate: null });
     reader.requests.length = 0;
@@ -54,6 +54,7 @@ export const flow = {
     await goto('/');
     await createProfile({ name: 'Maryam Mirza', year: 7 });
     await online.signIn({ name: 'Maryam Mirza' });
+    await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
     await check('server reading is on for this signed-in profile', await turnOnServerReading(page, base));
 
     const card = page.locator('.qpage').first();
@@ -80,8 +81,28 @@ export const flow = {
     };
     const waitVerdict = () => page.waitForSelector('.eval-card, .verdict[data-verdict-of]', { timeout: 30000 }).catch(() => {});
 
+    // A navigation that cuts a background request short is reported by WebKit
+    // as a page error; the flow leaves a page only once its network is quiet.
+    const quiet = () => page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+    // A slow server: the grade request for this question is held on the page
+    // until the flow lets it go, and the flow knows the request really was
+    // waiting (engine-independent — it does not rely on network interception).
+    const holdGrades = id => page.evaluate(path => {
+      const real = window.fetch.bind(window);
+      let open; const gate = new Promise(done => { open = done; });
+      window.__priHeldGrades = 0;
+      window.__priReleaseGrades = () => { window.fetch = real; open(); return window.__priHeldGrades; };
+      window.fetch = async (input, init) => {
+        const url = String(typeof input === 'string' ? input : input?.url || '');
+        if (url.includes(path)) { window.__priHeldGrades += 1; await gate; }
+        return real(input, init);
+      };
+    }, `/v1/practice/${id}/submit`);
+    const heldGrades = () => page.evaluate(() => window.__priHeldGrades || 0);
+    const releaseGrades = () => page.evaluate(() => window.__priReleaseGrades());
     /** A fresh, untried numeric question, in handwriting mode. */
     const openFresh = async ({ want = () => true, tries = 6, topic = TOPIC } = {}) => {
+      await quiet();
       await page.goto(`${base}/practice?subtopic=${topic}`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('.q-prompt', { timeout: 30000 });
       await settle();
@@ -176,6 +197,7 @@ export const flow = {
 
         // History, and History again after a reload: the same truthful values.
         const historyShows = async () => {
+          await quiet();
           await page.goto(`${base}/history`, { waitUntil: 'domcontentloaded' });
           await page.waitForSelector('.hist-row', { timeout: 30000 });
           await page.locator('.hist-row .hist-main').first().click();
@@ -185,6 +207,7 @@ export const flow = {
         const once = await historyShows();
         await check(`staging case, History: the attempt is kept with "Your answer: ${right.text}", and the transcript is labelled as the reader\'s transcript, not as the answer`,
           once.includes(`Your answer: ${right.text}`) && /the reader’s transcript was “2 ?2 ?\+”\. It is not your answer/.test(once) && !/Your answer:\s*\+/.test(once) && !INFERRED.test(once), once.slice(0, 260));
+        await quiet();
         await page.reload({ waitUntil: 'domcontentloaded' });
         const again = await historyShows();
         await check('staging case, History after a reload: the same answer and the same labelled transcript are replayed',
@@ -305,17 +328,14 @@ export const flow = {
           `lines ${JSON.stringify(await readLines(page))}; marks ${await marksOnInk()}; bar ${JSON.stringify(bar)}`);
 
         // …and a SLOW grade of it: no verdict is shown until the server's reply for THIS revision.
-        let openGrade; const gradeGate = new Promise(done => { openGrade = done; });
-        const slow = async route => { await gradeGate; await route.continue(); };
-        await ctx.route(`${online.origin}/v1/practice/${right.serverQuestionId}/submit`, slow);
+        await holdGrades(right.serverQuestionId);
         await submitNow();
         await page.waitForTimeout(1500);
         await check('rewrite, slow grade in flight: no result is shown for the new answer yet, and the old annotations do not come back',
-          await page.locator('.eval-card').count() === 0 && await lookHere() === 0 && await marksOnInk() === 0 && await page.locator('.verdict-bad').count() === 0,
-          `${await page.locator('.eval-card').count()} verdict(s); ${await marksOnInk()} mark(s)`);
-        openGrade();
+          await heldGrades() === 1 && await page.locator('.eval-card').count() === 0 && await lookHere() === 0 && await marksOnInk() === 0 && await page.locator('.verdict-bad').count() === 0,
+          `${await page.locator('.eval-card').count()} verdict(s); ${await marksOnInk()} mark(s); ${await heldGrades()} grade request(s) waiting`);
+        await releaseGrades();
         await page.waitForSelector('.eval-card', { timeout: 30000 }).catch(() => {});
-        await ctx.unroute(`${online.origin}/v1/practice/${right.serverQuestionId}/submit`, slow);
         const grades = await gradesOf(right.serverQuestionId);
         await check('rewrite: the new revision is graded on its own submission and only then annotated — correct, the submitted answer shown, one tick on the answer line, no cross',
           grades.length === 2 && grades[1].body?.answer === String(right.text) && grades[1].json?.correct === true && grades[0].json?.submissionId !== grades[1].json?.submissionId &&
@@ -336,20 +356,21 @@ export const flow = {
         await page.getByRole('button', { name: 'Answer by typing' }).click();
         const answerBox = page.locator('.editor-body input.answer-input').first();
         await answerBox.fill(wrong);
-        let openGrade; const gradeGate = new Promise(done => { openGrade = done; });
-        const slow = async route => { await gradeGate; await route.continue(); };
-        await ctx.route(`${online.origin}/v1/practice/${right.serverQuestionId}/submit`, slow);
+        await holdGrades(right.serverQuestionId);
         await submitNow();
         await page.waitForTimeout(700);
         // The student corrects the answer while the old one is still being marked.
         const editable = await answerBox.isEditable();
         if (editable) await answerBox.fill(String(right.text));
-        openGrade();
+        // The old answer's grade request was still waiting when the edit was made.
+        const waiting = await heldGrades();
+        const shownBefore = await page.locator('.verdict[data-verdict-of], .eval-card').count();
+        await releaseGrades();
         await page.waitForSelector('.verdict[data-verdict-of]', { timeout: 30000 }).catch(() => {});
-        await ctx.unroute(`${online.origin}/v1/practice/${right.serverQuestionId}/submit`, slow);
         const late = (await gradesOf(right.serverQuestionId)).at(-1);
-        await check('late grade: the reply that arrives is the server\'s verdict on the OLD answer', late?.body?.answer === wrong && late.json?.correct === false && late.json.resolved === false,
-          JSON.stringify({ sent: late?.body?.answer, correct: late?.json?.correct }));
+        await check('late grade: the reply that arrives AFTER the correction is the server\'s verdict on the OLD answer',
+          waiting === 1 && shownBefore === 0 && late?.body?.answer === wrong && late.json?.correct === false && late.json.resolved === false,
+          JSON.stringify({ waiting, shownBefore, sent: late?.body?.answer, correct: late?.json?.correct }));
         await check('late grade: with the answer already corrected, that verdict is shown as the previous attempt\'s — never as "Not quite" on the new, unsubmitted answer',
           editable && await answerBox.inputValue() === String(right.text) &&
             await page.locator('.verdict[data-verdict-of="previous-attempt"]').count() === 1 && await page.locator('.verdict-bad').count() === 0 &&
@@ -409,6 +430,7 @@ export const flow = {
         // Write the right answer, read it, and reload before submitting.
         await writeAndRead(box, '7', [String(right.text)]);
         await page.waitForFunction(() => document.querySelector('.ws-actions .status-line')?.getAttribute('data-state') === 'saved', null, { timeout: 10000 }).catch(() => {});
+        await quiet();
         await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
         await page.waitForSelector('.ink-line', { timeout: 20000 }).catch(() => {});

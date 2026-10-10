@@ -81,6 +81,9 @@ jobs:
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
           grep -Fq 'LEGAL PAGES: PASS — 234/234 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 183/183 checks' suites.log
+          # A marked handwritten attempt says only what the server established
+          # (synthetic evidence: scripted transcripts, the server's marking function).
+          grep -Fq 'TRUTHFUL FEEDBACK: PASS — 97/97 checks' suites.log
           grep -Fq 'BROWSER RUN FIXES: PASS — 23/23 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
@@ -462,6 +465,10 @@ jobs:
           # Read on request: what one handwritten answer costs the paid reader
           # (scripted reader), a double press, a second tab, and late readings.
           node client/test/tour-read-cost.js --no-build 2>&1 | tee -a browser.log
+          # Truthful handwritten feedback (scripted reader, real server marks): a
+          # misread page with a typed final answer, working the server did and did
+          # not check, and annotations that die with the revision they were about.
+          node client/test/tour-truthful-ink.js --no-build 2>&1 | tee -a browser.log
       - name: Accessibility suite
         if: always()
         run: |
@@ -537,6 +544,8 @@ jobs:
           grep -Fq 'Reader · usage limit reached' browser.log
           grep -Eq 'Read on request · provider calls per handwritten answer, first stroke to verdict +10/10' browser.log
           grep -Eq 'E2E SUITE.*38/38.*2 flows' browser.log
+          grep -Fq 'Ink · a marked attempt says only what the server established' browser.log
+          grep -Eq 'E2E SUITE.*49/49.*1 flows' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
           test "$(grep -Ec 'E2E SUITE PASSED — 158/158 checks across 1 flows' browser.log)" -eq 2
