@@ -17,7 +17,7 @@ import {
   saveInkDraft, savePendingSubmission, submissionContentKey,
   noteSubmissionEdited, recoveryPlan, settleFailedSubmission, submissionToSettleFirst
 } from './practiceRecovery.js';
-import { cloudReadingEnabled, INK_READER_STATE, noteReaderRefusal, readerBlock, readPhotoWithCloud, resumeReaderNow, takeCloudReadingNotice } from '../ink/cloudReader.js';
+import { cloudReadingEnabled, forgetCloudReads, INK_READER_STATE, noteReaderRefusal, readerBlock, readPhotoWithCloud, resumeReaderNow, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { retryClock } from '../ink/readerFailure.js';
 import { preparePhoto } from '../ink/photoRaster.js';
 import { buildTranscript, editLine, includeAll, includedLines, reviveTranscript, setLineExcluded, unreadablePage, workingOf } from '../photo/transcript.js';
@@ -316,6 +316,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [showSyms, setShowSyms] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const [state, setState] = useState({ phase: 'answering' });
+  // Submit found that the server no longer holds the read of this page (it
+  // was read long ago). Submit never buys a read: the student is asked to
+  // press Read again, and the ink, the transcript and the typed answer stay.
+  const [inkExpiredCount, setInkExpiredCount] = useState(0);
+  const [inkReadExpired, setInkReadExpired] = useState(false);
+  const [photoReadExpired, setPhotoReadExpired] = useState(false);
   const [busy, setBusy] = useState(false);
   const [photo, setPhoto] = useState(null);
   const [photoSignInOpen, setPhotoSignInOpen] = useState(false);
@@ -1326,6 +1332,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         : settleFailedSubmission(question.id, e, { definitive: definitiveSubmissionRefusal(e), meta: { label: question.subtopicName } });
       if (fate === 'cleared') pendingRef.current = null;
       inkFrozenRef.current = false;
+      // The page was read too long ago for the server to still hold that read.
+      // Nothing was marked, no try was used and nothing was paid for: the
+      // transcript is marked as needing "Read again", and everything is kept.
+      if (!recovering && (e?.readerFailure?.code === 'RECOGNITION_READ_EXPIRED' || e?.code === 'RECOGNITION_READ_EXPIRED')) {
+        forgetCloudReads();
+        if (body.viaInk === true) { setInkReadExpired(true); setInkExpiredCount(n => n + 1); } else setPhotoReadExpired(true);
+        setState({ phase: 'answering' });
+        return;
+      }
       if (recovering && e?.status === 409 && e?.code !== 'QUESTION_DISCARDED') {
         // Answered elsewhere under another submission: nothing here to recover.
         if (mountedRef.current) onNext?.();
@@ -1397,6 +1412,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const onInkRecognized = useCallback((r) => {
     if (inkFrozenRef.current) return;
     setInkResult(r);
+    // A reading of the page as it stands (the student read it again) is current.
+    if (r?.stale !== true) setInkReadExpired(false);
     // Recovery: the page restored after a relaunch is read once, for display
     // beside the verdict, and then frozen like any submitted reading.
     if (inFlightRef.current || attemptRef.current) inkFrozenRef.current = true;
@@ -1700,7 +1717,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     ocrPhase: photoOCR.phase, unreadPages: pdfUnread, pdfPageCount,
     reattachRequired: photoReattachRequired });
   const canSubmit = (isMcq ? mcqSel !== null : isWorking ? (writeMode ? inkReadable : !!working.trim()) : writeMode ? (inkReadable && !!inkResult?.answerLine && !!String(inkAnswer).trim()) : !!answer.trim()) &&
-    !photoAwaitingValidReading;
+    !photoAwaitingValidReading && !(mode === 'photo' && photoReadExpired);
   // Reader refused by authentication is not a handwriting error or a
   // server-issued grading receipt. Keep original ink and its verified local
   // save state separate; never unlock Submit with a guessed transcript.
@@ -1823,6 +1840,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     || (mode === 'photo' && !!photo && photoOCR.phase === 'idle'));
   // Why Submit is not available, said beside it — never a dead button.
   const submitReasonKey = resolved || isMcq || busy ? null
+    : writeMode && inkHasStrokes && inkStale && inkReadExpired ? 'ink.submitReadExpired'
+    : mode === 'photo' && photoInUse && photoReadExpired ? 'photo.readExpired'
     : writeMode && inkHasStrokes && inkStale ? 'ink.submitReadAgain'
       : writeMode && inkHasStrokes && !inkReadable && awaitingReading ? 'ink.submitReadFirst'
         : writeMode && !isWorking && inkReadable && inkProposal && !String(inkAnswer).trim() ? 'verdict.submitNeedsAnswer'
@@ -2110,6 +2129,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                           )}
                           {photoOCR.phase === 'done' && (
                             <>
+                              {photoReadExpired && !resolved && (
+                                <div data-photo-read-expired role="status" style={{ marginBottom: 8 }}>
+                                  <p style={{ fontSize: 13, margin: '0 0 6px' }}>{t('photo.readExpired')}</p>
+                                  <button type="button" className="btn btn-primary btn-sm" data-photo-read-again
+                                    onClick={() => { setPhotoReadExpired(false); if (pendingPdf.current) void decodePdf(pendingPdf.current); else if (photo) void decodePhoto(photo); }}>
+                                    {t('ink.readAgain')}
+                                  </button>
+                                </div>
+                              )}
                               {/* What actually read it. Saying "on-device" over a photo that
                                   was uploaded is the one thing this screen must never do. */}
                               <div style={{ fontSize: 12.5, marginBottom: 6 }}>
@@ -2250,6 +2278,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   disabled={resolved || busy} focusSymbol={checkFocus} recognitionContext={recognitionContext}
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes}
                   initialReading={inkExtrasRef.current.reading || restoredReading || null}
+                  readExpired={inkExpiredCount}
                   draftSaved={saveState === 'saved'} />
               )}
               {/* The answer taken from handwritten working: shown, editable,

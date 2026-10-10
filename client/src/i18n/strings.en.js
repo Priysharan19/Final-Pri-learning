@@ -2743,5 +2743,9 @@ export default {
   'ink.submitReadAgain': "Your writing changed after it was read. Read it again before you submit.",
   'verdict.submitNeedsAnswer': "Type your final answer first.",
   'photo.readMyPhoto': "Read my photo",
-  'photo.readMyPhotoHint': "The photo is kept on this device. It is read once, when you ask.",
+  'ink.readingExpired': "Read a while ago — read again to submit",
+  'ink.readExpiredHint': "This page was read some time ago. Your writing and the text below are kept; press Read again so it can be submitted.",
+  'ink.submitReadExpired': "This page was read a while ago and has to be read again before you submit. Nothing is lost — press Read again.",
+  'photo.readExpired': "This photo was read a while ago and has to be read again before you submit. Your photo and the lines below are kept.",
+  'photo.readMyPhotoHint': "The photo is kept on this device. A photo you attach is read once, straight away; a photo that was kept unread is read only when you press Read my photo.",
 };

@@ -517,7 +517,12 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     let result;
     let reused = false;
     try {
-      const read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId: req.requestId });
+      // Submit is not a request to read. This route never starts a provider
+      // call: it binds the transcript the student was already shown (the kept
+      // read, or one still in flight). When that read is gone the answer is a
+      // named, retryable refusal and the student presses Read again.
+      const read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId: req.requestId, paid: false });
+      if (read.missing) return reject(res, 409, 'RECOGNITION_READ_EXPIRED', 'This page needs to be read again before it can be submitted. Press Read again.');
       if (read.refusal) return sendRecognitionRefusal(res, read.refusal);
       ({ result, reused } = read);
     } catch (error) {

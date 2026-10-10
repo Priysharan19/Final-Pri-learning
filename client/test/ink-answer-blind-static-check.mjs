@@ -50,7 +50,12 @@ export const INK_ANSWER_PROPS = Object.freeze([
   // draft so a reload does not read the page again. It is display state for
   // the surface; it carries nothing about the question or its answer and is
   // never sent to the reader (the request is still the picture alone).
-  'initialReading'
+  'initialReading',
+  // Reviewed (review 17, F3): a counter the card bumps when Submit learns the
+  // server no longer holds this page's read. A number only; it makes the
+  // surface label its own transcript "read again". It carries nothing about
+  // the question or its answer and never reaches the reader request.
+  'readExpired'
 ]);
 /** Identifiers that must never appear inside a recognition-context expression. */
 export const FORBIDDEN_IDENTIFIERS = Object.freeze([

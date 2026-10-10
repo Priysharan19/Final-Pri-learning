@@ -103,7 +103,7 @@ export const strokeSignature = strokes => {
  *  strokes and History replay all keep one coordinate space. */
 const MAX_PAGES = 4;
 
-export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0 }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -139,6 +139,15 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   // an earlier state of it (the student wrote, erased or undid since).
   const [hasInk, setHasInk] = useState(false);
   const [stale, setStale] = useState(false);
+  // The reading on screen is of this very page, but was made too long ago for
+  // the server to still hold it: it cannot be submitted until it is read again.
+  const [expired, setExpired] = useState(false);
+  // Where keyboard focus rests when "Read my answer" leaves the page (the
+  // button is gone while the page is read), and where it goes when the
+  // reading lands: never back to <body>.
+  const statusRef = useRef(null);
+  const readingTitleRef = useRef(null);
+  const focusAfterRead = useRef(false);
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine !== false);
   // What is said about reading: a refusal the reader gave, or — before any
   // read is asked for — a reason this device already knows makes one
@@ -244,6 +253,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     abortRef.current = controller;
     flyingRef.current = signature;
     const landed = () => { if (flyingRef.current === signature) flyingRef.current = null; };
+    focusAfterRead.current = typeof document !== 'undefined' && !!document.activeElement?.closest?.('.ink-read-action, .ink-status-action');
     setStatus({ kind: 'reading' });
     readWithCloud(strokes, { user: who, signal: controller?.signal, freshReadiness: true }).finally(landed).then(outcome => {
       // The page was submitted or left while the server was reading it (§09:
@@ -273,6 +283,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           return;
         }
         readRef.current = signature;
+        setExpired(false);
         publish(reading, now, { stale: nowSignature !== signature });
         setStatus(null);
         return;
@@ -323,8 +334,9 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     // offered "Read again". Undoing back to the page that was read makes the
     // transcript current again — it is the same page.
     const isStale = signature !== readRef.current;
+    if (expired) setExpired(false);
     if (isStale !== stale) publish(rec, strokes, { stale: isStale });
-  }, [publish, rec, stale]);
+  }, [publish, rec, stale, expired]);
 
   // The world changed (back online, signed in, another profile): that can
   // clear a reason the page could not be read. It is never a reason to read —
@@ -353,6 +365,25 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     identityRef.current = identity;
     if (changed) setStatus(prev => (prev?.kind === 'waiting' && ['session', 'verify-email', 'guardian', 'not-allowed', 'turned-off'].includes(prev.block?.kind) ? null : prev));
   }, [user]);
+
+  // Submit found the server no longer holds this page's read (readExpired is
+  // a counter the card bumps). The transcript stays, labelled; it is not
+  // submitted; "Read again" is offered. Undoing cannot make it current again.
+  useEffect(() => {
+    if (!readExpired || !rec.lines.length) return;
+    readRef.current = null;
+    setExpired(true);
+    publish(rec, strokesRef.current, { stale: true });
+  }, [readExpired]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Focus follows the read: to the status line while the page is being read
+  // (the button that was pressed is no longer there), then to the reading.
+  useEffect(() => {
+    if (!focusAfterRead.current) return;
+    if (status?.kind === 'reading') { statusRef.current?.focus?.(); return; }
+    if (!status && rec.lines.length) { readingTitleRef.current?.focus?.(); focusAfterRead.current = false; return; }
+    if (status) { statusRef.current?.focus?.(); focusAfterRead.current = false; }
+  }, [status?.kind, rec]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handwriting kept from before a reload comes back onto the page — and so
   // does its transcript, with the student's corrections, exactly as kept. The
@@ -522,7 +553,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       </div>
 
       {statusLine && !disabled && (
-        <div className="ink-status ink-status-line muted" role="status" aria-live="polite">
+        <div className="ink-status ink-status-line muted" role="status" aria-live="polite" tabIndex={-1} ref={statusRef}>
           {statusLine}
         </div>
       )}
@@ -536,7 +567,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           <button type="button" className="btn btn-primary" data-ink-read={stale ? 'again' : 'first'} onClick={readNow}>
             {t(stale ? 'ink.readAgain' : 'ink.readMyAnswer')}
           </button>
-          <span className="muted ink-read-hint">{t(stale ? 'ink.readAgainHint' : 'ink.readMyAnswerHint')}</span>
+          <span className="muted ink-read-hint">{t(stale ? (expired ? 'ink.readExpiredHint' : 'ink.readAgainHint') : 'ink.readMyAnswerHint')}</span>
         </div>
       )}
       {/* A refusal the server gave (verify your email, a guardian's
@@ -565,11 +596,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
 
       {rec.lines.length > 0 && (
         <div className={`ink-preview${stale ? ' is-stale' : ''}`} data-stale={stale ? 'true' : undefined}>
-          <div className="ink-preview-title" id="ink-reading">
+          <div className="ink-preview-title" id="ink-reading" tabIndex={-1} ref={readingTitleRef}>
             {t('ink.reading')}
             {/* A student always learns when their writing was read on the server. */}
             {shownEngineNote && <span className="ink-status muted">{shownEngineNote}</span>}
-            {stale && <span className="ink-status ink-stale" role="status" data-ink-stale>{t('ink.readingStale')}</span>}
+            {stale && <span className="ink-status ink-stale" role="status" data-ink-stale={expired ? 'expired' : 'changed'}>{t(expired ? 'ink.readingExpired' : 'ink.readingStale')}</span>}
           </div>
           {rec.lines.map((line, li) => (
             <div className={`ink-line${isLowConfidence(line, lineConfidenceFloor) ? ' ink-line-low' : ''}`} key={li} data-text={line.text}
