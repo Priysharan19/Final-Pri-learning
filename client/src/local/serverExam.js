@@ -457,6 +457,10 @@ export async function resolveFrozenHandwriting(examId, result, images, { now = D
       const reply = await transport.resolveExamHandwriting(examId, { key, image: images[key] });
       if (reply?.result?.authoritative === true && Array.isArray(reply.result.detail)) latest = reply.result;
     } catch (cause) {
+      // The server will never read this picture for this answer (it is not
+      // the frozen one, or nothing is pending there): stop holding it, so it
+      // is not sent again on every visit.
+      if (cause?.status === 409 && (cause?.code === 'EXAM_HANDWRITING_CHANGED' || cause?.code === 'EXAM_HANDWRITING_NOT_PENDING')) { delete images[key]; continue; }
       // Offline, signed out or refused for the account: the page stays frozen
       // and pending, and a later visit asks again. Nothing is retried here.
       if (unavailableKind(cause)) break;

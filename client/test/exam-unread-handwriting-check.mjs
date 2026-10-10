@@ -146,6 +146,10 @@ const pages = states => ({ handwriting: { pages: Object.fromEntries(Object.entri
   let tries = 0;
   const offline = await resolveFrozenHandwriting('exam-1', many, { k0: png('k0'), k1: png('k1') }, { now: 1_000, transport: { resolveExamHandwriting: async () => { tries++; throw Object.assign(new Error('offline'), { status: 0, code: 'NETWORK_ERROR' }); } } });
   ok(tries <= 2 && offline === many, 'with no connection nothing is settled and nothing loops: the pages stay frozen and pending');
+  const refusedImages = { k0: png('not the frozen page'), k1: png('k1') };
+  let presented = 0;
+  await resolveFrozenHandwriting('exam-1', many, refusedImages, { now: 1_000, transport: { resolveExamHandwriting: async (id, body) => { presented++; if (body.key === 'k0') throw Object.assign(new Error('changed'), { status: 409, code: 'EXAM_HANDWRITING_CHANGED' }); return { result: many }; } } });
+  eq([presented, Object.keys(refusedImages)], [2, ['k1']], 'a picture the server says is not the frozen page is dropped, so it is never sent again; the other pages are still presented');
 
   // A later visit: the server is asked how each page stands, then the same bounded presentation.
   const exam2 = { id: 'e-late', questionIds: ['a'], server: { examId: 'x', questionIds: ['a'], handwriting: { pages: { a: png('a') } } }, finishedAt: 5, score: 0, total: 2,
