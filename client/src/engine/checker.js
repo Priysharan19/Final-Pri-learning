@@ -2136,11 +2136,18 @@ function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = n
   // Stated roots are one shape whatever their spelling: a working that gives
   // the unknown two or more different values, not all of them roots, is a
   // list of candidates, and none of its stated roots earns.
+  // The first false line is not one of the candidates. It is where the working
+  // broke — a slip, or the wrong final answer written under the working — and
+  // it already earns nothing and stops everything after it. Counting it here
+  // took the marks back from roots read off correctly ABOVE it: factorise,
+  // `x = 2`, `x = -3`, then a slip `x = 5`, fell from three marks to one. A
+  // second wrong value after the break is still a list of candidates.
   let rootSweep = false;
   if (statedRoots) {
     const wanted = uniqueNumeric(meta.solutions);
     const values = [];
     for (const l of allLines) {
+      if (l.status === 'break') continue;
       const c = readClaim(l.text);
       const v = c?.kind === 'equation' ? statedRootOf(c, meta.variable) : null;
       if (v !== null && !values.some(x => numsClose(x, v))) values.push(v);
