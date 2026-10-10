@@ -1564,7 +1564,7 @@ export default {
   'examRoom.provisional': { one: "{n} mark is not decided yet: a handwritten answer was saved but has not been read. Your score may rise; it will not fall.", other: "{n} marks are not decided yet: handwriting was saved but has not been read. Your score may rise; it will not fall." },
   'examRoom.tagPending': 'Not marked yet · out of {n}',
   'examRoom.pendingReading': "Your handwriting for this answer was saved exactly as you left it. It has not been read yet, so it has not been marked. Pri will read that saved page; nothing written now can change it.",
-  'examRoom.pendingReview': "Your handwriting for this answer was saved exactly as you left it, but it could not be read with confidence. It has not been marked, and it has not been counted as wrong or as blank.",
+  'examRoom.pendingReview': "Your handwriting for this answer was saved exactly as you left it, but Pri could not read it reliably. It has not been marked, and it has not been counted as wrong or as blank.",
   'examRoom.timeUp': 'Time is up. Your paper is being marked.',
   'examRoom.submitFailed': 'The paper could not be marked. Your answers are saved — try again.',
   'examRoom.orLabel': 'OR',

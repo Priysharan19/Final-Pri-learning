@@ -68,7 +68,7 @@ jobs:
           grep -Fq 'NCERT ANSWER FORMS: PASS — 419/419 checks' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 163/163 checks' suites.log
           grep -Fq 'EXAM SESSION: PASS — 176/176 checks' suites.log
-          grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 43/43 checks' suites.log
+          grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 44/44 checks' suites.log
           grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1082/1082 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
