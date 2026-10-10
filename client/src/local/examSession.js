@@ -216,6 +216,41 @@ function cleanInk(value) {
  * working and times are sent whole and replace what was there; ink is sent
  * only for the questions whose writing changed and is merged key by key.
  */
+const PAGE_DIGEST = /^[0-9a-f]{64}$/;
+const PAGE_IMAGE = /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
+const MAX_PAGES = 60;
+const MAX_PAGE_CHARS = 1_000_000;
+
+/** Pictures of handwritten pages that have not been read, by answer key: { digest, image }. */
+export function cleanPages(map, allowed) {
+  const out = {};
+  if (!map || typeof map !== 'object' || Array.isArray(map)) return out;
+  for (const [key, value] of Object.entries(map).slice(0, MAX_PAGES)) {
+    if (!allowed.has(questionOfKey(key)) || key.length > 160 || !value || typeof value !== 'object') continue;
+    if (!PAGE_DIGEST.test(String(value.digest || '')) || typeof value.image !== 'string' || value.image.length > MAX_PAGE_CHARS || !PAGE_IMAGE.test(value.image)) continue;
+    out[key] = { digest: value.digest, image: value.image };
+  }
+  return out;
+}
+
+/**
+ * The frozen pages after a save. `body.unread` names every answer whose
+ * handwriting is on the page and unread right now; `body.pages` carries the
+ * pictures that are new or changed. A page no longer named is dropped (it was
+ * read, typed over or erased); a body that says nothing leaves them as saved.
+ */
+function mergePages(prior = {}, body = {}, allowed) {
+  if (body.unread === undefined && body.pages === undefined) return prior || {};
+  const fresh = cleanPages(body.pages, allowed);
+  const named = Array.isArray(body.unread) ? body.unread.slice(0, MAX_PAGES).map(String) : [...Object.keys(prior || {}), ...Object.keys(fresh)];
+  const out = {};
+  for (const key of named) {
+    const page = fresh[key] || prior?.[key];
+    if (page && allowed.has(questionOfKey(key))) out[key] = page;
+  }
+  return out;
+}
+
 export function saveExamResponses(exam, body = {}, now = Date.now()) {
   if (exam.finishedAt) throw examError('This paper has been submitted — it can no longer change.', 409, 'EXAM_FINALISED');
   ensureExamClock(exam, now);
@@ -229,6 +264,7 @@ export function saveExamResponses(exam, body = {}, now = Date.now()) {
     times: body.times !== undefined ? cleanTimes(body.times, allowed) : (prior.times || {}),
     modes: prior.modes || {},
     inks: { ...(prior.inks || {}) },
+    pages: mergePages(prior.pages, body, allowed),
     cur: Number.isInteger(Number(body.cur)) ? Math.max(0, Math.min((exam.questionIds || []).length - 1, Number(body.cur))) : (prior.cur || 0),
     rev: (Number(prior.rev) || 0) + 1,
     savedAt: now
@@ -271,10 +307,15 @@ export function examMarkingInputs(exam, body = {}, now = Date.now()) {
   const answers = pick('answers', m => cleanTextMap(m, allowed, MAX_ANSWER));
   const workings = pick('workings', m => cleanTextMap(m, allowed, MAX_WORKING));
   const times = pick('times', m => cleanTimes(m, allowed));
+  // Handwritten pages not read: inside the deadline what the submit names,
+  // after it only what the autosave before the deadline held. A page whose
+  // answer was read or typed is not unread, whatever was sent.
+  const held = inTime ? mergePages(saved.pages, body, allowed) : (saved.pages || {});
+  const pages = Object.fromEntries(Object.entries(held).filter(([key]) => String(answers[key] ?? '').trim() === ''));
   const elapsed = Math.max(0, Math.min(now, exam.deadlineAt) - exam.startedAt);
   const ms = inTime && Number.isFinite(Number(body.ms)) && Number(body.ms) > 0 ? Number(body.ms) : elapsed;
   return {
-    answers, workings, times, ms,
+    answers, workings, times, ms, pages,
     source: inTime ? 'submission' : 'autosave-before-deadline',
     clockRolledBack: (Number(exam.clockRollbacks) || 0) > 0,
     late: !inTime,

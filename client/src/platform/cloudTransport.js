@@ -458,6 +458,9 @@ export const cloud = Object.freeze({
     method: 'POST', body, idempotencyKey, timeoutMs
   }),
   getExam: (examId, timeoutMs = undefined) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id'), { timeoutMs }),
+  // One page of handwriting frozen, unread, when the paper closed. The server
+  // reads it only if its picture is the frozen one, and bounds how often.
+  resolveExamHandwriting: (examId, body, timeoutMs = 60000) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id') + '/handwriting', { method: 'POST', body, timeoutMs }),
   repeatPractice: questionId => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/repeat', { method: 'POST', body: {} }),
   revealPractice: questionId => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/reveal', { method: 'POST', body: {} }),
   recognizePractice: (questionId, mode, image) =>

@@ -35,6 +35,7 @@ import { useApp } from '../App.jsx';
 import { clearDraft, queueDraft, readDraft } from '../components/drafts.js';
 import ExamAnalysis from '../components/ExamAnalysis.jsx';
 import { compactStrokes, expandStrokes } from '../local/examSession.js';
+import { freezePage, pendingSummary, unreadInkKeys } from '../local/examPages.js';
 import { tLater, useT, useTx } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
 import { CheckSignIn } from '../components/CheckRefusal.jsx';
@@ -44,6 +45,10 @@ import '../workspace.css';
 const SAVE_DEBOUNCE_MS = 600;
 // A submitted paper waiting for the server is asked about again this often.
 const PENDING_RECHECK_MS = 20000;
+// A marked paper with handwriting still waiting to be read asks again this often.
+const HANDWRITING_RECHECK_MS = 60000;
+// From this many seconds before the deadline, unread handwriting is warned about on the page.
+const UNREAD_WARNING_S = 300;
 const MARKED_BY_KEY = { server: 'examRoom.markedByServer', 'earlier-version': 'examRoom.markedByEarlier', backup: 'examRoom.markedByBackup' };
 const PENDING_KEY = { offline: 'examRoom.pendingOffline', 'sign-in': 'examRoom.pendingSignIn', refused: 'examRoom.pendingRefused' };
 
@@ -138,6 +143,11 @@ export default function ExamRoom() {
   const saveTimer = useRef(null);
   const saveChain = useRef(Promise.resolve());
   const warned = useRef(new Set());
+  // The picture of each handwritten page that has not been read, frozen with
+  // its digest: key → { strokes (as JSON), digest, image }. And which of those
+  // pictures the last save already carried.
+  const pageCache = useRef({});
+  const pagesSent = useRef({});
   // Flags are the student's own marks to come back to; they ride in the draft.
   const [flagged, setFlagged] = useState(() => readDraft('exam', id)?.flagged || {});
   const [confirming, setConfirming] = useState(false);
@@ -235,6 +245,39 @@ export default function ExamRoom() {
   const sitting = phase === 'sitting' && secondsLeft !== null && secondsLeft > 0;
   const locked = !sitting;
 
+  // ── Handwriting that has not been read ─────────────────────────────────────
+  // Written, kept, and not yet read by the student's own "Read my answer". It
+  // is their answer all the same, so its picture is frozen beside the strokes
+  // and named in every save and in the submit: after the deadline the paper
+  // says "handwriting was captured here", never "blank" (local/examPages.js).
+  const freezeUnread = useCallback(async (snap) => {
+    const unread = unreadInkKeys(snap.inks, snap.answers);
+    if (!unread.length) return { unread, pages: {} };
+    let rasterize = null;
+    try { rasterize = (await import('../ink/cloudRaster.js')).rasterizeInk; } catch { rasterize = null; }
+    const pages = {};
+    for (const key of unread) {
+      const strokes = snap.inks[key]?.strokes || [];
+      const signature = JSON.stringify(strokes);
+      let frozen = pageCache.current[key];
+      if (!frozen || frozen.signature !== signature) {
+        const page = rasterize ? freezePage(expandStrokes(strokes), rasterize) : null;
+        frozen = page ? { signature, ...page } : null;
+        if (frozen) pageCache.current[key] = frozen; else delete pageCache.current[key];
+      }
+      if (frozen) pages[key] = { digest: frozen.digest, image: frozen.image };
+    }
+    return { unread, pages };
+  }, []);
+  /** What a save or the submit says about unread handwriting: every key, and the pictures not yet sent. */
+  const unreadBody = frozen => ({
+    unread: frozen.unread,
+    pages: Object.fromEntries(Object.entries(frozen.pages).filter(([key, page]) => pagesSent.current[key] !== page.digest))
+  });
+  const noteSent = frozen => {
+    pagesSent.current = Object.fromEntries(Object.entries(frozen.pages).map(([key, page]) => [key, page.digest]));
+  };
+
   // ── Autosave ───────────────────────────────────────────────────────────────
   const save = useCallback((urgent = false) => {
     if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
@@ -259,7 +302,12 @@ export default function ExamRoom() {
       ...(urgent === true ? { urgent: true } : {})
     };
     setSaveState('saving');
-    saveChain.current = saveChain.current.catch(() => {}).then(() => api.post(`/exams/${id}/responses`, body)).then(res => {
+    let frozen = null;
+    saveChain.current = saveChain.current.catch(() => {}).then(async () => {
+      frozen = await freezeUnread(snap).catch(() => null);
+      return api.post(`/exams/${id}/responses`, frozen ? { ...body, ...unreadBody(frozen) } : body);
+    }).then(res => {
+      if (frozen) noteSent(frozen);
       learnClock(res?.now);
       setNow(clockNow());
       for (const k of sent) if (latest.current.inks[k] === snap.inks[k]) dirtyInk.current.delete(k);
@@ -279,7 +327,7 @@ export default function ExamRoom() {
       }
     });
     return saveChain.current;
-  }, [id, accrue]);
+  }, [id, accrue, freezeUnread]);
 
   const scheduleSave = useCallback(() => {
     if (phaseRef.current !== 'sitting') return;
@@ -359,7 +407,9 @@ export default function ExamRoom() {
     for (const [mark, key] of [[300, 'examRoom.fiveMinutesLeft'], [60, 'examRoom.oneMinuteLeft']]) {
       if (secondsLeft <= mark && secondsLeft > 0 && !warned.current.has(mark)) {
         warned.current.add(mark);
-        setAnnounce(tLater(key));
+        // Said with the time: handwriting that has not been read yet.
+        const unread = unreadInkKeys(latest.current.inks, latest.current.answers).length;
+        setAnnounce(unread ? <>{tLater(key)} {tLater('examRoom.unreadWarning', { count: unread, n: unread })}</> : tLater(key));
       }
     }
     // The clock submits once. If that submit fails, the student is offered a
@@ -382,10 +432,13 @@ export default function ExamRoom() {
     // Any autosave still in flight lands first, so the submit is the last write.
     await saveChain.current.catch(() => {});
     const snap = latest.current;
+    // Unread handwriting is frozen as it stands now and named in the submit.
+    const frozen = await freezeUnread(snap).catch(() => null);
     try {
       const r = await api.post(`/exams/${id}/submit`, {
         answers: snap.answers, workings: snap.workings, times: timesRef.current,
-        ms: Date.now() - startedAtRef.current, submissionKey: submissionKey.current, reason
+        ms: Date.now() - startedAtRef.current, submissionKey: submissionKey.current, reason,
+        ...(frozen ? unreadBody(frozen) : {})
       });
       clearDraft('exam', id);
       if (r?.pending) {
@@ -448,6 +501,24 @@ export default function ExamRoom() {
     const offSession = onCloudSessionChange(event => { if (event?.detail?.connected === true) recheck(); });
     return () => { clearInterval(timer); window.removeEventListener('online', recheck); offSession?.(); };
   }, [phase, recheck]);
+
+  // ── Marked, with handwriting still waiting to be read ──────────────────────
+  // Reading the paper back presents the frozen pages again (the backend and
+  // the server bound how often). The page only ever shows what came back.
+  const awaitingPages = phase === 'done' && result?.detail ? pendingSummary(result.detail).awaiting : 0;
+  useEffect(() => {
+    if (!awaitingPages) return;
+    let live = true;
+    const again = async () => {
+      try {
+        const back = (await api.get(`/exams/${id}`)).exam;
+        if (live && back?.finishedAt && back.detail) { setExam(back); setResult(prev => ({ ...resultOf(back), final: resultOf(back).final || prev?.final || null, markedBy: resultOf(back).markedBy || prev?.markedBy || null })); }
+      } catch { /* still waiting; what is on screen is still true */ }
+    };
+    const timer = setInterval(again, HANDWRITING_RECHECK_MS);
+    window.addEventListener('online', again);
+    return () => { live = false; clearInterval(timer); window.removeEventListener('online', again); };
+  }, [awaitingPages, id]);
 
   // ── Handwriting ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -574,6 +645,8 @@ export default function ExamRoom() {
   if (phase === 'done' && result) {
     const pct = result.pct ?? Math.round(100 * result.score / result.total);
     const shownPct = Math.round(pct);
+    // Answers whose handwriting was saved but not read: not marked, and said so.
+    const waiting = pendingSummary(result.detail);
     return (
       <div className="grid" style={{ gap: 18, maxWidth: 860, margin: '0 auto' }}>
         <h1 className="sr-only">{t('examRoom.markedHeading', { title: exam.title })}</h1>
@@ -591,6 +664,11 @@ export default function ExamRoom() {
                     'examRoom.verdictLow')}</p>
           {result.final?.finalisedBy === 'deadline' && (
             <p className="muted" style={{ marginTop: 4, fontSize: 13 }}>{t(result.final.late ? 'examRoom.finalisedLate' : 'examRoom.finalisedByDeadline')}</p>
+          )}
+          {waiting.any && (
+            <p style={{ marginTop: 8, fontSize: 14 }} role="status" data-exam-provisional={waiting.marks} data-exam-awaiting={waiting.awaiting}>
+              {t('examRoom.provisional', { count: waiting.marks, n: waiting.marks })}
+            </p>
           )}
           {/* Who marked it. Only the server's result is a certified one. */}
           {MARKED_BY_KEY[result.markedBy] && (
@@ -622,9 +700,13 @@ export default function ExamRoom() {
                 <div className="row" style={{ gap: 8, alignItems: 'baseline' }}>
                   <b>({pt.key})</b>
                   <span style={{ flex: 1 }} lang="en"><MathText text={pt.prompt} /></span>
-                  <span className="tag" style={{ color: pt.correct ? 'var(--good)' : 'var(--bad)' }}>
-                    {pt.awarded}/{pt.marks}<span className="sr-only"> {t(pt.correct ? 'examRoom.srMarksCorrect' : 'examRoom.srMarksIncorrect')}</span>
-                  </span>
+                  {pt.pending ? (
+                    <span className="tag" data-exam-pending-line={pt.pendingState}>{t('examRoom.tagPending', { n: pt.marks })}</span>
+                  ) : (
+                    <span className="tag" style={{ color: pt.correct ? 'var(--good)' : 'var(--bad)' }}>
+                      {pt.awarded}/{pt.marks}<span className="sr-only"> {t(pt.correct ? 'examRoom.srMarksCorrect' : 'examRoom.srMarksIncorrect')}</span>
+                    </span>
+                  )}
                 </div>
                 <div className="row" style={{ flexWrap: 'wrap', gap: 16, fontSize: 14, marginTop: 4 }}>
                   <span>{tx('examRoom.yours', { answer: <b>{pt.answerType === 'mcq' ? (pt.given !== '' && pt.given != null ? 'ABCD'[Number(pt.given)] ?? '—' : '—') : (pt.given || '—')}</b> })}</span>
@@ -656,13 +738,20 @@ export default function ExamRoom() {
               {d.sectionLabel && <span className="tag" lang="en">{d.sectionLabel}</span>}
               <span className="tag" lang="en">{d.subtopicName}</span>
               <span className="tag">{t('examRoom.difficultyTag', { n: d.difficulty })}</span>
-              <span className="tag" style={{ color: d.correct ? 'var(--good)' : d.awarded > 0 ? 'var(--warn)' : 'var(--bad)' }}>
-                {d.awarded < 0
-                  ? t('examRoom.tagNegative', { lost: -d.awarded, n: d.marks })
-                  : t(d.correct ? 'examRoom.tagCorrect' : d.awarded > 0 ? 'examRoom.tagPartial' : 'examRoom.tagWrong', { awarded: d.awarded, n: d.marks })}
-                {d.unanswered && <span> {t('examRoom.notAttempted')}</span>}
-              </span>
+              {d.pending ? (
+                <span className="tag" data-exam-pending-line={d.pendingState}>{t('examRoom.tagPending', { n: d.marks })}</span>
+              ) : (
+                <span className="tag" style={{ color: d.correct ? 'var(--good)' : d.awarded > 0 ? 'var(--warn)' : 'var(--bad)' }}>
+                  {d.awarded < 0
+                    ? t('examRoom.tagNegative', { lost: -d.awarded, n: d.marks })
+                    : t(d.correct ? 'examRoom.tagCorrect' : d.awarded > 0 ? 'examRoom.tagPartial' : 'examRoom.tagWrong', { awarded: d.awarded, n: d.marks })}
+                  {d.unanswered && <span> {t('examRoom.notAttempted')}</span>}
+                </span>
+              )}
             </div>
+            {d.pending && (
+              <p className="sub" style={{ marginTop: 6 }} role="status">{t(d.pendingState === 'awaiting-reading' ? 'examRoom.pendingReading' : 'examRoom.pendingReview')}</p>
+            )}
             <div lang="en"><MathText block className="q-prompt" style={{ fontSize: 16 }} text={d.prompt} /></div>
             {d.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: d.figure }} />}
             {OBJECTIVE.has(d.answerType) && d.mcqOptions && (
@@ -866,6 +955,10 @@ export default function ExamRoom() {
   const flaggedCount = Object.values(flagged).filter(Boolean).length;
   const unanswered = exam.questions.length - answeredCount;
   const low = left < 300;
+  // Handwritten answers on the paper that have not been read, and the first
+  // question that holds one.
+  const unreadKeys = unreadInkKeys(inks, answers);
+  const unreadAt = unreadKeys.length ? exam.questions.findIndex(q => keysOf(q).some(k => unreadKeys.includes(k))) : -1;
 
   return (
     <div className="exam-page">
@@ -892,6 +985,17 @@ export default function ExamRoom() {
       <div className="sr-only" role="status" aria-live="polite">{announce}</div>
 
       <div className="exam-body">
+      {sitting && left <= UNREAD_WARNING_S && unreadKeys.length > 0 && (
+        <div className="verdict verdict-technical" role="alert" data-exam-unread-warning={unreadKeys.length}>
+          <span className="verdict-ico"><Icon name="alert" /></span>
+          <div>
+            <div className="verdict-body">{t('examRoom.unreadWarning', { count: unreadKeys.length, n: unreadKeys.length })}</div>
+            {unreadAt >= 0 && unreadAt !== cur && (
+              <button className="btn btn-ghost btn-sm" style={{ marginTop: 8 }} data-exam-unread-goto onClick={() => setCur(unreadAt)}>{t('examRoom.unreadGoTo', { n: unreadAt + 1 })}</button>
+            )}
+          </div>
+        </div>
+      )}
       {submitError && (
         <div className="verdict verdict-technical" role="alert">
           <span className="verdict-ico"><Icon name="alert" /></span>
@@ -1001,6 +1105,7 @@ export default function ExamRoom() {
             <h2 id="exam-confirm-title">{t('exam.confirmTitle')}</h2>
             <p className="sub">{t('exam.confirmAnswered', { answered: answeredCount, total: exam.questions.length })}</p>
             {unanswered > 0 && <p className="sub" style={{ marginTop: 6 }}><b>{t('exam.confirmUnanswered', { count: unanswered, n: unanswered })}</b></p>}
+            {unreadKeys.length > 0 && <p className="sub" style={{ marginTop: 6 }} data-exam-confirm-unread={unreadKeys.length}><b>{t('exam.confirmUnread', { count: unreadKeys.length, n: unreadKeys.length })}</b></p>}
             {flaggedCount > 0 && <p className="sub" style={{ marginTop: 6 }}>{t('exam.confirmFlagged', { count: flaggedCount, n: flaggedCount })}</p>}
             <p className="muted" style={{ marginTop: 10 }}>{t('exam.confirmFinal')}</p>
             <div className="sheet-actions">

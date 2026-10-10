@@ -66,7 +66,8 @@ import { registerIssuedAttemptRecorder, registerRestoreSanitisers } from '../pla
 import { publicQuestionFields } from '../engine/publicQuestion.js';
 import {
   isServerPaper, markedByOf, issueServerExam, serverFieldOf, localStartOf, scheduleCheckpoint,
-  finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, finishedAtOf, fetchRemotePaper
+  finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, finishedAtOf, fetchRemotePaper,
+  markPendingLines, recoverHandwriting
 } from './serverExam.js';
 import { rasterizeInk } from '../ink/cloudRaster.js';
 import { preparePhoto } from '../ink/photoRaster.js';
@@ -3953,6 +3954,13 @@ const routes = {
         if (out.result && !fresh.finishedAt) await adoptPaperResult(p, fresh, out.result);
         else if (out.changed) await put('exams', fresh);
       });
+    } else if (held && held.pid === p.id && isServerPaper(held) && held.finishedAt && held.server.handwriting) {
+      // Handwriting that was not read when the paper closed is still pending:
+      // its frozen page is presented again (the server bounds how often).
+      await withMutationLock(`exam:${params.id}`, async () => {
+        const fresh = await get('exams', params.id);
+        if (fresh && await recoverHandwriting(fresh)) await put('exams', fresh);
+      });
     }
     const exam = await examFor(p.id, params.id);
     if (!exam) throw Object.assign(new Error('Exam not found'), { status: 404 });
@@ -5243,6 +5251,8 @@ async function adoptPaperResult(p, e, serverResult, { record = true } = {}) {
     settled.serverReceipt = { authoritative: true, examId: e.server.examId, attemptId: d.attemptId || null, solution: d.solution };
     await put('questions', settled);
   }
+  // An answer pending on handwriting that was not read says so on its line.
+  markPendingLines(result, detail);
   Object.assign(e, { finishedAt: finishedAtOf(e, result), score: result.score, total: result.total, detail });
   e.final = serverFinal(e, { ...result, detail });
   delete e.responses;

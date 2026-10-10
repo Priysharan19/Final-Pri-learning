@@ -68,6 +68,7 @@ jobs:
           grep -Fq 'NCERT ANSWER FORMS: PASS — 419/419 checks' suites.log
           grep -Fq 'INDIA EXAM FLOW: PASS — 163/163 checks' suites.log
           grep -Fq 'EXAM SESSION: PASS — 176/176 checks' suites.log
+          grep -Fq 'EXAM UNREAD HANDWRITING (DEVICE): PASS — 43/43 checks' suites.log
           grep -Fq 'EXAM ANALYSIS: PASS — 29/29 checks' suites.log
           grep -Fq 'INDIA PYQ: PASS — 1082/1082 checks — 45 source-cited previous-year questions' suites.log
           grep -Fq '✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups' suites.log
@@ -333,6 +334,12 @@ jobs:
           set -o pipefail
           node server/test/exam-authority-check.mjs 2>&1 | tee exam-authority.log
           grep -Fq 'EXAM AUTHORITY: PASS — 365/365 checks' exam-authority.log
+      - name: Exam handwriting not read at the deadline — frozen, pending, bounded reads (SQLite, synthetic reader)
+        run: |
+          set -o pipefail
+          node server/test/exam-handwriting-check.mjs 2>&1 | tee exam-handwriting.log
+          grep -Fq 'EXAM HANDWRITING: PASS — 93/93 checks' exam-handwriting.log
+          grep -Fq 'SYNTHETIC-READER EVIDENCE' exam-handwriting.log
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
       - name: Supabase migrations are self-contained transactions (supabase db push)
@@ -355,6 +362,7 @@ jobs:
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
           grep -Fq '✓ exam-authority-check.mjs' platform-postgres.log
+          grep -Fq '✓ exam-handwriting-check.mjs' platform-postgres.log
           grep -Fq '✓ method-progress-http-check.mjs' platform-postgres.log
           grep -Fq '✓ flagship-ap-working-http-check.mjs' platform-postgres.log
           grep -Fq '✓ marker-isolation-check.mjs' platform-postgres.log
