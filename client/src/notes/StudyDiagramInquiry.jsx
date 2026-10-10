@@ -19,7 +19,7 @@ function Wave({f}){
  return <g>
   <line x1={left} x2={right} y1={mid} y2={mid} stroke={muted} strokeWidth="1.6"/>
   <line x1={left} x2={left} y1={top} y2={bottom} stroke={muted} strokeWidth="1.6"/>
-  {[0,.5,1,1.5,2].map(z=><g key={z}><line x1={sx(z*Math.PI)} x2={sx(z*Math.PI)} y1={mid-5} y2={mid+5} stroke={muted}/><T x={sx(z*Math.PI)} y={mid+25} textAnchor="middle" fontSize="13">{({0:'0',.5:'π/2',1:'π',1.5:'3π/2',2:'2π'})[z]}</T></g>)}
+  {[0,.5,1,1.5,2].map(z=><g key={z}><line x1={sx(z*Math.PI)} x2={sx(z*Math.PI)} y1={mid-5} y2={mid+5} stroke={muted}/><T x={sx(z*Math.PI)} y={mid+25} textAnchor="middle" fontSize="13">{['0','π/2','π','3π/2','2π'][Math.round(z*2)]}</T></g>)}
   <T x={left-11} y={sy(amp)+4} textAnchor="end">+{amp}</T><T x={left-11} y={sy(-amp)+4} textAnchor="end">−{amp}</T>
   <line x1={left} x2={right} y1={sy(amp)} y2={sy(amp)} stroke={muted} strokeDasharray="3 6" opacity=".55"/>
   <line x1={left} x2={right} y1={sy(-amp)} y2={sy(-amp)} stroke={muted} strokeDasharray="3 6" opacity=".55"/>
