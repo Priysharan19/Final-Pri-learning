@@ -339,7 +339,7 @@ try {
       eq([Object.keys(said(right.data)).sort(), right.data.resolved, right.data.triesLeft, right.data.correct, right.data.invalid],
         [SILENT_KEYS, false, 1, false, false], `${label}: an open wrong try, and nothing in its reply but the fixed fields`);
       eq([right.data.marksEarned, right.data.stepReport, right.data.partial, right.data.trapWhy], [0, null, null, null], `${label}: no marks, no report, no method evidence, no misconception`);
-      eq(right.data.feedback, answer === '' ? 'There is no final answer here. Your working is checked when this question is finished.' : 'Not quite. Your working is checked when this question is finished.',
+      eq(right.data.feedback, answer === '' ? 'There is no final answer here. Your working is checked when this question is finished.' : 'Your working is checked when this question is finished.',
         `${label}: the feedback is the same fixed sentence whatever the lines say`);
       eq((await post(`/v1/practice/${kq.data.question.id}/submit`, { submissionId: right.sid, answer, mode: 'typed', steps: lines(letter, key, kq.data.question.prompt) }, knower.jar, { 'Idempotency-Key': right.sid })).data, right.data,
         `${label}: the stored reply is that same one`);

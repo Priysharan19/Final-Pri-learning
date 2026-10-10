@@ -149,7 +149,7 @@ function stepEvidence(q, answer, steps, result) {
 const OPEN_WORKING = 'Your working is checked when this question is finished.';
 const OPEN_FEEDBACK = {
   workingOnly: `There is no final answer here. ${OPEN_WORKING}`,
-  working: `Not quite. ${OPEN_WORKING}`
+  working: OPEN_WORKING
 };
 
 // Working arrives as one text or as lines. Either way it is at most this many
