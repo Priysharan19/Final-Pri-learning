@@ -20,7 +20,7 @@
 // Run on its own:  node client/test/tour-ink.js
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
-import { handwrite, readLines, turnOnServerReading } from './fakeServerReader.js';
+import { handwrite, pressRead, readLines, turnOnServerReading } from './fakeServerReader.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
 const TOPIC = 'y7-equations';
@@ -99,7 +99,23 @@ export const flow = {
 
     // ── 3 · strokes drawn with the pointer go to the reader ─────────────────
     reader.text = '1';
+    const callsBeforeWriting = reader.requests.length;
     await handwrite(page, box, '1');
+    // Read on request (owner decision): writing is saved, and NOTHING is read
+    // until the student asks. A pause used to send a paid read after 1.1 s.
+    await page.waitForTimeout(2600);
+    const readButton = page.locator('[data-ink-read="first"]');
+    const submitBefore = page.getByRole('button', SUBMIT);
+    await check('after writing and pausing, no read was sent: no request, no transcript, and an obvious "Read my answer" beside the work',
+      reader.requests.length === callsBeforeWriting && (await page.locator('.ink-line').count()) === 0 &&
+        await readButton.isVisible() && (await readButton.innerText()).trim() === 'Read my answer' && await readButton.evaluate(el => el.classList.contains('btn-primary')),
+      `${reader.requests.length - callsBeforeWriting} request(s); ${await page.locator('.ink-line').count()} line(s)`);
+    await check('Submit is not available for handwriting that has not been read, and says why: "Read your answer first"',
+      await submitBefore.isDisabled() && /Read your answer first/.test(await page.locator('[data-submit-reason="ink.submitReadFirst"]').innerText().catch(() => '')) &&
+        await page.locator('.ws-actions .status-line').getAttribute('data-work-state') === 'awaiting-reading',
+      `state ${await page.locator('.ws-actions .status-line').getAttribute('data-work-state')}`);
+    await readButton.focus();
+    await page.keyboard.press('Enter');     // reachable and operable from the keyboard
     await readingArrives(page);
     await check('a stroke drawn with the pointer is sent and read back',
       (await reading(page)).length === 1 && reader.requests.length >= 1,
@@ -127,11 +143,21 @@ export const flow = {
     const pageReadsBeforeRewrite = (await readCalls()).length;
     reader.text = '17';
     await handwrite(page, box, '7', { x: 150 });
+    await page.waitForTimeout(2600);
+    // The ink changed after it was read: the transcript stays, labelled as
+    // from earlier writing; it cannot be submitted; nothing was re-read.
+    await check('editing the ink after a read marks the transcript stale: still shown, labelled, Submit unavailable with the reason, "Read again" offered — and no read sent',
+      (await reading(page))[0] === '1' && await page.locator('[data-ink-stale]').isVisible() && /earlier writing/i.test(await page.locator('[data-ink-stale]').innerText()) &&
+        await page.getByRole('button', SUBMIT).isDisabled() && await page.locator('[data-submit-reason="ink.submitReadAgain"]').isVisible() &&
+        (await page.locator('[data-ink-read="again"]').innerText()).trim() === 'Read again' &&
+        reader.requests.length === callsBeforeRewrite && (await readCalls()).length === pageReadsBeforeRewrite,
+      `read ${JSON.stringify(await reading(page))}; provider calls +${reader.requests.length - callsBeforeRewrite}`);
+    await pressRead(page);
     for (let i = 0; i < 60 && (await reading(page))[0] !== '17'; i++) await page.waitForTimeout(150);
     await page.waitForTimeout(1500);
     const rewriteRead = (await readCalls()).at(-1);
-    await check('rewriting the ink costs exactly one more provider read: one page request, one provider call, not reused',
-      (await reading(page))[0] === '17' && reader.requests.length === callsBeforeRewrite + 1 && (await readCalls()).length === pageReadsBeforeRewrite + 1 && rewriteRead?.json?.reused === false,
+    await check('reading the rewritten ink costs exactly one more provider read: one page request, one provider call, not reused, and the transcript is current again',
+      (await reading(page))[0] === '17' && await page.locator('[data-ink-stale]').count() === 0 && reader.requests.length === callsBeforeRewrite + 1 && (await readCalls()).length === pageReadsBeforeRewrite + 1 && rewriteRead?.json?.reused === false,
       `provider calls +${reader.requests.length - callsBeforeRewrite}; page requests +${(await readCalls()).length - pageReadsBeforeRewrite}; reused ${rewriteRead?.json?.reused}; read ${JSON.stringify(await reading(page))}`);
 
     await page.locator('.ink-tool[title="Clear"]').click();
@@ -148,8 +174,11 @@ export const flow = {
     await check('offline, nothing is read or offered for marking, and the student is told why',
       await page.locator('.ink-preview').count() === 0 && /needs a connection/.test(offlineNote),
       `status ${JSON.stringify(offlineNote)}; ${await page.locator('.ink-line').count()} lines shown`);
-    await check('and told plainly: "Saved. It will be read when you are back online."',
-      /Saved\. It will be read when you are back online\./.test(offlineNote), JSON.stringify(offlineNote));
+    // The save claim is the card's (an IndexedDB readback), so the sentence may
+    // carry "Saved." only once that readback has landed.
+    const savedOfflineNote = await page.waitForFunction(() => /^Saved\. /.test((document.querySelector('.ink-status')?.innerText || '').trim()), null, { timeout: 8000 }).then(() => page.locator('.ink-status').innerText(), () => offlineNote);
+    await check('and told plainly that it is saved and what to do: "Saved. … When you are back online, press Read my answer." — with no "Read my answer" button that could not work',
+      /^Saved\. /.test(savedOfflineNote.trim()) && /When you are back online, press Read my answer\./.test(savedOfflineNote) && await page.locator('[data-ink-read]').count() === 0, JSON.stringify(savedOfflineNote));
     // The kept page is a row in the inkDrafts IndexedDB store (sealed when the
     // profile has a password), and nothing of it is in localStorage.
     await page.waitForTimeout(700);   // the store coalesces pen-lifts into one write
@@ -175,17 +204,12 @@ export const flow = {
     // came back), and go on waiting — no mark, nothing lost.
     reader.down = true;
     await ctx.setOffline(false);
-    // Coming back online is itself a reason for the page that is still open to
-    // offer its work to the reader, and it does. That request belongs to the
-    // page BEFORE the reload; it used to race the reload and was sometimes
-    // counted as a second read by the restored page (1 run in 7–10: "2 page
-    // request(s)", two different pictures from two page lifetimes). Let it
-    // land, then count what the restored page sends on its own.
-    const readsWhileOffline = (await readCalls()).length;
-    for (let i = 0; i < 25 && (await readCalls()).length === readsWhileOffline; i++) await page.waitForTimeout(100);
-    await page.waitForTimeout(300);
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
+    await page.waitForTimeout(1500);
     const requestsBeforeReload = reader.requests.length;
     const readsBeforeReload = (await readCalls()).length;
+    await check('coming back online sends no read by itself: the offline note goes and "Read my answer" is offered',
+      reader.requests.length === requestsBeforeReload && await page.locator('[data-ink-read]').isVisible() && !/offline/i.test((await page.locator('.ink-status').innerText().catch(() => '')) || ''));
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
     await check('after the reload the same question is back', await mathText('.q-prompt') === prompt,
@@ -193,25 +217,35 @@ export const flow = {
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
     const canvasAfter = await page.locator('.ink-canvas-live').boundingBox();
     await check('and the card came back to the pen by itself', !!canvasAfter && canvasAfter.width > 200);
+    await page.locator('[data-ink-read]').waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(2600);
+    // Restoring is not reading: the kept strokes are back (the Read action is
+    // offered for them) and not one request has been sent.
+    await check('the kept strokes were restored and NOT sent to the reader: no page request, no provider call, "Read my answer" offered',
+      (await readCalls()).length === readsBeforeReload && reader.requests.length === requestsBeforeReload && await page.locator('[data-ink-read="first"]').isVisible(),
+      `${(await readCalls()).length - readsBeforeReload} page request(s), ${reader.requests.length - requestsBeforeReload} provider call(s) after the reload`);
+    await pressRead(page);
     for (let i = 0; i < 60 && reader.requests.length === requestsBeforeReload; i++) await page.waitForTimeout(200);
-    // The page asks once. The server may put that one request to its fallback
-    // model when the first answers 5xx, so the provider can see it twice; a
-    // second request from the page would be a second read.
     await page.waitForTimeout(1500);
     const readsAfter = await readCalls();
     const restoredSent = readsAfter.at(-1);
     const providerCalls = reader.requests.length - requestsBeforeReload;
-    await check('the kept strokes were restored and offered to the reader (one request, a picture, nothing else)',
+    // One press, one request. (The server may put that one request to its
+    // fallback model when the first answers 5xx, so the provider can see two.)
+    await check('pressing Read my answer offers the restored strokes to the reader once (one request, a picture, nothing else)',
       readsAfter.length === readsBeforeReload + 1 && providerCalls >= 1 && providerCalls <= 2 &&
         Object.keys(restoredSent?.body || {}).every(k => ['image', 'mode'].includes(k)) && /^data:image\//.test(restoredSent?.body?.image || ''),
-      `${readsAfter.length - readsBeforeReload} page request(s), ${providerCalls} provider call(s) after the reload; page sent ${JSON.stringify(Object.keys(restoredSent?.body || {}))}`);
+      `${readsAfter.length - readsBeforeReload} page request(s), ${providerCalls} provider call(s) after the press; page sent ${JSON.stringify(Object.keys(restoredSent?.body || {}))}`);
     await page.waitForSelector('.ink-status', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(3000);
     const downNote = (await page.locator('.ink-status').innerText().catch(() => '')) || '';
-    await check('with the reader down the page waits, saved, and says so', /saved/i.test(downNote) && await page.locator('.eval-card').count() === 0, JSON.stringify(downNote));
+    await check('with the reader down the page says so, saved, with a Try again — and does not retry by itself',
+      /isn’t answering/.test(downNote) && /saved/i.test(downNote) && await page.locator('[data-ink-retry-reading]').isVisible() && await page.locator('.eval-card').count() === 0 &&
+        (await readCalls()).length === readsBeforeReload + 1, JSON.stringify(downNote));
     reader.down = false;
     await ctx.setOffline(true);
-    // The connection flaps before it settles: every return re-reads the kept
-    // page, but the answer must be submitted for marking exactly once.
+    // The connection flaps before it settles. No return reads the kept page by
+    // itself; the student asks once, and the answer is marked exactly once.
     const attemptCount = () => page.evaluate(() => new Promise(ok => {
       const r = indexedDB.open('pri-learning');
       r.onsuccess = () => { const db = r.result; const c = db.transaction('attempts').objectStore('attempts').count();
@@ -219,6 +253,7 @@ export const flow = {
       r.onerror = () => ok(-1);
     }));
     const attemptsBefore = await attemptCount();
+    const flapReadsBefore = (await readCalls()).length, flapCallsBefore = reader.requests.length;
     for (let flap = 0; flap < 4; flap++) {
       await ctx.setOffline(false);
       await page.evaluate(() => window.dispatchEvent(new Event('online')));
@@ -229,11 +264,18 @@ export const flow = {
     }
     await ctx.setOffline(false);
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
+    await page.waitForTimeout(1500);
+    const callsAfterFlaps = reader.requests.length;
+    await check('a flapping connection sends no read at all', (await readCalls()).length === flapReadsBefore && reader.requests.length === flapCallsBefore,
+      `${(await readCalls()).length - flapReadsBefore} page request(s) across the flaps`);
+    // A refusal note from before may still offer Try again; either is the student's own press.
+    if (!await pressRead(page, { timeout: 3000 })) await page.locator('[data-ink-retry-reading]').click();
     await readingArrives(page);
+    await check('one press reads the kept ink: exactly one request', reader.requests.length === callsAfterFlaps + 1, `${reader.requests.length - callsAfterFlaps}`);
 
     // ── 4 · the answer, written by hand, is read back ────────────────────────
     const lines = await reading(page);
-    await check('back online, the kept ink is read by itself as one line', lines.length === 1,
+    await check('back online, the kept ink is read as one line when asked', lines.length === 1,
       `read ${lines.length} lines: ${JSON.stringify(lines)}`);
     if (!await check(`the server reading ${JSON.stringify(answer)} is what the card will mark`,
       lines[0] === answer, `read ${JSON.stringify(lines[0])}`)) return;
@@ -372,6 +414,7 @@ export const flow = {
     reader.confidence = 0.4;            // under the 0.82 floor: a doubtful read
     const callsBeforeDoubt = reader.requests.length;
     await handwrite(page, box2, '1');   // what the student actually wrote
+    await pressRead(page);
     await readingArrives(page);
     await page.waitForTimeout(1200);
     const doubtRead = (await readCalls()).at(-1);
@@ -472,6 +515,7 @@ export const flow = {
       reader.confidence = 0.97;
       const callsBefore = reader.requests.length;
       await handwrite(page, canvas, glyphs);
+      await pressRead(page);
       await page.waitForFunction(n => document.querySelectorAll('.ink-line').length === n, 3, { timeout: 20000 }).catch(() => {});
       const shown = await reading(page);
       await check(`${label}: the three lines of working are read and shown, the last one an equation [SYNTHETIC-READER EVIDENCE]`,
@@ -519,6 +563,28 @@ export const flow = {
         await field.fill(right.text);
         await check('proposal changed: the field takes the student\'s own answer and says it is theirs',
           await field.inputValue() === right.text && await page.locator('[data-ink-answer-proposal="student"]').count() === 1);
+        // Durable: the transcript and the answer typed over the proposal are
+        // kept with the ink. A reload brings both back — it does not read the
+        // page again, and it does not bring back the proposal that was overridden.
+        const status = page.locator('.ws-actions .status-line');
+        await page.waitForFunction(() => document.querySelector('.ws-actions .status-line')?.getAttribute('data-state') === 'saved', null, { timeout: 10000 }).catch(() => {});
+        const callsBeforeReload = reader.requests.length;
+        const readsBeforeReload = (await readCalls()).length;
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+        await page.waitForFunction(n => document.querySelectorAll('.ink-line').length === n, 3, { timeout: 20000 }).catch(() => {});
+        await page.waitForTimeout(2600);
+        const restoredField = page.locator('[data-ink-final-answer]');
+        await check('after a reload the three-line transcript is back as it was read, current (not stale), with no read sent',
+          JSON.stringify(await reading(page)) === JSON.stringify(written) && await page.locator('[data-ink-stale]').count() === 0 &&
+            reader.requests.length === callsBeforeReload && (await readCalls()).length === readsBeforeReload && await page.locator('[data-ink-read]').count() === 0,
+          `${JSON.stringify(await reading(page))}; provider calls +${reader.requests.length - callsBeforeReload}`);
+        await check('and the answer the student typed over the proposal is restored — the overridden proposal does not come back',
+          await restoredField.inputValue().catch(() => null) === right.text && await restoredField.inputValue().catch(() => null) !== final &&
+            await page.locator('[data-ink-answer-proposal="student"]').count() === 1,
+          `field ${JSON.stringify(await restoredField.inputValue().catch(() => null))}; proposed was ${JSON.stringify(final)}`);
+        await check('the save state is "saved" again only after its own readback of strokes, transcript and typed answer', await page.waitForFunction(() => document.querySelector('.ws-actions .status-line')?.getAttribute('data-state') === 'saved', null, { timeout: 10000 }).then(() => true, () => false),
+          await status.innerText().catch(() => ''));
         await page.getByRole('button', SUBMIT).click();
         await page.waitForSelector('.eval-card, .verdict-bad', { timeout: 30000 }).catch(() => {});
         const of = suffix => online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/${suffix}$`));
@@ -527,6 +593,39 @@ export const flow = {
           grades.length === 1 && grades[0].body?.answer === right.text && grades[0].body.answer !== final && grades[0].body.steps === written.join('\n') &&
             confirms.length === 1 && confirms[0].body?.text === right.text && grades[0].json?.correct === true && grades[0].json.resolved === true,
           JSON.stringify({ sent: grades[0]?.body?.answer, proposed: final, confirm: confirms.map(c => c.body), correct: grades[0]?.json?.correct }));
+      }
+    }
+    // 8c · no confirmed answer: Submit is not available, and says why.
+    {
+      const canvas = await openFresh();
+      const right = await online.answerOf();
+      online.forgetKeptReads();           // re-scripted stand-in (desk only)
+      reader.lines = [{ text: '2 + 3 = 5' }, { text: 'so x = 1 or x = 2' }];
+      reader.confidence = 0.97;
+      await handwrite(page, canvas, '17');
+      await pressRead(page);
+      await page.waitForFunction(n => document.querySelectorAll('.ink-line').length === n, 2, { timeout: 20000 }).catch(() => {});
+      const field = page.locator('[data-ink-final-answer]');
+      const submit = page.getByRole('button', SUBMIT);
+      const reason = page.locator('[data-submit-reason="verdict.submitNeedsAnswer"]');
+      await check('two candidate answers on the last line: nothing is guessed — the Final answer field is empty and names both',
+        await field.inputValue().catch(() => null) === '' && await page.locator('[data-ink-answer-proposal="ambiguous"]').count() === 1 &&
+          /more than one possible final answer \(1, 2\)/.test(await page.locator('.ink-final-answer [role="status"]').innerText().catch(() => '')),
+        JSON.stringify(await field.inputValue().catch(() => null)));
+      await check('Submit is disabled with the reason shown — "Type your final answer first." — so no attempt can be spent on a guess',
+        await submit.isDisabled() && await reason.isVisible() && /Type your final answer first/.test(await reason.innerText()) &&
+          (await submit.getAttribute('aria-describedby')) === await reason.getAttribute('id') &&
+          (await online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/(recognize|submit)$`))).length === 0,
+        `disabled ${await submit.isDisabled()}; reason ${JSON.stringify(await reason.innerText().catch(() => ''))}`);
+      if (right.answerType === 'numeric' && right.text) {
+        await field.fill(right.text);
+        await check('typing the answer enables Submit and the reason goes', await submit.isEnabled() && await reason.count() === 0);
+        await submit.click();
+        await page.waitForSelector('.eval-card, .verdict-bad', { timeout: 30000 }).catch(() => {});
+        const graded = (await online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/submit$`))).at(-1);
+        await check('and the student\'s typed answer is what the server marks, correct, with the two lines as working',
+          graded?.body?.answer === right.text && graded.body.steps === '2 + 3 = 5\nso x = 1 or x = 2' && graded.json?.correct === true,
+          JSON.stringify({ body: graded?.body, correct: graded?.json?.correct }));
       }
     }
     reader.lines = null;

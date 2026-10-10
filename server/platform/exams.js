@@ -70,7 +70,64 @@
 // distractor explanations, step-check plans, seeds and marking criteria.
 // `publicPayload()` is an allow-list; nothing else of a question is sent.
 //
-// A model never sets a mark here: there is no model in this file.
+// HANDWRITING NOT READ WHEN THE PAPER CLOSED (owner decision, R4). During a
+// paper a handwritten answer is read only when the student presses "Read my
+// answer" (/v1/handwriting/transcribe); what is marked is the transcript they
+// then see. A page they never had read is not an empty answer. The device
+// sends, with every snapshot and with the finish, the SHA-256 of the picture of
+// each such page (`ink`: answer key → digest; never the picture). At
+// finalisation an answer key with a digest and no answer is PENDING, not
+// blank: it earns the grid's unanswered mark for now, is flagged
+// `pending: true` with `outcome: 'pending'`, records no attempt, and the
+// result carries `handwriting.pages[key]` — the frozen digest and its state.
+//
+//   POST /v1/exams/:id/handwriting   { key, image }
+//
+// reads ONE such page after the paper is finalised. The picture must hash to
+// the digest frozen with the paper (a late finish freezes the digests of the
+// last snapshot saved before deadline + grace), so nothing written, erased or
+// re-photographed afterwards can be read, and there is no transcript to edit:
+// the answer is taken from the reading by a fixed rule (the last line; every
+// line for a full-working answer) and marked by the same deterministic engine
+// in the same worker pool. The read goes through recognitionOps.js, so a
+// picture this account has already paid to have read is not paid for again.
+//
+// Bounded, and owned by the account's result row (it survives a restart and
+// is the same on every replica). At most HANDWRITING_MAX_ATTEMPTS reads are
+// ever started for one page: ONE automatic read (the device presents the page
+// once when the paper closes), and after that only reads the student asks for
+// by name (`retry: true`, "Retry checking"). A request without `retry` for a
+// page that has already had its automatic read starts nothing, so nothing
+// fires silently or repeatedly. Every read is reserved in the row under the
+// account's lock BEFORE the reader is asked, never sooner than the backoff
+// after the last one, and none after HANDWRITING_RECOVERY_WINDOW_MS. States:
+//
+//   awaiting-reading   not read yet (not-read) or the last try failed
+//                      (reader-unavailable, capacity, marking-busy)
+//   resolved           read with confidence and marked; the line is replaced,
+//                      the totals recomputed, one graded-attempt event written
+//   needs-review       the reading was uncertain or empty (the student may
+//                      retry while tries remain), or the tries are spent or
+//                      the window closed (retries-exhausted, window-closed:
+//                      nothing more can be asked here). The answer stays
+//                      preserved and unmarked; no mark is ever invented.
+//
+// Each page as read back says `triesLeft`, `canRetry` and `retryAt`.
+//
+// THE RECEIPT. `handwriting.pages[key]` is the server's record that
+// handwriting was captured for that answer: the question and answer key, the
+// digest of the picture, when the server RECEIVED that digest and on what
+// evidence (`submission-in-time`: the finish arrived by deadline + grace on
+// the server's clock; `snapshot-before-deadline`: the last checkpoint the
+// server saved before it, with its revision), and the status. It never holds
+// the picture. The server claims nothing about a page whose digest it did
+// not receive in time: such a page is not on the receipt at all.
+//
+// Every other line of the result, and `handwriting.submissionDigest` (the
+// digest of exactly the responses that were finalised), never change.
+//
+// A model never sets a mark here: the reader proposes a transcript, and only
+// the deterministic engine marks it.
 //
 // Storage is the existing account-scoped idempotency_keys table (no schema
 // change), under five scopes of its own, and practice's `practice-content`:
@@ -78,7 +135,9 @@
 //   exam-create   Idempotency-Key → { examId }      a retried create
 //   exam-paper    examId → the sealed paper          immutable
 //   exam-answers  examId → the latest snapshot       replaced by each save
-//   exam-result   examId → the immutable result      written once
+//   exam-result   examId → the result                written once; only a line
+//                                                    pending on handwriting is
+//                                                    ever replaced (see above)
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { asyncRouter } from './asyncRouter.js';
 import { asStore, isDatabaseOverload } from './store.js';
@@ -110,6 +169,8 @@ import { FREE_EXAM_ALLOWANCE } from '../../client/src/engine/examAllowance.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
 import { stampExamItem, contentHashOf } from '../../client/src/engine/contentIdentity.js';
 import { seenKeysOf, examItemsOf, seenAmong, markSeen } from './contentSeen.js';
+import { recognitionOpsFor } from './recognitionOps.js';
+import { transcribeHandwriting, validateImage } from './handwritingProvider.js';
 
 /** How long after the deadline a finish may still carry its own answers. */
 export const FINISH_GRACE_MS = 2 * 60 * 1000;
@@ -137,8 +198,20 @@ const OBJECTIVE = new Set(['mcq', 'multi-mcq']);
 
 const CREATE_FIELDS = new Set(['kind', 'blueprint', 'paper', 'layoutSeed', 'slots']);
 const LAYOUT_FIELDS = new Set(['blueprint']);
-const SNAPSHOT_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'cur', 'rev']);
-const FINISH_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'ms', 'reason', 'submissionKey']);
+const SNAPSHOT_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'ink', 'cur', 'rev']);
+const FINISH_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'ink', 'ms', 'reason', 'submissionKey']);
+const HANDWRITING_FIELDS = new Set(['key', 'image', 'retry']);
+
+// ── Handwriting not read when the paper closed (see the header) ─────────────
+/** How many reads are ever started for one frozen page. */
+export const HANDWRITING_MAX_ATTEMPTS = 3;
+/** The least time between one started read of a page and the next. */
+export const HANDWRITING_BACKOFF_MS = [60 * 1000, 15 * 60 * 1000];
+/** After this long from finalisation an unread page is left for a person. */
+export const HANDWRITING_RECOVERY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+export const PENDING_MESSAGE = 'Your handwriting for this answer was saved when the paper closed. It has not been read yet, so it has not been marked.';
+const MAX_INK_PAGES = 60;
+const PAGE_DIGEST = /^[0-9a-f]{64}$/;
 
 const digest = input => createHash('sha256').update(typeof input === 'string' ? input : JSON.stringify(input)).digest('hex');
 const plain = value => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -630,6 +703,18 @@ function readModes(map, keys) {
   return out;
 }
 
+/** Answer key → the SHA-256 of the picture of a handwritten page that has not been read. */
+function readInk(map, keys) {
+  if (map === undefined || map === null) return {};
+  if (!plain(map) || Object.keys(map).length > MAX_INK_PAGES) return null;
+  const out = {};
+  for (const [key, value] of Object.entries(map)) {
+    if (!keys.has(key) || typeof value !== 'string' || !PAGE_DIGEST.test(value)) return null;
+    out[key] = value;
+  }
+  return out;
+}
+
 /** What a snapshot or a finish carries, cleaned; null when any of it is malformed. */
 function readResponses(body, paper) {
   const keys = answerKeysOf(paper);
@@ -637,7 +722,8 @@ function readResponses(body, paper) {
   const workings = readTextMap(body.workings, keys, MAX_WORKING);
   const times = readTimes(body.times, paper);
   const modes = readModes(body.modes, keys);
-  return answers && workings && times && modes ? { answers, workings, times, modes } : null;
+  const ink = readInk(body.ink, keys);
+  return answers && workings && times && modes && ink ? { answers, workings, times, modes, ink } : null;
 }
 
 // ── Marking ──────────────────────────────────────────────────────────────────
@@ -680,7 +766,25 @@ const unreadableResponse = (q, grid) => ({
 const workingNotReadResponse = answered => ({
   ...answered, feedback: (answered.feedback ? answered.feedback + ' ' : '') + WORKING_NOT_READ_NOTE, workingNotRead: true
 });
-const cutOffFlags = r => ({ ...(r.unreadable ? { unreadable: true } : {}), ...(r.workingNotRead ? { workingNotRead: true } : {}) });
+// RULE (handwriting was captured for the answer and never read) — the part is
+// PENDING: it earns the grid's unanswered mark for now, it is not correct and
+// not wrong, it carries the fixed sentence and `pending: true`, and no attempt
+// is recorded for it. It is not a blank: see "HANDWRITING NOT READ" above.
+const pendingResponse = (q, grid) => ({
+  unanswered: true, correct: false, awarded: markObjective(grid, { unanswered: true }), feedback: PENDING_MESSAGE, partial: null,
+  markingScheme: OBJECTIVE.has(q.answerType) ? 'objective' : 'final-answer', outcome: 'pending', pending: true
+});
+const cutOffFlags = r => ({
+  ...(r.unreadable ? { unreadable: true } : {}), ...(r.workingNotRead ? { workingNotRead: true } : {}), ...(r.pending ? { pending: true } : {})
+});
+/** A part the marker was stopped on: what completed stands, nothing else is invented. */
+const stoppedResponse = (out, job) => {
+  const answered = out.partials.find(part => part?.response);
+  // A stage-one response that was already final needed no working.
+  return answered ? (answered.final ? answered.response : workingNotReadResponse(answered.response)) : unreadableResponse(job.q, job.grid);
+};
+/** Is this answer key a handwritten page that was captured and never read? */
+const unreadInk = (responses, key, q, given) => !!responses.ink?.[key] && blank(given) && !OBJECTIVE.has(q.answerType);
 
 /**
  * Mark every response of a paper in the marker pool. Returns the responses in
@@ -692,12 +796,14 @@ const cutOffFlags = r => ({ ...(r.unreadable ? { unreadable: true } : {}), ...(r
 async function markResponsesIsolated(paper, responses, accountId, budgetMs = null) {
   const jobs = [];
   const placeholder = { unanswered: true, correct: false, awarded: 0, feedback: '', partial: null, markingScheme: 'objective', outcome: 'unanswered' };
-  markPaper(paper, responses, { now: 0, totalMs: 0, mark: (q, given, working, grid) => { jobs.push({ q, given, working, grid }); return placeholder; } });
+  markPaper(paper, responses, { now: 0, totalMs: 0, mark: (q, given, working, grid, key) => { jobs.push({ q, given, working, grid, key }); return placeholder; } });
   const pool = markerPool();
   let budget = budgetMs ?? pool.examPaperBudgetMs;
   let kills = 0;
   const results = [];
   for (const job of jobs) {
+    // Captured handwriting nobody read: there is nothing for the marker yet.
+    if (unreadInk(responses, job.key, job.q, job.given)) { results.push(pendingResponse(job.q, job.grid)); continue; }
     if (budget <= 0) { results.push(unreadableResponse(job.q, job.grid)); continue; }
     const allowed = Math.min(pool.deadlineMs, budget);
     const out = await pool.run('exam', job, { key: accountId, deadlineMs: allowed });
@@ -706,11 +812,47 @@ async function markResponsesIsolated(paper, responses, accountId, budgetMs = nul
     budget -= out.ok ? out.ms : Math.max(out.ms, allowed);
     if (out.ok) { results.push(out.value.response); continue; }
     kills++;
-    const answered = out.partials.find(part => part?.response);
-    // A stage-one response that was already final needed no working.
-    results.push(answered ? (answered.final ? answered.response : workingNotReadResponse(answered.response)) : unreadableResponse(job.q, job.grid));
+    results.push(stoppedResponse(out, job));
   }
   return { results, kills };
+}
+
+// ── Totals ───────────────────────────────────────────────────────────────────
+// The paper's score and its section/chapter tallies are a function of its
+// detail lines and nothing else, so a line that is replaced later (a page of
+// handwriting read after the paper closed) is totalled by the same code.
+const tallySeed = (id, label) => ({ id, label, questions: 0, attempted: 0, correct: 0, incorrect: 0, partial: 0, unanswered: 0, marks: 0, awarded: 0, negative: 0, ms: 0 });
+function tally(map, key, label, out) {
+  const agg = map.get(key) || tallySeed(key, label);
+  agg.questions++; agg.marks += out.marks; agg.awarded += out.awarded; agg.ms += out.ms;
+  if (out.unanswered) agg.unanswered++;
+  else { agg.attempted++; if (out.correct) agg.correct++; else if (out.awarded > 0) agg.partial++; else agg.incorrect++; }
+  if (out.awarded < 0) agg.negative += -out.awarded;
+  map.set(key, agg);
+}
+function summarise(paper, detail, totalMs) {
+  const byId = new Map(paper.questions.map(sq => [sq.id, sq]));
+  const sections = new Map();
+  const chapters = new Map();
+  const schemes = {};
+  let score = 0, total = 0, negativeMarks = 0;
+  for (const out of detail) {
+    const sq = byId.get(out.id);
+    const q = sq.payload;
+    for (const scheme of out.multipart ? out.parts.map(part => part.markingScheme) : [out.markingScheme]) schemes[scheme] = (schemes[scheme] || 0) + 1;
+    score += out.awarded; total += out.marks;
+    if (out.awarded < 0) negativeMarks += -out.awarded;
+    tally(sections, sq.section, sq.sectionLabel, out);
+    tally(chapters, sq.chapterId || q.subtopic || sq.generator, sq.chapterName || q.title || q.subtopic || sq.generator, out);
+  }
+  return {
+    score, total, pct: Math.round(1000 * score / Math.max(1, total)) / 10,
+    summary: {
+      sections: [...sections.values()],
+      chapters: [...chapters.values()].sort((a, b) => String(a.label).localeCompare(String(b.label))),
+      negativeMarks, totalMs: totalMs || detail.reduce((n, d) => n + (d.ms || 0), 0), markingSchemes: schemes
+    }
+  };
 }
 
 /**
@@ -720,7 +862,7 @@ async function markResponsesIsolated(paper, responses, accountId, budgetMs = nul
  * among them is marked and scored like any other, and flagged `repeat: true`
  * on its result line and its attempt, so it earns no progress anywhere.
  *
- * `mark(q, given, working, grid)` supplies each response's marking. This
+ * `mark(q, given, working, grid, key)` supplies each response's marking. This
  * function never runs the marker itself: finalise() gives it the responses the
  * marker pool produced (markResponsesIsolated), in the order it asks for them.
  */
@@ -731,19 +873,11 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
   const nQ = Math.max(1, paper.questions.length);
   const detail = [];
   const attempts = [];
-  const sections = new Map();
-  const chapters = new Map();
-  const schemes = {};
-  let score = 0, total = 0, negativeMarks = 0;
-  const seed = (id, label) => ({ id, label, questions: 0, attempted: 0, correct: 0, incorrect: 0, partial: 0, unanswered: 0, marks: 0, awarded: 0, negative: 0, ms: 0 });
-  const tally = (map, key, label, out) => {
-    const agg = map.get(key) || seed(key, label);
-    agg.questions++; agg.marks += out.marks; agg.awarded += out.awarded; agg.ms += out.ms;
-    if (out.unanswered) agg.unanswered++;
-    else { agg.attempted++; if (out.correct) agg.correct++; else if (out.awarded > 0) agg.partial++; else agg.incorrect++; }
-    if (out.awarded < 0) agg.negative += -out.awarded;
-    map.set(key, agg);
-  };
+  // Answer keys left pending on handwriting that was captured and not read.
+  const pendingKeys = [];
+  // A page of unread handwriting counts as the version of a choice the
+  // student took, exactly as a typed answer to it would.
+  const inked = key => !!responses.ink?.[key] && blank(answers[key]);
   const inputMode = key => (modes[key] === 'ink' ? 'ink' : 'typed');
   const attempt = (sq, q, r, extra) => {
     const attemptId = randomUUID();
@@ -780,12 +914,13 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
       const parts = q.parts || [];
       for (const part of parts) {
         const mainKey = `${sq.id}::${part.key}`;
-        const useAlt = blank(answers[mainKey]) && part.alt && !blank(answers[`${mainKey}::or`]);
+        const useAlt = blank(answers[mainKey]) && part.alt && (!blank(answers[`${mainKey}::or`]) || (inked(`${mainKey}::or`) && !inked(mainKey)));
         const key = useAlt ? `${mainKey}::or` : mainKey;
         const chosen = useAlt ? part.alt : part;
         const synth = { ...chosen, subtopic: chosen.subtopic || q.subtopic, difficulty: chosen.difficulty || q.difficulty || 2 };
         const grid = { correct: part.marks, incorrect: 0, unanswered: 0 };
-        const r = mark(synth, answers[key], workings[key], grid);
+        const r = mark(synth, answers[key], workings[key], grid, key);
+        if (r.pending) pendingKeys.push(key);
         const repeat = isRepeat(chosen);
         if (repeat) repeatParts++;
         qMarks += part.marks; qAwarded += r.awarded;
@@ -800,7 +935,6 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
             attemptId = attempt(sq, synth, r, { marks: part.marks, part: String(part.key), repeat, inputMode: inputMode(key), ms: Math.round(ms / Math.max(1, parts.length)) });
           }
         }
-        schemes[r.markingScheme] = (schemes[r.markingScheme] || 0) + 1;
         partsOut.push({
           key: part.key, prompt: chosen.prompt, answerType: chosen.answerType, mcqOptions: chosen.mcqOptions || null,
           figure: chosen.figure || null, choiceTaken: useAlt ? 'or' : (part.alt ? 'main' : null),
@@ -821,14 +955,17 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
         ...base, multipart: true, title: q.title, stem: q.stem, figure: q.figure || null,
         marks: qMarks, awarded: qAwarded, correct: allCorrect && anyAnswered, unanswered: !anyAnswered, parts: partsOut,
         markingScheme: 'final-answer', outcome: !anyAnswered ? 'unanswered' : allCorrect ? 'correct' : 'wrong',
+        // A part is waiting on handwriting: the question's marks are not final.
+        ...(partsOut.some(part => part.pending) ? { pending: true } : {}),
         // The whole question again, or every part of it: nothing on it is new work.
         ...(isRepeat(q) || (parts.length > 0 && repeatParts === parts.length) ? { repeat: true } : {})
       };
     } else {
-      const useAlt = blank(answers[sq.id]) && q.alt && !blank(answers[`${sq.id}::or`]);
+      const useAlt = blank(answers[sq.id]) && q.alt && (!blank(answers[`${sq.id}::or`]) || (inked(`${sq.id}::or`) && !inked(sq.id)));
       const key = useAlt ? `${sq.id}::or` : sq.id;
       const chosen = useAlt ? { ...q.alt, subtopic: q.alt.subtopic || q.subtopic, difficulty: q.alt.difficulty || q.difficulty || 2 } : q;
-      const r = mark(chosen, answers[key], workings[key], sq.marking);
+      const r = mark(chosen, answers[key], workings[key], sq.marking, key);
+      if (r.pending) pendingKeys.push(key);
       const marks = Number(sq.marking.correct);
       // The question answered (the alternative, when that is the one taken).
       const repeat = isRepeat(useAlt ? q.alt : q);
@@ -836,9 +973,8 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
       // the evidence: not attempted is not wrong. A practice paper has always
       // counted a blank as a wrong attempt, and still does.
       // An answer the marker was stopped on is recorded on no paper as an
-      // attempt: unreadable is not wrong.
-      const attemptId = r.unreadable || (r.unanswered && paper.kind === 'india') ? null : attempt(sq, chosen, r, { marks, repeat, inputMode: inputMode(key), ms });
-      schemes[r.markingScheme] = (schemes[r.markingScheme] || 0) + 1;
+      // attempt: unreadable is not wrong. Neither is handwriting not yet read.
+      const attemptId = r.unreadable || r.pending || (r.unanswered && paper.kind === 'india') ? null : attempt(sq, chosen, r, { marks, repeat, inputMode: inputMode(key), ms });
       out = {
         ...base, prompt: chosen.prompt, answerType: chosen.answerType, mcqOptions: chosen.mcqOptions || null, matchList: chosen.matchList || null,
         figure: chosen.figure || null, choiceTaken: useAlt ? 'or' : (q.alt ? 'main' : null),
@@ -861,20 +997,9 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
         ].filter(why => typeof why === 'string' && why))].slice(0, 40)
       };
     }
-    score += out.awarded; total += out.marks;
-    if (out.awarded < 0) negativeMarks += -out.awarded;
-    tally(sections, sq.section, sq.sectionLabel, out);
-    tally(chapters, sq.chapterId || q.subtopic || sq.generator, sq.chapterName || q.title || q.subtopic || sq.generator, out);
     detail.push(out);
   }
-  return {
-    score, total, pct: Math.round(1000 * score / Math.max(1, total)) / 10, detail, attempts,
-    summary: {
-      sections: [...sections.values()],
-      chapters: [...chapters.values()].sort((a, b) => String(a.label).localeCompare(String(b.label))),
-      negativeMarks, totalMs: totalMs || detail.reduce((n, d) => n + (d.ms || 0), 0), markingSchemes: schemes
-    }
-  };
+  return { ...summarise(paper, detail, totalMs), detail, attempts, pendingKeys };
 }
 
 // ── Who may start how many papers ────────────────────────────────────────────
@@ -953,6 +1078,22 @@ async function readRecord(db, accountId, scope, key, now) {
   return row ? JSON.parse(row.response_json) : null;
 }
 
+/** The server grader's own event writer for one account, inside the caller's transaction. */
+async function serverEvents(db, accountId, now) {
+  const last = await db.get("SELECT MAX(device_seq) AS n FROM learning_events WHERE account_id=? AND device_id='server-grader'", [accountId]);
+  let seq = Number(last?.n || 0);
+  return async (eventId, kind, entityId, payload) => {
+    // The paper's id has been known to the device since the paper was
+    // created. /v1/sync/push refuses server-shaped ids now, but a row a
+    // device stored on this id before it did must not make this insert —
+    // and with it the whole finalisation — fail for ever.
+    await displaceDeviceEvent(db, accountId, eventId);
+    const cursor = await nextSyncCursor(db, accountId);
+    await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?, 'server-grader',?,?,?,?,?,?)",
+      [cursor, eventId, accountId, ++seq, kind, entityId, now, JSON.stringify(payload), now]);
+  };
+}
+
 /**
  * The one finalisation: the paper is marked in the marker pool with no
  * transaction open, and its result is committed in one transaction under the
@@ -987,7 +1128,7 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
     if (stored) return { result: stored };
     const inTime = now <= paper.deadline + FINISH_GRACE_MS;
     if (unattended && inTime) return { open: true };
-    let carried = { answers: {}, workings: {}, times: {}, modes: {} };
+    let carried = { answers: {}, workings: {}, times: {}, modes: {}, ink: {} };
     if (!unattended) {
       if (!plain(body) || unknown(body, FINISH_FIELDS).length
           || (body.reason !== undefined && body.reason !== 'student' && body.reason !== 'deadline')
@@ -1000,15 +1141,18 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
     }
     const snapshot = await readRecord(db, accountId, 'exam-answers', id, now);
     const saved = snapshot
-      ? { answers: snapshot.answers || {}, workings: snapshot.workings || {}, times: snapshot.times || {}, modes: snapshot.modes || {} }
-      : { answers: {}, workings: {}, times: {}, modes: {} };
+      ? { answers: snapshot.answers || {}, workings: snapshot.workings || {}, times: snapshot.times || {}, modes: snapshot.modes || {}, ink: snapshot.ink || {} }
+      : { answers: {}, workings: {}, times: {}, modes: {}, ink: {} };
     // In time: what the request carries, falling back to the snapshot for
     // anything it left out. Late: only what the server had already saved.
     const responses = inTime ? {
       answers: body.answers === undefined || body.answers === null ? saved.answers : carried.answers,
       workings: body.workings === undefined || body.workings === null ? saved.workings : carried.workings,
       times: body.times === undefined || body.times === null ? saved.times : carried.times,
-      modes: body.modes === undefined || body.modes === null ? saved.modes : carried.modes
+      modes: body.modes === undefined || body.modes === null ? saved.modes : carried.modes,
+      // Which handwritten pages were captured and not read, by the digest of
+      // their picture. Late: only the digests saved before deadline + grace.
+      ink: body.ink === undefined || body.ink === null ? saved.ink : carried.ink
     } : saved;
     // What was marked: the sealed paper and exactly these responses.
     const marking = digest(paperRow.response_json + '\n' + JSON.stringify(responses));
@@ -1070,24 +1214,27 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
       ...(unattended ? { unattended: true } : {}),
       snapshotSavedAt: snapshot?.savedAt ?? null,
       submissionKey: !unattended && typeof body.submissionKey === 'string' ? body.submissionKey : null,
-      score: marked.score, total: marked.total, pct: marked.pct, detail: marked.detail, summary: marked.summary
+      score: marked.score, total: marked.total, pct: marked.pct, detail: marked.detail, summary: marked.summary,
+      // Handwriting captured and never read: frozen here by the digest of its
+      // picture, pending, and owned by this row from now on (see the header).
+      ...(marked.pendingKeys.length ? { handwriting: {
+        frozenAt: now, submissionDigest: digest(JSON.stringify(responses)),
+        maxAttempts: HANDWRITING_MAX_ATTEMPTS, windowEndsAt: now + HANDWRITING_RECOVERY_WINDOW_MS,
+        pages: Object.fromEntries(marked.pendingKeys.map(key => [key, {
+          key, questionId: key.split('::')[0], digest: responses.ink[key],
+          // When, and on what evidence, the server came to hold this digest.
+          evidence: inTime && !(body.ink === undefined || body.ink === null) ? 'submission-in-time' : 'snapshot-before-deadline',
+          receivedAt: inTime && !(body.ink === undefined || body.ink === null) ? now : (snapshot?.savedAt ?? null),
+          snapshotRev: inTime && !(body.ink === undefined || body.ink === null) ? null : (snapshot?.rev ?? null),
+          state: 'awaiting-reading', reason: 'not-read', attempts: 0, lastAttemptAt: null, nextAttemptAt: now, resolvedAt: null
+        }]))
+      } } : {})
     };
     const json = JSON.stringify(result);
     await db.run(INSERT, [accountId, 'exam-result', id, json, digest(json), now, now + RECORD_TTL]);
     await markSeen(db, accountId, contentKeys, now);
     // Progress is committed in the same transaction as the immutable result.
-    const last = await db.get("SELECT MAX(device_seq) AS n FROM learning_events WHERE account_id=? AND device_id='server-grader'", [accountId]);
-    let seq = Number(last?.n || 0);
-    const event = async (eventId, kind, entityId, payload) => {
-      // The paper's id has been known to the device since the paper was
-      // created. /v1/sync/push refuses server-shaped ids now, but a row a
-      // device stored on this id before it did must not make this insert —
-      // and with it the whole finalisation — fail for ever.
-      await displaceDeviceEvent(db, accountId, eventId);
-      const cursor = await nextSyncCursor(db, accountId);
-      await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?, 'server-grader',?,?,?,?,?,?)",
-        [cursor, eventId, accountId, ++seq, kind, entityId, now, JSON.stringify(payload), now]);
-    };
+    const event = await serverEvents(db, accountId, now);
     for (const a of marked.attempts) await event(a.attemptId, 'graded-attempt', a.questionId, a);
     // `exam-result` is a kind only this server writes: /v1/sync/push does not
     // accept it, so no device can publish a paper as server-marked.
@@ -1097,6 +1244,8 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
       score: marked.score, total: marked.total, late: !inTime,
       createdAt: paper.startedAt, finishedAt: now, serverAcknowledgedAt: now,
       blueprint: paper.blueprint, questions: paper.questions.length, attempted: marked.attempts.length,
+      // Answers still waiting on handwriting: the score above is not final.
+      ...(marked.pendingKeys.length ? { pendingHandwriting: marked.pendingKeys.length } : {}),
       // What a second device needs to file the paper under its track.
       indiaExam: paper.kind === 'india' ? {
         blueprintId: paper.blueprint.id, label: paper.blueprint.label, track: paper.blueprint.track,
@@ -1105,6 +1254,260 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
     });
     return { result, written: true };
   }, { accountScope: accountId, lock: syncLockKey(accountId) }); }
+}
+
+// ── Handwriting read after the paper closed ─────────────────────────────────
+
+/** A frozen page as it stands now: past the recovery window it is a person's to resolve. */
+function pageView(page, handwriting, now) {
+  if (page.state === 'resolved') return { ...page, triesLeft: 0, canRetry: false, retryAt: null };
+  const triesLeft = Math.max(0, HANDWRITING_MAX_ATTEMPTS - Number(page.attempts || 0));
+  if (now > Number(handwriting.windowEndsAt)) return { ...page, state: 'needs-review', reason: 'window-closed', nextAttemptAt: null, triesLeft: 0, canRetry: false, retryAt: null };
+  if (!triesLeft) return { ...page, state: 'needs-review', reason: 'retries-exhausted', nextAttemptAt: null, triesLeft: 0, canRetry: false, retryAt: null };
+  // The first read is the automatic one; every later one is the student's own.
+  return { ...page, triesLeft, canRetry: Number(page.attempts || 0) >= 1, retryAt: Number(page.nextAttemptAt) > now ? Number(page.nextAttemptAt) : null };
+}
+/** May a read be started for this page (as viewed) now, by this kind of request? */
+const mayAttempt = (page, now, retry) => page.state !== 'resolved' && page.triesLeft > 0 && now >= Number(page.nextAttemptAt || 0)
+  && (Number(page.attempts || 0) === 0 || retry === true);
+
+/**
+ * The stored result as its owner reads it. A result with no pending
+ * handwriting is returned as stored. One with some says so: `provisional`
+ * while any page is unresolved, and how many marks are not yet decided.
+ */
+export function resultView(result, now) {
+  const handwriting = result?.handwriting;
+  if (!handwriting) return result;
+  const pages = Object.fromEntries(Object.entries(handwriting.pages).map(([key, page]) => [key, pageView(page, handwriting, now)]));
+  let pendingMarks = 0;
+  for (const d of result.detail) {
+    if (d.multipart) for (const part of d.parts) { if (part.pending) pendingMarks += Number(part.marks) || 0; }
+    else if (d.pending) pendingMarks += Number(d.marks) || 0;
+  }
+  return { ...result, handwriting: { ...handwriting, pages }, provisional: Object.values(pages).some(page => page.state !== 'resolved'), pendingMarks };
+}
+
+/** A marker response rebuilt from a stored line or part: what was decided stands. */
+const responseOfLine = d => ({
+  unanswered: d.unanswered === true, correct: d.correct === true, awarded: d.awarded, feedback: d.feedback, partial: d.partial ?? null,
+  markingScheme: d.markingScheme, outcome: d.outcome, ...cutOffFlags(d)
+});
+
+/** The answer key a stored line or part was marked under. */
+const keyOfLine = (sq, d, part = null) => (part
+  ? `${sq.id}::${part.key}${part.choiceTaken === 'or' ? '::or' : ''}`
+  : `${sq.id}${d.choiceTaken === 'or' ? '::or' : ''}`);
+
+/**
+ * The responses one stored question line was marked on, with the page that has
+ * just been read put in as its answer. Everything else is the frozen line's.
+ */
+function lineResponses(sq, old, key, given, working) {
+  const answers = {}, workings = {}, ink = {};
+  const keep = (k, d) => {
+    if (!blank(d.given)) answers[k] = String(d.given);
+    if (!blank(d.working)) workings[k] = String(d.working);
+    if (d.pending) ink[k] = 'pending';
+  };
+  if (old.multipart) for (const part of old.parts) keep(keyOfLine(sq, old, part), part);
+  else keep(keyOfLine(sq, old), old);
+  answers[key] = given;
+  if (!blank(working)) workings[key] = working; else delete workings[key];
+  delete ink[key];
+  return { answers, workings, times: old.timed ? { [sq.id]: old.ms } : {}, modes: { [key]: 'ink' }, ink };
+}
+
+/** The answer a confident reading states, by the rule the exam room itself uses. */
+function answerFromReading(item, lines) {
+  if (item.answerType === 'working') return { given: lines.join('\n'), working: undefined };
+  const supportsSteps = !OBJECTIVE.has(item.answerType) && !!stepMetaFor(item);
+  return { given: lines[lines.length - 1], working: supportsSteps && lines.length > 1 ? lines.join('\n') : undefined };
+}
+
+/**
+ * Read ONE page of handwriting that was frozen, unread, when the paper was
+ * finalised, and mark the answer it states. See "HANDWRITING NOT READ" in the
+ * header for the rule; in short: the picture must be the frozen one, a read is
+ * reserved in the result row before the reader is asked, at most
+ * HANDWRITING_MAX_ATTEMPTS are ever started, and only this one line changes.
+ * Returns { result, attempted, retryAt? } | { status, code, message }.
+ */
+async function resolveHandwriting(db, accountId, id, body, { env, transcribe, requestId = null, authorise = null }) {
+  const now = Date.now();
+  if (!plain(body) || unknown(body, HANDWRITING_FIELDS).length || typeof body.key !== 'string' || body.key.length > 240 || typeof body.image !== 'string'
+      || (body.retry !== undefined && typeof body.retry !== 'boolean')) {
+    return { status: 400, code: 'EXAM_HANDWRITING_INVALID', message: 'Send the answer the page belongs to and its picture.' };
+  }
+  try { validateImage(body.image); }
+  catch (error) { return { status: error?.status || 400, code: safeCode(error?.code, 'HANDWRITING_IMAGE_INVALID'), message: 'The picture of this page could not be accepted.' }; }
+  const key = body.key;
+  const lock = { accountScope: accountId, lock: syncLockKey(accountId) };
+
+  const load = async () => {
+    const paperRow = await db.get(SELECT, [accountId, 'exam-paper', id, now]);
+    if (!paperRow) return { status: 404 };
+    const result = await readRecord(db, accountId, 'exam-result', id, now);
+    if (!result) return { status: 409, code: 'EXAM_NOT_FINALISED', message: 'This paper is still open. Read your handwriting on the paper itself.' };
+    const stored = result.handwriting?.pages?.[key];
+    if (!stored) return { status: 409, code: 'EXAM_HANDWRITING_NOT_PENDING', message: 'No handwriting is waiting to be read for this answer.' };
+    return { paper: JSON.parse(paperRow.response_json), result, stored, page: pageView(stored, result.handwriting, now) };
+  };
+  const asItStands = state => ({
+    result: resultView(state.result, now), attempted: false,
+    ...(state.page.retryAt ? { retryAt: state.page.retryAt } : {})
+  });
+  const write = result => {
+    const json = JSON.stringify(result);
+    return db.run("UPDATE idempotency_keys SET response_json=?, request_digest=? WHERE account_id=? AND scope='exam-result' AND key=?", [json, digest(json), accountId, id]);
+  };
+  const withPage = (result, page) => ({ ...result, handwriting: { ...result.handwriting, pages: { ...result.handwriting.pages, [key]: page } } });
+
+  const first = await load();
+  if (first.status) return first;
+  if (first.page.state === 'resolved' || !first.page.triesLeft) return asItStands(first);
+  // Only the picture frozen with the paper can be read: not a page written,
+  // erased or photographed again afterwards.
+  const presented = createHash('sha256').update(Buffer.from(body.image.slice(body.image.indexOf(',') + 1), 'base64')).digest('hex');
+  if (presented !== first.page.digest) {
+    return { status: 409, code: 'EXAM_HANDWRITING_CHANGED', message: 'This is not the handwriting that was saved when the paper closed. Only that page can be read.' };
+  }
+  // Not yet allowed, or a second automatic read: nothing starts.
+  if (!mayAttempt(first.page, now, body.retry)) return asItStands(first);
+
+  // ── Reserve the read, in the row, before the reader is asked ──────────────
+  // Whoever gets here second (a second tap, a second tab, another replica)
+  // finds the attempt taken and its backoff running, and starts nothing.
+  const reserved = await db.transaction(async () => {
+    if (authorise) { const refused = await authorise(); if (refused) return refused; }
+    const state = await load();
+    if (state.status) return state;
+    if (!mayAttempt(state.page, now, body.retry)) return asItStands(state);
+    const attempts = Number(state.stored.attempts || 0) + 1;
+    await write(withPage(state.result, {
+      ...state.stored, attempts, lastAttemptAt: now,
+      nextAttemptAt: now + HANDWRITING_BACKOFF_MS[Math.min(attempts, HANDWRITING_BACKOFF_MS.length) - 1]
+    }));
+    return { attempts, paper: state.paper, result: state.result };
+  }, lock);
+  if (!reserved.attempts) return reserved;
+
+  // ── One bounded read (a kept read of the same picture is reused, free) ────
+  let failure = null, read = null;
+  try {
+    // The one automatic read reuses a kept read of this picture (free). The
+    // student's own Retry checking asks for a new reading, not a replay of
+    // the uncertain one.
+    read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId, fresh: body.retry === true && reserved.attempts > 1 });
+    if (read.refusal) {
+      failure = { reason: 'capacity', code: safeCode(read.refusal.verdict?.code, 'CAPACITY_REFUSED'), retryAt: Number(read.refusal.verdict?.resetAt) || 0 };
+    }
+  } catch (error) {
+    failure = { reason: 'reader-unavailable', code: safeCode(error?.code, 'HANDWRITING_FAILED') };
+  }
+  const lines = failure ? [] : (Array.isArray(read.result?.lines) ? read.result.lines : []).map(line => String(line?.text ?? '').trim()).filter(Boolean).slice(0, 40);
+  // A reading the reader itself doubts is never marked here: there is no
+  // student at the page to confirm it. An empty one states no answer.
+  const terminal = failure ? null : !lines.length ? 'unreadable' : read.result.needsConfirmation === true ? 'uncertain' : null;
+
+  // ── Mark the one answer, in the pool, with no transaction open ────────────
+  let response = null, located = null;
+  if (!failure && !terminal) {
+    const [qid] = key.split('::');
+    const sq = reserved.paper.questions.find(question => question.id === qid);
+    const old = reserved.result.detail.find(d => d.id === qid);
+    const one = { ...reserved.paper, questions: [sq] };
+    const placeholder = { unanswered: true, correct: false, awarded: 0, feedback: '', partial: null, markingScheme: 'objective', outcome: 'unanswered' };
+    // The item is found the way markPaper finds it, so the two cannot drift.
+    let item = null;
+    markPaper(one, lineResponses(sq, old, key, 'x', undefined), { now: 0, totalMs: 0, mark: (q, given, working, grid, k) => { if (k === key) item = { q, grid }; return placeholder; } });
+    if (!item) failure = { reason: 'reader-unavailable', code: 'EXAM_HANDWRITING_KEY' };
+    else {
+      const stated = answerFromReading(item.q, lines);
+      const job = { q: item.q, given: stated.given.slice(0, MAX_ANSWER), working: stated.working?.slice(0, MAX_WORKING), grid: item.grid };
+      const pool = markerPool();
+      const out = await pool.run('exam', job, { key: accountId, deadlineMs: pool.deadlineMs });
+      if (!out.ok && out.code === MARKING_BUSY) failure = { reason: 'marking-busy', code: MARKING_BUSY };
+      else {
+        if (!out.ok) await recordMarkerKills(db, accountId, 1);
+        response = out.ok ? out.value.response : stoppedResponse(out, job);
+        located = { sq, job };
+      }
+    }
+  }
+
+  // ── Commit under the lock, on what the row says now ───────────────────────
+  return db.transaction(async () => {
+    if (authorise) { const refused = await authorise(); if (refused) return refused; }
+    const state = await load();
+    if (state.status) return state;
+    // Settled meanwhile, or this is not the attempt the row is waiting on.
+    if (state.stored.state === 'resolved' || Number(state.stored.attempts) !== reserved.attempts) return asItStands(state);
+    let result = state.result;
+    let page;
+    if (failure) {
+      const spent = reserved.attempts >= HANDWRITING_MAX_ATTEMPTS;
+      page = {
+        ...state.stored, lastFailure: failure.code,
+        state: spent ? 'needs-review' : 'awaiting-reading', reason: spent ? 'retries-exhausted' : failure.reason,
+        nextAttemptAt: spent ? null : Math.max(Number(state.stored.nextAttemptAt) || 0, failure.retryAt || 0)
+      };
+    } else if (terminal) {
+      // Kept for the person who resolves it; never marked from here.
+      // The student may ask again while tries remain — not before a kept read
+      // of this picture has expired, so a retry is a new reading, not a replay.
+      page = { ...state.stored, state: 'needs-review', reason: terminal, transcript: lines, reused: read.reused === true,
+        nextAttemptAt: now + HANDWRITING_BACKOFF_MS[HANDWRITING_BACKOFF_MS.length - 1] };
+    } else {
+      const { sq, job } = located;
+      const index = result.detail.findIndex(d => d.id === sq.id);
+      const old = result.detail[index];
+      const partKey = sq.payload.multipart ? key.split('::')[1] : null;
+      const oldByKey = new Map(old.multipart ? old.parts.map(part => [keyOfLine(sq, old, part), part]) : [[keyOfLine(sq, old), old]]);
+      const rebuilt = markPaper({ ...state.paper, questions: [sq] }, lineResponses(sq, old, key, job.given, job.working), {
+        now, totalMs: old.ms, seen: null,
+        mark: (q, given, working, grid, k) => (k === key ? response : responseOfLine(oldByKey.get(k) || { unanswered: true, correct: false, awarded: 0, feedback: '', markingScheme: 'final-answer', outcome: 'unanswered' }))
+      });
+      const fresh = rebuilt.detail[0];
+      // Whether this was content the account had already seen was decided when
+      // the paper was finalised; it is not decided again now.
+      const carry = (line, was) => { const next = { ...line, readAfterClose: true }; delete next.repeat; return was?.repeat ? { ...next, repeat: true } : next; };
+      let line, written;
+      if (old.multipart) {
+        const parts = fresh.parts.map(part => (String(part.key) === partKey ? carry(part, old.parts.find(p => String(p.key) === partKey)) : old.parts.find(p => String(p.key) === String(part.key))));
+        line = { ...fresh, parts };
+        delete line.repeat;
+        if (old.repeat) line.repeat = true;
+        written = rebuilt.attempts.filter(a => a.part === partKey).map(a => { const next = { ...a }; delete next.repeat; return old.parts.find(p => String(p.key) === partKey)?.repeat ? { ...next, repeat: true } : next; });
+      } else {
+        line = carry(fresh, old);
+        written = rebuilt.attempts.map(a => { const next = { ...a }; delete next.repeat; return old.repeat ? { ...next, repeat: true } : next; });
+      }
+      const detail = result.detail.slice();
+      detail[index] = line;
+      const totals = summarise(state.paper, detail, result.summary.totalMs);
+      result = { ...result, score: totals.score, total: totals.total, pct: totals.pct, detail, summary: totals.summary };
+      page = { ...state.stored, state: 'resolved', reason: null, nextAttemptAt: null, resolvedAt: now, transcript: lines, reused: read.reused === true };
+      const event = await serverEvents(db, accountId, now);
+      for (const a of written) await event(a.attemptId, 'graded-attempt', a.questionId, a);
+      // The paper's own event says the score as it now is.
+      const row = await db.get("SELECT payload_json FROM learning_events WHERE account_id=? AND id=? AND device_id='server-grader' AND kind='exam-result'", [accountId, id]);
+      if (row) {
+        let payload = null;
+        try { payload = JSON.parse(row.payload_json); } catch { payload = null; }
+        if (payload) {
+          const open = Object.entries(result.handwriting.pages).filter(([k, p]) => k !== key && p.state !== 'resolved').length;
+          const next = { ...payload, score: totals.score, total: totals.total, attempted: (Number(payload.attempted) || 0) + written.length };
+          if (open) next.pendingHandwriting = open; else delete next.pendingHandwriting;
+          await db.run("UPDATE learning_events SET payload_json=? WHERE account_id=? AND id=? AND device_id='server-grader' AND kind='exam-result'", [JSON.stringify(next), accountId, id]);
+        }
+      }
+    }
+    result = withPage(result, page);
+    await write(result);
+    const viewed = resultView(result, now);
+    return { result: viewed, attempted: true, ...(viewed.handwriting.pages[key].retryAt ? { retryAt: viewed.handwriting.pages[key].retryAt } : {}) };
+  }, lock);
 }
 
 /**
@@ -1152,7 +1555,7 @@ export async function finaliseExpiredExams(db, options = {}) {
 
 // ── Router ───────────────────────────────────────────────────────────────────
 
-export function createExamRouter(db) {
+export function createExamRouter(db, { transcribe = transcribeHandwriting, env = process.env } = {}) {
   db = asStore(db);
   const router = asyncRouter();
   router.use(requireSession(db), requireVerifiedEmail, requireRole('student'));
@@ -1314,7 +1717,10 @@ export function createExamRouter(db) {
       const timing = { now, deadline: paper.deadline, remainingMs: Math.max(0, paper.deadline - now) };
       // A retried older save must never replace a newer one.
       if (prior && Number(prior.rev) >= body.rev) return { reply: { saved: false, stale: true, rev: prior.rev, savedAt: prior.savedAt, ...timing } };
-      const snapshot = { ...responses, cur: body.cur ?? 0, rev: body.rev, savedAt: now };
+      const { ink, ...entered } = responses;
+      // The digests of handwritten pages not yet read travel with the snapshot,
+      // so a paper nobody finishes still knows which answers were written.
+      const snapshot = { ...entered, ...(Object.keys(ink).length ? { ink } : {}), cur: body.cur ?? 0, rev: body.rev, savedAt: now };
       const json = JSON.stringify(snapshot);
       await db.run(INSERT + ' ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json, request_digest=excluded.request_digest',
         [accountId, 'exam-answers', id, json, digest(json), now, now + RECORD_TTL]);
@@ -1338,7 +1744,23 @@ export function createExamRouter(db) {
     if (outcome.status === 404) return notFound(res);
     if (outcome.status === 503) res.set('Retry-After', '2');
     if (outcome.status) return reject(res, outcome.status, outcome.code, outcome.message);
-    return res.status(200).json(outcome.result);
+    return res.status(200).json(resultView(outcome.result, Date.now()));
+  });
+
+  // One page of handwriting that was frozen, unread, when the paper closed.
+  // The limit is on requests; how many READS a page can ever start is bounded
+  // in the result row itself (HANDWRITING_MAX_ATTEMPTS), whatever is sent here.
+  router.post('/:id/handwriting', rateLimit(db, 'exam-handwriting', { limit: 120, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    const id = String(req.params.id || '');
+    if (!UUID.test(id)) return notFound(res);
+    const accountId = req.platformSession.account_id;
+    const blockedBefore = await consentBlockedNow(db, accountId);
+    const outcome = await resolveHandwriting(db, accountId, id, req.body, {
+      env, transcribe, requestId: req.requestId, authorise: () => authorityAtCommit(db, req, accountId, blockedBefore)
+    });
+    if (outcome.status === 404) return notFound(res);
+    if (outcome.status) return reject(res, outcome.status, outcome.code, outcome.message);
+    return res.status(200).json({ result: outcome.result, attempted: outcome.attempted === true, ...(outcome.retryAt ? { retryAt: outcome.retryAt } : {}) });
   });
 
   router.get('/:id', rateLimit(db, 'exam-read', { limit: 600, windowMs: 60 * 60 * 1000 }), async (req, res) => {
@@ -1353,7 +1775,7 @@ export function createExamRouter(db) {
     if (!paper) return notFound(res);
     const result = await read(accountId, 'exam-result', id, now);
     const exam = publicPaper(paper, now);
-    if (result) return res.status(200).json({ state: 'finished', exam, result, accountId: String(accountId) });
+    if (result) return res.status(200).json({ state: 'finished', exam, result: resultView(result, now), accountId: String(accountId) });
     const snapshot = await read(accountId, 'exam-answers', id, now);
     return res.status(200).json({
       state: 'open', exam, snapshot: snapshot || null,

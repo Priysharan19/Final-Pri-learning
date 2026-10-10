@@ -1836,6 +1836,8 @@ async function run() {
 
     blankExam = (await POST('/exams', { length: 10 })).exam;
     const blank = await POST(`/exams/${blankExam.id}/submit`, { answers: {}, ms: 60000 });
+    await rejects('Retry checking on a marked paper that holds no saved page says so by name and marks nothing',
+      POST(`/exams/${blankExam.id}/handwriting`, { key: 'no-such-page' }), { status: 409, code: 'EXAM_PAGE_NOT_ON_DEVICE' });
     eq('an unanswered paper scores nothing', blank.score, 0);
     ok('an unanswered paper is still worth marks', blank.total > 0, `total ${blank.total}`);
     eq('an unanswered paper is 0%', blank.pct, 0);

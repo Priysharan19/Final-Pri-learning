@@ -66,8 +66,10 @@ import { registerIssuedAttemptRecorder, registerRestoreSanitisers } from '../pla
 import { publicQuestionFields } from '../engine/publicQuestion.js';
 import {
   isServerPaper, markedByOf, issueServerExam, serverFieldOf, localStartOf, scheduleCheckpoint,
-  finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, finishedAtOf, fetchRemotePaper
+  finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, finishedAtOf, fetchRemotePaper,
+  markPendingLines, recoverHandwriting, retryHandwriting, confirmExamPagesSaved
 } from './serverExam.js';
+import { pendingSummary } from './examPages.js';
 import { rasterizeInk } from '../ink/cloudRaster.js';
 import { preparePhoto } from '../ink/photoRaster.js';
 
@@ -3921,7 +3923,9 @@ const routes = {
       id: e.id, title: e.title, year: e.year, duration_min: e.durationMin, created_at: e.createdAt, finished_at: e.finishedAt,
       deadline_at: Number.isFinite(e.deadlineAt) ? e.deadlineAt : null, score: e.score, total: e.total,
       // Who marked a finished paper, and whether one is still waiting to be.
-      marked_by: markedByOf(e), pending: !!e.pendingFinish
+      marked_by: markedByOf(e), pending: !!e.pendingFinish,
+      // Marks not yet decided: handwriting saved at the close and not read.
+      pending_marks: e.finishedAt ? pendingSummary(e.detail).marks : 0
     })) };
   },
   'GET /exams/:id': async (body, params) => {
@@ -3952,6 +3956,13 @@ const routes = {
         const out = await reconcileWithServer(fresh, { rebuildRow: (sq, localId) => paperRowOf(p.id, fresh.id, sq, fresh.createdAt, localId) });
         if (out.result && !fresh.finishedAt) await adoptPaperResult(p, fresh, out.result);
         else if (out.changed) await put('exams', fresh);
+      });
+    } else if (held && held.pid === p.id && isServerPaper(held) && held.finishedAt && held.server.handwriting) {
+      // Handwriting that was not read when the paper closed is still pending:
+      // its frozen page is presented again (the server bounds how often).
+      await withMutationLock(`exam:${params.id}`, async () => {
+        const fresh = await get('exams', params.id);
+        if (fresh && await recoverHandwriting(fresh)) await put('exams', fresh);
       });
     }
     const exam = await examFor(p.id, params.id);
@@ -4025,7 +4036,19 @@ const routes = {
     // Saved on the device; the server's copy follows a moment later and is
     // retried until it lands. It never delays or fails this save.
     if (isServerPaper(e)) scheduleCheckpoint(e.id, body?.urgent === true ? 0 : undefined);
-    return { saved: true, ...saved };
+    // A frozen page of handwriting is "saved" only once it has been read back.
+    return { saved: true, ...saved, pagesSaved: await confirmExamPagesSaved(e.id, e.responses?.pages) };
+  },
+  // "Retry checking" for one answer whose handwriting was saved at the close
+  // and is not marked: the frozen picture, no edits, the server's limits.
+  'POST /exams/:id/handwriting': async (body, params) => {
+    const p = await requireProfile();
+    return withMutationLock(`exam:${params.id}`, async () => {
+      const e = await get('exams', params.id);
+      if (!e || e.pid !== p.id) throw Object.assign(new Error('Exam not found'), { status: 404 });
+      try { return await retryHandwriting(e, String(body?.key || '')); }
+      finally { await put('exams', e); }
+    });
   },
   'POST /exams/:id/submit': async (body, params) => {
     const p = await requireProfile();
@@ -5243,6 +5266,8 @@ async function adoptPaperResult(p, e, serverResult, { record = true } = {}) {
     settled.serverReceipt = { authoritative: true, examId: e.server.examId, attemptId: d.attemptId || null, solution: d.solution };
     await put('questions', settled);
   }
+  // An answer pending on handwriting that was not read says so on its line.
+  markPendingLines(result, detail, e);
   Object.assign(e, { finishedAt: finishedAtOf(e, result), score: result.score, total: result.total, detail });
   e.final = serverFinal(e, { ...result, detail });
   delete e.responses;

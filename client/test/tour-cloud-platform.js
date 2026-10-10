@@ -6,7 +6,7 @@
 // this flow proves the browser product wiring reaches those contracts correctly.
 
 import { pathToFileURL } from 'node:url';
-import { handwrite } from './fakeServerReader.js';
+import { handwrite, pressRead } from './fakeServerReader.js';
 
 const ACCOUNT = {
   id: 'acct_e2e_student',
@@ -310,6 +310,13 @@ export const flow = {
       (await page.locator('.q-prompt').innerText()).replace(/\s+/g, ' ').trim() === inkPrompt,
       `prompt now ${JSON.stringify((await page.locator('.q-prompt').innerText()).slice(0, 120))}`);
     await check('without a reload', await page.evaluate(() => window.__PRI_E2E_NO_RELOAD__) === 'kept');
+    // Read on request: coming back signed in sends nothing. The student asks.
+    await page.locator('[data-ink-read]').waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
+    await page.waitForTimeout(1500);
+    await check('coming back signed in sends no read by itself: "Read my answer" is offered and nothing has gone to the reader routes',
+      await page.locator('[data-ink-read]').isVisible() && !requests.slice(registerIndexBefore).some(row => row.path === '/v1/handwriting/transcribe') && reader.requests.length === 0,
+      JSON.stringify(requests.slice(registerIndexBefore).filter(row => row.path.startsWith('/v1/handwriting/')).map(r => `${r.method} ${r.path}`)));
+    await pressRead(page);
     await page.waitForFunction(() => /parent or guardian needs to confirm/i.test(document.querySelector('[data-ink-blocker-reason]')?.textContent || ''), null, { timeout: 20000 }).catch(() => {});
     const guardianNote = await inkNotice();
     const guardianBlockedRequests = requests.slice(registerIndexBefore).filter(row => row.path.startsWith('/v1/handwriting/'));
@@ -324,10 +331,16 @@ export const flow = {
     await check('guardian pending offers Account settings as the relevant action',
       await inkLink.isVisible().catch(() => false) && (await inkLink.getAttribute('data-ink-blocker')) === 'ink.waitingGuardian');
 
-    // Approval can arrive elsewhere while this page stays open. Focus triggers
-    // the bounded fresh readiness probe; no force-quit or reload is required.
+    // Approval can arrive elsewhere while this page stays open. Coming back to
+    // the tab reads nothing by itself; the student presses Try again beside
+    // the notice — no force-quit or reload is required.
     guardianPending = false;
+    const beforeFocus = requests.length;
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await page.waitForTimeout(1200);
+    await check('a return to the tab sends nothing to the reader routes by itself', !requests.slice(beforeFocus).some(row => row.path.startsWith('/v1/handwriting/')),
+      JSON.stringify(requests.slice(beforeFocus).map(r => `${r.method} ${r.path}`)));
+    await page.locator('[data-ink-retry-reading]').click();
     // The status is now usable, the ink is sent, and the transcribe route names
     // the next real blocker: the still-unverified email.
     await page.waitForFunction(() => /Verify your email address/.test(document.querySelector('[data-ink-blocker-reason]')?.textContent || ''), null, { timeout: 20000 }).catch(() => {});
@@ -354,10 +367,13 @@ export const flow = {
     emailVerified = true;
     const sentBeforeVerify = reader.requests.length;
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await page.waitForTimeout(1200);
+    const sentByFocus = reader.requests.length - sentBeforeVerify;
+    await page.locator('[data-ink-retry-reading]').click();
     await page.waitForSelector('.ink-line', { timeout: 20000 }).catch(() => {});
     const readBack = await page.locator('.ink-line').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-text') || ''));
-    await check('once verified, the kept ink is read by itself — no retyping, no reload',
-      readBack.length === 1 && readBack[0] === reader.text && reader.requests.length > sentBeforeVerify,
+    await check('once verified, coming back to the tab reads nothing; one press of Try again reads the kept ink — no retyping, no reload',
+      readBack.length === 1 && readBack[0] === reader.text && sentByFocus === 0 && reader.requests.length === sentBeforeVerify + 1,
       `read ${JSON.stringify(readBack)}; ${reader.requests.length - sentBeforeVerify} further transcribe requests`);
     await check('and the waiting notice is gone',
       await page.locator('.ink-status-line').count() === 0 && await page.locator('[data-ink-account-recovery]').count() === 0);

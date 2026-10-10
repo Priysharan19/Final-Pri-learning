@@ -33,7 +33,7 @@
 //
 // Nothing here marks an answer. The engine's checker is not imported.
 // ─────────────────────────────────────────────────────────────────────────────
-import { get, put, byIndex } from './idb.js';
+import { get, put, byIndex, getFresh } from './idb.js';
 import { cloud } from '../platform/cloudTransport.js';
 import { profileCloudAccountId } from './entitlementGate.js';
 import { checkUnavailable, withExamLock } from './backend.js';
@@ -235,7 +235,16 @@ async function wireResponses(exam, responses) {
     const remote = toServer.get(String(qid));
     if (remote && Number.isFinite(Number(ms)) && Number(ms) >= 0) times[remote] = Math.round(Number(ms));
   }
-  return { answers: text(responses?.answers), workings: text(responses?.workings), times, modes: rekeyMap(responses?.modes, toServer, keys) };
+  // Handwritten pages not read: the digest of each picture, never the picture.
+  const ink = {};
+  for (const [key, page] of Object.entries(responses?.pages || {})) {
+    const remote = rekey(key, toServer);
+    if (remote && keys.has(key) && page?.digest && String(responses?.answers?.[key] ?? '').trim() === '') ink[remote] = page.digest;
+  }
+  return {
+    answers: text(responses?.answers), workings: text(responses?.workings), times, modes: rekeyMap(responses?.modes, toServer, keys),
+    ...(Object.keys(ink).length ? { ink } : {})
+  };
 }
 
 // ── Clock ────────────────────────────────────────────────────────────────────
@@ -367,7 +376,11 @@ export async function finishOnServer(exam, body = {}, now = Date.now(), { timeou
       clientKey: typeof body.submissionKey === 'string' ? body.submissionKey.slice(0, 100) : null,
       reason: inputs.finalisedBy === 'deadline' ? 'deadline' : 'student',
       queuedAt: exam.latestSeenAt || now,
-      inputs: { answers: inputs.answers, workings: inputs.workings, times: inputs.times, ms: Math.max(0, Math.round(Number(inputs.ms) || 0)), modes: exam.responses?.modes || {} },
+      inputs: {
+        answers: inputs.answers, workings: inputs.workings, times: inputs.times, ms: Math.max(0, Math.round(Number(inputs.ms) || 0)), modes: exam.responses?.modes || {},
+        // The pictures of handwritten pages not read, frozen with the submit.
+        pages: inputs.pages || {}
+      },
       // The device's own reading of the paper's clock. Past its deadline it
       // sends only what was autosaved before it, and the paper is late whatever
       // clock the server reads.
@@ -384,7 +397,10 @@ export async function finishOnServer(exam, body = {}, now = Date.now(), { timeou
     if (result?.authoritative !== true || !Array.isArray(result.detail) || !Number.isFinite(Number(result.score)) || !Number.isFinite(Number(result.total))) {
       throw Object.assign(new Error('The server did not return a certified result.'), { status: 502 });
     }
-    return { result };
+    // Handwriting that was never read is pending in that result, not blank.
+    // The frozen pictures are presented now — once each — and whatever is
+    // still waiting afterwards is kept on the paper for a later visit.
+    return { result: await settleFrozenPages(exam, result, queued.inputs.pages) };
   } catch (cause) {
     // A paper the session's account does not own reads as not found: on a
     // shared iPad that is another profile's session, and signing in fixes it.
@@ -399,6 +415,223 @@ export async function finishOnServer(exam, body = {}, now = Date.now(), { timeou
     queued.code = kind === 'refused' ? (cause?.code || null) : null;
     return { pending: pendingView(exam) };
   }
+}
+
+// ── Handwriting not read when the paper closed ───────────────────────────────
+// server/platform/exams.js freezes each such page by the digest of its picture
+// and leaves its answer PENDING. This device holds the pictures. It presents
+// each one to POST /v1/exams/:id/handwriting; the server reads it only if it is
+// the frozen picture, at most a fixed number of times, and replaces only that
+// answer's line. Nothing here marks, and nothing here can change what is read.
+
+/** How many frozen pages are presented while the student waits on the submit. */
+const INLINE_PAGE_READS = 6;
+/** How often a finished paper with pages still waiting asks again when it is opened. */
+export const HANDWRITING_RECOVERY_EVERY_MS = 60 * 1000;
+
+/** The frozen pictures by the SERVER's answer key. */
+function frozenImages(exam, pages) {
+  const { toServer } = idMaps(exam);
+  const out = {};
+  for (const [key, page] of Object.entries(pages || {})) {
+    const remote = rekey(key, toServer);
+    if (remote && typeof page?.image === 'string') out[remote] = page.image;
+  }
+  return out;
+}
+
+/**
+ * Present every frozen page that is waiting and may be asked for now. Returns
+ * the latest result the server gave; the one passed in when nothing changed.
+ */
+export async function resolveFrozenHandwriting(examId, result, images, { now = Date.now(), limit = INLINE_PAGE_READS, transport = cloud } = {}) {
+  let latest = result;
+  let asked = 0;
+  for (const key of Object.keys(result?.handwriting?.pages || {})) {
+    const page = latest.handwriting?.pages?.[key];
+    // ONE automatic read per page, ever: a page that has had it is presented
+    // again only by the student's own "Retry checking" (retryHandwriting).
+    if (!page || page.state === 'resolved' || Number(page.attempts) > 0 || !images?.[key] || asked >= limit) continue;
+    asked += 1;
+    try {
+      const reply = await transport.resolveExamHandwriting(examId, { key, image: images[key] });
+      if (reply?.result?.authoritative === true && Array.isArray(reply.result.detail)) latest = reply.result;
+    } catch (cause) {
+      // The server will never read this picture for this answer (it is not
+      // the frozen one, or nothing is pending there): stop holding it, so it
+      // is not sent again on every visit.
+      if (cause?.status === 409 && (cause?.code === 'EXAM_HANDWRITING_CHANGED' || cause?.code === 'EXAM_HANDWRITING_NOT_PENDING')) { delete images[key]; continue; }
+      // Offline, signed out or refused for the account: the page stays frozen
+      // and pending, and a later visit asks again. Nothing is retried here.
+      if (unavailableKind(cause)) break;
+    }
+  }
+  return latest;
+}
+
+/**
+ * A result has just arrived for a paper whose frozen pages this device holds
+ * (`pages`: local answer key → { digest, image }): present the ones that are
+ * waiting, keep the pictures of any still waiting, and return the latest result.
+ */
+async function settleFrozenPages(exam, result, pages) {
+  if (!result?.handwriting?.pages) return result;
+  const images = frozenImages(exam, pages);
+  const settled = await resolveFrozenHandwriting(exam.server.examId, result, images);
+  keepFrozenPages(exam, settled, images);
+  return settled;
+}
+
+/** Keep the pictures of pages that can still be read; forget the rest. */
+export function keepFrozenPages(exam, result, images) {
+  const waiting = {};
+  for (const [key, page] of Object.entries(result?.handwriting?.pages || {})) {
+    // Kept while the page can still be read here: unresolved, with a try left.
+    if (page.state !== 'resolved' && Number(page.triesLeft) > 0 && images?.[key]) waiting[key] = images[key];
+  }
+  if (Object.keys(waiting).length) exam.server.handwriting = { pages: waiting };
+  else delete exam.server.handwriting;
+}
+
+/**
+ * Say, on the device's own detail lines, which answers are pending on
+ * handwriting and why. `result` is the server's result with local ids
+ * (localResult); `detail` is what the backend is about to store.
+ */
+export function markPendingLines(result, detail, exam = null) {
+  const pages = result?.handwriting?.pages || {};
+  const held = exam?.server?.handwriting?.pages || {};
+  const byId = new Map((result?.detail || []).map(d => [String(d.id), d]));
+  const flag = (target, source, key) => {
+    for (const field of ['pending', 'pendingState', 'pendingReason', 'pendingKey', 'pendingTriesLeft', 'pendingCanRetry', 'pendingRetryAt', 'pictureHere']) delete target[field];
+    if (source.pending) {
+      const page = pages[key];
+      target.pending = true;
+      target.pendingState = page?.state === 'awaiting-reading' ? 'awaiting-reading' : 'needs-review';
+      target.pendingReason = page?.reason || null;
+      target.pendingKey = key;
+      // Whether the frozen picture — the only copy there is — is on THIS
+      // device, and whether the student may ask for it to be checked again.
+      target.pictureHere = typeof held[key] === 'string';
+      target.pendingTriesLeft = Number(page?.triesLeft) || 0;
+      target.pendingCanRetry = page?.canRetry === true && target.pictureHere;
+      target.pendingRetryAt = Number(page?.retryAt) || null;
+    }
+    if (source.readAfterClose) target.readAfterClose = true;
+  };
+  for (const line of detail || []) {
+    const d = byId.get(String(line.id));
+    if (!d) continue;
+    const remote = d.serverQuestionId || d.id;
+    if (d.multipart) {
+      for (const part of line.parts || []) {
+        const from = (d.parts || []).find(x => String(x.key) === String(part.key));
+        if (from) flag(part, from, `${remote}::${from.key}${from.choiceTaken === 'or' ? '::or' : ''}`);
+      }
+      if ((line.parts || []).some(part => part.pending)) line.pending = true; else delete line.pending;
+    } else flag(line, d, `${remote}${d.choiceTaken === 'or' ? '::or' : ''}`);
+  }
+  return detail;
+}
+
+const AMENDED = ['given', 'correct', 'unanswered', 'awarded', 'feedback', 'partial', 'working'];
+
+/**
+ * A page was read after the paper was adopted here: take the server's line for
+ * each answer that was PENDING on this device, and nothing else. A line that
+ * was not pending is never touched, whatever the server sends.
+ */
+export function applyHandwritingAmendment(exam, serverResult) {
+  const result = localResult(exam, serverResult);
+  const byId = new Map(result.detail.map(d => [String(d.id), d]));
+  const take = (target, source) => {
+    for (const field of AMENDED) if (source[field] !== undefined) target[field] = field === 'correct' || field === 'unanswered' ? !!source[field] : source[field];
+    return target;
+  };
+  exam.detail = (exam.detail || []).map(line => {
+    const d = byId.get(String(line.id));
+    if (!d || !line.pending) return line;
+    if (Array.isArray(line.parts)) {
+      const parts = line.parts.map(part => {
+        const from = (d.parts || []).find(x => String(x.key) === String(part.key));
+        return part.pending && from && !from.pending ? take({ ...part }, from) : part;
+      });
+      return { ...line, parts, awarded: d.awarded, correct: !!d.correct, unanswered: !!d.unanswered };
+    }
+    return d.pending ? { ...line } : take({ ...line }, d);
+  });
+  markPendingLines(result, exam.detail, exam);
+  exam.score = result.score;
+  exam.total = result.total;
+  if (exam.summary && result.summary) exam.summary = result.summary;
+  return exam;
+}
+
+const lastRecovery = new Map();   // local exam id → monotonic ms
+
+/**
+ * A finished paper that still holds frozen pages: ask the server how each
+ * stands, present the ones it will take, and bring this device's copy up to
+ * date. Returns true when the paper changed and must be written back. The
+ * caller holds the paper's lock.
+ */
+export async function recoverHandwriting(exam, { force = false, transport = cloud } = {}) {
+  const images = exam?.server?.handwriting?.pages;
+  if (!isServerPaper(exam) || !exam.finishedAt || !images || !Object.keys(images).length) return false;
+  const key = String(exam.id);
+  if (!force && lastRecovery.has(key) && monotonic() - lastRecovery.get(key) < HANDWRITING_RECOVERY_EVERY_MS) return false;
+  lastRecovery.set(key, monotonic());
+  let remote;
+  try { remote = await transport.getExam(exam.server.examId, RECONCILE_TIMEOUT_MS); } catch { return false; }
+  if (remote?.state !== 'finished' || remote.result?.authoritative !== true || !Array.isArray(remote.result.detail)) return false;
+  const settled = await resolveFrozenHandwriting(exam.server.examId, remote.result, images, { transport });
+  const before = JSON.stringify([exam.score, exam.detail, exam.server.handwriting]);
+  keepFrozenPages(exam, settled, images);
+  applyHandwritingAmendment(exam, settled);
+  return JSON.stringify([exam.score, exam.detail, exam.server.handwriting]) !== before;
+}
+
+/**
+ * "Retry checking": the student asks for ONE frozen page to be read again. The
+ * picture sent is the one kept when the paper closed — nothing can be edited —
+ * and the server decides whether a try is left and allowed. Throws
+ * EXAM_PAGE_NOT_ON_DEVICE when this device no longer holds the picture. The
+ * caller holds the paper's lock and writes `exam` back.
+ */
+export async function retryHandwriting(exam, key, { transport = cloud } = {}) {
+  const images = exam?.server?.handwriting?.pages || {};
+  const image = images[String(key)];
+  if (!isServerPaper(exam) || !exam.finishedAt || typeof image !== 'string') {
+    throw Object.assign(new Error('The saved page for this answer is not on this device, so it cannot be checked from here.'), { status: 409, code: 'EXAM_PAGE_NOT_ON_DEVICE' });
+  }
+  let reply;
+  try { reply = await transport.resolveExamHandwriting(exam.server.examId, { key: String(key), image, retry: true }); }
+  catch (cause) {
+    if (cause?.status === 409 && (cause?.code === 'EXAM_HANDWRITING_CHANGED' || cause?.code === 'EXAM_HANDWRITING_NOT_PENDING')) {
+      delete images[String(key)];
+      if (!Object.keys(images).length) delete exam.server.handwriting;
+      for (const line of exam.detail || []) for (const item of [line, ...(line.parts || [])]) if (item.pendingKey === String(key)) { item.pictureHere = false; item.pendingCanRetry = false; }
+    }
+    throw cause;
+  }
+  if (reply?.result?.authoritative !== true || !Array.isArray(reply.result.detail)) throw Object.assign(new Error('The server did not return a certified result.'), { status: 502 });
+  keepFrozenPages(exam, reply.result, images);
+  applyHandwritingAmendment(exam, reply.result);
+  return { attempted: reply.attempted === true, retryAt: reply.retryAt || null };
+}
+
+/**
+ * Are these frozen pages really on disk? Read back through a FRESH IndexedDB
+ * connection — never from the handle that wrote them — and compared by digest.
+ * "Saved" may be said about a page only after this is true.
+ */
+export async function confirmExamPagesSaved(examId, pages) {
+  const expected = Object.entries(pages || {});
+  if (!expected.length) return true;
+  let row;
+  try { row = await getFresh('exams', examId); } catch { return false; }
+  const stored = row?.responses?.pages || {};
+  return expected.every(([key, page]) => stored[key]?.digest === page.digest && stored[key]?.image === page.image);
 }
 
 // ── Results ──────────────────────────────────────────────────────────────────
@@ -512,7 +745,10 @@ export async function reconcileWithServer(exam, { force = false, rebuildRow = nu
     const sq = (remote?.exam?.questions || []).find(q => String(q.id) === String(exam.server.questionIds?.[i]));
     if (sq) { await put('questions', rebuildRow(sq, exam.questionIds[i])); changed = true; }
   }
-  if (remote?.state === 'finished' && remote.result?.authoritative === true) return { result: remote.result };
+  // Finalised elsewhere — by another device, or by the server itself once the
+  // paper's time had passed. Handwriting this device froze and the server left
+  // pending is presented now, from the pictures saved before the deadline.
+  if (remote?.state === 'finished' && remote.result?.authoritative === true) return { result: await settleFrozenPages(exam, remote.result, exam.responses?.pages) };
   if (remote?.state !== 'open') return { changed };
   if (exam.server.restored) { exam.server.restored = false; changed = true; }
   changed = clampDeadline(exam, remote.exam?.remainingMs) || changed;

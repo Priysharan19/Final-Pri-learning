@@ -881,6 +881,58 @@ async function run() {
       }
     });
 
+    // read on request (review 17, F4): the Read / reading / read / stale states
+    // of a handwritten answer, driven from the keyboard on the real server with
+    // the scripted stand-in reader. Where focus goes when "Read my answer"
+    // leaves the page, and what the stale and submit-reason states say.
+    await step('practice · read on request', '/practice', async () => {
+      await typedQuestion();
+      const writeTab = page.getByRole('button', { name: 'Answer by handwriting' });
+      if (!(await writeTab.count())) throw new Error('this question offers no handwriting tab');
+      await writeTab.click();
+      await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+      const box = await page.locator('.ink-canvas-live').boundingBox();
+      const stroke = async (x) => {
+        await page.mouse.move(box.x + x, box.y + 40);
+        await page.mouse.down();
+        for (let i = 1; i <= 8; i++) await page.mouse.move(box.x + x + i * 3, box.y + 40 + i * 9);
+        await page.mouse.up();
+        await wait(page, 700);
+      };
+      const focusNow = () => page.evaluate(() => {
+        const el = document.activeElement;
+        return { tag: (el?.tagName || '').toLowerCase(), body: el === document.body || !el, inInk: !!el?.closest?.('.ink-answer'), role: el?.getAttribute?.('role') || null, id: el?.id || null, text: (el?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60) };
+      });
+      const reason = () => page.evaluate(() => {
+        const r = document.querySelector('[data-submit-reason]');
+        const b = document.querySelector('.ws-actions .btn-primary');
+        return r ? { key: r.getAttribute('data-submit-reason'), role: r.getAttribute('role'), text: (r.textContent || '').trim(), describes: !!b && b.getAttribute('aria-describedby') === r.id, disabled: !!b && b.disabled } : null;
+      });
+      platform.reader.lines = null; platform.reader.text = '7'; platform.reader.confidence = 0.97;
+      let release; platform.reader.gate = new Promise(resolve => { release = resolve; });
+      try {
+        await stroke(60);
+        const read = page.locator('[data-ink-read]').first();
+        await read.waitFor({ timeout: 15000 });
+        refusals.read = { unread: await reason(), button: await read.evaluate(b => ({ tag: b.tagName.toLowerCase(), name: (b.textContent || '').trim() })) };
+        await read.focus();
+        await page.keyboard.press('Enter');
+        await wait(page, 600);
+        refusals.read.during = { focus: await focusNow(), spoken: await spokenNow(), button: await page.locator('[data-ink-read]').count() };
+        release(); platform.reader.gate = null;
+        await page.waitForSelector('.ink-line', { timeout: 20000 });
+        await wait(page, 500);
+        refusals.read.after = { focus: await focusNow(), lines: await page.locator('.ink-line').count() };
+        await stroke(160);
+        await page.waitForSelector('[data-ink-stale]', { timeout: 15000 });
+        refusals.read.stale = {
+          label: await page.locator('[data-ink-stale]').evaluate(el => ({ role: el.getAttribute('role'), text: (el.textContent || '').trim() })),
+          again: await page.locator('[data-ink-read="again"]').evaluate(b => ({ tag: b.tagName.toLowerCase(), name: (b.textContent || '').trim() })).catch(() => null),
+          reason: await reason()
+        };
+      } finally { release?.(); platform.reader.gate = null; platform.reader.text = '7'; platform.reader.confidence = 0.6; }
+    });
+
     // the marked state — the verdict, the evaluation card and the criteria table
     await step('practice · marked', '/practice', async () => {
       // Signed in by now: the verdict is the server's. A typed question, so the
@@ -1369,6 +1421,23 @@ async function run() {
     ok('signed out, Rapid Fire and Match that do not start are alerts in words with the same named sign-in — and no clock or question appears',
       announced(refusals.rush) && refusals.rush.clock === 0 && announced(refusals.match) && refusals.match.question === 0,
       JSON.stringify({ rush: refusals.rush, match: refusals.match }));
+
+    section('read on request');
+    ok('handwriting not yet read: a real, named "Read my answer" button, and Submit says why it is unavailable in a status the button is described by',
+      refusals.read?.button?.tag === 'button' && /\p{L}/u.test(refusals.read.button.name) && refusals.read.unread?.role === 'status' &&
+        /\p{L}/u.test(refusals.read.unread.text) && refusals.read.unread.describes === true && refusals.read.unread.disabled === true,
+      JSON.stringify({ button: refusals.read?.button, unread: refusals.read?.unread }));
+    ok('activating "Read my answer" from the keyboard does not drop focus to <body>: while the page is read, focus rests on the announced reading status inside the writing surface',
+      refusals.read?.during?.button === 0 && refusals.read.during.focus.body === false && refusals.read.during.focus.inInk === true &&
+        refusals.read.during.focus.role === 'status' && /\p{L}/u.test(refusals.read.during.focus.text),
+      JSON.stringify(refusals.read?.during));
+    ok('when the reading lands, focus moves to the reading itself — still inside the writing surface, never <body>',
+      refusals.read?.after?.lines >= 1 && refusals.read.after.focus.body === false && refusals.read.after.focus.inInk === true && refusals.read.after.focus.id === 'ink-reading',
+      JSON.stringify(refusals.read?.after));
+    ok('after the ink changes the transcript is announced as from earlier writing, a named "Read again" button is offered, and Submit says why in words',
+      refusals.read?.stale?.label?.role === 'status' && /\p{L}/u.test(refusals.read.stale.label.text) && refusals.read.stale.again?.tag === 'button' &&
+        /\p{L}/u.test(refusals.read.stale.again.name) && refusals.read.stale.reason?.key === 'ink.submitReadAgain' && refusals.read.stale.reason.describes === true,
+      JSON.stringify(refusals.read?.stale));
 
     section('colour is never alone');
     ok('correct / incorrect is never carried by colour alone', findingsFor('colour').length === 0, show(findingsFor('colour')));

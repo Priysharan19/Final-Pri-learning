@@ -152,6 +152,37 @@ eq(stripSentence('3. x = 6.'), 'x = 6', 'a list number in front of a line is dro
 eq(answerFromLine('x = 6.', N), proposed('6'), 'one line, one value');
 eq(proposeFinalAnswer(['a', 'b = 2', 'least value => 6.'], N).line, 2, 'the proposal names the line it came from');
 
+// ── Review 17 · a correct page is never mis-proposed ─────────────────────────
+// F2: the stop of "Ans." is not part of the first coordinate, and a number
+// written with a separator is not a pair.
+{
+  const P = { answerType: 'point' }, S = { answerType: 'set' };
+  const strip = r => ({ status: r.status, ...(r.answer !== undefined ? { answer: r.answer } : {}), ...(r.candidates ? { candidates: r.candidates } : {}) });
+  for (const [lines, type, want] of [
+    [['Ans. 4, 0'], P, { status: 'proposed', answer: '(4, 0)' }],
+    [['Ans: 4, 0'], P, { status: 'proposed', answer: '(4, 0)' }],
+    [['Answer. x = 4, y = 0'], P, { status: 'proposed', answer: '(4, 0)' }],
+    [['1, 000'], P, { status: 'none' }],
+    [['12, 050'], P, { status: 'none' }],
+    [['1,234'], P, { status: 'none' }],
+    [['7 and 9'], P, { status: 'none' }],
+    [['x = 7 and y = 9'], P, { status: 'proposed', answer: '(7, 9)' }],
+    [['1, 0'], P, { status: 'proposed', answer: '(1, 0)' }],
+    [['0.5, 0'], P, { status: 'proposed', answer: '(0.5, 0)' }],
+    // F5: only values of the solved variable belong in the set.
+    [['x^2 = 4, x = 2 or x = -2'], S, { status: 'proposed', answer: '2, -2' }],
+    [['x² = 4, x = 2 or -2'], S, { status: 'proposed', answer: '2, -2' }],
+    [['(x-1)(x-2) = 0, x = 1 or x = 2'], S, { status: 'proposed', answer: '1, 2' }],
+    [['2x = 2 or 2x = 4'], S, { status: 'ambiguous', candidates: ['2', '4'] }],
+    [['x^2 = 9 or x^2 = 16'], S, { status: 'ambiguous', candidates: ['9', '16'] }],
+    [['x + 1 = 3, y = 2 or x = 5'], S, { status: 'ambiguous', candidates: ['3', '2', '5'] }],
+    [['so x = 1 or x = 2'], S, { status: 'proposed', answer: '1, 2' }],
+    [['roots are {1, -2}'], S, { status: 'proposed', answer: '{1, -2}' }]
+  ]) eq(strip(proposeFinalAnswer(lines, type)), want, `review 17: ${JSON.stringify(lines[0])} as ${type.answerType}`);
+  // Whatever is proposed for a point reads, in the marker's own parser, as the pair that was written.
+  ok(!/\(\s*\./.test(JSON.stringify(proposeFinalAnswer(['Ans. 4, 0'], P))), 'no proposal ever opens a pair with a stray stop');
+}
+
 // ── 1b · handwriting (Write mode) uses the same module ───────────────────────
 // Owner case A3: working whose last line is an equation, "38.5 - 24.5 = 14".
 // The last line was sent verbatim and refused as unreadable. The card's rule,
@@ -227,6 +258,89 @@ for (const [lines, question, want] of INK) {
 eq(only(proposeFinalAnswer(['6x - 6 - 3x + 9 = 3x + 3'], E)), proposed('3x + 3'), 'Photo too: what follows the "=" is proposed, never the whole equation');
 eq(only(proposeFinalAnswer(['x^2 - 5x - 14 = (x + 2)(x - 7)'], E)), proposed('(x + 2)(x - 7)'), '…on a factorisation as on a simplification');
 eq(only(proposeFinalAnswer(['x^2 + y^2 = 25'], N)), proposed('25'), 'while a numeric question takes the value after the equals sign');
+
+// ── 1c · reviews 12–14: units, points, sets, and answers that must not be truncated ──
+// What goes into the answer field (Photo) or is sent (Write), for a transcript.
+const fieldOf = (lines, question) => {
+  const last = lines.at(-1);
+  if (readsAsWritten(last, question)) return { sent: last, how: 'as written' };
+  const p = proposeFinalAnswer(lines, question);
+  return p.status === 'proposed' ? { sent: p.answer, how: 'proposed' } : { sent: null, how: p.status, ...(p.candidates ? { candidates: p.candidates } : {}) };
+};
+const unit = answerSuffix => ({ answerType: 'numeric', answerSuffix });
+const PT = { answerType: 'point' }, SET = { answerType: 'set' };
+const GAPS = [
+  // a value with the question's OWN unit reads as that value; nothing is dropped from it
+  [['147 cm³/s'], unit('cm³/s'), { sent: '147 cm³/s', how: 'as written' }],
+  [['= 147 cm³/s'], unit('cm³/s'), { sent: '= 147 cm³/s', how: 'as written' }],
+  [['dV/dt = 147 cm^3/s'], unit('cm³/s'), { sent: '147 cm^3/s', how: 'proposed' }],
+  [['1 m/s²'], unit('m/s²'), { sent: '1 m/s²', how: 'as written' }],
+  [['1 square units'], unit('square units'), { sent: '1 square units', how: 'as written' }],
+  [['14 cm^2'], unit('cm²'), { sent: '14 cm^2', how: 'as written' }],
+  [['area = 14 cm²'], unit('cm²'), { sent: '14 cm²', how: 'proposed' }],
+  // a unit the marker cannot read off by itself: the number alone, since the field shows the unit
+  [['-19 °C'], unit('°C'), { sent: '-19', how: 'proposed' }],
+  [['temperature = -19 °C'], unit('°C'), { sent: '-19', how: 'proposed' }],
+  // a DIFFERENT unit is never dropped: it stays on the text for the marker's own unit check
+  [['14 m'], unit('cm'), { sent: '14 m', how: 'as written' }],
+  [['area = 14 m²'], unit('cm²'), { sent: '14 m²', how: 'proposed' }],
+  // and a word that is not a unit is not an answer
+  [['14 apples'], unit('cm'), { sent: null, how: 'none' }],
+  // points written as their coordinates
+  [['(1, 0)'], PT, { sent: '(1, 0)', how: 'as written' }],
+  [['x = 1, y = 0'], PT, { sent: '(1, 0)', how: 'proposed' }],
+  [['1, 0'], PT, { sent: '(1, 0)', how: 'proposed' }],
+  [['so x = 1 and y = 0'], PT, { sent: '(1, 0)', how: 'proposed' }],
+  [['y = 0, x = 1'], PT, { sent: '(1, 0)', how: 'proposed' }],
+  [['vertex: -2, 3/4'], PT, { sent: '(-2, 3/4)', how: 'proposed' }],
+  [['the point is (1, 0).'], PT, { sent: '(1, 0)', how: 'proposed' }],
+  [['x = 1'], PT, { sent: null, how: 'none' }],
+  [['1, 0, 2'], PT, { sent: null, how: 'none' }],
+  [['a = 1, b = 0'], PT, { sent: null, how: 'none' }],
+  [['x = 1, x = 2'], PT, { sent: null, how: 'none' }],
+  [['x = 1 or y = 0'], PT, { sent: null, how: 'none' }],
+  // every value of a set, never just the last
+  [['so x = 1 or x = 2'], SET, { sent: '1, 2', how: 'proposed' }],
+  [['∴ x = 1, x = 2 and x = 3'], SET, { sent: '1, 2, 3', how: 'proposed' }],
+  [['roots are 1, -2'], SET, { sent: '1, -2', how: 'proposed' }],
+  [['x = 1 or x = 2'], SET, { sent: 'x = 1 or x = 2', how: 'as written' }],
+  [['{1, 2}'], SET, { sent: '{1, 2}', how: 'as written' }],
+  [['so x = 1 or nothing'], SET, { sent: null, how: 'none' }],
+  // two candidates on a numeric question: never one of them
+  [['so x = 1 or x = 2'], N, { sent: null, how: 'ambiguous', candidates: ['1', '2'] }],
+  [['x = 1, x = 2'], N, { sent: null, how: 'ambiguous', candidates: ['1', '2'] }],
+  // a value AT a point is the value, not the point
+  [['3 at x = 1'], N, { sent: '3', how: 'proposed' }],
+  [['least value = 6 at x = -3'], N, { sent: '6', how: 'proposed' }],
+  [['minimum is 6 when x = -3'], N, { sent: '6', how: 'proposed' }],
+  [['6 (at x = -3)'], N, { sent: '6', how: 'proposed' }],
+  [['x = 3 if y = 2'], N, { sent: '3', how: 'proposed' }],
+  [['f(2) = 7 where f(x) = 3x + 1'], N, { sent: '7', how: 'proposed' }],
+  // a conditional STEP states no answer: either number could be meant
+  [['2x = 6 if x = 3'], N, { sent: null, how: 'none' }],
+  [['3 + 1 = 4 when x = 3'], N, { sent: null, how: 'none' }],
+  // a check line is not the answer
+  [['x = 3', 'check 3+1=4'], N, { sent: '3', how: 'proposed' }],
+  [['answer = 3', 'check: 3 + 1 = 4'], N, { sent: '3', how: 'proposed' }],
+  [['x = 3', 'verification: LHS = 4'], N, { sent: '3', how: 'proposed' }],
+  [['x = 3', 'Check: 3 + 1 = 4', 'RHS = 4'], N, { sent: '3', how: 'proposed' }],
+  [['check 3+1=4'], N, { sent: null, how: 'none' }],
+  [['2x = 6', 'check 3+1=4'], N, { sent: '6', how: 'proposed' }]
+];
+for (const [lines, question, want] of GAPS) eq(fieldOf(lines, question), want, `answer field for ${JSON.stringify(lines.join(' ⏎ '))} as ${question.answerType}${question.answerSuffix ? ` [${question.answerSuffix}]` : ''}`);
+// Truncation: these must never yield the LAST number on the line.
+for (const [line, question, never] of [['so x = 1 or x = 2', N, '2'], ['so x = 1 or x = 2', SET, '2'], ['3 at x = 1', N, '1'], ['x = 3 if y = 2', N, '2'], ['2x = 6 if x = 3', N, '3'], ['x = 1, y = 0', PT, '0']]) {
+  const got = fieldOf([line], question);
+  ok(got.sent !== never, `${JSON.stringify(line)} as ${question.answerType} is never cut down to ${JSON.stringify(never)} (got ${JSON.stringify(got)})`);
+}
+// The module looks only at public fields: a key on the question changes nothing.
+{
+  const keyed = { answerType: 'interval', answer: { variable: 'q', region: 'q > 3', value: 99 }, solution: 'x', traps: [{ value: 7 }] };
+  const source = readFileSync(new URL('../src/photo/finalAnswer.js', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  ok(!/question\??\.\s*(answer|solution|traps|steps|criteria|marks|expected)\b/.test(source), 'finalAnswer.js never reads question.answer or any other keyed field');
+  eq(fieldOf(['x > 3'], keyed), fieldOf(['x > 3'], { answerType: 'interval' }), 'and a key on the question it is handed changes nothing');
+  eq(fieldOf(['q > 3'], keyed), fieldOf(['q > 3'], { answerType: 'interval' }), 'not even the variable the key names');
+}
 
 // Unrelated numbers elsewhere on the page never become the answer.
 const OWNER_NOTES = ['b = {40,50,60}.', 'b = {100,50,60}.', 'final:', 'a = {10,99,30}.', 'b = {100,50,60}.'];
@@ -497,6 +611,29 @@ eq([drafts.savePhotoDraft('q-none', { photo: null }), drafts.savePhotoDraft('q-u
 eq((await drafts.confirmPhotoDraftSaved('q-big', { photo: PHOTO })), { saved: false, reason: 'missing' }, 'what was never written is never "saved"');
 // Only what the card wrote is kept: nothing else can ride along.
 eq(Object.keys(drafts.photoDraftPayload({ ...state, expected: '6', solution: 'x', marks: 3, question: { answer: 6 } })).sort(), ['answer', 'answerSource', 'confidence', 'engine', 'photo', 'reduced', 'transcript'], 'a draft holds the picture, the reading and the answer in the field — no key, solution or mark');
+// ── 4b · the ink draft keeps the transcript and a typed answer with the strokes ──
+{
+  ink.setInkDraftProfile('pid-ink-a');
+  const strokes = [{ points: [{ x: 10.4, y: 20.6 }, { x: 30, y: 40 }] }];
+  const reading = { signature: '1:2:abc', reading: { lines: [{ text: '38.5', conf: 0.97 }, { text: '24.5', conf: 0.97 }, { text: '38.5-24.5=14', conf: 0.97, corrected: true }], text: '38.5\n24.5\n38.5-24.5=14', engine: 'cloud-test', cloud: true, confidence: 0.97, needsConfirmation: false, corrected: true } };
+  eq(ink.saveInkDraft('q-ink-read', strokes, { label: 'L', reading, answer: '15' }), true, 'strokes, transcript and a typed answer are accepted for keeping');
+  eq((await ink.confirmInkDraftSaved('q-ink-read', strokes, { reading, answer: '15' })).saved, true, 'and confirmed together by readback');
+  eq(await ink.readInkDraftExtras('q-ink-read'), { reading, answer: '15' }, 'restored: the transcript with the corrected line, and the answer the student typed over the proposal');
+  eq((await ink.confirmInkDraftSaved('q-ink-read', strokes, { reading, answer: '14' })).saved, false, 'a different typed answer on screen is NOT reported as saved');
+  eq((await ink.confirmInkDraftSaved('q-ink-read', strokes, { reading })).saved, false, 'nor is an overridden answer that is no longer overridden');
+  eq((await ink.confirmInkDraftSaved('q-ink-read', strokes)).saved, true, 'a caller that keeps only strokes is confirmed on the strokes, as before');
+  eq(Object.keys(ink.inkExtras({ reading, answer: '15', expected: '14', solution: 's', marks: 3 })).sort(), ['answer', 'reading'], 'nothing but the transcript and the typed answer rides along');
+  eq(ink.inkExtras({ reading: { signature: 's', reading: { lines: [] } }, answer: 7 }), {}, 'an empty transcript or a non-text answer is not kept');
+  eq(ink.inkExtras({ reading: { signature: 's', reading: { lines: [{ text: 'x'.repeat(ink.MAX_READING_CHARS) }] } } }), {}, 'nor is one past the size bound');
+  ink.saveInkDraft('q-ink-read', strokes, { label: 'L' });
+  await ink.flushInkDrafts();
+  eq(await ink.readInkDraftExtras('q-ink-read'), {}, 'a save without them removes them: no stale transcript lingers');
+  ink.setInkDraftProfile('pid-ink-b');
+  eq(await ink.readInkDraftExtras('q-ink-read'), {}, 'another profile sees none of it');
+  ink.setInkDraftProfile('pid-ink-a');
+  await ink.clearInkDraft('q-ink-read');
+  ink.setInkDraftProfile('pid-photo-a');
+}
 await drafts.clearPhotoDraft('q-photo');
 eq([await drafts.readPhotoDraft('q-photo'), (rawRows().inkDrafts || []).filter(r => String(r.id).includes(':photo:')).length], [null, 0], 'submitted or discarded, it is gone from the device');
 const source = readFileSync(new URL('../src/local/photoDrafts.js', import.meta.url), 'utf8');

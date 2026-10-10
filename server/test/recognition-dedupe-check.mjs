@@ -404,21 +404,27 @@ try {
     await resetBudget();
     ceiling(1, 1000);
     c.eq((await transcribe(a.jar, picture('takes the last unit'))).status, 200, 'another student takes the deployment\'s last unit');
-    const refusedRead = await recognize(s.jar, sqid, picture('9', 'ok', 'z'));
-    c.deq([refusedRead.status, refusedRead.data?.error?.code], [503, 'PAID_CAPACITY_REACHED'], 'this student\'s submit is refused for capacity');
+    // Submit never starts a read (review 17, F3): a picture with no kept read
+    // is a named, retryable refusal — whatever the capacity — and costs nothing.
+    const nines = callsFor('9');
+    const unreadAtSubmit = await recognize(s.jar, sqid, picture('9', 'ok', 'z'));
+    c.deq([unreadAtSubmit.status, unreadAtSubmit.data?.error?.code, callsFor('9') - nines], [409, 'RECOGNITION_READ_EXPIRED', 0], 'a submit for a picture with no kept read is refused by name and reaches no provider');
+    const refusedRead = await transcribe(s.jar, picture('9', 'ok', 'z'));
+    c.deq([refusedRead.status, refusedRead.data?.error?.code], [503, 'PAID_CAPACITY_REACHED'], 'this student\'s own Read is refused for capacity');
     c.deq(await attemptState(), untouched, 'and wrote no receipt, no completion and no graded attempt');
     ceiling(10000, 100000);
     process.env.PRI_AI_DAILY_FREE = '1';
     c.eq((await transcribe(s.jar, picture('uses the allowance'))).status, 200, 'the student uses their one daily read');
-    const overAllowance = await recognize(s.jar, sqid, picture('9', 'ok', 'z'));
-    c.eq(overAllowance.status, 429, 'a submit over the allowance is refused');
+    const overAllowance = await transcribe(s.jar, picture('9', 'ok', 'z'));
+    c.eq(overAllowance.status, 429, 'a Read over the allowance is refused');
     c.deq(await attemptState(), untouched, 'and likewise consumed nothing of the attempt');
     delete process.env.PRI_AI_DAILY_FREE;
     const typed = await h.request(`/v1/practice/${sqid}/submit`, { method: 'POST', jar: s.jar, headers: { 'Idempotency-Key': 'dedupe-first-real-try' },
       body: { submissionId: 'dedupe-first-real-try', answer: '5', mode: 'typed' } });
     c.deq([typed.status, typed.data.correct, typed.data.resolved], [200, false, false], 'the question is still on its FIRST try: a wrong answer now leaves a second try');
+    c.deq([(await transcribe(s.jar, picture('9', 'ok', 'z'))).status, callsFor('9')], [200, nines + 1], 'once capacity is back the student\'s Read costs one provider call');
     const second = await recognize(s.jar, sqid, picture('9', 'ok', 'z'));
-    c.eq(second.status, 201, 'and once capacity is back the same picture is read and receipted');
+    c.deq([second.status, second.data.reused, callsFor('9')], [201, true, nines + 1], 'and the same picture is receipted at Submit from that read, with no further call');
     const final = await h.request(`/v1/practice/${sqid}/submit`, { method: 'POST', jar: s.jar, headers: { 'Idempotency-Key': 'dedupe-second-real-try' },
       body: { submissionId: 'dedupe-second-real-try', answer: '9', mode: 'ink', transcriptionReceipt: second.data.receipt } });
     c.deq([final.status, final.data.correct], [200, true], 'for the second try the student still had');
@@ -505,12 +511,23 @@ try {
     c.eq((await transcribe(a.jar, image)).data.reused, false, 'a read is kept');
     let offset = RECOGNITION_TTL_MS - 1000;
     ops.configure({ now: () => Date.now() + offset });
-    c.eq((await transcribe(a.jar, image)).data.reused, true, 'and is reused just inside the 15-minute lifetime');
+    c.eq((await transcribe(a.jar, image)).data.reused, true, 'and is reused just inside the 24-hour lifetime');
     offset = RECOGNITION_TTL_MS + 1000;
+    // Review 17, F3: once the kept read has expired, Submit pays for nothing.
+    // The transcript is still on the student's device; the server no longer
+    // holds the read; binding it is refused by name and the provider is not
+    // reached. Only the student's own Read again buys a read.
+    const lateQuestion = await issue(a.jar);
+    const atSubmit = await recognize(a.jar, lateQuestion.data.question.id, image);
+    c.deq([atSubmit.status, atSubmit.data?.error?.code, callsFor('expires')], [409, 'RECOGNITION_READ_EXPIRED', 1],
+      'Submit after the kept read has expired: a distinct retryable refusal and 0 provider calls');
+    c.deq([(await recognize(a.jar, lateQuestion.data.question.id, image)).status, callsFor('expires')], [409, 1], 'a second Submit, the same: still 0 provider calls');
     const expired = await transcribe(a.jar, image);
-    c.eq(expired.data.reused, false, 'and read afresh just after it');
-    c.eq(callsFor('expires'), 2, 'TTL expiry → a new provider call');
-    c.eq(RECOGNITION_TTL_MS, 15 * 60 * 1000, 'the lifetime is the documented 15 minutes');
+    c.eq(expired.data.reused, false, 'the student presses Read again: read afresh');
+    c.eq(callsFor('expires'), 2, 'Read again after expiry → exactly one provider call');
+    const bound = await recognize(a.jar, lateQuestion.data.question.id, image);
+    c.deq([bound.status, bound.data.reused, callsFor('expires')], [201, true, 2], 'and then Submit binds that read into a receipt with no further call');
+    c.eq(RECOGNITION_TTL_MS, 24 * 60 * 60 * 1000, 'the lifetime is the documented 24 hours');
     ops.configure({ now: () => Date.now() });
     // Reuse does not extend the lifetime: it is measured from the paid read.
     c.eq((await transcribe(a.jar, image)).data.reused, true, 'the fresh read is kept in turn');
@@ -566,8 +583,8 @@ try {
     const mintedAtCeiling = await recognize(a.jar, open.data.question.id, image);
     c.deq([mintedAtCeiling.status, mintedAtCeiling.data.reused], [201, true], 'and its receipt can still be minted');
     const recognizeRefused = await recognize(a.jar, open.data.question.id, picture('one too many for recognize'));
-    c.deq([recognizeRefused.status, recognizeRefused.data?.error?.code, recognizeRefused.data?.error?.window, Number.isInteger(recognizeRefused.data?.error?.resetAt)],
-      [503, 'PAID_CAPACITY_REACHED', 'hour', true], 'the recognize route refuses in the same shape');
+    c.deq([recognizeRefused.status, recognizeRefused.data?.error?.code, callsFor('one too many for recognize')],
+      [409, 'RECOGNITION_READ_EXPIRED', 0], 'the recognize route never asks for capacity: it starts no read at all');
 
     // The per-account allowance refusal, same idea.
     await resetBudget();

@@ -21,6 +21,7 @@
 import { cleanInput, parseNumericInput } from '../engine/checker-core.js';
 import { normalize, parse } from '../engine/expr.js';
 import { parseIntervalInput, parseMatrixInput, parseVectorInput } from '../engine/answer-forms.js';
+import { withoutUnit } from '../engine/units.js';
 
 /** Answer types this module can propose for. A choice or a page of working has no final-answer field. */
 export const PROPOSABLE_TYPES = Object.freeze(['numeric', 'expression', 'set', 'point', 'ratio', 'interval', 'matrix', 'vector']);
@@ -99,6 +100,26 @@ function hasProse(s) {
   return /(^|[^\p{L}])(so|is|if|as|we|to|at|by|an|it|of|on)(?=\s|$)/iu.test(String(s));
 }
 
+/** The answer with a unit the marker itself reads off ("12 metres" → "12"). */
+function markerUnitOff(text) {
+  try { return withoutUnit(String(text ?? '').trim()); } catch { return String(text ?? '').trim(); }
+}
+
+/**
+ * The number in front of the question's OWN unit, exactly as the question
+ * prints it ("-19 °C" for a question whose answer is in °C), or null. Used
+ * only where the marker cannot read that unit off by itself: the number alone
+ * is then what is proposed, since the field already shows the unit beside it.
+ * A different unit is never taken off.
+ */
+function beforeOwnUnit(text, suffix) {
+  const s = String(text ?? '').trim();
+  const unit = String(suffix ?? '').trim();
+  if (!unit || s.length <= unit.length || !s.toLowerCase().endsWith(unit.toLowerCase())) return null;
+  const body = s.slice(0, -unit.length).trim();
+  return /[\d)π]$/.test(body) ? body : null;
+}
+
 /**
  * Does this text read as an answer of this type, in the typed field's parser?
  * `question` is the PUBLIC question (answerType, answerSuffix); nothing else of
@@ -111,8 +132,15 @@ export function readsAsAnswer(text, question = {}) {
   try {
     switch (type) {
       case 'numeric': {
-        if (hasProse(cleanInput(s))) return false;
-        return Number.isFinite(parseNumericInput(s).value);
+        // A value written with the question's own unit ("147 cm³/s",
+        // "1 square units") is that value: the marker reads the unit off the
+        // same way before it parses (checker-core: withoutUnit). Only the
+        // PUBLIC suffix is used, and nothing is dropped from what is proposed
+        // or sent — the unit stays on the text, so a different unit still
+        // meets the marker's own "check the unit".
+        const value = question?.answerSuffix ? markerUnitOff(s) : s;
+        if (hasProse(cleanInput(value))) return false;
+        return Number.isFinite(parseNumericInput(value).value);
       }
       case 'expression': {
         if (hasProse(s) || relations(s).some(r => r.kind !== 'equals')) return false;
@@ -137,7 +165,7 @@ export function readsAsAnswer(text, question = {}) {
         const parts = inner.replace(/\bor\b|\band\b|;/gi, ',').split(',').map(p => p.trim()).filter(Boolean);
         return parts.length > 0 && parts.every(p => !hasProse(cleanInput(p)) && Number.isFinite(parseNumericInput(p).value));
       }
-      case 'interval': return hasProse(s.replace(/\b(or|and)\b/gi, '')) ? false : !!parseIntervalInput(s, question?.answer?.variable ?? null);
+      case 'interval': return hasProse(s.replace(/\b(or|and)\b/gi, '')) ? false : !!parseIntervalInput(s, null);
       case 'matrix': return !!parseMatrixInput(s);
       case 'vector': return !!parseVectorInput(s);
       default: return false;
@@ -182,11 +210,37 @@ function segments(s) {
   return out.map(x => x.trim()).filter(Boolean);
 }
 
+// "3 at x = 1", "x = 3 if y = 2", "least value 6 when x = -3": what follows
+// the word is WHERE or WHEN, not the answer. It is set aside only when it
+// really is a condition (it states a relation of its own).
+const CONDITION = /(^|[^\p{L}])(at|when|whenever|where|if|for)(?=[^\p{L}])/iu;
+function withoutCondition(s) {
+  const m = CONDITION.exec(s);
+  if (!m) return s;
+  const head = s.slice(0, m.index + m[1].length).trim().replace(/[(\[,]\s*$/, '').trim();
+  const tail = s.slice(m.index + m[0].length);
+  if (!head || !relations(tail).length) return s;
+  // "x = 3 if y = 2" and "least value = 6 at x = -3" say what the answer is and
+  // then where. "2x = 6 if x = 3" does not: the line is a step, and either
+  // number could be meant. That one is left for the student.
+  const at = head.lastIndexOf('=');
+  if (at > 0) {
+    const left = head.slice(0, at).trim();
+    const named = /^[a-zA-Zθ]['′]?(\s*\(\s*[^()]{1,12}\s*\))?$/.test(left);
+    if (!named && !hasProse(left)) return null;
+  }
+  return head;
+}
+
+/** A line that checks or verifies an answer is not the answer ("check: 3 + 1 = 4"). */
+const CHECK_LINE = /^\s*[(\[]?\s*(check(ing)?|verify|verification|verified|proof|l\.?h\.?s\.?|r\.?h\.?s\.?|जाँच|सत्यापन)(?=[^\p{L}]|$)/iu;
+export const isCheckLine = text => CHECK_LINE.test(String(text ?? ''));
+
 /** The one value a piece of a line states, or null. */
 function valueOf(piece, question) {
   const type = question?.answerType || 'numeric';
-  const s = stripSentence(piece);
-  if (!s) return null;
+  const s = withoutCondition(stripSentence(piece));
+  if (!s) return null;      // nothing there, or a conditional step too doubtful to cut
   const rel = relations(s);
   const words = answerWords(s);
   // For a list-shaped answer the whole line may be the answer ("x > 3",
@@ -200,6 +254,8 @@ function valueOf(piece, question) {
     // "Ans. 6": the stop belongs to the abbreviation, not to the value.
     const tail = stripSentence(s.slice(last.end).replace(/^\s*[.:,]\s+/, ''));
     if (tail && readsAsAnswer(tail, question)) return tail;
+    const bare = type === 'numeric' ? beforeOwnUnit(tail, question?.answerSuffix) : null;
+    if (bare && readsAsAnswer(bare, question)) return bare;
     // "6 is the least value": the value stands in front of the words.
     const firstWord = words.sort((a, b) => a.at - b.at)[0];
     if (firstWord && !rel.length) {
@@ -208,7 +264,9 @@ function valueOf(piece, question) {
     }
     return null;
   }
-  return readsAsAnswer(s, question) ? s : null;
+  if (readsAsAnswer(s, question)) return s;
+  const bare = type === 'numeric' ? beforeOwnUnit(s, question?.answerSuffix) : null;
+  return bare && readsAsAnswer(bare, question) ? bare : null;
 }
 
 /** Two candidate texts that would be marked as the same answer are one candidate. */
@@ -229,6 +287,103 @@ function distinct(values, question) {
   return out;
 }
 
+const NUMBER = { answerType: 'numeric' };
+
+/**
+ * An ordered pair. Written as a pair it is taken as written. Written as its
+ * coordinates — "x = 1, y = 0" or "1, 0" — it is proposed as "(1, 0)" only
+ * when there are exactly two values and it is clear which is which; anything
+ * else is left for the student.
+ */
+function pointFromLine(s, question) {
+  const whole = valueOf(s, question);
+  if (whole) return { status: 'proposed', answer: whole };
+  let text = withoutCondition(s);
+  // "x = 1 or y = 0" offers alternatives, not the two coordinates of a point.
+  if (!text || /(^|[^\p{L}])(or|या)(?=[^\p{L}]|$)/iu.test(text)) return { status: 'none' };
+  const rel = relations(text).filter(r => r.kind === 'arrow' || r.kind === 'colon');
+  const words = answerWords(text);
+  const lead = [...rel, ...words].sort((a, b) => a.end - b.end);
+  // Drop a lead-in ("so the point is", "∴", "vertex:") but never a coordinate name.
+  for (const cut of lead.reverse()) {
+    // "Ans. 4, 0": the stop belongs to the abbreviation, not to the first
+    // coordinate (the same rule valueOf applies) — never "(. 4, 0)".
+    const rest = text.slice(cut.end).replace(/^\s*[.:,]\s+/, '').trim();
+    if (segments(rest).length === 2) { text = rest; break; }
+  }
+  const parts = segments(text);
+  if (parts.length !== 2) return { status: 'none' };
+  const read = parts.map(part => {
+    const m = part.match(/^([a-zA-Z])\s*=\s*(.+)$/);
+    const value = stripSentence(m ? m[2] : part);
+    // A coordinate is a plain number as written. A piece that starts with a
+    // stray stop (". 4") or is a zero-padded group ("000" — the tail of
+    // "1, 000", one number written with a separator) is not one.
+    if (/^\.\s/.test(value) || /^[-+−]?0\d/.test(value) || /=/.test(value)) return null;
+    return readsAsAnswer(value, NUMBER) ? { name: m ? m[1].toLowerCase() : null, value } : null;
+  });
+  if (read.some(r => !r)) return { status: 'none' };
+  const names = read.map(r => r.name);
+  let ordered = null;
+  // Two bare numbers are a pair only when written as one: "4, 0". "1,234" is
+  // one number, and "7 and 9" lists two things that need not be coordinates.
+  if (names[0] === null && names[1] === null) {
+    if (/\d,\d{3}(?!\d)/.test(text) || /(^|[^\p{L}])(and|तथा)(?=[^\p{L}]|$)/iu.test(text)) return { status: 'none' };
+    ordered = read;
+  }
+  else if (names[0] === 'x' && names[1] === 'y') ordered = read;
+  else if (names[0] === 'y' && names[1] === 'x') ordered = [read[1], read[0]];
+  if (!ordered) return { status: 'none' };
+  const answer = `(${ordered[0].value}, ${ordered[1].value})`;
+  return readsAsAnswer(answer, question) ? { status: 'proposed', answer } : { status: 'none' };
+}
+
+/**
+ * A set of values written one by one — "so x = 1 or x = 2" — is every value,
+ * never just the last. Returns null when the line is not that shape (the
+ * ordinary rules then apply), and proposes nothing when one of the pieces
+ * states no value.
+ */
+function setFromLine(s, question) {
+  const whole = withoutCondition(s);
+  if (!whole) return { status: 'none' };
+  const parts = segments(whole);
+  if (parts.length < 2) return null;
+  // Only values of the solved variable belong in the set. "x² = 4, x = 2 or
+  // x = -2" states one equation and two roots: the 4 is a step. A piece whose
+  // "=" has anything but a bare variable on its left is a step, not a value.
+  const kinds = parts.map(part => {
+    const at = part.lastIndexOf('=');
+    if (at < 0) return { kind: 'value' };
+    const left = part.slice(0, at);
+    const named = /(^|[^\p{L}\p{N}^)\]}²³])([a-zA-Zθ])\s*$/u.exec(left);
+    return named && !/[\d^()\[\]{}²³√+*/<>=-]/.test(left.slice(0, named.index + named[1].length)) ? { kind: 'root', name: named[2] } : { kind: 'step' };
+  });
+  if (kinds.some(k => k.kind === 'step')) {
+    const roots = kinds.filter(k => k.kind === 'root');
+    const sameVariable = roots.length > 0 && roots.every(k => k.name === roots[0].name);
+    // Bare values ("x = 2 or -2") follow the root they are listed with.
+    const firstRoot = kinds.findIndex(k => k.kind === 'root');
+    const kept = sameVariable ? parts.filter((_, i) => kinds[i].kind === 'root' || (kinds[i].kind === 'value' && i > firstRoot)) : [];
+    const solved = kept.map(part => valueOf(part, NUMBER));
+    if (kept.length && solved.every(Boolean)) {
+      const answer = distinct(solved, NUMBER).join(', ');
+      if (readsAsAnswer(answer, question)) return { status: 'proposed', answer };
+    }
+    // Steps only, or roots of different variables: which numbers are meant is
+    // the student's to say.
+    const candidates = distinct(parts.map(part => valueOf(part, NUMBER)).filter(Boolean), NUMBER);
+    return candidates.length ? { status: 'ambiguous', candidates } : { status: 'none' };
+  }
+  const values = parts.map(part => valueOf(part, NUMBER));
+  if (values.some(v => !v)) {
+    // "roots are {1, -2}" and the like are read whole by the ordinary rules.
+    return valueOf(s, question) && parts.every(part => !/=/.test(part) || valueOf(part, NUMBER)) ? null : { status: 'none' };
+  }
+  const answer = distinct(values, NUMBER).join(', ');
+  return readsAsAnswer(answer, question) ? { status: 'proposed', answer } : { status: 'none' };
+}
+
 /**
  * What one line states as an answer.
  *   { status: 'proposed', answer }
@@ -240,6 +395,11 @@ export function answerFromLine(line, question = {}) {
   if (!PROPOSABLE_TYPES.includes(type)) return { status: 'none' };
   const s = stripSentence(line);
   if (!s) return { status: 'none' };
+  if (type === 'point') return pointFromLine(s, question);
+  if (type === 'set') {
+    const listed = setFromLine(s, question);
+    if (listed) return listed;
+  }
   const whole = valueOf(s, question);
   const parts = LIST_TYPES.has(type) ? [s] : segments(s);
   if (parts.length > 1) {
@@ -273,6 +433,9 @@ export function proposeFinalAnswer(lines, question = {}) {
     .filter(l => l.text);
   if (!kept.length) return { status: 'none' };
 
+  // A trailing "check: 3 + 1 = 4" verifies the answer; it is not the answer.
+  while (kept.length > 1 && isCheckLine(kept.at(-1).text)) kept.pop();
+  if (isCheckLine(kept.at(-1).text)) return { status: 'none' };
   const last = kept.at(-1);
   const fromLast = answerFromLine(last.text, question);
   // A line that says "answer" anywhere on the page is a candidate final too.

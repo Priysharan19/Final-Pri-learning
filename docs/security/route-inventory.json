@@ -2182,7 +2182,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "owner only: the sealed paper is read by (account_id, id), so another account's id, an unknown id and a malformed id are the same 404 EXAM_NOT_FOUND and write nothing; stores the latest answer snapshot (answers, working, per-question time, input mode — text only, keys of this paper only) with the server's timestamp; an older revision never replaces a newer one; refused with 409 once the paper is finalised or deadline + 2 minutes has passed",
+      "ownership": "owner only: the sealed paper is read by (account_id, id), so another account's id, an unknown id and a malformed id are the same 404 EXAM_NOT_FOUND and write nothing; stores the latest answer snapshot (answers, working, per-question time, input mode — text only, keys of this paper only — and, for handwriting not yet read, the SHA-256 of each page's picture by answer key, never the picture) with the server's timestamp; an older revision never replaces a newer one; refused with 409 once the paper is finalised or deadline + 2 minutes has passed",
       "rateLimits": [
         {
           "key": "exam-answers",
@@ -2205,7 +2205,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "the same handler and rule as PUT /v1/exams/:id/answers (the native iOS and Android cloud bridges carry GET, POST, PATCH and DELETE only): owner only: the sealed paper is read by (account_id, id), so another account's id, an unknown id and a malformed id are the same 404 EXAM_NOT_FOUND and write nothing; stores the latest answer snapshot (answers, working, per-question time, input mode — text only, keys of this paper only) with the server's timestamp; an older revision never replaces a newer one; refused with 409 once the paper is finalised or deadline + 2 minutes has passed",
+      "ownership": "the same handler and rule as PUT /v1/exams/:id/answers (the native iOS and Android cloud bridges carry GET, POST, PATCH and DELETE only): owner only: the sealed paper is read by (account_id, id), so another account's id, an unknown id and a malformed id are the same 404 EXAM_NOT_FOUND and write nothing; stores the latest answer snapshot (answers, working, per-question time, input mode — text only, keys of this paper only — and, for handwriting not yet read, the SHA-256 of each page's picture by answer key, never the picture) with the server's timestamp; an older revision never replaces a newer one; refused with 409 once the paper is finalised or deadline + 2 minutes has passed",
       "rateLimits": [
         {
           "key": "exam-answers",
@@ -2232,6 +2232,29 @@
       "rateLimits": [
         {
           "key": "exam-finish",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/exams/:id/handwriting",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "owner only (same 404 rule); reads ONE page of handwriting that was captured and never read when the paper was finalised: accepted only after finalisation (409 EXAM_NOT_FINALISED before), only for an answer key the stored result holds as pending (409 EXAM_HANDWRITING_NOT_PENDING otherwise), and only when the SHA-256 of the presented picture equals the digest frozen in the result (409 EXAM_HANDWRITING_CHANGED otherwise: nothing written, erased or photographed after the paper closed can be read); the picture is never stored; the read goes through recognitionOps (daily AI allowance, deployment spend ceiling, kept-read dedupe: an unchanged picture already read for this account is not paid for again); each read is reserved in the result row under the account sync lock BEFORE the provider is asked; exactly one read per page is automatic and every later one requires the student's explicit retry: true; at most 3 are ever started per page, never sooner than the backoff (1 min, then 15 min, or the ceiling/allowance reset) and none after 7 days, whatever is sent here; the page record is a receipt (question, answer key, digest, when and on what evidence the server received the digest, status, tries left) and never holds image bytes; a confident reading is turned into the answer by a fixed rule and marked by the deterministic engine in the marker pool; only that answer's line, the totals derived from the lines, one graded-attempt event and the score in the paper's own exam-result event change; an uncertain, empty or exhausted page stays pending and unmarked for an authorised person; session and guardian consent are rechecked inside both transactions; no model output sets a mark and no client field carries a transcript, an answer or a mark",
+      "rateLimits": [
+        {
+          "key": "exam-handwriting",
           "limit": 120,
           "windowMs": 3600000,
           "identity": "account"

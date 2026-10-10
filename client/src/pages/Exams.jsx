@@ -222,6 +222,7 @@ function PaperHistory({ exams, openPaper, nav, india = false }) {
             {e.finished_at
               ? <span className="tag" style={{ color: pct >= 80 ? 'var(--good)' : pct >= 50 ? 'var(--ink)' : 'var(--bad)' }}>
                 {e.score}/{e.total} · {pct}%
+                {e.pending_marks > 0 && <span data-exam-provisional={e.pending_marks}> · {t('exams.provisional', { count: e.pending_marks, n: e.pending_marks })}</span>}
               </span>
               : e.pending
                 ? <span className="tag" data-exam-pending>{t('exams.waitingToBeMarked')}</span>
