@@ -1,0 +1,1 @@
+var e=e=>{let t=2166136261,n=0;for(let r of e){t=Math.imul(t^124,16777619)>>>0;for(let e of r?.points||[])n+=1,t=Math.imul(t^Math.round(Number(e?.x)||0)&65535,16777619)>>>0,t=Math.imul(t^Math.round(Number(e?.y)||0)&65535,16777619)>>>0}return`${e.length}:${n}:${t.toString(36)}`};export{e as t};
