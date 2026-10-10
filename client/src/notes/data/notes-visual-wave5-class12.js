@@ -653,6 +653,41 @@ const specs=[
     "x": 0,
     "y": 5,
     "context": "Equality of differentiable functions E"
+  },
+  {
+    "chapterId": "c12-differential-equations",
+    "kind": "slopeField",
+    "m": 1,
+    "c": 2,
+    "context": "Differential field with initial condition A"
+  },
+  {
+    "chapterId": "c12-differential-equations",
+    "kind": "slopeField",
+    "m": 2,
+    "c": -1,
+    "context": "Solution trajectory B"
+  },
+  {
+    "chapterId": "c12-differential-equations",
+    "kind": "slopeField",
+    "m": 3,
+    "c": 0,
+    "context": "Slope geometry C"
+  },
+  {
+    "chapterId": "c12-differential-equations",
+    "kind": "slopeField",
+    "m": 4,
+    "c": -2,
+    "context": "Quadratic integral curves D"
+  },
+  {
+    "chapterId": "c12-differential-equations",
+    "kind": "slopeField",
+    "m": 2,
+    "c": 3,
+    "context": "Initial-value solution E"
   }
 ];
 const output={};for(const {chapterId,kind,...p} of specs)(output[chapterId]||={examples:[]}).examples.push(makeAdvancedVisual(kind,p));
