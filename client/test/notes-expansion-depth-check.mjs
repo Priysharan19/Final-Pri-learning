@@ -17,7 +17,7 @@ for (const group of IN_CURRICULUM) {
     assert.ok(n.concepts.length >= 2, `concept enrichment missing: ${chapter.id}`);
     assert.ok(n.points.length >= 2, `recall enrichment missing: ${chapter.id}`);
     assert.ok(n.mistakes.length >= 2, `misconception enrichment missing: ${chapter.id}`);
-    assert.ok(n.examples.length >= (group.grade >= 10 ? 4 : 3), `worked-example enrichment missing: ${chapter.id}`);
+    assert.ok(n.examples.length >= (group.grade >= 10 ? 4 : 5), `worked-example enrichment missing: ${chapter.id}`);
     const questions = n.examples.map(x => String(x.question).replace(/\\s+/g, ' ').trim());
     assert.equal(new Set(questions).size, questions.length, `duplicate worked example in ${chapter.id}`);
     for (const item of n.examples) {
@@ -31,4 +31,4 @@ assert.equal(c11['c11-complex-numbers'].examples.length, 26, 'Complex Numbers sh
 assert.equal(c11['c11-complex-numbers'].examples.filter(x => x.question.startsWith('Optional JEE')).length, 8, 'JEE extension labels are required');
 assert.ok(c11['c11-complex-numbers'].examples.slice(-16).every(x => x.question.startsWith('Optional ')), 'Optional study label required for all deeper studies');
 assert.equal(count, 77, 'total chapter count changed unexpectedly');
-console.log(`Notes expansion breadth PASS: ${count}/77 existing chapters, >=3–4 verified examples per chapter, 8 JEE bridges and 16 deeper Complex Numbers studies`);
+console.log(`Notes expansion breadth PASS: ${count}/77 existing chapters, at least 5 examples for Class 7–9 and 4 for Class 10–12, 8 JEE bridges and 16 deeper Complex Numbers studies`);
