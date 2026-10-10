@@ -331,7 +331,7 @@ const specs = [
     "context": "Range of a linear map"
   },
   {
-    "chapterId": "c12-3d-geometry",
+    "chapterId": "c12-vector-algebra",
     "kind": "vectors",
     "u": [
       6,
@@ -341,7 +341,7 @@ const specs = [
       -3,
       5
     ],
-    "context": "Projected components of 3D vectors"
+    "context": "Planar displacement-vector components"
   }
 ];
 const data={};for(const {chapterId,kind,...p} of specs)(data[chapterId]||={examples:[]}).examples.push(makeVisualExample(kind,p));
