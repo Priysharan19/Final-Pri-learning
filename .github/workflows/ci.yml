@@ -80,7 +80,7 @@ jobs:
           grep -Fq 'PLOTTING: PASS — 78/78 checks' suites.log
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
           grep -Fq 'LEGAL PAGES: PASS — 234/234 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 174/174 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 177/177 checks' suites.log
           grep -Fq 'BROWSER RUN FIXES: PASS — 23/23 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
@@ -95,7 +95,7 @@ jobs:
           grep -Fq 'NOTES CONTENT CHECK PASSED — 77/77 chapters' suites.log
           grep -Fq 'I18N VOICE: PASS — 92/92 checks' suites.log
           grep -Fq 'MISCONCEPTION ONTOLOGY: PASS — 99/99 checks' suites.log
-          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 174/174 checks' suites.log
+          grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 177/177 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
           grep -Fq 'MARK PREDICTOR: PASS — 42/42 checks' suites.log
@@ -260,7 +260,7 @@ jobs:
           # A photographed page: the answer proposed is mathematics, never a sentence;
           # unrelated lines are left out by default and never break the working.
           node client/test/photo-pipeline-check.mjs 2>&1 | tee photo-pipeline.log
-          grep -Fq 'PHOTO PIPELINE: PASS — 739/739 checks' photo-pipeline.log
+          grep -Fq 'PHOTO PIPELINE: PASS — 769/769 checks' photo-pipeline.log
           node server/test/photo-working-marking-http-check.mjs 2>&1 | tee -a photo-pipeline.log
           grep -Fq 'PHOTO WORKING MARKING: PASS — 40/40 checks' photo-pipeline.log
           node server/test/guardian-consent-check.mjs

@@ -647,7 +647,7 @@ function readerFailureOf(outcome) {
     ? { code: outcome.readiness.lastFailureCode, status: outcome.readiness.lastFailureStatus } : null;
   if (!own) return probe;
   // An account-side reason from either source outranks "did not answer".
-  const account = [READER_FAILURE.SESSION, READER_FAILURE.VERIFY_EMAIL, READER_FAILURE.GUARDIAN];
+  const account = [READER_FAILURE.SESSION, READER_FAILURE.VERIFY_EMAIL, READER_FAILURE.GUARDIAN, READER_FAILURE.MFA];
   if (probe && !account.includes(classifyReaderFailure(own).kind) && account.includes(classifyReaderFailure(probe).kind)) return probe;
   return own;
 }
@@ -670,13 +670,13 @@ export function accountBlockedKey(outcome = null) {
   const failure = readerFailureOf(outcome);
   if (!failure) return null;
   const named = classifyReaderFailure(failure);
-  return [READER_FAILURE.SESSION, READER_FAILURE.VERIFY_EMAIL, READER_FAILURE.GUARDIAN].includes(named.kind) ? named.photoKey : null;
+  return [READER_FAILURE.SESSION, READER_FAILURE.VERIFY_EMAIL, READER_FAILURE.GUARDIAN, READER_FAILURE.MFA].includes(named.kind) ? named.photoKey : null;
 }
 
 /** Blockers the student can clear in Account settings (sign in, verify, consent). */
 export const ACCOUNT_BLOCKED_KEYS = Object.freeze(new Set([
-  'ink.waitingSignIn', 'ink.waitingVerifyEmail', 'ink.waitingGuardian',
-  'verdict.photoReadingSignIn', 'verdict.photoReadingVerifyEmail', 'verdict.photoReadingGuardian'
+  'ink.waitingSignIn', 'ink.waitingVerifyEmail', 'ink.waitingGuardian', 'ink.waitingMfa',
+  'verdict.photoReadingSignIn', 'verdict.photoReadingVerifyEmail', 'verdict.photoReadingGuardian', 'verdict.photoReadingMfa'
 ]));
 
 /** Semantic reader states: blockers are not handwriting failures. */
