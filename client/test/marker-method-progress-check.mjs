@@ -747,6 +747,61 @@ ok(stepCheck(meta, `${fill('(x+1)', 290, '')}+12345 = 0`, { prompt }).lines[0].u
   ok(pairMarks('18x = -126\nx = -7\n4(-7) - y = -22\n-28 - y = -22') === 3, 'pair: elimination, then the value put back and simplified, keep their marks');
 }
 
+// ── Splitting the middle term is a stage; a named polynomial has a discriminant ─
+{
+  const marks = (meta, prompt, working, total = 4) => { try { return methodMarks({ meta, working, marks: total, prompt })?.awarded ?? 0; } catch { return -1; } };
+  const quad = { kind: 'equation', variable: 'x', solutions: [4, -8], source: 'x^2+4x-32=0' };
+  const qp = '$x^2+4x-32=0$';
+  ok(marks(quad, qp, 'x^2+8x-4x-32=0') === 1, 'the middle term split with the pair that factorises the quadratic is a step');
+  ok(marks(quad, qp, 'x^2-4x+8x-32=0') === 1, '…in either order');
+  ok(marks(quad, qp, 'x(x+8)-4(x+8)=0') === 1, 'the common factor taken out of each half is a step');
+  ok(marks(quad, qp, 'x^2+8x-4x-32=0\nx(x+8)-4(x+8)=0') === 1, 'the split and the grouping are one stage');
+  ok(marks(quad, qp, 'x^2+8x-4x-32=0\nx(x+8)-4(x+8)=0\n(x+8)(x-4)=0\nx=4\nx=-8', 5) === 4, 'split, factorise, and each root: four marks');
+  for (const line of ['x^2+6x-2x-32=0', 'x^2+2x+2x-32=0', 'x^2+5x-x-32=0', 'x(x+4)-32=0', 'x(x+8)-4(x+7)=4', 'x^2+4x-30-2=0', 'x(x+2)+2(x-16)=0']) {
+    ok(marks(quad, qp, line) === 0, `"${line}" splits the quadratic without the pair that factorises it and earns nothing`);
+  }
+  const zeroes = { kind: 'equation', variable: 'x', solutions: [-5, -6] };
+  const zp = 'Find the zeroes of $p(x)=x^2 + 11x + 30$ algebraically.';
+  ok(marks(zeroes, zp, 'x = (-11 + sqrt(1))/2') === 1, 'the formula on a polynomial the question names, with that polynomial\'s discriminant, is a step');
+  ok(marks(zeroes, zp, 'x = (-11 + sqrt(121 - 120))/2\nx = -5') === 2, '…and its root is then read off');
+  ok(marks(zeroes, zp, 'x = (-11 + sqrt(4))/2') === 0 && marks(zeroes, zp, 'x = -5') === 0, 'a root under some other square root, or stated alone, earns nothing');
+  ok(marks(zeroes, zp, 'x^2+6x+5x+30=0\n(x+6)(x+5)=0') === 2, 'split and factorise on a named polynomial keep both marks');
+}
+
+// ── The cost of an answer does not depend on the numbers in it ───────────────
+// `ncr(3000000000,1500000000)` — 26 characters in the final-answer box — took
+// five seconds, and being "unreadable" it spent no try and could be sent again.
+{
+  const numeric = { answerType: 'numeric', answer: { value: 120 }, prompt: 'Find the value.' };
+  const set = { answerType: 'set', answer: { values: [2, 3] }, prompt: 'Solve.' };
+  const expr = { answerType: 'expression', answer: { expr: '5x' }, prompt: 'Simplify.' };
+  const meta = { kind: 'equation', variable: 'n', solutions: [5] };
+  const mPrompt = 'Given that $\\binom{n}{2} = 10$, find $n$.';
+  const big = ['3000000000', '1500000000', '999999999999', '1e15', '170', '171', '9999', '10001', '99999', '2147483648'];
+  const shapes = [(a, b) => `ncr(${a},${b})`, (a, b) => `npr(${a},${b})`, (a, b) => `${a}C${b}`, (a, b) => `${a}P${b}`, a => `${a}!`, a => `sum(k;k;1;${a})`, (a, b) => `sum(sum(k;k;1;${b});j;1;${a})`,
+    () => 'sum(sum(sum(k;k;1;300);j;1;300);i;1;300)', (a, b) => `sum(ncr(${a},k);k;0;${b})`, (a, b) => `${a}^${b}`, a => `${a}^${a}^${a}`, (a, b) => `ncr(ncr(${a},2),${b})`, a => `sum(k!;k;1;${a})`, (a, b) => `\\binom{${a}}{${b}}`];
+  let worst = 0, worstText = '', inputs = 0;
+  const time = (label, run) => { const at = process.hrtime.bigint(); try { run(); } catch { failures.push(`${label} threw`); } const ms = Number(process.hrtime.bigint() - at) / 1e6; inputs++; if (ms > worst) { worst = ms; worstText = label; } };
+  for (const shape of shapes) for (const a of big) for (const b of big) {
+    const text = shape(a, b);
+    if (text.length > 40) continue;
+    for (const q of [numeric, set, expr]) time(`answer ${text}`, () => checkAnswer(q, text));
+    for (const line of [`${text} = n`, `n = ${text}`, text]) time(`working ${line}`, () => { const working = Array(16).fill(line).join('\n'); const report = stepCheck(meta, working, { prompt: mPrompt }); methodMarks({ meta, working, marks: 4, prompt: mPrompt, report }); });
+  }
+  // About 30 ms at worst on the development machine (the nested sums, which run to their budget);
+  // the bound asserted leaves room for a loaded machine, not for the seconds this used to take.
+  ok(inputs > 3000 && worst < 400, `${inputs} short answers and working lines built from huge numbers: the slowest takes ${worst.toFixed(0)} ms (${worstText})`);
+  // Exact small values are untouched, and what is out of range is not a number.
+  for (const [text, value] of [['nCr(10,3)', 120], ['10C3', 120], ['5!', 120], ['nPr(6,3)', 120], ['sum(k;k;1;15)', 120], ['sum(sum(1;j;1;10);k;1;12)', 120], ['ncr(120,1)', 120], ['ncr(1000,999) - 880', 120]]) {
+    ok(checkAnswer(numeric, text).correct === true, `${text} is still exactly 120`);
+  }
+  ok(checkAnswer({ answerType: 'numeric', answer: { value: 137846528820 }, prompt: '' }, 'nCr(40,20)').correct === true, 'nCr(40, 20) is still exact');
+  for (const text of ['ncr(3000000000,1500000000)', 'npr(3000000000,1500000000)', '600000000C300000000', 'sum(sum(sum(k;k;1;300);j;1;300);i;1;300)', '171!', 'ncr(20002,10001)']) {
+    const got = checkAnswer(numeric, text);
+    ok(got.correct !== true && got.invalid === true, `${text} is not a number the marker can hold: unreadable, never correct`);
+  }
+}
+
 // ── A comma with a space beside it is a list ─────────────────────────────────
 {
   const read = text => { try { return parseNumericInput(text).value; } catch { return null; } };

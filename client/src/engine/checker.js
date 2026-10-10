@@ -5,7 +5,11 @@
 // that API stable while routing mathematical working through Pri Reason.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { normalize, parse, evaluate, exprEquivalent, numsClose, variablesOf } from './expr.js';
+import { normalize, parse, evaluate, exprEquivalent, numsClose, variablesOf, withEvaluationBudget } from './expr.js';
+
+// Every sum term and counting-loop turn spent while one answer or one page of
+// working is checked comes out of this — see "What an evaluation may cost" in expr.js.
+const EVALUATION_BUDGET = 50000;
 import { diagnoseStep } from './diagnose.js';
 import {
   assessEquationLine, sameEquationClaim, sameExpressionClaim,
@@ -29,6 +33,9 @@ function malformedRatioInput(rawInput) {
 }
 
 export function checkAnswer(question, rawInput) {
+  return withEvaluationBudget(EVALUATION_BUDGET, () => checkAnswerWithinBudget(question, rawInput));
+}
+function checkAnswerWithinBudget(question, rawInput) {
   if (question?.answerType === 'working') return checkWorking(question, String(rawInput ?? ''));
   if (question?.answerType === 'ratio' && malformedRatioInput(rawInput)) {
     return { correct: false, feedback: 'Write the ratio with exactly two parts, like 2 : 3.' };
@@ -185,6 +192,9 @@ function readSolutionList(raw, meta) {
 }
 
 export function checkWorking(q, workingText) {
+  return withEvaluationBudget(EVALUATION_BUDGET, () => checkWorkingWithinBudget(q, workingText));
+}
+function checkWorkingWithinBudget(q, workingText) {
   const ans = q.answer;
   const meta = ans.stepMeta;
   let report;
@@ -968,6 +978,9 @@ function stepCheckPlan(meta, workingText) {
  * equations the question gives; without it, such a line is a note.
  */
 export function stepCheck(meta, workingText, options = null) {
+  return withEvaluationBudget(EVALUATION_BUDGET, () => stepCheckWithinBudget(meta, workingText, options));
+}
+function stepCheckWithinBudget(meta, workingText, options = null) {
   if (meta?.kind === 'plan') return stepCheckPlan(meta, workingText);
   return stepCheckSingle(meta, workingText, pinnedSystem(meta, typeof options?.prompt === 'string' ? options.prompt : ''), { loneBranches: true });
 }
@@ -1655,6 +1668,8 @@ function checkedRoot(claim, given, meta) {
 //   expanded    a bracketed question multiplied out, each side collected;
 //   cleared     a question with the unknown in a denominator or under a root,
 //               written as a polynomial equation;
+//   grouped     a quadratic's middle term split with the pair that factorises
+//               it, or the common factor taken out of each half;
 //   factorised  a product of factors of lower degree, equal to 0;
 //   square      a completed square, `(x + a)^2 = b`.
 // Each earns once. A line of lower degree (`x - 3 = 4`, `x - 2 = 0`) is linear
@@ -1732,7 +1747,30 @@ function productFactors(node, acc = []) {
   return acc;
 }
 
-/** What the equation `claim` is in itself: 'standard', 'factorised', 'square', 'collected' or null. */
+/**
+ * A quadratic on the way to its factors: the middle term split with the pair
+ * that factorises it (`x^2 + 8x - 4x - 32`: 8 + (-4) is b, 8 × (-4) is a·c),
+ * or the common factor taken out of each half (`x(x + 8) - 4(x + 8)`). Neither
+ * can be written without finding the factor pair.
+ */
+function groupedQuadratic(side, variable, poly) {
+  const terms = additiveTerms(side).map(term => ({ ...term, poly: polynomialIn(term.node, variable) }));
+  if (terms.some(term => !term.poly)) return false;
+  const [c, , a] = poly;
+  // Four monomials: one square, two in the unknown, one constant.
+  if (terms.length === 4 && terms.every(term => term.poly.filter(x => !numsClose(x, 0)).length === 1)) {
+    const linear = terms.filter(term => term.poly.length === 2).map(term => term.sign * term.poly[1]);
+    return linear.length === 2 && terms.filter(term => term.poly.length === 3).length === 1 && terms.filter(term => term.poly.length === 1).length === 1 &&
+      numsClose(linear[0] * linear[1], a * c) && !numsClose(linear[0], 0) && !numsClose(linear[1], 0);
+  }
+  // Two products sharing a linear factor.
+  if (terms.length === 2) {
+    const [first, second] = terms.map(term => productFactors(term.node).filter(f => { const n = unwrapGroup(f); return n?.t === 'bin' && (n.op === '+' || n.op === '-') && polynomialIn(f, variable)?.length === 2; }).map(f => polynomialIn(f, variable)));
+    return first.some(p => second.some(q => samePolynomial(p, q) || samePolynomial(p, q.map(x => -x))));
+  }
+  return false;
+}
+/** What the equation `claim` is in itself: 'standard', 'factorised', 'grouped', 'square', 'collected' or null. */
 function equationForm(claim, variable) {
   if (claim?.kind !== 'equation') return null;
   const [l, r] = claimSides(claim);
@@ -1744,6 +1782,7 @@ function equationForm(claim, variable) {
       const factors = productFactors(side).map(f => polynomialIn(f, variable));
       const real = factors.filter(p => p && p.length >= 2);
       if (factors.every(Boolean) && real.length >= 2 && real.every(p => p.length < poly.length)) return 'factorised';
+      if (poly.length === 3 && groupedQuadratic(side, variable, poly)) return 'grouped';
     }
     // (x + a)^2 = b, with or without a number in front.
     if (!variablesOf(other).size) {
@@ -1768,8 +1807,10 @@ function usesDiscriminant(value, references, variable) {
   for (const c of references) {
     if (c?.kind !== 'equation') continue;
     const [l, r] = claimSides(c);
-    if (!polynomialIn(l, variable) || !polynomialIn(r, variable)) continue;
-    const p = polynomialIn({ t: 'bin', op: '-', l, r }, variable);
+    const pl = polynomialIn(l, variable), pr = polynomialIn(r, variable);
+    // An equation in the unknown — or a polynomial the question names
+    // (`p(x) = x^2 + 11x + 30`, `y = x^2 - 6x + 8`), whose zeroes are asked for.
+    const p = pl && pr ? polynomialIn({ t: 'bin', op: '-', l, r }, variable) : pl && pl.length === 3 ? pl : pr && pr.length === 3 ? pr : null;
     if (p && p.length === 3) discriminants.push(p[1] * p[1] - 4 * p[2] * p[0]);
   }
   return under.some(node => {
@@ -1805,6 +1846,7 @@ function solvingStage(claim, variable, givenOwn) {
     }) ? 'standard' : null;
   }
   if (form === 'factorised') return givenForms.includes('factorised') ? null : 'factorised';
+  if (form === 'grouped') return givenForms.includes('grouped') || givenForms.includes('factorised') ? null : 'grouped';
   if (form === 'square') return givenForms.includes('square') ? null : 'square';
   // Each side collected, but not yet standard form.
   const mine = residual(claim);
@@ -1959,7 +2001,10 @@ const letterFree = claim => {
  * Returns null when nothing in the working could be verified; otherwise
  * { okLines, progressLines, awarded, note, report }.
  */
-export function methodMarks({ meta, working, marks, prompt = '', report = null } = {}) {
+export function methodMarks(input = {}) {
+  return withEvaluationBudget(EVALUATION_BUDGET, () => methodMarksWithinBudget(input));
+}
+function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = null } = {}) {
   if (!meta || working == null || !String(working).trim()) return null;
   let rep = report;
   if (!rep) {

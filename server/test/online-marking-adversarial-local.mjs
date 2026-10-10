@@ -159,7 +159,7 @@ try {
     const sealed = JSON.parse(sql.response_json);
     const t = (sealed.traps || []).find(x => x?.why && Number.isFinite(x.value) && x.value !== sealed.answer?.value);
     if (t && ['numeric', 'expression'].includes(sealed.answerType)) {
-      trapCase = { id: candidate.data.question.id, why: t.why, answer: String(t.value), typed: true };
+      trapCase = { id: candidate.data.question.id, why: t.why, answer: String(t.value) };
       break;
     }
     const options = sealed.answer?.optionTraps;
@@ -173,25 +173,19 @@ try {
     const trapped = await grade(a.jar, trapCase.id, 'trap-authored-001', trapCase.answer);
     eq(trapped.status, 200, 'authored misconception submission committed');
     eq(trapped.data.correct, false, 'designed distractor is not the correct answer');
-    if (trapCase.typed) {
-      // An authored trap for a TYPED value can state the answer ("… so the
-      // least value is 16"). While the question is open it is withheld; the
-      // reply that resolves the question carries it.
-      eq([trapped.data.resolved, trapped.data.trapWhy, trapped.data.feedback === trapCase.why], [false, null, false],
-        'an open typed question is not told the authored trap for the value typed');
-      eq((await grade(a.jar, trapCase.id, 'trap-authored-001', trapCase.answer)).data, trapped.data, 'and its replay is the same reply');
-      const closed = await grade(a.jar, trapCase.id, 'trap-authored-002', trapCase.answer);
-      eq([closed.data.resolved, closed.data.correct], [true, false], 'the same wrong value again resolves the question');
-      eq(closed.data.trapWhy, trapCase.why, 'server passes deterministic authored trap');
-      eq(closed.data.feedback, trapCase.why, 'server returns contextual authored feedback');
-      eq((await grade(a.jar, trapCase.id, 'trap-authored-002', trapCase.answer)).data.trapWhy,
-        trapCase.why, 'authoritative trap explanation stable across replay');
-    } else {
-      eq(trapped.data.trapWhy, trapCase.why, 'server passes deterministic authored trap');
-      eq(trapped.data.feedback, trapCase.why, 'server returns contextual authored feedback');
-      eq((await grade(a.jar, trapCase.id, 'trap-authored-001', trapCase.answer)).data.trapWhy,
-        trapCase.why, 'authoritative trap explanation stable across replay');
-    }
+    // An authored explanation of a wrong answer — a typed value's trap or a
+    // multiple-choice option's — can state the right one. While the question
+    // is open it is withheld; the reply that resolves the question carries it.
+    eq([trapped.data.resolved, trapped.data.trapWhy, trapped.data.feedback === trapCase.why], [false, null, false],
+      'an open question is not told the authored trap for the answer given');
+    eq((await grade(a.jar, trapCase.id, 'trap-authored-001', trapCase.answer)).data, trapped.data, 'and its replay is the same reply');
+    const closed = await grade(a.jar, trapCase.id, 'trap-authored-002', trapCase.answer);
+    eq([closed.data.resolved, closed.data.correct], [true, false], 'the same wrong answer again resolves the question');
+    eq(closed.data.trapWhy, trapCase.why, 'server passes deterministic authored trap');
+    eq(closed.data.feedback, trapCase.why, 'server returns contextual authored feedback');
+    eq(closed.data.firstTryTrapWhy, trapCase.why, 'and the first try\'s trap beside it');
+    eq((await grade(a.jar, trapCase.id, 'trap-authored-002', trapCase.answer)).data.trapWhy,
+      trapCase.why, 'authoritative trap explanation stable across replay');
   }
 
   const pull = await h.request('/v1/sync/pull/0', { jar: a.jar });

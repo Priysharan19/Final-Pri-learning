@@ -6,7 +6,11 @@
 // targeted misconception feedback for recognised wrong answers.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { normalize, parse, evaluate, evalNumeric, exprEquivalent, numsClose, variablesOf } from './expr.js';
+import { normalize, parse, evaluate, evalNumeric, exprEquivalent, numsClose, variablesOf, withEvaluationBudget } from './expr.js';
+
+// Every sum term and counting-loop turn spent while one answer or one page of
+// working is checked comes out of this — see "What an evaluation may cost" in expr.js.
+const EVALUATION_BUDGET = 50000;
 import { diagnoseStep } from './diagnose.js';
 import {
   parseIntervalInput, authoredRegion, sameRegion, sameRegionIgnoringEndpoints,
@@ -285,6 +289,9 @@ const READ_HELP = {
  * Returns { correct, feedback?, normalized? }
  */
 export function checkAnswer(question, rawInput) {
+  return withEvaluationBudget(EVALUATION_BUDGET, () => checkAnswerWithinBudget(question, rawInput));
+}
+function checkAnswerWithinBudget(question, rawInput) {
   const type = question.answerType;
   const ans = question.answer;
   try {
@@ -590,6 +597,9 @@ function checkForm(question, rawInput) {
  * Returns { correct, feedback, stepReport, validLines }
  */
 export function checkWorking(q, workingText) {
+  return withEvaluationBudget(EVALUATION_BUDGET, () => checkWorkingWithinBudget(q, workingText));
+}
+function checkWorkingWithinBudget(q, workingText) {
   const ans = q.answer;
   const meta = ans.stepMeta;
   let report;
@@ -645,6 +655,9 @@ export function checkWorking(q, workingText) {
  * Returns { lines: [{ text, status: 'ok'|'break'|'note', note? }], firstBreak }
  */
 export function stepCheck(meta, workingText) {
+  return withEvaluationBudget(EVALUATION_BUDGET, () => stepCheckWithinBudget(meta, workingText));
+}
+function stepCheckWithinBudget(meta, workingText) {
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   const out = [];
   let firstBreak = -1;
