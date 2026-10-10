@@ -186,6 +186,21 @@ export function proposeRelevance(lines, prompt) {
 }
 
 /**
+ * A reading that is not a reading: nothing came back, every line is the
+ * reader saying it could not make the page out, or the reader's own confidence
+ * in the whole page is near zero (a blurred or badly cropped photo). The card
+ * says "that photo could not be read" with a retry — an explicit reading
+ * problem, never lines of "[illegible]" to mark and never a verdict.
+ */
+export function unreadablePage(transcription) {
+  const lines = (Array.isArray(transcription?.lines) ? transcription.lines : []).map(l => String(l?.text ?? '').trim()).filter(Boolean);
+  if (!lines.length) return true;
+  if (lines.every(text => /^[\[(<]?\s*(illegible|unreadable|unclear|not legible|cannot read|can't read)[\s\w]*[\])>]?\.?$/i.test(text))) return true;
+  const confidence = Number(transcription?.confidence);
+  return Number.isFinite(confidence) && confidence < 0.2;
+}
+
+/**
  * The transcript the card holds: the reader's lines, each with what the
  * reader doubted, and the proposal of which lines belong.
  *

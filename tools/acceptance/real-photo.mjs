@@ -299,11 +299,12 @@ try {
     const { res, t } = await transcribe(http, jar, `SIMULATED ${page.id}`, sent.dataUrl);
     const card = res.status === 200 && t?.lines?.length ? asTheCardWould(t, PUBLIC) : null;
     const explicit = res.status >= 400 && !!res.code;
-    const empty = res.status === 200 && !(t?.lines?.length);
+    // The card's own test for "this photo could not be read" (retake / retry).
+    const empty = res.status === 200 && T.unreadablePage(t);
     const doubted = res.status === 200 && (t?.needsConfirmation === true || (card?.transcript.lines || []).some(l => l.check));
     const readRight = !!card && card.proposal.status === 'proposed' && card.proposal.answer === '6';
     const row = { id: page.id, status: res.status, code: res.code, read: t?.lines?.map(l => l.text) || [], confidence: t?.confidence ?? null, needsConfirmation: t?.needsConfirmation ?? null, proposal: card?.proposal || null,
-      outcome: explicit ? `explicit error ${res.code}` : empty ? 'empty reading' : readRight ? (doubted ? 'read correctly, flagged for checking' : 'read correctly') : doubted ? 'reading in doubt' : 'CONFIDENT WRONG READING' };
+      outcome: explicit ? `explicit error ${res.code}` : empty ? 'shown as "that photo could not be read" with a retry' : readRight ? (doubted ? 'read correctly, flagged for checking' : 'read correctly') : doubted ? 'reading in doubt' : 'CONFIDENT WRONG READING' };
     simulated.push(row);
     // Honest means: an explicit problem, an empty reading, a reading flagged
     // for the student — or simply the right reading. Never a confident wrong one.

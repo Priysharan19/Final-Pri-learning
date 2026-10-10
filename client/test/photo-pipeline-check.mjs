@@ -224,6 +224,13 @@ const revived = T.reviveTranscript(JSON.parse(JSON.stringify(fixed)));
 eq(revived, { lines: fixed.lines, undecided: false, anchor: 5 }, 'a transcript survives a round trip through storage');
 eq([T.reviveTranscript(null), T.reviveTranscript({ lines: [] }), T.reviveTranscript('x')], [null, null, null], 'and junk from storage is refused');
 
+// A page that could not be read is a reading problem, not working to mark.
+eq([T.unreadablePage({ lines: [] }), T.unreadablePage(null), T.unreadablePage({ confidence: 0.02, lines: [{ text: '[illegible]' }, { text: '[illegible]' }] }),
+  T.unreadablePage({ confidence: 0.9, lines: [{ text: 'illegible' }, { text: '(unreadable)' }] }), T.unreadablePage({ confidence: 0.1, lines: [{ text: 'x = 6' }] })], [true, true, true, true, true],
+  'no lines, lines of "[illegible]", or a page the reader has almost no confidence in: unreadable');
+eq([T.unreadablePage({ confidence: 0.68, lines: [{ text: ') 2 > =' }, { text: 'value = 6' }] }), T.unreadablePage({ confidence: 0.9, lines: [{ text: '[illegible]' }, { text: 'x = 6' }] }), T.unreadablePage({ lines: [{ text: '6' }] })], [false, false, false],
+  'a partly read page is shown line by line for the student to check — it is not thrown away');
+
 // ── 3 · why the reader did not read ──────────────────────────────────────────
 const NOW = 1_800_000_000_000;
 const IN_AN_HOUR = NOW + 40 * 60 * 1000;

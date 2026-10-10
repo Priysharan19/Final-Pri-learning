@@ -20,7 +20,7 @@ import {
 import { cloudReadingEnabled, INK_READER_STATE, noteReaderRefusal, readerBlock, readPhotoWithCloud, resumeReaderNow, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { retryClock } from '../ink/readerFailure.js';
 import { preparePhoto } from '../ink/photoRaster.js';
-import { buildTranscript, editLine, includeAll, includedLines, reviveTranscript, setLineExcluded, workingOf } from '../photo/transcript.js';
+import { buildTranscript, editLine, includeAll, includedLines, reviveTranscript, setLineExcluded, unreadablePage, workingOf } from '../photo/transcript.js';
 import { proposeFinalAnswer } from '../photo/finalAnswer.js';
 import { clearPhotoDraft, confirmPhotoDraftSaved, readPhotoDraft, savePhotoDraft } from '../local/photoDrafts.js';
 import PhotoLines from './PhotoLines.jsx';
@@ -471,6 +471,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       cloudOutcome = await readPhotoWithCloud(dataURL, { user });
       if (cloudOutcome && !cloudOutcome.error && !cloudOutcome.reason) {
         const text = String(cloudOutcome.transcription.text || '').trim();
+        // A blurred or cropped page comes back as lines of "[illegible]" at
+        // near-zero confidence: that is a photo to retake, not working.
+        if (unreadablePage(cloudOutcome.transcription)) return null;
         if (text) return { text, transcription: cloudOutcome.transcription, confidence: cloudOutcome.transcription.confidence, engine: cloudOutcome.transcription.engine };
       }
     }
