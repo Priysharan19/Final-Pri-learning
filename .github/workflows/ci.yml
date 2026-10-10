@@ -473,7 +473,9 @@ jobs:
           # taken up elsewhere, exams signed out.
           grep -Fq 'Write · signed out, sign in on the card, same question server-marked' browser.log
           grep -Fq 'Type · typed answer and working survive sign-in on the card, server-marked' browser.log
-          grep -Eq 'E2E SUITE.*56/56.*2 flows' browser.log
+          grep -Fq 'Write · signed out: one true save state; ink survives reload, mode switch, resize, offline; a failed write says so and retries' browser.log
+          grep -Fq 'Photo · signed out, sign in on the card, same photo read, transcript edited, server-marked on Submit' browser.log
+          grep -Eq 'E2E SUITE.*89/89.*4 flows' browser.log
           grep -Fq 'Type · signed out: kept, not checked; signed in on the card, server-marked' browser.log
           grep -Fq 'Type · offline: reconnect asked, work kept, Retry marked exactly once' browser.log
           grep -Fq 'Write · offline: reconnect asked, ink kept, Retry marked exactly once' browser.log
