@@ -346,13 +346,19 @@ async function run() {
     // Spring the same trap three times over fresh questions on the same dot point.
     let hits = 0;
     let firstFeedback = null;
+    let firstOpen = false, firstMcq = false, resolvedFeedback = null;
     let current = found.s;
     for (let tries = 0; tries < 40 && hits < 3; tries++) {
       const probe = (current.payload.traps || []).find(t => t.value !== undefined && misconceptionKey(chapter.id, t.why) === key && !checkAnswer(current.payload, String(t.value)).correct);
       if (probe) {
         const r1 = await POST(`/practice/${current.question.id}/submit`, { answer: String(probe.value), ms: 12000 });
-        if (firstFeedback === null) firstFeedback = r1.feedback;
-        if (!r1.resolved) await POST(`/practice/${current.question.id}/submit`, { answer: String(probe.value), ms: 12000 });
+        const r2 = r1.resolved ? r1 : await POST(`/practice/${current.question.id}/submit`, { answer: String(probe.value), ms: 12000 });
+        if (firstFeedback === null) {
+          firstFeedback = r1.feedback;
+          firstOpen = !r1.resolved;
+          firstMcq = current.question.answerType === 'mcq';
+          resolvedFeedback = r2.feedback;
+        }
         hits++;
       } else {
         await POST(`/practice/${current.question.id}/reveal`, { ms: 1000 });
@@ -367,7 +373,11 @@ async function run() {
       if (hits < 3) current = await serve({ subtopic: chapter.id, dotpoint: found.dotpoint, difficulty: found.difficulty });
     }
     eq('the trap was sprung three times', hits, 3);
-    eq('the feedback on a trap answer is the trap\'s own explanation', firstFeedback, trap.why);
+    // A typed answer's trap explanation can state the answer, so it is held
+    // until the question is finished; the reply that finishes it carries it.
+    // (A multiple-choice option's own explanation is given at once.)
+    eq('the trap\'s own explanation is the feedback when the question is finished, and for a typed answer not before',
+      [resolvedFeedback, firstOpen && !firstMcq ? firstFeedback !== trap.why : true], [trap.why, true]);
     const row = ratingRowsOf(user.id).find(r => r.subtopic === chapter.id);
     const ledger = row?.traps?.[key];
     ok('the trap ledger sits on the chapter row', !!ledger, show(Object.keys(row?.traps || {})));
