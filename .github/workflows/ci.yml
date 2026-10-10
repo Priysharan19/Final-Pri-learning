@@ -263,12 +263,14 @@ jobs:
         run: |
           set -o pipefail
           node server/test/method-progress-http-check.mjs 2>&1 | tee practice-http.log
+          node server/test/flagship-ap-working-http-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-seed-reissue-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-server-question-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-repeat-credit-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/india-bank-issue-coverage-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1192/1192 checks' practice-http.log
+          grep -Fq 'FLAGSHIP AP WORKING OVER HTTP: PASS — 127/127 checks' practice-http.log
           grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
           grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 34/34 checks' practice-http.log
           grep -Fq 'REPEAT CREDIT: PASS — 295/295 checks' practice-http.log
@@ -332,12 +334,13 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 43/43 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 44/44 suites' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
           grep -Fq '✓ exam-authority-check.mjs' platform-postgres.log
           grep -Fq '✓ method-progress-http-check.mjs' platform-postgres.log
+          grep -Fq '✓ flagship-ap-working-http-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-seed-reissue-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-server-question-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-repeat-credit-check.mjs' platform-postgres.log
