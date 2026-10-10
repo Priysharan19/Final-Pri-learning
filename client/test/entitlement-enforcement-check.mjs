@@ -123,7 +123,12 @@ for (const capability of Object.values(ENTITLEMENTS)) {
   const src = rel => readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
   ok('additional-ai-usage is enforced on the server (aiAllowance), not on the device',
     /^server · .*aiAllowance\.js/.test(gate.CAPABILITY_ENFORCEMENT[ENTITLEMENTS.EXTRA_AI]) &&
-    /consumeAiAllowance\(db, \{ accountId: req\.platformSession\.account_id, kind: 'handwriting'/.test(src('server/platform/handwriting.js')) &&
+    // Handwriting reads go through one paid path (recognitionOps.js), given the
+    // session's own account by the route: the allowance is consumed there, and
+    // a read served from a kept reading costs none.
+    /recognitionOpsFor\(db\)\.read\(\{\s*db, accountId: req\.platformSession\.account_id,/.test(src('server/platform/handwriting.js')) &&
+    /consumeAiAllowance\(db, \{ accountId, kind: 'handwriting'/.test(src('server/platform/recognitionOps.js')) &&
+    !/accountId: req\.body/.test(src('server/platform/handwriting.js')) &&
     /consumeAiAllowance\(db, \{ accountId: req\.platformSession\.account_id, kind: 'working'/.test(src('server/platform/working.js')));
 }
 
