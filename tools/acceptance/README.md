@@ -55,3 +55,15 @@ A Class 10 student is a child, so the account is registered as one, naming a gua
 - The request the server sends on to the provider is not observable from outside the server. That it carries only the image is proved without a network by `server/test/provider-answer-blind-check.mjs`. This run asserts what it can see: every transcribe body is `{ image }`, and the route refuses a body that names an answer or a question.
 - `/v1/practice/:id/recognize` reports no latency, engine or fallback fields, so those are recorded only for `/v1/handwriting/transcribe`.
 - Staging, production, Postgres, a physical iPad, Apple Pencil and real handwriting are all outside this run.
+
+## Recognition cost measurement
+
+**Evidence class: real provider, real localhost HTTP server, simulated handwriting images; not staging, not physical device.**
+
+```bash
+cd ~/Developer/Final-Pri-learning
+railway run --service pri-learning-staging --environment staging -- \
+  node <path-to-this-checkout>/tools/acceptance/launch-recognition-cost.mjs
+```
+
+`launch-recognition-cost.mjs` follows the same credential rules as `launch.mjs` (clean child environment, only `PRI_HANDWRITING_*`, temp SQLite, names never values, scrubbed output) and boots one local server whose own spend ceiling is **25 paid calls**, so the run cannot make a 26th. `recognition-cost.mjs` (which never holds the credential) reads about ten simulated pictures once each — single digit, numbers, multi-line working, two photo-sized pages, a blank page — and records, from the server's `/v1/metrics` counters, the provider calls, the model id the provider reported, input/output/reasoning tokens, latency and whether the fallback ran. It then shows that `/handwriting/transcribe` followed by `/practice/:id/recognize` on the same picture is one provider call. About 12 provider calls per run. Output: `recognition-cost-report.json` and `SIMULATED-handwriting-*` pictures in `PRI_ACCEPT_OUT`. Results and the cost model built on them: `docs/operations/recognition-cost.md`.

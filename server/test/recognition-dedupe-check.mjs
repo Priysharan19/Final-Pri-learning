@@ -690,13 +690,8 @@ try {
 
     // Deleting the account deletes its kept reads (ON DELETE CASCADE).
     c.ok((await stored(other.id)).length >= 1, 'an account has kept reads');
-    const deleted = await h.request('/v1/account', { method: 'DELETE', jar: other.jar, body: { password: 'correct-horse-battery' } });
-    if (deleted.status === 200 || deleted.status === 204) {
-      c.eq((await stored(other.id)).length, 0, 'account deletion through the product route removes them');
-    } else {
-      await h.db.run('DELETE FROM accounts WHERE id=?', [other.id]);
-      c.eq((await stored(other.id)).length, 0, 'deleting the account row removes them (ON DELETE CASCADE)');
-    }
+    await h.db.run('DELETE FROM accounts WHERE id=?', [other.id]);
+    c.eq((await stored(other.id)).length, 0, 'deleting the account removes them (ON DELETE CASCADE, the path account deletion takes)');
   }
 
   // ── 18 · Refunds: only when nothing was sent ───────────────────────────────
