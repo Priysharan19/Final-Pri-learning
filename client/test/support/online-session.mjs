@@ -86,7 +86,7 @@ export async function startOnlinePlatform({ dist = DIST } = {}) {
   // request the provider module sends is kept so a flow can prove the reader
   // was sent the picture and nothing about the question. `down` makes the
   // provider hop fail the way an unreachable model does.
-  const reader = { text: '7', confidence: 0.6, down: false, requests: [], refused: [] };
+  const reader = { text: '7', lines: null, confidence: 0.6, down: false, requests: [], refused: [] };
   const realFetch = globalThis.fetch;
   globalThis.fetch = async (input, init = {}) => {
     const url = new URL(typeof input === 'string' ? input : input.url);
@@ -97,7 +97,11 @@ export async function startOnlinePlatform({ dist = DIST } = {}) {
     if (url.host === 'api.openai.com' && url.pathname === '/v1/responses') {
       reader.requests.push(JSON.parse(String(init.body || '{}')));
       if (reader.down) return new Response(JSON.stringify({ error: { message: 'synthetic reader scripted down' } }), { status: 503, headers: { 'content-type': 'application/json' } });
-      const lines = String(reader.text).split('\n').filter(Boolean).map(text => ({ text, latex: text, confidence: reader.confidence }));
+      // `reader.lines` scripts whole line objects (per-line doubt, layout gap);
+      // otherwise every line of `reader.text` is read at `reader.confidence`.
+      const lines = (Array.isArray(reader.lines) && reader.lines.length ? reader.lines : String(reader.text).split('\n').filter(Boolean).map(text => ({ text })))
+        .map(line => ({ text: line.text, latex: line.latex ?? line.text, confidence: line.confidence ?? reader.confidence,
+          uncertain: line.uncertain === true, doubt: line.doubt || '', gap_before: line.gap_before === true }));
       return new Response(JSON.stringify({
         output_text: JSON.stringify({ lines, confidence: reader.confidence, needs_confirmation: reader.confidence < 0.82 })
       }), { status: 200, headers: { 'content-type': 'application/json' } });

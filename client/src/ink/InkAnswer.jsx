@@ -57,7 +57,6 @@ export const STILL_READING_MS = 5000;
 // never keep re-sending a read nobody is watching. A refusal that is not "did
 // not answer" (the service's reading limit, this account's allowance or rate
 // limit, a request the server will not accept) is never re-sent by a timer.
-const PASSIVE_BLOCKS = new Set(['capacity', 'rate-limited', 'allowance', 'request', 'not-allowed', 'not-available', 'turned-off']);
 
 // The reader's "why this page is waiting" sentences were written with a save
 // claim in them ("Saved. It will be read…"). The reader does not know whether
@@ -337,13 +336,23 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       retriesRef.current = 0;
       scheduleRead(strokesRef.current, { immediate: true, fresh: true });
     };
-    // Coming back to the tab is not a reason to re-send a read the server
-    // refused for a limit, or one the page has stopped retrying: only a change
-    // in the account or the connection is.
-    const quiet = () => status?.kind === 'allowance' || status?.stopped === true || PASSIVE_BLOCKS.has(status?.block?.kind);
-    const stopSession = onCloudSessionChange(retry);
-    const onOnline = () => { if (!PASSIVE_BLOCKS.has(status?.block?.kind) && status?.kind !== 'allowance') retry(); };
-    const onVisible = () => { if (quiet()) return; if (typeof document === 'undefined' || document.visibilityState !== 'hidden') retry(); };
+    // Each trigger re-sends only for the reasons it can have changed. A
+    // session announcement or a return from Settings can clear an account
+    // step; a connection coming back can clear "offline" or a reader that did
+    // not answer. None of them is a reason to re-send a read the server
+    // refused for a limit — and a reader that is simply not answering is
+    // retried by its own bounded timer, not by every focus, session
+    // announcement or re-render (after a reload those all arrive within a
+    // second of the first read, and each one used to be a second paid read
+    // of the same page).
+    const kind = status?.kind === 'allowance' ? 'allowance' : status?.block?.kind;
+    const accountStep = ['session', 'verify-email', 'guardian', 'not-allowed', 'allowance', 'turned-off'].includes(kind);
+    const stopSession = onCloudSessionChange(() => { if (accountStep) retry(); });
+    const onOnline = () => { if (kind === 'offline' || (kind === 'unreachable' && status?.stopped !== true)) retry(); };
+    const onVisible = () => {
+      if (!(accountStep && kind !== 'allowance') && kind !== 'offline') return;
+      if (typeof document === 'undefined' || document.visibilityState !== 'hidden') retry();
+    };
     if (typeof window !== 'undefined') {
       window.addEventListener?.('online', onOnline);
       window.addEventListener?.('focus', onVisible);
@@ -367,10 +376,10 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     const identity = readinessIdentity(user);
     const changed = identity !== identityRef.current;
     identityRef.current = identity;
-    // A re-render with the same account is not news: a read the server refused
-    // for a limit, or that the page stopped retrying, is not re-sent by it.
-    if (!changed && (status?.stopped === true || PASSIVE_BLOCKS.has(status?.block?.kind))) return;
-    if (status?.kind === 'waiting' && strokesRef.current.length && cloudReadingEnabled(user)) {
+    // A re-render with the same account is not news. Only a profile that has
+    // actually changed (signed in, switched, turned reading on) re-reads.
+    if (!changed) return;
+    if ((status?.kind === 'waiting' || status?.kind === 'allowance') && strokesRef.current.length && cloudReadingEnabled(user)) {
       scheduleRead(strokesRef.current, { immediate: true, fresh: changed });
     }
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps

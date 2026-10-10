@@ -10,7 +10,7 @@
 // Controlled and without logic of its own: photo/transcript.js decides, the
 // card owns the state and the draft.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useId, useState } from 'react';
+import React, { useId } from 'react';
 import { useT } from '../i18n/index.js';
 import { defaultExclusions, prettyLine } from '../photo/transcript.js';
 
@@ -23,9 +23,6 @@ const plain = value => String(value ?? '')
 export default function PhotoLines({ transcript, disabled = false, onEdit, onExclude, onIncludeAll }) {
   const t = useT();
   const uid = useId();
-  // A line being typed in shows exactly what is stored; at rest it is drawn
-  // with the proper signs. Switching while typing would move the caret.
-  const [focused, setFocused] = useState(-1);
   const lines = transcript?.lines || [];
   if (!lines.length) return null;
   const leftOut = defaultExclusions(transcript);
@@ -53,10 +50,17 @@ export default function PhotoLines({ transcript, disabled = false, onEdit, onExc
               <input className="input photo-line-text" data-photo-correct-transcript
                 aria-label={t('photo.lineFieldLabel', { n: i + 1 })}
                 aria-describedby={asks || line.edited || line.excluded ? noteId : undefined}
-                value={focused === i ? line.text : prettyLine(line.text)}
+                value={prettyLine(line.text)}
                 disabled={disabled || line.excluded}
-                onFocus={() => setFocused(i)} onBlur={() => setFocused(f => (f === i ? -1 : f))}
-                onChange={e => onEdit?.(i, plain(e.target.value))}
+                onChange={e => {
+                  // The field always shows the proper signs, so typing ">="
+                  // becomes "≥" as it is typed. Put the caret back where the
+                  // student was typing rather than at the end of the line.
+                  const el = e.target;
+                  const caret = prettyLine(plain(el.value.slice(0, el.selectionStart ?? el.value.length))).length;
+                  onEdit?.(i, plain(el.value));
+                  requestAnimationFrame(() => { try { if (document.activeElement === el) el.setSelectionRange(caret, caret); } catch { /* not a text field any more */ } });
+                }}
                 autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="text" />
               {!disabled && (
                 <button type="button" className="btn btn-quiet btn-sm photo-line-toggle"
