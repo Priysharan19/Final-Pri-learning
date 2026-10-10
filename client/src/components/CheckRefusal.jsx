@@ -98,14 +98,18 @@ export function CheckRefusal({
   const copy = checkRefusalCopy(kind, context);
   if (!copy) return null;
   const settings = { className: 'btn btn-ghost btn-sm', 'data-check-account': kind };
+  // This profile is linked to a Pri account and the server still said "sign
+  // in": the session ended (expired, signed out elsewhere, server restarted).
+  // Said as that, not as "you need an account".
+  const sessionEnded = copy.action === 'sign-in' && user?.cloudLinked === true && (!context || context === 'answer');
   return (
     <>
       <div className="verdict-title" data-check-refusal={kind}>{t(copy.titleKey)}</div>
-      <div className="verdict-body">{t(copy.contextKey)} <span className="muted">{t(copy.hintKey)}</span></div>
+      <div className="verdict-body">{t(copy.contextKey)} <span className="muted">{t(sessionEnded ? 'check.sessionEnded' : copy.hintKey)}</span></div>
       {copy.action === 'sign-in' && (
-        <div style={{ marginTop: 10 }}>
+        <div style={{ marginTop: 10 }} data-check-session-ended={sessionEnded ? '' : undefined}>
           <CheckSignIn user={user} refreshUser={refreshUser} ready={signInReady} waitText={signInWaitText}
-            label={context && context !== 'answer' ? t('check.signInActionPlain') : null} />
+            label={context && context !== 'answer' ? t('check.signInActionPlain') : sessionEnded ? t('check.signInAgainAction') : null} />
         </div>
       )}
       {copy.action !== 'sign-in' && <div className="row" style={{ marginTop: 10 }}>

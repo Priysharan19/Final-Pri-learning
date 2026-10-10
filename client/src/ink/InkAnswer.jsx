@@ -491,6 +491,18 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           account section of Settings holds sign-in and "send a fresh
           verification email". Kept beside the notice, not inside it, so the
           notice stays the one sentence it is announced as. */}
+      {/* A reader that is not answering is tried again by itself; the
+          student can also ask now instead of waiting for the next attempt. */}
+      {status?.kind === 'waiting' && !disabled && status.key === 'ink.waitingServiceDown' && (
+        <div className="ink-status-action">
+          <button type="button" className="btn btn-ghost btn-sm" data-ink-retry-reading
+            onClick={() => {
+              if (!strokesRef.current.length) return;
+              retriesRef.current = 0;
+              scheduleRead(strokesRef.current, { immediate: true, fresh: true });
+            }}>{t('common.tryAgain')}</button>
+        </div>
+      )}
       {status?.kind === 'waiting' && !disabled && ACCOUNT_BLOCKED_KEYS.has(status.key) && (
         <div className="ink-status-action">
           {inRouter

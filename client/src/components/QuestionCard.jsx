@@ -1463,6 +1463,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const inkAccountBlocked = blockedInkRecovery({ readerState: inkReaderState, mode, inkHasStrokes, resolved });
   const inkSignInReady = canOpenInkSignIn({ readerState: inkReaderState, mode, inkHasStrokes, resolved, saveState });
   const inkRecoveryCopy = inkRecoveryWords(language);
+  // The device holds an account link and the server still answered "sign in":
+  // the session has ended. That is said as "sign in again", never as a reader
+  // that is not answering and never as "you need an account".
+  const sessionEnded = user?.cloudLinked === true;
 
   // Client checkboxes are a reflection exercise, never grading authority.
   // When the server supplies an explicit awarded-mark count, use it only if
@@ -1860,7 +1864,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                               )}
                             </>
                           )}
-                           {(photoOCR.phase === 'failed' || photoOCR.phase === 'unavailable') && <span className="verdict-body">{photoOCR.error}</span>}
+                           {(photoOCR.phase === 'failed' || photoOCR.phase === 'unavailable') && (
+                             photoOCR.phase === 'unavailable' && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && sessionEnded
+                               ? <span className="verdict-body" data-photo-session-ended>{t('check.sessionEnded')}</span>
+                               : <span className="verdict-body">{photoOCR.error}</span>
+                           )}
                           {photoOCR.phase === 'unavailable' &&
                             canRetryPhotoReading(photoOCR.blockedKey, !!photo, !!pendingPdf.current) && (
                               <div style={{ marginTop: 8 }}>
@@ -1877,7 +1885,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                             <div style={{ marginTop: 10 }}>
                               <button className="btn btn-primary" type="button" data-photo-sign-in
                                 aria-expanded={photoSignInOpen} onClick={() => setPhotoSignInOpen(v => !v)}>
-                                {t('check.signInAction')}
+                                {sessionEnded ? t('check.signInAgainAction') : t('check.signInAction')}
                               </button>
                               <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
                                 {photoAwaitingOnlineReader(language)}
@@ -1949,13 +1957,16 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   {inkRecoveryCopy.blocker[inkReaderState?.blocker] && (
                     <p data-ink-blocker-reason={inkReaderState.blocker}>{inkRecoveryCopy.blocker[inkReaderState.blocker]}</p>
                   )}
+                  {inkReaderState?.blocker === 'ink.waitingSignIn' && sessionEnded && (
+                    <p data-ink-session-ended>{t('check.sessionEnded')}</p>
+                  )}
                   <p role="status" aria-live="polite">{inkRecoveryCopy.detail}</p>
                   {inkReaderState?.blocker === 'ink.waitingSignIn' && (
                     <>
                       <button type="button" className="btn btn-primary" data-ink-sign-in
                         disabled={!inkSignInReady} aria-expanded={inkSignInOpen}
                         onClick={() => setInkSignInOpen(v => !v)}>
-                        {inkRecoveryCopy.action}
+                        {sessionEnded ? t('check.signInAgainAction') : inkRecoveryCopy.action}
                       </button>
                       {!inkSignInReady && <p className="muted" role="status">{inkRecoveryCopy.saveFirst}</p>}
                       {inkSignInOpen && inkSignInReady && (

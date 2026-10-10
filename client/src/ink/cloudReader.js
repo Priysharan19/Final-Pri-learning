@@ -110,6 +110,18 @@ function safeFailureCode(value, fallback = null) {
  * 401 is "sign in", 403 is "this account may not". Only an unknown failure is
  * the transport fallback.
  */
+/**
+ * The HTTP status of a refusal, kept beside its code. The code alone is not
+ * enough: a 401 whose body carried no code, or a code this build does not
+ * know, used to leave the status probe saying only "unavailable", and the
+ * student was told the reader was not answering when the truth was that their
+ * session had ended.
+ */
+function failureStatus(error) {
+  const status = Number(error?.status);
+  return Number.isInteger(status) && status > 0 ? status : null;
+}
+
 function statusFailureCode(error, fallback) {
   const status = Number(error?.status);
   if (status === 401) return 'AUTH_REQUIRED';
@@ -253,7 +265,7 @@ export async function cloudHandwritingReadiness({
       : error?.name === 'TimeoutError'
         ? 'HANDWRITING_STATUS_TIMEOUT'
         : safeFailureCode(error?.code, statusFailureCode(error, 'HANDWRITING_STATUS_UNREACHABLE'));
-    const value = Object.freeze({ usable: false, state: 'unavailable', lastFailureCode: code, releaseSha: null });
+    const value = Object.freeze({ usable: false, state: 'unavailable', lastFailureCode: code, lastFailureStatus: failureStatus(error), releaseSha: null });
     recordCloudDiagnostics({ available: false, failureCode: code });
     return value;
   }
@@ -511,14 +523,19 @@ export function accountBlockedKey(outcome = null) {
   const codes = [outcome?.error?.code, outcome?.readiness?.lastFailureCode].map(c => String(c || '')).filter(Boolean);
   const status = Number(outcome?.error?.status);
   for (const code of codes) {
-    if (code === 'AUTH_REQUIRED') return 'verdict.photoReadingSignIn';
+    // CSRF_REJECTED: the session's security token is missing or stale (the
+    // cookie pair lapsed, or the server restarted). Only signing in again
+    // issues a new one; nothing about the reader is wrong.
+    if (code === 'AUTH_REQUIRED' || code === 'CSRF_REJECTED') return 'verdict.photoReadingSignIn';
     // A failed consent-state lookup is infrastructure trouble, not evidence
     // that this student needs a guardian. Fall through to service-unavailable.
     if (code === 'GUARDIAN_CONSENT_UNAVAILABLE') return null;
     if (code.startsWith('GUARDIAN_CONSENT') || code === 'AGE_DECLARATION_REQUIRED') return 'verdict.photoReadingGuardian';
     if (code === 'EMAIL_UNVERIFIED') return 'verdict.photoReadingVerifyEmail';
   }
-  if (status === 401) return 'verdict.photoReadingSignIn';
+  // Any 401, from the read itself or from the status probe before it, is a
+  // session that is not there — whatever code (or none) came with it.
+  if (status === 401 || Number(outcome?.readiness?.lastFailureStatus) === 401) return 'verdict.photoReadingSignIn';
   return null;
 }
 
