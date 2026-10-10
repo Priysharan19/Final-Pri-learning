@@ -18,6 +18,7 @@ import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import { IN_CURRICULUM, IN_CHAPTER_BY_ID } from '../engine/curriculum-in.js';
 import { NOTES_GRADES, gradeOfChapter, loadNotesForGrade, notesPracticeHref, notesSearchText } from '../notes/notesIndex.js';
+import { studyResourcesForGrade } from '../notes/data/notes-study-resources.js';
 import '../notes/Notes.css';
 
 const BOOKMARK_KEY = 'pri.notes.bookmarks.v1';
@@ -335,6 +336,12 @@ function ChapterNotes({ chapterId }) {
   const nav = useNavigate();
   const chapter = IN_CHAPTER_BY_ID[chapterId];
   const grade = gradeOfChapter(chapterId);
+  const [resourceParams] = useSearchParams();
+  // External references are track-specific; a CBSE visitor must not be told
+  // a JEE-specific examination archive is part of the school syllabus.
+  const routeTrack = resourceParams.get('track');
+  const resourceTrack = routeTrack === 'jee-main' || routeTrack === 'jee-advanced' ? routeTrack : 'cbse';
+  const linkedResources = studyResourcesForGrade(grade, resourceTrack);
   const [{ notes: all, failed }, retry] = useNotes(grade);
   const [marks, toggleMark] = useBookmarks();
   const [cards, setCards] = useState(false);
@@ -433,6 +440,27 @@ function ChapterNotes({ chapterId }) {
           <Section id="examples" title={t('notes.sectionExamples')}>
             {notes.examples.map((ex, i) => <Example key={i} ex={ex} n={i + 1} />)}
           </Section>
+
+          {linkedResources.length > 0 && (
+            <Section id="resources" title="Further study resources">
+              <p className="nt-quiet">These links open independent educational websites. They are references, not Pri Learning-graded questions; access requires an internet connection.</p>
+              <ul className="nt-chapters" data-testid="notes-study-resources">
+                {linkedResources.map(resource => (
+                  <li key={resource.id}>
+                    <a className="nt-chapter" href={resource.url} target="_blank" rel="noopener noreferrer"
+                      aria-label={`${resource.title} — external link, opens a new tab`}>
+                      <span className="nt-chapter-n" aria-hidden="true">↗</span>
+                      <span className="nt-chapter-body">
+                        <strong className="nt-chapter-name">{resource.title}</strong>
+                        <span className="nt-chapter-meta">{resource.issuer} · {resource.focus}</span>
+                      </span>
+                      <span className="nt-chapter-go" aria-hidden="true">↗</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
 
           <div className="nt-end nt-reveal">
             <button type="button" className="btn btn-primary" onClick={() => nav(notesPracticeHref(chapter))}>{t('notes.practise')}</button>
