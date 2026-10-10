@@ -9,9 +9,10 @@
 // call; it is never stored or logged.
 // ─────────────────────────────────────────────────────────────────────────────
 import { consentPage, recordTestMessage, testModeAllowed } from './smsProvider.js';
+import { postResendEmail } from './authDelivery.js';
+import { recordAuthEmail } from './metrics.js';
+import { logEvent, safeCode } from './observability.js';
 
-const REQUEST_TIMEOUT_MS = 10_000;
-const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 const trim = (value) => String(value ?? '').trim();
 
 function escapeHtml(value) {
@@ -53,27 +54,28 @@ export function createResendOtpEmailSender({ apiKey, from, fetchImpl = globalThi
   if (!key || !sender || typeof fetchImpl !== 'function') return null;
   return async ({ challengeId, to, code, purpose, intent = null }) => {
     const message = otpEmailMessage(code, purpose, undefined, { intent });
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(new Error('Auth email provider timed out')), REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetchImpl(RESEND_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${key}`,
-          'Content-Type': 'application/json',
-          'Idempotency-Key': `pri-otp/${challengeId}`.slice(0, 256),
-          'User-Agent': 'Pri-Learning-Auth/1.0'
-        },
-        body: JSON.stringify({
+      const providerMessageId = await postResendEmail({
+        key,
+        fetchImpl,
+        idempotencyKey: `pri-otp/${challengeId}`,
+        payload: {
           from: sender, to: [String(to)], subject: message.subject, text: message.text, html: message.html,
           tags: [{ name: 'category', value: 'otp' }]
-        }),
-        signal: controller.signal
+        }
       });
-      if (!response.ok) throw Object.assign(new Error('Auth email provider rejected the request'), { code: `RESEND_${response.status}`, status: 503 });
-      return { providerMessageId: null };
-    } finally {
-      clearTimeout(timer);
+      recordAuthEmail({ ok: true });
+      return { providerMessageId };
+    } catch (error) {
+      // WHY the send was refused, by code: a revoked key, an unverified sender
+      // domain and a recipient the shared test sender will not deliver to are
+      // three different repairs. The address and the code never reach the log
+      // (the log accepts no field that could hold them) and never reach the
+      // client, which is told only that the code could not be sent (otp.js).
+      const reason = safeCode(error?.code, 'DELIVERY_FAILED');
+      recordAuthEmail({ ok: false, code: reason });
+      logEvent('warn', 'auth_email_failed', { provider: 'resend', code: reason });
+      throw Object.assign(new Error('Auth email provider rejected the request'), { code: reason, status: 503 });
     }
   };
 }

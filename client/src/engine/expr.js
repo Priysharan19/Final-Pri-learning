@@ -69,10 +69,18 @@ export function factorial(n) {
 const COUNT_LOOP_LIMIT = 10000;
 let evaluationBudget = null;               // null: no check in progress, nothing is charged
 const spend = units => {
+  // A cost is a count: anything else (a negative range would hand budget back) is refused.
+  if (!Number.isFinite(units) || units < 0) return false;
   if (evaluationBudget === null) return true;
   evaluationBudget -= units;
   return evaluationBudget >= 0;
 };
+
+// A call with several arguments keeps its first one under two names, `arg`
+// and `args[0]`. A walk that follows both visits that subtree twice, and its
+// own first argument four times: twenty-four nested calls were sixteen million
+// visits. Every walk follows `args` when there is one, and `arg` only otherwise.
+const childKeys = node => (Array.isArray(node?.args) ? ['l', 'r', 'v'] : ['l', 'r', 'v', 'arg']);
 
 /** How many nodes an expression has; counted once per expression. */
 const sizes = new WeakMap();
@@ -80,10 +88,8 @@ function sizeOf(node) {
   if (!node || typeof node !== 'object') return 0;
   if (sizes.has(node)) return sizes.get(node);
   let size = 1;
-  for (const child of Object.values(node)) {
-    if (Array.isArray(child)) for (const each of child) size += sizeOf(each);
-    else if (child && typeof child === 'object') size += sizeOf(child);
-  }
+  for (const key of childKeys(node)) size += sizeOf(node[key]);
+  if (Array.isArray(node.args)) for (const each of node.args) size += sizeOf(each);
   sizes.set(node, size);
   return size;
 }
@@ -476,6 +482,8 @@ export function evaluate(ast, env = {}, opts) {
           // One budget for every sum in the check, however they are nested.
           // A term costs what it is: `sum(170! + 170! + …; k; 1; 10000)` is
           // ten thousand terms of a thousand nodes each, not ten thousand units.
+          // An upper bound below the lower one is the empty sum: nothing to add, nothing to charge.
+          if (hi < lo) return 0;
           if (!spend((hi - lo + 1) * sizeOf(ast.args[0]))) return NaN;
           let total = 0;
           for (let k = lo; k <= hi; k++) {
@@ -539,7 +547,7 @@ export function variablesOf(ast, acc = new Set()) {
     for (const a of ast.args) variablesOf(a, acc);
     return acc;
   }
-  for (const key of ['l', 'r', 'v', 'arg']) {
+  for (const key of childKeys(ast)) {
     if (ast[key] && typeof ast[key] === 'object') variablesOf(ast[key], acc);
   }
   return acc;
@@ -557,7 +565,7 @@ function integerVarsOf(ast, acc = new Set()) {
     variablesOf(ast.args[2], acc);
     variablesOf(ast.args[3], acc);
   }
-  for (const key of ['l', 'r', 'v', 'arg']) {
+  for (const key of childKeys(ast)) {
     if (ast[key] && typeof ast[key] === 'object') integerVarsOf(ast[key], acc);
   }
   if (Array.isArray(ast.args)) for (const a of ast.args) integerVarsOf(a, acc);
@@ -670,7 +678,7 @@ function guardsOf(ast, acc = []) {
     if (pole) acc.push({ k: 'z', g: { t: 'call', fn: pole, arg: ast.arg } });
   }
   if (Array.isArray(ast.args)) { if (ast.fn !== 'sum') for (const a of ast.args) guardsOf(a, acc); return acc; }
-  for (const key of ['l', 'r', 'v', 'arg']) if (ast[key] && typeof ast[key] === 'object') guardsOf(ast[key], acc);
+  for (const key of childKeys(ast)) if (ast[key] && typeof ast[key] === 'object') guardsOf(ast[key], acc);
   return acc;
 }
 

@@ -97,7 +97,9 @@ export async function verifyDeployment({ origin, sha, engine = null, allowHttp =
   const databaseReachable = readyDb.state === 'ok' || h.database?.reachable === true;
   const schemaVersion = readyDb.schemaVersion ?? h.schemaVersion;
   const billingSchemaVersion = readyDb.billingSchemaVersion ?? h.billingSchemaVersion;
-  const authEmailConfigured = readyAuth.state === 'ok' || h.authDelivery?.email === true;
+  // Configured, not proven: a CI image carries a placeholder key, which the
+  // readiness probe now reports as failing rather than ok.
+  const authEmailConfigured = (typeof readyAuth.state === 'string' && readyAuth.state !== 'not_configured') || h.authDelivery?.email === true;
 
   check(health.status === 200 && h.ok === true, '/v1/health answers 200 ok', `status ${health.status}`);
   check(h.service === 'pri-learning-platform', 'service is pri-learning-platform', h.service);
