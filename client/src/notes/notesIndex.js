@@ -30,6 +30,36 @@ const LOADERS = {
   12: () => import('./data/notes-class12.js')
 };
 
+// Load supplements beside the requested grade, never in another grade's chunk.
+// Original authored notes are retained and immutable; each addition is checked
+// by the same rigorous chapter-notes mathematical verification suite.
+const EXPANSION_LOADERS = {
+  7: () => import('./data/notes-expansion-class7.js'),
+  8: () => import('./data/notes-expansion-class8.js'),
+  9: () => import('./data/notes-expansion-class9.js'),
+  10: () => import('./data/notes-expansion-class10.js'),
+  11: () => import('./data/notes-expansion-class11.js'),
+  12: () => import('./data/notes-expansion-class12.js')
+};
+
+function mergeStudySupplements(base, additions) {
+  for (const chapterId of Object.keys(additions)) {
+    if (!Object.hasOwn(base, chapterId)) throw new Error(`Unknown study supplement chapter: ${chapterId}`);
+  }
+  return Object.fromEntries(Object.entries(base).map(([chapterId, chapter]) => {
+    const add = additions[chapterId];
+    if (!add) return [chapterId, chapter];
+    const fields = {};
+    for (const field of ['concepts', 'points', 'mistakes', 'examples']) {
+      if (!Array.isArray(chapter[field]) || !Array.isArray(add[field])) {
+        throw new Error(`Invalid supplement ${chapterId}.${field}`);
+      }
+      fields[field] = [...chapter[field], ...add[field]];
+    }
+    return [chapterId, { ...chapter, ...fields }];
+  }));
+}
+
 export const NOTES_GRADES = Object.freeze(Object.keys(LOADERS).map(Number));
 
 const cache = new Map();
@@ -39,7 +69,9 @@ export function loadNotesForGrade(grade) {
   const g = Number(grade);
   if (!LOADERS[g]) return Promise.resolve({});
   if (!cache.has(g)) {
-    cache.set(g, LOADERS[g]().then(m => m.default || {}, err => { cache.delete(g); throw err; }));
+    cache.set(g, Promise.all([LOADERS[g](), EXPANSION_LOADERS[g]()])
+      .then(([original, supplement]) => mergeStudySupplements(original.default || {}, supplement.default || {}))
+      .catch(err => { cache.delete(g); throw err; }));
   }
   return cache.get(g);
 }
