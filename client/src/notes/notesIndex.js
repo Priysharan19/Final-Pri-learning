@@ -62,9 +62,15 @@ function mergeStudySupplements(base, additions) {
 
 // Optional advanced study is separate from the CBSE core and the generated
 // exam/question bank. These are worked lessons, not server-issued questions.
+const CHALLENGE_LOADERS = {
+  10: () => import('./data/notes-challenges-class10.js'),
+  11: () => import('./data/notes-challenges-class11.js'),
+  12: () => import('./data/notes-challenges-class12.js')
+};
+
 function mergeOptionalComplexStudies(notes, extra) {
   for (const [id, section] of Object.entries(extra || {})) {
-    if (id !== 'c11-complex-numbers' || !notes[id] || !Array.isArray(section.examples)) {
+    if (!Object.hasOwn(notes,id) || !Array.isArray(section.examples) || !section.examples.every(x => x.question && Array.isArray(x.steps) && x.steps.length && x.answer && x.verify)) {
       throw new Error(`Invalid optional mathematics study section: ${id}`);
     }
     notes = { ...notes, [id]: { ...notes[id], examples: [...notes[id].examples, ...section.examples] } };
@@ -84,10 +90,13 @@ export function loadNotesForGrade(grade) {
     cache.set(g, Promise.all([
       LOADERS[g](),
       EXPANSION_LOADERS[g](),
-      g === 11 ? import('./data/notes-advanced-complex.js') : Promise.resolve({ default: {} })
+      g === 11 ? import('./data/notes-advanced-complex.js') : Promise.resolve({ default: {} }),
+      CHALLENGE_LOADERS[g] ? CHALLENGE_LOADERS[g]() : Promise.resolve({ default: {} })
     ])
-      .then(([original, supplement, optional]) => mergeOptionalComplexStudies(
-        mergeStudySupplements(original.default || {}, supplement.default || {}), optional.default || {}
+      .then(([original, supplement, optional, challenges]) => mergeOptionalComplexStudies(
+        mergeOptionalComplexStudies(
+          mergeStudySupplements(original.default || {}, supplement.default || {}), optional.default || {}
+        ), challenges.default || {}
       ))
       .catch(err => { cache.delete(g); throw err; }));
   }
