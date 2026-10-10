@@ -217,9 +217,19 @@ const CONDITION = /(^|[^\p{L}])(at|when|whenever|where|if|for)(?=[^\p{L}])/iu;
 function withoutCondition(s) {
   const m = CONDITION.exec(s);
   if (!m) return s;
-  const head = s.slice(0, m.index + m[1].length).trim();
+  const head = s.slice(0, m.index + m[1].length).trim().replace(/[(\[,]\s*$/, '').trim();
   const tail = s.slice(m.index + m[0].length);
-  return head && relations(tail).length ? head.replace(/[(\[,]\s*$/, '').trim() : s;
+  if (!head || !relations(tail).length) return s;
+  // "x = 3 if y = 2" and "least value = 6 at x = -3" say what the answer is and
+  // then where. "2x = 6 if x = 3" does not: the line is a step, and either
+  // number could be meant. That one is left for the student.
+  const at = head.lastIndexOf('=');
+  if (at > 0) {
+    const left = head.slice(0, at).trim();
+    const named = /^[a-zA-Zθ]['′]?(\s*\(\s*[^()]{1,12}\s*\))?$/.test(left);
+    if (!named && !hasProse(left)) return null;
+  }
+  return head;
 }
 
 /** A line that checks or verifies an answer is not the answer ("check: 3 + 1 = 4"). */
@@ -230,7 +240,7 @@ export const isCheckLine = text => CHECK_LINE.test(String(text ?? ''));
 function valueOf(piece, question) {
   const type = question?.answerType || 'numeric';
   const s = withoutCondition(stripSentence(piece));
-  if (!s) return null;
+  if (!s) return null;      // nothing there, or a conditional step too doubtful to cut
   const rel = relations(s);
   const words = answerWords(s);
   // For a list-shaped answer the whole line may be the answer ("x > 3",
@@ -289,6 +299,8 @@ function pointFromLine(s, question) {
   const whole = valueOf(s, question);
   if (whole) return { status: 'proposed', answer: whole };
   let text = withoutCondition(s);
+  // "x = 1 or y = 0" offers alternatives, not the two coordinates of a point.
+  if (!text || /(^|[^\p{L}])(or|या)(?=[^\p{L}]|$)/iu.test(text)) return { status: 'none' };
   const rel = relations(text).filter(r => r.kind === 'arrow' || r.kind === 'colon');
   const words = answerWords(text);
   const lead = [...rel, ...words].sort((a, b) => a.end - b.end);
@@ -322,7 +334,9 @@ function pointFromLine(s, question) {
  * states no value.
  */
 function setFromLine(s, question) {
-  const parts = segments(withoutCondition(s));
+  const whole = withoutCondition(s);
+  if (!whole) return { status: 'none' };
+  const parts = segments(whole);
   if (parts.length < 2) return null;
   const values = parts.map(part => valueOf(part, NUMBER));
   if (values.some(v => !v)) {
