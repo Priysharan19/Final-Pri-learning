@@ -78,6 +78,7 @@
     {"pattern":"scripts/ink-**","primary":"handwriting","reviewers":["ios-native","benchmark","qa-release"],"risk":"R3"},
     {"pattern":"ios/**","primary":"ios-native","reviewers":["handwriting","security","reliability","qa-release"],"risk":"R3"},
     {"pattern":"client/src/explain/**","primary":"adaptive-learning","reviewers":["math-reasoning","qa-release"],"risk":"R3"},
+    {"pattern":"client/src/notes/**","primary":"india-curriculum","reviewers":["math-reasoning","student-experience","qa-release"],"risk":"R3"},
     {"pattern":"client/src/engine/ncert/**","primary":"india-curriculum","reviewers":["math-reasoning","qa-release"],"risk":"R3"},
     {"pattern":"client/src/engine/india**","primary":"india-curriculum","reviewers":["math-reasoning","qa-release"],"risk":"R3"},
     {"pattern":"client/src/engine/generators/india-**","primary":"india-curriculum","reviewers":["math-reasoning","qa-release"],"risk":"R3"},
