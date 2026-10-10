@@ -43,7 +43,14 @@ export const INK_ANSWER_PROPS = Object.freeze([
   // IndexedDB readback of the student's own strokes). It only chooses whether
   // the waiting sentence may say "saved"; it carries nothing about the
   // question or its answer and never reaches the reader request.
-  'draftSaved'
+  'draftSaved',
+  // Reviewed (read on request): the student's OWN kept transcript of this
+  // page — the reader's earlier output with their corrections, and the
+  // signature of the strokes it was read from — restored from the sealed ink
+  // draft so a reload does not read the page again. It is display state for
+  // the surface; it carries nothing about the question or its answer and is
+  // never sent to the reader (the request is still the picture alone).
+  'initialReading'
 ]);
 /** Identifiers that must never appear inside a recognition-context expression. */
 export const FORBIDDEN_IDENTIFIERS = Object.freeze([
