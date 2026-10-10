@@ -438,6 +438,9 @@ jobs:
         run: |
           set -o pipefail
           npm run test:a11y 2>&1 | tee -a browser.log
+          # A failed chunk, a refused cache write or a probe that never settles must
+          # end in the app or in a visible notice with Reload, never a silent splash.
+          npm run test:boot 2>&1 | tee -a browser.log
       - name: Browser coverage invariants
         if: always()
         run: |
@@ -501,6 +504,7 @@ jobs:
           # The accessibility walk must have reached the refused-check states.
           grep -Eq 'online-only checking +9/9' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*47/47.*13 groups' browser.log
+          grep -Fq 'BOOT RESILIENCE: PASS — 61/61 checks' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
           test "$(grep -Ec 'E2E SUITE PASSED — 158/158 checks across 1 flows' browser.log)" -eq 2
