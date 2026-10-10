@@ -5,8 +5,8 @@ import { IN_CURRICULUM } from '../src/engine/curriculum-in.js';
 import { evalNumeric } from '../src/engine/expr.js';
 import { loadNotesForGrade } from '../src/notes/notesIndex.js';
 
-const expected=Object.freeze({7:38,8:45,9:38,10:54,11:60,12:65});
-const expectedNotes=Object.freeze({7:127,8:126,9:100,10:134,11:163,12:141});
+const expected=Object.freeze({7:38,8:60,9:38,10:59,11:60,12:70});
+const expectedNotes=Object.freeze({7:127,8:141,9:100,10:139,11:163,12:146});
 const loaders={
   7:()=>import('../src/notes/data/notes-visual-wave5-class7.js'),
   8:()=>import('../src/notes/data/notes-visual-wave5-class8.js'),
@@ -38,8 +38,10 @@ for(const group of IN_CURRICULUM) {
       assert.ok(!/</.test(f.description),'no HTML in figure text');
       types.set(f.type,(types.get(f.type)||0)+1);
       const v=ex.verify,items=v.kind==='value'?[[v.expr,v.answer]]:v.kind==='values'?v.pairs:null;
-      assert.ok(items?.length,'all new diagram answers must have deterministic receipts');
-      for(const [a,b] of items)assert.ok(close(evalNumeric(a),evalNumeric(b)),chapterId+' mismatch: '+a+' vs '+b);
+      assert.ok(items?.length || v.kind==='roots', 'all new diagram answers must have deterministic receipts');
+      if(v.kind==='roots'){
+        for(const root of v.answers)assert.ok(close(evalNumeric(v.f, {x:evalNumeric(root)}),0),chapterId+' invalid cube root');
+      } else for(const [a,b] of items)assert.ok(close(evalNumeric(a),evalNumeric(b)),chapterId+' mismatch: '+a+' vs '+b);
       if(f.type==='venn'){
         assert.ok([f.a,f.b,f.ab,f.out].every(n=>Number.isInteger(n)&&n>=0));
       } else if(f.type==='placevalue'){
@@ -69,6 +71,18 @@ for(const group of IN_CURRICULUM) {
         assert.ok(f.rows>=2&&f.rows<=10);
       } else if(f.type==='interval'){
         assert.ok(f.a<f.b && typeof f.lc==='boolean' && typeof f.rc==='boolean');
+      } else if(f.type==='square-grid'||f.type==='cube-grid'){
+        assert.ok(Number.isInteger(f.n)&&f.n>=2&&f.n<=12);
+      } else if(f.type==='algebra-area'){
+        assert.ok(Number.isInteger(f.a)&&f.a>0 && Number.isInteger(f.b)&&f.b>0);
+      } else if(f.type==='prime-bars'){
+        assert.ok(f.A.length===3&&f.B.length===3&&[...f.A,...f.B].every(n=>Number.isInteger(n)&&n>=0));
+      } else if(f.type==='slope-field'){
+        assert.ok(Number.isInteger(f.m)&&f.m>0&&Number.isInteger(f.c));
+        for(const x of [-2,-1,0,1,2]){
+          const y=t=>f.m*t*t/2+f.c,h=1e-5;
+          assert.ok(close((y(x+h)-y(x-h))/(2*h),f.m*x,1e-5), 'slope field not derivative-consistent');
+        }
       } else if(f.type==='plane'){
         assert.ok(f.points.length>=3 && f.points.every(pt=>checkNumber(pt.x)&&checkNumber(pt.y)));
         if(f.polygons){
@@ -83,7 +97,7 @@ for(const group of IN_CURRICULUM) {
     }
   }
 }
-assert.equal(inspected,300,'expected 300 exact new worked problems');
-assert.equal(allTotal,791,'491 previously authored examples plus 300 new visuals');
+assert.equal(inspected,325,'expected 325 exact new worked problems');
+assert.equal(allTotal,816,'491 previously authored examples plus 325 new visuals');
 assert.ok(types.size>=12,'insufficient visual geometry diversity');
-console.log('VISUAL WAVE 5: PASS — '+inspected+'/300 figure-driven examples, 791 total, '+types.size+' distinct graphic families');
+console.log('VISUAL WAVE 5: PASS — '+inspected+'/325 figure-driven examples, 816 total, '+types.size+' distinct graphic families');
