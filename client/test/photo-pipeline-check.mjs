@@ -198,16 +198,25 @@ const INK = [
   [['x + 3 > 7'], N, { sent: null, how: 'none' }],
   [['x = 2 or x = 6'], N, { sent: null, how: 'ambiguous', candidates: ['2', '6'] }],
   [['answer = 14', 'so total = 15'], N, { sent: null, how: 'ambiguous', candidates: ['15', '14'] }],
-  // an answer that IS an equation is never cut down to its right-hand side
-  [['x^2 + y^2 = 25'], E, { sent: 'x^2 + y^2 = 25', how: 'as written' }],
-  [['2x + 3y = 6'], E, { sent: '2x + 3y = 6', how: 'as written' }],
-  [['centre (0,0), radius 5', 'so x^2 + y^2 = 25'], E, { sent: 'x^2 + y^2 = 25', how: 'proposed' }],
-  [['the line is 2x + 3y = 6.'], E, { sent: '2x + 3y = 6', how: 'proposed' }],
+  // An equation is never kept whole as an expression answer: no keyed
+  // expression answer in the bank contains "=", so what comes before the "="
+  // is the student restating the question or naming the answer.
+  [['6x - 6 - 3x + 9 = 3x + 3'], E, { sent: '3x + 3', how: 'proposed' }],
+  [['∴ 6x - 6 - 3x + 9 = 3x + 3'], E, { sent: '3x + 3', how: 'proposed' }],
+  [['6x - 3x - 6 + 9', '3x - 6 + 9', '6x - 6 - 3x + 9 = 3x + 3'], E, { sent: '3x + 3', how: 'proposed' }],
+  [['10x + 40 + 9 = 10x + 49'], E, { sent: '10x + 49', how: 'proposed' }],
+  [['x^2 - 7x + 2x - 14 = x^2 - 5x - 14'], E, { sent: 'x^2 - 5x - 14', how: 'proposed' }],
+  [['x^2 - 5x - 14 = (x + 2)(x - 7)'], E, { sent: '(x + 2)(x - 7)', how: 'proposed' }],
+  [['d/dx 2x^3 - 5x^2 + 7x + 9 = 6x^2 - 10x + 7'], E, { sent: '6x^2 - 10x + 7', how: 'proposed' }],
+  [['d/dx -9x^7 = -63x^6'], E, { sent: '-63x^6', how: 'proposed' }],
+  [['f-1(x) = (x + 8)/4'], E, { sent: '(x + 8)/4', how: 'proposed' }],
+  [['y - 0 = 1(x + 5)'], E, { sent: '1(x + 5)', how: 'proposed' }],
+  [['x^2 + y^2 = 25'], E, { sent: '25', how: 'proposed' }],
+  [['centre (0,0), radius 5', 'so x^2 + y^2 = 25'], E, { sent: '25', how: 'proposed' }],
   [['dy/dx = 2x + 3'], E, { sent: '2x + 3', how: 'proposed' }],
   [['so f(x) = x^2 - 1'], E, { sent: 'x^2 - 1', how: 'proposed' }],
   [['f⁻¹(x) = (x - 4)/4'], E, { sent: '(x - 4)/4', how: 'proposed' }],
-  [['d/dx (4x+3)^4 = 16(4x + 3)^3'], E, { sent: '16(4x + 3)^3', how: 'proposed' }],
-  [['y - 3 = 2(x - 1)'], E, { sent: 'y - 3 = 2(x - 1)', how: 'as written' }]
+  [['d/dx (4x+3)^4 = 16(4x + 3)^3'], E, { sent: '16(4x + 3)^3', how: 'proposed' }]
 ];
 for (const [lines, question, want] of INK) eq(inkAnswer(lines, question), want, `ink answer of ${JSON.stringify(lines.join(' ⏎ '))} as ${question.answerType}`);
 for (const [lines, question, want] of INK) {
@@ -215,7 +224,8 @@ for (const [lines, question, want] of INK) {
   ok(readsAsWritten(want.sent, question), `the proposed ${JSON.stringify(want.sent)} reads in the typed field's parser for ${question.answerType}`);
   ok(!readsAsWritten(lines.at(-1), question), `and the last line ${JSON.stringify(lines.at(-1))} itself did not — which is why it was refused`);
 }
-eq(only(proposeFinalAnswer(['x^2 + y^2 = 25'], E)), proposed('x^2 + y^2 = 25'), 'Photo too: an equation-typed answer is kept whole');
+eq(only(proposeFinalAnswer(['6x - 6 - 3x + 9 = 3x + 3'], E)), proposed('3x + 3'), 'Photo too: what follows the "=" is proposed, never the whole equation');
+eq(only(proposeFinalAnswer(['x^2 - 5x - 14 = (x + 2)(x - 7)'], E)), proposed('(x + 2)(x - 7)'), '…on a factorisation as on a simplification');
 eq(only(proposeFinalAnswer(['x^2 + y^2 = 25'], N)), proposed('25'), 'while a numeric question takes the value after the equals sign');
 
 // Unrelated numbers elsewhere on the page never become the answer.
