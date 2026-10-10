@@ -73,6 +73,18 @@ export function makeAdvancedVisual(kind,p){
   const fig={type:'dots',description:`Triangular pattern of ${rows} horizontal rows with 1 through ${rows} dots, total ${current}.`,rows};
   return done(`Count ${mode==='next'?'the next triangular figure':'the shown dots'} using the dot-pattern rule.`,[`The pattern has rows of sizes 1, 2, up to ${rows}.`,`The displayed count is ${rows}(${rows}+1)/2=${current}.`,mode==='next'?`The next row adds ${rows+1}, giving ${answer}.`:`Therefore ${answer} dots are shown.`],answer,V(mode==='next'?`${rows}*(${rows}+1)/2+${rows}+1`:`${rows}*(${rows}+1)/2`,answer),fig);
  }
+ if(kind==='pascal'){
+  const {n,k,mode='coefficient'}=p;
+  if(!Number.isInteger(n)||n<3||n>8||!Number.isInteger(k)||k<0||k>n)throw Error('Pascal coefficients require 0≤k≤n');
+  const factorial=m=>Array.from({length:m},(_,i)=>i+1).reduce((a,b)=>a*b,1);
+  const binom=factorial(n)/(factorial(k)*factorial(n-k));
+  const answer=mode==='rowSum'?2**n:binom;
+  const numer=Array.from({length:k},(_,i)=>n-i);
+  const denom=Array.from({length:k},(_,i)=>i+1);
+  const expr=mode==='rowSum'?`2^${n}`:k?numer.join('*')+'/('+denom.join('*')+')':'1';
+  const fig={type:'pascal',description:`Pascal's triangle through row ${n}, with the kth coefficient in row ${n} labelled and highlighted. Each entry is the sum of the two above it.`,n,k,mode};
+  return done(`Using the labelled Pascal triangle, find ${mode==='rowSum'?'the sum of all coefficients in row '+n:'the binomial coefficient C('+n+','+k+')'}.`,[`Pascal row ${n} gives the coefficients of (a+b)^${n}.`,mode==='rowSum'?`Their sum is (1+1)^${n}.`:`The requested entry is C(${n},${k})=${n}!/(${k}!(${n}-${k})!).`,`The exact result is ${answer}.`],answer,V(expr,answer),fig);
+ }
  if(kind==='interval'){
   const {a,b,lc=true,rc=false}=p;if(!Number.isInteger(a)||!Number.isInteger(b)||b-a<2||b-a>28)throw Error('integer interval');
   const answer=b-a-1+(lc?1:0)+(rc?1:0);
