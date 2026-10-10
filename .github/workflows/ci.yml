@@ -285,6 +285,11 @@ jobs:
           grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
           grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 34/34 checks' practice-http.log
           grep -Fq 'REPEAT CREDIT: PASS — 295/295 checks' practice-http.log
+      - name: Marker isolation (worker pool, hard deadline, exactly-once under concurrency)
+        run: |
+          set -o pipefail
+          node server/test/marker-isolation-check.mjs 2>&1 | tee marker-isolation.log
+          grep -Fq 'MARKER ISOLATION: PASS — 152/152 checks' marker-isolation.log
       - name: Account, origin, CMS and classroom contracts
         run: |
           node server/test/account-deletion-reauth-check.mjs
@@ -345,13 +350,15 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 45/45 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 46/46 suites' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
           grep -Fq '✓ exam-authority-check.mjs' platform-postgres.log
           grep -Fq '✓ method-progress-http-check.mjs' platform-postgres.log
           grep -Fq '✓ flagship-ap-working-http-check.mjs' platform-postgres.log
+          grep -Fq '✓ marker-isolation-check.mjs' platform-postgres.log
+          grep -Fq '✓ recognition-dedupe-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-seed-reissue-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-server-question-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-repeat-credit-check.mjs' platform-postgres.log
@@ -465,7 +472,7 @@ jobs:
         run: |
           set -euo pipefail
           test -s browser.log
-          grep -Eq 'E2E SUITE.*401/401.*13 flows' browser.log
+          grep -Eq 'E2E SUITE.*407/407.*13 flows' browser.log
           grep -Fq 'Submission · interruption recovery and one attempt' browser.log
           grep -Fq 'Cloud · late results never rewrite an attempt' browser.log
           grep -Fq 'India exam · JEE Main handwritten, reloaded, analysed' browser.log
@@ -525,7 +532,7 @@ jobs:
           grep -Eq 'ACCESSIBILITY SUITE.*47/47.*13 groups' browser.log
           grep -Fq 'BOOT RESILIENCE: PASS — 61/61 checks' browser.log
           grep -Fq 'Reader · usage limit reached' browser.log
-          grep -Eq 'E2E SUITE.*37/37.*2 flows' browser.log
+          grep -Eq 'E2E SUITE.*38/38.*2 flows' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
           test "$(grep -Ec 'E2E SUITE PASSED — 158/158 checks across 1 flows' browser.log)" -eq 2
