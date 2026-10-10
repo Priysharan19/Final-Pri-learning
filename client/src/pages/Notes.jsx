@@ -14,10 +14,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { MathText } from '../lib/latex.jsx';
+import StudyDiagram from '../notes/StudyDiagram.jsx';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import { IN_CURRICULUM, IN_CHAPTER_BY_ID } from '../engine/curriculum-in.js';
 import { NOTES_GRADES, gradeOfChapter, loadNotesForGrade, notesPracticeHref, notesSearchText } from '../notes/notesIndex.js';
+import { studyResourcesForGrade } from '../notes/data/notes-study-resources.js';
 import '../notes/Notes.css';
 
 const BOOKMARK_KEY = 'pri.notes.bookmarks.v1';
@@ -335,13 +337,21 @@ function ChapterNotes({ chapterId }) {
   const nav = useNavigate();
   const chapter = IN_CHAPTER_BY_ID[chapterId];
   const grade = gradeOfChapter(chapterId);
+  const [resourceParams] = useSearchParams();
+  // External references are track-specific; a CBSE visitor must not be told
+  // a JEE-specific examination archive is part of the school syllabus.
+  const routeTrack = resourceParams.get('track');
+  const resourceTrack = routeTrack === 'jee-main' || routeTrack === 'jee-advanced' ? routeTrack : 'cbse';
+  const linkedResources = studyResourcesForGrade(grade, resourceTrack);
   const [{ notes: all, failed }, retry] = useNotes(grade);
   const [marks, toggleMark] = useBookmarks();
   const [cards, setCards] = useState(false);
+  // Rendering 30+ SVG charts in one frame is expensive on tablets. Mount six at a time.
+  const [visibleExamples, setVisibleExamples] = useState(6);
   const root = useRef(null);
   const notes = all?.[chapterId];
-  useReveal(root, [chapterId, notes]);
-  useEffect(() => { window.scrollTo?.(0, 0); }, [chapterId]);
+  useReveal(root, [chapterId, notes, visibleExamples]);
+  useEffect(() => { setVisibleExamples(6); window.scrollTo?.(0, 0); }, [chapterId]);
 
   const group = IN_CURRICULUM.find(g => g.grade === grade);
   const number = group ? group.chapters.findIndex(c => c.id === chapterId) + 1 : 0;
@@ -431,8 +441,37 @@ function ChapterNotes({ chapterId }) {
           </Section>
 
           <Section id="examples" title={t('notes.sectionExamples')}>
-            {notes.examples.map((ex, i) => <Example key={i} ex={ex} n={i + 1} />)}
+            {notes.examples.slice(0, visibleExamples).map((ex, i) => <Example key={i} ex={ex} n={i + 1} />)}
+            {notes.examples.length > visibleExamples && (
+              <div className="nt-example-more">
+                <button type="button" className="btn btn-secondary"
+                  onClick={() => setVisibleExamples(v => Math.min(v + 6, notes.examples.length))}
+                  aria-label={t('nav.more') + ' ' + t('notes.sectionExamples')}>
+                  {t('nav.more')} ({Math.min(visibleExamples + 6, notes.examples.length)}/{notes.examples.length})
+                </button>
+              </div>
+            )}
           </Section>
+
+          {linkedResources.length > 0 && (
+            <Section id="resources" title={t('nav.more')}>
+              <ul className="nt-chapters" data-testid="notes-study-resources">
+                {linkedResources.map(resource => (
+                  <li key={resource.id}>
+                    <a className="nt-chapter" href={resource.url} target="_blank" rel="noopener noreferrer"
+                      aria-label={resource.title}>
+                      <span className="nt-chapter-n" aria-hidden="true">↗</span>
+                      <span className="nt-chapter-body">
+                        <strong className="nt-chapter-name">{resource.title}</strong>
+                        <span className="nt-chapter-meta">{resource.issuer} · {resource.focus}</span>
+                      </span>
+                      <span className="nt-chapter-go" aria-hidden="true">↗</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
 
           <div className="nt-end nt-reveal">
             <button type="button" className="btn btn-primary" onClick={() => nav(notesPracticeHref(chapter))}>{t('notes.practise')}</button>
@@ -508,12 +547,14 @@ function Formula({ f, i }) {
 
 function Example({ ex, n }) {
   const t = useT();
-  const [shown, setShown] = useState(1);
+  // Do not reveal worked steps before the learner studies the source diagram.
+  const [shown, setShown] = useState(0);
   const done = shown >= ex.steps.length;
   return (
     <div className="nt-example nt-reveal">
       <p className="nt-example-n">{t('notes.exampleNumber', { n })}</p>
       <MathText block className="nt-example-q" text={ex.question} />
+      {ex.figure && <StudyDiagram figure={ex.figure} />}
       <ol className="nt-steps">
         {ex.steps.slice(0, shown).map((s, i) => <li key={i} className="nt-step"><MathText text={s} /></li>)}
       </ol>
