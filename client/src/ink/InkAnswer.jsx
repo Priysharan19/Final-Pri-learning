@@ -24,8 +24,8 @@ import InkCanvas from './InkCanvas.jsx';
 import NativeInkCanvas from './NativeInkCanvas.jsx';
 import { nativeInkAvailable } from './native.js';
 import { exprToLatex } from './inkLatex.js';
-import { ACCOUNT_BLOCKED_KEYS, cloudReadingEnabled, inkReaderUiState, readerBlock, readinessIdentity, resumeReaderNow, retryDelayMs, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
-import { AUTO_RETRY_MAX, retryClock, stoppedKey } from './readerFailure.js';
+import { ACCOUNT_BLOCKED_KEYS, inkReaderUiState, readerBlock, readerPaused, readinessIdentity, resumeReaderNow, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
+import { retryClock } from './readerFailure.js';
 import { Link, useInRouterContext } from 'react-router-dom';
 import { useApp } from '../App.jsx';
 import { feedbackGeometry } from './feedbackGeometry.js';
@@ -48,15 +48,8 @@ const inkDiagnosticsVisible = () => {
   if (window.__PRI_LAN_DEV__ === true) return true;
   try { return new URLSearchParams(window.location.search).has('inkdiag'); } catch { return false; }
 };
-/** How long the page must be still before it is worth sending. */
-const SETTLE_MS = 1100;
 // How long a server read runs before the note changes to "still reading".
 export const STILL_READING_MS = 5000;
-// A reader that did not answer is tried again on its own AUTO_RETRY_MAX times
-// (20 s, 40 s, 80 s) and then not again until the student asks: a page must
-// never keep re-sending a read nobody is watching. A refusal that is not "did
-// not answer" (the service's reading limit, this account's allowance or rate
-// limit, a request the server will not accept) is never re-sent by a timer.
 
 // The reader's "why this page is waiting" sentences were written with a save
 // claim in them ("Saved. It will be read…"). The reader does not know whether
@@ -69,6 +62,14 @@ const WAITING_WITHOUT_SAVE_CLAIM = {
 };
 
 const EMPTY_READING = { lines: [], text: '' };
+
+/** What this device already knows makes a read impossible, without asking — or null. */
+function knownBlockOf(who, isOnline) {
+  const paused = readerPaused();
+  const block = readerBlock(who, { online: () => isOnline, ...(paused ? { outcome: { failure: paused.failure } } : {}) });
+  if (['turned-off', 'not-available', 'offline', 'session'].includes(block.kind)) return block;
+  return paused ? block : null;
+}
 // The content of the page, not only its size: two pages with the same number
 // of strokes and points are different pages.
 const strokeSignature = strokes => {
@@ -96,7 +97,7 @@ const strokeSignature = strokes => {
  *  strokes and History replay all keep one coordinate space. */
 const MAX_PAGES = 4;
 
-export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -125,24 +126,32 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   const [cleared, setCleared] = useState(null);
   // null | { kind: 'reading' } | { kind: 'waiting', key, block, stopped } | { kind: 'empty' } | { kind: 'allowance', key, block }
   const [status, setStatus] = useState(null);
+  // Whether there is ink on the page, and whether the reading on screen is of
+  // an earlier state of it (the student wrote, erased or undid since).
+  const [hasInk, setHasInk] = useState(false);
+  const [stale, setStale] = useState(false);
+  const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine !== false);
+  // What is said about reading: a refusal the reader gave, or — before any
+  // read is asked for — a reason this device already knows makes one
+  // impossible (signed out, offline, switched off, a limit being waited out).
+  // The student is told the reason and its action instead of being shown a
+  // "Read my answer" that could not work.
+  const known = hasInk && !disabled ? knownBlockOf(user, online) : null;
+  const shownStatus = status || (known ? { kind: known.kind === 'allowance' ? 'allowance' : 'waiting', key: known.inkKey, block: known } : null);
+  const shownKey = shownStatus ? `${shownStatus.kind}|${shownStatus.key || ''}` : '';
   useEffect(() => {
     if (typeof onReaderState !== 'function') return;
-    try { onReaderState(inkReaderUiState(status, rec)); } catch { /* reporting must never break writing */ }
-  }, [status, rec, onReaderState]);
-  const settleRef = useRef(null);
-  const retryRef = useRef(null);
-  const retriesRef = useRef(0);
+    // A reading of earlier writing is not a reading of this page.
+    const state = inkReaderUiState(shownStatus, stale ? null : rec);
+    try { onReaderState(stale ? Object.freeze({ ...state, stale: true }) : state); } catch { /* reporting must never break writing */ }
+  }, [shownKey, rec, stale, onReaderState]); // eslint-disable-line react-hooks/exhaustive-deps
+  const emptyRef = useRef(null);
   const readSeqRef = useRef(0);
   const abortRef = useRef(null);
-  const sentRef = useRef(null);
   // The page being read right now, and the page the reading on screen is of.
   const flyingRef = useRef(null);
   const readRef = useRef(null);
   const strokesRef = useRef([]);
-  // The page waited for the reader (offline, signed out, reader down). The
-  // reading that eventually arrives is handed on as such, so the card can mark
-  // it without a second tap — once.
-  const queuedRef = useRef(false);
   const disabledRef = useRef(!!disabled);
   const onStrokesRef = useRef(onStrokes);
   useEffect(() => { onStrokesRef.current = onStrokes; }, [onStrokes]);
@@ -153,8 +162,9 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     });
   }, []);
 
-  const publish = useCallback((r, strokes, { afterWait = false } = {}) => {
+  const publish = useCallback((r, strokes, { afterWait = false, stale: isStale = false } = {}) => {
     setRec(r);
+    setStale(isStale && r.lines.length > 0);
     if (r.engine) recordLocalHandwritingDiagnostics({ engine: r.engine });
     // The server's own confidence is the number that means something here; it
     // feeds the caller's confirmation gate exactly as before.
@@ -178,71 +188,59 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       corrected: r.corrected === true,
       afterWait: afterWait && r.lines.length > 0,
       readKey: r.lines.length ? `${strokeSignature(strokes)}|${r.text}` : null,
+      // The reading is of EARLIER writing: shown, labelled, never submitted.
+      stale: isStale && r.lines.length > 0,
+      // What the card keeps with the ink so a reload restores the transcript
+      // (and the student's corrections) without reading the page again.
+      kept: r.lines.length ? { signature: readRef.current, reading: r } : null,
       strokes
     });
   }, [onRecognized]);
 
-  const clearRetry = () => { if (retryRef.current) { clearTimeout(retryRef.current); retryRef.current = null; } };
+  // ── Reading is asked for, never assumed ────────────────────────────────────
+  // Owner decision: a read is a paid operation and happens when the student
+  // presses "Read my answer" — once. Nothing else sends one: not a pause, a
+  // stroke, a focus, a re-render, a reload, coming back online or signing in.
+  // (The one other sender is "Try again" after a refusal or an outage, which
+  // is the same explicit press.) Reads stay single-flight.
 
-  const scheduleRetry = (seq) => {
-    clearRetry();
-    const delay = retryDelayMs(retriesRef.current);
-    retriesRef.current += 1;
-    retryRef.current = setTimeout(() => {
-      // A timed retry asks the server afresh too: the cached "not ready" it
-      // is retrying was learned before the wait, and a wait is exactly when
-      // the account or the deployment changes.
-      if (seq === readSeqRef.current && !disabledRef.current) sendToReaderRef.current?.(strokesRef.current, seq, { fresh: true });
-    }, delay);
-  };
-  const sendToReaderRef = useRef(null);
-  /**
-   * The page was not read. Name the reason, keep the ink, and try again by
-   * itself only when the reason is a reader that did not answer — and only
-   * AUTO_RETRY_MAX times. After that the sentence stops promising a retry and
-   * the "Try again" button is the way forward.
-   */
-  const waitFor = (who, outcome, seq) => {
+  const knownBlock = who => knownBlockOf(who, typeof navigator === 'undefined' || navigator.onLine !== false);
+
+  /** The page was not read: name the reason and offer its action. Nothing is retried by itself. */
+  const waitFor = (who, outcome) => {
     const block = readerBlock(who, { outcome });
     if (block.kind === 'allowance') { setStatus({ kind: 'allowance', key: block.inkKey, block }); return; }
-    const auto = block.autoRetry && retriesRef.current < AUTO_RETRY_MAX;
-    const stopped = block.autoRetry && !auto;
-    setStatus({ kind: 'waiting', key: stopped ? stoppedKey(block.inkKey) : block.inkKey, block, stopped });
-    if (auto) scheduleRetry(seq); else clearRetry();
+    setStatus({ kind: 'waiting', key: block.inkKey, block });
   };
 
   /**
-   * Send the page to the server reader. Its reading is the only reading.
-   * `fresh` bypasses the readiness cache: used for the first read after the
-   * account changed (signed in, verified, consented) so a status learned for
-   * the signed-out device is never the reason this student's page waits.
+   * Send the page to the server reader — ONE recognition operation, because
+   * the student asked. Its reading is the only reading.
    */
-  const sendToReader = useCallback((strokes, seq, { fresh = false } = {}) => {
-    if (disabledRef.current) return;
+  const readNow = useCallback(() => {
+    const strokes = strokesRef.current;
+    if (disabledRef.current || !strokes.length) return;
+    const signature = strokeSignature(strokes);
+    // Single flight: a page that is being read is not sent again.
+    if (flyingRef.current === signature) return;
     const who = userRef.current;
-    // Offline is known before anything is sent: no doomed request, just the
-    // honest note, and the 'online' listener below reads the page later.
-    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
-    if (offline || !cloudReadingEnabled(who)) {
-      queuedRef.current = true;
-      setStatus({ kind: 'waiting', key: readerBlock(who).inkKey, block: readerBlock(who) });
+    const blocked = knownBlock(who);
+    if (blocked && blocked.kind !== 'capacity' && blocked.kind !== 'rate-limited') {
+      setStatus(blocked.kind === 'allowance' ? { kind: 'allowance', key: blocked.inkKey, block: blocked } : { kind: 'waiting', key: blocked.inkKey, block: blocked });
       return;
     }
+    const seq = ++readSeqRef.current;
     abortRef.current?.abort?.();
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     abortRef.current = controller;
-    const signature = strokeSignature(strokes);
-    sentRef.current = signature;
     flyingRef.current = signature;
     const landed = () => { if (flyingRef.current === signature) flyingRef.current = null; };
     setStatus({ kind: 'reading' });
-    readWithCloud(strokes, { user: who, signal: controller?.signal, freshReadiness: fresh }).finally(landed).then(outcome => {
-      // Newer writing replaced this read, or the page was submitted while the
-      // server was reading it (§09: a late reading never rewrites the reading
-      // a mark was given for).
+    readWithCloud(strokes, { user: who, signal: controller?.signal, freshReadiness: true }).finally(landed).then(outcome => {
+      // The page was submitted or left while the server was reading it (§09:
+      // a late reading never rewrites the reading a mark was given for).
       if (seq !== readSeqRef.current || disabledRef.current) return;
-      if (outcome?.reason === 'cancelled') return;
-      if (outcome?.reason === 'allowance') { sentRef.current = null; waitFor(who, outcome, seq); return; }
+      if (outcome?.reason === 'cancelled') { setStatus(null); return; }
       // Line geometry comes from the strokes themselves (no recognition), so
       // the ✓/✗ can be drawn on the student's own lines when the counts agree.
       let geometry = null;
@@ -254,52 +252,23 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
         ? toReading(outcome.transcription, geometry, { confidenceFloor: outcome?.readiness?.confidenceFloor })
         : null;
       if (reading) {
-        retriesRef.current = 0;
-        const afterWait = queuedRef.current;
-        queuedRef.current = false;
         readRef.current = signature;
-        publish(reading, strokes, { afterWait });
+        // The student may have gone on writing while the page was being
+        // read: the reading that lands is then already of earlier writing.
+        const now = strokesRef.current;
+        publish(reading, now, { stale: !now.length || strokeSignature(now) !== signature });
         setStatus(null);
         return;
       }
-      if (outcome?.reason === 'empty') { setStatus({ kind: 'empty' }); return; }
-      // Not read: say why, keep the ink, and try again by itself.
-      sentRef.current = null;
-      queuedRef.current = true;
-      waitFor(who, outcome, seq);
+      if (outcome?.reason === 'empty') { emptyRef.current = signature; setStatus({ kind: 'empty' }); return; }
+      waitFor(who, outcome);
     }).catch((error) => {
       if (seq !== readSeqRef.current || disabledRef.current) return;
-      sentRef.current = null;
-      queuedRef.current = true;
       // A refusal that escaped still names its reason (401 → sign in, 403
       // EMAIL_UNVERIFIED → verify); only an unknown throw is "not answering".
-      waitFor(who, { error: { code: error?.code, status: error?.status, resetAt: error?.resetAt } }, seq);
+      waitFor(who, { error: { code: error?.code, status: error?.status, resetAt: error?.resetAt } });
     });
-  }, [publish]);
-  sendToReaderRef.current = sendToReader;
-
-  const scheduleRead = useCallback((strokes, { immediate = false, fresh = false } = {}) => {
-    // Single flight. After a reload the session announcement and the profile
-    // refresh both say "read now" within the same moment; the second used to
-    // abort the first after it had left and send the identical page again — a
-    // second paid read of the same strokes. A page that is being read is not
-    // sent again, and neither is one whose reading is already on screen.
-    const signature = strokes.length ? strokeSignature(strokes) : null;
-    if (signature && flyingRef.current === signature) return;
-    if (signature && readRef.current === signature && rec.lines.length) return;
-    const seq = ++readSeqRef.current;
-    clearRetry();
-    if (settleRef.current) { clearTimeout(settleRef.current); settleRef.current = null; }
-    abortRef.current?.abort?.();
-    // Writing changed: whatever was read before is no longer this page. A
-    // genuine prior READ_FAILED must disappear immediately while the student
-    // rewrites; account/network/service blockers remain truthful until retried.
-    if (rec.lines.length) publish(EMPTY_READING, strokes);
-    setStatus(prev => prev?.kind === 'empty' ? null : prev);
-    if (!strokes.length) { sentRef.current = null; setStatus(null); return; }
-    const go = () => sendToReader(strokes, seq, { fresh });
-    if (immediate) go(); else settleRef.current = setTimeout(go, SETTLE_MS);
-  }, [publish, rec.lines.length, sendToReader]);
+  }, [publish]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * One tap: the student says what they wrote on a line the reader was unsure
@@ -311,84 +280,78 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     setCorrecting(null);
     const next = applyLineCorrection(rec, index, text);
     if (next === rec) return;
-    publish(next, strokesRef.current);
-  }, [rec, publish]);
+    publish(next, strokesRef.current, { stale });
+  }, [rec, publish, stale]);
 
   const onStrokesChange = useCallback((strokes) => {
     if (strokes?.length) setCleared(null);
     strokesRef.current = strokes;
+    setHasInk(strokes.length > 0);
     setCorrecting(null);
-    // Kept the moment the pen lifts, before any reading: a page written in the
-    // second before the app went away is still the student's page.
+    // Kept the moment the pen lifts, whatever happens to reading: a page
+    // written in the second before the app went away is still the student's.
     try { onStrokesRef.current?.(strokes); } catch { /* keeping ink is best-effort */ }
-    if (sentRef.current && sentRef.current === strokeSignature(strokes)) return;
-    retriesRef.current = 0;
-    scheduleRead(strokes);
-  }, [scheduleRead]);
+    const signature = strokes.length ? strokeSignature(strokes) : null;
+    // A page that could not be read at all is a different page once it changes.
+    if (emptyRef.current && emptyRef.current !== signature) { emptyRef.current = null; setStatus(prev => (prev?.kind === 'empty' ? null : prev)); }
+    if (!rec.lines.length) return;
+    if (!strokes.length) {
+      // Nothing is written any more: an old transcript has nothing to be of.
+      readRef.current = null;
+      publish(EMPTY_READING, strokes);
+      return;
+    }
+    // The writing changed after it was read. The transcript stays on screen,
+    // labelled as from earlier writing; it is not sent, and the student is
+    // offered "Read again". Undoing back to the page that was read makes the
+    // transcript current again — it is the same page.
+    const isStale = signature !== readRef.current;
+    if (isStale !== stale) publish(rec, strokes, { stale: isStale });
+  }, [publish, rec, stale]);
 
-  // The working waits on the page; the moment the reason goes away it is read.
-  // Each of these is a moment the world may have changed (signed in, back
-  // online, back from Settings), so the server is asked afresh, not the cache.
+  // The world changed (back online, signed in, another profile): that can
+  // clear a reason the page could not be read. It is never a reason to read —
+  // the note goes and "Read my answer" is there to be pressed.
   useEffect(() => {
-    const retry = () => {
-      if (disabledRef.current || !strokesRef.current.length) return;
-      if (status?.kind !== 'waiting' && status?.kind !== 'allowance') return;
-      retriesRef.current = 0;
-      scheduleRead(strokesRef.current, { immediate: true, fresh: true });
-    };
-    // Each trigger re-sends only for the reasons it can have changed. A
-    // session announcement or a return from Settings can clear an account
-    // step; a connection coming back can clear "offline" or a reader that did
-    // not answer. None of them is a reason to re-send a read the server
-    // refused for a limit — and a reader that is simply not answering is
-    // retried by its own bounded timer, not by every focus, session
-    // announcement or re-render (after a reload those all arrive within a
-    // second of the first read, and each one used to be a second paid read
-    // of the same page).
-    const kind = status?.kind === 'allowance' ? 'allowance' : status?.block?.kind;
-    const accountStep = ['session', 'verify-email', 'guardian', 'not-allowed', 'allowance', 'turned-off'].includes(kind);
-    const stopSession = onCloudSessionChange(() => { if (accountStep) retry(); });
-    const onOnline = () => { if (kind === 'offline' || (kind === 'unreachable' && status?.stopped !== true)) retry(); };
-    const onVisible = () => {
-      if (!(accountStep && kind !== 'allowance') && kind !== 'offline') return;
-      if (typeof document === 'undefined' || document.visibilityState !== 'hidden') retry();
-    };
+    const clearIf = kinds => setStatus(prev => (prev?.kind === 'waiting' && kinds.includes(prev.block?.kind) ? null : prev));
+    const stopSession = onCloudSessionChange(() => clearIf(['session', 'verify-email', 'guardian', 'not-allowed']));
+    const onOnline = () => { setOnline(true); clearIf(['offline']); };
+    const onOffline = () => setOnline(false);
     if (typeof window !== 'undefined') {
       window.addEventListener?.('online', onOnline);
-      window.addEventListener?.('focus', onVisible);
+      window.addEventListener?.('offline', onOffline);
     }
-    if (typeof document !== 'undefined') document.addEventListener?.('visibilitychange', onVisible);
     return () => {
       try { stopSession(); } catch { /* gone */ }
       if (typeof window !== 'undefined') {
         window.removeEventListener?.('online', onOnline);
-        window.removeEventListener?.('focus', onVisible);
+        window.removeEventListener?.('offline', onOffline);
       }
-      if (typeof document !== 'undefined') document.removeEventListener?.('visibilitychange', onVisible);
     };
-  }, [status, scheduleRead]);
-
-  // A profile that just became able to read (signed in, registered, switched
-  // account) re-reads — and asks the server afresh, because any readiness it
-  // cached was for the account state before this one.
+  }, []);
   const identityRef = useRef(readinessIdentity(user));
   useEffect(() => {
     const identity = readinessIdentity(user);
     const changed = identity !== identityRef.current;
     identityRef.current = identity;
-    // A re-render with the same account is not news. Only a profile that has
-    // actually changed (signed in, switched, turned reading on) re-reads.
-    if (!changed) return;
-    if ((status?.kind === 'waiting' || status?.kind === 'allowance') && strokesRef.current.length && cloudReadingEnabled(user)) {
-      scheduleRead(strokesRef.current, { immediate: true, fresh: changed });
-    }
-  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (changed) setStatus(prev => (prev?.kind === 'waiting' && ['session', 'verify-email', 'guardian', 'not-allowed', 'turned-off'].includes(prev.block?.kind) ? null : prev));
+  }, [user]);
 
-  // Handwriting kept from before a reload comes back onto the page and is read.
+  // Handwriting kept from before a reload comes back onto the page — and so
+  // does its transcript, with the student's corrections, exactly as kept. The
+  // page is NOT read again: a kept reading of the same strokes is current, and
+  // one of other strokes is shown as from earlier writing.
   useEffect(() => {
     if (!Array.isArray(initialStrokes) || !initialStrokes.length) return;
     canvasRef.current?.setStrokes?.(initialStrokes);
-    onStrokesChange(initialStrokes);
+    strokesRef.current = initialStrokes;
+    setHasInk(true);
+    try { onStrokesRef.current?.(initialStrokes); } catch { /* keeping ink is best-effort */ }
+    const kept = initialReading?.reading;
+    if (kept && Array.isArray(kept.lines) && kept.lines.length && typeof initialReading.signature === 'string') {
+      readRef.current = initialReading.signature;
+      publish(kept, initialStrokes, { stale: strokeSignature(initialStrokes) !== initialReading.signature });
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Locking the page for marking invalidates every reading still in flight.
@@ -397,15 +360,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     disabledRef.current = !!disabled;
     if (!disabled || was) return;
     readSeqRef.current += 1;
-    if (settleRef.current) { clearTimeout(settleRef.current); settleRef.current = null; }
-    clearRetry();
     abortRef.current?.abort?.();
     setStatus(null);
   }, [disabled]);
   useEffect(() => () => {
     readSeqRef.current += 1;
-    if (settleRef.current) clearTimeout(settleRef.current);
-    clearRetry();
     abortRef.current?.abort?.();
   }, []);
 
@@ -445,15 +404,18 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   // i18n-exempt-end
   const shownEngineNote = diagnostics ? engineNote : (rec.cloud === true ? t('verdict.readOnServer') : null);
   const lineConfidenceFloor = confidenceFloorOf(rec);
-  const statusLine = status?.kind === 'reading'
+  const statusLine = shownStatus?.kind === 'reading'
     ? t(slowRead ? 'ink.serverStillReading' : 'ink.serverReading')
-    : status?.kind === 'empty'
+    : shownStatus?.kind === 'empty'
       ? t('ink.serverEmpty')
-      : status?.kind === 'allowance'
-        ? t(status.key || 'ink.waitingAllowance', { time: retryClock(status.block?.retryAt, language) })
-        : status?.kind === 'waiting'
-          ? t(draftSaved ? status.key : (WAITING_WITHOUT_SAVE_CLAIM[status.key] || status.key), { time: retryClock(status.block?.retryAt, language) })
+      : shownStatus?.kind === 'allowance'
+        ? t(shownStatus.key || 'ink.waitingAllowance', { time: retryClock(shownStatus.block?.retryAt, language) })
+        : shownStatus?.kind === 'waiting'
+          ? t(draftSaved ? shownStatus.key : (WAITING_WITHOUT_SAVE_CLAIM[shownStatus.key] || shownStatus.key), { time: retryClock(shownStatus.block?.retryAt, language) })
           : null;
+  // "Read my answer": offered whenever there is ink that has not been read as
+  // it now stands and nothing is known to stop a read. One press, one read.
+  const canAskToRead = hasInk && !disabled && !shownStatus && (!rec.lines.length || stale);
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`} data-engine={rec.engine || undefined}>
@@ -552,36 +514,42 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           account section of Settings holds sign-in and "send a fresh
           verification email". Kept beside the notice, not inside it, so the
           notice stays the one sentence it is announced as. */}
-      {/* A reader that is not answering is tried again by itself; the
-          student can also ask now instead of waiting for the next attempt. */}
-      {status?.kind === 'waiting' && !disabled && (status.block?.manualRetry === true || status.key === 'ink.waitingServiceDown') && (
+      {canAskToRead && (
+        <div className="ink-status-action ink-read-action">
+          <button type="button" className="btn btn-primary" data-ink-read={stale ? 'again' : 'first'} onClick={readNow}>
+            {t(stale ? 'ink.readAgain' : 'ink.readMyAnswer')}
+          </button>
+          <span className="muted ink-read-hint">{t(stale ? 'ink.readAgainHint' : 'ink.readMyAnswerHint')}</span>
+        </div>
+      )}
+      {/* After a refusal or an outage the student can ask again: one press
+          sends exactly one new read, and nothing is retried without it. */}
+      {shownStatus?.kind === 'waiting' && !disabled && shownStatus.block?.manualRetry === true && shownStatus.block?.kind !== 'offline' && (
         <div className="ink-status-action">
-          <button type="button" className="btn btn-ghost btn-sm" data-ink-retry-reading data-reader-block={status.block?.kind || undefined}
+          <button type="button" className="btn btn-ghost btn-sm" data-ink-retry-reading data-reader-block={shownStatus.block?.kind || undefined}
             onClick={() => {
               if (!strokesRef.current.length) return;
-              // The student asked: exactly one new read is sent, whatever
-              // limit was last reported. If it is refused again the page
-              // waits again, without a timer.
               resumeReaderNow();
-              retriesRef.current = 0;
-              scheduleRead(strokesRef.current, { immediate: true, fresh: true });
+              setStatus(null);
+              readNow();
             }}>{t('common.tryAgain')}</button>
         </div>
       )}
-      {status?.kind === 'waiting' && !disabled && ACCOUNT_BLOCKED_KEYS.has(status.key) && (
+      {shownStatus?.kind === 'waiting' && !disabled && ACCOUNT_BLOCKED_KEYS.has(shownStatus.key) && (
         <div className="ink-status-action">
           {inRouter
-            ? <Link className="ink-status-link" to="/settings" data-ink-blocker={status.key}>{t('app.accountSettings')}</Link>
-            : <a className="ink-status-link" href="/settings" data-ink-blocker={status.key}>{t('app.accountSettings')}</a>}
+            ? <Link className="ink-status-link" to="/settings" data-ink-blocker={shownStatus.key}>{t('app.accountSettings')}</Link>
+            : <a className="ink-status-link" href="/settings" data-ink-blocker={shownStatus.key}>{t('app.accountSettings')}</a>}
         </div>
       )}
 
       {rec.lines.length > 0 && (
-        <div className="ink-preview">
+        <div className={`ink-preview${stale ? ' is-stale' : ''}`} data-stale={stale ? 'true' : undefined}>
           <div className="ink-preview-title" id="ink-reading">
             {t('ink.reading')}
             {/* A student always learns when their writing was read on the server. */}
             {shownEngineNote && <span className="ink-status muted">{shownEngineNote}</span>}
+            {stale && <span className="ink-status ink-stale" role="status" data-ink-stale>{t('ink.readingStale')}</span>}
           </div>
           {rec.lines.map((line, li) => (
             <div className={`ink-line${isLowConfidence(line, lineConfidenceFloor) ? ' ink-line-low' : ''}`} key={li} data-text={line.text}
@@ -607,12 +575,12 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
               {/* Every line of the reading is the student's to correct before
                   Submit, not only the ones the reader doubted: a confident
                   misread is still a misread, and it is their page. */}
-              {!disabled && correcting?.index !== li && (
+              {!disabled && !stale && correcting?.index !== li && (
                 <button type="button" className="ink-correct-btn" aria-label={t('ink.iWroteAria', { n: li + 1 })}
                   data-line-doubt={isLowConfidence(line, lineConfidenceFloor) ? 'low' : undefined}
                   onClick={() => setCorrecting({ index: li, text: line.text })}>{isLowConfidence(line, lineConfidenceFloor) ? t('ink.iWrote') : t('ink.editLine')}</button>
               )}
-              {!disabled && correcting?.index === li && (
+              {!disabled && !stale && correcting?.index === li && (
                 <form className="ink-correct" onSubmit={e => { e.preventDefault(); correctLine(li, correcting.text); }}>
                   <input autoFocus value={correcting.text} aria-label={t('ink.correctionAria', { n: li + 1 })}
                     inputMode="text" autoCapitalize="off" autoCorrect="off" spellCheck={false} maxLength={400}
@@ -623,7 +591,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
               )}
             </div>
           ))}
-          {!disabled && lowConfidenceLines(rec).length > 0 && (
+          {!disabled && !stale && lowConfidenceLines(rec).length > 0 && (
             <div className="ink-doubt-note" role="status">{t('ink.lowConfidenceLine', { n: lowConfidenceLines(rec)[0] + 1 })}</div>
           )}
         </div>

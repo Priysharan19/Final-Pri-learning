@@ -40,6 +40,7 @@
 /* Photo mode: the lines read from the page. Same quiet rows as the ink
    reading; a line left out is struck through, never removed. */
 .photo-lines { margin-top: 12px; }
+.ws-submit-reason { font-size: 13px; }
 .photo-lines-help { font-size: 13px; margin: 2px 0 8px; }
 .photo-lines-note { font-size: 13.5px; margin: 0 0 8px; }
 .photo-lines-list { list-style: none; margin: 0; padding: 0; }

@@ -128,3 +128,9 @@
    beside the notice, in the notice's own quiet voice. */
 .ink-status-action { margin: 4px 2px 0; font-size: 12.5px; }
 .ink-status-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
+/* Reading on request: one obvious action beside the work. */
+.ink-read-action { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.ink-read-hint { font-size: 12.5px; }
+.ink-preview.is-stale .ink-line-math { opacity: 0.55; }
+.ink-stale { font-weight: 600; }

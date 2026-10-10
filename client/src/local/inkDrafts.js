@@ -115,6 +115,12 @@ export function saveInkDraft(questionId, strokes, meta = {}) {
   pending.set(id, {
     id, pid: who, questionId: String(questionId),
     strokes: compact,
+    // The transcript the student was shown for this page (with their own
+    // corrections) and a final answer they typed over the proposal. Kept so a
+    // reload restores them instead of reading — and paying for — the page
+    // again, and so an answer the student overrode never comes back as the
+    // proposal. Sealed with the strokes; never an expected answer or a mark.
+    ...inkExtras(meta),
     label: String(meta.label || '').slice(0, 120),
     savedAt: Date.now(),
     // The moment the page first had to wait for a reader, kept across saves.
@@ -122,6 +128,19 @@ export function saveInkDraft(questionId, strokes, meta = {}) {
   });
   if (timer === null) timer = setTimeout(() => { flushInkDrafts(); }, COALESCE_MS);
   return true;
+}
+
+export const MAX_READING_CHARS = 60_000;
+export const MAX_INK_ANSWER_CHARS = 2000;
+/** The reading and typed answer kept beside the strokes, bounded; absent fields are not written. */
+export function inkExtras(source = {}) {
+  const out = {};
+  const kept = source?.reading;
+  if (kept && typeof kept === 'object' && typeof kept.signature === 'string' && Array.isArray(kept.reading?.lines) && kept.reading.lines.length) {
+    try { if (JSON.stringify(kept).length <= MAX_READING_CHARS) out.reading = JSON.parse(JSON.stringify(kept)); } catch { /* not keepable */ }
+  }
+  if (typeof source?.answer === 'string') out.answer = source.answer.slice(0, MAX_INK_ANSWER_CHARS);
+  return out;
 }
 
 /** Write every queued row now. Resolves when the writes have settled. */
@@ -155,7 +174,7 @@ export function flushInkDrafts() {
  *   { saved: false, reason: 'missing' }     the write was acknowledged but no row is there
  *   { saved: false, reason: 'mismatch' }    a row is there, and it is not this page
  */
-export async function confirmInkDraftSaved(questionId, strokes) {
+export async function confirmInkDraftSaved(questionId, strokes, extras = undefined) {
   if (!questionId) return { saved: false, reason: 'missing' };
   const id = idFor(questionId);
   const expected = JSON.stringify(compactStrokes(strokes));
@@ -165,7 +184,11 @@ export async function confirmInkDraftSaved(questionId, strokes) {
   let row;
   try { row = await getFresh(INK_DRAFT_STORE, id); } catch { return { saved: false, reason: 'read' }; }
   if (!row || typeof row !== 'object' || row.pid !== pid() || !Array.isArray(row.strokes)) return { saved: false, reason: 'missing' };
-  return JSON.stringify(compactStrokes(row.strokes)) === expected ? { saved: true } : { saved: false, reason: 'mismatch' };
+  if (JSON.stringify(compactStrokes(row.strokes)) !== expected) return { saved: false, reason: 'mismatch' };
+  // When the caller also kept a transcript or a typed answer, "saved" means
+  // those are on disk too, exactly as they are on screen.
+  if (extras !== undefined && JSON.stringify(inkExtras(row)) !== JSON.stringify(inkExtras(extras))) return { saved: false, reason: 'mismatch' };
+  return { saved: true };
 }
 
 async function readRow(questionId) {
@@ -188,6 +211,12 @@ export async function readInkDraft(questionId) {
   if (!questionId) return null;
   const row = await readRow(questionId);
   return row ? expandStrokes(row.strokes) : null;
+}
+
+/** The transcript and typed answer kept with the page: { reading, answer } (either may be absent). */
+export async function readInkDraftExtras(questionId) {
+  const row = questionId ? await readRow(questionId) : null;
+  return row ? inkExtras(row) : {};
 }
 
 /** When the kept page was first queued for reading, or null. */

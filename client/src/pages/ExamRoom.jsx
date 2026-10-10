@@ -483,8 +483,33 @@ export default function ExamRoom() {
     else if (inkOpenKey === key) setInkOpenKey(null);
   }
 
+  // Handwriting is read when the student presses "Read my answer", not while
+  // they write. The strokes are kept the moment the pen lifts all the same,
+  // so a page that has not been read yet is still saved with the paper.
+  const onInkStrokes = useCallback((key, raw) => {
+    if (phaseRef.current !== 'sitting') return;
+    const strokes = compactStrokes(raw || []);
+    if (restoredSig.current[key] && restoredSig.current[key] === strokeSignature(strokes)) return;
+    dirtyInk.current.add(key);
+    setInks(x => {
+      const next = { ...x };
+      if (strokes.length) next[key] = { ...(x[key] || {}), strokes, lines: x[key]?.lines || [], answerLine: x[key]?.answerLine || '', engine: x[key]?.engine || null };
+      else delete next[key];
+      return next;
+    });
+  }, []);
+
   const onInk = useCallback((key, item, reading) => {
     if (phaseRef.current !== 'sitting') return;
+    // A reading of earlier writing (the ink changed after it was read) is not
+    // an answer: what it had put in the answer is withdrawn until the page is
+    // read again. Nothing that no longer matches the ink is ever submitted.
+    if (reading?.stale === true) {
+      const isWorkingItem = item.answerType === 'working';
+      setAnswers(a => ({ ...a, [key]: '' }));
+      if (!isWorkingItem) setWorkings(w => { const next = { ...w }; delete next[key]; return next; });
+      return;
+    }
     const strokes = compactStrokes(reading.strokes || []);
     const sig = strokeSignature(strokes);
     const lines = (reading.lines || []).map(l => String(l || ''));
@@ -782,6 +807,7 @@ export default function ExamRoom() {
                   initialStrokes={saved?.strokes?.length ? expandStrokes(saved.strokes) : null}
                   recognitionContext={item.answerType === 'numeric' ? { answerType: 'numeric', singleGlyphAlphabet: NUMERIC_SINGLE_GLYPH_ALPHABET } : null}
                   lineVerdicts={null}
+                  onStrokes={strokes => onInkStrokes(key, strokes)}
                   onRecognized={r => onInk(key, item, r)} />
               ) : inkPhase === 'failed' ? (
                 <div role="alert" className="muted" style={{ fontSize: 13 }}>
