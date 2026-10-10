@@ -13,6 +13,57 @@ const AccountPanel = React.lazy(() => import('./CloudAccountPanel.jsx'));
 const CodeSignIn = React.lazy(() => import('./SignUpFlow.jsx'));
 
 /**
+ * The two ways to sign in, on the page the work is on: the account panel and
+ * the phone or email code. Shared by every in-context sign-in (a refused
+ * check, handwriting, a photo) so each of them offers the same legitimate
+ * flow. `saved` is whether the work on screen is proven kept on this device;
+ * linking an account to the profile is refused without it.
+ */
+export function SignInChoices({ user, refreshUser, saved = true, onDone = null }) {
+  const t = useT();
+  const { language } = useLanguage();
+  const [byCode, setByCode] = useState(false);
+  const finishing = useRef(null);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const words = inkRecoveryWords(language);
+  return (
+    <React.Suspense fallback={<p role="status">{t('cloud.stateChecking')}</p>}>
+      {byCode ? (
+        <CodeSignIn initialMode="signin" initialName={user?.name || ''}
+          onCancel={() => setByCode(false)}
+          onFinish={async ({ account }) => {
+            // A guardian-approved sign-in may finish twice while a slow
+            // profile refresh runs. One verified account link is enough.
+            if (!finishing.current) {
+              finishing.current = (async () => {
+                const { cloudAccountLink, linkSignedInAccount } = await import('../platform/cloudAccount.js');
+                await completeInkOtpRecovery({
+                  localProfileId: user?.id,
+                  currentProfileId: mounted.current ? user?.id : null,
+                  account, verifiedSaved: saved === true,
+                  getLinked: cloudAccountLink, linkAccount: linkSignedInAccount,
+                  refreshProfile: refreshUser
+                });
+                if (mounted.current) { setByCode(false); onDone?.(); }
+              })().finally(() => { finishing.current = null; });
+            }
+            return finishing.current;
+          }}
+        />
+      ) : (
+        <>
+          <AccountPanel />
+          <p className="muted" style={{ marginTop: 8 }}>{words.otpNotice}</p>
+          <button type="button" className="btn btn-secondary" data-check-code-sign-in
+            onClick={() => setByCode(true)}>{words.otpAction}</button>
+        </>
+      )}
+    </React.Suspense>
+  );
+}
+
+/**
  * Sign in on the page the work is on. The same account panel and code flow the
  * handwriting recovery uses; the profile, the question and everything typed or
  * written stay mounted around it. `ready` is false while the work on screen is
@@ -20,13 +71,7 @@ const CodeSignIn = React.lazy(() => import('./SignUpFlow.jsx'));
  */
 export function CheckSignIn({ user, refreshUser, ready = true, waitText = null, label = null }) {
   const t = useT();
-  const { language } = useLanguage();
   const [open, setOpen] = useState(false);
-  const [byCode, setByCode] = useState(false);
-  const finishing = useRef(null);
-  const mounted = useRef(true);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  const words = inkRecoveryWords(language);
   return (
     <>
       <button type="button" className="btn btn-primary" data-check-sign-in
@@ -34,40 +79,7 @@ export function CheckSignIn({ user, refreshUser, ready = true, waitText = null, 
         {label || t('check.signInAction')}
       </button>
       {!ready && waitText && <p className="muted" role="status">{waitText}</p>}
-      {open && ready && (
-        <React.Suspense fallback={<p role="status">{t('cloud.stateChecking')}</p>}>
-          {byCode ? (
-            <CodeSignIn initialMode="signin" initialName={user?.name || ''}
-              onCancel={() => setByCode(false)}
-              onFinish={async ({ account }) => {
-                // A guardian-approved sign-in may finish twice while a slow
-                // profile refresh runs. One verified account link is enough.
-                if (!finishing.current) {
-                  finishing.current = (async () => {
-                    const { cloudAccountLink, linkSignedInAccount } = await import('../platform/cloudAccount.js');
-                    await completeInkOtpRecovery({
-                      localProfileId: user?.id,
-                      currentProfileId: mounted.current ? user?.id : null,
-                      account, verifiedSaved: ready === true,
-                      getLinked: cloudAccountLink, linkAccount: linkSignedInAccount,
-                      refreshProfile: refreshUser
-                    });
-                    if (mounted.current) { setByCode(false); setOpen(false); }
-                  })().finally(() => { finishing.current = null; });
-                }
-                return finishing.current;
-              }}
-            />
-          ) : (
-            <>
-              <AccountPanel />
-              <p className="muted" style={{ marginTop: 8 }}>{words.otpNotice}</p>
-              <button type="button" className="btn btn-secondary" data-check-code-sign-in
-                onClick={() => setByCode(true)}>{words.otpAction}</button>
-            </>
-          )}
-        </React.Suspense>
-      )}
+      {open && ready && <SignInChoices user={user} refreshUser={refreshUser} saved={ready === true} onDone={() => setOpen(false)} />}
     </>
   );
 }

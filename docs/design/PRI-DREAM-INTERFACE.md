@@ -179,7 +179,7 @@ Each entry lists what it is for and the states it must have. A component is not 
 
 **Error.** Three different things, never confused: a wrong answer (`.verdict-bad`, copper), an unreadable answer (`.verdict-unsure`, dashed indigo), a failure of the app (`.verdict-technical`, red, "Your work is still here and nothing was lost").
 
-**Status line.** `.status-line`: a dot and a sentence. Values: Saving on this device / Saved on this device / Offline · saved on this device / Not saved — keep this screen open / Checking your working / Looking at your method / Marked on this device.
+**Status line.** `.status-line`: a dot and a sentence. Values: Saving on this device / Saved on this device / Offline · saved on this device / Saved on this device · waiting for sign-in / Couldn’t save on this device — your work is still on this page (with a quiet “Save again”) / Checking your working / Looking at your method / Marked on this device.
 
 ## 10. Learning surfaces
 

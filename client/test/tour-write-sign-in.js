@@ -152,7 +152,8 @@ const saveTruth = (page, questionId) => page.evaluate(qid => new Promise(done =>
     .filter(el => el.getClientRects().length > 0).map(el => el.innerText).join(' | ').replace(/\s+/g, ' ');
   const claims = {
     saved: /\bsaved on this device\b|\b(?:is|are) saved\b|^saved\b/i.test(shown),
-    notSaved: /\bnot saved\b/i.test(shown),
+    notSaved: /\bnot saved\b|couldn.t save/i.test(shown),
+    state: document.querySelector('.qpage .ws-actions .status-line')?.getAttribute('data-work-state') || null,
     shown
   };
   const open = indexedDB.open('pri-learning');
@@ -162,7 +163,15 @@ const saveTruth = (page, questionId) => page.evaluate(qid => new Promise(done =>
     let req;
     try { req = db.transaction('inkDrafts').objectStore('inkDrafts').getAllKeys(); }
     catch { db.close(); return done({ ...claims, kept: false, store: 'missing' }); }
-    req.onsuccess = () => { db.close(); done({ ...claims, kept: req.result.some(k => String(k).endsWith(`:${qid}`)), store: 'read' }); };
+    req.onsuccess = () => {
+      const key = req.result.find(k => String(k).endsWith(`:${qid}`));
+      if (key === undefined) { db.close(); return done({ ...claims, kept: false, store: 'read', strokes: null }); }
+      // A profile with no password keeps the row readable, so the stored
+      // geometry itself can be compared; a sealed row gives only its key.
+      const row = db.transaction('inkDrafts').objectStore('inkDrafts').get(key);
+      row.onsuccess = () => { db.close(); done({ ...claims, kept: true, store: 'read', strokes: Array.isArray(row.result?.strokes) ? JSON.stringify(row.result.strokes) : null }); };
+      row.onerror = () => { db.close(); done({ ...claims, kept: true, store: 'read', strokes: null }); };
+    };
     req.onerror = () => { db.close(); done({ ...claims, kept: false, store: 'error' }); };
   };
 }), questionId);
@@ -344,8 +353,6 @@ export const writeFlow = {
       await check('before a stroke is drawn nothing is claimed saved, and nothing is',
         !blank.saved && !blank.notSaved && !blank.kept, JSON.stringify(blank));
 
-      // From here to the end of step 3 nothing reloads and nothing navigates.
-      await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
       const box = await page.locator('.ink-canvas-live').boundingBox();
       await handwrite(page, box, '7');
       const recovery = page.locator('[data-ink-account-recovery]');
@@ -390,6 +397,24 @@ export const writeFlow = {
         JSON.stringify(calls.map(c => `${c.method} ${c.path}`)));
       await check('sign-in is enabled only once the ink is proven saved',
         await recovery.locator('[data-ink-sign-in]').isEnabled());
+      await check('the one work state says it: saved on this device, waiting for sign-in',
+        truth.state === 'waiting-sign-in' && /Saved on this device · waiting for sign-in/.test(truth.shown), JSON.stringify(truth));
+
+      // ── 1b · the page is reloaded before signing in ────────────────────────
+      // Everything from here is what IndexedDB kept, not what React held.
+      const drawn = await inkOnCanvas(page);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
+      await page.waitForSelector('.ink-canvas-live', { timeout: 30000 }).catch(() => {});
+      await page.waitForFunction(() => document.querySelector('[data-ink-sign-in]')?.disabled === false, null, { timeout: 20000 }).catch(() => {});
+      const reloaded = await saveTruth(page, qid);
+      await check('after a reload, still signed out: the SAME question, back in Write mode, strokes restored from IndexedDB with their geometry',
+        await shownId(page) === qid && await mathText('.q-prompt') === prompt && drawn > inkBlank && await inkOnCanvas(page) > inkBlank &&
+          reloaded.kept && reloaded.strokes !== null && reloaded.strokes === truth.strokes,
+        `id ${await shownId(page)} (was ${qid}); painted ${await inkOnCanvas(page)} (was ${drawn}, blank ${inkBlank}); ${JSON.stringify({ kept: reloaded.kept, same: reloaded.strokes === truth.strokes })}`);
+      await check('and the restored page is again saved, waiting for sign-in, with the sign-in beside it',
+        reloaded.state === 'waiting-sign-in' && !reloaded.notSaved && await recovery.locator('[data-ink-sign-in]').isEnabled(), JSON.stringify(reloaded));
+      await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
       const inkBefore = await inkOnCanvas(page);
 
       // ── 2 · sign in, on the card ───────────────────────────────────────────
@@ -466,9 +491,15 @@ export const writeFlow = {
       // again and the student states what they wrote.
       await page.locator('.ink-answer').getByRole('button', { name: /clear/i }).first().click().catch(() => {});
       await page.waitForFunction(() => document.querySelectorAll('.ink-line').length === 0, null, { timeout: 10000 }).catch(() => {});
+      // This time the stand-in is CONFIDENT. A confident reading is still the
+      // student's to correct before Submit.
+      reader.confidence = 0.97;
       const box2 = await page.locator('.ink-canvas-live').boundingBox();
       await handwrite(page, box2, '7');
       await page.waitForSelector('.ink-line .ink-correct-btn', { timeout: 20000 }).catch(() => {});
+      const sure = await page.locator('.ink-line').first().evaluate(n => ({ low: n.classList.contains('ink-line-low'), edit: n.querySelector('.ink-correct-btn')?.innerText.trim() || null })).catch(() => null);
+      await check(`a confident transcript is shown and is editable before Submit too [${EVIDENCE}]`,
+        sure?.low === false && sure.edit === 'Edit' && await page.locator('.ws-actions .status-line').getAttribute('data-work-state') === 'read', JSON.stringify(sure));
       await correctReading(page, escrow.text);
       await pressSubmit(page);
       await page.waitForSelector('.eval-card', { timeout: 30000 }).catch(() => {});
@@ -646,7 +677,311 @@ export const typedFlow = {
   }
 };
 
-export const flows = [writeFlow, typedFlow];
+// ── Journeys 3 and 4 run on the shared online session ────────────────────────
+// (support/online-session.mjs): the real server serves this build from its own
+// origin, so the page reaches /v1 the way the deployed app does and the same
+// journey runs under --browser=webkit. The reader is the same scripted stand-in.
+
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+
+/** Class 10 Arithmetic Progressions, signed out, on a written-answer question. */
+async function openWrittenAPQuestion(page, base, settle) {
+  await page.goto(`${base}/practice?subtopic=c10-arithmetic-progressions`, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
+  for (let skips = 0; skips <= MAX_SKIPS; skips++) {
+    const kind = await page.locator('.qpage').first().getAttribute('data-mode');
+    if (kind !== 'mcq' && await page.getByRole('button', { name: 'Answer by handwriting' }).count() &&
+        await page.locator('[data-check-unmarkable]').count() === 0) return true;
+    const leaving = await shownId(page);
+    await page.locator('.ctx-next').click();
+    await page.waitForFunction(id => {
+      const el = document.querySelector('.qpage[data-question-id]');
+      return el && el.getAttribute('data-question-id') !== id && el.querySelector('.q-prompt');
+    }, leaving, { timeout: 30000 });
+    await settle();
+  }
+  return false;
+}
+
+/**
+ * A fault in the device store, injected under the app: `throw` refuses the
+ * write outright (a full disk); `drop` acknowledges it and writes nothing (a
+ * browser that loses the write after saying yes). Only the ink-draft store is
+ * touched, and only while the flow asks for it.
+ */
+const installInkWriteFault = page => page.addInitScript(() => {
+  const put = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function (value, ...rest) {
+    const fault = this.name === 'inkDrafts' ? globalThis.__PRI_E2E_INK_WRITE__ : null;
+    if (fault === 'throw') throw new DOMException('synthetic: the device store is full', 'QuotaExceededError');
+    if (fault === 'drop') return this.count();
+    return put.call(this, value, ...rest);
+  };
+  // Every distinct thing the status line said, in order, since the last reset.
+  globalThis.__PRI_E2E_STATUS__ = [];
+  setInterval(() => {
+    const el = document.querySelector('.qpage .ws-actions .status-line');
+    if (!el) return;
+    const now = `${el.getAttribute('data-work-state')}|${el.innerText.replace(/\s+/g, ' ').trim()}`;
+    const log = globalThis.__PRI_E2E_STATUS__;
+    if (log[log.length - 1] !== now) log.push(now);
+  }, 25);
+});
+const resetStatusLog = page => page.evaluate(() => { globalThis.__PRI_E2E_STATUS__ = []; });
+const statusLog = page => page.evaluate(() => globalThis.__PRI_E2E_STATUS__.slice());
+/** What the status line said from the moment the new stroke began to be saved. */
+const sinceSaving = log => { const at = log.findIndex(l => l.startsWith('saving|')); return at < 0 ? log : log.slice(at); };
+const waitWorkState = (page, state, timeout = 20000) => page.waitForFunction(
+  want => document.querySelector('.qpage .ws-actions .status-line')?.getAttribute('data-work-state') === want, state, { timeout }).then(() => true, () => false);
+const SAVED_WORDS = /saved on this device|\bis saved\b|^saved\b/i;
+
+/** Largest coordinate difference between two stored pages with the same shape, or null. */
+function geometryDrift(a, b) {
+  let A, B; try { A = JSON.parse(a); B = JSON.parse(b); } catch { return null; }
+  if (!Array.isArray(A) || !Array.isArray(B) || A.length !== B.length) return null;
+  let worst = 0;
+  for (let i = 0; i < A.length; i++) {
+    const pa = A[i].points, pb = B[i].points;
+    if (pa.length !== pb.length) return null;
+    for (let j = 0; j < pa.length; j++) worst = Math.max(worst, Math.abs(pa[j][0] - pb[j][0]), Math.abs(pa[j][1] - pb[j][1]));
+  }
+  return worst;
+}
+
+export const saveTruthFlow = {
+  id: 'ink-save-truth',
+  online: true,
+  name: 'Write · signed out: one true save state; ink survives reload, mode switch, resize, offline; a failed write says so and retries',
+
+  async run({ page, ctx, base, check, goto, createProfile, mathText, settle, note, online, browserName }) {
+    note(`${EVIDENCE}: "Write · signed out: one true save state…" [${browserName || 'chromium'}] reads nothing and marks nothing; it is browser automation of the device store (a real IndexedDB in a Playwright ${browserName || 'chromium'} context, with write faults injected by the test). Not evidence about a physical device, Safari itself, or real handwriting.`);
+    await installInkWriteFault(page);
+    await goto('/');
+    await createProfile({ name: 'Save Truth', course: 'in', year: 10 });
+    if (!await check('signed out, India Class 10 practice (Arithmetic Progressions) serves a written-answer question',
+      await openWrittenAPQuestion(page, base, settle), `${MAX_SKIPS} questions and none took a written answer`)) return;
+
+    await page.getByRole('button', { name: 'Answer by handwriting' }).click();
+    await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+    const qid = await shownId(page);
+    const prompt = await mathText('.q-prompt');
+    const inkBlank = await inkOnCanvas(page);
+    const blank = await saveTruth(page, qid);
+    await check('before a stroke: nothing is claimed saved or unsaved, and nothing is stored',
+      !blank.saved && !blank.notSaved && !blank.kept && blank.state === 'idle', JSON.stringify(blank));
+
+    // ── draw, signed out ─────────────────────────────────────────────────────
+    await resetStatusLog(page);
+    await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '5');
+    const settledSaved = await waitWorkState(page, 'waiting-sign-in');
+    const first = await saveTruth(page, qid);
+    const firstLog = await statusLog(page);
+    await check('the status goes saving → saved (waiting for sign-in), and never says the save failed',
+      settledSaved && firstLog.some(l => l.startsWith('saving|')) && !firstLog.some(l => l.startsWith('save-failed|') || /couldn.t save|not saved/i.test(l)),
+      JSON.stringify(firstLog));
+    await check('"saved" is on screen only with the row readable through a fresh IndexedDB connection',
+      first.saved && first.kept && first.store === 'read' && first.strokes !== null && !first.notSaved &&
+        /Saved on this device · waiting for sign-in/.test(first.shown), JSON.stringify({ ...first, strokes: first.strokes?.length }));
+    const recovery = page.locator('[data-ink-account-recovery]');
+    const signIn = recovery.locator('[data-ink-sign-in]');
+    const settingsLinks = await page.evaluate(() => [...document.querySelectorAll('.qpage a[href$="/settings"]')].filter(el => el.getClientRects().length > 0).length);
+    await check('beside the work: a "Sign in to check this answer" button, enabled; no "Account settings" link; Submit waits; nothing sent to be read',
+      await signIn.isVisible() && await signIn.isEnabled() && (await signIn.innerText()).trim() === 'Sign in to check this answer' &&
+        await signIn.evaluate(el => el.tagName === 'BUTTON' && el.classList.contains('btn-primary')) && settingsLinks === 0 &&
+        await page.locator('.ws-actions .btn-primary').isDisabled() && online.reader.requests.length === 0,
+      `settings links ${settingsLinks}; reader requests ${online.reader.requests.length}`);
+    const written = await inkOnCanvas(page);
+
+    // ── mode switches ────────────────────────────────────────────────────────
+    await page.getByRole('button', { name: 'Answer by typing' }).click();
+    await page.locator('.editor-body input.answer-input, .editor-body textarea').first().waitFor({ timeout: 15000 });
+    await page.getByRole('button', { name: /answer with a photo/i }).click();
+    await page.waitForTimeout(300);
+    await page.getByRole('button', { name: 'Answer by handwriting' }).click();
+    await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+    await waitWorkState(page, 'waiting-sign-in');
+    const afterModes = await saveTruth(page, qid);
+    await check('Type → Photo → Write: the same strokes are on the page and in the store',
+      await inkOnCanvas(page) === written && written > inkBlank && afterModes.strokes === first.strokes && afterModes.state === 'waiting-sign-in',
+      `painted ${await inkOnCanvas(page)} (was ${written}); stored same ${afterModes.strokes === first.strokes}; state ${afterModes.state}`);
+
+    // ── resize: the sheet narrows, then returns ──────────────────────────────
+    await page.setViewportSize({ width: 1100, height: 800 });
+    await page.waitForTimeout(500);
+    await waitWorkState(page, 'waiting-sign-in');
+    const narrow = await saveTruth(page, qid);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.waitForTimeout(500);
+    await waitWorkState(page, 'waiting-sign-in');
+    const wide = await saveTruth(page, qid);
+    const drift = geometryDrift(first.strokes, wide.strokes);
+    await check('resize: every stroke and point survives the narrower sheet, and the original geometry returns with the original width (±2px)',
+      geometryDrift(first.strokes, narrow.strokes) !== null && narrow.kept && drift !== null && drift <= 2 && await inkOnCanvas(page) > inkBlank && !wide.notSaved,
+      `narrow drift ${geometryDrift(first.strokes, narrow.strokes)}; restored drift ${drift}`);
+
+    // ── a brief offline blip ─────────────────────────────────────────────────
+    await resetStatusLog(page);
+    await ctx.setOffline(true);
+    await page.waitForTimeout(900);
+    const off = await saveTruth(page, qid);
+    await ctx.setOffline(false);
+    await page.waitForTimeout(900);
+    await waitWorkState(page, 'waiting-sign-in');
+    const back = await saveTruth(page, qid);
+    const blipLog = await statusLog(page);
+    await check('offline for a moment and back: strokes still on the page and in the store, and the save is never called failed',
+      off.kept && back.kept && back.strokes === wide.strokes && await inkOnCanvas(page) > inkBlank && back.state === 'waiting-sign-in' &&
+        !blipLog.some(l => l.startsWith('save-failed|')), JSON.stringify(blipLog));
+
+    // ── reload ───────────────────────────────────────────────────────────────
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
+    await page.waitForSelector('.ink-canvas-live', { timeout: 30000 }).catch(() => {});
+    await waitWorkState(page, 'waiting-sign-in');
+    const reloaded = await saveTruth(page, qid);
+    await check('reload: the same question comes back in Write mode with the strokes restored from IndexedDB, geometry unchanged',
+      await shownId(page) === qid && await mathText('.q-prompt') === prompt && await inkOnCanvas(page) > inkBlank &&
+        reloaded.strokes === back.strokes && reloaded.state === 'waiting-sign-in' && await signIn.isEnabled(),
+      `id ${await shownId(page)} (was ${qid}); painted ${await inkOnCanvas(page)}; stored same ${reloaded.strokes === back.strokes}; state ${reloaded.state}`);
+
+    // ── the device store refuses the write ───────────────────────────────────
+    const beforeFault = await inkOnCanvas(page);
+    await page.evaluate(() => { globalThis.__PRI_E2E_INK_WRITE__ = 'throw'; });
+    await resetStatusLog(page);
+    await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '2', { x: 140 });
+    const failed = await waitWorkState(page, 'save-failed');
+    const refused = await saveTruth(page, qid);
+    const refusedLog = await statusLog(page);
+    const retry = page.locator('.ws-actions [data-save-retry]');
+    await check('a refused write is said as a failed save, with "Save again" — and "saved" is never shown for it',
+      failed && /Couldn’t save on this device/.test(refused.shown) && !refused.saved && await retry.isVisible() &&
+        (await retry.innerText()).trim() === 'Save again' && refusedLog.some(l => l.startsWith('saving|')) && !sinceSaving(refusedLog).some(l => SAVED_WORDS.test(l.split('|')[1] || '')),
+      JSON.stringify({ shown: refused.shown, log: refusedLog }));
+    await check('the new stroke is still on the page (never dropped), the stored page is still the earlier one, and sign-in waits for the save',
+      await inkOnCanvas(page) > beforeFault && refused.strokes === reloaded.strokes && await signIn.isDisabled() &&
+        !SAVED_WORDS.test(await visibleText(page, '.qpage .ink-status, .qpage [data-ink-account-recovery] p')),
+      `painted ${await inkOnCanvas(page)} (was ${beforeFault}); sign-in disabled ${await signIn.isDisabled().catch(() => null)}`);
+    await retry.click();
+    await page.waitForTimeout(1200);
+    await check('"Save again" while the store still refuses: still a failed save, still not "saved"',
+      (await saveTruth(page, qid)).state === 'save-failed' && !(await saveTruth(page, qid)).saved);
+    await page.evaluate(() => { globalThis.__PRI_E2E_INK_WRITE__ = null; });
+    await retry.click();
+    const recovered = await waitWorkState(page, 'waiting-sign-in');
+    const healed = await saveTruth(page, qid);
+    await check('once the store accepts it, "Save again" saves BOTH strokes and the status says saved, from a fresh readback',
+      recovered && healed.saved && !healed.notSaved && healed.strokes !== reloaded.strokes && JSON.parse(healed.strokes).length > JSON.parse(reloaded.strokes).length &&
+        await signIn.isEnabled() && await retry.count() === 0, JSON.stringify({ state: healed.state, shown: healed.shown }));
+
+    // ── the store acknowledges the write and keeps nothing ───────────────────
+    await page.evaluate(() => { globalThis.__PRI_E2E_INK_WRITE__ = 'drop'; });
+    await resetStatusLog(page);
+    await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '3', { x: 240 });
+    const caught = await waitWorkState(page, 'save-failed');
+    const droppedLog = await statusLog(page);
+    await check('an acknowledged write that kept nothing is caught by the readback: failed save, never "saved"',
+      caught && droppedLog.some(l => l.startsWith('saving|')) && !sinceSaving(droppedLog).some(l => SAVED_WORDS.test(l.split('|')[1] || '')) && (await saveTruth(page, qid)).strokes === healed.strokes,
+      JSON.stringify(droppedLog));
+    await page.evaluate(() => { globalThis.__PRI_E2E_INK_WRITE__ = null; });
+    await retry.click();
+    await check('and is saved by "Save again" once the store really writes',
+      await waitWorkState(page, 'waiting-sign-in') && JSON.parse((await saveTruth(page, qid)).strokes).length > JSON.parse(healed.strokes).length);
+    await check('through all of it nothing was read, issued or marked, and no provider was reached',
+      online.reader.requests.length === 0 && online.reader.refused.length === 0 &&
+        (await online.practiceCalls(/^\/v1\/practice\/(?!prepare$)/)).length === 0,
+      JSON.stringify({ reader: online.reader.requests.length, refused: online.reader.refused }));
+  }
+};
+
+export const photoFlow = {
+  id: 'photo-sign-in',
+  online: true,
+  name: 'Photo · signed out, sign in on the card, same photo read, transcript edited, server-marked on Submit',
+
+  async run({ page, base, check, goto, createProfile, mathText, settle, note, online, browserName }) {
+    note(`${EVIDENCE}: "Photo · signed out…" [${browserName || 'chromium'}] uses a 1×1 test image and the scripted stand-in reader (it never looks at the picture); server, SQLite, sign-in, issue/recognise/correct/grade routes are real. Not real-provider, real-photo or real-device evidence.`);
+    const { reader } = online;
+    reader.text = '12'; reader.confidence = 0.97; reader.down = false;
+    const readsBefore = reader.requests.length;
+    await goto('/');
+    await createProfile({ name: 'Photo Journey', course: 'in', year: 10 });
+    if (!await check('signed out, India Class 10 practice (Arithmetic Progressions) serves a written-answer question',
+      await openWrittenAPQuestion(page, base, settle), `${MAX_SKIPS} questions and none took a written answer`)) return;
+    const qid = await shownId(page);
+    const prompt = await mathText('.q-prompt');
+
+    await page.getByRole('button', { name: /answer with a photo/i }).click();
+    await page.locator('.editor-body input[type="file"]').setInputFiles({ name: 'working.png', mimeType: 'image/png', buffer: PNG });
+    const signIn = page.locator('[data-photo-sign-in]');
+    await signIn.waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
+    await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
+    const thumb = await page.locator('.photo-thumb img').getAttribute('src').catch(() => null);
+    const status = page.locator('.ws-actions .status-line');
+    const settingsLinks = await page.evaluate(() => [...document.querySelectorAll('.qpage a[href$="/settings"]')].filter(el => el.getClientRects().length > 0).length);
+    await check('beside the photo: a "Sign in to check this answer" button; no "Account settings" link; one state — waiting for sign-in, with no "saved" claim about the photo',
+      await signIn.isVisible() && (await signIn.innerText()).trim() === 'Sign in to check this answer' &&
+        await signIn.evaluate(el => el.tagName === 'BUTTON' && el.classList.contains('btn-primary')) && settingsLinks === 0 &&
+        await status.getAttribute('data-work-state') === 'waiting-sign-in' && /Waiting for sign-in · the photo stays on this screen/.test(await status.innerText()) &&
+        !/saved on this device|not saved|couldn.t save/i.test(await status.innerText()),
+      `status ${JSON.stringify(await status.innerText())}; settings links ${settingsLinks}`);
+    await check('signed out, the photo is not read and Submit waits: no reader call, no transcript, nothing issued or marked',
+      /^data:image\//.test(thumb || '') && reader.requests.length === readsBefore && await page.locator('[data-photo-correct-transcript]').count() === 0 &&
+        await page.locator('.ws-actions .btn-primary').isDisabled() && (await online.practiceCalls(/^\/v1\/practice\/(?!prepare$)/)).length === 0);
+
+    // ── sign in, on the card ─────────────────────────────────────────────────
+    await signIn.click();
+    const panel = page.locator('[data-photo-account-recovery]');
+    await check('the sign-in opens in place and offers both ways in: the account form and a phone or email code',
+      await panel.locator('#cloud-password').waitFor({ state: 'attached', timeout: 20000 }).then(() => true, () => false) &&
+        await panel.locator('[data-check-code-sign-in]').count() === 1);
+    const account = await online.signInHere(panel, { name: 'Photo Journey' });
+    const transcript = page.locator('[data-photo-correct-transcript]');
+    await transcript.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    await check('signed in without leaving: same page, same question, the SAME photo still attached',
+      new URL(page.url()).pathname === '/practice' && await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' &&
+        await shownId(page) === qid && await mathText('.q-prompt') === prompt &&
+        await page.locator('.photo-thumb img').getAttribute('src').catch(() => null) === thumb, page.url());
+    const sent = reader.requests.slice(readsBefore);
+    await check(`the photo is then read by itself, answer-blind, and the transcript is shown in an editable box [${EVIDENCE}]`,
+      await transcript.inputValue().catch(() => null) === '12' && await transcript.isEditable() && sent.length >= 1 &&
+        sent.every(r => {
+          const parts = (r.input || []).flatMap(m => m.content || []);
+          return parts.filter(p => p.type === 'input_image').length === 1 && !JSON.stringify(parts.filter(p => p.type !== 'input_image')).includes(prompt.slice(0, 24));
+        }) && await status.getAttribute('data-work-state') !== 'waiting-sign-in' && await page.locator('[data-photo-sign-in]').count() === 0,
+      `transcript ${JSON.stringify(await transcript.inputValue().catch(() => null))}; ${sent.length} provider requests; state ${await status.getAttribute('data-work-state')}`);
+    await check('reading marks nothing: no question issued, nothing graded, until Submit is pressed',
+      (await online.practiceCalls(/^\/v1\/practice\/(?!prepare$)/)).length === 0 && await page.locator('.eval-card, .verdict-bad').count() === 0);
+
+    // ── the student corrects the transcript, then presses Submit ─────────────
+    await transcript.fill(SURELY_WRONG);
+    await pressSubmit(page);
+    await page.waitForSelector('.verdict-bad, .eval-card', { timeout: 30000 }).catch(() => {});
+    const right = await online.answerOf().catch(e => ({ kind: 'error', text: null, detail: String(e?.message || e) }));
+    const grades = () => online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/submit$`));
+    const firstGrade = (await grades()).at(-1);
+    await check('Submit sends the corrected transcript as a PHOTO answer under the reader\'s receipt, and the server marks it wrong: authoritative, 0 marks',
+      firstGrade?.status === 200 && firstGrade.json?.authoritative === true && firstGrade.json.correct === false && firstGrade.json.marksEarned === 0 &&
+        firstGrade.body?.mode === 'photo' && firstGrade.body?.answer === SURELY_WRONG && typeof firstGrade.body?.transcriptionReceipt === 'string' &&
+        (await online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/recognition/[^/]+/confirm$`))).some(c => c.status < 300 && c.body?.text === SURELY_WRONG),
+      JSON.stringify(firstGrade && { status: firstGrade.status, body: { ...firstGrade.body, transcriptionReceipt: !!firstGrade.body?.transcriptionReceipt }, json: firstGrade.json }).slice(0, 500));
+    if (!await check('the question is still open for another try, and the right answer is known only from the server\'s sealed copy',
+      firstGrade?.json?.resolved === false && typeof right.text === 'string' && right.text.length > 0 && await shownId(page) === qid,
+      JSON.stringify({ resolved: firstGrade?.json?.resolved, kind: right.kind, detail: right.detail }))) return;
+    await transcript.fill(right.text);
+    await pressSubmit(page);
+    await page.waitForSelector('.eval-card', { timeout: 30000 }).catch(() => {});
+    const lastGrade = (await grades()).at(-1);
+    const ledger = online.ledger(right.serverQuestionId);
+    await check('the right answer: the server\'s verdict is shown — correct, full marks, resolved once on the server',
+      lastGrade?.json?.authoritative === true && lastGrade.json.correct === true && lastGrade.json.resolved === true &&
+        lastGrade.json.marksEarned === lastGrade.json.marksPossible && await page.locator('.eval-card[data-outcome="correct"]').count() === 1 &&
+        await status.getAttribute('data-work-state') === 'submitted' && ledger.issued === 1 && ledger.thisDone === 1 && right.accountId === account.id,
+      `${JSON.stringify(lastGrade?.json).slice(0, 260)} ${JSON.stringify(ledger)}`);
+    await check('no outbound request was refused: nothing tried to reach a real provider', reader.refused.length === 0, JSON.stringify(reader.refused));
+  }
+};
+
+export const flows = [writeFlow, typedFlow, saveTruthFlow, photoFlow];
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const { runFlows } = await import('./e2e.mjs');

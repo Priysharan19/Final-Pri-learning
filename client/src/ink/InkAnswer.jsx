@@ -54,6 +54,16 @@ export const STILL_READING_MS = 5000;
 /** A reader that did not answer is tried again on its own, a few times. */
 // A focus or a return to the tab also tries again at once (see below).
 
+// The reader's "why this page is waiting" sentences were written with a save
+// claim in them ("Saved. It will be read…"). The reader does not know whether
+// the page was saved; the card does, from an IndexedDB readback. Until the
+// card says so, the same reason is given without the claim.
+const WAITING_WITHOUT_SAVE_CLAIM = {
+  'ink.waitingOffline': 'ink.waitingOfflinePlain',
+  'ink.waitingServiceDown': 'ink.waitingServiceDownPlain',
+  'ink.waitingNotOnThisInstall': 'ink.waitingNotOnThisInstallPlain'
+};
+
 const EMPTY_READING = { lines: [], text: '' };
 const strokeSignature = strokes => `${strokes.length}:${strokes.reduce((n, st) => n + (st?.points?.length || 0), 0)}`;
 
@@ -69,7 +79,7 @@ const strokeSignature = strokes => `${strokes.length}:${strokes.reduce((n, st) =
  *  strokes and History replay all keep one coordinate space. */
 const MAX_PAGES = 4;
 
-export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -381,7 +391,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       : status?.kind === 'allowance'
         ? t('ink.cloudAllowanceUsed')
         : status?.kind === 'waiting'
-          ? t(status.key)
+          ? t(draftSaved ? status.key : (WAITING_WITHOUT_SAVE_CLAIM[status.key] || status.key))
           : null;
 
   return (
@@ -517,9 +527,13 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
               {line.corrected === true && (
                 <span className="ink-line-corrected" role="status"><Icon name="check" size={13} /> {t('ink.correctedSr', { n: li + 1 })}</span>
               )}
-              {!disabled && isLowConfidence(line, lineConfidenceFloor) && correcting?.index !== li && (
+              {/* Every line of the reading is the student's to correct before
+                  Submit, not only the ones the reader doubted: a confident
+                  misread is still a misread, and it is their page. */}
+              {!disabled && correcting?.index !== li && (
                 <button type="button" className="ink-correct-btn" aria-label={t('ink.iWroteAria', { n: li + 1 })}
-                  onClick={() => setCorrecting({ index: li, text: line.text })}>{t('ink.iWrote')}</button>
+                  data-line-doubt={isLowConfidence(line, lineConfidenceFloor) ? 'low' : undefined}
+                  onClick={() => setCorrecting({ index: li, text: line.text })}>{isLowConfidence(line, lineConfidenceFloor) ? t('ink.iWrote') : t('ink.editLine')}</button>
               )}
               {!disabled && correcting?.index === li && (
                 <form className="ink-correct" onSubmit={e => { e.preventDefault(); correctLine(li, correcting.text); }}>
