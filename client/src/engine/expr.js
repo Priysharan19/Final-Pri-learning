@@ -209,7 +209,12 @@ function rewriteCounting(s) {
 /** Normalise unicode / friendly maths notation into parseable ASCII. */
 export function normalize(raw) {
   if (raw == null) return '';
-  let s = String(raw);
+  // A run of blank characters — spaces, tabs, no-break spaces — is cut to its
+  // first one. Nothing in maths notation means more by being spaced wider,
+  // and the notation rewrites below are patterns with optional blanks in
+  // several places: four hundred spaces after `C(` took one of them thirty-three
+  // seconds to give up on.
+  let s = String(raw).replace(/\s{2,}/g, run => run[0]);
   s = s.replace(/[−–—]/g, '-')     // −, –, — → -
     .replace(/[×✕✖·⋅]/g, '*')
     .replace(/[÷]/g, '/')

@@ -157,6 +157,17 @@ try {
     c.deq([deep.status, deep.data.correct], [200, false], 'twenty-four nested calls as an expression answer are answered, and are not correct');
     c.ok(ms < 1500, `without holding the server (${ms} ms)`);
   }
+  // Blanks after `C(`: 399 characters of them held this request for 33 s and
+  // every other account's with it. Long ones are refused unread; short ones
+  // are read at once, in an answer and on a page of working.
+  for (const [label, text] of [['399 characters', `C(${' '.repeat(197)},${' '.repeat(198)}x`], ['117 characters', `C(${' '.repeat(56)},${' '.repeat(57)}x`], ['tabs and no-break spaces', `C(${'\t\u00a0'.repeat(28)},${'\u00a0 '.repeat(28)}x`]]) {
+    const q = await issue();
+    const at = Date.now();
+    const blank = await submit(q.id, `ap-blank-run-${label.replace(/[^a-z0-9]/gi, '-')}`, text, [`n=5+0C(${' '.repeat(90)},${' '.repeat(90)}x)`]);
+    const ms = Date.now() - at;
+    c.deq([blank.status, blank.data.correct], [200, false], `C( followed by blanks (${label}) is answered, and is not correct`);
+    c.ok(ms < 1500, `without holding the server (${ms} ms)`);
+  }
   // An answer that agrees with the key wherever it is sampled, padded with
   // `+0tan(kx)` to the 12,000 characters the route accepts, took 2.8 s in a
   // probe no budget covers. An answer that long is not read at all.
