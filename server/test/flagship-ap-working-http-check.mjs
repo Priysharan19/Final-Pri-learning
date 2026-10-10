@@ -17,7 +17,10 @@
 //     sweep or a false set-up earns nothing;
 //   · while the question is open the reply says nothing about the working;
 //   · a twelve-thousand-character sum is marked in well under a second, and a
-//     sweep of middle-term splits on a quadratic earns nothing.
+//     sweep of middle-term splits on a quadratic earns nothing;
+//   · on a quadratic, both roots read off a factorisation keep their marks
+//     under a wrong last line whether the roots share a sign or not, while
+//     guessed roots, a list of candidates and a sweep still earn nothing.
 // ─────────────────────────────────────────────────────────────────────────────
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -207,6 +210,41 @@ try {
     c.deq([first.status, first.data.correct, first.data.resolved], [200, false, false], `seed ${seed}: a sweep of ${sweep.length} splits under a wrong answer leaves the question open`);
     const second = await submit(q.id, `split-sweep-${seed}-two`, '97, 98', sweep);
     c.deq([second.status, second.data.resolved, second.data.marksEarned], [200, true, 0], `seed ${seed}: and resolves at 0 of ${second.data.marksPossible} on "${q.prompt}"`);
+  }
+
+  // Both roots read off a factorisation, then a wrong last line. Roots of one
+  // sign are written in one shape (`x = 3`, `x = 8`), so the slip under them
+  // made three values of that shape and the receipt took both roots back:
+  // 1 of 3 where the same working on roots of opposite sign was paid 2. The
+  // server-issued questions below have two positive roots, two negative
+  // roots, and one of each.
+  for (const [seed, prompt, r1, r2] of [[7000, 'Use the quadratic formula to solve $x^2 - 11x + 24 = 0$.', 3, 8], [7003, 'Use the quadratic formula to solve $x^2 + 13x + 42 = 0$.', -7, -6], [7001, 'Use the quadratic formula to solve $x^2 - x - 56 = 0$.', -7, 8]]) {
+    const bracket = r => (r < 0 ? `(x+${-r})` : `(x-${r})`);
+    const factorised = `${bracket(r1)}${bracket(r2)}=0`;
+    const slip = Math.max(r1, r2) + 2, other = Math.max(r1, r2) + 4;
+    const resolved = async (label, steps) => {
+      const r = await h.request('/v1/practice/issue', { method: 'POST', jar: a.jar, body: { generator: 'c10-quadratic-roots', difficulty: 3, seed, curriculum: 'in' } });
+      assert.equal(r.status, 201, `seed ${seed}: the server issues a quadratic`);
+      assert.equal(r.data.question.prompt, prompt, `seed ${seed}: the issued quadratic is the expected one`);
+      const id = `roots-${seed}-${label}`;
+      const first = await submit(r.data.question.id, `${id}-one`, '97, 98', steps);
+      c.deq([first.status, first.data.correct, first.data.resolved, first.data.marksEarned, first.data.partial], [200, false, false, 0, null], `seed ${seed} ${label}: a first wrong try leaves the question open and says nothing about the working`);
+      const second = await submit(r.data.question.id, `${id}-two`, '97, 98', steps);
+      c.deq([second.status, second.data.correct, second.data.resolved, second.data.marksPossible], [200, false, true, 3], `seed ${seed} ${label}: the second wrong try resolves it out of three marks`);
+      c.eq(second.data.partial?.awarded ?? 0, second.data.marksEarned, `seed ${seed} ${label}: the method evidence agrees with the marks`);
+      return second.data;
+    };
+    const clean = await resolved('roots', [factorised, `x=${r1}`, `x=${r2}`]);
+    c.eq(clean.marksEarned, 2, `seed ${seed}: factorised and both roots read off under a wrong answer: 2 of 3 on "${prompt}"`);
+    const slipped = await resolved('roots-slip-last', [factorised, `x=${r1}`, `x=${r2}`, `x=${slip}`]);
+    c.eq(slipped.marksEarned, clean.marksEarned, `seed ${seed}: a wrong last line under that working takes nothing back (${slipped.marksEarned}/3)`);
+    c.deq(slipped.stepReport?.lines?.map(line => line.status), ['ok', 'ok', 'ok', 'break'], `seed ${seed}: and the report names the last line as the one that broke`);
+    c.deq(slipped.partial?.lines?.map(line => line.reason), ['progress', 'progress', 'cap', 'break'], `seed ${seed}: with the roots above it left standing`);
+    c.eq((await resolved('slip-first', [factorised, `x=${slip}`, `x=${r1}`, `x=${r2}`])).marksEarned, 1, `seed ${seed}: a wrong value before the roots stops the working there: only the factorisation earns`);
+    c.eq((await resolved('candidates', [factorised, `x=${r1}`, `x=${r2}`, `x=${slip}`, `x=${other}`])).marksEarned, 1, `seed ${seed}: two wrong values after the roots are a list of candidates: the roots lose their marks`);
+    c.eq((await resolved('guessed-roots', [`x=${r1}`, `x=${r2}`, `x=${slip}`])).marksEarned, 0, `seed ${seed}: the roots stated with no working earn nothing, with a slip under them or not`);
+    c.eq((await resolved('sweep', Array.from({ length: 21 }, (_, k) => `x=${k - 10}`))).marksEarned, 0, `seed ${seed}: twenty-one candidate values earn nothing`);
+    c.eq((await resolved('sweep-under-factorisation', [factorised, ...Array.from({ length: 21 }, (_, k) => `x=${k - 10}`)])).marksEarned, 1, `seed ${seed}: and under a factorisation only the factorisation earns`);
   }
 } finally {
   await h.close();
