@@ -18,43 +18,26 @@ import StudyDiagram from '../notes/StudyDiagram.jsx';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import { IN_CURRICULUM, IN_CHAPTER_BY_ID } from '../engine/curriculum-in.js';
-import { NOTES_GRADES, gradeOfChapter, loadNotesForGrade, notesSearchText } from '../notes/notesIndex.js';
-import { studyHref, selectedStudyContext, selectedStudyPracticeHref } from '../lib/studyJourney.js';
+import { NOTES_GRADES, gradeOfChapter, loadNotesForGrade, notesPracticeHref, notesSearchText } from '../notes/notesIndex.js';
 import { studyResourcesForGrade } from '../notes/data/notes-study-resources.js';
 import '../notes/Notes.css';
-import { notesBookmarkKey } from './notesBookmarkScope.js';
-import { chapterNotesLink, notesIndexReturnLink } from './notesStudyLinks.js';
-import { loadAllSearchNotes, keepNotesQueryForReload, readNotesQueryAfterReload, clearNotesQueryAfterReload } from './notesSearchRecovery.js';
 
-// Official exam-track names remain visible as students move between notes,
-// examples and practice; internal URL slugs are never presented as titles.
-const STUDY_TRACK_LABELS = Object.freeze({
-  cbse: 'CBSE / NCERT',
-  'jee-main': 'JEE Main',
-  'jee-advanced': 'JEE Advanced'
-});
+const BOOKMARK_KEY = 'pri.notes.bookmarks.v1';
 
 // ── Small utilities ──────────────────────────────────────────────────────────
-function readBookmarks(key) {
-  try {
-    const values = JSON.parse(localStorage.getItem(key) || '[]');
-    return new Set(Array.isArray(values) ? values.filter(v => typeof v === 'string') : []);
-  } catch { return new Set(); }
+function readBookmarks() {
+  try { return new Set(JSON.parse(localStorage.getItem(BOOKMARK_KEY) || '[]')); } catch { return new Set(); }
 }
 function useBookmarks() {
-  const { user } = useApp() || {};
-  const key = notesBookmarkKey(user?.id);
-  // The outer Notes route is also keyed by the active local profile, so a
-  // profile change never displays another student's in-memory bookmarks.
-  const [marks, setMarks] = useState(() => readBookmarks(key));
+  const [marks, setMarks] = useState(readBookmarks);
   const toggle = useCallback((id) => {
     setMarks(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
-      try { localStorage.setItem(key, JSON.stringify([...next])); } catch { /* private window: kept for this visit only */ }
+      try { localStorage.setItem(BOOKMARK_KEY, JSON.stringify([...next])); } catch { /* private window: kept for this visit only */ }
       return next;
     });
-  }, [key]);
+  }, []);
   return [marks, toggle];
 }
 
@@ -93,24 +76,13 @@ function useNotes(grade) {
     );
     return () => { live = false; };
   }, [grade, attempt]);
-  return [state, () => {
-    // An explicit retry after a module import failure must make a fresh
-    // document: failed ES module records can be cached for this whole page.
-    if (typeof window !== 'undefined' && typeof window.location?.reload === 'function') window.location.reload();
-    else setAttempt(a => a + 1);
-  }];
+  return [state, () => setAttempt(a => a + 1)];
 }
 
 // ── Entry ────────────────────────────────────────────────────────────────────
 export default function Notes() {
   const { chapterId } = useParams();
-  const { user } = useApp() || {};
-  // Same browser session can switch local profiles without leaving this URL.
-  // Remount bookmark state before either student's saved preferences render.
-  const identity = String(user?.id ?? 'no-profile');
-  return <React.Fragment key={identity}>
-    {chapterId ? <ChapterNotes chapterId={chapterId} /> : <NotesIndex />}
-  </React.Fragment>;
+  return chapterId ? <ChapterNotes chapterId={chapterId} /> : <NotesIndex />;
 }
 
 // ── The index: classes, search, map, chapters ────────────────────────────────
@@ -124,13 +96,7 @@ function NotesIndex() {
   const [{ notes, failed }, retry] = useNotes(grade);
   const [marks, toggleMark] = useBookmarks();
   const [onlyMarked, setOnlyMarked] = useState(false);
-  const [query, setQuery] = useState(() =>
-    readNotesQueryAfterReload(user?.id, typeof window === 'undefined' ? null : window.sessionStorage));
-  useEffect(() => {
-    // StrictMode may run the lazy initializer twice. Erase the profile-scoped
-    // restoration only after the query was captured in committed state.
-    clearNotesQueryAfterReload(user?.id, typeof window === 'undefined' ? null : window.sessionStorage);
-  }, [user?.id]);
+  const [query, setQuery] = useState('');
   const root = useRef(null);
 
   const chapters = useMemo(() => (group?.chapters || []).filter(c => !onlyMarked || marks.has(c.id)), [group, onlyMarked, marks]);
@@ -194,7 +160,7 @@ function NotesIndex() {
                   const num = (group.chapters.indexOf(c) + 1);
                   return (
                     <li key={c.id} className="nt-reveal" style={{ '--i': Math.min(num, 14) }}>
-                      <Link to={chapterNotesLink(c, params)} className="nt-chapter" data-testid="notes-chapter">
+                      <Link to={`/notes/${c.id}`} className="nt-chapter" data-testid="notes-chapter">
                         <span className="nt-chapter-n">{String(num).padStart(2, '0')}</span>
                         <span className="nt-chapter-body">
                           <span className="nt-chapter-name">{c.name}</span>
@@ -245,7 +211,6 @@ function BookmarkGlyph({ on }) {
 function ChapterMap({ group, notes }) {
   const t = useT();
   const nav = useNavigate();
-  const [params] = useSearchParams();
   const [focus, setFocus] = useState(null);
   const strands = useMemo(() => [...new Set(group.chapters.map(c => c.strand))], [group]);
   const W = 1000, rowH = 54, padX = 40, top = 30;
@@ -294,7 +259,7 @@ function ChapterMap({ group, notes }) {
               aria-label={`${t('notes.chapterNumber', { n: i + 1 })}: ${c.name}`}
               onMouseEnter={() => setFocus(c.id)} onMouseLeave={() => setFocus(null)}
               onFocus={() => setFocus(c.id)} onBlur={() => setFocus(null)}
-              onClick={() => nav(chapterNotesLink(c, params))}>
+              onClick={() => nav(`/notes/${c.id}`)}>
               {i + 1}
             </button>
           ))}
@@ -308,22 +273,14 @@ function ChapterMap({ group, notes }) {
 // ── Search across every class ────────────────────────────────────────────────
 function SearchResults({ query }) {
   const t = useT();
-  const { user } = useApp() || {};
-  const [params] = useSearchParams();
   const [all, setAll] = useState(null);
   const [failed, setFailed] = useState(false);
-  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let live = true;
-    // Retry must invoke the real dynamic grade loaders again. Clearing only
-    // the failed flag used to strand the learner on a permanent Loading message.
-    setAll(null); setFailed(false);
-    loadAllSearchNotes(NOTES_GRADES, loadNotesForGrade).then(
-      notes => { if (live) setAll(notes); },
-      () => { if (live) setFailed(true); }
-    );
+    Promise.all(NOTES_GRADES.map(g => loadNotesForGrade(g).then(n => [g, n])))
+      .then(rows => { if (live) setAll(Object.fromEntries(rows)); }, () => { if (live) setFailed(true); });
     return () => { live = false; };
-  }, [attempt]);
+  }, []);
   const results = useMemo(() => {
     if (!all) return [];
     const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -338,15 +295,7 @@ function SearchResults({ query }) {
     return out;
   }, [all, query]);
 
-  if (failed) return <LoadFailed retry={() => {
-    // Browser modules that failed to download may not be importable again
-    // until a new document is created. A same-document retry stays red.
-    const kept = keepNotesQueryForReload(user?.id, query,
-      typeof window === 'undefined' ? null : window.sessionStorage);
-    if (typeof window !== 'undefined' && typeof window.location?.reload === 'function') {
-      window.location.reload();
-    } else if (!kept) setAttempt(n => n + 1);
-  }} />;
+  if (failed) return <LoadFailed retry={() => { setFailed(false); }} />;
   if (!all) return <p className="nt-status" role="status">{t('notes.loading')}</p>;
   return (
     <section className="nt-results" aria-live="polite">
@@ -354,7 +303,7 @@ function SearchResults({ query }) {
       <ol className="nt-chapters">
         {results.slice(0, 40).map(({ c, grade, snippet }) => (
           <li key={c.id}>
-            <Link to={chapterNotesLink(c, params)} className="nt-chapter">
+            <Link to={`/notes/${c.id}`} className="nt-chapter">
               <span className="nt-chapter-n">{grade}</span>
               <span className="nt-chapter-body">
                 <span className="nt-chapter-name">{c.name}</span>
@@ -388,33 +337,23 @@ function ChapterNotes({ chapterId }) {
   const nav = useNavigate();
   const chapter = IN_CHAPTER_BY_ID[chapterId];
   const grade = gradeOfChapter(chapterId);
+  const [resourceParams] = useSearchParams();
+  // External references are track-specific; a CBSE visitor must not be told
+  // a JEE-specific examination archive is part of the school syllabus.
+  const routeTrack = resourceParams.get('track');
+  const resourceTrack = routeTrack === 'jee-main' || routeTrack === 'jee-advanced' ? routeTrack : 'cbse';
+  const linkedResources = studyResourcesForGrade(grade, resourceTrack);
   const [{ notes: all, failed }, retry] = useNotes(grade);
   const [marks, toggleMark] = useBookmarks();
   const [cards, setCards] = useState(false);
-  const notes = all?.[chapterId];
-  const [params] = useSearchParams();
-  const selected = selectedStudyContext(chapter, params);
-  // Keep the study shelf scoped to the selected CBSE/JEE track; never imply a paper is mandatory for CBSE.
-  const linkedResources = studyResourcesForGrade(grade, selected.track);
-  const practiceLink = selectedStudyPracticeHref(chapter, params);
-  const mode = params.get('view') === 'examples' ? 'examples' : 'notes';
-  const changeMode = next => {
-    const href = studyHref({ ...selected, view: next });
-    if (href) nav(href);
-  };
-  useEffect(() => {
-    if (mode !== 'examples' || !notes) return;
-    // Let the lazy-loaded chapter render its verified examples before focus.
-    requestAnimationFrame(() => document.getElementById('examples')?.scrollIntoView({ block: 'start' }));
-  }, [mode, notes, chapterId]);
-
   const root = useRef(null);
+  const notes = all?.[chapterId];
   useReveal(root, [chapterId, notes]);
   useEffect(() => { window.scrollTo?.(0, 0); }, [chapterId]);
 
   const group = IN_CURRICULUM.find(g => g.grade === grade);
   const number = group ? group.chapters.findIndex(c => c.id === chapterId) + 1 : 0;
-  const backTo = notesIndexReturnLink(chapter, params);
+  const backTo = `/notes?class=${grade}`;
 
   if (!chapter) {
     return <div className="nt"><p className="nt-quiet">{t('notes.notFound')}</p><Link className="nt-back" to="/notes">← {t('notes.back')}</Link></div>;
@@ -425,30 +364,9 @@ function ChapterNotes({ chapterId }) {
       <header className="nt-ch-head">
         <p className="nt-eyebrow">{t('common.classNumber', { n: grade })} · {t('notes.chapterNumber', { n: number })} · {chapter.strand}</p>
         <h1 className="nt-title" id="nt-ch-title">{chapter.name}</h1>
-        <nav className="nt-path" aria-label={t('study.path')} data-study-path>
-          <Link to="/">{t('study.curriculum')}</Link>
-          <span>{t('common.classNumber', { n: grade })}</span>
-          <span data-study-track>{STUDY_TRACK_LABELS[selected.track]}</span>
-          <span>{t('study.subject')}</span>
-          <span aria-current="page">{chapter.name}</span>
-        </nav>
-        {selected.difficulty != null && (
-          <p className="nt-selected-difficulty" data-study-difficulty>
-            {t('home.difficultyChip', { n: selected.difficulty, label: t(`difficulty.${selected.difficulty}`) })}
-          </p>
-        )}
-        {selected.dotpoint != null && (
-          <p className="nt-selected-outcome">{t('study.selectedOutcome')}: {typeof chapter.dotpoints[selected.dotpoint] === 'string'
-            ? chapter.dotpoints[selected.dotpoint] : chapter.dotpoints[selected.dotpoint]?.text}</p>
-        )}
-        <div className="nt-journey-tabs" role="group" aria-label={t('study.choosePath')} data-study-journey>
-          <button type="button" className={mode === 'notes' ? 'on' : ''} aria-pressed={mode === 'notes'} data-study-notes onClick={() => changeMode('notes')}>{t('study.notes')}</button>
-          <button type="button" className={mode === 'examples' ? 'on' : ''} aria-pressed={mode === 'examples'} data-study-examples onClick={() => changeMode('examples')}>{t('study.examples')}</button>
-          <button type="button" data-study-practice onClick={() => nav(practiceLink)}>{t('study.practice')}</button>
-        </div>
         {notes && <MathText block className="nt-lede" text={notes.summary} />}
         <div className="nt-actions">
-          <button type="button" className="btn btn-primary" onClick={() => nav(practiceLink)} data-testid="notes-practise">
+          <button type="button" className="btn btn-primary" onClick={() => nav(notesPracticeHref(chapter))} data-testid="notes-practise">
             {t('notes.practise')}
           </button>
           {notes && (
@@ -465,7 +383,7 @@ function ChapterNotes({ chapterId }) {
           <p className="nt-builds">
             <span>{t('notes.buildsOn')}</span>
             {notes.prereqs.filter(p => IN_CHAPTER_BY_ID[p]).map(p => (
-              <Link key={p} to={chapterNotesLink(IN_CHAPTER_BY_ID[p], params)}>{IN_CHAPTER_BY_ID[p].name} <small>{t('common.classNumber', { n: gradeOfChapter(p) })}</small></Link>
+              <Link key={p} to={`/notes/${p}`}>{IN_CHAPTER_BY_ID[p].name} <small>{t('common.classNumber', { n: gradeOfChapter(p) })}</small></Link>
             ))}
           </p>
         )}
@@ -481,7 +399,6 @@ function ChapterNotes({ chapterId }) {
             <Concepts concepts={notes.concepts} />
           </Section>
 
-          {chapter.id === 'c11-complex-numbers' && <ComplexArgandFigure />}
           <Section id="definitions" title={t('notes.sectionDefinitions')}>
             <dl className="nt-defs">
               {notes.definitions.map((d, i) => (
@@ -546,7 +463,7 @@ function ChapterNotes({ chapterId }) {
           )}
 
           <div className="nt-end nt-reveal">
-            <button type="button" className="btn btn-primary" onClick={() => nav(practiceLink)}>{t('notes.practise')}</button>
+            <button type="button" className="btn btn-primary" onClick={() => nav(notesPracticeHref(chapter))}>{t('notes.practise')}</button>
             <button type="button" className="btn btn-secondary" onClick={() => setCards(true)}>{t('notes.revise')}</button>
           </div>
         </div>
@@ -557,42 +474,9 @@ function ChapterNotes({ chapterId }) {
   );
 }
 
-// Exact vector geometry for z = -1 + i√3: scale=75 px/unit and the
-// example's 120° principal argument. No generated bitmap or decorative plot.
-function ComplexArgandFigure() {
-  const t = useT();
-  return (
-    <figure className="nt-argand nt-reveal" aria-label={t('study.argandAlt')}>
-      <svg role="img" aria-labelledby="nt-argand-title nt-argand-desc" viewBox="0 0 520 336" preserveAspectRatio="xMidYMid meet">
-        <title id="nt-argand-title">{t('study.argandTitle')}</title>
-        <desc id="nt-argand-desc">{t('study.argandAlt')}</desc>
-        <defs><marker id="nt-argand-arrow" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="none" stroke="currentColor" strokeWidth="1.3" /></marker></defs>
-        <g className="nt-argand-grid">
-          {[110,185,335,410].map(x => <line key={x} x1={x} y1="22" x2={x} y2="314" />)}
-          {[35,110,260].map(y => <line key={y} x1="36" y1={y} x2="484" y2={y} />)}
-        </g>
-        <line className="nt-argand-axis" x1="36" y1="185" x2="478" y2="185" markerEnd="url(#nt-argand-arrow)" />
-        <line className="nt-argand-axis" x1="260" y1="314" x2="260" y2="22" markerEnd="url(#nt-argand-arrow)" />
-        <line className="nt-argand-radius" x1="260" y1="185" x2="185" y2="55.096" />
-        <path className="nt-argand-angle" d="M318 185 A58 58 0 0 0 231 134.77" fill="none" />
-        <line className="nt-argand-guide" x1="185" y1="55.096" x2="185" y2="185" />
-        <line className="nt-argand-guide" x1="185" y1="55.096" x2="260" y2="55.096" />
-        <circle className="nt-argand-point" cx="185" cy="55.096" r="5.5" />
-        <g className="nt-argand-label">
-          <text x="484" y="204">{t('study.axisReal')}</text><text x="275" y="24">{t('study.axisImaginary')}</text>
-          <text x="248" y="204">0</text><text x="176" y="205">−1</text>
-          <text x="269" y="61">√3</text><text x="109" y="42">−1 + i√3</text>
-          <text x="305" y="135">2π/3</text><text x="204" y="111">{t('study.radiusTwo')}</text>
-        </g>
-      </svg>
-      <figcaption>{t('study.argandCaption')}</figcaption>
-    </figure>
-  );
-}
-
 function Section({ id, title, children }) {
   return (
-    <section className="nt-section" id={id} aria-labelledby={`nt-s-${id}`}>
+    <section className="nt-section" aria-labelledby={`nt-s-${id}`}>
       <h2 className="nt-section-h nt-reveal" id={`nt-s-${id}`}>{title}</h2>
       {children}
     </section>
@@ -652,7 +536,7 @@ function Formula({ f, i }) {
 
 function Example({ ex, n }) {
   const t = useT();
-  // The student first sees only the problem, never an unsolicited solution.
+  // Do not reveal worked steps before the learner studies the source diagram.
   const [shown, setShown] = useState(0);
   const done = shown >= ex.steps.length;
   return (
@@ -661,10 +545,7 @@ function Example({ ex, n }) {
       <MathText block className="nt-example-q" text={ex.question} />
       {ex.figure && <StudyDiagram figure={ex.figure} />}
       <ol className="nt-steps">
-        {ex.steps.slice(0, shown).map((s, i) => <li key={i} className="nt-step">
-          <MathText text={s} />
-          {ex.reasons?.[i] && <p className="nt-step-reason"><MathText text={ex.reasons[i]} /></p>}
-        </li>)}
+        {ex.steps.slice(0, shown).map((s, i) => <li key={i} className="nt-step"><MathText text={s} /></li>)}
       </ol>
       {!done ? (
         <div className="nt-example-more">
@@ -676,12 +557,6 @@ function Example({ ex, n }) {
           <span className="nt-tag">{t('notes.answer')}</span>
           <MathText text={ex.answer} />
           <span className="nt-checked">{t('notes.engineChecked')}</span>
-          {ex.alternative && (
-            <details className="nt-alternative">
-              <summary>{t('study.alternative')}</summary>
-              <MathText block text={ex.alternative} />
-            </details>
-          )}
         </div>
       )}
     </div>
