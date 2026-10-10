@@ -123,7 +123,7 @@ const EQN = { answerType: 'numeric', answer: { value: 4 }, answerPrefix: 'x =', 
   const sub = submittedInk('4', lines);
   const said = sentence(res, sub);
   ok(res.correct === true && res.stepReport?.firstBreak === 0, 'incorrect working: correct answer, and the server reports the break on line 1');
-  eq(said.text, 'Your final answer is correct, but line 1 of your working does not hold. See the step check below.',
+  eq(said.text, 'Your final answer is correct, but line 1 of your working, as it was read, does not hold. See the step check below.',
     'incorrect working: a right answer does not launder wrong working');
   const v = marks(res, sub);
   ok(positive(v) === 0 && v[0].status === 'break', 'incorrect working: the broken line is marked, and nothing is ticked');
@@ -162,7 +162,7 @@ const EQN = { answerType: 'numeric', answer: { value: 4 }, answerPrefix: 'x =', 
   ok(res.stepReport?.lines?.[0]?.status === 'ok' && res.stepReport.lines[1].status === 'ok' && res.stepReport.firstBreak === 2,
     'wrong final: the server report credits the two true lines and places the break on the last');
   const said = sentence(res, sub);
-  eq(said.text, 'Line 3 of your working does not hold. See the step check below.', 'wrong final: the break is named, not the whole page');
+  eq(said.text, 'Line 3 of your working, as it was read, does not hold. See the step check below.', 'wrong final: the break is named, not the whole page');
   const v = marks(res, sub);
   ok(v[0].status === 'ok' && v[1].status === 'ok' && v[2].status === 'break', 'wrong final: true lines keep their ticks, the wrong line is marked');
   ok(res.partial === null || Number.isInteger(res.partial.awarded), 'wrong final: any method credit is the server\'s own figure');

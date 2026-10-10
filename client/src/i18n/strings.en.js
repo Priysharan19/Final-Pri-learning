@@ -411,8 +411,8 @@ export default {
   'verdict.workingNotChecked': 'Your final answer was checked. Your working was not verified.',
   'verdict.workingAllChecked': { one: 'Your working was checked: the {n} line you submitted is consistent with the correct solution.', other: 'Your working was checked: all {n} lines you submitted are consistent with the correct solution.' },
   'verdict.workingSomeChecked': '{ok} of the {total} lines of your working were checked and are consistent with the correct solution. The rest were not verified.',
-  'verdict.workingBreakButCorrect': 'Your final answer is correct, but line {line} of your working does not hold. See the step check below.',
-  'verdict.workingBreak': 'Line {line} of your working does not hold. See the step check below.',
+  'verdict.workingBreakButCorrect': 'Your final answer is correct, but line {line} of your working, as it was read, does not hold. See the step check below.',
+  'verdict.workingBreak': 'Line {line} of your working, as it was read, does not hold. See the step check below.',
   'verdict.transcriptNotAnswer': 'This is the answer you confirmed, and it is the one that was marked. The reading of your handwriting is shown as it was read; it is not your answer.',
   // The page changed after it was marked: the result is the earlier attempt's.
   'verdict.previousAttemptWrong': 'Your previous attempt was not correct.',
