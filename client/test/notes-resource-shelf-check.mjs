@@ -11,7 +11,7 @@ assert.ok(view.includes('data-testid="notes-study-resources"'), 'Study resources
 assert.ok(view.includes('target="_blank" rel="noopener noreferrer"'), 'External link must be isolated from opener');
 assert.ok(view.includes('aria-label={resource.title}'), 'External links require an accessible name');
 assert.ok(view.includes("t('nav.more')"), 'Resource heading must use existing localized copy');
-assert.equal(STUDY_RESOURCE_LINKS.length, 15, 'unexpected source register count');
+assert.equal(STUDY_RESOURCE_LINKS.length, 23, 'unexpected source register count');
 const ids = new Set();
 for (const item of STUDY_RESOURCE_LINKS) {
   assert.ok(!ids.has(item.id), `duplicate reference ID ${item.id}`); ids.add(item.id);
@@ -30,4 +30,4 @@ for (const grade of [7, 8, 9, 10, 11, 12]) {
 assert.ok(!studyResourcesForGrade(10,'cbse').some(x => x.id === 'jee-advanced-papers'), 'JEE archives exposed as CBSE course');
 assert.ok(studyResourcesForGrade(11,'jee-advanced').some(x => x.id === 'jee-advanced-papers'));
 assert.ok(!studyResourcesForGrade(11,'jee-main').some(x => x.id === 'jee-advanced-papers'));
-console.log('Resource links PASS: 15 verified external references, grade/track isolation and safe navigation');
+console.log('Resource links PASS: 23 verified external references, grade/track isolation and safe navigation');
