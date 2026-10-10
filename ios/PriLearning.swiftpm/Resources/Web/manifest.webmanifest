@@ -1,7 +1,7 @@
 {
   "name": "Pri Learning",
   "short_name": "Pri Learning",
-  "description": "Maths practice for Indian students — NCERT Classes 7–12, JEE Main & Advanced and olympiad. Questions generated and marked on your device, with handwriting recognition and worked solutions. Offline-first; a Pri cloud account is optional.",
+  "description": "Maths practice for Indian students — NCERT Classes 7–12, JEE Main & Advanced and olympiad. Handwriting recognition and worked solutions. Answers are checked by Pri’s server with a Pri account.",
   "lang": "en-IN",
   "categories": ["education"],
   "start_url": "/",

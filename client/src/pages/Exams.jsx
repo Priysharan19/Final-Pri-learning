@@ -6,6 +6,10 @@ import { useApp } from '../App.jsx';
 import { MathText } from '../lib/latex.jsx';
 import { indiaExamBlueprint, indiaExamClaim } from '../engine/indiaExams.js';
 import { tLater, useT, useTx } from '../i18n/index.js';
+import { checkRefusal, checkRefusalCopy } from '../components/checkAccess.js';
+import { CheckRefusal } from '../components/CheckRefusal.jsx';
+import { onCloudSessionChange } from '../platform/cloudSession.js';
+import Icon from '../components/Icon.jsx';
 
 // The India blueprints and their claims are engine data with an English source
 // of truth in engine/indiaExams.js; these are their catalogue keys, so the page
@@ -27,14 +31,26 @@ const CLAIM_KEYS = {
 };
 
 export default function Exams() {
-  const { user } = useApp();
+  const { user, refreshUser } = useApp();
   const t = useT();
   const [exams, setExams] = useState(null);
   const [cfg, setCfg] = useState({ length: 10, minutes: 30, year: user.year });
   const [busy, setBusy] = useState(false);
   const [paper, setPaper] = useState(null);
   const [error, setError] = useState('');
+  // Why a paper could not start: a paper is marked work, so it needs a
+  // signed-in eligible account and a connection, like checking an answer.
+  const [refusal, setRefusal] = useState(null);
+  // A local paper the server says is still open, when that is why a start was refused.
+  const [stillOpen, setStillOpen] = useState(null);
   const nav = useNavigate();
+  // Signed in on this page for this profile: the reason is gone. The student
+  // starts the paper themselves; nothing starts on its own.
+  useEffect(() => onCloudSessionChange(event => {
+    if (event?.detail?.connected === true && String(event.detail.localProfileId) === String(user?.id)) {
+      setRefusal(kind => (kind === 'sign-in' ? null : kind));
+    }
+  }), [user?.id]);
   const indiaBlueprint = useMemo(() => user.course === 'in'
     ? indiaExamBlueprint({ track: user.indiaTrack || 'cbse', grade: user.year })
     : null, [user.course, user.indiaTrack, user.year]);
@@ -52,18 +68,33 @@ export default function Exams() {
   async function start() {
     setBusy(true);
     setError('');
+    setRefusal(null);
+    setStillOpen(null);
     try {
       const body = user.course === 'in' ? { year: user.year } : cfg;
       const r = await api.post('/exams', body);
       nav(`/exams/${r.exam.id}`);
     } catch (err) {
-      setError(err.message || tLater('exams.formatNotReady'));
+      const kind = checkRefusal(err);
+      if (checkRefusalCopy(kind, 'exam')) setRefusal(kind);
+      // The account already has its limit of papers open: point at one.
+      else if (err?.code === 'EXAM_OPEN_PAPER_LIMIT') { setStillOpen(err.openExamId || true); setError(tLater('exams.openPaperLimit')); }
+      else setError(err.message || tLater('exams.formatNotReady'));
     } finally { setBusy(false); }
   }
 
+  const startRefused = refusal ? (
+    <div className="verdict verdict-technical" role="alert" data-exam-start-refused={refusal} style={{ marginTop: 14, gridColumn: '1 / -1' }}>
+      <span className="verdict-ico"><Icon name="alert" /><span className="sr-only">{t('exams.notStartedLabel')}</span></span>
+      <div>
+        <CheckRefusal kind={refusal} context="exam" user={user} refreshUser={refreshUser} onRetry={start} busy={busy} />
+      </div>
+    </div>
+  ) : null;
+
   if (user.course === 'in') {
     return <IndiaExams
-      user={user} exams={exams} blueprint={indiaBlueprint} busy={busy} error={error}
+      user={user} exams={exams} blueprint={indiaBlueprint} busy={busy} error={error} startRefused={startRefused} stillOpen={stillOpen}
       start={start} openPaper={openPaper} nav={nav} paper={paper} setPaper={setPaper}
     />;
   }
@@ -104,13 +135,16 @@ export default function Exams() {
       </div>
 
       <PaperHistory exams={exams} openPaper={openPaper} nav={nav} />
-      {error && <div className="card" role="alert" style={{ gridColumn: '1 / -1' }}>{error}</div>}
+      {startRefused}
+      {error && <div className="card" role="alert" style={{ gridColumn: '1 / -1' }}>{error}
+        {typeof stillOpen === 'string' && <div style={{ marginTop: 10 }}><button className="btn btn-ghost btn-sm" data-exam-resume-open onClick={() => nav(`/exams/${stillOpen}`)}>{t('exams.resume')}</button></div>}
+      </div>}
       {paper && <PrintPaper paper={paper} onClose={() => setPaper(null)} />}
     </div>
   );
 }
 
-function IndiaExams({ user, exams, blueprint, busy, error, start, openPaper, nav, paper, setPaper }) {
+function IndiaExams({ user, exams, blueprint, busy, error, startRefused, stillOpen, start, openPaper, nav, paper, setPaper }) {
   const claim = indiaExamClaim(blueprint);
   const track = user.indiaTrack || 'cbse';
   const jeeMainReady = track === 'jee-main' && blueprint?.authenticity === 'official-mathematics-section';
@@ -153,7 +187,10 @@ function IndiaExams({ user, exams, blueprint, busy, error, start, openPaper, nav
             {t('exams.notReleased')}
           </button>
         </>}
-        {error && <div role="alert" style={{ marginTop: 14, color: 'var(--bad)' }}>{error}</div>}
+        {startRefused}
+        {error && <div role="alert" style={{ marginTop: 14, color: 'var(--bad)' }}>{error}
+          {typeof stillOpen === 'string' && <div style={{ marginTop: 10 }}><button className="btn btn-ghost btn-sm" data-exam-resume-open onClick={() => nav(`/exams/${stillOpen}`)}>{t('exams.resume')}</button></div>}
+        </div>}
       </div>
 
       <PaperHistory exams={exams} openPaper={openPaper} nav={nav} india />
@@ -177,16 +214,21 @@ function PaperHistory({ exams, openPaper, nav, india = false }) {
               <div style={{ fontWeight: 640, fontSize: 14 }}>{e.title}</div>
               <div className="muted" style={{ fontSize: 12.5 }}>
                 {t(india ? 'exams.paperMetaIndia' : 'exams.paperMeta', { date: new Date(e.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }), n: e.duration_min })}
+                {/* A score the server did not certify says where it came from. */}
+                {e.finished_at && e.marked_by === 'earlier-version' && <> · <span data-exam-marked-by="earlier-version">{t('exams.markedEarlier')}</span></>}
+                {e.finished_at && e.marked_by === 'backup' && <> · <span data-exam-marked-by="backup">{t('exams.markedBackup')}</span></>}
               </div>
             </div>
             {e.finished_at
               ? <span className="tag" style={{ color: pct >= 80 ? 'var(--good)' : pct >= 50 ? 'var(--ink)' : 'var(--bad)' }}>
                 {e.score}/{e.total} · {pct}%
               </span>
-              : <span className="tag tag-brand">{t('exams.inProgress')}</span>}
+              : e.pending
+                ? <span className="tag" data-exam-pending>{t('exams.waitingToBeMarked')}</span>
+                : <span className="tag tag-brand">{t('exams.inProgress')}</span>}
             <button className="btn btn-quiet btn-sm" title={t('exams.openPrintable')}
               aria-label={t('exams.openPrintableAria', { title: e.title })} onClick={() => openPaper(e.id)}>{t('exams.print')}</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => nav(`/exams/${e.id}`)}>{e.finished_at ? t('nav.review') : t('exams.resume')}</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => nav(`/exams/${e.id}`)}>{e.finished_at ? t('nav.review') : e.pending ? t('exams.openPending') : t('exams.resume')}</button>
           </div>
         );
       })}

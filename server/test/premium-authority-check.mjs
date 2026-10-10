@@ -96,7 +96,11 @@ const post = async (path, account, body, headers = {}) => {
   });
   return { status: res.status, data: await res.json().catch(() => null) };
 };
-const read = (account, extra = {}, headers = {}, path = '/handwriting/transcribe') => post(path, account, { image: PNG, ...extra }, headers);
+// A different picture each time: this account's SAME picture is read once and
+// then served from memory (recognitionOps.js), which is not what is counted here.
+let pictures = 0;
+const freshPicture = () => 'data:image/png;base64,' + Buffer.from('a'.repeat(600) + `-${pictures += 1}`).toString('base64');
+const read = (account, extra = {}, headers = {}, path = '/handwriting/transcribe') => post(path, account, { image: freshPicture(), ...extra }, headers);
 const used = (account, kind = 'handwriting') => db.prepare('SELECT count FROM rate_limits WHERE bucket=?').get(`ai-daily:${kind}:${sha256(account).slice(0, 24)}`)?.count ?? 0;
 const until429 = async account => { let n = 0; for (let i = 0; i < 40; i++) { const r = await read(account); if (r.status !== 200) return { n, r }; n += 1; } return { n, r: null }; };
 

@@ -22,6 +22,10 @@ import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 
 installBrowserEnv();
 resetStorage();
+// An exam starts only for a signed-in account that can reach the server
+// (online-only grading), so the suite runs against the real one.
+const { startOnlineAuthority } = await import('./support/online-authority.mjs');
+const online = await startOnlineAuthority({ label: 'bad-input' });
 
 const { dispatch } = await import('../src/local/backend.js');
 const { validateRequest } = await import('../src/local/gateway.js');
@@ -79,12 +83,18 @@ ok('a route with no body contract is not silently given an object',
   validateRequest('POST', '/auth/logout', null).body === null,
   JSON.stringify(validateRequest('POST', '/auth/logout', null).body));
 
-await api.post('/profiles', { name: 'Bad Input', year: 10, course: 'nsw' });
+await online.link((await api.post('/profiles', { name: 'Bad Input', year: 10, course: 'nsw' })).user.id);
 for (const path of ['/rush/finish', '/match/finish', '/classes', '/tasks', '/history/list', '/practice/next']) {
   await shaped(`POST ${path} with a null body comes back shaped`, () => api.post(path, null));
 }
 
 // ── An exam whose question rows are gone ─────────────────────────────────────
+// The server issued the paper and still holds it, so a question row this
+// device has lost is not lost from the paper. With no connection the page and
+// the printable paper open on what is left; with one, the missing rows are put
+// back from the server's public paper, and the server marks the whole paper it
+// issued — a question the student never saw an answer box for is unanswered,
+// not wrong, and no mark is invented on the device.
 
 const me = (await dispatch('GET', '/me')).user;
 const realExam = (await dispatch('POST', '/exams', { length: 10, minutes: 30 })).exam;
@@ -97,20 +107,29 @@ const orphaned = stored.questionIds.slice(0, 5);
 for (const qid of orphaned) await idb.del('questions', qid);
 
 const survivors = stored.questionIds.length - orphaned.length;
-await shaped('the exam page still opens when half its questions are missing',
+const offlineView = await shaped('offline, the exam page still opens when half its questions are missing',
+  () => online.offline(() => dispatch('GET', `/exams/${realExam.id}`)));
+eq('offline, the page shows the questions that are still there', offlineView?.exam?.questions?.length, survivors);
+const offlinePaper = await shaped('offline, the printable paper still renders when half its questions are missing',
+  () => online.offline(() => dispatch('GET', `/exams/${realExam.id}/paper`)));
+eq('offline, the printable paper prints the questions that are still there', offlinePaper?.questions?.length, survivors);
+
+const repaired = await shaped('online, opening the paper puts the lost questions back from the server',
   () => dispatch('GET', `/exams/${realExam.id}`));
-const paper = await shaped('the printable paper still renders when half its questions are missing',
-  () => dispatch('GET', `/exams/${realExam.id}/paper`));
-eq('the printable paper prints the questions that are still there', paper?.questions?.length, survivors);
-const marked = await shaped('the paper still marks when half its questions are missing',
+eq('the paper is whole again', repaired?.exam?.questions?.length, stored.questionIds.length);
+ok('the restored rows are the public paper: no answer is on the device',
+  (await Promise.all(orphaned.map(qid => idb.get('questions', qid)))).every(row => row?.examServer === true && row.payload && !('answer' in row.payload) && !('steps' in row.payload)));
+const paper = await shaped('the printable paper prints the whole paper again', () => dispatch('GET', `/exams/${realExam.id}/paper`));
+eq('the printable paper prints every question', paper?.questions?.length, stored.questionIds.length);
+const marked = await shaped('the paper is marked by the server',
   () => dispatch('POST', `/exams/${realExam.id}/submit`, { answers: {}, ms: 60000 }));
-ok('the marker returns a score out of a real total',
-  Number.isFinite(marked?.total) && Number.isFinite(marked?.score) && marked.total > 0,
-  JSON.stringify({ score: marked?.score, total: marked?.total }));
-eq('the marked detail covers only the questions that exist', marked?.detail?.length, survivors);
-ok('a missing question is not marked wrong against the student',
-  !!marked && marked.detail.every(d => !orphaned.includes(d.id)),
-  JSON.stringify(marked?.detail?.map(d => d.id)));
+ok('the server returns a score out of a real total',
+  Number.isFinite(marked?.total) && Number.isFinite(marked?.score) && marked.total > 0 && marked.markedBy === 'server',
+  JSON.stringify({ score: marked?.score, total: marked?.total, markedBy: marked?.markedBy }));
+eq('the marked detail covers the whole paper the server issued', marked?.detail?.length, stored.questionIds.length);
+ok('a question whose row was lost is unanswered, not wrong for an answer nobody gave',
+  !!marked && marked.detail.filter(d => orphaned.includes(d.id)).every(d => d.awarded === 0 && d.given === '' && (d.multipart || d.unanswered === true)),
+  JSON.stringify(marked?.detail?.filter(d => orphaned.includes(d.id)).map(d => [d.awarded, d.given, d.unanswered])));
 
 // ── A multipart question with no parts ───────────────────────────────────────
 
@@ -165,5 +184,6 @@ if (failures.length) {
   console.log('\nfailures:');
   for (const line of failures) console.log(`  ${line}`);
 }
+await online.close();
 console.log(`\nBAD INPUT: ${fail ? 'FAIL' : 'PASS'} — ${pass}/${pass + fail} checks`);
 process.exit(fail ? 1 : 0);

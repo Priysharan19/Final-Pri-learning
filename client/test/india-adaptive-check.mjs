@@ -34,27 +34,15 @@ const DAY = 86400000;
 
 /**
  * This suite drives dozens of questions through one profile to watch the
- * adaptive engine move. The free tier allows twenty a day, which is the
- * subject of entitlement-enforcement-check.mjs, not of this one — so every
- * profile here is given a server-issued Premium snapshot and the cap stays out
- * of the way. Without this the suite would be measuring the cap.
+ * adaptive engine move. Every answer is marked by the real server (owner
+ * decision 2026-10-10: online-only grading), so each profile signs in to its
+ * own verified account. The free tier allows twenty a day, which is the
+ * subject of entitlement-enforcement-check.mjs, not of this one — so the real
+ * link row is given a Premium snapshot and the cap stays out of the way.
+ * Without this the suite would be measuring the cap.
  */
-async function liftFreeCap(pid) {
-  const [{ cloudLinkRowId }, idb] = await Promise.all([
-    import(`${SRC}platform/cloudAccount.js`),
-    import(`${SRC}local/idb.js`)
-  ]);
-  const now = Date.now();
-  await idb.put('device', {
-    id: cloudLinkRowId(pid), accountId: `acct-${pid}`, role: 'student',
-    emailVerified: true, linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
-    entitlement: {
-      plan: 'premium', status: 'active', provider: 'web',
-      currentPeriodEnd: now + 30 * DAY, offlineUntil: now + 7 * DAY,
-      issuedAt: now, sourceVersion: 1
-    }
-  });
-}
+let online = null;
+const liftFreeCap = pid => online.link(pid, { entitlement: 'premium' });
 
 // ── Determinism ──────────────────────────────────────────────────────────────
 
@@ -128,6 +116,8 @@ function wrongInput(q) {
 async function run() {
   installBrowserEnv();
   resetStorage();
+  const { startOnlineAuthority, nextSubmissionId } = await import('./support/online-authority.mjs');
+  online = await startOnlineAuthority({ label: 'india-adaptive' });
   const { dispatch } = await import(`${SRC}local/backend.js`);
   const idb = await import(`${SRC}local/idb.js`);
   const { checkAnswer } = await import(`${SRC}engine/checker.js`);
@@ -137,19 +127,28 @@ async function run() {
   const { SUBTOPIC_BY_ID } = await import(`${SRC}engine/curriculum.js`);
   const {
     indiaPracticeScope, indiaDifficultyWindow, indiaDotpointKey, parseIndiaDotpointKey, indiaChapterGrade, indiaAheadUnlocked,
-    indiaDotpointsInWindow
+    indiaDotpointsInWindow, indiaRequestableDifficulties
   } = await import(`${SRC}engine/indiaProduct.js`);
   const { misconceptionKey, TRAP_ACTIVE_AT, INTERLEAVE } = await import(`${SRC}engine/adaptive.js`);
   const { INDIA_REASON_TAGS } = await import(`${SRC}engine/indiaProgress.js`);
 
   const GET = (path, body) => dispatch('GET', path, body);
-  const POST = (path, body) => dispatch('POST', path, body);
+  // The card names every tap with a stable submission key; the server marks under it.
+  const SUBMIT = /^\/practice\/[^/]+\/submit$/;
+  const POST = (path, body) => dispatch('POST', path,
+    SUBMIT.test(path) && body && body.submissionId === undefined ? { ...body, submissionId: nextSubmissionId('sub_india') } : body);
   const TAGS = new Set(INDIA_REASON_TAGS);
 
+  const unissued = [];
   async function serve(body = {}) {
     const res = await POST('/practice/next', body);
     const row = await idb.get('questions', res.question.id);
-    return { ...res, payload: row.payload, row };
+    // A linked India profile is served a server-issued question: the device
+    // row holds no answer, steps or traps. `payload` is the test oracle's
+    // regeneration of the issued question — used to choose what to type, never
+    // to mark. Marks come back from the server.
+    if (!row.serverQuestionId || 'answer' in row.payload || 'traps' in row.payload) unissued.push(row.id);
+    return { ...res, payload: await online.answerKey(row), row };
   }
 
   /** Resolve a served question with the wanted outcome where the form allows it; returns what actually happened. */
@@ -325,7 +324,11 @@ async function run() {
       // which is the correct behaviour and not something to probe through.
       for (const dp of indiaDotpointsInWindow(c, user.indiaTrack, user.year)) {
         if (found) break;
-        for (let d = window.floor; d <= window.ceiling && !found; d++) {
+        // Only the levels the dot point is authored at: a named level with no
+        // form is refused with DIFFICULTY_UNAVAILABLE (issue #408), never
+        // answered at another level, so it is not something to probe through.
+        for (const d of indiaRequestableDifficulties(c, { dotpoint: dp, track: user.indiaTrack, grade: user.year })) {
+          if (found) break;
           for (let i = 0; i < 3 && !found; i++) {
             const probe = await serve({ subtopic: c.id, dotpoint: dp, difficulty: d });
             const trap = (probe.payload.traps || []).find(t => t.value !== undefined && t.why && !checkAnswer(probe.payload, String(t.value)).correct);
@@ -343,13 +346,18 @@ async function run() {
     // Spring the same trap three times over fresh questions on the same dot point.
     let hits = 0;
     let firstFeedback = null;
+    let firstOpen = false, resolvedFeedback = null;
     let current = found.s;
     for (let tries = 0; tries < 40 && hits < 3; tries++) {
       const probe = (current.payload.traps || []).find(t => t.value !== undefined && misconceptionKey(chapter.id, t.why) === key && !checkAnswer(current.payload, String(t.value)).correct);
       if (probe) {
         const r1 = await POST(`/practice/${current.question.id}/submit`, { answer: String(probe.value), ms: 12000 });
-        if (firstFeedback === null) firstFeedback = r1.feedback;
-        if (!r1.resolved) await POST(`/practice/${current.question.id}/submit`, { answer: String(probe.value), ms: 12000 });
+        const r2 = r1.resolved ? r1 : await POST(`/practice/${current.question.id}/submit`, { answer: String(probe.value), ms: 12000 });
+        if (firstFeedback === null) {
+          firstFeedback = r1.feedback;
+          firstOpen = !r1.resolved;
+          resolvedFeedback = r2.feedback;
+        }
         hits++;
       } else {
         await POST(`/practice/${current.question.id}/reveal`, { ms: 1000 });
@@ -364,7 +372,11 @@ async function run() {
       if (hits < 3) current = await serve({ subtopic: chapter.id, dotpoint: found.dotpoint, difficulty: found.difficulty });
     }
     eq('the trap was sprung three times', hits, 3);
-    eq('the feedback on a trap answer is the trap\'s own explanation', firstFeedback, trap.why);
+    // A trap's explanation can state the answer or pick it out — for a typed
+    // value and for a multiple-choice option alike — so it is held until the
+    // question is finished; the reply that finishes it carries it.
+    eq('the trap\'s own explanation is the feedback when the question is finished, and for no answer type before',
+      [resolvedFeedback, firstOpen ? firstFeedback !== trap.why : true], [trap.why, true]);
     const row = ratingRowsOf(user.id).find(r => r.subtopic === chapter.id);
     const ledger = row?.traps?.[key];
     ok('the trap ledger sits on the chapter row', !!ledger, show(Object.keys(row?.traps || {})));
@@ -503,7 +515,13 @@ async function run() {
   const j12log = await drive(24);
   ok('every JEE Advanced serve is D3 or D4', j12log.every(e => e.difficulty >= 3 && e.difficulty <= 4 && e.windowed === true), show([...new Set(j12log.map(e => e.difficulty))]));
   ok('JEE Advanced draws on both senior years', j12log.some(e => e.year === 11) && j12log.some(e => e.year === 12), show([...new Set(j12log.map(e => e.year))]));
-  ok('an explicit D1 request is held to the JEE Advanced floor', (await serve({ subtopic: j12log[0].chapter, difficulty: 1 })).question.difficulty >= 3);
+  // D1 is not a JEE Advanced level. It is refused with the levels that exist —
+  // never served, and never answered with a D3 question in its place (#408).
+  const belowFloor = await POST('/practice/next', { subtopic: j12log[0].chapter, difficulty: 1 }).then(() => null, e => e);
+  ok('an explicit D1 request is refused on JEE Advanced, not served at another level',
+    belowFloor?.code === 'DIFFICULTY_UNAVAILABLE' && belowFloor.detail?.difficultyRequested === 1
+      && belowFloor.detail.available.length > 0 && belowFloor.detail.available.every(a => a.difficulty >= 3 && a.difficulty <= 4),
+    show({ code: belowFloor?.code, detail: belowFloor?.detail }));
   ok('JEE Advanced keeps interleaving', longestRun(j12log) <= 2, `longest run ${longestRun(j12log)}`);
   ok('JEE Advanced rating rows are chapter-keyed', ratingRowsOf(j12.id).every(r => IN_CHAPTER_BY_ID[r.subtopic]));
 
@@ -520,6 +538,15 @@ async function run() {
   ok('four profiles hold four separate evidence sets', new Set(all.map(r => r.pid)).size === 5);
   ok('a shared generator never merged two students\' chapters', all.every(r => IN_CHAPTER_BY_ID[r.subtopic]));
 
+  // ── Server authority ──────────────────────────────────────────────────────
+  section('server authority');
+  eq('every question served to a signed-in profile was server-issued, with no answer or trap list on the device', unissued.slice(0, 3), []);
+  const resolvedRows = rawRows().questions.filter(r => r.answered);
+  ok('every resolved question carries the server\'s authoritative receipt', resolvedRows.length > 300 && resolvedRows.every(r => r.serverQuestionId && r.serverReceipt?.authoritative === true),
+    `${resolvedRows.filter(r => !r.serverReceipt?.authoritative).length}/${resolvedRows.length} without a receipt`);
+  ok('the server marked or revealed every one of them', online.traffic.grade + online.traffic.reveal >= resolvedRows.length, show(online.traffic));
+  await online.close();
+
   // ── Verdict ───────────────────────────────────────────────────────────────
   const total = pass + failures.length;
   if (failures.length) {
@@ -532,8 +559,9 @@ async function run() {
   return 0;
 }
 
-run().then(code => process.exit(code)).catch(err => {
+run().then(code => process.exit(code)).catch(async err => {
   console.error(err?.stack || err);
+  await online?.close().catch(() => {});
   console.log(`\nINDIA ADAPTIVE: FAIL — crashed in "${group}" after ${pass} passing checks`);
   process.exit(1);
 });

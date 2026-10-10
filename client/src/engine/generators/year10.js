@@ -781,6 +781,11 @@ export const year10 = {
         return {
           prompt: `The scatterplot shows ${ctx.yL.toLowerCase()} against ${ctx.xL.toLowerCase()} for $${n}$ ${ctx.who}. Describe the association between the two variables.`,
           figure,
+          // Each context here always slopes the same way and is always strong,
+          // so every plot of one prompt is keyed to one answer: the same
+          // question, whichever points were drawn. (Never sent to a student:
+          // not in PUBLIC_QUESTION_FIELDS. Read by the server's content identity.)
+          identityIgnoresFigure: true,
           answerType: 'mcq', answer: { correctIndex: mm.correctIndex, optionTraps: mm.optionTraps }, mcqOptions: mm.options,
           hints: ['Ask two questions: which way does the cloud slope, and how tightly do the points hug that slope?',
             `Reading left to right, the points head ${ctx.up ? 'upwards' : 'downwards'} — that fixes the direction.`,
@@ -819,6 +824,8 @@ export const year10 = {
       return {
         prompt: `The scatterplot shows ${ctx.yL.toLowerCase()} against ${ctx.xL.toLowerCase()} for $${n}$ ${ctx.who}. Which statement best describes what the graph shows?`,
         figure,
+        // As above: one prompt, one keyed answer, whatever the plot.
+        identityIgnoresFigure: true,
         answerType: 'mcq', answer: { correctIndex: mm.correctIndex, optionTraps: mm.optionTraps }, mcqOptions: mm.options,
         hints: ['Read the plot from left to right and watch what happens to the height of the points.',
           `Here they head ${ctx.up ? 'upwards' : 'downwards'}.`,

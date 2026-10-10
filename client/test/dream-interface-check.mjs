@@ -2,6 +2,7 @@
 // workspace contracts. Pure node: no browser, no build.
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -240,10 +241,33 @@ check('the action bar holds exactly one primary action', () => {
 check('status only claims what the device actually knows', () => {
   assert.doesNotMatch(en, /'verdict\.status[A-Za-z]*': '[^']*(synced|uploaded|cloud)/i);
   assert.match(card, /saveDraft\('question', question\.id/);
-  // Ink is reported saved only after the record is read back from the store.
-  assert.match(card, /const at = draftSavedAt\('ink', question\.id\);\s*setSaveState\(at && at >= asked \? 'saved' : 'failed'\)/);
-  // …and a draft cleared by marking is never reported as a failed save.
-  assert.match(card, /if \(attemptRef\.current\) return;\s*const at = draftSavedAt/);
+  // Ink is kept in *sealed IndexedDB*, not the plaintext typed-draft store.
+  // Queue acceptance is not proof of durability: flush, read back, then
+  // compare exactly the strokes the student actually wrote before saying Saved.
+  assert.doesNotMatch(card, /draftSavedAt\('ink', question\.id\)/);
+  // Stronger than the read through the writing handle it replaces: the row is
+  // read back through a FRESH IndexedDB connection (never the cached handle,
+  // never the in-memory queue) and compared stroke for stroke.
+  assert.match(card, /confirmInkDraftSaved\(question\.id, strokes\)/);
+  assert.match(card, /setSaveState\(outcome\.saved \? 'saved' : 'failed'\)/);
+  assert.doesNotMatch(card, /readInkDraft\(question\.id\)\)\.then\(\s*kept => \{[^}]*setSaveState\([^)]*'saved'/);
+  const inkDrafts = readFileSync(new URL('../src/local/inkDrafts.js', import.meta.url), 'utf8');
+  const confirm = inkDrafts.slice(inkDrafts.indexOf('export async function confirmInkDraftSaved'));
+  assert.match(confirm, /await flushInkDrafts\(\)/);
+  assert.match(confirm, /if \(pending\.has\(id\)\) return \{ saved: false, reason: 'superseded' \}/);
+  assert.match(confirm, /row = await getFresh\(INK_DRAFT_STORE, id\)/);
+  assert.match(confirm, /JSON\.stringify\(compactStrokes\(row\.strokes\)\) === expected \? \{ saved: true \}/);
+  const idb = readFileSync(new URL('../src/local/idb.js', import.meta.url), 'utf8');
+  const fresh = idb.slice(idb.indexOf('export async function getFresh'), idb.indexOf('export async function put'));
+  assert.match(fresh, /indexedDB\.open\(DB_NAME\)/);
+  assert.doesNotMatch(fresh, /openDB\(\)|dbHandle|dbPromise/);
+  // One state for the work, and a failed save always carries its retry.
+  assert.match(card, /data-work-state=\{workState\}/);
+  assert.match(card, /workState === 'save-failed' && \(\s*<button[^>]*data-save-retry/);
+  // A stale async completion must not say Saved for newer strokes, nor turn a
+  // successfully graded/cleared answer into a failed write.
+  assert.match(card, /attemptRef\.current \|\| inkSaveRevision\.current !== revision/);
+  assert.match(card, /setSaveState\('failed'\)/);
   // The same for a typed draft: a late timed write must not put back what marking cleared.
   assert.match(card, /if \(attemptRef\.current\) return;\s*setSaveState\(saveDraft\('question'/);
   assert.match(card, /if \(!saveInkDraft\(question\.id, strokes, [^)]*\)\) \{ setSaveState\('failed'\); return; \}/);

@@ -223,6 +223,25 @@ eq(throwingCalls, 2, 'a status request that failed outright is never cached');
   const signedOutAgain = await cloudHandwritingReadiness({ user: signedOutProfile, transport: gate, available: there, now: T1 + 3 });
   ok(signedOutAgain.usable === false && probes === 3, 'a ready answer cached for the signed-in state is not served to the signed-out one');
 
+  // An ended session is never "the reader isn't answering" (owner report,
+  // 2026-10-10: production answered 401 to a linked device and the page blamed
+  // the reader). The status probe keeps the HTTP status of its refusal, so a
+  // 401 whose body carried no code this build knows is still "sign in"; so is
+  // a stale session security token. A real outage keeps its own sentence.
+  const linked = { id: 'p-ended', cloudLinked: true };
+  const env = { available: there, online: () => true };
+  const codeless = await cloudHandwritingReadiness({ user: linked, available: there, cache: false,
+    transport: { handwritingStatus: async () => { throw Object.assign(new Error('Cloud request failed (401)'), { status: 401, code: 'CLOUD_REQUEST_FAILED' }); } } });
+  ok(codeless.lastFailureStatus === 401 && inkReadingBlockedKey(linked, { outcome: { reason: 'unavailable', readiness: codeless }, ...env }) === 'ink.waitingSignIn',
+    `a 401 from the status probe with no recognised code is the sign-in blocker for a linked profile, not a reader outage (${codeless.lastFailureCode}/${codeless.lastFailureStatus})`);
+  eq(inkReadingBlockedKey(linked, { outcome: { error: { code: 'CSRF_REJECTED', status: 403 } }, ...env }), 'ink.waitingSignIn',
+    'a stale session security token (CSRF_REJECTED) on the read is "sign in again" too');
+  const down = await cloudHandwritingReadiness({ user: linked, available: there, cache: false,
+    transport: { handwritingStatus: async () => { throw Object.assign(new Error('Cloud request failed (503)'), { status: 503, code: 'HANDWRITING_PROVIDER_5XX' }); } } });
+  ok(inkReadingBlockedKey(linked, { outcome: { reason: 'unavailable', readiness: down }, ...env }) === 'ink.waitingServiceDown' &&
+      inkReadingBlockedKey(linked, { outcome: { error: { code: 'HANDWRITING_TIMEOUT' } }, ...env }) === 'ink.waitingServiceDown',
+    'while a 5xx from the probe and a timed-out read are still the reader not answering');
+
   // A session change (register, sign in, sign out, verified, consent) drops
   // whatever is cached even when the profile view has not caught up yet.
   signedIn = true;
@@ -506,7 +525,7 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   const inkSrc = readFileSync(new URL('../src/ink/InkAnswer.jsx', import.meta.url), 'utf8');
   ok(/segmentInkLines\(strokes\)/.test(inkSrc) && /ink-linebox/.test(inkSrc) && /ink\.mistakeHere/.test(inkSrc), 'the ink surface draws line boxes and the mistake note again');
   const qc = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
-  ok(/inkResult\?\.afterWait/.test(qc) && /autoMarkedRef\.current === inkResult\.readKey/.test(qc), 'ink read after waiting is marked once, by its reading key');
+  ok(!/inkResult\?\.afterWait/.test(qc) && !/autoMarkedRef/.test(qc), 'ink read after waiting is shown, never sent to be marked without the student\'s Submit');
   ok(/onReaderState=\{setInkReaderState\}/.test(qc) && /inkReaderState\?\.kind === INK_READER_STATE\.READ_FAILED/.test(qc),
     'the question-level “could not read” copy is driven by a genuine reader failure, never strokes-without-text alone');
   ok(/setStatus\(prev => prev\?\.kind === 'empty' \? null : prev\)/.test(inkSrc),
@@ -529,8 +548,8 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   ok(/'visibilitychange'/.test(ink) && /'focus'/.test(ink), 'and retries on focus and on a return to the tab');
   ok(/plausibleLineMatch\(/.test(ink), 'and only places a reading on the ink when it plausibly matches');
   const qc = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
-  ok(/if \(busy \|\| inFlightRef\.current\) return;\s*autoMarkedRef\.current = inkResult\.readKey;/.test(qc) && /\}, \[inkResult, busy\]\)/.test(qc),
-    'a waited-for reading that lands while the card is busy is marked when it is idle, not dropped');
+  ok(/const onInkRecognized = useCallback\(\(r\) => \{\s*if \(inkFrozenRef\.current\) return;\s*setInkResult\(r\);/.test(qc),
+    'a waited-for reading that lands while the card is busy is still shown, not dropped');
 }
 
 // ── Doubtful lines, one-tap correction, and no second provider call (4.4) ───
@@ -600,7 +619,7 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   ok(/\['inkDrafts', 'pid'\]/.test(idb), 'and is erased with its profile');
   const card = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
   ok(/InkAnswer && restoredInk !== undefined && \(/.test(card), 'the ink surface mounts only once the kept page has been looked for');
-  ok(/autoMarkedRef\.current === inkResult\.readKey/.test(card), 'a page read after waiting is marked once per reading (idempotent on the read key)');
+  ok(!/autoMarkedRef/.test(card), 'a page read after waiting is not marked by the card on its own');
 }
 
 console.log(failures.length

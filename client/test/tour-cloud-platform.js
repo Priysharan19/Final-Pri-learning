@@ -174,6 +174,12 @@ export const flow = {
     // answering" — nothing was asked of the server after sign-in. This is that
     // day, with the right ending.
     const handwritingRequests = () => requests.filter(row => row.path.startsWith('/v1/handwriting/'));
+    // What the student can actually read about the blocked ink: the generic
+    // reader sentence is display:none while an account action is pending, so
+    // only text that is rendered counts (innerText of a hidden node would
+    // quietly return its textContent and prove nothing).
+    const inkNotice = () => page.evaluate(() => [...document.querySelectorAll('.ink-status, [data-ink-account-recovery] p')]
+      .filter(el => el.getClientRects().length > 0).map(el => el.innerText).join(' ').replace(/\s+/g, ' ').trim());
     await goto('/practice');
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
     const writeTab = page.getByRole('button', { name: 'Answer by handwriting' });
@@ -187,11 +193,17 @@ export const flow = {
     const inkPrompt = (await page.locator('.q-prompt').innerText()).replace(/\s+/g, ' ').trim();
     const box = await page.locator('.ink-canvas-live').boundingBox();
     await handwrite(page, box, reader.text);
-    await page.waitForSelector('.ink-status', { timeout: 15000 }).catch(() => {});
-    const signedOutNote = (await page.locator('.ink-status').innerText().catch(() => '')) || '';
+    const inkSignIn = page.locator('[data-ink-account-recovery] [data-ink-sign-in]');
+    await inkSignIn.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+    const signedOutNote = await inkNotice();
+    // The sentence changed with the in-card recovery (it used to read "needs a
+    // Pri account … your working is saved"); what is protected is the same:
+    // the ink is not read, the student is told it is an account matter and is
+    // not told the reader is down.
     await check('signed out, the kept ink waits for a Pri account — the student is told that, not "the reader is down"',
-      /needs a Pri account/.test(signedOutNote) && await page.locator('.ink-preview').count() === 0,
-      `status ${JSON.stringify(signedOutNote)}`);
+      /has not been read or graded/.test(signedOutNote) && /^Sign in to check this answer$/.test((await inkSignIn.innerText().catch(() => '')).trim()) &&
+        !/isn.t answering/.test(signedOutNote) && await page.locator('.ink-preview').count() === 0,
+      `notice ${JSON.stringify(signedOutNote)}`);
     const signedOutActionStatus = (await page.locator('.status-line').innerText().catch(() => '')) || '';
     await check('signed out, the action bar does not blame handwriting when recognition was never attempted',
       !/couldn.?t read|rewrite your last line more clearly/i.test(signedOutActionStatus),
@@ -200,13 +212,21 @@ export const flow = {
       handwritingRequests().length === 0 && reader.requests.length === 0,
       JSON.stringify(handwritingRequests().map(r => `${r.method} ${r.path}`)));
     const inkLink = page.locator('.ink-status-link');
-    await check('the notice offers the way to Account settings',
-      await inkLink.count() === 1 && (await inkLink.getAttribute('href')) === '/settings' && (await inkLink.getAttribute('data-ink-blocker')) === 'ink.waitingSignIn',
-      `href ${JSON.stringify(await inkLink.getAttribute('href').catch(() => null))}`);
+    // Signed out, the way forward is the sign-in inside the card, enabled once
+    // the ink is proven saved; the old "Account settings" link (a dead end for
+    // a student with ink on the page) is not shown beside it. The in-card
+    // sign-in itself is driven end to end by tour-write-sign-in.js.
+    await page.waitForFunction(() => document.querySelector('[data-ink-sign-in]')?.disabled === false, null, { timeout: 15000 }).catch(() => {});
+    await check('the notice offers sign-in on the card, not a link away to Account settings',
+      await inkSignIn.isEnabled() && !(await inkLink.isVisible().catch(() => false)),
+      `sign-in enabled ${await inkSignIn.isEnabled().catch(() => null)}, settings link visible ${await inkLink.isVisible().catch(() => null)}`);
     // From here on nothing reloads: a reload would wipe the module-level
-    // readiness cache and hide the very bug this flow exists to catch.
+    // readiness cache and hide the very bug this flow exists to catch. This
+    // flow goes on to prove Settings refreshes live when an account connects,
+    // so the student walks there through the app's own navigation.
     await page.evaluate(() => { window.__PRI_E2E_NO_RELOAD__ = 'kept'; });
-    await inkLink.click();
+    await page.locator('.ws-exit').click();
+    await page.getByRole('link', { name: 'Settings', exact: true }).first().click();
     await page.waitForURL(url => url.pathname === '/settings', { timeout: 15000 });
     // Settings is a lazy route: wait for the account panel itself, not the URL.
     await page.locator('#cloud-account-title').waitFor({ state: 'visible', timeout: 30000 });
@@ -290,8 +310,8 @@ export const flow = {
       (await page.locator('.q-prompt').innerText()).replace(/\s+/g, ' ').trim() === inkPrompt,
       `prompt now ${JSON.stringify((await page.locator('.q-prompt').innerText()).slice(0, 120))}`);
     await check('without a reload', await page.evaluate(() => window.__PRI_E2E_NO_RELOAD__) === 'kept');
-    await page.waitForFunction(() => /parent or guardian needs to confirm/i.test(document.querySelector('.ink-status')?.textContent || ''), null, { timeout: 20000 }).catch(() => {});
-    const guardianNote = (await page.locator('.ink-status').innerText().catch(() => '')) || '';
+    await page.waitForFunction(() => /parent or guardian needs to confirm/i.test(document.querySelector('[data-ink-blocker-reason]')?.textContent || ''), null, { timeout: 20000 }).catch(() => {});
+    const guardianNote = await inkNotice();
     const guardianBlockedRequests = requests.slice(registerIndexBefore).filter(row => row.path.startsWith('/v1/handwriting/'));
     await check('guardian pending is named as an account action, not a handwriting failure',
       /parent or guardian needs to confirm/i.test(guardianNote), `status ${JSON.stringify(guardianNote)}`);
@@ -302,7 +322,7 @@ export const flow = {
     await check('a pre-reader account gate never tells the student to rewrite clearer handwriting',
       !/couldn.?t read|rewrite your last line more clearly/i.test(lowerWhileGated), `lower status ${JSON.stringify(lowerWhileGated)}`);
     await check('guardian pending offers Account settings as the relevant action',
-      await inkLink.count() === 1 && (await inkLink.getAttribute('data-ink-blocker')) === 'ink.waitingGuardian');
+      await inkLink.isVisible().catch(() => false) && (await inkLink.getAttribute('data-ink-blocker')) === 'ink.waitingGuardian');
 
     // Approval can arrive elsewhere while this page stays open. Focus triggers
     // the bounded fresh readiness probe; no force-quit or reload is required.
@@ -310,12 +330,12 @@ export const flow = {
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
     // The status is now usable, the ink is sent, and the transcribe route names
     // the next real blocker: the still-unverified email.
-    await page.waitForFunction(() => /Verify your email address/.test(document.querySelector('.ink-status')?.textContent || ''), null, { timeout: 20000 }).catch(() => {});
+    await page.waitForFunction(() => /Verify your email address/.test(document.querySelector('[data-ink-blocker-reason]')?.textContent || ''), null, { timeout: 20000 }).catch(() => {});
     const afterSignIn = requests.slice(registerIndexBefore).filter(row => row.path.startsWith('/v1/handwriting/'));
     await check('after sign-in the device asks the server again: a status probe and the kept ink itself',
       afterSignIn.some(r => r.path === '/v1/handwriting/status') && afterSignIn.some(r => r.path === '/v1/handwriting/transcribe'),
       JSON.stringify(afterSignIn.map(r => `${r.method} ${r.path}`)));
-    const verifyNote = (await page.locator('.ink-status').innerText().catch(() => '')) || '';
+    const verifyNote = await inkNotice();
     await check('the real blocker is shown — verify the email — not "the reader is not answering"',
       /Verify your email address/.test(verifyNote) && !/isn’t answering/.test(verifyNote),
       `status ${JSON.stringify(verifyNote)}`);
@@ -324,7 +344,7 @@ export const flow = {
       !/couldn.?t read|rewrite your last line more clearly/i.test(verifyActionStatus),
       `action status ${JSON.stringify(verifyActionStatus)}`);
     await check('with the way to Account settings, where a fresh verification email is sent from',
-      await inkLink.count() === 1 && (await inkLink.getAttribute('data-ink-blocker')) === 'ink.waitingVerifyEmail');
+      await inkLink.isVisible().catch(() => false) && (await inkLink.getAttribute('data-ink-blocker')) === 'ink.waitingVerifyEmail');
     await check('the ink that was sent is the picture and nothing else — answer-blind, before and after sign-in',
       reader.requests.length >= 1 && reader.requests.every(r => r.parsed && JSON.stringify(Object.keys(r.parsed)) === '["image"]' && /^data:image\//.test(r.parsed.image)),
       JSON.stringify(reader.requests.map(r => r.parsed && Object.keys(r.parsed))));
@@ -339,7 +359,8 @@ export const flow = {
     await check('once verified, the kept ink is read by itself — no retyping, no reload',
       readBack.length === 1 && readBack[0] === reader.text && reader.requests.length > sentBeforeVerify,
       `read ${JSON.stringify(readBack)}; ${reader.requests.length - sentBeforeVerify} further transcribe requests`);
-    await check('and the waiting notice is gone', await page.locator('.ink-status-line').count() === 0);
+    await check('and the waiting notice is gone',
+      await page.locator('.ink-status-line').count() === 0 && await page.locator('[data-ink-account-recovery]').count() === 0);
     await check('still without a reload', await page.evaluate(() => window.__PRI_E2E_NO_RELOAD__) === 'kept');
 
     // Back to Settings for the assignment hand-off. (A reload is fine from

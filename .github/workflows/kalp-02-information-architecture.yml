@@ -12,6 +12,7 @@ on:
       - 'client/test/kalp02-navigation-check.mjs'
       - 'client/test/tour-kalp02-navigation.js'
       - 'client/test/tour-kalp01-design.js'
+      - 'client/test/support/**'
       - 'docs/design/KALP-02-information-architecture.md'
       - '.github/workflows/kalp-02-information-architecture.yml'
   workflow_dispatch:
@@ -44,6 +45,9 @@ jobs:
 
       - name: Install client dependencies
         run: npm ci --prefix client
+      # Client suites are marked by the real /v1 server, booted in-process (online-only grading).
+      - name: Install server dependencies
+        run: npm ci --prefix server
 
       - name: KALP-02 route and role source gate
         run: node client/test/kalp02-navigation-check.mjs

@@ -20,14 +20,13 @@
 import { readFileSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
-import cookieParser from 'cookie-parser';
 import { createPlatformDb } from '../platform/db.js';
 import {
   CONSENT_METHOD, CONSENT_NOTICE_VERSION, confirmConsent, consentBlockerCode, consentState,
   hasAgeDeclaration, learnerIsChild, recordConsentRequest, requireGuardianConsent, validateGuardian, withdrawConsent
 } from '../platform/guardianConsent.js';
 import { authEmailMessage, buildAuthActionUrl } from '../platform/authDelivery.js';
-import { SESSION_COOKIE, sha256 } from '../platform/security.js';
+import { SESSION_COOKIE, csrfGuard, sha256 } from '../platform/security.js';
 
 let pass = 0;
 const failures = [];
@@ -96,7 +95,18 @@ ok((await consentState(db, 'acct-child')).row.requested_at > 0 && (await consent
 // ── 4 · The gate, over HTTP ──────────────────────────────────────────────────
 const app = express();
 app.use(express.json());
-app.use(cookieParser());
+// The stand-in reads its two cookies itself. The real app's cookie parsing and
+// CSRF guard are exercised through the real router in the other suites; here
+// only the guardian gate is under test, behind the real guard below.
+app.use((req, _res, next) => {
+  req.cookies = Object.fromEntries(String(req.headers.cookie || '').split(';').map(part => part.trim().split('=')).filter(([k]) => k)
+    .map(([k, ...v]) => [k, decodeURIComponent(v.join('='))]));
+  next();
+});
+// The gate is mounted the way the platform router mounts it: behind the real
+// CSRF guard. A stand-in that parsed cookies with no guard after it would be a
+// shape of app this product never runs.
+app.use(csrfGuard);
 app.use('/guarded', requireGuardianConsent(db), (req, res) => res.json({ ok: true }));
 const server = await new Promise(r => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -121,6 +131,12 @@ try {
 
   await confirmConsent(db, 'acct-child', now);
   eq((await call('acct-child')).status, 200, 'once confirmed, it passes');
+
+  // A write carrying the session cookie but no CSRF token never reaches the
+  // gate at all, for any account — the guard in front of it answers first.
+  const forged = await fetch(`${base}/guarded`, { method: 'POST', headers: { cookie: `${SESSION_COOKIE}=raw-acct-adult` } })
+    .then(async r => ({ status: r.status, json: await r.json().catch(() => null) }));
+  eq([forged.status, forged.json?.error?.code], [403, 'CSRF_REJECTED'], 'a cross-site write with the session cookie and no CSRF token is refused before the gate');
 } finally {
   server.close();
 }

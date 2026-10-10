@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { createHistoryLoadGate } from './historyLoadLifecycle.js';
+const old = createHistoryLoadGate();
+assert.equal(old.current(),true,'initial list may render');
+old.cancel();
+assert.equal(old.current(),false,'late old-filter response rejected');
+const fresh = createHistoryLoadGate();
+assert.equal(fresh.current(),true,'new filter request may render');
+old.cancel();
+assert.equal(fresh.current(),true,'old cancellation cannot suppress new response');
+fresh.cancel();
+assert.equal(fresh.current(),false,'unmounted profile cannot publish a result');
+console.log('SAVED ATTEMPTS ASYNC REQUEST ISOLATION: PASS 5/5');

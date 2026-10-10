@@ -20,6 +20,8 @@ on:
       - 'scripts/native-bridge-selfcheck.mjs'
       - 'scripts/iphone-journey.mjs'
       - 'scripts/cloud-fixture-server.mjs'
+      - 'scripts/journey-oracle.mjs'
+      - 'scripts/synthetic-reader-server.mjs'
       - 'scripts/apple-shipping-target.mjs'
       - 'scripts/ink-native-check.mjs'
       - 'scripts/check-native-package-sync.mjs'
@@ -33,6 +35,8 @@ on:
       - 'scripts/native-bridge-selfcheck.mjs'
       - 'scripts/iphone-journey.mjs'
       - 'scripts/cloud-fixture-server.mjs'
+      - 'scripts/journey-oracle.mjs'
+      - 'scripts/synthetic-reader-server.mjs'
       - 'scripts/apple-shipping-target.mjs'
       - 'scripts/ink-native-check.mjs'
       - 'scripts/check-native-package-sync.mjs'
@@ -97,9 +101,20 @@ jobs:
           echo "PRI_SIM_APP=$APP" >> "$GITHUB_ENV"
 
       # The same shell on an iPhone simulator, and the native student journey
-      # on iPhone and iPad (onboarding → typed attempt marked → feedback → next
-      # → native ink reading with hardware-correct ink facts → progress →
-      # relaunch persistence). SYNTHETIC / SIMULATOR evidence records uploaded.
+      # on iPhone and iPad. Grading is online-only and server-authoritative
+      # (ADR-0001, owner decision 2026-10-10), so the journey has two legs and
+      # both must pass (scripts/iphone-journey.mjs):
+      #   1. no server — typed answer and working, strokes on the PencilKit
+      #      surface (hardware-correct ink facts, sealed draft, one truthful
+      #      save status), a photo that is not read on the device; the offline
+      #      draft says it cannot be marked and offers no Submit or Show
+      #      solution, asking for a markable question changes nothing, nothing
+      #      is marked; relaunch keeps the work;
+      #   2. a real local Pri server on SQLite with a SYNTHETIC handwriting
+      #      reader — server-prepared question signed out, in-card sign-in,
+      #      server-marked typed and handwritten answers, History after relaunch.
+      # SIMULATOR + SYNTHETIC READER evidence records are uploaded; they are
+      # never device, Pencil or real-provider evidence.
       - name: priNative bridge self-check (iPhone simulator)
         run: node scripts/native-bridge-selfcheck.mjs --family iphone --app "$PRI_SIM_APP"
 
@@ -109,7 +124,9 @@ jobs:
       # reconnect after relaunch; disconnect), background → foreground with an
       # unsent answer, an in-shell accessibility smoke, and the largest
       # accessibility text size with no sideways overflow.
-      - name: Server dependencies for the cloud fixture
+      # Both journeys start the real server (the marking leg always; the
+      # iPhone run also for the account journey).
+      - name: Server dependencies for the local Pri server
         run: npm ci --prefix server
 
       - name: iPhone certification journey (simulator)

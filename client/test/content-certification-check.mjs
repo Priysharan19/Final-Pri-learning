@@ -13,6 +13,12 @@ import { readFileSync } from 'node:fs';
 import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 
 installBrowserEnv();
+// Online-only grading (owner decision 2026-10-10): the backend sections below
+// run against the real server. Every profile is a real verified account, so
+// its India questions are issued by the server and answered questions are
+// marked by it.
+const { startOnlineAuthority, nextSubmissionId } = await import('./support/online-authority.mjs');
+const online = await startOnlineAuthority({ label: 'content-certification' });
 
 const cert = await import('./content-certify.mjs');
 const {
@@ -25,12 +31,11 @@ const {
 } = await import('../src/engine/contentIdentity.js');
 const { generateQuestion, loadAllBanks } = await import('../src/engine/generators/index.js');
 const { IN_CURRICULUM, IN_CHAPTER_BY_ID } = await import('../src/engine/curriculum-in.js');
-const { resolveIndiaTarget } = await import('../src/engine/indiaProduct.js');
+const { resolveIndiaTarget, indiaRequestableDifficulties } = await import('../src/engine/indiaProduct.js');
 const { CONTENT_EMPTY_CODES, isContentEmpty, servable, contentEmptySignal } = await import('../src/lib/contentServe.js');
 const { telemetryEvent } = await import('../src/platform/telemetry.js');
 const { dispatch } = await import('../src/local/backend.js');
 const idb = await import('../src/local/idb.js');
-const { cloudLinkRowId } = await import('../src/platform/cloudAccount.js');
 
 await loadAllBanks();
 // Every bank a V1 path reaches, including the demand-loaded archives — the app
@@ -214,12 +219,7 @@ ok(servable({ question: { id: 'x', prompt: 'p' } }) && servable({ question: { id
 resetStorage();
 async function premiumProfile(spec) {
   const created = await dispatch('POST', '/profiles', spec);
-  const now = Date.now();
-  await idb.put('device', {
-    id: cloudLinkRowId(created.user.id), accountId: `acct-${created.user.id}`, role: 'student', emailVerified: true,
-    linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
-    entitlement: { plan: 'premium', status: 'active', provider: 'web', currentPeriodEnd: now + 30 * 86400000, offlineUntil: now + 7 * 86400000, issuedAt: now, sourceVersion: 1 }
-  });
+  await online.link(created.user.id, { entitlement: 'premium' });
   return created.user;
 }
 const student = await premiumProfile({ name: 'Cert Student', course: 'in', indiaTrack: 'cbse', year: 10 });
@@ -239,22 +239,42 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
 {
   const r = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: 'c10-real-numbers', track: 'cbse' });
   const row = await idb.get('questions', r.question.id);
+  // The row is server-issued: what is on the device (q) has no answer and no
+  // seed. `key` is the same question regenerated from the parameters the
+  // device asked the server to issue — the suite's oracle, never the product's.
   const q = row.payload;
+  const key = await online.answerKey(row);
+  ok(!!row.serverQuestionId && !('answer' in q) && !('seed' in q), 'the served India question was issued by the server and carries no answer or seed on the device');
   ok(typeof q.contentId === 'string' && q.contentId.length > 0, `a served India question carries a contentId (${q.contentId})`);
   eq(q.contentVersion, CONTENT_VERSION, 'a served India question carries the current content version');
-  eq(q.contentHash, contentHashOf(q), 'its contentHash matches what was served');
-  if (!q.pyq) eq(q.contentId, contentIdOf(q, row.generator), 'its contentId names the generator, difficulty and seed that reproduce it');
-  const same = generateQuestion(row.generator, q.difficulty, q.seed);
-  eq(same.contentHash, q.contentHash, 'the contentId reproduces the same question under the same content version');
+  // The engine's own content id spells out the seed and its content hash is
+  // taken over the answer; with the bundled generators either is the answer
+  // key. The device is handed keyed digests instead, and the server's sealed
+  // copy keeps the real identity.
+  ok(/^[0-9a-f]{16}$/.test(q.contentHash) && q.contentHash !== contentHashOf(key), 'its contentHash on the device is not the answer-derived hash');
+  if (!key.pyq) {
+    ok(q.contentId !== contentIdOf(key, row.generator) && !q.contentId.includes(String(key.seed)), 'its contentId on the device does not name the seed');
+    eq(key.contentId, contentIdOf(key, row.generator), 'the server\'s sealed copy names the generator, difficulty and seed that reproduce it');
+  }
+  const same = generateQuestion(row.generator, q.difficulty, key.seed);
+  eq(same.contentHash, key.contentHash, 'the sealed identity reproduces the same question under the same content version');
 
-  const answer = q.answerType === 'mcq' ? String(q.answer.correctIndex) : String(q.answer?.value ?? q.answer?.expr ?? '0');
-  await dispatch('POST', `/practice/${r.question.id}/submit`, { answer });
+  const answer = key.answerType === 'mcq' ? String(key.answer.correctIndex) : String(key.answer?.value ?? key.answer?.expr ?? '0');
+  const marked = await dispatch('POST', `/practice/${r.question.id}/submit`, { answer, submissionId: nextSubmissionId() });
+  ok(online.traffic.grade === 1 && typeof marked?.correct === 'boolean', `the answer was marked by the server (${online.traffic.grade} grade request, correct=${marked?.correct})`);
   const attempts = (await idb.byIndex('attempts', 'pid', student.id)).filter(a => a.questionId === r.question.id);
   eq(attempts.length, 1, 'the answered question produced one attempt');
   eq(attempts[0]?.contentId, q.contentId, 'the attempt records the contentId it was made on');
   eq(attempts[0]?.contentVersion, CONTENT_VERSION, 'the attempt records the content version');
   eq(attempts[0]?.contentHash, q.contentHash, 'the attempt records the content hash');
-  eq(attempts[0]?.seed, q.seed, 'the attempt records the seed');
+  // The server chooses the seed and never discloses it (owner decision
+  // 2026-10-10), so the attempt is tied to its content by identity and to the
+  // server's own record by the attempt id — and the device holds no seed.
+  eq(attempts[0]?.seed, null, 'the attempt holds no seed: the server never disclosed one');
+  ok(Number.isSafeInteger(key.seed) && !JSON.stringify(await idb.get('questions', r.question.id)).includes(`"seed":${key.seed}`), 'nor does the stored question, before or after it is marked');
+  eq(attempts[0]?.serverAttemptId, marked.attemptId, 'the attempt records the server attempt id of its mark');
+  const graded = await online.db.all("SELECT id, payload_json FROM learning_events WHERE kind='graded-attempt' AND entity_id=?", [row.serverQuestionId]);
+  eq(JSON.stringify([graded.length, graded[0]?.id, JSON.parse(graded[0]?.payload_json || '{}').contentId]), JSON.stringify([1, marked.attemptId, q.contentId]), 'which is the server\'s own graded attempt, on the same contentId');
 }
 {
   // Legacy rows: no identity reads as the legacy version, never as current.
@@ -283,17 +303,23 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   ok(sync.includes("...(typeof attempt?.contentId === 'string' && attempt.contentId ? {"), 'a synced attempt carries its content identity only when it has one (legacy payloads unchanged)');
 }
 {
-  // "Retry the same question" on a question stamped with an older version is
-  // re-served from its stored payload rather than regenerated differently.
+  // "Retry the same question" on a question from an older content version
+  // shows the question as it was first served, never one regenerated by a
+  // newer bank. The server re-issues the sealed copy it holds, so the fixture
+  // is the server's own record of a question issued under an older version.
   const r = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: 'c10-quadratic-equations', track: 'cbse', difficulty: 2 });
   const row = await idb.get('questions', r.question.id);
-  const old = { ...row, payload: { ...row.payload, contentVersion: '2025.1.0', prompt: `${row.payload.prompt} [as first served]` } };
-  await idb.put('questions', old);
-  const q = row.payload;
-  const answer = q.answerType === 'mcq' ? String(q.answer.correctIndex) : String(q.answer?.value ?? q.answer?.expr ?? '0');
-  await dispatch('POST', `/practice/${r.question.id}/submit`, { answer }).catch(() => {});
+  const key = await online.answerKey(row);
+  const firstServed = `${key.prompt} [as first served]`;
+  await online.db.run("UPDATE idempotency_keys SET response_json=? WHERE scope='practice-question' AND key=?",
+    [JSON.stringify({ ...key, contentVersion: '2025.1.0', prompt: firstServed }), row.serverQuestionId]);
+  await idb.put('questions', { ...row, payload: { ...row.payload, contentVersion: '2025.1.0', prompt: firstServed } });
+  const answer = key.answerType === 'mcq' ? String(key.answer.correctIndex) : String(key.answer?.value ?? key.answer?.expr ?? '0');
+  const first = await dispatch('POST', `/practice/${r.question.id}/submit`, { answer, submissionId: nextSubmissionId() });
+  if (!first.resolved) await dispatch('POST', `/practice/${r.question.id}/reveal`, {});
   const again = await dispatch('POST', `/history/${r.question.id}/retry`, { variant: 'same' }).catch(e => ({ error: e }));
-  ok(again?.question?.prompt?.endsWith('[as first served]'), 'retrying a question from an older content version shows the question as it was first served');
+  ok(again?.variant === 'same' && again?.question?.prompt === firstServed, 'retrying a question from an older content version shows the question as it was first served');
+  eq((await idb.get('questions', again?.question?.id))?.payload?.contentVersion, '2025.1.0', 'and it keeps the content version it was served under');
 }
 
 {
@@ -321,26 +347,33 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   // authored rung to the one pressed, and a stale generator-id link resolves to
   // its chapter instead of refusing.
   const { NCERT_CLASS10_CONTENT } = await import('../src/engine/ncert/class10-content.js');
-  const { class10LibraryPracticeHref, practiceRequestFromQuery, practiceHref, practiceDifficulties } = await import('../src/lib/practiceLinks.js');
+  const { class10LibraryPracticeHref, class10LibraryDifficulties, practiceRequestFromQuery, practiceHref, practiceDifficulties } = await import('../src/lib/practiceLinks.js');
   await premiumProfile({ name: 'Cert Library', course: 'in', indiaTrack: 'cbse', year: 10 });
   const refused = [], offChapter = [], offRung = [];
   for (const chapter of NCERT_CLASS10_CONTENT) {
     const rungs = new Set((IN_CHAPTER_BY_ID[chapter.id]?.covers || []).flatMap(c => c.diff || []));
-    for (const d of practiceDifficulties({ track: 'cbse' })) {
+    // The library shows a button only for a level the chapter has (issue #408);
+    // a level it lacks is refused with the levels that exist, never served at
+    // the nearest one.
+    const offered = class10LibraryDifficulties(indiaRequestableDifficulties(IN_CHAPTER_BY_ID[chapter.id], { track: 'cbse', grade: 10 }));
+    if (!offered.length) refused.push(`${chapter.id} offers no level`);
+    for (const d of practiceDifficulties({ track: 'cbse' }).filter(x => !offered.includes(x))) {
+      const e = await dispatch('POST', '/practice/next', practiceRequestFromQuery(new URL(class10LibraryPracticeHref(chapter, d), 'https://x.invalid').searchParams)).then(() => null, err => err);
+      if (e?.code !== 'DIFFICULTY_UNAVAILABLE' || JSON.stringify(e.detail.available.map(a => a.difficulty)) !== JSON.stringify(offered)) offRung.push(`${chapter.id}@D${d} not refused with ${offered}`);
+    }
+    for (const d of offered) {
       const href = class10LibraryPracticeHref(chapter, d);
       const r = await dispatch('POST', '/practice/next', practiceRequestFromQuery(new URL(href, 'https://x.invalid').searchParams)).catch(e => ({ error: e }));
       if (r.error) { refused.push(`${chapter.id}@D${d} ${r.error.code}`); continue; }
       const row = await idb.get('questions', r.question.id);
       if (row.india?.chapterId !== chapter.id) offChapter.push(`${chapter.id}@D${d}`);
-      const held = Math.min(3, d); // CBSE practice is held to D1–D3 (adaptive-08)
-      const gap = Math.min(...[...rungs].map(x => Math.abs(x - held)));
-      if (Math.abs(row.difficulty - held) !== gap) offRung.push(`${chapter.id}@D${d}→D${row.difficulty}`);
+      if (row.difficulty !== d || !rungs.has(d)) offRung.push(`${chapter.id}@D${d}→D${row.difficulty}`);
       await dispatch('POST', `/practice/${r.question.id}/discard`, {});
     }
   }
   eq(refused.length, 0, `every Class X library button serves a question (refused: ${refused.slice(0, 4).join(', ')})`);
   eq(offChapter.length, 0, `every Class X library button serves its own chapter (${offChapter.slice(0, 4).join(', ')})`);
-  eq(offRung.length, 0, `every Class X library button serves the nearest authored rung to the one pressed, held to the CBSE window (${offRung.slice(0, 4).join(', ')})`);
+  eq(offRung.length, 0, `every Class X library button serves exactly the level pressed, and a level the chapter lacks is refused with the levels it has (${offRung.slice(0, 4).join(', ')})`);
   for (const [gen, chapterId] of [['c10-polynomial-zeroes', 'c10-polynomials'], ['c10-linear-graphs', 'c10-pair-linear-equations'], ['c10-triangles-current', 'c10-triangles'], ['c10-surface-area-combo', 'c10-surface-volume']]) {
     const r = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: gen, track: 'cbse', difficulty: 2 }).catch(e => ({ error: e }));
     const row = r.question ? await idb.get('questions', r.question.id) : null;
@@ -349,12 +382,11 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   }
   {
     // Defence for links built before the D4 button was hidden (bookmarks,
-    // shared links): the backend still holds them to D3 and says so.
-    const r = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: 'c10-polynomials', track: 'cbse', difficulty: 4 });
-    const row = await idb.get('questions', r.question.id);
-    eq(row.difficulty, 3, 'a named D4 on a CBSE chapter is held to the CBSE window (adaptive-08)');
-    ok(/You asked for D4; CBSE \/ NCERT practice is held to D1–D3/.test(r.why), `and the reply says so instead of moving it silently (${r.why})`);
-    await dispatch('POST', `/practice/${r.question.id}/discard`, {});
+    // shared links): D4 is not a CBSE level, so the request is refused with the
+    // CBSE levels the chapter has — never served at D3 in its place (#408).
+    const e = await dispatch('POST', '/practice/next', { mode: 'topic', subtopic: 'c10-polynomials', track: 'cbse', difficulty: 4 }).then(() => null, err => err);
+    eq(e?.code, 'DIFFICULTY_UNAVAILABLE', 'a named D4 on a CBSE chapter is refused, not moved to another level (adaptive-08, #408)');
+    ok(e?.detail?.difficultyRequested === 4 && e.detail.available.length > 0 && e.detail.available.every(a => a.difficulty <= 3), `and the refusal lists the CBSE levels that exist (${JSON.stringify(e?.detail?.available)})`);
   }
   // The link reader sends exactly what Practice always sent.
   const body = practiceRequestFromQuery(new URL(practiceHref({ subtopic: 'c10-polynomials', dotpoint: 1, difficulty: 3, track: 'cbse', pyq: true }), 'https://x.invalid').searchParams);
@@ -405,10 +437,11 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   ok(!/difficulty=4/.test(practiceHref({ subtopic: 'c10-polynomials', track: 'cbse', difficulty: 4 })), 'the shared builder never emits a CBSE D4 link');
   ok(/difficulty=4/.test(practiceHref({ subtopic: 'c12-integrals-methods', track: 'jee-advanced', difficulty: 4 })), 'a JEE D4 link is still built');
   const { NCERT_CLASS10_CONTENT } = await import('../src/engine/ncert/class10-content.js');
-  const libLinks = NCERT_CLASS10_CONTENT.flatMap(c => practiceDifficulties({ track: 'cbse' }).map(d => class10LibraryPracticeHref(c, d)));
-  ok(libLinks.length === NCERT_CLASS10_CONTENT.length * 3 && libLinks.every(h => !/difficulty=4/.test(h)), 'the Class X library renders D1–D3 links only');
+  const { class10LibraryDifficulties } = await import('../src/lib/practiceLinks.js');
+  const libLinks = NCERT_CLASS10_CONTENT.flatMap(c => class10LibraryDifficulties(indiaRequestableDifficulties(IN_CHAPTER_BY_ID[c.id], { track: 'cbse', grade: 10 })).map(d => class10LibraryPracticeHref(c, d)));
+  ok(libLinks.length >= NCERT_CLASS10_CONTENT.length && libLinks.length <= NCERT_CLASS10_CONTENT.length * 3 && libLinks.every(h => !/difficulty=4/.test(h)), 'the Class X library renders D1–D3 links only');
   const library = src('../src/components/Class10NCERTLibrary.jsx');
-  ok(library.includes("practiceDifficulties({track:'cbse'}).map(") && !library.includes('[1,2,3,4].map'), 'the Class X library buttons come from the shared CBSE difficulty list');
+  ok(library.includes('class10LibraryDifficulties(indiaRequestableDifficulties(') && library.includes('{levels.map(') && !library.includes('[1,2,3,4].map'), 'the Class X library buttons are the shared CBSE levels the chapter really has');
   const home = src('../src/pages/Home.jsx');
   ok(home.includes('offeredDifficulties.map(') && !/\[1, 2, 3, 4\]\.filter/.test(home), 'Home\'s difficulty picker offers only practiceDifficulties for the context');
   ok(home.includes('difficulty: chosenDifficulty'), 'a remembered D4 filter is not sent from a CBSE Home');
@@ -440,6 +473,7 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   eq(paths.filter(p => p.track === 'cbse' && p.dotpoint == null && !p.pyqOnly).length, chapters.length, 'every CBSE chapter is its own path');
 }
 
+await online.close();
 const total = pass + failures.length;
 if (failures.length) {
   for (const f of failures) console.log(`FAIL ${f}`);

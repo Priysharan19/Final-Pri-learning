@@ -72,39 +72,48 @@ app.use('/working', createWorkingRouter(db, {
 const server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
 const base = `http://127.0.0.1:${server.address().port}`;
 const PNG = 'data:image/png;base64,' + Buffer.from('a'.repeat(600)).toString('base64');
+// A different picture each time: this account's SAME picture is read once and
+// then served from memory (recognitionOps.js), which is not what is counted here.
+let pictures = 0;
+const freshPicture = () => 'data:image/png;base64,' + Buffer.from('a'.repeat(600) + `-${pictures += 1}`).toString('base64');
 const call = async (who, path, body) => {
   const res = await fetch(`${base}${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=raw-${who}` },
     body: JSON.stringify(body)
   });
-  return { status: res.status, json: await res.json().catch(() => null) };
+  return { status: res.status, headers: res.headers, json: await res.json().catch(() => null) };
 };
 
 try {
   // Five calls fit the hourly ceiling. Spread across two accounts and both
   // routes, because the budget is the deployment's and not a student's.
   const spread = [
-    ['acct-a', '/handwriting/transcribe', { image: PNG }],
-    ['acct-b', '/handwriting/transcribe', { image: PNG }],
+    ['acct-a', '/handwriting/transcribe', { image: freshPicture() }],
+    ['acct-b', '/handwriting/transcribe', { image: freshPicture() }],
     ['acct-a', '/working/check', { prompt: 'q', lines: ['2x = 8', 'x = 4'] }],
     ['acct-b', '/working/check', { prompt: 'q', lines: ['2x = 8', 'x = 4'] }],
-    ['acct-a', '/handwriting/transcribe', { image: PNG }]
+    ['acct-a', '/handwriting/transcribe', { image: freshPicture() }]
   ];
   const results = [];
   for (const [who, path, body] of spread) results.push((await call(who, path, body)).status);
   eq(results, [200, 200, 200, 200, 200], 'five calls fit a ceiling of five, whoever makes them and whichever route');
   eq(providerCalls, 5, 'and every one of them reached the provider');
 
-  const sixth = await call('acct-b', '/handwriting/transcribe', { image: PNG });
+  const sixth = await call('acct-b', '/handwriting/transcribe', { image: freshPicture() });
   eq([sixth.status, sixth.json?.error?.code], [503, 'PAID_CAPACITY_REACHED'],
     'the sixth is refused, though this account has used only two of its own 240');
   eq(providerCalls, 5, 'and never reaches the provider — nothing is spent that was not counted');
 
   const alsoWorking = await call('acct-a', '/working/check', { prompt: 'q', lines: ['2x = 8', 'x = 4'] });
   eq(alsoWorking.status, 503, 'the other route is refused too — one key, one bill, one budget');
-  ok(/still being read on your device/i.test(alsoWorking.json?.error?.message || ''),
-    'and the student is told their work is still being read, because it is');
+  // Reading and marking are online-only. The refusal used to say "Your work
+  // is still being read on your device", which stopped being true.
+  ok(!/on your device|on-device/i.test(alsoWorking.json?.error?.message || ''),
+    'the refusal does not claim the work is being read on the device: nothing is');
+  ok(/has not been read or marked/i.test(alsoWorking.json?.error?.message || ''),
+    'and says plainly that the work has not been read or marked');
+  ok(Number(sixth.headers.get('ratelimit-reset')) * 1000 > Date.now(), 'and RateLimit-Reset says when the limit lifts');
   ok(alsoWorking.json?.error?.retryable === true, 'a spent budget is temporary, and says so');
 
   // ── 3 · A malformed request cannot burn the budget ─────────────────────────

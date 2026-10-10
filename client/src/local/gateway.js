@@ -265,6 +265,8 @@ const BODY_RULES = [
   [/^POST \/exams\/[A-Za-z0-9._-]+\/responses$/, body => {
     requireObject(body, 'exam responses'); boundedMap(body, 'answers', 120); boundedMap(body, 'workings', 120);
     boundedMap(body, 'times', 120); boundedMap(body, 'modes', 120); boundedMap(body, 'inks', 12); optionalNumber(body, 'cur');
+    // The page is hiding: send the server its checkpoint now, not after the debounce.
+    optionalBoolean(body, 'urgent');
   }],
   [/^POST \/rush\/answer$/, body => {
     requireObject(body, 'POST /rush/answer'); requiredId(body);

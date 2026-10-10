@@ -238,7 +238,8 @@ ok(await sha256Hex('raw-nonce-1') === sha('raw-nonce-1'), 'the nonce digest is S
   priNative.dispose();
   const browserHero = render({ initialStage: 'hero' });
   ok(!browserHero.includes('data-testid="apple-sign-in"'), 'a browser never sees Sign in with Apple on the landing screen');
-  ok(browserHero.includes('Sign in to your Pri cloud account'), 'the password route is still offered there');
+  ok(browserHero.includes('data-testid="hero-sign-in-code"') && !browserHero.includes('Sign in to your Pri cloud account'),
+    'a browser uses the account-first sign-in route and does not expose the legacy local-profile cloud route');
   const host = createFakeHost({ capabilities: { identity: { versions: [1], apple: true }, cloud: { versions: [1], configured: true } } });
   const shellHero = render({ initialStage: 'hero' });
   ok(shellHero.includes('data-testid="apple-sign-in"') && shellHero.includes('Sign in with Apple'), 'a shell with identity + cloud sees it');

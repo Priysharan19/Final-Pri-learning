@@ -1537,7 +1537,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "stateless per account; ladder replies (nudge/socratic/walkthrough) cached by a SHA-256 of the request content only (no account id), so an account can read back only a reply to an identical request; a conversational turn (level ask: free-text message ≤600 chars, control characters stripped, last 6 history turns server-trimmed) is cached under a key that also takes a truncated hash of the account, so free text is never read back by another account. 404 unless PRI_FEATURE_TUTOR=1; practice context only (TUTOR_EXAM_LOCKED); closed body ≤48 kB, maths-only (TUTOR_NOT_MATHS); per-account daily allowance (PRI_TUTOR_CALLS_PER_ACCOUNT_DAY, plan-aware) and one unit of the deployment paid-call ceiling per model call",
+      "ownership": "a body naming serverQuestionId is grounded in that server-issued practice question, read from the practice-question escrow keyed by (account_id, id): another account's id, an expired id and an unknown id are the same 404 TUTOR_QUESTION_NOT_FOUND before the cache, the allowance or the provider; such a body may not carry question (400); the Step Check is re-run on the server and, until the question is resolved, the answer is never excused and level walkthrough is 409 TUTOR_LEVEL_ORDER. A device question (no serverQuestionId) is stateless per account. Ladder replies (nudge/socratic/walkthrough) cached by a SHA-256 of the request content only (no account id), so an account can read back only a reply to an identical request; a conversational turn (level ask: free-text message ≤600 chars, control characters stripped, last 6 history turns server-trimmed) is cached under a key that also takes a truncated hash of the account, so free text is never read back by another account. 404 unless PRI_FEATURE_TUTOR=1; practice context only (TUTOR_EXAM_LOCKED); closed body ≤48 kB, maths-only (TUTOR_NOT_MATHS); per-account daily allowance (PRI_TUTOR_CALLS_PER_ACCOUNT_DAY, plan-aware) and one unit of the deployment paid-call ceiling per model call",
       "rateLimits": [
         {
           "key": "tutor-help",
@@ -1558,7 +1558,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "stateless per account; same body contract, exam lock, maths-only and size bounds as /v1/tutor/help, for levels nudge, socratic and ask only (walkthrough captions stay on /help). Every refusal — 404 dark, TUTOR_EXAM_LOCKED, body, TUTOR_NOT_CONFIGURED, TUTOR_DAILY_LIMIT (429), PAID_CAPACITY_REACHED — is answered as JSON before any event-stream byte and before the provider is contacted. The reply streams as text/event-stream (meta, delta, done | fallback | error); each sentence is checked against the verified solution before release and a leak ends the stream with the authored hint, uncached. Cache keyed as /help (per-account for ask). One open stream per session: a newer stream closes the older with TUTOR_STREAM_SUPERSEDED. Provider output capped per turn (STREAM_MAX_OUTPUT_TOKENS, MAX_STREAM_CHARS).",
+      "ownership": "same account-scoped serverQuestionId grounding as /v1/tutor/help (another account's issued question is 404 TUTOR_QUESTION_NOT_FOUND as JSON before any event); otherwise stateless per account; same body contract, exam lock, maths-only and size bounds as /v1/tutor/help, for levels nudge, socratic and ask only (walkthrough captions stay on /help). Every refusal — 404 dark, TUTOR_EXAM_LOCKED, body, TUTOR_NOT_CONFIGURED, TUTOR_DAILY_LIMIT (429), PAID_CAPACITY_REACHED — is answered as JSON before any event-stream byte and before the provider is contacted. The reply streams as text/event-stream (meta, delta, done | fallback | error); each sentence is checked against the verified solution before release and a leak ends the stream with the authored hint, uncached. Cache keyed as /help (per-account for ask). One open stream per session: a newer stream closes the older with TUTOR_STREAM_SUPERSEDED. Provider output capped per turn (STREAM_MAX_OUTPUT_TOKENS, MAX_STREAM_CHARS).",
       "rateLimits": [
         {
           "key": "tutor-stream",
@@ -1966,6 +1966,303 @@
       "csrf": "double-submit-when-session-cookie",
       "origin": "enforced",
       "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/practice/prepare",
+      "auth": "none",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "public; server-chosen question preview for a signed-out student plus an encrypted, expiring token; no account data read or written; the token is bound once by one eligible account through /v1/practice/issue",
+      "rateLimits": [
+        {
+          "key": "practice-prepare",
+          "limit": 90,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/practice/issue",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "eligible student; the server chooses and issues an authored, private per-account question (or binds a prepared one, once); sealed server question record; a caller-chosen seed is refused outside NODE_ENV=test",
+      "rateLimits": [
+        {
+          "key": "practice-issue",
+          "limit": 200,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/practice/:id/recognize",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "student owns the live server-issued question; one bounded ink/photo image goes to answer-blind recognition; receipt is private and bound to account and question; recheck session, guardian consent and completion after provider wait",
+      "rateLimits": [
+        {
+          "key": "practice-recognize",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/practice/:id/recognition/:receipt/confirm",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "student owns original server recognition receipt and its question; explicitly corrected transcript produces a new bound receipt; account-serialized with final grade and prohibited after completion",
+      "rateLimits": [
+        {
+          "key": "practice-correction",
+          "limit": 200,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/practice/:id/reveal",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "student owns the live server-issued question; a server-committed reveal closes the attempt as incorrect with zero credit; idempotent receipt and progress isolated to account",
+      "rateLimits": [
+        {
+          "key": "practice-reveal",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/practice/:id/repeat",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "eligible student; re-issues to the same account a question it has already resolved, flagged as a repeat so its attempt is never new credit; another account's or an unresolved question id is refused",
+      "rateLimits": [
+        {
+          "key": "practice-repeat",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/practice/:id/submit",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "student owns a sealed server-issued question; final answer or authenticated ink/photo receipt is marked server-side; stable idempotency key commits numerical marks and exactly-once progress; no client award authority",
+      "rateLimits": [
+        {
+          "key": "practice-grade",
+          "limit": 300,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/exams/layout",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "eligible student asks for the layout seed of its next paper of one blueprint (body: blueprint track/class/variant only; a released blueprint, else 409 EXAM_BLUEPRINT_NOT_RELEASED). The seed is chosen by the server and held per (account_id, blueprint) in idempotency_keys scope exam-layout, written under the account's exam-create lock; every request returns the same pending seed until a paper is sealed under it (or the server retires it because it could not issue that paper), so a caller cannot draw layouts until a favourable one appears. Carries no question, answer or mark; reveals only an integer seed for the public layout allocation and the caller's own account id",
+      "rateLimits": [
+        {
+          "key": "exam-layout",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/exams/",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "eligible student starts a paper: the body is a paper SPEC only (blueprint track/class/variant with the layout seed the server set for this account by POST /v1/exams/layout — any other seed is 409 EXAM_LAYOUT_NOT_ISSUED, and the seed is spent in the transaction that seals the paper — or practice-paper year/minutes/pathway, and ordered slots; no title, seed, mark or question). A blueprint spec is held to the server's own layout for that seed (chapter allotted to each slot, internal-choice slots) and each slot's cells to that chapter inside the section's difficulty window; a practice paper to the year's subtopic scope, difficulty ladder and structured question. The plan is enforced from the server's entitlement record inside the create transaction: the free plan's exam simulations are counted from the account's own sealed papers (402 FREE_CAP_REACHED), a jee-advanced blueprint needs the jee-advanced-content capability (402 PREMIUM_REQUIRED), and an account holds at most 3 unfinalised papers (409 EXAM_OPEN_PAPER_LIMIT); before either is counted, any paper of the account left unfinished past deadline + 2 minutes is finalised by the server on its last saved snapshot. The server chooses every question, owns title, marking grid, start and deadline, and seals them under a new exam id keyed by (account_id, id) in idempotency_keys scope exam-paper; returns the public paper only (allow-listed fields; content ids and hashes are keyed digests, never the engine seed or answer-derived hash); a required Idempotency-Key replays the same paper without counting it again, a different body under the same key is 409",
+      "rateLimits": [
+        {
+          "key": "exam-create",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "PUT",
+      "path": "/v1/exams/:id/answers",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "owner only: the sealed paper is read by (account_id, id), so another account's id, an unknown id and a malformed id are the same 404 EXAM_NOT_FOUND and write nothing; stores the latest answer snapshot (answers, working, per-question time, input mode — text only, keys of this paper only) with the server's timestamp; an older revision never replaces a newer one; refused with 409 once the paper is finalised or deadline + 2 minutes has passed",
+      "rateLimits": [
+        {
+          "key": "exam-answers",
+          "limit": 1800,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "PATCH",
+      "path": "/v1/exams/:id/answers",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "the same handler and rule as PUT /v1/exams/:id/answers (the native iOS and Android cloud bridges carry GET, POST, PATCH and DELETE only): owner only: the sealed paper is read by (account_id, id), so another account's id, an unknown id and a malformed id are the same 404 EXAM_NOT_FOUND and write nothing; stores the latest answer snapshot (answers, working, per-question time, input mode — text only, keys of this paper only) with the server's timestamp; an older revision never replaces a newer one; refused with 409 once the paper is finalised or deadline + 2 minutes has passed",
+      "rateLimits": [
+        {
+          "key": "exam-answers",
+          "limit": 1800,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/exams/:id/finish",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "owner only (same 404 rule); exactly-once finalisation in one transaction under the account sync lock: every question marked by the deterministic engine against the sealed key and server-owned grid, one immutable result, one exam-result (a kind /v1/sync/push refuses) and per-attempted-question graded-attempt learning events by device server-grader; a replay returns the stored result unchanged; arriving after deadline + 2 minutes marks only the last server-saved snapshot and flags late (and if the server has already finalised the abandoned paper itself, returns that stored result); every item of the paper is recorded as seen content for the account (scope practice-content) and an item already seen is flagged repeat: true on its result line and event; no client award authority",
+      "rateLimits": [
+        {
+          "key": "exam-finish",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/exams/:id",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "owner only (same 404 rule); the public paper, timing and saved snapshot while open; a paper of the account left unfinished past deadline + 2 minutes is first finalised by the server, exactly once, on its last saved snapshot (the same transaction and marking as a late finish); the stored result (marks, solutions) once finalised; never an answer, step, trap or seed of an unfinished paper",
+      "rateLimits": [
+        {
+          "key": "exam-read",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
     }
   ]
 }

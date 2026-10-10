@@ -3,11 +3,25 @@ import assert from 'node:assert/strict';
 import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 
 installBrowserEnv(); resetStorage();
-const { api } = await import('../src/api.js');
+// Only the server marks (owner decision 2026-10-10): each profile here is a
+// real verified account and every submit/reveal goes to the real /v1 app. One
+// tap is one submission key, so two taps racing carry two different keys.
+const { startOnlineAuthority, nextSubmissionId } = await import('./support/online-authority.mjs');
+const online = await startOnlineAuthority({ label: 'practice-state' });
+const { api: appApi } = await import('../src/api.js');
+const api = {
+  get: (path) => appApi.get(path),
+  async post(path, body) {
+    const keyed = /^\/practice\/[^/]+\/submit$/.test(path) && body && body.submissionId === undefined
+      ? { ...body, submissionId: nextSubmissionId('sub_state') } : body;
+    const result = await appApi.post(path, keyed);
+    if (path === '/profiles' && result?.user?.id) await online.link(result.user.id, { name: result.user.name });
+    return result;
+  }
+};
 const idb = await import('../src/local/idb.js');
 const { checkAnswer } = await import('../src/engine/checker.js');
 const { loadAllBanks } = await import('../src/engine/generators/index.js');
-const { cloudLinkRowId } = await import('../src/platform/cloudAccount.js');
 await loadAllBanks();
 
 function canonical(q) {
@@ -26,7 +40,8 @@ function canonical(q) {
   if(q.answerType==='working') return a.canonicalWorking ?? null;
   return null;
 }
-async function rightFor(id){ const row=await idb.get('questions',id); const x=canonical(row?.payload); return x!==null&&checkAnswer(row.payload,x).correct?x:null; }
+// The device holds no answer; the key is the server's sealed copy of the issued question (the suite's oracle).
+async function rightFor(id){ const key=await online.answerKey(await idb.get('questions',id)); const x=canonical(key); return x!==null&&checkAnswer(key,x).correct?x:null; }
 async function resolveAny(body={}){
   for(let i=0;i<40;i++){
     const s=await api.post('/practice/next',{...body,resume:true}); const right=await rightFor(s.question.id);
@@ -87,7 +102,7 @@ assert.equal((await api.post('/practice/next',{resume:true})).question.id,otherO
 await api.post('/profiles/select',{id:free.id}); assert.equal((await api.post('/practice/next',{resume:true})).question.id,freeOpen.question.id);
 
 const premium=(await api.post('/profiles',{name:'PRI-02 Premium',year:10})).user, now=Date.now();
-await idb.put('device',{id:cloudLinkRowId(premium.id),accountId:`acct-${premium.id}`,role:'student',emailVerified:true,linkedAt:now,lastVerifiedAt:now,lastSyncAt:null,entitlement:{plan:'premium',status:'active',provider:'web',currentPeriodEnd:now+30*86400000,offlineUntil:now+7*86400000,issuedAt:now,sourceVersion:1}});
+await online.setEntitlement(premium.id,'premium');
 const ps=await snap(premium.id); await resolveAny(); await resolveAny(); const pe=await snap(premium.id);
 assert.equal(pe.attempts,ps.attempts+2); assert.equal(pe.today,ps.today+2);
 
@@ -96,4 +111,5 @@ const attempt={id:claim,pid:premium.id,questionId:'rollback-seed',subtopic:'roll
 await idb.atomicBatch([{type:'add',store:'attempts',value:attempt}]);
 await assert.rejects(idb.atomicBatch([{type:'add',store:'attempts',value:{...attempt,questionId:'rollback-duplicate'}},{type:'put',store:'profiles',value:{...stored,xp:xp0+9999}}]));
 assert.equal((await idb.get('profiles',premium.id)).xp||0,xp0);
+await online.close();
 console.log('PASS — PRI-02 state invariants: resume, duplicate Next, exactly-once submit/reveal, retry, adaptive persistence, profile isolation, free/premium, atomic rollback.');

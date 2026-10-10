@@ -49,8 +49,53 @@ The server-side OpenAI providers already exist (`server/platform/handwritingProv
    under-18 account waits for guardian consent). The on-device recogniser is not in the marking
    path or the "I'm reading:" panel. When the server cannot read (offline, not signed in, reader
    down) the ink stays on the page, the student is told the real reason, and it is read
-   automatically when the reason clears; typed answers still mark offline. The transcription is
+   automatically when the reason clears. The transcription is
    still only a proposal — the deterministic engine decides the mark from it.
+   **Amendment (2026-10-10, owner decision): grading is online-only and server-authoritative.**
+   In the owner's words: "Do NOT allow signed-out or offline mathematical checking, even when
+   labelled 'marked on this device'." This supersedes the connection-loss marking clause of item 5.
+   - Checking an answer, awarding marks and showing the solution require a verified, eligible,
+     signed-in account, a connection, and a question the server issued. The server runs the same
+     deterministic engine; a model still never sets a mark (item 4).
+   - Before that, a student may read the question, type, write, preview notation and save drafts.
+     All of it is kept on the device. When the answer is checked the server issues the identical
+     question from its generator, difficulty and seed — never from a client-supplied answer or id —
+     so the question, typed steps and ink the student already has are the ones that get marked.
+   - Without an account or a connection the app says so in the question itself (sign in / reconnect)
+     and marks nothing. No result is labelled as marked on the device.
+   - The engine stays bundled in the client for question selection and generation, notation preview,
+     and reading attempts recorded by earlier versions. It does not mark new work.
+   - Examination papers (CBSE, JEE Main, JEE Advanced, IOQM and the practice paper) are issued,
+     collected and marked by the server (`server/platform/exams.js`, `/v1/exams`). The device
+     composes a paper *spec*; the server holds it to its own blueprint slot by slot (the layout its
+     seed allots, each chapter's cells inside the section's difficulty window), enforces the plan
+     from its own entitlement record (free exam simulations counted from its sealed papers, the JEE
+     Advanced capability, at most three open papers), chooses every question, titles the paper, seals questions, marking grid, start and deadline
+     under an exam id owned by the account, keeps the latest answer snapshot, and finalises exactly
+     once. The layout seed is the server's too: the device asks for it (`POST /v1/exams/layout`),
+     composes for it, and a paper composed for any other seed is refused; the same seed is returned
+     until a paper is sealed under it. A finish that arrives later than `deadline + 2 minutes` is
+     marked on the last snapshot the server holds and flagged late. A paper nobody finishes is
+     finalised by the server in the same way once that time has passed — on the account's next
+     start or read of a paper, and in housekeeping — so an abandoned paper still has a result and
+     still counts as a sat paper. Finalising records every question of the paper as content the
+     account has seen (the record practice keeps), so a later practice copy is a repeat; and an
+     item already seen when the paper is finalised is marked and scored but flagged a repeat, which
+     earns no XP, rating or mastery. With no connection at the finish the paper is queued on the
+     device, frozen and unscored, until the server's result arrives. A paper marked by an earlier
+     app version opens in review labelled as such and is never shown as certified.
+   - The placement diagnostic is marked by the server as well: each placement question is issued
+     by `/v1/practice/issue` in mode `placement` and answered through the practice submit and
+     reveal routes (`client/src/local/backend.js`, `POST /placement/start` and
+     `POST /placement/:id/answer`). The server writes no progress event for that mode — a
+     placement verdict is diagnostic evidence, not practice — and a placement check begun by a
+     version that marked on the device cannot be continued; it is started again.
+   - Known limits, not hidden: an open paper is resumed on the device that started it; a second
+     device sees a paper once it is finished (its result and marked detail are read back from the
+     account).
+   - `.pri-os/fleet.json` keeps the principle key `deterministic_marking_fallback` (the fleet
+     validator pins the key name). From this amendment it means: the deterministic engine, not a
+     model, decides every mark — on the server.
 6. **Answer-blind handwriting is unchanged.** Vision transcription receives the ink image only —
    never the question's expected answer, solution or marks.
 7. **Secrets live only on the server.** `OPENAI_API_KEY` and Supabase service-role credentials live

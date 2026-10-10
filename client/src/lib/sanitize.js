@@ -138,6 +138,10 @@ export function sanitizeFigure(html) {
 /** Any file-sourced value as a plain, control-free, length-capped string. */
 export function sanitizeText(value, maxLen = 200) {
   if (value === null || value === undefined) return '';
+  // Only a primitive is text. String() of an object runs the object's own
+  // toString and throws when that is not a function; a restored or imported
+  // field that is not text is simply empty.
+  if (typeof value === 'object' || typeof value === 'function' || typeof value === 'symbol') return '';
   return String(value)
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
     .trim()

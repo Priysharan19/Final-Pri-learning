@@ -57,7 +57,7 @@ const metricsModule = await import('../platform/metrics.js');
 const { metrics, createMetrics, ALERT_RULES, metricsAccess } = metricsModule;
 const { readinessReport } = await import('../platform/readiness.js');
 const { cachedServerReleaseIdentity, serverReleaseIdentity } = await import('../platform/releaseIdentity.js');
-const { drainAuthDeliveryOutbox, createResendAuthEmailTransport } = await import('../platform/authDelivery.js');
+const { drainAuthDeliveryOutbox, createResendAuthEmailTransport, resetAuthEmailProbeCache } = await import('../platform/authDelivery.js');
 const { createPlatformRouter } = await import('../platform/router.js');
 const { requestContext } = await import('../platform/observability.js');
 const { requestLogger } = await import('../app.js');
@@ -253,10 +253,35 @@ try {
   c.ok(ready.data.degraded.includes('AUTH_EMAIL_NOT_CONFIGURED'), 'and says why');
 
   Object.assign(process.env, { PRI_AUTH_EMAIL_PROVIDER: 'resend', PRI_RESEND_API_KEY: SECRET.resendKey, PRI_AUTH_EMAIL_FROM: 'Pri <noreply@pri.example>' });
+  // Readiness PROBES the email provider (authDelivery.js probeAuthEmail). No
+  // suite may reach the real one, so the provider's host is answered here and
+  // every other request (this suite's own HTTP to the app) passes through.
+  const realFetch = globalThis.fetch;
+  const resend = { calls: 0, answer: () => new Response(JSON.stringify({ object: 'list', has_more: false, data: [{ id: 'd1', name: 'pri.example', status: 'verified' }] }), { status: 200 }) };
+  globalThis.fetch = async (url, init) => {
+    if (!String(url?.url || url).startsWith('https://api.resend.com/')) return realFetch(url, init);
+    resend.calls += 1;
+    return resend.answer();
+  };
+  resetAuthEmailProbeCache();
   metrics.reset();
   ready = await h.request('/v1/ready');
   c.eq(ready.data.state, 'ready', 'with every dependency configured and healthy the replica is ready');
   c.eq(ready.data.checks.authEmail.state, 'ok', 'auth email ok');
+  c.deq([ready.data.checks.authEmail.credential, ready.data.checks.authEmail.sender], ['valid', 'verified'], 'because the provider accepted the key and lists the sender domain as verified');
+  await h.request('/v1/ready');
+  c.eq(resend.calls, 1, 'the provider is asked once; later readiness checks read the cached answer');
+
+  // The defect this probe exists for: every variable present, the key refused.
+  resend.answer = () => new Response(JSON.stringify({ statusCode: 400, name: 'validation_error', message: `API key is invalid (${SECRET.resendKey}) for ${SECRET.email}` }), { status: 400 });
+  resetAuthEmailProbeCache();
+  ready = await h.request('/v1/ready');
+  c.deq([ready.data.checks.authEmail.state, ready.data.checks.authEmail.code], ['failing', 'AUTH_EMAIL_KEY_INVALID'], 'a key the provider refuses is failing with AUTH_EMAIL_KEY_INVALID, not ok');
+  c.deq([ready.status, ready.data.state, ready.data.degraded.includes('AUTH_EMAIL_KEY_INVALID'), ready.data.failing.length], [200, 'degraded', true, 0],
+    'and that degrades the replica: it must never fail the deploy healthcheck');
+  c.eq(leaks(ready.text).length, 0, 'the refused key and the provider text never reach the readiness body');
+  resend.answer = () => new Response(JSON.stringify({ object: 'list', has_more: false, data: [{ id: 'd1', name: 'pri.example', status: 'verified' }] }), { status: 200 });
+  resetAuthEmailProbeCache();
 
   await drainAuthDeliveryOutbox(h.db, { send: async () => { throw Object.assign(new Error('down'), { code: 'RESEND_503' }); }, publicOrigin: 'http://localhost:5173', now: Date.now() + 10 * 60_000 });
   const verificationAgain = await h.request('/v1/account/email/verification-request', { method: 'POST', jar: student.jar, body: {} });
@@ -333,7 +358,7 @@ try {
   const exposed = await h.request('/v1/ready');
   delete process.env.PRI_RAZORPAY_MONTHLY_PLAN_ID;
   c.deq(Object.keys(exposed.data.checks.billing).sort(), ['code', 'state'], 'billing readiness says only state and code, not which product is misconfigured');
-  c.deq(Object.keys(exposed.data.checks.authEmail).sort(), ['code', 'required', 'state'], 'email readiness carries no failure counts');
+  c.deq(Object.keys(exposed.data.checks.authEmail).sort(), ['code', 'credential', 'required', 'sender', 'state'], 'email readiness carries coded states only: no failure counts, no address, no domain');
   c.ok(!/recentFailures|failures|count/i.test(exposed.text), 'no counts anywhere in public readiness');
 
   // ── 5 · /v1/metrics access ───────────────────────────────────────────────

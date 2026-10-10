@@ -22,7 +22,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
 import { TEMPLATES } from '../src/ink/templates.js';
-import { readLines, turnOnServerReading, useFakeServerReader } from './fakeServerReader.js';
+import { readLines, turnOnServerReading } from './fakeServerReader.js';
+import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
 const GLYPH_W = 58;
 const GLYPH_H = 84;
@@ -77,13 +78,19 @@ const waitSaved = (page) => page.waitForSelector('.exam-save[data-state="saved"]
 export const flow = {
   id: 'exam-india',
   name: 'India exam · JEE Main handwritten, reloaded, analysed',
+  online: true,
 
-  async run({ page, base, check, note, goto, createProfile, settle }) {
-    const reader = await useFakeServerReader(page, base);
-    reader.text = '42';
+  async run({ page, base, check, note, goto, createProfile, settle, online }) {
+    // An exam is marked work: it is sat by a signed-in account on the real
+    // platform server. The handwriting reader behind that server is the
+    // scripted stand-in (it returns the text set here; it never sees a key).
+    const reader = online.reader;
+    Object.assign(reader, { text: '42', confidence: 0.97, down: false });
+    note(`${SYNTHETIC_EVIDENCE}: the handwriting reader in "India exam · JEE Main handwritten…" is a scripted stand-in behind the real server; not real-handwriting, real-provider or real-device evidence.`);
     await goto('/');
     await createProfile({ name: 'Chitra Rao', year: 12, course: 'in', track: 'jee-main' });
-    await check('server reading can be turned on for this profile', await turnOnServerReading(page, base));
+    await online.signIn({ name: 'Chitra Rao' });
+    await check('server reading is on for this signed-in profile', await turnOnServerReading(page, base));
 
     // ── 1 · the paper starts, with a clock read off a stored deadline ────────
     await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
@@ -204,6 +211,14 @@ export const flow = {
     await page.waitForSelector('.hero-num', { timeout: 30000 });
     await check('a reload of a finalised paper shows the result, not the paper', await page.locator('.exam-timer').count() === 0);
     await check('and the analysis is still there', await page.locator('.exam-analysis').count() === 1);
+    // Who marked it: the server, once, for this account — and the device holds
+    // no answer for any question of the paper it was issued.
+    const finishCalls = await online.practiceCalls(/^\/v1\/exams\/[^/]+\/finish$/);
+    const serverResult = await online.examResult(examId);
+    await check('the JEE Main paper was issued once and marked once by the server; the analysis on screen is its result',
+      finishCalls.filter(c => c.status === 200).length === 1 && !!serverResult && serverResult.accountId === online.account.id &&
+        (await online.practiceCalls(/^\/v1\/exams$/)).filter(c => c.status < 300).length === 1,
+      `finish ${JSON.stringify(finishCalls.map(c => c.status))}; server result ${serverResult ? 'held' : 'missing'}`);
     note(`JEE Main paper scored ${scored?.[1]}/${scored?.[2]} with one MCQ and one handwritten numerical answer`);
   }
 };

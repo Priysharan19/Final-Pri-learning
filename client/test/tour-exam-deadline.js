@@ -33,11 +33,14 @@ const storedExam = (page, examId) => page.evaluate(async (examId) => {
 export const flow = {
   id: 'exam-deadline',
   name: 'India exam · the clock runs out and the paper submits itself',
+  online: true,
 
-  async run({ page, base, check, note, goto, createProfile, settle }) {
+  async run({ page, base, check, note, goto, createProfile, settle, online }) {
     await page.clock.install();
     await goto('/');
     await createProfile({ name: 'Kavya Nair', year: 12, course: 'in', track: 'jee-main' });
+    // An exam is marked work: it is sat by a signed-in account.
+    await online.signIn({ name: 'Kavya Nair' });
 
     await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
     const start = page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' });
@@ -100,6 +103,14 @@ export const flow = {
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.hero-num', { timeout: 30000 });
     await check('a reload shows the marked paper, not a reopened one', await page.locator('.exam-timer').count() === 0);
+    // Who marked it: the server, once, for this account — and the device holds
+    // no answer for any question of the paper it was issued.
+    const finishCalls = await online.practiceCalls(/^\/v1\/exams\/[^/]+\/finish$/);
+    const serverResult = await online.examResult(examId);
+    await check('the auto-submitted paper was marked once by the server (only the page clock was moved, so the server saw the finish in time)',
+      finishCalls.filter(c => c.status === 200).length === 1 && !!serverResult && serverResult.accountId === online.account.id &&
+        (await online.practiceCalls(/^\/v1\/exams$/)).filter(c => c.status < 300).length === 1,
+      `finish ${JSON.stringify(finishCalls.map(c => c.status))}; server result ${serverResult ? 'held' : 'missing'}`);
     note(`the deadline finalised the paper ${Math.round((done?.finishedAt - done?.deadlineAt) / 1000)} s after it passed`);
   }
 };

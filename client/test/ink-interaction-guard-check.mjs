@@ -22,8 +22,11 @@ class FakeClassList {
   contains(v) { return this.values.has(v); }
 }
 class FakeElement {
-  constructor(inInk = false) { this.inInk = inInk; }
-  closest(selector) { return selector === '.ink-wrap' && this.inInk ? this : null; }
+  constructor(inInk = false, textEntry = false) { this.inInk = inInk; this.textEntry = textEntry; }
+  closest(selector) {
+    if (selector === '.ink-wrap') return this.inInk ? this : null;
+    return /(^|,\s*)input\b/.test(selector) && this.textEntry ? this : null;
+  }
 }
 
 global.Element = FakeElement;
@@ -91,10 +94,28 @@ const clearsBeforeChange = selectionClears;
 documentHandlers.get('selectionchange')({});
 check('selectionchange is actively cleared throughout the handwriting session', selectionClears > clearsBeforeChange);
 
+// WebKit (Playwright WebKit, 2026-10-10): with the guard cancelling
+// `selectstart` on the line-correction field and clearing ranges on every
+// mutation, the focused field received keydown and no input — "I wrote…" could
+// not be typed into. A caret is a selection there; a real text field keeps it.
+const field = new FakeElement(false, true);
+const typed = (() => { let prevented = 0; return { type: 'selectstart', target: field, cancelable: true, preventDefault: () => { prevented++; }, get prevented() { return prevented; } }; })();
+documentHandlers.get('selectstart')(typed);
+check('a real text field keeps its caret during the session: selectstart on it is not cancelled', typed.prevented === 0);
+global.document.activeElement = field;
+const clearsWhileTyping = selectionClears;
+documentHandlers.get('selectionchange')({});
+syncSessionClass();
+check('and neither selectionchange nor a re-render clears the selection while that field has focus', selectionClears === clearsWhileTyping);
+global.document.activeElement = null;
+
 const down = event('pointerdown');
 documentHandlers.get('pointerdown')(down);
 check('Pencil down in ink also arms document pointer guard', html.classList.contains(activeClass));
 check('Pencil down cancels native browser gesture', down.prevented === 1);
+const duringStroke = (() => { let prevented = 0; return { type: 'selectstart', target: new FakeElement(false, true), cancelable: true, preventDefault: () => { prevented++; }, get prevented() { return prevented; } }; })();
+documentHandlers.get('selectstart')(duringStroke);
+check('during an actual pen stroke the guard still wins, even over a text field', duringStroke.prevented === 1);
 
 const selection = event('selectstart', { inInk: false });
 documentHandlers.get('selectstart')(selection);

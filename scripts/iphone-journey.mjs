@@ -3,14 +3,35 @@
 // Pri Learning · native student journey on an iOS simulator (CP-04/CP-05)
 //
 // Builds the canonical Apple package, installs it fresh on an iPhone (default)
-// or iPad simulator and runs JourneySelfCheck.swift twice:
-//   1. --journey-selfcheck : onboarding → practice → typed attempt marked →
-//      feedback → next → native ink reading → progress → persistence marker;
-//   2. --journey-relaunch  : after terminating the app, the profile and marker
-//      survived the relaunch.
+// or iPad simulator and runs JourneySelfCheck.swift.
+//
+// Grading is online-only and server-authoritative (owner decision 2026-10-10,
+// ADR-0001). Nothing is checked, marked or revealed signed out or offline, so
+// the journey has two legs and BOTH are required for a PASS:
+//
+//   1. no server (--journey-selfcheck, --journey-relaunch): onboarding →
+//      practice → typed answer and working → strokes on the native PencilKit
+//      surface, sealed in IndexedDB with one truthful save status → a photo
+//      attached and not read on the device → the question is an offline
+//      draft: the card says so before any work and offers no Submit and no
+//      Show solution; "Try for a markable question" asks first and, with no
+//      server, changes nothing; nothing marked, nothing in History → relaunch
+//      keeps the profile, the question, the typed work and the strokes;
+//   2. a real local Pri server on SQLite with a SYNTHETIC handwriting reader
+//      (--journey-marking, --journey-marking-relaunch; a fresh install): a
+//      server-prepared question signed out → in-card sign-in → the server
+//      binds and marks it (wrong: 0 with a try left; right: full marks) → a
+//      handwritten page read by the server, corrected, marked → History after
+//      relaunch. The right answer comes from this process reading the server's
+//      sealed copy of the issued question, never from the page.
+//      If that server cannot be started the leg's steps are reported as
+//      "not measured" and the journey FAILS.
+//
 // Writes a machine-readable evidence record (exact SHA, simulator, OS, steps)
-// with --evidence <file>. Labelled SYNTHETIC / SIMULATOR — never physical.
-// CP-05 adds, on the same install:
+// with --evidence <file>. Evidence tier: SIMULATOR + SYNTHETIC READER, with
+// programmatic strokes. Never physical-device, Apple Pencil, real-handwriting
+// or real-provider evidence.
+// CP-05 adds, on the first install:
 //   --cloud         a real Pri server (scripts/cloud-fixture-server.mjs, or the
 //                   PRI_CLOUD_* environment) — sign in through Settings, Sync
 //                   now, relaunch keeps the session, Disconnect;
@@ -27,12 +48,19 @@ import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { engineeringPackage } from './apple-shipping-target.mjs';
+import { openServerDesk } from './journey-oracle.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
 const PACKAGE = join(ROOT, 'ios/PriLearning.swiftpm');
-const FIRST = ['launch', 'onboarding', 'practice', 'typedAttempt', 'feedback', 'nextQuestion', 'nativeInk', 'nativePhoto', 'progress', 'persistenceMarker'];
-const RELAUNCH = ['relaunchProfile', 'relaunchMarker'];
+const FIRST = ['launch', 'onboarding', 'practice', 'typedDraft', 'nativeInk', 'photoDraft', 'noCheckOffered', 'replaceKeepsWork', 'nothingRecorded', 'progress', 'persistenceMarker'];
+const RELAUNCH = ['relaunchProfile', 'relaunchMarker', 'relaunchDraftKept'];
+// The signed-in leg. The server* steps are read by this process from the
+// server's own database, request log and the stand-in reader's request log.
+const MARKING = ['onlineOnboarding', 'preparedQuestion', 'signedOutRefusal', 'signInOnCard', 'typedWrongZero', 'typedCorrectFull', 'inkServerReading', 'inkCorrectedMarked', 'historyRecorded'];
+const MARKING_SERVER = ['serverPreparedThenBound', 'serverGrades', 'serverReaderAnswerBlind'];
+const MARKING_RELAUNCH = ['historyAfterRelaunch'];
+const TIER = 'SIMULATOR + SYNTHETIC READER';
 const SIGNUP = ['cloudSignUp', 'cloudLogin', 'cloudDeleteAccount'];
 const CLOUD = ['cloudSignIn', 'cloudSync'];
 const OFFLINE = ['offlinePractice', 'offlineSyncSafe'];
@@ -115,7 +143,7 @@ function builtApp(derived) {
   return join(products, apps[0]);
 }
 
-function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = null, duringAfterMs = 20_000 } = {}) {
+function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = null, duringAfterMs = 20_000, tick = null, loops = 75 } = {}) {
   const started = localStamp(new Date(Date.now() - 2000));
   // SIMCTL_CHILD_* reaches the app's environment (DEBUG builds read the cloud
   // origin override and the journey's fixture account from it).
@@ -125,11 +153,24 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
   let lines = [];
   const t0 = Date.now();
   let duringDone = !during;
-  for (let i = 0; i < 75; i++) {
-    execSync('sleep 2');
+  for (let i = 0; i < loops; i++) {
+    // With an oracle to serve, look twice a second-and-a-half rather than
+    // letting the page wait on the (slow) log read.
+    if (tick) { for (let k = 0; k < 4; k++) { execSync('sleep 0.5'); tick(); } } else execSync('sleep 2');
     if (!duringDone && Date.now() - t0 >= duringAfterMs) { duringDone = true; during(); }
-    const log = run('xcrun', ['simctl', 'spawn', udid, 'log', 'show', '--start', started,
-      '--predicate', 'eventMessage CONTAINS "PRIJOURNEY"', '--style', 'compact']);
+    // One read is bounded: on a loaded machine `log show` inside a simulator
+    // has hung for many minutes, and an unbounded read then hangs the whole
+    // journey with nothing reported. A read that does not come back is not a
+    // result — the next pass reads again, and a phase whose summary is never
+    // read is reported "not reported" and fails the journey.
+    let log;
+    try {
+      log = run('xcrun', ['simctl', 'spawn', udid, 'log', 'show', '--start', started,
+        '--predicate', 'eventMessage CONTAINS "PRIJOURNEY"', '--style', 'compact'], { timeout: 90_000, killSignal: 'SIGKILL' });
+    } catch (e) {
+      console.log(`  (log read ${i + 1} of ${phase} did not come back: ${String(e.code || e.signal || e.message).slice(0, 60)})`);
+      continue;
+    }
     lines = log.split('\n').filter(l => l.includes('PRIJOURNEY') && !l.includes("'log'")).map(l => l.slice(l.indexOf('PRIJOURNEY')));
     // Only this launch: everything after its own "started <phase>" line.
     const start = lines.lastIndexOf(`PRIJOURNEY started ${phase}`);
@@ -143,7 +184,7 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
 
 const sim = pickDevice();
 const udid = sim.udid;
-console.log(`Native student journey on ${sim.name} (${udid}) — SYNTHETIC / SIMULATOR evidence\n`);
+console.log(`Native student journey on ${sim.name} (${udid}) — ${TIER} evidence (programmatic strokes; not a physical device, a Pencil or a real provider)\n`);
 ensureBooted(sim);
 // `main` is iPad-only (the V1 shipping target); an iPhone simulator run builds
 // the engineering copy that adds the iPhone family. --app reuses a prebuilt
@@ -161,7 +202,8 @@ try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* not ru
 try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
 run('xcrun', ['simctl', 'install', udid, app]);
 
-const first = launchAndRead(udid, bundleId, '--journey-selfcheck', 'first');
+console.log('Leg 1 · no server: drafts are kept, nothing is checked, marked or revealed …');
+const first = launchAndRead(udid, bundleId, '--journey-selfcheck', 'first', {}, { loops: 110 });
 for (const line of first) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
 const second = launchAndRead(udid, bundleId, '--journey-relaunch', 'relaunch');
 for (const line of second) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
@@ -273,9 +315,118 @@ if (WANT_DYNAMIC) {
   for (const line of dynamicLines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
 }
 
+// ── Leg 2 · a real local server marks the work ───────────────────────────────
+// A fresh install, so the student starts signed out with the server reachable.
+// DEBUG builds read PRI_CLOUD_ORIGIN from the launch environment (and accept
+// http only for loopback); a Release build has neither (NativeCloudBridge.swift).
+const READER_TEXT = '7';
+const WRONG = '-987654';
+let markingLines = [];
+let markingRelaunchLines = [];
+let markingNotMeasured = null;
+{
+  let server = null;
+  try {
+    console.log(`\nLeg 2 · a real local Pri server marks the work — ${TIER} …`);
+    const out = join(mkdtempSync(join(tmpdir(), 'pri-marking-')), 'fixture.env');
+    try {
+      execFileSync(process.execPath, [join(HERE, 'cloud-fixture-server.mjs'), '--port', '4332', '--host', '127.0.0.1', '--synthetic-reader', '--out', out], { stdio: 'inherit' });
+    } catch (error) { throw new Error(`the local server did not start (${String(error?.message || error).split('\n')[0]})`); }
+    server = Object.fromEntries(readFileSync(out, 'utf8').trim().split('\n').map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
+    if (server.PRI_CLOUD_READER !== 'synthetic') throw new Error('the local server is not running the synthetic reader');
+    writeFileSync(server.PRI_CLOUD_READER_SCRIPT, JSON.stringify({ text: READER_TEXT, confidence: 0.6 }));
+    // The server's own database, read-only: the "teacher's desk" (shared with
+    // the Android journey's relay, scripts/journey-oracle.mjs).
+    const desk = openServerDesk({ dbPath: server.PRI_CLOUD_DB, email: server.PRI_CLOUD_EMAIL, avoid: [READER_TEXT, WRONG] });
+    const { db, rows, completed } = desk;
+    /** The sealed answer of the question this account was issued last. */
+    const sealedAnswer = () => ({ ...desk.sealedAnswer(), readerText: READER_TEXT });
+    const oracleDir = mkdtempSync(join(tmpdir(), 'pri-oracle-'));
+    const answered = new Set();
+    const tick = () => {
+      for (const name of readdirSync(oracleDir)) {
+        const n = name.match(/^ask-(\d+)\.json$/)?.[1];
+        if (!n || answered.has(n)) continue;
+        let ask = null;
+        try { ask = JSON.parse(readFileSync(join(oracleDir, name), 'utf8')); } catch { continue; }
+        let reply;
+        try { reply = ask.kind === 'answer' ? sealedAnswer() : { supported: false, reason: 'unknown question' }; }
+        catch (error) { reply = { supported: false, reason: String(error?.message || error).slice(0, 120) }; }
+        writeFileSync(join(oracleDir, `reply-${n}.json`), JSON.stringify({ n: Number(n), ...reply }));
+        answered.add(n);
+      }
+    };
+
+    try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* not running */ }
+    try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
+    run('xcrun', ['simctl', 'install', udid, app]);
+    const childEnv = { PRI_CLOUD_ORIGIN: server.PRI_CLOUD_ORIGIN, PRI_JOURNEY_EMAIL: server.PRI_CLOUD_EMAIL, PRI_JOURNEY_PASSWORD: server.PRI_CLOUD_PASSWORD, PRI_JOURNEY_ORACLE_DIR: oracleDir };
+    markingLines = launchAndRead(udid, bundleId, '--journey-marking', 'marking', childEnv, { tick, loops: 130 });
+    for (const line of markingLines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
+
+    // What the SERVER holds, whatever the screen said.
+    const verdict = (name, fn) => {
+      let detail;
+      try { detail = fn(); markingLines.push(`PRIJOURNEY ok ${name} ${detail}`); }
+      catch (error) { markingLines.push(`PRIJOURNEY FAIL ${name} ${String(error?.message || error).slice(0, 200)}`); }
+      console.log(`  ${markingLines.at(-1).replace(/^PRIJOURNEY\s*/, '')}`);
+    };
+    const requests = () => readFileSync(server.PRI_CLOUD_SERVER_LOG, 'utf8').split('\n').filter(l => l.includes('"http_request"')).map(l => { try { return JSON.parse(l); } catch { return {}; } });
+    verdict('serverPreparedThenBound', () => {
+      const log = requests();
+      const prepared = log.filter(r => r.method === 'POST' && r.route === '/v1/practice/prepare' && r.status === 200).length;
+      const bound = rows('practice-prepared').length;
+      if (!prepared) throw new Error('the server prepared no question for the signed-out student');
+      if (bound !== 1) throw new Error(`${bound} prepared question(s) bound to the account, expected 1`);
+      return `${prepared} question(s) prepared signed out, 1 bound to the account at check time, ${rows('practice-question').length} issued in all`;
+    });
+    verdict('serverGrades', () => {
+      const done = completed();
+      const typed = done.filter(q => q.inputMode === 'typed');
+      const ink = done.filter(q => q.inputMode === 'ink');
+      if (done.length !== 2 || typed.length !== 1 || ink.length !== 1) throw new Error(`completed questions by input: ${JSON.stringify(done.map(q => q.inputMode))}`);
+      const [miss, hit] = typed[0].grades;
+      if (typed[0].grades.length !== 2 || miss.authoritative !== true || miss.correct !== false || miss.invalid !== false || miss.marksEarned !== 0 ||
+          miss.resolved !== false || miss.triesLeft !== 1) throw new Error(`typed miss: ${JSON.stringify(typed[0].grades.map(g => [g.correct, g.invalid, g.marksEarned, g.marksPossible, g.triesLeft]))}`);
+      if (hit.authoritative !== true || hit.correct !== true || hit.resolved !== true || hit.marksEarned !== hit.marksPossible || !(hit.marksPossible > 0)) throw new Error(`typed hit: ${JSON.stringify([hit.correct, hit.marksEarned, hit.marksPossible])}`);
+      const [read] = ink[0].grades;
+      if (ink[0].grades.length !== 1 || read.authoritative !== true || read.correct !== true || read.resolved !== true || read.marksEarned !== read.marksPossible || !(read.marksPossible > 0)) throw new Error(`ink: ${JSON.stringify(ink[0].grades.map(g => [g.correct, g.marksEarned, g.marksPossible]))}`);
+      const confirmed = rows('practice-recognition').map(r => JSON.parse(r.response_json)).filter(r => r.questionId === ink[0].id);
+      if (confirmed.length < 2) throw new Error(`${confirmed.length} reading receipt(s) for the handwritten question; expected the reader's and the student's correction`);
+      return `typed: 0/${miss.marksPossible} with 1 try left, then ${hit.marksEarned}/${hit.marksPossible}; handwritten: ${read.marksEarned}/${read.marksPossible} on a corrected reading (${confirmed.length} receipts)`;
+    });
+    verdict('serverReaderAnswerBlind', () => {
+      let entries = [];
+      try { entries = readFileSync(server.PRI_CLOUD_READER_LOG, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l)); } catch { /* none */ }
+      const reads = entries.filter(e => e.kind === 'reader');
+      const refused = entries.filter(e => e.kind === 'refused');
+      if (!reads.length) throw new Error('the stand-in reader was never asked');
+      if (refused.length) throw new Error(`outbound requests were attempted: ${refused.map(e => e.target).join(', ')}`);
+      const prompts = completed().map(q => JSON.stringify(q.prompt).slice(1, 25)).filter(p => p.length >= 12);
+      const leaked = reads.filter(e => e.images !== 1 || e.imageIsDataUrl !== true || prompts.some(p => String(e.nonImageText).includes(p)));
+      if (leaked.length) throw new Error(`${leaked.length} reader request(s) carried more than one picture or question text`);
+      return `${reads.length} request(s) to the SYNTHETIC reader: one picture each, no question text; no other outbound request`;
+    });
+    db.close();
+
+    markingRelaunchLines = launchAndRead(udid, bundleId, '--journey-marking-relaunch', 'markingRelaunch', childEnv);
+    for (const line of markingRelaunchLines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
+  } catch (error) {
+    markingNotMeasured = String(error?.message || error).split('\n')[0].slice(0, 200);
+    console.log(`  NOT MEASURED — ${markingNotMeasured}`);
+  } finally {
+    if (server?.PRI_CLOUD_SERVER_PID) { try { process.kill(Number(server.PRI_CLOUD_SERVER_PID)); } catch { /* already gone */ } }
+  }
+}
+
 const result = (lines, name) => {
   const hit = lines.find(l => l.startsWith(`PRIJOURNEY ok ${name}`) || l.startsWith(`PRIJOURNEY FAIL ${name}`));
   return hit ? { ok: hit.startsWith('PRIJOURNEY ok'), detail: hit.replace(/^PRIJOURNEY (ok|FAIL) \S+\s*/, '') } : { ok: false, detail: 'not reported' };
+};
+// A marking step with no line was not run: it is never counted as passed.
+const marked = (lines, name) => {
+  const r = result(lines, name);
+  return r.detail === 'not reported' ? { ok: false, detail: `not measured${markingNotMeasured ? `: ${markingNotMeasured}` : ''}` } : r;
 };
 const steps = Object.fromEntries([
   ...FIRST.map(n => [n, result(first, n)]), ...RELAUNCH.map(n => [n, result(second, n)]),
@@ -288,6 +439,8 @@ const steps = Object.fromEntries([
   ...(WANT_DYNAMIC ? DYNAMIC.map(n => [n, result(dynamicLines, n)]) : []),
   ...(WANT_LIFECYCLE ? BACKGROUND.map(n => [n, result(backgroundLines, n)]) : []),
   ...(WANT_A11Y ? A11Y.map(n => [n, result(a11yLines, n)]) : []),
+  ...[...MARKING, ...MARKING_SERVER].map(n => [n, marked(markingLines, n)]),
+  ...MARKING_RELAUNCH.map(n => [n, marked(markingRelaunchLines, n)]),
 ]);
 // The ink facts must match the hardware: iPhone writes with a finger by default
 // and has no stylus; iPad is stylus-first. (Finger *touch* input itself remains
@@ -313,7 +466,14 @@ try {
 const evidence = {
   schemaVersion: 1,
   evidenceClass: 'SYNTHETIC_SIMULATOR',
+  evidenceTier: TIER,
   physicalDevice: false,
+  // What is real and what is not, so the record cannot be over-read.
+  real: ['the built client in the shipped WKWebView shell', 'the native PencilKit surface and priInk bridge', 'IndexedDB / localStorage persistence across a relaunch',
+    'the Pri /v1 server (accounts, sessions, prepare / issue / recognise / confirm / grade) on a local SQLite file'],
+  synthetic: ['an iOS simulator, not a device', 'strokes placed on the surface programmatically, not written with a Pencil or finger',
+    'the handwriting reader: a scripted stand-in at the provider hop that never looks at the picture', 'a fixture account verified in the local database'],
+  notEvidenceFor: ['a physical iPad or Apple Pencil', 'real handwriting recognition accuracy', 'a real model provider', 'the production or staging deployment'],
   sha,
   dirtyWorkingTree: dirty,
   simulator: { name: sim.name, udid, runtime: os },
@@ -326,6 +486,6 @@ const evidence = {
 const out = argOf('evidence');
 if (out) writeFileSync(out, `${JSON.stringify(evidence, null, 2)}\n`);
 console.log(passed === total
-  ? `\nNATIVE JOURNEY: PASS — ${passed}/${total} steps on ${sim.name} (SYNTHETIC / SIMULATOR)`
-  : `\nNATIVE JOURNEY: FAIL — ${passed}/${total} steps on ${sim.name}`);
+  ? `\nNATIVE JOURNEY: PASS — ${passed}/${total} steps on ${sim.name} (${TIER})`
+  : `\nNATIVE JOURNEY: FAIL — ${passed}/${total} steps on ${sim.name} (${TIER})${Object.entries(steps).filter(([, s]) => !s.ok).map(([n, s]) => `\n  ✗ ${n}: ${s.detail}`).join('')}`);
 process.exit(passed === total ? 0 : 1);

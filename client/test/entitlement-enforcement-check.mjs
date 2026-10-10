@@ -21,6 +21,13 @@ import { installBrowserEnv, resetStorage, rawRows } from './backend-check.mjs';
 
 installBrowserEnv();
 resetStorage();
+// Online-only grading (owner decision 2026-10-10): an exam starts, and an
+// India question is issued, only for a real signed-in account. The gates
+// below are still decided on the device from the entitlement snapshot on the
+// cloud link row, so every linked profile here is a real verified account
+// (never a made-up accountId) whose snapshot the suite then sets.
+const { startOnlineAuthority } = await import('./support/online-authority.mjs');
+const authority = await startOnlineAuthority({ label: 'entitlement-enforcement' });
 
 const { dispatch } = await import('../src/local/backend.js');
 const { dispatchIndiaExam } = await import('../src/local/indiaExamBackend.js');
@@ -74,10 +81,27 @@ function premiumSnapshot(overrides = {}) {
   };
 }
 
-async function link(pid, entitlement) {
-  await idb.put('device', { id: cloudLinkRowId(pid), accountId: `acct-${pid}`, role: 'student', emailVerified: true, linkedAt: now, lastVerifiedAt: now, lastSyncAt: null, entitlement });
+// A real account for the profile. What the server filed on the link row at
+// sign-in is the account's own free snapshot; it is kept so a profile can be
+// put back on the free plan without ever being signed out.
+const serverFree = new Map();
+async function signIn(pid) {
+  if (serverFree.has(pid)) return;
+  await authority.link(pid);
+  const row = await idb.get('device', cloudLinkRowId(pid));
+  if (!row?.accountId || row.accountId !== authority.accountOf(pid).accountId) throw new Error('the profile is not linked to its real account');
+  serverFree.set(pid, row.entitlement ?? null);
 }
-async function unlink(pid) { await idb.del('device', cloudLinkRowId(pid)); }
+async function link(pid, entitlement) {
+  await signIn(pid);
+  await authority.setEntitlement(pid, entitlement);
+}
+// Formerly "unlink": the profile stays signed in and goes back to the free
+// snapshot the server issued for its account.
+async function backToFree(pid) {
+  await signIn(pid);
+  await authority.setEntitlement(pid, serverFree.get(pid));
+}
 
 // ── A · the calendar and the enforcement map ─────────────────────────────────
 same('a UTC evening is still 5 Sep in Asia/Kolkata', gate.dayKey(T0, 'Asia/Kolkata'), '2026-09-05');
@@ -99,7 +123,12 @@ for (const capability of Object.values(ENTITLEMENTS)) {
   const src = rel => readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
   ok('additional-ai-usage is enforced on the server (aiAllowance), not on the device',
     /^server · .*aiAllowance\.js/.test(gate.CAPABILITY_ENFORCEMENT[ENTITLEMENTS.EXTRA_AI]) &&
-    /consumeAiAllowance\(db, \{ accountId: req\.platformSession\.account_id, kind: 'handwriting'/.test(src('server/platform/handwriting.js')) &&
+    // Handwriting reads go through one paid path (recognitionOps.js), given the
+    // session's own account by the route: the allowance is consumed there, and
+    // a read served from a kept reading costs none.
+    /recognitionOpsFor\(db\)\.read\(\{\s*db, accountId: req\.platformSession\.account_id,/.test(src('server/platform/handwriting.js')) &&
+    /consumeAiAllowance\(db, \{ accountId, kind: 'handwriting'/.test(src('server/platform/recognitionOps.js')) &&
+    !/accountId: req\.body/.test(src('server/platform/handwriting.js')) &&
     /consumeAiAllowance\(db, \{ accountId: req\.platformSession\.account_id, kind: 'working'/.test(src('server/platform/working.js')));
 }
 
@@ -133,7 +162,11 @@ same('one minute past Kolkata midnight the India profile starts a new day', [fre
 
 // ── C · Australian profile: the same instants on the Sydney calendar ─────────
 now = T0;
-const ned = (await POST('/profiles', { name: 'Ned', year: 9 })).user;
+let ned = (await POST('/profiles', { name: 'Ned', year: 9 })).user;
+// Asha above has no account at all; Ned is a signed-in account on the free
+// plan. The cap is the same for both.
+await signIn(ned.id);
+ned = (await GET('/me')).user;
 same('an Australian profile counts on the Sydney calendar', ned.usage.practice.timeZone, 'Australia/Sydney');
 for (let i = 0; i < 20; i++) await POST('/practice/next', { mode: 'smart' });
 await gated('Ned hits the same 20-a-day cap', POST('/practice/next', { mode: 'smart' }), { code: 'FREE_CAP_REACHED' });
@@ -173,7 +206,7 @@ same('inside the offline window Premium keeps working without a network', [offli
 online = true;
 
 // ── F · one exam simulation per 30 days (HSC paper builder) ──────────────────
-await unlink(ned.id);
+await backToFree(ned.id);
 now = T0;
 const firstPaper = await POST('/exams', { length: 10 });
 same('the first exam simulation is free', [firstPaper.allowance.used, firstPaper.allowance.limit], [1, 1]);
@@ -183,15 +216,48 @@ const examCapped = await gated('a second simulation inside 30 days is refused on
   { code: 'FREE_CAP_REACHED', capability: ENTITLEMENTS.PREMIUM_EXAMS });
 same('the refusal says when the next free simulation unlocks', examCapped?.nextAt, T0 + 30 * DAY);
 now = T0 + 30 * DAY + MIN;
+// The server counts its own sealed papers on its own clock, and it is the
+// authority: with only the device's clock moved it still refuses, and the
+// device shows the server's refusal.
+{
+  let serverSays = null;
+  try { await POST('/exams', { length: 10 }); } catch (err) { serverSays = err; }
+  same('a device whose own counter has lapsed is still refused by the server', [serverSays?.status, serverSays?.code, serverSays?.capability, serverSays?.reason], [402, 'FREE_CAP_REACHED', ENTITLEMENTS.PREMIUM_EXAMS, 'server-refused']);
+  ok('the server says when its own window unlocks', Number.isFinite(serverSays?.nextAt) && serverSays.nextAt > Date.now());
+  same('a start the server refused is not counted on the device either', (await gate.examAllowance(ned)).used, 0);
+}
+// Thirty days pass for the server too.
+await authority.ageExamPapers(ned.id, 30 * DAY + MIN);
 same('30 days later a simulation is free again', (await POST('/exams', { length: 10 })).allowance.used, 1);
+// A device that wipes its own counter gains nothing: the server still counts.
+{
+  const usageId = (await idb.all('device')).find(r => r?.pid === ned.id && Array.isArray(r.exams))?.id;
+  const usage = await idb.get('device', usageId);
+  await idb.put('device', { ...usage, exams: [] });
+  same('with its counter wiped the device believes a simulation is free', (await gate.examAllowance(ned)).allowed, true);
+  let bypass = null;
+  try { await POST('/exams', { length: 10 }); } catch (err) { bypass = err; }
+  same('but the server refuses the paper', [bypass?.status, bypass?.code], [402, 'FREE_CAP_REACHED']);
+  await idb.put('device', usage);
+}
 await link(ned.id, premiumSnapshot());
 const premiumPapers = [await POST('/exams', { length: 10 }), await POST('/exams', { length: 10 })];
 ok('premium-exams lifts the 30-day cap', premiumPapers.every(r => r.allowance.unlimited === true && r.exam?.id));
-await unlink(ned.id);
+await backToFree(ned.id);
 
 // ── G · the India exam module shares the same rule and counter ───────────────
 now = T0;
 const jai = (await POST('/profiles', { name: 'Jai', year: 12, course: 'in', indiaTrack: 'jee-main' })).user;
+// A paper is marked by the server, so the India path starts one only for a
+// signed-in account — the same refusal the practice paper gives. It used to
+// start for anyone. A refused start spends nothing.
+{
+  let refusal = null;
+  try { await dispatchIndiaExam(jai, 'POST', '/exams', {}); } catch (err) { refusal = err; }
+  same('an India profile that has never signed in cannot start a paper', [refusal?.status, refusal?.code], [401, 'SIGN_IN_TO_CHECK']);
+  same('a refused start is not counted as a simulation', (await gate.examAllowance(jai)).used, 0);
+}
+await backToFree(jai.id);   // signed in to a real account, on the free plan
 const jeeSection = await dispatchIndiaExam(jai, 'POST', '/exams', {});
 ok('a JEE Main mathematics section is built for a free Class 12 profile', jeeSection.exam?.indiaExam?.track === 'jee-main' && jeeSection.allowance?.used === 1,
   JSON.stringify({ track: jeeSection.exam?.indiaExam?.track, allowance: jeeSection.allowance }));
@@ -199,7 +265,7 @@ await gated('a second JEE section inside 30 days is refused on the free plan', d
   { code: 'FREE_CAP_REACHED', capability: ENTITLEMENTS.PREMIUM_EXAMS });
 await link(jai.id, premiumSnapshot());
 ok('premium-exams lifts the India exam cap too', (await dispatchIndiaExam(jai, 'POST', '/exams', {})).allowance.unlimited === true);
-await unlink(jai.id);
+await backToFree(jai.id);
 
 // ── H · JEE Advanced is Premium content ──────────────────────────────────────
 await gated('a JEE Main profile asking for the JEE Advanced track is refused', POST('/practice/next', { mode: 'smart', track: 'jee-advanced' }),
@@ -213,7 +279,7 @@ same('JEE Advanced practice is not counted when it is refused', (await GET('/me'
 await link(vik.id, premiumSnapshot());
 const advanced = await POST('/practice/next', { mode: 'smart' });
 same('with Premium the JEE Advanced track serves its own questions', advanced.question.indiaTrack, 'jee-advanced');
-await unlink(vik.id);
+await backToFree(vik.id);
 
 // ── I · nothing personal in the counter ──────────────────────────────────────
 const deviceRows = rawRows().device || [];
@@ -223,6 +289,7 @@ const usageDisk = JSON.stringify(usageRows);
 ok('usage rows carry no name or email', !/Asha|Ned|Jai|Vik|@/.test(usageDisk), usageDisk.slice(0, 200));
 ok('usage rows never carry a plan flag a client could forge', !/premium|plan|entitlement/i.test(usageDisk), usageDisk.slice(0, 200));
 
+await authority.close();
 console.log(`\nEntitlement enforcement — ${pass}/${pass + fail} checks`);
 if (failures.length) {
   console.log('\nfailures:');

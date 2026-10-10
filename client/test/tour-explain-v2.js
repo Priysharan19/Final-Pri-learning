@@ -11,10 +11,14 @@ const SUBMIT = { name: 'Submit Answer' };
 export const flow = {
   id: 'explain-v2',
   name: 'Pri Explain V8 · adaptive board-style reasoning playback',
+  online: true,
 
-  async run({ page, base, check, goto, createProfile, settle }) {
+  async run({ page, base, check, goto, createProfile, settle, online }) {
     await goto('/');
     await createProfile({ name: 'Emmy Noether', year: 7 });
+    // Signed in to the real server: the two misses are marked there, and the
+    // solution the player teaches from is the one the server released.
+    await online.signIn({ name: 'Emmy Noether' });
     await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
 
@@ -37,6 +41,13 @@ export const flow = {
     await answerBox.fill(SECOND_WRONG);
     await page.getByRole('button', SUBMIT).click();
     await page.waitForSelector('.eval-card', { timeout: 20000 });
+
+    const resolvedRow = await online.shownRow();
+    const misses = await online.practiceCalls(new RegExp(`^/v1/practice/${resolvedRow?.serverQuestionId}/submit$`));
+    await check('both misses were marked by the server, and the solution to teach from is the one it released',
+      misses.length === 2 && misses.every(c => c.status === 200 && c.json?.authoritative === true && c.json.correct === false) &&
+        misses[1].json.resolved === true && Array.isArray(misses[1].json.solution?.steps) && misses[1].json.solution.steps.length >= 1,
+      JSON.stringify(misses.map(c => ({ status: c.status, resolved: c.json?.resolved, steps: c.json?.solution?.steps?.length }))));
 
     const launch = page.getByRole('button', { name: 'Watch explanation' });
     if (!await check('a resolved question exposes Pri Explain', await launch.count() === 1)) return;
@@ -108,6 +119,23 @@ export const flow = {
       await page.waitForSelector('.q-prompt', { timeout: 20000 });
       await check('the follow-up returns to a fresh unresolved practice question',
         await page.locator('.pri-explain-dialog').count() === 0 && await page.locator('.eval-card').count() === 0);
+      // A follow-up that could not be checked would be a dead end: answer it.
+      const typeAgain = page.getByRole('button', { name: 'Answer by typing' });
+      if (await typeAgain.count()) await typeAgain.click();
+      await settle();
+      const canType = await answerBox.count() === 1;
+      if (canType) {
+        await answerBox.fill(FIRST_WRONG);
+        await page.getByRole('button', SUBMIT).click();
+        await page.waitForSelector('.verdict-bad, .eval-card, [data-check-access], [role="alert"]', { timeout: 20000 }).catch(() => {});
+      }
+      const followRow = await online.shownRow();
+      const followGrades = followRow?.serverQuestionId
+        ? await online.practiceCalls(new RegExp(`^/v1/practice/${followRow.serverQuestionId}/submit$`)) : [];
+      await check('and the follow-up question can be checked: the server issued it and marked the answer',
+        !canType || (followGrades.length === 1 && followGrades[0].status === 200 && followGrades[0].json?.authoritative === true &&
+          await page.locator('.verdict-bad').count() >= 1),
+        `typed ${canType}; server question ${followRow?.serverQuestionId}; grades ${JSON.stringify(followGrades.map(c => c.status))}; on screen ${JSON.stringify((await page.locator('.ws-actions').innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 160))}`);
     } else {
       await page.getByRole('button', { name: 'Close visual solution' }).click();
       await check('closing the player returns to the resolved question',

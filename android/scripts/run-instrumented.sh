@@ -9,7 +9,10 @@
 # against the data the first run left. Regenerate the fixture for every run
 # (the run stops its servers). With PRI_CLOUD_ORIGIN/EMAIL/PASSWORD set
 # (scripts/cloud-fixture-server.mjs), it then runs the cloud journey
-# against that real server the same way: sign in + sync, force-stop, then the
+# against that real server the same way: sign in + sync and a server-marked
+# answer (the right answer comes from scripts/journey-oracle.mjs, outside the
+# page), an offline draft that says it cannot be marked, offers no Submit or
+# Show solution, is kept and is never marked, force-stop, then the
 # session survives and Disconnect clears it. SYNTHETIC / EMULATOR evidence.
 set -euo pipefail
 EXPECT="${1:-any}"; shift || true
@@ -62,26 +65,43 @@ if [ -n "${PRI_CLOUD_ORIGIN:-}" ] && [ "$EXPECT" != "floor" ]; then
   CLOUD="com.prilearning.app.CloudJourneyTest"
   cloud_args=(-e priCloud "$PRI_CLOUD_ORIGIN" -e priCloudEmail "$PRI_CLOUD_EMAIL" -e priCloudPassword "$PRI_CLOUD_PASSWORD"
     -e priCloudNewEmail "${PRI_CLOUD_NEW_EMAIL:-}" -e priCloudNewPassword "${PRI_CLOUD_NEW_PASSWORD:-}")
+  # The right answer of a server-issued question exists only on the server.
+  # scripts/journey-oracle.mjs reads the sealed copy from the throwaway fixture
+  # database (read-only) and answers the TEST PROCESS on this machine's
+  # loopback, which the emulator reaches at the same host as the server.
+  ORACLE_PID=""; RESTARTED_PID=""
+  # Installed before anything is started, so a half-started process is still stopped.
+  trap '[ -n "${ORACLE_PID:-}" ] && kill "$ORACLE_PID" 2>/dev/null || true; [ -n "${RESTARTED_PID:-}" ] && kill "$RESTARTED_PID" 2>/dev/null || true' EXIT
+  [ -n "${PRI_CLOUD_DB:-}" ] || { echo "the cloud journey needs PRI_CLOUD_DB (scripts/cloud-fixture-server.mjs --out)" >&2; exit 2; }
+  ORACLE_PORT="${PRI_ORACLE_PORT:-4311}"
+  ORACLE_TOKEN="$(node -e "process.stdout.write(require('node:crypto').randomBytes(18).toString('base64url'))")"
+  ORACLE_READY="$(mktemp)"; rm -f "$ORACLE_READY"
+  # -987654 is the wrong answer CloudJourneyTest types: never a usable sealed answer.
+  node "$HERE/../scripts/journey-oracle.mjs" --serve --db "$PRI_CLOUD_DB" --email "$PRI_CLOUD_EMAIL" --port "$ORACLE_PORT" \
+    --token "$ORACLE_TOKEN" --avoid -987654 --out "$ORACLE_READY" > "$OUT/oracle.log" 2>&1 &
+  ORACLE_PID=$!
+  for _ in $(seq 1 40); do [ -f "$ORACLE_READY" ] && break; kill -0 "$ORACLE_PID" 2>/dev/null || break; sleep 0.25; done
+  [ -f "$ORACLE_READY" ] || { echo "the sealed-answer oracle did not start:" >&2; cat "$OUT/oracle.log" >&2; exit 1; }
+  rm -f "$ORACLE_READY"
+  ORACLE_HOST="$(printf '%s' "$PRI_CLOUD_ORIGIN" | sed -E 's#^https?://([^:/]+).*#\1#')"
+  cloud_args+=(-e priOracle "http://$ORACLE_HOST:$ORACLE_PORT" -e priOracleToken "$ORACLE_TOKEN")
   run "$CLOUD#cloudSignUpThenDeleteAccount" "${cloud_args[@]}" "$@"
   run "$CLOUD#cloudSignInAndSync" "${cloud_args[@]}" "$@"
-  summary="$summary, sign-up + delete and sign-in + sync against the real server"
+  summary="$summary, sign-up + delete, signed-out refusal, sign-in + sync and a server-marked answer (sealed-answer oracle) against the real server"
   if [ -n "${PRI_CLOUD_DB:-}" ] && [ -n "${PRI_CLOUD_SERVER_PID:-}" ]; then
-    RESTARTED_PID=""
-    # Installed before the restart, so a server that half-started is still stopped.
-    trap '[ -n "${RESTARTED_PID:-}" ] && kill "$RESTARTED_PID" 2>/dev/null || true' EXIT
     # Offline: the cloud server goes away.
     kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null || true
     sleep 2
-    run "$CLOUD#offlineLearningContinuesAndSyncIsNotOffered" "${cloud_args[@]}" -e priCloudOffline true "$@"
+    run "$CLOUD#offlineWorkIsKeptUnmarkedAndSyncIsNotOffered" "${cloud_args[@]}" -e priCloudOffline true "$@"
     # Reconnect: the same server and database come back.
     node "$HERE/../scripts/cloud-fixture-server.mjs" --port "$PRI_CLOUD_PORT" --db "$PRI_CLOUD_DB" --restart --out "$OUT/restart.env"
     RESTARTED_PID="$(sed -n 's/^PRI_CLOUD_SERVER_PID=//p' "$OUT/restart.env")"
-    summary="$summary, offline attempt"
+    summary="$summary, offline draft said to be unmarkable (no Submit or Show solution), kept and never marked"
   fi
   adb shell am force-stop com.prilearning.app
   sleep 2
   run "$CLOUD#cloudSessionSurvivesProcessDeathThenDisconnectClearsIt" "${cloud_args[@]}" "$@"
-  summary="$summary, reconnect + session after process death, disconnect"
+  summary="$summary, reconnect + session and History after process death, disconnect"
 fi
 adb logcat -d -s PRITEST > "$OUT/logcat.txt" || true
 [ -n "${PRI_CLOUD_SERVER_LOG:-}" ] && cp "$PRI_CLOUD_SERVER_LOG" "$OUT/server.log" 2>/dev/null || true

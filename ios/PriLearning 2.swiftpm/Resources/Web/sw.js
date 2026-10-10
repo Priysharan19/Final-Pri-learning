@@ -33,10 +33,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Build manifest, filled in by the pri-precache plugin ─────────────────────
-const VERSION = 'pri-41ac850b3781';
-const PRECACHE = ["/","/assets/App-N_pz-a7O.js","/assets/KaTeX_AMS-Regular-BQhdFMY1.woff2","/assets/KaTeX_Main-Bold-Cx986IdX.woff2","/assets/KaTeX_Main-BoldItalic-DxDJ3AOS.woff2","/assets/KaTeX_Main-Italic-NWA7e6Wa.woff2","/assets/KaTeX_Main-Regular-B22Nviop.woff2","/assets/KaTeX_Math-BoldItalic-CZnvNsCZ.woff2","/assets/KaTeX_Math-Italic-t53AETM-.woff2","/assets/KaTeX_Size1-Regular-mCD8mA8B.woff2","/assets/KaTeX_Size2-Regular-Dy4dx90m.woff2","/assets/KaTeX_Size4-Regular-Dl5lxZxV.woff2","/assets/adaptive-BYs9b20J.js","/assets/cloudAccount-Cg3OG9jD.js","/assets/cloudErrorCopy-B8ogfnw1.js","/assets/cloudSession-CnTBrYKl.js","/assets/cloudTransport-BEdbcvOL.js","/assets/curriculum-in-CMuvRa7h.js","/assets/defineProperty-BbfpZ9Tg.js","/assets/formFactor-CvnDoCvZ.js","/assets/generators-vugnolC0.js","/assets/i18n-DDrfBSxs.js","/assets/idb-hsAHxpD-.js","/assets/index-3XX4Q_aS.js","/assets/index-C0j6hODx.css","/assets/indiaProduct-BLNwflxg.js","/assets/inter-latin-wght-normal-Dx4kXJAl.woff2","/assets/native-BgLmmOa8.js","/assets/ncert-syllabus-CKacrE7J.js","/assets/practiceLinks-C9WJYwDl.js","/assets/preload-helper-BZ1Pz5am.js","/assets/pyqCoverage-DAjph3AM.js","/assets/qhelpers-Dq1uC5IS.js","/assets/releaseIdentity-DVNlwEoP.js","/assets/rolldown-runtime-CbXtAM7H.js","/assets/store-B7pBBZGn.js","/assets/vendor-react-Dtm3F6TO.js","/favicon.svg","/icons/icon-180.png","/index.html","/manifest.webmanifest","/splash.svg","/theme-boot.js"];
-const WARM = ["/assets/AccountDeleteRequest-CzMe01o_.js","/assets/AssignmentInboxPanel-CF4VUDI3.js","/assets/Charts-DOgTVDDb.js","/assets/Classes-C6d7era_.js","/assets/ClassroomPanel-bjAO3awu.js","/assets/ExamRoom-CYdsXHSL.js","/assets/Exams-rko_hplD.js","/assets/GuardianConsent-C9NFeRdx.js","/assets/History-D3Uw8bFk.js","/assets/Legal-EY5zBgBQ.js","/assets/LinearEquationsTopperSectionProduction-BuoAWbc1.js","/assets/Match-BrdbWTOM.js","/assets/NcertClass8ChapterSection-BYjCSdnS.js","/assets/NcertClass9ChapterSection-CpzcS1hT.js","/assets/OtpInput-gppXVL6N.js","/assets/PlanCard-B2k5tTrl.js","/assets/PlanPage-CKHmtbHn.js","/assets/PracticeBase-12r9qhCW.css","/assets/PracticeBase-5E2BSwjR.js","/assets/Progress-u5-uFN2H.js","/assets/QuestionCard-CJGG_n-B.js","/assets/RationalNumbersTopperSectionProduction-lOXpDUsK.js","/assets/Rush-yK1zLFA4.js","/assets/Settings-BmdCQ39X.js","/assets/SignUpFlow-C7apyZXw.css","/assets/SignUpFlow-DGQHGpvB.js","/assets/SignUpFlow-syD4_2z0.js","/assets/Tasks-PzCbqBXa.js","/assets/assignmentTarget-CBWIsMpd.js","/assets/cloudAccount-Cwmllxyn.js","/assets/cloudReader-Bp0vVW76.js","/assets/cloudSyncScheduler-C1S4iZ9Y.js","/assets/cloudSyncScheduler-DhIzyV33.js","/assets/copy-bRRshDpC.js","/assets/demoSeed-DCfv9oDq.js","/assets/figures--_2Ot-DF.js","/assets/files-BkEChupo.js","/assets/inkLatex-4SP97VBx.js","/assets/latex-hWwEj1kh.js","/assets/ncertTerms-Ds6pWWUR.js","/assets/personal-BaQRH6eb.js","/assets/photoRaster-CV5l6z5r.js","/assets/reminders-BuYHSlGK.js","/assets/reminders-D3XX7qsL.js","/assets/settings-DJf9DDsQ.js","/assets/socialSignIn-Dnd9-eJj.js","/assets/strings.hi-tqaeHps0.js","/assets/vendor-katex-CRuPsUhM.js","/assets/vendor-katex-DzFXvcrH.css","/assets/workspace-m0yn0Sme.css","/auth/callback.html","/auth/callback.js","/icons/icon-192.png","/icons/icon-512.png","/icons/icon-maskable-192.png"];
-const OPTIONAL = ["/assets/InkAnswer-CArPvru0.js","/assets/InkAnswer-DQPWEJyj.js","/assets/InkAnswer-Dj04Zdt3.js","/assets/InkAnswer-Dp3BML4A.js","/assets/InkAnswer-DzbPHpIF.js","/assets/InkAnswer-LR6s67Ax.js","/assets/NativeInkCanvas-DgTSDOpK.js","/assets/ink-engine-C1fc9g9V.js","/assets/ink-model-D3cN_hBH.js","/assets/ink-personal-BHAF41nc.js","/assets/model-data-DsXS_xxz.js","/assets/recognizer-Mqe9D0S6.js"];
+const VERSION = 'pri-b86ca98f9351';
+const PRECACHE = ["/","/assets/App-X5YUznev.js","/assets/KaTeX_AMS-Regular-BQhdFMY1.woff2","/assets/KaTeX_Main-Bold-Cx986IdX.woff2","/assets/KaTeX_Main-BoldItalic-DxDJ3AOS.woff2","/assets/KaTeX_Main-Italic-NWA7e6Wa.woff2","/assets/KaTeX_Main-Regular-B22Nviop.woff2","/assets/KaTeX_Math-BoldItalic-CZnvNsCZ.woff2","/assets/KaTeX_Math-Italic-t53AETM-.woff2","/assets/KaTeX_Size1-Regular-mCD8mA8B.woff2","/assets/KaTeX_Size2-Regular-Dy4dx90m.woff2","/assets/KaTeX_Size4-Regular-Dl5lxZxV.woff2","/assets/backend-qx8YWFon.js","/assets/cloudAccount-Cz72ku5y.js","/assets/cloudErrorCopy-B8ogfnw1.js","/assets/cloudSession-CnTBrYKl.js","/assets/cloudSyncRestore-DJnR54li.js","/assets/cloudTransport-B3YGHM4v.js","/assets/curriculum-in-Bh2Dn16G.js","/assets/defineProperty-BbfpZ9Tg.js","/assets/diagnose-BrvrPQmn.js","/assets/expr-BAyLlB_l.js","/assets/formFactor-CvnDoCvZ.js","/assets/generators-Bkemxq7a.js","/assets/i18n-DWdLnAeN.js","/assets/idb-CNrzlctl.js","/assets/index-ByWvqU2N.js","/assets/index-Y2rCuy1j.css","/assets/indiaProduct-BVftTEgi.js","/assets/inputHint-BaQGaT5a.js","/assets/inter-latin-wght-normal-Dx4kXJAl.woff2","/assets/languages-CVi7imSC.js","/assets/native-BgLmmOa8.js","/assets/ncert-syllabus-CKacrE7J.js","/assets/practiceLinks-C92U7OG6.js","/assets/preload-helper-BZ1Pz5am.js","/assets/pyqCoverage-DAjph3AM.js","/assets/qhelpers-Dq1uC5IS.js","/assets/reason-area-vKC4I3-I.js","/assets/releaseIdentity-J0Uj19H1.js","/assets/rolldown-runtime-CbXtAM7H.js","/assets/store-aGxDTp25.js","/assets/vendor-react-Dtm3F6TO.js","/boot-guard.js","/favicon.svg","/icons/icon-180.png","/index.html","/manifest.webmanifest","/splash.svg","/theme-boot.js"];
+const WARM = ["/assets/AccountDeleteRequest-CpSkmEDM.js","/assets/AssignmentInboxPanel-Bl8lBW3Z.js","/assets/Charts-CfUL0ki0.js","/assets/CheckRefusal-wxEBs6fX.js","/assets/Classes-BrXmybJd.js","/assets/ClassroomPanel-DwoB2699.js","/assets/CloudAccountPanel-5HOzbxcV.js","/assets/CloudAccountPanel-BenFbFXA.js","/assets/ExamRoom-BzDExrvr.js","/assets/Exams-C506zbFy.js","/assets/GuardianConsent-BMb5-vXK.js","/assets/History-B4wfcxGI.js","/assets/Legal-CJAvmxGC.js","/assets/LinearEquationsTopperSectionProduction-B96vXtzw.js","/assets/Match-nnHKNDPX.js","/assets/NcertClass8ChapterSection-B3F5v5n6.js","/assets/NcertClass9ChapterSection-QgTByLom.js","/assets/OtpInput-C5M8DEd6.js","/assets/PlanCard-kCMJ5L3G.js","/assets/PlanPage-RqEZBHgx.js","/assets/PracticeBase-12r9qhCW.css","/assets/PracticeBase-BtzR3lE2.js","/assets/Progress-iTOUffx7.js","/assets/QuestionCard-C-mUo43x.css","/assets/QuestionCard-xzqfOKE6.js","/assets/RationalNumbersTopperSectionProduction-BhNnpuYc.js","/assets/Rush-CAy8bpAW.js","/assets/Settings-C4epV4A1.js","/assets/SignUpFlow-C7apyZXw.css","/assets/SignUpFlow-CotKobT8.js","/assets/SignUpFlow-Dbs12BM8.js","/assets/Tasks-Bp89g0tY.js","/assets/assignmentTarget-B6wjmFCI.js","/assets/backend-CV8dezbJ.js","/assets/cloudAccount-C7MlyzKl.js","/assets/cloudReader-CrCG1Ang.js","/assets/cloudSyncScheduler-BSN8x4A5.js","/assets/cloudSyncScheduler-BZuHY5Ag.js","/assets/copy-DC7k5i8z.js","/assets/demoSeed-Bx3veiPx.js","/assets/figures--_2Ot-DF.js","/assets/files-BkEChupo.js","/assets/inkLatex-4SP97VBx.js","/assets/latex-hWwEj1kh.js","/assets/ncertTerms-Ds6pWWUR.js","/assets/notesIndex-Bxk9oByQ.js","/assets/notesIndex-C9JaehS2.js","/assets/personal-BaQRH6eb.js","/assets/reminders-BMrw_MYb.js","/assets/reminders-DeKkmgjm.js","/assets/settings-DhD3I8ka.js","/assets/socialSignIn-Dyiog5qL.js","/assets/strings.hi-YM9Oe0Xf.js","/assets/vendor-katex-CRuPsUhM.js","/assets/vendor-katex-DzFXvcrH.css","/assets/workspace-CpWUaWGD.css","/auth/callback.html","/auth/callback.js","/icons/icon-192.png","/icons/icon-512.png","/icons/icon-maskable-192.png"];
+const OPTIONAL = ["/assets/InkAnswer-CHKE018n.js","/assets/InkAnswer-D_tR5lbZ.js","/assets/InkAnswer-Dm4uwOGY.js","/assets/InkAnswer-Dz8er4TQ.js","/assets/InkAnswer-ZV2mR0g3.js","/assets/InkAnswer-ltHkBS4L.js","/assets/NativeInkCanvas-DfvikEGC.js","/assets/ink-engine-C1fc9g9V.js","/assets/ink-model-D3cN_hBH.js","/assets/ink-personal-BHAF41nc.js","/assets/model-data-DsXS_xxz.js","/assets/recognizer-Mqe9D0S6.js"];
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SHELL = '/index.html';
@@ -52,12 +52,29 @@ const CACHEABLE = /(?:^\/assets\/)|(?:\.(?:js|css|html|svg|png|webmanifest|woff2
 // the wrong bytes; the shell is the one name that outlives its contents.
 const hashed = (url) => url !== '/' && url !== SHELL;
 
+// A server that answers every path it does not know with the shell — ours
+// does, because an unknown path is usually an in-app route — answers a chunk
+// it no longer has with `200 text/html`. Kept under the chunk's name, that
+// page would be handed back as the chunk on every later load, and a module
+// that arrives as HTML never runs: the app would sit on its splash with no
+// failed request to show for it. So a script is only kept if it is a script,
+// a stylesheet if it is a stylesheet, and HTML only under an HTML name.
+function rightKind(pathname, res) {
+  const type = res.headers.get('content-type') || '';
+  const html = /text\/html/i.test(type);
+  if (pathname === '/' || /\.html$/.test(pathname)) return html;
+  if (/\.m?js$/.test(pathname)) return /javascript|ecmascript/i.test(type);
+  if (/\.css$/.test(pathname)) return /text\/css/i.test(type);
+  return !html;
+}
+
 async function fill(cache, urls) {
   const missed = [];
   await Promise.all(urls.map(async (url) => {
     try {
       const res = await fetch(new Request(url, { cache: hashed(url) ? 'default' : 'reload', credentials: 'same-origin' }));
       if (!res.ok) throw new Error(String(res.status));
+      if (!rightKind(url, res)) throw new Error('wrong kind');
       await cache.put(url, res);
     } catch {
       missed.push(url);
@@ -183,26 +200,47 @@ self.addEventListener('activate', (e) => {
 
 // ── Fetch ────────────────────────────────────────────────────────────────────
 
+// The API is not the worker's. Nothing under these paths is ever cached, so
+// answering them here bought nothing and put the worker — its start-up, its
+// cache lookup, its lifetime — between the app and every server call it makes,
+// the boot health probe included. They go straight to the network, exactly as
+// they would with no worker installed; offline they fail the same way.
+const API = /^\/(?:v1|api)\//;
+
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
+  if (API.test(url.pathname)) return;
   // The Google/Apple sign-in popup lands here; it is its own small page, not an
   // in-app route, and must never be answered with the app shell.
   if (url.pathname === '/auth/callback.html' || url.pathname === '/auth/callback.js') return;
-  e.respondWith(req.mode === 'navigate' ? shellFor(req) : assetFor(req, url));
+  e.respondWith(req.mode === 'navigate' ? shellFor(e) : assetFor(e, url));
 });
+
+// Keeping a copy is a convenience; the answer the page is waiting for is not.
+// The copy is written after the response has been handed back, and a write
+// that fails — a full disk, a body cut short, a quota — loses the copy and
+// nothing else. It used to be awaited inside the same try as the fetch, so a
+// failed write turned a good network response into a network error.
+function keep(e, key, res) {
+  const copy = res.clone();
+  e.waitUntil(caches.open(VERSION).then(cache => cache.put(key, copy)).catch(() => {}));
+}
 
 // Every in-app route renders from the one shell, and it has to be this build's
 // shell — an older one would name chunks this cache no longer holds.
-async function shellFor(req) {
-  const cache = await caches.open(VERSION);
-  const shell = (await cache.match(SHELL)) || (await cache.match('/'));
+async function shellFor(e) {
+  let shell = null;
+  try {
+    const cache = await caches.open(VERSION);
+    shell = (await cache.match(SHELL)) || (await cache.match('/'));
+  } catch { /* a cache that cannot be read is a cache miss */ }
   if (shell) return shell;
   try {
-    const res = await fetch(req);
-    if (res.ok) await cache.put(SHELL, res.clone());
+    const res = await fetch(e.request);
+    if (res.ok && res.type === 'basic' && rightKind(SHELL, res)) keep(e, SHELL, res);
     return res;
   } catch {
     return Response.error();
@@ -212,14 +250,14 @@ async function shellFor(req) {
 // Filenames carry a content hash, so a hit in the retained previous build is
 // the same bytes under the same name — that is what keeps a session that was
 // open across a redeploy able to reach the chunks it has not loaded yet.
-async function assetFor(req, url) {
-  const hit = await caches.match(req);
+async function assetFor(e, url) {
+  const req = e.request;
+  let hit = null;
+  try { hit = await caches.match(req); } catch { /* unreadable cache: ask the network */ }
   if (hit) return hit;
   try {
     const res = await fetch(req);
-    if (res.ok && res.type === 'basic' && CACHEABLE.test(url.pathname)) {
-      await (await caches.open(VERSION)).put(req, res.clone());
-    }
+    if (res.ok && res.type === 'basic' && CACHEABLE.test(url.pathname) && rightKind(url.pathname, res)) keep(e, req, res);
     return res;
   } catch {
     return Response.error();

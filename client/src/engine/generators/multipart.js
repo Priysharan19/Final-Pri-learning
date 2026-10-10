@@ -4,6 +4,7 @@
 // each with its own marks, answer type and worked steps. Later parts build on
 // earlier ones — "hence" chains, exactly like the back half of a real paper.
 // ─────────────────────────────────────────────────────────────────────────────
+import { withSafeInputHints } from '../inputHint.js';
 import { makeRng, ri, rc, nz, r1, r2, moneyPlain, mcq, Frac, gcd, NAMES, rad } from '../qhelpers.js';
 import { figParabola, figAnglesAtPoint, figRightTriangle, figCircle } from '../figures.js';
 
@@ -465,5 +466,5 @@ export function generateMultipart(id, seed) {
   const rng = makeRng(s);
   const payload = gen(rng);
   const totalMarks = payload.parts.reduce((t, p) => t + (p.marks || 1), 0);
-  return { seed: s, id, multipartId: id, difficulty: 3, totalMarks, ...payload };
+  return withSafeInputHints({ seed: s, id, multipartId: id, difficulty: 3, totalMarks, ...payload });
 }

@@ -5,6 +5,9 @@ import { api } from '../api.js';
 import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import { useT, useTx } from '../i18n/index.js';
+import Icon from '../components/Icon.jsx';
+import { checkRefusal, checkRefusalCopy } from '../components/checkAccess.js';
+import { CheckRefusal } from '../components/CheckRefusal.jsx';
 
 // The rivals' names are what the backend stores in match history (the English
 // name is the record), so the display name is looked up from the stored name.
@@ -60,8 +63,20 @@ export default function Match() {
     return 1200 + 60 * hist.wins - 22 * (hist.played - hist.wins);
   }, [hist]);
 
+  // Why the race could not start or go on: marking needs a signed-in account online.
+  const [refusal, setRefusal] = useState(null);
+  const refused = err => {
+    const kind = checkRefusal(err);
+    if (!checkRefusalCopy(kind, 'game')) throw err;
+    clearInterval(rivalTimer.current);
+    stateRef.current.done = true;
+    setRefusal(kind); setPhase('lobby');
+  };
+
   async function start() {
-    const r = await api.post('/match/start', { rival: rivalKey, strand });
+    setRefusal(null);
+    let r;
+    try { r = await api.post('/match/start', { rival: rivalKey, strand }); } catch (err) { refused(err); return; }
     setGame(r); setIdx(0); setMe(0); setRival(0); setResult(null); setAnswer(''); setLastAnswer(null);
     stateRef.current = { me: 0, rival: 0, done: false };
     setPhase('racing');
@@ -99,7 +114,7 @@ export default function Match() {
       if (idx + 1 >= game.questions.length) { finish(stateRef.current.me > stateRef.current.rival); return; }
       setIdx(i => i + 1);
       setTimeout(() => inputRef.current?.focus(), 30);
-    } finally { busyRef.current = false; }
+    } catch (err) { refused(err); } finally { busyRef.current = false; }
   }
 
   async function finish(reachedFirst) {
@@ -127,6 +142,12 @@ export default function Match() {
           <h1>{t('match.title')}</h1>
           <p>{t('match.subtitle')}</p>
         </div>
+        {refusal && (
+          <div className="verdict verdict-technical" role="alert" data-game-refused={refusal} style={{ marginBottom: 14 }}>
+            <span className="verdict-ico"><Icon name="alert" /><span className="sr-only">{t('verdict.notCheckedLabel')}</span></span>
+            <div><CheckRefusal kind={refusal} context="game" user={user} refreshUser={refreshUser} onRetry={start} /></div>
+          </div>
+        )}
         <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', alignItems: 'start' }}>
           <div className="grid" style={{ gap: 14 }}>
             <div className="card card-flush">

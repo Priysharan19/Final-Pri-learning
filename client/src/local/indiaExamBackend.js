@@ -5,51 +5,49 @@
 // never accidentally append the legacy HSC multipart Section II.
 //
 // It composes a paper from a source-versioned blueprint (engine/indiaExams.js)
-// through engine/indiaExamComposer.js, stores it, serves it to the exam room in
-// the same {exam} envelope the room already reads, marks it under the
-// blueprint's own grid (CBSE marks, JEE +4/−1/0 with Advanced partial marking,
-// IOQM 2/3/5), and records every attempted question through the ordinary
-// evidence path in backend.js so progress and the adaptive engine see it.
-import { get, put, del, byIndex, uuid } from './idb.js';
-import { indiaScope, indiaChapter, cleanIndiaTrack, resolveIndiaTarget } from '../engine/indiaProduct.js';
-import { pyqCellsFor, pyqAbsenceFor, PYQ_MANIFEST } from '../engine/pyq/pyqCoverage.js';
+// through engine/indiaExamComposer.js to learn what the banks can supply, and
+// sends only the paper's SPEC to the server, which chooses the questions,
+// owns the marking grid (CBSE marks, JEE +4/−1/0 with Advanced partial
+// marking, IOQM 2/3/5) and marks the paper (server/platform/exams.js; owner
+// decision 2026-10-10). The device stores the public paper and the exam id,
+// collects answers, and renders the server's result. Evidence for every
+// attempted question is recorded through the ordinary path in backend.js so
+// progress and the adaptive engine see it.
+//
+// NOTHING HERE MARKS AN ANSWER. A paper finished by an earlier app version
+// still opens in review, labelled as marked by an earlier version; it is never
+// shown as server-certified. A paper an earlier version started and did not
+// finish cannot be marked at all.
+import { get, put, del, byIndex } from './idb.js';
+import { indiaScope, indiaChapter, cleanIndiaTrack } from '../engine/indiaProduct.js';
+import { pyqAbsenceFor, PYQ_MANIFEST } from '../engine/pyq/pyqCoverage.js';
+import { indiaPyqCells, narrowCells } from '../engine/indiaExamCells.js';
 import { generateQuestion, loadBanksFor } from '../engine/generators/index.js';
-import { checkAnswer, stepCheck } from '../engine/checker.js';
 import { sanitizeFigure } from '../lib/sanitize.js';
 import {
   JEE_MAIN_MATHEMATICS_2026,
   indiaExamBlueprint,
   indiaExamPaperSpec,
-  indiaExamClaim,
-  markObjective,
-  markMultiCorrect
+  indiaExamClaim
 } from '../engine/indiaExams.js';
-import { composeIndiaPaper, composerNotes, answerText } from '../engine/indiaExamComposer.js';
-import { stampExamItem } from '../engine/contentIdentity.js';
+import { composeIndiaPaper, composerNotes, answerText, paperSpecOf } from '../engine/indiaExamComposer.js';
 import { examStepMeta, recordIndiaExamEvidence, finishIndiaExamEvidence, withExamLock } from './backend.js';
 import { assertExamAllowed, examAllowance, recordExamSimulation, requireCapability } from './entitlementGate.js';
 import { ENTITLEMENTS } from '../platform/entitlements.js';
 import {
-  startExamClock, ensureExamClock, saveExamResponses, examMarkingInputs,
-  paperFingerprint, freezeExam, isReplayOf, examSessionView
+  startExamClock, ensureExamClock, saveExamResponses, isReplayOf, examSessionView
 } from './examSession.js';
 import { analyseExam } from './examAnalysis.js';
+import {
+  isServerPaper, markedByOf, requireExamAccount, issueServerExam, issueExamLayout, serverFieldOf, scheduleCheckpoint,
+  finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, localStartOf, finishedAtOf, fetchRemotePaper
+} from './serverExam.js';
 
 function error(message, status = 400, code = 'INDIA_EXAM_ERROR') {
   return Object.assign(new Error(message), { status, code });
 }
 
-function randomSeed() {
-  try {
-    const a = new Uint32Array(1);
-    globalThis.crypto?.getRandomValues?.(a);
-    if (a[0]) return a[0] & 0x7fffffff;
-  } catch { /* fallback below */ }
-  return Math.floor(Math.random() * 0x7fffffff);
-}
-
 const safeFigure = v => sanitizeFigure(typeof v === 'string' ? v : '') || null;
-const blank = v => v === undefined || v === null || String(v).trim() === '';
 const objectiveTypes = new Set(['mcq', 'multi-mcq']);
 
 // ── Public views ────────────────────────────────────────────────────────────
@@ -58,7 +56,9 @@ function publicSingle(q) {
   return {
     prompt: q.prompt, answerType: q.answerType, mcqOptions: q.mcqOptions || null, matchList: q.matchList || null,
     figure: safeFigure(q.figure), inputHint: q.inputHint || null, answerPrefix: q.answerPrefix || null, answerSuffix: q.answerSuffix || null,
-    supportsSteps: !objectiveTypes.has(q.answerType) && !!examStepMeta(q)
+    // A server-issued item says whether working can earn method marks; the
+    // device has no step plan to ask. (A paper from an earlier version does.)
+    supportsSteps: typeof q.supportsSteps === 'boolean' ? q.supportsSteps : (!objectiveTypes.has(q.answerType) && !!examStepMeta(q))
   };
 }
 
@@ -106,44 +106,29 @@ function titleFor(spec, n) {
 
 /**
  * Previous-year cells for every chapter in scope, once their banks are loaded.
- * Two archives can contribute and both are used: the reviewed JEE department
- * catalog for JEE tracks, and the source-cited archive (engine/pyq) for any
- * track it publishes — which today is CBSE Classes 10 and 12 and JEE Advanced.
+ * Two archives can contribute and both are used (engine/indiaExamCells.js).
  * Authored forms fill whatever the archives cannot, and the composer labels
  * every question with which of the two it was.
  */
 async function pyqCellsByChapter(track, chapters) {
-  const cells = new Map();
-  const generators = new Set();
-  for (const chapter of chapters) {
-    const list = [];
-    if (track === 'jee-main' || track === 'jee-advanced') {
-      for (const difficulty of [3, 4]) {
-        const target = resolveIndiaTarget(chapter, { track, grade: 12, difficulty, random: () => 0 });
-        if (target?.pyqArchive !== 'jee-question-department') continue;
-        if (list.some(c => c.generator === target.generator && c.difficulty === target.difficulty)) continue;
-        list.push({ generator: target.generator, difficulty: target.difficulty, pyq: true });
-      }
-    }
-    // Every rung the source-cited archive actually publishes for this chapter.
-    // buildItem narrows them to the section's own window before drawing.
-    for (const cell of pyqCellsFor(track, chapter.id)) list.push(cell);
-    if (!list.length) continue;
-    for (const cell of list) generators.add(cell.generator);
-    cells.set(chapter.id, list);
-  }
+  const cells = indiaPyqCells(track, chapters);
+  const generators = new Set([...cells.values()].flatMap(list => list.map(cell => cell.generator)));
   if (generators.size) await loadBanksFor([...generators]);
   return cells;
 }
 
-/** Cells inside a difficulty window, or the nearest rungs to it when none are. */
-function narrowCells(cells, { min = 1, max = 4 } = {}) {
-  if (!cells.length) return cells;
-  const inside = cells.filter(c => c.difficulty >= min && c.difficulty <= max);
-  if (inside.length) return inside;
-  const gap = c => Math.min(Math.abs(c.difficulty - min), Math.abs(c.difficulty - max));
-  const best = Math.min(...cells.map(gap));
-  return cells.filter(c => gap(c) === best);
+/** The device's row for one server-issued question: the public payload and where it sits on the paper. */
+function rowOf(pid, track, examId, sq, now, id = String(sq.id)) {
+  return {
+    id, pid, subtopic: sq.payload.subtopic || sq.generator, difficulty: sq.difficulty,
+    // The public payload only: prompt, options, parts. No answer, step or trap.
+    payload: sq.payload,
+    india: { chapterId: sq.chapterId, track, dotpointIndex: null },
+    mode: 'exam', examId, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: now,
+    indiaExamSection: sq.section, indiaExamSectionLabel: sq.sectionLabel, indiaExamItem: sq.item, examOrder: sq.order,
+    examMarking: sq.marking, sourceKind: sq.pyq ? 'reviewed-jee-pyq' : 'authored-generator', conversion: sq.conversion,
+    examServer: true
+  };
 }
 
 async function createIndiaExam(profile, body = {}) {
@@ -160,46 +145,62 @@ async function createIndiaExam(profile, body = {}) {
   if (!chapters.length) throw error('The curriculum scope for this track is unavailable.', 503, 'INDIA_SCOPE_UNAVAILABLE');
   await loadBanksFor([...new Set(chapters.flatMap(c => (c.covers || []).map(x => x.gen)))]);
   const pyqCells = await pyqCellsByChapter(track, chapters);
-  const seed = Number.isFinite(Number(body.seed)) && Number(body.seed) > 0 ? Math.floor(Number(body.seed)) & 0x7fffffff : randomSeed();
+  const count = (await byIndex('exams', 'pid', profile.id)).filter(e => e?.indiaExam?.blueprintId === spec.id).length;
+  const title = titleFor(spec, count + 1);
+  let seed = null;
+  let paper = null;
+  let issued = null;
+  // The LAYOUT of the paper (which chapter each slot is allotted, which slots
+  // offer a choice) is the server's: it hands this account one layout seed for
+  // the blueprint, and accepts a paper composed for that seed only. A seed in
+  // the request body is not honoured — the device does not pick a layout.
+  // A spec the server cannot issue (a recipe whose bank came up short on its
+  // own draws) retires that layout on the server; the next one is asked for
+  // and composed, twice, before the student is told. Nothing is ever dropped
+  // from a paper to make it fit.
+  for (let attempt = 0; attempt < 3 && !issued; attempt++) {
+    seed = await issueExamLayout(profile.id, { track, grade, variant });
+    paper = composeIndiaPaper(spec, {
+      seed, draw: generateQuestion, chapters,
+      // The section's own difficulty window narrows the chapter's archive cells,
+      // by the same nearest-rung rule chapterCells uses for authored ones: a
+      // one-mark Section A slot should not be handed a D4 JEE Advanced item just
+      // because the chapter has one, but a chapter whose only past-paper question
+      // sits a rung outside the window is still better than no past paper at all.
+      pyqCellsFor: (chapter, range) => narrowCells(pyqCells.get(chapter.id) || [], range)
+    });
+    if (body.source === 'reviewed' && paper.composition.pyq < paper.questions.length) {
+      throw error(
+        'The reviewed JEE PYQ archive cannot currently supply enough unique questions for a reviewed-only Mathematics-section simulation.',
+        503,
+        'JEE_REVIEWED_BANK_INSUFFICIENT'
+      );
+    }
 
-  const paper = composeIndiaPaper(spec, {
-    seed, draw: generateQuestion, chapters,
-    // The section's own difficulty window narrows the chapter's archive cells,
-    // by the same nearest-rung rule chapterCells uses for authored ones: a
-    // one-mark Section A slot should not be handed a D4 JEE Advanced item just
-    // because the chapter has one, but a chapter whose only past-paper question
-    // sits a rung outside the window is still better than no past paper at all.
-    pyqCellsFor: (chapter, range) => narrowCells(pyqCells.get(chapter.id) || [], range)
-  });
-  if (body.source === 'reviewed' && paper.composition.pyq < paper.questions.length) {
-    throw error(
-      'The reviewed JEE PYQ archive cannot currently supply enough unique questions for a reviewed-only Mathematics-section simulation.',
-      503,
-      'JEE_REVIEWED_BANK_INSUFFICIENT'
-    );
+    // The device's own draws were only how it learnt what the banks can supply.
+    // What goes to the server is the recipe of each item; the server chooses the
+    // questions, and no answer to any of them comes back until it has marked.
+    try {
+      issued = await issueServerExam(profile.id, paperSpecOf(paper, { track, grade, variant }),
+        `india:${track}:${grade}:${variant}:${body.source === 'reviewed' ? 'reviewed' : 'any'}`,
+        { seed, units: paper.units, composition: paper.composition, reducedPattern: paper.reducedPattern });
+    } catch (err) {
+      // EXAM_LAYOUT_NOT_ISSUED: the layout was spent meanwhile (another device
+      // of this account started a paper); the fresh one is composed next.
+      if ((err?.code !== 'EXAM_CONTENT_UNSUPPORTED' && err?.code !== 'EXAM_LAYOUT_NOT_ISSUED') || attempt === 2) throw err;
+    }
   }
 
-  const examId = uuid();
+  const examId = String(issued.id);
   const questionIds = [];
   const created = [];
-  const rows = [];
   const now = Date.now();
   try {
-    for (const q of paper.questions) {
-      const row = {
-        id: uuid(), pid: profile.id, subtopic: q.payload.subtopic, difficulty: q.difficulty,
-        // Every paper item is versioned like a practice question, so a sat
-        // paper stays interpretable after the banks behind it change.
-        payload: stampExamItem(q.payload, { blueprintId: spec.id, paperSeed: seed, order: q.order }),
-        india: { chapterId: q.chapterId, track, dotpointIndex: null },
-        mode: 'exam', examId, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: now,
-        indiaExamSection: q.section, indiaExamSectionLabel: q.sectionLabel, indiaExamItem: q.item, examOrder: q.order,
-        examMarking: q.marking, sourceKind: q.pyq ? 'reviewed-jee-pyq' : 'authored-generator', conversion: q.conversion
-      };
+    for (const sq of issued.questions) {
+      const row = rowOf(profile.id, track, examId, sq, now);
       await put('questions', row);
       created.push(row.id);
       questionIds.push(row.id);
-      rows.push(row);
     }
   } catch (err) {
     // Exam generation is atomic from the student's perspective: never leave a
@@ -208,19 +209,30 @@ async function createIndiaExam(profile, body = {}) {
     throw err;
   }
 
-  const count = (await byIndex('exams', 'pid', profile.id)).filter(e => e?.indiaExam?.blueprintId === spec.id).length;
+  // What the device knew about the spec the server actually issued from.
+  const composed = issued.composed || { seed, units: paper.units, composition: paper.composition, reducedPattern: paper.reducedPattern };
+  // What the paper is made of is counted from what the server issued.
+  const tally = fn => issued.questions.filter(fn).length;
+  const composition = {
+    ...composed.composition,
+    pyq: tally(q => q.pyq), authored: tally(q => !q.pyq),
+    nativeMcq: tally(q => q.conversion === 'native-mcq'), numericToMcq: tally(q => q.conversion === 'numeric-to-mcq'),
+    assertionReason: tally(q => q.item === 'assertion-reason'), caseStudy: tally(q => q.item === 'case-study'),
+    multiCorrect: tally(q => q.item === 'multi-correct'), matrixMatch: tally(q => q.item === 'matrix-match'),
+    internalChoice: tally(q => q.payload.alt || q.payload.parts?.some(part => part.alt))
+  };
   const exam = {
     id: examId,
     pid: profile.id,
     year: profile.year,
     pathway: null,
-    title: titleFor(spec, count + 1),
-    durationMin: spec.durationMinutes || spec.recommendedSectionMinutes || 60,
+    title,
+    durationMin: issued.durationMin,
     questionIds,
     createdAt: now,
     finishedAt: null,
     score: null,
-    total: paper.totalMarks,
+    total: issued.total,
     detail: null,
     summary: null,
     indiaExam: {
@@ -233,35 +245,39 @@ async function createIndiaExam(profile, body = {}) {
       fullPaper: track === 'cbse' || track === 'olympiad',
       sectionTimerOfficial: !!spec.sectionTimerIsOfficial,
       fullPaperDurationMinutes: spec.fullPaperDurationMinutes || spec.durationMinutes || null,
-      seed,
+      // The seed the device composed the SPEC from. The questions are the
+      // server's; no seed on this device reproduces them.
+      seed: composed.seed,
       sections: spec.sections.map(s => ({
         id: s.id, label: s.label || `Section ${s.id}`, questions: s.questions, marks: s.marks,
         marksEach: s.marksEach ?? s.correct, negative: Math.abs(Number(s.incorrect || 0)), partialPerOption: s.partialPerOption ?? null,
         types: s.types || [s.type]
       })),
-      units: paper.units,
+      units: composed.units,
       // What this paper actually drew from the previous-year archive, and what
       // the archive holds. `absent` is present when the student's track is one
       // the archive deliberately carries nothing for, so an empty PYQ count is
       // a stated reason rather than a silence.
       pyq: {
-        used: paper.composition.pyq,
-        questions: paper.questions.length,
+        used: composition.pyq,
+        questions: issued.questions.length,
         archive: PYQ_MANIFEST,
         absent: pyqAbsenceFor(track)
       },
-      composition: paper.composition,
-      reducedPattern: paper.reducedPattern,
+      composition,
+      reducedPattern: composed.reducedPattern,
       composerNotes: composerNotes(spec),
       sources: (spec.sources || []).map(s => ({ authority: s.authority, title: s.title, url: s.url }))
     },
-    // The paper as composed, fingerprinted once, so finalisation can record
-    // exactly which version of it was marked.
-    paperVersion: paperFingerprint(rows)
+    // The server's own immutable version of what is asked and how it is marked.
+    paperVersion: issued.paperVersion,
+    server: serverFieldOf(issued, await requireExamAccount(profile.id).catch(() => null))
   };
   // The clock starts when the paper exists: the room opens straight onto it.
-  startExamClock(exam, Date.now());
+  // The server keeps its own; this one is never later (serverExam.js).
+  startExamClock(exam, localStartOf(issued));
   await put('exams', exam);
+  noteReconciled(exam.id);
   return { exam: await examView(profile, exam.id) };
 }
 
@@ -274,7 +290,26 @@ async function requireExam(profile, id) {
 }
 
 async function examView(profile, id) {
-  const exam = await requireExam(profile, id);
+  let exam = await requireExam(profile, id);
+  if (isServerPaper(exam) && exam.server.remote && exam.finishedAt) {
+    await hydrateRemote(profile, id);
+    exam = await requireExam(profile, id);
+  }
+  // An open paper the server owns is brought up to date with it first: a
+  // queued finish is sent, a result produced on another device is adopted, a
+  // newer snapshot replaces the local one. Unreachable server: local state stands.
+  if (isServerPaper(exam) && (!exam.finishedAt || exam.server.restored)) {
+    await withExamLock(id, async () => {
+      const fresh = await requireExam(profile, id);
+      if (fresh.finishedAt && !fresh.server.restored) return;
+      const out = await reconcileWithServer(fresh, {
+        rebuildRow: (sq, localId) => rowOf(profile.id, fresh.indiaExam?.track, fresh.id, sq, fresh.createdAt, localId)
+      });
+      if (out.result && !fresh.finishedAt) await adoptResult(fresh, out.result);
+      else if (out.changed) await put('exams', fresh);
+    });
+    exam = await requireExam(profile, id);
+  }
   // A paper stored before the deadline was recorded gets one now, from when it
   // was created, and keeps it.
   // One reading of the clock for the whole view, so what is stored and what
@@ -299,7 +334,11 @@ async function examView(profile, id) {
     detail: exam.detail || null,
     summary: exam.summary || null,
     analysis: exam.finishedAt && exam.detail ? analyseExam({ detail: exam.detail, indiaExam: exam.indiaExam }) : null,
-    session: examSessionView(exam, viewedAt),
+    session: { ...examSessionView(exam, viewedAt), pending: pendingView(exam) },
+    // Who marked a finished paper: the server, or an earlier app version on
+    // this device. Only the first is a certified result.
+    markedBy: markedByOf(exam),
+    serverIssued: isServerPaper(exam),
     indiaExam: exam.indiaExam
   };
 }
@@ -316,12 +355,15 @@ async function listExams(profile) {
     exams: rows.map(e => ({
       id: e.id, title: e.title, year: e.year, duration_min: e.durationMin,
       created_at: e.createdAt, finished_at: e.finishedAt, score: e.score, total: e.total,
+      marked_by: markedByOf(e), pending: !!e.pendingFinish,
       indiaExam: e.indiaExam
     }))
   };
 }
 
-// ── Marking ─────────────────────────────────────────────────────────────────
+// ── Results ─────────────────────────────────────────────────────────────────
+// The server marks (server/platform/exams.js). What follows stores its result
+// and records the evidence it certifies; no answer is checked on this device.
 
 function criteriaFor(q, marks, marking) {
   if (objectiveTypes.has(q.answerType) || (marking.incorrect || 0) < 0) {
@@ -336,64 +378,13 @@ function criteriaFor(q, marks, marking) {
   }));
 }
 
-function parseIndices(given) {
-  return String(given).split(/[,\s]+/).map(s => s.trim()).filter(Boolean).map(Number).filter(Number.isInteger);
-}
-
-/**
- * Mark one response under a marking grid. Written answers that are wrong but
- * come with typed working go through Step Check for method marks (capped one
- * below full marks), exactly as the legacy paper does; objective and
- * negative-marking items never earn method marks.
- */
-function markResponse(q, given, working, marking) {
-  const marks = Number(marking.correct);
-  if (blank(given)) {
-    return { unanswered: true, correct: false, awarded: markObjective(marking, { unanswered: true }), feedback: 'Not attempted.', partial: null, markingScheme: objectiveTypes.has(q.answerType) ? 'objective' : 'final-answer' };
-  }
-  if (q.answerType === 'multi-mcq') {
-    const chosen = parseIndices(given);
-    const r = markMultiCorrect(marking, chosen, q.answer?.correctIndices || []);
-    const note = r.outcome === 'partial'
-      ? `+${r.awarded}: every option you chose is correct, but not all correct options were chosen.`
-      : r.outcome === 'wrong' ? `${r.awarded}: at least one chosen option is wrong.` : '';
-    return { unanswered: false, correct: r.outcome === 'full', awarded: r.awarded, feedback: note, partial: r.outcome === 'partial' ? { awarded: r.awarded, note } : null, markingScheme: 'objective-partial', outcome: r.outcome };
-  }
-  let result;
-  try { result = checkAnswer(q, given); } catch { result = { correct: false }; }
-  const correct = !!result.correct;
-  let awarded = markObjective(marking, { unanswered: false, correct });
-  let feedback = result.feedback || '';
-  if (!feedback && q.answerType === 'mcq' && q.answer?.optionTraps) feedback = q.answer.optionTraps[Number(given)] || '';
-  let partial = null;
-  let markingScheme = objectiveTypes.has(q.answerType) || (marking.incorrect || 0) < 0 || marks <= 1 ? 'objective' : 'final-answer';
-  if (!correct && markingScheme === 'final-answer' && !blank(working)) {
-    const meta = examStepMeta(q);
-    if (meta) {
-      try {
-        const rep = stepCheck(meta, String(working));
-        const okLines = (rep?.lines || []).filter(l => l.status === 'ok').length;
-        if (okLines > 0) {
-          awarded = Math.min(marks - 1, okLines);
-          partial = { okLines, awarded, note: `${awarded} method mark${awarded === 1 ? '' : 's'} — the final answer was wrong, but ${okLines} line${okLines === 1 ? '' : 's'} of your working checked out.` };
-        }
-        markingScheme = 'step-marked';
-      } catch { /* final-answer marks stand */ }
-    }
-  }
-  return { unanswered: false, correct, awarded, feedback, partial, markingScheme };
-}
-
-function solutionFor(q, marks, marking) {
-  return { steps: q.steps || [], answerText: answerText(q), criteria: criteriaFor(q, marks, marking) };
-}
-
 function finalResult(exam, extra = {}) {
   const pct = Math.round(1000 * exam.score / Math.max(1, exam.total)) / 10;
   return {
     score: exam.score, total: exam.total, pct, detail: exam.detail, summary: exam.summary,
     analysis: analyseExam({ detail: exam.detail, indiaExam: exam.indiaExam }),
     final: { submittedAt: exam.final?.submittedAt ?? exam.finishedAt, finalisedBy: exam.final?.finalisedBy ?? null, late: !!exam.final?.late, paperVersion: exam.final?.paperVersion ?? null },
+    markedBy: markedByOf(exam),
     indiaExam: exam.indiaExam,
     ...extra
   };
@@ -402,9 +393,106 @@ function finalResult(exam, extra = {}) {
 async function saveResponses(profile, id, body = {}) {
   const exam = await requireExam(profile, id);
   if (exam.finishedAt) throw error('This paper has been submitted — it can no longer change.', 409, 'INDIA_EXAM_ALREADY_SUBMITTED');
+  if (exam.pendingFinish) throw error('This paper has been submitted and is waiting to be marked — it can no longer change.', 409, 'EXAM_SUBMITTED_PENDING');
   const saved = saveExamResponses(exam, body);
   await put('exams', exam);
-  return { saved: true, ...saved };
+  // The device copy is saved; the server's follows a moment later and is
+  // retried until it lands. It never delays or fails this save.
+  if (isServerPaper(exam)) scheduleCheckpoint(exam.id, body.urgent === true ? 0 : undefined);
+  return { saved: true, ...saved, checkpoint: isServerPaper(exam) ? { savedRev: exam.server.savedRev || 0, savedAt: exam.server.savedAt || null } : null };
+}
+
+/**
+ * Store the server's result on the paper and record the evidence it certifies.
+ * Every attempt carries the attempt id the server gave it, so recording is
+ * exactly-once on this device and is recognised when the same event is pulled
+ * back through sync.
+ */
+async function adoptResult(exam, serverResult, { record = true } = {}) {
+  const result = localResult(exam, serverResult);
+  const detail = [];
+  for (const d of result.detail) {
+    const row = await get('questions', d.id);
+    const chapter = indiaChapter(row?.india?.chapterId || d.chapterId);
+    const out = {
+      ...d, figure: safeFigure(d.figure),
+      chapterId: chapter?.id || d.chapterId || null, subtopic: chapter?.id || d.subtopic, subtopicName: chapter?.name || d.subtopicName
+    };
+    if (out.parts) out.parts = out.parts.map(part => ({ ...part, figure: safeFigure(part.figure) }));
+    detail.push(out);
+    if (!row) continue;
+    const q = row.payload || {};
+    // `record: false` — a paper sat on another device: its evidence reaches
+    // this one through the server's own graded-attempt events, once.
+    if (!record) { /* store the solution below; record nothing */ } else if (d.multipart) {
+      for (const part of d.parts || []) {
+        if (part.unanswered || !part.attemptId) continue;
+        const shown = (q.parts || []).find(x => String(x.key) === String(part.key));
+        const chosen = part.choiceTaken === 'or' ? shown?.alt : shown;
+        const synth = { ...(chosen || {}), prompt: part.prompt, answerType: part.answerType, subtopic: part.subtopic || q.subtopic, difficulty: part.difficulty || q.difficulty || 2 };
+        await recordIndiaExamEvidence(row, synth, {
+          correct: part.correct, given: part.given, ms: Math.round((d.ms || 0) / Math.max(1, d.parts.length)), feedback: part.feedback,
+          evidenceKey: `part:${part.key}`, serverAttemptId: part.attemptId, repeat: part.repeat === true
+        });
+      }
+    } else if (!d.unanswered && d.attemptId) {
+      const chosen = d.choiceTaken === 'or' && q.alt ? { ...q.alt, subtopic: q.alt.subtopic || q.subtopic, difficulty: q.alt.difficulty || q.difficulty || 2 } : q;
+      await recordIndiaExamEvidence(row, chosen, {
+        correct: d.correct, given: d.given, ms: d.ms, feedback: d.feedback, evidenceKey: 'question', serverAttemptId: d.attemptId,
+        repeat: d.repeat === true,
+        trapWhy: !d.correct && d.feedback && (d.repairOpportunities || []).includes(d.feedback) ? d.feedback : null
+      });
+    }
+    // The solution the result disclosed now lives with the question, for
+    // History and the printable paper.
+    const settled = (await get('questions', d.id)) || row;
+    settled.answered = 1;
+    settled.serverReceipt = d.multipart
+      ? { authoritative: true, examId: exam.server.examId, parts: (d.parts || []).map(part => ({ key: part.key, answerText: part.answerText, steps: part.steps || [], attemptId: part.attemptId || null })) }
+      : { authoritative: true, examId: exam.server.examId, attemptId: d.attemptId || null, solution: d.solution };
+    await put('questions', settled);
+  }
+  // The server's time, and never earlier than a time this paper has already seen.
+  exam.finishedAt = finishedAtOf(exam, result);
+  exam.score = result.score;
+  exam.total = result.total;
+  exam.detail = detail;
+  exam.summary = result.summary;
+  exam.final = serverFinal(exam, { ...result, detail });
+  delete exam.responses;
+  delete exam.pendingFinish;
+  await put('exams', exam);
+  if (!record) return [];
+  const pct = Math.round(1000 * exam.score / Math.max(1, exam.total)) / 10;
+  return finishIndiaExamEvidence(Math.max(0, pct));
+}
+
+/**
+ * A paper the server marked on another device reached this one as a result
+ * only. Read its public questions and stored result back from the account so
+ * it opens in review here. Nothing is marked and no evidence is recorded.
+ */
+async function hydrateRemote(profile, id) {
+  await withExamLock(id, async () => {
+    const exam = await requireExam(profile, id);
+    const remote = await fetchRemotePaper(exam);
+    if (!remote) return;
+    const track = exam.indiaExam?.track || cleanIndiaTrack(profile.indiaTrack || 'cbse', Number(profile.year));
+    const ids = [];
+    for (const sq of remote.paper.questions) {
+      const row = rowOf(profile.id, track, exam.id, sq, exam.createdAt);
+      await put('questions', row);
+      ids.push(row.id);
+    }
+    exam.questionIds = ids;
+    exam.server = { ...exam.server, questionIds: ids.slice(), remote: false };
+    exam.durationMin = remote.paper.durationMin;
+    exam.paperVersion = remote.paper.paperVersion;
+    const kept = exam.finishedAt;
+    await adoptResult(exam, remote.result, { record: false });
+    // History keeps the time the result event gave this paper.
+    if (kept) { exam.finishedAt = kept; await put('exams', exam); }
+  });
 }
 
 async function submitExam(profile, id, body = {}) {
@@ -413,150 +501,34 @@ async function submitExam(profile, id, body = {}) {
   // raced the first — gets the frozen result back rather than a second mark.
   if (isReplayOf(exam, body)) return finalResult(exam, { replayed: true, newBadges: [] });
   if (exam.finishedAt) throw error('Exam already submitted.', 409, 'INDIA_EXAM_ALREADY_SUBMITTED');
-  const now = Date.now();
-  // What is marked is decided by the clock, not by the request: after the
-  // deadline only the responses saved before it count.
-  const inputs = examMarkingInputs(exam, body, now);
-  // Never earlier than the paper has already seen (see observeClock).
-  const at = Number(exam.latestSeenAt) || now;   // the paper's time, after any rollback correction
-  const answers = inputs.answers;
-  const workings = inputs.workings;
-  const times = inputs.times;
-  const totalMs = Math.max(0, Number(inputs.ms) || 0);
-  const nQ = Math.max(1, (exam.questionIds || []).length);
-  const timedPaper = Object.keys(times).length > 0;
-  const markedRows = [];
-
-  let score = 0;
-  let total = 0;
-  const detail = [];
-  const sections = new Map();
-  const chapters = new Map();
-  const schemes = {};
-  let negativeMarks = 0;
-  const bump = (map, key, seed, fn) => { const row = map.get(key) || seed(); fn(row); map.set(key, row); };
-  const sectionSeed = row => () => ({ id: row.indiaExamSection, label: row.indiaExamSectionLabel || `Section ${row.indiaExamSection}`, questions: 0, attempted: 0, correct: 0, incorrect: 0, partial: 0, unanswered: 0, marks: 0, awarded: 0, negative: 0, ms: 0 });
-  const chapterSeed = (chapter, row) => () => ({ id: chapter?.id || row.subtopic, label: chapter?.name || row.subtopic, questions: 0, attempted: 0, correct: 0, incorrect: 0, partial: 0, unanswered: 0, marks: 0, awarded: 0, negative: 0, ms: 0 });
-  const tally = (agg, out) => {
-    agg.questions++; agg.marks += out.marks; agg.awarded += out.awarded; agg.ms += out.ms;
-    if (out.unanswered) agg.unanswered++; else { agg.attempted++; if (out.correct) agg.correct++; else if (out.awarded > 0) agg.partial++; else agg.incorrect++; }
-    if (out.awarded < 0) agg.negative += -out.awarded;
-  };
-
-  for (const qid of exam.questionIds || []) {
-    const row = await get('questions', qid);
-    if (!row) continue;
-    const q = row.payload;
-    const marking = row.examMarking || { correct: 1, incorrect: 0, unanswered: 0 };
-    const chapter = indiaChapter(row.india?.chapterId);
-    markedRows.push(row);
-    // When the room measured time per question, that measurement is the time —
-    // zero for a question never opened. Otherwise the paper's total is split
-    // evenly for the evidence record, and the detail says it was not measured.
-    const timed = timedPaper;
-    const ms = timedPaper ? Math.max(0, Number(times[qid]) || 0) : Math.round(totalMs / nQ);
-    const base = {
-      id: qid, order: row.examOrder, section: row.indiaExamSection, sectionLabel: row.indiaExamSectionLabel || `Section ${row.indiaExamSection}`,
-      item: row.indiaExamItem, chapterId: chapter?.id || null, subtopic: chapter?.id || q.subtopic, subtopicName: chapter?.name || q.subtopic,
-      difficulty: q.difficulty || row.difficulty || 2, ms, timed, sourceKind: row.sourceKind
-    };
-
-    let out;
-    if (q.multipart) {
-      const partsOut = [];
-      let qMarks = 0, qAwarded = 0, allCorrect = true, anyAnswered = false;
-      for (const [partIndex, part] of (q.parts || []).entries()) {
-        const mainGiven = answers[`${qid}::${part.key}`];
-        const useAlt = blank(mainGiven) && part.alt && !blank(answers[`${qid}::${part.key}::or`]);
-        const chosen = useAlt ? part.alt : part;
-        const given = useAlt ? answers[`${qid}::${part.key}::or`] : mainGiven;
-        const working = useAlt ? workings[`${qid}::${part.key}::or`] : workings[`${qid}::${part.key}`];
-        const synth = { ...chosen, subtopic: chosen.subtopic || q.subtopic, difficulty: chosen.difficulty || q.difficulty || 2 };
-        const partMarking = { correct: part.marks, incorrect: 0, unanswered: 0 };
-        const r = markResponse(synth, given, working, partMarking);
-        qMarks += part.marks; qAwarded += r.awarded;
-        if (!r.correct) allCorrect = false;
-        if (!r.unanswered) {
-          anyAnswered = true;
-          await recordIndiaExamEvidence(row, synth, {
-            correct: r.correct, given, ms: Math.round(ms / (q.parts.length || 1)), feedback: r.feedback,
-            evidenceKey: `part:${part.key ?? partIndex}`
-          });
-        }
-        schemes[r.markingScheme] = (schemes[r.markingScheme] || 0) + 1;
-        partsOut.push({
-          key: part.key, prompt: chosen.prompt, answerType: chosen.answerType, mcqOptions: chosen.mcqOptions || null, figure: safeFigure(chosen.figure),
-          choiceTaken: useAlt ? 'or' : (part.alt ? 'main' : null),
-          given: blank(given) ? '' : String(given), correct: r.correct, unanswered: r.unanswered, marks: part.marks, awarded: r.awarded,
-          feedback: r.feedback, partial: r.partial, markingScheme: r.markingScheme, answerText: answerText(chosen), steps: chosen.steps || []
-        });
-      }
-      if (!row.answered) { row.answered = 1; await put('questions', row); }
-      out = {
-        ...base, multipart: true, title: q.title, stem: q.stem, figure: safeFigure(q.figure),
-        marks: qMarks, awarded: qAwarded, correct: allCorrect && anyAnswered, unanswered: !anyAnswered, parts: partsOut, markingScheme: 'final-answer'
-      };
-    } else {
-      const mainGiven = answers[qid];
-      const useAlt = blank(mainGiven) && q.alt && !blank(answers[`${qid}::or`]);
-      const chosen = useAlt ? { ...q.alt, subtopic: q.alt.subtopic || q.subtopic, difficulty: q.alt.difficulty || q.difficulty || 2 } : q;
-      const given = useAlt ? answers[`${qid}::or`] : mainGiven;
-      const working = useAlt ? workings[`${qid}::or`] : workings[qid];
-      const r = markResponse(chosen, given, working, marking);
-      if (!r.unanswered) {
-        await recordIndiaExamEvidence(row, chosen, { correct: r.correct, given, ms, feedback: r.feedback, evidenceKey: 'question' });
-      } else if (!row.answered) {
-        row.answered = 1;
-        await put('questions', row);
-      }
-      schemes[r.markingScheme] = (schemes[r.markingScheme] || 0) + 1;
-      out = {
-        ...base, prompt: chosen.prompt, answerType: chosen.answerType, mcqOptions: chosen.mcqOptions || null, matchList: chosen.matchList || null,
-        figure: safeFigure(chosen.figure), choiceTaken: useAlt ? 'or' : (q.alt ? 'main' : null),
-        given: blank(given) ? '' : String(given), correct: r.correct, unanswered: r.unanswered, feedback: r.feedback,
-        marks: Number(marking.correct), negativeMarks: Math.abs(Number(marking.incorrect || 0)), awarded: r.awarded, partial: r.partial,
-        working: blank(working) ? null : String(working), markingScheme: r.markingScheme, outcome: r.outcome || (r.unanswered ? 'unanswered' : r.correct ? 'correct' : 'wrong'),
-        solution: solutionFor(chosen, Number(marking.correct), marking)
-      };
-    }
-
-    score += out.awarded;
-    total += out.marks;
-    if (out.awarded < 0) negativeMarks += -out.awarded;
-    bump(sections, row.indiaExamSection, sectionSeed(row), agg => tally(agg, out));
-    bump(chapters, chapter?.id || row.subtopic, chapterSeed(chapter, row), agg => tally(agg, out));
-    detail.push(out);
+  // A paper an earlier version of the app composed holds its answers on the
+  // device. Marking is the server's alone now, and the server never issued it.
+  if (!isServerPaper(exam)) {
+    throw error('This paper was started in an earlier version of the app, so it cannot be marked. Start a new paper to be marked.', 409, 'EXAM_NOT_SERVER_ISSUED');
   }
-
-  const pct = Math.round(1000 * score / Math.max(1, total)) / 10;
-  const summary = {
-    sections: [...sections.values()],
-    chapters: [...chapters.values()].sort((a, b) => a.label.localeCompare(b.label)),
-    negativeMarks,
-    totalMs: totalMs || detail.reduce((n, d) => n + (d.ms || 0), 0),
-    markingSchemes: schemes
-  };
-  exam.finishedAt = at;
-  exam.score = score;
-  exam.total = total;
-  exam.detail = detail;
-  exam.summary = summary;
-  freezeExam(exam, { inputs, paperVersion: paperFingerprint(markedRows), submissionKey: body.submissionKey, now: at });
-  await put('exams', exam);
-  const newBadges = await finishIndiaExamEvidence(Math.max(0, pct));
-  return { ...finalResult(exam), pct, newBadges };
+  const out = await finishOnServer(exam, body, Date.now());
+  if (out.pending) {
+    // Queued: frozen on the device, unmarked, and no score exists yet.
+    await put('exams', exam);
+    return { ...out.pending, score: null, total: exam.total, detail: null, newBadges: [] };
+  }
+  const newBadges = await adoptResult(exam, out.result);
+  return { ...finalResult(exam), newBadges };
 }
 
 // ── Printable paper ─────────────────────────────────────────────────────────
 
-function printableSingle(q, marks, marking, finished) {
-  const view = { prompt: q.prompt, answerType: q.answerType, mcqOptions: q.mcqOptions || null, matchList: q.matchList || null, figure: safeFigure(q.figure), answerPrefix: q.answerPrefix || null, answerSuffix: q.answerSuffix || null };
-  return finished ? { ...view, answerText: answerText(q), steps: q.steps || [], criteria: criteriaFor(q, marks, marking) } : view;
+const printView = q => ({ prompt: q.prompt, answerType: q.answerType, mcqOptions: q.mcqOptions || null, matchList: q.matchList || null, figure: safeFigure(q.figure), answerPrefix: q.answerPrefix || null, answerSuffix: q.answerSuffix || null });
+
+/** A paper from an earlier version holds its own solutions; print them as it always did. */
+function printableLegacy(q, marks, marking, finished) {
+  return finished ? { ...printView(q), answerText: answerText(q), steps: q.steps || [], criteria: criteriaFor(q, marks, marking) } : printView(q);
 }
 
 async function paper(profile, id) {
   const exam = await requireExam(profile, id);
   const finished = !!exam.finishedAt;
+  const marked = new Map((exam.detail || []).map(d => [String(d.id), d]));
   const questions = [];
   for (const qid of exam.questionIds || []) {
     const row = await get('questions', qid);
@@ -566,21 +538,40 @@ async function paper(profile, id) {
     const chapter = indiaChapter(row.india?.chapterId);
     const marks = Number(marking.correct);
     const base = { section: row.indiaExamSection, sectionLabel: row.indiaExamSectionLabel, item: row.indiaExamItem, marks, negativeMarks: Math.abs(Number(marking.incorrect || 0)), subtopicName: chapter?.name || q.subtopic, difficulty: q.difficulty || row.difficulty };
+    // A server-issued paper prints its questions from the public payload and,
+    // once marked, its solutions from the server's result — the only place
+    // they exist on this device.
+    const d = row.examServer ? marked.get(String(qid)) : null;
     if (q.multipart) {
       questions.push({
         ...base, multipart: true, stem: q.stem, title: q.title, figure: safeFigure(q.figure),
-        parts: (q.parts || []).map(pt => ({
-          key: pt.key, marks: pt.marks, ...printableSingle(pt, pt.marks, { correct: pt.marks, incorrect: 0, unanswered: 0 }, finished),
-          alt: pt.alt ? { key: pt.key, marks: pt.marks, ...printableSingle(pt.alt, pt.marks, { correct: pt.marks, incorrect: 0, unanswered: 0 }, finished) } : null
-        })),
+        parts: (q.parts || []).map(pt => {
+          if (!row.examServer) {
+            return {
+              key: pt.key, marks: pt.marks, ...printableLegacy(pt, pt.marks, { correct: pt.marks, incorrect: 0, unanswered: 0 }, finished),
+              alt: pt.alt ? { key: pt.key, marks: pt.marks, ...printableLegacy(pt.alt, pt.marks, { correct: pt.marks, incorrect: 0, unanswered: 0 }, finished) } : null
+            };
+          }
+          const dp = (d?.parts || []).find(x => String(x.key) === String(pt.key));
+          const solved = (which, fallback) => (finished && dp ? { answerText: dp.choices?.[which]?.answerText ?? fallback?.answerText ?? '', steps: dp.choices?.[which]?.steps || fallback?.steps || [] } : {});
+          return {
+            key: pt.key, marks: pt.marks, ...printView(pt), ...solved('main', dp?.choiceTaken === 'or' ? null : dp),
+            alt: pt.alt ? { key: pt.key, marks: pt.marks, ...printView(pt.alt), ...solved('or', dp?.choiceTaken === 'or' ? dp : null) } : null
+          };
+        }),
         criteria: finished ? (q.parts || []).map(pt => ({ mark: pt.marks, text: `Part (${pt.key})` })) : undefined
       });
       continue;
     }
-    questions.push({
-      ...base, ...printableSingle(q, marks, marking, finished),
-      choice: q.alt ? printableSingle(q.alt, marks, marking, finished) : null
-    });
+    if (!row.examServer) {
+      questions.push({ ...base, ...printableLegacy(q, marks, marking, finished), choice: q.alt ? printableLegacy(q.alt, marks, marking, finished) : null });
+      continue;
+    }
+    const solved = which => {
+      const solution = d?.choices?.[which]?.solution || (which === (d?.choiceTaken === 'or' ? 'or' : 'main') ? d?.solution : null);
+      return finished && solution ? { answerText: solution.answerText ?? '', steps: solution.steps || [], criteria: solution.criteria || [] } : {};
+    };
+    questions.push({ ...base, ...printView(q), ...solved('main'), choice: q.alt ? { ...printView(q.alt), ...solved('or') } : null });
   }
   return {
     title: exam.title,
@@ -589,6 +580,7 @@ async function paper(profile, id) {
     course: exam.indiaExam.label,
     questions,
     solutionsAvailable: finished,
+    markedBy: markedByOf(exam),
     indiaExam: exam.indiaExam
   };
 }
@@ -604,6 +596,11 @@ export async function dispatchIndiaExam(profile, method, path, body = {}) {
   if (!profile?.id || profile.course !== 'in') throw error('India exam routing requires an India profile.', 400, 'INDIA_PROFILE_REQUIRED');
   if (path === '/exams' && method === 'GET') return listExams(profile);
   if (path === '/exams' && method === 'POST') {
+    // A paper is marked work, so it starts only for a signed-in account: the
+    // same refusal a practice check gives (SIGN_IN_TO_CHECK). Whether the
+    // server can be reached, and whether the account is eligible, is answered
+    // by the server itself when it is asked to issue the paper.
+    await requireExamAccount(profile.id);
     // A JEE Advanced paper is JEE Advanced content, so it meets the track's own
     // gate before the free-simulation window is even consulted: a free profile
     // on that track is told the track is Premium, which is the true reason, and

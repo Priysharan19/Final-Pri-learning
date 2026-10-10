@@ -3,9 +3,12 @@ import { api } from '../api.js';
 import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import { useT, useTx } from '../i18n/index.js';
+import Icon from '../components/Icon.jsx';
+import { checkRefusal, checkRefusalCopy } from '../components/checkAccess.js';
+import { CheckRefusal } from '../components/CheckRefusal.jsx';
 
 export default function Rush() {
-  const { celebrate, refreshUser } = useApp();
+  const { user, celebrate, refreshUser } = useApp();
   const t = useT();
   const tx = useTx();
   const [phase, setPhase] = useState('lobby'); // lobby | running | done
@@ -22,6 +25,9 @@ export default function Rush() {
   const [lastAnswer, setLastAnswer] = useState(null);
   const inputRef = useRef(null);
   const busyRef = useRef(false);
+  // Why the game could not start or go on: marking needs a signed-in account online.
+  const [refusal, setRefusal] = useState(null);
+  const refused = err => { const kind = checkRefusal(err); if (!checkRefusalCopy(kind, 'game')) throw err; setRefusal(kind); setPhase('lobby'); };
 
   useEffect(() => {
     if (phase !== 'running') return;
@@ -31,7 +37,9 @@ export default function Rush() {
   }, [phase, left]); // eslint-disable-line
 
   async function start() {
-    const r = await api.post('/rush/start', {});
+    setRefusal(null);
+    let r;
+    try { r = await api.post('/rush/start', {}); } catch (err) { refused(err); return; }
     setQuestions(r.questions); setLeft(r.seconds);
     setIdx(0); setCombo(0); setBestCombo(0); setCorrect(0); setAttempted(0); setSummary(null); setLastAnswer(null);
     setPhase('running');
@@ -59,7 +67,7 @@ export default function Rush() {
       setAnswer('');
       setIdx(i => i + 1);
       setTimeout(() => inputRef.current?.focus(), 30);
-    } finally { busyRef.current = false; }
+    } catch (err) { refused(err); return; } finally { busyRef.current = false; }
     if (idx + 1 >= questions.length) finish();
   }
 
@@ -81,6 +89,12 @@ export default function Rush() {
           {t('rush.lobbyIntro')}
         </p>
         <button className="btn btn-primary btn-lg" onClick={start}>{t('rush.start')}</button>
+        {refusal && (
+          <div className="verdict verdict-technical" role="alert" data-game-refused={refusal} style={{ marginTop: 14, textAlign: 'left' }}>
+            <span className="verdict-ico"><Icon name="alert" /><span className="sr-only">{t('verdict.notCheckedLabel')}</span></span>
+            <div><CheckRefusal kind={refusal} context="game" user={user} refreshUser={refreshUser} onRetry={start} /></div>
+          </div>
+        )}
       </div>
     );
   }

@@ -38,7 +38,12 @@ export const ALLOWED_MEMBERS = Object.freeze(['answerType']);
 /** Props InkAnswer accepts. A new prop is a new channel into the engine: review it here. */
 export const INK_ANSWER_PROPS = Object.freeze([
   'key', 'onRecognized', 'onReaderState', 'onStrokes', 'initialStrokes', 'height', 'disabled',
-  'lineVerdicts', 'focusSymbol', 'recognitionContext'
+  'lineVerdicts', 'focusSymbol', 'recognitionContext',
+  // Reviewed 2026-10-10: a boolean, `saveState === 'saved'` on the card (the
+  // IndexedDB readback of the student's own strokes). It only chooses whether
+  // the waiting sentence may say "saved"; it carries nothing about the
+  // question or its answer and never reaches the reader request.
+  'draftSaved'
 ]);
 /** Identifiers that must never appear inside a recognition-context expression. */
 export const FORBIDDEN_IDENTIFIERS = Object.freeze([

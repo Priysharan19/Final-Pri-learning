@@ -15,15 +15,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { get, put } from './idb.js';
 import { cloudLinkRowId } from '../platform/cloudAccount.js';
-import { ENTITLEMENTS, entitlementDecision, normalizeEntitlementSnapshot } from '../platform/entitlements.js';
+import { ENTITLEMENTS, FREE_EXAM_ALLOWANCE, entitlementDecision, normalizeEntitlementSnapshot } from '../platform/entitlements.js';
 
 const DAY = 86_400_000;
 const USAGE_PREFIX = 'pri-free-usage-v1:';
 
 export const FREE_TIER = Object.freeze({
   practicePerDay: 20,
-  examsPerWindow: 1,
-  examWindowDays: 30,
+  examsPerWindow: FREE_EXAM_ALLOWANCE.examsPerWindow,
+  examWindowDays: FREE_EXAM_ALLOWANCE.examWindowDays,
   explain: 'basic'
 });
 
@@ -90,6 +90,13 @@ async function linkRow(pid) {
 export async function profileCloudLinked(pid) {
   if (!pid) return false;
   return !!(await linkRow(pid))?.accountId;
+}
+
+/** The cloud account this local profile is linked to, or null. */
+export async function profileCloudAccountId(pid) {
+  if (!pid) return null;
+  const id = (await linkRow(pid))?.accountId;
+  return id ? String(id) : null;
 }
 
 async function usageRow(pid) {

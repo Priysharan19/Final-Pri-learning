@@ -89,6 +89,34 @@ const clean = normalizeResult(
   { model: 'test', confidenceFloor: 0.82 }
 );
 ok(!clean.needsConfirmation && clean.confidence >= 0.9, 'a confident single line is usable');
+// ── per-line doubt: reported, never settled silently, never repaired ─────────
+// The owner's page (2026-10-10): "(x+3)² ⩾ 0" written with a slanted bar. A
+// symbol the reader cannot tell is a doubt about THAT line, handed to the
+// student — the text is passed on exactly as read.
+{
+  const doubted = normalizeResult({
+    confidence: 0.95, needs_confirmation: false,
+    lines: [
+      { text: 'f(x) = (x+3)^2 + 6', latex: '', confidence: 0.97, uncertain: false, doubt: '', gap_before: true },
+      { text: '(x+3)^2 > 0', latex: '', confidence: 0.95, uncertain: true, doubt: '>= or >', gap_before: false },
+      { text: 'least value => 6.', latex: '', confidence: 0.98, uncertain: false, doubt: 'ignored when not uncertain', gap_before: false }
+    ]
+  }, { model: 'test', confidenceFloor: 0.82 });
+  eq(doubted.lines.map(l => [l.text, l.uncertain, l.doubt, l.gapBefore]),
+    [['f(x) = (x+3)^2 + 6', false, null, true], ['(x+3)^2 > 0', true, '>= or >', false], ['least value => 6.', false, null, false]],
+    'each line carries its own doubt and layout gap; a doubt is kept only for a line marked uncertain');
+  eq(doubted.text, 'f(x) = (x+3)^2 + 6\n(x+3)^2 > 0\nleast value => 6.', 'and no line is rewritten: a doubted ">" stays ">", a sentence keeps its full stop');
+  eq([doubted.providerNeedsConfirmation, doubted.needsConfirmation], [true, true], 'a line the reader doubts makes the page one to confirm, even when the page-level flag was not raised');
+  const legacy = normalizeResult({ confidence: 0.95, needs_confirmation: false, lines: [{ text: '7', latex: '', confidence: 0.95 }] }, { model: 'test', confidenceFloor: 0.82 });
+  eq([legacy.lines[0].uncertain, legacy.lines[0].doubt, legacy.lines[0].gapBefore, legacy.needsConfirmation], [false, null, false, false], 'a reply without the new fields reads as no doubt');
+  const line = TRANSCRIPTION_SCHEMA.properties.lines.items;
+  eq([...line.required].sort(), ['confidence', 'doubt', 'gap_before', 'latex', 'text', 'uncertain'], 'the strict schema requires every per-line field');
+  ok(line.additionalProperties === false && line.properties.uncertain.type === 'boolean' && line.properties.doubt.maxLength === 120 && line.properties.gap_before.type === 'boolean', 'and nothing beyond them');
+  ok(/bar under it/.test(SYSTEM_INSTRUCTIONS) && /x and n/.test(SYSTEM_INSTRUCTIONS) && /do not settle it silently/.test(SYSTEM_INSTRUCTIONS), 'the instruction reads relation and look-alike symbols from their strokes and reports a doubt');
+  ok(/Never choose a symbol because it would make the mathematics true/.test(SYSTEM_INSTRUCTIONS) && /You do not know the question/.test(SYSTEM_INSTRUCTIONS), 'and never decides a symbol by what would be mathematically right');
+  ok(!/expected|answer key|solution|rubric|marks? scheme/i.test(SYSTEM_INSTRUCTIONS), 'the instruction names no answer, solution or rubric');
+}
+
 eq(normalizeResult({ lines: [], confidence: 1, needs_confirmation: false }, { model: 'test', confidenceFloor: 0.5 }).needsConfirmation,
   true, 'a transcription with no lines always needs confirmation');
 
@@ -501,11 +529,14 @@ try {
   ok(statusLimited?.body?.error?.code === 'RATE_LIMITED' && statusLimited.i === 120,
     `status refuses past its per-account limit (${statusLimited?.i})`);
 
+  // A different picture each call: the same picture would be read once and
+  // then served from memory (recognitionOps.js), spending nothing further.
+  let budgetPictures = 0;
   const budgetCall = async () => {
     const res = await fetch(`${budgetBase}/handwriting/transcribe`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=raw-acct-budget` },
-      body: JSON.stringify({ image: PNG })
+      body: JSON.stringify({ image: PNG + Buffer.from(`budget-picture-${budgetPictures += 1}`.padEnd(18, '.')).toString('base64') })
     });
     return { status: res.status, json: await res.json().catch(() => null) };
   };

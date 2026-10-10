@@ -510,6 +510,7 @@ async function rejects(name, promise, want = {}) {
   if (!err) { ok(name, false, 'call resolved, expected a rejection'); return null; }
   const wrong = [];
   if (want.status !== undefined && err.status !== want.status) wrong.push(`status ${err.status} ≠ ${want.status}`);
+  if (want.code !== undefined && err.code !== want.code) wrong.push(`code ${err.code} ≠ ${want.code}`);
   if (want.message && !want.message.test(String(err.message))) wrong.push(`message ${show(err.message)}`);
   if (want.needsPassword !== undefined && !!err.needsPassword !== want.needsPassword) wrong.push(`needsPassword ${!!err.needsPassword}`);
   ok(name, !wrong.length, `${wrong.join('; ')}${wrong.length ? ` — ${show(err.message)}` : ''}`);
@@ -616,6 +617,11 @@ async function run() {
   // falls back to a Math.random UUID when randomUUID is absent.
   Object.defineProperty(globalThis.crypto, 'randomUUID', { value: undefined, configurable: true });
   installBrowserEnv();
+  // Only the server marks (owner decision 2026-10-10). Every check below that
+  // submits, reveals or starts an exam does it against the real /v1 app, as a
+  // real verified account linked to the local profile.
+  const { startOnlineAuthority, nextSubmissionId } = await import('./support/online-authority.mjs');
+  const online = await startOnlineAuthority({ label: 'backend', ink: true });
   const { dispatch } = await import(`${SRC}local/backend.js`);
   const idb = await import(`${SRC}local/idb.js`);
   const { checkAnswer } = await import(`${SRC}engine/checker.js`);
@@ -633,10 +639,20 @@ async function run() {
   coverage = { driven: 0, total: routes.length };
 
   /** Drive an endpoint and record which route in the table it landed on. */
-  function call(method, path, body) {
+  const SUBMIT = /^\/practice\/[^/]+\/submit$/;
+  async function call(method, path, body) {
     const key = resolveRoute(routes, method, path);
     if (key) reached.add(key);
-    return dispatch(method, path, body);
+    // The card names every tap with a stable submission key and the server
+    // grades under it; a check that does not care which key gets a fresh one.
+    if (method === 'POST' && SUBMIT.test(path) && body && body.submissionId === undefined) {
+      body = { ...body, submissionId: nextSubmissionId('sub_backend') };
+    }
+    const result = await dispatch(method, path, body);
+    // A profile made on this device signs in to its own verified account, as a
+    // student must before anything of theirs can be checked.
+    if (method === 'POST' && path === '/profiles' && result?.user?.id) await online.link(result.user.id, { name: result.user.name });
+    return result;
   }
 
   const GET = (path, body) => call('GET', path, body);
@@ -649,17 +665,24 @@ async function run() {
   let created, marked, blankExam, history;
   let teacher, custom, backup, restored;
 
+  /** The full question behind a stored row — the device copy, or the oracle once the server holds the key. */
+  const answerKeyOf = async id => online.answerKey(await idb.get('questions', id));
+
   /** Serve a question and hand back both the public view and the real payload. */
   async function nextQuestion(body = {}) {
     const res = await POST('/practice/next', body);
     const row = await idb.get('questions', res.question.id);
-    return { ...res, payload: row.payload };
+    // The device holds no answer for a served question. For an issued one the
+    // suite reads the server's sealed copy (its oracle); a prepared question
+    // or an offline draft has no key anywhere the suite may look.
+    return { ...res, row, payload: row.serverQuestionId ? await online.answerKey(row) : row.payload };
   }
 
   /** A served question whose answer the suite can both satisfy and miss. */
   async function answerableQuestion(body = {}, tries = 30) {
     for (let i = 0; i < tries; i++) {
       const q = await nextQuestion(body);
+      if (!q.row.serverQuestionId) throw new Error('answerableQuestion() needs a signed-in profile: only an issued question has a key');
       const right = canonicalInput(q.payload);
       const wrong = wrongInput(q.payload);
       if (right === null || wrong === null) continue;
@@ -1032,6 +1055,235 @@ async function run() {
     eq('today’s activity is recorded', (await GET('/me')).user.today.questions, stats.totals.attempts);
   } catch (err) { crashed(err); }
 
+  // ── Only the server marks, and only the server chooses the question ───────
+  // Owner decisions 2026-10-10. A signed-in profile is ISSUED its question; a
+  // signed-out one that can reach the server holds a PREPARED question (a
+  // sealed token one account binds, once, when the answer is checked); with
+  // no server the device shows a DRAFT of its own that can never be marked.
+  // The device never sends a seed and never holds an answer. Each refusal
+  // below must name its reason, mark nothing, spend nothing, and leave the
+  // question exactly where the student left it.
+  section('online-only marking');
+  try {
+    await POST('/profiles/select', { id: ada.id });
+    // This group and the ones after it serve Ada far more than twenty
+    // questions; the free daily cap is entitlement-enforcement-check's subject.
+    await online.setEntitlement(ada.id, 'premium');
+    const attemptsFor = async (pid, qid) => (await idb.byIndex('attempts', 'pid', pid)).filter(a => a.questionId === qid).length;
+    const KEY_FIELDS = ['answer', 'steps', 'solutionText', 'seed', 'traps', 'stepcheck'];
+    const keyOnDevice = row => KEY_FIELDS.filter(k => k in (row.payload || {}));
+    const snapshot = async (pid, qid) => {
+      const row = await idb.get('questions', qid);
+      return { xp: (await GET('/me')).user.xp, rating: JSON.stringify(await idb.get('ratings', `${pid}:${row.subtopic}`) ?? null), prompt: row.payload.prompt };
+    };
+    /** Everything a refusal must leave alone, for the selected profile's question. */
+    async function untouched(label, pid, qid, before, { tries = 0 } = {}) {
+      const row = await idb.get('questions', qid);
+      eq(`${label}: no try is spent and the question stays open`, [row.tries || 0, row.answered || 0, !!row.discardedAt], [tries, 0, false]);
+      eq(`${label}: no attempt is recorded`, await attemptsFor(pid, qid), 0);
+      eq(`${label}: no XP is awarded`, (await GET('/me')).user.xp, before.xp);
+      eq(`${label}: no rating moves`, JSON.stringify(await idb.get('ratings', `${pid}:${row.subtopic}`) ?? null), before.rating);
+      eq(`${label}: the same question is still the one to answer`,
+        (await POST('/practice/next', { mode: 'topic', subtopic: topicId, resume: true })).question.id, qid);
+      eq(`${label}: what the student is looking at is unchanged`, row.payload.prompt, before.prompt);
+    }
+
+    // 0 · A signed-in profile is issued its question; the device asks for a
+    // generator and a difficulty, never a seed, and is handed no key.
+    const issuedQ = await nextQuestion({ mode: 'topic', subtopic: topicId });
+    eq('a signed-in profile is served an issued question', [issuedQ.question.checkState, typeof issuedQ.row.serverQuestionId, !!issuedQ.row.prepared, !!issuedQ.row.draftOnly], ['issued', 'string', false, false]);
+    eq('an issued question keeps no answer, steps or seed on the device', keyOnDevice(issuedQ.row), []);
+    eq('the device has never sent the server a seed', online.traffic.seedsSent, 0);
+    await POST(`/practice/${issuedQ.question.id}/discard`, {});
+
+    // 1 · Signed out, server reachable: a prepared question. It can be read
+    // and answered into, but not checked — until an account binds it.
+    const guest = (await dispatch('POST', '/profiles', { name: 'Guest Reader', year: 10 })).user;
+    const before1 = { ...online.traffic };
+    const guestQ = await nextQuestion({ mode: 'topic', subtopic: topicId });
+    const guestId = guestQ.question.id;
+    ok('a signed-out student is still served a question to read', typeof guestQ.question.prompt === 'string' && guestQ.question.prompt.length > 0);
+    eq('— a prepared one: a sealed token, no server question id yet', [guestQ.question.checkState, typeof guestQ.row.prepared, guestQ.row.serverQuestionId, !!guestQ.row.draftOnly], ['prepared', 'string', undefined, false]);
+    eq('— prepared anonymously, nothing issued', [online.traffic.prepare - before1.prepare, online.traffic.issue - before1.issue], [1, 0]);
+    eq('a prepared question keeps no answer, steps or seed on the device', keyOnDevice(guestQ.row), []);
+    ok('the sealed token does not spell out the answer', !/"answer"|correctIndex|canonical/i.test(guestQ.row.prepared), guestQ.row.prepared.slice(0, 60));
+    const typed = guestQ.question.answerType === 'mcq' ? '0' : '987654321';
+    const guestKey = nextSubmissionId('sub_backend_guest');
+    const guestBefore = await snapshot(guest.id, guestId);
+    const sent1 = { ...online.traffic };
+    const guestSubmit = await rejects('signed out, an answer is not checked',
+      POST(`/practice/${guestId}/submit`, { answer: typed, ms: 3000, submissionId: guestKey }), { status: 401, code: 'SIGN_IN_TO_CHECK' });
+    ok('signed out, the refusal carries no verdict and no solution',
+      guestSubmit && !('correct' in guestSubmit) && !('solution' in guestSubmit), show(Object.keys(guestSubmit || {})));
+    await rejects('signed out, the solution is not shown',
+      POST(`/practice/${guestId}/reveal`, { ms: 1000 }), { status: 401, code: 'SIGN_IN_TO_CHECK' });
+    eq('signed out, nothing was bound or graded', [online.traffic.issue - sent1.issue, online.traffic.grade - sent1.grade, online.traffic.reveal - sent1.reveal], [0, 0, 0]);
+    await untouched('signed out', guest.id, guestId, guestBefore);
+    eq('signed out, the question is still a prepared one with the same token', (await idb.get('questions', guestId)).prepared, guestQ.row.prepared);
+    await rejects('signed out, an exam does not start', POST('/exams', { length: 10, minutes: 30 }), { status: 401, code: 'SIGN_IN_TO_CHECK' });
+    eq('signed out, no exam was created', (await GET('/exams')).exams.length, 0);
+
+    // Signing in on the question is enough: the SAME row is bound to the
+    // account and the answer typed while signed out is marked by the server.
+    await online.link(guest.id, { name: guest.name });
+    const sent2 = { ...online.traffic };
+    const guestFirst = await POST(`/practice/${guestId}/submit`, { answer: typed, ms: 3000, submissionId: guestKey });
+    const bound = await idb.get('questions', guestId);
+    eq('after signing in, the same row is bound: one issue carrying the token, one grade', [online.traffic.bind - sent2.bind, online.traffic.issue - sent2.issue, online.traffic.grade - sent2.grade], [1, 1, 1]);
+    eq('the row keeps its id and its prompt and is now an issued question', [bound.id, bound.payload.prompt, typeof bound.serverQuestionId, bound.prepared], [guestId, guestQ.question.prompt, 'string', undefined]);
+    eq('binding hands the device no key', keyOnDevice(bound), []);
+    eq('the answer typed while signed out is marked by the server, under the same key', [guestFirst.authoritative, typeof guestFirst.correct, guestFirst.submissionId], [true, 'boolean', guestKey]);
+    const boundKey = await online.answerKey(bound);
+    eq('the server marked it against its own sealed question', guestFirst.correct, checkAnswer(boundKey, typed).correct === true);
+    if (!guestFirst.resolved) {
+      const rightNow = canonicalInput(boundKey);
+      const guestSecond = rightNow === null ? await POST(`/practice/${guestId}/reveal`, { ms: 500 })
+        : await POST(`/practice/${guestId}/submit`, { answer: rightNow, ms: 3000 });
+      eq('and the question is then finished with the server', [guestSecond.resolved, guestSecond.authoritative], [true, true]);
+    }
+    eq('exactly one attempt is recorded for the bound question', await attemptsFor(guest.id, guestId), 1);
+    eq('still exactly one bind was ever sent for it', online.traffic.bind - sent2.bind, 1);
+
+    // A token belongs to the first account that binds it. Another profile's
+    // account cannot take the same prepared question up.
+    await POST('/profiles/select', { id: grace.id, password: 'punch-cards-9' });
+    const stolen = { ...structuredClone(guestQ.row), id: `${guestId}-copy`, pid: grace.id, createdAt: Date.now() };
+    await idb.put('questions', stolen);
+    const sent3 = { ...online.traffic };
+    const taken = await rejects('a second account cannot bind a prepared question another account took up',
+      POST(`/practice/${stolen.id}/submit`, { answer: typed, ms: 3000 }), { status: 409, code: 'QUESTION_PREPARED_EXPIRED' });
+    ok('— and learns nothing about the answer', taken && !('correct' in taken) && !('solution' in taken), show(Object.keys(taken || {})));
+    await rejects('nor reveal it', POST(`/practice/${stolen.id}/reveal`, { ms: 500 }), { status: 409, code: 'QUESTION_PREPARED_EXPIRED' });
+    {
+      const row = await idb.get('questions', stolen.id);
+      eq('the refused bind issued nothing, graded nothing and spent nothing',
+        [typeof row.serverQuestionId, online.traffic.grade - sent3.grade, row.tries || 0, row.answered || 0, await attemptsFor(grace.id, stolen.id)], ['undefined', 0, 0, 0, 0]);
+    }
+    await idb.del('questions', stolen.id);
+
+    // 2 · No connection when the question was opened: an offline draft. It was
+    // never the server's question, so it can never be marked — not signed
+    // out, not after signing in, not after reconnecting.
+    const drifter = (await dispatch('POST', '/profiles', { name: 'Offline Drifter', year: 10 })).user;
+    const draftQ = await online.offline(() => nextQuestion({ mode: 'topic', subtopic: topicId }));
+    const draftId = draftQ.question.id;
+    eq('with no connection the student is still shown a question, as a draft', [draftQ.question.checkState, draftQ.row.draftOnly, draftQ.row.serverQuestionId, draftQ.row.prepared], ['draft', true, undefined, undefined]);
+    eq('a draft is a public projection: no answer, steps or seed on the device', keyOnDevice(draftQ.row), []);
+    const draftBefore = await snapshot(drifter.id, draftId);
+    const sent4 = { ...online.traffic };
+    for (const [when, during] of [['offline', fn => online.offline(fn)], ['reconnected but signed out', fn => fn()]]) {
+      await during(async () => {
+        await rejects(`a draft is not checked (${when})`, POST(`/practice/${draftId}/submit`, { answer: '1', ms: 2000 }), { status: 409, code: 'QUESTION_NOT_SERVER_ISSUED' });
+        await rejects(`a draft's solution is not shown (${when})`, POST(`/practice/${draftId}/reveal`, { ms: 500 }), { status: 409, code: 'QUESTION_NOT_SERVER_ISSUED' });
+      });
+    }
+    await online.link(drifter.id, { name: drifter.name });
+    await rejects('a draft is still not checked after signing in', POST(`/practice/${draftId}/submit`, { answer: '1', ms: 2000 }), { status: 409, code: 'QUESTION_NOT_SERVER_ISSUED' });
+    await rejects('nor is its solution shown after signing in', POST(`/practice/${draftId}/reveal`, { ms: 500 }), { status: 409, code: 'QUESTION_NOT_SERVER_ISSUED' });
+    eq('no draft refusal reached the marker', [online.traffic.issue - sent4.issue, online.traffic.grade - sent4.grade, online.traffic.reveal - sent4.reveal], [0, 0, 0]);
+    await untouched('draft', drifter.id, draftId, draftBefore);
+    // The way on is a new question, which a signed-in connected profile is issued.
+    await POST(`/practice/${draftId}/discard`, {});
+    eq('the next question for the now signed-in profile is an issued one', (await nextQuestion({ mode: 'topic', subtopic: topicId })).question.checkState, 'issued');
+
+    await POST('/profiles/select', { id: ada.id });
+
+    // 3 · Linked, but the session is gone (signed out elsewhere, cookie expired).
+    const expiredQ = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+    const expiredBefore = await snapshot(ada.id, expiredQ.question.id);
+    const expiredKey = nextSubmissionId('sub_backend_expired');
+    await online.signedOut(async () => {
+      await rejects('with no session, an answer is not checked',
+        POST(`/practice/${expiredQ.question.id}/submit`, { answer: expiredQ.right, ms: 3000, submissionId: expiredKey }), { status: 401, code: 'SIGN_IN_TO_CHECK' });
+      await rejects('with no session, the solution is not shown',
+        POST(`/practice/${expiredQ.question.id}/reveal`, { ms: 1000 }), { status: 401, code: 'SIGN_IN_TO_CHECK' });
+      await rejects('with no session, an exam does not start', POST('/exams', { length: 10, minutes: 30 }), { status: 401, code: 'SIGN_IN_TO_CHECK' });
+    });
+    await untouched('no session', ada.id, expiredQ.question.id, expiredBefore);
+
+    // 4 · Offline. The request never leaves the device.
+    const offlineQ = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+    const offlineBefore = await snapshot(ada.id, offlineQ.question.id);
+    const offlineKey = nextSubmissionId('sub_backend_offline');
+    const gradedBefore = online.traffic.grade;
+    await online.offline(async () => {
+      await rejects('offline, an answer is not checked',
+        POST(`/practice/${offlineQ.question.id}/submit`, { answer: offlineQ.right, ms: 3000, submissionId: offlineKey }), { status: 503, code: 'RECONNECT_TO_CHECK' });
+      await rejects('offline, the solution is not shown',
+        POST(`/practice/${offlineQ.question.id}/reveal`, { ms: 1000 }), { status: 503, code: 'RECONNECT_TO_CHECK' });
+      await rejects('offline, an exam does not start', POST('/exams', { length: 10, minutes: 30 }), { status: 503, code: 'RECONNECT_TO_CHECK' });
+      ok('offline, a question can still be read', !!(await POST('/practice/next', { mode: 'topic', subtopic: topicId, resume: true })).question.prompt);
+      ok('offline, a hint the question already carries can still be read',
+        typeof (await POST(`/practice/${offlineQ.question.id}/hint`, {})).level === 'number');
+    });
+    eq('offline, the server graded nothing', online.traffic.grade, gradedBefore);
+    {
+      const row = await idb.get('questions', offlineQ.question.id);
+      eq('offline: no try is spent and the question stays open', [row.tries || 0, row.answered || 0], [0, 0]);
+      eq('offline: no attempt is recorded', await attemptsFor(ada.id, offlineQ.question.id), 0);
+      eq('offline: no XP is awarded', (await GET('/me')).user.xp, offlineBefore.xp);
+    }
+    // A build with no cloud origin at all is the same refusal.
+    await online.unconfigured(() => rejects('with no server configured, an answer is not checked',
+      POST(`/practice/${offlineQ.question.id}/submit`, { answer: offlineQ.right, ms: 3000, submissionId: offlineKey }), { status: 503, code: 'RECONNECT_TO_CHECK' }));
+    // Reconnected, the very same submission key is marked — once.
+    const reconnected = await POST(`/practice/${offlineQ.question.id}/submit`, { answer: offlineQ.right, ms: 3000, submissionId: offlineKey });
+    eq('reconnected, the same submission is marked by the server', [reconnected.correct, reconnected.resolved, reconnected.authoritative, reconnected.submissionId], [true, true, true, offlineKey]);
+    const replayed = await POST(`/practice/${offlineQ.question.id}/submit`, { answer: offlineQ.right, ms: 3000, submissionId: offlineKey });
+    eq('sending it again replays the same verdict', [replayed.correct, replayed.replayed, replayed.attemptId], [true, true, reconnected.attemptId]);
+    eq('and still exactly one attempt is recorded', await attemptsFor(ada.id, offlineQ.question.id), 1);
+
+    // 5 · The device session belongs to another profile's account (a shared
+    // iPad). Ada's question was issued to Ada's account; the other account's
+    // session can neither grade nor reveal it, and is told nothing.
+    const sharedQ = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+    const sharedBefore = await snapshot(ada.id, sharedQ.question.id);
+    await online.withSessionOf(grace.id, async () => {
+      const foreign = await rejects('another account cannot grade a question issued to this one',
+        POST(`/practice/${sharedQ.question.id}/submit`, { answer: sharedQ.right, ms: 3000 }), { status: 404 });
+      ok('— and is told nothing about it', foreign && !('correct' in foreign) && !('solution' in foreign), show(Object.keys(foreign || {})));
+      await rejects('nor is the solution shown to it', POST(`/practice/${sharedQ.question.id}/reveal`, { ms: 1000 }), { status: 404 });
+    });
+    await untouched('wrong account', ada.id, sharedQ.question.id, sharedBefore);
+    const firstTry = await POST(`/practice/${sharedQ.question.id}/submit`, { answer: sharedQ.wrong, ms: 3000 });
+    eq('under her own session the first try is marked', [firstTry.correct, firstTry.resolved, firstTry.triesLeft], [false, false, 1]);
+    await online.withSessionOf(grace.id, () => rejects('the other account cannot take the second try either',
+      POST(`/practice/${sharedQ.question.id}/submit`, { answer: sharedQ.right, ms: 3000 }), { status: 404 }));
+    {
+      const row = await idb.get('questions', sharedQ.question.id);
+      eq('the refused grade spends no further try', [row.tries, row.answered || 0], [1, 0]);
+      eq('and records no attempt', await attemptsFor(ada.id, sharedQ.question.id), 0);
+    }
+    const secondTry = await POST(`/practice/${sharedQ.question.id}/submit`, { answer: sharedQ.right, ms: 3000 });
+    eq('back under her own session the second try is marked', [secondTry.correct, secondTry.resolved], [true, true]);
+    // A signed-in profile whose device session is another account's is not
+    // issued a question under that account: it gets a prepared one instead.
+    const misfiled = await online.withSessionOf(grace.id, () => nextQuestion({ mode: 'topic', subtopic: topicId }));
+    eq('under another account’s session a new question is prepared, not issued to the wrong account', [misfiled.question.checkState, misfiled.row.serverQuestionId], ['prepared', undefined]);
+    await online.withSessionOf(grace.id, () => rejects('and it is not checked under that session',
+      POST(`/practice/${misfiled.question.id}/submit`, { answer: '1', ms: 3000 }), { status: 401, code: 'SIGN_IN_TO_CHECK' }));
+    ok('the wrong account did not take the token up', !(await idb.get('questions', misfiled.question.id)).serverQuestionId);
+    // …on the server either: back under her own session the SAME question is
+    // bound and marked. (The device used to send the bind first and compare
+    // accounts afterwards, which spent the prepared question on the other
+    // account and left her work unmarkable.)
+    const ownAgain = await POST(`/practice/${misfiled.question.id}/submit`, { answer: '1', ms: 3000, submissionId: `misfiled-${Date.now()}` })
+      .then(value => ({ value }), error => ({ error }));
+    eq('under her own session the same prepared question is bound and marked by the server',
+      [ownAgain.error?.code ?? null, ownAgain.value?.authoritative, !!(await idb.get('questions', misfiled.question.id)).serverQuestionId], [null, true, true]);
+    if (!(await idb.get('questions', misfiled.question.id)).answered) await POST(`/practice/${misfiled.question.id}/discard`, {});
+
+    // 6 · A submission with no stable key cannot be graded: the server grades
+    // under the key, so there is nothing to recover it by.
+    const keylessQ = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+    const keylessBefore = await snapshot(ada.id, keylessQ.question.id);
+    await rejects('a submission with no key is not marked',
+      dispatch('POST', `/practice/${keylessQ.question.id}/submit`, { answer: keylessQ.right, ms: 3000 }), { status: 503, code: 'ONLINE_GRADE_REQUIRED' });
+    await untouched('no submission key', ada.id, keylessQ.question.id, keylessBefore);
+    await POST(`/practice/${keylessQ.question.id}/discard`, {});
+    eq('through all of it the device never sent the server a seed', online.traffic.seedsSent, 0);
+  } catch (err) { crashed(err); }
+
   // ── Misconception repair is opportunity-specific (issue #232) ──────────────
   // A clean correct answer is evidence against a misconception only when the
   // question carried that misconception's designed trap or distractor. Before
@@ -1042,24 +1294,12 @@ async function run() {
     const { getRating, putRating } = await import(`${SRC}local/store.js`);
     const { misconceptionKey, START_RATING, TRAP_ACTIVE_AT, activeTraps } = await import(`${SRC}engine/adaptive.js`);
     const { misconceptionIdForTrap, mappedIdForTrap, AUTHORED_TRAP_SHAPES } = await import(`${SRC}engine/misconceptions.js`);
-    const { cloudLinkRowId } = await import(`${SRC}platform/cloudAccount.js`);
 
     const noether = (await POST('/profiles', { name: 'Emmy Noether', year: 10 })).user;
     eq('a fresh learner is selected for this group', (await GET('/me')).user.id, noether.id);
     // This group serves dozens of questions; the free daily cap is the subject
     // of entitlement-enforcement-check.mjs, so it is lifted here.
-    {
-      const nowMs = Date.now();
-      await idb.put('device', {
-        id: cloudLinkRowId(noether.id), accountId: `acct-${noether.id}`, role: 'student',
-        emailVerified: true, linkedAt: nowMs, lastVerifiedAt: nowMs, lastSyncAt: null,
-        entitlement: {
-          plan: 'premium', status: 'active', provider: 'web',
-          currentPeriodEnd: nowMs + 30 * 86400000, offlineUntil: nowMs + 7 * 86400000,
-          issuedAt: nowMs, sourceVersion: 1
-        }
-      });
-    }
+    await online.setEntitlement(noether.id, 'premium');
 
     const probeKeys = (q, owner) => new Set([
       ...(Array.isArray(q.traps) ? q.traps : []),
@@ -1347,7 +1587,11 @@ async function run() {
     eq('and is recorded on the question', (await idb.get('questions', id)).tutorLevel, 1);
     const sent = tutorCalls[0] || {};
     eq('the tutor is asked as practice, at the nudge level', [sent.context, sent.level, sent.locale], ['practice', 'nudge', 'en']);
-    ok('grounded in the verified solution and its answer', sent.question?.steps?.length === target.payload.steps.length && typeof sent.question?.answer === 'string' && sent.question.answer.length > 0, show(sent.question));
+    // The question is the server's, so the device names it and sends nothing
+    // of it: /v1/tutor grounds the help in the server's own sealed copy
+    // (server/test/tutor-issued-grounding-check.mjs proves that side).
+    eq('the request names the issued question for the server to ground the help in', sent.serverQuestionId, (await idb.get('questions', id)).serverQuestionId);
+    eq('and sends no prompt, step, answer or hint of it', ['question', 'prompt', 'steps', 'answer', 'hints', 'solution'].filter(k => k in sent), []);
     eq('with the student’s own lines', sent.studentWork?.lines, ['first line of working']);
     ok('and how many of them the deterministic checker verified', Number.isInteger(sent.studentWork?.verifiedLines), show(sent.studentWork));
     ok('and nothing that identifies the student', !/Ada|Lovelace|ada\.lovelace|"pid"|"email"|"name"/.test(JSON.stringify(sent)), JSON.stringify(sent).slice(0, 200));
@@ -1416,7 +1660,7 @@ async function run() {
     // Offline: the real bridge with no cloud configured.
     setTutorTransportForTests(null);
     const hintOnly = await answerableQuestion({ mode: 'topic', subtopic: topicId });
-    const offline = await POST(`/practice/${hintOnly.question.id}/tutor`, { level: 1 });
+    const offline = await online.unconfigured(() => POST(`/practice/${hintOnly.question.id}/tutor`, { level: 1 }));
     eq('offline, level 1 is the first authored hint', [offline.source, offline.code], ['deterministic', 'TUTOR_OFFLINE']);
     eq('with its text', offline.message, (hintOnly.payload.hints || [])[0] ?? null);
     setTutorTransportForTests(async (body) => { tutorCalls.push(body); return reply(body); });
@@ -1477,7 +1721,10 @@ async function run() {
     const sent = askCalls[0] || {};
     eq('the server is asked as practice, at the conversational level, with the cleaned message', [sent.context, sent.level, sent.message], ['practice', 'ask', 'Why do we undo the last operation first?']);
     eq('and the history the panel sent', sent.history, [{ role: 'tutor', text: 'Look at the operation.' }]);
-    ok('grounded here in the verified solution and answer', Array.isArray(sent.question?.steps) && sent.question.steps.length > 0 && !!sent.question?.answer, show(sent.question));
+    // The device holds no answer for a server-issued question, so it sends the
+    // server's question id and the server grounds the reply from its own copy.
+    ok('grounded by the server: the request names the issued question and carries no solution or answer',
+      typeof sent.serverQuestionId === 'string' && sent.serverQuestionId.length > 8 && sent.question === undefined, show(sent));
     ok('with the student\'s own working', Array.isArray(sent.studentWork?.lines) && sent.studentWork.lines[0] === 'first line', show(sent.studentWork));
     ok('and nothing that identifies the student', !/Ada|Lovelace|ada\.lovelace|"pid"|"email"|"name"/.test(JSON.stringify(sent)), JSON.stringify(sent).slice(0, 200));
     eq('a conversation costs no further credit: the row still shows level 1', (await idb.get('questions', id)).tutorLevel, 1);
@@ -1513,23 +1760,9 @@ async function run() {
   try {
     // This group exercises the paper builder and its marking, not the free
     // tier, which allows one simulation every 30 days and is covered by
-    // entitlement-enforcement-check.mjs. Give this profile a server-issued
-    // Premium snapshot so the cap is not what is under test here.
-    {
-      const { cloudLinkRowId } = await import(`${SRC}platform/cloudAccount.js`);
-      const nowMs = Date.now();
-      const examinee = (await GET('/me')).user.id;
-      await idb.put('device', {
-        id: cloudLinkRowId(examinee), accountId: `acct-${examinee}`, role: 'student',
-        emailVerified: true, linkedAt: nowMs, lastVerifiedAt: nowMs, lastSyncAt: null,
-        entitlement: {
-          plan: 'premium', status: 'active', provider: 'web',
-          currentPeriodEnd: nowMs + 30 * 86400000,
-          offlineUntil: nowMs + 7 * 86400000,
-          issuedAt: nowMs, sourceVersion: 1
-        }
-      });
-    }
+    // entitlement-enforcement-check.mjs. File a Premium snapshot on this
+    // profile's real account link so the cap is not what is under test here.
+    await online.setEntitlement((await GET('/me')).user.id, 'premium');
     created = (await POST('/exams', { length: 10, minutes: 30 })).exam;
     ok('an exam is built with at least the length asked for', created.questions.length >= 10, `${created.questions.length} questions`);
     eq('the exam keeps its duration', created.durationMin, 30);
@@ -1542,14 +1775,26 @@ async function run() {
     eq('the paper of an unsubmitted exam withholds model answers (#230)', paper.questions.filter(q => q.answerText !== undefined).length, 0);
     eq('the paper names the course', paper.course, 'Year 10 · Stage 5');
 
-    // Answer the whole paper correctly, straight from the stored payloads.
+    // The paper is the server's: the device holds no answer to any of it.
+    {
+      const storedRows = [];
+      for (const qid of (await idb.get('exams', created.id)).questionIds) storedRows.push(await idb.get('questions', qid));
+      const privateKeys = new Set(['answer', 'steps', 'traps', 'stepcheck', 'seed', 'hints', 'solutionText']);
+      const held = v => (!v || typeof v !== 'object' ? [] : Object.entries(v).flatMap(([k, x]) => [...(privateKeys.has(k) ? [k] : []), ...held(x)]));
+      eq('no answer, step or trap of the paper is stored on the device', held(storedRows.map(r => r.payload)), []);
+      ok('the paper is server-issued', !!(await idb.get('exams', created.id)).server?.examId && storedRows.every(r => r.examServer === true));
+    }
+    // Answer the whole paper correctly, from the SERVER's sealed paper (a test
+    // oracle read from its store; the product never sees it).
     const perfect = {};
     for (const qid of (await idb.get('exams', created.id)).questionIds) {
-      const q = (await idb.get('questions', qid)).payload;
+      const q = await online.answerKey(await idb.get('questions', qid));
       if (q.multipart) for (const part of q.parts) perfect[`${qid}::${part.key}`] = canonicalInput(part);
       else perfect[qid] = canonicalInput(q);
     }
     marked = await POST(`/exams/${created.id}/submit`, { answers: perfect, ms: 1200000 });
+    eq('the paper is marked by the server', marked.markedBy, 'server');
+    eq('the score is the server\'s stored result', [marked.score, marked.total], await online.examResult(created.id).then(r => [r?.score, r?.total]));
     ok('every mark on the paper is awarded', marked.score === marked.total, `${marked.score}/${marked.total}`);
     eq('a perfect paper is 100%', marked.pct, 100);
     ok('the paper is worth what its criteria say', marked.total > 0, `total ${marked.total}`);
@@ -1566,7 +1811,7 @@ async function run() {
       const payloads = [];
       for (const qid of (await idb.get('exams', created.id)).questionIds) {
         const row = await idb.get('questions', qid);
-        if (row?.payload) payloads.push(row.payload);
+        if (row?.payload) payloads.push(await online.answerKey(row));
       }
       const refused = [];
       markedPaper.questions.forEach((pq, i) => {
@@ -1753,13 +1998,65 @@ async function run() {
     eq('detail returns the same question', detail.question.id, target.id);
     ok('detail carries the model answer', typeof detail.solution?.answerText === 'string' || Array.isArray(detail.solution?.parts), show(Object.keys(detail.solution || {})));
 
+    // History is mostly practice, and practice is marked by the server: the
+    // device holds no answer key for those rows, only the server's receipt.
+    // (The newest retryable row above is an exam question, which still carries
+    // its own key, so the practice row is asked for by name.)
+    const practised = [];
+    for (const item of history.items) {
+      const row = await idb.get('questions', item.id);
+      if (row?.serverQuestionId && row.answered && !row.examId && row.mode !== 'rush' && row.mode !== 'match') practised.push({ item, row });
+    }
+    if (ok('history holds server-marked practice questions', practised.length >= 1, `${practised.length} rows`)) {
+      const { item, row } = practised[0];
+      const opened = await GET(`/history/${item.id}/detail`).then(value => ({ value }), error => ({ error }));
+      ok('detail opens for a server-marked practice question', !!opened.value, `threw ${opened.error?.name}: ${opened.error?.message}`);
+      eq('— with the model answer the server released', opened.value?.solution?.answerText, row.serverReceipt?.solution?.answerText);
+      ok('— and its worked steps', Array.isArray(opened.value?.solution?.steps) && opened.value.solution.steps.length > 0, show(opened.value?.solution?.steps?.length));
+      const again = await POST(`/history/${item.id}/retry`, { variant: 'same' }).then(value => ({ value }), error => ({ error }));
+      ok('a server-marked practice question can be retried', !!again.value, `threw ${again.error?.name}: ${again.error?.message}`);
+      eq('retry "same" reproduces the practice question', [again.value?.variant, again.value?.question?.prompt], ['same', row.payload.prompt]);
+      if (again.value) {
+        const retriedRow = await idb.get('questions', again.value.question.id);
+        ok('— as a new question the server issued again, tied to the one it repeats',
+          typeof retriedRow.serverQuestionId === 'string' && retriedRow.serverQuestionId !== row.serverQuestionId && retriedRow.repeatOf === item.id, show([retriedRow.serverQuestionId, retriedRow.repeatOf]));
+        const retried = await answerKeyOf(again.value.question.id);
+        const meBefore = (await GET('/me')).user;
+        const ratingsBefore = JSON.stringify(rawRows().ratings.filter(r => r.pid === meBefore.id).map(r => [r.key, r.rating, r.attempts]).sort());
+        const marked = await POST(`/practice/${again.value.question.id}/submit`, { answer: canonicalInput(retried) ?? '0', ms: 2000 })
+          .then(value => ({ value }), error => ({ error }));
+        ok('the retried question can be checked', !!marked.value, `refused ${marked.error?.status} ${marked.error?.code}: ${marked.error?.message}`);
+        // The student has already been shown this question's solution: getting
+        // it right again is history, not progress.
+        if (marked.value?.resolved) {
+          const meAfter = (await GET('/me')).user;
+          eq('a repeat earns no XP', [marked.value.xp, meAfter.xp], [0, meBefore.xp]);
+          eq('and the result says it was a repeat, so the card can', marked.value.repeat, true);
+          eq('— and moves no rating', JSON.stringify(rawRows().ratings.filter(r => r.pid === meAfter.id).map(r => [r.key, r.rating, r.attempts]).sort()), ratingsBefore);
+        }
+        eq('— by the server', marked.value?.authoritative, true);
+        const stored = await idb.get('questions', again.value.question.id);
+        const receipt = stored.serverReceipt || stored.lastTry?.serverReceipt;
+        eq('— and its receipt says it was a repeat', receipt?.repeat, true);
+        const events = await online.db.all("SELECT payload_json FROM learning_events WHERE kind='graded-attempt' AND entity_id=?", [stored.serverQuestionId]);
+        ok('— as does the server’s own graded-attempt record', !stored.answered || (events.length === 1 && JSON.parse(events[0].payload_json).repeat === true), show(events.map(e => JSON.parse(e.payload_json).repeat)));
+        eq('the first sitting’s receipt is not a repeat', row.serverReceipt?.repeat === true, false);
+      }
+    }
+
     const retryable = history.items.find(i => i.canRetry);
     if (retryable) {
       const original = await idb.get('questions', retryable.id);
       const same = await POST(`/history/${retryable.id}/retry`, { variant: 'same' });
       ok('retry issues a new question row', same.question.id !== retryable.id, 'the same id came back');
       eq('retry keeps the subtopic', same.question.subtopic, original.subtopic);
-      eq('retry "same" reproduces the question', same.question.prompt, original.payload.prompt);
+      // "The same question again" is the server re-issuing a question it
+      // holds. The newest retryable row here is an exam question, which the
+      // server never issued, so the student gets a fresh one and is told so.
+      // (The server-marked practice row below is repeated exactly.)
+      eq('a question the server never issued cannot be repeated', !!original.serverQuestionId, false);
+      eq('— retry "same" says it is a fresh question instead', same.variant, 'fresh');
+      eq('— one that can be marked', same.question.checkState, 'issued');
       eq('the retried question is unanswered', same.question.triesLeft, 2);
       const fresh = await POST(`/history/${retryable.id}/retry`, { variant: 'fresh' });
       eq('retry "fresh" stays in the same subtopic', fresh.question.subtopic, original.subtopic);
@@ -1787,20 +2084,47 @@ async function run() {
     ok('rush shows the answer either way', typeof rushRes.answerText === 'string', show(rushRes.answerText));
     await rejects('a rush question cannot be answered twice',
       POST('/rush/answer', { id: rush.questions[0].id, answer: rushAnswer }), { status: 409 });
+    // The score is what the server marked in this run. The page's own count is
+    // not evidence: a body claiming thirteen after one marked answer scores
+    // what was marked (review 5, M2-2).
+    let rushMarked = rushRes.correct ? 1 : 0;
+    for (const q of rush.questions.slice(1, 5)) {
+      const key = canonicalInput(await answerKeyOf(q.id));
+      const r = await POST('/rush/answer', { id: q.id, answer: key ?? '0' });
+      if (r.correct) rushMarked++;
+    }
+    ok('the run has server-marked correct answers to count', rushMarked >= 1, `${rushMarked}`);
     const rushDone = await POST('/rush/finish', { correct: 13, total: 20, bestCombo: 6 });
-    eq('rush records the score', rushDone.score, 13);
-    eq('rush reports the personal best', rushDone.best, 13);
+    eq('rush records the score the server marked, not the count the page sent', rushDone.score, rushMarked);
+    eq('rush reports the personal best', rushDone.best, rushMarked);
+    const rushRow = rawRows().rushRuns.at(-1);
+    eq('the stored run is consistent: correct = score, total = answers marked, combo within the score', [rushRow.correct, rushRow.total, rushRow.bestCombo <= rushRow.score], [rushMarked, 5, true]);
+    const rushAgain = await POST('/rush/finish', { correct: 20, total: 20, bestCombo: 20 });
+    eq('finishing the same run again scores nothing', [rushAgain.score, rushAgain.best], [0, rushMarked]);
+    const badgesAfterRush = (await GET('/badges')).badges.filter(b => b.earned).map(b => b.id);
+    ok('a claimed score earns no Rapid Fire badge', !badgesAfterRush.includes('rush-15'), show(badgesAfterRush));
 
     const match = await POST('/match/start', { rival: 'pro' });
     eq('match deals ten questions', match.questions.length, 10);
     eq('match names the rival', match.rival.name, 'Captain Cosine');
-    const matchDone = await POST('/match/finish', { won: true, playerScore: 8, rivalScore: 6, rival: 'Captain Cosine', ms: 90000 });
+    // A win claimed with nothing marked is not a win.
+    const claimed = await POST('/match/finish', { won: true, playerScore: 10, rivalScore: 0, rival: 'Captain Cosine', ms: 90000 });
+    eq('a win claimed with no server-marked answer is not recorded as one', [claimed.won, claimed.wins, claimed.newBadges.map(b => b.id).includes('match-winner')], [false, 0, false]);
+    const match2 = await POST('/match/start', { rival: 'pro' });
+    let matchMarked = 0;
+    for (const q of match2.questions.slice(0, 8)) {
+      const key = canonicalInput(await answerKeyOf(q.id));
+      const r = await POST('/rush/answer', { id: q.id, answer: key ?? '0' });
+      if (r.correct) matchMarked++;
+    }
+    ok('the match has server-marked correct answers', matchMarked >= 1, `${matchMarked}`);
+    const matchDone = await POST('/match/finish', { won: true, playerScore: 99, rivalScore: 0, rival: 'Captain Cosine', ms: 90000 });
     eq('a win is recorded', matchDone.won, true);
     eq('the win count moves', matchDone.wins, 1);
-    eq('the played count moves', matchDone.played, 1);
+    eq('the played count moves', matchDone.played, 2);
     const matchHistory = await GET('/match/history');
-    eq('match history remembers the game', matchHistory.played, 1);
-    eq('match history keeps the scoreline', matchHistory.recent[0].playerScore, 8);
+    eq('match history remembers the games', matchHistory.played, 2);
+    eq('match history keeps the scoreline the server marked', matchHistory.recent[0].playerScore, matchMarked);
   } catch (err) { crashed(err); }
 
   // ── Curriculum, badges, report, reviews ────────────────────────────────────
@@ -1953,6 +2277,17 @@ async function run() {
     const packQ = await nextQuestion({ taskId: imported.id });
     eq('the imported task serves the imported question', packQ.question.prompt, custom.q.prompt);
     eq('and it is flagged as a custom question', packQ.payload.custom, true);
+    // A teacher's own question has no server copy, so it cannot be checked
+    // (online-only grading): the refusal says so and nothing is marked.
+    await rejects('a teacher-authored question is not checked on the device',
+      POST(`/practice/${packQ.question.id}/submit`, { answer: '34.6', ms: 2000 }), { status: 503, code: 'QUESTION_CHECK_UNAVAILABLE' });
+    await rejects('nor is its solution shown',
+      POST(`/practice/${packQ.question.id}/reveal`, { ms: 500 }), { status: 503, code: 'QUESTION_CHECK_UNAVAILABLE' });
+    {
+      const row = await idb.get('questions', packQ.question.id);
+      eq('the refusal spends no try and leaves the question open', [row.tries || 0, row.answered || 0], [0, 0]);
+      eq('and records no attempt', (await idb.byIndex('attempts', 'pid', grace.id)).filter(a => a.questionId === packQ.question.id).length, 0);
+    }
     await rejects('a file that is not a pack is refused', POST('/tasks/import-pack', { format: 'something-else' }), { status: 400 });
     await rejects('a pack with nothing usable is refused',
       POST('/tasks/import-pack', { format: 'pri-task-pack', task: { title: 'Empty', subtopics: ['nope'] }, customQs: [] }), { status: 400 });
@@ -1997,7 +2332,8 @@ async function run() {
     eq('the ink archive keeps the strokes that were drawn', archived.strokes.length, 1);
     eq('and the reading taken off them', archived.recognized, inkQ.right);
     eq('an unknown ink id comes back empty rather than throwing', (await GET('/ink/not-a-real-id')).ink, null);
-    eq('the same ink reaches history', (await GET(`/history/${inkQ.question.id}/detail`)).ink.recognized, inkQ.right);
+    const inkDetail = await GET(`/history/${inkQ.question.id}/detail`).then(value => ({ value }), error => ({ error }));
+    eq('the same ink reaches history', inkDetail.value?.ink?.recognized ?? `threw ${inkDetail.error?.name}: ${inkDetail.error?.message}`, inkQ.right);
 
     // Handwriting is the most personal thing this app stores and the archive is
     // reachable by a bare id, so the route is asked for one that is not the
@@ -2056,7 +2392,10 @@ async function run() {
       Object.values(reexport.stores).flat().filter(r => r.pid !== restored.id).length, 0);
 
     const restoredHistory = await POST('/history/list', { pageSize: 200 });
-    eq('the restored profile can read its own history', restoredHistory.total, history.total + 3);
+    // Sixteen more questions were answered between the History group and the
+    // backup: four as before, plus the four Rapid Fire and eight Match answers
+    // the rush + match group now marks to have a real score to count.
+    eq('the restored profile can read its own history', restoredHistory.total, history.total + 16);
     eq('the restored stats match the source', (await GET('/stats')).totals.attempts, backup.stores.attempts.length);
 
     await POST('/profiles/select', { id: ada.id });
@@ -2227,6 +2566,7 @@ async function run() {
     eq('every route in the table is one the dispatcher will route to', unknown, []);
   } catch (err) { crashed(err); }
 
+  await online.close();
   return report();
 }
 

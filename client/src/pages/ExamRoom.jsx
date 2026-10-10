@@ -15,6 +15,12 @@
 // refuses those writes after the deadline or once the paper is finalised, and
 // a submit after the deadline is marked on what was saved before it.
 //
+// THE SERVER MARKS. The paper was issued by Pri's server and only its result is
+// ever shown as a score. If the finish cannot reach the server the paper is
+// submitted, frozen and waiting: this screen says so plainly and shows no score
+// until the server's result arrives. A paper an earlier app version marked on
+// the device opens in review labelled as that — never as a certified result.
+//
 // EXAM CONDITIONS. No hints, no tutor, no explanations, no step feedback and no
 // solutions while the paper is open. Handwriting is only transcribed — the
 // reader is answer-blind, and the ink is never ticked or crossed until the
@@ -31,9 +37,21 @@ import ExamAnalysis from '../components/ExamAnalysis.jsx';
 import { compactStrokes, expandStrokes } from '../local/examSession.js';
 import { tLater, useT, useTx } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
+import { CheckSignIn } from '../components/CheckRefusal.jsx';
+import { onCloudSessionChange } from '../platform/cloudSession.js';
 import '../workspace.css';
 
 const SAVE_DEBOUNCE_MS = 600;
+// A submitted paper waiting for the server is asked about again this often.
+const PENDING_RECHECK_MS = 20000;
+const MARKED_BY_KEY = { server: 'examRoom.markedByServer', 'earlier-version': 'examRoom.markedByEarlier', backup: 'examRoom.markedByBackup' };
+const PENDING_KEY = { offline: 'examRoom.pendingOffline', 'sign-in': 'examRoom.pendingSignIn', refused: 'examRoom.pendingRefused' };
+
+/** The result card's data from a finished paper as the backend reads it back. */
+const resultOf = e => ({
+  score: e.score, total: e.total, pct: Math.round(100 * e.score / Math.max(1, e.total)), detail: e.detail,
+  analysis: e.analysis || null, final: e.session?.final || null, markedBy: e.markedBy || null
+});
 const INK_POINTS_PER_SAVE = 9000;
 const HEARTBEAT_MS = 30000;
 const OBJECTIVE = new Set(['mcq', 'multi-mcq']);
@@ -84,7 +102,7 @@ function mmss(totalSeconds) {
 
 export default function ExamRoom() {
   const { id } = useParams();
-  const { celebrate, refreshUser } = useApp();
+  const { celebrate, refreshUser, user } = useApp();
   const nav = useNavigate();
   const t = useT();
   const tx = useTx();
@@ -97,7 +115,10 @@ export default function ExamRoom() {
   const [cur, setCur] = useState(0);
   const [deadlineAt, setDeadlineAt] = useState(null);
   const [now, setNow] = useState(() => Date.now());
-  const [phase, setPhase] = useState('loading');   // loading | sitting | finalising | done
+  const [phase, setPhase] = useState('loading');   // loading | sitting | finalising | pending | done
+  // Submitted but not yet marked by the server: { reason, code }. Never a score.
+  const [pending, setPending] = useState(null);
+  const [rechecking, setRechecking] = useState(false);
   const [result, setResult] = useState(null);
   const [resumed, setResumed] = useState(false);
   const [saveState, setSaveState] = useState('idle');   // idle | saving | saved | error
@@ -168,11 +189,19 @@ export default function ExamRoom() {
         // outlived its submit would only resurrect it.
         clearDraft('exam', id);
         setExam(e);
-        setResult({ score: e.score, total: e.total, pct: Math.round(100 * e.score / Math.max(1, e.total)), detail: e.detail, analysis: e.analysis || null, final: e.session?.final || null });
+        setResult(resultOf(e));
         setPhaseBoth('done');
         return;
       }
       const session = e.session || {};
+      if (session.pending) {
+        // Submitted earlier and still waiting for the server: no score to show.
+        clearDraft('exam', id);
+        setExam(e);
+        setPending(session.pending);
+        setPhaseBoth('pending');
+        return;
+      }
       const saved = session.responses;
       const draft = saved ? null : readDraft('exam', id);
       const from = saved || draft;
@@ -207,7 +236,7 @@ export default function ExamRoom() {
   const locked = !sitting;
 
   // ── Autosave ───────────────────────────────────────────────────────────────
-  const save = useCallback(() => {
+  const save = useCallback((urgent = false) => {
     if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
     if (phaseRef.current !== 'sitting') return saveChain.current;
     accrue();
@@ -225,7 +254,9 @@ export default function ExamRoom() {
     }
     const body = {
       answers: snap.answers, workings: snap.workings, times: timesRef.current, modes: snap.modes, cur: snap.cur,
-      inks: Object.fromEntries(sent.map(k => [k, snap.inks[k] || { strokes: [], lines: [] }]))
+      inks: Object.fromEntries(sent.map(k => [k, snap.inks[k] || { strokes: [], lines: [] }])),
+      // The page is going away: the server's checkpoint is sent now, not after its debounce.
+      ...(urgent === true ? { urgent: true } : {})
     };
     setSaveState('saving');
     saveChain.current = saveChain.current.catch(() => {}).then(() => api.post(`/exams/${id}/responses`, body)).then(res => {
@@ -235,7 +266,7 @@ export default function ExamRoom() {
       setSaveState(dirtyInk.current.size ? 'saving' : 'saved');
       if (dirtyInk.current.size && phaseRef.current === 'sitting') {
         if (saveTimer.current) clearTimeout(saveTimer.current);
-        saveTimer.current = setTimeout(save, 50);
+        saveTimer.current = setTimeout(() => save(), 50);
       }
     }, err => {
       setSaveState('error');
@@ -255,7 +286,7 @@ export default function ExamRoom() {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     // An unsaved change is never shown as saved, even for the debounce window.
     setSaveState('saving');
-    saveTimer.current = setTimeout(save, SAVE_DEBOUNCE_MS);
+    saveTimer.current = setTimeout(() => save(), SAVE_DEBOUNCE_MS);
   }, [save]);
 
   const answeredCount = useMemo(() => {
@@ -280,10 +311,10 @@ export default function ExamRoom() {
   // paper's time, which corrects a device clock changed while the app was away.
   useEffect(() => {
     const onVisibility = () => {
-      if (document.visibilityState === 'hidden') save();
+      if (document.visibilityState === 'hidden') save(true);
       else { accrue(); save(); }
     };
-    const onPageHide = () => save();
+    const onPageHide = () => save(true);
     const onFocus = () => save();
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('pagehide', onPageHide);
@@ -357,6 +388,13 @@ export default function ExamRoom() {
         ms: Date.now() - startedAtRef.current, submissionKey: submissionKey.current, reason
       });
       clearDraft('exam', id);
+      if (r?.pending) {
+        // The server could not be reached. The paper is submitted and frozen;
+        // it is not marked, and nothing here may look like a result.
+        setPending(r);
+        setPhaseBoth('pending');
+        return;
+      }
       setResult(r);
       setPhaseBoth('done');
       celebrate(r);
@@ -370,17 +408,46 @@ export default function ExamRoom() {
           if (back.finishedAt && back.detail) {
             clearDraft('exam', id);
             setExam(back);
-            setResult({ score: back.score, total: back.total, pct: Math.round(100 * back.score / Math.max(1, back.total)), detail: back.detail, analysis: back.analysis || null, final: back.session?.final || null });
+            setResult(resultOf(back));
             setPhaseBoth('done');
             return;
           }
         } catch { /* fall through to the retry message */ }
       }
-      setSubmitError(err?.message || tLater('examRoom.submitFailed'));
+      setSubmitError(err?.code === 'EXAM_NOT_SERVER_ISSUED' ? tLater('examRoom.notServerIssued') : (err?.message || tLater('examRoom.submitFailed')));
       setPhaseBoth('sitting');
       setNow(clockNow());
     }
   }
+
+  // ── Waiting to be marked ───────────────────────────────────────────────────
+  // Reading the paper back asks the server again (the backend sends the queued
+  // finish). It is tried when the connection or the session returns, every
+  // twenty seconds, and whenever the student asks.
+  const recheck = useCallback(async () => {
+    if (phaseRef.current !== 'pending') return;
+    setRechecking(true);
+    try {
+      const back = (await api.get(`/exams/${id}`)).exam;
+      if (phaseRef.current !== 'pending') return;
+      if (back.finishedAt && back.detail) {
+        setExam(back);
+        setResult(resultOf(back));
+        setPending(null);
+        setPhaseBoth('done');
+        refreshUser();
+      } else if (back.session?.pending) setPending(back.session.pending);
+    } catch { /* still waiting; the message on screen is still true */ }
+    finally { setRechecking(false); }
+  }, [id, refreshUser]);
+
+  useEffect(() => {
+    if (phase !== 'pending') return;
+    const timer = setInterval(recheck, PENDING_RECHECK_MS);
+    window.addEventListener('online', recheck);
+    const offSession = onCloudSessionChange(event => { if (event?.detail?.connected === true) recheck(); });
+    return () => { clearInterval(timer); window.removeEventListener('online', recheck); offSession?.(); };
+  }, [phase, recheck]);
 
   // ── Handwriting ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -451,6 +518,31 @@ export default function ExamRoom() {
   // ── Results view ───────────────────────────────────────────────────────────
   if (!exam) return <div className="skeleton" style={{ height: 300 }} />;
 
+  if (phase === 'pending' && pending) {
+    return (
+      <div className="grid" style={{ gap: 18, maxWidth: 860, margin: '0 auto' }}>
+        <h1 className="sr-only">{t('examRoom.pendingHeading', { title: exam.title })}</h1>
+        <div className="card" style={{ padding: 34 }} role="status" data-exam-pending={pending.reason || 'offline'}>
+          <div className="card-title">{exam.title}</div>
+          <p style={{ fontWeight: 640, fontSize: 18, margin: '10px 0 0' }}>{t('examRoom.pendingTitle')}</p>
+          <p className="sub" style={{ marginTop: 8 }}>{t(PENDING_KEY[pending.reason] || PENDING_KEY.offline)}</p>
+          <p className="muted" style={{ marginTop: 8, fontSize: 13 }}>{t('examRoom.pendingLateNote')}</p>
+          {pending.reason === 'sign-in' && (
+            <div style={{ marginTop: 14 }}>
+              <CheckSignIn user={user} refreshUser={refreshUser} label={t('examRoom.pendingSignInAction')} />
+            </div>
+          )}
+          <div className="row" style={{ marginTop: 16 }}>
+            <button className="btn btn-primary" onClick={recheck} disabled={rechecking}>
+              {rechecking ? t('examRoom.pendingChecking') : t('examRoom.pendingRetry')}
+            </button>
+            <button className="btn btn-ghost" onClick={() => nav('/exams')}>{t('examRoom.pendingLeave')}</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (phase === 'done' && result) {
     const pct = result.pct ?? Math.round(100 * result.score / result.total);
     const shownPct = Math.round(pct);
@@ -472,6 +564,10 @@ export default function ExamRoom() {
           {result.final?.finalisedBy === 'deadline' && (
             <p className="muted" style={{ marginTop: 4, fontSize: 13 }}>{t(result.final.late ? 'examRoom.finalisedLate' : 'examRoom.finalisedByDeadline')}</p>
           )}
+          {/* Who marked it. Only the server's result is a certified one. */}
+          {MARKED_BY_KEY[result.markedBy] && (
+            <p className="muted" style={{ marginTop: 4, fontSize: 13 }} data-exam-marked-by={result.markedBy}>{t(MARKED_BY_KEY[result.markedBy])}</p>
+          )}
           <div className="row" style={{ justifyContent: 'center', marginTop: 16 }}>
             <button className="btn btn-primary" onClick={() => nav('/exams')}>{t('examRoom.newPaper')}</button>
             <button className="btn btn-ghost" onClick={() => nav('/stats')}>{t('examRoom.seeInsights')}</button>
@@ -491,13 +587,13 @@ export default function ExamRoom() {
                 <span className="sr-only"> — {t(d.awarded === d.marks ? 'examRoom.allEarned' : d.awarded > 0 ? 'examRoom.partlyEarned' : 'examRoom.noneEarned')}</span>
               </span>
             </div>
-            <MathText block className="q-prompt" style={{ fontSize: 16 }} text={d.stem} />
+            <div lang="en"><MathText block className="q-prompt" style={{ fontSize: 16 }} text={d.stem} /></div>
             {d.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: d.figure }} />}
             {d.parts.map(pt => (
               <div key={pt.key} style={{ margin: '12px 0 0', paddingTop: 10, borderTop: '1px solid var(--hairline)' }}>
                 <div className="row" style={{ gap: 8, alignItems: 'baseline' }}>
                   <b>({pt.key})</b>
-                  <span style={{ flex: 1 }}><MathText text={pt.prompt} /></span>
+                  <span style={{ flex: 1 }} lang="en"><MathText text={pt.prompt} /></span>
                   <span className="tag" style={{ color: pt.correct ? 'var(--good)' : 'var(--bad)' }}>
                     {pt.awarded}/{pt.marks}<span className="sr-only"> {t(pt.correct ? 'examRoom.srMarksCorrect' : 'examRoom.srMarksIncorrect')}</span>
                   </span>
@@ -539,11 +635,11 @@ export default function ExamRoom() {
                 {d.unanswered && <span> {t('examRoom.notAttempted')}</span>}
               </span>
             </div>
-            <MathText block className="q-prompt" style={{ fontSize: 16 }} text={d.prompt} />
+            <div lang="en"><MathText block className="q-prompt" style={{ fontSize: 16 }} text={d.prompt} /></div>
             {d.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: d.figure }} />}
             {OBJECTIVE.has(d.answerType) && d.mcqOptions && (
               <div className="muted" style={{ marginBottom: 8 }}>
-                {t('examRoom.options')} {d.mcqOptions.map((o, j) => <span key={j} style={{ marginRight: 12 }}>{'ABCD'[j]}. <MathText text={o} /></span>)}
+                {t('examRoom.options')} {d.mcqOptions.map((o, j) => <span key={j} lang="en" style={{ marginRight: 12 }}>{'ABCD'[j]}. <MathText text={o} /></span>)}
               </div>
             )}
             <div className="row" style={{ flexWrap: 'wrap', gap: 16, fontSize: 14 }}>
@@ -789,6 +885,9 @@ export default function ExamRoom() {
         <span><Icon name="flag" size={13} />{t('exam.legendFlagged')}</span>
       </div>
 
+      {/* The paper retains English question content in a Hindi interface. Mark the
+          authored mathematics in its source language for screen readers; keep
+          the surrounding navigation and scoring labels translated with t(). */}
       <section className="exam-paper" aria-label={t('examRoom.questionOf', { n: qNumber, total: exam.questions.length })}>
         <div className="q-meta exam-qhead">
           <span className="tag">{t('examRoom.questionOf', { n: qNumber, total: exam.questions.length })}</span>
@@ -809,13 +908,13 @@ export default function ExamRoom() {
         </div>
         {q.multipart ? (
           <>
-            <MathText block className="q-prompt" text={q.stem} />
+            <div lang="en"><MathText block className="q-prompt" text={q.stem} /></div>
             {q.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: q.figure }} />}
             {q.parts.map(pt => (
               <div key={pt.key} style={{ margin: '14px 0 0', paddingTop: 12, borderTop: '1px solid var(--hairline)' }}>
                 <div className="row" style={{ gap: 8, alignItems: 'baseline', marginBottom: 8 }}>
                   <b style={{ fontSize: 16 }}>({pt.key})</b>
-                  <span style={{ flex: 1 }}><MathText text={pt.prompt} /></span>
+                  <span style={{ flex: 1 }} lang="en"><MathText text={pt.prompt} /></span>
                   <span className="tag">{t('examRoom.marksCount', { count: pt.marks, n: pt.marks })}</span>
                 </div>
                 {pt.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: pt.figure }} />}
@@ -823,7 +922,7 @@ export default function ExamRoom() {
                 {pt.alt && (
                   <div style={{ marginTop: 10 }}>
                     <div className="muted" style={{ fontWeight: 600, margin: '6px 0' }}>{t('examRoom.orLabel')}</div>
-                    <MathText block text={pt.alt.prompt} />
+                    <div lang="en"><MathText block text={pt.alt.prompt} /></div>
                     {answerControl(answerKey(q.id, pt.key, OR), pt.alt, t('examRoom.labelPartOr', { key: pt.key }))}
                   </div>
                 )}
@@ -832,13 +931,13 @@ export default function ExamRoom() {
           </>
         ) : (
           <>
-            <MathText block className="q-prompt" text={q.prompt} />
+            <div lang="en"><MathText block className="q-prompt" text={q.prompt} /></div>
             {q.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: q.figure }} />}
             {answerControl(q.id, q, t('examRoom.labelQuestion', { n: qNumber }))}
             {q.choice && (
               <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--hairline)' }}>
                 <div className="muted" style={{ fontWeight: 600, marginBottom: 6 }}>{t('examRoom.orChoiceNote')}</div>
-                <MathText block className="q-prompt" text={q.choice.prompt} />
+                <div lang="en"><MathText block className="q-prompt" text={q.choice.prompt} /></div>
                 {q.choice.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: q.choice.figure }} />}
                 {answerControl(answerKey(q.id, OR), q.choice, t('examRoom.labelQuestionOr', { n: qNumber }))}
               </div>

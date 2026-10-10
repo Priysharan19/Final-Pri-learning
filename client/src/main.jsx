@@ -17,6 +17,12 @@ import { installFormFactorAttributes } from './platform/formFactor.js';
 import { installBackNavigation } from './platform/backNavigation.js';
 import { featureSnapshot } from './platform/features.js';
 
+// Where the boot has got to, for public/boot-guard.js (which says so on screen
+// when the app never renders) and for the browser suites. Reaching this line
+// means the entry module and every file it imports loaded and evaluated.
+const bootPhase = (phase) => { if (window.__PRI_BOOT__) window.__PRI_BOOT__.phase = phase; };
+bootPhase('module');
+
 // Listen for the native shell (if any) before anything else can emit events.
 priNative.start();
 // data-ff / data-short / data-pointer on <html>: semantic form factor (CP-03).
@@ -85,6 +91,7 @@ if (LAN_DEV) {
 }
 
 const root = createRoot(document.getElementById('root'));
+if (GUARDIAN_MODE || DELETE_REQUEST_MODE || ACCOUNT_ACTION_MODE) bootPhase('render');
 if (GUARDIAN_MODE) {
   // Outside StrictMode for the same reason as account actions: one-time codes.
   const GuardianConsent = React.lazy(() => import('./pages/GuardianConsent.jsx'));
@@ -115,9 +122,15 @@ if (GUARDIAN_MODE) {
 } else {
   // When the page is served by the Pri platform server, that server is the
   // cloud authority: settle that before the first render so account, billing
-  // and sync controls do not first paint as "cloud disabled". The probe is
-  // bounded (1.5 s) and offline learning never waits on its answer.
+  // and sync controls do not first paint as "cloud disabled". The first render
+  // waits for that answer and for nothing else, and the wait is bounded by the
+  // probe itself (1.5 s, whatever becomes of its request — see
+  // discoverCloudOrigin). A server that is down, slow or absent therefore
+  // costs the first paint at most that long and never the app: it starts with
+  // the cloud not found, and every screen that needs the server says so in its
+  // own words, as it does when the connection drops later.
   void discoverCloudOrigin().catch(() => null).then(() => {
+    bootPhase('render');
     // The root boundary sits outside the router so that everything is covered —
     // the boot screen, the whole Login and cold-start path, the topbar, the account
     // menu, the sidebar, the toasts and the mobile nav, not only the routes.

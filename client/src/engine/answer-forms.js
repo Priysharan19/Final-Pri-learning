@@ -300,14 +300,22 @@ const HATS = /[̂̃̄⃗⃖]/g;
  * Returns { components } — three entries; a two-dimensional answer is padded with 0.
  */
 const VECTOR_AXES = ['i', 'j', 'k'];
+
+// "\hat{i}" → "i", then a leading "\vec{a} =" or "a⃗ =" label is dropped. Each
+// optional brace or arrow owns the whitespace that follows it, so a run of
+// spaces can be read one way only and the match stays linear in the input —
+// two adjacent `\s*` around an optional token is what made these quadratic.
+// The strings matched, and what replaces them, are unchanged.
+const HAT_AXIS = /\\hat\s*(?:\{\s*)?([ijk])\s*\}?/g;
+const VEC_LABEL = /\\vec\s*(?:\{\s*)?[a-zA-Z]\s*(?:\}\s*)?=\s*/g;
+const NAME_LABEL = /^[a-zA-Z]{1,3}\s*(?:(?:→|⃗)\s*)?=\s*/;
+export function stripVectorNotation(text) {
+  return String(text).replace(HAT_AXIS, '$1').replace(VEC_LABEL, '').replace(NAME_LABEL, '');
+}
 export function parseVectorInput(raw) {
   let s = String(raw ?? '').trim();
   if (!s) throw new Error('Empty vector');
-  s = s.replace(/\$/g, '')
-    .replace(HATS, '')
-    .replace(/\\hat\s*\{?\s*([ijk])\s*\}?/g, '$1')
-    .replace(/\\vec\s*\{?\s*[a-zA-Z]\s*\}?\s*=\s*/g, '')
-    .replace(/^[a-zA-Z]{1,3}\s*(?:→|⃗)?\s*=\s*/, '')
+  s = stripVectorNotation(s.replace(/\$/g, '').replace(HATS, ''))
     .replace(/[îí]/g, 'i').replace(/[ĵ]/g, 'j').replace(/[ǩ]/g, 'k')
     .replace(/[−–—]/g, '-')
     .trim();

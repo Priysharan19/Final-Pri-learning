@@ -6,10 +6,14 @@
 // targeted misconception feedback for recognised wrong answers.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { normalize, parse, evaluate, evalNumeric, exprEquivalent, numsClose, variablesOf } from './expr.js';
+import { normalize, parse, evaluate, evalNumeric, exprEquivalent, numsClose, variablesOf, withEvaluationBudget } from './expr.js';
+
+// Every sum term and counting-loop turn spent while one answer or one page of
+// working is checked comes out of this — see "What an evaluation may cost" in expr.js.
+const EVALUATION_BUDGET = 50000;
 import { diagnoseStep } from './diagnose.js';
 import {
-  parseIntervalInput, authoredRegion, sameRegion, sameRegionIgnoringEndpoints, formatRegion,
+  parseIntervalInput, authoredRegion, sameRegion, sameRegionIgnoringEndpoints,
   parseMatrixInput, sameMatrix, transposeMatrix,
   parseVectorInput, sameVector
 } from './answer-forms.js';
@@ -22,7 +26,50 @@ const UNIT_TAIL = /(cm³|m³|mm³|cm²|m²|mm²|km²|km\/h|m\/s|cm|mm|km|kg|ml|l
 // normalize(). The sign carries no value, so it is stripped before parsing —
 // but it can never rescue a wrong number, because the number is still compared.
 const CURRENCY_LEAD = /^\s*(?:[₹$]|Rs\.?|INR|रु\.?|₨)\s*/i;
-const CURRENCY_TAIL = /\s*(?:\b(?:rupees?|paise|rs)\.?|₹)\s*$/i;
+// The trailing currency word or sign, with the whitespace around it:
+// "9.75 rupees", "9.75 Rs.", "50 paise", "9.75 ₹". It was the pattern
+//   /\s*(?:\b(?:rupees?|paise|rs)\.?|₹)\s*$/i
+// which rescans every run of spaces from each of its positions when no
+// currency word follows. This reads the same tail from the end of the string
+// in one pass: the word (ASCII letters, either case) must start on a word
+// boundary, may carry one full stop, and takes the whitespace on both sides.
+const CURRENCY_WORDS = ['rupees', 'rupee', 'paise', 'rs'];
+const isSpace = (ch) => /\s/.test(ch);
+const isWordChar = (ch) => /\w/.test(ch);
+const asciiLower = (text) => text.replace(/[A-Z]/g, (c) => c.toLowerCase());
+export function stripCurrencyTail(s) {
+  let end = s.length;
+  while (end > 0 && isSpace(s[end - 1])) end--;
+  let start = -1;
+  if (end > 0 && s[end - 1] === '₹') start = end - 1;
+  else {
+    const wordEnd = end > 0 && s[end - 1] === '.' ? end - 1 : end;
+    for (const word of CURRENCY_WORDS) {
+      const at = wordEnd - word.length;
+      if (at < 0 || asciiLower(s.slice(at, wordEnd)) !== word) continue;
+      if (at === 0 || !isWordChar(s[at - 1])) start = at;
+      break;
+    }
+  }
+  if (start < 0) return s;
+  while (start > 0 && isSpace(s[start - 1])) start--;
+  return s.slice(0, start);
+}
+
+/**
+ * The inside of a string wrapped in one pair of braces, trimmed — or null when
+ * it is not wrapped. With `nested` off, a brace inside disqualifies it, which
+ * is the one-element roster "{5}"; with it on, anything may sit inside, which
+ * is the solution set "{10, 12}". These were /^\{\s*([^{}]*?)\s*\}$/ and
+ * /^\{\s*([\s\S]*?)\s*\}$/: a lazy run between two `\s*` that also match
+ * whitespace, quadratic on "{" followed by spaces.
+ */
+export function bracedInner(s, { nested = false } = {}) {
+  if (s.length < 2 || s[0] !== '{' || s[s.length - 1] !== '}') return null;
+  const inner = s.slice(1, -1);
+  if (!nested && (inner.includes('{') || inner.includes('}'))) return null;
+  return inner.trim();
+}
 
 /**
  * Light clean: trim, strip currency/units/thousands separators, unify symbols.
@@ -40,7 +87,7 @@ export function cleanInput(raw, { stripUnits = true } = {}) {
   // "3sqrt(2)." — it never carries value. A run of dots is left alone, because
   // "0.333..." means something else.
   s = s.replace(/(?<!\.)\.\s*$/, '').trim();
-  s = s.replace(CURRENCY_TAIL, '');
+  s = stripCurrencyTail(s);
   if (stripUnits) s = s.replace(UNIT_TAIL, '');
   return s.trim();
 }
@@ -68,13 +115,102 @@ function percentAnswerWanted(question, ans) {
   return ASKS_PERCENT.test(String(question?.prompt ?? ''));
 }
 
+// One number written in groups: 1,234,567 · 12,34,567 (lakh) · 1 234 567 ·
+// 12 34 567 (lakh, spaced). Nothing else that breaks digits apart is a number.
+const GROUPED = /^\d{1,3}(?:,\d{3})+$|^\d{1,2}(?:,\d{2})*,\d{3}$|^\d{1,3}(?: \d{3})+$|^\d{1,2}(?: \d{2})* \d{3}$/;
+// A space a person types or pastes between digit groups: the plain space, the
+// no-break space, and the thin, narrow no-break, en, figure and punctuation
+// spaces typesetting uses for digit groups. A tab or a line break is never one
+// — it separates two things that were written.
+const GROUP_SPACE = /[ \u00a0\u2002\u2007\u2008\u2009\u202f]/g;
+// The calls whose commas the expression engine reads as argument separators:
+// nCr(n, r), nPr(n, r), sum(term, k, a, b) and the bare C(n, r) / P(n, r).
+// Everywhere else it removes a comma as a thousands separator, so "sqrt(1,2,3)"
+// would be the root of 123 and "log(2, 8)" the logarithm of 28.
+const COUNTING_CALL = /(?:^|[^A-Za-z])(?:[nN][cC][rR]|[nN][pP][rR]|[sS][uU][mM]|C|P)\s*$/;
+
+/**
+ * Are the digits of this answer broken apart in a way no single number is
+ * written? Commas, spaces, tabs and line breaks are all separators. Brackets
+ * that only group — "(1,2,3)", "[0 1 2 3]" — hide nothing: their inside is
+ * read like the rest, and so is the bracket after sqrt or log. Only the
+ * argument list of a counting call ("nCr(5, 2)", "C(5, 2)") is set aside,
+ * because there a comma separates arguments; each argument is still read on
+ * its own, so "nCr(1 0, 2)" is not ten choose two.
+ */
+function brokenDigitGroups(s) {
+  const text = String(s).replace(GROUP_SPACE, ' ');
+  const pieces = [];
+  let top = '';
+  const stack = [];                       // one entry per open bracket: is it a call?
+  let call = null;                        // { depth, text } of the outermost open call
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if ('([{'.includes(ch)) {
+      const named = ch === '(' && COUNTING_CALL.test(text.slice(0, i));
+      stack.push(named);
+      if (call) call.text += ch;
+      else if (named) { call = { depth: stack.length, text: '' }; top += '#'; }
+      else top += ch;
+      continue;
+    }
+    if (')]}'.includes(ch)) {
+      if (call && stack.length === call.depth) {
+        pieces.push(...splitArguments(call.text));
+        call = null;
+        top += '#';
+      } else if (call) call.text += ch;
+      else top += ch;
+      if (stack.length) stack.pop();
+      continue;
+    }
+    if (call) call.text += ch; else top += ch;
+  }
+  if (call) pieces.push(...splitArguments(call.text));
+  pieces.push(top);
+  return pieces.some(brokenRun);
+}
+
+/** The arguments of a call, split at the commas that are not inside a bracket. */
+function splitArguments(inner) {
+  const out = [];
+  let depth = 0, part = '';
+  for (const ch of inner) {
+    if ('([{'.includes(ch)) depth++;
+    else if (')]}'.includes(ch)) depth = Math.max(0, depth - 1);
+    if (ch === ',' && depth === 0) { out.push(part); part = ''; } else part += ch;
+  }
+  out.push(part);
+  return out;
+}
+
+function brokenRun(piece) {
+  for (const run of piece.match(/\d[\d,\s]*\d/g) || []) {
+    if (!/[,\s]/.test(run)) continue;
+    // A tab or a line break between digits is two things written, never one number.
+    if (/[^\d, ]/.test(run)) return true;
+    // A comma with a space beside it separates two things: "1, 234" is the
+    // list 1 and 234, not one thousand two hundred and thirty-four.
+    if (GROUPED.test(run.replace(/ +/g, ' '))) continue;
+    // "2 1/2" is a mixed numeral, read below.
+    if (/^\d+ +\d+$/.test(run) && new RegExp(run.replace(/ +/g, ' +') + ' */ *\\d').test(piece)) continue;
+    return true;
+  }
+  return false;
+}
+
 /** Parse a numeric-ish student answer: "2 1/2", "3/4", "50%", "$1,200", "sqrt(2)+1". */
 export function parseNumericInput(raw) {
   let s = cleanInput(raw);
   // A single value written as a one-element roster: "{5}"
-  const roster = s.match(/^\{\s*([^{}]*?)\s*\}$/);
-  if (roster && !roster[1].includes(',')) s = cleanInput(roster[1]);
+  const roster = bracedInner(s);
+  if (roster !== null && !roster.includes(',')) s = cleanInput(roster);
   if (!s) throw new Error('Empty answer');
+  // Digits broken up by commas or spaces are one number only when they are
+  // grouped the way numbers are written — 1,234,567 · 12,34,567 · 1 234 567 ·
+  // 12 34 567. "1,2,3", "0 1 2 3", "(1,2,3)" and three lines "1", "2", "3" are
+  // lists, not 123.
+  if (brokenDigitGroups(s)) throw new Error('Not a single number');
   const meta = { isPercent: /%\s*$/.test(s), text: s };
 
   // mixed numeral: "2 1/2" or "-2 1/2" — also the handwritten form "2 (1)/(2)"
@@ -107,8 +243,8 @@ function splitList(raw) {
     .replace(/^[a-zA-Z]\s*(?:∈|\\in)\s*/, '')          // "x ∈ {…}"
     .replace(/^[A-Za-z]\s*=\s*(?=\{)/, '')            // "S = {…}"
     .replace(/^(∅|\\emptyset|\\varnothing|phi|φ)$/i, '{}');
-  const braced = s.match(/^\{\s*([\s\S]*?)\s*\}$/);
-  if (braced) s = braced[1];
+  const braced = bracedInner(s, { nested: true });
+  if (braced !== null) s = braced;
   s = cleanInput(s)
     .replace(/\bor\b/gi, ',')
     .replace(/\band\b/gi, ',')
@@ -152,7 +288,29 @@ const READ_HELP = {
  *  vector     { components: [x, y, z], tol? }   — "(1, 2, 3)", "i − 2j + 3k", "1i−2j+3k"
  * Returns { correct, feedback?, normalized? }
  */
+// ── How long a final answer may be ───────────────────────────────────────────
+// Working is read a line at a time, 200 characters a line. The final-answer
+// box had no such bound, and the server accepts 12,000 characters there: every
+// cost in the marker that grows with what is written — sampling, domain probes,
+// root finding — grew forty times past what a line of working can ask of it.
+// The longest answer any generator keys is 43 characters; the bound is nearly
+// three times that. A longer one is not read at all, so it
+// is "unreadable": it spends no try, and it costs nothing to refuse.
+export const ANSWER_LIMIT = 120;
+export function answerTooLong(rawInput) {
+  const length = typeof rawInput === 'string' ? rawInput.length
+    : Array.isArray(rawInput) ? rawInput.reduce((n, part) => n + String(part ?? '').length, 0) : 0;
+  return length > ANSWER_LIMIT
+    ? { correct: false, invalid: true, feedback: `That is longer than an answer can be (${ANSWER_LIMIT} characters). Write only the final answer here; working goes in the working space.` }
+    : null;
+}
+
 export function checkAnswer(question, rawInput) {
+  const long = answerTooLong(rawInput);
+  if (long) return long;
+  return withEvaluationBudget(EVALUATION_BUDGET, () => checkAnswerWithinBudget(question, rawInput));
+}
+function checkAnswerWithinBudget(question, rawInput) {
   const type = question.answerType;
   const ans = question.answer;
   try {
@@ -364,6 +522,10 @@ export function checkAnswer(question, rawInput) {
         return { correct: false, feedback: 'Unknown answer type.' };
     }
   } catch (err) {
+    // Digits broken apart in a way no single number is written: say how one is.
+    if (err?.message === 'Not a single number') {
+      return { correct: false, invalid: true, feedback: 'I couldn’t read that as one number. Write it without gaps (1512), or grouped in the usual way (1,512 or 1 512) — a comma followed by a space reads as two numbers.' };
+    }
     return { correct: false, invalid: true, feedback: "I couldn't read that as a maths answer — check for typos (e.g. write 3/4, 0.75, sqrt(2), 2pi, or (2, -3))." };
   }
 }
@@ -403,7 +565,8 @@ function checkForm(question, rawInput) {
       }], ans.tol);
     if (mirrored) return { correct: false, feedback: 'The boundary is right but the inequality points the wrong way — remember the sign reverses when you multiply or divide by a negative number.' };
     if (sameRegion(got.intervals, flipped, ans.tol)) return { correct: false, feedback: 'Check the sign of the boundary — the solution set is reflected.' };
-    return { correct: false, feedback: `Not the solution set. The answer is written as ${formatRegion(want, ans.variable || 'x')}, or in interval notation ${formatRegion(want, ans.variable || 'x', 'interval')} — check your working.` };
+    // The sentence does not print the solution set: said after a wrong try, it would be the answer.
+    return { correct: false, feedback: 'Not the solution set — check the boundary values, which side of each the solutions lie on, and whether each boundary is included.' };
   }
 
   if (type === 'matrix') {
@@ -453,6 +616,9 @@ function checkForm(question, rawInput) {
  * Returns { correct, feedback, stepReport, validLines }
  */
 export function checkWorking(q, workingText) {
+  return withEvaluationBudget(EVALUATION_BUDGET, () => checkWorkingWithinBudget(q, workingText));
+}
+function checkWorkingWithinBudget(q, workingText) {
   const ans = q.answer;
   const meta = ans.stepMeta;
   let report;
@@ -508,6 +674,9 @@ export function checkWorking(q, workingText) {
  * Returns { lines: [{ text, status: 'ok'|'break'|'note', note? }], firstBreak }
  */
 export function stepCheck(meta, workingText) {
+  return withEvaluationBudget(EVALUATION_BUDGET, () => stepCheckWithinBudget(meta, workingText));
+}
+function stepCheckWithinBudget(meta, workingText) {
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   const out = [];
   let firstBreak = -1;

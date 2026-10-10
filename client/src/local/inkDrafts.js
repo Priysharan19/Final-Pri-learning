@@ -27,7 +27,7 @@
 //   · Never holds the expected answer, a solution, a reading or a mark —
 //     strokes only.
 // ─────────────────────────────────────────────────────────────────────────────
-import { byIndex, del, get, put } from './idb.js';
+import { byIndex, del, get, getFresh, put } from './idb.js';
 import { currentPid } from './store.js';
 import { priNative } from '../platform/native/index.js';
 
@@ -44,12 +44,15 @@ let pending = new Map();        // id → row waiting to be written
 let timer = null;
 let flushHooked = false;
 let inFlight = Promise.resolve();
+const refused = new Set();    // ids whose last write the store refused
 
 const pid = () => activePid || safeCurrentPid() || 'anon';
 function safeCurrentPid() {
   try { return currentPid(); } catch { return null; }
 }
 const idFor = (questionId, who = pid()) => `${who}:${questionId}`;
+/** The profile a draft written now belongs to (shared with local/photoDrafts.js). */
+export const inkDraftProfileId = () => pid();
 const offlineNow = () => typeof navigator !== 'undefined' && navigator.onLine === false;
 
 /** Integer [x, y] points — the same compact shape a submission carries. */
@@ -102,6 +105,7 @@ export function saveInkDraft(questionId, strokes, meta = {}) {
   const id = idFor(questionId, who);
   if (!compact.length) {
     pending.delete(id);
+    refused.delete(id);
     inFlight = inFlight.then(() => del(INK_DRAFT_STORE, id)).catch(() => { });
     return true;
   }
@@ -128,10 +132,40 @@ export function flushInkDrafts() {
   pending = new Map();
   inFlight = inFlight.then(async () => {
     for (const row of batch.values()) {
-      try { await put(INK_DRAFT_STORE, row); } catch { /* storage refused; the ink is still on the page */ }
+      // Storage refused: the ink is still on the page, and the row is noted so
+      // confirmInkDraftSaved can say the write failed rather than guess.
+      try { await put(INK_DRAFT_STORE, row); refused.delete(row.id); } catch { refused.add(row.id); }
     }
   });
   return inFlight;
+}
+
+/**
+ * Whether exactly these strokes are durably kept for this question.
+ *
+ * The only thing a "Saved on this device" claim may rest on: the queued write
+ * is flushed, then the row is read back through a fresh IndexedDB connection
+ * (idb.js getFresh — not the handle that wrote it, and never the in-memory
+ * queue) and compared stroke for stroke. Resolves, never rejects:
+ *
+ *   { saved: true }
+ *   { saved: false, reason: 'superseded' }  newer strokes are queued; ask again for those
+ *   { saved: false, reason: 'write' }       the store refused the write
+ *   { saved: false, reason: 'read' }        the store could not be read back
+ *   { saved: false, reason: 'missing' }     the write was acknowledged but no row is there
+ *   { saved: false, reason: 'mismatch' }    a row is there, and it is not this page
+ */
+export async function confirmInkDraftSaved(questionId, strokes) {
+  if (!questionId) return { saved: false, reason: 'missing' };
+  const id = idFor(questionId);
+  const expected = JSON.stringify(compactStrokes(strokes));
+  try { await flushInkDrafts(); } catch { return { saved: false, reason: 'write' }; }
+  if (pending.has(id)) return { saved: false, reason: 'superseded' };
+  if (refused.has(id)) return { saved: false, reason: 'write' };
+  let row;
+  try { row = await getFresh(INK_DRAFT_STORE, id); } catch { return { saved: false, reason: 'read' }; }
+  if (!row || typeof row !== 'object' || row.pid !== pid() || !Array.isArray(row.strokes)) return { saved: false, reason: 'missing' };
+  return JSON.stringify(compactStrokes(row.strokes)) === expected ? { saved: true } : { saved: false, reason: 'mismatch' };
 }
 
 async function readRow(questionId) {
@@ -190,7 +224,7 @@ export async function queuedInkDrafts() {
   try { rows = await byIndex(INK_DRAFT_STORE, 'pid', pid()); } catch { rows = []; }
   const now = Date.now();
   return rows
-    .filter(r => r && typeof r === 'object' && r.savedAt && now - r.savedAt <= MAX_AGE_MS && Array.isArray(r.strokes) && r.strokes.length)
+    .filter(r => r && typeof r === 'object' && r.kind !== 'photo' && r.savedAt && now - r.savedAt <= MAX_AGE_MS && Array.isArray(r.strokes) && r.strokes.length)
     .map(r => ({ questionId: String(r.questionId || String(r.id).slice(String(r.pid).length + 1)), label: r.label || '', savedAt: r.savedAt, queuedAt: r.queuedAt ?? null }))
     .sort((a, b) => b.savedAt - a.savedAt);
 }

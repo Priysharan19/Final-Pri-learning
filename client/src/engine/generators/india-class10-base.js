@@ -172,6 +172,9 @@ export const indiaClass10 = {
       return {
         prompt: `In the arithmetic progression with first term $${a}$ and common difference $${d}$, which term is equal to $${term}$? Give the term number.`,
         answerType: 'numeric', answer: { value: n },
+        // The equation is the student's to set up, so none is given as the
+        // source: a line is judged on whether it holds for the term number.
+        stepcheck: { kind: 'equation', variable: 'n', solutions: [n] },
         traps: [{ value: n - 1, why: `Solving $a + (n-1)d = ${term}$ gives $n - 1 = ${n - 1}$, so $n = ${n}$ — the question asks for the term number, not the number of steps.` }].filter(t => t.value !== n),
         hints: [
           'Set the nth-term formula equal to the value given.',

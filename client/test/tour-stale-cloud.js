@@ -23,6 +23,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
 import { TEMPLATES } from '../src/ink/templates.js';
+import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
 const TOPIC = 'y7-equations';
 // Whole-number answers with no Step Check metadata: wrong working here is the
@@ -62,42 +63,55 @@ const READ = () => {
   return { lines, foot: foot.replace(/^.*?:\s*/, '').replace(/\s+/g, '') };
 };
 const reading = (page) => page.evaluate(READ);
-const readsAs = (page, text) => page.waitForFunction(([src, t]) => {
-  const r = (0, eval)(`(${src})`)();
-  return r.lines.length === 1 && r.lines[0] === t;
-}, [READ.toString(), text], { timeout: 15000 }).then(() => true, () => false);
+// Polled from the test: the real server's Content-Security-Policy forbids
+// eval in the page, as it does in production.
+const readsAs = async (page, text) => {
+  const until = Date.now() + 15000;
+  while (Date.now() < until) {
+    const r = await reading(page);
+    if (r.lines.length === 1 && r.lines[0] === text) return true;
+    await page.waitForTimeout(100);
+  }
+  return false;
+};
 
 export const flow = {
   id: 'stale-cloud',
   name: 'Cloud · late results never rewrite an attempt',
+  online: true,
 
-  async run({ page, ctx, base, check, goto, createProfile, settle }) {
+  async run({ page, ctx, base, check, goto, createProfile, settle, online, note }) {
+    const reader = online.reader;
+    Object.assign(reader, { text: '7', confidence: 0.99, down: false });
+    note(`${SYNTHETIC_EVIDENCE}: in "Cloud · late results…" the handwriting reader behind the real server is a scripted stand-in, and the working check (/v1/working/check) is a labelled stub that returns only per-line notes. Every mark is the real server's.`);
     const stub = {
-      transcribeDelay: 0, transcribed: 0, transcribeAnswered: 0, text: '7',
+      transcribeDelay: 0, transcribed: 0, transcribeAnswered: 0,
+      // What the stand-in reader will "see": scripted on the server's provider hop.
+      get text() { return reader.text; }, set text(value) { reader.text = value; },
       lastSentAt: 0, submittedAt: 0, answeredAfterSubmit: 0,
       checkDelay: 0, checkDelays: {}, checked: 0, checkAnswered: 0, answeredChecks: []
     };
-    await page.addInitScript(origin => { window.__PRI_CLOUD_ORIGIN__ = origin; }, base);
     const json = (route, status, value) => route.fulfill({
       status, contentType: 'application/json', body: JSON.stringify(value)
     }).catch(() => { /* the page abandoned the request — exactly the late case */ });
-    await ctx.route('**/v1/**', async route => {
+    // Two things are held at the network layer, and nothing else: the real
+    // server's reading is DELAYED (the request is passed on to the server and
+    // its own answer is returned late), and the working check — an after-the-
+    // fact note on the student's lines, never a mark — is answered by a stub.
+    // Accounts, question issue and every grade go straight to the real server.
+    await ctx.route(url => url.origin === base && /^\/v1\/(?:handwriting\/transcribe|working\/(?:status|check))$/.test(url.pathname), async route => {
       const url = new URL(route.request().url());
       const method = route.request().method();
-      if (url.pathname === '/v1/handwriting/status') {
-        return json(route, 200, { state: 'ready', configured: true, usable: true, available: true, confidenceFloor: 0.8 });
-      }
       if (url.pathname === '/v1/working/status') return json(route, 200, { available: true, configured: true });
       if (url.pathname === '/v1/handwriting/transcribe' && method === 'POST') {
         stub.transcribed++;
         stub.lastSentAt = Date.now();
         await new Promise(r => setTimeout(r, stub.transcribeDelay));
+        const response = await route.fetch().catch(() => null);
         stub.transcribeAnswered++;
         if (stub.submittedAt && Date.now() > stub.submittedAt) stub.answeredAfterSubmit++;
-        return json(route, 200, { transcription: {
-          engine: 'stub-reader', confidence: 0.99, needsConfirmation: false,
-          lines: String(stub.text).split('\n').filter(Boolean).map(text => ({ text, confidence: 0.99 }))
-        } });
+        if (!response) return route.abort().catch(() => {});
+        return route.fulfill({ response }).catch(() => { /* abandoned: the late case */ });
       }
       if (url.pathname === '/v1/working/check' && method === 'POST') {
         const n = ++stub.checked;
@@ -110,11 +124,12 @@ export const flow = {
           lines: lines.map((_, i) => ({ index: i, status: i === lines.length - 1 ? 'break' : 'ok', why: i === lines.length - 1 ? noteFor(n) : undefined }))
         } });
       }
-      return json(route, 404, { error: { code: 'NOT_FOUND', message: url.pathname } });
+      return route.continue();
     });
 
     await goto('/');
     await createProfile({ name: 'Grace Hopper', year: 7 });
+    await online.signIn({ name: 'Grace Hopper' });
 
     // Both server features are opt-in, so they are switched on the way a
     // student does: in Settings.
@@ -124,7 +139,8 @@ export const flow = {
       const button = row.locator('button[aria-pressed]');
       await button.waitFor({ timeout: 20000 });
       await page.waitForFunction(el => !el.disabled, await button.elementHandle(), { timeout: 20000 });
-      await button.click();
+      // Server reading is already on for a signed-in account; a tap would turn it off.
+      if (await button.getAttribute('aria-pressed') !== 'true') await button.click();
       await page.waitForFunction(el => el.getAttribute('aria-pressed') === 'true', await button.elementHandle(), { timeout: 20000 });
     }
     await check('both server features are switched on in Settings',
@@ -172,6 +188,7 @@ export const flow = {
     await page.locator('.ink-tool[title="Clear"]').click();
     await settle();
     let glyph = '4';
+    online.forgetKeptReads();   // re-scripted stand-in (desk only)
     stub.text = glyph;
     const sentBefore = stub.transcribed;
     await handwrite(page, box, glyph);
@@ -190,6 +207,7 @@ export const flow = {
       await page.locator('.ink-tool[title="Clear"]').click();
       await settle();
       glyph = '9';
+      online.forgetKeptReads();   // re-scripted stand-in (desk only)
       stub.text = glyph;
       await handwrite(page, box, glyph);
       await readsAs(page, glyph);
@@ -212,6 +230,10 @@ export const flow = {
     // Two lines on the question on screen, submitted until it resolves.
     const writeTwoLinesAndResolve = async () => {
       stub.transcribeDelay = 100;
+      // Re-scripted stand-in: earlier in this flow a lone "1" was scripted to
+      // read as "7". The server keeps a read per account and picture, so the
+      // desk says "a different reader now" (harness-only; online-session.mjs).
+      online.forgetKeptReads();
       stub.text = '1\n2';
       if (await page.getByRole('button', { name: 'Answer by handwriting' }).count()) {
         await page.getByRole('button', { name: 'Answer by handwriting' }).click();
@@ -291,6 +313,16 @@ export const flow = {
     }, idA);
     await check('A\u2019s recorded mark is unchanged in History: still wrong',
       !!rowA && rowA.bad && !rowA.good && /\b0 \/ \d+ marks/.test(evalA), `row ${JSON.stringify(rowA)}, evaluation ${JSON.stringify(evalA.slice(0, 80))}`);
+    // Every verdict above was the server's, and the late results changed
+    // nothing there either: one completion per resolved question, no more.
+    const graded = await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/);
+    const resolvedOnServer = new Set(graded.filter(c => c.json?.resolved === true).map(c => c.path));
+    const ledger = online.ledger();
+    await check('every mark in this flow was the server\u2019s, and it completed each resolved question exactly once',
+      graded.length >= 4 && graded.every(c => c.status === 200 && c.json?.authoritative === true && c.body?.mode === 'ink') &&
+        ledger.completions === resolvedOnServer.size,
+      `${graded.length} grades, ${resolvedOnServer.size} resolved, ledger ${JSON.stringify(ledger)}`);
+    await check('nothing in this flow tried to reach a real provider', reader.refused.length === 0, JSON.stringify(reader.refused));
   }
 };
 

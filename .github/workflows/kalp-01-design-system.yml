@@ -6,6 +6,7 @@ on:
       - 'client/src/**'
       - 'client/test/design-system-check.mjs'
       - 'client/test/tour-kalp01-design.js'
+      - 'client/test/support/**'
       - 'docs/design/**'
       - 'docs/evidence/KALP-01*'
       - '.github/workflows/kalp-01-design-system.yml'
@@ -40,6 +41,9 @@ jobs:
 
       - name: Install client dependencies
         run: npm ci --prefix client
+      # Client suites are marked by the real /v1 server, booted in-process (online-only grading).
+      - name: Install server dependencies
+        run: npm ci --prefix server
 
       - name: Canonical design-system source gate
         run: node client/test/design-system-check.mjs

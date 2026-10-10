@@ -3,6 +3,7 @@ import { asStore, isDatabaseOverload } from './store.js';
 import { nextSyncCursor, syncLockKey } from './db.js';
 import { rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 import { syncQuota } from './config.js';
+import { logEvent } from './observability.js';
 
 const SCHEMA = 1;
 const MAX_PUSH = 100;
@@ -10,6 +11,46 @@ const MAX_PULL = 500;
 const ID = /^[A-Za-z0-9._:-]{1,160}$/;
 const CLIENT_ENTITY = new Set(['profile', 'settings', 'bookmark', 'favorite', 'task', 'custom-question']);
 const APPEND_EVENT = new Set(['practice-progress', 'practice-attempt', 'exam-attempt', 'rush-history', 'match-history', 'task-completion', 'mastery-observation']);
+
+// Ids the server writes its own learning events under. Every one of them is a
+// bare UUID: an examination paper's id (known to the device from the moment the
+// paper is created, and later the id of its `exam-result` event) or a marked
+// attempt's id. `learning_events` is unique on (account_id, id), so a device
+// that pushed one of its own events under such an id could make the server's
+// insert fail: the paper could then never be finished. A device's own ids are
+// never of this shape — the client mints `evt-<deviceId>-<seq>` for live items
+// and `hist:<deviceId>:…` for backfilled history (client/src/platform/
+// syncWorker.js, syncHistorical.js) — so the whole shape is refused at the door.
+// `displaced:` is where finalisation moves a device row found on a server id in
+// data stored before this rule (displaceDeviceEvent below); a device may not
+// pre-occupy that either.
+const SERVER_EVENT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DISPLACED_PREFIX = 'displaced:';
+export const isServerEventId = id => SERVER_EVENT_ID.test(String(id)) || String(id).toLowerCase().startsWith(DISPLACED_PREFIX);
+
+/**
+ * Make `id` free for an event the server is about to write for this account.
+ *
+ * Called inside the writer's own transaction (under the account's sync lock),
+ * just before the insert. Normally there is nothing to do. If a row a DEVICE
+ * pushed is sitting on the id — possible only in data stored before the push
+ * route refused server-shaped ids — it is moved to a derived id rather than
+ * deleted: the device's record survives, the server's event takes the id its
+ * readers expect, and the finish that needed it completes. Returns true when a
+ * row was moved. Logs that it happened, never what the row held.
+ */
+export async function displaceDeviceEvent(db, accountId, id) {
+  const row = await db.get("SELECT device_id,device_seq FROM learning_events WHERE account_id=? AND id=? AND device_id<>'server-grader'", [accountId, id]);
+  if (!row) return false;
+  const base = DISPLACED_PREFIX + sha256(`${row.device_id}\n${row.device_seq}\n${id}`).slice(0, 32);
+  // The derived id is unique per (device, sequence, id); the suffix only
+  // matters if that very id is itself already taken in old data.
+  let moved = base;
+  for (let n = 1; await db.get('SELECT 1 FROM learning_events WHERE account_id=? AND id=?', [accountId, moved]); n++) moved = `${base}.${n}`;
+  await db.run("UPDATE learning_events SET id=? WHERE account_id=? AND id=? AND device_id<>'server-grader'", [moved, accountId, id]);
+  logEvent('warn', 'platform_error', { code: 'SYNC_EVENT_ID_DISPLACED' });
+  return true;
+}
 
 function plain(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value) && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
@@ -19,15 +60,22 @@ function parseJson(value, fallback = {}) {
   try { return value ? JSON.parse(value) : fallback; } catch { return fallback; }
 }
 
+// A device clock later than the year 2100 is not a time; it is stored as unknown.
+const MAX_EVENT_TIME = 4102444800000;
 function cleanEvent(raw, deviceId) {
-  if (!plain(raw) || !ID.test(String(raw.id || '')) || !ID.test(String(raw.kind || '')) || !APPEND_EVENT.has(raw.kind)) throw Object.assign(new Error('Invalid learning event.'), { status: 400, code: 'SYNC_EVENT_INVALID' });
+  // Ids and kinds are strings. Anything else is refused before it is read:
+  // an object here used to throw inside String() and answer 500.
+  const idText = v => typeof v === 'string' && ID.test(v);
+  if (!plain(raw) || !idText(raw.id) || !idText(raw.kind) || !APPEND_EVENT.has(raw.kind) || typeof raw.deviceId !== 'string' ||
+      (raw.entityId != null && !idText(raw.entityId))) throw Object.assign(new Error('Invalid learning event.'), { status: 400, code: 'SYNC_EVENT_INVALID' });
+  if (isServerEventId(raw.id)) throw Object.assign(new Error('This event id is reserved for the server.'), { status: 400, code: 'SYNC_EVENT_ID_RESERVED' });
   if (String(raw.deviceId || '') !== deviceId) throw Object.assign(new Error('Event device does not match sync device.'), { status: 400, code: 'SYNC_DEVICE_MISMATCH' });
   if (!Number.isSafeInteger(raw.deviceSeq) || raw.deviceSeq <= 0) throw Object.assign(new Error('Event sequence is invalid.'), { status: 400, code: 'SYNC_SEQUENCE_INVALID' });
   if (raw.entityId != null && !ID.test(String(raw.entityId))) throw Object.assign(new Error('Event entity id is invalid.'), { status: 400, code: 'SYNC_EVENT_INVALID' });
   if (!plain(raw.payload || {})) throw Object.assign(new Error('Event payload is invalid.'), { status: 400, code: 'SYNC_EVENT_INVALID' });
   const payload = JSON.stringify(raw.payload || {});
   if (Buffer.byteLength(payload) > 256 * 1024) throw Object.assign(new Error('Event payload is too large.'), { status: 413, code: 'SYNC_EVENT_TOO_LARGE' });
-  return { id: String(raw.id), deviceId, deviceSeq: raw.deviceSeq, kind: raw.kind, entityId: raw.entityId == null ? null : String(raw.entityId), occurredAt: Number.isFinite(raw.occurredAt) ? Math.max(0, Math.floor(raw.occurredAt)) : null, payload };
+  return { id: String(raw.id), deviceId, deviceSeq: raw.deviceSeq, kind: raw.kind, entityId: raw.entityId == null ? null : String(raw.entityId), occurredAt: typeof raw.occurredAt === 'number' && Number.isFinite(raw.occurredAt) && raw.occurredAt <= MAX_EVENT_TIME ? Math.max(0, Math.floor(raw.occurredAt)) : null, payload };
 }
 
 function cleanEntity(raw) {
@@ -169,6 +217,9 @@ export function createSyncRouter(db) {
     if (body.schemaVersion !== SCHEMA) return res.status(409).json({ error: { code: 'SYNC_SCHEMA_UNSUPPORTED', message: `Expected sync schema ${SCHEMA}.` } });
     const deviceId = String(body.deviceId || '');
     if (!ID.test(deviceId) || deviceId !== req.platformSession.device_id) return res.status(400).json({ error: { code: 'SYNC_DEVICE_MISMATCH', message: 'Sync device does not match this session.' } });
+    // The server's own grader writes under this id. A device that took it
+    // would share, and could exhaust, the sequence the account's marks use.
+    if (deviceId === 'server-grader') return res.status(400).json({ error: { code: 'SYNC_DEVICE_RESERVED', message: 'This device id is reserved.' } });
     const eventsRaw = Array.isArray(body.events) ? body.events : [];
     const entitiesRaw = Array.isArray(body.entities) ? body.entities : [];
     if (eventsRaw.length + entitiesRaw.length > MAX_PUSH) return res.status(413).json({ error: { code: 'SYNC_BATCH_TOO_LARGE', message: `At most ${MAX_PUSH} sync items are accepted per push.` } });

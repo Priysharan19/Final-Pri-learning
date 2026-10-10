@@ -169,11 +169,8 @@ const reading = ({
 
   const gateAt = submitBody.indexOf('if (needsCheck && vouchedNow !== reading)');
   const deliveryAt = submitBody.indexOf('await deliver(');
-  const autoStart = card.indexOf('const autoMarkedRef = useRef(');
-  const autoEnd = card.indexOf('async function getHint()', autoStart);
-  const autoBody = card.slice(autoStart, autoEnd);
-  ok(gateAt >= 0 && deliveryAt > gateAt && /submit\(\);/.test(autoBody),
-    'CASE 6: afterWait auto-mark calls submit, whose surviving-uncertainty gate runs before any delivery/mark');
+  ok(gateAt >= 0 && deliveryAt > gateAt && !/autoMarkedRef/.test(card) && !/inkResult\?\.afterWait/.test(card),
+    'CASE 6: a reading that arrives after waiting is never submitted by the card; the student\'s Submit runs the surviving-uncertainty gate before any delivery/mark');
   ok(/if \(ink\.needsConfirmation === true\)/.test(card)
       && /ink\.minConf < confidenceGate/.test(card)
       && /Number\(ink\.confidenceFloor\)/.test(card),

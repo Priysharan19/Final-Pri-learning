@@ -72,10 +72,15 @@ async function answerCurrentQuestion(page) {
 export const flow = {
   id: 'progress-truth',
   name: 'Progress truth · rendered numbers = attempt ledger',
+  online: true,
 
-  async run({ page, base, check, goto, createProfile, settle }) {
+  async run({ page, base, check, goto, createProfile, settle, online }) {
     await goto('/');
     await createProfile(STUDENT);
+    // Every attempt in the ledger below is one the server marked (or whose
+    // solution the server released): the profile is signed in to the real
+    // platform server before the first question.
+    await online.signIn({ name: STUDENT.name });
 
     const sitting = async (n) => {
       await page.goto(`${base}/practice`, { waitUntil: 'domcontentloaded' });
@@ -113,6 +118,11 @@ export const flow = {
         };
       });
       await check(`${label}: Questions answered = attempt rows`, shown.answered === L.answered, `${shown.answered} vs ${L.answered}`);
+      // The ledger on the device is not a second opinion: each row is a
+      // question the server completed (marked, or its solution released).
+      const held = online.ledger();
+      await check(`${label}: every attempt row is one the server completed — no device-only marks`,
+        held.completions === L.answered, `server completions ${held.completions} vs attempt rows ${L.answered}`);
       await check(`${label}: Chapters started = chapters with evidence`, shown.started === L.started, `${shown.started} vs ${L.started}`);
       await check(`${label}: Chapters practised = chapters with 5+ answers`, shown.practised === L.practised, `${shown.practised} vs ${L.practised}`);
       const drift = shown.rows.filter(r => (L.byCh[r.id]?.attempts || 0) !== r.attempts || (L.byCh[r.id]?.correct || 0) !== r.correct);

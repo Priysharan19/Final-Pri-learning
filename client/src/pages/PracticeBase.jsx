@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
+import { onCloudSessionChange } from '../platform/cloudSession.js';
 import {
   assignmentProgressSummary, assignmentQuestionTarget, assignmentSessionFromSubmission
 } from '../platform/assignmentProgress.js';
@@ -15,10 +16,24 @@ import Icon from '../components/Icon.jsx';
 import { isContentEmpty, servable, contentEmptySignal } from '../lib/contentServe.js';
 import { practiceHref, practiceRequestFromQuery } from '../lib/practiceLinks.js';
 import { queueTelemetry } from '../platform/telemetry.js';
+import { consumeSessionReceipt } from './practiceSessionReceipt.js';
+import { shouldReloadPracticeOnCloudSignIn } from './practiceCloudRecovery.js';
+
+// Reuse the existing verified account flow; never create a parallel practice login.
+const PracticeAccountRecovery = React.lazy(() => import('../components/CloudAccountPanel.jsx'));
 
 const EMPTY_SESSION = Object.freeze({ answered: 0, correct: 0, xp: 0 });
 
+// A device may change local profiles while this route remains mounted.
+// Keep every in-memory question, photo, transcript and recovery ref scoped to
+// its owning profile. A cloud session refresh for the SAME local profile must
+// not remount the card or discard a Photo awaiting account recovery.
 export default function Practice() {
+  const { user } = useApp();
+  return <ProfilePractice key={String(user?.id ?? 'no-profile')} />;
+}
+
+function ProfilePractice() {
   const { user } = useApp();
   const t = useT();
   const tx = useTx();
@@ -52,11 +67,21 @@ export default function Practice() {
   const handedRef = useRef(location.state?.serve || null);   // a retry handed over from History
   const [error, setError] = useState('');
   const [errorCode, setErrorCode] = useState('');
+  const [accountRecoveryOpen, setAccountRecoveryOpen] = useState(false);
   const [pyqAlternatives, setPyqAlternatives] = useState([]);
+  // A named difficulty with no authored form: the refusal's own detail — the
+  // level asked for and the levels that exist — so the student can choose.
+  const [difficultyGap, setDifficultyGap] = useState(null);
   const [capped, setCapped] = useState(null);
   const [session, setSession] = useState({ ...EMPTY_SESSION });
   const sessionRef = useRef({ ...EMPTY_SESSION });
+  const seenSessionAttempts = useRef(new Set());
   const loading = useRef(false);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; };
+  }, []);
 
   // An empty path is a deliberate state, not an error to retry: it is shown
   // once, with a way out, and reported as a low-cardinality signal.
@@ -158,13 +183,18 @@ export default function Practice() {
     setError('');
     setErrorCode('');
     setPyqAlternatives([]);
+    setDifficultyGap(null);
     setCapped(null);
     try {
       // Reload/restart resumes unfinished work. Pressing the explicit Next
       // control is different: the student chose to skip, so record a safe
       // discard before serving a fresh question. A resolved row returns 409
       // here and is already safe to move past.
-      if (options?.fresh === true && currentQuestionRef.current && !assignmentMode) {
+      // Leaving a question that cannot be marked (an offline draft) for one
+      // that can is different again: the draft is given up only once a
+      // markable question has actually arrived, never on the way to asking.
+      const replacing = options?.replaceUnmarkable === true && !assignmentMode ? currentQuestionRef.current : null;
+      if (options?.fresh === true && currentQuestionRef.current && !assignmentMode && !replacing) {
         const leaving = currentQuestionRef.current;
         // A submission still being marked is not abandoned by moving on: the
         // card finishes it, and the discard below waits for it in the backend.
@@ -176,15 +206,18 @@ export default function Practice() {
       const assignmentSubtopic = assignmentSpec.subtopic ? String(assignmentSpec.subtopic) : null;
       const assignmentTrack = assignmentSpec.track ? String(assignmentSpec.track) : null;
       const assignmentDifficulty = Number.isFinite(Number(assignmentSpec.difficulty)) ? Number(assignmentSpec.difficulty) : null;
-      const body = taskId ? { taskId }
+      // A level the student chose after a DIFFICULTY_UNAVAILABLE refusal is in
+      // the URL; it stands in for the level a task or assignment named.
+      const chosenLevel = difficulty != null && difficulty !== '' && Number.isFinite(Number(difficulty)) ? Number(difficulty) : null;
+      const body = taskId ? { taskId, ...(chosenLevel != null ? { difficulty: chosenLevel } : {}) }
         : assignmentMode && assignmentSubtopic ? {
             mode: 'topic', subtopic: assignmentSubtopic,
             track: assignmentTrack || undefined,
-            difficulty: assignmentDifficulty ?? undefined
+            difficulty: chosenLevel ?? assignmentDifficulty ?? undefined
           }
           : assignmentMode ? {
               mode: 'smart', track: assignmentTrack || undefined,
-              difficulty: assignmentDifficulty ?? undefined
+              difficulty: chosenLevel ?? assignmentDifficulty ?? undefined
             }
           : practiceRequestFromQuery(params);
       // Real local practice resumes the exact unresolved question after reload,
@@ -196,23 +229,68 @@ export default function Practice() {
       const pendingQuestionId = body.resume === true ? pendingSubmissionQuestionId() : null;
       if (pendingQuestionId) body.pendingQuestionId = pendingQuestionId;
       const r = await api.post('/practice/next', body);
+      if (!alive.current) return; // A former profile cannot restore this question.
       // Not served back means there is nothing left to recover (skipped, or
       // gone); a record that can never replay must not be sent forever.
       if (pendingQuestionId && r?.question?.id !== pendingQuestionId) clearPendingSubmission(pendingQuestionId);
+      if (replacing) {
+        const state = servable(r) ? r.question.checkState : 'draft';
+        if (state === 'draft' || state === 'legacy') {
+          // Still no markable question. The one just made is empty and is put
+          // aside; the question the student was working on stays as it was.
+          if (r?.question?.id && r.question.id !== replacing) {
+            await api.post(`/practice/${r.question.id}/discard`, {}).catch(() => undefined);
+          }
+          return 'still-unmarkable';
+        }
+        try { await api.post(`/practice/${replacing}/discard`, {}); }
+        catch (e) { if (e?.status !== 409) throw e; }
+        if (!readPendingSubmission(replacing)) clearInkDraft(replacing);
+        setServe(r);
+        return 'replaced';
+      }
       if (!servable(r)) throw Object.assign(new Error(emptyContext.current.t('practice.emptyTitle')), { code: 'CONTENT_EMPTY' });
       setServe(r);
     } catch (e) {
+      if (!alive.current) return;
+      // Asking for a markable question failed: nothing was replaced, and the
+      // card says so beside the work that is still on it.
+      if (options?.replaceUnmarkable === true && currentQuestionRef.current) return 'still-unmarkable';
       // A free-tier refusal is not a fault: it is the end of today's free
       // questions, and it is explained rather than shown as an error string.
       if (e?.code === 'FREE_CAP_REACHED' || e?.code === 'FREE_EXAM_CAP_REACHED') setCapped(e);
       else {
         if (isContentEmpty(e?.code)) noteEmpty(e.code);
-        setError(e.message); setErrorCode(e?.code || '');
+        setError(e.message); setErrorCode(e?.status === 401 ? 'AUTH_REQUIRED' : (e?.code || ''));
         setPyqAlternatives(e?.code === 'INDIA_PYQ_UNAVAILABLE' && Array.isArray(e?.detail?.alternatives) ? e.detail.alternatives : []);
+        if (e?.code === 'DIFFICULTY_UNAVAILABLE') {
+          // Nothing was served, and nothing is shown in its place but the choice.
+          setServe(null);
+          setDifficultyGap({
+            requested: Number(e?.detail?.difficultyRequested) || null,
+            available: (Array.isArray(e?.detail?.available) ? e.detail.available : []).map(a => Number(a?.difficulty)).filter(d => Number.isInteger(d) && d >= 1 && d <= 4),
+            dotpoint: e?.detail?.dotpoint != null
+          });
+        }
       }
     }
     finally { loading.current = false; }
   }, [subtopic, dotpoint, difficulty, taskId, track, pyqOnly, assignmentMode, assignmentContext, assignmentClassId, assignmentId, noteEmpty]);
+
+  // After the existing account panel verifies the SAME local profile, retry
+  // the untouched topic/dotpoint/difficulty request. An event from a different
+  // student must never open this student's question or recover their work.
+  useEffect(() => onCloudSessionChange(event => {
+    if (event?.detail?.connected !== true ||
+        String(event.detail.localProfileId) !== String(user?.id)) return;
+    setAccountRecoveryOpen(false);
+    // Signing in while a student is writing must not re-issue a question or
+    // replace the mounted Ink canvas with another question ID. InkAnswer has
+    // its own same-profile session listener which retries recognition after
+    // the verified cloud-account transition. Only an empty Practice surface
+    // needs initial question issuance after sign-in.
+    if (shouldReloadPracticeOnCloudSignIn(event, user?.id, currentQuestionRef.current)) void load();
+  }), [load, user?.id]);
 
   const setPyqOnly = useCallback((on) => {
     const next = new URLSearchParams(params);
@@ -267,6 +345,9 @@ export default function Practice() {
   }, [assignmentMode, assignmentContext, assignmentClassId, assignmentId, assignmentTarget, t]);
 
   const onResolved = res => {
+    // A network acknowledgement from a removed account's card cannot change
+    // this student's session or send an assignment summary under a new login.
+    if (!alive.current || !consumeSessionReceipt(res, seenSessionAttempts.current)) return;
     const goal = Math.max(1, Number(user.dailyGoal) || 10);
     const before = Math.max(0, Number(user.today?.questions) || 0);
     if (!assignmentMode && !sessionDoneShown.current && before < goal && before + 1 >= goal) {
@@ -461,7 +542,37 @@ export default function Practice() {
           </div>
         )}
 
-        {error && !capped && !isContentEmpty(errorCode) && (
+        {/* The level asked for has no questions for this selection. Nothing is
+            served in its place: the page names the level, lists the levels that
+            do exist, and waits for the student to choose one (issue #408). */}
+        {error && !capped && errorCode === 'DIFFICULTY_UNAVAILABLE' && difficultyGap && (
+          <div className="notice" role="status" data-difficulty-unavailable
+            data-difficulty-requested={difficultyGap.requested || ''}>
+            <strong>{t(difficultyGap.dotpoint ? 'practice.levelUnavailableDotpoint' : 'practice.levelUnavailableTopic', {
+              requested: difficultyGap.requested ? `D${difficultyGap.requested} · ${t(`difficulty.${difficultyGap.requested}`)}` : ''
+            })}</strong>
+            <p className="muted" style={{ margin: '4px 0 10px' }}>
+              {t(difficultyGap.available.length ? 'practice.levelUnavailableChoose' : 'practice.levelUnavailableNone')}
+            </p>
+            <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+              {difficultyGap.available.map(d => (
+                <button key={d} type="button" className="btn btn-primary btn-sm" data-difficulty-choice={d}
+                  onClick={() => { const next = new URLSearchParams(params); next.set('difficulty', String(d)); setParams(next); }}>
+                  {t('practice.levelPractiseAt', { level: `D${d} · ${t(`difficulty.${d}`)}` })}
+                </button>
+              ))}
+              {difficulty != null && !taskId && !assignmentMode && (
+                <button type="button" className="btn btn-quiet btn-sm" data-difficulty-choice="adaptive"
+                  onClick={() => { const next = new URLSearchParams(params); next.delete('difficulty'); setParams(next); }}>
+                  {t('practice.levelLetPriChoose')}
+                </button>
+              )}
+              <Link className="btn btn-quiet btn-sm" to="/">{t('practice.emptyChooseTopic')}</Link>
+            </div>
+          </div>
+        )}
+
+        {error && !capped && errorCode !== 'DIFFICULTY_UNAVAILABLE' && !isContentEmpty(errorCode) && (
           <div className="verdict verdict-technical" role="alert" data-practice-error={errorCode || 'error'}>
             <span className="verdict-ico"><Icon name="alert" /></span>
             <div>
@@ -480,6 +591,20 @@ export default function Practice() {
                       </Link>
                     ))}
                   </div>
+                </div>
+              )}
+              {errorCode === 'AUTH_REQUIRED' && cloudAvailable() && (
+                <div data-practice-auth-recovery style={{ marginTop: 10 }}>
+                  <button type="button" className="btn btn-primary btn-sm"
+                    data-testid="practice-sign-in" aria-expanded={accountRecoveryOpen}
+                    onClick={() => setAccountRecoveryOpen(open => !open)}>
+                    {t('login.cloudSignIn')}
+                  </button>
+                  {accountRecoveryOpen && (
+                    <React.Suspense fallback={<p role="status">{t('cloud.stateChecking')}</p>}>
+                      <PracticeAccountRecovery />
+                    </React.Suspense>
+                  )}
                 </div>
               )}
               <div style={{ marginTop: 10 }}>
@@ -537,17 +662,18 @@ export default function Practice() {
       {serve && !assignmentCompleteLocally && (
         <>
           <QuestionCard
-            key={serve.question.id}
+            key={`${user.id}:${serve.question.id}`}
             question={serve.question}
             reason={serve.reason}
             reasonTag={serve.reasonTag || null}
             why={serve.why}
             onResolved={onResolved}
             onNext={() => load({ fresh: true })}
+            onReplace={assignmentMode ? null : () => load({ fresh: true, replaceUnmarkable: true })}
             onRedo={redo}
           />
           <PriExplain
-            key={`explain-${serve.question.id}`}
+            key={`explain-${user.id}:${serve.question.id}`}
             questionId={serve.question.id}
             questionPrompt={serve.question.prompt}
             questionFigure={serve.question.figure}

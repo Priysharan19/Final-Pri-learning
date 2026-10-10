@@ -64,18 +64,26 @@ function ok(name, cond, detail = '') {
 }
 const eq = (name, actual, expected) => ok(name, show(actual) === show(expected), `expected ${show(expected)}, got ${show(actual)}`);
 
-// ── Network: offline until a test says otherwise ─────────────────────────────
-globalThis.__PRI_CLOUD_ORIGIN__ = 'https://pri.example.test';
-let online = false;
+// ── Network ──────────────────────────────────────────────────────────────────
+// Marking is online-only and server-authoritative (owner decision 2026-10-10),
+// so the real /v1 app runs behind this suite (support/online-authority.mjs) and
+// every practice mark below is the server's.
+//
+// One leg still needs a server that misbehaves on purpose: a sync endpoint
+// that replays the same remote events on every pull, including counterfeits.
+// The real server cannot be asked to do that, so while `syncStandIn` is on —
+// and only then, and only for /v1/sync/* — this stand-in answers instead. It
+// never sees a question or an answer and never produces a mark. It is
+// installed under the authority's own fetch wrapper, so sign-in, issuing,
+// marking and entitlements always reach the real server.
+let syncStandIn = false;
 const serverEvents = new Map();   // id → event (the server's UNIQUE(account_id, id))
 let remoteFeed = [];               // what a pull hands back, every time
 const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } });
-const account = { id: 'acct-sync', email: 's@example.test', name: 'S', role: 'student', emailVerified: true };
+const trueFetch = globalThis.fetch;
 globalThis.fetch = async (url, options = {}) => {
-  if (!online) throw new TypeError('Failed to fetch');
-  const path = new URL(url).pathname;
-  if (path === '/v1/account/login' || path === '/v1/account/me') return json({ account });
-  if (path === '/v1/entitlements') return json({ entitlement: { plan: 'free', status: 'free', provider: 'none', sourceVersion: 0 } });
+  const path = new URL(String(url)).pathname;
+  if (!syncStandIn || !path.startsWith('/v1/sync/')) return trueFetch(url, options);
   if (path.startsWith('/v1/sync/pull/')) {
     // A replaying server: every pull returns the same remote events.
     return json({ schemaVersion: 1, cursor: 900, hasMore: false, events: remoteFeed, entities: [] });
@@ -95,6 +103,7 @@ globalThis.fetch = async (url, options = {}) => {
   }
   return json({ error: { code: 'NOT_FOUND' } }, 404);
 };
+let online = null;
 
 // ── Answer helpers (canonical forms, as india-adaptive-check derives them) ───
 function canonicalInput(q) {
@@ -131,8 +140,11 @@ function wrongInput(q) {
 }
 
 async function run() {
+  let seededRepeatQuestion = null;
   installBrowserEnv();
   resetStorage();
+  const { startOnlineAuthority, nextSubmissionId } = await import('./support/online-authority.mjs');
+  online = await startOnlineAuthority({ label: 'progress-truth' });
   const { dispatch } = await import(`${SRC}local/backend.js`);
   const idb = await import(`${SRC}local/idb.js`);
   const { checkAnswer } = await import(`${SRC}engine/checker.js`);
@@ -141,20 +153,14 @@ async function run() {
   const A = await import(`${SRC}engine/adaptive.js`);
   const { PROGRESS_THRESHOLDS, accuracyClaim } = await import(`${SRC}engine/progressTruth.js`);
   const { dispatchIndiaExam } = await import(`${SRC}local/indiaExamBackend.js`);
-  const { cloudLinkRowId, loginCloudAccount } = await import(`${SRC}platform/cloudAccount.js`);
   const { syncNow, remoteLearningSummary } = await import(`${SRC}platform/syncWorker.js`);
 
   const GET = (path, body) => dispatch('GET', path, body);
   const POST = (path, body) => dispatch('POST', path, body);
 
-  async function liftFreeCap(pid) {
-    const now = Date.now();
-    await idb.put('device', {
-      id: cloudLinkRowId(pid), accountId: `acct-${pid}`, role: 'student',
-      emailVerified: true, linkedAt: now, lastVerifiedAt: now, lastSyncAt: null,
-      entitlement: { plan: 'premium', status: 'active', provider: 'web', currentPeriodEnd: now + 60 * DAY, offlineUntil: now + 60 * DAY, issuedAt: now, sourceVersion: 1 }
-    });
-  }
+  // Each profile signs in to its own verified account; the Premium snapshot on
+  // the real link row keeps the free daily cap (not this suite's subject) away.
+  const liftFreeCap = pid => online.link(pid, { entitlement: 'premium' });
 
   // What the test did to each question, so the expected rating step can be
   // computed without reading anything the backend wrote about help.
@@ -163,7 +169,10 @@ async function run() {
   async function serve(body = {}) {
     const res = await POST('/practice/next', { ...body, resume: false });
     const row = await idb.get('questions', res.question.id);
-    return { res, row, q: row.payload };
+    // `q` is the test oracle's copy of the question (the device row of a
+    // server-issued question holds no answer). It chooses what to type; the
+    // server marks.
+    return { res, row, q: await online.answerKey(row) };
   }
 
   /** Play one served question in a given style; returns what happened. */
@@ -176,7 +185,7 @@ async function run() {
     const canWrong = !!wc && !wc.correct && !wc.invalid;
     const help = { hints: 0, tutor: 0, tries: 0 };
     helpLog.set(row.id, help);
-    const submit = (answer, ms) => POST(`/practice/${row.id}/submit`, { answer, ms });
+    const submit = (answer, ms) => POST(`/practice/${row.id}/submit`, { answer, ms, submissionId: nextSubmissionId('sub_progress') });
     if (style === 'reveal' || (!canRight && style !== 'wrong2') || (!canWrong && (style === 'retry' || style === 'wrong2'))) {
       await POST(`/practice/${row.id}/reveal`, { ms: 20000 });
       return 'reveal';
@@ -223,11 +232,31 @@ async function run() {
   await session(3, 5, { subtopic: chosen });
   // Day 2: nothing. Day 3: practice, a game, and a full board paper.
   setIst(3, 16, 0); await session(6, 7);
+  // One deliberate repeat, so every run exercises the rule and not only the
+  // runs where the server happens to draw a question again: a finished
+  // practice question is retried as the same question and answered correctly.
+  {
+    const done = rawRows().questions.filter(r => r.pid === asha.id && r.serverQuestionId && r.answered && !r.examId && ['practice', 'review'].includes(r.mode));
+    let again = null;
+    for (const row of done) {
+      again = await POST(`/history/${row.id}/retry`, { variant: 'same' }).catch(() => null);
+      if (again?.question?.id) break;
+    }
+    const retried = again?.question?.id ? await idb.get('questions', again.question.id) : null;
+    const key = retried ? canonicalInput(await online.answerKey(retried)) : null;
+    if (retried) {
+      helpLog.set(retried.id, { hints: 0, tutor: 0, tries: 0 });
+      tick(30000);
+      if (key !== null) await POST(`/practice/${retried.id}/submit`, { answer: key, ms: 20000, submissionId: nextSubmissionId('sub_progress') });
+      else await POST(`/practice/${retried.id}/reveal`, { ms: 20000 });
+    }
+    seededRepeatQuestion = retried?.id || null;
+  }
   const rush = await POST('/rush/start', {});
   let rushCorrect = 0;
   for (const q of rush.questions.slice(0, 6)) {
     const row = await idb.get('questions', q.id);
-    const right = canonicalInput(row.payload);
+    const right = canonicalInput(await online.answerKey(row));
     const r = await POST('/rush/answer', { id: q.id, answer: right ?? '0' });
     if (r.correct) rushCorrect++;
     tick(4000);
@@ -242,7 +271,7 @@ async function run() {
   for (const [i, q] of (paper.questions || []).entries()) {
     if (i % 2) continue;
     const row = await idb.get('questions', q.id);
-    const right = row?.payload ? canonicalInput(row.payload) : null;
+    const right = row?.payload ? canonicalInput(await online.answerKey(row)) : null;
     if (right !== null) answers[q.id] = right;
   }
   tick(30 * MIN);
@@ -259,6 +288,9 @@ async function run() {
   await POST('/profiles/select', { id: asha.id });
   setIst(4, 20, 0);
   const NOW = Date.now();
+  ok('the seeded history holds a repeat the server flagged, recorded and kept out of the evidence',
+    !!seededRepeatQuestion && rawRows().attempts.some(a => a.pid === asha.id && a.questionId === seededRepeatQuestion && a.repeat === true),
+    show(rawRows().attempts.filter(a => a.questionId === seededRepeatQuestion).map(a => [a.mode, a.repeat, a.correct])));
   ok('the seeded history is substantial', rawRows().attempts.filter(a => a.pid === asha.id).length >= 60, `${rawRows().attempts.filter(a => a.pid === asha.id).length}`);
 
   // ── Independent expectations, from raw attempt rows ────────────────────────
@@ -268,7 +300,8 @@ async function run() {
 
   function expectedFor(pid) {
     const atts = rawRows().attempts.filter(a => a.pid === pid).sort((a, b) => a.createdAt - b.createdAt || (a.id > b.id ? 1 : -1));
-    const isEvidence = a => a.mode !== 'rush' && a.mode !== 'match' && a.subtopic && a.subtopic !== 'custom';
+    // A repeat (the server's word for it, kept on the attempt) is recorded and is not evidence.
+    const isEvidence = a => a.mode !== 'rush' && a.mode !== 'match' && a.subtopic && a.subtopic !== 'custom' && a.repeat !== true;
     const ev = atts.filter(isEvidence);
     const byCh = {};
     for (const a of ev) {
@@ -276,6 +309,8 @@ async function run() {
       c.attempts++; if (a.correct) { c.correct++; if (a.support !== 'supported') c.independent++; }
       c.last = Math.max(c.last, a.createdAt); c.rows.push(a);
     }
+    // Repeats sat in a chapter, for the review replay only.
+    for (const a of atts) if (a.repeat === true && byCh[a.subtopic]) (byCh[a.subtopic].repeats ||= []).push(a);
     const days = {};
     for (const a of atts) { const d = dateOf(a.createdAt); days[d] = (days[d] || 0) + 1; }
     const prev = d => new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) - DAY).toISOString().slice(0, 10);
@@ -284,7 +319,11 @@ async function run() {
     const evCorrect = ev.filter(a => a.correct).length;
     return {
       atts, ev, byCh, days, streak,
-      answered: atts.length, correct: atts.filter(a => a.correct).length,
+      // A repeat is a question answered and never a correct one: every quoted
+      // "correct" excludes it, and a plain accuracy is taken over `scored`.
+      answered: atts.length, correct: atts.filter(a => a.correct && a.repeat !== true).length,
+      repeats: atts.filter(a => a.repeat === true).length, scored: atts.filter(a => a.repeat !== true).length,
+      byDiff: [1, 2, 3, 4].map(d => ({ difficulty: d, n: atts.filter(a => a.difficulty === d && a.repeat !== true).length, c: atts.filter(a => a.difficulty === d && a.correct && a.repeat !== true).length })).filter(r => r.n),
       evidence: { attempts: ev.length, correct: evCorrect, independentCorrect: ev.filter(a => a.correct && a.support !== 'supported').length, supportedCorrect: ev.filter(a => a.correct && a.support === 'supported').length },
       accuracy: ev.length >= PROGRESS_THRESHOLDS.overallAccuracy ? Math.round(1000 * evCorrect / ev.length) / 10 : null,
       today: days[dateOf(NOW)] || 0
@@ -296,12 +335,16 @@ async function run() {
     const out = {};
     for (const [ch, c] of Object.entries(byCh)) {
       let rev = null;
-      c.rows.forEach((a, i) => {
+      // A repeat reschedules a review that already exists, as a helped recall
+      // at best; it never starts one and is not one of the three answers that do.
+      const timeline = [...c.rows.map((a, i) => ({ a, i })), ...(c.repeats || []).map(a => ({ a, i: -1 }))]
+        .sort((x, y) => x.a.createdAt - y.a.createdAt || (x.a.id > y.a.id ? 1 : -1));
+      timeline.forEach(({ a, i }) => {
         if (!['practice', 'review', 'task'].includes(a.mode)) return;
-        const supported = a.support === 'supported';
+        const supported = a.support === 'supported' || a.repeat === true;
         const grade = A.gradeFor({ correct: !!a.correct, hintsUsed: supported ? 1 : 0, ms: a.ms || 0, difficulty: a.difficulty || 2 });
         if (rev) rev = A.scheduleReview(rev, grade, a.createdAt);
-        else if (i + 1 >= 3) rev = A.scheduleReview(null, grade, a.createdAt);
+        else if (a.repeat !== true && i + 1 >= 3) rev = A.scheduleReview(null, grade, a.createdAt);
       });
       if (rev) out[ch] = rev;
     }
@@ -368,7 +411,12 @@ async function run() {
   section('GET /stats');
   const stats = await GET('/stats');
   eq('questions answered = every attempt row', stats.totals.attempts, X.answered);
-  eq('correct = every correct attempt row', stats.totals.correct, X.correct);
+  eq('correct = every correct attempt row that is not a repeat', stats.totals.correct, X.correct);
+  ok('the history holds correct repeats, so that rule is exercised', X.atts.some(a => a.repeat === true && a.correct) && X.correct < X.atts.filter(a => a.correct).length);
+  eq('repeats and first sittings are counted apart, and add up to the answers', [stats.totals.repeats, stats.totals.scored, stats.totals.repeats + stats.totals.scored], [X.repeats, X.scored, X.answered]);
+  eq('accuracy by difficulty leaves repeats out of both sides', stats.byDiff, X.byDiff);
+  const file = await GET('/data/progress-file');
+  eq('the progress file a teacher imports quotes the same totals', file.totals, { attempts: X.answered, correct: X.correct, repeats: X.repeats, scored: X.scored });
   eq('learning evidence (games excluded) matches', stats.totals.evidence, X.evidence);
   eq('accuracy is the evidence ratio', stats.totals.accuracy.value, X.accuracy);
   eq('the accuracy claim is marked as enough evidence', stats.totals.accuracy.enough, true);
@@ -427,7 +475,7 @@ async function run() {
   // ── /report ────────────────────────────────────────────────────────────────
   section('GET /report');
   const report = await GET('/report');
-  eq('report totals = ledger', report.totals, { attempts: X.answered, correct: X.correct });
+  eq('report totals = ledger', report.totals, { attempts: X.answered, correct: X.correct, repeats: X.repeats, scored: X.scored });
   eq('report streak = ledger', report.streak, X.streak);
   eq('report active days (28) = distinct IST days with an answer', report.activeDays, Object.keys(X.days).length);
   const repDrift = report.chapters.filter(c => (X.byCh[c.id]?.attempts || 0) !== c.attempts).map(c => c.id);
@@ -459,6 +507,7 @@ async function run() {
   // ── Low-sample honesty ─────────────────────────────────────────────────────
   section('low sample');
   const nova = (await POST('/profiles', { name: 'Nova', year: 9, course: 'in', indiaTrack: 'cbse' })).user;
+  await online.link(nova.id, { name: 'Nova' });
   let nstats = await GET('/stats');
   eq('a new profile has no accuracy', nstats.totals.accuracy.value, null);
   eq('…and says how many answers it needs', nstats.totals.accuracy.needed, PROGRESS_THRESHOLDS.overallAccuracy);
@@ -485,18 +534,69 @@ async function run() {
   await POST('/profiles/select', { id: asha.id });
   eq('the original is untouched by both restores', (await GET('/stats')).totals.attempts, X.answered);
 
-  // ── Offline, then synced (twice), then another device's events pulled twice ─
+  // ── Signed out and offline nothing is checked; marked online, then synced
+  //    (twice), then another device's events pulled twice ────────────────────
   section('offline then synced');
   const sita = (await POST('/profiles', { name: 'Sita', year: 8, course: 'in', indiaTrack: 'cbse' })).user;
-  online = false;
-  for (let i = 0; i < 6; i++) { const s = await serve(); await play(s, STYLES[i]); tick(MIN); }
+  const sitaLedger = () => show({
+    attempts: rawRows().attempts.filter(a => a.pid === sita.id).length,
+    ratings: rawRows().ratings.filter(r => r.pid === sita.id).length,
+    reviews: rawRows().reviews.filter(r => r.pid === sita.id).length,
+    activity: rawRows().activity.filter(r => r.pid === sita.id).length,
+    xp: rawRows().profiles.find(r => r.id === sita.id)?.xp || 0
+  });
+  const emptyLedger = sitaLedger();
+  const refusal = fn => fn().then(() => 'checked', err => err?.code || String(err));
+  // Signed out with the server reachable, the question is a PREPARED one: the
+  // device holds a sealed token and no answer, and nothing has a key to read
+  // until an account binds it.
+  let firstServed = null;
+  for (let i = 0; i < 12 && !firstServed; i++) {
+    const res = await POST('/practice/next', { resume: false });
+    const row = await idb.get('questions', res.question.id);
+    if (res.question.answerType !== 'mcq') firstServed = { res, row };
+    else await POST(`/practice/${row.id}/discard`, {});
+  }
+  ok('signed out, the question served is a prepared one with no answer on the device',
+    firstServed?.res.question.checkState === 'prepared' && typeof firstServed.row.prepared === 'string' && !firstServed.row.serverQuestionId && !('answer' in firstServed.row.payload), show(firstServed?.res.question.checkState));
+  const firstRight = '0';
+  const gradedBefore = online.traffic.grade;
+  // Before signing in: the question can be read, but not checked.
+  eq('signed out, an answer is not checked', await refusal(() => POST(`/practice/${firstServed.row.id}/submit`, { answer: firstRight, ms: 9000, submissionId: nextSubmissionId('sub_progress_out') })), 'SIGN_IN_TO_CHECK');
+  eq('…and nothing is counted: no attempt, rating, review, activity or XP', sitaLedger(), emptyLedger);
+  await online.link(sita.id, { name: 'Sita' });
+  // Signed in but with no connection: still nothing is checked.
+  await online.offline(async () => {
+    eq('offline, an answer is not checked', await refusal(() => POST(`/practice/${firstServed.row.id}/submit`, { answer: firstRight, ms: 9000, submissionId: nextSubmissionId('sub_progress_off') })), 'RECONNECT_TO_CHECK');
+    eq('offline, the solution is not shown either', await refusal(() => POST(`/practice/${firstServed.row.id}/reveal`, { ms: 9000 })), 'RECONNECT_TO_CHECK');
+    eq('offline practice counts nothing locally', (await GET('/stats')).totals.attempts, 0);
+  });
+  eq('…no attempt, rating, review, activity or XP was written', sitaLedger(), emptyLedger);
+  eq('the server marked nothing while signed out or offline', online.traffic.grade, gradedBefore);
+  const kept = await idb.get('questions', firstServed.row.id);
+  ok('the refused question is still there, unanswered, with no try spent, still holding its token',
+    !!kept && !kept.answered && (kept.tries || 0) === 0 && kept.payload.prompt === firstServed.res.question.prompt && kept.prepared === firstServed.row.prepared, show({ answered: kept?.answered, tries: kept?.tries }));
+  // Back online and signed in, the account binds that same row. An unreadable
+  // first entry binds it without spending a try (the server does not count
+  // unreadable input as an attempt), after which the suite's oracle can read
+  // the server's sealed copy and play the question like any other.
+  const bindsBefore = online.traffic.bind;
+  const unreadable = await POST(`/practice/${firstServed.row.id}/submit`, { answer: 'not maths at all ###', ms: 1000, submissionId: nextSubmissionId('sub_progress_bind') });
+  const boundRow = await idb.get('questions', firstServed.row.id);
+  eq('signed in and reconnected, the same row is bound to the account by one issue carrying its token',
+    [online.traffic.bind - bindsBefore, boundRow.id, typeof boundRow.serverQuestionId, boundRow.prepared, boundRow.payload.prompt], [1, firstServed.row.id, 'string', undefined, firstServed.res.question.prompt]);
+  eq('an unreadable entry is refused by the server as unreadable and spends nothing', [unreadable.invalid, unreadable.resolved, boundRow.tries || 0, sitaLedger()], [true, false, 0, emptyLedger]);
+  firstServed = { res: firstServed.res, row: boundRow, q: await online.answerKey(boundRow) };
+  await play(firstServed, STYLES[0]); tick(MIN);
+  for (let i = 1; i < 6; i++) { const s = await serve(); await play(s, STYLES[i]); tick(MIN); }
+  ok('once reconnected the refused question was marked by the server', (await idb.get('questions', firstServed.row.id))?.serverReceipt?.authoritative === true);
   const offline = await GET('/stats');
   const S = expectedFor(sita.id);
-  eq('offline practice counts locally at once', offline.totals.attempts, S.answered);
-  online = true;
-  await loginCloudAccount(sita.id, { email: account.email, password: 'test-password-only' });
+  eq('practice marked online counts locally at once', offline.totals.attempts, S.answered);
+  eq('…as six answers', S.answered, 6);
+  syncStandIn = true;
   const first = await syncNow(sita.id);
-  ok('the first sync published the offline answers', first.pushedEvents >= S.answered, show(first));
+  ok('the first sync published the answers', first.pushedEvents >= S.answered, show(first));
   const practiceEvents = () => [...serverEvents.values()].filter(e => e.kind === 'practice-progress').length;
   eq('the server holds one practice event per local answer', practiceEvents(), S.answered);
   await syncNow(sita.id);
@@ -504,14 +604,54 @@ async function run() {
   eq('syncing again publishes nothing new', practiceEvents(), S.answered);
   const afterSync = await GET('/stats');
   eq('sync does not change local progress', [afterSync.totals, afterSync.streak], [offline.totals, offline.streak]);
-  // A second device's answers arrive in every pull — the server is replaying.
+  // Another device's answers arrive in every pull — the server is replaying.
   // Two were answered today, two yesterday (the profile's own timezone).
+  //
+  // Only the canonical event the SERVER GRADER wrote in the same transaction
+  // as the mark changes progress here (kind 'graded-attempt', the reserved
+  // device identity 'server-grader', event id === payload.attemptId, entity id
+  // === payload.questionId — see cloudSyncRestore.js / syncWorker.js). What
+  // another device merely *claims* about its own answers is archival.
   const remoteAt = i => Date.now() - i * MIN - (i >= 2 ? DAY : 0);
-  remoteFeed = [0, 1, 2, 3].map(i => ({
-    id: `evt-other-${i}`, deviceId: 'device-other', deviceSeq: i + 1, serverCursor: 500 + i, kind: 'practice-progress',
+  const remotePayload = (i, extra = {}) => ({ subtopic: 'in-c8-rational-numbers', difficulty: 2, correct: i % 2 === 0, ms: 20000, hintsUsed: 0, tutorLevel: 0, support: 'independent', mode: 'practice', viaInk: false, ratingBefore: null, ratingAfter: null, createdAt: remoteAt(i), ...extra });
+  const gradedFeed = [0, 1, 2, 3].map(i => ({
+    id: `evt-other-${i}`, deviceId: 'server-grader', deviceSeq: i + 1, serverCursor: 500 + i, kind: 'graded-attempt',
     entityId: `q-other-${i}`, occurredAt: remoteAt(i),
-    payload: { subtopic: 'in-c8-rational-numbers', difficulty: 2, correct: i % 2 === 0, ms: 20000, hintsUsed: 0, tutorLevel: 0, support: 'independent', mode: 'practice', viaInk: false, ratingBefore: null, ratingAfter: null, createdAt: remoteAt(i) }
+    payload: remotePayload(i, { attemptId: `evt-other-${i}`, questionId: `q-other-${i}` })
   }));
+  // First, the negative: the same four answers as a client-authored
+  // 'practice-progress' claim from another device, every one "correct", plus
+  // two counterfeits of the canonical kind (one not from the server grader,
+  // one whose id is not the attempt it names). None of them is a mark.
+  const stats0 = await GET('/stats');
+  const rows0 = rawRows().attempts.filter(a => a.pid === sita.id).length;
+  const activity0 = JSON.stringify(rawRows().activity.filter(r => r.pid === sita.id));
+  const ratings0 = JSON.stringify(rawRows().ratings?.filter(r => r.pid === sita.id) ?? null);
+  remoteFeed = [
+    ...[0, 1, 2, 3].map(i => ({
+      id: `evt-claim-${i}`, deviceId: 'device-other', deviceSeq: i + 1, serverCursor: 400 + i, kind: 'practice-progress',
+      entityId: `q-claim-${i}`, occurredAt: remoteAt(i),
+      payload: remotePayload(i, { correct: true, marksEarned: 4, marksPossible: 4 })
+    })),
+    { id: 'evt-forged-device', deviceId: 'device-other', deviceSeq: 5, serverCursor: 404, kind: 'graded-attempt',
+      entityId: 'q-forged-device', occurredAt: remoteAt(0),
+      payload: remotePayload(0, { attemptId: 'evt-forged-device', questionId: 'q-forged-device' }) },
+    { id: 'evt-forged-id', deviceId: 'server-grader', deviceSeq: 99, serverCursor: 405, kind: 'graded-attempt',
+      entityId: 'q-forged-id', occurredAt: remoteAt(0),
+      payload: remotePayload(0, { attemptId: 'some-other-attempt', questionId: 'q-forged-id' }) }
+  ];
+  await syncNow(sita.id);
+  await syncNow(sita.id);
+  const claimed = await remoteLearningSummary(sita.id);
+  ok('the client-authored claims were received and archived', claimed.cachedEvents >= 4, show(claimed));
+  eq('a client-authored practice-progress event from another device is not counted as marks', [claimed.attempts, claimed.correct], [0, 0]);
+  const stats1 = await GET('/stats');
+  eq('…and changes no total, accuracy or streak on this device', [stats1.totals, stats1.streak], [stats0.totals, stats0.streak]);
+  eq('…and adds no attempt row', rawRows().attempts.filter(a => a.pid === sita.id).length, rows0);
+  eq('…and no activity-day count', JSON.stringify(rawRows().activity.filter(r => r.pid === sita.id)), activity0);
+  eq('…and no rating', JSON.stringify(rawRows().ratings?.filter(r => r.pid === sita.id) ?? null), ratings0);
+  // Now the canonical server-graded events for the same four answers.
+  remoteFeed = [...remoteFeed, ...gradedFeed];
   const ashaBefore = rawRows().attempts.filter(a => a.pid === asha.id).length;
   await syncNow(sita.id);
   const once = await remoteLearningSummary(sita.id);
@@ -527,7 +667,7 @@ async function run() {
     independentCorrect: offline.totals.evidence.independentCorrect + 2, supportedCorrect: offline.totals.evidence.supportedCorrect
   };
   const folded = {
-    attempts: offline.totals.attempts + 4, correct: offline.totals.correct + 2, ms: offline.totals.ms + 4 * 20000,
+    attempts: offline.totals.attempts + 4, correct: offline.totals.correct + 2, repeats: offline.totals.repeats, scored: offline.totals.scored + 4, ms: offline.totals.ms + 4 * 20000,
     evidence: foldedEvidence, accuracy: accuracyClaim(foldedEvidence.correct, foldedEvidence.attempts, PROGRESS_THRESHOLDS.overallAccuracy)
   };
   const after2 = await GET('/stats');
@@ -538,7 +678,7 @@ async function run() {
   eq('pulling the same events a third time leaves the totals unchanged', (await GET('/stats')).totals, folded);
   const restoredRows = rawRows().attempts.filter(a => a.pid === sita.id && typeof a.remoteEventId === 'string');
   eq('the four restored attempt rows carry the cloud event id they came from', restoredRows.map(a => a.remoteEventId).sort(), ['evt-other-0', 'evt-other-1', 'evt-other-2', 'evt-other-3']);
-  ok('every restored row names the other device', restoredRows.every(a => a.remoteDeviceId === 'device-other'));
+  ok('every restored row names the server grader that marked it', restoredRows.every(a => a.remoteDeviceId === 'server-grader'));
   eq('no local answer was re-stamped as remote', rawRows().attempts.filter(a => a.pid === sita.id).length - restoredRows.length, S.answered);
   eq('the streak reflects the remote days in the profile\'s timezone', after2.streak, S2.streak);
   eq('…which is yesterday and today', [S2.streak, Object.keys(S2.days).length], [2, 2]);
@@ -549,7 +689,162 @@ async function run() {
   eq('…and none of its rows is marked remote', rawRows().attempts.filter(a => a.pid === asha.id && a.remoteEventId).length, 0);
   const otherProfile = await remoteLearningSummary(asha.id);
   eq('one profile\'s pulled events are invisible to another', otherProfile.attempts, 0);
-  online = false;
+  syncStandIn = false;
+
+  // ── Every mark in this history is the server's ─────────────────────────────
+  section('server authority');
+  // The four profiles that practised on this device (a restored backup copy is
+  // history, not a marking: it carries neither a server question nor a receipt).
+  const live = new Set([asha.id, kabir.id, nova.id, sita.id]);
+  const allPractice = rawRows().questions.filter(r => r.answered && ['practice', 'review', 'task'].includes(r.mode));
+  const practiceRows = allPractice.filter(r => live.has(r.pid));
+  ok('every practice question resolved on this device carries the server\'s authoritative receipt', practiceRows.length >= 50 && practiceRows.every(r => r.serverQuestionId && r.serverReceipt?.authoritative === true),
+    `${practiceRows.filter(r => !r.serverReceipt?.authoritative).length}/${practiceRows.length} without a receipt`);
+  ok('no resolved practice question kept an answer on the device', allPractice.every(r => !('answer' in (r.payload || {}))));
+  // A real sync with the real server: the server already holds the canonical
+  // graded attempt for every answer it marked. Pulling them back must not
+  // count any answer a second time.
+  await POST('/profiles/select', { id: asha.id });
+  const realBefore = [(await GET('/stats')).totals, rawRows().attempts.filter(a => a.pid === asha.id).length];
+  const real1 = await syncNow(asha.id).then(r => r, err => ({ threw: err?.code || String(err) }));
+  const real2 = await syncNow(asha.id).then(r => r, err => ({ threw: err?.code || String(err) }));
+  ok('a sync with the real server completes', !real1?.threw && !real2?.threw, show([real1, real2]));
+  eq('syncing with the real server double-counts no server-marked answer', [(await GET('/stats')).totals, rawRows().attempts.filter(a => a.pid === asha.id).length], realBefore);
+
+  // ── A repeat, counter by counter (review 4, M3) ────────────────────────────
+  // A second deterministic repeat, this time on a question that belongs to a
+  // teacher's task, answered correctly. It is a question of the day; it is not
+  // a correct answer of the day, it is `done` and not `correct` on the task,
+  // and it earns no rating, XP or badge.
+  section('repeat counters');
+  {
+    const tz10 = dateOf(Date.now());
+    const candidates = rawRows().questions.filter(r => r.pid === asha.id && r.serverQuestionId && r.answered && !r.examId && ['practice', 'review'].includes(r.mode) && r.id !== seededRepeatQuestion);
+    let retried = null, key = null;
+    for (const row of candidates) {
+      const out = await POST(`/history/${row.id}/retry`, { variant: 'same' }).catch(() => null);
+      const fresh = out?.question?.id ? await idb.get('questions', out.question.id) : null;
+      const k = fresh ? canonicalInput(await online.answerKey(fresh)) : null;
+      if (fresh && k !== null) { retried = fresh; key = k; break; }
+      if (fresh) await POST(`/practice/${fresh.id}/discard`, {}).catch(() => {});
+    }
+    ok('a finished question could be sat again as the same question', !!retried);
+    // (The task row itself is sealed to its class roll and is not needed
+    // here: the counters under test are the student's own progress row.)
+    await idb.put('questions', { ...retried, taskId: 'task-m3' });
+    const before = {
+      day: rawRows().activity.find(r => r.pid === asha.id && r.date === tz10) || { questions: 0, correct: 0, xp: 0 },
+      xp: (await idb.get('profiles', asha.id)).xp, badges: rawRows().badges.filter(b => b.pid === asha.id).length,
+      rating: JSON.stringify(rawRows().ratings.filter(r => r.pid === asha.id)), evidence: (await GET('/stats')).totals.evidence,
+      quoted: await (async () => {
+        const st = await GET('/stats'); const rep = await GET('/report'); const pf = await GET('/data/progress-file');
+        return { stats: [st.totals.attempts, st.totals.correct, st.totals.repeats], byDiff: st.byDiff, accuracy: st.totals.accuracy.value, report: rep.totals, file: pf.totals };
+      })()
+    };
+    tick(30000);
+    const res = await POST(`/practice/${retried.id}/submit`, { answer: key, ms: 20000, submissionId: nextSubmissionId('sub_progress_m3') });
+    const row = rawRows().attempts.find(a => a.pid === asha.id && a.questionId === retried.id);
+    eq('the server marked it correct and flagged it a repeat; the attempt row says both', [res.correct, res.repeat, row?.correct, row?.repeat], [true, true, 1, true]);
+    const day = rawRows().activity.find(r => r.pid === asha.id && r.date === tz10);
+    eq('a repeat is a question of the day, and not one of the day\'s correct answers', [day.questions - before.day.questions, day.correct - before.day.correct, day.xp - before.day.xp], [1, 0, 0]);
+    const tp = await idb.get('taskProgress', `task-m3:${asha.id}`);
+    eq('on a teacher\'s task a repeat is done, not correct, and recorded as a repeat', tp && [tp.done, tp.correct, tp.repeats], [1, 0, 1]);
+    eq('a repeat earns no XP and no badge', [(await idb.get('profiles', asha.id)).xp, res.xp, res.newBadges, rawRows().badges.filter(b => b.pid === asha.id).length], [before.xp, 0, [], before.badges]);
+    eq('a repeat moves no rating and no learning evidence', [JSON.stringify(rawRows().ratings.filter(r => r.pid === asha.id)), (await GET('/stats')).totals.evidence], [before.rating, before.evidence]);
+    // Every surface that quotes a number of correct answers, with the repeat present.
+    const quoted = async () => {
+      const st = await GET('/stats'); const rep = await GET('/report'); const pf = await GET('/data/progress-file');
+      return { stats: [st.totals.attempts, st.totals.correct, st.totals.repeats], byDiff: st.byDiff, accuracy: st.totals.accuracy.value, report: rep.totals, file: pf.totals };
+    };
+    const after = await quoted();
+    eq('/stats: one more answer, one more repeat, not one more correct', [after.stats[0] - before.quoted.stats[0], after.stats[1] - before.quoted.stats[1], after.stats[2] - before.quoted.stats[2]], [1, 0, 1]);
+    eq('/stats accuracy and accuracy by difficulty do not move', [after.accuracy, after.byDiff], [before.quoted.accuracy, before.quoted.byDiff]);
+    eq('/report and the progress file: attempts +1, repeats +1, correct and scored unchanged',
+      [after.report, after.file], [before.quoted.report, before.quoted.file].map(q => ({ attempts: q.attempts + 1, correct: q.correct, repeats: q.repeats + 1, scored: q.scored })));
+    // The whole ledger: each day's correct count is its correct answers minus its correct repeats.
+    const mine = rawRows().attempts.filter(a => a.pid === asha.id);
+    const dayDrift = rawRows().activity.filter(r => r.pid === asha.id).filter(r => {
+      const on = mine.filter(a => dateOf(a.createdAt) === r.date);
+      return r.questions !== on.length || r.correct !== on.filter(a => a.correct && a.repeat !== true).length;
+    }).map(r => r.date);
+    eq('every day: questions = every answer, correct = correct answers that were not repeats', dayDrift, []);
+  }
+
+  // ── Cloud restore: a fresh device, the same account ───────────────────────
+  // The student signs in on a new iPad (or reinstalls). Nothing is on the
+  // device; everything it shows is rebuilt from the account's events on the
+  // real server. It must show exactly what the original device shows: the
+  // same answers, the same learning evidence chapter by chapter, the same
+  // reviews, the same days. In particular the seeded REPEAT must come back as
+  // a repeat — restored without the server's flag it would count as evidence
+  // here that the device which sat it never gave it (review 4, B1).
+  section('cloud restore replay');
+  const snapshot = async pid => {
+    const st = await GET('/stats');
+    const yr10 = (await GET('/curriculum')).years.find(y => y.year === 10);
+    const rv = await GET('/reviews');
+    const rep = await GET('/report');
+    const rows = rawRows();
+    return {
+      answered: st.totals.attempts, correct: st.totals.correct, evidence: st.totals.evidence, accuracy: st.totals.accuracy,
+      statsChapters: Object.fromEntries(st.chapters.filter(c => c.attempts).map(c => [c.id, [c.attempts, c.correct]])),
+      tableChapters: Object.fromEntries(yr10.subtopics.filter(c => c.attempts).map(c => [c.id, [c.attempts, c.correct]])),
+      reportChapters: Object.fromEntries(rep.chapters.filter(c => c.attempts).map(c => [c.id, c.attempts])),
+      reportTotals: rep.totals,
+      reviewsDue: rv.due.map(r => r.subtopic).sort(), reviewsUpcoming: rv.upcoming.map(r => r.subtopic).sort(), reviewsDueCount: st.reviewsDue,
+      reviewRows: Object.fromEntries(rows.reviews.filter(r => r.pid === pid).map(r => [r.subtopic, [r.reps, r.lapses]]).sort()),
+      reviewDue: Object.fromEntries(rows.reviews.filter(r => r.pid === pid).map(r => [r.subtopic, r.dueAt])),
+      ratingRows: Object.fromEntries(rows.ratings.filter(r => r.pid === pid).map(r => [r.subtopic, [r.attempts, r.correct]]).sort()),
+      days: Object.fromEntries(rows.activity.filter(r => r.pid === pid).map(r => [r.date, [r.questions, r.correct]])),
+      streak: st.streak, today: (await GET('/me')).user.today.questions,
+      repeats: rows.attempts.filter(a => a.pid === pid && a.repeat === true).map(a => [a.subtopic, a.mode, a.correct]).sort(),
+      modes: Object.entries(rows.attempts.filter(a => a.pid === pid).reduce((m, a) => ({ ...m, [a.mode]: (m[a.mode] || 0) + 1 }), {})).sort(),
+      examCount: st.examCount, bestRush: st.bestRush
+    };
+  };
+  const original = await snapshot(asha.id);
+  ok('the original device holds the seeded repeat, and it is not evidence there', original.repeats.length >= 1 && original.evidence.attempts < original.answered, show(original.repeats));
+  const originalPid = asha.id;
+  resetStorage();
+  eq('the fresh device starts with nothing', [rawRows().attempts.length, rawRows().ratings.length, rawRows().profiles.length], [0, 0, 0]);
+  const again = (await POST('/profiles', { name: 'Asha', year: 10, course: 'in', indiaTrack: 'cbse' })).user;
+  await online.linkExisting(again.id, originalPid, { entitlement: 'premium' });
+  const restore1 = await syncNow(again.id).then(r => r, err => ({ threw: err?.code || String(err) }));
+  ok('the fresh device restores the account from the real server', !restore1?.threw && restore1.restoredEvents >= original.answered, show(restore1));
+  const restored = await snapshot(again.id);
+  eq('restored: the seeded repeat is still a repeat (B1)', restored.repeats, original.repeats);
+  eq('restored: questions answered and correct', [restored.answered, restored.correct], [original.answered, original.correct]);
+  eq('restored: the same answers in the same modes', restored.modes, original.modes);
+  eq('restored: learning evidence — the repeat is not counted', [restored.evidence.attempts, restored.evidence.correct], [original.evidence.attempts, original.evidence.correct]);
+  eq('restored: accuracy', restored.accuracy, original.accuracy);
+  eq('restored: every chapter on /stats', restored.statsChapters, original.statsChapters);
+  eq('restored: every chapter row of the progress table', restored.tableChapters, original.tableChapters);
+  eq('restored: every chapter on the report', [restored.reportChapters, restored.reportTotals], [original.reportChapters, original.reportTotals]);
+  eq('restored: rating-row attempts and correct per chapter', restored.ratingRows, original.ratingRows);
+  eq('restored: the review schedule holds the same chapters, each with the same reps and lapses', restored.reviewRows, original.reviewRows);
+  // The server's event does not certify how much help an answer had (hints and
+  // tutor levels are observed by the device), so it files every restored
+  // answer as supported. A restored device may therefore claim LESS than the
+  // original — never more: no independent success it cannot vouch for, and no
+  // review due later than the original device has it.
+  eq('restored: correct answers are all there, split no more generously than the original',
+    [restored.evidence.independentCorrect + restored.evidence.supportedCorrect, restored.evidence.independentCorrect <= original.evidence.independentCorrect],
+    [original.evidence.correct, true]);
+  eq('restored: no review is due later than on the original device',
+    Object.keys(original.reviewDue).filter(ch => !(restored.reviewDue[ch] <= original.reviewDue[ch])), []);
+  ok('restored: every review due on the original device is due here too', original.reviewsDue.every(ch => restored.reviewsDue.includes(ch)), show([original.reviewsDue, restored.reviewsDue]));
+  eq('restored: answers and correct answers per day — a repeat is a question of its day, never a correct one (M3)', restored.days, original.days);
+  eq('restored: streak and today', [restored.streak, restored.today], [original.streak, original.today]);
+  eq('restored: exam and Rapid Fire history', [restored.examCount, restored.bestRush], [original.examCount, original.bestRush]);
+  // The restored device against its own raw rows, by the same oracle.
+  const R = expectedFor(again.id);
+  eq('restored: the totals are what the restored attempt rows say', [restored.answered, restored.correct, restored.evidence], [R.answered, R.correct, R.evidence]);
+  const repeatDays = rawRows().attempts.filter(a => a.pid === again.id && a.repeat === true && a.correct).map(a => dateOf(a.createdAt));
+  ok('restored: on the day of a correct repeat the day\'s correct count is below the day\'s correct answers by exactly the repeats',
+    repeatDays.length > 0 && [...new Set(repeatDays)].every(d => restored.days[d][1] === R.atts.filter(a => dateOf(a.createdAt) === d && a.correct).length - repeatDays.filter(x => x === d).length), show(repeatDays));
+  const restore2 = await syncNow(again.id).then(r => r, err => ({ threw: err?.code || String(err) }));
+  ok('pulling again restores nothing twice', !restore2?.threw && restore2.restoredEvents === 0, show(restore2));
+  eq('…and every number is unchanged', await snapshot(again.id), restored);
 }
 
 try {
@@ -557,6 +852,7 @@ try {
 } catch (err) {
   failures.push(`${group} · threw: ${err?.stack || err}`);
 }
+await online?.close().catch(() => {});
 if (failures.length) {
   console.error(`PROGRESS TRUTH: FAIL — ${failures.length} failed, ${pass} passed`);
   for (const f of failures) console.error(`  ✘ ${f}`);

@@ -6,10 +6,11 @@ import { resolveHomeRecommendation, actionOpenable } from '../home/recommendatio
 import { cacheAssignments, cachedAssignments, loadSavedFilters, saveFilters } from '../home/homeCache.js';
 import Icon from '../components/Icon.jsx';
 import { useApp } from '../App.jsx';
-import { dotpointAvailable, practiceTargetAvailable, topicAvailability } from '../engine/curriculumAvailability.js';
+import { dotpointAvailable, practiceTargetAvailable, selectableDifficulties, topicAvailability } from '../engine/curriculumAvailability.js';
 import { dayKey, formatWeekday } from '../lib/locale.js';
 import { useT, useTx } from '../i18n/index.js';
 import { practiceDifficulties, practiceHref } from '../lib/practiceLinks.js';
+import { studyHref } from '../lib/studyJourney.js';
 import { textMatches, useGlossary } from '../i18n/glossary.js';
 import TermGloss from '../components/TermGloss.jsx';
 import { featureEnabled } from '../platform/features.js';
@@ -140,11 +141,10 @@ export default function Home() {
   // The difficulty buttons this context may offer: never D4 to a CBSE student
   // (CBSE practice is held to D1–D3), and never above the section's ceiling. A
   // remembered D4 from an earlier filter is dropped rather than sent.
-  const offeredDifficulties = practiceDifficulties({
+  const trackDifficulties = practiceDifficulties({
     course: user.course, track: section?.track || (user.course === 'in' ? user.indiaTrack || 'cbse' : null),
     grade: section?.year ?? user.year, ceiling: section?.difficultyCeiling || null
   });
-  const chosenDifficulty = difficulty != null && offeredDifficulties.includes(difficulty) ? difficulty : null;
 
   // Indian students type Hindi words in Latin letters and English words in
   // half: "trikonmiti", "trig", "quadratic", "समुच्चय". The matcher folds all
@@ -161,16 +161,39 @@ export default function Home() {
     return [...m.entries()];
   }, [section, topicQuery]);
 
+  // A topic is valid only inside the class and course the student selected.
+  // Previously a saved topic could be resolved from another year/track even
+  // when the active section had changed, silently practising the wrong syllabus.
   const selSub = useMemo(() => {
-    if (!subtopic || !curriculum) return null;
-    for (const sec of [...(curriculum.years || []), ...(curriculum.streams || [])]) {
-      const hit = sec.subtopics.find(s => s.id === subtopic);
-      if (hit) return hit;
-    }
-    return null;
-  }, [subtopic, curriculum]);
+    if (!subtopic || !section) return null;
+    return section.subtopics.find(s => s.id === subtopic) || null;
+  }, [subtopic, section]);
 
   const selectedDotpoint = dotpoint != null ? selSub?.dotpoints?.[dotpoint] || null : null;
+  // Only the levels a question really exists at for THIS chapter / dot point
+  // are offered (issue #408): a dot point authored only at D3 does not show a
+  // D4 button, so "Extension" can never be answered with an easier question.
+  // The curriculum response names those levels per selection (`requestable`);
+  // a level the track allows but this selection lacks is listed as unavailable.
+  const offeredDifficulties = selectableDifficulties(trackDifficulties, selectedDotpoint || selSub);
+  const missingDifficulties = trackDifficulties.filter(d => !offeredDifficulties.includes(d));
+  const chosenDifficulty = difficulty != null && offeredDifficulties.includes(difficulty) ? difficulty : null;
+  // Notes are published only when the existing reviewed chapter actually has
+  // content. The grade bundle is loaded on demand; a syllabus listing alone
+  // must never become an empty or invented "Study Notes" promise.
+  const [studyContent, setStudyContent] = useState({ id: null, available: false });
+  useEffect(() => {
+    let live = true;
+    setStudyContent({ id: null, available: false });
+    if (!selSub?.id || !/^c(?:7|8|9|10|11|12)-/.test(selSub.id)) return () => { live = false; };
+    void import('../notes/notesIndex.js').then(({ loadNotesForGrade }) => loadNotesForGrade(year))
+      .then(notes => {
+        if (live) setStudyContent({ id: selSub.id, available: !!notes?.[selSub.id]?.examples?.length });
+      }).catch(() => { if (live) setStudyContent({ id: selSub.id, available: false }); });
+    return () => { live = false; };
+  }, [selSub?.id, year]);
+  const studyAvailable = !!selSub && studyContent.id === selSub.id && studyContent.available;
+
   const impossibleTarget = Boolean(
     (subtopic && curriculum && !selSub) ||
     (selSub && !practiceTargetAvailable(selSub, dotpoint))
@@ -204,6 +227,15 @@ export default function Home() {
   if (selSub) chips.push({ k: 'topic', label: selSub.name, clear: () => { setSubtopic(null); setDotpoint(null); } });
   if (dotpoint != null && selSub) chips.push({ k: 'dp', label: t('home.dotpointChip', { n: dotpoint + 1 }), clear: () => setDotpoint(null) });
   if (chosenDifficulty != null) chips.push({ k: 'diff', label: t('home.difficultyChip', { n: chosenDifficulty, label: t(DIFF_KEYS[chosenDifficulty]) }), clear: () => setDifficulty(null) });
+
+  const learn = (view) => {
+    if (!studyAvailable || !selSub || impossibleTarget) return;
+    const href = studyHref({
+      subtopic: selSub.id, dotpoint, difficulty: chosenDifficulty,
+      track: section?.track || 'cbse', view
+    });
+    if (href) nav(href);
+  };
 
   const generate = () => {
     if (impossibleTarget) return;
@@ -259,7 +291,13 @@ export default function Home() {
           {t('snap.entry')}
         </button>
 
-        {/* ── Manual practice configuration is deliberately secondary ── */}
+        {/* Keep smart practice as the default, but make exact-topic practice
+            discoverable without guessing that the class chip is clickable. */}
+        <button type="button" className="btn btn-ghost btn-sm" data-testid="choose-topic"
+          onClick={() => { setOpen(true); setCat(section ? 'topics' : 'course'); }}>
+          <Icon name="classes" size={16} /> {t('home.pickTopic')}
+        </button>
+
         <div className="genbar">
           <div className={`genbar-head ${open ? 'open' : ''}`}>
             <button className="genbar-toggle" onClick={() => setOpen(o => !o)}
@@ -304,7 +342,8 @@ export default function Home() {
                 ))}
               </div>
 
-              <div className="gen-pane" id="gen-pane" role="tabpanel">
+              <div className="gen-pane" id="gen-pane" role="tabpanel"
+                style={{ minWidth: 0, minHeight: 0, WebkitOverflowScrolling: 'touch', overscrollBehaviorY: 'contain', touchAction: 'pan-y' }}>
                 {cat === 'year' && (
                   <>
                     <div className="gen-pane-title">{t(india ? 'home.pickClass' : 'home.pickYear')}</div>
@@ -390,18 +429,44 @@ export default function Home() {
                     <div className="gen-pane-title">{t('home.pickDifficulty')}</div>
                     <div className="gen-opts">
                       {offeredDifficulties.map(d => (
-                        <button key={d} className={`gen-opt ${difficulty === d ? 'on' : ''}`} aria-pressed={difficulty === d}
-                          onClick={() => setDifficulty(difficulty === d ? null : d)}>
+                        <button key={d} className={`gen-opt ${chosenDifficulty === d ? 'on' : ''}`} aria-pressed={chosenDifficulty === d}
+                          onClick={() => setDifficulty(chosenDifficulty === d ? null : d)}>
                           {`D${d}`} · {t(DIFF_KEYS[d])}
                         </button>
                       ))}
                     </div>
+                    {selSub && missingDifficulties.length > 0 && (
+                      <p className="muted" data-difficulty-unavailable style={{ margin: '10px 0 0' }}>
+                        {t(selectedDotpoint ? 'home.difficultyMissingDotpoint' : 'home.difficultyMissingTopic', {
+                          levels: missingDifficulties.map(d => `D${d} · ${t(DIFF_KEYS[d])}`).join(', ')
+                        })}
+                      </p>
+                    )}
                   </>
                 )}
               </div>
             </div>
           )}
         </div>
+        {selSub && !impossibleTarget && (
+          <div className="home-study-choices" data-study-journey>
+            <h3 className="gen-pane-title">{t('study.choosePath')}</h3>
+            <p className="muted" data-study-context>
+              {selSub.name}{selectedDotpoint ? ` · ${typeof selectedDotpoint === 'string' ? selectedDotpoint : selectedDotpoint.text}` : ''}
+              {chosenDifficulty != null ? ` · D${chosenDifficulty}` : ''}
+            </p>
+            <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+              {studyAvailable && (
+                <>
+                  <button className="btn btn-secondary" type="button" data-study-notes onClick={() => learn('notes')}>{t('study.notes')}</button>
+                  <button className="btn btn-secondary" type="button" data-study-examples onClick={() => learn('examples')}>{t('study.examples')}</button>
+                </>
+              )}
+              <button className="btn btn-primary" type="button" data-study-practice onClick={generate}>{t('study.practice')}</button>
+            </div>
+            {!studyAvailable && <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>{t('study.reviewPending')}</p>}
+          </div>
+        )}
       </section>
 
       <section className="home-section" aria-labelledby="home-week-title">

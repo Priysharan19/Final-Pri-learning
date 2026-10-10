@@ -53,12 +53,63 @@ export function factorial(n) {
   }
   return gamma(n + 1);
 }
+// ── What an evaluation may cost ──────────────────────────────────────────────
+// The cost of evaluating must not depend on the VALUES written. A 26-character
+// answer, `ncr(3000000000,1500000000)`, looped one and a half thousand million
+// times; three nested sums ran twenty-seven million terms. So:
+//   · a counting function never loops more than COUNT_LOOP_LIMIT times, and
+//     stops as soon as its product is no longer finite. Past that many
+//     factors the true value is beyond what a number can hold, so the answer
+//     is Infinity either way — exact small values (`nCr(10, 3)`) are untouched;
+//   · while a marker is checking something a student wrote, every term of
+//     every sum and every turn of every counting loop is charged to ONE
+//     budget for the whole check (`withEvaluationBudget`). When it is spent,
+//     what is left evaluates to NaN — "not a number", which no marker accepts.
+// Nothing here looks at the clock: the same input is always marked the same.
+const COUNT_LOOP_LIMIT = 10000;
+let evaluationBudget = null;               // null: no check in progress, nothing is charged
+const spend = units => {
+  // A cost is a count: anything else (a negative range would hand budget back) is refused.
+  if (!Number.isFinite(units) || units < 0) return false;
+  if (evaluationBudget === null) return true;
+  evaluationBudget -= units;
+  return evaluationBudget >= 0;
+};
+
+// A call with several arguments keeps its first one under two names, `arg`
+// and `args[0]`. A walk that follows both visits that subtree twice, and its
+// own first argument four times: twenty-four nested calls were sixteen million
+// visits. Every walk follows `args` when there is one, and `arg` only otherwise.
+const childKeys = node => (Array.isArray(node?.args) ? ['l', 'r', 'v'] : ['l', 'r', 'v', 'arg']);
+
+/** How many nodes an expression has; counted once per expression. */
+const sizes = new WeakMap();
+function sizeOf(node) {
+  if (!node || typeof node !== 'object') return 0;
+  if (sizes.has(node)) return sizes.get(node);
+  let size = 1;
+  for (const key of childKeys(node)) size += sizeOf(node[key]);
+  if (Array.isArray(node.args)) for (const each of node.args) size += sizeOf(each);
+  sizes.set(node, size);
+  return size;
+}
+
+/** Run `fn` with at most `units` evaluated sum-term nodes and counting-loop turns in total. An enclosing budget is kept. */
+export function withEvaluationBudget(units, fn) {
+  if (evaluationBudget !== null) return fn();
+  evaluationBudget = units;
+  try { return fn(); } finally { evaluationBudget = null; }
+}
+
 const MULTI_FUNCTIONS = {
   ncr: (n, r) => {
     if (Number.isInteger(n) && Number.isInteger(r)) {
       if (r < 0 || r > n || n < 0) return 0;
+      const turns = Math.min(r, n - r);
+      if (turns > COUNT_LOOP_LIMIT) return Infinity;
+      if (!spend(turns)) return NaN;
       let out = 1;
-      for (let k = 1; k <= Math.min(r, n - r); k++) out = out * (n - k + 1) / k;
+      for (let k = 1; k <= turns && Number.isFinite(out); k++) out = out * (n - k + 1) / k;
       return Math.round(out);
     }
     return factorial(n) / (factorial(r) * factorial(n - r));
@@ -66,8 +117,10 @@ const MULTI_FUNCTIONS = {
   npr: (n, r) => {
     if (Number.isInteger(n) && Number.isInteger(r)) {
       if (r < 0 || r > n || n < 0) return 0;
+      if (r > COUNT_LOOP_LIMIT) return Infinity;
+      if (!spend(r)) return NaN;
       let out = 1;
-      for (let k = 0; k < r; k++) out *= (n - k);
+      for (let k = 0; k < r && Number.isFinite(out); k++) out *= (n - k);
       return out;
     }
     return factorial(n) / factorial(n - r);
@@ -122,11 +175,21 @@ function protectArguments(s) {
   return out + s.slice(cursor);
 }
 
+// ⁿCᵣ / ⁵C₂ with unicode super/subscripts. The whole run of superscripts is
+// always consumed, and the "C₂" that makes it a counting form is optional: a
+// run that is not one is put back as it was. Requiring the tail outright, as
+// /([⁰-⁹]+)\s*([CP])\s*([₀-₉]+)/g did, retried every suffix of a long run of
+// "²" that no C follows — quadratic for the same rewrites.
+const SUPERSCRIPT_COUNTING = /([⁰¹²³⁴⁵⁶⁷⁸⁹]+)(?:\s*([CP])\s*([₀₁₂₃₄₅₆₇₈₉]+))?/g;
+export function rewriteSuperscriptCounting(s) {
+  return s.replace(SUPERSCRIPT_COUNTING, (whole, n, f, r) => (f === undefined ? whole
+    : `${f === 'C' ? 'ncr' : 'npr'}(${[...n].map(ch => SUPER[ch]).join('')};${[...r].map(ch => SUB[ch]).join('')})`));
+}
+
 /** The counting and summation notations NCERT students actually write. */
 function rewriteCounting(s) {
   // ⁿCᵣ / ⁵C₂ with unicode super/subscripts
-  s = s.replace(/([⁰¹²³⁴⁵⁶⁷⁸⁹]+)\s*([CP])\s*([₀₁₂₃₄₅₆₇₈₉]+)/g, (_, n, f, r) =>
-    `${f === 'C' ? 'ncr' : 'npr'}(${[...n].map(ch => SUPER[ch]).join('')};${[...r].map(ch => SUB[ch]).join('')})`);
+  s = rewriteSuperscriptCounting(s);
   // \binom{n}{r}
   s = s.replace(/\\binom\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, 'ncr($1;$2)');
   // nCr(n, r) / C(n, r) / nPr(n, r) / P(n, r) as function calls. The bare
@@ -146,7 +209,12 @@ function rewriteCounting(s) {
 /** Normalise unicode / friendly maths notation into parseable ASCII. */
 export function normalize(raw) {
   if (raw == null) return '';
-  let s = String(raw);
+  // A run of blank characters — spaces, tabs, no-break spaces — is cut to its
+  // first one. Nothing in maths notation means more by being spaced wider,
+  // and the notation rewrites below are patterns with optional blanks in
+  // several places: four hundred spaces after `C(` took one of them thirty-three
+  // seconds to give up on.
+  let s = String(raw).replace(/\s{2,}/g, run => run[0]);
   s = s.replace(/[−–—]/g, '-')     // −, –, — → -
     .replace(/[×✕✖·⋅]/g, '*')
     .replace(/[÷]/g, '/')
@@ -328,7 +396,13 @@ class Parser {
           const args = [arg];
           while (this.peek() && this.peek().t === 'sep') { this.next(); args.push(this.parseExpression(0)); }
           this.expect('rp');
-          return this.maybePower({ t: 'call', fn: tok.v, arg, args });
+          // `arg` is the first argument under its single-argument name, kept for
+          // code that reads it — but not enumerable: it is the same subtree as
+          // `args[0]`, and anything that copies, counts or serialises a node by
+          // its keys would otherwise take that subtree twice at every level.
+          const call = { t: 'call', fn: tok.v, args };
+          Object.defineProperty(call, 'arg', { value: arg, enumerable: false, writable: true, configurable: true });
+          return this.maybePower(call);
         }
         this.expect('rp');
       } else if (this.peek() && this.peek().t === 'op' && this.peek().v === '*' && this.peek().implicit) {
@@ -416,6 +490,12 @@ export function evaluate(ast, env = {}, opts) {
           if (!name || !BINDABLE_NAME.test(name)) return NaN;
           const lo = evaluate(ast.args[2], env, opts), hi = evaluate(ast.args[3], env, opts);
           if (!Number.isInteger(lo) || !Number.isInteger(hi) || hi - lo > SUM_LIMIT) return NaN;
+          // One budget for every sum in the check, however they are nested.
+          // A term costs what it is: `sum(170! + 170! + …; k; 1; 10000)` is
+          // ten thousand terms of a thousand nodes each, not ten thousand units.
+          // An upper bound below the lower one is the empty sum: nothing to add, nothing to charge.
+          if (hi < lo) return 0;
+          if (!spend((hi - lo + 1) * sizeOf(ast.args[0]))) return NaN;
           let total = 0;
           for (let k = lo; k <= hi; k++) {
             const scope = Object.assign(Object.create(null), env);
@@ -478,7 +558,7 @@ export function variablesOf(ast, acc = new Set()) {
     for (const a of ast.args) variablesOf(a, acc);
     return acc;
   }
-  for (const key of ['l', 'r', 'v', 'arg']) {
+  for (const key of childKeys(ast)) {
     if (ast[key] && typeof ast[key] === 'object') variablesOf(ast[key], acc);
   }
   return acc;
@@ -496,7 +576,7 @@ function integerVarsOf(ast, acc = new Set()) {
     variablesOf(ast.args[2], acc);
     variablesOf(ast.args[3], acc);
   }
-  for (const key of ['l', 'r', 'v', 'arg']) {
+  for (const key of childKeys(ast)) {
     if (ast[key] && typeof ast[key] === 'object') integerVarsOf(ast[key], acc);
   }
   if (Array.isArray(ast.args)) for (const a of ast.args) integerVarsOf(a, acc);
@@ -609,7 +689,7 @@ function guardsOf(ast, acc = []) {
     if (pole) acc.push({ k: 'z', g: { t: 'call', fn: pole, arg: ast.arg } });
   }
   if (Array.isArray(ast.args)) { if (ast.fn !== 'sum') for (const a of ast.args) guardsOf(a, acc); return acc; }
-  for (const key of ['l', 'r', 'v', 'arg']) if (ast[key] && typeof ast[key] === 'object') guardsOf(ast[key], acc);
+  for (const key of childKeys(ast)) if (ast[key] && typeof ast[key] === 'object') guardsOf(ast[key], acc);
   return acc;
 }
 
@@ -859,6 +939,9 @@ export function exprEquivalent(a, b, opts = {}) {
   return EQUIV_CACHE.get(key);
 }
 
+/** The most distinct letters two expressions may hold between them and still be compared. */
+export const EQUIVALENCE_LETTERS = 8;
+
 function exprEquivalentUncached(a, b, opts) {
   let astA, astB;
   try { astA = typeof a === 'string' ? parse(a) : a; astB = typeof b === 'string' ? parse(b) : b; }
@@ -870,6 +953,11 @@ function exprEquivalentUncached(a, b, opts) {
   // e is Euler's number, never a sampled variable: sampling it made ln(eˣ)
   // vs x (and even ln(e⁵) vs 5) disagree, a false negative on a correct answer
   vars.delete('e');
+  // Two expressions are compared over the letters of both, and the domain
+  // probe is paid once for each. No answer on any syllabus is written in more
+  // than a handful of letters; one written in more than EQUIVALENCE_LETTERS
+  // is not the same expression as the key, and is not sampled to find out.
+  if (vars.size > EQUIVALENCE_LETTERS) return false;
   const names = [...vars];
   const integers = new Set([...integerVarsOf(astA), ...integerVarsOf(astB)]);
   const domain = opts.domain || [-3.5, 3.5];

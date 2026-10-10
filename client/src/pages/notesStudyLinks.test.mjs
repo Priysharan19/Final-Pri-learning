@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import { IN_CHAPTER_BY_ID } from '../engine/curriculum-in.js';
+import { chapterNotesLink, notesIndexReturnLink } from './notesStudyLinks.js';
+
+const complex = IN_CHAPTER_BY_ID['c11-complex-numbers'];
+assert.ok(complex);
+const q = new URLSearchParams('class=11&track=jee-advanced&difficulty=4&subtopic=c11-complex-numbers&dotpoint=0');
+const path = chapterNotesLink(complex, q);
+assert.equal(new URL(path, 'https://local.test').searchParams.get('track'), 'jee-advanced');
+assert.equal(new URL(path, 'https://local.test').searchParams.get('difficulty'), '4');
+assert.equal(new URL(path, 'https://local.test').searchParams.get('dotpoint'), '0');
+assert.equal(new URL(path, 'https://local.test').searchParams.get('view'), 'notes');
+const back = notesIndexReturnLink(complex, q);
+assert.equal(new URL(back, 'https://local.test').searchParams.get('track'), 'jee-advanced');
+assert.equal(new URL(back, 'https://local.test').searchParams.get('difficulty'), '4');
+assert.equal(new URL(back, 'https://local.test').searchParams.get('subtopic'), complex.id);
+assert.equal(new URL(back, 'https://local.test').searchParams.get('dotpoint'), '0');
+const different = Object.values(IN_CHAPTER_BY_ID).find(c => c.grade === 11 && c.id !== complex.id);
+assert.ok(different, 'known other Class11 chapter exists');
+const other = new URL(chapterNotesLink(different, q), 'https://local.test').searchParams;
+assert.equal(other.get('track'), 'jee-advanced');
+assert.equal(other.get('difficulty'), '4');
+assert.equal(other.get('dotpoint'), null, 'chapter change may not reuse old dotpoint');
+const cbse = new URL(chapterNotesLink(complex, new URLSearchParams('track=cbse&difficulty=4')), 'https://local.test').searchParams;
+assert.equal(cbse.get('track'), 'cbse');
+assert.equal(cbse.get('difficulty'), null, 'D4 cannot be silently served as CBSE');
+assert.equal(chapterNotesLink(complex, new URLSearchParams('class=11')), '/notes/c11-complex-numbers');
+console.log('NOTES JEE ROUTE CONTINUITY: PASS 16/16');

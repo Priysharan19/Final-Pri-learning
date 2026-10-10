@@ -1,5 +1,5 @@
 {
- "contentVersion": "2026.10.2",
+ "contentVersion": "2026.10.4",
  "draws": 6,
  "generators": {
   "c10-areas-circles": "7ad393462801ae01",
@@ -7,7 +7,7 @@
   "c10-circles": "5cf7a30181431c24",
   "c10-coordinate-geometry": "ec4ad6b074e71ce7",
   "c10-irrationality-proofs": "0129ce5a70f0b803",
-  "c10-linear-graphs": "78590de100b7f27a",
+  "c10-linear-graphs": "bdb1a3cc8cc8e2d3",
   "c10-linear-pair-methods": "89cc1faaa3c18f43",
   "c10-linear-solution-conditions": "e338db302bc0cec1",
   "c10-polynomial-zeroes": "eb49eb06b98b8c0b",
@@ -86,7 +86,7 @@
   "c8-linear-equations-foundations": "4457d0246f7787a7",
   "c8-linear-equations-fractions": "7cde11fdbc7faafc",
   "c8-linear-equations-source-mastery": "8c9c86e836402655",
-  "c8-linear-equations-verification": "e1811aa66da2d0bf",
+  "c8-linear-equations-verification": "d0fa6018b27e32b3",
   "c8-mensuration-ncert-mastery": "5f75e94c05f379a3",
   "c8-proportions-ncert-mastery": "fd20752c04c7e4b5",
   "c8-quadrilaterals-ncert-mastery": "b96384b48c3c27e3",

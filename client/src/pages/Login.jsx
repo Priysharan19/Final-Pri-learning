@@ -1,10 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Landing + profile entry
-// A profile is a record in this device's own storage — created here, unlocked
-// here, wiped here. Nothing on this screen contacts a provider, verifies an
-// address or resets a password. The optional Pri cloud account lives in
-// Settings: this screen only offers the way there, and never passes a local
-// profile off as a cloud sign-in.
+// Pri has one normal account flow on this screen: create/sign in to the Pri
+// account, then bind it to this device's local profile before entering Practice.
+// Device-only profiles still exist for explicit offline use, but are labelled as
+// such and are never presented as a signed-in account.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -277,6 +276,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
   const [error, setError] = useState('');
   const stepHeadingRef = useRef(null);
   const createPendingRef = useRef(false);
+  const accountProfileRef = useRef(null);
 
   const load = () => api.get('/profiles').then(r => setProfiles(r.profiles)).catch(() => setProfiles([]));
   useEffect(() => { load(); }, []);
@@ -487,17 +487,33 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
 
   /** The account flow is done: make this device's profile, link it, and open the first question. */
   const finishAccount = async ({ account, name, year, track }) => {
-    const r = await api.post('/profiles', {
-      name: name || account?.name || 'Pri', year: Number(year), avatar: '🚀', role: 'student',
-      language: signInLanguage(), course: 'in', indiaTrack: track || 'cbse'
-    });
-    if (account?.id) {
-      const { linkSignedInAccount } = await import('../platform/cloudAccount.js');
-      await linkSignedInAccount(r.user.id, account).catch(() => {});
+    if (!account?.id) throw new Error(t('signup.genericError'));
+
+    // Creating the local profile and linking the cloud account are two requests.
+    // If the link (or the authoritative /me refresh) fails transiently, the
+    // signup panel stays mounted and lets the learner retry. Keep the first pid
+    // for that account so a retry never creates another orphan device profile.
+    let pid = accountProfileRef.current?.accountId === account.id
+      ? accountProfileRef.current.pid
+      : null;
+    if (!pid) {
+      const r = await api.post('/profiles', {
+        name: name || account.name || 'Pri', year: Number(year), avatar: '🚀', role: 'student',
+        language: signInLanguage(), course: 'in', indiaTrack: track || 'cbse'
+      });
+      pid = r.user.id;
+      accountProfileRef.current = { accountId: account.id, pid };
     }
+
+    const { linkSignedInAccount } = await import('../platform/cloudAccount.js');
+    await linkSignedInAccount(pid, account);
+    // POST /profiles returns the view from before the cloud link exists. Re-read
+    // it after linking so Practice never mounts with stale cloudLinked=false.
+    const linkedUser = (await api.get('/me')).user;
+    accountProfileRef.current = null;
     localStorage.setItem('pri-seen-hero', '1');
     nav('/practice', { replace: true, flushSync: true });
-    flushSync(() => setUser(r.user));
+    flushSync(() => setUser(linkedUser));
     refreshDue();
   };
 
@@ -543,9 +559,6 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
           <div className="row" style={{ marginTop: 34 }}>
             <button className="btn btn-primary btn-lg" data-testid="hero-create-account" onClick={() => openAccount('signup')}>{t('login.createAccount')}</button>
           </div>
-          <div className="row" style={{ marginTop: 10 }}>
-            <button className="btn btn-ghost btn-lg" onClick={enter}>{t('login.getStarted')}</button>
-          </div>
           <div style={{ textAlign: 'center', marginTop: 14 }}>
             <button className="linklike" type="button" data-testid="hero-sign-in-code" onClick={() => openAccount('signin')}>{t('login.signInWithCode')}</button>
           </div>
@@ -554,11 +567,11 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
               {t('login.tryDemoIndia')}
             </button>
           </div>
+          <div style={{ textAlign: 'center', marginTop: 12 }}>
+            <button className="linklike" type="button" data-testid="hero-offline" onClick={enter}>{t('signup.offline')}</button>
+          </div>
           {error && <div className="error-box" role="alert" style={{ marginTop: 12 }}>{error}</div>}
           <p className="muted" style={{ marginTop: 26, textAlign: 'center' }}>{t('login.heroPrivacy')}</p>
-          <div style={{ textAlign: 'center', marginTop: 10 }}>
-            <button className="linklike" onClick={cloudSignIn}>{t('login.cloudSignIn')}</button>
-          </div>
           {appleEntry}
           <LanguagePicker />
           {/* A store reviewer, a payment provider and a parent all look for
@@ -852,18 +865,11 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                     )}
                   </div>
 
-                  <div className="field">
-                    <div className="label" id="signup-cloud-choice">{t('login.cloudChoice')}</div>
-                    <div className="pathway-row" role="group" aria-labelledby="signup-cloud-choice">
-                      <button type="button" className={`pathway-pick ${!cloudIntent ? 'on' : ''}`}
-                        aria-pressed={!cloudIntent} onClick={() => setCloudIntent(false)}>
-                        <b>{t('login.localOnly')}</b><span>{t('login.localOnlySub')}</span>
-                      </button>
-                      <button type="button" className={`pathway-pick ${cloudIntent ? 'on' : ''}`}
-                        aria-pressed={cloudIntent} onClick={() => setCloudIntent(true)}>
-                        <b>{t('login.connectCloudNext')}</b><span>{t('login.connectCloudNextSub')}</span>
-                      </button>
-                    </div>
+                  <div className="field" data-testid="onboarding-identity-path">
+                    <div className="label">{t(cloudIntent ? 'login.connectCloudNext' : 'login.localOnly')}</div>
+                    <p className="muted" style={{ margin: 0, fontSize: 12.5 }}>
+                      {t(cloudIntent ? 'login.connectCloudNextSub' : 'login.localOnlySub')}
+                    </p>
                   </div>
                   <p className="auth-note">{t('login.localCloudHonesty')}</p>
                 </>

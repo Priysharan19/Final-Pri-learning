@@ -24,6 +24,7 @@ const SAFE_ID = /^[A-Za-z0-9._:-]{1,160}$/;
 const ORIGIN_META = 'pri-cloud-origin';
 const HEALTH_SERVICE = 'pri-learning-platform';
 let discovery = null;
+let lastRediscovery = 0;
 
 function metaOrigin() {
   try { return String(globalThis.document?.querySelector?.(`meta[name="${ORIGIN_META}"]`)?.getAttribute('content') || '').trim(); }
@@ -65,6 +66,11 @@ export async function readReleaseIdentityManifest({ timeoutMs = 1500 } = {}) {
  * Probe the serving origin once for the platform health signature and, when it
  * answers, make that origin the cloud authority. Resolves to the origin or
  * null; never throws, never delays boot for more than `timeoutMs`.
+ *
+ * That last promise is kept here and not by the request: the time limit both
+ * aborts the request and settles the probe. Aborting alone left the bound in
+ * the hands of whatever was answering the request — a service worker, a
+ * captive portal, an in-app browser — and the first render waits on this.
  */
 export function discoverCloudOrigin({ timeoutMs = 1500 } = {}) {
   if (discovery) return discovery;
@@ -75,8 +81,14 @@ export function discoverCloudOrigin({ timeoutMs = 1500 } = {}) {
     const loc = globalThis.location;
     if (!loc || !/^https?:$/.test(String(loc.protocol || '')) || typeof fetch !== 'function') return null;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), Math.max(200, Math.min(10_000, Number(timeoutMs) || 1500)));
-    try {
+    let timer;
+    const limit = new Promise(resolve => {
+      timer = setTimeout(() => {
+        resolve(null);
+        try { controller.abort(new DOMException('Timed out', 'TimeoutError')); } catch { /* nothing left to abort */ }
+      }, Math.max(200, Math.min(10_000, Number(timeoutMs) || 1500)));
+    });
+    const asked = (async () => {
       const response = await fetch(`${loc.origin}/v1/health`, {
         method: 'GET',
         headers: { Accept: 'application/json', 'X-Pri-Client': 'web-v1' },
@@ -93,12 +105,17 @@ export function discoverCloudOrigin({ timeoutMs = 1500 } = {}) {
       const origin = normalizeCloudOrigin(loc.origin);
       globalThis.__PRI_CLOUD_ORIGIN__ = origin;
       return origin;
-    } catch {
-      return null;
+    })().catch(() => null);
+    try {
+      return await Promise.race([asked, limit]);
     } finally {
       clearTimeout(timer);
     }
   })();
+  // A page loaded while the server was unreachable must find it again once it
+  // is back: only a successful probe is remembered.
+  const attempt = discovery;
+  attempt.then(found => { if (!found && discovery === attempt) discovery = null; });
   return discovery;
 }
 
@@ -221,15 +238,25 @@ export async function cloudRequest(path, {
       err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
       if (Number.isFinite(Number(data?.error?.resetAt))) err.resetAt = Number(data.error.resetAt);
       if (data?.error?.quota && typeof data.error.quota === 'object') err.quota = data.error.quota;
+      // An entitlement refusal names what it is about and when it lifts.
+      if (typeof data?.error?.capability === 'string') err.capability = data.error.capability.slice(0, 60);
+      for (const k of ['nextAt', 'used', 'limit', 'windowDays']) if (Number.isFinite(Number(data?.error?.[k]))) err[k] = Number(data.error[k]);
+      if (typeof data?.error?.openExamId === 'string' && SAFE_ID.test(data.error.openExamId)) err.openExamId = data.error.openExamId;
       err.requestId = result?.requestId || rid;
       throw err;
     }
     return data;
   }
 
+  // No server was found when the page loaded: look once more (briefly, and
+  // not more than every few seconds) before saying there is none.
+  if (!normalizeCloudOrigin() && Date.now() - lastRediscovery > 4000) {
+    lastRediscovery = Date.now();
+    await discoverCloudOrigin({ timeoutMs: 1500 });
+  }
   const origin = normalizeCloudOrigin();
   if (!origin) {
-    const err = new Error('Cloud is not configured; local Pri Learning remains available offline.');
+    const err = new Error('Pri\'s server cannot be reached from this device right now.');
     err.code = 'CLOUD_DISABLED';
     throw err;
   }
@@ -266,7 +293,17 @@ export async function cloudRequest(path, {
       err.status = response.status;
       err.code = data?.error?.code || 'CLOUD_REQUEST_FAILED';
       if (Number.isFinite(Number(data?.error?.resetAt))) err.resetAt = Number(data.error.resetAt);
+      else {
+        // When a limit lifts: the body's resetAt (epoch ms) first; the
+        // standard RateLimit-Reset header (epoch seconds) when the body has none.
+        const reset = Number(response.headers?.get?.('ratelimit-reset'));
+        if ((response.status === 429 || response.status === 503) && Number.isFinite(reset) && reset > 0) err.resetAt = reset * 1000;
+      }
       if (data?.error?.quota && typeof data.error.quota === 'object') err.quota = data.error.quota;
+      // An entitlement refusal names what it is about and when it lifts.
+      if (typeof data?.error?.capability === 'string') err.capability = data.error.capability.slice(0, 60);
+      for (const k of ['nextAt', 'used', 'limit', 'windowDays']) if (Number.isFinite(Number(data?.error?.[k]))) err[k] = Number(data.error[k]);
+      if (typeof data?.error?.openExamId === 'string' && SAFE_ID.test(data.error.openExamId)) err.openExamId = data.error.openExamId;
       err.requestId = response.headers.get('x-pri-request-id') || rid;
       throw err;
     }
@@ -327,9 +364,15 @@ function streamUnsupported(status) {
 export async function cloudStreamRequest(path, { body, onEvent, timeoutMs = 45_000, signal = null } = {}) {
   if (!PATH.test(String(path || '')) || String(path).includes('..')) throw new Error('Cloud path is not allowed');
   if (nativeCloudAvailable()) throw streamUnsupported();
+  // No server was found when the page loaded: look once more (briefly, and
+  // not more than every few seconds) before saying there is none.
+  if (!normalizeCloudOrigin() && Date.now() - lastRediscovery > 4000) {
+    lastRediscovery = Date.now();
+    await discoverCloudOrigin({ timeoutMs: 1500 });
+  }
   const origin = normalizeCloudOrigin();
   if (!origin) {
-    const err = new Error('Cloud is not configured; local Pri Learning remains available offline.');
+    const err = new Error('Pri\'s server cannot be reached from this device right now.');
     err.code = 'CLOUD_DISABLED';
     throw err;
   }
@@ -393,6 +436,39 @@ export async function cloudStreamRequest(path, { body, onEvent, timeoutMs = 45_0
 
 export const cloud = Object.freeze({
   health: () => cloudRequest('/v1/health'),
+  // The device never computes a grade: question and attempt authority are on
+  // the authenticated server. Transport failures are propagated, not converted
+  // into local answers or queued pseudo-receipts.
+  issuePractice: body => cloudRequest('/v1/practice/issue', { method: 'POST', body }),
+  // Needs no session: the question a signed-out student may start working on.
+  preparePractice: body => cloudRequest('/v1/practice/prepare', { method: 'POST', body }),
+  gradePractice: (questionId, body) => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/submit', {
+    method: 'POST', body, idempotencyKey: body.submissionId
+  }),
+  // Examination papers are issued, collected and marked by the server
+  // (server/platform/exams.js). The device sends a paper spec and answers; it
+  // never receives an answer key before the paper is finalised.
+  // The layout of a blueprint paper is the server's choice: the device asks for
+  // the seed, composes for it, and a create under any other seed is refused.
+  examLayout: body => cloudRequest('/v1/exams/layout', { method: 'POST', body }),
+  createExam: (body, idempotencyKey) => cloudRequest('/v1/exams', { method: 'POST', body, idempotencyKey, timeoutMs: 30000 }),
+  // PATCH, not PUT: the native iOS and Android bridges carry GET/POST/PATCH/DELETE.
+  saveExamAnswers: (examId, body) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id') + '/answers', { method: 'PATCH', body }),
+  finishExam: (examId, body, idempotencyKey, timeoutMs = 30000) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id') + '/finish', {
+    method: 'POST', body, idempotencyKey, timeoutMs
+  }),
+  getExam: (examId, timeoutMs = undefined) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id'), { timeoutMs }),
+  repeatPractice: questionId => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/repeat', { method: 'POST', body: {} }),
+  revealPractice: questionId => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/reveal', { method: 'POST', body: {} }),
+  recognizePractice: (questionId, mode, image) =>
+    cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/recognize', {
+      method: 'POST', body: { mode, image }, timeoutMs: 55000
+    }),
+  confirmPracticeRecognition: (questionId, receipt, text) =>
+    cloudRequest('/v1/practice/' + pathId(questionId, 'question id') +
+      '/recognition/' + pathId(receipt, 'receipt') + '/confirm', {
+      method: 'POST', body: { text }
+    }),
   me: () => cloudRequest('/v1/account/me'),
   register: body => cloudRequest('/v1/account/register', { method: 'POST', body }),
   // A guardian answering the email has no account and no session — the token in

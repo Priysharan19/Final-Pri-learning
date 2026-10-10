@@ -288,7 +288,15 @@ function fmtLin(a, b, v = 'x') {
   return poly([a, b], v);
 }
 
+// The equation's variable is drawn per question (x, t, m or y). A caller that
+// writes its own sentence around the equation — the verification skill's
+// "A student claims …" — needs that same letter, so the builder returns it
+// alongside the question instead of leaving the caller to assume x.
 function bothSidesGenerated(rng, diff) {
+  return bothSidesParts(rng, diff).question;
+}
+
+function bothSidesParts(rng, diff) {
   const variable = rc(rng, ['x', 't', 'm', 'y']);
   const sol = ri(rng, diff <= 2 ? -8 : -14, diff <= 2 ? 12 : 18);
   let a = ri(rng, 2, diff >= 3 ? 9 : 6);
@@ -297,7 +305,7 @@ function bothSidesGenerated(rng, diff) {
   const b = ri(rng, -15, 15);
   const d = (a - c) * sol + b;
   const prompt = `$${fmtLin(a, b, variable)}=${fmtLin(c, d, variable)}$`;
-  return numericQuestion(prompt, sol, {
+  const question = numericQuestion(prompt, sol, {
     variable,
     hints: [
       `Collect the ${variable}-terms on one side.`,
@@ -315,6 +323,7 @@ function bothSidesGenerated(rng, diff) {
       { value: -sol, why: 'A sign was likely changed without performing the same operation on both sides.' }
     ]
   });
+  return { variable, question };
 }
 
 function bracketGenerated(rng, diff) {
@@ -487,12 +496,15 @@ export const NCERT_CLASS8_LINEAR_GENERATORS = Object.freeze({
   },
 
   'y8-ncert-linear-verification': (rng, diff) => {
-    const q = bothSidesGenerated(rng, Math.max(2, diff));
+    // The claim, the substitution step and the stated solution all name the
+    // variable the equation was written in. They used to say x whatever the
+    // equation's letter was ("claims $x=3$ solves $4t-13=t+2$").
+    const { variable, question: q } = bothSidesParts(rng, Math.max(2, diff));
     const correct = q.answer.value;
     const wrong = correct + rc(rng, [-2, -1, 1, 2]);
     if (diff <= 2) return propertyMcq(
       rng,
-      `A student claims $x=${wrong}$ solves ${q.prompt}. What is the correct verification strategy?`,
+      `A student claims $${variable}=${wrong}$ solves ${q.prompt}. What is the correct verification strategy?`,
       'Substitute the claimed value into the original LHS and RHS and compare them.',
       [
         { text: 'Substitute only into the LHS; if it is an integer, accept it', why: 'A solution requires LHS = RHS, so both sides must be compared.' },
@@ -502,11 +514,12 @@ export const NCERT_CLASS8_LINEAR_GENERATORS = Object.freeze({
       ['A solution is defined by equality of the original two sides.', 'Use the untouched original equation.', 'Evaluate LHS and RHS separately.'],
       [
         { h: 'Definition', d: 'A solution makes the original LHS equal the original RHS.' },
-        { h: 'Substitute', d: `Put x = ${wrong} into both sides.` },
+        { h: 'Substitute', d: `Put ${variable} = ${wrong} into both sides.` },
         { h: 'Compare', d: 'If the two numbers differ, the claim is rejected.' }
       ]
     );
     return numericQuestion(`Solve and then verify ${q.prompt}.`, new Frac(correct), {
+      variable,
       hints: ['Solve by collecting variable terms.', 'Then substitute into the untouched original equation.', 'Both sides must match exactly.'],
       steps: [...q.steps, { h: 'Verification standard', d: 'Evaluate original LHS and RHS independently and state LHS = RHS.' }]
     });

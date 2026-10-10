@@ -18,7 +18,7 @@ import {
 } from './syncContract.js';
 import { historicalSupplementalEvents } from './syncHistorical.js';
 import { remoteEventPrefix, syncStateId } from './syncReplicaState.js';
-import { applyRemoteLearningEvents, isRestoredRow } from './cloudSyncRestore.js';
+import { applyRemoteLearningEvents, isRestoredRow, reconcileDeferredGrades } from './cloudSyncRestore.js';
 
 const MAX_REMOTE_EVENT_CACHE = 2000;
 // The profile outbox's own ceiling. Asking for fewer than it can hold would let
@@ -190,7 +190,10 @@ async function eventForOutbox(item, pid, deviceId) {
         total: exam.total == null ? null : Number(exam.total),
         createdAt: Number(exam.createdAt) || common.occurredAt,
         finishedAt: Number(exam.finishedAt) || null,
-        indiaExam: plain(exam.indiaExam) ? { ...exam.indiaExam } : null
+        indiaExam: plain(exam.indiaExam) ? { ...exam.indiaExam } : null,
+        // A paper the server issued: its result is the server's own event, and
+        // other devices take the paper from that, not from this copy.
+        ...(exam.server?.examId ? { serverExamId: String(exam.server.examId) } : {})
       }
     };
   }
@@ -456,6 +459,9 @@ async function pullAll(pid, deviceId, state, unpublished, { fromCursor = null } 
       const restored = await applyRemoteLearningEvents(pid, foreign);
       restoredEvents += restored.applied;
     }
+    // Server-marked attempts held back while this device's own submit was in
+    // flight are recorded once that submit is known not to have done it.
+    restoredEvents += await reconcileDeferredGrades(pid);
     for (const entity of raw.entities) {
       await applyRemoteEntity(pid, entity, state, unpublished);
       pulledEntities++;
@@ -756,7 +762,12 @@ export async function remoteLearningSummary(pid) {
   let correct = 0;
   const bySubtopic = {};
   for (const row of rows) {
-    if (row.kind !== 'practice-progress') continue;
+    // Legacy client-authored practice events are archival evidence, not marks.
+    // A remote score only exists when the canonical grader committed it.
+    if (row.kind !== 'graded-attempt' || row.deviceId !== 'server-grader' ||
+        row.eventId !== row.payload?.attemptId ||
+        row.entityId !== row.payload?.questionId ||
+        (row.payload?.revealed === true && row.payload?.correct !== false)) continue;
     const subtopic = row.payload?.subtopic;
     if (!subtopic) continue;
     attempts++;

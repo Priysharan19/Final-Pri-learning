@@ -150,6 +150,37 @@ export const flow = {
       await page.waitForURL(/\/practice/, { timeout: 30000 });
       await page.waitForSelector('.shell', { timeout: 30000 });
       await check('the student lands on practice, the first question', new URL(page.url()).pathname === '/practice');
+
+      const cloudMeStatus = await page.evaluate(async () => (await fetch('/v1/account/me', { credentials: 'include' })).status);
+      await check('the same onboarding leaves a live Pri cloud session', cloudMeStatus === 200, String(cloudMeStatus));
+
+      // The adaptive first question may legitimately be MCQ. Move to the first
+      // written-answer question before checking the working modes; this keeps the
+      // auth regression deterministic instead of depending on question type.
+      let answerModesAvailable = false;
+      for (let i = 0; i < 12; i++) {
+        const photo = await page.getByRole('button', { name: 'Photo' }).count();
+        const write = await page.getByRole('button', { name: 'Write' }).count();
+        if (photo && write) { answerModesAvailable = true; break; }
+        const next = page.locator('.ctx-next');
+        if (!await next.count()) break;
+        await next.click();
+        await page.waitForSelector('.q-prompt', { timeout: 15000 });
+        await page.waitForTimeout(80);
+      }
+      await check('the signed-in journey reaches a written-answer question', answerModesAvailable);
+      if (answerModesAvailable) {
+        await page.getByRole('button', { name: 'Photo' }).click();
+        await page.waitForTimeout(120);
+        await check('photo mode does not ask the newly signed-in learner to sign in again',
+          await page.getByText('Sign in to read photos of your working.', { exact: false }).count() === 0);
+
+        await page.getByRole('button', { name: 'Write' }).click();
+        await page.waitForTimeout(120);
+        await check('handwriting mode does not ask the newly signed-in learner to sign in again',
+          await page.getByText('Reading your handwriting needs a Pri account.', { exact: false }).count() === 0);
+      }
+
       const given = h.db.prepare('SELECT method, confirmed_at FROM guardian_consents WHERE account_id=?').get(account.id);
       await check('the parent’s approval is recorded as a phone-code consent', given.method === 'guardian-phone-otp' && given.confirmed_at > 0, JSON.stringify(given));
       await check('every step went through the real server', seen.includes('POST /v1/account/otp/verify') && seen.includes('POST /v1/account/otp/guardian/approve'));

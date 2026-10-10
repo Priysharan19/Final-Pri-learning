@@ -10,6 +10,10 @@
 // right, so the flow asserts the shape and the honesty of what is shown, not a
 // particular level.
 //
+// The check is marked work (owner decision 2026-10-10): signed out it does not
+// start; the flow asserts that refusal, signs in on the placement page to the
+// real platform server, and every verdict after that is the server's.
+//
 // Run on its own:  node client/test/tour-placement.js
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
@@ -17,8 +21,9 @@ import { pathToFileURL } from 'node:url';
 export const flow = {
   id: 'placement',
   name: 'Placement · onboarding → diagnostic → evidence map',
+  online: true,
 
-  async run({ page, check, goto, createProfile, settle }) {
+  async run({ page, check, goto, createProfile, settle, online, note }) {
     await goto('/');
     // Type mode is the deterministic way to drive the card from a script; the
     // write tab is the same card and has its own flow.
@@ -27,7 +32,7 @@ export const flow = {
     if (!enabled) {
       // A production build without PRI_FEATURE_PLACEMENT: outside the frozen
       // V1 scope, so there must be no placement surface anywhere.
-      await page.getByRole('button', { name: 'Get Started' }).click();
+      await page.getByRole('button', { name: 'Use without an account' }).click();
       await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
       await page.getByRole('button', { name: 'Student', exact: true }).click();
       await page.locator('.auth-card .btn-primary').click();
@@ -61,6 +66,30 @@ export const flow = {
     await check('the offer says it is optional', /optional/i.test(await offer.innerText().catch(() => '')));
     await check('the offer can be declined', await offer.getByRole('button', { name: 'Not now' }).count() === 1);
     await offer.getByRole('button', { name: 'Start the placement check' }).click();
+
+    // ── 1b · signed out, the check does not start: sign in, in place ────────
+    // The placement check is marked work: every question is the server's and
+    // every answer is marked there. With no account nothing starts.
+    const refused = page.locator('[data-placement-refused]');
+    await refused.waitFor({ state: 'visible', timeout: 30000 }).catch(() => { });
+    await check('signed out, the placement check does not start: the page says why, as an alert, with the sign-in in place',
+      await refused.getAttribute('data-placement-refused').catch(() => null) === 'sign-in' && await refused.getAttribute('role') === 'alert' &&
+        await refused.locator('[data-check-sign-in]').isEnabled() && await page.locator('.q-prompt').count() === 0,
+      (await refused.innerText().catch(() => 'no refusal shown')).replace(/\s+/g, ' ').slice(0, 200));
+    await check('and nothing was asked of the server on a signed-out student\'s behalf: no question issued',
+      (await online.practiceCalls(/^\/v1\/(?:practice\/issue|placement\/)/)).filter(c => c.status < 300).length === 0,
+      JSON.stringify((await online.practiceCalls(/^\/v1\/(?:practice|placement)\//)).map(c => `${c.status} ${c.path}`)));
+    await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
+    await refused.locator('[data-check-sign-in]').click();
+    const account = await online.signInHere(refused, { name: 'Nisha Rao' });
+    await check('sign-in completes on the placement page: no navigation, no reload',
+      /\/placement$/.test(new URL(page.url()).pathname) && await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept', page.url());
+    if (!(await page.locator('.q-prompt').count())) {
+      const again = page.locator('[data-placement-start], [data-check-retry]').first();
+      await again.waitFor({ state: 'visible', timeout: 15000 }).catch(() => { });
+      if (await again.count()) await again.click();
+    }
+    const eventsOf = kind => Number(online.platform.db.prepare('SELECT COUNT(*) AS n FROM learning_events WHERE account_id=? AND kind=?').get(account.id, kind).n);
 
     // ── 2 · the first question, and it survives a reload ─────────────────────
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
@@ -107,6 +136,10 @@ export const flow = {
         await next.waitFor({ timeout: 15000 });
       }
       if (asked === 0) {
+        const firstMark = (await online.practiceCalls(/^\/v1\/(?:practice|placement)\/.+/)).filter(c => c.json?.authoritative === true).at(-1);
+        await check('the verdict on a placement answer is the server\'s: an authoritative result for a question it issued',
+          !!firstMark && firstMark.status === 200 && typeof firstMark.json.attemptId === 'string',
+          JSON.stringify((await online.practiceCalls(/^\/v1\/(?:practice|placement)\/.+/)).slice(-4).map(c => `${c.status} ${c.path.replace(/[0-9a-f-]{36}/g, ':id')} ${c.json?.authoritative}`)));
         await check('a marked answer shows the evaluation card', await page.locator('.eval-card').count() === 1);
         await check('and says the mark is diagnostic evidence only', /diagnostic evidence only/.test(await page.locator('.eval-card').innerText()));
         await check('the answered card offers no dead "Next question" of its own (the placement page advances)',
@@ -119,6 +152,15 @@ export const flow = {
       await page.waitForSelector('.q-prompt', { timeout: 30000 });
     }
     await check('the check ended within twelve questions', asked >= 1 && asked <= 12, `${asked} answered`);
+    // Who marked, and what it cost: every answer and every "I don't know" went
+    // to the server, and a whole placement run wrote no progress event there.
+    const placementCalls = (await online.practiceCalls(/^\/v1\/(?:practice|placement)\/.+/)).filter(c => !/\/(?:issue|prepare)$/.test(c.path));
+    const resolvedOnServer = placementCalls.filter(c => c.status === 200 && c.json?.authoritative === true);
+    await check('every answered or skipped question was resolved by the server, authoritatively — none on the device',
+      resolvedOnServer.length >= asked && placementCalls.every(c => c.status < 300),
+      `${asked} asked; ${resolvedOnServer.length} authoritative server results; ${JSON.stringify(placementCalls.filter(c => c.status >= 300).map(c => `${c.status} ${c.json?.error?.code}`))}`);
+    await check('a whole placement run adds no graded-attempt learning event on the server',
+      eventsOf('graded-attempt') === 0, `${eventsOf('graded-attempt')} graded-attempt events for this account`);
 
     // ── 4 · the result and the map ───────────────────────────────────────────
     await page.waitForSelector('.pm-map', { timeout: 30000 });

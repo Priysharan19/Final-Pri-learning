@@ -111,8 +111,14 @@ jobs:
       - name: Build and regenerate declared mirrors
         if: steps.scope.outputs.needs_sync == 'true'
         working-directory: candidate
+        env:
+          # actions/checkout uses PR head, but GITHUB_SHA names GitHub's synthetic
+          # merge commit. Pin the candidate build to the actual checked-out SHA.
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PRI_RELEASE_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
           npm run build
           npm run sync:ios
           npm run check:ios

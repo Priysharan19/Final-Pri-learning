@@ -162,7 +162,12 @@ try {
     accountId: 'acct-apple-a', body: { signedTransaction: wrongProduct }
   }), error => error?.code === 'BILLING_PRODUCT_UNKNOWN');
 
-  const tampered = `${activeJws.slice(0, -2)}aa`;
+  // One signature character is changed to a different one. Overwriting the
+  // tail with fixed text left the signature intact whenever it already ended
+  // that way, and the suite then failed on a JWS that was not tampered with.
+  const sigAt = activeJws.lastIndexOf('.') + 5;
+  const tampered = `${activeJws.slice(0, sigAt)}${activeJws[sigAt] === 'A' ? 'B' : 'A'}${activeJws.slice(sigAt + 1)}`;
+  assert.notEqual(tampered, activeJws);
   await assert.rejects(async () => apple.native.apple.transaction({
     accountId: 'acct-apple-a', body: { signedTransaction: tampered }
   }), error => error?.code === 'APPLE_JWS_SIGNATURE_INVALID');

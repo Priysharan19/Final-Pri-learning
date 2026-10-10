@@ -232,6 +232,9 @@ jobs:
           cache-dependency-path: client/package-lock.json
       - name: Install client dependencies
         run: npm ci --prefix client
+      # Client suites are marked by the real /v1 server, booted in-process (online-only grading).
+      - name: Install server dependencies
+        run: npm ci --prefix server
       - name: Release authority contract
         run: node tools/pri01-release-authority-check.mjs
       - name: Build

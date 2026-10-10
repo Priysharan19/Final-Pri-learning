@@ -34,6 +34,26 @@ export const ENGINE_SUITES = [
   'platform-http-journeys-check.mjs',
   'sync-idempotency-contract-check.mjs',
   'practice-attempt-sync-check.mjs',
+  // The immutable online-issued grading receipts and adversarial account, replay,
+  // and awarded-marks checks MUST also pass with real pri_server Postgres.
+  'online-marking-authority-check.mjs',
+  // Examination papers: sealed paper, answer snapshots, exactly-once
+  // finalisation and the deadline rule, account-scoped under Row-Level Security.
+  'exam-authority-check.mjs',
+  // Method marks need progress and issuing by seed is deterministic and
+  // per-account — through the same real HTTP routes, on the Postgres store.
+  'method-progress-http-check.mjs',
+  'flagship-ap-working-http-check.mjs',
+  'practice-seed-reissue-check.mjs',
+  // The server chooses the seed and a prepared question is bound once by one
+  // account: the one-account claim and the sealed copy must hold on Postgres.
+  'practice-server-question-check.mjs',
+  'practice-repeat-credit-check.mjs',
+  // The marker runs off the request thread under a hard deadline, and a
+  // submission is read → marked → committed with the state re-read under the
+  // account's lock. The re-check and the exactly-once guarantees under
+  // concurrency must hold on SERIALIZABLE Postgres as the pri_server role too.
+  'marker-isolation-check.mjs',
   'account-lifecycle-contract-check.mjs',
   'account-lifecycle-journey-check.mjs',
   'account-deletion-reauth-check.mjs',
@@ -54,7 +74,14 @@ export const ENGINE_SUITES = [
   'storekit-entitlement-state-machine-check.mjs',
   'tutor-help-check.mjs',
   'tutor-device-journey-check.mjs',
+  // The tutor grounded in the server's own escrowed question: the escrow read
+  // must be account-scoped under Row-Level Security as pri_server too.
+  'tutor-issued-grounding-check.mjs',
   'failure-drills-check.mjs',
+  // One paid read per unchanged picture: the ceiling reservation under
+  // concurrency (SERIALIZABLE retries), the refund, and the receipt minted from
+  // a reused transcript all have to hold on the Postgres store too.
+  'recognition-dedupe-check.mjs',
   'security-acceptance-check.mjs',
   'abuse-limits-check.mjs',
   // Staff second factor, identity sign-in age declaration, and the hardening

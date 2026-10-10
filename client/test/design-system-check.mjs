@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -93,6 +93,32 @@ check("every motion-system animation stops under reduced motion", animated.lengt
 const frames = [...motion.matchAll(/@keyframes [\w-]+ \{([^\n]*)\}/g)].map(m => m[1]);
 check("motion keyframes animate transform and opacity only", frames.length > 0 && frames.every(k => !/\b(width|height|top|left|margin|padding)\s*:/.test(k)));
 check('reduced motion is globally respected', /prefers-reduced-motion:\s*reduce[\s\S]*animation-duration:\s*0\.001ms\s*!important/s.test(theme));
+// Reduced motion must not START transitions. `transition-property` is `all`
+// by default, so a duration above zero forced on `*` turns every style change
+// on every element into a transition. On Chromium 9x–10x a background-colour
+// one runs on the compositor, and in an Android WebView (101, animations off)
+// that stalled the frame pipeline: the first pen stroke hung the page.
+const blocksOf = (css, at) => [...css.matchAll(at)].map(m => {
+  const open = css.indexOf('{', m.index);
+  let depth = 0, end = open;
+  for (; end < css.length; end++) { if (css[end] === '{') depth++; else if (css[end] === '}' && --depth === 0) break; }
+  return css.slice(open + 1, end);
+});
+const everyStylesheet = readdirSync(new URL('../src/', import.meta.url), { recursive: true })
+  .filter(name => String(name).endsWith('.css'))
+  .map(name => ({ name: String(name), css: readFileSync(new URL(`../src/${name}`, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '') }));
+const forcedOnEverything = everyStylesheet.flatMap(({ name, css }) => blocksOf(css, /@media[^{]*prefers-reduced-motion:\s*reduce[^{]*\{/g)
+  .flatMap(block => [...block.matchAll(/([^{}]+)\{([^{}]*)\}/g)])
+  .filter(rule => rule[1].split(',').some(sel => /^\*(::?[\w-]+)?$/.test(sel.trim())))
+  .map(rule => ({ name, declared: Object.fromEntries(rule[2].split(';').map(d => d.split(':').map(x => x.trim())).filter(d => d.length === 2)) })));
+const zeroTime = value => /^0(s|ms)?\s*!important$/.test(value || '');
+const startsTransitions = forcedOnEverything.filter(({ declared }) =>
+  ('transition-duration' in declared && !zeroTime(declared['transition-duration']))
+  || ('transition' in declared && !/^none\b/.test(declared.transition)));
+check('reduced motion forces no transition duration on every element (it would make every style change a transition)',
+  forcedOnEverything.length > 0 && startsTransitions.length === 0, startsTransitions.map(r => `${r.name}: ${r.declared['transition-duration'] || r.declared.transition}`).join(', '));
+check('reduced motion switches transitions off globally: zero duration and zero delay',
+  forcedOnEverything.some(({ name, declared }) => name === 'theme.css' && zeroTime(declared['transition-duration']) && zeroTime(declared['transition-delay'])));
 check('tablet has a persistent touch navigation contract',
   /pointer:\s*coarse[\s\S]*min-width:\s*761px[\s\S]*max-width:\s*1180px[\s\S]*\.sidebar\s*\{\s*width:\s*178px/s.test(theme));
 check('tablet touch controls reach at least 44px',

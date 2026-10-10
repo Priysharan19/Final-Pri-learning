@@ -27,28 +27,49 @@
 import { add, atomicBatch, byIndex, get, put } from '../local/idb.js';
 import { dayKey, timezoneOf } from '../lib/locale.js';
 import { START_RATING, gradeFor, scheduleReview, updateRating, xpFor } from '../engine/adaptive.js';
+import { indiaNameOf } from '../engine/indiaProduct.js';
 
 // backend.js's RECENT_WINDOW: the rolling right/wrong window a rating row keeps.
 const RECENT_WINDOW = 8;
 const ID = /^[A-Za-z0-9._:-]{1,160}$/;
 const LEARNING_MODES = new Set(['practice', 'review', 'task']);
 const GAME_MODES = new Set(['rush', 'match']);
-const PRACTICE_KINDS = new Set(['practice-progress', 'practice-attempt']);
+// Only a canonical server-created event may alter mastery, reviews, XP or
+// resolved attempt history. Old client-supplied practice-progress and
+// practice-attempt remain visible as archived sync data but are not marks.
+const PRACTICE_KINDS = new Set(['graded-attempt']);
 
-export const RESTORABLE_EVENT_KINDS = Object.freeze(['practice-progress', 'practice-attempt', 'exam-attempt', 'rush-history', 'match-history']);
+// An examination paper's result. Only the server writes this kind (the sync
+// push route refuses it), so a row restored from one is the server's word.
+const EXAM_RESULT_KIND = 'exam-result';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export const RESTORABLE_EVENT_KINDS = Object.freeze(['graded-attempt', 'exam-attempt', EXAM_RESULT_KIND, 'rush-history', 'match-history']);
 
 function plain(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value) &&
     (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
 }
 
-const num = (value, fallback = 0) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
+// An event's payload is whatever its author sent. Nothing in it is coerced:
+// `Number({ valueOf: 1 })` and `String({ toString: 1 })` THROW, and one such
+// field used to stop the whole pull before the cursor moved, for every device
+// of the account. A number is a finite number (or a short numeric string); a
+// text is a string (or a finite number); anything else — an object, an array,
+// a boolean, NaN, Infinity — is simply absent.
+const numOf = value => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : NaN;
+  if (typeof value === 'string' && value.length <= 40 && value.trim() !== '') { const n = Number(value); return Number.isFinite(n) ? n : NaN; }
+  return NaN;
+};
+const text = value => (typeof value === 'string' ? value : typeof value === 'number' && Number.isFinite(value) ? String(value) : '');
+const num = (value, fallback = 0) => { const n = numOf(value); return Number.isFinite(n) ? n : fallback; };
 const clampInt = (value, lo, hi, fallback) => {
-  const n = Number(value);
+  const n = numOf(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.max(lo, Math.min(hi, Math.round(n)));
 };
-const safeId = value => (ID.test(String(value ?? '')) ? String(value) : null);
+const safeId = value => (ID.test(text(value)) ? text(value) : null);
 
 /** The local row key one cloud event owns. Stable, so a re-pull is a no-op. */
 export function restoredRowId(pid, eventId) {
@@ -63,15 +84,20 @@ export function restoredRowId(pid, eventId) {
  */
 export function isRestoredRow(pid, row) {
   if (typeof row?.remoteEventId === 'string') return true;
-  return String(row?.id ?? '').startsWith(`${pid}:remote:`);
+  return text(row?.id).startsWith(`${pid}:remote:`);
 }
+
+// A moment in time is a whole number of milliseconds inside this century.
+// Anything else (a fraction, 1e308, a year-287000 timestamp, an object) is no
+// clock at all, and the next source is used.
+const CLOCK_MIN = Date.UTC(2000, 0, 1);
+const CLOCK_MAX = Date.UTC(2100, 0, 1);
+const clockOf = value => { const n = Math.round(numOf(value)); return Number.isFinite(n) && n >= CLOCK_MIN && n <= CLOCK_MAX ? n : 0; };
 
 /** When the answer happened: the payload's own clock first, the event's second. */
 export function eventTime(event) {
-  const created = num(event?.payload?.createdAt, 0);
-  if (created > 0) return created;
-  const occurred = num(event?.occurredAt, 0);
-  return occurred > 0 ? occurred : 0;
+  const created = clockOf(event?.payload?.createdAt);
+  return created || clockOf(event?.occurredAt);
 }
 
 /**
@@ -89,37 +115,89 @@ export function effectiveHelp(payload) {
   return { hints, tutor, tries: supported && hints + tutor === 0 ? 1 : 0, help: hints + tutor };
 }
 
-function attemptRowFrom(pid, event, at) {
+/**
+ * The key an answer's evidence is filed under on this device.
+ *
+ * The server's event names the GENERATOR that authored the question. The
+ * device that sat it filed the evidence under the NCERT chapter the question
+ * was served for (resolve(): evidenceKeyOf), and every chapter surface — the
+ * progress table, /stats, the report, the review queue — reads that key. So an
+ * Indian profile's restored answer is filed under the chapter that draws on
+ * the generator, resolved the way a legacy generator-keyed row already is
+ * (indiaNameOf; the profile's class breaks a tie). Anything that names no
+ * Indian chapter keeps the id it came with.
+ */
+export function evidenceOwnerOf(profile, subtopic) {
+  const id = safeId(subtopic);
+  if (!id) return 'custom';
+  if ((profile?.course || 'nsw') !== 'in') return id;
+  return indiaNameOf(id, { grade: profile?.year ?? null })?.id || id;
+}
+
+function attemptRowFrom(pid, event, at, profile = null) {
   const p = event.payload;
   const { hints, tutor, tries, help } = effectiveHelp(p);
   return {
     id: restoredRowId(pid, event.id),
     pid,
     questionId: safeId(event.entityId) || restoredRowId(pid, event.id),
-    subtopic: safeId(p.subtopic) || 'custom',
+    subtopic: evidenceOwnerOf(profile, p.subtopic),
     generator: safeId(p.subtopic) || 'custom',
     difficulty: clampInt(p.difficulty, 1, 4, 2),
     ...(typeof p.contentId === 'string' && p.contentId ? {
-      contentId: String(p.contentId).slice(0, 200),
-      contentVersion: p.contentVersion == null ? null : String(p.contentVersion).slice(0, 40),
+      contentId: p.contentId.slice(0, 200),
+      contentVersion: text(p.contentVersion).slice(0, 40) || null,
       contentHash: typeof p.contentHash === 'string' ? p.contentHash.slice(0, 32) : null
     } : {}),
     correct: p.correct ? 1 : 0,
+    // A repeat stays a repeat on every device. The server flags an answer to
+    // content whose solution the account had already been shown; restored
+    // without the flag the row would read as learning evidence here (accuracy,
+    // chapter counts, the progress table) that the device which sat it never
+    // gave it.
+    ...(p.repeat === true ? { repeat: true } : {}),
+    // Only a real, server-grader-origin progress event reaches this path.
+    // Legacy events missing the two certified numeric fields remain valid
+    // historical attempts, but their marks are UNKNOWN, not inferred as
+    // zero/full from the boolean correct verdict.
+    ...(Number.isInteger(p.marksEarned) && Number.isInteger(p.marksPossible) &&
+      p.marksPossible >= 1 && p.marksPossible <= 4 &&
+      p.marksEarned >= 0 && p.marksEarned <= p.marksPossible &&
+      (p.correct !== true || p.marksEarned === p.marksPossible) &&
+      (p.correct !== false || p.marksEarned < p.marksPossible) &&
+      (p.revealed !== true || p.marksEarned === 0)
+      ? { marksEarned: p.marksEarned, marksPossible: p.marksPossible }
+      : {}),
     // The student's written answer never travels through the generic replica.
     answerGiven: '',
     ms: Math.max(0, num(p.ms, 0)),
     hintsUsed: hints,
-    mode: String(p.mode || 'practice').slice(0, 30),
+    mode: (text(p.mode) || 'practice').slice(0, 30),
     viaInk: !!p.viaInk,
     tutorLevel: tutor,
     support: help || tries ? 'supported' : 'independent',
     evidenceKey: null,
-    ratingBefore: Number.isFinite(Number(p.ratingBefore)) ? Number(p.ratingBefore) : null,
-    ratingAfter: Number.isFinite(Number(p.ratingAfter)) ? Number(p.ratingAfter) : null,
+    ratingBefore: Number.isFinite(numOf(p.ratingBefore)) ? numOf(p.ratingBefore) : null,
+    ratingAfter: Number.isFinite(numOf(p.ratingAfter)) ? numOf(p.ratingAfter) : null,
     createdAt: at,
     remoteEventId: event.id,
     remoteDeviceId: event.deviceId
   };
+}
+
+// The backup importer's row builders (backend.js IMPORT_ROWS) are the one
+// definition of what a Rush run, a Match run or an exam row may hold. They are
+// handed over by the local backend rather than imported: backend.js imports
+// this module, and a static import back would be a cycle. A pull that lands
+// before the backend has loaded loads it.
+let rowSanitisers = null;
+export function registerRestoreSanitisers(builders) {
+  rowSanitisers = builders && typeof builders === 'object' ? builders : null;
+}
+async function sanitisers() {
+  if (!rowSanitisers) await import('../local/backend.js');
+  if (!rowSanitisers) throw new Error('Restore row sanitisers are unavailable.');
+  return rowSanitisers;
 }
 
 async function alreadyRestored(store, id) {
@@ -137,7 +215,7 @@ async function applyPracticeEvent(pid, profile, event) {
   if (await alreadyRestored('attempts', id)) return 'duplicate';
   const p = event.payload;
   const at = eventTime(event) || Date.now();
-  const attempt = attemptRowFrom(pid, event, at);
+  const attempt = attemptRowFrom(pid, event, at, profile);
   const owner = attempt.subtopic;
   const correct = !!p.correct;
   const mode = attempt.mode;
@@ -146,9 +224,12 @@ async function applyPracticeEvent(pid, profile, event) {
   const isGame = GAME_MODES.has(mode);
 
   const ops = [{ type: 'add', store: 'attempts', value: attempt }];
-  let xp = isGame ? (correct ? 6 : 0) : xpFor(attempt.difficulty, correct, 0, effHints);
+  // A repeat of content the account had already been shown the solution of is
+  // history, not progress: the server flags it and it earns nothing here.
+  const isRepeat = p.repeat === true;
+  let xp = isRepeat ? 0 : isGame ? (correct ? 6 : 0) : xpFor(attempt.difficulty, correct, 0, effHints);
 
-  if (!isGame && owner !== 'custom') {
+  if (!isGame && !isRepeat && owner !== 'custom') {
     const st = (await get('ratings', `${pid}:${owner}`).catch(() => null))
       || { key: `${pid}:${owner}`, pid, subtopic: owner, rating: START_RATING, attempts: 0, correct: 0, last_at: null, dp: {}, traps: {}, recent: [] };
     const ratingNext = {
@@ -174,6 +255,17 @@ async function applyPracticeEvent(pid, profile, event) {
     }
   }
 
+  // As on the device that sat it: a repeat earns nothing, but a review that
+  // already exists has been sat and is rescheduled as a helped recall at best.
+  if (!isGame && isRepeat && owner !== 'custom' && LEARNING_MODES.has(mode)) {
+    const key = `${pid}:${owner}`;
+    const rev = await get('reviews', key).catch(() => null);
+    if (rev) {
+      const grade = gradeFor({ correct, hintsUsed: Math.max(1, help), tries, ms: attempt.ms, difficulty: attempt.difficulty });
+      ops.push({ type: 'put', store: 'reviews', value: { ...rev, key, pid, subtopic: owner, ...scheduleReview(rev, grade, at) } });
+    }
+  }
+
   const tz = timezoneOf(profile || 'nsw');
   const date = dayKey(at, tz);
   const activityKey = `${pid}:${date}`;
@@ -183,8 +275,11 @@ async function applyPracticeEvent(pid, profile, event) {
     type: 'put', store: 'activity',
     value: {
       ...activity, key: activityKey, pid, date,
+      // Exactly as resolve() counts it: a repeat is time the student spent, so
+      // it is a question of the day (and keeps a streak), and it is never one
+      // of the day's correct answers.
       questions: num(activity.questions, 0) + 1,
-      correct: num(activity.correct, 0) + (correct ? 1 : 0),
+      correct: num(activity.correct, 0) + (correct && !isRepeat ? 1 : 0),
       xp: num(activity.xp, 0) + xp,
       ms: num(activity.ms, 0) + attempt.ms
     }
@@ -206,20 +301,73 @@ async function applyExamEvent(pid, event) {
   // An exam another device started and never finished cannot be resumed here:
   // the paper itself does not travel. Finished results are history worth keeping.
   if (p.state !== 'finished') return 'unsupported';
+  // A paper the server marked is recorded by the server's own `exam-result`
+  // event. The sitting device's copy of the same paper says which server exam
+  // it was; restoring both would list the paper twice, and the device's copy
+  // carries a score no server vouched for on this path.
+  const serverResult = event.kind === EXAM_RESULT_KIND;
+  if (serverResult) {
+    if (event.deviceId !== 'server-grader' || p.serverMarked !== true || !UUID.test(text(p.examId)) ||
+        p.examId !== event.id || p.examId !== event.entityId) return 'unsupported';
+    // The device that sat the paper already holds it, with its questions.
+    const held = (await byIndex('exams', 'pid', pid).catch(() => [])).some(e => e?.server?.examId === p.examId);
+    if (held) return 'duplicate';
+  } else if (p.serverExamId) return 'unsupported';
   const id = restoredRowId(pid, event.id);
   if (await alreadyRestored('exams', id)) return 'duplicate';
   const at = eventTime(event) || Date.now();
+  // The server's own result is the server's word and is kept as it is. A
+  // device's `exam-attempt` is whatever that device published: every field is
+  // rebuilt by the backup importer's exam builder (title, year, score and
+  // total ranges, the India blueprint field by field) rather than copied. Such
+  // a row carries no `server`, so it is listed as a paper marked by an earlier
+  // version, never as certified, and it writes no attempt, rating, review,
+  // activity, XP or badge: it is history only.
+  let fields;
+  if (serverResult) {
+    fields = {
+      title: text(p.title).slice(0, 120),
+      year: Number.isFinite(numOf(p.year)) ? numOf(p.year) : null,
+      finishedAt: clockOf(p.finishedAt) || at,
+      score: p.score == null ? null : num(p.score, 0),
+      total: p.total == null ? null : num(p.total, 0),
+      indiaExam: plain(p.indiaExam) ? { ...p.indiaExam } : null
+    };
+  } else {
+    const safe = (await sanitisers()).exams({
+      id, title: p.title, year: p.year, createdAt: at, finishedAt: clockOf(p.finishedAt) || at,
+      score: p.score, total: p.total, indiaExam: plain(p.indiaExam) ? p.indiaExam : null
+    }, pid, { exam: () => id, question: () => null });
+    fields = {
+      title: safe.title,
+      year: Number.isFinite(numOf(p.year)) ? safe.year : null,
+      finishedAt: safe.finishedAt || at,
+      // A score above the paper's own total is not a result any paper can have.
+      score: safe.score != null && safe.total != null ? Math.min(safe.score, safe.total) : safe.score,
+      total: safe.total,
+      // Only the fields the event carried: the builder's defaults (a seed,
+      // say) are not facts about this paper.
+      indiaExam: safe.indiaExam && plain(p.indiaExam)
+        ? Object.fromEntries(Object.entries(safe.indiaExam).filter(([field]) => Object.prototype.hasOwnProperty.call(p.indiaExam, field)))
+        : null
+    };
+  }
   try {
     await add('exams', {
       id, pid,
-      title: String(p.title || '').slice(0, 120),
-      year: Number.isFinite(Number(p.year)) ? Number(p.year) : null,
+      title: fields.title,
+      year: fields.year,
       questionIds: [],
       createdAt: at,
-      finishedAt: num(p.finishedAt, 0) || at,
-      score: p.score == null ? null : num(p.score, 0),
-      total: p.total == null ? null : num(p.total, 0),
-      indiaExam: plain(p.indiaExam) ? { ...p.indiaExam } : null,
+      finishedAt: fields.finishedAt,
+      score: fields.score,
+      total: fields.total,
+      indiaExam: fields.indiaExam,
+      ...(numOf(p.durationMin) > 0 ? { durationMin: Math.min(600, Math.round(numOf(p.durationMin))) } : {}),
+      // The server's own result: this row names the server's exam, so its
+      // questions and marked detail can be read back from the account. Any
+      // other restored paper carries no `server` and is never shown as certified.
+      ...(serverResult ? { server: { examId: text(p.examId), questionIds: [], kind: typeof p.kind === 'string' ? p.kind.slice(0, 20) : null, remote: true } } : {}),
       remoteEventId: event.id,
       remoteDeviceId: event.deviceId
     });
@@ -233,9 +381,19 @@ async function applyExamEvent(pid, event) {
 async function applyRunEvent(pid, event, store, fields) {
   const id = restoredRowId(pid, event.id);
   if (await alreadyRestored(store, id)) return 'duplicate';
+  // A Rush or Match run is published by the device that played it, so another
+  // device of the same account can publish anything. The row is rebuilt by the
+  // backup importer's builder for that store — typed and range-clamped — and
+  // only the fields the event actually carried are kept.
+  const safe = (await sanitisers())[store]({ ...event.payload, createdAt: eventTime(event) || Date.now() }, pid);
   const row = { id, pid, remoteEventId: event.id, remoteDeviceId: event.deviceId };
-  for (const field of fields) if (event.payload[field] !== undefined) row[field] = event.payload[field];
-  row.createdAt = num(row.createdAt, 0) || eventTime(event) || Date.now();
+  for (const field of fields) {
+    const sent = event.payload[field];
+    // A label that did not arrive as text is dropped, not stringified.
+    if (sent === undefined || sent === null || (typeof safe[field] === 'string' && typeof sent !== 'string')) continue;
+    row[field] = safe[field];
+  }
+  row.createdAt = safe.createdAt;
   try {
     await add(store, row);
   } catch (error) {
@@ -269,23 +427,158 @@ async function creditXp(pid, xp) {
  * originate on this device. They are replayed in the order the answers
  * happened, so the engine sees the same sequence the student produced.
  */
+// How long a grade request may still be running before its server event is
+// taken as abandoned by this device.
+const GRADE_IN_FLIGHT_MS = 2 * 60 * 1000;
+const gradeInFlight = row => !row.answered && !!row.pendingGrade && row.pendingGrade.notSent !== true && Date.now() - num(row.pendingGrade.at, 0) < GRADE_IN_FLIGHT_MS;
+
+// A server-marked attempt on a question THIS device was issued is settled by
+// the device's own resolution routine, which the local backend registers here:
+// the attempt (under the same exactly-once claim a submit uses), the rating,
+// review and activity, the question row and any task progress are one write.
+// A partial copy written from here would leave the question open, so that a
+// replayed submit collides with the claim instead of returning the verdict.
+let recordIssuedAttempt = null;
+export function registerIssuedAttemptRecorder(fn) { recordIssuedAttempt = typeof fn === 'function' ? fn : null; }
+
+/**
+ * Settle an issued question from its server event. Returns the usual outcome,
+ * or 'deferred' when it must wait: the device's own submit is in flight, or
+ * the recorder is not loaded yet. A deferred event is kept on the row.
+ */
+async function settleIssued(pid, rowId, event) {
+  const row = await get('questions', rowId).catch(() => null);
+  if (!row || row.answered) return 'duplicate';
+  if (gradeInFlight(row) || !recordIssuedAttempt) {
+    if (!row.deferredGrade || row.deferredGrade.event?.id !== event.id) await put('questions', { ...row, deferredGrade: { event, at: Date.now() } });
+    return 'deferred';
+  }
+  return recordIssuedAttempt(pid, rowId, event);
+}
+
+/**
+ * Settle server-marked attempts that were held back while this device's own
+ * submit was in flight, once that submit is no longer running. Run on every
+ * sync pass, with or without new events.
+ */
+export async function reconcileDeferredGrades(pid) {
+  let applied = 0;
+  // XP from events restored by the fallback below; the device's own routine
+  // credits the profile itself and reports none.
+  let xp = 0;
+  for (const listed of await byIndex('questions', 'pid', pid)) {
+    if (!listed.deferredGrade) continue;
+    // Decide on the row as it is now, not as it was listed: a retry may have
+    // started, or the submit may have finished, since.
+    const row = await get('questions', listed.id).catch(() => null);
+    if (!row?.deferredGrade || gradeInFlight(row)) continue;
+    const event = row.deferredGrade.event;
+    if (!row.answered && plain(event) && event.kind === 'graded-attempt' && recordIssuedAttempt) {
+      const held = { ...event, payload: plain(event.payload) ? event.payload : {} };
+      let outcome = await recordIssuedAttempt(pid, row.id, held);
+      // A submit took the question's lock first and is now in flight: leave
+      // the deferred copy where it is for a later pass.
+      if (outcome === 'deferred') continue;
+      // An event the device's own routine cannot settle (one from before marks
+      // were carried) is restored the way the pull path restores it, never
+      // dropped: the sync cursor has already moved past it.
+      if (outcome === 'unsupported' && held.deviceId === 'server-grader') {
+        const profile = await get('profiles', pid).catch(() => null);
+        if (!profile) continue;
+        outcome = await applyPracticeEvent(pid, profile, held);
+      }
+      if (outcome && outcome.applied) { applied++; xp += num(outcome.xp, 0); }
+    } else if (!row.answered && !recordIssuedAttempt) continue;
+    // Whatever happened, the copy kept with the row is no longer needed. Strip
+    // it from the row as it stands after that write.
+    const after = await get('questions', row.id).catch(() => null);
+    if (after?.deferredGrade) { const { deferredGrade: _dropped, ...rest } = after; await put('questions', rest); }
+  }
+  if (xp > 0) await creditXp(pid, xp);
+  return applied;
+}
+
 export async function applyRemoteLearningEvents(pid, events) {
-  const summary = { applied: 0, duplicates: 0, unsupported: 0, byKind: {}, xp: 0 };
+  const summary = { applied: 0, duplicates: 0, unsupported: 0, rejected: 0, byKind: {}, xp: 0 };
   const list = (Array.isArray(events) ? events : []).filter(event => plain(event) && plain(event.payload || {}) && safeId(event.id));
   if (!list.length) return summary;
   const profile = await get('profiles', pid).catch(() => null);
   if (!profile) return summary;
+  // Server-owned events carry the reserved "server-grader" device identity,
+  // even when the student's OWN device received and committed the grade.
+  // Hence the normal sync deviceId filter cannot prevent double-awarding.
+  // Our durable attempt row links the original local resolution to the exact
+  // server attempt ID, without trusting a client-provided mark or event body.
+  const locallyCommitted = new Set();
+  // A question this device was issued is recorded by this device, in the same
+  // write as its resolution, and by nothing else. Matching only on the attempt
+  // id raced with a submit in flight: a pull landing between the server's
+  // commit and the local write imported the same attempt a second time. The
+  // question row carries the server question id before any grade is sent, so
+  // it is already here for every event the server can have for it.
+  const issuedHere = new Map();
+  if (list.some(event => event.kind === 'graded-attempt')) {
+    for (const attempt of await byIndex('attempts', 'pid', pid)) {
+      if (typeof attempt.serverAttemptId === 'string' && safeId(attempt.serverAttemptId)) {
+        locallyCommitted.add(attempt.serverAttemptId);
+      }
+    }
+    for (const question of await byIndex('questions', 'pid', pid)) {
+      if (typeof question.serverQuestionId === 'string' && question.serverQuestionId) issuedHere.set(question.serverQuestionId, question);
+    }
+  }
 
-  list.sort((a, b) => (eventTime(a) - eventTime(b)) || (num(a.serverCursor) - num(b.serverCursor)) || String(a.id).localeCompare(String(b.id)));
+  // A total order over anything: every key is a finite number or a string.
+  list.sort((a, b) => (eventTime(a) - eventTime(b)) || (num(a.serverCursor) - num(b.serverCursor)) || text(a.id).localeCompare(text(b.id)));
+  const applyOne = async event => {
+    let outcome;
+    if (PRACTICE_KINDS.has(event.kind)) {
+      const issuedRow = issuedHere.get(text(event.entityId)) || null;
+      // Already committed locally in the same atomic batch as the source
+      // question resolution. Cache/sync is still safe; progress is not.
+      if (locallyCommitted.has(event.id) || issuedRow?.answered) return 'duplicate';
+      // A client cannot publish graded-attempt through /sync/push: it is
+      // excluded from server APPEND_EVENT. The server alone writes it, using
+      // the reserved device identity in the same DB transaction as the grade.
+      outcome = event.deviceId === 'server-grader' &&
+          event.payload?.questionId === event.entityId &&
+          event.payload?.attemptId === event.id &&
+          (event.payload?.correct === true || event.payload?.correct === false) &&
+          // A server-committed Reveal is an incorrect, supported attempt too;
+          // local resolve() already records it, so restore must not omit it.
+          (event.payload?.revealed !== true || event.payload?.correct === false) &&
+          safeId(event.payload?.subtopic)
+        ? (issuedRow ? await settleIssued(pid, issuedRow.id, event) : await applyPracticeEvent(pid, profile, event)) : 'unsupported';
+      // An issued question whose event cannot be settled through the device's
+      // own routine (an event from before marks were carried) is restored as
+      // any other device's attempt would be.
+      if (issuedRow && outcome === 'unsupported' && event.deviceId === 'server-grader') outcome = await applyPracticeEvent(pid, profile, event);
+      return outcome === 'deferred' ? 'duplicate' : outcome;
+    }
+    if (event.kind === 'exam-attempt' || event.kind === EXAM_RESULT_KIND) return applyExamEvent(pid, event);
+    if (event.kind === 'rush-history') return applyRunEvent(pid, event, 'rushRuns', ['score', 'correct', 'total', 'bestCombo', 'createdAt']);
+    if (event.kind === 'match-history') return applyRunEvent(pid, event, 'matchRuns', ['won', 'playerScore', 'rivalScore', 'rival', 'ms', 'createdAt']);
+    return 'unsupported';
+  };
+
+  // One event never stops the others (review 5, R1). An event a DEVICE
+  // published that cannot be applied — whatever it holds — is counted as
+  // rejected and passed over for good: the pull goes on and the cursor moves
+  // past it, so no device of the account can wedge restore for the rest. An
+  // event the SERVER wrote is different: it is a real mark, and failing to
+  // record it is this device's fault, not the event's. Every other event is
+  // still applied, and then the failure is thrown, so the pull does not move
+  // its cursor past a mark it did not record and the next sync tries again
+  // (everything already applied is a duplicate by then).
+  const serverFailures = [];
   for (const raw of list) {
     const event = { ...raw, payload: plain(raw.payload) ? raw.payload : {} };
     let outcome;
-    if (PRACTICE_KINDS.has(event.kind)) outcome = await applyPracticeEvent(pid, profile, event);
-    else if (event.kind === 'exam-attempt') outcome = await applyExamEvent(pid, event);
-    else if (event.kind === 'rush-history') outcome = await applyRunEvent(pid, event, 'rushRuns', ['score', 'correct', 'total', 'bestCombo', 'createdAt']);
-    else if (event.kind === 'match-history') outcome = await applyRunEvent(pid, event, 'matchRuns', ['won', 'playerScore', 'rivalScore', 'rival', 'ms', 'createdAt']);
-    else outcome = 'unsupported';
-
+    try { outcome = await applyOne(event); } catch (error) {
+      if (event.deviceId === 'server-grader') { serverFailures.push({ id: event.id, kind: text(event.kind), error }); continue; }
+      summary.rejected++;
+      outcome = 'unsupported';
+    }
     if (outcome === 'duplicate') summary.duplicates++;
     else if (outcome === 'unsupported') summary.unsupported++;
     else {
@@ -295,6 +588,11 @@ export async function applyRemoteLearningEvents(pid, events) {
     }
   }
   if (summary.xp) await creditXp(pid, summary.xp);
+  if (serverFailures.length) {
+    throw Object.assign(new Error(`${serverFailures.length} server-marked event(s) could not be recorded on this device.`), {
+      code: 'RESTORE_SERVER_EVENT_FAILED', eventIds: serverFailures.map(f => f.id), cause: serverFailures[0].error, summary
+    });
+  }
   return summary;
 }
 

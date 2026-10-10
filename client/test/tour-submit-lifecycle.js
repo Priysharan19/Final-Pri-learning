@@ -19,7 +19,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
 import { TEMPLATES } from '../src/ink/templates.js';
-import { turnOnServerReading, useFakeServerReader } from './fakeServerReader.js';
+import { turnOnServerReading } from './fakeServerReader.js';
+import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
 const TOPIC = 'y7-equations';
 const WRONG_1 = '-987654';
@@ -51,11 +52,25 @@ const draftIds = (page) => page.evaluate(() => {
   return null;
 });
 
-/** Leave storage exactly as a kill between "sent" and "answered" leaves it. */
+/**
+ * Leave storage exactly as a kill between "sent" and "answered" leaves it.
+ * The card records which input the answer came through (`sourceMode`): a
+ * record without it is a pre-provenance one, which is deliberately restored
+ * for the student to resubmit instead of being replayed as a typed answer.
+ * This flow is about a typed submission the current build wrote.
+ */
 const plantPending = (page, pid, qid, submissionId, answer) => page.evaluate(({ pid, qid, submissionId, answer }) => {
+  // The card writes the typed draft to disk when Submit is pressed, before the
+  // pending record: after a kill the two agree. (A draft that differs means
+  // the student edited after pressing, and such a submission is never
+  // replayed on its own.)
+  const draftKey = `pri.draft.${pid}.question.${qid}`;
+  let draft = null;
+  try { draft = JSON.parse(localStorage.getItem(draftKey)); } catch { draft = null; }
+  if (draft?.data) localStorage.setItem(draftKey, JSON.stringify({ ...draft, savedAt: Date.now(), data: { ...draft.data, typed: answer } }));
   localStorage.setItem(`pri.draft.${pid}.submit.${qid}`, JSON.stringify({
     v: 1, scope: 'submit', id: qid, label: '', note: 'Answer being marked', path: '/practice', savedAt: Date.now(),
-    data: { submissionId, answer, viaInk: false, ms: 1500, lines: null }
+    data: { submissionId, answer, viaInk: false, sourceMode: 'typed', ms: 1500, lines: null }
   }));
 }, { pid, qid, submissionId, answer });
 
@@ -91,14 +106,19 @@ const pendingLeft = (page) => page.evaluate(() => {
 export const flow = {
   id: 'submit-lifecycle',
   name: 'Submission · interruption recovery and one attempt',
+  online: true,
 
-  async run({ page, base, check, goto, createProfile, mathText, settle }) {
-    // Handwriting is read only by the server reader (owner decision): a
-    // stand-in reader reads back what this flow writes.
-    const reader = await useFakeServerReader(page, base);
-    reader.text = '1';
+  async run({ page, base, check, goto, createProfile, mathText, settle, online, note }) {
+    // Signed in to the real server: every recovered submission below is marked
+    // there, under the key the card planted. Handwriting is read only by the
+    // server reader (owner decision); its provider hop is the scripted
+    // stand-in, which reads back what this flow writes.
+    const reader = online.reader;
+    Object.assign(reader, { text: '1', confidence: 0.97, down: false });
+    note(`${SYNTHETIC_EVIDENCE}: the handwriting reader in "Submission · interruption recovery…" is a scripted stand-in; the server, its database and every mark are real.`);
     await goto('/');
     await createProfile({ name: 'Rosalind Franklin', year: 7 });
+    await online.signIn({ name: 'Rosalind Franklin' });
     await turnOnServerReading(page, base);
     const practice = `${base}/practice?subtopic=${TOPIC}`;
     const reopen = async () => {
@@ -172,6 +192,21 @@ export const flow = {
     await check('with nothing pending, the answered question is not served again',
       await shownId(page) !== ids.qid,
       `question ${await shownId(page)} is the resolved ${ids.qid}`);
+
+    // One tap, one attempt — on the server too. Four relaunches replayed two
+    // submissions; the server graded each key once and completed the question once.
+    const graded = await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/);
+    const keys = new Set(graded.map(c => c.body?.submissionId));
+    await check('every recovered submission was marked by the server, under the two keys the card planted',
+      graded.length >= 2 && graded.every(c => c.status === 200 && c.json?.authoritative === true && c.json.correct === false) &&
+        keys.size === 2 && keys.has('sub_e2e_first_try_0001') && keys.has('sub_e2e_second_try_002'),
+      JSON.stringify(graded.map(c => ({ status: c.status, key: c.body?.submissionId, resolved: c.json?.resolved }))));
+    await check('a replayed key gets the same server verdict back: the first try never resolves, the second always does',
+      graded.filter(c => c.body?.submissionId === 'sub_e2e_first_try_0001').every(c => c.json?.resolved === false) &&
+        graded.filter(c => c.body?.submissionId === 'sub_e2e_second_try_002').every(c => c.json?.resolved === true),
+      JSON.stringify(graded.map(c => `${c.body?.submissionId}:${c.json?.resolved}`)));
+    const ledger = online.ledger();
+    await check('and the server completed that question exactly once', ledger.completions === 1, JSON.stringify(ledger));
 
     // ── 4 · handwriting survives a reload ────────────────────────────────────
     await page.getByRole('button', { name: 'Answer by handwriting' }).click();

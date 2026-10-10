@@ -34,7 +34,7 @@ let package = Package(
                 .portraitUpsideDown(.when(deviceFamilies: [.pad]))
             ],
             capabilities: [
-                .camera(purposeString: "Photograph handwritten maths so Pri can read it on-device and attach it to your attempt.")
+                .camera(purposeString: "Photograph handwritten maths so Pri can read it and attach it to your attempt. The photo is sent to the Pri server to be read.")
             ],
             appCategory: .education,
             // Xcode/App Store builds supply PRI_CLOUD_ORIGIN as a user-defined

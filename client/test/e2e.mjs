@@ -37,6 +37,8 @@ import { join, normalize, extname, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { chromium, webkit } from '@playwright/test';
+import { onlinePlatform, closeOnlinePlatform } from './support/online-session.mjs';
+import { watchBoot, bootFailure, bootRecovery } from './support/boot-diagnostics.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DIST = join(ROOT, 'client', 'dist');
@@ -226,8 +228,21 @@ function helpers(page, base, flowId) {
 
   /** Load a route and wait for the app to have decided who is signed in. */
   const goto = async (path = '/') => {
-    await page.goto(base + path, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.auth-wrap .hero-title, .auth-card, .shell', { timeout: 30000 });
+    // A load that never shows the app must say why (support/boot-diagnostics):
+    // whether the bundle ran, which files failed or came back as the wrong
+    // kind, what the service worker was doing, what the console said. It is
+    // reported in the failure and never retried — a second load would hide it.
+    const watch = watchBoot(page);
+    try {
+      await page.goto(base + path, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.auth-wrap .hero-title, .auth-card, .signup-flow, .shell', { timeout: 30000 });
+    } catch (err) {
+      throw await bootFailure(err, watch, `${path} never showed the app`);
+    }
+    // A load that needed the page's one automatic reload passed, and says so.
+    const recovered = await bootRecovery(watch, page, `${flowId} ${path}`);
+    if (recovered) note(recovered);
+    watch.stop();
     // Routes are lazily loaded now, so the shell paints before the page inside
     // it does and Suspense shows "Loading…" in between. Without this wait the
     // next assertion races the chunk over the network and fails on a slow CI
@@ -249,7 +264,7 @@ function helpers(page, base, flowId) {
     course = 'nsw', track = null, role = 'student', language = 'en',
     avatar = null, cloud = false, fromPicker = false
   } = {}) => {
-    await page.getByRole('button', { name: fromPicker ? 'Add another profile' : 'Get Started' }).click();
+    await page.getByRole('button', { name: fromPicker ? 'Add another profile' : 'Use without an account' }).click();
     await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
     await page.getByRole('button', { name: role === 'teacher' ? 'Teacher' : 'Student', exact: true }).click();
     await page.locator('.auth-card .btn-primary').click();
@@ -330,9 +345,20 @@ async function runFlow(flow, { browser, base, opts }) {
   const crashes = [];
   page.on('pageerror', e => crashes.push(String(e?.message || e).slice(0, 200)));
 
+  // A flow that marks anything declares `online: true` and runs against the
+  // real platform server, which serves this same build from its own origin
+  // (support/online-session.mjs). Its `online` session signs the profile in
+  // through the app. Every other flow keeps the plain file server: a device
+  // with no Pri server behind it, which is what "signed out" means here.
+  let online = null;
+  if (flow.online) {
+    const platform = await onlinePlatform();
+    base = platform.origin;
+    online = platform.session(ctx, page);
+  }
   const api = helpers(page, base, flow.id);
   try {
-    await flow.run({ page, ctx, base, note, browserName: opts.browser, ...api });
+    await flow.run({ page, ctx, base, note, online, browserName: opts.browser, ...api });
   } catch (err) {
     const path = await api.shot('FAIL-crash');
     ok('the flow ran to the end', false,
@@ -382,6 +408,7 @@ async function run(flows, opts) {
   } finally {
     await browser.close();
     await server.close();
+    await closeOnlinePlatform();
   }
   return report();
 }

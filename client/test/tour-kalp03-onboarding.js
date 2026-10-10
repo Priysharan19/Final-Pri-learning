@@ -1,7 +1,15 @@
 // KALP-03 · real-browser onboarding and profile creation acceptance.
+//
+// Only Pri's server marks (owner decision 2026-10-10), so the "first learning
+// action" runs against the real in-process platform server
+// (support/online-session.mjs). The device-only student is first shown,
+// honestly, that checking needs a Pri account and nothing is marked; then the
+// profile is signed in through the app and the feedback on the card must be
+// the server's own authoritative receipt.
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { join } from 'node:path';
+import { serverMarking, nothingMarkedOnCard } from './support/server-marked.mjs';
 
 const ARTIFACTS = fileURLToPath(new URL('../../artifacts/kalp-03/', import.meta.url));
 const PHONE = { width: 390, height: 844 };
@@ -49,7 +57,7 @@ async function personalise(page, name, { language = 'en', avatarIndex = 0 } = {}
   await next(page);
 }
 
-async function finishLocal(page, { email = '', protect = false, password = '', cloud = false } = {}) {
+async function finishLocal(page, { email = '', protect = false, password = '' } = {}) {
   await page.waitForSelector('[data-onboarding-step="4"]');
   if (email) await page.locator('#signup-email').fill(email);
   if (protect) {
@@ -57,20 +65,46 @@ async function finishLocal(page, { email = '', protect = false, password = '', c
     await page.getByLabel('Password', { exact: true }).fill(password);
     await page.getByLabel('Repeat password').fill(password);
   }
-  if (cloud) await page.locator('[aria-labelledby="signup-cloud-choice"] .pathway-pick').nth(1).click();
   await next(page);
   await page.waitForSelector('[data-onboarding-step="5"]');
 }
 
-async function reachRealFeedback(page, check) {
+/** POSTs that ask the server to issue, mark or reveal — not `prepare`. */
+const MARKING = /^\/v1\/practice\/(?:issue|[^/]+\/(?:submit|reveal|recognize|repeat|recognition\/.+))$/;
+
+async function openPractice(page) {
   await page.goto(new URL('/practice', page.url()).href, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.q-prompt', { timeout: 30000 });
-  const before = (await page.locator('.q-prompt').innerText()).trim();
-  await check('new student reaches a real Practice question', before.length > 5);
-
   const type = page.getByRole('button', { name: /Answer by typing/i }).first();
   if (await type.count()) await type.click();
   await page.waitForTimeout(150);
+  return (await page.locator('.q-prompt').innerText()).trim();
+}
+
+/**
+ * The profile onboarding just made is device-only. Practice opens for it, and
+ * says before anything is submitted that checking needs a Pri account. Submit
+ * is not pressed here: the refusal after a press is tour-online-check's
+ * subject, and this flow goes on to have this same profile marked.
+ */
+async function deviceOnlyProfileIsNotMarked(page, check, online) {
+  const before = await openPractice(page);
+  await check('new student reaches a real Practice question', before.length > 5);
+  const notice = page.locator('[data-check-needs-account]');
+  await notice.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+  const row = await online.shownRow();
+  const shown = await nothingMarkedOnCard(page);
+  const sent = (await online.practiceCalls(MARKING)).map(c => c.path);
+  const words = await notice.innerText().catch(() => '');
+  await check('a device-only profile is told checking needs a Pri account: sign-in in the card, no verdict, nothing issued or sent to be marked',
+    /needs a Pri account/i.test(words) && await notice.locator('[data-check-sign-in]').isEnabled().catch(() => false)
+      && row?.checkState === 'prepared' && !row.serverQuestionId && shown.none && sent.length === 0
+      && !/marked on this device|checked on this device/i.test(await page.locator('.qpage').innerText()),
+    JSON.stringify({ words: words.slice(0, 160), row: row && { checkState: row.checkState, issued: !!row.serverQuestionId }, card: shown.card, sent }));
+}
+
+async function reachRealFeedback(page, check, online) {
+  await openPractice(page);
   const mcq = page.locator('.mcq button:visible').first();
   if (await mcq.count()) {
     await mcq.click();
@@ -83,30 +117,49 @@ async function reachRealFeedback(page, check) {
   }
   const submit = page.locator('.editor-foot .btn-primary:visible, .row.no-print .btn-primary:visible').first();
   await submit.click();
-  const feedback = await page.waitForSelector('.verdict, .eval-card', { timeout: 30000 }).catch(() => null);
-  await check('a real answer reaches real marking feedback', !!feedback);
+  const feedback = await page.waitForSelector('.verdict-bad, .eval-card', { timeout: 30000 }).catch(() => null);
+  // "Real marking" is the server's: an authoritative receipt for the question
+  // it issued to this account, and the verdict on the card is that receipt's.
+  const marking = await serverMarking(online, page);
+  await check('a real answer reaches real marking feedback', !!feedback && marking.ok, JSON.stringify(marking));
+  const ledger = online.ledger(marking.serverQuestionId);
+  await check('the feedback is the server\'s authoritative receipt for a question it issued to this account',
+    marking.owned && marking.authoritative && marking.agrees && marking.submits === 1 && ledger.issued >= 1
+      && ledger.thisDone === (marking.receipt?.resolved ? 1 : 0),
+    JSON.stringify({ marking, ledger }));
 
+  // Another question is another question id. Its wording may match the last
+  // one word for word when the numbers are read from the figure, so the text
+  // is not what tells them apart, and a fixed pause is not what waits for it.
+  const idOf = () => page.locator('.qpage[data-question-id]').first().getAttribute('data-question-id').catch(() => null);
+  const markedId = await idOf();
   const nextButton = page.locator('.ctx-next:visible').first();
   if (await nextButton.count()) {
     await nextButton.click();
-    await page.waitForTimeout(200);
+    await page.waitForFunction(id => {
+      const el = document.querySelector('.qpage[data-question-id]');
+      return el && el.getAttribute('data-question-id') !== id && el.querySelector('.q-prompt');
+    }, markedId, { timeout: 30000 }).catch(() => {});
+    const afterId = await idOf();
     const after = (await page.locator('.q-prompt').innerText()).trim();
-    await check('the learning journey can continue to another question', after.length > 5);
+    await check('the learning journey can continue to another question', !!markedId && !!afterId && afterId !== markedId && after.length > 5,
+      `before ${markedId}; after ${afterId}; prompt ${JSON.stringify(after.slice(0, 60))}`);
   } else {
-    await check('the learning journey can continue to another question', true);
+    await check('the learning journey can continue to another question', false, 'no Next control on the marked question');
   }
 }
 
 export const flow = {
   id: 'kalp03-onboarding',
   name: 'KALP-03 · onboarding, real profiles and first learning action',
+  online: true,
 
-  async run({ page, check, goto, settle }) {
+  async run({ page, check, goto, settle, online }) {
     await page.setViewportSize(IPAD_PORTRAIT);
     await goto('/');
 
     await check('cold launch shows the first-run hero', await page.locator('.hero-title').isVisible());
-    await page.getByRole('button', { name: 'Get Started' }).click();
+    await page.getByRole('button', { name: 'Use without an account' }).click();
     await page.waitForSelector('[data-onboarding-step="1"]');
     await check('onboarding begins at role', await page.locator('[data-onboarding-step="1"]').count() === 1);
     await check('role buttons expose semantic selected state',
@@ -160,10 +213,13 @@ export const flow = {
       await page.locator('#signup-email').getAttribute('aria-invalid') === 'true');
     await page.locator('#signup-email').fill('');
     const identityCopy = await page.locator('.auth-card').innerText();
-    await check('local email and cloud identity are explained separately',
-      /not verified/i.test(identityCopy) && /cloud/i.test(identityCopy) && /separate/i.test(identityCopy));
-    await check('local-only is selected by default',
-      await page.locator('[aria-labelledby="signup-cloud-choice"] .pathway-pick').first().getAttribute('aria-pressed') === 'true');
+    await check('device-only identity is unmistakably not a cloud sign-in',
+      /(?:not|never) verified/i.test(identityCopy) && /not a sign-in/i.test(identityCopy)
+      && /handwriting\/photo reading/i.test(identityCopy));
+    const identityPath = await page.getByTestId('onboarding-identity-path').innerText();
+    await check('explicit offline onboarding stays device-only through the wizard',
+      /Use this device profile only/i.test(identityPath)
+      && await page.getByTestId('onboarding-identity-path').getByRole('button').count() === 0);
 
     await page.setViewportSize(DESKTOP);
     await snap(page, '04-desktop-protect');
@@ -193,7 +249,10 @@ export const flow = {
     await check('student receives KALP-02 student navigation',
       ['Home', 'Practice', 'Tasks', 'Exams', 'Progress', 'Review'].every(x => studentLabels.includes(x)));
     await check('student navigation does not expose Teacher workspace', !studentLabels.includes('Teacher workspace'));
-    await reachRealFeedback(page, check);
+    await deviceOnlyProfileIsNotMarked(page, check, online);
+    // Sign this profile in through the app (Settings → Pri account).
+    await online.signIn({ name: 'KALP03 Class 10 Student' });
+    await reachRealFeedback(page, check, online);
 
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.shell');
@@ -285,13 +344,15 @@ export const flow = {
       await page.locator('#teacher-classes').count() === 1 && await page.locator('#teacher-assignments').count() === 1);
 
     await switchProfile(page);
+    await page.getByRole('button', { name: 'Sign in to your Pri cloud account' }).click();
     await beginAdditional(page, 'student');
     await chooseIndia(page, '9');
     await personalise(page, 'KALP03 Cloud Handoff');
     await page.waitForSelector('[data-onboarding-step="4"]');
-    await page.locator('[aria-labelledby="signup-cloud-choice"] .pathway-pick').nth(1).click();
-    await check('cloud intent is explicit before local profile creation',
-      await page.locator('[aria-labelledby="signup-cloud-choice"] .pathway-pick').nth(1).getAttribute('aria-pressed') === 'true');
+    const cloudIdentityPath = await page.getByTestId('onboarding-identity-path').innerText();
+    await check('cloud handoff intent is fixed before local profile creation',
+      /Connect a Pri cloud account next/i.test(cloudIdentityPath)
+      && await page.getByTestId('onboarding-identity-path').getByRole('button').count() === 0);
     await check('cloud path still says local profile comes first',
       /Create this real local profile first/i.test(await page.locator('.auth-card').innerText()));
     await next(page);

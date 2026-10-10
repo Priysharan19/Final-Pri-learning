@@ -14,6 +14,9 @@ export const ENTITLEMENTS = Object.freeze({
   EXTRA_AI: 'additional-ai-usage'
 });
 
+// Defined in the engine folder so the server's image can import it too.
+export { FREE_EXAM_ALLOWANCE } from '../engine/examAllowance.js';
+
 export const PLAN_CAPABILITIES = Object.freeze({
   free: Object.freeze([]),
   premium: Object.freeze(Object.values(ENTITLEMENTS))

@@ -38,7 +38,7 @@ export const flow = {
   async run({ page, check, goto, settle }) {
     await page.setViewportSize(IPAD_PORTRAIT);
     await goto('/');
-    await page.getByRole('button', { name: 'Get Started' }).click();
+    await page.getByRole('button', { name: 'Use without an account' }).click();
     await page.waitForSelector('[data-onboarding-step="1"]');
     await page.getByRole('button', { name: 'Student', exact: true }).click();
     await next(page);

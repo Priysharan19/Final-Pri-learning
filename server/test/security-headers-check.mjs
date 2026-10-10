@@ -213,7 +213,7 @@ if (browserRequested) {
     await goto('/');
     // Make a profile the way a student does — through the real hero and
     // create form — so the app's own storage, worker and style paths run.
-    await page.getByRole('button', { name: 'Get Started' }).click();
+    await page.getByRole('button', { name: 'Use without an account' }).click();
     await page.waitForSelector('.sso-btn', { timeout: 15000 });
     await page.getByRole('button', { name: /Continue without an email/ }).click();
     await page.waitForSelector('.auth-card input.input', { timeout: 15000 });
