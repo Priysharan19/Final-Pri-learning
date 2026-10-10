@@ -2343,6 +2343,23 @@ async function run() {
     eq('the ink archive keeps the strokes that were drawn', archived.strokes.length, 1);
     eq('and the reading taken off them', archived.recognized, inkQ.right);
     eq('an unknown ink id comes back empty rather than throwing', (await GET('/ink/not-a-real-id')).ink, null);
+    // Review 18, N10: the harness plays the student's Read before a handwritten
+    // Submit. A device that submits ink which was NEVER read must not get it
+    // marked: no provider call is made for it and nothing is graded.
+    {
+      const unread = await answerableQuestion({});
+      const before = { ...online.traffic };
+      online.traffic.studentHasRead = false;
+      // (Every picture in this harness is the same stand-in image, so the read
+      // an earlier question paid for is forgotten first: this page was never read.)
+      await online.db.run("DELETE FROM idempotency_keys WHERE scope='recognition-read'");
+      try {
+        await rejects('ink submitted without ever being read is not marked: the server answers "read again", never a silent read',
+          POST(`/practice/${unread.question.id}/submit`, { answer: unread.right, ms: 4000, viaInk: true, ink: { strokes: [{ points: [{ x: 5, y: 5 }, { x: 40, y: 60 }, { x: 80, y: 20 }] }], recognized: unread.right } }),
+          { status: 409, code: 'RECOGNITION_READ_EXPIRED' });
+      } finally { online.traffic.studentHasRead = true; }
+      eq('and for that submission the device asked for no read and the server graded nothing', [(online.traffic.read || 0) - (before.read || 0), online.traffic.grade - before.grade], [0, 0]);
+    }
     const inkDetail = await GET(`/history/${inkQ.question.id}/detail`).then(value => ({ value }), error => ({ error }));
     eq('the same ink reaches history', inkDetail.value?.ink?.recognized ?? `threw ${inkDetail.error?.name}: ${inkDetail.error?.message}`, inkQ.right);
 
