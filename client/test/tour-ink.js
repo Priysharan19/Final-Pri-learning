@@ -436,6 +436,20 @@ export const flow = {
       await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('.q-prompt', { timeout: 30000 });
       await settle();
+      // A question that already had a try (section 7 leaves one open after a
+      // wrong first answer) is not a fresh one: move on to the next.
+      for (let moved = 0; moved < 4; moved++) {
+        const row = await online.shownRow();
+        const tried = row?.serverQuestionId ? await online.practiceCalls(new RegExp(`^/v1/practice/${row.serverQuestionId}/submit$`)) : [];
+        if (!tried.length) break;
+        const leaving = await page.locator('.qpage').first().getAttribute('data-question-id');
+        await page.locator('.ctx-next').click();
+        await page.waitForFunction(id => {
+          const el = document.querySelector('.qpage[data-question-id]');
+          return el && el.getAttribute('data-question-id') !== id && el.querySelector('.q-prompt');
+        }, leaving, { timeout: 30000 });
+        await settle();
+      }
       const tab = page.getByRole('button', { name: 'Answer by handwriting' });
       if (await tab.count()) await tab.click();
       await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
