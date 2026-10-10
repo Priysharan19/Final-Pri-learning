@@ -113,7 +113,11 @@ try {
   const series = snap.latency['provider_latency_ms{provider=handwriting}'];
   ok(series && series.count === 3, `three reads, three latency samples (${series?.count})`);
   ok(series && series.last5m.count === 3 && Number.isFinite(series.last5m.p95Ms), 'the series reports a 5-minute window with its own p95');
-  ok(series && series.p95Ms >= 2000, `the timed-out read's full wait is in the series (p95 ${series?.p95Ms} ms)`);
+  // The read is abandoned by a 2000 ms timer and its wait is measured with the
+  // clock; a timer may fire a millisecond before the clock has moved 2000 (a
+  // CI run recorded 1999). What is asserted is that the whole wait is in the
+  // series — not a fraction of it, and not zero — so the bound allows for that.
+  ok(series && series.p95Ms >= 1990, `the timed-out read's full wait is in the series (p95 ${series?.p95Ms} ms)`);
   eq(snap.counters['provider_calls_total{outcome=failed,provider=handwriting}']?.total, 1, 'the timeout is one failed provider call');
   eq(snap.counters['provider_failures_total{code=HANDWRITING_TIMEOUT,provider=handwriting}']?.total, 1, 'with HANDWRITING_TIMEOUT as its code');
   eq(snap.counters['provider_calls_total{outcome=ok,provider=handwriting}']?.total, 2, 'and the two reads that answered are ok calls');
