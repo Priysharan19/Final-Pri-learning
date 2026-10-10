@@ -20,10 +20,10 @@
 // failure shows up in a response, which is the same argument the proxy-hops
 // setting makes, so the server refuses to start rather than guess.
 //
-// When the ceiling is reached the route refuses. That is safe by construction:
-// the client publishes its on-device reading first and always, and treats a
-// refusal as "carry on with the local reading" — so a student meets a slightly
-// worse reader, not a broken app.
+// When the ceiling is reached the route refuses, before anything is sent to
+// the provider and before anything is marked. Reading is online-only, so the
+// student's page is then NOT read: the client says so, names when the limit
+// lifts, stops re-sending until then, and leaves typing the answer open.
 // ─────────────────────────────────────────────────────────────────────────────
 import { consumeRateLimit } from './security.js';
 import { asStore } from './store.js';
@@ -98,7 +98,10 @@ function spent(resetAt) {
     // them to slow down would be a lie. The deployment is out of capacity.
     status: 503,
     code: 'PAID_CAPACITY_REACHED',
-    message: "Server reading has reached this service's limit for now. Your work is still being read on your device.",
+    // Reading and marking are online-only: nothing is read on the device, so
+    // this must not say so. The work is not lost; it is not read until the
+    // limit lifts (resetAt, also sent as RateLimit-Reset).
+    message: "Pri's reader has reached this service's reading limit for now. Your work has not been read or marked; try again after the limit resets, or type your answer.",
     retryable: true,
     resetAt
   };
@@ -109,5 +112,9 @@ export function refusePaidCall(res, verdict) {
   if (verdict.resetAt) res.set('RateLimit-Reset', String(Math.ceil(verdict.resetAt / 1000)));
   const error = { code: verdict.code, message: verdict.message };
   if (verdict.retryable) error.retryable = true;
+  // The same instant as the RateLimit-Reset header, in the body, because the
+  // shipped client reads a refusal's time from the body (as it does for
+  // AI_ALLOWANCE_EXHAUSTED) and its native transports do not expose headers.
+  if (Number.isFinite(verdict.resetAt)) error.resetAt = verdict.resetAt;
   return res.status(verdict.status).json({ error });
 }

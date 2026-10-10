@@ -29,6 +29,7 @@ import { rasterizeInk } from './cloudRaster.js';
 import { onCloudSessionChange, onEntitlementChange } from '../platform/cloudSession.js';
 import { preparePhoto } from './photoRaster.js';
 import { confidenceFloorOf } from './readingCorrection.js';
+import { classifyReaderFailure, READER_FAILURE } from './readerFailure.js';
 
 /** How the returned reading is labelled, so History and evidence can tell. */
 export const CLOUD_ENGINE_PREFIX = 'cloud';
@@ -73,11 +74,32 @@ export const ALLOWANCE_CODE = 'AI_ALLOWANCE_EXHAUSTED';
 export function cloudAllowanceExhausted(now = Date.now()) { return now < allowanceExhaustedUntil; }
 export function clearCloudAllowanceExhausted() { allowanceExhaustedUntil = 0; }
 function noteAllowance(error, now = Date.now()) {
+  notePause(error, now);
   if (error?.code !== ALLOWANCE_CODE) return;
   const reset = Number(error.resetAt);
   // Trust a sane reset time from the server; otherwise back off for 30 minutes.
   allowanceExhaustedUntil = Number.isFinite(reset) && reset > now && reset - now <= 25 * 60 * 60 * 1000 ? reset : now + 30 * 60 * 1000;
 }
+// The server refused for a limit that lifts at a known time: the whole
+// service's reading ceiling for the hour or day (PAID_CAPACITY_REACHED), or
+// this account asking too often (429). Until then nothing is sent — not by a
+// timer, not by the next pen stroke, not by coming back to the tab. Production
+// 2026-10-10: every read answered 503 PAID_CAPACITY_REACHED and the page kept
+// re-sending it. Only the student's own "Try again" sends before the time.
+let readerPause = null;        // { failure: { code, status, resetAt }, until }
+function notePause(error, now = Date.now()) {
+  const named = classifyReaderFailure({ code: error?.code, status: error?.status, resetAt: error?.resetAt }, { now });
+  if (named.kind !== READER_FAILURE.CAPACITY && named.kind !== READER_FAILURE.RATE_LIMITED) return;
+  readerPause = { failure: { code: named.code, status: named.status, resetAt: named.retryAt }, until: named.pauseUntil };
+}
+/** The limit the reader is waiting out, or null: { failure, until }. */
+export function readerPaused(now = Date.now()) {
+  if (readerPause && now >= readerPause.until) readerPause = null;
+  return readerPause;
+}
+/** The student asked: the next read is sent whatever limit was last reported. */
+export function resumeReaderNow() { readerPause = null; }
+const pausedOutcome = pause => ({ reason: 'paused', failure: pause.failure, until: pause.until });
 let listening = false;
 function listenForAccountChanges() {
   if (listening) return;
@@ -331,6 +353,7 @@ export async function readWithCloud(strokes, {
   if (!cloudReadingEnabled(user, { available })) return { reason: 'disabled' };
   listenForAccountChanges();
   if (cloudAllowanceExhausted()) return { reason: 'allowance', until: allowanceExhaustedUntil };
+  if (readerPaused()) return pausedOutcome(readerPaused());
 
   const ready = await readiness({ user, transport, available, signal, refresh: freshReadiness === true });
   if (!cloudReadingEnabled(user, { available, readiness: ready })) {
@@ -392,7 +415,8 @@ export async function readWithCloud(strokes, {
     recordCloudDiagnostics({ available: true, latencyMs: Date.now() - started, failureCode: code, releaseSha: ready?.releaseSha });
     if (code === ALLOWANCE_CODE) return { reason: 'allowance', until: allowanceExhaustedUntil, readiness: ready, diagnostics: handwritingDiagnostics() };
     const status = Number.isInteger(Number(error?.status)) && Number(error.status) > 0 ? Number(error.status) : undefined;
-    return { error: { code, status, message: error?.message || '' }, readiness: ready, diagnostics: handwritingDiagnostics() };
+    const resetAt = Number.isFinite(Number(error?.resetAt)) ? Number(error.resetAt) : undefined;
+    return { error: { code, status, resetAt, message: error?.message || '' }, readiness: ready, diagnostics: handwritingDiagnostics() };
   }
 }
 
@@ -440,6 +464,7 @@ export async function readPhotoWithCloud(dataUrl, {
   if (!cloudReadingEnabled(user, { available })) return { reason: 'disabled' };
   listenForAccountChanges();
   if (cloudAllowanceExhausted()) return { reason: 'allowance', until: allowanceExhaustedUntil };
+  if (readerPaused()) return pausedOutcome(readerPaused());
   const ready = await readiness({ user, transport, available, signal });
   if (!cloudReadingEnabled(user, { available, readiness: ready })) {
     return { reason: ready?.lastFailureCode === 'HANDWRITING_CANCELLED' ? 'cancelled' : 'unavailable', readiness: ready };
@@ -488,7 +513,8 @@ export async function readPhotoWithCloud(dataUrl, {
     recordCloudDiagnostics({ available: true, latencyMs: Date.now() - started, failureCode: code, releaseSha: ready?.releaseSha });
     if (code === ALLOWANCE_CODE) return { reason: 'allowance', until: allowanceExhaustedUntil, readiness: ready, diagnostics: handwritingDiagnostics() };
     const status = Number.isInteger(Number(error?.status)) && Number(error.status) > 0 ? Number(error.status) : undefined;
-    return { error: { code, status, message: error?.message || '' }, readiness: ready, diagnostics: handwritingDiagnostics() };
+    const resetAt = Number.isFinite(Number(error?.resetAt)) ? Number(error.resetAt) : undefined;
+    return { error: { code, status, resetAt, message: error?.message || '' }, readiness: ready, diagnostics: handwritingDiagnostics() };
   }
 }
 
@@ -500,43 +526,67 @@ const browserOnline = () => typeof navigator === 'undefined' || navigator.onLine
  * student turned server reading off); otherwise it names the real cause.
  * There is no offline photo queue, so offline means "type it for now".
  */
-export function photoReadingBlockedKey(user, { outcome = null, online = browserOnline, available = cloudAvailable } = {}) {
-  if (cloudReadingChoice(user) === 'off') return 'verdict.photoReadingTurnedOff';
+/**
+ * Why this read did not happen, with what the student can do about it:
+ * { kind, action, key, inkKey, autoRetry, manualRetry, retryAt }.
+ *
+ * What the device already knows comes first (switched off in Settings, no
+ * server on this install, offline, no account); then the reader's own refusal,
+ * named by readerFailure.js. The transcribe route's refusal wins over the
+ * status probe's, and a refusal is read from its code first and its HTTP
+ * status second.
+ */
+export function readerBlock(user, { outcome = null, online = browserOnline, available = cloudAvailable, now = Date.now() } = {}) {
+  const fixed = (kind, action, key, inkKey, more = {}) => Object.freeze({ kind, action, key, inkKey, autoRetry: false, manualRetry: false, retryAt: null, ...more });
+  if (cloudReadingChoice(user) === 'off') return fixed('turned-off', 'settings', 'verdict.photoReadingTurnedOff', 'ink.waitingTurnedOff');
   let configured = false;
   try { configured = available() === true; } catch { configured = false; }
-  if (!configured) return 'verdict.photoReadingNotOnThisInstall';
+  if (!configured) return fixed(READER_FAILURE.NOT_AVAILABLE, 'type', 'verdict.photoReadingNotOnThisInstall', 'ink.waitingNotOnThisInstall');
   let isOnline = true;
   try { isOnline = online() !== false; } catch { isOnline = true; }
-  if (!isOnline) return 'verdict.photoReadingOffline';
-  if (user?.cloudLinked !== true) return 'verdict.photoReadingSignIn';
-  return accountBlockedKey(outcome) || 'verdict.photoReadingServiceDown';
+  if (!isOnline) return fixed('offline', 'reconnect', 'verdict.photoReadingOffline', 'ink.waitingOffline', { manualRetry: true });
+  if (user?.cloudLinked !== true) return fixed(READER_FAILURE.SESSION, 'sign-in', 'verdict.photoReadingSignIn', 'ink.waitingSignIn');
+  const failure = readerFailureOf(outcome);
+  const named = classifyReaderFailure(failure, { now });
+  return Object.freeze({
+    kind: named.kind, action: named.action, key: named.photoKey, inkKey: named.inkKey,
+    autoRetry: named.autoRetry, manualRetry: named.manualRetry, retryAt: named.retryAt
+  });
+}
+
+/** The failure a read outcome carries: the read's own, a limit being waited out, or the status probe's. */
+function readerFailureOf(outcome) {
+  if (outcome?.reason === 'allowance') return { code: ALLOWANCE_CODE, status: 429, resetAt: outcome.until };
+  if (outcome?.failure) return outcome.failure;
+  const own = outcome?.error;
+  const probe = outcome?.readiness?.lastFailureCode || outcome?.readiness?.lastFailureStatus
+    ? { code: outcome.readiness.lastFailureCode, status: outcome.readiness.lastFailureStatus } : null;
+  if (!own) return probe;
+  // An account-side reason from either source outranks "did not answer".
+  const account = [READER_FAILURE.SESSION, READER_FAILURE.VERIFY_EMAIL, READER_FAILURE.GUARDIAN];
+  if (probe && !account.includes(classifyReaderFailure(own).kind) && account.includes(classifyReaderFailure(probe).kind)) return probe;
+  return own;
+}
+
+/**
+ * The plain-language reason a photo could not be read by the server, as an
+ * i18n key. Points at Settings only when Settings is genuinely the fix (the
+ * student turned server reading off); otherwise it names the real cause.
+ * There is no offline photo queue, so offline means "type it for now".
+ */
+export function photoReadingBlockedKey(user, options = {}) {
+  return readerBlock(user, options).key;
 }
 
 /**
  * The precise account-side reason a read was refused, or null when the reason
- * is not the account (the reader itself, the network). The transcribe route's
- * own refusal wins over the status probe's, and a refusal is read from its
- * code first and its HTTP status second (a 401/403 whose body lost its code is
- * still "sign in" / "this account may not", never "the reader is down").
+ * is not the account (the reader itself, the network, a limit).
  */
 export function accountBlockedKey(outcome = null) {
-  const codes = [outcome?.error?.code, outcome?.readiness?.lastFailureCode].map(c => String(c || '')).filter(Boolean);
-  const status = Number(outcome?.error?.status);
-  for (const code of codes) {
-    // CSRF_REJECTED: the session's security token is missing or stale (the
-    // cookie pair lapsed, or the server restarted). Only signing in again
-    // issues a new one; nothing about the reader is wrong.
-    if (code === 'AUTH_REQUIRED' || code === 'CSRF_REJECTED') return 'verdict.photoReadingSignIn';
-    // A failed consent-state lookup is infrastructure trouble, not evidence
-    // that this student needs a guardian. Fall through to service-unavailable.
-    if (code === 'GUARDIAN_CONSENT_UNAVAILABLE') return null;
-    if (code.startsWith('GUARDIAN_CONSENT') || code === 'AGE_DECLARATION_REQUIRED') return 'verdict.photoReadingGuardian';
-    if (code === 'EMAIL_UNVERIFIED') return 'verdict.photoReadingVerifyEmail';
-  }
-  // Any 401, from the read itself or from the status probe before it, is a
-  // session that is not there — whatever code (or none) came with it.
-  if (status === 401 || Number(outcome?.readiness?.lastFailureStatus) === 401) return 'verdict.photoReadingSignIn';
-  return null;
+  const failure = readerFailureOf(outcome);
+  if (!failure) return null;
+  const named = classifyReaderFailure(failure);
+  return [READER_FAILURE.SESSION, READER_FAILURE.VERIFY_EMAIL, READER_FAILURE.GUARDIAN].includes(named.kind) ? named.photoKey : null;
 }
 
 /** Blockers the student can clear in Account settings (sign in, verify, consent). */
@@ -562,7 +612,7 @@ export function inkReaderUiState(status = null, reading = null) {
   // Only an attempted read with no usable transcription is a real read failure.
   if (status?.kind === 'empty') return Object.freeze({ kind: INK_READER_STATE.READ_FAILED });
   if (status?.kind === 'allowance') {
-    return Object.freeze({ kind: INK_READER_STATE.READER_UNAVAILABLE, blocker: 'ink.cloudAllowanceUsed' });
+    return Object.freeze({ kind: INK_READER_STATE.READER_UNAVAILABLE, blocker: status.key || 'ink.waitingAllowance' });
   }
   if (status?.kind === 'waiting') {
     if (ACCOUNT_BLOCKED_KEYS.has(status.key)) return Object.freeze({ kind: INK_READER_STATE.ACCOUNT_ACTION_REQUIRED, blocker: status.key });
@@ -591,20 +641,10 @@ export function takeCloudReadingNotice(user, storage = globalThis.localStorage) 
 }
 
 /**
- * The same plain-language reasons for ink, phrased for working that stays on
- * the page: it is saved, and it is read by itself once the reason goes away.
+ * The same reasons for ink, phrased for working that stays on the page.
  */
-const INK_BLOCKED = Object.freeze({
-  'verdict.photoReadingTurnedOff': 'ink.waitingTurnedOff',
-  'verdict.photoReadingNotOnThisInstall': 'ink.waitingNotOnThisInstall',
-  'verdict.photoReadingOffline': 'ink.waitingOffline',
-  'verdict.photoReadingSignIn': 'ink.waitingSignIn',
-  'verdict.photoReadingGuardian': 'ink.waitingGuardian',
-  'verdict.photoReadingVerifyEmail': 'ink.waitingVerifyEmail',
-  'verdict.photoReadingServiceDown': 'ink.waitingServiceDown'
-});
 export function inkReadingBlockedKey(user, options = {}) {
-  return INK_BLOCKED[photoReadingBlockedKey(user, options)] || 'ink.waitingServiceDown';
+  return readerBlock(user, options).inkKey || 'ink.waitingServiceDown';
 }
 
 /**

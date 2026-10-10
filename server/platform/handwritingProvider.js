@@ -81,11 +81,20 @@ export const TRANSCRIPTION_SCHEMA = Object.freeze({
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['text', 'latex', 'confidence'],
+        required: ['text', 'latex', 'confidence', 'uncertain', 'doubt', 'gap_before'],
         properties: {
           text: { type: 'string', maxLength: 400 },
           latex: { type: 'string', maxLength: 600 },
-          confidence: { type: 'number', minimum: 0, maximum: 1 }
+          confidence: { type: 'number', minimum: 0, maximum: 1 },
+          // A symbol on this line could be one of two things. The reader says
+          // so here instead of quietly picking one; the student is shown the
+          // line as one to check. `doubt` names the two readings.
+          uncertain: { type: 'boolean' },
+          doubt: { type: 'string', maxLength: 120 },
+          // A clearly larger vertical gap above this line than between the
+          // other lines: layout only, so a page holding more than one piece
+          // of work can be shown to the student in its pieces.
+          gap_before: { type: 'boolean' }
         }
       }
     },
@@ -102,6 +111,11 @@ export const SYSTEM_INSTRUCTIONS = [
   'Write `text` as plain linear mathematics a parser can read: use <= >= != for the relations, / for division, ^ for powers, and ordinary commas between listed values. Write ordinary English words as words.',
   'Write `latex` as a faithful display-only transcription of the same line; when the line has nothing display-worthy, set `latex` to an empty string.',
   '`confidence` is how certain you are that the transcription matches the marks on the page, not whether the mathematics is correct.',
+  'Read every relation sign from its strokes. A "greater than" with a bar under it, even a short, slanted or detached bar, is >= ; without a bar it is > . The same for <= and < . A double-shafted arrow is => , a single arrow is -> , and neither is an equals sign. Tell a minus sign from a dash, a hyphen and a fraction bar; a raised digit (a power) from a digit on the line; and round brackets from set braces and square brackets.',
+  'Handwritten letters and digits that look alike (x and n, u and v, z and 2, l and 1, O and 0, s and 5, b and 6, q and 9, t and +) are decided from the strokes on the page, and the same handwritten shape is transcribed the same way every time it recurs. A cursive x drawn as two curves back to back is easily mistaken for n, and the reverse: when a letter could be either, that is a doubt to report, not to settle.',
+  'Never choose a symbol because it would make the mathematics true or tidy. You do not know the question, and a student may have written something false.',
+  'When you cannot tell which of two symbols was written, do not settle it silently: write the more likely one, set `uncertain` to true for that line, and name both readings in `doubt` as "A or B" (for example ">= or >", "x or n", "- or ="). Otherwise set `uncertain` to false and `doubt` to an empty string.',
+  'Set `gap_before` to true when the blank space above a line is clearly larger than the spacing between the other lines (about a skipped line or more); otherwise false. It is false for the first line.',
   'Set needs_confirmation to true whenever any mark, symbol, line break, fraction, superscript, or the boundary between a diagram and text is genuinely ambiguous.'
 ].join('\n');
 
@@ -316,7 +330,14 @@ function normalizeLines(raw) {
       latex: line?.latex ? String(line.latex).slice(0, 600).trim() : null,
       confidence: Number.isFinite(Number(line?.confidence))
         ? Math.min(1, Math.max(0, Number(line.confidence)))
-        : 0
+        : 0,
+      // The reader's own per-line doubt, passed on exactly as it was given.
+      // Nothing here re-reads or repairs the line: the text is never changed.
+      uncertain: line?.uncertain === true,
+      doubt: line?.uncertain === true && typeof line?.doubt === 'string' && line.doubt.trim()
+        ? line.doubt.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 120)
+        : null,
+      gapBefore: line?.gap_before === true
     }))
     .filter(line => line.text.length > 0);
 }
@@ -330,7 +351,9 @@ export function normalizeResult(parsed, { model, confidenceFloor }) {
   // a page is only as readable as its worst line, and the marker reads them all.
   const worstLine = lines.length ? Math.min(...lines.map(l => l.confidence)) : 0;
   const confidence = lines.length ? Math.min(stated, worstLine) : 0;
-  const providerNeedsConfirmation = parsed?.needs_confirmation === true;
+  // A line the reader marked as uncertain is a doubt about the page, whether
+  // or not the reader also raised the page-level flag.
+  const providerNeedsConfirmation = parsed?.needs_confirmation === true || lines.some(line => line.uncertain);
   const needsConfirmation = providerNeedsConfirmation
     || !lines.length
     || confidence < confidenceFloor;

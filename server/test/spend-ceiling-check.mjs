@@ -78,7 +78,7 @@ const call = async (who, path, body) => {
     headers: { 'content-type': 'application/json', cookie: `${SESSION_COOKIE}=raw-${who}` },
     body: JSON.stringify(body)
   });
-  return { status: res.status, json: await res.json().catch(() => null) };
+  return { status: res.status, headers: res.headers, json: await res.json().catch(() => null) };
 };
 
 try {
@@ -103,8 +103,15 @@ try {
 
   const alsoWorking = await call('acct-a', '/working/check', { prompt: 'q', lines: ['2x = 8', 'x = 4'] });
   eq(alsoWorking.status, 503, 'the other route is refused too — one key, one bill, one budget');
-  ok(/still being read on your device/i.test(alsoWorking.json?.error?.message || ''),
-    'and the student is told their work is still being read, because it is');
+  // Reading and marking are online-only. The refusal used to say "Your work
+  // is still being read on your device", which stopped being true.
+  ok(!/on your device|on-device/i.test(alsoWorking.json?.error?.message || ''),
+    'the refusal does not claim the work is being read on the device: nothing is');
+  ok(/has not been read or marked/i.test(alsoWorking.json?.error?.message || ''),
+    'and says plainly that the work has not been read or marked');
+  ok(Number.isFinite(sixth.json?.error?.resetAt) && sixth.json.error.resetAt > Date.now() &&
+    Math.ceil(sixth.json.error.resetAt / 1000) === Number(sixth.headers.get('ratelimit-reset')),
+    'and when the limit lifts is in the body as well as the RateLimit-Reset header');
   ok(alsoWorking.json?.error?.retryable === true, 'a spent budget is temporary, and says so');
 
   // ── 3 · A malformed request cannot burn the budget ─────────────────────────

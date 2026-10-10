@@ -36,6 +36,14 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '..', '..');
+// Which acceptance script this launcher runs. launch-real-photo.mjs sets this
+// before importing the launcher; everything about the credential, the clean
+// child environments and the scrubber is the same for every runner.
+const RUNNER = Object.freeze({
+  script: 'flagship-handwriting.mjs', title: 'flagship handwriting acceptance', passEnv: [],
+  ...(globalThis.__PRI_ACCEPT_RUNNER__ || {})
+});
+if (!/^[a-z-]+\.mjs$/.test(RUNNER.script)) throw new Error('invalid acceptance runner');
 
 // ── What may cross into a server child ───────────────────────────────────────
 const PROVIDER_PREFIX = 'PRI_HANDWRITING_';
@@ -59,7 +67,7 @@ const say = line => process.stdout.write(scrub(line) + '\n');
 
 if (!providerEnv.PRI_HANDWRITING_API_KEY) {
   say('DEPENDENCY MISSING: PRI_HANDWRITING_API_KEY is not present in this process environment.');
-  say('Run this launcher under `railway run --service pri-learning-staging --environment staging -- node tools/acceptance/launch.mjs`.');
+  say('Run this launcher under `railway run --service pri-learning-staging --environment staging -- node tools/acceptance/<launcher>.mjs`.');
   say('No mock was substituted. Nothing was run.');
   process.exit(2);
 }
@@ -147,7 +155,7 @@ process.on('SIGTERM', () => { stopAll(); process.exit(143); });
 
 let exitCode = 1;
 try {
-  say('── Pri Learning flagship handwriting acceptance ─ launcher');
+  say(`── Pri Learning ${RUNNER.title} ─ launcher`);
   say(`provider variable NAMES passed to the local servers (values never printed): ${providerNames.join(', ')}`);
   say('not passed: any database URL, Supabase, Resend, billing, Twilio, session or CSRF variable');
   // Server A: the journey. Server B: identical, but the reading budget is the
@@ -158,10 +166,13 @@ try {
   say(`local server (timeout) ${slow.origin}  SQLite temp file  pid ${slow.pid}  PRI_HANDWRITING_TIMEOUT_MS=2000`);
   say(`output directory       ${outDir}`);
 
-  const runner = spawn(process.execPath, [join(HERE, 'flagship-handwriting.mjs')], {
+  const runner = spawn(process.execPath, [join(HERE, RUNNER.script)], {
     cwd: REPO,
     env: {
       ...base,
+      // Named, non-secret settings of the runner only (a fixture path, a read
+      // count). Never a provider, database, session or billing variable.
+      ...Object.fromEntries(RUNNER.passEnv.filter(name => /^PRI_ACCEPT_[A-Z_]+$/.test(name) && process.env[name]).map(name => [name, process.env[name]])),
       // The acceptance script never holds the provider credential.
       PRI_ACCEPT_BASE: main.origin,
       PRI_ACCEPT_DB: main.dbPath,
