@@ -1907,12 +1907,18 @@ html.theme-switching, html.theme-switching * {
   
 }
 
+/* Transitions are switched off, not shortened: `transition-property` is `all`
+   unless a rule says otherwise, so any duration above zero forced on `*`
+   makes every style change on every element a transition. On Chromium
+   9x–10x WebViews a background-colour one runs on the compositor, and the
+   first pen stroke could hang the page (Android WebView 101, 2026-10-10). */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     scroll-behavior: auto !important;
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
   }
 }
 
