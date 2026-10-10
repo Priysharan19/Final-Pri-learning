@@ -30,6 +30,97 @@ const LOADERS = {
   12: () => import('./data/notes-class12.js')
 };
 
+// Load supplements beside the requested grade, never in another grade's chunk.
+// Original authored notes are retained and immutable; each addition is checked
+// by the same rigorous chapter-notes mathematical verification suite.
+const EXPANSION_LOADERS = {
+  7: () => import('./data/notes-expansion-class7.js'),
+  8: () => import('./data/notes-expansion-class8.js'),
+  9: () => import('./data/notes-expansion-class9.js'),
+  10: () => import('./data/notes-expansion-class10.js'),
+  11: () => import('./data/notes-expansion-class11.js'),
+  12: () => import('./data/notes-expansion-class12.js')
+};
+
+function mergeStudySupplements(base, additions) {
+  for (const chapterId of Object.keys(additions)) {
+    if (!Object.hasOwn(base, chapterId)) throw new Error(`Unknown study supplement chapter: ${chapterId}`);
+  }
+  return Object.fromEntries(Object.entries(base).map(([chapterId, chapter]) => {
+    const add = additions[chapterId];
+    if (!add) return [chapterId, chapter];
+    const fields = {};
+    for (const field of ['concepts', 'points', 'mistakes', 'examples']) {
+      if (!Array.isArray(chapter[field]) || !Array.isArray(add[field])) {
+        throw new Error(`Invalid supplement ${chapterId}.${field}`);
+      }
+      fields[field] = [...chapter[field], ...add[field]];
+    }
+    return [chapterId, { ...chapter, ...fields }];
+  }));
+}
+
+// Optional advanced study is separate from the CBSE core and the generated
+// exam/question bank. These are worked lessons, not server-issued questions.
+const CHALLENGE_LOADERS = {
+  7: () => import('./data/notes-challenges-class7.js'),
+  8: () => import('./data/notes-challenges-class8.js'),
+  9: () => import('./data/notes-challenges-class9.js'),
+  10: () => import('./data/notes-challenges-class10.js'),
+  11: () => import('./data/notes-challenges-class11.js'),
+  12: () => import('./data/notes-challenges-class12.js')
+};
+
+// Per-grade diagram-question chunks; diagram data does not ride in other grades.
+const VISUAL_LOADERS = {
+  7: () => import('./data/notes-visual-class7.js'),
+  8: () => import('./data/notes-visual-class8.js'),
+  9: () => import('./data/notes-visual-class9.js'),
+  10: () => import('./data/notes-visual-class10.js'),
+  11: () => import('./data/notes-visual-class11.js'),
+  12: () => import('./data/notes-visual-class12.js')
+};
+
+// Second large visual wave: 300 new original cases in 11 additional SVG diagram families.
+const VISUAL_WAVE5_LOADERS = {
+  7: () => import('./data/notes-visual-wave5-class7.js'),
+  8: () => import('./data/notes-visual-wave5-class8.js'),
+  9: () => import('./data/notes-visual-wave5-class9.js'),
+  10: () => import('./data/notes-visual-wave5-class10.js'),
+  11: () => import('./data/notes-visual-wave5-class11.js'),
+  12: () => import('./data/notes-visual-wave5-class12.js')
+};
+
+// Third figure-led content wave: graph reasoning, distributions and combinatorics.
+const VISUAL_INQUIRY_LOADERS = {
+  7: () => import('./data/notes-visual-wave6-class7.js'),
+  8: () => import('./data/notes-visual-wave6-class8.js'),
+  9: () => import('./data/notes-visual-wave6-class9.js'),
+  10: () => import('./data/notes-visual-wave6-class10.js'),
+  11: () => import('./data/notes-visual-wave6-class11.js'),
+  12: () => import('./data/notes-visual-wave6-class12.js')
+};
+
+// Wave 7: a compact, original set of 120 additional figure-dependent tasks.
+const VISUAL_WAVE7_LOADERS = {
+  7: () => import('./data/notes-visual-wave7-class7.js'),
+  8: () => import('./data/notes-visual-wave7-class8.js'),
+  9: () => import('./data/notes-visual-wave7-class9.js'),
+  10: () => import('./data/notes-visual-wave7-class10.js'),
+  11: () => import('./data/notes-visual-wave7-class11.js'),
+  12: () => import('./data/notes-visual-wave7-class12.js')
+};
+
+function mergeOptionalComplexStudies(notes, extra) {
+  for (const [id, section] of Object.entries(extra || {})) {
+    if (!Object.hasOwn(notes,id) || !Array.isArray(section.examples) || !section.examples.every(x => x.question && Array.isArray(x.steps) && x.steps.length && x.answer && x.verify)) {
+      throw new Error(`Invalid optional mathematics study section: ${id}`);
+    }
+    notes = { ...notes, [id]: { ...notes[id], examples: [...notes[id].examples, ...section.examples] } };
+  }
+  return notes;
+}
+
 export const NOTES_GRADES = Object.freeze(Object.keys(LOADERS).map(Number));
 
 const cache = new Map();
@@ -39,7 +130,30 @@ export function loadNotesForGrade(grade) {
   const g = Number(grade);
   if (!LOADERS[g]) return Promise.resolve({});
   if (!cache.has(g)) {
-    cache.set(g, LOADERS[g]().then(m => m.default || {}, err => { cache.delete(g); throw err; }));
+    cache.set(g, Promise.all([
+      LOADERS[g](),
+      EXPANSION_LOADERS[g](),
+      g === 11 ? import('./data/notes-advanced-complex.js') : Promise.resolve({ default: {} }),
+      CHALLENGE_LOADERS[g] ? CHALLENGE_LOADERS[g]() : Promise.resolve({ default: {} }),
+      VISUAL_LOADERS[g](),
+      VISUAL_WAVE5_LOADERS[g](),
+      VISUAL_INQUIRY_LOADERS[g](),
+      VISUAL_WAVE7_LOADERS[g]()
+    ])
+      .then(([original, supplement, optional, challenges, visuals, extendedVisuals, inquiry, wave7]) => mergeOptionalComplexStudies(
+        mergeOptionalComplexStudies(
+          mergeOptionalComplexStudies(
+            mergeOptionalComplexStudies(
+              mergeOptionalComplexStudies(
+                mergeOptionalComplexStudies(
+                  mergeStudySupplements(original.default || {}, supplement.default || {}), optional.default || {}
+                ), challenges.default || {}
+              ), visuals.default || {}
+            ), extendedVisuals.default || {}
+          ), inquiry.default || {}
+        ), wave7.default || {}
+      ))
+      .catch(err => { cache.delete(g); throw err; }));
   }
   return cache.get(g);
 }

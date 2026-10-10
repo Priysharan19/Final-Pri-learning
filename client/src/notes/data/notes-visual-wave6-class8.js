@@ -1,0 +1,924 @@
+// Original Class 8 diagram inquiry cases, quartiles and lattice counting labelled optional extension.
+import { makeInquiryVisual } from '../visualInquiryFactory.js';
+const specs=[
+  {
+    "chapterId": "c8-mensuration",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        5,
+        0
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        0,
+        4
+      ]
+    ],
+    "context": "Composite pentagon plot 1"
+  },
+  {
+    "chapterId": "c8-mensuration",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        6,
+        0
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        0,
+        4
+      ]
+    ],
+    "context": "Composite pentagon plot 2"
+  },
+  {
+    "chapterId": "c8-mensuration",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        7,
+        0
+      ],
+      [
+        7,
+        2
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        0,
+        5
+      ]
+    ],
+    "context": "Composite pentagon plot 3"
+  },
+  {
+    "chapterId": "c8-mensuration",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        8,
+        0
+      ],
+      [
+        8,
+        4
+      ],
+      [
+        7,
+        5
+      ],
+      [
+        0,
+        5
+      ]
+    ],
+    "context": "Composite pentagon plot 4"
+  },
+  {
+    "chapterId": "c8-mensuration",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        9,
+        0
+      ],
+      [
+        9,
+        4
+      ],
+      [
+        7,
+        6
+      ],
+      [
+        0,
+        6
+      ]
+    ],
+    "context": "Composite pentagon plot 5"
+  },
+  {
+    "chapterId": "c8-mensuration",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        10,
+        0
+      ],
+      [
+        10,
+        3
+      ],
+      [
+        7,
+        6
+      ],
+      [
+        0,
+        6
+      ]
+    ],
+    "context": "Composite pentagon plot 6"
+  },
+  {
+    "chapterId": "c8-mensuration",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        11,
+        0
+      ],
+      [
+        11,
+        6
+      ],
+      [
+        10,
+        7
+      ],
+      [
+        0,
+        7
+      ]
+    ],
+    "context": "Composite pentagon plot 7"
+  },
+  {
+    "chapterId": "c8-mensuration",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        5,
+        0
+      ],
+      [
+        5,
+        5
+      ],
+      [
+        3,
+        7
+      ],
+      [
+        0,
+        7
+      ]
+    ],
+    "context": "Composite pentagon plot 8"
+  },
+  {
+    "chapterId": "c8-mensuration",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        6,
+        0
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        3,
+        8
+      ],
+      [
+        0,
+        8
+      ]
+    ],
+    "context": "Composite pentagon plot 9"
+  },
+  {
+    "chapterId": "c8-mensuration",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        7,
+        0
+      ],
+      [
+        7,
+        7
+      ],
+      [
+        6,
+        8
+      ],
+      [
+        0,
+        8
+      ]
+    ],
+    "context": "Composite pentagon plot 10"
+  },
+  {
+    "chapterId": "c8-mensuration",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        8,
+        0
+      ],
+      [
+        8,
+        7
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        0,
+        9
+      ]
+    ],
+    "context": "Composite pentagon plot 11"
+  },
+  {
+    "chapterId": "c8-mensuration",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        9,
+        0
+      ],
+      [
+        9,
+        6
+      ],
+      [
+        6,
+        9
+      ],
+      [
+        0,
+        9
+      ]
+    ],
+    "context": "Composite pentagon plot 12"
+  },
+  {
+    "chapterId": "c8-quadrilaterals",
+    "kind": "transform",
+    "A": [
+      -6,
+      -5
+    ],
+    "B": [
+      -3,
+      -5
+    ],
+    "C": [
+      -6,
+      -2
+    ],
+    "dx": 1,
+    "dy": -2,
+    "mode": "area",
+    "context": "Coordinate transformation sketch 1"
+  },
+  {
+    "chapterId": "c8-graphs",
+    "kind": "transform",
+    "A": [
+      -5,
+      -3
+    ],
+    "B": [
+      -1,
+      -3
+    ],
+    "C": [
+      -5,
+      3
+    ],
+    "dx": 2,
+    "dy": -3,
+    "mode": "image",
+    "context": "Coordinate transformation sketch 2"
+  },
+  {
+    "chapterId": "c8-quadrilaterals",
+    "kind": "transform",
+    "A": [
+      -4,
+      -1
+    ],
+    "B": [
+      1,
+      -1
+    ],
+    "C": [
+      -4,
+      3
+    ],
+    "dx": 3,
+    "dy": -4,
+    "mode": "image",
+    "context": "Coordinate transformation sketch 3"
+  },
+  {
+    "chapterId": "c8-graphs",
+    "kind": "transform",
+    "A": [
+      -3,
+      1
+    ],
+    "B": [
+      3,
+      1
+    ],
+    "C": [
+      -3,
+      8
+    ],
+    "dx": 4,
+    "dy": -2,
+    "mode": "area",
+    "context": "Coordinate transformation sketch 4"
+  },
+  {
+    "chapterId": "c8-quadrilaterals",
+    "kind": "transform",
+    "A": [
+      -2,
+      -4
+    ],
+    "B": [
+      1,
+      -4
+    ],
+    "C": [
+      -2,
+      1
+    ],
+    "dx": 1,
+    "dy": -3,
+    "mode": "image",
+    "context": "Coordinate transformation sketch 5"
+  },
+  {
+    "chapterId": "c8-graphs",
+    "kind": "transform",
+    "A": [
+      -6,
+      -2
+    ],
+    "B": [
+      -2,
+      -2
+    ],
+    "C": [
+      -6,
+      1
+    ],
+    "dx": 2,
+    "dy": -4,
+    "mode": "image",
+    "context": "Coordinate transformation sketch 6"
+  },
+  {
+    "chapterId": "c8-quadrilaterals",
+    "kind": "transform",
+    "A": [
+      -5,
+      0
+    ],
+    "B": [
+      0,
+      0
+    ],
+    "C": [
+      -5,
+      6
+    ],
+    "dx": 3,
+    "dy": -2,
+    "mode": "area",
+    "context": "Coordinate transformation sketch 7"
+  },
+  {
+    "chapterId": "c8-graphs",
+    "kind": "transform",
+    "A": [
+      -4,
+      -5
+    ],
+    "B": [
+      2,
+      -5
+    ],
+    "C": [
+      -4,
+      -1
+    ],
+    "dx": 4,
+    "dy": -3,
+    "mode": "image",
+    "context": "Coordinate transformation sketch 8"
+  },
+  {
+    "chapterId": "c8-quadrilaterals",
+    "kind": "transform",
+    "A": [
+      -3,
+      -3
+    ],
+    "B": [
+      0,
+      -3
+    ],
+    "C": [
+      -3,
+      4
+    ],
+    "dx": 1,
+    "dy": -4,
+    "mode": "image",
+    "context": "Coordinate transformation sketch 9"
+  },
+  {
+    "chapterId": "c8-graphs",
+    "kind": "transform",
+    "A": [
+      -2,
+      -1
+    ],
+    "B": [
+      2,
+      -1
+    ],
+    "C": [
+      -2,
+      4
+    ],
+    "dx": 2,
+    "dy": -2,
+    "mode": "area",
+    "context": "Coordinate transformation sketch 10"
+  },
+  {
+    "chapterId": "c8-quadrilaterals",
+    "kind": "transform",
+    "A": [
+      -6,
+      1
+    ],
+    "B": [
+      -1,
+      1
+    ],
+    "C": [
+      -6,
+      4
+    ],
+    "dx": 3,
+    "dy": -3,
+    "mode": "image",
+    "context": "Coordinate transformation sketch 11"
+  },
+  {
+    "chapterId": "c8-graphs",
+    "kind": "transform",
+    "A": [
+      -5,
+      -4
+    ],
+    "B": [
+      1,
+      -4
+    ],
+    "C": [
+      -5,
+      2
+    ],
+    "dx": 4,
+    "dy": -4,
+    "mode": "image",
+    "context": "Coordinate transformation sketch 12"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "histogram",
+    "counts": [
+      3,
+      8,
+      15,
+      7
+    ],
+    "width": 3,
+    "mode": "modal",
+    "context": "Frequency-distribution chart 1"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "histogram",
+    "counts": [
+      10,
+      15,
+      5,
+      14,
+      8
+    ],
+    "width": 4,
+    "mode": "total",
+    "context": "Frequency-distribution chart 2"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "histogram",
+    "counts": [
+      17,
+      5,
+      12,
+      4,
+      15,
+      11
+    ],
+    "width": 5,
+    "mode": "total",
+    "context": "Frequency-distribution chart 3"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "histogram",
+    "counts": [
+      7,
+      12,
+      19,
+      11
+    ],
+    "width": 6,
+    "mode": "modal",
+    "context": "Frequency-distribution chart 4"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "histogram",
+    "counts": [
+      14,
+      19,
+      9,
+      18,
+      12
+    ],
+    "width": 3,
+    "mode": "total",
+    "context": "Frequency-distribution chart 5"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "histogram",
+    "counts": [
+      4,
+      9,
+      16,
+      8,
+      19,
+      15
+    ],
+    "width": 4,
+    "mode": "total",
+    "context": "Frequency-distribution chart 6"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "histogram",
+    "counts": [
+      11,
+      16,
+      6,
+      15
+    ],
+    "width": 5,
+    "mode": "modal",
+    "context": "Frequency-distribution chart 7"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "histogram",
+    "counts": [
+      18,
+      6,
+      13,
+      5,
+      16
+    ],
+    "width": 6,
+    "mode": "total",
+    "context": "Frequency-distribution chart 8"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "histogram",
+    "counts": [
+      8,
+      13,
+      3,
+      12,
+      6,
+      19
+    ],
+    "width": 3,
+    "mode": "total",
+    "context": "Frequency-distribution chart 9"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "histogram",
+    "counts": [
+      15,
+      3,
+      10,
+      19
+    ],
+    "width": 4,
+    "mode": "modal",
+    "context": "Frequency-distribution chart 10"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "histogram",
+    "counts": [
+      5,
+      10,
+      17,
+      9,
+      3
+    ],
+    "width": 5,
+    "mode": "total",
+    "context": "Frequency-distribution chart 11"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "histogram",
+    "counts": [
+      12,
+      17,
+      7,
+      16,
+      10,
+      6
+    ],
+    "width": 6,
+    "mode": "total",
+    "context": "Frequency-distribution chart 12"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "histogram",
+    "counts": [
+      19,
+      7,
+      14,
+      6
+    ],
+    "width": 3,
+    "mode": "modal",
+    "context": "Frequency-distribution chart 13"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "histogram",
+    "counts": [
+      9,
+      14,
+      4,
+      13,
+      7
+    ],
+    "width": 4,
+    "mode": "total",
+    "context": "Frequency-distribution chart 14"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "histogram",
+    "counts": [
+      16,
+      4,
+      11,
+      3,
+      14,
+      10
+    ],
+    "width": 5,
+    "mode": "total",
+    "context": "Frequency-distribution chart 15"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "boxPlot",
+    "min": -5,
+    "q1": -3,
+    "med": -1,
+    "q3": 1,
+    "max": 4,
+    "mode": "iqr",
+    "context": "Optional quartile-plot exploration 1"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "boxPlot",
+    "min": -4,
+    "q1": -1,
+    "med": 2,
+    "q3": 5,
+    "max": 9,
+    "mode": "range",
+    "context": "Optional quartile-plot exploration 2"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "boxPlot",
+    "min": -3,
+    "q1": 1,
+    "med": 3,
+    "q3": 7,
+    "max": 10,
+    "mode": "iqr",
+    "context": "Optional quartile-plot exploration 3"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "boxPlot",
+    "min": -2,
+    "q1": 0,
+    "med": 3,
+    "q3": 5,
+    "max": 9,
+    "mode": "range",
+    "context": "Optional quartile-plot exploration 4"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "boxPlot",
+    "min": -1,
+    "q1": 2,
+    "med": 4,
+    "q3": 7,
+    "max": 10,
+    "mode": "iqr",
+    "context": "Optional quartile-plot exploration 5"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "boxPlot",
+    "min": 0,
+    "q1": 4,
+    "med": 7,
+    "q3": 11,
+    "max": 15,
+    "mode": "range",
+    "context": "Optional quartile-plot exploration 6"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "boxPlot",
+    "min": 1,
+    "q1": 3,
+    "med": 5,
+    "q3": 7,
+    "max": 10,
+    "mode": "iqr",
+    "context": "Optional quartile-plot exploration 7"
+  },
+  {
+    "chapterId": "c8-data-handling",
+    "kind": "boxPlot",
+    "min": 2,
+    "q1": 5,
+    "med": 8,
+    "q3": 11,
+    "max": 15,
+    "mode": "range",
+    "context": "Optional quartile-plot exploration 8"
+  },
+  {
+    "chapterId": "c8-graphs",
+    "kind": "latticePaths",
+    "east": 2,
+    "north": 1,
+    "context": "Optional rectangular-grid counting 1"
+  },
+  {
+    "chapterId": "c8-graphs",
+    "kind": "latticePaths",
+    "east": 3,
+    "north": 4,
+    "context": "Optional rectangular-grid counting 2"
+  },
+  {
+    "chapterId": "c8-graphs",
+    "kind": "latticePaths",
+    "east": 4,
+    "north": 2,
+    "context": "Optional rectangular-grid counting 3"
+  },
+  {
+    "chapterId": "c8-graphs",
+    "kind": "latticePaths",
+    "east": 5,
+    "north": 5,
+    "context": "Optional rectangular-grid counting 4"
+  },
+  {
+    "chapterId": "c8-graphs",
+    "kind": "latticePaths",
+    "east": 6,
+    "north": 3,
+    "context": "Optional rectangular-grid counting 5"
+  },
+  {
+    "chapterId": "c8-graphs",
+    "kind": "latticePaths",
+    "east": 2,
+    "north": 1,
+    "context": "Optional rectangular-grid counting 6"
+  },
+  {
+    "chapterId": "c8-graphs",
+    "kind": "latticePaths",
+    "east": 3,
+    "north": 4,
+    "context": "Optional rectangular-grid counting 7"
+  },
+  {
+    "chapterId": "c8-graphs",
+    "kind": "latticePaths",
+    "east": 4,
+    "north": 2,
+    "context": "Optional rectangular-grid counting 8"
+  }
+];
+const out={};for(const {chapterId,kind,...p} of specs)(out[chapterId]||={examples:[]}).examples.push(makeInquiryVisual(kind,p));
+export default out;
