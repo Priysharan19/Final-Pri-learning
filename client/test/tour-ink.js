@@ -118,6 +118,21 @@ export const flow = {
 
     await check('the footer says the server read it',
       /Read by Pri’s server reader/.test(await page.locator('.editor-foot').innerText().catch(() => '')));
+    // One read of one picture is one provider call; more ink is a different
+    // picture and is read afresh — exactly one more call.
+    const firstRead = (await readCalls()).at(-1);
+    await check('that first read was a provider read, not a reused one', firstRead?.status === 200 && firstRead.json?.reused === false,
+      JSON.stringify({ status: firstRead?.status, reused: firstRead?.json?.reused }));
+    const callsBeforeRewrite = reader.requests.length;
+    const pageReadsBeforeRewrite = (await readCalls()).length;
+    reader.text = '17';
+    await handwrite(page, box, '7', { x: 150 });
+    for (let i = 0; i < 60 && (await reading(page))[0] !== '17'; i++) await page.waitForTimeout(150);
+    await page.waitForTimeout(1500);
+    const rewriteRead = (await readCalls()).at(-1);
+    await check('rewriting the ink costs exactly one more provider read: one page request, one provider call, not reused',
+      (await reading(page))[0] === '17' && reader.requests.length === callsBeforeRewrite + 1 && (await readCalls()).length === pageReadsBeforeRewrite + 1 && rewriteRead?.json?.reused === false,
+      `provider calls +${reader.requests.length - callsBeforeRewrite}; page requests +${(await readCalls()).length - pageReadsBeforeRewrite}; reused ${rewriteRead?.json?.reused}; read ${JSON.stringify(await reading(page))}`);
 
     await page.locator('.ink-tool[title="Clear"]').click();
     await settle();
@@ -236,6 +251,7 @@ export const flow = {
     const confirm = page.getByRole('button', { name: 'That’s what I wrote' });
     await page.waitForTimeout(2500);
     const markedByItself = await page.locator('.eval-card').count();
+    const callsBeforeSubmit = reader.requests.length;
     await page.getByRole('button', SUBMIT).click();
     await page.waitForSelector('.eval-card', { timeout: 20000 }).catch(async () => {
       if (await confirm.count()) {
@@ -281,6 +297,13 @@ export const flow = {
 
     // ── 5b · and the mark was the server's ───────────────────────────────────
     const inkRow = await online.shownRow();
+    // The receipt the server takes at Submit is of the picture it has just
+    // read for the transcript: the kept read is reused, and no second provider
+    // call is paid for the same unchanged ink.
+    const submitReceipts = await online.practiceCalls(new RegExp(`^/v1/practice/${inkRow?.serverQuestionId}/recognize$`));
+    await check('Submit after an unchanged read costs no further provider read: one receipt, reused: true, +0 provider calls',
+      submitReceipts.length === 1 && submitReceipts[0].status === 201 && submitReceipts[0].json?.reused === true && reader.requests.length === callsBeforeSubmit,
+      `recognize ${JSON.stringify(submitReceipts.map(c => [c.status, c.json?.reused]))}; provider calls +${reader.requests.length - callsBeforeSubmit}`);
     const inkGrades = await online.practiceCalls(new RegExp(`^/v1/practice/${inkRow?.serverQuestionId}/submit$`));
     await check('the handwritten answer was marked by the server, once, against its own reading receipt',
       inkGrades.length === 1 && inkGrades[0].status === 200 && inkGrades[0].json?.authoritative === true &&
@@ -335,10 +358,27 @@ export const flow = {
     if (await writeTab.count()) await writeTab.click();
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
     const box2 = await page.locator('.ink-canvas-live').boundingBox();
+    // The stand-in is re-scripted here to misread a "1" this account has
+    // already had read (as "1", confidently) earlier in this flow. A real
+    // reader does not change its answer for an identical picture, and the
+    // server would rightly hand back the reading it kept. So the desk says
+    // "this is a different reader now" — a test-harness reset of the kept
+    // reads (support/online-session.mjs), not a product path.
+    const keptBefore = online.keptReads();
+    const forgotten = online.forgetKeptReads();
+    await check('the server was keeping this account\'s earlier reads, and the desk reset them for the re-scripted reader', keptBefore >= 1 && forgotten === keptBefore && online.keptReads() === 0,
+      `kept ${keptBefore}, forgotten ${forgotten}`);
     reader.text = '7';
     reader.confidence = 0.4;            // under the 0.82 floor: a doubtful read
+    const callsBeforeDoubt = reader.requests.length;
     await handwrite(page, box2, '1');   // what the student actually wrote
     await readingArrives(page);
+    await page.waitForTimeout(1200);
+    const doubtRead = (await readCalls()).at(-1);
+    await check('the transcript read is one provider call, and the doubtful reading it returns is kept with its doubt',
+      reader.requests.length === callsBeforeDoubt + 1 && doubtRead?.json?.reused === false && doubtRead.json?.transcription?.needsConfirmation === true &&
+        doubtRead.json.transcription.confidence === 0.4 && online.keptReads() === 1,
+      `provider calls +${reader.requests.length - callsBeforeDoubt}; ${JSON.stringify({ reused: doubtRead?.json?.reused, t: doubtRead?.json?.transcription && { c: doubtRead.json.transcription.confidence, n: doubtRead.json.transcription.needsConfirmation } })}; kept ${online.keptReads()}`);
     const doubtful = page.locator('.ink-line.ink-line-low');
     await check('a line the reader was unsure of is highlighted as doubtful',
       await doubtful.count() === 1 && (await doubtful.first().getAttribute('data-confidence')) === '0.4',
@@ -372,9 +412,14 @@ export const flow = {
     const [receipts, confirms, doubtGrades] = [await of('recognize'), await of('recognition/[^/]+/confirm'), await of('submit')];
     await check('a verdict comes from the server\u2019s deterministic engine on the corrected line: one receipt reading, the correction confirmed as "1", one grade',
       receipts.length === 1 && receipts[0].status === 201 && confirms.length === 1 && confirms[0].status < 300 && confirms[0].body?.text === '1' &&
-        doubtGrades.length === 1 && doubtGrades[0].json?.authoritative === true && doubtGrades[0].body?.mode === 'ink' &&
-        reader.requests.length === readsBeforeCorrection + 1,
-      `recognize ${receipts.map(c => c.status)}, confirm ${JSON.stringify(confirms.map(c => c.body))}, grades ${doubtGrades.length}, provider reads +${reader.requests.length - readsBeforeCorrection}`);
+        doubtGrades.length === 1 && doubtGrades[0].json?.authoritative === true && doubtGrades[0].body?.mode === 'ink',
+      `recognize ${receipts.map(c => c.status)}, confirm ${JSON.stringify(confirms.map(c => c.body))}, grades ${doubtGrades.length}`);
+    // The receipt read is of the same unchanged picture: the server reuses the
+    // read it kept — doubt and all — and pays for nothing more.
+    await check('the receipt read at Submit reused the kept doubtful read: reused: true, still flagged for confirmation, +0 provider calls since the transcript',
+      receipts[0]?.json?.reused === true && receipts[0].json.transcription?.needsConfirmation === true && receipts[0].json.transcription.text === '7' &&
+        reader.requests.length === readsBeforeCorrection,
+      `reused ${receipts[0]?.json?.reused}; receipt reading ${JSON.stringify(receipts[0]?.json?.transcription)}; provider reads +${reader.requests.length - readsBeforeCorrection}`);
     const anyProvenance = (await page.locator('.eval-provenance').first().innerText().catch(() => '')) || '';
     await check('and whichever way it went, the handwritten verdict carries the honesty line',
       /Read by AI, marked by Pri’s engine/.test(anyProvenance), JSON.stringify(anyProvenance));
