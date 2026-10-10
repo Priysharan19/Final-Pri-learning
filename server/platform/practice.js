@@ -758,13 +758,34 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // marker's verdict that is itself a verdict on the lines.
       const answeredByWorking = q.answerType === 'working' || Boolean(result.stepReport);
       const answerFeedback = String(optionWhy || result.feedback || '').slice(0, 3000);
+      const ownTrap = !result.correct
+        ? trapProbes.find(t => t?.why && String(t.why) === answerFeedback)?.why || null : null;
+      // What the marker says about a wrong answer is information about the
+      // right one: an authored trap for a typed value can state the answer
+      // outright ("… so the least value is 16"), and so can "there are 7
+      // solutions — you've given 1" or "that is the transpose". While the
+      // question is open only a multiple-choice option's own explanation is
+      // returned — it is what choosing that option means, and never names the
+      // keyed option (linted in practice-repeat-credit-check). Every other
+      // answer type gets the fixed sentence; the explanation, and the
+      // misconception it names, come with the reply that resolves the question.
+      const isMcq = q.answerType === 'mcq';
+      // Two generators' option explanations do name the keyed option
+      // ("Reflexivity — no number is less than itself"). That is a content
+      // defect, listed by the lint; until it is corrected the server does not
+      // pass such an explanation on while the question is open.
+      const squash = text => String(text ?? '').replace(/\\[dt]?frac/g, '\\frac').replace(/[\s$]|\\[,;!]|\\left|\\right/g, '');
+      const keyedOption = isMcq ? squash(q.mcqOptions?.[q.answer?.correctIndex]) : '';
+      const namesKey = isMcq && keyedOption.length >= 3 && squash(answerFeedback).includes(keyedOption);
       const feedback = resolved || invalid
         ? answerFeedback
         : workingOnly ? OPEN_FEEDBACK.workingOnly
-          : answeredByWorking ? OPEN_FEEDBACK.working
-            : answerFeedback || (working.trim() ? OPEN_FEEDBACK.working : '');
-      const trapWhy = !result.correct && !(answeredByWorking && !resolved)
-        ? trapProbes.find(t => t?.why && String(t.why) === answerFeedback)?.why || null : null;
+          : isMcq ? (namesKey ? '' : answerFeedback)
+            : working.trim() || answeredByWorking ? OPEN_FEEDBACK.working : '';
+      const deferredTrap = priorTry ? JSON.parse(priorTry.response_json).trapWhy || null : null;
+      const trapWhy = result.correct ? null
+        : resolved ? ownTrap || deferredTrap
+          : isMcq && !namesKey ? ownTrap : null;
       // Blank final answers are not automatically attempts: verified positive
       // method evidence alone makes an otherwise blank response gradable.
       // Unreadable working or an invalid NONBLANK answer still cannot earn
@@ -818,7 +839,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
           }), now]);
       } else if (!invalid) {
         await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-tries',?,?,?,?,?) ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json",
-          [accountId, qid, JSON.stringify({ tries: tries + 1 }), hash, now, now + MAX_AGE]);
+          [accountId, qid, JSON.stringify({ tries: tries + 1, ...(ownTrap ? { trapWhy: ownTrap } : {}) }), hash, now, now + MAX_AGE]);
         if (q._repeat !== true) await markContentTried(db, accountId, q, now);
       }
       return { response };

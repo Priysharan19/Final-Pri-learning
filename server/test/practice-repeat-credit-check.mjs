@@ -424,6 +424,139 @@ try {
     console.log(`  largest accepted working: resolved in ${heavy.ms.toFixed(0)} ms (no working: ${bare.ms.toFixed(0)} ms)`);
   }
 
+  // ══ the cost of working is bounded in the engine, whoever calls it ════════
+  // The text form of working had no bound on one line: 7,994 characters of
+  // `(x+1)(x+1)… = 0` took four seconds to check, on the thread every other
+  // request waits on. The engine now reads no line longer than 300 characters
+  // and no more working than a page can be, wherever it is called from.
+  {
+    const { loadAllBanks: loadBanks, generateQuestion: generate, GENERATORS: ALL } = await import('../../client/src/engine/generators/index.js');
+    await loadBanks();
+    const bOk = (cond, name) => { assert.ok(cond, name); count++; };
+    const bAccount = async tag => { await h.db.run('DELETE FROM rate_limits'); const x = await registerAccount(h, { email: `bound.${tag}@example.test`, deviceId: `ipad-bound-${tag}` }); await verifyEmail(h, x.account.id); return x; };
+    const bSubmit = (jar, id, answer, steps) => { const sid = `repeat-credit-${String(++n).padStart(4, '0')}`; return post(`/v1/practice/${id}/submit`, { submissionId: sid, answer: String(answer), mode: 'typed', ...(steps === undefined ? {} : { steps }) }, jar, { 'Idempotency-Key': sid }); };
+    const fill = (unit, length) => { let s = ''; while ((s + unit).length <= length) s += unit; return s; };
+    const said = ({ questionId, submissionId, attemptId, serverAcknowledgedAt, ...rest }) => rest;
+    const heavyUser = await bAccount('heavy');
+    const rush = seed => post('/v1/practice/issue', { generator: 'c8-linear-equations-both-sides', difficulty: 3, seed, curriculum: 'in', mode: 'rush' }, heavyUser.jar);
+    const timedSubmit = async (seed, steps) => {
+      const q = await rush(seed);
+      const letter = q.data.question.prompt.match(/[a-z]/i)[0];
+      const at = process.hrtime.bigint();
+      const r = await bSubmit(heavyUser.jar, q.data.question.id, '987654', typeof steps === 'function' ? steps(letter) : steps);
+      return { ms: Number(process.hrtime.bigint() - at) / 1e6, r };
+    };
+    const bare = await timedSubmit(8101, undefined);
+    for (const [index, [label, steps]] of [
+      ['one line of 7,994 characters of (x+1)(x+1)…', v => `${fill(`(${v}+1)`, 7990)} = 0`],
+      ['one line of nested ninth powers', v => `${fill(`((${v}^9)^9)^9+`, 7990)}1 = 0`],
+      ['twenty-six lines of 300 characters', v => Array.from({ length: 26 }, (_, i) => `${fill(`(${v}+1)`, 290)} = ${i}`).join('\n')],
+      ['a hundred lines of products', v => Array.from({ length: 100 }, (_, i) => `${fill(`(${v}+1)`, 70)} = ${i}`)]
+    ].entries()) {
+      const heavy = await timedSubmit(8102 + index, steps);
+      eq([heavy.r.status, heavy.r.data.resolved, heavy.r.data.marksEarned], [200, true, 0], `${label}: accepted, resolved on its one try, earns nothing`);
+      bOk(heavy.ms < Math.max(750, bare.ms * 60), `${label}: checked in ${heavy.ms.toFixed(0)} ms against ${bare.ms.toFixed(0)} ms with no working`);
+      if (index < 3) bOk(heavy.r.data.stepReport.lines.some(l => l.unread === true && /^Not checked/.test(l.note)), `${label}: what is not read is returned as a note saying so`);
+      else eq(heavy.r.data.stepReport.lines.filter(l => l.unread).length, 0, `${label}: a hundred short lines are within what is read, and all are`);
+    }
+
+    // The same rule at the end of a paper, where every question's working is marked in one request.
+    // A practice paper as the device composes one (see exam-authority-check).
+    const { subtopicsForYear } = await import('../../client/src/engine/curriculum.js');
+    const { multipartForYear } = await import('../../client/src/engine/generators/multipart.js');
+    const y7Other = subtopicsForYear(7).map(sub => sub.id).find(id => id !== 'y7-equations');
+    const rung = i => (i < 2 ? 1 : i < 6 ? 2 : i < 9 ? 3 : 4);
+    const paper = jar => post('/v1/exams', { kind: 'practice-paper', paper: { year: 7, minutes: 30 },
+      slots: [...Array.from({ length: 10 }, (_, i) => ({ generator: i % 2 ? 'y7-equations' : y7Other, difficulty: rung(i) })), { multipart: multipartForYear(7, 'advanced')[0] }] },
+    jar, { 'Idempotency-Key': `bound-paper-${String(++n).padStart(6, '0')}` });
+    // One paper to an account: the free allowance.
+    const finishTimed = async (tag, working) => {
+      const sitter = await bAccount(tag);
+      const p = await paper(sitter.jar);
+      eq(p.status, 201, 'a ten-question paper is issued');
+      const ids = p.data.exam.questions.filter(q => !q.payload?.multipart).map(q => q.id);
+      const at = process.hrtime.bigint();
+      const done = await post(`/v1/exams/${p.data.exam.id}/finish`, { answers: Object.fromEntries(ids.map(id => [id, '987654'])), workings: Object.fromEntries(ids.map(id => [id, working])) }, sitter.jar);
+      return { ms: Number(process.hrtime.bigint() - at) / 1e6, done };
+    };
+    const lightPaper = await finishTimed('light', '');
+    const heavyPaper = await finishTimed('weighty', `${fill('(n+1)', 7990)} = 0`);
+    eq([lightPaper.done.status, heavyPaper.done.status], [200, 200], 'a paper finishes with no working, and with 7,994 characters of working on every question');
+    bOk(heavyPaper.ms < Math.max(1500, lightPaper.ms * 40), `the paper with the heaviest working is marked in ${heavyPaper.ms.toFixed(0)} ms against ${lightPaper.ms.toFixed(0)} ms with none`);
+    console.log(`  heaviest working: practice ${bare.ms.toFixed(0)} ms bare; paper ${lightPaper.ms.toFixed(0)} ms bare, ${heavyPaper.ms.toFixed(0)} ms heavy`);
+
+    // ══ an open question is not told the answer through authored feedback ════
+    // The authored explanation for a wrong TYPED value sometimes states the
+    // answer; "there are 2 solutions — you've given 1" is a count of it. While
+    // a question is open only a multiple-choice option's own explanation comes
+    // back. Everything else waits for the reply that resolves the question.
+    const sealedOf = async id => JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE scope='practice-question' AND key=?", [id])).response_json);
+    const trapped = await bAccount('trapped'), plain = await bAccount('plain');
+    let trap = null;
+    for (let seed = 1; seed <= 60 && !trap; seed++) {
+      const q = await issue(trapped.jar, seed);
+      const sealed = await sealedOf(q.data.question.id);
+      const t = (sealed.traps || []).find(x => x?.why && Number.isFinite(x.value) && x.value !== sealed.answer?.value);
+      if (t && sealed.answerType === 'numeric') trap = { seed, id: q.data.question.id, why: t.why, value: t.value, key: Number(sealed.answer.value) };
+    }
+    bOk(trap !== null, 'a typed question with an authored trap value is found');
+    const other = await issue(plain.jar, trap.seed);
+    let dull = trap.key + 1000;                      // a wrong value no trap is written for
+    const t1 = await bSubmit(trapped.jar, trap.id, trap.value), d1 = await bSubmit(plain.jar, other.data.question.id, dull);
+    eq([t1.data.resolved, t1.data.trapWhy, t1.data.feedback], [false, null, ''], 'the trap value typed on an open question: no explanation, no misconception named');
+    eq(said(t1.data), said(d1.data), 'it is answered exactly as any other wrong value is');
+    const t2 = await bSubmit(trapped.jar, trap.id, dull);
+    eq([t2.data.resolved, t2.data.correct, t2.data.trapWhy], [true, false, trap.why], 'the reply that resolves the question carries the explanation of the first try, so the misconception is still recorded');
+    const d2 = await bSubmit(plain.jar, other.data.question.id, trap.value);
+    eq([d2.data.resolved, d2.data.trapWhy, d2.data.feedback], [true, trap.why, trap.why], 'and a trap value typed on the resolving try is explained there');
+    // A set answer short of a root is not told how many there are.
+    const setUser = await bAccount('setter');
+    const sq = await post('/v1/practice/issue', { generator: 'c10-quadratic-roots', difficulty: 3, seed: 7, curriculum: 'in' }, setUser.jar);
+    const sqSealed = await sealedOf(sq.data.question.id);
+    eq([sqSealed.answerType, sqSealed.answer.values.length], ['set', 2], 'a question whose answer is two roots');
+    const s1 = await bSubmit(setUser.jar, sq.data.question.id, String(sqSealed.answer.values[0]));
+    eq([s1.data.resolved, s1.data.correct, s1.data.feedback, s1.data.trapWhy], [false, false, '', null], 'one of the two roots on an open question: not told how many roots there are');
+    const s2 = await bSubmit(setUser.jar, sq.data.question.id, String(sqSealed.answer.values[0]));
+    bOk(s2.data.resolved === true && /two solutions/.test(s2.data.feedback), 'the count is said once the question is resolved');
+    // Multiple choice: the chosen option's own explanation, as before.
+    const mq = await post('/v1/practice/issue', { generator: 'c11-linear-inequalities', difficulty: 2, seed: 7, curriculum: 'in' }, setUser.jar);
+    const mSealed = await sealedOf(mq.data.question.id);
+    const wrongOption = Object.keys(mSealed.answer.optionTraps || {}).map(Number).find(i => i !== mSealed.answer.correctIndex);
+    const m1 = await bSubmit(setUser.jar, mq.data.question.id, wrongOption);
+    eq([mSealed.answerType, m1.data.resolved, m1.data.feedback, m1.data.trapWhy], ['mcq', false, mSealed.answer.optionTraps[wrongOption], mSealed.answer.optionTraps[wrongOption]],
+      'a wrong option on an open multiple-choice question is told what that option gets wrong');
+
+    // Content lint: no option's explanation may name the keyed option.
+    const squash = text => String(text ?? '').replace(/\\[dt]?frac/g, '\\frac').replace(/[\s$]|\\[,;!]|\\left|\\right/g, '');
+    const offenders = new Set();
+    let linted = 0;
+    for (const g of Object.keys(ALL)) for (const d of [1, 2, 3, 4]) for (let i = 0; i < 12; i++) {
+      let q; try { q = generate(g, d, i * 131 + 7); } catch { continue; }
+      if (!q || q.answerType !== 'mcq' || !q.answer?.optionTraps) continue;
+      const keyed = squash(q.mcqOptions?.[q.answer.correctIndex]);
+      if (keyed.length < 3) continue;                 // "5" is in every sentence about 15
+      for (const [index, why] of Object.entries(q.answer.optionTraps)) {
+        if (Number(index) === q.answer.correctIndex) continue;
+        linted++;
+        if (squash(why).includes(keyed)) offenders.add(`${g} d${d}`);
+      }
+    }
+    bOk(linted > 500, `option explanations linted: ${linted}`);
+    // Known content defects, reported to the content owner. The server
+    // withholds these explanations on an open question (checked below); the
+    // lint fails on any generator not listed here.
+    const KNOWN_DEFECTS = ['c10-irrationality-proofs d2', 'c12-relations-equivalence d2'];
+    eq([...offenders].filter(x => !KNOWN_DEFECTS.includes(x)), [], 'no multiple-choice option explanation states the keyed option, beyond the defects already listed');
+    if (offenders.size) console.log(`  CONTENT DEFECT (withheld by the server until corrected): option explanations name the keyed option in ${[...offenders].join(', ')}`);
+    const dq = await post('/v1/practice/issue', { generator: 'c12-relations-equivalence', difficulty: 2, seed: 7, curriculum: 'in' }, setUser.jar);
+    const dSealed = await sealedOf(dq.data.question.id);
+    const keyedText = dSealed.mcqOptions[dSealed.answer.correctIndex];
+    const leaky = Object.entries(dSealed.answer.optionTraps).find(([i, why]) => Number(i) !== dSealed.answer.correctIndex && String(why).includes(keyedText));
+    bOk(!!leaky, 'a defective explanation is on this question');
+    const dx = await bSubmit(setUser.jar, dq.data.question.id, leaky[0]);
+    eq([dx.data.resolved, dx.data.feedback, dx.data.trapWhy, JSON.stringify(dx.data).includes(keyedText)], [false, '', null, false], 'an explanation that names the keyed option is not passed on while the question is open');
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
   // R4 SERVER STREAM (H3) — a figure is content only when the answer is read
   // from it. Separate block: its own accounts, helpers prefixed `fig`.

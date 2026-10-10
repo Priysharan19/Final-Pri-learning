@@ -406,8 +406,41 @@ function namesAValue(text, meta) {
   } catch { return false; }
 }
 
+// ── How much working is read ─────────────────────────────────────────────────
+// Checking a line costs time that grows faster than its length: a line of
+// 8000 characters of `(x+1)(x+1)…` took four seconds, on the thread every
+// other request waits on. So the engine itself — whoever calls it — reads only
+// what a page of working can be:
+//   · a line of more than 300 characters is not read;
+//   · no more than 100 lines are read;
+//   · the lines read are bounded together, by the sum of the squares of their
+//     lengths (sixteen lines of 300 characters, or a hundred of 120).
+// A line that is not read is returned as a note saying so. It is neither a
+// mistake nor credit, and nothing after the budget is spent is credited. The
+// bound is on the text, not the clock, so the same working is always marked
+// the same way; the clock is only a backstop that these bounds keep idle.
+export const WORKING_LIMITS = Object.freeze({ lineChars: 300, lines: 100, work: 1500000, backstopMs: 750 });
+const UNREAD = {
+  long: `Not checked — this line is longer than ${WORKING_LIMITS.lineChars} characters. Write one step per line.`,
+  many: 'Not checked — this is more working than can be checked. Keep to the steps of your method.'
+};
+
+/** For each line of working, null when it is to be read, or the note saying why it is not. */
+function unreadLines(rawLines) {
+  let spent = 0, closed = false;
+  const started = Date.now();
+  return rawLines.map((line, index) => {
+    if (line.length > WORKING_LIMITS.lineChars) return UNREAD.long;
+    spent += line.length * line.length;
+    if (closed || index >= WORKING_LIMITS.lines || spent > WORKING_LIMITS.work) { closed = true; return UNREAD.many; }
+    return () => (Date.now() - started > WORKING_LIMITS.backstopMs ? UNREAD.many : null);
+  });
+}
+const unreadNote = entry => (typeof entry === 'function' ? entry() : entry);
+
 function stepCheckSingle(meta, workingText, system = null, { loneBranches = false } = {}) {
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
+  const unread = unreadLines(rawLines);
   const out = [];
   let firstBreak = -1;
   let previousEquation = null;
@@ -418,6 +451,8 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
   const branchLines = [];
 
   rawLines.forEach((line, i) => {
+    const skipped = unreadNote(unread[i]);
+    if (skipped) { out.push({ text: line, status: 'note', note: skipped, unread: true }); return; }
     let status = 'note';
     let note;
     let lineDiagnosis = null;
@@ -595,6 +630,23 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               status = assessed.status;
               note = assessed.note;
               lineDiagnosis = assessed.diagnosis || null;
+              // A mistake is a line that is false for the question. A line
+              // that every answer satisfies and that would also let in
+              // another value — `a^2 = 4` where the question says a > 0,
+              // `n(n - 1) = 20` where n counts things — is true: the
+              // question's own conditions decide between its values. Where
+              // it is what the student starts from, it is a note, not the
+              // point after which nothing is credited. Where it FOLLOWS a
+              // verified line with the answer's values and no others
+              // (`x = 5` then `x^2 = 25`), the step itself let the extra
+              // value in, and that stays the mistake.
+              if (status === 'break' && lineDiagnosis?.code === 'extraneous-solution' &&
+                  !previousEquationTrusted && typeof meta.source !== 'string' &&
+                  solutionsSatisfying(ast, meta).length === uniqueNumeric(meta.solutions).length) {
+                status = 'note';
+                note = `True for the answer. It would also allow another value of ${meta.variable}, which the question's conditions rule out — check each value against the question.`;
+                lineDiagnosis = null;
+              }
               if (assessed.check) {
                 // A check of the answer makes no claim to reason from.
                 out.push({ text: line, status, note, check: true, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
@@ -813,8 +865,11 @@ function stepCheckPlan(meta, workingText) {
 
   const ready = idx => requires[idx].every(r => completed.has(r));
 
+  const unread = unreadLines(rawLines);
   for (let i = 0; i < rawLines.length; i++) {
     const line = rawLines[i];
+    const skipped = unreadNote(unread[i]);
+    if (skipped) { out.push({ text: line, status: 'note', note: skipped, unread: true, stage: active }); continue; }
     if (firstBreak !== -1) {
       out.push({ text: line, status: 'note', note: 'Follows from the earlier slip.', stage: active });
       continue;
@@ -944,6 +999,7 @@ function plainTex(tex) {
 }
 
 function readClaim(text) {
+  if (String(text ?? '').length > WORKING_LIMITS.lineChars) return null;     // not read: see "How much working is read"
   const src = String(text ?? '').trim()
     .replace(/[−–—]/g, '-')
     .replace(/^∴\s*/, '')
@@ -1761,6 +1817,31 @@ function solvingStage(claim, variable, givenOwn) {
   return null;
 }
 
+/** Is this line the answer itself — the solved inequality, or the expression as the answer writes it? */
+function statesTheAnswer(claim, meta, unknown) {
+  try {
+    if (claim.kind === 'relation' && unknown && typeof meta.canonical === 'string') {
+      const lone = side => unwrapGroup(side)?.t === 'var' && unwrapGroup(side).v === unknown;
+      const { l, r } = claim.relation;
+      return (lone(l) && !variablesOf(r).size) || (lone(r) && !variablesOf(l).size);
+    }
+    if (meta.kind === 'expression' && typeof meta.canonical === 'string') {
+      const answer = readClaim(meta.canonical);
+      const written = claim.kind === 'equation' ? { kind: 'expression', ast: claim.ast.r } : claim;
+      return !!answer && written.kind === 'expression' && sameWrittenClaim(written, answer);
+    }
+    // A derivative is checked as "is this the derivative": every verified line
+    // is the answer in some form. Written as simply as the answer, it is the
+    // answer; written with the rule still showing (`-9 * 2x`), it is working.
+    if (meta.kind === 'derivative' && typeof meta.canonical === 'string') {
+      const answer = readClaim(meta.canonical);
+      const written = claim.kind === 'equation' ? claim.ast.r : claim.kind === 'expression' ? claim.ast : null;
+      return !!answer && !!written && answer.kind === 'expression' && symbolCount(written) <= symbolCount(answer.ast);
+    }
+  } catch { /* unreadable: not the answer */ }
+  return false;
+}
+
 /** Does an equation in the unknown alone hold whatever the unknown is? */
 function silentOnUnknown(claim, variable) {
   const sides = claimSides(claim);
@@ -1854,21 +1935,26 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
   const total = Math.max(1, Number(marks) || 1);
   const cap = Math.max(0, total - 1);
   // Working is a derivation, not a list of guesses.
-  //  · On an equation, nothing after the first mistake earns: what follows a
-  //    false line is built on it or is another attempt at the same thing.
-  //    Marks earned before the mistake stay earned. (Only on an equation,
-  //    where a mistake is a line that is false at the answer. On an
-  //    expression or a derivative an honest side line — `u = x^2` — is
-  //    "not the answer" without being wrong.)
-  //  · Three or more lines of one shape that give a letter different values —
-  //    `v = 3`, `v = 4`, `v = 5`; `2v = 6`, `2v = 8`, `2v = 10` — are a sweep
-  //    of candidates, and none of them earns, wherever the true one stands.
-  //    The shape is the line as written with its numbers blanked out. Two
-  //    values are a slip and its correction, which the first rule settles.
+  //  · On an equation or an inequality, nothing after the first mistake earns:
+  //    what follows a false line is built on it or is another attempt at the
+  //    same thing. Marks earned before the mistake stay earned. On an
+  //    inequality a relation that has not the question's solutions is the
+  //    mistake, whether the checker could name the fault or not. (Not on an
+  //    expression or a derivative, where an honest side line — `u = x^2`,
+  //    `y = 2x + c` — is "not the answer" without being wrong.)
+  //  · Three or more lines of one shape with different numbers in them —
+  //    `v = 3`, `v = 4`, `v = 5`; `2v > 6`, `2v > 8`, `2v > 10`; `A = 1/3`,
+  //    `A = 2/3`, `A = 1` — are a sweep of candidates, and none of them earns,
+  //    wherever the true one stands. The shape is the line as written with its
+  //    numbers blanked out. Two are a slip and its correction, which the first
+  //    rule settles. This holds for every kind of question.
   //  · A check of a root earns once, and not beside a letter-free line that
   //    is false: one true substitution among false ones is the one that
   //    happened to balance.
-  const firstBreak = meta.kind === 'equation' ? allLines.findIndex(l => l.status === 'break') : -1;
+  const relational = meta.kind === 'inequality' || meta.kind === 'chained-inequality' || meta.kind === 'modulus-inequality';
+  const firstBreak = meta.kind === 'equation' ? allLines.findIndex(l => l.status === 'break')
+    : relational ? allLines.findIndex(l => l.status === 'break' || (l.status !== 'ok' && readClaim(l.text)?.kind === 'relation'))
+      : -1;
   // More values than the equation has roots, and at least three.
   const sweepSize = Math.max(3, uniqueNumeric(meta.solutions).length + 1);
   const contradicted = new Set();
@@ -1876,37 +1962,37 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
   {
     const shapes = new Map();
     allLines.forEach((l, index) => {
+      const text = String(l.text ?? '').replace(/[−–—]/g, '-').replace(/\s+/g, '');
       const c = readClaim(l.text);
-      if (c?.kind !== 'equation') return;
-      const names = [...variablesOf(c.ast)];
-      if (!names.length) {
+      if (c?.kind === 'equation' && !variablesOf(c.ast).size) {
         try {
           const L = evaluate(c.ast.l, {}), R = evaluate(c.ast.r, {});
           if (Number.isFinite(L) && Number.isFinite(R) && !holdsWithin(L, R)) falseArithmetic = true;
         } catch { /* unreadable arithmetic says nothing */ }
         return;
       }
-      if (names.length !== 1) return;
-      const st = linearState(c, names[0]);
-      if (!st) return;
-      const [a, b, cc, d] = st.sides;
+      if (!/[a-zA-Z]/.test(text) || !/\d/.test(text)) return;
       // The shape is the line as written with its numbers blanked out.
-      const blank = node => JSON.stringify(node, (k, v) => (v && typeof v === 'object' && v.t === 'num' ? { t: 'num' } : v));
-      const key = `${names[0]}|${[blank(c.ast.l), blank(c.ast.r)].sort().join('=')}`;
-      const root = (d - b) / (a - cc);
-      const seen = shapes.get(key) || [];
-      seen.push({ index, root });
+      const numbers = text.match(/\d+(?:\.\d+)?/g).join(',');
+      const key = text.replace(/\d+(?:\.\d+)?/g, '#');
+      const seen = shapes.get(key) || { values: new Set(), lines: [] };
+      seen.values.add(numbers);
+      seen.lines.push(index);
       shapes.set(key, seen);
     });
     for (const seen of shapes.values()) {
-      const values = [];
-      for (const x of seen) if (!values.some(v => numsClose(v, x.root))) values.push(x.root);
-      if (values.length >= sweepSize) for (const x of seen) contradicted.add(x.index);
+      if (seen.values.size >= sweepSize) for (const index of seen.lines) contradicted.add(index);
     }
   }
   // Does the question hand over an equation that is linear in the unknown
   // alone? Then every step towards the answer is linear in it too.
-  const linearQuestion = !!meta.variable && given.some(c => !!linearState(c, meta.variable));
+  // An inequality's meta names no unknown; it is the one letter of its source.
+  const unknown = meta.variable || (() => {
+    if (!relational || typeof meta.source !== 'string') return null;
+    const letters = [...new Set(meta.source.match(/[a-zA-Z]/g) || [])];
+    return letters.length === 1 ? letters[0] : null;
+  })();
+  const linearQuestion = !!unknown && given.some(c => !!linearState(c, unknown));
   // The per-line mark vector: one entry per written line, in order, saying
   // what that line earned and why. Its marks always sum to `awarded`, so a
   // multi-line answer can show the examiner's tick (or its absence) per line.
@@ -2021,9 +2107,14 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
     // On an equation, a line that is not an equation (a bare `7`) states a
     // value; it derives nothing.
     if (meta.kind === 'equation' && claim && claim.kind === 'expression') { row.reason = 'final-answer'; return row; }
-    const state = meta.variable ? linearState(claim, meta.variable) : null;
+    // The answer itself, written with nothing before it, is a statement: the
+    // inequality solved (`x > 6`) or the expression in its final form.
+    // (Written under the question's own line it is the one step of a one-step
+    // question, as `x = 2` is under `3x = 6`.)
+    if (!counted.length && !restated && claim && statesTheAnswer(claim, meta, unknown)) { row.reason = 'final-answer'; return row; }
+    const state = unknown ? linearState(claim, unknown) : null;
     if (state) {
-      const before = [...given, ...counted].map(c => linearState(c, meta.variable)).filter(Boolean);
+      const before = [...given, ...counted].map(c => linearState(c, unknown)).filter(Boolean);
       if (before.some(g => !linearStateAdvances(state, g))) { row.reason = 'repeat'; return row; }
     } else if (meta.kind === 'equation' && meta.variable && claim?.kind === 'equation') {
       // A line that is not linear in the unknown.
@@ -2041,9 +2132,22 @@ export function methodMarks({ meta, working, marks, prompt = '', report = null }
       if (!stage) { row.reason = 'restated'; return row; }
       if (solvedStages.has(stage)) { row.reason = 'repeat'; return row; }
       solvedStages.add(stage);
+      row.stage = stage;
     }
     return credit();
   });
+  // Rewriting the equation — expanding it, clearing it, putting it in standard
+  // form — can be done without knowing how to solve it. With nothing solved
+  // after it (no factorisation, square, formula, root or line of lower
+  // degree), all the rewriting together is one mark.
+  if (meta.kind === 'equation') {
+    const REWRITING = ['expanded', 'cleared', 'standard'];
+    const marked = vector.filter(row => row.mark > 0);
+    const rewritten = marked.filter(row => REWRITING.includes(row.stage));
+    if (rewritten.length > 1 && marked.length === rewritten.length) {
+      for (const row of rewritten.slice(1)) { row.mark = 0; row.reason = 'rewriting'; counted.pop(); }
+    }
+  }
   const progress = counted.length;
   const awarded = Math.min(cap, progress);
   const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;

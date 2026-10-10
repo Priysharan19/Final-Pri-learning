@@ -9,7 +9,7 @@
 import { normalize, parse, evaluate, evalNumeric, exprEquivalent, numsClose, variablesOf } from './expr.js';
 import { diagnoseStep } from './diagnose.js';
 import {
-  parseIntervalInput, authoredRegion, sameRegion, sameRegionIgnoringEndpoints, formatRegion,
+  parseIntervalInput, authoredRegion, sameRegion, sameRegionIgnoringEndpoints,
   parseMatrixInput, sameMatrix, transposeMatrix,
   parseVectorInput, sameVector
 } from './answer-forms.js';
@@ -539,7 +539,8 @@ function checkForm(question, rawInput) {
       }], ans.tol);
     if (mirrored) return { correct: false, feedback: 'The boundary is right but the inequality points the wrong way — remember the sign reverses when you multiply or divide by a negative number.' };
     if (sameRegion(got.intervals, flipped, ans.tol)) return { correct: false, feedback: 'Check the sign of the boundary — the solution set is reflected.' };
-    return { correct: false, feedback: `Not the solution set. The answer is written as ${formatRegion(want, ans.variable || 'x')}, or in interval notation ${formatRegion(want, ans.variable || 'x', 'interval')} — check your working.` };
+    // The sentence does not print the solution set: said after a wrong try, it would be the answer.
+    return { correct: false, feedback: 'Not the solution set — check the boundary values, which side of each the solutions lie on, and whether each boundary is included.' };
   }
 
   if (type === 'matrix') {

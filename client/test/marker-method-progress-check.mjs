@@ -14,7 +14,7 @@
 //
 // Every case is authored. Nothing here is generated.
 // ─────────────────────────────────────────────────────────────────
-import { methodMarks, stepCheck, checkAnswer } from '../src/engine/checker.js';
+import { methodMarks, stepCheck, checkAnswer, WORKING_LIMITS } from '../src/engine/checker.js';
 import { parseNumericInput } from '../src/engine/checker-core.js';
 
 let pass = 0;
@@ -576,6 +576,117 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   ok(lone.firstBreak === -1 && lone.lines[1].status === 'ok' && /other is still to find/.test(lone.lines[1].note || ''), 'x - 3 = 4 after (x - 3)^2 = 16 is one branch, not a mistake');
   ok(stepCheck(quad, '(x-3)^2=16\nx-3=5', { prompt: '$x^2-6x=7$' }).firstBreak === 1, 'a branch that is true of no root is still the mistake');
   ok(checkAnswer({ answerType: 'set', answer: { values: [7, -1] }, prompt: 'Solve $x^2-6x=7$.' }, '7').correct !== true, 'and one root is still not the answer');
+}
+
+// ── Rewriting a quadratic is one mark until something is solved ──────────────
+// `x^2 - 11x = -28` and then `x(x - 11) = -28` under two wrong answers earned
+// every method mark on every printed quadratic: a term moved across, then that
+// line rewritten. Neither needs the equation to be solved.
+{
+  const marks = (source, roots, working, total = 4) => {
+    const meta = { kind: 'equation', variable: 'x', solutions: roots, source };
+    try { return methodMarks({ meta, working: `${working}\nx = 424242`, marks: total, prompt: `$${source}$` })?.awarded ?? 0; } catch { return -1; }
+  };
+  for (const working of ['x^2 - 11x = -28', 'x(x - 11) = -28', 'x^2 - 11x = -28\nx(x - 11) = -28', 'x^2 = 11x - 28\nx^2 - 11x = -28\nx(x - 11) = -28\nx^2 + 28 = 11x', 'x(x - 11) + 28 = 0']) {
+    ok(marks('x^2 - 11x + 28=0', [4, 7], working) === 0, `a quadratic already in standard form: "${working.replace(/\n/g, ' ; ')}" rearranges it and earns nothing`);
+  }
+  // Expanding, clearing and standard form are each a stage; with nothing solved after them they are one mark together.
+  ok(marks('x(x-5)=-6', [2, 3], 'x^2-5x=-6\nx^2-5x+6=0') === 1, 'expanding and then standard form, with nothing solved, are one mark');
+  ok(marks('x + 6/x=5', [2, 3], 'x^2+6=5x\nx^2-5x+6=0') === 1, 'clearing a denominator and then standard form, with nothing solved, are one mark');
+  ok(marks('x(x-5)=-6', [2, 3], 'x^2-5x=-6\nx^2-5x+6=0\n(x-2)(x-3)=0') === 3, 'followed by the factorisation, each of the three counts');
+  ok(marks('x + 6/x=5', [2, 3], 'x^2+6=5x\nx^2-5x+6=0\nx = (5 + sqrt(1))/2') === 3, 'followed by the formula, each of the three counts');
+  ok(marks('x^2=9', [3, -3], 'x^2-9=0') === 1, 'standard form of a question not in it is one mark');
+}
+
+// ── Sweeps of candidates earn nothing on any kind of question ────────────────
+// On "Solve -2x - 9 < -21" a page of `2x > 2k` and `2x < 2k` earned the method
+// mark: a false inequality was only "not proved", the first-mistake rule ran
+// on equations alone, and the candidates were not seen as a list.
+{
+  const ineq = { kind: 'inequality', source: '-2x - 9 < -21', canonical: 'x > 6' };
+  const iPrompt = 'Solve $-2x - 9 < -21$.';
+  const run = (meta, prompt, working, total = 3) => { try { return methodMarks({ meta, working, marks: total, prompt })?.awarded ?? 0; } catch { return -1; } };
+  const K = Array.from({ length: 49 }, (_, i) => i - 24);
+  ok(run(ineq, iPrompt, [...K.map(k => `2x < ${2 * k}`), ...K.map(k => `2x > ${2 * k}`)].join('\n')) === 0, 'inequality: a sweep of 2x < 2k and 2x > 2k earns nothing');
+  ok(run(ineq, iPrompt, ['2x > 12', ...K.map(k => `2x > ${2 * k + 1}`)].join('\n')) === 0, 'inequality: nor when the true line stands first');
+  ok(run(ineq, iPrompt, '2x > 10\n2x > 12') === 0, 'inequality: after a relation that is not the question\'s, the true one earns nothing');
+  ok(run(ineq, iPrompt, '2x > 12\n2x > 14') === 1, 'inequality: a true step keeps its mark when a wrong line follows it');
+  ok(run(ineq, iPrompt, 'x > 6') === 0, 'inequality: the answer written with nothing before it is a statement');
+  ok(run(ineq, iPrompt, '-2x < -12\nx > 6') === 2, 'inequality: adding 9 and then dividing by -2 keep both marks');
+  ok(run(ineq, iPrompt, '-2x < -12\n-4x < -24\n-6x < -36\n2x > 12') === 1, 'inequality: multiples of a line already written earn nothing more');
+  ok(run(ineq, iPrompt, '-2x - 9 + 9 < -21 + 9') === 0, 'inequality: adding 9 to both sides, written beside each, has not yet done it');
+  // Other kinds: the true line among candidates, and the answer stated alone.
+  const deriv = { kind: 'derivative', variable: 'x', source: '-9x^2', canonical: '-18x^1' };
+  const dPrompt = 'Differentiate $y = -9x^{2}$.';
+  ok(run(deriv, dPrompt, 'dy/dx = -18x') === 0, 'derivative: the answer written with nothing before it is a statement');
+  ok(run(deriv, dPrompt, 'dy/dx = -9*2x^1\ndy/dx = -18x') >= 1, 'derivative: the rule applied, then simplified, is working');
+  ok(run(deriv, dPrompt, ['dy/dx = -16x', 'dy/dx = -17x', 'dy/dx = -18x', 'dy/dx = -19x'].join('\n')) === 0, 'derivative: a list of candidates earns nothing');
+  const expr = { kind: 'expression', canonical: '5x', source: '3x + 2x' };
+  ok(run(expr, 'Simplify $3x + 2x$.', ['3x', '4x', '5x', '6x'].join('\n'), 2) === 0, 'expression: a list of candidates earns nothing');
+  ok(run(expr, 'Simplify $3x + 2x$.', '5x', 2) === 0, 'expression: the answer written with nothing before it is a statement');
+  ok(run(expr, 'Simplify $3x + 2x$.', '3x + 2x\n5x', 2) === 1, 'expression: written under the question, it is the one step of a one-step question');
+}
+
+// ── How much working is read ─────────────────────────────────────────────────
+// One line of 7,994 characters of `(x+1)(x+1)… = 0` took four seconds to
+// check. The bound is in the engine, so every caller has it.
+{
+  const meta = { kind: 'equation', variable: 'x', solutions: [-1], source: '3x + 15=2x + 14' };
+  const prompt = '$3x + 15=2x + 14$';
+  const fill = (unit, length, tail = ' = 0') => { let s = ''; while (s.length + unit.length + tail.length <= length) s += unit; return s + tail; };
+  ok(WORKING_LIMITS.lineChars === 300 && WORKING_LIMITS.lines === 100, 'a line is read up to 300 characters, and a page up to 100 lines');
+  const long = stepCheck(meta, `${fill('(x+1)', 290, '')}+123456 = 0`, { prompt });   // 301 characters
+  ok(long.lines[0].status === 'note' && long.lines[0].unread === true && /longer than 300 characters/.test(long.lines[0].note) && long.firstBreak === -1, 'a line over 300 characters is not read: a note, not a mistake');
+  ok(`${fill('(x+1)', 290, '')}+123456 = 0`.length === 301 && `${fill('(x+1)', 290, '')}+12345 = 0`.length === 300, '(those two lines are 301 and 300 characters)');
+ok(stepCheck(meta, `${fill('(x+1)', 290, '')}+12345 = 0`, { prompt }).lines[0].unread !== true, 'a line of exactly 300 characters is read');
+  const mixed = stepCheck(meta, `x + 15 = 14\n${fill('(x+1)', 400)}\nx = -1`, { prompt });
+  ok(mixed.lines.map(l => l.status).join() === 'ok,note,ok', 'the lines round an unread one are read as usual');
+  ok((methodMarks({ meta, working: `x + 15 = 14\n${fill('(x+1)', 400)}\nx = 9`, marks: 3, prompt })?.awarded ?? 0) === 1, 'and keep their marks');
+  const page = stepCheck(meta, Array.from({ length: 130 }, (_, i) => `x + ${i} = ${i - 1}`).join('\n'), { prompt });
+  ok(page.lines.slice(0, 100).every(l => !l.unread) && page.lines.slice(100).every(l => l.unread === true && l.status === 'note'), 'the hundred-and-first line onward is not read');
+  const heavy = stepCheck(meta, Array.from({ length: 26 }, (_, i) => fill('(x+1)', 300, ` = ${i}`)).join('\n'), { prompt });
+  ok(heavy.lines.slice(0, 16).every(l => !l.unread) && heavy.lines.slice(17).every(l => l.unread === true), 'sixteen lines of 300 characters are read, and no more after them');
+  ok((methodMarks({ meta, working: `${Array.from({ length: 26 }, (_, i) => fill('(x+1)', 300, ` = ${i}`)).join('\n')}\nx + 15 = 14`, marks: 3, prompt })?.awarded ?? 0) === 0, 'a true step after the working that could not be read earns nothing');
+  // Every shape that is slow to check, at the largest size accepted, on every kind of question.
+  const metas = [meta, { kind: 'equation', variable: 'x', solutions: [2, 3], source: 'x^2-5x+6=0' }, { kind: 'expression', canonical: '5x' },
+    { kind: 'inequality', source: '-2x - 9 < -21', canonical: 'x > 6' }, { kind: 'derivative', variable: 'x', source: 'x^3 - 5x^2', canonical: '3x^2 - 10x' }];
+  const nest = (open, close, core, length) => { let s = core; while (s.length + open.length + close.length + 4 <= length) s = open + s + close; return `${s} = 0`; };
+  const shapes = {
+    'a long product': n => fill('(x+1)', n), 'nested powers': n => fill('((x^9)^9)^9+', n, '1 = 0'), 'deep brackets': n => nest('(', ')', 'x', n), 'a long sum': n => fill('x^2+', n, '1 = 0'),
+    'a huge exponent': () => 'x^999999999 = (x+1)^99999', 'a tower of powers': () => 'x^x^x^x^x^x^x^x = 2', 'many abs': n => nest('abs(', ')', 'x-1', n), 'repeated sqrt': n => nest('sqrt(', ')', 'x+1', n),
+    'nested fractions': n => nest('1/(1+', ')', 'x', n), 'factorials': n => fill('(x+1)!+', n, '1 = 1'), 'big numbers': n => fill('99999999*', n, 'x = 1'), 'ninth powers': n => fill('(x+1)^9*', n, '1 = 0')
+  };
+  let worst = 0, worstName = '';
+  for (const [name, make] of Object.entries(shapes)) for (const [lines, length] of [[1, 7990], [1, 300], [26, 300], [100, 79], [8, 999]]) for (const m of metas) {
+    const working = Array.from({ length: lines }, () => make(length)).join('\n').slice(0, 8000);
+    const at = process.hrtime.bigint();
+    let threw = false;
+    try { const report = stepCheck(m, working, { prompt: `$${m.source || '3x + 2x'}$` }); methodMarks({ meta: m, working, marks: 4, prompt: `$${m.source || '3x + 2x'}$`, report }); } catch { threw = true; }
+    const ms = Number(process.hrtime.bigint() - at) / 1e6;
+    if (ms > worst) { worst = ms; worstName = `${name}, ${lines} × ${length}, ${m.kind}`; }
+    if (threw) failures.push(`${name} (${lines} × ${length}, ${m.kind}) threw`);
+  }
+  // Measured at about 30 ms on the development machine; the budget asked for is 100 ms. The
+  // assertion allows for a loaded machine without allowing the seconds this used to take.
+  ok(worst < 750, `the slowest working of accepted size is checked in ${worst.toFixed(0)} ms (${worstName})`);
+}
+
+// ── A mistake is a line that is false ────────────────────────────────────────
+// `a^2 = 4` on "∫₀ᵃ 2x dx = 4, a > 0" is the authored step, and it was called
+// the first mistake because it would also allow a = -2.
+{
+  const meta = { kind: 'equation', variable: 'a', solutions: [2] };
+  const prompt = 'Given that $\\displaystyle\\int_{0}^{a} 2x\\,dx = 4$ and $a > 0$, find $a$.';
+  const first = stepCheck(meta, 'a^2 = 4\na = 2', { prompt });
+  ok(first.firstBreak === -1 && first.lines[0].status === 'note' && /True for the answer/.test(first.lines[0].note), 'a^2 = 4 is true for the answer: a note, not a mistake');
+  ok(first.lines[1].status === 'ok', 'and the line after it is still read');
+  const count = { kind: 'equation', variable: 'n', solutions: [5] };
+  const chain = stepCheck(count, 'n(n-1)/2 = 10\nn(n-1) = 20\nn^2 - n - 20 = 0\n(n-5)(n+4) = 0\nn = 5', { prompt: 'Given that $\\binom{n}{2} = 10$, find $n$.' });
+  ok(chain.firstBreak === -1 && chain.lines.every(l => l.status !== 'break'), 'no line of the nC2 solution is called a mistake');
+  // A step that itself lets an extra value in is still the mistake.
+  ok(stepCheck({ kind: 'equation', variable: 'x', solutions: [5] }, 'x = 5\nx^2 = 25').firstBreak === 1, 'squaring a solved equation, which adds a root, is still the mistake');
+  ok(stepCheck({ kind: 'equation', variable: 'x', solutions: [5] }, '3x = 15\n(x - 5)(x - 100) = 0').firstBreak === 1, 'a root injected after a verified line is still the mistake');
+  ok(stepCheck(meta, 'a^2 = 9', { prompt }).firstBreak === 0, 'and a line that is false for the answer is the mistake');
 }
 
 // ── A comma with a space beside it is a list ─────────────────────────────────
