@@ -104,5 +104,33 @@ export function makeAdvancedVisual(kind,p){
   const fig={type:'plane',description:`Two rays y=${m1}x and y=${m2}x bound a shaded triangle from x=0 to x=${end}.`,points:[pt('O',[0,0]),pt('U',[end,m1*end]),pt('L',[end,m2*end])],polygons:[{vertices:['O','U','L'],shade:true}],segments:[['O','U'],['O','L'],['U','L']]};
   return done('Calculate the area between the two graphs and the vertical boundary.',[`The vertical gap at x=${end} is (${m1}−${m2})×${end}.`,`The shaded triangle has base ${end} and height ${(m1-m2)*end}.`,`Its exact area is ${answer} square units.`],`${answer} square units`,V(`(${m1}-${m2})*${end}^2/2`,answer),fig);
  }
+ if(kind==='squareGrid'){
+  const {n}=p;if(!Number.isInteger(n)||n<3||n>12)throw Error('square-grid order');
+  const fig={type:'square-grid',description:`A square array of ${n} rows and ${n} columns of unit tiles, totalling ${n*n} tiles.`,n};
+  return done('Find the side length of the shown square array if each small tile has unit side.',[`The arrangement has ${n*n} identical unit-square tiles.`,'For a square with side length s, the tile count is s².',`The positive square root sqrt(${n*n}) is ${n}.`],n,V(`sqrt(${n*n})`,n),fig);
+ }
+ if(kind==='cubeGrid'){
+  const {n}=p;if(!Number.isInteger(n)||n<2||n>7)throw Error('cube-grid order');
+  const volume=n*n*n,fig={type:'cube-grid',description:`An n-by-n-by-n unit-cube stack, with n=${n} per edge, containing ${volume} unit cubes.`,n};
+  return done(`A solid cube of ${volume} identical unit cubes is shown. How many unit cubes lie along one edge?`,[`All three perpendicular edges contain the same number n of unit cubes.`,`The volume count is n³=${volume}.`,`Its positive cube root is ${n} cubes per edge.`],n,{kind:'roots',f:`x^3-${volume}`,answers:[String(n)],degree:3},fig);
+ }
+ if(kind==='algebraArea'){
+  const {a,b}=p;if(![a,b].every(Number.isInteger)||a<=0||b<=0||a>9||b>9)throw Error('area model strips');
+  const fig={type:'algebra-area',description:`A square-and-strip area model partitioning a rectangle with sides x+${a} and x+${b} into four labelled regions x², ${a}x, ${b}x and ${a*b}.`,a,b};
+  const total=a+b,constant=a*b;
+  return done(`Use the partitioned rectangle to factor x²+${total}x+${constant}.`,[`The horizontal side is x+${a}, while the vertical side is x+${b}.`,`The four regions have areas x², ${a}x, ${b}x, and ${constant}.`,`Their sum factors to (x+${a})(x+${b}).`],`(x+${a})(x+${b})`,P([[`${a}+${b}`,total],[`${a}*${b}`,constant],[`(2+${a})*(2+${b})`,`2^2+${total}*2+${constant}`],[`(-1+${a})*(-1+${b})`,`(-1)^2+${total}*(-1)+${constant}`]]),fig);
+ }
+ if(kind==='primeBars'){
+  const {A,B}=p;
+  if(!Array.isArray(A)||!Array.isArray(B)||A.length!==3||B.length!==3||[...A,...B].some(n=>!Number.isInteger(n)||n<0||n>5))throw Error('prime power diagrams');
+  const power=[2,3,5],used=A.map((x,i)=>Math.max(x,B[i])),value=used.reduce((prod,e,i)=>prod*power[i]**e,1);
+  const fig={type:'prime-bars',description:`Prime exponent columns for A and B: prime 2 exponents ${A[0]} and ${B[0]}; prime 3 exponents ${A[1]} and ${B[1]}; prime 5 exponents ${A[2]} and ${B[2]}.`,A,B};
+  return done('Determine LCM(A,B) from the prime-power bar chart.',[`The chart compares prime exponents of A and B for 2, 3 and 5.`,`For each prime choose the larger exponent: ${used.join(', ')}.`,`The LCM is 2^${used[0]} × 3^${used[1]} × 5^${used[2]}=${value}.`],value,V(`2^${used[0]}*3^${used[1]}*5^${used[2]}`,value),fig);
+ }
+ if(kind==='slopeField'){
+  const {m,c}=p;if(!Number.isInteger(m)||m<=0||m>4||!Number.isInteger(c)||Math.abs(c)>3)throw Error('slope field');
+  const answer=2*m+c,fig={type:'slope-field',description:`Slope field for dy/dx=${m}x with a highlighted solution through the initial point (0,${c}).`,m,c};
+  return done(`The slope field satisfies dy/dx=${m}x, and the highlighted curve passes through y(0)=${c}. Find y(2).`,[`Integrate dy/dx=${m}x to obtain y(x)=${m}/2 x²+C.`,`The marked initial point (0,${c}) fixes C=${c}.`,`At x=2, y(2)=${m}/2·2²+(${c})=${answer}.`],answer,V(`${m}/2*2^2+(${c})`,answer),fig);
+ }
  throw Error('Unsupported advanced figure archetype '+kind);
 }
