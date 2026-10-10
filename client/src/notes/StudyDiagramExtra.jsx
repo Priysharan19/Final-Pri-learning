@@ -136,6 +136,26 @@ function Interval({f}){
   <T x="300" y="110" textAnchor="middle">Filled endpoint = included; open = excluded</T>
  </g>;
 }
+function Pascal({f}){
+ const choose=(n,k)=>{
+  let result=1;
+  for(let i=1;i<=k;i++)result=result*(n-i+1)/i;
+  return Math.round(result);
+ };
+ return <g>
+  {Array.from({length:f.n+1},(_,row)=>
+   Array.from({length:row+1},(_,k)=>{
+    const cx=300+(k-row/2)*54,cy=40+row*34;
+    const selected=row===f.n&&(f.mode==='rowSum'||k===f.k);
+    return <g key={row+'-'+k}>
+     {selected&&<rect x={cx-23} y={cy-22} width="46" height="29" rx="5" fill="var(--nt-accent-soft)" stroke={color} strokeWidth="1.5"/>}
+     <T x={cx} y={cy} textAnchor="middle" fontSize="14" fontWeight={selected?'bold':'normal'}>{choose(row,k)}</T>
+    </g>;
+   })
+  )}
+  <T x="300" y="347" textAnchor="middle" fontSize="13">Row number begins at zero</T>
+ </g>;
+}
 export default function StudyDiagramExtra({figure}) {
  switch(figure.type){
  case 'venn':return <Venn f={figure}/>;
@@ -149,6 +169,7 @@ export default function StudyDiagramExtra({figure}) {
  case 'tree':return <Tree f={figure}/>;
  case 'dots':return <Dots f={figure}/>;
  case 'interval':return <Interval f={figure}/>;
+ case 'pascal':return <Pascal f={figure}/>;
  default:return null;
  }
 }
