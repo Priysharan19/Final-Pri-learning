@@ -88,7 +88,7 @@ jobs:
           grep -Fq 'APPLE SIGN IN: PASS — 66/66 checks' suites.log
           # The one sign-in card: code entry, every refusal in words, one request
           # per code, no account without age and agreement, no navigation, no read.
-          grep -Fq 'SIGN-IN CARD: PASS — 85/85 checks' suites.log
+          grep -Fq 'SIGN-IN CARD: PASS — 86/86 checks' suites.log
           grep -Fq 'ONBOARDING SCOPE: PASS — 40/40 checks' suites.log
           grep -Fq 'STUDY PLAN: PASS — 211/211 checks' suites.log
           grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
@@ -553,6 +553,17 @@ jobs:
           grep -Fq 'Reader · usage limit reached' browser.log
           grep -Eq 'Read on request · provider calls per handwritten answer, first stroke to verdict +10/10' browser.log
           grep -Eq 'E2E SUITE.*38/38.*2 flows' browser.log
+          # The one sign-in card, in Chromium and in WebKit: six journeys each.
+          # Codes come from the server's test mail sink, and the log must say so.
+          grep -Fq 'Sign-in card · new student: email, code in the same card, account made and verified, class, practice' browser.log
+          grep -Fq 'Sign-in card · returning student: code for a password account, password option, resend, expiry, change email, offline, slow send, limits' browser.log
+          grep -Fq 'Sign-in card · inside practice with ink: compact card, same question, same strokes, no navigation, no paid read' browser.log
+          grep -Fq 'Sign-in card · inside practice with a photo: same question, same photo, no navigation, no paid read' browser.log
+          grep -Fq 'Sessions · kept across a browser restart, a second tab follows sign-in and sign-out, expiry asks again in place, sign out everywhere' browser.log
+          grep -Fq 'Sign-in card · under 18: a parent is asked in the card, the account stays limited until they approve on their own page' browser.log
+          test "$(grep -Ec 'E2E SUITE PASSED — 102/102 checks across 6 flows' browser.log)" -eq 2
+          grep -Fq 'TEST-MAIL-SINK EVIDENCE' browser.log
+          grep -Eq 'the sign-in card +6/6' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
           test "$(grep -Ec 'E2E SUITE PASSED — 158/158 checks across 1 flows' browser.log)" -eq 2
