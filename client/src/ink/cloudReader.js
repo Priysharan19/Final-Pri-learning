@@ -161,7 +161,7 @@ function transcribeOnce(transport, image, { signal = null, now = Date.now() } = 
   if (!flight) {
     const controller = typeof AbortController === 'function' ? new AbortController() : null;
     flight = { waiters: 0, controller, promise: null };
-    flight.promise = Promise.resolve().then(() => transport.transcribeHandwriting(image, { signal: controller?.signal ?? null, questionId }))
+    flight.promise = Promise.resolve().then(() => transport.transcribeHandwriting(image, { signal: controller?.signal ?? null, ...(questionId ? { questionId } : {}) }))
       .then(response => {
         // Remembered only when the reader stood behind it. A reading it
         // doubted may be asked for again: a second look can be a better one.
