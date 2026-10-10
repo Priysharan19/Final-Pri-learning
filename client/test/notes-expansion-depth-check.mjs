@@ -31,10 +31,11 @@ for (const group of IN_CURRICULUM) {
   }
 }
 const c11 = await loadNotesForGrade(11);
-assert.equal(c11['c11-complex-numbers'].examples.length, 26, 'Complex Numbers should have 2 existing + 8 JEE bridge + 16 original deeper studies');
+assert.equal(c11['c11-complex-numbers'].examples.length, 30, 'Complex Numbers should retain 26 former examples and 4 new Argand-angle diagrams');
 assert.equal(c11['c11-complex-numbers'].examples.filter(x => x.question.startsWith('Optional JEE')).length, 8, 'JEE extension labels are required');
-assert.ok(c11['c11-complex-numbers'].examples.slice(-16).every(x => x.question.startsWith('Optional ')), 'Optional study label required for all deeper studies');
-assert.deepEqual(Object.fromEntries(gradeWorked), { 7: 89, 8: 81, 9: 62, 10: 80, 11: 103, 12: 76 }, 'Class-by-class authored depth must be retained');
-assert.equal(totalWorked, 491, 'expected 366 prior and 125 original figure-led studies');
+assert.ok(c11['c11-complex-numbers'].examples.slice(10,26).every(x => x.question.startsWith('Optional ')), 'Previously-authored 16 optional studies must remain distinct');
+assert.ok(c11['c11-complex-numbers'].examples.slice(-4).every(x => x.question.startsWith('Optional Argand rotation')), 'Additional complex plane rotation figures must remain labelled optional');
+assert.deepEqual(Object.fromEntries(gradeWorked), { 7: 127, 8: 126, 9: 100, 10: 134, 11: 163, 12: 141 }, 'Class-by-class authored depth must be retained');
+assert.equal(totalWorked, 791, 'expected 491 prior and 300 newly authored diagram-first studies');
 assert.equal(count, 77, 'total chapter count changed unexpectedly');
 console.log(`Notes expansion breadth PASS: ${count}/77 existing chapters, at least 5 examples for Class 7–9 and 4 for Class 10–12, 8 JEE bridges and 16 deeper Complex Numbers studies`);
