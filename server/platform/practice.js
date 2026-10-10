@@ -761,31 +761,27 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const ownTrap = !result.correct
         ? trapProbes.find(t => t?.why && String(t.why) === answerFeedback)?.why || null : null;
       // What the marker says about a wrong answer is information about the
-      // right one: an authored trap for a typed value can state the answer
-      // outright ("… so the least value is 16"), and so can "there are 7
-      // solutions — you've given 1" or "that is the transpose". While the
-      // question is open only a multiple-choice option's own explanation is
-      // returned — it is what choosing that option means, and never names the
-      // keyed option (linted in practice-repeat-credit-check). Every other
-      // answer type gets the fixed sentence; the explanation, and the
-      // misconception it names, come with the reply that resolves the question.
-      const isMcq = q.answerType === 'mcq';
-      // Two generators' option explanations do name the keyed option
-      // ("Reflexivity — no number is less than itself"). That is a content
-      // defect, listed by the lint; until it is corrected the server does not
-      // pass such an explanation on while the question is open.
-      const squash = text => String(text ?? '').replace(/\\[dt]?frac/g, '\\frac').replace(/[\s$]|\\[,;!]|\\left|\\right/g, '');
-      const keyedOption = isMcq ? squash(q.mcqOptions?.[q.answer?.correctIndex]) : '';
-      const namesKey = isMcq && keyedOption.length >= 3 && squash(answerFeedback).includes(keyedOption);
+      // right one. An authored trap for a typed value can state the answer
+      // outright ("… so the least value is 16"); so can "there are 7 solutions
+      // — you've given 1" or "that is the transpose"; and the explanation of a
+      // wrong multiple-choice option can name the keyed one ("… a polynomial
+      // of degree 1 is called linear") or pick it out without naming it ("the
+      // direction is right but the sign of the boundary is not"). No filter
+      // on the wording can be trusted with that. So while the question is
+      // open, for every answer type, the reply says only that the try was
+      // wrong: nothing the marker derived from the key, and no misconception.
+      // The explanation is kept with the try and comes back with the reply
+      // that resolves the question.
       const feedback = resolved || invalid
         ? answerFeedback
         : workingOnly ? OPEN_FEEDBACK.workingOnly
-          : isMcq ? (namesKey ? '' : answerFeedback)
-            : working.trim() || answeredByWorking ? OPEN_FEEDBACK.working : '';
+          : working.trim() || answeredByWorking ? OPEN_FEEDBACK.working : '';
       const deferredTrap = priorTry ? JSON.parse(priorTry.response_json).trapWhy || null : null;
-      const trapWhy = result.correct ? null
-        : resolved ? ownTrap || deferredTrap
-          : isMcq && !namesKey ? ownTrap : null;
+      // On resolution: this answer's own trap, or — when this answer is wrong
+      // and names none — the first try's. `firstTryTrapWhy` carries the first
+      // try's trap whatever this answer was, so a misconception shown on the
+      // first try is not lost when the second try is right.
+      const trapWhy = !resolved || result.correct ? null : ownTrap || deferredTrap;
       // Blank final answers are not automatically attempts: verified positive
       // method evidence alone makes an otherwise blank response gradable.
       // Unreadable working or an invalid NONBLANK answer still cannot earn
@@ -800,6 +796,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         marksEarned, marksPossible,
         triesLeft: resolved ? 0 : 1,
         feedback: !resolved ? feedback : workingOnlyCredit ? partial.note : workingOnly ? (partial?.note || 'There is no final answer here, and this working does not earn a mark.') : feedback, trapWhy,
+        ...(resolved && deferredTrap ? { firstTryTrapWhy: deferredTrap } : {}),
         contentId: opaqueContentId(q.contentId), serverAcknowledgedAt: now,
         ...(q._repeat === true ? { repeat: true } : {}),
         // An entry that is not an attempt costs nothing, so it may not return

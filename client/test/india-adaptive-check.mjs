@@ -346,7 +346,7 @@ async function run() {
     // Spring the same trap three times over fresh questions on the same dot point.
     let hits = 0;
     let firstFeedback = null;
-    let firstOpen = false, firstMcq = false, resolvedFeedback = null;
+    let firstOpen = false, resolvedFeedback = null;
     let current = found.s;
     for (let tries = 0; tries < 40 && hits < 3; tries++) {
       const probe = (current.payload.traps || []).find(t => t.value !== undefined && misconceptionKey(chapter.id, t.why) === key && !checkAnswer(current.payload, String(t.value)).correct);
@@ -356,7 +356,6 @@ async function run() {
         if (firstFeedback === null) {
           firstFeedback = r1.feedback;
           firstOpen = !r1.resolved;
-          firstMcq = current.question.answerType === 'mcq';
           resolvedFeedback = r2.feedback;
         }
         hits++;
@@ -373,11 +372,11 @@ async function run() {
       if (hits < 3) current = await serve({ subtopic: chapter.id, dotpoint: found.dotpoint, difficulty: found.difficulty });
     }
     eq('the trap was sprung three times', hits, 3);
-    // A typed answer's trap explanation can state the answer, so it is held
-    // until the question is finished; the reply that finishes it carries it.
-    // (A multiple-choice option's own explanation is given at once.)
-    eq('the trap\'s own explanation is the feedback when the question is finished, and for a typed answer not before',
-      [resolvedFeedback, firstOpen && !firstMcq ? firstFeedback !== trap.why : true], [trap.why, true]);
+    // A trap's explanation can state the answer or pick it out — for a typed
+    // value and for a multiple-choice option alike — so it is held until the
+    // question is finished; the reply that finishes it carries it.
+    eq('the trap\'s own explanation is the feedback when the question is finished, and for no answer type before',
+      [resolvedFeedback, firstOpen ? firstFeedback !== trap.why : true], [trap.why, true]);
     const row = ratingRowsOf(user.id).find(r => r.subtopic === chapter.id);
     const ledger = row?.traps?.[key];
     ok('the trap ledger sits on the chapter row', !!ledger, show(Object.keys(row?.traps || {})));

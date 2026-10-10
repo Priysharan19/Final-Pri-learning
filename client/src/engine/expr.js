@@ -53,12 +53,43 @@ export function factorial(n) {
   }
   return gamma(n + 1);
 }
+// ── What an evaluation may cost ──────────────────────────────────────────────
+// The cost of evaluating must not depend on the VALUES written. A 26-character
+// answer, `ncr(3000000000,1500000000)`, looped one and a half thousand million
+// times; three nested sums ran twenty-seven million terms. So:
+//   · a counting function never loops more than COUNT_LOOP_LIMIT times, and
+//     stops as soon as its product is no longer finite. Past that many
+//     factors the true value is beyond what a number can hold, so the answer
+//     is Infinity either way — exact small values (`nCr(10, 3)`) are untouched;
+//   · while a marker is checking something a student wrote, every term of
+//     every sum and every turn of every counting loop is charged to ONE
+//     budget for the whole check (`withEvaluationBudget`). When it is spent,
+//     what is left evaluates to NaN — "not a number", which no marker accepts.
+// Nothing here looks at the clock: the same input is always marked the same.
+const COUNT_LOOP_LIMIT = 10000;
+let evaluationBudget = null;               // null: no check in progress, nothing is charged
+const spend = units => {
+  if (evaluationBudget === null) return true;
+  evaluationBudget -= units;
+  return evaluationBudget >= 0;
+};
+
+/** Run `fn` with at most `units` sum terms and counting-loop turns in total. An enclosing budget is kept. */
+export function withEvaluationBudget(units, fn) {
+  if (evaluationBudget !== null) return fn();
+  evaluationBudget = units;
+  try { return fn(); } finally { evaluationBudget = null; }
+}
+
 const MULTI_FUNCTIONS = {
   ncr: (n, r) => {
     if (Number.isInteger(n) && Number.isInteger(r)) {
       if (r < 0 || r > n || n < 0) return 0;
+      const turns = Math.min(r, n - r);
+      if (turns > COUNT_LOOP_LIMIT) return Infinity;
+      if (!spend(turns)) return NaN;
       let out = 1;
-      for (let k = 1; k <= Math.min(r, n - r); k++) out = out * (n - k + 1) / k;
+      for (let k = 1; k <= turns && Number.isFinite(out); k++) out = out * (n - k + 1) / k;
       return Math.round(out);
     }
     return factorial(n) / (factorial(r) * factorial(n - r));
@@ -66,8 +97,10 @@ const MULTI_FUNCTIONS = {
   npr: (n, r) => {
     if (Number.isInteger(n) && Number.isInteger(r)) {
       if (r < 0 || r > n || n < 0) return 0;
+      if (r > COUNT_LOOP_LIMIT) return Infinity;
+      if (!spend(r)) return NaN;
       let out = 1;
-      for (let k = 0; k < r; k++) out *= (n - k);
+      for (let k = 0; k < r && Number.isFinite(out); k++) out *= (n - k);
       return out;
     }
     return factorial(n) / factorial(n - r);
@@ -426,6 +459,8 @@ export function evaluate(ast, env = {}, opts) {
           if (!name || !BINDABLE_NAME.test(name)) return NaN;
           const lo = evaluate(ast.args[2], env, opts), hi = evaluate(ast.args[3], env, opts);
           if (!Number.isInteger(lo) || !Number.isInteger(hi) || hi - lo > SUM_LIMIT) return NaN;
+          // One budget for every sum in the check, however they are nested.
+          if (!spend(hi - lo + 1)) return NaN;
           let total = 0;
           for (let k = lo; k <= hi; k++) {
             const scope = Object.assign(Object.create(null), env);

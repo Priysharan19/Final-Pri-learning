@@ -485,6 +485,35 @@ try {
     bOk(heavyPaper.ms < Math.max(1500, lightPaper.ms * 40), `the paper with the heaviest working is marked in ${heavyPaper.ms.toFixed(0)} ms against ${lightPaper.ms.toFixed(0)} ms with none`);
     console.log(`  heaviest working: practice ${bare.ms.toFixed(0)} ms bare; paper ${lightPaper.ms.toFixed(0)} ms bare, ${heavyPaper.ms.toFixed(0)} ms heavy`);
 
+    // ── the cost does not depend on the numbers written either ───────────────
+    // `ncr(3000000000,1500000000)` in the final-answer box took five seconds,
+    // and being unreadable it spent no try: it could be sent again and again.
+    const costly = ['ncr(3000000000,1500000000)', 'npr(3000000000,1500000000)', '600000000C300000000', 'sum(sum(sum(k;k;1;300);j;1;300);i;1;300)', '99999999!', 'sum(ncr(9999,k);k;0;9999)'];
+    const vq = await issue(heavyUser.jar, 8201);
+    const timedAnswer = async (answer, steps) => { const at = process.hrtime.bigint(); const r = await bSubmit(heavyUser.jar, vq.data.question.id, answer, steps); return { ms: Number(process.hrtime.bigint() - at) / 1e6, r }; };
+    const plainAnswer = await timedAnswer('abc');
+    eq([plainAnswer.r.data.invalid, plainAnswer.r.data.resolved], [true, false], 'an unreadable answer spends no try');
+    for (const text of costly) {
+      const got = await timedAnswer(text);
+      eq([got.r.status, got.r.data.invalid, got.r.data.correct, got.r.data.resolved], [200, true, false, false], `${text} as a final answer: unreadable, as before`);
+      bOk(got.ms < Math.max(750, plainAnswer.ms * 60), `${text} as a final answer: ${got.ms.toFixed(0)} ms against ${plainAnswer.ms.toFixed(0)} ms for "abc"`);
+    }
+    for (const text of costly) {
+      const heavy = await timedSubmit(8300 + costly.indexOf(text), v => Array.from({ length: 16 }, () => `${text} = ${v}`));
+      eq([heavy.r.status, heavy.r.data.resolved, heavy.r.data.marksEarned], [200, true, 0], `${text} on sixteen lines of working: accepted, resolved, earns nothing`);
+      bOk(heavy.ms < Math.max(750, bare.ms * 60), `${text} on sixteen lines of working: ${heavy.ms.toFixed(0)} ms against ${bare.ms.toFixed(0)} ms with no working`);
+    }
+    const valuePaper = await (async () => {
+      const sitter = await bAccount('values');
+      const p2 = await paper(sitter.jar);
+      const ids = p2.data.exam.questions.filter(q => !q.payload?.multipart).map(q => q.id);
+      const at = process.hrtime.bigint();
+      const done = await post(`/v1/exams/${p2.data.exam.id}/finish`, { answers: Object.fromEntries(ids.map((id, i) => [id, costly[i % costly.length]])), workings: Object.fromEntries(ids.map((id, i) => [id, Array.from({ length: 16 }, () => `${costly[(i + 1) % costly.length]} = n`).join('\n')])) }, sitter.jar);
+      return { ms: Number(process.hrtime.bigint() - at) / 1e6, done };
+    })();
+    eq(valuePaper.done.status, 200, 'a paper answered with those throughout is finished');
+    bOk(valuePaper.ms < Math.max(1500, lightPaper.ms * 40), `and marked in ${valuePaper.ms.toFixed(0)} ms against ${lightPaper.ms.toFixed(0)} ms for an empty paper`);
+
     // ══ an open question is not told the answer through authored feedback ════
     // The authored explanation for a wrong TYPED value sometimes states the
     // answer; "there are 2 solutions — you've given 1" is a count of it. While
@@ -518,43 +547,49 @@ try {
     eq([s1.data.resolved, s1.data.correct, s1.data.feedback, s1.data.trapWhy], [false, false, '', null], 'one of the two roots on an open question: not told how many roots there are');
     const s2 = await bSubmit(setUser.jar, sq.data.question.id, String(sqSealed.answer.values[0]));
     bOk(s2.data.resolved === true && /two solutions/.test(s2.data.feedback), 'the count is said once the question is resolved');
-    // Multiple choice: the chosen option's own explanation, as before.
-    const mq = await post('/v1/practice/issue', { generator: 'c11-linear-inequalities', difficulty: 2, seed: 7, curriculum: 'in' }, setUser.jar);
-    const mSealed = await sealedOf(mq.data.question.id);
-    const wrongOption = Object.keys(mSealed.answer.optionTraps || {}).map(Number).find(i => i !== mSealed.answer.correctIndex);
-    const m1 = await bSubmit(setUser.jar, mq.data.question.id, wrongOption);
-    eq([mSealed.answerType, m1.data.resolved, m1.data.feedback, m1.data.trapWhy], ['mcq', false, mSealed.answer.optionTraps[wrongOption], mSealed.answer.optionTraps[wrongOption]],
-      'a wrong option on an open multiple-choice question is told what that option gets wrong');
+    // Multiple choice is no different. An option's explanation can name the
+    // keyed option ("… a polynomial of degree 1 is called linear") or pick it
+    // out without naming it, so no wrong option is explained while the
+    // question is open: two different wrong options are answered identically.
+    const optA = await bAccount('option-a'), optB = await bAccount('option-b');
+    const MCQ = { generator: 'c11-linear-inequalities', difficulty: 2, seed: 7, curriculum: 'in' };
+    const ma = await post('/v1/practice/issue', MCQ, optA.jar), mb = await post('/v1/practice/issue', MCQ, optB.jar);
+    const mSealed = await sealedOf(ma.data.question.id);
+    const wrongs = Object.keys(mSealed.answer.optionTraps || {}).map(Number).filter(i => i !== mSealed.answer.correctIndex);
+    eq([mSealed.answerType, wrongs.length >= 2, (await sealedOf(mb.data.question.id)).mcqOptions], ['mcq', true, mSealed.mcqOptions], 'two accounts sit one multiple-choice question, dealt the same way');
+    const a1 = await bSubmit(optA.jar, ma.data.question.id, wrongs[0]), b1 = await bSubmit(optB.jar, mb.data.question.id, wrongs[1]);
+    eq([a1.data.resolved, a1.data.feedback, a1.data.trapWhy, 'firstTryTrapWhy' in a1.data], [false, '', null, false], 'a wrong option on an open question: no explanation, no misconception named');
+    eq(said(a1.data), said(b1.data), 'a different wrong option is answered identically');
+    bOk(mSealed.answer.optionTraps[wrongs[0]] !== mSealed.answer.optionTraps[wrongs[1]] && !JSON.stringify(a1.data).includes(mSealed.answer.optionTraps[wrongs[0]]), '(the two options do have different explanations, and neither is in the reply)');
+    // Resolved wrong: the option's explanation, and the first try's beside it.
+    const a2 = await bSubmit(optA.jar, ma.data.question.id, wrongs[1]);
+    eq([a2.data.resolved, a2.data.correct, a2.data.feedback, a2.data.trapWhy, a2.data.firstTryTrapWhy],
+      [true, false, mSealed.answer.optionTraps[wrongs[1]], mSealed.answer.optionTraps[wrongs[1]], mSealed.answer.optionTraps[wrongs[0]]],
+      'the reply that resolves the question explains the option chosen then, and carries the first try\'s explanation');
+    // Resolved right: correct, full marks — and the first try's misconception is still reported.
+    const b2 = await bSubmit(optB.jar, mb.data.question.id, mSealed.answer.correctIndex);
+    eq([b2.data.resolved, b2.data.correct, b2.data.marksEarned === b2.data.marksPossible, b2.data.trapWhy, b2.data.firstTryTrapWhy],
+      [true, true, true, null, mSealed.answer.optionTraps[wrongs[1]]], 'a right second try is full marks, and still carries the first try\'s explanation so the misconception is recorded');
+    // The same for a typed trap value followed by the right answer.
+    const typedAgain = await bAccount('typed-again');
+    const tq = await issue(typedAgain.jar, trap.seed);
+    const ty1 = await bSubmit(typedAgain.jar, tq.data.question.id, trap.value), ty2 = await bSubmit(typedAgain.jar, tq.data.question.id, trap.key);
+    eq([ty1.data.trapWhy, ty2.data.correct, ty2.data.trapWhy, ty2.data.firstTryTrapWhy], [null, true, null, trap.why], 'a typed trap value and then the right answer: the trap comes with the resolving reply');
+    eq('firstTryTrapWhy' in (await bSubmit(typedAgain.jar, (await issue(typedAgain.jar, trap.seed + 500)).data.question.id, 'abc')).data, false, 'a reply that resolves nothing carries no such field');
 
-    // Content lint: no option's explanation may name the keyed option.
-    const squash = text => String(text ?? '').replace(/\\[dt]?frac/g, '\\frac').replace(/[\s$]|\\[,;!]|\\left|\\right/g, '');
-    const offenders = new Set();
-    let linted = 0;
-    for (const g of Object.keys(ALL)) for (const d of [1, 2, 3, 4]) for (let i = 0; i < 12; i++) {
+    // Content report (not a gate: nothing is disclosed on an open question
+    // whatever an explanation says). Explanations that name the keyed option
+    // teach less than they should on the resolving reply, so they are listed.
+    const squash = text => String(text ?? '').toLowerCase().replace(/\\[dt]?frac/g, '\\frac').replace(/[\s$.,;:!?'"()]|\\[,;!]|\\left|\\right/g, '');
+    const naming = new Set();
+    for (const g of Object.keys(ALL)) for (const d of [1, 2, 3, 4]) for (let i = 0; i < 6; i++) {
       let q; try { q = generate(g, d, i * 131 + 7); } catch { continue; }
       if (!q || q.answerType !== 'mcq' || !q.answer?.optionTraps) continue;
       const keyed = squash(q.mcqOptions?.[q.answer.correctIndex]);
-      if (keyed.length < 3) continue;                 // "5" is in every sentence about 15
-      for (const [index, why] of Object.entries(q.answer.optionTraps)) {
-        if (Number(index) === q.answer.correctIndex) continue;
-        linted++;
-        if (squash(why).includes(keyed)) offenders.add(`${g} d${d}`);
-      }
+      if (keyed.length < 3) continue;
+      if (Object.entries(q.answer.optionTraps).some(([index, why]) => Number(index) !== q.answer.correctIndex && squash(why).includes(keyed))) naming.add(`${g} d${d}`);
     }
-    bOk(linted > 500, `option explanations linted: ${linted}`);
-    // Known content defects, reported to the content owner. The server
-    // withholds these explanations on an open question (checked below); the
-    // lint fails on any generator not listed here.
-    const KNOWN_DEFECTS = ['c10-irrationality-proofs d2', 'c12-relations-equivalence d2'];
-    eq([...offenders].filter(x => !KNOWN_DEFECTS.includes(x)), [], 'no multiple-choice option explanation states the keyed option, beyond the defects already listed');
-    if (offenders.size) console.log(`  CONTENT DEFECT (withheld by the server until corrected): option explanations name the keyed option in ${[...offenders].join(', ')}`);
-    const dq = await post('/v1/practice/issue', { generator: 'c12-relations-equivalence', difficulty: 2, seed: 7, curriculum: 'in' }, setUser.jar);
-    const dSealed = await sealedOf(dq.data.question.id);
-    const keyedText = dSealed.mcqOptions[dSealed.answer.correctIndex];
-    const leaky = Object.entries(dSealed.answer.optionTraps).find(([i, why]) => Number(i) !== dSealed.answer.correctIndex && String(why).includes(keyedText));
-    bOk(!!leaky, 'a defective explanation is on this question');
-    const dx = await bSubmit(setUser.jar, dq.data.question.id, leaky[0]);
-    eq([dx.data.resolved, dx.data.feedback, dx.data.trapWhy, JSON.stringify(dx.data).includes(keyedText)], [false, '', null, false], 'an explanation that names the keyed option is not passed on while the question is open');
+    console.log(`  content report: option explanations that name the keyed option — ${naming.size ? [...naming].join(', ') : 'none'}`);
   }
 
   // ══════════════════════════════════════════════════════════════════════════
