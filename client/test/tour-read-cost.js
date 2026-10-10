@@ -12,6 +12,9 @@
 //   3. read, edit the ink, read again                      → 2
 //   4. second try after a wrong first try, ink unchanged   → 1
 //   5. second try after rewriting the ink                  → 2
+//   6. double press on a slow reader, then a second tab    → 1
+//   7. late reading vs. a hand-corrected current transcript → 2 (correction stands)
+//   8. ink written while an earlier page is being read     → 2 (late one is stale)
 //
 // WHAT IS REAL: the built client, the platform server (issue, transcribe,
 // recognise, confirm, grade, the kept-read dedupe) on its own SQLite file.
@@ -195,9 +198,121 @@ export const flow = {
           beforeSecondRead === 1 && grades.length === 2 && grades[0].json?.correct === false && grades[1].json?.correct === true && costs.secondTryRewritten === 2,
           `provider calls ${costs.secondTryRewritten} (before the second read: ${beforeSecondRead}); grades ${JSON.stringify(grades.map(g => g.json?.correct))}`);
       }
+
+      // ── 6 · an impatient double press on a slow reader; then a second tab ──
+      {
+        const { canvas, right } = await fresh();
+        const start = reader.requests.length, pageStart = (await readCalls()).length;
+        reader.lines = null; reader.text = right.text; reader.confidence = 0.97;
+        let release; reader.gate = new Promise(resolve => { release = resolve; });
+        await handwrite(page, canvas, '7');
+        await page.waitForSelector('[data-ink-read]', { timeout: 8000 });
+        // Two presses in one task: the second lands before the page has re-rendered.
+        await page.evaluate(() => { const b = document.querySelector('[data-ink-read]'); b.click(); b.click(); });
+        await page.waitForTimeout(1200);
+        const whileSlow = { provider: reader.requests.length - start, page: (await readCalls()).length - pageStart, button: await page.locator('[data-ink-read]').count() };
+        release(); reader.gate = null;
+        await lines(1);
+        await page.waitForTimeout(2500);              // the transcript's own save and readback
+        const afterRead = reader.requests.length - start;
+        // The same account opens the same question in a second tab: the kept
+        // page comes back with its transcript, and nothing is read for it.
+        const tab = await page.context().newPage();
+        let tabLines = [], tabQuestion = null;
+        try {
+          await tab.goto(page.url(), { waitUntil: 'domcontentloaded' });
+          await tab.waitForSelector('.ink-line', { timeout: 30000 }).catch(() => {});
+          tabLines = await tab.locator('.ink-line').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-text') || ''));
+          tabQuestion = await tab.locator('.qpage').first().getAttribute('data-question-id').catch(() => null);
+          await tab.waitForTimeout(1500);
+        } finally { await tab.close(); }
+        const afterTab = reader.requests.length - start;
+        const sameQuestion = tabQuestion === await page.locator('.qpage').first().getAttribute('data-question-id');
+        await submitAndSettle();
+        const grade = (await gradesOf(right.serverQuestionId)).at(-1);
+        costs.doublePress = reader.requests.length - start;
+        await check(`6 · a double press on a slow reader, then the same page in a second tab: 1 provider call in all — one page request for two presses, none for the second tab, none for Submit [${EVIDENCE}]`,
+          whileSlow.provider === 1 && whileSlow.page === 1 && whileSlow.button === 0 && afterRead === 1 &&
+            sameQuestion && tabLines.length === 1 && tabLines[0] === right.text && afterTab === 1 &&
+            costs.doublePress === 1 && grade?.json?.correct === true,
+          `while the reader was slow ${JSON.stringify(whileSlow)}; after the read ${afterRead}; second tab same question ${sameQuestion} lines ${JSON.stringify(tabLines)} calls ${afterTab}; total ${costs.doublePress}; correct ${grade?.json?.correct}`);
+      }
+
+      // ── 7 · a late reading never replaces newer ink or a hand-corrected line ─
+      {
+        const { canvas, right } = await fresh();
+        const start = reader.requests.length;
+        const misread = String(Number(right.text) + 6);
+        reader.lines = null; reader.text = misread; reader.confidence = 0.97;
+        await handwrite(page, canvas, '1');
+        await pressRead(page);
+        await lines(1);
+        // More ink, "Read again" — and the reader is slow about it.
+        await handwrite(page, canvas, '7', { x: 170 });
+        reader.text = '999';
+        let release; reader.gate = new Promise(resolve => { release = resolve; });
+        await pressRead(page);
+        await page.waitForTimeout(800);
+        // While it is in flight the student takes the new ink back (the page is
+        // the one already read) and says what its line should read.
+        for (let i = 0; i < 6 && await page.locator('[data-ink-stale]').count(); i++) {
+          await page.locator('.ink-tool[title="Undo"]').click();
+          await page.waitForTimeout(250);
+        }
+        const currentAgain = await page.locator('[data-ink-stale]').count() === 0 && (await page.locator('.ink-line').first().getAttribute('data-text')) === misread;
+        await page.locator('.ink-line .ink-correct-btn').first().click();
+        await page.locator('.ink-line form.ink-correct input').fill(right.text);
+        await page.locator('.ink-line form.ink-correct button[type="submit"]').click();
+        await page.waitForFunction(t => document.querySelector('.ink-line[data-corrected="true"]')?.getAttribute('data-text') === t, right.text, { timeout: 10000 }).catch(() => {});
+        const inFlight = reader.requests.length - start;
+        release(); reader.gate = null;
+        await page.waitForTimeout(2500);              // the late reading lands
+        const after = {
+          lines: await page.locator('.ink-line').evaluateAll(nodes => nodes.map(n => [n.getAttribute('data-text'), n.getAttribute('data-corrected')])),
+          stale: await page.locator('[data-ink-stale]').count()
+        };
+        await submitAndSettle();
+        const grade = (await gradesOf(right.serverQuestionId)).at(-1);
+        costs.lateReading = reader.requests.length - start;
+        await check(`7 · a slow reading of ink the student has since taken back lands on a page whose transcript they corrected by hand: the correction stands, nothing is marked stale, and it is what Submit marks — 2 provider calls, both asked for [${EVIDENCE}]`,
+          currentAgain && inFlight === 2 && after.lines.length === 1 && after.lines[0][0] === right.text && after.lines[0][1] === 'true' && after.stale === 0 &&
+            costs.lateReading === 2 && grade?.json?.correct === true,
+          `current again after undo ${currentAgain}; in flight ${inFlight}; after the late reading ${JSON.stringify(after)}; total ${costs.lateReading}; correct ${grade?.json?.correct}`);
+      }
+
+      // ── 8 · the late reading of an EARLIER page never becomes the answer ───
+      {
+        const { canvas, right } = await fresh();
+        const start = reader.requests.length;
+        reader.lines = null; reader.text = '1'; reader.confidence = 0.97;
+        let release; reader.gate = new Promise(resolve => { release = resolve; });
+        await handwrite(page, canvas, '1');
+        await pressRead(page);
+        await page.waitForTimeout(600);
+        await handwrite(page, canvas, '7', { x: 170 });   // written while the first page is being read
+        release(); reader.gate = null;
+        await page.waitForSelector('[data-ink-stale]', { timeout: 15000 }).catch(() => {});
+        const late = {
+          stale: await page.locator('[data-ink-stale]').count(),
+          submitDisabled: await page.getByRole('button', SUBMIT).isDisabled().catch(() => null),
+          reason: await page.locator('[data-submit-reason]').getAttribute('data-submit-reason').catch(() => null),
+          grades: (await gradesOf(right.serverQuestionId)).length
+        };
+        reader.text = right.text;
+        await pressRead(page);
+        await lines(1);
+        await submitAndSettle();
+        const grade = (await gradesOf(right.serverQuestionId)).at(-1);
+        costs.wroteWhileReading = reader.requests.length - start;
+        await check(`8 · ink written while an earlier page was being read: that reading arrives labelled as from earlier writing, Submit is unavailable with the reason, nothing is marked; "Read again" reads the page as it stands — 2 provider calls [${EVIDENCE}]`,
+          late.stale === 1 && late.submitDisabled === true && late.reason === 'ink.submitReadAgain' && late.grades === 0 &&
+            costs.wroteWhileReading === 2 && grade?.json?.correct === true,
+          `when the late reading landed ${JSON.stringify(late)}; total ${costs.wroteWhileReading}; correct ${grade?.json?.correct}`);
+      }
       note(`provider calls per completed handwritten answer [${EVIDENCE}]: one line right first time ${costs.oneLine} · four lines with pauses, read once ${costs.fourLines} · read, edit, read again ${costs.editAndReread} · second try, ink unchanged ${costs.secondTrySameInk} · second try after rewriting ${costs.secondTryRewritten}`);
       await check('no provider was reached but the scripted reader', reader.refused.length === 0, JSON.stringify(reader.refused));
     } finally {
+      reader.gate = null;
       reader.lines = null; reader.text = '7'; reader.confidence = 0.6;
     }
   }

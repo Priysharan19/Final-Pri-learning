@@ -119,6 +119,9 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   const [tool, setTool] = useState('pen');
   const [finger, setFinger] = useState(() => priNative.ink.facts()?.fingerDefault === true);
   const [rec, setRec] = useState(EMPTY_READING);
+  // The reading on screen, for a read that lands later (see readNow).
+  const recRef = useRef(EMPTY_READING);
+  recRef.current = rec;
   // { index, text } while the student is saying what they wrote on a doubtful line.
   const [correcting, setCorrecting] = useState(null);
   // Restored work arrives with its own extent: a page that already reaches past
@@ -258,11 +261,19 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
         ? toReading(outcome.transcription, geometry, { confidenceFloor: outcome?.readiness?.confidenceFloor })
         : null;
       if (reading) {
-        readRef.current = signature;
         // The student may have gone on writing while the page was being
         // read: the reading that lands is then already of earlier writing.
         const now = strokesRef.current;
-        publish(reading, now, { stale: !now.length || strokeSignature(now) !== signature });
+        const nowSignature = now.length ? strokeSignature(now) : null;
+        // …or gone BACK to a page that already has its transcript on screen
+        // (undo), and perhaps corrected it by hand. That transcript is of the
+        // ink as it stands; a late reading of other ink never replaces it.
+        if (nowSignature !== signature && nowSignature !== null && readRef.current === nowSignature && recRef.current.lines.length) {
+          setStatus(null);
+          return;
+        }
+        readRef.current = signature;
+        publish(reading, now, { stale: nowSignature !== signature });
         setStatus(null);
         return;
       }

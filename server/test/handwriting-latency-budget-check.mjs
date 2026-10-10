@@ -165,7 +165,10 @@ try {
     ok(typeof hi[key] === 'string' && /[ऀ-ॿ]/.test(hi[key]), `HI has ${key} in Devanagari`);
   }
   ok(/nothing is lost/i.test(en['ink.serverStillReading']), 'the still-reading note promises the ink is kept');
-  ok(/saved/i.test(en['ink.waitingServiceDown']) && /tried again/i.test(en['ink.waitingServiceDown']), 'the timed-out note says the working is saved and will be retried');
+  // Read on request (owner decision): nothing is retried by itself, so the
+  // note offers the student's own Try again instead of promising a retry.
+  ok(/saved/i.test(en['ink.waitingServiceDown']) && /press Try again/i.test(en['ink.waitingServiceDown']) && !/will be (read|tried)/i.test(en['ink.waitingServiceDown']),
+    'the timed-out note says the working is saved and offers Try again, promising no automatic retry');
   // A timed-out read resolves to that note, not to a settings pointer or a blank.
   const { inkReadingBlockedKey } = await import(join(ROOT, 'client/src/ink/cloudReader.js'));
   const user = { cloudLinked: true, cloudHandwriting: true };
@@ -176,7 +179,8 @@ try {
   eq(inkReadingBlockedKey(user, { outcome: { error: { code: 'HANDWRITING_PROVIDER_5XX' } }, available, online }), 'ink.waitingServiceDown',
     'as does a provider outage');
   eq(inkReadingBlockedKey(user, { available, online: () => false }), 'ink.waitingOffline', 'while offline is its own, saved-and-read-later note');
-  ok(/Saved\. It will be read when you are back online\./.test(en['ink.waitingOffline']), 'the offline note begins with the plain promise');
+  ok(/^Saved\. /.test(en['ink.waitingOffline']) && /When you are back online, press Read my answer\./.test(en['ink.waitingOffline']) && !/will be read/i.test(en['ink.waitingOffline']),
+    'the offline note begins with the plain promise and says what to press when back online, promising no automatic read');
 }
 
 // ── report ───────────────────────────────────────────────────────────────────
