@@ -1404,7 +1404,10 @@ async function run() {
     // before the seek starts, so its cost is bounded here: a cell stops being
     // probed once its yield has saturated, and the bound keeps the budget from
     // creeping back towards the full 48 seeds on every cell.
-    const { trapProbeStatsForTests } = await import(`${SRC}local/backend.js`);
+    const { trapProbeStatsForTests, clearTrapYieldCacheForTests } = await import(`${SRC}local/backend.js`);
+    // Earlier journey questions may have warmed precisely this ontology-id
+    // cell. Force a real cold hunt before asserting the bounded probe budget.
+    clearTrapYieldCacheForTests();
     const probeBefore = trapProbeStatsForTests();
     const mapped = await servedWhere([MS], (s) => mappedProbes(s.payload).has(M), 40);
     const probeAfter = trapProbeStatsForTests();

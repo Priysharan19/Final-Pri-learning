@@ -218,6 +218,10 @@ const trapYieldCache = new Map();
 // bound about the trap probe specifically.
 const trapProbeStats = { generations: 0, cells: 0 };
 export function trapProbeStatsForTests() { return { ...trapProbeStats }; }
+// The backend test must measure an ACTUAL first hunt, even when an earlier
+// scenario in its same process happened to warm this keyed calibration cache.
+// Does not change question or mark authority; no HTTP route calls this.
+export function clearTrapYieldCacheForTests() { trapYieldCache.clear(); }
 function trapYield(subtopicId, dotpointId, difficulty, trapKey) {
   const k = `${subtopicId}|${dotpointId || ''}|${difficulty}|${trapKey}`;
   if (trapYieldCache.has(k)) return trapYieldCache.get(k);

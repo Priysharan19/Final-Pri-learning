@@ -34,11 +34,21 @@ jobs:
     name: Mounted app, product contracts and repair report
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Audit the same supported release flags as browser and native package.
+    # Tutor and uncertified exam handwriting remain disabled.
+    env:
+      PRI_FEATURE_PLACEMENT: '1'
+      PRI_FEATURE_EXTENDED_TRACKS: '1'
+      PRI_FEATURE_AUSTRALIA: '1'
     outputs:
       blocking: ${{ steps.health.outputs.blocking }}
       verdict: ${{ steps.health.outputs.verdict }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        # Check packaged source at reviewed PR head, not GitHub's
+        # ephemeral PR-merge commit; main CI checks merging separately.
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
