@@ -1,12 +1,9 @@
 // Independent vector drawing of more advanced source-grounded mathematics diagrams.
 // Receives only author-controlled plain numeric objects; no external media or HTML injection.
 import React from 'react';
-const W=600,H=360;
 const color='var(--nt-accent)',muted='var(--nt-ink-3)',ink='var(--nt-ink)';
 const line={fill:'none',stroke:color,strokeWidth:2.6,strokeLinejoin:'round',strokeLinecap:'round'};
-const small={fill:muted,fontFamily:'var(--font,system-ui,sans-serif)',fontSize:12};
 const txt={fill:ink,fontFamily:'var(--font,system-ui,sans-serif)',fontSize:14};
-const show=n=>Number(n.toFixed(3)).toString();
 const T=({x,y,children,...props})=><text x={x} y={y} {...txt} {...props}>{children}</text>;
 const axes=(x0,y0,x1,y1)=> <g><line x1={x0} y1={y1} x2={x1} y2={y1} stroke={muted} strokeWidth="1.6"/><line x1={x0} y1={y0} x2={x0} y2={y1} stroke={muted} strokeWidth="1.6"/></g>;
 function Wave({f}){

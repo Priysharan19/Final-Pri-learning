@@ -528,7 +528,7 @@ function ChapterNotes({ chapterId }) {
               <div className="nt-example-more">
                 <button type="button" className="btn btn-secondary"
                   onClick={() => setVisibleExamples(v => Math.min(v + 6, notes.examples.length))}
-                  aria-label={t('nav.more') + ' ' + t('notes.sectionExamples')}>
+                  aria-label={t('notes.showMoreExamples')}>
                   {t('nav.more')} ({Math.min(visibleExamples + 6, notes.examples.length)}/{notes.examples.length})
                 </button>
               </div>
@@ -536,7 +536,7 @@ function ChapterNotes({ chapterId }) {
           </Section>
 
           {linkedResources.length > 0 && (
-            <Section id="resources" title={t('nav.more')}>
+            <Section id="resources" title={t('notes.sectionResources')}>
               <ul className="nt-chapters" data-testid="notes-study-resources">
                 {linkedResources.map(resource => (
                   <li key={resource.id}>

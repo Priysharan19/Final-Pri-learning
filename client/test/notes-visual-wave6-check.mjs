@@ -18,7 +18,6 @@ const gradeExamples=Object.freeze({7:192,8:216,9:185,10:239,11:273,12:266});
 const eq=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<=1e-6*Math.max(1,Math.abs(a),Math.abs(b));
 const n=x=>evalNumeric(String(x));
 const num=x=>typeof x==='number' && Number.isFinite(x);
-const kinds=new Set();
 const shapes=new Set();
 let checked=0,all=0,visual=0,chapters=0,visuallyCovered=0;
 for(const group of IN_CURRICULUM){

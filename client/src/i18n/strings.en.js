@@ -2562,6 +2562,8 @@ export default {
   'study.argandAlt': 'A vector from the origin to minus one plus i root three. Its length is two and its counterclockwise angle from the positive real axis is two pi over three.',
   'study.argandCaption': 'Argand geometry: modulus is distance; argument is directed angle. The principal argument is 2π/3, not −π/3.',
   'notes.sectionExamples': 'Worked examples',
+  'notes.sectionResources': 'External study references',
+  'notes.showMoreExamples': 'Show more worked examples',
   'notes.unfoldAll': 'Unfold all',
   'notes.foldAll': 'Fold all',
   'notes.mistakeWrong': 'Not this',

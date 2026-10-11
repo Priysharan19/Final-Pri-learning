@@ -4,7 +4,6 @@ const color='var(--nt-accent)';
 const ink='var(--nt-ink)';
 const muted='var(--nt-ink-3)';
 const TXT={fill:ink,fontFamily:'var(--font, sans-serif)',fontSize:15};
-const LBL={...TXT,fontSize:13};
 const STROKE={fill:'none',stroke:color,strokeWidth:2.5};
 const shade={fill:'var(--nt-accent-soft)',stroke:color,strokeWidth:2.1};
 const T=({x,y,children,...rest})=><text x={x} y={y} {...TXT} {...rest}>{children}</text>;
@@ -206,7 +205,7 @@ function AlgebraArea({f}){
  </g>;
 }
 function PrimeBars({f}){
- const labels=['2','3','5'],max=6,baseY=291,bar=25;
+ const labels=['2','3','5'],baseY=291,bar=25;
  return <g>
   <T x="300" y="42" textAnchor="middle" fontWeight="bold">Prime exponents of A and B</T>
   {Array.from({length:6},(_,i)=><g key={i}><line x1="85" x2="530" y1={baseY-i*37} y2={baseY-i*37} stroke={muted} strokeOpacity=".25"/><T x="65" y={baseY-i*37+5} textAnchor="end" fontSize="12">{i}</T></g>)}

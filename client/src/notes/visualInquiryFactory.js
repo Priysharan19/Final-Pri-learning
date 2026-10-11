@@ -4,7 +4,6 @@ export function makeInquiryVisual(kind,p){
  const V=(a,b)=>({kind:"value",expr:String(a),answer:String(b)});
  const P=items=>({kind:"values",pairs:items.map(([a,b])=>[String(a),String(b)])});
  const pt=(id,xy)=>({id,x:xy[0],y:xy[1],label:id});
- const round=n=>Number(n.toFixed(7));
  const done=(q,steps,answer,verify,figure)=>{
   if(!figure?.description||steps.length<3||!answer&&answer!==0)throw Error("missing figure or maths");
   return {question:(p.context?p.context+": ":"")+q,steps,answer:String(answer),verify,figure};
