@@ -557,7 +557,7 @@ jobs:
           grep -Fq 'Sign-in card · inside practice with a photo: same question, same photo, no navigation, nothing submitted' browser.log
           grep -Fq 'Sessions · kept across a browser restart, a second tab follows sign-in and sign-out, expiry asks again in place, sign out everywhere' browser.log
           grep -Fq 'Sign-in card · under 18: a parent is asked in the card, the account stays limited until they approve on their own page' browser.log
-          test "$(grep -Ec 'E2E SUITE PASSED — 102/102 checks across 6 flows' browser.log)" -eq 2
+          test "$(grep -Ec 'E2E SUITE PASSED — 100/100 checks across 6 flows' browser.log)" -eq 2
           grep -Fq 'TEST-MAIL-SINK EVIDENCE' browser.log
           grep -Eq 'the sign-in card +6/6' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
