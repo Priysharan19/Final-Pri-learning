@@ -239,7 +239,7 @@ class CloudJourneyTest {
         ActivityScenario.launch(MainActivity::class.java).use { s ->
             reachHome(s)
             openSettings(s)
-            assertEquals("\"Not connected\"", waitFor(s, stateTag))
+            assertEquals("\"Not signed in\"", waitFor(s, stateTag))
             eval(s, "($byText)('Create account').click()")
             setValue(s, "#cloud-name", "Android Adult")
             setValue(s, "#cloud-email", email)
@@ -255,7 +255,7 @@ class CloudJourneyTest {
             setValue(s, "#cloud-delete-phrase", "DELETE")
             Thread.sleep(300)
             eval(s, "document.querySelector('#cloud-delete-phrase').form.querySelector('button[type=submit]').click()")
-            waitFor(s, "/Cloud account deleted/.test(document.body.innerText) && $stateTag === 'Not connected'")
+            waitFor(s, "/Cloud account deleted/.test(document.body.innerText) && $stateTag === 'Not signed in'")
             // Server-side proof: the same credentials that worked a moment ago are refused.
             assertEquals("the server refuses the deleted account", 401, loginStatus(email, password))
         }
@@ -365,7 +365,7 @@ class CloudJourneyTest {
             assertEquals("signed out, the server issued and marked nothing for the account", 0, oracle("/marked").getInt("issued"))
 
             openSettings(s)
-            assertEquals("\"Not connected\"", waitFor(s, stateTag))
+            assertEquals("\"Not signed in\"", waitFor(s, stateTag))
             eval(s, "($byText)('Sign in').click()")
             setValue(s, "#cloud-email", email)
             setValue(s, "#cloud-password", password)
@@ -553,7 +553,7 @@ class CloudJourneyTest {
             openSettings(s)
             waitFor(s, "$stateTag === 'Connected'")
             eval(s, "($byText)('Disconnect').click()")
-            waitFor(s, "$stateTag === 'Not connected'")
+            waitFor(s, "$stateTag === 'Not signed in'")
             val end = System.currentTimeMillis() + 5_000
             while (jarOnDisk().value(host, "pri_cloud_session") != null && System.currentTimeMillis() < end) Thread.sleep(100)
             assertEquals("Disconnect cleared the device's session", null, jarOnDisk().value(host, "pri_cloud_session"))
