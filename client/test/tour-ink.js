@@ -32,6 +32,13 @@ const SUBMIT = { name: 'Submit Answer' };
 const reading = (page) => readLines(page);
 const readingArrives = (page) => page.waitForSelector('.ink-line', { timeout: 15000 }).catch(() => {});
 
+// What the page may send with a read: the picture, and — so the server can bind
+// its read receipt to the issued question — that question's own opaque id (a
+// UUID). Nothing about the question's content, and nothing else at all. What
+// the PROVIDER is sent is checked separately and is the picture alone.
+const onlyPictureAndQuestionId = body => !!body && Object.keys(body).every(k => ['image', 'mode', 'questionId'].includes(k)) &&
+  (body.questionId === undefined || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(body.questionId)));
+
 export const flow = {
   id: 'ink',
   name: 'Ink · handwriting on the real canvas',
@@ -127,7 +134,7 @@ export const flow = {
     const sent = reader.requests.at(-1);
     const sentParts = (sent?.input || []).flatMap(m => m.content || []);
     await check('the request is the picture of the ink and nothing else — answer-blind',
-      !!pageSent && Object.keys(pageSent.body || {}).every(k => ['image', 'mode'].includes(k)) && /^data:image\//.test(pageSent.body?.image || '') &&
+      !!pageSent && onlyPictureAndQuestionId(pageSent.body) && /^data:image\//.test(pageSent.body?.image || '') &&
         sentParts.filter(part => part.type === 'input_image').length === 1 &&
         !JSON.stringify(sentParts.filter(part => part.type !== 'input_image')).includes(prompt.slice(0, 24)),
       `page sent ${JSON.stringify(pageSent && Object.keys(pageSent.body || {}))} to ${pageSent?.path}; provider request keys ${JSON.stringify(sent && Object.keys(sent))}`);
@@ -247,7 +254,7 @@ export const flow = {
     // fallback model when the first answers 5xx, so the provider can see two.)
     await check('pressing Read my answer offers the restored strokes to the reader once (one request, a picture, nothing else)',
       readsAfter.length === readsBeforeReload + 1 && providerCalls >= 1 && providerCalls <= 2 &&
-        Object.keys(restoredSent?.body || {}).every(k => ['image', 'mode'].includes(k)) && /^data:image\//.test(restoredSent?.body?.image || ''),
+        onlyPictureAndQuestionId(restoredSent?.body) && /^data:image\//.test(restoredSent?.body?.image || ''),
       `${readsAfter.length - readsBeforeReload} page request(s), ${providerCalls} provider call(s) after the press; page sent ${JSON.stringify(Object.keys(restoredSent?.body || {}))}`);
     await page.waitForSelector('.ink-status', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(3000);
