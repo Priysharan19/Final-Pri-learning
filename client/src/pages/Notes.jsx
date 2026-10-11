@@ -14,10 +14,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { MathText } from '../lib/latex.jsx';
+import StudyDiagram from '../notes/StudyDiagram.jsx';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import { IN_CURRICULUM, IN_CHAPTER_BY_ID } from '../engine/curriculum-in.js';
 import { NOTES_GRADES, gradeOfChapter, loadNotesForGrade, notesSearchText } from '../notes/notesIndex.js';
+import { studyResourcesForGrade } from '../notes/data/notes-study-resources.js';
 import { studyHref, selectedStudyContext, selectedStudyPracticeHref } from '../lib/studyJourney.js';
 import '../notes/Notes.css';
 import { notesBookmarkKey } from './notesBookmarkScope.js';
@@ -389,9 +391,14 @@ function ChapterNotes({ chapterId }) {
   const [{ notes: all, failed }, retry] = useNotes(grade);
   const [marks, toggleMark] = useBookmarks();
   const [cards, setCards] = useState(false);
+  // Limit initial SVG mounting on tablets; reveal more without discarding solved steps.
+  const [visibleExamples, setVisibleExamples] = useState(6);
+  const [visualOnly, setVisualOnly] = useState(false);
   const notes = all?.[chapterId];
+  const selectedExamples = visualOnly ? (notes?.examples || []).filter(ex => ex.figure) : (notes?.examples || []);
   const [params] = useSearchParams();
   const selected = selectedStudyContext(chapter, params);
+  const linkedResources = studyResourcesForGrade(grade, selected?.track || 'cbse');
   const practiceLink = selectedStudyPracticeHref(chapter, params);
   const mode = params.get('view') === 'examples' ? 'examples' : 'notes';
   const changeMode = next => {
@@ -405,8 +412,8 @@ function ChapterNotes({ chapterId }) {
   }, [mode, notes, chapterId]);
 
   const root = useRef(null);
-  useReveal(root, [chapterId, notes]);
-  useEffect(() => { window.scrollTo?.(0, 0); }, [chapterId]);
+  useReveal(root, [chapterId, notes, visibleExamples, visualOnly]);
+  useEffect(() => { setVisibleExamples(6); setVisualOnly(false); window.scrollTo?.(0, 0); }, [chapterId]);
 
   const group = IN_CURRICULUM.find(g => g.grade === grade);
   const number = group ? group.chapters.findIndex(c => c.id === chapterId) + 1 : 0;
@@ -518,8 +525,46 @@ function ChapterNotes({ chapterId }) {
           </Section>
 
           <Section id="examples" title={t('notes.sectionExamples')}>
-            {notes.examples.map((ex, i) => <Example key={i} ex={ex} n={i + 1} />)}
+            {notes.examples.some(ex => ex.figure) && (
+              <div className="nt-example-more">
+                <button type="button" className="btn btn-secondary"
+                  aria-pressed={visualOnly}
+                  onClick={() => { setVisualOnly(v => !v); setVisibleExamples(6); }}>
+                  {visualOnly ? t('notes.showAllExamples') : t('notes.visualExamplesOnly')}
+                </button>
+              </div>
+            )}
+            {selectedExamples.slice(0, visibleExamples).map((ex, i) => <Example key={chapterId + ':' + ex.question} ex={ex} n={i + 1} />)}
+            {selectedExamples.length > visibleExamples && (
+              <div className="nt-example-more">
+                <button type="button" className="btn btn-secondary"
+                  onClick={() => setVisibleExamples(v => Math.min(v + 6, selectedExamples.length))}
+                  aria-label={t('notes.showMoreExamples')}>
+                  {t('nav.more')} ({Math.min(visibleExamples + 6, selectedExamples.length)}/{selectedExamples.length})
+                </button>
+              </div>
+            )}
           </Section>
+
+          {linkedResources.length > 0 && (
+            <Section id="resources" title={t('notes.sectionResources')}>
+              <ul className="nt-chapters" data-testid="notes-study-resources">
+                {linkedResources.map(resource => (
+                  <li key={resource.id}>
+                    <a className="nt-chapter" href={resource.url} target="_blank" rel="noopener noreferrer"
+                      aria-label={resource.title}>
+                      <span className="nt-chapter-n" aria-hidden="true">↗</span>
+                      <span className="nt-chapter-body">
+                        <strong className="nt-chapter-name">{resource.title}</strong>
+                        <span className="nt-chapter-meta">{resource.issuer} · {resource.focus}</span>
+                      </span>
+                      <span className="nt-chapter-go" aria-hidden="true">↗</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
 
           <div className="nt-end nt-reveal">
             <button type="button" className="btn btn-primary" onClick={() => nav(practiceLink)}>{t('notes.practise')}</button>
@@ -635,6 +680,7 @@ function Example({ ex, n }) {
     <div className="nt-example nt-reveal">
       <p className="nt-example-n">{t('notes.exampleNumber', { n })}</p>
       <MathText block className="nt-example-q" text={ex.question} />
+      {ex.figure && <StudyDiagram figure={ex.figure} />}
       <ol className="nt-steps">
         {ex.steps.slice(0, shown).map((s, i) => <li key={i} className="nt-step">
           <MathText text={s} />

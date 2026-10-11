@@ -1,0 +1,262 @@
+// Wave 7: independently verifiable original vector-diagram practice.
+import { makeInquiryVisual } from '../visualInquiryFactory.js';
+const specs=[
+  {
+    "chapterId": "c10-quadratic-equations",
+    "kind": "quadraticRoots",
+    "r1": -5,
+    "r2": 2,
+    "a": -1,
+    "context": "Root-midpoint investigation 1"
+  },
+  {
+    "chapterId": "c10-quadratic-equations",
+    "kind": "quadraticRoots",
+    "r1": -6,
+    "r2": 3,
+    "a": 2,
+    "context": "Root-midpoint investigation 2"
+  },
+  {
+    "chapterId": "c10-quadratic-equations",
+    "kind": "quadraticRoots",
+    "r1": -7,
+    "r2": 4,
+    "a": -1,
+    "context": "Root-midpoint investigation 3"
+  },
+  {
+    "chapterId": "c10-quadratic-equations",
+    "kind": "quadraticRoots",
+    "r1": -8,
+    "r2": 5,
+    "a": 2,
+    "context": "Root-midpoint investigation 4"
+  },
+  {
+    "chapterId": "c10-quadratic-equations",
+    "kind": "quadraticRoots",
+    "r1": -9,
+    "r2": 6,
+    "a": -1,
+    "context": "Root-midpoint investigation 5"
+  },
+  {
+    "chapterId": "c10-quadratic-equations",
+    "kind": "quadraticRoots",
+    "r1": -10,
+    "r2": 7,
+    "a": 2,
+    "context": "Root-midpoint investigation 6"
+  },
+  {
+    "chapterId": "c10-quadratic-equations",
+    "kind": "quadraticRoots",
+    "r1": -11,
+    "r2": 8,
+    "a": -1,
+    "context": "Root-midpoint investigation 7"
+  },
+  {
+    "chapterId": "c10-quadratic-equations",
+    "kind": "quadraticRoots",
+    "r1": -12,
+    "r2": 9,
+    "a": 2,
+    "context": "Root-midpoint investigation 8"
+  },
+  {
+    "chapterId": "c10-triangles",
+    "kind": "similarTriangles",
+    "base": 12,
+    "height": 16,
+    "num": 1,
+    "den": 2,
+    "context": "Nested parallel triangle 1"
+  },
+  {
+    "chapterId": "c10-triangles",
+    "kind": "similarTriangles",
+    "base": 24,
+    "height": 32,
+    "num": 1,
+    "den": 2,
+    "context": "Nested parallel triangle 2"
+  },
+  {
+    "chapterId": "c10-triangles",
+    "kind": "similarTriangles",
+    "base": 36,
+    "height": 48,
+    "num": 1,
+    "den": 2,
+    "context": "Nested parallel triangle 3"
+  },
+  {
+    "chapterId": "c10-triangles",
+    "kind": "similarTriangles",
+    "base": 48,
+    "height": 64,
+    "num": 1,
+    "den": 2,
+    "context": "Nested parallel triangle 4"
+  },
+  {
+    "chapterId": "c10-triangles",
+    "kind": "similarTriangles",
+    "base": 60,
+    "height": 80,
+    "num": 1,
+    "den": 2,
+    "context": "Nested parallel triangle 5"
+  },
+  {
+    "chapterId": "c10-triangles",
+    "kind": "similarTriangles",
+    "base": 72,
+    "height": 96,
+    "num": 1,
+    "den": 2,
+    "context": "Nested parallel triangle 6"
+  },
+  {
+    "chapterId": "c10-coordinate-geometry",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        3,
+        0
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        0,
+        4
+      ]
+    ],
+    "context": "Surveyed shape shoelace 1"
+  },
+  {
+    "chapterId": "c10-coordinate-geometry",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        0,
+        5
+      ]
+    ],
+    "context": "Surveyed shape shoelace 2"
+  },
+  {
+    "chapterId": "c10-coordinate-geometry",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        5,
+        0
+      ],
+      [
+        7,
+        6
+      ],
+      [
+        0,
+        6
+      ]
+    ],
+    "context": "Surveyed shape shoelace 3"
+  },
+  {
+    "chapterId": "c10-coordinate-geometry",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        6,
+        0
+      ],
+      [
+        8,
+        7
+      ],
+      [
+        0,
+        7
+      ]
+    ],
+    "context": "Surveyed shape shoelace 4"
+  },
+  {
+    "chapterId": "c10-coordinate-geometry",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        7,
+        0
+      ],
+      [
+        9,
+        8
+      ],
+      [
+        0,
+        8
+      ]
+    ],
+    "context": "Surveyed shape shoelace 5"
+  },
+  {
+    "chapterId": "c10-coordinate-geometry",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        8,
+        0
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        0,
+        9
+      ]
+    ],
+    "context": "Surveyed shape shoelace 6"
+  }
+];
+const data={};for(const {chapterId,kind,...p} of specs)(data[chapterId]||={examples:[]}).examples.push(makeInquiryVisual(kind,p));
+export default data;
