@@ -43,6 +43,9 @@ const readerLog = join(dir, 'synthetic-reader.jsonl');
 const readerScript = join(dir, 'synthetic-reader-script.json');
 // Never shared with the app: the external Android TEST runner reads these
 // undeliverable OTPs only through the authenticated loopback oracle.
+// Deliberately leave PRI_AUTH_EMAIL_PROVIDER empty in this non-production fixture:
+// the OTP adapter provides in-memory test mail, while the account outbox
+// worker must NOT boot with an unsupported provider named "test".
 const nativeOtpCapture = join(dir, 'native-otp-capture.jsonl');
 if (!restart) writeFileSync(nativeOtpCapture, '', { mode: 0o600, flag: 'wx' });
 // The stand-in reader's environment: a key that is not a provider key (the
@@ -60,7 +63,7 @@ const entry = syntheticReader ? join(ROOT, 'scripts/synthetic-reader-server.mjs'
 
 const child = spawn(process.execPath, [entry], {
   cwd: ROOT,
-  env: { ...process.env, PORT: String(port), PRI_PLATFORM_DB: dbPath, NODE_ENV: 'development', PRI_DATABASE_URL: '', PRI_AUTH_EMAIL_PROVIDER: 'test', PRI_NATIVE_OTP_CAPTURE_FILE: nativeOtpCapture, ...readerEnv },
+  env: { ...process.env, PORT: String(port), PRI_PLATFORM_DB: dbPath, NODE_ENV: 'development', PRI_DATABASE_URL: '', PRI_AUTH_EMAIL_PROVIDER: '', PRI_NATIVE_OTP_CAPTURE_FILE: nativeOtpCapture, ...readerEnv },
   detached: true,
   stdio: ['ignore', log, log],
 });
@@ -68,6 +71,9 @@ child.unref();
 
 const base = `http://127.0.0.1:${port}`;
 for (let i = 0; ; i++) {
+  // An exited child cannot become healthy. Fail fast with the local log path
+  // rather than hiding a bootstrap error behind 30 seconds of polling.
+  if (child.exitCode !== null) { console.error(`fixture server exited (code ${child.exitCode}); see ${join(dir, 'server.log')}`); process.exit(1); }
   try { if ((await fetch(`${base}/v1/health`)).ok) break; } catch { /* starting */ }
   if (i > 60) { console.error(`server did not start (log: ${join(dir, 'server.log')})`); process.exit(1); }
   await new Promise(r => setTimeout(r, 500));
