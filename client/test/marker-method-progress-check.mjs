@@ -15,7 +15,7 @@
 // Every case is authored. Nothing here is generated.
 // ─────────────────────────────────────────────────────────────────
 import { ANSWER_LIMIT } from '../src/engine/checker-core.js';
-import { methodMarks, stepCheck, checkAnswer, WORKING_LIMITS } from '../src/engine/checker.js';
+import { methodMarks, stepCheck, checkAnswer, checkWorking, WORKING_LIMITS, UNVERIFIED_NOTE, setBackstopClockForTests } from '../src/engine/checker.js';
 import { parseNumericInput } from '../src/engine/checker-core.js';
 
 let pass = 0;
@@ -1040,6 +1040,118 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
   for (const [name, space] of [['tab', '\t'], ['line break', '\n'], ['em', ' '], ['ideographic', '　'], ['zero-width', '​']]) {
     ok(read(`1${space}234`) !== 1234, `a ${name} between digit groups is not a grouping space`);
   }
+}
+
+// ── A busy machine never lowers a mark ───────────────────────────────────────
+// The engine reads working under a wall-clock backstop (WORKING_LIMITS
+// .backstopMs). A line the clock skipped used to be returned as an ordinary
+// unread line, which earns nothing: `(x-1)(x+3)=0`, `x-1=0`, `x+3=0` read 1 of
+// 3 on a machine busy enough. The clock is replaced here by one that runs out
+// at a chosen read, so every stage a check can be stopped at is reached
+// exactly, on any machine. The rule: a check either finishes, and is then the
+// same as with no clock at all, or it is `unverified` and carries no mark, no
+// verdict and no line report — never anything in between.
+{
+  /** Run `fn` under a clock that reads 0 for its first `reads` readings and far past the backstop after. */
+  const stoppedAfter = (reads, fn) => {
+    let n = 0;
+    const previous = setBackstopClockForTests(() => (n++ < reads ? 0 : 10 * WORKING_LIMITS.backstopMs));
+    try { return fn(); } finally { setBackstopClockForTests(previous); }
+  };
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const SKIP = Symbol('not comparable');
+  const QUAD = { kind: 'equation', variable: 'x', solutions: [1, -3], source: 'x^2+2x-3=0' };
+  const LIN = { kind: 'equation', variable: 't', solutions: [3], source: '5t - 4=2t + 5' };
+  const PAIR = { kind: 'equation', variable: 'y', solutions: [-2] };
+  const PLAN = { kind: 'plan', stages: [
+    { kind: 'derivative', variable: 'x', source: '3x^2 - 6x - 1', canonical: '6x - 6' },
+    { kind: 'evaluation', source: '6x - 6', substitutions: { x: -3 }, expected: -24, labels: ['m', 'gradient', 'dy/dx'] }] };
+  const long = Array.from({ length: 40 }, (_, k) => `${k + 2}t=${3 * (k + 2)}`);
+  const CASES = [
+    ['the reported working', QUAD, '$x^2+2x-3=0$', ['(x-1)(x+3)=0', 'x-1=0', 'x+3=0'], 4, 3],
+    ['roots read off and a slip', QUAD, '$x^2+2x-3=0$', ['(x-1)(x+3)=0', 'x=1', 'x=-3', 'x=5'], 4, 3],
+    ['the quadratic formula', QUAD, '$x^2+2x-3=0$', ['x=(-2±4)/2', 'x=1', 'x=-3'], 4, 3],
+    ['completing the square', QUAD, '$x^2+2x-3=0$', ['(x+1)^2=4', 'x+1=2', 'x=1'], 4, null],
+    ['splitting the middle term', QUAD, '$x^2+2x-3=0$', ['x^2+3x-x-3=0', 'x(x+3)-(x+3)=0', '(x-1)(x+3)=0', 'x=1', 'x=-3'], 4, 3],
+    ['a linear equation, collected', LIN, '$5t - 4=2t + 5$', ['5t - 2t = 5 + 4', '3t = 9', 't = 4'], 4, 2],
+    ['a linear equation, constants first', LIN, '$5t - 4=2t + 5$', ['5t = 2t + 9', '3t = 9'], 4, null],
+    ['elimination through the other unknown', PAIR, 'Solve by elimination: $3x + 5y = 5$ and $5x - 2y = 29$. Find the value of $y$.', ['-31x = -155', 'x = 5', '3(5) + 5y = 5', '5y = -10', 'y = 99'], 5, 3],
+    ['a differentiation plan', PLAN, 'Find the gradient of $y = 3x^2 - 6x - 1$ at $x = -3$.', ['dy/dx = 6x - 6', 'm = 6(-3) - 6'], 3, null],
+    ['a long page of working', LIN, '$5t - 4=2t + 5$', ['5t - 2t = 5 + 4', ...long, 't = 4'], 4, null],
+    ['a sweep of candidates', QUAD, '$x^2+2x-3=0$', Array.from({ length: 13 }, (_, k) => `x=${k - 6}`), 4, 0]
+  ];
+  for (const [name, meta, prompt, lines, marks, expected] of CASES) {
+    const working = lines.join('\n');
+    const report = stepCheck(meta, working, { prompt });
+    const method = methodMarks({ meta, working, marks, prompt });
+    const methodWithReport = methodMarks({ meta, working, marks, prompt, report });
+    ok(report.unverified !== true && method?.unverified !== true, `${name}: with the clock idle the check completes`);
+    if (expected !== null) ok((method?.awarded ?? 0) === expected, `${name}: and earns ${expected} (got ${method?.awarded ?? 0})`);
+    // Marked again and again, it is marked the same.
+    ok([1, 2, 3].every(() => same(stepCheck(meta, working, { prompt }), report) && same(methodMarks({ meta, working, marks, prompt }), method)), `${name}: the same working is marked identically every time`);
+    // A clock that never runs out changes nothing, however often it is read.
+    ok(same(stoppedAfter(Infinity, () => stepCheck(meta, working, { prompt })), report) && same(stoppedAfter(Infinity, () => methodMarks({ meta, working, marks, prompt })), method), `${name}: a clock that is read but never runs out changes nothing`);
+    let stoppedSomewhere = 0, finishedSomewhere = 0, lower = [];
+    for (let reads = 0; reads <= 3 * lines.length + 6; reads++) {
+      const r = stoppedAfter(reads, () => stepCheck(meta, working, { prompt }));
+      const m = stoppedAfter(reads, () => methodMarks({ meta, working, marks, prompt }));
+      const mr = stoppedAfter(reads, () => methodMarks({ meta, working, marks, prompt, report: r }));
+      for (const [what, got, whole] of [['report', r, report], ['method marks', m, method], ['method marks on that report', mr, r.unverified ? SKIP : methodWithReport]]) {
+        if (got?.unverified === true) {
+          stoppedSomewhere++;
+          const silent = what === 'report'
+            ? got.firstBreak === -1 && got.lines.length === lines.length && got.lines.every((l, i) => l.status === 'note' && l.unread === true && l.note === UNVERIFIED_NOTE && l.text === lines[i]) && !('diagnosis' in got)
+            : got.awarded === 0 && got.okLines === 0 && got.progressLines === 0 && got.lines.length === 0 && got.note === UNVERIFIED_NOTE;
+          if (!silent) lower.push(`${what} stopped at read ${reads} still says something: ${JSON.stringify(got).slice(0, 160)}`);
+        } else if (whole !== SKIP && same(got, whole)) finishedSomewhere++;
+        else lower.push(`${what} stopped at read ${reads} is neither whole nor unverified: ${JSON.stringify(got).slice(0, 160)}`);
+      }
+    }
+    ok(lower.length === 0, `${name}: stopped at any reading of the clock, the check is whole or unverified, never a different mark${lower.length ? ' — ' + lower[0] : ''}`);
+    ok(stoppedSomewhere > 0 && finishedSomewhere > 0, `${name}: both outcomes were reached (${stoppedSomewhere} stopped, ${finishedSomewhere} whole)`);
+    // After a stopped check the engine is as it was: nothing is remembered.
+    ok(same(stepCheck(meta, working, { prompt }), report) && same(methodMarks({ meta, working, marks, prompt }), method), `${name}: and the next check, with the clock idle, is the whole one again`);
+  }
+  // The reported case, by name: never 1 of 3.
+  {
+    const working = '(x-1)(x+3)=0\nx-1=0\nx+3=0';
+    const seen = new Set();
+    for (let reads = 0; reads < 20; reads++) { const m = stoppedAfter(reads, () => methodMarks({ meta: QUAD, working, marks: 4, prompt: '$x^2+2x-3=0$' })); seen.add(m?.unverified ? 'unverified' : m?.awarded ?? 0); }
+    ok(same([...seen].sort(), [3, 'unverified']), `factorise and both branches is 3 marks or not marked — never 1 or 2 (saw ${[...seen].join(', ')})`);
+  }
+  // A question answered BY its working: a stopped check is not a wrong answer.
+  {
+    const q = { answerType: 'working', prompt: 'Solve $x^2+2x-3=0$.', answer: { stepMeta: QUAD }, stepcheck: QUAD };
+    const text = '(x-1)(x+3)=0\nx=1\nx=-3';
+    const whole = checkAnswer(q, text);
+    ok(whole.unverified !== true, 'a working-type answer is marked when the clock is idle');
+    const outcomes = [];
+    for (let reads = 0; reads < 20; reads++) {
+      for (const got of [stoppedAfter(reads, () => checkAnswer(q, text)), stoppedAfter(reads, () => checkWorking(q, text))]) {
+        if (got.unverified === true) outcomes.push(got.invalid === true && got.correct === false && got.feedback === UNVERIFIED_NOTE && !('stepReport' in got));
+        else outcomes.push(same(got, whole));
+      }
+    }
+    ok(outcomes.every(Boolean), 'stopped by the clock, a working-type answer is the whole verdict or invalid-and-unverified (not an attempt) — never a wrong answer');
+  }
+  // The limits on the text are not the clock, and are untouched: what they
+  // leave unread is unread on every machine, and is not "unverified".
+  {
+    const longLine = 'x=' + '1+'.repeat(WORKING_LIMITS.lineChars) + '1';
+    const r = stepCheck(LIN, `5t - 2t = 5 + 4\n${longLine}\n3t = 9`, { prompt: '$5t - 4=2t + 5$' });
+    ok(r.unverified !== true && r.lines[1].unread === true && r.lines[1].note !== UNVERIFIED_NOTE && r.lines[0].status === 'ok', 'a line too long to read is still unread by the rule on its length, deterministically');
+    const many = Array.from({ length: WORKING_LIMITS.lines + 20 }, (_, k) => `${k + 2}t=${3 * (k + 2)}`).join('\n');
+    const rm = stepCheck(LIN, many, { prompt: '$5t - 4=2t + 5$' });
+    ok(rm.unverified !== true && rm.lines.slice(WORKING_LIMITS.lines).every(l => l.unread === true) && rm.lines.slice(0, WORKING_LIMITS.lines).every(l => l.unread !== true), `no more than ${WORKING_LIMITS.lines} lines are read, as before`);
+    ok(same(stepCheck(LIN, many, { prompt: '$5t - 4=2t + 5$' }), rm), 'and the same over-long page is read the same way twice');
+    ok(WORKING_LIMITS.backstopMs === 750 && WORKING_LIMITS.lineChars === 200 && WORKING_LIMITS.lines === 100 && WORKING_LIMITS.work === 600000, 'every limit on working is what it was');
+    // The work budget is a count, not a time: the same answer is refused the same way.
+    const heavy = { answerType: 'numeric', answer: { value: 5 }, prompt: 'p' };
+    const a = checkAnswer(heavy, 'sum(sum(k;k;1;10000);j;1;10000)'), b = stoppedAfter(0, () => checkAnswer(heavy, 'sum(sum(k;k;1;10000);j;1;10000)'));
+    ok(a.correct !== true && a.unverified !== true && same(a, b), 'an answer that spends the evaluation budget is refused by the count — identically, whatever the clock says');
+  }
+  // A report the clock stopped is evidence of nothing, whoever passes it on.
+  ok(methodMarks({ meta: LIN, working: '3t = 9', marks: 3, prompt: '$5t - 4=2t + 5$', report: { unverified: true, firstBreak: -1, lines: [] } })?.unverified === true, 'method marks are never read from an unverified report');
 }
 
 console.log(failures.length

@@ -55,11 +55,12 @@ const {
   MARKER_LIMITS, MARKER_COOLDOWN, MARKING_TOO_COMPLEX, MARKING_BUSY, MARKING_COOLDOWN,
   TOO_COMPLEX_MESSAGE, WORKING_NOT_READ_NOTE
 } = await import('../platform/markerPool.js');
-const { MARKER_OPS, stepMetaFor, tutorEvidence } = await import('../platform/markerOps.js');
+const { MARKER_OPS, stepMetaFor, tutorEvidence, UNVERIFIED_MESSAGE } = await import('../platform/markerOps.js');
+const { EXAM_UNVERIFIED_LIMIT, EXAM_UNVERIFIED_SPACING_MS } = await import('../platform/exams.js');
 const { issuedQuestionForTutor } = await import('../platform/practice.js');
 const { setLogSink } = await import('../platform/observability.js');
 const { metrics } = await import('../platform/metrics.js');
-const { checkAnswer } = await import('../../client/src/engine/checker.js');
+const { checkAnswer, setBackstopClockForTests, UNVERIFIED_NOTE } = await import('../../client/src/engine/checker.js');
 const { subtopicsForYear } = await import('../../client/src/engine/curriculum.js');
 const { multipartForYear } = await import('../../client/src/engine/generators/multipart.js');
 
@@ -243,11 +244,11 @@ try {
     t.deq([await count(who, 'practice-grade', `${qid}:%`), await count(who, 'practice-tries', qid), await count(who, 'practice-completion', qid), (await attempts(who, qid)).length],
       [0, 0, 0, 0], `${label}: no receipt, no try, no completion and no attempt were recorded`);
   };
-  const unreadable = (r, q, label, t = c) => {
+  const unreadable = (r, q, label, t = c, sentence = TOO_COMPLEX_MESSAGE) => {
     t.eq(r.status, 200, `${label}: answered 200, as an unreadable entry is`);
     t.deq([r.data.invalid, r.data.correct, r.data.resolved, r.data.marksEarned, r.data.stepReport, r.data.partial, r.data.trapWhy],
       [true, false, false, 0, null, null, null], `${label}: invalid, not correct, not resolved, no marks, no step report, no method evidence`);
-    t.eq(r.data.feedback, TOO_COMPLEX_MESSAGE, `${label}: with the fixed plain sentence`);
+    t.eq(r.data.feedback, sentence, `${label}: with the fixed plain sentence${sentence === TOO_COMPLEX_MESSAGE ? '' : ' that it could not be checked this time and may be sent again'}`);
     t.deq([r.data.code, r.data.tooComplex, r.data.authoritative, r.data.marksPossible, r.data.triesLeft], [MARKING_TOO_COMPLEX, true, true, q.criteriaCount, 1], `${label}: typed, attested, out of the question's own marks, the try not spent`);
     t.ok(!('solution' in r.data) && !('repairOpportunities' in r.data) && !('firstTryTrapWhy' in r.data), `${label}: no solution, nothing from the key`);
     // The shipped client only accepts a grade reply that has this shape
@@ -401,37 +402,86 @@ try {
   }
 
   // ── B5. Working that cannot be read in time ──────────────────────────────
+  // Two outcomes only: a VERIFIED grade, or UNABLE TO VERIFY — the whole
+  // submission is not an attempt, nothing is spent or written, and the same
+  // submission key marks it again. A stopped check is never a lower mark.
   // A short deadline keeps the suite quick; the rules do not depend on it.
-  await useMarkerPoolForTests({ entry: TEST_ENTRY, deadlineMs: 250 });
-  await markerPool().ready();
+  const sealedOf = async (who, qid) => JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=?", [who.account.id, qid])).response_json);
+  /** What the deterministic marker gives this submission when nothing stops it. */
+  const verifiedMarks = async (who, qid, answer, steps) => {
+    const out = MARKER_OPS.practice({ q: await sealedOf(who, qid), answer, working: steps.join('\n'), evidenceIfWrong: true }, () => {});
+    assert.equal(out.result.correct, false, 'a wrong answer');
+    return Math.max(0, out.evidence?.partial?.awarded ?? 0);
+  };
+  /** The genuine steps of a server-issued linear equation, worked out from its public prompt. */
+  const genuineSteps = prompt => {
+    const { left, right, variable } = solveLinearPrompt(prompt);
+    const a = left.coefficient - right.coefficient, k = right.constant - left.constant;
+    const coef = n => (n === 1 ? '' : n === -1 ? '-' : n);
+    const collected = left.constant ? `${coef(a)}${variable}${left.constant < 0 ? '-' : '+'}${Math.abs(left.constant)}=${right.constant}` : null;
+    return [collected, `${coef(a)}${variable}=${k}`].filter(Boolean);
+  };
+  const slowPool = () => useMarkerPoolForTests({ entry: TEST_ENTRY, deadlineMs: 250 }).then(() => markerPool().ready());
+  const idlePool = () => useMarkerPoolForTests({ entry: TEST_ENTRY }).then(() => markerPool().ready());
+  await slowPool();
   {
     const who = await student('working');
-    // (a) A wrong answer on the try that resolves, with working that never
-    // finishes: the answer's verdict stands, the working is not read.
+    // (a) A wrong answer on the try that resolves, with working the worker
+    // cannot finish inside its deadline.
     const one = await linear(who);
-    const first = await submit(who, one.q.id, 'w-first', String(one.root + 1), [`x = ${one.root} ${magic('spin')}`]);
+    const step = genuineSteps(one.q.prompt)[0];
+    const slowSteps = [`${step} ${magic('spin', 600)}`];
+    const first = await submit(who, one.q.id, 'w-first', String(one.root + 1), slowSteps);
     c.deq([first.status, first.data.resolved, first.data.triesLeft, first.data.stepReport, 'workingNotRead' in first.data], [200, false, 1, null, false],
       'working: on an open try the working is not checked at all, so nothing about it can run out of time');
-    const second = await timed(submit(who, one.q.id, 'w-second', String(one.root + 2), [`x = ${one.root} ${magic('spin')}`]));
+    const second = await timed(submit(who, one.q.id, 'w-second', String(one.root + 2), slowSteps));
     c.ok(second.ms < 250 + MARGIN, `working: the resolving try returns at the deadline (${Math.round(second.ms)} ms)`);
-    c.deq([second.value.status, second.value.data.correct, second.value.data.invalid, second.value.data.resolved, second.value.data.marksEarned, second.value.data.stepReport, second.value.data.partial, second.value.data.workingNotRead],
-      [200, false, false, true, 0, null, null, true], 'working: the wrong answer stands as wrong and resolved; the unread working earns no method marks and is flagged not read');
-    c.ok(String(second.value.data.feedback).endsWith(WORKING_NOT_READ_NOTE), 'working: and the reply says it was not read');
-    c.eq((await attempts(who, one.q.id)).length, 1, 'working: exactly one graded attempt');
-    c.deq((await submit(who, one.q.id, 'w-second', String(one.root + 2), [`x = ${one.root} ${magic('spin')}`])).data, second.value.data, 'working: and the replay is the identical receipt, without marking again');
+    unreadable(second.value, one.q, 'a wrong answer whose working was stopped at the deadline', c, UNVERIFIED_MESSAGE);
+    c.ok(UNVERIFIED_MESSAGE === UNVERIFIED_NOTE && /this time/.test(UNVERIFIED_MESSAGE) && /again/i.test(UNVERIFIED_MESSAGE) && !/simply|short/.test(UNVERIFIED_MESSAGE), 'working: the sentence is the engine\'s own — nothing in it blames the entry');
+    c.ok(!('workingNotRead' in second.value.data), 'working: it is not "the answer stands, the working was not read" — there is no such outcome');
+    c.deq([await count(who, 'practice-grade', `${one.q.id}:%`), await count(who, 'practice-tries', one.q.id), await count(who, 'practice-completion', one.q.id), (await attempts(who, one.q.id)).length], [1, 1, 0, 0],
+      'working: only the first try stands — the stopped submission wrote no receipt, spent no try, resolved nothing and recorded no attempt');
+    const again = await submit(who, one.q.id, 'w-second', String(one.root + 2), slowSteps);
+    unreadable(again, one.q, 'the same submission sent again while the marker is still as slow', c, UNVERIFIED_MESSAGE);
+    // The machine is no longer busy: the SAME submission, under the SAME key,
+    // is now marked — and gets what the marker gives it, method marks included.
+    await idlePool();
+    const due = await verifiedMarks(who, one.q.id, String(one.root + 2), [step]);
+    const verified = await submit(who, one.q.id, 'w-second', String(one.root + 2), slowSteps);
+    c.deq([verified.status, verified.data.correct, verified.data.invalid, verified.data.resolved, verified.data.marksEarned, 'tooComplex' in verified.data],
+      [200, false, false, true, due, false], `working: sent again when the marker has time, the same submission is a verified grade with the marks its working earns (${due})`);
+    c.ok(due >= 1 && verified.data.partial?.awarded === due && Array.isArray(verified.data.stepReport?.lines), 'working: a genuine step earns its method mark — the mark a busy machine used to withhold');
+    c.eq((await attempts(who, one.q.id)).length, 1, 'working: exactly one graded attempt, the verified one');
+    c.eq(JSON.parse((await attempts(who, one.q.id))[0].payload_json).marksEarned, due, 'working: carrying the verified marks');
+    await slowPool();
+    c.deq((await submit(who, one.q.id, 'w-second', String(one.root + 2), slowSteps)).data, verified.data, 'working: and its replay is the identical receipt, without marking again, however busy the marker is');
 
-    // (b) A right answer with working that never finishes keeps its full marks.
+    // (b) A right answer whose working cannot be read is sent back too: what
+    // the reply says never depends on whether the answer was right.
     const two = await linear(who);
-    const right = await submit(who, two.q.id, 'w-right', String(two.root), [`x = ${two.root} ${magic('spin')}`]);
-    c.deq([right.status, right.data.correct, right.data.resolved, right.data.marksEarned, right.data.workingNotRead], [200, true, true, two.q.criteriaCount, true],
-      'working: a right answer keeps its verdict and its full marks; its working is flagged not read');
+    const right1 = await submit(who, two.q.id, 'w-right', String(two.root), [`x = ${two.root} ${magic('spin')}`]);
+    unreadable(right1, two.q, 'a right answer whose working was stopped at the deadline', c, UNVERIFIED_MESSAGE);
+    // On the resolving try the reply for a right answer and for a wrong one is the same reply.
+    {
+      const pairWho = await student('working-pair');
+      const pair = await linear(pairWho);
+      await submit(pairWho, pair.q.id, 'w-pair-open', String(pair.root + 1));
+      const strip = d => { const { attemptId, submissionId, serverAcknowledgedAt, ...rest } = d; return rest; };
+      const wrongReply = await submit(pairWho, pair.q.id, 'w-pair-wrong', String(pair.root + 2), [`${genuineSteps(pair.q.prompt)[0]} ${magic('spin')}`]);
+      const rightReply = await submit(pairWho, pair.q.id, 'w-pair-right', String(pair.root), [`${genuineSteps(pair.q.prompt)[0]} ${magic('spin')}`]);
+      c.deq(strip(rightReply.data), strip(wrongReply.data), 'working: on the try that resolves, a right answer and a wrong answer whose working was stopped get the identical reply — a slow page of working cannot test an answer');
+      c.deq([await count(pairWho, 'practice-completion', pair.q.id), (await attempts(pairWho, pair.q.id)).length], [0, 0], 'working: and neither resolved the question');
+    }
+    await untouched(who, two.q.id, 'a right answer whose working was stopped');
+    const right2 = await submit(who, two.q.id, 'w-right-plain', String(two.root), [`x = ${two.root}`]);
+    c.deq([right2.status, right2.data.correct, right2.data.resolved, right2.data.marksEarned], [200, true, true, two.q.criteriaCount], 'working: sent with working that can be read, the right answer has its full marks and both tries were intact');
 
     // (c) No answer at all, and working that never finishes: there is no
     // verdict to stand on. Unreadable — never a working-only attempt worth 0.
     const three = await linear(who);
     await submit(who, three.q.id, 'w-open', String(three.root + 1));           // spend the first try, so the working would be checked
     const blank = await submit(who, three.q.id, 'w-blank', '', [`x = ${three.root} ${magic('spin')}`]);
-    unreadable(blank, three.q, 'working-only entry that cannot be read');
+    unreadable(blank, three.q, 'working-only entry that cannot be read', c, UNVERIFIED_MESSAGE);
     c.deq([await count(who, 'practice-completion', three.q.id), await count(who, 'practice-grade', `${three.q.id}:marker-w-blank`), (await attempts(who, three.q.id)).length], [0, 0, 0],
       'working-only entry that cannot be read: the question stays open and nothing is recorded for it');
 
@@ -441,6 +491,78 @@ try {
     const read = await submit(who, four.q.id, 'w4-read', String(four.root + 1), [`x = ${four.root}`]);
     c.ok(read.data.resolved === true && !('workingNotRead' in read.data) && Array.isArray(read.data.stepReport?.lines), 'working: ordinary working is read and reported as before');
   }
+
+  // ── B5b. The engine's own clock stops a check ────────────────────────────
+  // Inside its deadline the worker still reads working under the engine's
+  // 750 ms backstop (checker.js). When that clock stopped a line, the lines
+  // after it were returned unread and earned nothing — a lower mark, committed
+  // as an ordinary grade with no flag at all. The test worker makes that clock
+  // run out at an exact reading, so this is reached on any machine.
+  await idlePool();
+  {
+    const who = await student('engine-clock');
+    const one = await linear(who);
+    const steps = genuineSteps(one.q.prompt);
+    const wrong = String(one.root + 3);
+    const due = await verifiedMarks(who, one.q.id, wrong, steps);
+    assert.ok(due >= 1, `the working earns method marks when it is read (${due}) on ${one.q.prompt}`);
+    await submit(who, one.q.id, 'ec-open', String(one.root + 1));              // the first try
+    // Stopped at each line the engine can be stopped at.
+    const seen = [];
+    for (let reads = 1; reads <= steps.length; reads++) {
+      const r = await submit(who, one.q.id, 'ec-resolve', wrong, [...steps.slice(0, -1), `${steps.at(-1)} ${magic('clock', reads)}`]);
+      seen.push(r.data.tooComplex === true ? 'unable' : `marks:${r.data.marksEarned}`);
+      if (r.data.tooComplex === true) unreadable(r, one.q, `the engine's clock stopped the working after ${reads} reading(s)`, uncounted, UNVERIFIED_MESSAGE);
+    }
+    c.ok(seen.length >= 1 && seen.every(x => x === 'unable'), `engine clock: stopped at each line of the working the reply is "unable to verify" every time — never a lower mark (${seen.join(', ')})`);
+    c.deq([await count(who, 'practice-grade', `${one.q.id}:%`), await count(who, 'practice-completion', one.q.id), (await attempts(who, one.q.id)).length], [1, 0, 0],
+      'engine clock: nothing was written for any of them — the question is still open on its second try');
+    const whole = await submit(who, one.q.id, 'ec-resolve', wrong, [...steps.slice(0, -1), `${steps.at(-1)} ${magic('clock', 100000)}`]);
+    c.deq([whole.status, whole.data.invalid, whole.data.resolved, whole.data.marksEarned, whole.data.partial?.awarded], [200, false, true, due, due],
+      `engine clock: with a clock that does not run out, the same answer and working are a verified grade with their ${due} method mark(s)`);
+    c.eq(whole.data.stepReport?.lines?.every(line => line.unread !== true), true, 'engine clock: and every line of the report was read');
+    c.eq((await attempts(who, one.q.id)).length, 1, 'engine clock: one graded attempt');
+    // They cost no worker, so they are not counted towards the cooldown.
+    {
+      const many = await linear(who);
+      const letterOf = solveLinearPrompt(many.q.prompt).variable;
+      const stops = [];
+      for (let i = 0; i < MARKER_COOLDOWN.limit + 3; i++) stops.push(await submit(who, many.q.id, `ec-many-${i}`, String(many.root), [`${letterOf} = ${many.root} ${magic('clock', 1)}`]));
+      c.ok(stops.every(r => r.status === 200 && r.data.tooComplex === true), `engine clock: ${MARKER_COOLDOWN.limit + 3} entries in a row stopped by the engine's clock are each sent back — none is refused 429`);
+      const after = await submit(who, many.q.id, 'ec-many-after', String(many.root), [`${letterOf} = ${many.root}`]);
+      c.deq([after.status, after.data.correct], [200, true], 'engine clock: and the account is marked at once afterwards — an honest student is not made to wait because the server was busy');
+    }
+
+    // A right answer is treated the same way, and then keeps its full marks.
+    const two = await linear(who);
+    const letter = solveLinearPrompt(two.q.prompt).variable;
+    const stoppedRight = await submit(who, two.q.id, 'ec-right', String(two.root), [`${letter} = ${two.root} ${magic('clock', 1)}`]);
+    unreadable(stoppedRight, two.q, 'a right answer whose working the engine clock stopped', c, UNVERIFIED_MESSAGE);
+    await untouched(who, two.q.id, 'a right answer whose working the engine clock stopped');
+    const sameKey = await submit(who, two.q.id, 'ec-right', String(two.root), [`${letter} = ${two.root} ${magic('clock', 100000)}`]);
+    c.deq([sameKey.data.correct, sameKey.data.marksEarned], [true, two.q.criteriaCount], 'engine clock: sent again it is correct with full marks');
+
+    // The operation itself: one answer, never a count of the lines that happened to finish.
+    const q = await sealedOf(who, one.q.id);
+    const op = reads => {
+      let n = 0;
+      const previous = setBackstopClockForTests(() => (n++ < reads ? 0 : 1e7));
+      try { return MARKER_OPS.practice({ q, answer: wrong, working: steps.join('\n'), evidenceIfWrong: true }, () => {}); } finally { setBackstopClockForTests(previous); }
+    };
+    const outcomes = Array.from({ length: 12 }, (_, reads) => op(reads));
+    c.ok(outcomes.every(o => o.unverified === true ? Object.keys(o).length === 1 : o.evidence?.partial?.awarded === due), 'engine clock: the marking operation returns the verified result or { unverified: true } and nothing else, at every reading');
+    c.ok(outcomes.some(o => o.unverified === true) && outcomes.some(o => o.unverified !== true), 'engine clock: both outcomes were reached');
+    c.deq(tutorEvidence(q, steps), tutorEvidence(q, steps), 'tutor: the Step Check is the same every time');
+    {
+      let n = 0;
+      const previous = setBackstopClockForTests(() => (n++ < 1 ? 0 : 1e7));
+      let silent;
+      try { silent = tutorEvidence(q, steps); } finally { setBackstopClockForTests(previous); }
+      c.deq(silent, { firstBreak: -1, verifiedLines: 0, misconception: null, unverified: true }, 'tutor: a Step Check the clock stopped is silence — no line verified, no line called the first mistake — and says it is unverified, unlike one that ran');
+      c.ok(!('unverified' in tutorEvidence(q, ['qwerty'])), 'tutor: a Step Check that ran and verified no line is not marked unverified');
+    }
+  }
+  await slowPool();
 
   // ── B6. Concurrency: the restructured transaction ────────────────────────
   {
@@ -503,7 +625,7 @@ try {
     const sealed = JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=?", [who.account.id, t.q.id])).response_json);
     c.deq(await issued.workEvidence(lines), tutorEvidence(sealed, lines), 'tutor: the Step Check through the pool is exactly the in-process one');
     const stuck = await timed(issued.workEvidence([`x = ${t.root} ${magic('spin')}`]));
-    c.deq(stuck.value, { firstBreak: -1, verifiedLines: 0, misconception: null }, 'tutor: a Step Check that is cut off is silence — no line verified, no first mistake');
+    c.deq(stuck.value, { firstBreak: -1, verifiedLines: 0, misconception: null, unverified: true }, 'tutor: a Step Check that is cut off is silence — no line verified, no first mistake — marked unverified');
     c.ok(stuck.ms < 250 + MARGIN, 'tutor: at the deadline');
   }
 
@@ -553,7 +675,22 @@ try {
     const singles = paper => paper.questions.filter(sq => !sq.payload.multipart);
     const examEvents = async who => h.db.all("SELECT entity_id, payload_json FROM learning_events WHERE account_id=? AND kind='graded-attempt'", [who.account.id]);
 
-    // (a) One answer and one page of working are cut off; the rest is marked.
+    const holdOf = async (w, id) => { const row = await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='exam-marking-stopped' AND key=?", [w.account.id, id]); return row ? JSON.parse(row.response_json) : null; };
+    /** Let the spacing between counted stopped markings pass for this paper. */
+    const ageHold = async (w, id) => {
+      const rec = await holdOf(w, id);
+      await h.db.run("UPDATE idempotency_keys SET response_json=? WHERE account_id=? AND scope='exam-marking-stopped' AND key=?", [JSON.stringify({ ...rec, countedAt: Number(rec.countedAt) - EXAM_UNVERIFIED_SPACING_MS - 1 }), w.account.id, id]);
+    };
+    const uncool = () => h.db.run("DELETE FROM rate_limits WHERE bucket LIKE 'marker-complex:%'");
+    const resultRows = async who => Number((await h.db.get("SELECT COUNT(*) AS n FROM idempotency_keys WHERE account_id=? AND scope='exam-result'", [who.account.id])).n);
+    const savedAnswers = async (who, id) => { const row = await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='exam-answers' AND key=?", [who.account.id, id]); return row ? JSON.parse(row.response_json) : null; };
+    const busy = (r, label) => {
+      c.deq([r.status, r.data?.error?.code, r.headers.get('retry-after'), 'result' in (r.data || {}), 'detail' in (r.data || {})], [503, MARKING_BUSY, '2', false, false], `${label}: answered MARKING_BUSY — retry — not with a result`);
+    };
+
+    // (a) A paper marked while the marker is too slow for two of its parts is
+    // NOT finalised: nothing is written, the answers are kept, and the same
+    // finish, sent again when the marker has time, is the verified result.
     const who = await student('exam');
     const paper = await create(who);
     const answerable = singles(paper).filter(sq => right(sq.payload) !== null);
@@ -562,46 +699,178 @@ try {
     const honest = answerable.filter(sq => sq !== stepped && sq !== cutAnswer);
     assert.ok(stepped && cutAnswer && honest.length >= 2, 'the paper holds a multi-mark stepped question and others to answer');
     const answers = Object.fromEntries(honest.map(sq => [sq.id, right(sq.payload)]));
-    answers[cutAnswer.id] = `${right(cutAnswer.payload)} ${magic('spin')}`;
+    answers[cutAnswer.id] = `${right(cutAnswer.payload)} ${magic('spin', 600)}`;       // right, but slower than the 250 ms deadline
     answers[stepped.id] = String(Number(stepped.payload.answer.value) + 7);
-    const workings = { [stepped.id]: `x = 1 ${magic('spin')}` };
+    const workings = { [stepped.id]: `x = 1 ${magic('spin', 600)}` };
     const body = { answers, workings, submissionKey: 'marker-exam-finish' };
-    const [f1, f2] = await Promise.all([timed(finish(who, paper.id, body)), timed(finish(who, paper.id, body))]);
-    c.deq([f1.value.status, f2.value.status], [200, 200], 'exam: two simultaneous finishes of one paper are both answered');
+    const held = await timed(finish(who, paper.id, body));
+    busy(held.value, 'exam: a paper with parts the marker could not finish in time');
+    c.deq([await resultRows(who), (await examEvents(who)).length], [0, 0], 'exam: no result is stored and no attempt recorded — the paper is not finalised by a marking that was stopped');
+    const kept = await savedAnswers(who, paper.id);
+    c.deq([kept?.answers, kept?.workings], [answers, workings], 'exam: the answers and working the finish carried are kept on the server, so a retry that arrives after the paper\'s time marks the same work');
+    c.eq((await h.request(`/v1/exams/${paper.id}`, { jar: who.jar })).data.state, 'open', 'exam: the paper has no result yet');
+    // A held paper is frozen on what that finish carried.
+    const sneaky = { ...answers, [stepped.id]: String(stepped.payload.answer.value) };
+    const save = await h.request(`/v1/exams/${paper.id}/answers`, { method: 'PUT', jar: who.jar, body: { answers: sneaky, workings: {}, rev: 99 } });
+    c.deq([save.status, save.data?.error?.code], [409, 'EXAM_FINALISED'], 'exam: a save after a held finish is refused — the paper has been submitted');
+    c.deq([(await savedAnswers(who, paper.id))?.answers, (await savedAnswers(who, paper.id))?.workings], [answers, workings], 'exam: and changed nothing');
+    // The marker has time again: the same finish is now a verified result.
+    await idlePool();
+    // …and it is sent with DIFFERENT answers this time: the wrong part corrected, the working dropped.
+    const changed = { answers: sneaky, workings: {}, submissionKey: 'marker-exam-finish' };
+    const [f1, f2] = await Promise.all([timed(finish(who, paper.id, changed)), timed(finish(who, paper.id, body))]);
+    c.deq([f1.value.status, f2.value.status], [200, 200], 'exam: sent again when the marker has time, two simultaneous finishes of the paper are both answered');
     c.deq(f2.value.data, f1.value.data, 'exam: with the identical result — the paper was marked into the record once');
-    c.eq(Number((await h.db.get("SELECT COUNT(*) AS n FROM idempotency_keys WHERE account_id=? AND scope='exam-result'", [who.account.id])).n), 1, 'exam: one stored result');
+    c.eq(await resultRows(who), 1, 'exam: one stored result');
     const result = f1.value.data;
     const line = id => result.detail.find(d => d.id === id);
     const cut = line(cutAnswer.id);
-    c.deq([cut.unreadable, cut.correct, cut.awarded, cut.outcome, cut.feedback, cut.attemptId, cut.partial],
-      [true, false, 0, 'unreadable', TOO_COMPLEX_MESSAGE, null, null], 'exam: the part whose answer could not be marked in time is unreadable — no mark, not wrong, no attempt');
+    c.deq([cut.correct, cut.awarded, cut.outcome, 'unreadable' in cut, typeof cut.attemptId],
+      [true, Number(cutAnswer.marking.correct), 'correct', false, 'string'], 'exam: the part whose answer was too slow to mark the first time is marked — correct, full marks, an attempt — not recorded as unreadable with nothing');
     const unread = line(stepped.id);
-    c.deq([unread.workingNotRead, unread.correct, unread.awarded, unread.partial, unread.markingScheme, unread.outcome],
-      [true, false, 0, null, 'final-answer', 'wrong'], 'exam: the part whose working could not be read keeps its answer verdict (wrong) and earns no method marks');
-    c.ok(String(unread.feedback).endsWith(WORKING_NOT_READ_NOTE) && typeof unread.attemptId === 'string', 'exam: flagged as not read; the wrong answer itself is an attempt');
-    c.ok(honest.every(sq => line(sq.id).correct === true && line(sq.id).awarded === Number(sq.marking.correct) && !('unreadable' in line(sq.id)) && !('workingNotRead' in line(sq.id))),
-      `exam: the other ${honest.length} answered parts are marked normally, full marks each — one part does not block the paper`);
-    c.eq(result.score, result.detail.reduce((n, d) => n + d.awarded, 0), 'exam: the score is the sum of what was actually marked');
+    c.deq([unread.correct, unread.outcome, 'workingNotRead' in unread, unread.markingScheme], [false, 'wrong', false, 'step-marked'], 'exam: the part whose working was too slow to read the first time has its working read — and is marked on the answer the HELD finish carried (wrong), not the corrected one the retry sent');
+    c.eq(unread.given, answers[stepped.id], 'exam: the retry\'s changed answer was ignored');
+    c.ok(honest.every(sq => line(sq.id).correct === true && line(sq.id).awarded === Number(sq.marking.correct)), `exam: the other ${honest.length} answered parts have full marks each`);
+    c.ok(result.detail.every(d => !('unreadable' in d) && !('workingNotRead' in d)), 'exam: no line of the verified result is flagged as stopped');
+    c.eq(result.score, result.detail.reduce((n, d) => n + d.awarded, 0), 'exam: the score is the sum of what was marked');
     const recorded = await examEvents(who);
     const attemptIds = result.detail.flatMap(d => [d.attemptId, ...(d.parts || []).map(p => p.attemptId)]).filter(Boolean);
-    c.deq(recorded.map(e => JSON.parse(e.payload_json).attemptId).sort(), [...attemptIds].sort(), 'exam: exactly the result\'s attempts are recorded, once each, though two finishes marked it');
-    c.ok(!recorded.some(e => e.entity_id === cutAnswer.id), 'exam: and none for the unreadable part');
+    c.deq(recorded.map(e => JSON.parse(e.payload_json).attemptId).sort(), [...attemptIds].sort(), 'exam: exactly the result\'s attempts are recorded, once each, though three finishes marked it');
     c.deq((await finish(who, paper.id, {})).data, result, 'exam: a later finish replays the stored result');
 
-    // (b) The whole paper has a budget: it is not parts × deadline.
+    // The oracle this closes. One part, the same slow working, a right answer
+    // on one paper and a wrong answer on another: the two finishes are
+    // answered identically (held), so being held says nothing about an answer.
+    {
+      const outcomes = [];
+      for (const [label, pick] of [['right', sq => right(sq.payload)], ['wrong', sq => String(Number(sq.payload.answer.value) + 7)]]) {
+        await clearLimits();
+        const w = await student(`exam-oracle-${label}`);
+        const p = await create(w);
+        const sq = singles(p).filter(x => right(x.payload) !== null).find(x => Number(x.marking.correct) >= 2 && stepMetaFor(x.payload) && x.payload.answerType === 'numeric');
+        const r = await finish(w, p.id, { answers: { [sq.id]: pick(sq) }, workings: { [sq.id]: `x = 1 ${magic('clock', 1)}` }, submissionKey: 'marker-exam-oracle' });
+        outcomes.push([r.status, r.data?.error?.code, r.headers.get('retry-after'), await resultRows(w), (await h.request(`/v1/exams/${p.id}`, { jar: w.jar })).data.state]);
+        // In process, with the reviewer's clock: the operation says the same for both.
+        let n = 0;
+        const previous = setBackstopClockForTests(() => (n++ < 1 ? 0 : 1e7));
+        try { outcomes.push(MARKER_OPS.exam({ q: sq.payload, given: pick(sq), working: 'x = 1', grid: sq.marking }, () => {})); } finally { setBackstopClockForTests(previous); }
+      }
+      c.deq(outcomes[0], [503, MARKING_BUSY, '2', 0, 'open'], 'exam oracle: a RIGHT answer whose working the engine clock stopped is held — not finalised');
+      c.deq(outcomes[2], outcomes[0], 'exam oracle: a WRONG answer with the same working is answered identically');
+      c.deq([outcomes[1], outcomes[3]], [{ unverified: true }, { unverified: true }], 'exam oracle: and the marking operation returns { unverified: true } for both');
+    }
+    // The reviewer's case: 6x + 8 = 2x + 28, working 6x-2x=28-8 / 4x=20, three marks.
+    {
+      const q = { answerType: 'numeric', answer: { value: 5 }, prompt: '$6x + 8 = 2x + 28$', difficulty: 3, steps: [{ h: 'a', d: '' }, { h: 'b', d: '' }, { h: 'c', d: '' }] };
+      const grid = { correct: 3, incorrect: 0, unanswered: 0 };
+      const mark = (given, reads) => { let n = 0; const previous = setBackstopClockForTests(() => (n++ < reads ? 0 : 1e7)); try { return MARKER_OPS.exam({ q, given, working: '6x-2x=28-8\n4x=20', grid }, () => {}); } finally { setBackstopClockForTests(previous); } };
+      assert.ok(stepMetaFor(q), 'the question has step metadata');
+      c.deq([mark('5', 1), mark('9', 1)], [{ unverified: true }, { unverified: true }], 'exam oracle: on the reported question, stopped after one reading, answer 5 and answer 9 are both unverified');
+      c.deq([mark('5', Infinity).response.awarded, mark('5', Infinity).response.correct, mark('9', Infinity).response.correct], [3, true, false], 'exam oracle: and unstopped, 5 is correct for 3 and 9 is wrong, as before');
+      c.ok(mark('9', Infinity).response.awarded >= 1 && mark('9', Infinity).response.awarded < 3, 'exam oracle: with 9\'s genuine working earning method marks');
+    }
+    // The same paper marked by the marking code alone gives the same awards.
+    {
+      const clean = text => String(text ?? '').replace(/\s*@@marker-test:[a-z]+(?::\d+)?@@/, '');
+      const awards = singles(paper).filter(sq => sq.id in answers).map(sq => [sq.id, MARKER_OPS.exam({ q: sq.payload, given: clean(answers[sq.id]), working: clean(workings[sq.id] ?? ''), grid: sq.marking }, () => {}).response.awarded]);
+      c.deq(awards.map(([id]) => line(id).awarded), awards.map(([, awarded]) => awarded), 'exam: every answered part carries exactly the award the deterministic marker gives it with nothing stopping it');
+    }
+
+    // (b) The ceiling. A part that can never be marked inside its deadline
+    // does not keep its paper open for ever: after EXAM_UNVERIFIED_LIMIT
+    // stopped markings the paper is finalised, with that part flagged.
+    await slowPool();
+    await clearLimits();
+    const stuckWho = await student('exam-stuck');
+    const paper3 = await create(stuckWho);
+    const able = singles(paper3).filter(sq => right(sq.payload) !== null);
+    const stepped3 = able.find(sq => Number(sq.marking.correct) >= 2 && stepMetaFor(sq.payload) && sq.payload.answerType === 'numeric');
+    const never = able.find(sq => sq !== stepped3);
+    const honest3 = able.filter(sq => sq !== stepped3 && sq !== never);
+    const answers3 = Object.fromEntries(honest3.map(sq => [sq.id, right(sq.payload)]));
+    answers3[never.id] = `${right(never.payload)} ${magic('spin')}`;
+    answers3[stepped3.id] = String(Number(stepped3.payload.answer.value) + 7);
+    const body3 = { answers: answers3, workings: { [stepped3.id]: `x = 1 ${magic('spin')}` }, submissionKey: 'marker-exam-stuck' };
+    // Retries in quick succession are one busy moment, not three: only the
+    // first of them counts towards the ceiling.
+    for (let quick = 1; quick <= EXAM_UNVERIFIED_LIMIT + 2; quick++) {
+      await uncool();
+      const r = await finish(stuckWho, paper3.id, body3);
+      if (quick === 1 || quick === EXAM_UNVERIFIED_LIMIT + 2) busy(r, `exam ceiling: quick retry ${quick}`);
+      else assert.equal(r.status, 503, `quick retry ${quick}`);
+    }
+    c.deq([(await holdOf(stuckWho, paper3.id)).count, (await holdOf(stuckWho, paper3.id)).frozen, await resultRows(stuckWho)], [1, true, 0],
+      `exam ceiling: ${EXAM_UNVERIFIED_LIMIT + 2} stopped markings within seconds count as ONE — a spike of load cannot exhaust the ceiling — and nothing is stored`);
+    // An account that is cooling down gets one deadline for the whole paper,
+    // so its parts are mostly never reached: that marking is not counted.
+    await ageHold(stuckWho, paper3.id);
+    for (let i = 0; i < MARKER_COOLDOWN.limit + 1; i++) await submit(stuckWho, (await linear(stuckWho)).q.id, `exam-cool-${i}`, magic('spin'));
+    busy(await finish(stuckWho, paper3.id, body3), 'exam ceiling: a stopped marking while the account is cooling down');
+    c.eq((await holdOf(stuckWho, paper3.id)).count, 1, 'exam ceiling: is not counted, although the spacing had passed — it did not have the paper\'s budget');
+    await uncool();
+    // Spaced in time, they count.
+    for (let round = 2; round < EXAM_UNVERIFIED_LIMIT; round++) {
+      await ageHold(stuckWho, paper3.id); await uncool();
+      busy(await finish(stuckWho, paper3.id, body3), `exam ceiling: stopped marking ${round} of ${EXAM_UNVERIFIED_LIMIT}, a minute after the last`);
+      c.deq([(await holdOf(stuckWho, paper3.id)).count, await resultRows(stuckWho)], [round, 0], `exam ceiling: after ${round} counted stopped markings nothing is stored`);
+    }
+    await ageHold(stuckWho, paper3.id); await uncool();
+    const last = await finish(stuckWho, paper3.id, body3);
+    c.eq(last.status, 200, `exam ceiling: the ${EXAM_UNVERIFIED_LIMIT}rd counted stopped marking finalises the paper — an entry that can never be marked does not hold its paper open, or cost a marking budget on every retry`);
+    const line3 = id => last.data.detail.find(d => d.id === id);
+    const cut3 = line3(never.id);
+    c.deq([cut3.unreadable, cut3.correct, cut3.awarded, cut3.outcome, cut3.feedback, cut3.attemptId, cut3.partial],
+      [true, false, 0, 'unreadable', TOO_COMPLEX_MESSAGE, null, null], 'exam ceiling: the part whose answer could never be marked is FLAGGED unreadable — no mark, not called wrong, no attempt recorded');
+    const unread3 = line3(stepped3.id);
+    c.deq([unread3.workingNotRead, unread3.correct, unread3.awarded, unread3.partial, unread3.markingScheme, unread3.outcome],
+      [true, false, 0, null, 'final-answer', 'wrong'], 'exam ceiling: the part whose working could never be read is FLAGGED working-not-read; its answer verdict stands');
+    c.ok(String(unread3.feedback).endsWith(WORKING_NOT_READ_NOTE) && typeof unread3.attemptId === 'string', 'exam ceiling: and says so');
+    c.ok(honest3.every(sq => line3(sq.id).correct === true && line3(sq.id).awarded === Number(sq.marking.correct) && !('unreadable' in line3(sq.id)) && !('workingNotRead' in line3(sq.id))),
+      `exam ceiling: the other ${honest3.length} answered parts are marked normally, full marks each`);
+    c.ok(!(await examEvents(stuckWho)).some(e => e.entity_id === never.id), 'exam ceiling: no attempt is recorded for the unreadable part');
+    c.deq((await finish(stuckWho, paper3.id, body3)).data, last.data, 'exam ceiling: and the result is replayed, not marked again');
+
+    // (c) The engine's own clock stopping one part's working holds the paper
+    // exactly as a deadline does: never a lower mark with no flag. The stop is
+    // one that goes away (each worker thread stops this entry once), and the
+    // IDENTICAL finish is then a verified result.
+    await idlePool();
+    await clearLimits();
+    const clockWho = await student('exam-clock');
+    const paper4 = await create(clockWho);
+    const able4 = singles(paper4).filter(sq => right(sq.payload) !== null);
+    const stepped4 = able4.find(sq => Number(sq.marking.correct) >= 2 && stepMetaFor(sq.payload) && sq.payload.answerType === 'numeric');
+    const wrong4 = String(Number(stepped4.payload.answer.value) + 7);
+    const body4 = { answers: { [stepped4.id]: wrong4 }, workings: { [stepped4.id]: `x = 1 ${magic('clockonce', 4)}` }, submissionKey: 'marker-exam-clock' };
+    const first4 = await finish(clockWho, paper4.id, body4);
+    busy(first4, 'exam: a paper with a part whose working the engine clock stopped');
+    c.eq(await resultRows(clockWho), 0, 'exam: is not finalised by that marking');
+    let done4 = first4, tries4 = 0;
+    while (done4.status === 503 && tries4++ < 4) done4 = await finish(clockWho, paper4.id, body4);
+    const d4 = done4.data.detail.find(d => d.id === stepped4.id);
+    c.deq([done4.status, d4.outcome, 'workingNotRead' in d4, 'unreadable' in d4, d4.markingScheme], [200, 'wrong', false, false, 'step-marked'], `exam: sent again unchanged (${tries4} more time(s), inside the spacing so none counted), the same paper is a verified result, its working read`);
+    c.eq(d4.awarded, MARKER_OPS.exam({ q: stepped4.payload, given: wrong4, working: 'x = 1', grid: stepped4.marking }, () => {}).response.awarded, 'exam: with the award the marker gives that working');
+
+    // (d) The whole paper has a budget: it is not parts × deadline. A paper
+    // that spends it is held, inside the budget, and finalised at the ceiling.
     await useMarkerPoolForTests({ entry: TEST_ENTRY, deadlineMs: 200, examPaperBudgetMs: 500 });
     await markerPool().ready();
+    await clearLimits();
     const spender = await student('exam-budget');
     const paper2 = await create(spender);
     const all = singles(paper2);
     const stuck = Object.fromEntries(all.map(sq => [sq.id, `1 ${magic('spin')}`]));
     const killsBefore = markerPool().stats().deadlineKills;
     const spent = await timed(finish(spender, paper2.id, { answers: stuck }));
-    c.eq(spent.value.status, 200, 'exam budget: a paper whose every answer never finishes is still finalised');
+    busy(spent.value, 'exam budget: a paper whose every answer never finishes');
     c.ok(spent.ms < 500 + MARGIN, `exam budget: inside the paper's budget, not ${all.length} × the deadline (${Math.round(spent.ms)} ms for a 500 ms budget, ${all.length} stuck parts)`);
     c.eq(markerPool().stats().deadlineKills - killsBefore, 3, 'exam budget: three parts used the budget (200 + 200 + 100 ms); the rest were not run at all');
-    c.ok(all.every(sq => { const d = spent.value.data.detail.find(x => x.id === sq.id); return d.unreadable === true && d.awarded === 0 && d.attemptId === null; }), 'exam budget: every such part is unreadable, with no mark and no attempt');
-    c.deq([spent.value.data.score, (await examEvents(spender)).length], [0, 0], 'exam budget: nothing was scored and no attempt recorded');
+    c.deq([await resultRows(spender), (await examEvents(spender)).length], [0, 0], 'exam budget: nothing was stored, scored or recorded');
+    let final2 = spent.value;
+    for (let round = 2; round <= EXAM_UNVERIFIED_LIMIT; round++) { await ageHold(spender, paper2.id); await uncool(); final2 = await finish(spender, paper2.id, { answers: stuck }); }
+    c.eq(final2.status, 200, 'exam budget: at the ceiling the paper is finalised');
+    c.ok(all.every(sq => { const d = final2.data.detail.find(x => x.id === sq.id); return d.unreadable === true && d.awarded === 0 && d.attemptId === null; }), 'exam budget: every such part flagged unreadable, with no mark and no attempt');
+    c.deq([final2.data.score, (await examEvents(spender)).length], [0, 0], 'exam budget: nothing was scored and no attempt recorded');
   }
 
   // ── B10. What was logged ─────────────────────────────────────────────────

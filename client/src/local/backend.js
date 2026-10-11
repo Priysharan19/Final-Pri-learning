@@ -1966,11 +1966,20 @@ function markSubmission(q, answer, steps) {
   // the solution on earns marks for those lines; restating the question does
   // not. Practice and exams share methodMarks() so the two never disagree.
   let partial = null;
+  let unverified = false;
   if (!result.correct && !result.invalid && steps && String(steps).trim() && meta0) {
     try {
       const mm = methodMarks({ meta: meta0, working: String(steps), marks: criteriaFor(q).length, prompt: q.prompt, report: stepReport });
-      if (mm) partial = { okLines: mm.okLines, awarded: mm.awarded, note: mm.note };
+      if (mm?.unverified === true) unverified = true;
+      else if (mm) partial = { okLines: mm.okLines, awarded: mm.awarded, note: mm.note };
     } catch { partial = null; }
+  }
+  // The engine's clock stopped the check (checker.js WORKING_LIMITS.backstopMs):
+  // nothing was marked, so this is not an attempt — the engine's own `invalid`
+  // — whatever the answer was. A busy device never lowers a mark.
+  if (unverified || stepReport?.unverified === true || result.unverified === true) {
+    const note = stepReport?.lines?.[0]?.note || result.feedback || 'This could not be checked this time, so nothing was marked. Send it again.';
+    return { result: { correct: false, invalid: true, unverified: true, feedback: note }, feedback: note, stepReport: null, partial: null, meta0 };
   }
   return { result, feedback, stepReport, partial, meta0 };
 }

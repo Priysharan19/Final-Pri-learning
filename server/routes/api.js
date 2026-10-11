@@ -355,6 +355,8 @@ api.post('/rush/answer', requireAuth, (req, res) => {
   if (row.answered) return res.status(409).json({ error: 'Already answered' });
   const q = JSON.parse(row.payload);
   const result = checkAnswer(q, answer);
+  // A check the engine's clock stopped is not a wrong answer (checker.js): nothing is recorded, send it again.
+  if (result.unverified === true) return res.status(503).json({ error: result.feedback });
   resolve(req.user, row, q, result.correct, answer, 0, 'rush');
   res.json({ correct: result.correct, answerText: displayAnswer(q) });
 });
