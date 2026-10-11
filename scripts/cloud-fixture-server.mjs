@@ -41,6 +41,10 @@ const log = openSync(join(dir, 'server.log'), 'a');
 const syntheticReader = process.argv.includes('--synthetic-reader');
 const readerLog = join(dir, 'synthetic-reader.jsonl');
 const readerScript = join(dir, 'synthetic-reader-script.json');
+// Never shared with the app: the external Android TEST runner reads these
+// undeliverable OTPs only through the authenticated loopback oracle.
+const nativeOtpCapture = join(dir, 'native-otp-capture.jsonl');
+if (!restart) writeFileSync(nativeOtpCapture, '', { mode: 0o600, flag: 'wx' });
 // The stand-in reader's environment: a key that is not a provider key (the
 // provider hop never leaves the process), a named synthetic model, and the
 // paid-call ceiling the server requires whenever a reader is configured.
@@ -56,7 +60,7 @@ const entry = syntheticReader ? join(ROOT, 'scripts/synthetic-reader-server.mjs'
 
 const child = spawn(process.execPath, [entry], {
   cwd: ROOT,
-  env: { ...process.env, PORT: String(port), PRI_PLATFORM_DB: dbPath, NODE_ENV: 'development', PRI_DATABASE_URL: '', ...readerEnv },
+  env: { ...process.env, PORT: String(port), PRI_PLATFORM_DB: dbPath, NODE_ENV: 'development', PRI_DATABASE_URL: '', PRI_AUTH_EMAIL_PROVIDER: 'test', PRI_NATIVE_OTP_CAPTURE_FILE: nativeOtpCapture, ...readerEnv },
   detached: true,
   stdio: ['ignore', log, log],
 });
@@ -98,7 +102,7 @@ if (changed !== 1) { console.error('could not mark the fixture account verified'
 // A second, never-registered credential for sign-up journeys.
 const newEmail = `native-new-${Date.now()}@example.test`;
 const newPassword = `Fixture-${randomBytes(9).toString('base64url')}`;
-const env = `PRI_CLOUD_ORIGIN=http://${deviceHost}:${port}\nPRI_CLOUD_EMAIL=${email}\nPRI_CLOUD_PASSWORD=${password}\nPRI_CLOUD_NEW_EMAIL=${newEmail}\nPRI_CLOUD_NEW_PASSWORD=${newPassword}\nPRI_CLOUD_DB=${dbPath}\nPRI_CLOUD_PORT=${port}\nPRI_CLOUD_SERVER_PID=${child.pid}\nPRI_CLOUD_SERVER_LOG=${join(dir, 'server.log')}\n${syntheticReader ? `PRI_CLOUD_READER=synthetic\nPRI_CLOUD_READER_LOG=${readerLog}\nPRI_CLOUD_READER_SCRIPT=${readerScript}\n` : ''}`;
+const env = `PRI_CLOUD_ORIGIN=http://${deviceHost}:${port}\nPRI_CLOUD_EMAIL=${email}\nPRI_CLOUD_PASSWORD=${password}\nPRI_CLOUD_NEW_EMAIL=${newEmail}\nPRI_CLOUD_NEW_PASSWORD=${newPassword}\nPRI_CLOUD_OTP_CAPTURE=${nativeOtpCapture}\nPRI_CLOUD_DB=${dbPath}\nPRI_CLOUD_PORT=${port}\nPRI_CLOUD_SERVER_PID=${child.pid}\nPRI_CLOUD_SERVER_LOG=${join(dir, 'server.log')}\n${syntheticReader ? `PRI_CLOUD_READER=synthetic\nPRI_CLOUD_READER_LOG=${readerLog}\nPRI_CLOUD_READER_SCRIPT=${readerScript}\n` : ''}`;
 const out = arg('out');
 if (out) writeFileSync(out, env);
 console.log(`Real Pri server on ${base} (pid ${child.pid}); fixture account ${email} (verified). SYNTHETIC TEST FIXTURE.${syntheticReader ? ' Handwriting reader: SYNTHETIC stand-in (no provider is reached).' : ''}`);

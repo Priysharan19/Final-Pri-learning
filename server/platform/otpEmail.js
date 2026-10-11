@@ -8,6 +8,7 @@
 // PRI_RESEND_API_KEY, PRI_AUTH_EMAIL_FROM). The raw code exists only in this
 // call; it is never stored or logged.
 // ─────────────────────────────────────────────────────────────────────────────
+import { appendFileSync } from 'node:fs';
 import { recordTestMessage, testModeAllowed } from './smsProvider.js';
 import { cleanPublicOrigin, postResendEmail } from './authDelivery.js';
 import { recordAuthEmail } from './metrics.js';
@@ -144,8 +145,18 @@ export function createOtpEmailSenderFromEnv(env = process.env, { fetchImpl } = {
     if (!testModeAllowed(env)) {
       throw Object.assign(new Error('PRI_AUTH_EMAIL_PROVIDER=test cannot run with NODE_ENV=production unless PRI_SMS_TEST_MODE_ALLOW_STAGING=1 is set for a staging deployment.'), { code: 'EMAIL_TEST_MODE_FORBIDDEN', status: 500 });
     }
-    return async ({ to, code, purpose, intent = null }) => {
+    return async ({ challengeId, to, code, purpose, intent = null }) => {
       recordTestMessage({ channel: 'email', to, code, purpose, intent, body: otpEmailMessage(code, purpose, undefined, { intent }).text });
+      // Android's native E2E driver runs OUTSIDE the fixture server process.
+      // Its private, token-gated oracle needs the generated test email code.
+      // Capture only unrouteable fixture mailboxes on an explicitly opted-in
+      // DEVELOPMENT test adapter. No normal delivery, production build, or
+      // real account can write this file; never log or return a code to a user.
+      if (env.NODE_ENV === 'development' && provider === 'test' &&
+          /^native-new-[0-9]+@example\.test$/.test(String(to)) && env.PRI_NATIVE_OTP_CAPTURE_FILE) {
+        appendFileSync(env.PRI_NATIVE_OTP_CAPTURE_FILE,
+          JSON.stringify({ to, code, purpose, challengeId }) + '\n', { mode: 0o600 });
+      }
       return { providerMessageId: null };
     };
   };

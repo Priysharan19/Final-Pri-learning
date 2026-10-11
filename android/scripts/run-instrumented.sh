@@ -78,7 +78,7 @@ if [ -n "${PRI_CLOUD_ORIGIN:-}" ] && [ "$EXPECT" != "floor" ]; then
   ORACLE_READY="$(mktemp)"; rm -f "$ORACLE_READY"
   # -987654 is the wrong answer CloudJourneyTest types: never a usable sealed answer.
   node "$HERE/../scripts/journey-oracle.mjs" --serve --db "$PRI_CLOUD_DB" --email "$PRI_CLOUD_EMAIL" --port "$ORACLE_PORT" \
-    --token "$ORACLE_TOKEN" --avoid -987654 --out "$ORACLE_READY" > "$OUT/oracle.log" 2>&1 &
+    --token "$ORACLE_TOKEN" --avoid -987654 --otp-capture "${PRI_CLOUD_OTP_CAPTURE:-}" --otp-email "${PRI_CLOUD_NEW_EMAIL:-}" --out "$ORACLE_READY" > "$OUT/oracle.log" 2>&1 &
   ORACLE_PID=$!
   for _ in $(seq 1 40); do [ -f "$ORACLE_READY" ] && break; kill -0 "$ORACLE_PID" 2>/dev/null || break; sleep 0.25; done
   [ -f "$ORACLE_READY" ] || { echo "the sealed-answer oracle did not start:" >&2; cat "$OUT/oracle.log" >&2; exit 1; }
