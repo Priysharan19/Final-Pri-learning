@@ -93,9 +93,9 @@ export const flow = {
     await google.click();
     const popup = await popupOpened;
     await check('the click opens a sign-in window (not blocked: it opens before any await)', !!popup);
-    await panel.getByText('Connected', { exact: true }).waitFor({ timeout: 20000 });
+    await panel.locator('[data-cloud-state]', { hasText: /^Signed in$/ }).waitFor({ timeout: 20000 });
     await check('the profile ends up connected without leaving Settings',
-      new URL(page.url()).pathname === '/settings' && await panel.getByText('Connected', { exact: true }).isVisible());
+      new URL(page.url()).pathname === '/settings' && await panel.locator('[data-cloud-state]', { hasText: /^Signed in$/ }).isVisible());
 
     await check('the popup went to Google with this deployment\'s client id and the server nonce',
       authorizeUrl?.searchParams.get('client_id') === 'pri-e2e.apps.googleusercontent.com' &&
@@ -126,14 +126,14 @@ export const flow = {
     const secondPopup = page.waitForEvent('popup', { timeout: 15000 });
     await remove.click();
     await secondPopup;
-    await panel.getByText('Not connected', { exact: true }).waitFor({ timeout: 20000 });
+    await panel.locator('[data-cloud-state]', { hasText: /^Not signed in$/ }).waitFor({ timeout: 20000 });
     const deletion = requests.find(row => row.path === '/v1/account' && row.method === 'DELETE');
     const deletionBody = deletion ? JSON.parse(deletion.body || '{}') : {};
     await check('deletion carries a fresh Google token and nonce, never a bare session',
       deletionBody.provider === 'google' && deletionBody.idToken === ID_TOKEN && deletionBody.nonce === NONCE &&
         authorizeUrl?.searchParams.get('nonce') === NONCE, JSON.stringify(deletionBody));
     await check('after deletion the local profile is disconnected and stays on this device',
-      await panel.getByText('Not connected', { exact: true }).isVisible());
+      await panel.locator('[data-cloud-state]', { hasText: /^Not signed in$/ }).isVisible());
   }
 };
 

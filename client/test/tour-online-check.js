@@ -229,7 +229,7 @@ export const typeSignedOut = {
     // ── sign in, on the card ─────────────────────────────────────────────────
     await page.locator('.verdict [data-check-sign-in]').click();
     const account = await online.signInHere(page.locator('.qpage'), { name: 'Signed Out Typist' });
-    await page.waitForFunction(() => !document.querySelector('[data-check-needs-account]') && !document.querySelector('.qpage #cloud-password'), null, { timeout: 30000 }).catch(() => {});
+    await page.waitForFunction(() => !document.querySelector('[data-check-needs-account]') && !document.querySelector('.qpage [data-signin-card]'), null, { timeout: 30000 }).catch(() => {});
     await check('signed in on the real server without leaving the question: same page, no reload',
       new URL(page.url()).pathname === '/practice' && await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' &&
         (await online.linkedAccounts())?.includes(account.id), page.url());

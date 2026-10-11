@@ -19,7 +19,11 @@ function has(text, pattern, description) {
 
 has(photo, /data-photo-sign-in/, 'Photo must show a real sign-in action');
 has(photo, /aria-expanded=\{photoSignInOpen\}/, 'Sign-in action must expose expansion state');
-has(photo, /React\.lazy\(\(\) => import\('\.\/CloudAccountPanel\.jsx'\)\)/, 'Sign-in uses existing account implementation, lazy-loaded');
+// The in-place sign-in is the one sign-in card (CheckRefusal.jsx SignInChoices),
+// fetched only when a student asks to sign in.
+const signIn = read('components/CheckRefusal.jsx');
+has(photo, /<SignInChoices user=\{user\} refreshUser=\{refreshUser\} onDone=\{\(\) => setPhotoSignInOpen\(false\)\} \/>/, 'Sign-in uses the shared in-place sign-in card');
+has(signIn, /const SignInCard = React\.lazy\(\(\) => import\('\.\/SignUpFlow\.jsx'\)\)/, 'which is the existing account implementation, lazy-loaded');
 has(photo, /photoSignInOpen && photoOCR\.blockedKey === 'verdict\.photoReadingSignIn'/, 'Only a genuine auth refusal opens account recovery');
 has(photo, /onCloudSessionChange\(event =>/, 'Photo must subscribe to verified session updates');
 has(photo, /event\?\.detail\?\.connected === true/, 'Retry is triggered by connected event, never mere profile display');
@@ -40,8 +44,12 @@ assert.doesNotMatch(photo, /setAnswer\(page\.markable\)|editAnswer\(lastLine\)/,
 count += 1;
 has(photo, /newSubmissionId\(\)/, 'Grading retains idempotent submission keys');
 has(photo, /savePendingSubmission\(question\.id/, 'Grading request is protected by existing submission recovery');
-has(account, /session\?\.reason === 'signed-out'\) && <form/, 'Expired linked session has an actual login form');
-has(account, /mode === 'register' && !link\?\.accountId/, 'Linked profile cannot silently start second registration');
+has(account, /const needsSignIn = enabled && \(!link\?\.accountId \|\| session\?\.reason === 'signed-out'\);/, 'Expired linked session is offered sign-in');
+has(account, /\{needsSignIn && appleStep !== 'consent' && \([\s\S]{0,700}<SignInCard variant="inline"/, 'with an actual sign-in card, in place');
+has(account, /allowCreate=\{!link\?\.accountId\}/, 'Linked profile cannot silently start second registration');
+has(signIn, /allowCreate=\{user\?\.cloudLinked !== true\}/, 'nor can a linked profile signing in again on a question');
+has(read('components/SignUpFlow.jsx'), /result\.status === 'profile-required' && !allowCreate/, 'the card drops an unused sign-up ticket for a linked profile');
+has(account, /if \(err\?\.code === 'CLOUD_LINK_CONFLICT'\) await cloud\.logout\(\)/, 'A session for a different account is ended, not kept beside this profile');
 // The photo goes to the server reader through the single-flight sender
 // (one paid read per picture), which is the only caller of the transport.
 has(reader, /await transcribeOnce\(transport, prepared\.dataUrl, \{ signal \}\)/, 'Photo recognition remains server-authoritative');

@@ -53,27 +53,16 @@ export const flow = {
       await ctx.route('**/v1/**', proxy);
 
       await goto('/');
-      await page.getByRole('button', { name: 'Create your account' }).click();
-      await page.waitForSelector('[data-signup-step="role"]', { timeout: 15000 });
-      await check('the account flow opens on "who is setting up"', await page.getByRole('heading', { name: 'Who is setting up Pri?' }).isVisible());
-      await check('the step heading takes focus for screen readers',
-        await page.evaluate(() => document.activeElement?.id === 'signup-step-title'));
-      const animation = await page.locator('.signup-step').evaluate(el => getComputedStyle(el).animationName);
-      await check('reduced motion removes the step animation', animation === 'none', animation);
-
-      await page.getByTestId('signup-role-student').click();
-      await page.waitForSelector('[data-signup-step="age"]');
-      await page.getByTestId('signup-age-15').click();
-      await page.waitForSelector('[data-signup-step="class"]');
-      await check('JEE is not offered below Class 11',
-        await page.getByTestId('signup-class-9').click().then(() => page.getByTestId('signup-track-jee-main').isDisabled()));
-      await page.getByTestId('signup-class-11').click();
-      await page.getByTestId('signup-track-jee-main').click();
-      await shot('class');
-      await page.getByTestId('signup-class-next').click();
-
-      await page.waitForSelector('[data-signup-step="method"]');
-      await page.locator('#signup-flow-name').fill('Asha');
+      const card = page.locator('[data-signin-card]');
+      await card.waitFor({ state: 'visible', timeout: 15000 });
+      await check('the landing screen is the one sign-in card', await page.getByRole('heading', { name: 'Welcome to Pri Learning' }).isVisible()
+        && await card.getAttribute('data-signup-step') === 'method');
+      // A phone code is offered because THIS server reports an SMS provider
+      // (/v1/account/otp/channels); a deployment without one shows email only.
+      await page.getByTestId('signup-channel-sms').waitFor({ state: 'visible', timeout: 15000 });
+      await check('a mobile number is offered only because the server reports an SMS provider',
+        seen.includes('GET /v1/account/otp/channels'));
+      await page.getByTestId('signup-channel-sms').click();
       await page.locator('#signup-destination').fill('98765 43210');
       await shot('method');
       await page.getByTestId('signup-send-code').click();
@@ -95,6 +84,23 @@ export const flow = {
       // Typing digit by digit auto-advances box to box and submits on the sixth.
       await page.locator('#signup-code-0').focus();
       await page.keyboard.type(sent.code);
+      // A new number: the same card asks the name and the age, then the class.
+      await page.waitForSelector('[data-signup-step="age"]', { timeout: 15000 });
+      await check('the step heading takes focus for screen readers',
+        await page.evaluate(() => document.activeElement?.id === 'signup-step-title'));
+      const animation = await page.locator('.signup-step').evaluate(el => getComputedStyle(el).animationName);
+      await check('reduced motion removes the step animation', animation === 'none', animation);
+      await page.locator('#signup-flow-name').fill('Asha');
+      await page.getByTestId('signup-age-15').click();
+      await page.getByTestId('signup-agree').check();
+      await page.getByTestId('signup-age-next').click();
+      await page.waitForSelector('[data-signup-step="class"]');
+      await check('JEE is not offered below Class 11',
+        await page.getByTestId('signup-class-9').click().then(() => page.getByTestId('signup-track-jee-main').isDisabled()));
+      await page.getByTestId('signup-class-11').click();
+      await page.getByTestId('signup-track-jee-main').click();
+      await shot('class');
+      await page.getByTestId('signup-class-next').click();
       await page.waitForSelector('[data-signup-step="parent"]', { timeout: 15000 });
       await check('a 15-year-old is asked for a parent next', await page.getByRole('heading', { name: 'Now, a parent’s approval' }).isVisible());
 
@@ -104,13 +110,14 @@ export const flow = {
       await check('and it starts limited: consent pending', pending && pending.confirmed_at === null, JSON.stringify(pending));
 
       await page.locator('#signup-parent-name').fill('Meera');
+      await page.getByTestId('signup-parent-sms').click();
       await page.locator('#signup-parent-destination').fill('99887 76655');
       await page.getByTestId('signup-parent-send').click();
       await page.waitForSelector('[data-signup-step="parent-wait"]');
       await check('the child’s screen only waits for the parent: no code box, no approve button',
         await page.locator('[data-testid="signup-parent-waiting"]').isVisible() &&
           await page.locator('input[autocomplete="one-time-code"]').count() === 0 &&
-          await page.getByRole('button', { name: 'Approve' }).count() === 0);
+          await page.getByRole('button', { name: 'Approve', exact: true }).count() === 0);
       await check('and can ask for the code again once the cooldown ends', await page.getByTestId('signup-parent-resend').isDisabled());
       const parentSms = sms.readTestOutbox({ to: '+919988776655' }).at(-1);
       await check('the parent’s phone got the consent code with the address of their own page',
