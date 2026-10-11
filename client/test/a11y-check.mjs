@@ -543,6 +543,7 @@ async function run() {
   let dist = null, server = null, browser = null, platform = null;
   let online = null;
   const refusals = {};
+  const signInCard = {};
   const routesSeen = new Set();
   const views = [];
   const skipped = [];
@@ -628,6 +629,72 @@ async function run() {
       await page.goto(BASE, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('.auth-wrap', { timeout: 20000 });
       await wait(page, 600);
+    });
+
+    // ── the same card, one and two steps on ─────────────────────────────────
+    // The landing screen IS the sign-in card; its code and "about you" steps
+    // replace the welcome heading in place, so each is audited as a view of
+    // its own (one <h1>, every field named, nothing reachable only by mouse).
+    // The code is read from the server's test mail adapter: no email is sent.
+    await step('login · sign-in card, code', '/', async () => {
+      const address = `a11y.walk.${Date.now().toString(36)}@example.test`;
+      signInCard.address = address;
+      await page.locator('[data-signin-card] #signup-destination').fill(address);
+      await page.keyboard.press('Enter');
+      await page.waitForSelector('[data-signin-card] #signup-code-0', { timeout: 20000 });
+      await wait(page, 300);
+      signInCard.code = await page.evaluate(() => {
+        const group = document.querySelector('[data-signin-card] .otp-boxes');
+        const boxes = [...document.querySelectorAll('[data-signin-card] .otp-box')];
+        const labelled = (group?.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean).map(id => (document.getElementById(id)?.textContent || '').trim());
+        const live = group?.querySelector('[role="status"][aria-live="polite"]');
+        const resend = document.querySelector('[data-testid="signup-resend"]');
+        return {
+          role: group?.getAttribute('role') || '', labelled,
+          boxNames: boxes.map(b => b.getAttribute('aria-label') || ''),
+          hints: boxes.map(b => `${b.getAttribute('inputmode')}|${b.getAttribute('autocomplete')}`),
+          focus: document.activeElement?.id || '', live: !!live,
+          resend: resend ? { tag: resend.tagName.toLowerCase(), name: (resend.textContent || '').trim(), disabled: resend.disabled } : null,
+          verify: (document.querySelector('[data-testid="signup-verify"]')?.textContent || '').trim()
+        };
+      });
+      // A wrong code: how the refusal is announced and tied to the boxes.
+      const sent = platform.sms.readTestOutbox({ to: address, channel: 'email' }).at(-1);
+      signInCard.sent = /^\d{6}$/.test(sent?.code || '');
+      await page.keyboard.type(sent.code === '000000' ? '111111' : '000000');
+      await page.waitForSelector('[data-testid="signup-error"]', { timeout: 15000 });
+      signInCard.wrong = await page.evaluate(() => {
+        const error = document.querySelector('[data-testid="signup-error"]');
+        const first = document.getElementById('signup-code-0');
+        return {
+          role: error?.getAttribute('role') || '', text: (error?.textContent || '').trim(), id: error?.id || '',
+          described: first?.getAttribute('aria-describedby') || '', invalid: first?.getAttribute('aria-invalid') || '',
+          focus: document.activeElement?.id || '', cleared: [...document.querySelectorAll('[data-signin-card] .otp-box')].every(b => b.value === '')
+        };
+      });
+    });
+
+    await step('login · sign-in card, about you', '/', async () => {
+      const sent = platform.sms.readTestOutbox({ to: signInCard.address, channel: 'email' }).at(-1);
+      await page.locator('#signup-code-0').focus();
+      await page.keyboard.type(sent.code);
+      await page.waitForSelector('[data-signin-card] #signup-flow-name', { timeout: 20000 });
+      await wait(page, 300);
+      signInCard.about = await page.evaluate(() => {
+        const agree = document.querySelector('[data-testid="signup-agree"]');
+        const ages = [...document.querySelectorAll('[data-testid^="signup-age-"]:not([data-testid="signup-age-next"])')];
+        const group = ages[0]?.closest('[role="group"]');
+        return {
+          focus: document.activeElement?.id || '', focusTag: document.activeElement?.tagName.toLowerCase() || '',
+          nameLabel: (document.querySelector('label[for="signup-flow-name"]')?.textContent || '').trim(),
+          ageGroup: (document.getElementById(group?.getAttribute('aria-labelledby') || '')?.textContent || '').trim(),
+          agesPressed: ages.map(a => a.getAttribute('aria-pressed')),
+          agreeLabel: (agree?.closest('label')?.textContent || '').trim().slice(0, 60), agreeChecked: agree?.checked
+        };
+      });
+      await page.locator('[data-testid="signup-age-15"]').focus();
+      await page.keyboard.press('Space');
+      signInCard.picked = await page.locator('[data-testid="signup-age-15"]').getAttribute('aria-pressed');
     });
 
     // ── the skip link, measured on a page nothing has focused yet ────────────
@@ -817,7 +884,7 @@ async function run() {
       const button = page.locator('.verdict [data-check-sign-in]');
       await button.focus();
       await page.keyboard.press('Enter');
-      await page.waitForSelector('.qpage #cloud-password', { timeout: 20000 });
+      await page.waitForSelector('.qpage [data-signin-card] #signup-destination', { timeout: 20000 });
       await wait(page, 500);
       // Focus order: from the button that opened it, Tab goes into the panel
       // it opened (inside the card), not on past it to the rest of the page.
@@ -837,7 +904,7 @@ async function run() {
     // signed in on the card (the real server, a real verified account)
     try {
       await online.signInHere(page.locator('.qpage'), { name: 'Accessibility Student' });
-      await page.waitForFunction(() => !document.querySelector('.qpage #cloud-password'), null, { timeout: 30000 }).catch(() => { });
+      await page.waitForFunction(() => !document.querySelector('.qpage [data-signin-card]'), null, { timeout: 30000 }).catch(() => { });
       refusals.signedIn = true;
     } catch (err) {
       skipped.push(`practice · signing in on the card — ${String(err.message || err).split('\n')[0].slice(0, 130)}`);
@@ -1337,6 +1404,25 @@ async function run() {
         /(correct|not quite|revealed)/i.test(spoken) && /marks?/i.test(spoken),
         `the live regions on the marked page said ${JSON.stringify(liveVerdict.after)}`);
     }
+
+    section('the sign-in card');
+    ok('the code step is one labelled group — "Check your email" and where the code went — and the caret starts in its first box',
+      signInCard.code?.role === 'group' && /Check your email/.test(signInCard.code.labelled?.[0] || '') && (signInCard.code.labelled?.[1] || '').includes(signInCard.address || 'no address') &&
+        signInCard.code.focus === 'signup-code-0', JSON.stringify(signInCard.code));
+    ok('each of the six boxes has its own name, asks for a numeric keypad, and the first asks for the code from the message',
+      signInCard.code?.boxNames?.length === 6 && signInCard.code.boxNames.every((name, i) => name === `Digit ${i + 1} of 6`) &&
+        signInCard.code.hints.every(h => h.startsWith('numeric|')) && signInCard.code.hints[0] === 'numeric|one-time-code', JSON.stringify(signInCard.code));
+    ok('progress through the boxes has a polite live region; Verify and Resend are real, named buttons, and the countdown is in Resend\'s name',
+      signInCard.code?.live === true && signInCard.code.verify === 'Verify and continue' && signInCard.code.resend?.tag === 'button' &&
+        /^Resend code in \d+ s$/.test(signInCard.code.resend.name) && signInCard.code.resend.disabled === true, JSON.stringify(signInCard.code));
+    ok('a wrong code is an alert in words, tied to the boxes (aria-describedby, aria-invalid), and focus returns to the first, empty box',
+      signInCard.sent === true && signInCard.wrong?.role === 'alert' && /isn’t right/.test(signInCard.wrong.text) && signInCard.wrong.described === signInCard.wrong.id &&
+        signInCard.wrong.invalid === 'true' && signInCard.wrong.focus === 'signup-code-0' && signInCard.wrong.cleared === true, JSON.stringify(signInCard.wrong));
+    ok('the next step takes focus on its heading; the name is labelled, the ages are one named group with nothing preselected, and agreeing is a labelled, unticked checkbox',
+      signInCard.about?.focus === 'signup-step-title' && signInCard.about.focusTag === 'h1' && /first name/i.test(signInCard.about.nameLabel) && /How old/i.test(signInCard.about.ageGroup) &&
+        signInCard.about.agesPressed.length === 8 && signInCard.about.agesPressed.every(p => p === 'false') && /I have read/.test(signInCard.about.agreeLabel) && signInCard.about.agreeChecked === false,
+      JSON.stringify(signInCard.about));
+    ok('an age is chosen from the keyboard and says so (aria-pressed)', signInCard.picked === 'true', String(signInCard.picked));
 
     section('online-only checking');
     ok('signed out, the card says before Submit that checking needs an account: a labelled group holding a real, named sign-in button',

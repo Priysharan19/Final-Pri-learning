@@ -29,9 +29,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { createServer } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -90,6 +90,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const port = Number(arg('port') || 4311);
   const token = arg('token') || randomBytes(18).toString('base64url');
   const avoid = (arg('avoid') || '').split(',').filter(Boolean);
+  const otpEmail = arg('otp-email') || '';
+  const otpCapture = arg('otp-capture') || '';
+  // Only the Android fixture mailbox, captured beside the EXACT throwaway DB.
+  // Not a general-purpose OTP lookup endpoint, including on staging.
+  const otpAllowed = /^native-new-[0-9]+@example\.test$/.test(otpEmail) &&
+    resolve(otpCapture || '/dev/null') === resolve(dirname(arg('db')), 'native-otp-capture.jsonl') &&
+    process.env.NODE_ENV !== 'production';
   let desk;
   try { desk = openServerDesk({ dbPath: arg('db'), email: arg('email'), avoid }); }
   catch (error) { console.error(String(error?.message || error)); process.exit(1); }
@@ -108,6 +115,22 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     if (!authorised(req.headers['x-pri-oracle'])) return send(401, { error: 'oracle token required' });
     const path = new URL(req.url, 'http://oracle').pathname;
     try {
+      if (path === '/otp-code') {
+        if (!otpAllowed) return send(404, { error: 'no native OTP fixture' });
+        const purpose = new URL(req.url, 'http://oracle').searchParams.get('purpose');
+        if (purpose !== 'sign-in' && purpose !== 'reauth') return send(400, { error: 'unsupported purpose' });
+        const messages = readFileSync(otpCapture, 'utf8').split('\n').filter(Boolean);
+        const sent = messages.map(line => JSON.parse(line)).reverse()
+          .find(row => row.to === otpEmail && row.purpose === purpose && /^\d{6}$/.test(row.code));
+        if (!sent) return send(404, { error: 'test code not sent' });
+        return send(200, { code: sent.code, purpose });
+      }
+      if (path === '/native-new-account') {
+        if (!otpAllowed) return send(404, { error: 'no native fixture' });
+        const row = desk.db.prepare('SELECT id, password_hash, email_verified_at, deleted_at FROM accounts WHERE email=?').get(otpEmail);
+        return send(200, { exists: !!row && !row.deleted_at, deleted: !row || !!row.deleted_at,
+          passwordless: !!row && !row.password_hash, verified: !!row?.email_verified_at });
+      }
       if (path === '/answer') return send(200, desk.sealedAnswer());
       if (path === '/marked') {
         return send(200, { completed: desk.completed().map(q => ({ serverQuestionId: q.id, inputMode: q.inputMode, grades: q.grades.map(gradeFacts) })), prepared: desk.rows('practice-prepared').length, issued: desk.rows('practice-question').length });

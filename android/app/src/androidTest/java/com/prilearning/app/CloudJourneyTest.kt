@@ -230,43 +230,59 @@ class CloudJourneyTest {
     /** What cloudSignInAndSync left for the runs after the process is killed. */
     private val gradedFile get() = java.io.File(context.filesDir, "pri-test-graded-question")
 
-    /** Sign up through Settings, sign in, then permanently delete the account. */
+    /** Real native OTP card: previously this test tried the REMOVED
+     * #cloud-name / password-registration form and never reached signup.
+     * The test-only oracle reads mail sent to an unrouteable fixture mailbox;
+     * it does not inspect the app's DOM, disclose OTPs to the page outside
+     * the real typed-code control, or bypass the server's verification. */
     @Test
     fun cloudSignUpThenDeleteAccount() {
         val email = args.getString("priCloudNewEmail", "")
-        val password = args.getString("priCloudNewPassword", "")
-        assertTrue("a never-registered fixture credential is given", email.isNotEmpty() && password.isNotEmpty())
+        assertTrue("a never-registered fixture mailbox is given", Regex("^native-new-[0-9]+@example[.]test$").matches(email))
+        assertFalse("fixture account has not yet been created", oracle("/native-new-account").getBoolean("exists"))
         ActivityScenario.launch(MainActivity::class.java).use { s ->
             reachHome(s)
             openSettings(s)
-            assertEquals("\"Not connected\"", waitFor(s, stateTag))
-            eval(s, "($byText)('Create account').click()")
-            setValue(s, "#cloud-name", "Android Adult")
-            setValue(s, "#cloud-email", email)
-            setValue(s, "#cloud-password", password)
-            eval(s, "(function(){[].slice.call(document.querySelector('#cloud-email').form.querySelectorAll('input[type=checkbox]')).forEach(function(b){if(!b.checked)b.click();});return true;})()")
-            Thread.sleep(300)
-            eval(s, "document.querySelector('#cloud-email').form.querySelector('button[type=submit]').click()")
-            // Registration creates a session: signing up connects the account.
+            assertEquals("\"Not signed in\"", waitFor(s, stateTag))
+            // The single in-place sign-in card handles both returning accounts
+            // and new addresses. There is no standalone Create account form.
+            waitFor(s, "document.querySelector('[data-signin-card=inline][data-signup-step=method]')")
+            setValue(s, "#signup-destination", email)
+            eval(s, "document.querySelector('[data-testid=signup-send-code]').click()")
+            waitFor(s, "document.querySelector('[data-signin-card=inline][data-signup-step=code]')")
+            val signupCode = oracle("/otp-code?purpose=sign-in").getString("code")
+            assertTrue("fixture email supplied six digits", Regex("^[0-9]{6}$").matches(signupCode))
+            setValue(s, "#signup-code-0", signupCode)
+            waitFor(s, "document.querySelector('[data-signin-card=inline][data-signup-step=age]')")
+            setValue(s, "#signup-flow-name", "Android Adult")
+            eval(s, "document.querySelector('[data-testid=signup-age-18]').click()")
+            eval(s, "document.querySelector('[data-testid=signup-agree]').click()")
+            eval(s, "document.querySelector('[data-testid=signup-age-next]').click()")
             waitFor(s, "$stateTag === 'Connected'")
-            // Positive control: the account can sign in on the server right now.
-            assertEquals("the new account can sign in before deletion", 200, loginStatus(email, password))
-            setValue(s, "#cloud-delete-password", password)
-            setValue(s, "#cloud-delete-phrase", "DELETE")
-            Thread.sleep(300)
-            eval(s, "document.querySelector('#cloud-delete-phrase').form.querySelector('button[type=submit]').click()")
-            waitFor(s, "/Cloud account deleted/.test(document.body.innerText) && $stateTag === 'Not connected'")
-            // Server-side proof: the same credentials that worked a moment ago are refused.
-            assertEquals("the server refuses the deleted account", 401, loginStatus(email, password))
-        }
-    }
+            val created = oracle("/native-new-account")
+            assertTrue("the email code created a verified adult account", created.getBoolean("exists") && created.getBoolean("verified"))
+            assertTrue("a code-created account starts without a password", created.getBoolean("passwordless"))
+            // The new account's session is genuinely usable server-side.
+            val host = java.net.URI(origin).host
+            val session = jarOnDisk().value(host, "pri_cloud_session")
+            assertNotNull("the new account has a native stored session", session)
+            assertEquals("the OTP-created session is accepted by the server", 200, meStatus(session!!))
 
-    private fun loginStatus(email: String, password: String): Int {
-        val conn = java.net.URL("$origin/v1/account/login").openConnection() as java.net.HttpURLConnection
-        conn.requestMethod = "POST"; conn.doOutput = true
-        conn.setRequestProperty("Content-Type", "application/json"); conn.setRequestProperty("X-Pri-Client", "android-native-v1")
-        conn.outputStream.use { it.write(org.json.JSONObject().put("email", email).put("password", password).toString().toByteArray()) }
-        return try { conn.responseCode } finally { conn.disconnect() }
+            // Passwordless accounts delete by reauthentication code, not a
+            // fictional password. The pending work stays protected until the
+            // server has validated this second independently issued OTP.
+            setValue(s, "#cloud-delete-phrase", "DELETE")
+            eval(s, "document.querySelector('[data-testid=cloud-delete-send-code]').click()")
+            waitFor(s, "document.querySelector('#cloud-delete-code-0')")
+            val deleteCode = oracle("/otp-code?purpose=reauth").getString("code")
+            assertTrue("deletion sent a separate six-digit code", Regex("^[0-9]{6}$").matches(deleteCode))
+            setValue(s, "#cloud-delete-code-0", deleteCode)
+            waitFor(s, "document.querySelector('[data-testid=cloud-delete-with-code]') && !document.querySelector('[data-testid=cloud-delete-with-code]').disabled")
+            eval(s, "document.querySelector('[data-testid=cloud-delete-with-code]').click()")
+            waitFor(s, "/Cloud account deleted/.test(document.body.innerText) && $stateTag === 'Not signed in'")
+            assertFalse("the account is removed from the server", oracle("/native-new-account").getBoolean("exists"))
+            assertEquals("the deleted session is revoked", 401, meStatus(session))
+        }
     }
 
     /** Runs while the cloud server is unreachable (the runner passes priCloudOffline). */
@@ -365,7 +381,7 @@ class CloudJourneyTest {
             assertEquals("signed out, the server issued and marked nothing for the account", 0, oracle("/marked").getInt("issued"))
 
             openSettings(s)
-            assertEquals("\"Not connected\"", waitFor(s, stateTag))
+            assertEquals("\"Not signed in\"", waitFor(s, stateTag))
             eval(s, "($byText)('Sign in').click()")
             setValue(s, "#cloud-email", email)
             setValue(s, "#cloud-password", password)
@@ -553,7 +569,7 @@ class CloudJourneyTest {
             openSettings(s)
             waitFor(s, "$stateTag === 'Connected'")
             eval(s, "($byText)('Disconnect').click()")
-            waitFor(s, "$stateTag === 'Not connected'")
+            waitFor(s, "$stateTag === 'Not signed in'")
             val end = System.currentTimeMillis() + 5_000
             while (jarOnDisk().value(host, "pri_cloud_session") != null && System.currentTimeMillis() < end) Thread.sleep(100)
             assertEquals("Disconnect cleared the device's session", null, jarOnDisk().value(host, "pri_cloud_session"))

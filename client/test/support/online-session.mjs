@@ -263,18 +263,20 @@ function onlineSession(platform, ctx, page) {
   }));
 
   /**
-   * Fill and send the account panel's sign-in form inside `scope` (Settings,
-   * or the panel a question card opens in place), then prove the link by
-   * readback. Selectors, not wording: the Hindi flow signs in with this too.
+   * Sign in through the one sign-in card inside `scope` (Settings, or the card
+   * a question opens in place) with the account's password — the card's
+   * "Sign in with password" road — then prove the link by readback. The
+   * emailed-code road has its own journeys (tour-sign-in-card.js). Selectors,
+   * not wording: the Hindi flow signs in with this too.
    */
   async function completeSignIn(scope, who) {
-    const form = scope.locator('form', { has: page.locator('#cloud-password') });
-    await form.waitFor({ state: 'visible', timeout: 30000 });
-    await form.locator('button.btn-sm').first().click();
-    await form.locator('#cloud-email').fill(who.email);
-    await form.locator('#cloud-password').fill(who.password);
+    const card = scope.locator('[data-signin-card]');
+    await card.waitFor({ state: 'visible', timeout: 30000 });
+    await card.getByTestId('signup-use-password').click();
+    await card.locator('#signup-password-email').fill(who.email);
+    await card.locator('#signup-password').fill(who.password);
     const answered = page.waitForResponse(r => new URL(r.url()).pathname === '/v1/account/login', { timeout: 30000 });
-    await form.locator('button[type="submit"]').click();
+    await card.getByTestId('signup-password-submit').click();
     const login = await answered;
     if (login.status() !== 200) throw new Error(`online-session: sign-in answered ${login.status()}`);
     let linked = null;
@@ -309,8 +311,8 @@ function onlineSession(platform, ctx, page) {
     const panel = page.locator('section', { has: page.locator('#cloud-account-title') });
     await panel.waitFor({ state: 'visible', timeout: 30000 });
     await completeSignIn(panel, who);
-    // The form goes away once the panel holds a linked, verified session.
-    await panel.locator('form', { has: page.locator('#cloud-password') }).waitFor({ state: 'detached', timeout: 30000 });
+    // The card goes away once the panel holds a linked, verified session.
+    await panel.locator('[data-cloud-sign-in]').waitFor({ state: 'detached', timeout: 30000 });
     session.account = who;
     return who;
   }

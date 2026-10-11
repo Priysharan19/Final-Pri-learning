@@ -69,7 +69,10 @@ ok(/\{featureEnabled\('australia'\) && \(\s*<div className="field" style=\{\{ ma
   'the onboarding link renders only when the flag is on');
 
 // ── 7 · A prefilled name is replaced, not appended to ────────────────────────
-ok(/id="cloud-name"[\s\S]{0,400}onFocus=\{e => \{ if \(e\.target\.value && e\.target\.value === \(user\?\.name \|\| ''\)\) e\.target\.select\(\); \}\}/.test(cloudPanel),
+// The account's name is asked on the sign-in card now (a new address, after
+// its code), prefilled from the profile the same way.
+const signInCard = read('client/src/components/SignUpFlow.jsx');
+ok(/id="signup-flow-name"[\s\S]{0,500}onFocus=\{e => \{ if \(e\.target\.value && e\.target\.value === String\(initialName \|\| ''\)\) e\.target\.select\(\); \}\}/.test(signInCard),
   'focusing the prefilled account name selects it');
 
 if (failures.length) {

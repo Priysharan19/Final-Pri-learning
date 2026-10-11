@@ -10,6 +10,22 @@ What shipped, how to switch it on in Railway, and what only the owner can do.
 - **Withdrawal**: the parent screen in the app (`I'm a parent` → Withdraw consent) sends a code to the approving phone; entering it withdraws every consent that phone gave and sync stops at once. Email parents keep the withdraw link.
 - **Account deletion** for a passwordless (code-only) account requires a fresh code sent to the account's own phone/email.
 
+## The one sign-in card (seamless sign-in)
+
+The landing screen, every in-question "Sign in to check this answer", and Settings → Your Pri account all mount the same component (`client/src/components/SignUpFlow.jsx`):
+
+1. **Email → "Continue with email" → the six-digit code, in the same card.** No navigation, no reload, and no "create account / sign in" choice first: `POST /v1/account/otp/request` then `/verify` sign an existing account in (verified or not, with or without a password) and answer `profile-required` for a new address.
+2. **A new address** is then asked, still in the card, only what an account needs: first name, age (11–17 or "18 or older" — never inferred), and an explicit agreement to the terms and privacy notice. On the landing screen the class is asked next; inside a page the profile's class is used and never asked again. Under 18, the parent step follows with the reason for it stated.
+3. **Only what the server reports is offered.** Google/Apple from `GET /v1/account/identity/providers`; a phone code only when `GET /v1/account/otp/channels` reports an SMS provider. `GET /v1/account/otp/channels` is new, public and read-only: `{ channels: { email, sms } }` from deployment configuration alone (no account, address or session is read; `Cache-Control: no-store`; inventoried in `docs/security/route-inventory.json`).
+4. **"Sign in with password"** is a small option for accounts that have one. A wrong password and an unknown address get the same words, with the email code offered as the way out. Password *registration* is no longer offered in the client; `POST /v1/account/register` is unchanged on the server.
+5. **A linked profile signing in again never becomes a second account** (`allowCreate={false}`): an address with no account is told so and the unused sign-up ticket is dropped. A session for an account other than the profile's is ended rather than kept beside it.
+6. **The card reads nothing and submits nothing.** It has no access to handwriting, photos or answers, and Submit stays the student's own action. Whether the page then reads kept ink is the page's rule, not the card's: on this tree the reader's existing behaviour applies (at most one read, asserted in `client/test/tour-sign-in-card.js`); the "zero paid reads on sign-in" assertions land with read-on-request (PR #440) and are listed in that tour file under `DEFERRED TO THE READ-MY-ANSWER PR`.
+7. **`/verify` says nothing about an address until a correct code is shown.** The code (or the sign-up ticket a code earned) is checked before anything that depends on whether an account exists; a sign-up profile is validated only on the ticket, after the proof.
+
+No limit, expiry, attempt ceiling or cookie attribute changed; the one enumeration change tightens `/verify` (point 7). The server contract the card relies on is held in `server/test/otp-sign-in-check.mjs`; the card's own rules in `client/test/sign-in-card-check.mjs`; the journeys (Chromium and WebKit) in `client/test/tour-sign-in-card.js`. Those journeys read codes from the in-memory test mail adapter: they are not evidence that a real provider delivered a real message.
+
+**The code email** (`server/platform/otpEmail.js`): one narrow column, "Pri Learning", the code as the largest element, the 10-minute single-use expiry, and "if you did not ask for this". A sign-in or deletion code email carries **no link and no URL**. A guardian's email links only to `/guardian/consent` on this deployment's own validated `PRI_PUBLIC_ORIGIN` (`otpEmailConsentLink`); an origin with a query, credentials, a non-http scheme, or plain http for a non-local host yields no link at all.
+
 ## What this consent is, and is not
 
 This is **parent-controlled-channel consent**: `guardian-phone-otp` / `guardian-email-otp` / `guardian-email-confirmation` record that someone holding the named phone or inbox read the notice on the parent page and approved. It does **not** verify identity or age: it is not DigiLocker-verified, and it does not prove the person is an adult or this child's parent.

@@ -259,36 +259,38 @@ async function openOneMarkWorkingQuestion(page, base, settle) {
 
 /**
  * Sign in without leaving the question: the card's own "Sign in to check this
- * answer" → "Use a phone or email code". A new phone number has no account, so
- * the same panel asks the sign-up questions and finishes with the ticket the
- * code earned. 18 or older: no guardian is needed for this account (the
- * guardian gate has its own journey in tour-otp-onboarding.js).
+ * answer" opens the one sign-in card in place. This journey uses a phone code
+ * (this server reports an SMS provider, so the card offers it); the emailed
+ * code is tour-sign-in-card.js's. A new number has no account, so the same
+ * card asks the account's name and age and finishes with the ticket the code
+ * earned — the class is never asked, because this profile already has one.
+ * 18 or older: no guardian is needed for this account (the guardian gate has
+ * its own journey in tour-otp-onboarding.js).
  */
 async function signInOnTheCard({ page, sms, phone, e164 }) {
   const seen = {};
   const recovery = page.locator('[data-ink-account-recovery]');
   await recovery.locator('[data-ink-sign-in]').click();
-  await recovery.locator('[data-ink-code-sign-in]').waitFor({ state: 'visible', timeout: 20000 });
-  await recovery.locator('[data-ink-code-sign-in]').click();
-  await recovery.locator('[data-signup-step="method"]').waitFor({ timeout: 20000 });
-  await recovery.locator('#signup-destination').fill(phone);
-  await recovery.getByTestId('signup-send-code').click();
+  const card = recovery.locator('[data-signin-card]');
+  await card.waitFor({ state: 'visible', timeout: 20000 });
+  await card.getByTestId('signup-channel-sms').waitFor({ state: 'visible', timeout: 20000 });
+  await card.getByTestId('signup-channel-sms').click();
+  await card.locator('#signup-destination').fill(phone);
+  await card.getByTestId('signup-send-code').click();
   await recovery.locator('[data-signup-step="code"]').waitFor({ timeout: 20000 });
   const sent = sms.readTestOutbox({ to: e164 }).at(-1);
   // The whole code lands in the first box at once — the way the keyboard's
   // "from Messages" suggestion and SMS autofill deliver it (the box is
   // autocomplete="one-time-code"). Digit-by-digit typing is tour-otp-onboarding's.
-  await recovery.locator('#signup-code-0').fill(sent.code);
-  await recovery.locator('[data-signup-step="role"]').waitFor({ timeout: 20000 });
-  await recovery.getByTestId('signup-role-student').click();
+  await card.locator('#signup-code-0').fill(sent.code);
   await recovery.locator('[data-signup-step="age"]').waitFor({ timeout: 20000 });
-  await recovery.getByTestId('signup-age-18').click();
-  await recovery.locator('[data-signup-step="class"]').waitFor({ timeout: 20000 });
-  await recovery.getByTestId('signup-class-12').click();
   // The new account's name: asked here, already filled from this profile.
-  seen.name = await recovery.locator('#signup-flow-name').inputValue().catch(() => null);
-  await recovery.getByTestId('signup-class-next').click();
-  return { ...sent, nameOffered: seen.name };
+  seen.name = await card.locator('#signup-flow-name').inputValue().catch(() => null);
+  seen.classAsked = await card.locator('[data-testid^="signup-class-"]').count();
+  await card.getByTestId('signup-age-18').click();
+  await card.getByTestId('signup-agree').check();
+  await card.getByTestId('signup-age-next').click();
+  return { ...sent, nameOffered: seen.name, classAsked: seen.classAsked };
 }
 
 /** Correct the doubtful line the reader returned to what the student "wrote". */
@@ -422,8 +424,8 @@ export const writeFlow = {
       const sent = await signInOnTheCard({ page, sms, phone: PHONE, e164: E164 });
       await check('the code arrived through the server\'s test SMS adapter (no real message was sent)',
         /^\d{6}$/.test(sent?.code || ''), JSON.stringify(sent && { purpose: sent.purpose }));
-      await check('a new number is asked for the account\'s name on the card, pre-filled from this profile',
-        sent.nameOffered === 'Write Journey', JSON.stringify(sent.nameOffered));
+      await check('a new number is asked for the account\'s name on the card, pre-filled from this profile — and not the class, which the profile already has',
+        sent.nameOffered === 'Write Journey' && sent.classAsked === 0, JSON.stringify({ name: sent.nameOffered, classAsked: sent.classAsked }));
       await page.waitForSelector('.ink-line', { timeout: 30000 }).catch(() => {});
       const account = h.db.prepare("SELECT a.id FROM account_phones p JOIN accounts a ON a.id=p.account_id WHERE p.phone_e164=?").get(E164);
       await check('the account was created and verified on the real server',
@@ -962,9 +964,9 @@ export const photoFlow = {
     // ── sign in, on the card ─────────────────────────────────────────────────
     await signIn.click();
     const panel = page.locator('[data-photo-account-recovery]');
-    await check('the sign-in opens in place and offers both ways in: the account form and a phone or email code',
-      await panel.locator('#cloud-password').waitFor({ state: 'attached', timeout: 20000 }).then(() => true, () => false) &&
-        await panel.locator('[data-check-code-sign-in]').count() === 1);
+    await check('the sign-in opens in place as the one sign-in card: an email field for a code, and the password road only on request',
+      await panel.locator('[data-signin-card="inline"] #signup-destination').waitFor({ state: 'visible', timeout: 20000 }).then(() => true, () => false) &&
+        await panel.locator('input[type="password"]').count() === 0 && await panel.getByTestId('signup-use-password').count() === 1);
     const account = await online.signInHere(panel, { name: 'Photo Journey' });
     const transcript = page.locator('[data-photo-correct-transcript]');
     await transcript.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});

@@ -78,9 +78,20 @@ export const flow = {
         });
       }
 
-      if (path === '/v1/account/register' && method === 'POST') {
+      // The sign-in card's road: which channels exist, a code, and the verify
+      // that first earns a sign-up ticket (a new address) and then, with the
+      // student's answers, makes the account.
+      if (path === '/v1/account/otp/channels' && method === 'GET') return respond(route, 200, { channels: { email: true, sms: false } });
+      if (path === '/v1/account/identity/providers' && method === 'GET') return respond(route, 200, { providers: { google: null, apple: null } });
+      if (path === '/v1/account/otp/request' && method === 'POST') {
+        return respond(route, 202, { ok: true, channel: 'email', challengeId: 'otp_e2e_challenge', expiresInMs: 600000, resendAfterMs: 30000 });
+      }
+      if (path === '/v1/account/otp/verify' && method === 'POST') {
+        let sentBody = {};
+        try { sentBody = JSON.parse(body || '{}'); } catch { sentBody = {}; }
+        if (!sentBody.signupTicket) return respond(route, 200, { status: 'profile-required', signupTicket: 'otp_e2e_ticket' });
         authenticated = true;
-        return respond(route, 201, { account: ACCOUNT }, {
+        return respond(route, 201, { status: 'signed-in', created: true, account: ACCOUNT, guardianConsent: { required: false, state: 'not-required' } }, {
           'set-cookie': 'pri_csrf=e2e-csrf; Path=/; SameSite=Lax'
         });
       }
@@ -236,47 +247,51 @@ export const flow = {
     await check('cloud account controls render when the deployment origin is configured',
       await accountPanel.isVisible());
     await check('the fresh local profile starts disconnected from cloud',
-      /Not connected/.test(await accountPanel.innerText()),
+      /Not signed in/.test(await accountPanel.innerText()),
       `account panel reads ${JSON.stringify((await accountPanel.innerText()).slice(0, 180))}`);
 
-    await accountPanel.getByRole('button', { name: 'Create account' }).click();
-    await accountPanel.getByLabel('Your name').fill(ACCOUNT.name);
-    await accountPanel.getByLabel('Your email').fill(ACCOUNT.email);
-    await accountPanel.getByLabel('Password').fill('cloud-e2e-password-42');
+    // The one sign-in card, in place: email → code → (a new address) the
+    // account's name, age and agreement. The class is never asked: this
+    // profile already has one.
+    const card = accountPanel.locator('[data-signin-card]');
+    await card.locator('#signup-destination').fill(ACCOUNT.email);
+    await card.getByTestId('signup-send-code').click();
+    await card.locator('#signup-code-0').waitFor({ state: 'visible', timeout: 15000 });
+    await card.locator('#signup-code-0').fill('123456');
+    await card.locator('#signup-flow-name').waitFor({ state: 'visible', timeout: 15000 });
+    await card.locator('#signup-flow-name').fill(ACCOUNT.name);
 
-    // The form opens on the under-18 path, because under the DPDP Act that is
-    // most students here. Two things are asserted before ticking past it: the
-    // guardian fields are actually on screen, and the submit stays disabled
-    // until the notice is acknowledged. The second is the whole point of the
-    // consent checkbox — a gate that renders but does not gate is worse than
-    // no gate, because it looks like one.
-    const submit = accountPanel.getByRole('button', { name: 'Create and connect account' });
-    await check('a signup starts on the under-18 path and asks for a guardian',
-      await accountPanel.getByLabel("Parent or guardian\u2019s name").isVisible());
+    // Nothing about age is assumed, and no account is made without the notice
+    // being acknowledged. A gate that renders but does not gate is worse than
+    // no gate, because it looks like one — so both refusals are asserted by
+    // the request that was NOT sent.
+    const creating = () => requests.filter(row => row.path === '/v1/account/otp/verify' && /signupTicket/.test(row.body)).length;
+    await check('a new account is asked its age outright: no age is preselected',
+      await card.locator('[data-testid^="signup-age-"][aria-pressed="true"]').count() === 0);
+    await card.getByTestId('signup-age-next').click();
+    await check('without an age the account is not created',
+      creating() === 0 && /Choose your age/.test(await card.getByTestId('signup-error').innerText()));
+    await card.getByTestId('signup-age-18').click();
+    await card.getByTestId('signup-age-next').click();
     await check('the notice must be acknowledged before an account can be created',
-      await submit.isDisabled());
-
-    await accountPanel.getByLabel('I am 18 or older').check();
-    await check('declaring 18 or older withdraws the guardian fields',
-      !(await accountPanel.getByLabel("Parent or guardian\u2019s name").isVisible()));
-
-    await accountPanel.getByLabel('I have read the').check();
-    await check('acknowledging the notice releases the gate', await submit.isEnabled());
-    await submit.click();
-    await accountPanel.getByText('Connected', { exact: true }).waitFor({ timeout: 15000 });
+      creating() === 0 && /Tick the box to agree/.test(await card.getByTestId('signup-error').innerText()));
+    await card.getByLabel('I have read the').check();
+    await card.getByTestId('signup-age-next').click();
+    await accountPanel.locator('[data-cloud-state]', { hasText: /^Signed in$/ }).waitFor({ timeout: 15000 });
+    await check('acknowledging the notice releases the gate: one account-creating request', creating() === 1, `${creating()} request(s)`);
 
     await check('account creation links the current local profile without leaving Settings',
-      new URL(page.url()).pathname === '/settings' && await accountPanel.getByText('Connected', { exact: true }).isVisible(),
+      new URL(page.url()).pathname === '/settings' && await accountPanel.locator('[data-cloud-state]', { hasText: /^Signed in$/ }).isVisible(),
       `current URL is ${page.url()}`);
 
-    const registerCall = requests.find(row => row.path === '/v1/account/register' && row.method === 'POST');
-    await check('account registration goes through the audited web transport',
+    const registerCall = requests.find(row => row.path === '/v1/account/otp/verify' && row.method === 'POST' && /signupTicket/.test(row.body));
+    await check('account creation goes through the audited web transport',
       !!registerCall && registerCall.headers['x-pri-client'] === 'web-v1',
-      registerCall ? JSON.stringify(registerCall.headers) : 'no register request captured');
+      registerCall ? JSON.stringify(registerCall.headers) : 'no account-creating request captured');
 
     const registerBody = registerCall ? JSON.parse(registerCall.body || '{}') : {};
-    await check('the cloud account request carries a device id but no local-profile database payload',
-      typeof registerBody.deviceId === 'string' && registerBody.deviceId.startsWith('device-') &&
+    await check('the cloud account request carries a device id and the declared age, but no local-profile database payload',
+      typeof registerBody.deviceId === 'string' && registerBody.deviceId.startsWith('device-') && registerBody.profile?.isAdult === true &&
         !('localProfileId' in registerBody) && !('encryptionKey' in registerBody),
       JSON.stringify(registerBody));
 
