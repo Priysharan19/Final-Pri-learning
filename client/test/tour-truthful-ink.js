@@ -126,11 +126,12 @@ export const flow = {
       window.__priRelease = () => { window.fetch = real; open(); return window.__priHeld; };
       window.fetch = async (input, init) => {
         const url = String(typeof input === 'string' ? input : input?.url || '');
-        if (url.includes(fragment)) { window.__priHeld += 1; await gate; }
+        if (new RegExp(fragment).test(url)) { window.__priHeld += 1; await gate; }
         return real(input, init);
       };
     }, path);
-    const holdGrades = id => hold(`/v1/practice/${id}/submit`);
+    const holdGrades = id => hold(`/v1/practice/${id}/submit$`);
+    const holdReads = () => hold('/v1/(handwriting/transcribe|practice/[^/]+/recognize)$');
     const heldGrades = () => page.evaluate(() => window.__priHeld || 0);
     const releaseGrades = () => page.evaluate(() => window.__priRelease());
     /** A fresh, untried numeric question, in handwriting mode. */
@@ -333,7 +334,7 @@ export const flow = {
         const callsBefore = (await gradesOf(right.serverQuestionId)).length;
         online.forgetKeptReads();
         reader.lines = [{ text: String(right.text) }];
-        await hold('/v1/');
+        await holdReads();
         const readsHeldFrom = reader.requests.length;
         await handwrite(page, box, '7', { x: 150 });
         const after = {
