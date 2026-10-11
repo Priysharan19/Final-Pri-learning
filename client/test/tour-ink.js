@@ -175,7 +175,15 @@ export const flow = {
     // ── 3b · offline: no reading, the ink is kept, and it is read on reconnect
     reader.text = answer;
     await ctx.setOffline(true);
-    await handwrite(page, box, answer);
+    // The raster is cropped to its stroke bounds. Repositioning the same glyph
+    // is NOT a new server image. Draw a small flourish inside this same line:
+    // an outage check must reach the provider, not an earlier valid cache hit.
+    const earlierImages = new Set((await readCalls()).map(call => call.body?.image).filter(Boolean));
+    await handwrite(page, box, answer, { x: 85, y: 65 });
+    await page.mouse.move(box.x + 96, box.y + 108);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 128, box.y + 108);
+    await page.mouse.up();
     await page.waitForSelector('.ink-status', { timeout: 10000 }).catch(() => {});
     const offlineNote = (await page.locator('.ink-status').innerText().catch(() => '')) || '';
     await check('offline, nothing is read or offered for marking, and the student is told why',
@@ -236,6 +244,9 @@ export const flow = {
     await page.waitForTimeout(1500);
     const readsAfter = await readCalls();
     const restoredSent = readsAfter.at(-1);
+    await check('the manually recovered page is a new image, not a prior cached result',
+      !!restoredSent?.body?.image && !earlierImages.has(restoredSent.body.image),
+      `earlier images ${earlierImages.size}; collision ${earlierImages.has(restoredSent?.body?.image)}`);
     const providerCalls = reader.requests.length - requestsBeforeReload;
     // One press, one request. (The server may put that one request to its
     // fallback model when the first answers 5xx, so the provider can see two.)
