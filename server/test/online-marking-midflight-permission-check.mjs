@@ -49,6 +49,11 @@ const h=await startApp({engine:requestedEngine()});
 const image='data:image/png;base64,'+Buffer.from('a'.repeat(600)).toString('base64');
 const issue=jar=>h.request('/v1/practice/issue',{method:'POST',jar,body:{generator:'c8-linear-equations-both-sides',difficulty:2,seed:104729,curriculum:'in'}});
 const recognize=(jar,qid)=>h.request('/v1/practice/'+qid+'/recognize',{method:'POST',jar,body:{mode:'photo',image}});
+// Submit never starts a provider read (review 17, F3): it binds the read the
+// student asked for. So each case below has the student's own Read in flight
+// at the provider, and the recognise request joins it before the change.
+const reading=jar=>h.request('/v1/handwriting/transcribe',{method:'POST',jar,body:{image}}).catch(()=>null);
+const joined=()=>new Promise(resolve=>setTimeout(resolve,300));
 async function guardianToken(accountId,kind){
  const row=await h.db.get('SELECT token_id,token_ciphertext FROM auth_delivery_outbox WHERE account_id=? AND kind=? ORDER BY created_at DESC LIMIT 1',[accountId,kind]);
  assert.ok(row,'guardian delivery envelope must exist');
@@ -60,8 +65,10 @@ try{
  eq(a.status,201);
  eq((await verifyEmail(h,a.account.id)).status,200);
  const q=await issue(a.jar);eq(q.status,201);
- const running=recognize({...a.jar},q.data.question.id);
+ const shown=reading({...a.jar});
  const reply=await waitingProvider();
+ const running=recognize({...a.jar},q.data.question.id);
+ await joined();
  const logout=await h.request('/v1/account/logout',{method:'POST',jar:a.jar,body:{}});
  eq(logout.status,200);
  finish(reply);
@@ -74,8 +81,10 @@ try{
  const foreign=await recognize({...b.jar},q.data.question.id);
  eq(foreign.status,404,'foreign account cannot enter provider route for another question');
  const fresh=await issue(b.jar);eq(fresh.status,201);
- const running2=recognize({...b.jar},fresh.data.question.id);
+ const shown2=reading({...b.jar});
  const reply2=await waitingProvider();
+ const running2=recognize({...b.jar},fresh.data.question.id);
+ await joined();
  const grade=await h.request('/v1/practice/'+fresh.data.question.id+'/submit',{method:'POST',jar:b.jar,
    headers:{'Idempotency-Key':'qa-grading-while-provider-waiting'},
    body:{submissionId:'qa-grading-while-provider-waiting',answer:'9',mode:'typed'}});
@@ -104,8 +113,10 @@ try{
  eq(confirmed.data?.confirmed,true,'guardian consent granted');
  const childQuestion=await issue(childJar);
  eq(childQuestion.status,201,'guardian-approved minor receives online issued question');
- const heldChild=recognize({...childJar},childQuestion.data.question.id);
+ const shownChild=reading({...childJar});
  const heldReply=await waitingProvider();
+ const heldChild=recognize({...childJar},childQuestion.data.question.id);
+ await joined();
  const withdrawToken=await guardianToken(childId,'guardian-withdraw');
  const withdrawn=await h.request('/v1/account/guardian/withdraw',{method:'POST',body:{token:withdrawToken}});
  eq(withdrawn.status,200,'guardian withdrawal accepted during OCR wait');

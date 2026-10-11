@@ -9,7 +9,7 @@ import { api } from '../api.js';
 import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import InkCanvas from '../ink/InkCanvas.jsx';
-import { flushInkDrafts } from '../local/inkDrafts.js';
+import { flushInkDrafts, readInkDraftExtras } from '../local/inkDrafts.js';
 import { sanitizeFigure } from '../lib/sanitize.js';
 import { clearDraft, flushDrafts, queueDraft, readDraft, saveDraft } from './drafts.js';
 import {
@@ -17,7 +17,7 @@ import {
   saveInkDraft, savePendingSubmission, submissionContentKey,
   noteSubmissionEdited, recoveryPlan, settleFailedSubmission, submissionToSettleFirst
 } from './practiceRecovery.js';
-import { cloudReadingEnabled, INK_READER_STATE, noteReaderRefusal, readerBlock, readPhotoWithCloud, resumeReaderNow, takeCloudReadingNotice } from '../ink/cloudReader.js';
+import { cloudReadingEnabled, forgetCloudReads, setReadingQuestion, INK_READER_STATE, noteReaderRefusal, readerBlock, readPhotoWithCloud, resumeReaderNow, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { retryClock } from '../ink/readerFailure.js';
 import { preparePhoto } from '../ink/photoRaster.js';
 import { buildTranscript, editLine, includeAll, includedLines, reviveTranscript, setLineExcluded, unreadablePage, workingOf } from '../photo/transcript.js';
@@ -292,6 +292,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // The ink surface mounts only once the answer is in, so a kept page is
   // always the page it starts from.
   const [restoredInk, setRestoredInk] = useState(undefined);
+  // Kept with the page: the transcript the student was shown (and corrected)
+  // and a final answer they typed over the proposal. Restored with the ink so
+  // a reload neither reads the page again nor brings back an overridden answer.
+  const [restoredReading, setRestoredReading] = useState(null);
+  const restoredAnswerRef = useRef(null);
+  const inkExtrasRef = useRef({});
   const [mode, setMode] = useState(() => preferMode());       // 'type' | 'write' | 'photo'
   const [inkResult, setInkResult] = useState(null);
   // The ink surface owns the truth about whether recognition was attempted.
@@ -312,6 +318,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const [showSyms, setShowSyms] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
   const [state, setState] = useState({ phase: 'answering' });
+  // Submit found that the server no longer holds the read of this page (it
+  // was read long ago). Submit never buys a read: the student is asked to
+  // press Read again, and the ink, the transcript and the typed answer stay.
+  const [inkExpiredCount, setInkExpiredCount] = useState(0);
+  const [inkReadExpired, setInkReadExpired] = useState(false);
+  const [photoReadExpired, setPhotoReadExpired] = useState(false);
   const [busy, setBusy] = useState(false);
   const [photo, setPhoto] = useState(null);
   const [photoSignInOpen, setPhotoSignInOpen] = useState(false);
@@ -337,6 +349,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // 'proposed' while the field holds the proposal, 'student' once they typed.
   const [photoAnswerSource, setPhotoAnswerSource] = useState(null);
   const [photoRestored, setPhotoRestored] = useState(false);
+  // The server's read receipt for the photo on the card (and the text it
+  // covers), kept with the draft and presented at Submit.
+  const [photoAttested, setPhotoAttested] = useState(null);
+  // A PDF that has been attached and not yet read (it has no thumbnail until
+  // its pages are rendered, which happens when the student asks for the read).
+  const [heldPdf, setHeldPdf] = useState(false);
+  const photoReadStarting = useRef(false);
+  // A read is asked for THIS issued question: the server binds its receipt to it.
+  useEffect(() => {
+    setReadingQuestion(question.serverQuestionId || null);
+    return () => setReadingQuestion(null);
+  }, [question.serverQuestionId]);
   const photoSaveRevision = useRef(0);
   const [photoSaveTick, setPhotoSaveTick] = useState(0);
   // One quiet line, once per device, the first time a photo is read on the
@@ -429,9 +453,17 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   useEffect(() => {
     let live = true;
     setRestoredInk(undefined);
-    Promise.resolve().then(() => flushInkDrafts()).then(() => readInkDraft(question.id)).then(
-      kept => {
+    setRestoredReading(null);
+    restoredAnswerRef.current = null;
+    inkExtrasRef.current = {};
+    Promise.resolve().then(() => flushInkDrafts()).then(async () => [await readInkDraft(question.id), await readInkDraftExtras(question.id).catch(() => ({}))]).then(
+      ([kept, extras]) => {
         if (!live) return;
+        if (kept?.length && extras?.reading) {
+          setRestoredReading(extras.reading);
+          inkExtrasRef.current = { ...extras };
+          if (typeof extras.answer === 'string') restoredAnswerRef.current = { answer: extras.answer, text: String(extras.reading.reading?.text ?? '') };
+        }
         setRestoredInk(kept || null);
         if (kept?.length) {
           // readInkDraft can return a pending in-memory queue row. A read at
@@ -490,7 +522,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         // A blurred or cropped page comes back as lines of "[illegible]" at
         // near-zero confidence: that is a photo to retake, not working.
         if (unreadablePage(cloudOutcome.transcription)) return null;
-        if (text) return { text, transcription: cloudOutcome.transcription, confidence: cloudOutcome.transcription.confidence, engine: cloudOutcome.transcription.engine };
+        if (text) return { attested: cloudOutcome.attested || null, text, transcription: cloudOutcome.transcription, confidence: cloudOutcome.transcription.confidence, engine: cloudOutcome.transcription.engine };
       }
     }
     // The photo itself was the problem: say so. Anything else is a read that
@@ -563,6 +595,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       return;
     }
     const transcript = showReading(page.transcription);
+    setPhotoAttested(page.attested || null);
     if (String(page.engine || '').startsWith('cloud') && takeCloudReadingNotice(user)) setCloudNotice(true);
     setPhotoSignInOpen(false);
     setPhotoOCR({ phase: 'done', text: workingOf(transcript), confidence: Number(page.confidence || 0), error: '', engine: page.engine });
@@ -588,9 +621,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (!photo || photoOCR.phase !== 'unavailable' ||
         photoOCR.blockedKey !== 'verdict.photoReadingSignIn' ||
         !cloudReadingEnabled(user)) return;
-    if (pendingPdf.current) void decodePdf(pendingPdf.current);
-    else void decodePhoto(photo);
-  // Intentional: only a verified profile/session transition initiates retry,
+    // Signed in: the photo can be read now. It is NOT read by this — a read is
+    // a paid operation the student asks for. The sign-in notice goes and
+    // "Read my photo" is there to be pressed.
+    photoReadGeneration.current += 1;
+    setPhotoSignInOpen(false);
+    setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
+  // Intentional: only a verified profile/session transition clears the notice,
   // never a failing OCR state update or repeated render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.cloudLinked, photoAuthEpoch]);
@@ -674,6 +711,24 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setPhotoOCR({ phase: 'done', text: joined, confidence: worst, error: '', engine: engine || 'cloud-pdf' });
   }, [decodePhoto, readOnePage, showReading, t]);
 
+  // Attaching is not asking for a read (owner decision). A photo or PDF that
+  // has just been attached is shown and kept on the device; it is sent to the
+  // AI reading service only when the student presses "Read my photo" — never
+  // by attaching, replacing, reloading, signing in or reconnecting. Replacing
+  // the photo has already dropped the previous reading (the attach handler
+  // clears it), so the new one needs its own deliberate read. When reading is
+  // not available to this account the reason is shown exactly as before;
+  // that path sends nothing.
+  const holdAttachment = useCallback((dataURL, kind) => {
+    if (!cloudReadingEnabled(user)) { if (kind === 'pdf') void decodePdf(dataURL); else void decodePhoto(dataURL); return; }
+    photoReadGeneration.current += 1;
+    pendingPdf.current = kind === 'pdf' ? dataURL : null;
+    setHeldPdf(kind === 'pdf');
+    setPdfUnread(null); setPdfPageCount(0);
+    setPhotoLines(null); setPhotoNote(null); setPhotoAttested(null);
+    setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
+  }, [user, decodePhoto, decodePdf]);
+
   // Paste a photo straight in. On a laptop this is how a student moves a shot
   // from their phone: AirDrop or a screenshot, then ⌘V.
   useEffect(() => {
@@ -705,7 +760,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         const dataURL = String(reader.result || '');
         if (!dataURL.startsWith('data:image/')) { fail(); return; }
         setPhoto(dataURL);
-        decodePhoto(dataURL);
+        holdAttachment(dataURL, 'photo');
       };
       reader.onerror = fail;
       reader.onabort = fail;
@@ -713,7 +768,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     };
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
-  }, [mode, resolved, decodePhoto]);
+  }, [mode, resolved, holdAttachment]);
 
   // ── A photographed page, kept where a reload cannot reach it ───────────────
   // The picture, the lines as read and as corrected, which lines are part of
@@ -727,7 +782,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const read = photoOCR.phase === 'done' && !!photoLines;
     const snapshot = {
       photo, transcript: read ? photoLines : null, answer: read && !isWorking ? answer : '',
-      answerSource: read ? photoAnswerSource : null, engine: read ? photoOCR.engine : null, confidence: read ? photoOCR.confidence : null
+      answerSource: read ? photoAnswerSource : null, engine: read ? photoOCR.engine : null, confidence: read ? photoOCR.confidence : null,
+      attested: read ? photoAttested : null
     };
     const meta = { label: question.subtopicName };
     const live = () => mountedRef.current && !attemptRef.current && photoSaveRevision.current === revision;
@@ -747,7 +803,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     }, 350);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, photo, photoLines, answer, photoAnswerSource, photoOCR.phase, pdfPageCount, resolved, question.id, photoSaveTick]);
+  }, [mode, photo, photoLines, answer, photoAnswerSource, photoAttested, photoOCR.phase, pdfPageCount, resolved, question.id, photoSaveTick]);
 
   // The kept page comes back after a reload: the same picture, the same lines
   // with the student's corrections and exclusions, the same answer. A page
@@ -761,8 +817,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       setMode('photo');
       setPhoto(kept.photo);
       const transcript = reviveTranscript(kept.transcript);
-      if (!transcript) { if (generation === photoReadGeneration.current) void decodePhoto(kept.photo); return; }
+      // Kept before it could be read (signed out, offline, a refusal): it comes
+      // back as it was — unread — with "Read my photo" beside it. A restore
+      // never sends a read.
+      if (!transcript) { setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null }); return; }
       setPhotoLines(transcript);
+      setPhotoAttested(kept.attested || null);
       setWorking(workingOf(transcript));
       if (question.answerType === 'working') setShowWorking(true);
       else { setAnswer(kept.answer || ''); setPhotoAnswerSource(kept.answerSource); }
@@ -927,8 +987,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     photoReadGeneration.current += 1;
     ++photoSaveRevision.current;
     pendingPdf.current = null;
-    setPdfUnread(null); setPdfPageCount(0); setPhoto(null); setPhotoSignInOpen(false);
-    setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false);
+    setPdfUnread(null); setPdfPageCount(0); setPhoto(null); setPhotoSignInOpen(false); setHeldPdf(false);
+    setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false); setPhotoAttested(null);
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
     setSaveState(null);
     void clearPhotoDraft(question.id);
@@ -959,21 +1019,28 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     }
     latestInk.current = strokes;
     setInkHasStrokes(Array.isArray(strokes) && strokes.length > 0);
+    saveInk(strokes);
+  }, [question.id, question.subtopicName]); // eslint-disable-line react-hooks/exhaustive-deps
+  /**
+   * Keep the page: the strokes, and with them the transcript and typed answer
+   * of the moment (inkExtrasRef). "Saved" is said only after exactly that has
+   * been read back through a FRESH IndexedDB connection — never from the
+   * write queue, never from the handle that wrote it. A refused write, a
+   * missing row or a different page is a failed save, said as one, with the
+   * strokes still on the canvas and a retry. Saving never reads the page.
+   */
+  const saveInk = (strokes) => {
     if (inkSaveTimer.current) { clearTimeout(inkSaveTimer.current); inkSaveTimer.current = null; }
     const revision = ++inkSaveRevision.current;
+    const extras = { ...inkExtrasRef.current };
     // saveInkDraft queues *sealed IndexedDB*, not drafts.js localStorage.
     // Its boolean acknowledges only acceptance into a write queue, not disk.
-    if (!saveInkDraft(question.id, strokes, { label: question.subtopicName })) { setSaveState('failed'); return; }
+    if (!saveInkDraft(question.id, strokes, { label: question.subtopicName, ...extras })) { setSaveState('failed'); return; }
     if (!Array.isArray(strokes) || !strokes.length) { setSaveState(null); return; }
     setSaveState('saving');
     inkSaveTimer.current = setTimeout(() => {
       inkSaveTimer.current = null;
-      // "Saved" is said only after these exact strokes have been read back
-      // through a FRESH IndexedDB connection (inkDrafts.confirmInkDraftSaved):
-      // never from the write queue, and never from the handle that wrote
-      // them. A refused write, a missing row or a different page is a failed
-      // save, said as one, with the strokes still on the canvas and a retry.
-      confirmInkDraftSaved(question.id, strokes).then(
+      confirmInkDraftSaved(question.id, strokes, extras).then(
         outcome => {
           if (!mountedRef.current || attemptRef.current || inkSaveRevision.current !== revision) return;
           // Newer strokes are already queued: their own readback will answer.
@@ -985,7 +1052,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         }
       );
     }, 700);
-  }, [question.id, question.subtopicName]);
+  };
   useEffect(() => () => { ++inkSaveRevision.current; if (inkSaveTimer.current) clearTimeout(inkSaveTimer.current); }, []);
   useEffect(() => () => { if (typedSaveTimer.current) clearTimeout(typedSaveTimer.current); }, []);
 
@@ -1051,20 +1118,44 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     () => !!reading && readsAsWritten(reading, publicAnswerShape),
     [reading, publicAnswerShape]
   );
+  // The reading on screen is of EARLIER writing (the ink changed after it was
+  // read). It stays visible, labelled; nothing of it is proposed or sent.
+  const inkStale = inkResult?.stale === true;
+  const inkReadable = !!inkResult?.lines?.length && !inkStale;
   const inkProposal = useMemo(() => {
-    if (!writeMode || isMcq || isWorking || !inkResult?.lines?.length || inkLastLineIsAnswer) return null;
+    if (!writeMode || isMcq || isWorking || !inkResult?.lines?.length || inkStale || inkLastLineIsAnswer) return null;
     return proposeFinalAnswer(inkResult.lines, publicAnswerShape);
-  }, [writeMode, isMcq, isWorking, inkResult, inkLastLineIsAnswer, publicAnswerShape]);
+  }, [writeMode, isMcq, isWorking, inkResult, inkStale, inkLastLineIsAnswer, publicAnswerShape]);
   // What the student typed over the proposal; null while the field follows it.
   const [inkAnswerEdit, setInkAnswerEdit] = useState(null);
-  useEffect(() => { if (!inkFrozenRef.current) setInkAnswerEdit(null); }, [inkResult?.text, question.id]);
+  useEffect(() => {
+    if (inkFrozenRef.current) return;
+    // A new reading starts from its own proposal — except the reading that was
+    // restored with the page, which comes back with the answer the student
+    // had typed over it. An overridden proposal never returns after a reload.
+    const kept = restoredAnswerRef.current;
+    if (kept && inkResult?.text !== undefined && kept.text === inkResult.text) { restoredAnswerRef.current = null; setInkAnswerEdit(kept.answer); return; }
+    if (inkResult?.text !== undefined) setInkAnswerEdit(null);
+  }, [inkResult?.text, question.id]);
+  // The transcript and the typed answer are part of the page that is kept.
+  const inkKeptKey = inkResult?.kept ? `${inkResult.kept.signature}|${inkResult.text}|${inkResult.corrected === true}` : '';
+  useEffect(() => {
+    const next = { ...(inkResult?.kept ? { reading: inkResult.kept } : {}), ...(inkAnswerEdit !== null && inkResult?.kept ? { answer: inkAnswerEdit } : {}) };
+    if (JSON.stringify(next) === JSON.stringify(inkExtrasRef.current)) return;
+    // Nothing read yet on this mount: what was restored with the page stands.
+    if (!inkResult?.kept && inkExtrasRef.current.reading && !inkResult) return;
+    inkExtrasRef.current = next;
+    if (resolved || inFlightRef.current || attemptRef.current || !writeMode) return;
+    // Written at once, not on the coalescing timer: a transcript is the one
+    // thing on the page that cost a paid read to produce.
+    if (latestInk.current?.length) { saveInk(latestInk.current); void flushInkDrafts(); }
+  }, [inkKeptKey, inkAnswerEdit]); // eslint-disable-line react-hooks/exhaustive-deps
   const inkAnswer = !inkProposal ? reading
     : inkAnswerEdit !== null ? inkAnswerEdit
       : inkProposal.status === 'proposed' ? inkProposal.answer : '';
   // Read-on-request marks a reading of earlier writing as stale; with automatic
   // reading there is no such state, and the ink's own signature (below) is
   // what tells a judged page from a changed one.
-  const inkStale = inkResult?.stale === true;
   const needsCheck = !!doubt && !!reading && !inkStale && vouched !== reading;
   // The page as it stands now. Submit records it; a graded result is shown as
   // a result of what is on screen only while this has not changed since.
@@ -1156,17 +1247,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (given === null) return;
     } else if (isWorking) {
       if (writeMode) {
-        if (!inkResult?.lines?.length) return;
+        if (!inkResult?.lines?.length || inkStale) return;
         given = inkResult.lines.join('\n');
         viaInk = true;
         lines = inkResult.lines.slice();
-        ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null };
+        ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null, attested: inkResult.attested || null };
       } else {
         given = working;
         if (!given.trim()) return;
       }
     } else if (writeMode) {
-      if (!inkResult?.answerLine || !String(inkAnswer).trim()) return;
+      // Never a transcript or a proposed answer that no longer matches the ink.
+      if (!inkResult?.answerLine || inkStale || !String(inkAnswer).trim()) return;
       // The last line as written when it is itself an answer; otherwise the
       // answer shown in the field (the proposal, or what the student typed).
       // Either way the recognised lines go as working, and an answer that is
@@ -1176,7 +1268,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       steps = inkResult.lines.length > 1 || inkProposal ? inkResult.lines.join('\n') : undefined;
       viaInk = true;
       lines = inkResult.lines.slice();
-      ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null };
+      ink = { strokes: compactInkStrokes(inkResult.strokes), recognized: inkResult.text, engine: inkResult.engine || null, attested: inkResult.attested || null };
     } else {
       given = answer;
       if (String(given).trim() === '') return;
@@ -1227,7 +1319,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
       ? compactInkStrokes(scribbleRef.current.getStrokes())
       : undefined;
-    await deliver({ answer: String(given), ms, steps, viaInk, ink, photo, scribble: scribbleStrokes, submissionId }, { lines, sourceMode, revision: currentRevision });
+    await deliver({ answer: String(given), ms, steps, viaInk, ink, photo, ...(photo && photoAttested ? { photoAttested } : {}), scribble: scribbleStrokes, submissionId }, { lines, sourceMode, revision: currentRevision });
   }
 
   /**
@@ -1340,6 +1432,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         : settleFailedSubmission(question.id, e, { definitive: definitiveSubmissionRefusal(e), meta: { label: question.subtopicName } });
       if (fate === 'cleared') pendingRef.current = null;
       inkFrozenRef.current = false;
+      // The page was read too long ago for the server to still hold that read.
+      // Nothing was marked, no try was used and nothing was paid for: the
+      // transcript is marked as needing "Read again", and everything is kept.
+      if (!recovering && (e?.readerFailure?.code === 'RECOGNITION_READ_EXPIRED' || e?.code === 'RECOGNITION_READ_EXPIRED')) {
+        forgetCloudReads();
+        if (body.viaInk === true) { setInkReadExpired(true); setInkExpiredCount(n => n + 1); } else setPhotoReadExpired(true);
+        setState({ phase: 'answering' });
+        return;
+      }
       if (recovering && e?.status === 409 && e?.code !== 'QUESTION_DISCARDED') {
         // Answered elsewhere under another submission: nothing here to recover.
         if (mountedRef.current) onNext?.();
@@ -1411,6 +1512,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const onInkRecognized = useCallback((r) => {
     if (inkFrozenRef.current) return;
     setInkResult(r);
+    // A reading of the page as it stands (the student read it again) is current.
+    if (r?.stale !== true) setInkReadExpired(false);
     // Recovery: the page restored after a relaunch is read once, for display
     // beside the verdict, and then frozen like any submitted reading.
     if (inFlightRef.current || attemptRef.current) inkFrozenRef.current = true;
@@ -1734,8 +1837,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const photoAwaitingValidReading = !photoEligibleForGrading({ mode, photo,
     ocrPhase: photoOCR.phase, unreadPages: pdfUnread, pdfPageCount,
     reattachRequired: photoReattachRequired });
-  const canSubmit = (isMcq ? mcqSel !== null : isWorking ? (writeMode ? !!inkResult?.lines?.length : !!working.trim()) : writeMode ? (!!inkResult?.answerLine && !!String(inkAnswer).trim()) : !!answer.trim()) &&
-    !photoAwaitingValidReading;
+  const canSubmit = (isMcq ? mcqSel !== null : isWorking ? (writeMode ? inkReadable : !!working.trim()) : writeMode ? (inkReadable && !!inkResult?.answerLine && !!String(inkAnswer).trim()) : !!answer.trim()) &&
+    !photoAwaitingValidReading && !(mode === 'photo' && photoReadExpired);
   // Reader refused by authentication is not a handwriting error or a
   // server-issued grading receipt. Keep original ink and its verified local
   // save state separate; never unlock Submit with a guessed transcript.
@@ -1852,6 +1955,21 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const submitBlockKey = state.phase === 'retry' && state.res?.readerBlock ? String(state.res.readerBlock.key) : null;
   const readerLimit = [inkBlockKey, photoBlockKey, submitBlockKey].some(k => k && LIMIT_BLOCKS.test(k));
   const readerDown = !readerLimit && [inkBlockKey, photoBlockKey, submitBlockKey].some(Boolean);
+  // Written (or photographed) and kept, not yet read as it now stands: the
+  // student's own "Read my answer" is the next step, and nothing is marked
+  // until they have seen the reading.
+  const awaitingReading = !resolved && !isMcq && (
+    (writeMode && inkHasStrokes && !inkReadable && inkReaderState?.kind !== INK_READER_STATE.READING && !inkAccountBlocked && !inkBlockKey && inkReaderState?.kind !== INK_READER_STATE.READ_FAILED)
+    || (mode === 'photo' && !!photo && photoOCR.phase === 'idle'));
+  // Why Submit is not available, said beside it — never a dead button.
+  const submitReasonKey = resolved || isMcq || busy ? null
+    : writeMode && inkHasStrokes && inkStale && inkReadExpired ? 'ink.submitReadExpired'
+    : mode === 'photo' && photoInUse && photoReadExpired ? 'photo.readExpired'
+    : writeMode && inkHasStrokes && inkStale ? 'ink.submitReadAgain'
+      : writeMode && inkHasStrokes && !inkReadable && awaitingReading ? 'ink.submitReadFirst'
+        : writeMode && !isWorking && inkReadable && inkProposal && !String(inkAnswer).trim() ? 'verdict.submitNeedsAnswer'
+          : mode === 'photo' && !isWorking && photoInUse && !String(answer).trim() ? 'verdict.submitNeedsAnswer'
+            : null;
   // ONE state for the student's work, so the page can never say two things
   // about it at once. In order: a save that failed outranks everything but a
   // check in flight; "waiting for sign-in" is said for handwriting only once
@@ -1863,9 +1981,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           : (inkWaitingSignIn && saveState === 'saved') || photoWaitingSignIn ? 'waiting-sign-in'
             : readerLimit ? 'usage-limit'
             : readerDown ? 'reader-unavailable'
+            : awaitingReading ? 'awaiting-reading'
             : writeMode && !isMcq && inkReaderState?.kind === INK_READER_STATE.READING ? 'reading'
               : inkUnread ? 'read-failed'
-                : (writeMode && !isMcq && !!(isWorking ? inkResult?.lines?.length : inkResult?.answerLine)) || (mode === 'photo' && !!photo && photoOCR.phase === 'done') ? 'read'
+                : (writeMode && !isMcq && inkReadable && !!(isWorking ? inkResult?.lines?.length : inkResult?.answerLine)) || (mode === 'photo' && !!photo && photoOCR.phase === 'done') ? 'read'
                   : saveState === 'saved' ? 'saved'
                     // A photo on the page that could not be kept on the device.
                     : mode === 'photo' && !!photo && !isMcq ? 'unsaved'
@@ -2117,15 +2236,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       setPdfUnread(null);
                       setPdfPageCount(0);
                       setPhotoSignInOpen(false);
-                      setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false);
-                      setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
+                      setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false); setPhotoAttested(null); setHeldPdf(false);
+                      setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
                       attachPhoto(e,
                         data => { if (live()) setPhoto(data); },
-                        data => { if (live()) void decodePhoto(data); },
-                        data => { if (live()) void decodePdf(data); },
+                        data => { if (live()) holdAttachment(data, 'photo'); },
+                        data => { if (live()) holdAttachment(data, 'pdf'); },
                         message => { if (live()) setPhotoOCR({ phase: 'failed', text: '', confidence: 0, engine: null, error: message }); });
                     }} />
-                  {!photo && photoOCR.phase === 'idle'
+                  {!photo && !heldPdf && photoOCR.phase === 'idle'
                     ? <button className="btn btn-ghost" onClick={() => photoInputRef.current?.click()}>{t('verdict.photographWorking')}<span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2, fontWeight: 400 }}>{photoSupportedFormats(language)}</span></button>
                     : (
                       <div className="photo-attach">
@@ -2142,6 +2261,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                           )}
                           {photoOCR.phase === 'done' && (
                             <>
+                              {photoReadExpired && !resolved && (
+                                <div data-photo-read-expired role="status" style={{ marginBottom: 8 }}>
+                                  <p style={{ fontSize: 13, margin: '0 0 6px' }}>{t('photo.readExpired')}</p>
+                                  <button type="button" className="btn btn-primary btn-sm" data-photo-read-again
+                                    onClick={() => { setPhotoReadExpired(false); if (pendingPdf.current) void decodePdf(pendingPdf.current); else if (photo) void decodePhoto(photo); }}>
+                                    {t('ink.readAgain')}
+                                  </button>
+                                </div>
+                              )}
                               {/* What actually read it. Saying "on-device" over a photo that
                                   was uploaded is the one thing this screen must never do. */}
                               <div style={{ fontSize: 12.5, marginBottom: 6 }}>
@@ -2201,7 +2329,23 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                               </p>
                             </div>
                           )}
-                          {photoOCR.phase === 'idle' && <span className="muted">{photoAwaitingOnlineReader(language)}</span>}
+                          {photoOCR.phase === 'idle' && (cloudReadingEnabled(user) && !offline && !resolved ? (
+                            <div data-photo-unread>
+                              <button type="button" className="btn btn-primary" data-photo-read
+                                onClick={() => {
+                                  // One press, one read: a second press in the same moment finds the read started.
+                                  if (photoReadStarting.current) return;
+                                  photoReadStarting.current = true;
+                                  setTimeout(() => { photoReadStarting.current = false; }, 0);
+                                  setHeldPdf(false);
+                                  if (pendingPdf.current) void decodePdf(pendingPdf.current); else if (photo) void decodePhoto(photo);
+                                }}>
+                                {t('photo.readMyPhoto')}
+                              </button>
+                              <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t('photo.readMyPhotoHint')}</p>
+                              {heldPdf && <p className="muted" style={{ fontSize: 12, marginTop: 4 }} data-photo-pdf-cost>{t('photo.readPdfHint')}</p>}
+                            </div>
+                          ) : <span className="muted">{photoAwaitingOnlineReader(language)}</span>)}
                         </div>
                       </div>
                     )}
@@ -2273,6 +2417,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 <InkAnswer onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
                   disabled={resolved || busy} focusSymbol={checkFocus} recognitionContext={recognitionContext}
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes}
+                  initialReading={inkExtrasRef.current.reading || restoredReading || null}
+                  readExpired={inkExpiredCount}
                   draftSaved={saveState === 'saved'} />
               )}
               {/* The answer taken from handwritten working: shown, editable,
@@ -2719,7 +2865,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         <div className="ws-actions editor-foot no-print">
           <span className="status-line" data-state={statusState} data-work-state={workState} role="status" aria-live="polite">
             {statusState !== 'idle' && <span className="dot" aria-hidden="true" />}
-            {writeMode && shownAnswerLine && !inkStale && !needsCheck && !cloudPending && !(resolved && !judgedShown) && saveState !== 'failed' && saveState !== 'saving'
+            {writeMode && shownAnswerLine && !inkStale && !needsCheck && !cloudPending && !(resolved && !boundLines) && saveState !== 'failed' && saveState !== 'saving'
               ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(shownAnswerLine)}$`} /></span>
               : statusText}
             {/* Handwriting is read only by the server reader (#316); say so where the work is submitted. */}
@@ -2727,6 +2873,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               <span className="ws-read-by">{String(inkResult?.engine || '').startsWith('cloud') ? t('verdict.inkReadByServer') : t('verdict.inkReadByServerPending')}</span>
             )}
           </span>
+          {submitReasonKey && (
+            <span className="ws-submit-reason muted" id={`submit-reason-${question.id}`} role="status" data-submit-reason={submitReasonKey}>{t(submitReasonKey)}</span>
+          )}
           <div className="ws-actions-btns">
             {/* A save that failed is said as one and can be tried again here,
                 whatever the input mode. The work itself is still on the page. */}
@@ -2748,7 +2897,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               <button type="button" className="btn btn-quiet" data-check-replace-cancel onClick={() => setReplaceArmed(false)}>{t('check.draftKeep')}</button>
             )}
             {!(diagnostic && resolved) && primary && (
-              <button className="btn btn-primary" data-primary-action={unmarkable ? 'replace' : undefined} onClick={primary.run} disabled={primary.disabled} aria-busy={busy || undefined}>
+              <button className="btn btn-primary" data-primary-action={unmarkable ? 'replace' : undefined} onClick={primary.run} disabled={primary.disabled} aria-busy={busy || undefined}
+                aria-describedby={submitReasonKey ? `submit-reason-${question.id}` : undefined}>
                 {primary.label}
               </button>
             )}

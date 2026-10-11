@@ -26,7 +26,7 @@ ok(/export const STILL_READING_MS = 5000;/.test(inkAnswer), 'the still-reading n
 ok(/t\(slowRead \? 'ink\.serverStillReading' : 'ink\.serverReading'\)/.test(inkAnswer), 'a slow read switches to the still-reading note');
 ok(typeof en['ink.serverStillReading'] === 'string' && typeof hi['ink.serverStillReading'] === 'string', 'the still-reading note exists in English and Hindi');
 const transport = read('client/src/platform/cloudTransport.js');
-const clientTimeout = Number(transport.match(/transcribeHandwriting: \(image, \{ signal = null, timeoutMs = (\d+) \}/)?.[1]);
+const clientTimeout = Number(transport.match(/transcribeHandwriting: \(image, \{ signal = null, timeoutMs = (\d+)\b/)?.[1]);
 const serverDefault = Number(read('server/platform/handwritingProvider.js').match(/const DEFAULT_TIMEOUT_MS = ([\d_]+);/)?.[1].replace(/_/g, ''));
 ok(serverDefault === 45000, 'the server reading budget defaults to 45 s');
 ok(clientTimeout > serverDefault && clientTimeout <= 60000, 'the client waits longer than the server budget, inside the 60 s transport cap');

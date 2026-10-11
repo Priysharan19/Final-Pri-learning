@@ -97,3 +97,16 @@ export async function turnOnServerReading(page, base) {
 
 /** The lines the reading panel shows, as the reader returned them. */
 export const readLines = (page) => page.locator('.ink-line').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-text') || ''));
+
+/**
+ * Press "Read my answer" (or "Read again"). Reading is the student's own act:
+ * nothing is read because ink was drawn. Returns false when the button is not
+ * offered (signed out, offline, a limit, or a reading already current).
+ */
+export async function pressRead(page, { timeout = 8000 } = {}) {
+  const button = page.locator('[data-ink-read]').first();
+  const there = await button.waitFor({ state: 'visible', timeout }).then(() => true, () => false);
+  if (!there) return false;
+  await button.click();
+  return true;
+}

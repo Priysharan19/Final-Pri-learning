@@ -39,7 +39,7 @@
 // Run on its own:  node client/test/tour-online-check.js
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
-import { handwrite } from './fakeServerReader.js';
+import { handwrite, pressRead } from './fakeServerReader.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
 const TOPIC = 'y7-equations';
@@ -380,6 +380,7 @@ export const writeOffline = {
     const blank = await inkOnCanvas(page);
     reader.text = known.text;
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), known.text);
+    await pressRead(page);   // reading is asked for: nothing is read because ink was drawn
     await page.waitForSelector('.ink-line', { timeout: 20000 }).catch(() => {});
     const lines = await page.locator('.ink-line').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-text')));
     await check(`online, the writing is read and shown as one line [${SYNTHETIC_EVIDENCE}]`,
