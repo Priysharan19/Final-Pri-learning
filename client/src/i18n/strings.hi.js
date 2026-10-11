@@ -2633,6 +2633,8 @@ export default {
   'notes.sectionExamples': 'हल किए गए उदाहरण',
   'notes.sectionResources': 'बाहरी अध्ययन संदर्भ',
   'notes.showMoreExamples': 'और हल किए हुए उदाहरण दिखाएँ',
+  'notes.visualExamplesOnly': 'चित्रों वाले उदाहरण दिखाएँ',
+  'notes.showAllExamples': 'सभी हल किए हुए उदाहरण दिखाएँ',
   'notes.unfoldAll': 'सब खोलिए',
   'notes.foldAll': 'सब बंद कीजिए',
   'notes.mistakeWrong': 'यह नहीं',

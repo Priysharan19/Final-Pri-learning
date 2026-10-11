@@ -2564,6 +2564,8 @@ export default {
   'notes.sectionExamples': 'Worked examples',
   'notes.sectionResources': 'External study references',
   'notes.showMoreExamples': 'Show more worked examples',
+  'notes.visualExamplesOnly': 'Show illustrated examples',
+  'notes.showAllExamples': 'Show all worked examples',
   'notes.unfoldAll': 'Unfold all',
   'notes.foldAll': 'Fold all',
   'notes.mistakeWrong': 'Not this',

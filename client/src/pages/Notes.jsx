@@ -393,7 +393,9 @@ function ChapterNotes({ chapterId }) {
   const [cards, setCards] = useState(false);
   // Limit initial SVG mounting on tablets; reveal more without discarding solved steps.
   const [visibleExamples, setVisibleExamples] = useState(6);
+  const [visualOnly, setVisualOnly] = useState(false);
   const notes = all?.[chapterId];
+  const selectedExamples = visualOnly ? (notes?.examples || []).filter(ex => ex.figure) : (notes?.examples || []);
   const [params] = useSearchParams();
   const selected = selectedStudyContext(chapter, params);
   const linkedResources = studyResourcesForGrade(grade, selected?.track || 'cbse');
@@ -410,8 +412,8 @@ function ChapterNotes({ chapterId }) {
   }, [mode, notes, chapterId]);
 
   const root = useRef(null);
-  useReveal(root, [chapterId, notes, visibleExamples]);
-  useEffect(() => { setVisibleExamples(6); window.scrollTo?.(0, 0); }, [chapterId]);
+  useReveal(root, [chapterId, notes, visibleExamples, visualOnly]);
+  useEffect(() => { setVisibleExamples(6); setVisualOnly(false); window.scrollTo?.(0, 0); }, [chapterId]);
 
   const group = IN_CURRICULUM.find(g => g.grade === grade);
   const number = group ? group.chapters.findIndex(c => c.id === chapterId) + 1 : 0;
@@ -523,13 +525,22 @@ function ChapterNotes({ chapterId }) {
           </Section>
 
           <Section id="examples" title={t('notes.sectionExamples')}>
-            {notes.examples.slice(0, visibleExamples).map((ex, i) => <Example key={i} ex={ex} n={i + 1} />)}
-            {notes.examples.length > visibleExamples && (
+            {notes.examples.some(ex => ex.figure) && (
               <div className="nt-example-more">
                 <button type="button" className="btn btn-secondary"
-                  onClick={() => setVisibleExamples(v => Math.min(v + 6, notes.examples.length))}
+                  aria-pressed={visualOnly}
+                  onClick={() => { setVisualOnly(v => !v); setVisibleExamples(6); }}>
+                  {visualOnly ? t('notes.showAllExamples') : t('notes.visualExamplesOnly')}
+                </button>
+              </div>
+            )}
+            {selectedExamples.slice(0, visibleExamples).map((ex, i) => <Example key={chapterId + ':' + ex.question} ex={ex} n={i + 1} />)}
+            {selectedExamples.length > visibleExamples && (
+              <div className="nt-example-more">
+                <button type="button" className="btn btn-secondary"
+                  onClick={() => setVisibleExamples(v => Math.min(v + 6, selectedExamples.length))}
                   aria-label={t('notes.showMoreExamples')}>
-                  {t('nav.more')} ({Math.min(visibleExamples + 6, notes.examples.length)}/{notes.examples.length})
+                  {t('nav.more')} ({Math.min(visibleExamples + 6, selectedExamples.length)}/{selectedExamples.length})
                 </button>
               </div>
             )}
