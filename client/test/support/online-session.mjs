@@ -200,7 +200,21 @@ export async function startOnlinePlatform({ dist = DIST } = {}) {
   /** How many completed reads the server is keeping for an account right now. */
   const keptReads = accountId => Number(h.db.prepare("SELECT COUNT(*) AS n FROM idempotency_keys WHERE scope='recognition-read' AND account_id=? AND expires_at>?").get(accountId, Date.now()).n);
 
-  const platform = { origin: h.origin, h, db, sms, reader, newAccount, ledger, bindPreparedElsewhere, forgetKeptReads, keptReads, close };
+  /**
+   * The reading receipts the server holds for one issued question: the
+   * reader's own (`correctedByStudent` absent) and, when the submitted answer
+   * was not the whole transcript or the reader asked for confirmation, the
+   * student's correction on top of it (`parentReceipt` names the reader's).
+   * A handwritten or photographed Submit is one request now; these rows are
+   * what /recognize and /recognition/:receipt/confirm used to report.
+   */
+  const readingReceipts = serverQuestionId => h.db.prepare("SELECT key,response_json FROM idempotency_keys WHERE scope='practice-recognition'").all()
+    .map(row => ({ key: row.key, ...JSON.parse(row.response_json) })).filter(row => row.questionId === serverQuestionId);
+  /** The transcript lines of the reads the server is keeping for an account (newest last). */
+  const keptReadLines = accountId => h.db.prepare("SELECT response_json FROM idempotency_keys WHERE scope='recognition-read' AND account_id=? ORDER BY created_at").all(accountId)
+    .map(row => JSON.parse(row.response_json)?.result?.lines || []);
+
+  const platform = { origin: h.origin, h, db, sms, reader, newAccount, ledger, bindPreparedElsewhere, forgetKeptReads, keptReads, readingReceipts, keptReadLines, close };
   platform.session = (ctx, page) => onlineSession(platform, ctx, page);
   return platform;
 }
