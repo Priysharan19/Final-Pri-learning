@@ -386,9 +386,9 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   // (the button that was pressed is no longer there), then to the reading.
   useEffect(() => {
     if (!focusAfterRead.current) return;
-    if (status?.kind === 'reading') { statusRef.current?.focus?.(); return; }
-    if (!status && rec.lines.length) { readingTitleRef.current?.focus?.(); focusAfterRead.current = false; return; }
-    if (status) { statusRef.current?.focus?.(); focusAfterRead.current = false; }
+    if (status?.kind === 'reading') { statusRef.current?.focus?.({ preventScroll: true }); return; }
+    if (!status && rec.lines.length) { readingTitleRef.current?.focus?.({ preventScroll: true }); focusAfterRead.current = false; return; }
+    if (status) { statusRef.current?.focus?.({ preventScroll: true }); focusAfterRead.current = false; }
   }, [status?.kind, rec]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handwriting kept from before a reload comes back onto the page — and so
