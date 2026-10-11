@@ -249,6 +249,7 @@ export default {
   'history.correctAnswerWas': 'Correct answer:',
   'history.yourHandwriting': 'Your handwriting',
   'history.readAs': 'Your handwriting — read as “{text}”',
+  'history.readAsNotAnswer': 'Your handwriting — the reader’s transcript was “{text}”. It is not your answer: the answer that was marked is the one you confirmed, shown above.',
   'history.scribblePad': 'Scribble pad',
   'history.attachedWorking': 'Attached paper working',
   'history.paperWorking': 'Paper working',
@@ -404,7 +405,19 @@ export default {
   'verdict.revealed': 'Solution revealed.',
   'verdict.notThisTime': 'Not this time.',
   'verdict.afterHints': { one: 'after {n} hint', other: 'after {n} hints' },
-  'verdict.everyLineChecked': { one: 'Every line of your handwritten working was checked — {n} step read and verified, reaching the required result through a logical chain.', other: 'Every line of your handwritten working was checked — {n} steps read and verified, reaching the required result through a logical chain.' },
+  // Said only from the server's step report of the lines that were submitted
+  // (components/attemptEvidence.js). A right final answer is never presented
+  // as a check of the working.
+  'verdict.workingNotChecked': 'Your final answer was checked. Your working was not verified.',
+  'verdict.workingAllChecked': { one: 'Your working was checked: the {n} line you submitted is consistent with the correct solution.', other: 'Your working was checked: all {n} lines you submitted are consistent with the correct solution.' },
+  'verdict.workingSomeChecked': '{ok} of the {total} lines of your working were checked and are consistent with the correct solution. The rest were not verified.',
+  'verdict.workingBreakButCorrect': 'Your final answer is correct, but line {line} of your working, as it was read, does not hold. See the step check below.',
+  'verdict.workingBreak': 'Line {line} of your working, as it was read, does not hold. See the step check below.',
+  'verdict.transcriptNotAnswer': 'This is the answer you confirmed, and it is the one that was marked. The reading of your handwriting is shown as it was read; it is not your answer.',
+  // The page changed after it was marked: the result is the earlier attempt's.
+  'verdict.previousAttemptWrong': 'Your previous attempt was not correct.',
+  'verdict.previousAttemptUnread': 'Your previous attempt could not be read as an answer.',
+  'verdict.newWorkNotChecked': 'What is on the page now has not been checked yet. Submit it when you are ready.',
   'verdict.expected': 'Expected:',
   'verdict.workedSolution': 'Worked solution',
   'verdict.finalAnswer': 'Final answer',
