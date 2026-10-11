@@ -75,7 +75,7 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
    const illustrate=page.getByRole('button',{name:'Show illustrated examples'});
    assert.equal(await illustrate.count(),1,'visual discovery filter missing');checks++;
    await illustrate.click();
-   assert.equal(await illustrate.getAttribute('aria-pressed'),'true','illustrated-only action must report pressed state');checks++;
+   assert.equal(await page.getByRole('button',{name:'Show all worked examples'}).getAttribute('aria-pressed'),'true','illustrated-only action must report pressed state');checks++;
    const rendered=page.locator('.nt-example').filter({has:page.locator('svg[role="img"]')});
    assert.ok(await rendered.count()>0,name+' '+id+': original diagram not drawn');checks++;
    assert.equal(await rendered.count(),await a.count(),name+' '+id+': nonvisual example leaked through filter');checks++;
