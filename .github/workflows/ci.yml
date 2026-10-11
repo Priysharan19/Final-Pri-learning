@@ -103,6 +103,9 @@ jobs:
           grep -Fq 'README TRUTH: PASS — 16/16 checks' suites.log
           grep -Fq 'LEGAL PAGES: PASS — 246/246 checks' suites.log
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 174/174 checks' suites.log
+          # A marked handwritten attempt says only what the server established
+          # (synthetic evidence: scripted transcripts, the server's marking function).
+          grep -Fq 'TRUTHFUL FEEDBACK: PASS — 97/97 checks' suites.log
           grep -Fq 'BROWSER RUN FIXES: PASS — 23/23 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
@@ -551,6 +554,11 @@ jobs:
           # pointer input. Chromium + WebKit × dpr 1.25/1.5 × mouse/pen, dark.
           # Emulated scale factors, not Windows 11 hardware evidence.
           node client/test/ink-canvas-loss-browser-check.mjs 2>&1 | tee -a browser.log
+          # Truthful handwritten feedback (scripted reader, real server marks): a
+          # misread page with a typed final answer, working the server did and did
+          # not check, and annotations that die with the revision they were about.
+          node client/test/tour-truthful-ink.js --no-build 2>&1 | tee -a browser.log
+          node client/test/tour-truthful-ink.js --no-build --browser=webkit 2>&1 | tee -a browser.log
       - name: Accessibility suite
         if: always()
         run: |
@@ -643,6 +651,8 @@ jobs:
           grep -Eq 'E2E SUITE.*38/38.*2 flows' browser.log
           # Ink canvas loss (#449/#550): both engines, 200 checks, none failed.
           grep -Fq 'INK CANVAS LOSS (emulated Windows scale factors, dark theme, mouse + pen; not Windows 11 hardware evidence): 200 passed, 0 failed' browser.log
+          grep -Fq 'Ink · a marked attempt says only what the server established' browser.log
+          test "$(grep -Ec 'E2E SUITE PASSED — 49/49 checks across 1 flows' browser.log)" -eq 2
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
           test "$(grep -Ec 'E2E SUITE PASSED — 158/158 checks across 1 flows' browser.log)" -eq 2
