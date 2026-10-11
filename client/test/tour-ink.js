@@ -143,15 +143,15 @@ export const flow = {
     reader.text = answer;
     await ctx.setOffline(true);
     // The rasteriser crops to the written bounds, so moving identical ink to
-    // another position DOES NOT change its server image identity. Underline
-    // the answer as a student could: the mathematics is unchanged, but this
-    // picture is genuinely different from earlier reads of the bare numeral.
-    // The outage probe must exercise the reader, not the server's valid cache.
+    // another position does NOT change its server image identity. Give the
+    // first numeral a short pen flourish WITHIN its existing line, so the
+    // image is new but line segmentation and later ink annotations still refer
+    // to the same single answer line. This tests a genuine uncached outage.
     const earlierImages = new Set((await readCalls()).map(call => call.body?.image).filter(Boolean));
     await handwrite(page, box, answer, { x: 85, y: 65 });
-    await page.mouse.move(box.x + 88, box.y + 185);
+    await page.mouse.move(box.x + 96, box.y + 108);
     await page.mouse.down();
-    await page.mouse.move(box.x + 130, box.y + 185);
+    await page.mouse.move(box.x + 128, box.y + 108);
     await page.mouse.up();
     await page.waitForSelector('.ink-status', { timeout: 10000 }).catch(() => {});
     const offlineNote = (await page.locator('.ink-status').innerText().catch(() => '')) || '';
