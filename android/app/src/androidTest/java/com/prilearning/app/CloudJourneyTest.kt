@@ -256,9 +256,23 @@ class CloudJourneyTest {
             waitFor(s, "document.querySelector('[data-signin-card=inline][data-signup-step=age]')")
             setValue(s, "#signup-flow-name", "Android Adult")
             eval(s, "document.querySelector('[data-testid=signup-age-18]').click()")
+            // Each choice is React-controlled. evaluateJavascript's callback
+            // only proves the click ran, not that React committed its state:
+            // submitting in that gap sends neither the chosen age nor consent.
+            waitFor(s, "(function(){var n=document.querySelector('#signup-flow-name'),a=document.querySelector('[data-testid=signup-age-18]');return !!n && n.value==='Android Adult' && a && a.getAttribute('aria-pressed')==='true';})()")
             eval(s, "document.querySelector('[data-testid=signup-agree]').click()")
+            waitFor(s, "(function(){var a=document.querySelector('[data-testid=signup-agree]');return !!a && a.checked && document.querySelector('[data-testid=signup-age-18]').getAttribute('aria-pressed')==='true';})()")
             eval(s, "document.querySelector('[data-testid=signup-age-next]').click()")
-            waitFor(s, "$stateTag === 'Connected'")
+            try {
+                waitFor(s, "$stateTag === 'Connected'")
+            } catch (failure: AssertionError) {
+                // Failure evidence without fixture address, session cookie or
+                // OTP: distinguish server-side creation from a form error or
+                // native-account link/refresh failure.
+                val state = eval(s, "(function(){var c=document.querySelector('[data-signin-card=inline]'),e=document.querySelector('[data-testid=signup-error]');return (c?.getAttribute('data-signup-step')||'closed')+'; '+(e?.textContent?.trim()||'no signup error');})()")
+                val serverCreated = oracle("/native-new-account").getBoolean("exists")
+                throw AssertionError("signup did not connect; UI=$state; server account exists=$serverCreated", failure)
+            }
             val created = oracle("/native-new-account")
             assertTrue("the email code created a verified adult account", created.getBoolean("exists") && created.getBoolean("verified"))
             assertTrue("a code-created account starts without a password", created.getBoolean("passwordless"))
