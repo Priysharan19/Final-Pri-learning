@@ -211,8 +211,8 @@ const specs=[
     "entries": [
       6,
       4,
-      5,
-      3
+      3,
+      2
     ],
     "mode": "det",
     "context": "Zero determinant C"

@@ -54,6 +54,10 @@ for(const group of IN_CURRICULUM) {
       } else if(f.type==='matrix'){
         assert.equal(f.entries.length,4);
         assert.ok(f.entries.every(Number.isInteger));
+        if(/^Zero determinant\b/i.test(ex.question)){
+          const [a,b,c,d]=f.entries;
+          assert.equal(a*d-b*c,0,'zero-determinant title contradicts the displayed matrix');
+        }
       } else if(f.type==='unitcircle'){
         assert.ok([0,30,45,60,90,120,135,150,180,210,225,240,270,300,315,330].includes(f.deg));
         const trig=ex.question.includes('sin(')?Math.sin(f.deg*Math.PI/180):Math.cos(f.deg*Math.PI/180);
@@ -71,6 +75,14 @@ for(const group of IN_CURRICULUM) {
         assert.ok(f.rows>=2&&f.rows<=10);
       } else if(f.type==='interval'){
         assert.ok(f.a<f.b && typeof f.lc==='boolean' && typeof f.rc==='boolean');
+        if(/^Positive (solutions|integers)\b/i.test(ex.question)){
+          const first=f.a+(f.lc?0:1);
+          assert.ok(first>0, 'positive-integer title cannot include zero or negative integers');
+        }
+        if(/^Nonnegative integers\b/i.test(ex.question)){
+          assert.equal(f.a,0,'nonnegative-integer illustration must begin at zero');
+          assert.equal(f.lc,true,'nonnegative-integer illustration must include zero');
+        }
       } else if(f.type==='square-grid'||f.type==='cube-grid'){
         assert.ok(Number.isInteger(f.n)&&f.n>=2&&f.n<=12);
       } else if(f.type==='algebra-area'){

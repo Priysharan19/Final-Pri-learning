@@ -309,7 +309,7 @@ const specs=[
     "kind": "interval",
     "a": 0,
     "b": 10,
-    "lc": true,
+    "lc": false,
     "rc": false,
     "context": "Positive solutions"
   },

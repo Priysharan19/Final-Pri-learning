@@ -51,7 +51,7 @@ const specs=[
     "kind": "interval",
     "a": 0,
     "b": 16,
-    "lc": false,
+    "lc": true,
     "rc": true,
     "context": "Nonnegative integers"
   },
