@@ -22,11 +22,17 @@
 //                               times and then far past the backstop, for this
 //                               one operation: the engine stops its check of
 //                               the working at an exact line, on any machine
+//   @@marker-test:clockonce:7@@ the same, stopping after one reading, but only
+//                               the first time each worker thread sees token 7
 import { parentPort } from 'node:worker_threads';
 import { MARKER_OPS, serveMarker } from '../../platform/markerOps.js';
 import { setBackstopClockForTests, WORKING_LIMITS } from '../../../client/src/engine/checker.js';
 
-const CLOCK = /\s*@@marker-test:clock:(\d+)@@/;
+const CLOCK = /\s*@@marker-test:clock(once)?:(\d+)@@/;
+// `clockonce:TOKEN` stops the engine's clock (after one reading) only the
+// first time THIS worker thread meets TOKEN: a stop that goes away on a
+// retry of the identical entry, as a busy moment does.
+const met = new Set();
 /** Run `fn` with the engine's backstop clock running out after `reads` readings. */
 function underClock(reads, fn) {
   let n = 0;
@@ -65,7 +71,8 @@ const wrap = (run, answerField, workingField, continues) => (args, emit) => {
   const clock = CLOCK.exec(text);
   if (clock) {
     const clean = value => (Array.isArray(value) ? value.map(line => String(line).replace(CLOCK, '')) : typeof value === 'string' ? value.replace(CLOCK, '') : value);
-    return underClock(Number(clock[1]), () => run({ ...args, [answerField]: clean(args[answerField]), [workingField]: clean(args[workingField]) }, emit));
+    const reads = clock[1] ? (met.has(clock[2]) ? Infinity : (met.add(clock[2]), 1)) : Number(clock[2]);
+    return underClock(reads, () => run({ ...args, [answerField]: clean(args[answerField]), [workingField]: clean(args[workingField]) }, emit));
   }
   const answer = misbehave(args[answerField]);
   let working = args[workingField];

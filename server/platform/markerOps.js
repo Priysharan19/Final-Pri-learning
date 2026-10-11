@@ -14,7 +14,7 @@
 // This file imports the engine only (client/src/engine, which the production
 // image ships — see Dockerfile and production-runtime-image-check.mjs). It
 // must never import a server module: the worker has no store and no secrets.
-import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
+import { checkAnswer, stepCheck, methodMarks, UNVERIFIED_NOTE } from '../../client/src/engine/checker.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
 
 // Mirrors the shared deterministic checker input used by local practice;
@@ -68,6 +68,8 @@ export function marksPossibleFor(q) {
 // and the request handlers answer it exactly as they answer a worker stopped
 // at its deadline: not an attempt, nothing spent, nothing written, send again.
 export const UNVERIFIED = Object.freeze({ unverified: true });
+/** What a student is told when a check was stopped: the engine's own sentence. */
+export const UNVERIFIED_MESSAGE = UNVERIFIED_NOTE;
 
 export function stepEvidence(q, answer, steps, result) {
   const meta = stepMetaFor(q);
@@ -133,7 +135,13 @@ export function examAnswerStage(q, given, working, grid) {
   const markingScheme = objective || (grid.incorrect || 0) < 0 || marks <= 1 ? 'objective' : 'final-answer';
   const response = { unanswered: false, correct, awarded, feedback: feedback.slice(0, 3000), partial: null, markingScheme,
     outcome: correct ? 'correct' : 'wrong' };
-  const meta = !correct && markingScheme === 'final-answer' && !blank(working) ? stepMetaFor(q) : null;
+  // Working that comes with a written answer is read WHATEVER the answer was.
+  // Reading it only under a wrong answer made the paper's outcome an oracle:
+  // with working slow enough to be stopped, a right answer finalised the paper
+  // and a wrong one left it open to be answered again. A right answer's marks
+  // do not depend on its working — it is read so that being stopped does not
+  // depend on the answer.
+  const meta = markingScheme === 'final-answer' && !blank(working) ? stepMetaFor(q) : null;
   return { final: !meta, response, meta };
 }
 
@@ -147,6 +155,9 @@ export function examWorkingStage(q, working, grid, stage) {
     // The clock stopped the check of the working: there is no method mark to
     // report, and "none" would be a mark. The caller is told so instead.
     if (method?.unverified === true) return null;
+    // A right answer has its full marks already; its working was read only so
+    // that a stopped check is the same for every answer.
+    if (response.correct === true) return response;
     if (method && method.awarded > 0) {
       response.awarded = Math.max(0, Math.min(marks - 1, method.awarded));
       response.partial = { okLines: method.okLines, awarded: response.awarded, note: method.note };
@@ -177,7 +188,7 @@ export function tutorEvidence(q, lines) {
   try {
     const report = stepCheck(meta, lines.join('\n'), { prompt: q.prompt });
     // A check the clock stopped is silence, not "no line verified".
-    if (report?.unverified === true) return evidence;
+    if (report?.unverified === true) return { ...evidence, unverified: true };
     const judged = report?.lines || [];
     const at = judged.findIndex(line => line?.status === 'break');
     if (at >= 0 && at < lines.length) evidence.firstBreak = at;

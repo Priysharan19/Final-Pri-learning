@@ -26,7 +26,7 @@ import { loadAllBanks, generateQuestion } from '../../client/src/engine/generato
 // worker threads under a hard deadline. Only the two pure rubric helpers
 // below, which read the server's own question and run no student text through
 // the engine, are used directly here.
-import { stepMetaFor, marksPossibleFor } from './markerOps.js';
+import { stepMetaFor, marksPossibleFor, UNVERIFIED_MESSAGE } from './markerOps.js';
 import {
   markerPool, markerCooldownUntil, recordMarkerKills, sendMarkerCooldown, sendMarkerBusy,
   MARKING_TOO_COMPLEX, MARKING_BUSY, TOO_COMPLEX_MESSAGE
@@ -204,19 +204,22 @@ export async function issuedQuestionForTutor(db, accountId, questionId, now = Da
     answerText: String(answerTextFor(q) ?? ''),
     hints: Array.isArray(q.hints) ? q.hints.filter(h => typeof h === 'string') : [],
     // Runs in the marker pool, never on this thread. A Step Check that is cut
-    // off at its deadline, refused because the pool is busy, or skipped
-    // because the account is cooling down says nothing: no line is verified
-    // and no line is the first mistake — "the checker's silence is not
-    // evidence", exactly as when the engine threw.
+    // off at its deadline, stopped by the engine's clock, refused because the
+    // pool is busy, or skipped because the account is cooling down says
+    // nothing: no line is verified and no line is the first mistake — "the
+    // checker's silence is not evidence", exactly as when the engine threw.
+    // That silence is marked `unverified: true`, so it cannot be mistaken for
+    // a Step Check that ran and verified no line.
     async workEvidence(lines) {
       const silent = { firstBreak: -1, verifiedLines: 0, misconception: null };
+      const unchecked = { ...silent, unverified: true };
       if (!stepMetaFor(q) || !Array.isArray(lines) || !lines.length) return silent;
-      if (await markerCooldownUntil(db, accountId)) return silent;
+      if (await markerCooldownUntil(db, accountId)) return unchecked;
       let outcome;
-      try { outcome = await markerPool().run('tutor', { q, lines }, { key: accountId }); } catch { return silent; }
+      try { outcome = await markerPool().run('tutor', { q, lines }, { key: accountId }); } catch { return unchecked; }
       if (outcome.ok) return outcome.value.evidence;
       if (outcome.code === MARKING_TOO_COMPLEX) await recordMarkerKills(db, accountId);
-      return silent;
+      return unchecked;
     }
   };
 }
@@ -782,20 +785,37 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // whose working was not used to stand with "working not read, no method
       // marks", and was committed: the same page of working earned its method
       // marks on an idle machine and none on a busy one. A stopped check is
-      // never turned into a lower mark — and it is not turned into a higher
-      // one either: a right answer whose working could not be read is also
-      // sent back, so what this reply says never depends on whether the
-      // answer was right, and a slow page of working cannot be used to test
-      // answers without spending tries.
+      // never turned into a lower mark.
+      //
+      // What this reply does and does not depend on, exactly:
+      //   · On the try that RESOLVES the question (a second try, or a one-try
+      //     mode) the working is read whatever the answer was, so a stopped
+      //     check is this same reply for a right answer and a wrong one. A
+      //     slow page of working cannot be used to test answers there.
+      //   · On an OPEN first try the working of a wrong answer is not read at
+      //     all (an open question is told nothing about its working), so
+      //     nothing stops it: the wrong answer spends its try, as always. A
+      //     right answer's working is read, and if that is stopped the right
+      //     answer is sent back unmarked. The two differ — but the wrong
+      //     answer has paid a try for what it learned, and the right answer
+      //     has learned only that it may be sent again.
       const stopped = !marked.ok || marked.value?.unverified === true;
       if (stopped) {
-        // Counted towards the cooldown either way: each costs marker time
-        // that no try pays for.
-        await recordMarkerKills(db, accountId);
+        // Only a worker that had to be TERMINATED counts towards the cooldown:
+        // that costs up to the deadline and a respawn. A check the engine's
+        // own clock stopped cost at most its 750 ms and no worker; counting it
+        // would make an honest student wait because the server was busy.
+        if (!marked.ok) await recordMarkerKills(db, accountId);
+        // The sentence. When the answer itself never finished, the fixed
+        // "write it simply" sentence, as before. When the answer was read and
+        // only the working was stopped — by the engine's clock or at the
+        // deadline — nothing says the entry is at fault: the engine's own
+        // "could not be checked this time, send it again".
+        const answerRead = marked.ok || marked.partials.some(part => part?.result);
         return res.status(200).json({ authoritative: true, questionId: qid, submissionId, attemptId: randomUUID(),
           correct: false, invalid: true, resolved: false, tooComplex: true, code: MARKING_TOO_COMPLEX,
           marksEarned: 0, marksPossible: marksPossibleFor(forecast.q),
-          triesLeft: 1, feedback: TOO_COMPLEX_MESSAGE, trapWhy: null,
+          triesLeft: 1, feedback: answerRead ? UNVERIFIED_MESSAGE : TOO_COMPLEX_MESSAGE, trapWhy: null,
           contentId: opaqueContentId(forecast.q.contentId), serverAcknowledgedAt: now,
           stepReport: null, partial: null });
       }
