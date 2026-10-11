@@ -142,12 +142,17 @@ export const flow = {
     // ── 3b · offline: no reading, the ink is kept, and it is read on reconnect
     reader.text = answer;
     await ctx.setOffline(true);
-    // Use a distinct canvas position for the offline page. An earlier successful
-    // read may otherwise be the exact same image (for example when answer=1);
-    // the server correctly reuses that result even if the synthetic provider
-    // is now down, invalidating the outage/recovery probe. Keep the same glyph
-    // and the same mathematical answer, but require a genuine cache miss.
+    // The rasteriser crops to the written bounds, so moving identical ink to
+    // another position DOES NOT change its server image identity. Underline
+    // the answer as a student could: the mathematics is unchanged, but this
+    // picture is genuinely different from earlier reads of the bare numeral.
+    // The outage probe must exercise the reader, not the server's valid cache.
+    const earlierImages = new Set((await readCalls()).map(call => call.body?.image).filter(Boolean));
     await handwrite(page, box, answer, { x: 85, y: 65 });
+    await page.mouse.move(box.x + 88, box.y + 185);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 130, box.y + 185);
+    await page.mouse.up();
     await page.waitForSelector('.ink-status', { timeout: 10000 }).catch(() => {});
     const offlineNote = (await page.locator('.ink-status').innerText().catch(() => '')) || '';
     await check('offline, nothing is read or offered for marking, and the student is told why',
@@ -205,6 +210,9 @@ export const flow = {
     await page.waitForTimeout(1500);
     const readsAfter = await readCalls();
     const restoredSent = readsAfter.at(-1);
+    await check('offline recovery fixture is a new image, not an earlier cached read',
+      !!restoredSent?.body?.image && !earlierImages.has(restoredSent.body.image),
+      `had ${earlierImages.size} earlier image(s); cached-image collision ${earlierImages.has(restoredSent?.body?.image)}`);
     const providerCalls = reader.requests.length - requestsBeforeReload;
     await check('the kept strokes were restored and offered to the reader (one request, a picture, nothing else)',
       readsAfter.length === readsBeforeReload + 1 && providerCalls >= 1 && providerCalls <= 2 &&
