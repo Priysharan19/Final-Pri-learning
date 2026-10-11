@@ -291,6 +291,7 @@ const FLAGSHIP = ['a = 9, d = 3', 'T_n = a + (n - 1)d', 'T_9 = 9 + 8 × 3', '   
     eq(auditWorking(lines, { vocabulary: ['x'] }).breaks, [], `not a slip: ${lines.join(' | ')}`);
   }
   eq(auditWorking(['T = 9 + 24', '= 33', '= 35']).firstBreak, 2, 'but a value that changes from one line of a chain to the next is one');
+  eq(describeBreak(breakOn(auditWorking(['T = 9 + 24', '= 33', '= 35']).lines[2])).correction, '33 was written as 35 — these should be the same value.', 'and it is described as a copying slip, not as a sum');
   eq(auditWorking(['7/2 = 3']).lines[0].verdict, 'approx', 'a value cut short is neither ticked nor crossed');
   eq(buildWorkingReview({ working: '7/2 = 3\n= 3', correct: false }).lines[0].check, 'not-checked', 'and the review says it was not checked exactly');
   eq(auditWorking(['8 x 3 = 25'], { vocabulary: [] }).lines[0].verdict, 'confirm', 'a slip that depends on reading x as × is a reading to confirm');

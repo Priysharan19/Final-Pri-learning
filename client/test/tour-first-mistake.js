@@ -185,7 +185,11 @@ export const photoFlow = {
     const last = page.locator('[data-photo-line="4"] input');
     await last.fill('= 33');
     await check('correcting the line to "= 33" removes the hint', await until(page, async () => await page.locator('[data-working-hint]').count() === 0, 4000));
+    // The field restores its caret a frame after each edit; a person cannot
+    // select and retype inside that frame, so the script waits it out.
+    await page.waitForTimeout(250);
     await last.fill('= 35');
+    await check('the line reads "= 35" again', await until(page, async () => await last.inputValue() === '= 35', 3000), await last.inputValue());
     await check('and the slip written again brings it back', await until(page, async () => await page.locator('[data-working-hint="recheck"]').count() === 1, 4000));
     await answer.fill('35');
 

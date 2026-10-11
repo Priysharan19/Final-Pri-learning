@@ -387,6 +387,15 @@ export function describeBreak(link) {
       correction: `${link.from} is not the same expression as ${link.claimedText} — they give different values.`
     };
   }
+  // A value copied down as a different value, with no arithmetic between them.
+  if (/^\(?\s*[+-]?\s*\d+(?:\.\d+)?\s*\)?$/.test(String(link.from ?? '')) && link.cls !== 'sign') {
+    return {
+      cls: 'arithmetic-slip',
+      what: 'The value changed between two lines with nothing done to it.',
+      hint: `Recheck where ${link.from} became ${link.claimedText}.`,
+      correction: `${link.from} was written as ${link.claimedText} — these should be the same value.`
+    };
+  }
   const op = link.operation ? `the ${link.operation}` : 'the calculation';
   // A wrong value written out (`= 35`) is corrected by the value; a wrong
   // expression (`= 9 + 26`) by showing that the two lines are different numbers.
