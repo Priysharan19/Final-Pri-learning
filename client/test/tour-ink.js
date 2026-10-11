@@ -142,7 +142,12 @@ export const flow = {
     // ── 3b · offline: no reading, the ink is kept, and it is read on reconnect
     reader.text = answer;
     await ctx.setOffline(true);
-    await handwrite(page, box, answer);
+    // Use a distinct canvas position for the offline page. An earlier successful
+    // read may otherwise be the exact same image (for example when answer=1);
+    // the server correctly reuses that result even if the synthetic provider
+    // is now down, invalidating the outage/recovery probe. Keep the same glyph
+    // and the same mathematical answer, but require a genuine cache miss.
+    await handwrite(page, box, answer, { x: 85, y: 65 });
     await page.waitForSelector('.ink-status', { timeout: 10000 }).catch(() => {});
     const offlineNote = (await page.locator('.ink-status').innerText().catch(() => '')) || '';
     await check('offline, nothing is read or offered for marking, and the student is told why',
