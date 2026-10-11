@@ -111,6 +111,16 @@ const VISUAL_WAVE7_LOADERS = {
   12: () => import('./data/notes-visual-wave7-class12.js')
 };
 
+// Wave 8: 600 distinct original mathematical investigations carried forward from draft #436.
+const VISUAL_WAVE8_LOADERS = {
+  7: () => import('./data/notes-visual-wave8-class7.js'),
+  8: () => import('./data/notes-visual-wave8-class8.js'),
+  9: () => import('./data/notes-visual-wave8-class9.js'),
+  10: () => import('./data/notes-visual-wave8-class10.js'),
+  11: () => import('./data/notes-visual-wave8-class11.js'),
+  12: () => import('./data/notes-visual-wave8-class12.js')
+};
+
 function mergeOptionalComplexStudies(notes, extra) {
   for (const [id, section] of Object.entries(extra || {})) {
     if (!Object.hasOwn(notes,id) || !Array.isArray(section.examples) || !section.examples.every(x => x.question && Array.isArray(x.steps) && x.steps.length && x.answer && x.verify)) {
@@ -138,21 +148,17 @@ export function loadNotesForGrade(grade) {
       VISUAL_LOADERS[g](),
       VISUAL_WAVE5_LOADERS[g](),
       VISUAL_INQUIRY_LOADERS[g](),
-      VISUAL_WAVE7_LOADERS[g]()
+      VISUAL_WAVE7_LOADERS[g](),
+      VISUAL_WAVE8_LOADERS[g]()
     ])
-      .then(([original, supplement, optional, challenges, visuals, extendedVisuals, inquiry, wave7]) => mergeOptionalComplexStudies(
-        mergeOptionalComplexStudies(
-          mergeOptionalComplexStudies(
-            mergeOptionalComplexStudies(
-              mergeOptionalComplexStudies(
-                mergeOptionalComplexStudies(
-                  mergeStudySupplements(original.default || {}, supplement.default || {}), optional.default || {}
-                ), challenges.default || {}
-              ), visuals.default || {}
-            ), extendedVisuals.default || {}
-          ), inquiry.default || {}
-        ), wave7.default || {}
-      ))
+      .then(([original, supplement, optional, challenges, visuals, extendedVisuals, inquiry, wave7, wave8]) => {
+        // Merge every supplement in source chronology; the published 120-item Wave7 stays intact.
+        let notes = mergeStudySupplements(original.default || {}, supplement.default || {});
+        for (const pack of [optional, challenges, visuals, extendedVisuals, inquiry, wave7, wave8]) {
+          notes = mergeOptionalComplexStudies(notes, pack.default || {});
+        }
+        return notes;
+      })
       .catch(err => { cache.delete(g); throw err; }));
   }
   return cache.get(g);
