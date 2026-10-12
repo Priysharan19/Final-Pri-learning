@@ -350,7 +350,12 @@ export const flow = {
           after.previous.includes('Your previous attempt was not correct.') && after.previous.includes('What is on the page now has not been checked yet.') &&
             after.pinned === 0 && !/Not quite/.test(after.previous) && after.speech.includes('Your previous attempt was not correct.') && !/Not quite/.test(after.speech),
           JSON.stringify({ previous: after.previous, speech: after.speech, pinned: after.pinned }));
-        await check('rewrite: the new ink was not sent anywhere by being written', (await gradesOf(right.serverQuestionId)).length === callsBefore);
+        // Stay beyond the old auto-read debounce window. A stroke must not
+        // dispatch either a grading request or a paid handwriting read.
+        await page.waitForTimeout(2200);
+        await check('rewrite: the new ink itself sent no grade or handwriting read',
+          (await gradesOf(right.serverQuestionId)).length === callsBefore && await heldGrades() === 0,
+          `${await heldGrades()} unexpected held read(s)`);
 
         // A SLOW student-requested read of the rewritten page: still nothing
         // judged while it flies. Rewriting alone MUST NOT trigger recognition.
@@ -358,7 +363,7 @@ export const flow = {
         await page.locator('[data-ink-read]').click();
         await page.waitForTimeout(2200);
         await check('rewrite, slow read in flight: the read of the new work is still waiting, and the unread new work carries no annotation',
-          await heldGrades() >= 1 && reader.requests.length === readsHeldFrom &&
+          await heldGrades() === 1 && reader.requests.length === readsHeldFrom &&
             await lookHere() === 0 && await marksOnInk() === 0 && await page.locator('.verdict[data-verdict-of="previous-attempt"]').count() === 1,
           `${await heldGrades()} request(s) waiting; provider calls +${reader.requests.length - readsHeldFrom}`);
         await releaseGrades();
