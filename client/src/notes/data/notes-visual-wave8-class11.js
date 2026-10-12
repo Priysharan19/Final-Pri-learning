@@ -1296,7 +1296,7 @@ const specs=[
     "kind": "network",
     "weights": [
       9,
-      2,
+      4,
       7,
       8,
       9,
@@ -1310,7 +1310,7 @@ const specs=[
     "kind": "network",
     "weights": [
       12,
-      3,
+      4,
       12,
       12,
       2,
@@ -1323,7 +1323,7 @@ const specs=[
     "chapterId": "c11-permutations-combinations",
     "kind": "network",
     "weights": [
-      2,
+      4,
       10,
       2,
       10,
@@ -1338,7 +1338,7 @@ const specs=[
     "kind": "network",
     "weights": [
       12,
-      1,
+      2,
       2,
       1,
       12,
@@ -1351,7 +1351,7 @@ const specs=[
     "chapterId": "c11-permutations-combinations",
     "kind": "network",
     "weights": [
-      1,
+      3,
       13,
       15,
       1,
@@ -1365,7 +1365,7 @@ const specs=[
     "chapterId": "c11-permutations-combinations",
     "kind": "network",
     "weights": [
-      2,
+      3,
       10,
       9,
       2,
@@ -1380,7 +1380,7 @@ const specs=[
     "kind": "network",
     "weights": [
       9,
-      1,
+      5,
       7,
       8,
       9,
@@ -1394,7 +1394,7 @@ const specs=[
     "kind": "network",
     "weights": [
       12,
-      1,
+      5,
       12,
       12,
       2,
@@ -1407,7 +1407,7 @@ const specs=[
     "chapterId": "c11-permutations-combinations",
     "kind": "network",
     "weights": [
-      1,
+      5,
       10,
       2,
       10,
@@ -1449,7 +1449,7 @@ const specs=[
     "chapterId": "c11-permutations-combinations",
     "kind": "network",
     "weights": [
-      1,
+      4,
       10,
       9,
       2,
@@ -1505,7 +1505,7 @@ const specs=[
     "chapterId": "c11-probability",
     "kind": "pieAngle",
     "counts": [
-      2,
+      6,
       3,
       4,
       3
@@ -1518,7 +1518,7 @@ const specs=[
     "chapterId": "c11-probability",
     "kind": "pieAngle",
     "counts": [
-      4,
+      10,
       6,
       8,
       6
@@ -1533,7 +1533,7 @@ const specs=[
     "counts": [
       3,
       4,
-      5,
+      2,
       6
     ],
     "index": 2,
@@ -1557,7 +1557,7 @@ const specs=[
     "chapterId": "c11-probability",
     "kind": "pieAngle",
     "counts": [
-      8,
+      2,
       6,
       6,
       10
@@ -1570,7 +1570,7 @@ const specs=[
     "chapterId": "c11-probability",
     "kind": "pieAngle",
     "counts": [
-      9,
+      13,
       9,
       6,
       12
@@ -1585,7 +1585,7 @@ const specs=[
     "counts": [
       12,
       8,
-      10,
+      15,
       10
     ],
     "index": 2,
@@ -1596,7 +1596,7 @@ const specs=[
     "chapterId": "c11-probability",
     "kind": "pieAngle",
     "counts": [
-      2,
+      8,
       3,
       4,
       3
@@ -1609,7 +1609,7 @@ const specs=[
     "chapterId": "c11-probability",
     "kind": "pieAngle",
     "counts": [
-      4,
+      10,
       6,
       8,
       6
@@ -1622,7 +1622,7 @@ const specs=[
     "chapterId": "c11-probability",
     "kind": "pieAngle",
     "counts": [
-      3,
+      5,
       4,
       5,
       6

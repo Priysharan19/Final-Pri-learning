@@ -318,7 +318,7 @@ const specs=[
     "chapterId": "c9-probability",
     "kind": "pieAngle",
     "counts": [
-      9,
+      3,
       9,
       6,
       12
@@ -333,7 +333,7 @@ const specs=[
     "counts": [
       12,
       8,
-      10,
+      6,
       10
     ],
     "index": 2,
@@ -344,7 +344,7 @@ const specs=[
     "chapterId": "c9-probability",
     "kind": "pieAngle",
     "counts": [
-      2,
+      5,
       3,
       4,
       3
@@ -396,7 +396,7 @@ const specs=[
     "chapterId": "c9-probability",
     "kind": "pieAngle",
     "counts": [
-      8,
+      2,
       6,
       6,
       10
@@ -409,7 +409,7 @@ const specs=[
     "chapterId": "c9-probability",
     "kind": "pieAngle",
     "counts": [
-      9,
+      3,
       9,
       6,
       12
@@ -422,7 +422,7 @@ const specs=[
     "chapterId": "c9-probability",
     "kind": "pieAngle",
     "counts": [
-      12,
+      2,
       8,
       10,
       10
@@ -461,7 +461,7 @@ const specs=[
     "chapterId": "c9-probability",
     "kind": "pieAngle",
     "counts": [
-      3,
+      5,
       4,
       5,
       6
@@ -474,7 +474,7 @@ const specs=[
     "chapterId": "c9-probability",
     "kind": "pieAngle",
     "counts": [
-      5,
+      3,
       3,
       7,
       5
@@ -489,7 +489,7 @@ const specs=[
     "counts": [
       8,
       6,
-      6,
+      3,
       10
     ],
     "index": 2,

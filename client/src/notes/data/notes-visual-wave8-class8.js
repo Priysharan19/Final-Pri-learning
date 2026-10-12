@@ -461,7 +461,7 @@ const specs=[
     "chapterId": "c8-data-handling",
     "kind": "pieAngle",
     "counts": [
-      2,
+      5,
       3,
       4,
       3
@@ -474,7 +474,7 @@ const specs=[
     "chapterId": "c8-comparing-quantities",
     "kind": "pieAngle",
     "counts": [
-      4,
+      7,
       6,
       8,
       6

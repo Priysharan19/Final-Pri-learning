@@ -1007,7 +1007,7 @@ const specs=[
     "kind": "inverseLine",
     "m": 3,
     "b": 1,
-    "x0": -1,
+    "x0": -2,
     "context": "Inverse map reflected across diagonal 3"
   },
   {
@@ -1150,7 +1150,7 @@ const specs=[
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
     "a": 5,
-    "b": 2,
+    "b": 1,
     "mode": "focal",
     "context": "Optional ellipse integral geometry 1"
   },
@@ -1158,7 +1158,7 @@ const specs=[
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
     "a": 6,
-    "b": 3,
+    "b": 2,
     "mode": "area",
     "context": "Optional ellipse integral geometry 2"
   },
@@ -1166,7 +1166,7 @@ const specs=[
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
     "a": 7,
-    "b": 4,
+    "b": 3,
     "mode": "focal",
     "context": "Optional ellipse integral geometry 3"
   },
@@ -1174,7 +1174,7 @@ const specs=[
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
     "a": 8,
-    "b": 5,
+    "b": 4,
     "mode": "area",
     "context": "Optional ellipse integral geometry 4"
   },
@@ -1182,7 +1182,7 @@ const specs=[
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
     "a": 9,
-    "b": 2,
+    "b": 1,
     "mode": "focal",
     "context": "Optional ellipse integral geometry 5"
   },
@@ -1190,7 +1190,7 @@ const specs=[
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
     "a": 10,
-    "b": 3,
+    "b": 2,
     "mode": "area",
     "context": "Optional ellipse integral geometry 6"
   },
@@ -1198,14 +1198,14 @@ const specs=[
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
     "a": 11,
-    "b": 4,
+    "b": 3,
     "mode": "focal",
     "context": "Optional ellipse integral geometry 7"
   },
   {
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
-    "a": 12,
+    "a": 11,
     "b": 5,
     "mode": "area",
     "context": "Optional ellipse integral geometry 8"
@@ -1213,7 +1213,7 @@ const specs=[
   {
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
-    "a": 4,
+    "a": 3,
     "b": 2,
     "mode": "focal",
     "context": "Optional ellipse integral geometry 9"
@@ -1221,7 +1221,7 @@ const specs=[
   {
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
-    "a": 5,
+    "a": 4,
     "b": 3,
     "mode": "area",
     "context": "Optional ellipse integral geometry 10"
@@ -1229,7 +1229,7 @@ const specs=[
   {
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
-    "a": 6,
+    "a": 5,
     "b": 4,
     "mode": "focal",
     "context": "Optional ellipse integral geometry 11"
@@ -1237,7 +1237,7 @@ const specs=[
   {
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
-    "a": 7,
+    "a": 6,
     "b": 5,
     "mode": "area",
     "context": "Optional ellipse integral geometry 12"
@@ -1245,7 +1245,7 @@ const specs=[
   {
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
-    "a": 8,
+    "a": 7,
     "b": 2,
     "mode": "focal",
     "context": "Optional ellipse integral geometry 13"
@@ -1253,7 +1253,7 @@ const specs=[
   {
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
-    "a": 9,
+    "a": 8,
     "b": 3,
     "mode": "area",
     "context": "Optional ellipse integral geometry 14"
@@ -1261,7 +1261,7 @@ const specs=[
   {
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
-    "a": 10,
+    "a": 9,
     "b": 4,
     "mode": "focal",
     "context": "Optional ellipse integral geometry 15"
@@ -1271,7 +1271,7 @@ const specs=[
     "kind": "network",
     "weights": [
       12,
-      3,
+      6,
       12,
       12,
       2,
@@ -1284,7 +1284,7 @@ const specs=[
     "chapterId": "c12-linear-programming",
     "kind": "network",
     "weights": [
-      2,
+      6,
       10,
       2,
       10,
@@ -1299,7 +1299,7 @@ const specs=[
     "kind": "network",
     "weights": [
       12,
-      1,
+      3,
       2,
       1,
       12,
@@ -1312,7 +1312,7 @@ const specs=[
     "chapterId": "c12-linear-programming",
     "kind": "network",
     "weights": [
-      1,
+      4,
       13,
       15,
       1,
@@ -1326,7 +1326,7 @@ const specs=[
     "chapterId": "c12-linear-programming",
     "kind": "network",
     "weights": [
-      2,
+      5,
       10,
       9,
       2,
@@ -1341,7 +1341,7 @@ const specs=[
     "kind": "network",
     "weights": [
       9,
-      2,
+      6,
       7,
       8,
       9,
@@ -1355,7 +1355,7 @@ const specs=[
     "kind": "network",
     "weights": [
       12,
-      1,
+      7,
       12,
       12,
       2,
@@ -1368,7 +1368,7 @@ const specs=[
     "chapterId": "c12-linear-programming",
     "kind": "network",
     "weights": [
-      1,
+      7,
       10,
       2,
       10,
@@ -1382,7 +1382,7 @@ const specs=[
     "chapterId": "c12-linear-programming",
     "kind": "network",
     "weights": [
-      1,
+      4,
       1,
       2,
       1,
@@ -1396,7 +1396,7 @@ const specs=[
     "chapterId": "c12-linear-programming",
     "kind": "network",
     "weights": [
-      2,
+      5,
       13,
       15,
       1,
@@ -1410,7 +1410,7 @@ const specs=[
     "chapterId": "c12-linear-programming",
     "kind": "network",
     "weights": [
-      1,
+      6,
       10,
       9,
       2,
@@ -1425,7 +1425,7 @@ const specs=[
     "kind": "network",
     "weights": [
       9,
-      1,
+      7,
       7,
       8,
       9,
@@ -1439,7 +1439,7 @@ const specs=[
     "kind": "network",
     "weights": [
       12,
-      2,
+      8,
       12,
       12,
       2,
@@ -1452,7 +1452,7 @@ const specs=[
     "chapterId": "c12-linear-programming",
     "kind": "network",
     "weights": [
-      3,
+      9,
       10,
       2,
       10,
@@ -1480,7 +1480,7 @@ const specs=[
     "chapterId": "c12-probability",
     "kind": "pieAngle",
     "counts": [
-      5,
+      3,
       3,
       7,
       5
@@ -1493,7 +1493,7 @@ const specs=[
     "chapterId": "c12-probability",
     "kind": "pieAngle",
     "counts": [
-      8,
+      2,
       6,
       6,
       10
@@ -1508,7 +1508,7 @@ const specs=[
     "counts": [
       9,
       9,
-      6,
+      10,
       12
     ],
     "index": 2,
@@ -1519,7 +1519,7 @@ const specs=[
     "chapterId": "c12-probability",
     "kind": "pieAngle",
     "counts": [
-      12,
+      2,
       8,
       10,
       10
@@ -1532,7 +1532,7 @@ const specs=[
     "chapterId": "c12-probability",
     "kind": "pieAngle",
     "counts": [
-      2,
+      8,
       3,
       4,
       3
@@ -1545,7 +1545,7 @@ const specs=[
     "chapterId": "c12-probability",
     "kind": "pieAngle",
     "counts": [
-      4,
+      16,
       6,
       8,
       6
@@ -1560,7 +1560,7 @@ const specs=[
     "counts": [
       3,
       4,
-      5,
+      7,
       6
     ],
     "index": 2,
@@ -1571,7 +1571,7 @@ const specs=[
     "chapterId": "c12-probability",
     "kind": "pieAngle",
     "counts": [
-      5,
+      3,
       3,
       7,
       5
@@ -1584,7 +1584,7 @@ const specs=[
     "chapterId": "c12-probability",
     "kind": "pieAngle",
     "counts": [
-      8,
+      11,
       6,
       6,
       10
@@ -1597,7 +1597,7 @@ const specs=[
     "chapterId": "c12-probability",
     "kind": "pieAngle",
     "counts": [
-      9,
+      18,
       9,
       6,
       12
@@ -1612,7 +1612,7 @@ const specs=[
     "counts": [
       12,
       8,
-      10,
+      18,
       10
     ],
     "index": 2,
@@ -1623,7 +1623,7 @@ const specs=[
     "chapterId": "c12-probability",
     "kind": "pieAngle",
     "counts": [
-      2,
+      10,
       3,
       4,
       3
@@ -1636,7 +1636,7 @@ const specs=[
     "chapterId": "c12-probability",
     "kind": "pieAngle",
     "counts": [
-      4,
+      12,
       6,
       8,
       6
@@ -1649,7 +1649,7 @@ const specs=[
     "chapterId": "c12-probability",
     "kind": "pieAngle",
     "counts": [
-      3,
+      9,
       4,
       5,
       6
@@ -1664,7 +1664,7 @@ const specs=[
     "counts": [
       5,
       3,
-      7,
+      5,
       5
     ],
     "index": 2,
@@ -1675,7 +1675,7 @@ const specs=[
     "chapterId": "c12-probability",
     "kind": "pieAngle",
     "counts": [
-      8,
+      14,
       6,
       6,
       10
@@ -1688,7 +1688,7 @@ const specs=[
     "chapterId": "c12-probability",
     "kind": "pieAngle",
     "counts": [
-      9,
+      18,
       9,
       6,
       12
@@ -1701,7 +1701,7 @@ const specs=[
     "chapterId": "c12-probability",
     "kind": "pieAngle",
     "counts": [
-      12,
+      8,
       8,
       10,
       10
@@ -1716,7 +1716,7 @@ const specs=[
     "counts": [
       2,
       3,
-      4,
+      2,
       3
     ],
     "index": 2,
@@ -1727,7 +1727,7 @@ const specs=[
     "chapterId": "c12-probability",
     "kind": "pieAngle",
     "counts": [
-      4,
+      10,
       6,
       8,
       6
@@ -1740,7 +1740,7 @@ const specs=[
     "chapterId": "c12-probability",
     "kind": "stemLeaf",
     "values": [
-      22,
+      10,
       25,
       28,
       28,

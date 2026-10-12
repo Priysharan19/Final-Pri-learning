@@ -19,6 +19,18 @@ const val=x=>evalNumeric(String(x));
 const close=(a,b,t=1e-7)=>Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<=t*Math.max(1,Math.abs(a),Math.abs(b));
 let authored=0,worked=0,illustrated=0,chapters=0,covered=0;
 const figures=new Map;
+// Cross-grade deduplication is authoritative. A chapter/context label is not a new problem.
+const contentSignature=ex=>ex.question.replace(/^[^:]*:\s*/, '')+'|'+JSON.stringify(ex.figure||null);
+const previousCorpus=new Set();
+for(const group of IN_CURRICULUM){
+  const additions=(await loaders[group.grade]()).default;
+  const wave8Titles=new Set(Object.values(additions).flatMap(part=>part.examples||[]).map(ex=>ex.question));
+  const current=await loadNotesForGrade(group.grade);
+  for(const chapter of Object.values(current))for(const ex of chapter.examples){
+    if(!wave8Titles.has(ex.question))previousCorpus.add(contentSignature(ex));
+  }
+}
+const globalWave8=new Map;
 for(const group of IN_CURRICULUM){
   const grade=group.grade,added=(await loaders[grade]()).default,all=await loadNotesForGrade(grade);
   const ordered=Object.values(added).flatMap(n=>n.examples||[]);
@@ -37,10 +49,15 @@ for(const group of IN_CURRICULUM){
   }
   for(const [chapterId,body] of Object.entries(added)){
     // A changing numerical context label does not create a different mathematical problem.
-    const semanticSignature=ex=>ex.question.replace(/^[^:]*:\s*/, '')+'|'+JSON.stringify(ex.figure||null);
-    assert.equal(new Set(body.examples.map(semanticSignature)).size,body.examples.length,
+    assert.equal(new Set(body.examples.map(contentSignature)).size,body.examples.length,
       'Wave8 duplicates actual mathematical content or figure data in '+chapterId);
     for(const ex of body.examples){
+      const normalized=contentSignature(ex);
+      assert.ok(!globalWave8.has(normalized),
+        'Wave8 repeats the same mathematics/figure across grades: '+globalWave8.get(normalized)+' and '+grade+'/'+chapterId);
+      assert.ok(!previousCorpus.has(normalized),
+        'Wave8 repeats a previously published problem with only a context label changed: '+grade+'/'+chapterId);
+      globalWave8.set(normalized,grade+'/'+chapterId);
       authored++;
       assert.ok(ex.question?.length>=15 && Array.isArray(ex.steps) && ex.steps.length>=3 && ex.answer && ex.verify && ex.figure,'incomplete new question '+chapterId);
       assert.ok(all[chapterId].examples.some(x=>x.question===ex.question),'authored question lost in Notes loader');

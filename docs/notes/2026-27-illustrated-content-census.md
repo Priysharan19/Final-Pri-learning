@@ -7,7 +7,7 @@
 ## Measured candidate inventory
 
 - **77/77** internal app chapters, **1,971** worked-study examples, **1,605** authored SVG diagram-data illustrations.
-- Exactly **600** Wave8 investigations, six grade chunks (70/80/90/100/120/140), verified to add no identical question text to the preceding 1,371-study baseline.
+- Exactly **600** Wave8 investigations, six grade chunks (70/80/90/100/120/140), verified globally unique by normalized question and figure data across grades, with zero semantic duplicates against the preceding 1,371-study baseline.
 - **120** earlier Wave7 worked studies are retained unchanged. Wave8 source was renamed to separate modules; no overwrite.
 - **35** current diagram representation types (counted from figure data, not render-independent visual-quality certification).
 - All 77 chapters retain at least one illustrated example; students can use the six-at-a-time illustrated-only filter.
