@@ -24,10 +24,12 @@ const contentSignature=ex=>ex.question.replace(/^[^:]*:\s*/, '')+'|'+JSON.string
 const previousCorpus=new Set();
 for(const group of IN_CURRICULUM){
   const additions=(await loaders[group.grade]()).default;
-  const wave8Titles=new Set(Object.values(additions).flatMap(part=>part.examples||[]).map(ex=>ex.question));
+  // Preserve object identity through the lazy loader: a historic example with
+  // matching wording but different graphical data must NOT be excluded.
+  const wave8Examples=new Set(Object.values(additions).flatMap(part=>part.examples||[]));
   const current=await loadNotesForGrade(group.grade);
   for(const chapter of Object.values(current))for(const ex of chapter.examples){
-    if(!wave8Titles.has(ex.question))previousCorpus.add(contentSignature(ex));
+    if(!wave8Examples.has(ex))previousCorpus.add(contentSignature(ex));
   }
 }
 const globalWave8=new Map;
