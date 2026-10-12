@@ -331,8 +331,8 @@ export const flow = {
             await lookHere() === 1 && await crossesOnInk() === 1 && await page.locator('.editor-shell[data-marked="yes"]').count() === 1,
           `${await lookHere()} "Look here", ${await crossesOnInk()} cross(es)`);
 
-        // One new stroke. Its (automatic) read is held: nothing has been read
-        // back, and nothing is submitted.
+        // One new stroke immediately withdraws stale feedback. No read is
+        // automatic: its explicit student-requested read will be held below.
         const callsBefore = (await gradesOf(right.serverQuestionId)).length;
         online.forgetKeptReads();
         reader.lines = [{ text: String(right.text) }];
@@ -352,7 +352,10 @@ export const flow = {
           JSON.stringify({ previous: after.previous, speech: after.speech, pinned: after.pinned }));
         await check('rewrite: the new ink was not sent anywhere by being written', (await gradesOf(right.serverQuestionId)).length === callsBefore);
 
-        // A SLOW read of the rewritten page: still nothing judged while it flies…
+        // A SLOW student-requested read of the rewritten page: still nothing
+        // judged while it flies. Rewriting alone MUST NOT trigger recognition.
+        await page.locator('[data-ink-read]').waitFor({ state: 'visible', timeout: 20000 });
+        await page.locator('[data-ink-read]').click();
         await page.waitForTimeout(2200);
         await check('rewrite, slow read in flight: the read of the new work is still waiting, and the unread new work carries no annotation',
           await heldGrades() >= 1 && reader.requests.length === readsHeldFrom &&
