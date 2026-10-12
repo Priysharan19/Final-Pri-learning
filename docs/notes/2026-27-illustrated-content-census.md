@@ -1,30 +1,48 @@
-# Pri Learning — Original Mathematics Notes Content Census
+# Pri Learning — Original Mathematical Notes Coverage Census
 
-**Measured:** 12 October 2026 | **Scope:** Final-Pri-learning source chapter inventory, not certification of CBSE/NCERT compliance.
+**Verified source census:** 12 October 2026 | **Revision:** proposed Wave8 extension (NOT yet published to Railway staging).
 
-> This report is a reproducible internal census only. It does not certify question originality beyond the project’s authoring claim, mathematical pedagogy, copyright status, syllabus alignment, real provider handwriting recognition or availability in the live deployment.
+> The numbers below are derived from the actual grade-lazy Notes loader, not a marketing certification of CBSE/NCERT 2026–27 curriculum, user efficacy, source rights or authoritative grading. The live staging release remains at 1,371 worked examples until the complete protected Wave8 release passes.
 
-## Source inventory
+## Measured candidate inventory
 
-- **77/77** internal curriculum chapter IDs have at least one diagram-dependent worked example.
-- **1,371** worked-study examples, of which **1,005** carry structured data for a native graphical illustration.
-- **28** drawing data types. The figures are not user-submitted marked questions and are not trusted server question-bank assignments.
-- The student UI includes a six-example-at-a-time **Show illustrated examples** filter. This is critical because some modules place their first illustrated example after many introductory examples.
+- **77/77** internal app chapters, **1,971** worked-study examples, **1,605** authored SVG diagram-data illustrations.
+- Exactly **600** Wave8 investigations, six grade chunks (70/80/90/100/120/140), verified globally unique by normalized question and figure data across grades, with zero semantic duplicates against the preceding 1,371-study baseline.
+- **120** earlier Wave7 worked studies are retained unchanged. Wave8 source was renamed to separate modules; no overwrite.
+- **35** current diagram representation types (counted from figure data, not render-independent visual-quality certification).
+- All 77 chapters retain at least one illustrated example; students can use the six-at-a-time illustrated-only filter.
 
-## Diagram representation by type
+| Class | Worked studies | Illustrated studies |
+|---:|---:|---:|
+| 7 | 262 | 187 |
+| 8 | 296 | 231 |
+| 9 | 275 | 235 |
+| 10 | 339 | 283 |
+| 11 | 393 | 315 |
+| 12 | 406 | 354 |
+| **Total** | **1971** | **1605** |
 
-| Representation | Verified inventory |
+## Diagram-data representation census
+
+| Figure type | Instances |
 |---|---:|
-| `plane` | 345 |
+| `plane` | 556 |
+| `pie` | 90 |
+| `dot-plot` | 78 |
+| `motion` | 65 |
 | `scatter` | 61 |
 | `histogram` | 55 |
+| `stem-leaf` | 51 |
 | `lattice` | 49 |
 | `piecewise` | 48 |
 | `geometry` | 45 |
 | `trig-wave` | 42 |
+| `network` | 40 |
+| `two-box` | 35 |
 | `box-plot` | 30 |
 | `cuboid` | 30 |
 | `exponential` | 30 |
+| `ellipse` | 30 |
 | `venn` | 28 |
 | `interval` | 28 |
 | `bars` | 25 |
@@ -44,103 +62,99 @@
 | `pascal` | 5 |
 | `slope-field` | 5 |
 
-## App chapter coverage and visual discoverability
+## Chapter-by-chapter source inventory
 
-| Grade | App chapter ID | Worked | Illustrated | First illustration at example |
-|---|---|---:|---:|---:|
-| 7 | `c7-large-numbers-current` | 11 | 6 | 6 |
+| Class | Internal chapter ID | Worked | Illustrated | First illustrated example |
+|---:|---|---:|---:|---:|
+| 7 | `c7-large-numbers-current` | 17 | 12 | 6 |
 | 7 | `c7-arithmetic-expressions-current` | 8 | 3 | 6 |
 | 7 | `c7-decimals-current` | 8 | 3 | 6 |
 | 7 | `c7-letter-numbers-current` | 8 | 3 | 6 |
 | 7 | `c7-parallel-intersecting-lines-current` | 12 | 7 | 6 |
-| 7 | `c7-number-play-current` | 22 | 17 | 6 |
+| 7 | `c7-number-play-current` | 45 | 40 | 6 |
 | 7 | `c7-triangles-current` | 30 | 25 | 6 |
-| 7 | `c7-fractions-current` | 8 | 3 | 6 |
-| 7 | `c7-geometric-twins-current` | 24 | 19 | 6 |
+| 7 | `c7-fractions-current` | 15 | 10 | 6 |
+| 7 | `c7-geometric-twins-current` | 36 | 31 | 6 |
 | 7 | `c7-integer-operations-current` | 12 | 7 | 6 |
-| 7 | `c7-common-ground-current` | 8 | 3 | 6 |
+| 7 | `c7-common-ground-current` | 16 | 11 | 6 |
 | 7 | `c7-decimal-operations-current` | 7 | 2 | 6 |
-| 7 | `c7-connecting-dots-current` | 20 | 15 | 6 |
+| 7 | `c7-connecting-dots-current` | 34 | 29 | 6 |
 | 7 | `c7-constructions-tilings-current` | 7 | 2 | 6 |
 | 7 | `c7-finding-unknown-current` | 7 | 2 | 6 |
 | 8 | `c8-rational-numbers` | 14 | 9 | 6 |
 | 8 | `c8-linear-equations` | 8 | 3 | 6 |
-| 8 | `c8-quadrilaterals` | 19 | 14 | 6 |
-| 8 | `c8-data-handling` | 43 | 38 | 6 |
+| 8 | `c8-quadrilaterals` | 29 | 24 | 6 |
+| 8 | `c8-data-handling` | 81 | 76 | 6 |
 | 8 | `c8-squares-roots` | 10 | 5 | 6 |
 | 8 | `c8-cubes-roots` | 10 | 5 | 6 |
-| 8 | `c8-comparing-quantities` | 11 | 6 | 6 |
+| 8 | `c8-comparing-quantities` | 18 | 13 | 6 |
 | 8 | `c8-algebraic-identities` | 6 | 1 | 6 |
 | 8 | `c8-mensuration` | 36 | 31 | 6 |
 | 8 | `c8-exponents` | 10 | 5 | 6 |
 | 8 | `c8-proportions` | 11 | 6 | 6 |
 | 8 | `c8-factorisation` | 10 | 5 | 6 |
-| 8 | `c8-graphs` | 28 | 23 | 6 |
-| 9 | `c9-coordinate-geometry` | 45 | 40 | 6 |
-| 9 | `c9-linear-polynomials` | 30 | 25 | 6 |
+| 8 | `c8-graphs` | 53 | 48 | 6 |
+| 9 | `c9-coordinate-geometry` | 85 | 80 | 6 |
+| 9 | `c9-linear-polynomials` | 40 | 35 | 6 |
 | 9 | `c9-number-systems` | 16 | 11 | 6 |
 | 9 | `c9-algebraic-identities` | 7 | 2 | 6 |
 | 9 | `c9-circles` | 8 | 3 | 6 |
 | 9 | `c9-perimeter-area` | 31 | 26 | 6 |
-| 9 | `c9-probability` | 30 | 25 | 6 |
+| 9 | `c9-probability` | 70 | 65 | 6 |
 | 9 | `c9-sequences-progressions` | 18 | 13 | 6 |
 | 10 | `c10-real-numbers` | 9 | 5 | 5 |
 | 10 | `c10-polynomials` | 16 | 12 | 5 |
-| 10 | `c10-pair-linear-equations` | 31 | 27 | 5 |
+| 10 | `c10-pair-linear-equations` | 51 | 47 | 5 |
 | 10 | `c10-quadratic-equations` | 24 | 20 | 5 |
 | 10 | `c10-arithmetic-progressions` | 7 | 3 | 5 |
 | 10 | `c10-triangles` | 40 | 36 | 5 |
-| 10 | `c10-coordinate-geometry` | 35 | 31 | 5 |
+| 10 | `c10-coordinate-geometry` | 75 | 71 | 5 |
 | 10 | `c10-trigonometry` | 5 | 1 | 5 |
 | 10 | `c10-trig-applications` | 6 | 2 | 5 |
 | 10 | `c10-circles` | 7 | 3 | 5 |
 | 10 | `c10-areas-circles` | 15 | 11 | 5 |
 | 10 | `c10-surface-volume` | 12 | 8 | 5 |
-| 10 | `c10-statistics` | 21 | 17 | 5 |
-| 10 | `c10-probability` | 11 | 7 | 5 |
+| 10 | `c10-statistics` | 46 | 42 | 5 |
+| 10 | `c10-probability` | 26 | 22 | 5 |
 | 11 | `c11-sets` | 12 | 8 | 5 |
-| 11 | `c11-relations-functions` | 20 | 16 | 5 |
+| 11 | `c11-relations-functions` | 35 | 31 | 5 |
 | 11 | `c11-trig-functions` | 44 | 40 | 5 |
 | 11 | `c11-complex-numbers` | 30 | 4 | 27 |
 | 11 | `c11-linear-inequalities` | 13 | 9 | 5 |
-| 11 | `c11-permutations-combinations` | 27 | 23 | 5 |
+| 11 | `c11-permutations-combinations` | 42 | 38 | 5 |
 | 11 | `c11-binomial-theorem` | 6 | 2 | 5 |
 | 11 | `c11-sequences-series` | 15 | 11 | 5 |
 | 11 | `c11-straight-lines` | 30 | 26 | 5 |
-| 11 | `c11-conic-sections` | 21 | 17 | 5 |
+| 11 | `c11-conic-sections` | 36 | 32 | 5 |
 | 11 | `c11-3d-introduction` | 11 | 7 | 5 |
-| 11 | `c11-limits-derivatives` | 20 | 16 | 5 |
-| 11 | `c11-statistics` | 13 | 9 | 5 |
-| 11 | `c11-probability` | 11 | 7 | 5 |
-| 12 | `c12-relations-functions` | 25 | 21 | 5 |
+| 11 | `c11-limits-derivatives` | 55 | 51 | 5 |
+| 11 | `c11-statistics` | 43 | 39 | 5 |
+| 11 | `c11-probability` | 21 | 17 | 5 |
+| 12 | `c12-relations-functions` | 45 | 41 | 5 |
 | 12 | `c12-inverse-trigonometric` | 24 | 20 | 5 |
 | 12 | `c12-matrices` | 16 | 12 | 5 |
 | 12 | `c12-determinants` | 13 | 9 | 5 |
 | 12 | `c12-continuity-differentiability` | 25 | 21 | 5 |
-| 12 | `c12-applications-derivatives` | 12 | 8 | 5 |
+| 12 | `c12-applications-derivatives` | 37 | 33 | 5 |
 | 12 | `c12-integrals` | 12 | 8 | 5 |
-| 12 | `c12-applications-integrals` | 15 | 11 | 5 |
+| 12 | `c12-applications-integrals` | 50 | 46 | 5 |
 | 12 | `c12-differential-equations` | 27 | 23 | 5 |
 | 12 | `c12-vector-algebra` | 37 | 33 | 5 |
 | 12 | `c12-3d-geometry` | 14 | 10 | 5 |
-| 12 | `c12-linear-programming` | 10 | 6 | 5 |
-| 12 | `c12-probability` | 36 | 32 | 5 |
-| **All** | **77 app chapters** | **1371** | **1005** | — |
+| 12 | `c12-linear-programming` | 25 | 21 | 5 |
+| 12 | `c12-probability` | 81 | 77 | 5 |
 
-## Curriculum research references (links only)
+## Curriculum and rights boundaries
 
-- [CBSE 2026–27 curriculum index](https://cbseacademic.nic.in/curriculum_2027.html) — explicitly separates Class IX Mathematics and Mathematics at Advanced Level, and publishes Class X, XI–XII syllabi.
-- [CBSE 2026–27 Class IX Mathematics](https://cbseacademic.nic.in/web_material/CurriculumMain27/SecPart1/Maths_SecP1IX_2026-27.pdf) — emphasises conceptual reasoning, mathematical representation, modelling, visualisation and competency-based activities.
-- [NCERT Grade VIII mathematics bridge](https://www.ncert.nic.in/pdf/Bridge_Programme/Grade8/Bridge_Programme-Mathematics-Grade_8.pdf) — new Ganita Prakash sequence and old/new bridging.
-- [CBSE Class X 2026–27 sample paper index](https://cbseacademic.nic.in/sqp_classx_2026-27.html) and [Class XII sample papers](https://cbseacademic.nic.in/SQP_CLASSXII_2026-27.html) — external exam-style benchmarks, not permission to copy questions.
+- [CBSE 2026–27 official curriculum index](https://cbseacademic.nic.in/curriculum_2027.html). Distinguish standard Class IX Mathematics from optional Mathematics at Advanced Level; chapter similarity is **not** official competence coverage.
+- [NCERT Grade VIII Ganita Prakash bridge](https://www.ncert.nic.in/pdf/Bridge_Programme/Grade8/Bridge_Programme-Mathematics-Grade_8.pdf). Bridge/version mapping remains a teacher-reviewed obligation.
+- [JEE Main syllabus, 2026](https://jeemain.nta.nic.in/document/syllabus-2026/) and [JEE Advanced syllabus, 2026](https://jeeadv.ac.in/documents/jee-advanced-2026-syllabus.pdf) are distinct optional advanced references.
+- The 23 external study reference destinations remain *links*, not replicated textbook/question-bank pages. Curriculum issue #451 tracks human signoff and missing competency mapping.
 
-## Release-grade follow-up research, not yet certified
+## Independent verification required to release Wave8
 
-1. Build a dated, page-referenced, teacher-reviewed standard-vs-advanced **competency mapping** for every app chapter, not just a similarity of names. Grades 7/8 use the current NCERT edition and bridge.
-2. Identify **actual missing syllabus competencies**, reasoned core/optional/enrichment tags and JEE-specific prerequisites before marketing syllabus completeness.
-3. Independently solve and draw adversarial examples from each of the 28 visual families. Validate plotted points, open/closed endpoints, indicated areas and accessibility labels against solution text.
-4. Maintain the cross-browser proof for all 77 chapters; use the **12-chapter** representative Chromium/WebKit suite as the normal CI runtime floor and the **--all-chapters** mode as deep release QA.
-5. Externally linked resources remain links only; original PDF scans, diagrams and board questions must never be reprinted without appropriate rights.
-6. This study library **does not certify** server-authoritative grading, photographed answer checking, physical Apple Pencil performance, Android/iOS packaging or production data cutover.
-
-**Mathematics/source verifier:** `npm run test:notes`. **Student-facing rendering:** `node client/test/notes-illustrated-browser-check.mjs` or `... --all-chapters`. Both must pass on the exact candidate SHA, while all protected GitHub CI and release gates remain in force.
+1. All historical and new source maths checks: npm run test:notes (expected **1,971**/ **1,605**); independent Wave8 figure/answer authority currently consists of numeric receipts and SVG geometric assertions, not a human examiner verdict.
+2. New figure-family real-browser inspection in Chromium/WebKit at desktop and iPad-width; all 77 chapters should pass bounded loading, hidden answers, accessible diagrams and navigation.
+3. A production source build and both native web mirror directories must match the **same committed source SHA**; verify-release-identity and native sync checks may not be weakened.
+4. Protected GitHub PR review + required four CI suites, Fleet Governance, CodeQL, native iPad simulator; live Railway staging /v1/ready, /v1/health and /release.json exact commit checks.
+5. Production remains a separate environment/branch requiring actual physical Pencil test evidence, MFA/security and controlled PostgreSQL backup and data cutover; server-authoritative online mathematical grading remains unchanged.
