@@ -223,7 +223,7 @@ const specs=[
     "a": -3,
     "h": -4,
     "k": -5,
-    "x0": -3,
+    "x0": -2,
     "context": "Class 12 differential tangent 25"
   },
   {
@@ -1213,7 +1213,7 @@ const specs=[
   {
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
-    "a": 5,
+    "a": 4,
     "b": 2,
     "mode": "focal",
     "context": "Optional ellipse integral geometry 9"
@@ -1221,7 +1221,7 @@ const specs=[
   {
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
-    "a": 6,
+    "a": 5,
     "b": 3,
     "mode": "area",
     "context": "Optional ellipse integral geometry 10"
@@ -1229,7 +1229,7 @@ const specs=[
   {
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
-    "a": 7,
+    "a": 6,
     "b": 4,
     "mode": "focal",
     "context": "Optional ellipse integral geometry 11"
@@ -1237,7 +1237,7 @@ const specs=[
   {
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
-    "a": 8,
+    "a": 7,
     "b": 5,
     "mode": "area",
     "context": "Optional ellipse integral geometry 12"
@@ -1245,7 +1245,7 @@ const specs=[
   {
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
-    "a": 9,
+    "a": 8,
     "b": 2,
     "mode": "focal",
     "context": "Optional ellipse integral geometry 13"
@@ -1253,7 +1253,7 @@ const specs=[
   {
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
-    "a": 10,
+    "a": 9,
     "b": 3,
     "mode": "area",
     "context": "Optional ellipse integral geometry 14"
@@ -1261,7 +1261,7 @@ const specs=[
   {
     "chapterId": "c12-applications-integrals",
     "kind": "ellipse",
-    "a": 11,
+    "a": 10,
     "b": 4,
     "mode": "focal",
     "context": "Optional ellipse integral geometry 15"
@@ -1355,7 +1355,7 @@ const specs=[
     "kind": "network",
     "weights": [
       12,
-      3,
+      1,
       12,
       12,
       2,
@@ -1368,7 +1368,7 @@ const specs=[
     "chapterId": "c12-linear-programming",
     "kind": "network",
     "weights": [
-      2,
+      1,
       10,
       2,
       10,
@@ -1382,7 +1382,7 @@ const specs=[
     "chapterId": "c12-linear-programming",
     "kind": "network",
     "weights": [
-      12,
+      1,
       1,
       2,
       1,
@@ -1396,7 +1396,7 @@ const specs=[
     "chapterId": "c12-linear-programming",
     "kind": "network",
     "weights": [
-      1,
+      2,
       13,
       15,
       1,
@@ -1410,7 +1410,7 @@ const specs=[
     "chapterId": "c12-linear-programming",
     "kind": "network",
     "weights": [
-      2,
+      1,
       10,
       9,
       2,
@@ -1425,7 +1425,7 @@ const specs=[
     "kind": "network",
     "weights": [
       9,
-      2,
+      1,
       7,
       8,
       9,
@@ -1439,7 +1439,7 @@ const specs=[
     "kind": "network",
     "weights": [
       12,
-      3,
+      2,
       12,
       12,
       2,
@@ -1452,7 +1452,7 @@ const specs=[
     "chapterId": "c12-linear-programming",
     "kind": "network",
     "weights": [
-      2,
+      3,
       10,
       2,
       10,
@@ -1466,7 +1466,7 @@ const specs=[
     "chapterId": "c12-linear-programming",
     "kind": "network",
     "weights": [
-      12,
+      2,
       1,
       2,
       1,

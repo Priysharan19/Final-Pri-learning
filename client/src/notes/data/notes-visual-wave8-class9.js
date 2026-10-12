@@ -125,26 +125,6 @@ const specs=[
     "chapterId": "c9-probability",
     "kind": "dotPlot",
     "values": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      1,
-      2,
-      2,
-      3,
-      4,
-      5,
-      6
-    ],
-    "mode": "median",
-    "context": "Class 9 recorded outcomes 7"
-  },
-  {
-    "chapterId": "c9-probability",
-    "kind": "dotPlot",
-    "values": [
       1,
       1,
       1,
@@ -158,6 +138,26 @@ const specs=[
       6,
       7
     ],
+    "mode": "median",
+    "context": "Class 9 recorded outcomes 7"
+  },
+  {
+    "chapterId": "c9-probability",
+    "kind": "dotPlot",
+    "values": [
+      2,
+      2,
+      2,
+      2,
+      2,
+      3,
+      4,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
     "mode": "mode",
     "context": "Class 9 recorded outcomes 8"
   },
@@ -165,7 +165,7 @@ const specs=[
     "chapterId": "c9-probability",
     "kind": "dotPlot",
     "values": [
-      2,
+      0,
       2,
       2,
       2,
@@ -185,26 +185,6 @@ const specs=[
     "chapterId": "c9-probability",
     "kind": "dotPlot",
     "values": [
-      3,
-      3,
-      3,
-      3,
-      3,
-      4,
-      5,
-      5,
-      6,
-      7,
-      8,
-      9
-    ],
-    "mode": "median",
-    "context": "Class 9 recorded outcomes 10"
-  },
-  {
-    "chapterId": "c9-probability",
-    "kind": "dotPlot",
-    "values": [
       4,
       4,
       4,
@@ -218,6 +198,26 @@ const specs=[
       9,
       10
     ],
+    "mode": "median",
+    "context": "Class 9 recorded outcomes 10"
+  },
+  {
+    "chapterId": "c9-probability",
+    "kind": "dotPlot",
+    "values": [
+      5,
+      5,
+      5,
+      5,
+      5,
+      6,
+      7,
+      7,
+      8,
+      9,
+      10,
+      11
+    ],
     "mode": "mode",
     "context": "Class 9 recorded outcomes 11"
   },
@@ -225,7 +225,7 @@ const specs=[
     "chapterId": "c9-probability",
     "kind": "dotPlot",
     "values": [
-      5,
+      0,
       5,
       5,
       5,
@@ -245,6 +245,26 @@ const specs=[
     "chapterId": "c9-probability",
     "kind": "dotPlot",
     "values": [
+      2,
+      2,
+      2,
+      2,
+      2,
+      3,
+      4,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "mode": "median",
+    "context": "Class 9 recorded outcomes 13"
+  },
+  {
+    "chapterId": "c9-probability",
+    "kind": "dotPlot",
+    "values": [
       0,
       0,
       0,
@@ -258,26 +278,6 @@ const specs=[
       5,
       6
     ],
-    "mode": "median",
-    "context": "Class 9 recorded outcomes 13"
-  },
-  {
-    "chapterId": "c9-probability",
-    "kind": "dotPlot",
-    "values": [
-      1,
-      1,
-      1,
-      1,
-      1,
-      2,
-      3,
-      3,
-      4,
-      5,
-      6,
-      7
-    ],
     "mode": "mode",
     "context": "Class 9 recorded outcomes 14"
   },
@@ -285,7 +285,7 @@ const specs=[
     "chapterId": "c9-probability",
     "kind": "dotPlot",
     "values": [
-      2,
+      1,
       2,
       2,
       2,

@@ -248,7 +248,7 @@ const specs=[
   {
     "chapterId": "c11-conic-sections",
     "kind": "ellipse",
-    "a": 5,
+    "a": 4,
     "b": 2,
     "mode": "focal",
     "context": "Class 11 ellipse focal geometry 9"
@@ -256,7 +256,7 @@ const specs=[
   {
     "chapterId": "c11-conic-sections",
     "kind": "ellipse",
-    "a": 6,
+    "a": 5,
     "b": 3,
     "mode": "area",
     "context": "Class 11 ellipse focal geometry 10"
@@ -264,7 +264,7 @@ const specs=[
   {
     "chapterId": "c11-conic-sections",
     "kind": "ellipse",
-    "a": 7,
+    "a": 6,
     "b": 4,
     "mode": "focal",
     "context": "Class 11 ellipse focal geometry 11"
@@ -272,7 +272,7 @@ const specs=[
   {
     "chapterId": "c11-conic-sections",
     "kind": "ellipse",
-    "a": 8,
+    "a": 7,
     "b": 5,
     "mode": "area",
     "context": "Class 11 ellipse focal geometry 12"
@@ -280,7 +280,7 @@ const specs=[
   {
     "chapterId": "c11-conic-sections",
     "kind": "ellipse",
-    "a": 9,
+    "a": 8,
     "b": 2,
     "mode": "focal",
     "context": "Class 11 ellipse focal geometry 13"
@@ -288,7 +288,7 @@ const specs=[
   {
     "chapterId": "c11-conic-sections",
     "kind": "ellipse",
-    "a": 10,
+    "a": 9,
     "b": 3,
     "mode": "area",
     "context": "Class 11 ellipse focal geometry 14"
@@ -296,7 +296,7 @@ const specs=[
   {
     "chapterId": "c11-conic-sections",
     "kind": "ellipse",
-    "a": 11,
+    "a": 10,
     "b": 4,
     "mode": "focal",
     "context": "Class 11 ellipse focal geometry 15"
@@ -1235,18 +1235,18 @@ const specs=[
     "chapterId": "c11-statistics",
     "kind": "dotPlot",
     "values": [
+      0,
+      0,
+      0,
+      0,
+      0,
       1,
       1,
-      1,
-      1,
-      1,
-      2,
       2,
       3,
       4,
       5,
-      6,
-      7
+      6
     ],
     "mode": "mode",
     "context": "Class 11 observational analysis 13"
@@ -1255,7 +1255,7 @@ const specs=[
     "chapterId": "c11-statistics",
     "kind": "dotPlot",
     "values": [
-      2,
+      0,
       2,
       2,
       2,
@@ -1275,18 +1275,18 @@ const specs=[
     "chapterId": "c11-statistics",
     "kind": "dotPlot",
     "values": [
-      3,
-      3,
-      3,
-      3,
-      3,
-      4,
-      4,
       5,
+      5,
+      5,
+      5,
+      5,
+      6,
       6,
       7,
       8,
-      9
+      9,
+      10,
+      11
     ],
     "mode": "median",
     "context": "Class 11 observational analysis 15"
@@ -1380,7 +1380,7 @@ const specs=[
     "kind": "network",
     "weights": [
       9,
-      2,
+      1,
       7,
       8,
       9,
@@ -1394,7 +1394,7 @@ const specs=[
     "kind": "network",
     "weights": [
       12,
-      3,
+      1,
       12,
       12,
       2,
@@ -1407,7 +1407,7 @@ const specs=[
     "chapterId": "c11-permutations-combinations",
     "kind": "network",
     "weights": [
-      2,
+      1,
       10,
       2,
       10,
@@ -1421,7 +1421,7 @@ const specs=[
     "chapterId": "c11-permutations-combinations",
     "kind": "network",
     "weights": [
-      12,
+      1,
       1,
       2,
       1,
@@ -1435,7 +1435,7 @@ const specs=[
     "chapterId": "c11-permutations-combinations",
     "kind": "network",
     "weights": [
-      1,
+      2,
       13,
       15,
       1,
@@ -1449,7 +1449,7 @@ const specs=[
     "chapterId": "c11-permutations-combinations",
     "kind": "network",
     "weights": [
-      2,
+      1,
       10,
       9,
       2,
@@ -1464,7 +1464,7 @@ const specs=[
     "kind": "network",
     "weights": [
       9,
-      2,
+      3,
       7,
       8,
       9,
@@ -1478,7 +1478,7 @@ const specs=[
     "kind": "network",
     "weights": [
       12,
-      3,
+      2,
       12,
       12,
       2,
@@ -1491,7 +1491,7 @@ const specs=[
     "chapterId": "c11-permutations-combinations",
     "kind": "network",
     "weights": [
-      2,
+      3,
       10,
       2,
       10,

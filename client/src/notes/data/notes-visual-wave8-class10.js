@@ -1629,7 +1629,7 @@ const specs=[
     "chapterId": "c10-coordinate-geometry",
     "kind": "network",
     "weights": [
-      2,
+      1,
       10,
       9,
       2,
@@ -1644,7 +1644,7 @@ const specs=[
     "kind": "network",
     "weights": [
       9,
-      2,
+      1,
       7,
       8,
       9,
@@ -1658,7 +1658,7 @@ const specs=[
     "kind": "network",
     "weights": [
       12,
-      3,
+      1,
       12,
       12,
       2,
@@ -1671,7 +1671,7 @@ const specs=[
     "chapterId": "c10-coordinate-geometry",
     "kind": "network",
     "weights": [
-      2,
+      1,
       10,
       2,
       10,

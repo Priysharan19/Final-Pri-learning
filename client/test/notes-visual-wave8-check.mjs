@@ -36,6 +36,10 @@ for(const group of IN_CURRICULUM){
     if(whole.examples.some(x=>x.figure))covered++;
   }
   for(const [chapterId,body] of Object.entries(added)){
+    // A changing numerical context label does not create a different mathematical problem.
+    const semanticSignature=ex=>ex.question.replace(/^[^:]*:\s*/, '')+'|'+JSON.stringify(ex.figure||null);
+    assert.equal(new Set(body.examples.map(semanticSignature)).size,body.examples.length,
+      'Wave8 duplicates actual mathematical content or figure data in '+chapterId);
     for(const ex of body.examples){
       authored++;
       assert.ok(ex.question?.length>=15 && Array.isArray(ex.steps) && ex.steps.length>=3 && ex.answer && ex.verify && ex.figure,'incomplete new question '+chapterId);
@@ -43,6 +47,13 @@ for(const group of IN_CURRICULUM){
       const fig=ex.figure,v=ex.verify;
       assert.ok(fig.description?.length>=25 && !/<\s*\/?\s*[a-z][\w:-]*(?:\s|\/>|>)/i.test(fig.description),'bad screen-reader diagram description');
       figures.set(fig.type,(figures.get(fig.type)||0)+1);
+      // The accessibility description represents GIVEN diagram data, not computed solutions.
+      if(ex.question.includes('midpoint'))assert.ok(!/midpoint M\([^)]*\)/.test(fig.description),'midpoint answer leaked by SVG caption');
+      if(ex.question.includes('After reflection')&&ex.question.includes('coordinates of point P'))assert.ok(!/image P\(/.test(fig.description),'reflection answer leaked by SVG caption');
+      if(ex.question.includes('Find f⁻¹(')){
+        assert.ok(!/P['′]\(/.test(fig.description),'inverse answer leaked under a mismatched SVG point label');
+        assert.ok(fig.description.includes('Q on the inverse'),'spoken inverse point label differs from plotted Q');
+      }
       const receipts=v.kind==='value'?[[v.expr,v.answer]]:v.kind==='values'?v.pairs:null;
       assert.ok(receipts?.length,'deterministic source maths receipts required');
       for(const [expr,expected] of receipts)assert.ok(close(val(expr),val(expected)),'incorrect source arithmetic for '+chapterId+': '+expr+' vs '+expected);

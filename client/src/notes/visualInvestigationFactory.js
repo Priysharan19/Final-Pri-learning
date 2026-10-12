@@ -5,7 +5,6 @@ export function makeInvestigation(kind,p) {
  const P=a=>({kind:'values',pairs:a.map(([x,y])=>[String(x),String(y)])});
  const pt=(id,xy)=>({id,x:xy[0],y:xy[1],label:id});
  const gcd=(a,b)=>b?gcd(b,a%b):Math.abs(a);
- const choose=(n,k)=>{let v=1;for(let i=1;i<=k;i++)v=v*(n-i+1)/i;return Math.round(v)};
  const done=(q,steps,answer,verify,figure)=>{
   if(!q||steps.length<3||!figure?.description||!verify||answer==null)throw Error('Incomplete investigation');
   return {question:(p.context?p.context+': ':'')+q,steps,answer:String(answer),verify,figure};
@@ -45,7 +44,7 @@ export function makeInvestigation(kind,p) {
   const det=(B[0]-A[0])*(C[1]-A[1])-(B[1]-A[1])*(C[0]-A[0]);if(det===0)throw Error('degenerate triangle');
   const reflected=[A,B,C].map(([x,y])=>axis==='y'?[-x,y]:[x,-y]);
   const points=[...([A,B,C].map((xy,i)=>pt('ABC'[i],xy))),...reflected.map((xy,i)=>pt('PQR'[i],xy))];
-  const figure={type:'plane',description:`Triangles ABC and PQR are mirror images in the ${axis}-axis. A(${A}), B(${B}), C(${C}); image P(${reflected[0]}), Q(${reflected[1]}), R(${reflected[2]}).`,points,polygons:[{vertices:['A','B','C'],shade:false},{vertices:['P','Q','R'],shade:true}]};
+  const figure={type:'plane',description:`Triangles ABC and PQR are mirror images in the ${axis}-axis. Original vertices A(${A}), B(${B}) and C(${C}) are given; the image vertices P, Q and R are marked without numerical coordinates.`,points,polygons:[{vertices:['A','B','C'],shade:false},{vertices:['P','Q','R'],shade:true}]};
   const area=Math.abs(det)/2;
   if(mode==='area')return done('A triangle is reflected in the labelled axis. Find the area of its shaded image.',[`The original vertices are A(${A}), B(${B}), C(${C}).`,'Reflection preserves all lengths and areas.',`The original triangle area is |${det}|/2=${area}, which is also the image area.`],`${area} square units`,V(`abs((${B[0]-A[0]})*(${C[1]-A[1]})-(${B[1]-A[1]})*(${C[0]-A[0]}))/2`,area),figure);
   const ans=reflected[0];
@@ -55,7 +54,7 @@ export function makeInvestigation(kind,p) {
   const {A,B,mode='x'}=p;
   if(![...A,...B].every(Number.isInteger)||A.join()===B.join())throw Error('same point');
   const m=[(A[0]+B[0])/2,(A[1]+B[1])/2],dist=(B[0]-A[0])**2+(B[1]-A[1])**2;
-  const fig={type:'plane',description:`The segment AB from A(${A}) to B(${B}) with midpoint M(${m}) indicated on a Cartesian grid.`,points:[pt('A',A),pt('B',B),pt('M',m)],segments:[['A','M'],['M','B']]};
+  const fig={type:'plane',description:`The segment AB from A(${A}) to B(${B}) with midpoint M marked on the Cartesian grid; M's numerical coordinates are not labelled.`,points:[pt('A',A),pt('B',B),pt('M',m)],segments:[['A','M'],['M','B']]};
   const ans=mode==='x'?m[0]:mode==='y'?m[1]:dist;
   return done(`From the labelled segment find ${mode==='x'?'the x-coordinate of its midpoint':mode==='y'?'the y-coordinate of its midpoint':'the square of its Euclidean length'}.`,[`The endpoints are A(${A}) and B(${B}).`,mode==='distance2'?'The squared distance equals (Δx)²+(Δy)².':'The midpoint is found by averaging the two endpoint coordinates.',`The requested value is ${ans}.`],ans,V(mode==='x'?`((${A[0]})+(${B[0]}))/2`:mode==='y'?`((${A[1]})+(${B[1]}))/2`:`((${B[0]})-(${A[0]}))^2+((${B[1]})-(${A[1]}))^2`,ans),fig);
  }
@@ -112,7 +111,7 @@ export function makeInvestigation(kind,p) {
  if(kind==='inverseLine'){
   const {m,b,x0}=p;if(![m,b,x0].every(Number.isInteger)||m<1||m>4||Math.abs(b)>6)throw Error('inverse');
   const y0=m*x0+b;
-  const fig={type:'plane',description:`A pair of reflected function graphs y=${m}x+(${b}) and its inverse y=(x-(${b}))/${m}, reflected in the diagonal y=x. Labeled points P(${x0},${y0}) and P'(${y0},${x0}).`,points:[pt('A',[-3,m*(-3)+b]),pt('B',[4,4*m+b]),pt('C',[m*(-3)+b,-3]),pt('D',[4*m+b,4]),pt('P',[x0,y0]),pt('Q',[y0,x0])],segments:[['A','B'],['C','D'],['P','Q']]};
+  const fig={type:'plane',description:`The linear function y=${m}x+(${b}) and inverse y=(x-(${b}))/${m} are reflected in the diagonal y=x; P on the original and Q on the inverse are marked without numerical coordinate labels.`,points:[pt('A',[-3,m*(-3)+b]),pt('B',[4,4*m+b]),pt('C',[m*(-3)+b,-3]),pt('D',[4*m+b,4]),pt('P',[x0,y0]),pt('Q',[y0,x0])],segments:[['A','B'],['C','D'],['P','Q']]};
   return done(`The graph of f(x)=${m}x+(${b}) and its inverse are reflected in y=x. Find f⁻¹(${y0}).`,[`The point P=(${x0},${y0}) lies on f.`,`Reflect P in y=x: its inverse point is (${y0},${x0}).`,`Therefore f⁻¹(${y0})=${x0}.`],x0,V(`((${y0})-(${b}))/${m}`,x0),fig);
  }
  throw Error('unsupported investigation kind '+kind);
