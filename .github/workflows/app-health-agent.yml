@@ -28,6 +28,10 @@ concurrency:
 env:
   HEALTH_MODE: ${{ github.event_name == 'schedule' && 'deep' || (github.event_name == 'workflow_dispatch' && inputs.mode || 'fast') }}
   PRI_APP_URL: ${{ vars.PRI_APP_URL }}
+  # PR checkout uses the reviewed head, while GITHUB_SHA names GitHub's
+  # temporary merge commit. Keep the fail-closed exact-source identity gate
+  # pointed at the source actually checked out for app-health builds.
+  PRI_RELEASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   app:
