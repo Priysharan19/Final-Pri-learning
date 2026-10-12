@@ -48,7 +48,7 @@ const hi = say(HI, 'hi');
 // A resolved reply carries { correct, stepReport, partial } from exactly this.
 function serverReply(q, answer, lines) {
   const steps = lines && lines.length ? lines.join('\n') : undefined;
-  const result = checkAnswer(q, answer, { steps });
+  const result = checkAnswer(q, answer);
   const evidence = stepEvidence(q, answer, steps, result);
   return {
     authoritative: true, resolved: true, invalid: result.invalid === true, correct: result.correct === true,

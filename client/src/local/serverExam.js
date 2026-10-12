@@ -454,7 +454,7 @@ export async function resolveFrozenHandwriting(examId, result, images, { now = D
     const page = latest.handwriting?.pages?.[key];
     // ONE automatic read per page, ever: a page that has had it is presented
     // again only by the student's own "Retry checking" (retryHandwriting).
-    if (!page || page.state === 'resolved' || Number(page.attempts) > 0 || !images?.[key] || refused?.[key] || asked >= limit) continue;
+    if (!page || page.state === 'resolved' || Number(page.attempts) > 0 || page.autoUsed === true || !images?.[key] || refused?.[key] || asked >= limit) continue;
     asked += 1;
     try {
       const reply = await transport.resolveExamHandwriting(examId, { key, image: images[key] });

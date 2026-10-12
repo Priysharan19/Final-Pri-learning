@@ -163,10 +163,12 @@ export const flow = {
     /** Write, ask for the read, and wait for the scripted lines. */
     const writeAndRead = async (box, glyphs, lines, { x = 40 } = {}) => {
       online.forgetKeptReads();           // re-scripted stand-in: a different reader now (desk only)
-      // On main the page is read by itself once the pen rests: the stand-in is
-      // scripted before the writing, and the flow waits for that reading.
+      // Recognition is explicitly student-triggered; waiting after a stroke
+      // must not spend a paid read or invent a transcript.
       reader.lines = lines.map(text => ({ text }));
       await handwrite(page, box, glyphs, { x });
+      await page.locator('[data-ink-read]').waitFor({ state: 'visible', timeout: 20000 });
+      await page.locator('[data-ink-read]').click();
       await page.waitForFunction(want => {
         const got = [...document.querySelectorAll('.ink-line')].map(n => n.getAttribute('data-text') || '');
         return JSON.stringify(got) === want && !document.querySelector('[data-ink-stale]');

@@ -141,6 +141,16 @@ const pages = states => ({ handwriting: { pages: Object.fromEntries(Object.entri
   const settled = await resolveFrozenHandwriting('exam-1', result, images, { now: 1_000, transport });
   eq(asked, [['exam-1', 'a', png('a')]], 'only a page that has never had its one automatic read, and whose frozen picture this device holds, is presented — once; a page that has had it is never presented again by itself');
   eq(settled.handwriting.pages.a.state, 'resolved', 'and the server\'s reply is the result');
+  // A capacity-refunded read has attempts=0 but the one automatic read is
+  // already consumed. The frozen photo must remain local, not upload each poll.
+  const capacity = { authoritative: true, detail: [], ...pages({ capped: ['awaiting-reading', 'reader-unavailable'] }) };
+  capacity.handwriting.pages.capped.autoUsed = true;
+  capacity.handwriting.pages.capped.attempts = 0;
+  let repeatedUploads = 0;
+  const capImages = { capped: png('capped') };
+  await resolveFrozenHandwriting('exam-1', capacity, capImages, { now: 1_000, transport: { resolveExamHandwriting: async () => { repeatedUploads++; return { result: capacity }; } } });
+  eq(repeatedUploads, 0, 'a capacity-refunded automatic read is not uploaded again on a later recovery poll');
+  eq(Object.keys(capImages), ['capped'], 'the rejected automatic read still preserves the frozen student picture');
   const many = { authoritative: true, detail: [], ...pages(Object.fromEntries(Array.from({ length: 12 }, (_, i) => ['k' + i, ['awaiting-reading', 'not-read']]))) };
   let sent = 0;
   await resolveFrozenHandwriting('exam-1', many, Object.fromEntries(Array.from({ length: 12 }, (_, i) => ['k' + i, png('k' + i)])), { now: 1_000, transport: { resolveExamHandwriting: async () => { sent++; return { result: many }; } } });
