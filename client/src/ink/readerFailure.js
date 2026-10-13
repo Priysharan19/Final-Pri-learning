@@ -36,6 +36,7 @@ export const READER_FAILURE = Object.freeze({
   SESSION: 'session',
   VERIFY_EMAIL: 'verify-email',
   GUARDIAN: 'guardian',
+  MFA: 'mfa',
   NOT_ALLOWED: 'not-allowed',
   REQUEST: 'request',
   RATE_LIMITED: 'rate-limited',
@@ -49,6 +50,7 @@ const SHAPE = Object.freeze({
   [READER_FAILURE.SESSION]: { action: 'sign-in', autoRetry: false, manualRetry: false, pause: false, photoKey: 'verdict.photoReadingSignIn', inkKey: 'ink.waitingSignIn' },
   [READER_FAILURE.VERIFY_EMAIL]: { action: 'verify-email', autoRetry: false, manualRetry: false, pause: false, photoKey: 'verdict.photoReadingVerifyEmail', inkKey: 'ink.waitingVerifyEmail' },
   [READER_FAILURE.GUARDIAN]: { action: 'guardian', autoRetry: false, manualRetry: false, pause: false, photoKey: 'verdict.photoReadingGuardian', inkKey: 'ink.waitingGuardian' },
+  [READER_FAILURE.MFA]: { action: 'mfa', autoRetry: false, manualRetry: false, pause: false, photoKey: 'verdict.photoReadingMfa', inkKey: 'ink.waitingMfa' },
   [READER_FAILURE.NOT_ALLOWED]: { action: 'type', autoRetry: false, manualRetry: false, pause: false, photoKey: 'verdict.photoReadingNotAllowed', inkKey: 'ink.waitingNotAllowed' },
   [READER_FAILURE.REQUEST]: { action: 'try-again', autoRetry: false, manualRetry: true, pause: false, photoKey: 'verdict.photoReadingRequest', inkKey: 'ink.waitingRequest' },
   [READER_FAILURE.RATE_LIMITED]: { action: 'try-again', autoRetry: false, manualRetry: true, pause: true, photoKey: 'verdict.photoReadingRateLimited', inkKey: 'ink.waitingRateLimited', timed: true, photoKeyUntil: 'verdict.photoReadingRateLimitedUntil', inkKeyUntil: 'ink.waitingRateLimitedUntil' },
@@ -66,6 +68,7 @@ function kindOf(code, status) {
   // PAID_CAPACITY_REACHED is not a reader that is down.
   if (SESSION_CODES.has(code)) return READER_FAILURE.SESSION;
   if (code === 'EMAIL_UNVERIFIED') return READER_FAILURE.VERIFY_EMAIL;
+  if (['MFA_ENROLMENT_REQUIRED', 'MFA_REQUIRED', 'MFA_STEP_UP_REQUIRED'].includes(code)) return READER_FAILURE.MFA;
   // A failed consent-state lookup is the server's trouble, not a guardian's.
   if (code === 'GUARDIAN_CONSENT_UNAVAILABLE') return READER_FAILURE.UNREACHABLE;
   if (code.startsWith('GUARDIAN_CONSENT') || code === 'AGE_DECLARATION_REQUIRED') return READER_FAILURE.GUARDIAN;

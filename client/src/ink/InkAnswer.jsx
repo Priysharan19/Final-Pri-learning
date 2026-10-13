@@ -346,7 +346,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     // second of the first read, and each one used to be a second paid read
     // of the same page).
     const kind = status?.kind === 'allowance' ? 'allowance' : status?.block?.kind;
-    const accountStep = ['session', 'verify-email', 'guardian', 'not-allowed', 'allowance', 'turned-off'].includes(kind);
+    const accountStep = ['session', 'verify-email', 'guardian', 'mfa', 'not-allowed', 'allowance', 'turned-off'].includes(kind);
     const stopSession = onCloudSessionChange(() => { if (accountStep) retry(); });
     const onOnline = () => { if (kind === 'offline' || (kind === 'unreachable' && status?.stopped !== true)) retry(); };
     const onVisible = () => {
