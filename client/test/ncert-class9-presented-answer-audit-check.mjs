@@ -7,7 +7,7 @@ import { class9SolidMeasure202627 as solids } from '../src/engine/ncert/class9-2
 
 const sum=a=>a.reduce((x,y)=>x+y,0);
 const near=(a,b)=>Math.abs(a-b)<1e-9;
-const tokens=s=>(s.match(/\d+(?:\.\d+)?(?:\/\d+)?/g)||[]).map(t=>t.includes('/')?Number(t.split('/')[0])/Number(t.split('/')[1]):Number(t));
+const tokens=s=>(s.match(/-?\d+(?:\.\d+)?(?:\/\d+)?/g)||[]).map(t=>t.includes('/')?Number(t.split('/')[0])/Number(t.split('/')[1]):Number(t));
 const med=a=>{const v=[...a].sort((x,y)=>x-y),n=v.length;return n%2?v[(n-1)/2]:(v[n/2-1]+v[n/2])/2;};
 const duplicates=new Set();
 function displayed(item,values){
