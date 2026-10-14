@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {generateKeyPairSync} from 'node:crypto';
 import {appendGrant, inspectSignedLog, eventDigest, assertLedgerMatchesGrants,
-  authorizeCAS, revokeAuthoritativeGrant} from '../../scripts/pri-admission-state.mjs';
+  authorizeCAS, revokeAuthoritativeGrant, assertAppendOnlyHistory} from '../../scripts/pri-admission-state.mjs';
 const {publicKey, privateKey}=generateKeyPairSync('ed25519');
 const sha='ce8d4b06c91736c82a0e9920917914fe086de6d3';
 const head='90b5c405722807282c454592f6e6016397fd59a3';
@@ -85,5 +85,11 @@ ok('orphaned expired PR can still revoke from signed grant alone',()=>
  assert.equal(inspectSignedLog(abandoned,publicKey,now+13*3600000+1).live.length,0));
 denied('unrelated issue cannot revoke another grant',/UNKNOWN_AUTHORITY_GRANT/,()=>
  revokeAuthoritativeGrant(grant,999,'Kalp-Bajpai',90021,now+2000,privateKey,publicKey));
+
+ok('genuine append-only signed event extension',()=>assertAppendOnlyHistory(grant,empty));
+denied('rollback by rewinding valid signed log',/NON_APPEND_ONLY_AUTHORITY_HISTORY/,()=>
+ assertAppendOnlyHistory(empty,grant));
+denied('non-append-only historical event rewrite',/NON_APPEND_ONLY_AUTHORITY_HISTORY/,()=>
+ assertAppendOnlyHistory({...revoked,events:[{...grant.events[0],signature:'altered'},revoked.events[1]]},grant));
 
 console.log('PASS: '+checks+' signed-grant/CAS security assertions');

@@ -121,7 +121,9 @@ async function inspectRemote(nowMs, strict=true) {
   return {mainSha,issues,auth,replay,ledger};
 }
 async function verifyOnly() {
-  await assertProtection();
+  // Pull-request checks use a read-only token. Signatures, exact main and
+  // protected Git ancestry suffice here; only the privileged transaction
+  // must query admin-only branch-protection configuration.
   const inspected=await inspectRemote(Date.now());
   ensure(inspected.ledger.live_writers<=2,'WRITER_CAP');
   console.log(JSON.stringify({decision:'VERIFIED',main_sha:inspected.mainSha,
@@ -152,7 +154,12 @@ async function transactRevocation(request,inspected,actor,runId,nowMs,secret) {
   const committed=await commitSignedTransaction(inspected,next,request,runId);
   // A signed revocation is effective immediately. A closed or deleted PR
   // is deliberately NOT required to release a writer.
-  const current=await get('issues/'+request.issue_number);
+  let current;
+  try { current=await get('issues/'+request.issue_number); }
+  catch(e) {
+    if(!String(e.message).includes('GITHUB_GET_404_')) throw e;
+    current={state:'missing'};
+  }
   if(current.state==='open' && String(current.title||'').startsWith('[PRI-MISSION]')) {
     let body=replace(current.body,'Pri-Mission-Status','BLOCKED_AUTOMATION');
     for(const key of ['Pri-Lease-Grant-ID','Pri-Lease-Heartbeat-At',
@@ -202,7 +209,8 @@ async function transact() {
   // All changed files must be in the exact mission scope and owned by its
   // one canonical primary agent. PR changed-files pagination is complete.
   const files=await allPages('pulls/'+request.pr_number+'/files');
-  ensure(files.length>0,'EMPTY_SOURCE_SCOPE');
+  ensure(files.length>0 && Number.isInteger(pr.changed_files) &&
+    files.length===pr.changed_files,'EMPTY_OR_INCOMPLETE_SOURCE_SCOPE');
   for (const f of files) {
     ensure(mission.paths.some(p=>fileMatches(p,f.filename)),'PR_SCOPE_ESCAPES_MISSION_'+f.filename);
     const route=run([join(process.cwd(),'scripts/pri-fleet.mjs'),'route',f.filename]);
