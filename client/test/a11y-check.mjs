@@ -1169,7 +1169,7 @@ async function run() {
       await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
       await page.waitForSelector('.exam-nav', { timeout: 60000 }).catch(async error => {
         const alerts = (await page.locator('[role="alert"]').allInnerTexts()).map(s => s.replace(/\s+/g, ' ').slice(0, 180));
-        throw new Error(`${String(error.message).split('\\n')[0]} · route ${new URL(page.url()).pathname} · alerts ${JSON.stringify(alerts)} · last server calls ${JSON.stringify(online.calls.slice(-6).map(c => `${c.status} ${c.path}`))}`);
+        throw new Error(`JEE entry blocked · route ${new URL(page.url()).pathname} · alerts ${JSON.stringify(alerts)} · last server calls ${JSON.stringify(online.calls.slice(-6).map(c => `${c.status} ${c.path}`))} · ${String(error.message).split('\n')[0]}`);
       });
       await click(page, '.mcq .mcq-opt');
       await page.locator('.exam-dot').nth(20).click();
