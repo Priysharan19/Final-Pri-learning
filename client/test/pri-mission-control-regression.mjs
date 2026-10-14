@@ -87,7 +87,7 @@ verify('Duplicate mission identities fail closed',checkLedger('dup-ids.json',[re
 const baseRecord={id:'cbse',status:'REVIEW',agent:'india-curriculum',branch:'agent/mission/india-curriculum/cbse',risk:'R3',base_sha:sha,attempt:0,acceptance:['approved original questions'],required_gate_ids:['india'],updated_at:at(),failure_fingerprint:null};
 const expiredWriter={...baseRecord,status:'ACTIVE',lease_heartbeat_at:at(13),lease_heartbeat_ref:ref,lease_heartbeat_by:'india-curriculum'};
 const expiredTransition=run(['transition',file('stale-writer.json',expiredWriter),'IMPLEMENTING']);
-verify('Expired writer may not continue into implementation',expiredTransition.code!==0&&expiredTransition.data.errors.some(x=>x.includes('EXPIRED_WRITER_LEASE')));
+verify('Expired writer may not continue into implementation',expiredTransition.code!==0&&expiredTransition.data.errors.some(x=>x.includes('SIGNED_SERIALIZED_GOVERNOR_LEASE_REQUIRED')));
 const transition=run(['transition',file('review-record.json',baseRecord),'REPAIR_PENDING']);
 verify('Reviewer can request repair without occupying writer slot',transition.code===0&&transition.data.status==='REPAIR_PENDING');
 const reacquire=run(['transition',file('repair-record.json',transition.data),'ACTIVE']);
@@ -153,3 +153,7 @@ const spoofed={...e1,body:e1.body.replace(/^Pri-Lease-Heartbeat-Ref:.*$/m,'Pri-L
 const spoofResult=run(['admit',file('spoof-candidate.json',{id:'student-new',agent:'student-experience',status:'ACTIVE',branch:'agent/mission/student-experience/student-new',base_sha:sha,risk:'R2',paths:[student],dependencies:[]}),file('spoof-ledger.json',[spoofed])]);
 verify('Forged-looking heartbeat is snapshot-eligible but blocked by serialized-admission requirement',spoofResult.code!==0&&spoofResult.data.decision==='DENY'&&spoofResult.data.reason==='SERIALIZED_ADMISSION_REQUIRED'&&spoofResult.data.eligible_on_snapshot===true);
 console.log(`PASS: ${checks} deterministic governance regression assertions (isolated proposal; no GitHub write)`);
+
+const editableHeartbeat={...baseRecord,status:'ACTIVE',lease_heartbeat_at:at(),lease_heartbeat_ref:ref,lease_heartbeat_by:'india-curriculum'};
+const unsignedStatus=run(['lease-status',file('editable-heartbeat.json',editableHeartbeat)]);
+verify('Fresh editable issue heartbeat cannot establish lease authority',unsignedStatus.code!==0&&unsignedStatus.data.reason==='SIGNED_SERIALIZED_GOVERNOR_LEASE_REQUIRED');
