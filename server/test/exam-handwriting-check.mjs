@@ -298,6 +298,13 @@ try {
       [[q2.id], digestOf(image), 'awaiting-reading', 'not-read', 0, HANDWRITING_MAX_ATTEMPTS, HANDWRITING_RECOVERY_WINDOW_MS],
       'the page is frozen in the result by the digest of its picture, awaiting reading, with its limits stated');
     eq(provider.total - before, 0, 'finalising read nothing and paid for nothing');
+    // Prototype property names cannot become keys inside frozen page maps,
+    // and must spend zero recognition/marking calls.
+    for (const poison of ['__proto__', 'constructor', 'prototype']) {
+      const refused = await present(s.jar, s.exam.id, poison, image);
+      eq([refused.status, refused.data?.error?.code, provider.total - before],
+        [400, 'EXAM_HANDWRITING_INVALID', 0], `poisoned page key ${poison} is denied before any reader request`);
+    }
     const receiptRow = (await h.db.get("SELECT response_json FROM idempotency_keys WHERE scope='exam-result' AND key=?", [s.exam.id])).response_json;
     eq([page.key, page.questionId, page.evidence, page.receivedAt, page.snapshotRev, page.triesLeft, page.canRetry],
       [q2.id, q2.id, 'submission-in-time', frozen.finishedAt, null, HANDWRITING_MAX_ATTEMPTS, false],

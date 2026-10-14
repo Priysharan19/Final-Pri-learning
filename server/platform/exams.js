@@ -819,7 +819,7 @@ const cutOffFlags = r => ({
 });
 /** Preserve completed stage-one credit on timeout, never turn it into a guessed mark. */
 const stoppedResponse = (out, job) => {
-  const answered = out.partials.find(part => part?.response);
+  const answered = Array.isArray(out?.partials) ? out.partials.find(part => part?.response && typeof part.response === 'object') : null;
   return answered ? (answered.final ? answered.response : workingNotReadResponse(answered.response)) : unreadableResponse(job.q, job.grid);
 };
 const unreadInk = (responses, key, q, given) => !!responses.ink?.[key] && blank(given) && !OBJECTIVE.has(q.answerType);
@@ -1403,7 +1403,9 @@ const keyOfLine = (sq, d, part = null) => (part
  * just been read put in as its answer. Everything else is the frozen line's.
  */
 function lineResponses(sq, old, key, given, working) {
-  const answers = {}, workings = {}, ink = {};
+  // Answer keys are server-authored, but must not mutate Object.prototype
+  // even if a stored or legacy page key is poisoned.
+  const answers = Object.create(null), workings = Object.create(null), ink = Object.create(null);
   const keep = (k, d) => {
     if (!blank(d.given)) answers[k] = String(d.given);
     if (!blank(d.working)) workings[k] = String(d.working);
@@ -1441,6 +1443,9 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
   try { validateImage(body.image); }
   catch (error) { return { status: error?.status || 400, code: safeCode(error?.code, 'HANDWRITING_IMAGE_INVALID'), message: 'The picture of this page could not be accepted.' }; }
   const key = body.key;
+  if (key.split('::').some(component => ['__proto__', 'constructor', 'prototype'].includes(component))) {
+    return { status: 400, code: 'EXAM_HANDWRITING_INVALID', message: 'That answer key is not valid.' };
+  }
   const lock = { accountScope: accountId, lock: syncLockKey(accountId) };
 
   const load = async () => {
@@ -1448,7 +1453,8 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
     if (!paperRow) return { status: 404 };
     const result = await readRecord(db, accountId, 'exam-result', id, now);
     if (!result) return { status: 409, code: 'EXAM_NOT_FINALISED', message: 'This paper is still open. Read your handwriting on the paper itself.' };
-    const stored = result.handwriting?.pages?.[key];
+    const pages = result.handwriting?.pages;
+    const stored = pages && Object.hasOwn(pages, key) ? pages[key] : null;
     if (!stored) return { status: 409, code: 'EXAM_HANDWRITING_NOT_PENDING', message: 'No handwriting is waiting to be read for this answer.' };
     return { paper: JSON.parse(paperRow.response_json), result, stored, page: pageView(stored, result.handwriting, now) };
   };
@@ -1460,7 +1466,11 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
     const json = JSON.stringify(result);
     return db.run("UPDATE idempotency_keys SET response_json=?, request_digest=? WHERE account_id=? AND scope='exam-result' AND key=?", [json, digest(json), accountId, id]);
   };
-  const withPage = (result, page) => ({ ...result, handwriting: { ...result.handwriting, pages: { ...result.handwriting.pages, [key]: page } } });
+  const withPage = (result, page) => {
+    const pages = Object.assign(Object.create(null), result.handwriting.pages);
+    pages[key] = page;
+    return { ...result, handwriting: { ...result.handwriting, pages } };
+  };
 
   const first = await load();
   if (first.status) return first;
@@ -1528,9 +1538,13 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
       const pool = markerPool();
       const out = await pool.run('exam', job, { key: accountId, deadlineMs: pool.deadlineMs });
       if (!out.ok && out.code === MARKING_BUSY) failure = { reason: 'marking-busy', code: MARKING_BUSY };
-      else {
+      else if (!out.ok || out.value?.unverified === true || !out.value?.response) {
         if (!out.ok) await recordMarkerKills(db, accountId, 1);
-        response = out.ok ? out.value.response : stoppedResponse(out, job);
+        // A frozen answer is NEVER settled from a worker that could not
+        // certify a response. Keep its exact digest and retry allocation.
+        failure = { reason: 'marking-unverified', code: out.ok ? 'MARKING_UNVERIFIED' : safeCode(out.code, 'MARKING_FAILED') };
+      } else {
+        response = out.value.response;
         located = { sq, job };
       }
     }

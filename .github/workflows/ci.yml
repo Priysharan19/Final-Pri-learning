@@ -355,7 +355,7 @@ jobs:
         run: |
           set -o pipefail
           node server/test/exam-handwriting-check.mjs 2>&1 | tee exam-handwriting.log
-          grep -Fq 'EXAM HANDWRITING: PASS — 108/108 checks' exam-handwriting.log
+          grep -Fq 'EXAM HANDWRITING: PASS — 111/111 checks' exam-handwriting.log
           grep -Fq 'SYNTHETIC-READER EVIDENCE' exam-handwriting.log
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs

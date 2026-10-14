@@ -853,7 +853,7 @@ function assessAPTermGiven(stage, line) {
   const text = String(line || '').trim().replace(/[−–—]/g, '-');
   const clauses = text.split(/\s*[,;]\s*/).filter(Boolean);
   if (!clauses.length || clauses.length > 2) return { status: 'note', trusted: false };
-  const values = {};
+  const values = Object.create(null);
   for (const clause of clauses) {
     const parsed = clause.match(/^([ad])\s*=\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))$/i);
     if (!parsed) return { status: 'note', trusted: false };
