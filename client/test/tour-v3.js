@@ -197,6 +197,16 @@ export const flow = {
     await check('both attempts are on the same question',
       scores.every(t => t.includes('Finding the Unknown')),
       `rows read ${JSON.stringify(scores.map(t => t.replace(/\s+/g, ' ').slice(0, 60)))}`);
+    const historyTopics = await page.locator('.hist-row .hist-name').allInnerTexts();
+    await check('History identifies the NCERT maths topic rather than an internal generator or demo',
+      historyTopics.length === 2 && historyTopics.every(name => /Finding the Unknown/.test(name) && !/Pri demo|generator|iPad/i.test(name)),
+      JSON.stringify(historyTopics));
+    const historyDates = await page.locator('.hist-row .hist-top > .muted').allInnerTexts();
+    await check('India History uses day-month dates, not a US month-first format',
+      historyDates.length === 2 && historyDates.every(date => /^\d{1,2}\s+[A-Za-z]{3}$/.test(date.trim())),
+      JSON.stringify(historyDates));
+    await check('History never calls this Indian learner an iPad user',
+      !/\biPad\b/i.test(await page.locator('main').innerText()));
 
     // ── 6b · "Same question" from History: the server repeats it ─────────────
     // The missed question is tried again. The server — which chose it and
@@ -265,6 +275,33 @@ export const flow = {
         await page.locator('.q-prompt').count() === 1 &&
         await page.locator('[data-testid="account-activation-gate"]').count() === 0);
     }
+
+    // A full offline reload is distinct from a visibilitychange on an already
+    // mounted lesson. Exercise the installed service worker and activation
+    // boundary, then prove that restored connectivity recovers the same learner.
+    const beforeReload = await page.locator('.qpage').getAttribute('data-question-id');
+    let offlineReloadBooted = false;
+    let offlineState = '';
+    await ctx.setOffline(true);
+    try {
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 20000 });
+      offlineReloadBooted = await page.locator('.shell, .auth-wrap, [data-testid="account-activation-gate"]')
+        .first().waitFor({ state: 'attached', timeout: 15000 }).then(() => true).catch(() => false);
+      offlineState = (await page.locator('body').innerText().catch(() => '')).slice(0, 180);
+    } catch (error) {
+      offlineState = String(error).slice(0, 180);
+    } finally {
+      await ctx.setOffline(false);
+    }
+    await check('offline reload boots a safe account-aware screen instead of a blank or crashed page',
+      offlineReloadBooted && await page.locator('.crash-card').count() === 0,
+      `page ${page.url()}, state ${JSON.stringify(offlineState)}`);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.qpage .q-prompt', { timeout: 30000 });
+    await check('after offline reload the verified learner resumes the same question without another OTP',
+      await page.locator('.qpage').getAttribute('data-question-id') === beforeReload &&
+      await page.locator('[data-testid="account-activation-gate"]').count() === 0,
+      `before ${beforeReload}, after ${await page.locator('.qpage').getAttribute('data-question-id')}`);
 
   }
 };
