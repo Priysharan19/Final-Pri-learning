@@ -638,34 +638,47 @@ async function run() {
       skipLink = { error: String(err.message || err) };
     }
 
-    // ── back out to the signed-out screens, now that a profile exists ────────
+    // ── switch accounts through the supported verified flow ─────────────────
     await step('login · pick a profile', '/', async () => {
       await click(page, '.user-chip');
       await click(page, '[role="menuitem"]', { text: 'Switch profile' });
-      await page.waitForSelector('.auth-wrap', { timeout: 15000 });
+      await page.waitForSelector('.acct-list', { timeout: 15000 });
       await wait(page, 500);
     });
 
-    await step('login · onboarding role', '/', async () => {
-      await click(page, 'button.btn-ghost', { text: 'Add another profile' });
+    const secondEmail = 'a11y.secondary.' + process.pid + '.' + Date.now().toString(36) + '@example.test';
+    await step('login · onboarding verified email entry', '/', async () => {
+      await page.getByTestId('picker-create-account').click();
+      await page.locator('[data-signup-step="method"]').waitFor({ timeout: 15000 });
+      await page.locator('#signup-destination[type="email"]').waitFor({ state: 'visible' });
     });
 
-    await step('login · onboarding curriculum', '/', async () => {
-      await page.getByRole('button', { name: 'Student', exact: true }).click();
-      await click(page, '.auth-card .btn-primary');
+    await step('login · onboarding one-time code', '/', async () => {
+      await page.locator('#signup-destination').fill(secondEmail);
+      await page.getByTestId('signup-send-code').click();
+      await page.locator('[data-signup-step="code"]').waitFor({ timeout: 15000 });
     });
 
-    await step('login · onboarding protection', '/', async () => {
-      await page.locator('#signup-track').selectOption('10');
-      await click(page, '.auth-card .btn-primary');
-      await page.locator('#signup-name').fill('Accessibility Draft');
-      await click(page, '.auth-card .btn-primary');
-      await page.getByRole('checkbox').first().check();
-      await wait(page, SETTLE);
+    await step('login · onboarding age consent', '/', async () => {
+      const issued = platform.sms.readTestOutbox({ to: secondEmail, channel: 'email' }).at(-1)?.code;
+      if (!/^\d{6}$/.test(issued || '')) throw new Error('no real backend OTP for the second verified account');
+      await page.locator('#signup-code-0').focus();
+      await page.keyboard.type(issued);
+      await page.locator('[data-signup-step="age"]').waitFor({ timeout: 15000 });
     });
 
-    // ── signed in ────────────────────────────────────────────────────────────
-    await signInToDemo(page, BASE, platform);
+    await step('login · onboarding first sync to Home', '/', async () => {
+      await page.getByTestId('signup-age-18').click();
+      await page.locator('[data-signup-step="class"]').waitFor({ timeout: 15000 });
+      await page.getByTestId('signup-class-10').click();
+      await page.locator('#signup-flow-name').fill('Accessibility Student');
+      await page.getByTestId('signup-class-next').click();
+      await page.locator('.home-greet').waitFor({ timeout: 30000 });
+      await online.signIn({ name: 'Accessibility Student' });
+      if (await page.locator('[data-testid="account-activation-gate"]').count()) {
+        throw new Error('account has not completed first-sync activation');
+      }
+    });
 
     await step('home', '/', async () => { await goTo(page, BASE, '/'); });
 
@@ -674,16 +687,16 @@ async function run() {
       await click(page, '.genbar-toggle');
     });
 
-    for (const label of ['Course', 'Topics', 'Dot Points', 'Difficulty']) {
+    for (const label of ['Class', 'Track', 'Topics', 'Dot Points', 'Difficulty']) {
       await step(`home · generator · ${label.toLowerCase()}`, '/', async () => {
-        const tab = page.locator('.gen-cat', { hasText: label }).first();
-        if (await tab.isDisabled()) {
-          // walk far enough into the flow that this pane has something to show
-          await click(page, '.gen-cat', { text: 'Course' });
-          await click(page, '.gen-pane .gen-opt');
-          await click(page, '.gen-pane .gen-opt');
+        const tab = page.getByRole('tab', { name: label, exact: true });
+        await tab.waitFor({ state: 'visible', timeout: 10000 });
+        if (!await tab.isDisabled()) {
+          await tab.click();
+          await wait(page, SETTLE);
+        } else if (await tab.getAttribute('disabled') === null) {
+          throw new Error('disabled topic control does not expose its disabled state');
         }
-        await click(page, '.gen-cat', { text: label });
       });
     }
 
