@@ -5,6 +5,9 @@
 import { createHash, sign, verify } from 'node:crypto';
 
 const WRITERS = new Set(['ACTIVE', 'IMPLEMENTING', 'TESTING', 'REPAIR']);
+const STATES = new Set(['DISCOVERED','TRIAGED','ACTIVE','IMPLEMENTING','TESTING',
+  'REVIEW','CI','REPAIR_PENDING','REPAIR','MERGE_READY','BLOCKED_EXTERNAL',
+  'BLOCKED_AUTOMATION','DONE','ABANDONED']);
 const MAX_WRITERS = 2;
 const TTL_MS = 12 * 3600 * 1000;
 const sha = text => createHash('sha256').update(text).digest('hex');
@@ -147,6 +150,7 @@ export function assertLedgerMatchesGrants(issues, authority, mainSha, nowMs = Da
   const seen = new Set();
   for (const x of managed) {
     const id = issueIdentity(x);
+    if (!STATES.has(id.status)) throw new Error('UNKNOWN_MANAGED_ISSUE_STATUS_' + x.number);
     if (seen.has(id.issue_number)) throw new Error('DUPLICATE_ISSUE');
     seen.add(id.issue_number);
     const current = authority.active.get(x.number);

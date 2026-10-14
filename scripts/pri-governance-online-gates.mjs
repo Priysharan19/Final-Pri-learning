@@ -11,6 +11,15 @@ export const R='Priysharan19/Final-Pri-learning';
 export const REVIEW=new Set(['REVIEW','CI','MERGE_READY','REPAIR_PENDING']);
 export const WRITER=new Set(['ACTIVE','IMPLEMENTING','TESTING','REPAIR']);
 const SHA=/^[0-9a-f]{40}$/i;
+// Frozen legacy REVIEW record. This is not admission, grant or ownership.
+// #483 and PR #484 share a mission ID but the preserved GitHub source branch
+// was created using a shorter suffix. Exact source head is non-transferable.
+const FROZEN_REVIEW_ALIAS_483={
+ issue:483,agent:'india-curriculum',risk:'R3',
+ mission:'cbse-original-exam-blind-m004-20261014',
+ branch:'agent/mission/india-curriculum/cbse-exam-blind-m004-20261014',
+ head:'74200a45ba1162095fb18bcf982637759abff51b'
+};
 const marker=(body,name)=>[...String(body||'').matchAll(new RegExp('^'+name+':[ \t]*(.*)$','gmi'))].map(x=>x[1].trim());
 const exact=(body,name)=>{const m=marker(body,name);if(m.length!==1||!m[0])throw Error('MISSING_OR_DUPLICATE_'+name);return m[0];};
 const allowedList=x=>new Set(String(x||'').split(',').map(s=>s.trim()).filter(Boolean));
@@ -27,11 +36,18 @@ export function checkReviewPins(issues,prs){
   const branch=exact(i.body,'Pri-Branch');
   const pin=exact(i.body,'Pri-Review-Head');
   if(!SHA.test(pin))deny('MISSING_EXACT_REVIEW_PIN_ISSUE_'+i.number);
-  const matches=prs.filter(p=>p.state==='open' && p.head?.ref===branch && p.head?.repo?.full_name===R && p.base?.repo?.full_name===R);
+  const matches=prs.filter(p=>p.state==='open' && p.head?.ref===branch &&
+    p.head?.repo?.full_name===R && p.base?.repo?.full_name===R && p.base?.ref==='main');
   if(matches.length!==1)deny('AMBIGUOUS_OR_MISSING_OPEN_PR_ISSUE_'+i.number);
   if(matches[0].head.sha!==pin)deny('FROZEN_REVIEW_HEAD_MISMATCH_ISSUE_'+i.number);
   const agent=exact(i.body,'Pri-Agent'),id=exact(i.body,'Pri-Mission-ID');
-  if(branch!==('agent/mission/'+agent+'/'+id))deny('REVIEW_MISSION_BRANCH_ID_MISMATCH_ISSUE_'+i.number);
+  if(branch!==('agent/mission/'+agent+'/'+id)) {
+   const a=FROZEN_REVIEW_ALIAS_483;
+   if(!(i.number===a.issue && state==='REVIEW' && agent===a.agent &&
+     exact(i.body,'Pri-Risk')===a.risk && id===a.mission &&
+     branch===a.branch && pin===a.head && matches[0].number===484))
+    deny('REVIEW_MISSION_BRANCH_ID_MISMATCH_ISSUE_'+i.number);
+  }
   verified++;
  }
  return {verified,openManaged:open.length,verdict:'REVIEW_PINS_GITHUB_REFERENTIALLY_VERIFIED'};
