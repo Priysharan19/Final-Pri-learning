@@ -77,7 +77,7 @@ function audit(item,section) {
   }else if(w.kind==='corresponding'){
    assert.equal(w.theta,w.corresponding);assert.equal(w.corresponding+w.adjacent,180);
    show(item,''+w.corresponding);show(item,''+w.adjacent);
-   assert.ok(item.question.includes(w.theta+'°'),'shown corresponding-angle premise differs');
+   assert.deepEqual([...item.question.matchAll(/(\d+)°/g)].map(m=>Number(m[1])),[w.theta],'shown corresponding-angle premise differs');
    if(item.figure){
     const f=item.figure;
     assert.equal(f.parallelY.length,2);assert.notEqual(f.parallelY[0],f.parallelY[1]);
@@ -86,7 +86,7 @@ function audit(item,section) {
    checks+=5;
   }else if(w.kind==='alternate-converse'){
    assert.equal(w.angles[0],w.angles[1]);assert.equal(w.parallel,true);
-   assert.ok(item.question.includes(w.angles[0]+'°'));
+   assert.deepEqual([...item.question.matchAll(/(\d+)°/g)].map(m=>Number(m[1])),w.angles,'alternate interior angle data changed');
    assert.ok(/parallel/i.test(item.answer));
    if(item.figure)assert.notEqual(item.figure.parallelY[0],item.figure.parallelY[1]);
    checks+=4;
@@ -94,7 +94,7 @@ function audit(item,section) {
    assert.equal(w.parallel,false);
    if(w.kind==='nonparallel-corresponding')assert.notEqual(w.angles[0],w.angles[1]);
    else assert.notEqual(sum(w.angles),180);
-   for(const a of w.angles)assert.ok(item.question.includes(a+'°'),'wrong given angle');
+   assert.deepEqual([...item.question.matchAll(/(\d+)°/g)].map(m=>Number(m[1])),w.angles,'printed nonparallel angle data changed');
    assert.ok(/not parallel/i.test(item.answer));checks+=5;
   }else assert.fail('unrecognised angle type '+w.kind);
  }else if(section==='quadrilaterals'){
