@@ -674,7 +674,11 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                   );
                 })}
               </div>
-              <button className="btn btn-ghost" type="button" style={{ width: '100%', marginTop: 14 }} disabled={busy}
+              <button className="btn btn-primary" type="button" style={{ width: '100%', marginTop: 14 }} disabled={busy}
+                data-testid="picker-create-account" onClick={() => openAccount('signup')}>
+                Create another Pri account
+              </button>
+              <button className="btn btn-ghost" type="button" style={{ width: '100%', marginTop: 10 }} disabled={busy}
                 onClick={() => beginCreate(cloudIntent)}>
                 {t('login.addAnother')}
               </button>

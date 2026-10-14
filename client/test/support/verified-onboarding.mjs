@@ -15,12 +15,12 @@ export async function createVerifiedProfile(page, platform, {
   platform.h.db.prepare("DELETE FROM rate_limits WHERE bucket LIKE 'otp-%'").run();
   const address = email || ('browser.' + process.pid + '.' + (++serial) + '.' + Date.now().toString(36) + '@example.test');
   if (fromPicker) {
-    // Picker is not permission to enter another profile. Its own visible
-    // welcome control exposes the supported account-first creation route.
-    await page.getByRole('button', { name: 'Back to the Pri Learning welcome screen' }).click();
-    await page.getByTestId('hero-create-account').waitFor({ timeout: 15000 });
+    // Existing students need a public account-first path for a second identity.
+    // The old local-only wizard is not a valid shortcut through verification.
+    await page.getByTestId('picker-create-account').click();
+  } else {
+    await page.getByTestId('hero-create-account').click();
   }
-  await page.getByTestId('hero-create-account').click();
   await page.locator('[data-signup-step="method"]').waitFor({ timeout: 15000 });
   await page.locator('#signup-destination').fill(address);
   await page.getByTestId('signup-send-code').click();
