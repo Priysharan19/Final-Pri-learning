@@ -196,9 +196,9 @@ export const newStudentFlow = {
       /^\d{6}$/.test(sent?.code || '') && sent.purpose === 'sign-in', JSON.stringify(sent && { purpose: sent.purpose }));
     await check('the code step is the SAME card: same URL, same document (no navigation, no reload)',
       page.url() === urlBefore && await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' && await stepOf(card) === 'code');
-    await check('"Check your email — we sent a six-digit code to <email>", and how long it lasts',
+    await check('the code card reports a request, not guaranteed inbox delivery, and gives the ten-minute expiry',
       (await card.locator('#signup-step-title').innerText()).trim() === 'Check your email'
-        && (await card.locator('#signup-code-lead').innerText()).replace(/\s+/g, ' ').includes(`We sent a six-digit code to ${email}. It works for 10 minutes.`),
+        && (await card.locator('#signup-code-lead').innerText()).replace(/\s+/g, ' ').includes(`We requested a six-digit code for ${email}. Check your messages; delivery can take a moment. It works for 10 minutes.`),
       await card.locator('#signup-code-lead').innerText());
     await check('six boxes, each labelled; numeric keypad; the first asks the device for the code from the message',
       await boxes(card).count() === 6
