@@ -39,10 +39,7 @@ jobs:
     environment:
       name: pri-writer-admission
     permissions:
-      contents: write
-      issues: write
-      pull-requests: read
-      deployments: read
+      contents: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -83,8 +80,24 @@ jobs:
             operation:op,issue_number:issue,pr_number:pr,head_sha:sha
           }));
           NODE
+      # App installation token is scoped to THIS repo. An approved GitHub
+      # ruleset grants only this app narrow non-force ref update authority.
+      # Never put this key/token into pull_request jobs.
+      - name: Obtain dedicated approved governor app identity
+        id: governor-app
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.PRI_GOVERNOR_APP_ID }}
+          private-key: ${{ secrets.PRI_GOVERNOR_APP_PRIVATE_KEY }}
+          owner: Priysharan19
+          repositories: Final-Pri-learning
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: read
+          permission-administration: read
+
       - name: Apply signed non-fast-forward CAS, reconcile issue, verify ledger
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.governor-app.outputs.token }}
           PRI_ADMISSION_PRIVATE_KEY: ${{ secrets.PRI_ADMISSION_PRIVATE_KEY }}
         run: node scripts/pri-admission-github.mjs transact /tmp/pri-authority-request.json
