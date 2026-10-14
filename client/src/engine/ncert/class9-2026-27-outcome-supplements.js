@@ -11,7 +11,7 @@ export const class9OutcomeSupplements202627 = {
  workedExamples:[
   {id:'pl9-m004-w-pyramid',chapter:'Surface Area and Volume',classification:'core',
    prompt:'A square pyramid has base side 6 cm and perpendicular height 4 cm. Derive its slant height, full outer area and volume.',
-   steps:['The altitude bisects the line from the centre to each side midpoint: slant = √(4²+3²) = 5 cm.','Four side triangles total area 4×(1/2)×6×5 = 60 cm², and the square base contributes 36 cm², giving 96 cm².','Volume is one third of base area times perpendicular height: (1/3)×36×4 = 48 cm³.'],
+   steps:['The perpendicular height (4 cm), the base-centre-to-side-midpoint segment (3 cm) and the face slant height form a right triangle: slant = √(4²+3²) = 5 cm.','Four side triangles total area 4×(1/2)×6×5 = 60 cm², and the square base contributes 36 cm², giving 96 cm².','Volume is one third of base area times perpendicular height: (1/3)×36×4 = 48 cm³.'],
    answer:'slant 5 cm; total area 96 cm²; volume 48 cm³',
    data:{type:'square-pyramid',a:6,h:4,l:5,area:96,volume:48}},
   {id:'pl9-m004-w-vertical-proof',chapter:'Lines and Angles',classification:'core',
