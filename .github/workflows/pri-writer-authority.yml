@@ -24,12 +24,10 @@ on:
 permissions:
   contents: read
 
-# The queue prevents overlapping controller jobs. An independently approved
-# protected Git ref supplies durable non-fast-forward compare-and-swap,
-# protecting against outside workflow races or multiple queued dispatches.
-concurrency:
-  group: pri-writer-authority-global
-  cancel-in-progress: false
+# A global Actions concurrency group can evict an already-pending REVOKE
+# when a new operation queues. Do not use it for security-critical revocations.
+# Serialization is instead the non-force Git compare-and-swap; collisions
+# MUST fail visibly and require a fresh, independently approved dispatch.
 
 jobs:
   authorize:
@@ -95,9 +93,11 @@ jobs:
           permission-issues: write
           permission-pull-requests: read
           permission-administration: read
+          permission-actions: read
 
       - name: Apply signed non-fast-forward CAS, reconcile issue, verify ledger
         env:
+          PRI_AUTHORITY_GENESIS_SHA: ${{ vars.PRI_AUTHORITY_GENESIS_SHA }}
           GITHUB_TOKEN: ${{ steps.governor-app.outputs.token }}
           PRI_ADMISSION_PRIVATE_KEY: ${{ secrets.PRI_ADMISSION_PRIVATE_KEY }}
         run: node scripts/pri-admission-github.mjs transact /tmp/pri-authority-request.json
