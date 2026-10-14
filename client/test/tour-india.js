@@ -110,6 +110,16 @@ export const flow = {
     await check('Class 10 learner can open the real progress page',
       await progressHeadings.count() === 1 && /Class 10/.test(progressHeading),
       `URL ${page.url()}, heading ${JSON.stringify(progressHeading)}, screen ${JSON.stringify((await page.locator('main').innerText().catch(() => '')).slice(0, 400))}`);
+    // Preserve the evidence-integrity checks from the old India tour. An
+    // unpractised learner must not receive percentile/rank predictions or a
+    // bare estimated mark that conceals the amount of syllabus actually seen.
+    await check('Progress refuses percentile and rank predictions',
+      await page.getByText('No percentile, no rank').count() === 1);
+    const marksEstimate = await page.getByText('If you sat this paper tomorrow').count();
+    const marksCoverage = await page.getByText(/marks practised/).count();
+    await check('any mark estimate travels with its coverage',
+      marksEstimate === 0 || marksCoverage >= 1,
+      `estimate ${marksEstimate}, coverage ${marksCoverage}`);
     await check('fresh profile does not pretend to have studied before',
       !/\bPri demo\b/i.test(await page.locator('main').innerText()));
     await goto('/history');
