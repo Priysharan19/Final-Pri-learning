@@ -289,6 +289,10 @@ jobs:
           grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
           grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 34/34 checks' practice-http.log
           grep -Fq 'REPEAT CREDIT: PASS — 295/295 checks' practice-http.log
+      - name: AP first-mistake proof and one-mark rubric regression
+        run: |
+          node server/test/ap-term-firstbreak-regression-check.mjs
+          node server/test/owner-ap-first-mistake-contract-check.mjs
       - name: Marker isolation (worker pool, hard deadline, exactly-once under concurrency)
         run: |
           set -o pipefail
