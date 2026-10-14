@@ -419,11 +419,14 @@ jobs:
           path: trusted-pri-admission
           persist-credentials: false
 
-      - name: Verify signed authoritative writer ledger
+      - name: Verify exact-PR signed authoritative writer grant
         if: github.event_name == 'pull_request' && steps.meta.outputs.autonomous == 'true'
         working-directory: trusted-pri-admission
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          PRI_AUTHORITY_GENESIS_SHA: ${{ vars.PRI_AUTHORITY_GENESIS_SHA }}
+          EXPECTED_PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_PR_HEAD: ${{ github.event.pull_request.head.sha }}
         run: node scripts/pri-admission-github.mjs verify
 
       - name: Verify active writer lease
