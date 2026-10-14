@@ -293,7 +293,7 @@ jobs:
         run: |
           set -o pipefail
           node server/test/marker-isolation-check.mjs 2>&1 | tee marker-isolation.log
-          grep -Fq 'MARKER ISOLATION: PASS — 152/152 checks' marker-isolation.log
+          grep -Fq 'MARKER ISOLATION: PASS — 230/230 checks' marker-isolation.log
       - name: Account, origin, CMS and classroom contracts
         run: |
           node server/test/account-deletion-reauth-check.mjs

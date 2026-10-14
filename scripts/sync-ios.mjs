@@ -49,7 +49,7 @@ for (const bundle of BUNDLES) {
   if (!existsSync(builtRelease)) {
     failed = true;
     console.error('client/dist/release.json is missing.');
-  } else if (CHECK && !existsSync(bundledRelease)) {
+  } else if (CHECK && !CONTENT_ONLY && !existsSync(bundledRelease)) {
     failed = true;
     console.error(`${bundle.label} release.json is missing.`);
   } else if (CHECK && !CONTENT_ONLY && existsSync(bundledRelease) && readFileSync(bundledRelease, 'utf8') !== readFileSync(builtRelease, 'utf8')) {
