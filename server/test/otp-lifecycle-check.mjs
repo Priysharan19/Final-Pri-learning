@@ -101,8 +101,8 @@ try {
   r = await h.request('/v1/sync/pull', { jar: studentJar });
   c.eq(r.data?.error?.code, 'GUARDIAN_CONSENT_PENDING', 'sync is refused while consent is pending');
 
-  // Recovery for a wrong age capture: the signed-in learner explicitly says
-  // 18+, using the same authenticated/rate-limited guardian action surface.
+  // A learner with a pending guardian ceremony must not be able to declare
+  // themselves adult. Secure age correction requires external review.
   const studentAccountId = raw.prepare("SELECT id FROM accounts WHERE email='new.student@example.test'").get().id;
   const historyBeforeCorrection = raw.prepare('SELECT * FROM guardian_consents WHERE account_id=?').get(studentAccountId);
   r = await h.request('/v1/account/guardian/state', { jar: studentJar });
@@ -112,23 +112,21 @@ try {
     'guardian state safely names the exact live blocker'
   );
   r = await post('/guardian/request', { isAdult: true }, studentJar);
-  c.eq(r.status, 200, 'a pending learner can explicitly correct a wrongly captured age to adult');
-  c.deq(
-    [r.data?.ageCorrected, r.data?.ageBasis, r.data?.guardianConsent?.required, r.data?.guardianConsent?.blockerCode],
-    [true, 'adult', false, null],
-    'the correction returns the new server-authoritative eligibility'
-  );
-  c.eq(raw.prepare('SELECT age_basis FROM accounts WHERE id=?').get(studentAccountId).age_basis, 'adult', 'the server records the corrected age basis');
+  c.deq([r.status, r.data?.error?.code], [409, 'AGE_CORRECTION_REVIEW_REQUIRED'],
+    'child cannot re-declare adult without a separately authorised age correction');
+  c.eq(raw.prepare('SELECT age_basis FROM accounts WHERE id=?').get(studentAccountId).age_basis, 'child',
+    'self-correction leaves server age authority classified child');
   const historyAfterCorrection = raw.prepare('SELECT * FROM guardian_consents WHERE account_id=?').get(studentAccountId);
   c.deq(
-    [historyAfterCorrection.account_id, historyAfterCorrection.method, historyAfterCorrection.requested_at],
-    [historyBeforeCorrection.account_id, historyBeforeCorrection.method, historyBeforeCorrection.requested_at],
-    'adult correction preserves the guardian-history row'
+    [historyAfterCorrection.account_id, historyAfterCorrection.method, historyAfterCorrection.requested_at, historyAfterCorrection.confirmed_at],
+    [historyBeforeCorrection.account_id, historyBeforeCorrection.method, historyBeforeCorrection.requested_at, historyBeforeCorrection.confirmed_at],
+    'self-correction cannot alter or approve a guardian consent record'
   );
-  c.ok(raw.prepare("SELECT COUNT(*) n FROM audit_log WHERE actor_account_id=? AND action='account.age-declaration.update'").get(studentAccountId).n >= 1,
-    'and records the correction in the audit log');
+  c.eq(raw.prepare("SELECT COUNT(*) n FROM audit_log WHERE actor_account_id=? AND action='account.age-declaration.update'").get(studentAccountId).n,
+    0, 'rejected age self-upgrade does not produce an age-change audit record');
   r = await h.request('/v1/sync/pull', { jar: studentJar });
-  c.ok(r.status !== 403, 'the corrected adult account passes the cloud gate immediately');
+  c.eq(r.data?.error?.code, 'GUARDIAN_CONSENT_PENDING',
+    'the child remains unable to sync after attempted self-upgrade');
 
   // ── no enumeration: same answer for a known and an unknown address ──────
   resetLimits();
