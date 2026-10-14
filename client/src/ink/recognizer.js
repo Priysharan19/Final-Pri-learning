@@ -2532,7 +2532,11 @@ function operatorContextPass(line) {
   for (let i = 2; i < line.length - 3; i++) {
     const s = line[i];
     if (s.sym !== 't' || s.composite || !s._group || s._group.strokes.length !== 2) continue;
-    if (!isDigit(line[i - 2]) || !isVar(line[i - 1]) || !isDigit(line[i + 1]) || !isVar(line[i + 2])) continue;
+    if (!isDigit(line[i - 2]) || !isVar(line[i - 1]) || !isDigit(line[i + 1])) continue;
+    // Also distinguish an arithmetic addend (2x+35=105) from a second
+    // coefficient term (5n+2t=67). Both have a relation after the next
+    // glyph; never reinterpret a genuine standalone letter as an operator.
+    if (!isVar(line[i + 2]) && !isDigit(line[i + 2])) continue;
     if (catOf(line[i + 3].sym) !== 'r') continue;
     const plusAlt = (s.alts || []).find(a => a.sym === '+');
     if (!plusAlt || plusAlt.conf < 0.01) continue;
