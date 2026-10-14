@@ -96,6 +96,15 @@ export const flow = {
         });
       }
 
+      // The inline OTP card must fetch current server guardian authority before
+      // linking this local profile. The old fixture omitted this endpoint,
+      // making the secure fail-closed client look like a broken sign-in.
+      if (path === '/v1/account/guardian/state' && method === 'GET') {
+        return authenticated
+          ? respond(route, 200, { required: guardianPending, state: guardianPending ? 'pending' : 'not-required' })
+          : respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
+      }
+
       if (path === '/v1/account/me' && method === 'GET') {
         return authenticated
           ? respond(route, 200, { account: { ...ACCOUNT, emailVerified } })
@@ -278,6 +287,10 @@ export const flow = {
     await card.getByLabel('I have read the').check();
     await card.getByTestId('signup-age-next').click();
     await accountPanel.locator('[data-cloud-state]', { hasText: /^Signed in$/ }).waitFor({ timeout: 15000 });
+    await check('the OTP card confirms live server guardian authority before linking this device',
+      requests.slice(registerIndexBefore).some(row =>
+        row.path === '/v1/account/guardian/state' && row.method === 'GET'),
+      'no authenticated guardian-state check was observed');
     await check('acknowledging the notice releases the gate: one account-creating request', creating() === 1, `${creating()} request(s)`);
 
     await check('account creation links the current local profile without leaving Settings',

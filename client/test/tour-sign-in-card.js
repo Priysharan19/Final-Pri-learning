@@ -196,9 +196,9 @@ export const newStudentFlow = {
       /^\d{6}$/.test(sent?.code || '') && sent.purpose === 'sign-in', JSON.stringify(sent && { purpose: sent.purpose }));
     await check('the code step is the SAME card: same URL, same document (no navigation, no reload)',
       page.url() === urlBefore && await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' && await stepOf(card) === 'code');
-    await check('"Check your email — we sent a six-digit code to <email>", and how long it lasts',
+    await check('the code card reports a request, not guaranteed inbox delivery, and gives the ten-minute expiry',
       (await card.locator('#signup-step-title').innerText()).trim() === 'Check your email'
-        && (await card.locator('#signup-code-lead').innerText()).replace(/\s+/g, ' ').includes(`We sent a six-digit code to ${email}. It works for 10 minutes.`),
+        && (await card.locator('#signup-code-lead').innerText()).replace(/\s+/g, ' ').includes(`We requested a six-digit code for ${email}. Check your messages; delivery can take a moment. It works for 10 minutes.`),
       await card.locator('#signup-code-lead').innerText());
     await check('six boxes, each labelled; numeric keypad; the first asks the device for the code from the message',
       await boxes(card).count() === 6
@@ -382,7 +382,7 @@ export const returningFlow = {
     await card.getByTestId('signup-notice').waitFor({ timeout: 20000 });
     const second = mail(online, who.email);
     await check('after the countdown "Resend code" sends a new code and says the earlier one no longer works',
-      mailCount(online, who.email) === 2 && second.code !== undefined && /A new code is on its way to .*The earlier code no longer works\./.test((await card.getByTestId('signup-notice').innerText()).trim()),
+      mailCount(online, who.email) === 2 && second.code !== undefined && /A new code was requested for .*The earlier code no longer works\./.test((await card.getByTestId('signup-notice').innerText()).trim()),
       await card.getByTestId('signup-notice').innerText().catch(() => ''));
     if (first.code !== second.code) {
       await typeCode(page, card, first.code);
@@ -457,6 +457,22 @@ export const returningFlow = {
     await check('a verified account keeps its password: a code sign-in does not take it away',
       accountByEmail(online, who.email).password_hash !== null);
     await card.getByTestId('signup-class-10').click();
+    // A different browser tab can replace the device-wide session while the
+    // guardian check is in flight. Refuse the wrong account before linking.
+    const accountUrl = u => u.pathname === '/v1/account/me';
+    const switchedSession = route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ account: { id: 'acct_different_tab', role: 'student', emailVerified: true } })
+    });
+    await ctx.route(accountUrl, switchedSession);
+    await card.getByTestId('signup-class-next').click();
+    await card.getByTestId('signup-error').waitFor({ timeout: 15000 });
+    await check('a changed server identity cannot link another student\'s local profile',
+      /signed-in Pri account changed/.test(await errorText(card))
+        && await stepOf(card) === 'class' && new URL(page.url()).pathname === '/'
+        && accountCount(online) === accountsBefore,
+      await errorText(card));
+    await ctx.unroute(accountUrl, switchedSession);
     await card.getByTestId('signup-class-next').click();
     await page.waitForURL(/\/practice/, { timeout: 30000 });
     await page.waitForSelector('.shell', { timeout: 30000 });
@@ -808,6 +824,12 @@ export const minorFlow = {
 
   async run({ page, ctx, check, goto, note, online, browserName }) {
     note(`${EVIDENCE}: "Sign-in card · under 18" [${browserName || 'chromium'}] — the parent's code is read from the test mail sink; no guardian, child or real mailbox is involved. This is software behaviour, not evidence of a real parent's consent.`);
+    // Only the temporary 503 guardian test is network-layer mocked. In WebKit
+    // an active service worker can answer fetch outside Playwright page.route,
+    // yielding a false timeout instead of an observed server refusal.
+    await page.addInitScript(() => {
+      if (navigator.serviceWorker) navigator.serviceWorker.register = () => new Promise(() => {});
+    });
     clearLimits(online);
     const email = address('minor');
     const parent = address('parent');
@@ -831,6 +853,11 @@ export const minorFlow = {
     await check('the parent step explains, in the card, why a guardian is needed and what works meanwhile',
       (await card.locator('#signup-step-title').innerText()).trim() === 'Now, a parent’s approval'
         && /Because you are under 18, a parent or guardian approves your account\. Until they do, you can read questions, write and keep drafts on this device, but answers cannot be checked and nothing syncs\./.test(await card.innerText()));
+    await check('under-18 onboarding cannot skip the guardian step and enter practice',
+      await card.getByTestId('signup-parent-later').count() === 0
+        && await card.getByTestId('signup-parent-required').isVisible()
+        && /must approve before you enter the app/.test(await card.getByTestId('signup-parent-required').innerText())
+        && new URL(page.url()).pathname === '/');
     const gate = await page.evaluate(async () => {
       const csrf = decodeURIComponent((document.cookie.match(/pri_csrf=([^;]+)/) || [])[1] || '');
       const r = await fetch('/v1/sync/pull', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-Pri-CSRF': csrf }, body: '{}' });
@@ -857,6 +884,65 @@ export const minorFlow = {
     const childSide = { codeBoxes: await card.locator('input[autocomplete="one-time-code"]').count(), approve: await page.getByRole('button', { name: 'Approve', exact: true }).count(), step: await stepOf(card) };
     await check('the child\'s screen only waits: no code box, no approve button — a child cannot approve their own account',
       childSide.codeBoxes === 0 && childSide.approve === 0 && childSide.step === 'parent-wait', JSON.stringify(childSide));
+    await check('the waiting card offers approval-status checking, not a bypass into the application',
+      await card.getByTestId('signup-parent-continue').count() === 0
+        && await card.getByTestId('signup-parent-check').isVisible()
+        && new URL(page.url()).pathname === '/');
+
+    // A -> B -> A: the pending child A's tab sees a fresh guardian response for
+    // unrelated adult B, while the browser session can already be A again.
+    // A single *bound* response must not become a guardian bypass for A.
+    const wrongAdult = async route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({
+        accountId: 'acct_unrelated_adult_B', sessionBinding: 'b'.repeat(64),
+        required: false, state: 'not-required', emailVerified: true, eligible: true
+      })
+    });
+    await page.route('**/v1/account/guardian/state', wrongAdult);
+    await card.getByTestId('signup-parent-check').click();
+    await card.getByTestId('signup-error').waitFor({ state: 'visible', timeout: 15000 });
+    await check('A→B→A guardian-response race is refused before linking the pending child account',
+      /signed-in Pri account changed/.test(await errorText(card))
+        && await stepOf(card) === 'parent-wait'
+        && new URL(page.url()).pathname === '/'
+        && consent().confirmed_at === null,
+      await errorText(card));
+    await page.unroute('**/v1/account/guardian/state', wrongAdult);
+    await page.waitForFunction(() =>
+      !document.querySelector('[data-testid=signup-parent-check]')?.disabled,
+      null, { timeout: 15000 });
+
+    await card.getByTestId('signup-parent-check').click();
+    await page.waitForFunction(() => /approval is still pending/i.test(
+      document.querySelector('#signup-error')?.textContent || ''), null, { timeout: 15000 });
+    await check('checking before actual parental approval keeps the minor on the waiting card',
+      /approval is still pending/.test(await errorText(card))
+        && await stepOf(card) === 'parent-wait'
+        && new URL(page.url()).pathname === '/'
+        && consent().confirmed_at === null, await errorText(card));
+
+    // Network loss during a fresh consent check must be recoverable, and must
+    // never complete child onboarding based on a cached or pending flag.
+    const unavailableGuardian = async route => route.fulfill({
+      status: 503, contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Test guardian lookup offline.' } })
+    });
+    await page.route('**/v1/account/guardian/state', unavailableGuardian);
+    await card.getByTestId('signup-parent-check').click();
+    await page.waitForFunction(() => /server|try again/i.test(document.querySelector('#signup-error')?.textContent || ''), null, { timeout: 12000 });
+    await check('offline guardian-status check remains on the waiting card with a recoverable message',
+      await stepOf(card) === 'parent-wait'
+        && new URL(page.url()).pathname === '/'
+        && consent().confirmed_at === null
+        && /server|try again/i.test(await errorText(card)), await errorText(card));
+    await page.unroute('**/v1/account/guardian/state', unavailableGuardian);
+    await card.getByTestId('signup-parent-check').click();
+    await page.waitForFunction(() => /approval is still pending/i.test(document.querySelector('#signup-error')?.textContent || ''), null, { timeout: 12000 });
+    await check('the child may retry the check after the network recovers but cannot enter before approval',
+      await stepOf(card) === 'parent-wait'
+        && /approval is still pending/.test(await errorText(card))
+        && consent().confirmed_at === null);
 
     const parentCtx = await ctx.browser().newContext({ viewport: PHONE, reducedMotion: 'reduce' });
     try {

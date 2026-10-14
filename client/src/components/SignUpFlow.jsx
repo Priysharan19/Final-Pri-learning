@@ -37,6 +37,7 @@ import { requestIdentityToken, socialProviderConfig } from '../platform/socialSi
 import { tLater, useT, useTx } from '../i18n/index.js';
 import OtpInput, { OTP_LENGTH } from './OtpInput.jsx';
 import { isNetworkFailure, signInErrorCopy } from './signInErrors.js';
+import { readOnboardingAuthority } from './onboardingAuthority.js';
 
 export { isNetworkFailure, signInErrorCopy };
 import './SignUpFlow.css';
@@ -392,8 +393,40 @@ export default function SignUpFlow({
     setBusy('finish');
     finishing.current = (async () => {
       try {
+        // Never trust a remembered consent flag, a delayed account response or
+        // the "continue" UI as permission to enter the application. The
+        // server's CURRENT session is the authority at the very last step.
+        if (!signedInAccount?.id) {
+          setError(tLater('signup.verifyFirst'));
+          return;
+        }
+        // A→B→A defeats two sequential calls to guardianState() and me().
+        // Require ONE server-authoritative guardian statement that binds the
+        // account, its live session, approval and eligibility in that reply.
+        // Older servers missing the binding are refused, not grandfathered in.
+        const authority = await readOnboardingAuthority(signedInAccount.id, () => cloud.guardianState());
+        if (authority.outcome === 'changed') {
+          setError(tLater('signup.accountChanged'));
+          return;
+        }
+        if (authority.outcome === 'unavailable') {
+          setError(tLater('signup.consentCheckUnavailable'));
+          return;
+        }
+        setConsent(authority.consent);
+        if (authority.outcome === 'revoked') {
+          if (step !== 'parent-wait') go('parent-wait');
+          setError(tLater('signup.parentRevoked'));
+          return;
+        }
+        if (authority.outcome === 'waiting') {
+          if (step !== 'parent' && step !== 'parent-wait') go('parent');
+          setError(tLater('signup.parentStillWaiting'));
+          return;
+        }
         await onFinish({ account: signedInAccount, name: name.trim() || signedInAccount?.name || '', year: year || 9, track });
       } catch (err) { fail(err); }
+      finally { setBusy(''); }
     })().finally(() => { finishing.current = null; });
     return finishing.current;
   }
@@ -631,9 +664,7 @@ export default function SignUpFlow({
             {busy === 'parent' ? t('signup.sending') : t('signup.parentSend')}
           </button>
         </form>
-        <div className="signup-alt">
-          <button type="button" className="linklike" disabled={!!busy} onClick={() => finish()} data-testid="signup-parent-later">{t('signup.parentLater')}</button>
-        </div>
+        <p className="signup-hint" role="status" data-testid="signup-parent-required">{t('signup.parentBeforeEntry')}</p>
       </>
     );
   } else if (step === 'parent-wait') {
@@ -648,7 +679,7 @@ export default function SignUpFlow({
           <button type="button" className="linklike" disabled={waitSeconds > 0 || !!busy} onClick={askParent} data-testid="signup-parent-resend">
             {waitSeconds > 0 ? t('signup.resendIn', { n: waitSeconds }) : t('signup.resend')}
           </button>
-          <button type="button" className="linklike" disabled={busy === 'finish'} onClick={() => finish()} data-testid="signup-parent-continue">{t('signup.parentContinue')}</button>
+          <button type="button" className="linklike" disabled={!!busy} onClick={() => finish()} data-testid="signup-parent-check">{t('signup.checkApproval')}</button>
         </div>
       </>
     );
