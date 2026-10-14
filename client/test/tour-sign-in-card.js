@@ -382,7 +382,7 @@ export const returningFlow = {
     await card.getByTestId('signup-notice').waitFor({ timeout: 20000 });
     const second = mail(online, who.email);
     await check('after the countdown "Resend code" sends a new code and says the earlier one no longer works',
-      mailCount(online, who.email) === 2 && second.code !== undefined && /A new code is on its way to .*The earlier code no longer works\./.test((await card.getByTestId('signup-notice').innerText()).trim()),
+      mailCount(online, who.email) === 2 && second.code !== undefined && /A new code was requested for .*The earlier code no longer works\./.test((await card.getByTestId('signup-notice').innerText()).trim()),
       await card.getByTestId('signup-notice').innerText().catch(() => ''));
     if (first.code !== second.code) {
       await typeCode(page, card, first.code);
@@ -457,6 +457,22 @@ export const returningFlow = {
     await check('a verified account keeps its password: a code sign-in does not take it away',
       accountByEmail(online, who.email).password_hash !== null);
     await card.getByTestId('signup-class-10').click();
+    // A different browser tab can replace the device-wide session while the
+    // guardian check is in flight. Refuse the wrong account before linking.
+    const accountUrl = u => u.pathname === '/v1/account/me';
+    const switchedSession = route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ account: { id: 'acct_different_tab', role: 'student', emailVerified: true } })
+    });
+    await ctx.route(accountUrl, switchedSession);
+    await card.getByTestId('signup-class-next').click();
+    await card.getByTestId('signup-error').waitFor({ timeout: 15000 });
+    await check('a changed server identity cannot link another student\'s local profile',
+      /signed-in Pri account changed/.test(await errorText(card))
+        && await stepOf(card) === 'class' && new URL(page.url()).pathname === '/'
+        && accountCount(online) === accountsBefore,
+      await errorText(card));
+    await ctx.unroute(accountUrl, switchedSession);
     await card.getByTestId('signup-class-next').click();
     await page.waitForURL(/\/practice/, { timeout: 30000 });
     await page.waitForSelector('.shell', { timeout: 30000 });

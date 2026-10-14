@@ -410,6 +410,15 @@ export default function SignUpFlow({
           setError(tLater('signup.parentStillWaiting'));
           return;
         }
+        // A second tab/device can replace this browser's global session while
+        // guardianState() is in flight. Never link account A's local drafts to
+        // a live session for account B. Check the server's current identity
+        // immediately before calling either profile-creation/linking callback.
+        const current = await cloud.me();
+        if (!current?.account?.id || String(current.account.id) !== String(signedInAccount.id)) {
+          setError(tLater('signup.accountChanged'));
+          return;
+        }
         await onFinish({ account: signedInAccount, name: name.trim() || signedInAccount?.name || '', year: year || 9, track });
       } catch (err) { fail(err); }
       finally { setBusy(''); }

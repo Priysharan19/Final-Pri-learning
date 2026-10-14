@@ -2518,6 +2518,7 @@ export default {
   'signup.changeEmail': "ईमेल बदलें",
   'signup.genericError': "कुछ गड़बड़ हुई। फिर से कोशिश कीजिए।",
   'signup.verifyFirst': "आगे बढ़ने से पहले अपना ईमेल सत्यापित करें।",
+  'signup.accountChanged': "आपका साइन-इन किया हुआ Pri खाता बदल गया है। इस प्रोफ़ाइल को जोड़ने से पहले फिर से साइन इन करें।",
   'signup.consentCheckUnavailable': "अभिभावक की अनुमति की स्थिति जाँची नहीं जा सकी। फिर से कोशिश करें।",
   'signup.parentStillWaiting': "अभिभावक की अनुमति अभी बाकी है। उनसे अनुमति देने को कहें और फिर जाँचें।",
   'signup.parentBeforeEntry': "ऐप में जाने से पहले अभिभावक की अनुमति ज़रूरी है।",
