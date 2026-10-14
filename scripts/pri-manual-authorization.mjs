@@ -25,6 +25,7 @@ export function manualDecision({pr,headSha,reviews,permissions,files,securityRev
   const lastByReviewer=new Map();
   for(const r of reviews) {
     if (!r?.user?.login) return deny('REVIEWER_IDENTITY_MISSING');
+    if(!['APPROVED','CHANGES_REQUESTED','DISMISSED'].includes(r.state)) continue;
     const prev=lastByReviewer.get(r.user.login);
     if(!prev || String(r.submitted_at||'')>=String(prev.submitted_at||'')) lastByReviewer.set(r.user.login,r);
   }
