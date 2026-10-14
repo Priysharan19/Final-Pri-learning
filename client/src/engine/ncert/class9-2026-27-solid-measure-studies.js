@@ -257,20 +257,20 @@ export const class9SolidMeasure202627={
     {
       "id": "pl9-solid-cone2",
       "archetypeId": "pl9-solid-cone-slant",
-      "question": "A right cone has radius 5 cm, height 12 cm. Calculate its slant height, curved area, and volume.",
+      "question": "A right cone has radius 8 cm, height 15 cm. Calculate its slant height, curved area, and volume.",
       "solutionSteps": [
-        "The right cross-section gives slant √(25+144)=13 cm.",
-        "Curved area=π×5×13=65π cm².",
-        "Volume=(1/3)π×25×12=100π cm³."
+        "The right cross-section gives slant √(64+225)=17 cm.",
+        "Curved area=π×8×17=136π cm².",
+        "Volume=(1/3)π×64×15=320π cm³."
       ],
-      "answer": "13 cm; 65π cm²; 100π cm³",
+      "answer": "17 cm; 136π cm²; 320π cm³",
       "check": {
         "kind": "cone",
-        "r": 5,
-        "h": 12,
-        "slant": 13,
-        "curved": 65,
-        "volume": 100
+        "r": 8,
+        "h": 15,
+        "slant": 17,
+        "curved": 136,
+        "volume": 320
       },
       "hint": "Find slant length using Pythagoras.",
       "commonMistake": "Do not use h instead of l in curved area.",
