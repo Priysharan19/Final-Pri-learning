@@ -61,6 +61,20 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Install exact web dependencies
+        run: npm ci --prefix client
+      - name: Build and verify immutable web source identity
+        run: |
+          npm run build
+          npm run verify:release
+      - name: Verify iPad web content from exact source
+        run: npm run check:ios:content
+      - name: Materialize the candidate identity before native compilation
+        run: |
+          npm run sync:ios
+          npm run check:ios
+          npm run verify:release:native
+
       - name: Canonical native source has no stale duplicate
         run: node scripts/check-native-package-sync.mjs
 

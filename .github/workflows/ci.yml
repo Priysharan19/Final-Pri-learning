@@ -598,11 +598,13 @@ jobs:
         run: npm run build
       - name: Exact release identity
         run: node tools/verify-release-identity.mjs
-      - name: iOS bundle matches the client build
-        run: npm run check:ios
-      - name: Materialize exact native release identity
+      - name: Verify exact native web contents before stamping release identity
+        run: npm run check:ios:content
+      - name: Materialize checkout-specific native release identity
         run: npm run sync:ios
-      - name: Verify exact native release identity
+      - name: Verify all native bytes, including exact release identity
+        run: npm run check:ios
+      - name: Verify exact source SHA and native release identity
         run: npm run verify:release:native
       # After the build and the iOS bundle sync, so the scan reads the bytes
       # that ship: every tracked file (iOS bundles included) and client/dist.

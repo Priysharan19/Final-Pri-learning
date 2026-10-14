@@ -17,7 +17,9 @@ const BUNDLES = [
   { label: 'PriLearning.swiftpm', web: join(ROOT, 'ios', 'PriLearning.swiftpm', 'Resources', 'Web') },
   { label: 'PriLearning 2.swiftpm', web: join(ROOT, 'ios', 'PriLearning 2.swiftpm', 'Resources', 'Web') },
 ];
-const CHECK = process.argv.includes('--check');
+const CONTENT_ONLY = process.argv.includes('--check-content');
+const CHECK = process.argv.includes('--check') || CONTENT_ONLY;
+if (CONTENT_ONLY && process.argv.includes('--check')) throw new Error('Choose one native check mode');
 
 if (!existsSync(DIST)) {
   console.error('client/dist does not exist — run `npm run build` first.');
@@ -44,7 +46,13 @@ for (const bundle of BUNDLES) {
   const builtRelease = join(DIST, 'release.json');
   const bundledRelease = join(bundle.web, 'release.json');
 
-  if (CHECK && existsSync(bundledRelease) && readFileSync(bundledRelease, 'utf8') !== readFileSync(builtRelease, 'utf8')) {
+  if (!existsSync(builtRelease)) {
+    failed = true;
+    console.error('client/dist/release.json is missing.');
+  } else if (CHECK && !existsSync(bundledRelease)) {
+    failed = true;
+    console.error(`${bundle.label} release.json is missing.`);
+  } else if (CHECK && !CONTENT_ONLY && existsSync(bundledRelease) && readFileSync(bundledRelease, 'utf8') !== readFileSync(builtRelease, 'utf8')) {
     failed = true;
     console.error(`${bundle.label} release.json does not match this exact client build.`);
   } else if (!CHECK && existsSync(builtRelease)) {
