@@ -304,6 +304,25 @@ function onlineSession(platform, ctx, page) {
    * session cookie are written by product code, not by the test.
    */
   async function signIn({ name = 'Online Student', account = null } = {}) {
+    // The account-first first-run fixture has already signed the learner in
+    // through the shipped email OTP flow. Reuse THAT proven session instead of
+    // sending them to the obsolete Settings password card a second time.
+    const currentId = await page.evaluate(async () => {
+      try {
+        const r = await fetch('/v1/account/me', { credentials: 'include' });
+        return r.ok ? String((await r.json()).account?.id || '') : null;
+      } catch { return null; }
+    });
+    if (currentId && await page.locator('.shell').count()) {
+      if (account && String(account.id) !== currentId) {
+        throw new Error('online-session: requested another account without explicitly signing out');
+      }
+      const row = platform.h.db.prepare('SELECT id, name, email FROM accounts WHERE id=?').get(currentId);
+      if (!row) throw new Error('online-session: browser identity is absent from the platform database');
+      const who = { id: String(row.id), name: row.name, email: row.email, password: null };
+      session.account = who;
+      return who;
+    }
     const who = account || await platform.newAccount({ name });
     await page.goto(`${platform.origin}/settings`, { waitUntil: 'domcontentloaded' });
     const panel = page.locator('section', { has: page.locator('#cloud-account-title') });
