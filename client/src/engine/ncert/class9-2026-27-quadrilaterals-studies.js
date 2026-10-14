@@ -82,7 +82,10 @@ export const class9Quadrilaterals202627={
         "E": [
           0,
           4
-        ]
+        ],
+        "DE2": 25,
+        "DEtext": "5",
+        "BCtext": "10"
       }
     },
     {
@@ -347,7 +350,10 @@ export const class9Quadrilaterals202627={
         "E": [
           1,
           3
-        ]
+        ],
+        "DE2": 18,
+        "DEtext": "3√2",
+        "BCtext": "6√2"
       },
       "hint": "Use vectors to establish parallelism.",
       "commonWrong": "Half-length alone does not prove a parallel line.",
@@ -413,7 +419,10 @@ export const class9Quadrilaterals202627={
         "E": [
           2,
           4
-        ]
+        ],
+        "DE2": 25,
+        "DEtext": "5",
+        "BCtext": "10"
       },
       "hint": "Compare directed vectors.",
       "commonWrong": "Do not assume the midpoint segment lies on BC.",
