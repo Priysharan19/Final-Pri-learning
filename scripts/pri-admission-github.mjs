@@ -172,7 +172,15 @@ async function commitSignedTransaction(inspected,next,request,runId) {
 }
 async function transactRevocation(request,inspected,actor,runId,nowMs,secret) {
   const prior=inspected.replay.active.get(request.issue_number);
-  ensure(prior,'NO_AUTHORITY_GRANT_TO_REVOKE');
+  if(!prior) {
+    const latest=[...inspected.auth.log.events].reverse().find(e=>
+      e.payload.issue_number===request.issue_number);
+    ensure(latest?.payload.operation==='REVOKE', 'NO_AUTHORITY_GRANT_TO_REVOKE');
+    console.log(JSON.stringify({decision:'ALREADY_REVOKED_SIGNED_AUTHORITY',
+      receipt:eventDigest(latest.payload),issue_number:request.issue_number,
+      authority_head:inspected.auth.head,issue_reconciliation_required:true}));
+    return;
+  }
   const next=revokeAuthoritativeGrant(inspected.auth.log,request.issue_number,
     actor,runId,nowMs,secret,PUBKEY);
   const committed=await commitSignedTransaction(inspected,next,request,runId);
@@ -207,9 +215,18 @@ async function transact() {
   ensure(actor && Number.isSafeInteger(runId) && runId>0,'UNTRUSTED_ACTOR_OR_RUN');
   // GitHub environment required reviewer is independently configured.
   const env=await get('environments/pri-writer-admission');
-  ensure(env.prevent_self_review===true &&
-    env.protection_rules?.some(r=>r.type==='required_reviewers' && r.reviewers?.length>0),
+  const policy=env.protection_rules?.find(r=>r.type==='required_reviewers');
+  ensure(policy?.prevent_self_review===true &&
+    policy.reviewers?.some(r=>r.type==='User' && r.reviewer?.login==='Kalp-Bajpai'),
     'INDEPENDENT_ENVIRONMENT_APPROVAL_REQUIRED');
+  const approvals=await get('actions/runs/'+runId+'/approvals');
+  ensure(Array.isArray(approvals) && approvals.some(a=>
+    a.state==='approved' && a.user?.login==='Kalp-Bajpai' &&
+    a.user.login!==actor && a.environments?.some(e=>e.name==='pri-writer-admission')),
+    'AUTHENTICATED_INDEPENDENT_RUN_APPROVAL_REQUIRED');
+  const securityPermission=await get('collaborators/Kalp-Bajpai/permission');
+  ensure(['admin','maintain','write'].includes(securityPermission.permission),
+    'ENVIRONMENT_APPROVER_NOT_AUTHORITATIVE_WRITER');
   const permission=await get('collaborators/'+encodeURIComponent(actor)+'/permission');
   ensure(['admin','maintain','write'].includes(permission.permission),'ACTOR_NOT_REPOSITORY_WRITER');
   await assertProtection();
