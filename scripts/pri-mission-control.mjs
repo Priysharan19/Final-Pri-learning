@@ -115,8 +115,8 @@ function transition(record, next) {
   // through the separate authoritative serialized controller.
   if (WRITER_STATES.has(next) && !WRITER_STATES.has(record.status))
     throw new Error('SERIALIZED_ADMISSION_REQUIRED: cannot acquire a writer lease with transition');
-  if (WRITER_STATES.has(next) && !freshness(record.lease_heartbeat_at).valid)
-    throw new Error('EXPIRED_WRITER_LEASE: release and re-admit before further code writing');
+  if (WRITER_STATES.has(next))
+    throw new Error('SIGNED_SERIALIZED_GOVERNOR_LEASE_REQUIRED: transition cannot prove writer renewal');
   const allowed = control.transitions[record.status] || [];
   if (!allowed.includes(next)) throw new Error(`transition ${record.status} -> ${next} is not allowed`);
   // A transition never fabricates progress or extends the writer lease.
@@ -145,7 +145,8 @@ function leaseStatus(record, now = Date.now()) {
   if (!WRITER_STATES.has(record.status)) return { valid: false, reason: `state ${record.status} does not hold a code-writer lease` };
   const errors = validateRecord(record);
   if (errors.length) return { valid: false, reason: `invalid record: ${errors.join('; ')}` };
-  return freshness(record.lease_heartbeat_at, now);
+  // Editable heartbeats are audit metadata, not a signed governor grant.
+  return {valid:false,reason:'SIGNED_SERIALIZED_GOVERNOR_LEASE_REQUIRED',heartbeat_structurally_valid:true};
 }
 
 function markerValues(body, key) {
