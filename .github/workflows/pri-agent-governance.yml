@@ -285,6 +285,13 @@ jobs:
         shell: bash
         run: node client/test/pri-mission-control-regression.mjs
 
+      - name: Signed governor event lineage and competing-CAS regression
+        shell: bash
+        run: node client/test/pri-admission-state-check.mjs
+
+      - name: Manual lane exact-head approval regression
+        run: node client/test/pri-manual-authorization-check.mjs
+
       - name: PR lane classifier self-test
         shell: bash
         run: |
@@ -350,6 +357,27 @@ jobs:
           echo "mission=$mission" >> "$GITHUB_OUTPUT"
           echo "risk=$declared_risk" >> "$GITHUB_OUTPUT"
 
+      # A task/* or feature/* prefix alone NEVER authenticates a human writer.
+      # Execute the guard from protected main, not from the candidate PR.
+      - name: Checkout protected manual-lane verifier
+        if: github.event_name == 'pull_request' && steps.meta.outputs.lane == 'manual-governed'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: main
+          path: trusted-manual-governor
+          persist-credentials: false
+
+      - name: Verify exact-head independent manual authorisation
+        if: github.event_name == 'pull_request' && steps.meta.outputs.lane == 'manual-governed'
+        working-directory: trusted-manual-governor
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          test -f scripts/pri-manual-authorization.mjs
+          node scripts/pri-manual-authorization.mjs
+
       - name: Snapshot GitHub-Issue mission ledger
         if: github.event_name == 'pull_request' && steps.meta.outputs.autonomous == 'true'
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
@@ -363,6 +391,23 @@ jobs:
               per_page: 100
             });
             fs.writeFileSync('/tmp/pri-issues.json', JSON.stringify(issues.filter(issue => !issue.pull_request), null, 2));
+
+      # PR code cannot forge its own writer grant. Verify using the trusted
+      # protected-main controller and its signed protected-ref event lineage.
+      - name: Checkout trusted protected-main admission authority
+        if: github.event_name == 'pull_request' && steps.meta.outputs.autonomous == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: main
+          path: trusted-pri-admission
+          persist-credentials: false
+
+      - name: Verify signed authoritative writer ledger
+        if: github.event_name == 'pull_request' && steps.meta.outputs.autonomous == 'true'
+        working-directory: trusted-pri-admission
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/pri-admission-github.mjs verify
 
       - name: Verify active writer lease
         if: github.event_name == 'pull_request' && steps.meta.outputs.autonomous == 'true'
