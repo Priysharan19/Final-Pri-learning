@@ -98,7 +98,15 @@ function audit(item,section) {
    if(w.kind==='nonparallel-corresponding')assert.notEqual(w.angles[0],w.angles[1]);
    else assert.notEqual(sum(w.angles),180);
    assert.deepEqual([...item.question.matchAll(/(\d+)°/g)].map(m=>Number(m[1])),w.angles,'printed nonparallel angle data changed');
-   assert.ok(/not parallel/i.test(item.answer));checks+=5;
+   assert.ok(/not parallel/i.test(item.answer)); 
+   const contradiction=w.kind==='nonparallel-corresponding'
+     ?w.angles[0]+'°≠'+w.angles[1]+'°'
+     :w.angles[0]+'°+'+w.angles[1]+'°='+sum(w.angles)+'°';
+   assert.ok(item.steps[1].includes(contradiction),item.id+' must show the true contradictory measured angles');
+   assert.ok(/not parallel|cannot be parallel/i.test(item.steps[2]),item.id+' lost the necessary negative theorem conclusion');
+   assert.ok(!/\b(?:are|is|must be) parallel\b/i.test(item.steps[2]) || /not parallel|cannot be parallel/i.test(item.steps[2]),
+     item.id+' asserts an unjustified positive parallel conclusion');
+   checks+=8;
   }else assert.fail('unrecognised angle type '+w.kind);
  }else if(section==='quadrilaterals'){
   if(w.kind==='fourth'){
@@ -199,7 +207,8 @@ function independentlyExpectedStepAnchor(item,type){
   }
   if(k==='corresponding')return ''+w.corresponding;
   if(k==='alternate-converse')return 'parallel';
-  if(k.startsWith('nonparallel'))return 'parallel';
+  if(k==='nonparallel-corresponding')return w.angles[0]+'°≠'+w.angles[1]+'°';
+  if(k==='nonparallel-cointerior')return w.angles[0]+'°+'+w.angles[1]+'°='+sum(w.angles)+'°';
  }
  if(type==='quadrilaterals'){
   if(k==='fourth')return coords(sub(add(w.A,w.C),w.B));
@@ -227,11 +236,31 @@ for(const [type,pack] of [['euclid',euclid],['angles',angles],['quadrilaterals',
   assert.notEqual(wrongAnswer,original.answer);
   assert.throws(()=>audit({...original,answer:wrongAnswer},type),'derived-value wrong answer survived: '+original.id);
   answerMutations++;
-  const decisiveStep=independentlyExpectedStepAnchor(original,type);
-  const wrongSteps=original.steps.map(s=>s.replaceAll(decisiveStep,'ERRONEOUS DERIVATION'));
-  assert.notDeepEqual(wrongSteps,original.steps,'no matching calculated step token: '+original.id);
-  assert.throws(()=>audit({...original,steps:wrongSteps},type),'invalid decisive reasoning step survived: '+original.id);
-  stepMutations++;
+  // Plausible mathematical errors only. Do not count target-deletion sentinels as proof tests.
+  const witness=original.proof||original.witness;
+  const derived=independentlyExpectedStepAnchor(original,type);
+  if(/-?\d+(?:\.\d+)?/.test(derived)){
+   const bad=derived.replace(/-?\d+(?:\.\d+)?/,v=>String(Number(v)+1));
+   const wrongSteps=original.steps.map(s=>s.replace(derived,bad));
+   if(JSON.stringify(wrongSteps)!==JSON.stringify(original.steps)){
+    assert.throws(()=>audit({...original,steps:wrongSteps},type),'plausible arithmetic step mutation survived: '+original.id);
+    stepMutations++;
+   }
+  }
+  if(type==='angles'&&witness.kind.startsWith('nonparallel')){
+   const last=original.steps[2];
+   const flipped=last.replace('not parallel','parallel').replace('cannot be parallel','can be parallel');
+   assert.notEqual(last,flipped,'no negative theorem conclusion available to challenge');
+   const wrongSteps=[...original.steps.slice(0,2),flipped];
+   assert.throws(()=>audit({...original,steps:wrongSteps},type),'false positive-parallel claim survived: '+original.id);
+   stepMutations++;
+   const target=independentlyExpectedStepAnchor(original,type);
+   assert.ok(original.steps[1].includes(target),'premise contradiction not present');
+   const corrupted=original.steps.map(s=>s.replace(target,target.replace(/=\d+°/, '=180°').replace('≠','=')));
+   assert.notDeepEqual(corrupted,original.steps,'contradiction mutation failed');
+   assert.throws(()=>audit({...original,steps:corrupted},type),'altered contradiction survived: '+original.id);
+   stepMutations++;
+  }
   if(original.figure){
    assert.throws(()=>audit({...original,figure:{...original.figure,alt:''}},type),'missing accessibility description survived');
    diagramMutations++;
@@ -246,8 +275,8 @@ for(const [type,pack] of [['euclid',euclid],['angles',angles],['quadrilaterals',
  }
 }
 assert.equal(ids.size,45,'new 45-item coverage');
-assert.equal(answerMutations,45);assert.equal(stepMutations,45);
+assert.equal(answerMutations,45);assert.ok(stepMutations>=10,'insufficient meaningful step mutations');
 console.log('PASS Mission 004 Class IX: 60 previous + 45 new = 105 displayed items checked.');
-console.log('New 45: '+checks+' calculated answer/premise/geometry validations, 45/45 domain-anchored plausible wrong answers rejected; 45/45 decisive computed step tokens corrupted and rejected; full line-by-line proof audit pending.');
+console.log('New 45: '+checks+' calculated answer/premise/geometry validations, 45/45 domain-anchored plausible wrong answers rejected; '+stepMutations+' plausible arithmetic/polarity step mutations rejected (not 45 full proofs); independent line-by-line proof audit pending.');
 console.log('Also caught '+premiseMutations+' altered angle premises and '+diagramMutations+' missing required accessibility descriptions.');
 console.log('LIMIT: complete independent mathematical proof/historical review and rendered figure quality still pending; older 60 did not yet receive the new step/premise mutation protocol.');
