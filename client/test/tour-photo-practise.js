@@ -33,8 +33,10 @@ export const flow = {
           candidates: [{ chapterId: 'c10-quadratic-equations', chapterName: 'Quadratic Equations', grade: 10, skillId: 'c10-quadratic-discriminant', dotpoint: 2, confidence: 0.91 }]
         } });
       }
-      // All authentication and grading requests go to the real backend.
-      // Only the external image-recognition provider path is scripted here.
+      // Every other request goes to the real backend. The identify endpoint
+      // itself is synthetic here, including its server-side auth, quota and
+      // validation decisions; this does NOT certify that route or its provider.
+      // Dedicated real-provider acceptance must cover that boundary.
       return route.continue();
     });
 
