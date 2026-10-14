@@ -22,7 +22,7 @@ import { TEMPLATES } from '../src/ink/templates.js';
 import { turnOnServerReading } from './fakeServerReader.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
-const TOPIC = 'c7-simple-equations';
+const TOPIC = 'c7-finding-unknown-current';
 const WRONG_1 = '-987654';
 const WRONG_2 = '-9876541';
 const MAX_QUESTIONS = 8;
