@@ -408,8 +408,12 @@ try {
   // ── Answer-blindness at the route (no provider call is made by a refusal) ──
   const leak = await http('/v1/handwriting/transcribe', { method: 'POST', jar, body: { image: tiny, expectedAnswer: '24' } });
   expect('blind', 'a transcribe body that names an answer is refused (400 HANDWRITING_NOT_ANSWER_BLIND)', leak.status === 400 && leak.code === 'HANDWRITING_NOT_ANSWER_BLIND', `${leak.status} ${leak.code}`);
-  const leak2 = await http('/v1/handwriting/transcribe', { method: 'POST', jar, body: { image: tiny, questionId: 'anything' } });
-  expect('blind', 'a transcribe body that names a question is refused (400)', leak2.status === 400, `${leak2.status} ${leak2.code}`);
+  // questionId is a permitted opaque receipt-binding identifier: it never
+  // enters the provider prompt. Only question CONTENT is forbidden here.
+  const leak2 = await http('/v1/handwriting/transcribe', { method: 'POST', jar, body: { image: tiny, question: 'What is 2 + 2?' } });
+  expect('blind', 'a transcribe body containing question TEXT is refused without a paid read',
+    leak2.status === 400 && leak2.code === 'HANDWRITING_NOT_ANSWER_BLIND',
+    `${leak2.status} ${leak2.code}`);
 
   // ── Questions: issued by the server, which chooses the seed ────────────────
   const PROMPT = /first term \$(-?\d+)\$ and common difference \$(-?\d+)\$, which term is equal to \$(-?\d+)\$\? Give the term number\./;
@@ -758,7 +762,13 @@ try {
       if (recognised.res.status === 201) {
         if (row.pass !== null) unverified.push({ id, what: 'the receipt route answered inside the 2000 ms budget on this run, so its timeout path was not observed' });
       } else {
-        expect(id, 'the receipt route also fails explicitly on a timeout and issues no receipt', recognised.res.status === 504 && recognised.res.code === 'HANDWRITING_TIMEOUT' && !recognised.receipt, `${recognised.res.status} ${recognised.res.code}`);
+        // The receipt route deliberately does NOT start a second provider
+        // read after a timeout. The old test expected another 504, but the
+        // no-paid-retry contract correctly returns 409: Read again explicitly.
+        const unavailable = recognised.res.status === 409 && recognised.res.code === 'RECOGNITION_READ_EXPIRED';
+        expect(id, 'no cached read: receipt refuses with Read again (409), no receipt or hidden second paid read',
+          unavailable && !recognised.receipt,
+          `${recognised.res.status} ${recognised.res.code}`);
         const marked = await slowHttp(`/v1/practice/${sq.id}/submit`, { method: 'POST', jar: slow.jar, body: { submissionId: `accept-timeout-${randomBytes(5).toString('hex')}`, answer: '0', mode: 'ink' } });
         expect(id, 'nothing can be marked without a reading: 422, no verdict', marked.status === 422 && !('correct' in (marked.data || {})), `${marked.status} ${marked.code}`);
         row.marks = `no receipt (${recognised.res.status} ${recognised.res.code}); submit → ${marked.status} ${marked.code}`;
