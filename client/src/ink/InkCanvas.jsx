@@ -62,7 +62,13 @@ const InkCanvas = forwardRef(function InkCanvas({
   disabledRef.current = disabled;
   fingerRef.current = fingerMode;
 
-  const notify = useCallback(() => { onStrokesChange?.(strokesRef.current); }, [onStrokesChange]);
+  // Parent save/recognition state changes must not tear down the canvas
+  // ResizeObserver or native pointer listeners while a stroke is in progress.
+  const onStrokesChangeRef = useRef(onStrokesChange);
+  onStrokesChangeRef.current = onStrokesChange;
+  const notify = useCallback(() => {
+    onStrokesChangeRef.current?.(strokesRef.current);
+  }, []);
 
   /** Reading a CSS custom property forces a style recalc, so it never happens
    *  in the frame loop — only when the theme actually changes. */
@@ -202,6 +208,9 @@ const InkCanvas = forwardRef(function InkCanvas({
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
       const w = wrap.clientWidth;
+      // Hidden tabs/panels can report zero width transiently. A zero-sized
+      // bitmap destroys visible ink and must not overwrite its known geometry.
+      if (!Number.isFinite(w) || w <= 0) return;
       // Rotation, split view or a resized window changes the width under ink
       // that was written in CSS pixels. Scale it uniformly with the width so
       // the work keeps its shape instead of being clipped (CP-03).
@@ -209,41 +218,65 @@ const InkCanvas = forwardRef(function InkCanvas({
       // lowest point stays inside the canvas height. Points are copied, never
       // mutated, so snapshots held elsewhere keep their coordinates.
       const prev = widthRef.current;
-      if (prev > 0 && w > 0 && Math.abs(w - prev) >= 1 && strokesRef.current.length) {
+      if (prev > 0 && Math.abs(w - prev) >= 1 && (strokesRef.current.length || currentRef.current)) {
         let f = w / prev;
         if (f > 1) {
           let maxY = 0;
           for (const stroke of strokesRef.current) for (const pt of stroke?.points || []) maxY = Math.max(maxY, pt.y);
+          for (const pt of currentRef.current?.points || []) maxY = Math.max(maxY, pt.y);
           if (maxY > 0) f = Math.max(1, Math.min(f, (height - 8) / maxY));
         }
         if (Math.abs(f - 1) > 1e-3) {
+          const scalePoint = pt => ({ ...pt, x: pt.x * f, y: pt.y * f });
           const scale = list => list.map(stroke => ({
-            ...stroke, points: (stroke?.points || []).map(pt => ({ ...pt, x: pt.x * f, y: pt.y * f }))
+            ...stroke, points: (stroke?.points || []).map(scalePoint)
           }));
           strokesRef.current = scale(strokesRef.current);
           redoRef.current = scale(redoRef.current);
+          // Resize can happen between pointerdown and pointerup (split-view,
+          // keyboard, orientation). Preserve the unfinished line as well.
+          if (currentRef.current) {
+            currentRef.current.points = currentRef.current.points.map(scalePoint);
+            currentRef.current.drawnTo = 0;
+          }
           // A resolved (disabled) answer is never re-read: its marked reading
           // and verdict geometry stay exactly as they were marked.
           if (!disabledRef.current) queueMicrotask(notify);
         }
       }
-      if (w > 0) widthRef.current = w;
-      for (const c of [baseRef.current, liveRef.current]) {
-        if (!c) continue;
-        c.width = Math.round(w * dpr);
-        c.height = Math.round(height * dpr);
-        c.style.width = w + 'px';
-        c.style.height = height + 'px';
+      widthRef.current = w;
+      const pxWidth = Math.round(w * dpr);
+      const pxHeight = Math.round(height * dpr);
+      const canvases = [baseRef.current, liveRef.current].filter(Boolean);
+      // Assigning canvas.width or .height CLEARS the bitmap, even when the
+      // assigned value is unchanged. ResizeObserver and React callback churn
+      // previously cleared real student strokes on spurious notifications.
+      const bitmapChanged = canvases.some(c => c.width !== pxWidth || c.height !== pxHeight);
+      for (const c of canvases) {
+        if (bitmapChanged) {
+          if (c.width !== pxWidth) c.width = pxWidth;
+          if (c.height !== pxHeight) c.height = pxHeight;
+        }
+        if (c.style.width !== w + 'px') c.style.width = w + 'px';
+        if (c.style.height !== height + 'px') c.style.height = height + 'px';
       }
+      if (!bitmapChanged) return;
       primeContexts();
       predRectRef.current = null;
+      predictedRef.current = [];
       redrawBase();
+      // The resized live bitmap is empty: replay any in-flight pen points.
+      if (currentRef.current) {
+        currentRef.current.drawnTo = 0;
+        dirtyRef.current = true;
+        scheduleFrame();
+      }
     };
     resize();
     const ro = new ResizeObserver(resize);
     ro.observe(wrap);
     return () => ro.disconnect();
-  }, [height, redrawBase, primeContexts, notify]);
+  }, [height, redrawBase, primeContexts, notify, scheduleFrame]);
 
   // repaint committed ink when the theme flips (this also refreshes cached ink)
   useEffect(() => {

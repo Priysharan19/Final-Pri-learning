@@ -39,7 +39,7 @@
 // Run on its own:  node client/test/tour-online-check.js
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
-import { handwrite } from './fakeServerReader.js';
+import { handwrite, pressRead } from './fakeServerReader.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
 const TOPIC = 'y7-equations';
@@ -229,7 +229,7 @@ export const typeSignedOut = {
     // ── sign in, on the card ─────────────────────────────────────────────────
     await page.locator('.verdict [data-check-sign-in]').click();
     const account = await online.signInHere(page.locator('.qpage'), { name: 'Signed Out Typist' });
-    await page.waitForFunction(() => !document.querySelector('[data-check-needs-account]') && !document.querySelector('.qpage #cloud-password'), null, { timeout: 30000 }).catch(() => {});
+    await page.waitForFunction(() => !document.querySelector('[data-check-needs-account]') && !document.querySelector('.qpage [data-signin-card]'), null, { timeout: 30000 }).catch(() => {});
     await check('signed in on the real server without leaving the question: same page, no reload',
       new URL(page.url()).pathname === '/practice' && await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' &&
         (await online.linkedAccounts())?.includes(account.id), page.url());
@@ -380,6 +380,7 @@ export const writeOffline = {
     const blank = await inkOnCanvas(page);
     reader.text = known.text;
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), known.text);
+    await pressRead(page);   // reading is asked for: nothing is read because ink was drawn
     await page.waitForSelector('.ink-line', { timeout: 20000 }).catch(() => {});
     const lines = await page.locator('.ink-line').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-text')));
     await check(`online, the writing is read and shown as one line [${SYNTHETIC_EVIDENCE}]`,
@@ -623,28 +624,64 @@ export const syncOverlap = {
     }));
     let rows = [];
     let rounds = 0;
+    const roundsSeen = [];
     for (; rounds < 4; rounds++) {
       const known = await openTypedQuestion({ page, base, settle, online });
       if (!known) break;
+      const before = online.ledger(known.serverQuestionId);
+      // Every round must start with a NEW server-issued question, not the
+      // previous question's sealed answer reused after a partial reload.
+      if (before.thisDone !== 0 || known.accountId !== online.account?.id) {
+        roundsSeen.push({ round: rounds + 1, question: known.serverQuestionId,
+          issue: 'not a fresh question for the signed-in account', before });
+        break;
+      }
       await page.locator('.editor-body input.answer-input').fill(known.text);
-      // The connection flaps around the submit: every return starts a sync pull.
+      // Exercise the actual offline/online race, including a click that lands
+      // while the browser is offline. An offline click that did not leave the
+      // browser is NOT a submitted answer, and must be retried explicitly.
       const flap = (async () => { for (let i = 0; i < 12; i++) {
         await ctx.setOffline(true); await page.evaluate(() => window.dispatchEvent(new Event('offline')));
         await ctx.setOffline(false); await page.evaluate(() => window.dispatchEvent(new Event('online')));
         await page.waitForTimeout(25);
       } })();
-      await submitButton(page).click().catch(() => {});
+      const firstClick = await submitButton(page).click().then(() => true, () => false);
       await flap;
-      await page.waitForSelector('.eval-card, .verdict', { timeout: 20000 }).catch(() => {});
-      const retry = page.locator('[data-check-retry]');
-      if (await retry.count()) { await retry.click(); await page.waitForSelector('.eval-card, .verdict-bad', { timeout: 20000 }).catch(() => {}); }
-      await page.waitForTimeout(2500);   // a late pull would land now
-      rows = await rowsNow() || [];
+      let complete = false;
+      let retried = 0;
+      // After reconnection, give the card its actual acknowledgement/retry
+      // cycle. Do not move to another question while a submitted attempt is
+      // unknown: that could hide an unmarked answer behind a successful count.
+      for (let poll = 0; poll < 60; poll++) {
+        rows = await rowsNow() || [];
+        const finished = online.ledger(known.serverQuestionId).thisDone === 1;
+        if (finished && rows.length === rounds + 1) { complete = true; break; }
+        const retry = page.locator('[data-check-retry]');
+        if (await retry.isVisible().catch(() => false) && await retry.isEnabled()) {
+          await retry.click();
+          retried++;
+        } else if (!finished && await submitButton(page).isVisible().catch(() => false)
+            && await submitButton(page).isEnabled()) {
+          // The original press was not dispatched/received, or the card has
+          // settled back to editable work. A student must press it explicitly.
+          await submitButton(page).click();
+          retried++;
+        }
+        await page.waitForTimeout(250);
+      }
+      roundsSeen.push({ round: rounds + 1, question: known.serverQuestionId,
+        firstClick, retried, completed: complete,
+        serverDone: online.ledger(known.serverQuestionId).thisDone,
+        deviceRows: rows.length });
+      if (!complete) break;
     }
     const perServerAttempt = new Map();
     for (const a of rows) perServerAttempt.set(a.server, (perServerAttempt.get(a.server) || 0) + 1);
     const ledger = online.ledger();
-    await check('four answers were submitted under a flapping connection, each marked by the server', rounds === 4 && ledger.completions === 4, `${rounds} rounds; ${JSON.stringify(ledger)}`);
+    await check('four answers were submitted under a flapping connection, each marked by the server',
+      roundsSeen.length === 4 && roundsSeen.every(r => r.completed && r.serverDone === 1)
+        && ledger.completions === 4 && ledger.issued >= 4,
+      `${roundsSeen.length} rounds; ${JSON.stringify(ledger)}; ${JSON.stringify(roundsSeen)}`);
     await check('no server attempt appears as two attempt rows on the device: one row per answer',
       rows.length === 4 && [...perServerAttempt.values()].every(n => n === 1) && !perServerAttempt.has(null), JSON.stringify(rows));
   }

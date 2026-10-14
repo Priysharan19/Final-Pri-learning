@@ -152,9 +152,14 @@ export async function consentState(db, accountId) {
   // for an explicit guardian withdrawal, which is permission-reducing and wins.
   // A historical pending/given row remains evidence of an earlier ceremony, not
   // authority to keep an explicitly-adult account blocked forever.
-  const account = await db.get('SELECT age_basis FROM accounts WHERE id = ?', [accountId]);
-  const basis = account?.age_basis ?? null;
-  const row = await db.get('SELECT * FROM guardian_consents WHERE account_id = ?', [accountId]);
+  // One SQL snapshot reads age authority AND guardian ceremony together.
+  // Separate reads can straddle a concurrent withdrawal/reclassification on
+  // PostgreSQL and wrongly pair another moment's consent with an old age.
+  const snapshot = await db.get(`SELECT a.age_basis, g.*
+    FROM accounts a LEFT JOIN guardian_consents g ON g.account_id = a.id
+    WHERE a.id = ?`, [accountId]);
+  const basis = snapshot?.age_basis ?? null;
+  const row = snapshot?.account_id ? snapshot : null;
 
   // Withdrawal is permission-reducing authority and always wins, even if the
   // learner corrected their age basis after the guardian ceremony began. This

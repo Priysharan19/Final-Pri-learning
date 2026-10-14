@@ -135,7 +135,7 @@ function buildApp() {
     // signs up a Teacher and audits /teach; the Teacher role is offered to a
     // new profile only under EXTENDED_TRACKS, so without it here the suite
     // only passes where the CI job happens to export the variable.
-    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1' } });
+    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' } });
   if (r.status !== 0) throw new Error(`the build failed:\n${r.stdout || ''}${r.stderr || ''}`);
   if (!existsSync(join(out, 'index.html'))) throw new Error('the build emitted no index.html');
   return out;
@@ -543,6 +543,7 @@ async function run() {
   let dist = null, server = null, browser = null, platform = null;
   let online = null;
   const refusals = {};
+  const signInCard = {};
   const routesSeen = new Set();
   const views = [];
   const skipped = [];
@@ -628,6 +629,72 @@ async function run() {
       await page.goto(BASE, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('.auth-wrap', { timeout: 20000 });
       await wait(page, 600);
+    });
+
+    // ── the same card, one and two steps on ─────────────────────────────────
+    // The landing screen IS the sign-in card; its code and "about you" steps
+    // replace the welcome heading in place, so each is audited as a view of
+    // its own (one <h1>, every field named, nothing reachable only by mouse).
+    // The code is read from the server's test mail adapter: no email is sent.
+    await step('login · sign-in card, code', '/', async () => {
+      const address = `a11y.walk.${Date.now().toString(36)}@example.test`;
+      signInCard.address = address;
+      await page.locator('[data-signin-card] #signup-destination').fill(address);
+      await page.keyboard.press('Enter');
+      await page.waitForSelector('[data-signin-card] #signup-code-0', { timeout: 20000 });
+      await wait(page, 300);
+      signInCard.code = await page.evaluate(() => {
+        const group = document.querySelector('[data-signin-card] .otp-boxes');
+        const boxes = [...document.querySelectorAll('[data-signin-card] .otp-box')];
+        const labelled = (group?.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean).map(id => (document.getElementById(id)?.textContent || '').trim());
+        const live = group?.querySelector('[role="status"][aria-live="polite"]');
+        const resend = document.querySelector('[data-testid="signup-resend"]');
+        return {
+          role: group?.getAttribute('role') || '', labelled,
+          boxNames: boxes.map(b => b.getAttribute('aria-label') || ''),
+          hints: boxes.map(b => `${b.getAttribute('inputmode')}|${b.getAttribute('autocomplete')}`),
+          focus: document.activeElement?.id || '', live: !!live,
+          resend: resend ? { tag: resend.tagName.toLowerCase(), name: (resend.textContent || '').trim(), disabled: resend.disabled } : null,
+          verify: (document.querySelector('[data-testid="signup-verify"]')?.textContent || '').trim()
+        };
+      });
+      // A wrong code: how the refusal is announced and tied to the boxes.
+      const sent = platform.sms.readTestOutbox({ to: address, channel: 'email' }).at(-1);
+      signInCard.sent = /^\d{6}$/.test(sent?.code || '');
+      await page.keyboard.type(sent.code === '000000' ? '111111' : '000000');
+      await page.waitForSelector('[data-testid="signup-error"]', { timeout: 15000 });
+      signInCard.wrong = await page.evaluate(() => {
+        const error = document.querySelector('[data-testid="signup-error"]');
+        const first = document.getElementById('signup-code-0');
+        return {
+          role: error?.getAttribute('role') || '', text: (error?.textContent || '').trim(), id: error?.id || '',
+          described: first?.getAttribute('aria-describedby') || '', invalid: first?.getAttribute('aria-invalid') || '',
+          focus: document.activeElement?.id || '', cleared: [...document.querySelectorAll('[data-signin-card] .otp-box')].every(b => b.value === '')
+        };
+      });
+    });
+
+    await step('login · sign-in card, about you', '/', async () => {
+      const sent = platform.sms.readTestOutbox({ to: signInCard.address, channel: 'email' }).at(-1);
+      await page.locator('#signup-code-0').focus();
+      await page.keyboard.type(sent.code);
+      await page.waitForSelector('[data-signin-card] #signup-flow-name', { timeout: 20000 });
+      await wait(page, 300);
+      signInCard.about = await page.evaluate(() => {
+        const agree = document.querySelector('[data-testid="signup-agree"]');
+        const ages = [...document.querySelectorAll('[data-testid^="signup-age-"]:not([data-testid="signup-age-next"])')];
+        const group = ages[0]?.closest('[role="group"]');
+        return {
+          focus: document.activeElement?.id || '', focusTag: document.activeElement?.tagName.toLowerCase() || '',
+          nameLabel: (document.querySelector('label[for="signup-flow-name"]')?.textContent || '').trim(),
+          ageGroup: (document.getElementById(group?.getAttribute('aria-labelledby') || '')?.textContent || '').trim(),
+          agesPressed: ages.map(a => a.getAttribute('aria-pressed')),
+          agreeLabel: (agree?.closest('label')?.textContent || '').trim().slice(0, 60), agreeChecked: agree?.checked
+        };
+      });
+      await page.locator('[data-testid="signup-age-15"]').focus();
+      await page.keyboard.press('Space');
+      signInCard.picked = await page.locator('[data-testid="signup-age-15"]').getAttribute('aria-pressed');
     });
 
     // ── the skip link, measured on a page nothing has focused yet ────────────
@@ -817,7 +884,7 @@ async function run() {
       const button = page.locator('.verdict [data-check-sign-in]');
       await button.focus();
       await page.keyboard.press('Enter');
-      await page.waitForSelector('.qpage #cloud-password', { timeout: 20000 });
+      await page.waitForSelector('.qpage [data-signin-card] #signup-destination', { timeout: 20000 });
       await wait(page, 500);
       // Focus order: from the button that opened it, Tab goes into the panel
       // it opened (inside the card), not on past it to the rest of the page.
@@ -837,7 +904,7 @@ async function run() {
     // signed in on the card (the real server, a real verified account)
     try {
       await online.signInHere(page.locator('.qpage'), { name: 'Accessibility Student' });
-      await page.waitForFunction(() => !document.querySelector('.qpage #cloud-password'), null, { timeout: 30000 }).catch(() => { });
+      await page.waitForFunction(() => !document.querySelector('.qpage [data-signin-card]'), null, { timeout: 30000 }).catch(() => { });
       refusals.signedIn = true;
     } catch (err) {
       skipped.push(`practice · signing in on the card — ${String(err.message || err).split('\n')[0].slice(0, 130)}`);
@@ -879,6 +946,58 @@ async function run() {
       } finally {
         await online.reconnect();
       }
+    });
+
+    // read on request (review 17, F4): the Read / reading / read / stale states
+    // of a handwritten answer, driven from the keyboard on the real server with
+    // the scripted stand-in reader. Where focus goes when "Read my answer"
+    // leaves the page, and what the stale and submit-reason states say.
+    await step('practice · read on request', '/practice', async () => {
+      await typedQuestion();
+      const writeTab = page.getByRole('button', { name: 'Answer by handwriting' });
+      if (!(await writeTab.count())) throw new Error('this question offers no handwriting tab');
+      await writeTab.click();
+      await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+      const box = await page.locator('.ink-canvas-live').boundingBox();
+      const stroke = async (x) => {
+        await page.mouse.move(box.x + x, box.y + 40);
+        await page.mouse.down();
+        for (let i = 1; i <= 8; i++) await page.mouse.move(box.x + x + i * 3, box.y + 40 + i * 9);
+        await page.mouse.up();
+        await wait(page, 700);
+      };
+      const focusNow = () => page.evaluate(() => {
+        const el = document.activeElement;
+        return { tag: (el?.tagName || '').toLowerCase(), body: el === document.body || !el, inInk: !!el?.closest?.('.ink-answer'), role: el?.getAttribute?.('role') || null, id: el?.id || null, text: (el?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60) };
+      });
+      const reason = () => page.evaluate(() => {
+        const r = document.querySelector('[data-submit-reason]');
+        const b = document.querySelector('.ws-actions .btn-primary');
+        return r ? { key: r.getAttribute('data-submit-reason'), role: r.getAttribute('role'), text: (r.textContent || '').trim(), describes: !!b && b.getAttribute('aria-describedby') === r.id, disabled: !!b && b.disabled } : null;
+      });
+      platform.reader.lines = null; platform.reader.text = '7'; platform.reader.confidence = 0.97;
+      let release; platform.reader.gate = new Promise(resolve => { release = resolve; });
+      try {
+        await stroke(60);
+        const read = page.locator('[data-ink-read]').first();
+        await read.waitFor({ timeout: 15000 });
+        refusals.read = { unread: await reason(), button: await read.evaluate(b => ({ tag: b.tagName.toLowerCase(), name: (b.textContent || '').trim() })) };
+        await read.focus();
+        await page.keyboard.press('Enter');
+        await wait(page, 600);
+        refusals.read.during = { focus: await focusNow(), spoken: await spokenNow(), button: await page.locator('[data-ink-read]').count() };
+        release(); platform.reader.gate = null;
+        await page.waitForSelector('.ink-line', { timeout: 20000 });
+        await wait(page, 500);
+        refusals.read.after = { focus: await focusNow(), lines: await page.locator('.ink-line').count() };
+        await stroke(160);
+        await page.waitForSelector('[data-ink-stale]', { timeout: 15000 });
+        refusals.read.stale = {
+          label: await page.locator('[data-ink-stale]').evaluate(el => ({ role: el.getAttribute('role'), text: (el.textContent || '').trim() })),
+          again: await page.locator('[data-ink-read="again"]').evaluate(b => ({ tag: b.tagName.toLowerCase(), name: (b.textContent || '').trim() })).catch(() => null),
+          reason: await reason()
+        };
+      } finally { release?.(); platform.reader.gate = null; platform.reader.text = '7'; platform.reader.confidence = 0.6; }
     });
 
     // the marked state — the verdict, the evaluation card and the criteria table
@@ -1338,6 +1457,25 @@ async function run() {
         `the live regions on the marked page said ${JSON.stringify(liveVerdict.after)}`);
     }
 
+    section('the sign-in card');
+    ok('the code step is one labelled group — "Check your email" and where the code went — and the caret starts in its first box',
+      signInCard.code?.role === 'group' && /Check your email/.test(signInCard.code.labelled?.[0] || '') && (signInCard.code.labelled?.[1] || '').includes(signInCard.address || 'no address') &&
+        signInCard.code.focus === 'signup-code-0', JSON.stringify(signInCard.code));
+    ok('each of the six boxes has its own name, asks for a numeric keypad, and the first asks for the code from the message',
+      signInCard.code?.boxNames?.length === 6 && signInCard.code.boxNames.every((name, i) => name === `Digit ${i + 1} of 6`) &&
+        signInCard.code.hints.every(h => h.startsWith('numeric|')) && signInCard.code.hints[0] === 'numeric|one-time-code', JSON.stringify(signInCard.code));
+    ok('progress through the boxes has a polite live region; Verify and Resend are real, named buttons, and the countdown is in Resend\'s name',
+      signInCard.code?.live === true && signInCard.code.verify === 'Verify and continue' && signInCard.code.resend?.tag === 'button' &&
+        /^Resend code in \d+ s$/.test(signInCard.code.resend.name) && signInCard.code.resend.disabled === true, JSON.stringify(signInCard.code));
+    ok('a wrong code is an alert in words, tied to the boxes (aria-describedby, aria-invalid), and focus returns to the first, empty box',
+      signInCard.sent === true && signInCard.wrong?.role === 'alert' && /isn’t right/.test(signInCard.wrong.text) && signInCard.wrong.described === signInCard.wrong.id &&
+        signInCard.wrong.invalid === 'true' && signInCard.wrong.focus === 'signup-code-0' && signInCard.wrong.cleared === true, JSON.stringify(signInCard.wrong));
+    ok('the next step takes focus on its heading; the name is labelled, the ages are one named group with nothing preselected, and agreeing is a labelled, unticked checkbox',
+      signInCard.about?.focus === 'signup-step-title' && signInCard.about.focusTag === 'h1' && /first name/i.test(signInCard.about.nameLabel) && /How old/i.test(signInCard.about.ageGroup) &&
+        signInCard.about.agesPressed.length === 8 && signInCard.about.agesPressed.every(p => p === 'false') && /I have read/.test(signInCard.about.agreeLabel) && signInCard.about.agreeChecked === false,
+      JSON.stringify(signInCard.about));
+    ok('an age is chosen from the keyboard and says so (aria-pressed)', signInCard.picked === 'true', String(signInCard.picked));
+
     section('online-only checking');
     ok('signed out, the card says before Submit that checking needs an account: a labelled group holding a real, named sign-in button',
       refusals.notice?.role === 'group' && !!refusals.notice.label && /needs a Pri account/i.test(refusals.notice.text) &&
@@ -1369,6 +1507,23 @@ async function run() {
     ok('signed out, Rapid Fire and Match that do not start are alerts in words with the same named sign-in — and no clock or question appears',
       announced(refusals.rush) && refusals.rush.clock === 0 && announced(refusals.match) && refusals.match.question === 0,
       JSON.stringify({ rush: refusals.rush, match: refusals.match }));
+
+    section('read on request');
+    ok('handwriting not yet read: a real, named "Read my answer" button, and Submit says why it is unavailable in a status the button is described by',
+      refusals.read?.button?.tag === 'button' && /\p{L}/u.test(refusals.read.button.name) && refusals.read.unread?.role === 'status' &&
+        /\p{L}/u.test(refusals.read.unread.text) && refusals.read.unread.describes === true && refusals.read.unread.disabled === true,
+      JSON.stringify({ button: refusals.read?.button, unread: refusals.read?.unread }));
+    ok('activating "Read my answer" from the keyboard does not drop focus to <body>: while the page is read, focus rests on the announced reading status inside the writing surface',
+      refusals.read?.during?.button === 0 && refusals.read.during.focus.body === false && refusals.read.during.focus.inInk === true &&
+        refusals.read.during.focus.role === 'status' && /\p{L}/u.test(refusals.read.during.focus.text),
+      JSON.stringify(refusals.read?.during));
+    ok('when the reading lands, focus moves to the reading itself — still inside the writing surface, never <body>',
+      refusals.read?.after?.lines >= 1 && refusals.read.after.focus.body === false && refusals.read.after.focus.inInk === true && refusals.read.after.focus.id === 'ink-reading',
+      JSON.stringify(refusals.read?.after));
+    ok('after the ink changes the transcript is announced as from earlier writing, a named "Read again" button is offered, and Submit says why in words',
+      refusals.read?.stale?.label?.role === 'status' && /\p{L}/u.test(refusals.read.stale.label.text) && refusals.read.stale.again?.tag === 'button' &&
+        /\p{L}/u.test(refusals.read.stale.again.name) && refusals.read.stale.reason?.key === 'ink.submitReadAgain' && refusals.read.stale.reason.describes === true,
+      JSON.stringify(refusals.read?.stale));
 
     section('colour is never alone');
     ok('correct / incorrect is never carried by colour alone', findingsFor('colour').length === 0, show(findingsFor('colour')));

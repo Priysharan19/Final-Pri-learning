@@ -116,6 +116,18 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
     finally { setBusy(''); }
   }
 
+  /** Sign out everywhere: the server revokes every session of this account, then this device forgets its own. */
+  async function signOutEverywhere() {
+    start('logout-all');
+    try {
+      await cloud.logoutAll();
+      await disconnectCloudAccount(pid);
+      setMessage(tLater('cloudSecurity.signedOutEverywhere'));
+      await onDeleted?.({ cloudDeleted: false, sessionRevoked: true });
+    } catch (err) { setError(tLater('cloudSecurity.signOutEverywhereFailed')); }
+    finally { setBusy(''); }
+  }
+
   async function exportAccount() {
     start('export');
     try {
@@ -251,6 +263,12 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
               </button>
             </div>
           )) : <div className="muted" style={{ fontSize: 13 }}>{t('cloudSecurity.noSessions')}</div>}
+        </div>
+        <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--hairline)' }}>
+          <button className="btn btn-quiet btn-sm" type="button" data-testid="cloud-sign-out-everywhere" onClick={signOutEverywhere} disabled={!!busy}>
+            {busy === 'logout-all' ? t('cloudSecurity.revoking') : t('cloudSecurity.signOutEverywhere')}
+          </button>
+          <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>{t('cloudSecurity.signOutEverywhereHelp')}</p>
         </div>
       </div>
 

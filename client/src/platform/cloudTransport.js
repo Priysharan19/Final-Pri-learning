@@ -240,7 +240,7 @@ export async function cloudRequest(path, {
       if (data?.error?.quota && typeof data.error.quota === 'object') err.quota = data.error.quota;
       // An entitlement refusal names what it is about and when it lifts.
       if (typeof data?.error?.capability === 'string') err.capability = data.error.capability.slice(0, 60);
-      for (const k of ['nextAt', 'used', 'limit', 'windowDays']) if (Number.isFinite(Number(data?.error?.[k]))) err[k] = Number(data.error[k]);
+      for (const k of ['nextAt', 'used', 'limit', 'windowDays', 'attemptsRemaining']) if (Number.isFinite(Number(data?.error?.[k]))) err[k] = Number(data.error[k]);
       if (typeof data?.error?.openExamId === 'string' && SAFE_ID.test(data.error.openExamId)) err.openExamId = data.error.openExamId;
       err.requestId = result?.requestId || rid;
       throw err;
@@ -299,10 +299,14 @@ export async function cloudRequest(path, {
         const reset = Number(response.headers?.get?.('ratelimit-reset'));
         if ((response.status === 429 || response.status === 503) && Number.isFinite(reset) && reset > 0) err.resetAt = reset * 1000;
       }
+      // A one-time-code cooldown answers with Retry-After (seconds): how long
+      // until another code may be asked for.
+      const retryAfter = Number(response.headers?.get?.('retry-after'));
+      if (response.status === 429 && Number.isFinite(retryAfter) && retryAfter > 0) err.retryAfterMs = Math.min(retryAfter, 3600) * 1000;
       if (data?.error?.quota && typeof data.error.quota === 'object') err.quota = data.error.quota;
       // An entitlement refusal names what it is about and when it lifts.
       if (typeof data?.error?.capability === 'string') err.capability = data.error.capability.slice(0, 60);
-      for (const k of ['nextAt', 'used', 'limit', 'windowDays']) if (Number.isFinite(Number(data?.error?.[k]))) err[k] = Number(data.error[k]);
+      for (const k of ['nextAt', 'used', 'limit', 'windowDays', 'attemptsRemaining']) if (Number.isFinite(Number(data?.error?.[k]))) err[k] = Number(data.error[k]);
       if (typeof data?.error?.openExamId === 'string' && SAFE_ID.test(data.error.openExamId)) err.openExamId = data.error.openExamId;
       err.requestId = response.headers.get('x-pri-request-id') || rid;
       throw err;
@@ -458,11 +462,19 @@ export const cloud = Object.freeze({
     method: 'POST', body, idempotencyKey, timeoutMs
   }),
   getExam: (examId, timeoutMs = undefined) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id'), { timeoutMs }),
+  // One page of handwriting frozen, unread, when the paper closed. The server
+  // reads it only if its picture is the frozen one, and bounds how often.
+  resolveExamHandwriting: (examId, body, timeoutMs = 60000) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id') + '/handwriting', { method: 'POST', body, timeoutMs }),
   repeatPractice: questionId => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/repeat', { method: 'POST', body: {} }),
   revealPractice: questionId => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/reveal', { method: 'POST', body: {} }),
-  recognizePractice: (questionId, mode, image) =>
+  // Submit never reads: it binds a read the student asked for. `attested`
+  // is the read receipt and the text that was read (readReceipt.js on the
+  // server), sent so the read is proven even after the server's short kept
+  // record of it has gone.
+  recognizePractice: (questionId, mode, image, attested = null) =>
     cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/recognize', {
-      method: 'POST', body: { mode, image }, timeoutMs: 55000
+      method: 'POST', timeoutMs: 55000,
+      body: { mode, image, ...(attested && typeof attested.receipt === 'string' && typeof attested.text === 'string' ? { receipt: attested.receipt, text: attested.text } : {}) }
     }),
   confirmPracticeRecognition: (questionId, receipt, text) =>
     cloudRequest('/v1/practice/' + pathId(questionId, 'question id') +
@@ -488,6 +500,8 @@ export const cloud = Object.freeze({
   // address with or without an account; /verify proves it.
   otpRequest: body => cloudRequest('/v1/account/otp/request', { method: 'POST', body }),
   otpVerify: body => cloudRequest('/v1/account/otp/verify', { method: 'POST', body }),
+  // Which code channels this deployment can send on (email, sms): configuration only.
+  otpChannels: () => cloudRequest('/v1/account/otp/channels'),
   otpReauthRequest: () => cloudRequest('/v1/account/otp/reauth-request', { method: 'POST', body: {} }),
   // Deletion from the public page (/account/delete-request), no session: a code
   // to the account's own email, then the same deletion as DELETE /v1/account.
@@ -498,6 +512,8 @@ export const cloud = Object.freeze({
   guardianWithdrawRequest: body => cloudRequest('/v1/account/otp/guardian/withdraw-request', { method: 'POST', body }),
   guardianWithdrawByPhone: body => cloudRequest('/v1/account/otp/guardian/withdraw', { method: 'POST', body }),
   logout: () => cloudRequest('/v1/account/logout', { method: 'POST', body: {} }),
+  // Every session of this account, on every device, this one included.
+  logoutAll: () => cloudRequest('/v1/account/logout-all', { method: 'POST', body: {} }),
   requestEmailVerification: () => cloudRequest('/v1/account/email/verification-request', { method: 'POST', body: {} }),
   requestPasswordReset: body => cloudRequest('/v1/account/password/reset-request', { method: 'POST', body }),
   resetPassword: body => cloudRequest('/v1/account/password/reset', { method: 'POST', body }),
@@ -512,8 +528,11 @@ export const cloud = Object.freeze({
     cloudRequest('/v1/handwriting/status', { signal, timeoutMs }),
   // Longer than the server's own reading budget (PRI_HANDWRITING_TIMEOUT_MS,
   // 45 s by default) so the server answers before the client gives up.
-  transcribeHandwriting: (image, { signal = null, timeoutMs = 55000 } = {}) =>
-    cloudRequest('/v1/handwriting/transcribe', { method: 'POST', body: { image }, signal, timeoutMs }),
+  // `questionId` (the server's id of the issued question) only lets the
+  // server bind its read receipt to that question; the reader is sent the
+  // picture alone.
+  transcribeHandwriting: (image, { signal = null, timeoutMs = 55000, questionId = null } = {}) =>
+    cloudRequest('/v1/handwriting/transcribe', { method: 'POST', body: { image, ...(questionId ? { questionId } : {}) }, signal, timeoutMs }),
   workingStatus: () => cloudRequest('/v1/working/status'),
   // The question is sent; the expected answer never is, and the route refuses
   // a body that carries one.

@@ -102,7 +102,10 @@ export function mergeVerdicts(localVerdicts, check, { lineCount } = {}) {
   const n = Number.isInteger(lineCount) ? lineCount : (localVerdicts?.length || check?.lines?.length || 0);
   if (!n || !check || check.error) return localVerdicts || null;
 
-  const confident = check.needsConfirmation !== true;
+  // A model's confidence is NOT verification. A definite cross needs an
+  // independently deterministic attestation from the server, never a flag
+  // inferred from the LLM's own confidence. Absent attestation = advisory.
+  const confident = check.verifiedByDeterministic === true && check.needsConfirmation !== true;
   // When the server found no break at all, its words are useful and its ticks
   // are not: a green ✓ from a judgement renders identically to one from a
   // verified rule, and this only runs when the answer is already known to be
@@ -154,16 +157,16 @@ export function workingNote(check) {
   if (firstBreak < 0) {
     return {
       tone: 'note',
-      text: 'Each line follows from the one before it, so the slip is in how the question was set up rather than in the algebra.'
+      text: 'This second opinion could not verify a specific error. It does not prove that every step is correct.'
     };
   }
   const line = check.lines.find(l => l.index === firstBreak);
   const why = line?.why ? ` — ${line.why}` : '';
   const hint = check.hint ? ` ${check.hint}` : '';
   return {
-    tone: check.needsConfirmation ? 'maybe' : 'break',
-    text: check.needsConfirmation
-      ? `This might be line ${firstBreak + 1}${why}.${hint} Check it yourself — I am not certain of this one.`
+    tone: check.needsConfirmation || check.verifiedByDeterministic !== true ? 'maybe' : 'break',
+    text: check.needsConfirmation || check.verifiedByDeterministic !== true
+      ? `This might be line ${firstBreak + 1}${why}.${hint} Check it yourself — this is not independently verified.`
       : `Line ${firstBreak + 1} is where it goes wrong${why}.${hint}`
   };
 }
@@ -196,7 +199,7 @@ export function misconceptionProposal(check, lines) {
       lines: compact.slice(0, 40),
       firstBreak: breakAt,
       misconceptionId: check.misconceptionId,
-      confident: check.needsConfirmation !== true
+      confident: check.needsConfirmation !== true && check.verifiedByDeterministic === true
     }
   };
 }

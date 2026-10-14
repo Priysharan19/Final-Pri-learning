@@ -69,6 +69,19 @@ export const flow = {
         });
       }
 
+      // The password card consults current server guardian authority before
+      // activating ANY identity, including an adult staff member. An omitted
+      // fake endpoint must not force a secure fail-closed UI to time out.
+      if (path === '/v1/account/guardian/state' && method === 'GET') {
+        return authenticated
+          ? respond(route, 200, {
+              accountId: ADMIN.id, sessionBinding: 'a'.repeat(64),
+              emailVerified: ADMIN.emailVerified, eligible: true,
+              required: false, state: 'not-required'
+            })
+          : respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
+      }
+
       if (path === '/v1/account/me' && method === 'GET') {
         return authenticated
           ? respond(route, 200, { account: ADMIN })
@@ -160,10 +173,15 @@ export const flow = {
     await goto('/settings');
 
     const accountPanel = page.locator('section', { has: page.locator('#cloud-account-title') });
-    await accountPanel.getByLabel('Email').fill(ADMIN.email);
-    await accountPanel.getByLabel('Password').fill('admin-e2e-password-42');
-    await accountPanel.getByRole('button', { name: 'Connect account' }).click();
-    await accountPanel.getByText('Connected', { exact: true }).waitFor({ timeout: 15_000 });
+    // Staff accounts have a password: the sign-in card's "Sign in with password".
+    await accountPanel.getByTestId('signup-use-password').click();
+    await accountPanel.locator('#signup-password-email').fill(ADMIN.email);
+    await accountPanel.locator('#signup-password').fill('admin-e2e-password-42');
+    await accountPanel.getByTestId('signup-password-submit').click();
+    await accountPanel.locator('[data-cloud-state]', { hasText: /^Signed in$/ }).waitFor({ timeout: 15000 });
+    await check('the staff account checks current server guardian authority before activation',
+      requests.some(row => row.path === '/v1/account/guardian/state' && row.method === 'GET'),
+      'no live guardian status request before sign-in');
 
     // The authenticator gate comes first: enrol through the real panel.
     await enrolStaffMfaThroughPanel({ page, check });

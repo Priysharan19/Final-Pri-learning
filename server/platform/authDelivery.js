@@ -54,7 +54,7 @@ export function ensureAuthDeliverySchema(db) {
     ON auth_delivery_outbox(delivered_at, next_attempt_at, created_at);`);
 }
 
-function cleanPublicOrigin(raw) {
+export function cleanPublicOrigin(raw) {
   const text = nonEmpty(raw);
   if (!text) throw Object.assign(new Error('PRI_PUBLIC_ORIGIN is not configured'), { code: 'PUBLIC_ORIGIN_MISSING' });
   let url;

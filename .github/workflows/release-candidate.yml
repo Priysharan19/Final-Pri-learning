@@ -241,11 +241,13 @@ jobs:
         run: npm run build
       - name: Exact release identity
         run: node tools/verify-release-identity.mjs
-      - name: iOS bundle matches the client build
-        run: npm run check:ios
-      - name: Materialize exact native release identity
+      - name: Verify exact native web contents before stamping release identity
+        run: npm run check:ios:content
+      - name: Materialize checkout-specific native release identity
         run: npm run sync:ios
-      - name: Verify exact native release identity
+      - name: Verify all native bytes, including exact release identity
+        run: npm run check:ios
+      - name: Verify exact source SHA and native release identity
         run: npm run verify:release:native
       - name: Cross-platform release matrix (CP-11)
         run: node scripts/release-matrix.mjs --require-native-apple

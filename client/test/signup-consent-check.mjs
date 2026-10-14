@@ -37,16 +37,32 @@ const panelCopy = englishOf(panel);
 ok(/href="\/privacy"/.test(panel), 'the registration form links the privacy notice');
 ok(/href="\/terms"/.test(panel), 'and the terms');
 ok(/checked=\{agreed\}/.test(panel), 'and requires an affirmative action rather than assuming agreement');
-ok(/disabled=\{!!busy \|\| \(mode === 'register' && !agreed\)\}/.test(panel),
+// Two places make an account: the sign-in card (an emailed code or a web
+// provider) and the native Apple sheet's consent step in the panel. Neither
+// may proceed until the box is ticked.
+const card = read('../src/components/SignUpFlow.jsx');
+ok(/disabled=\{!!busy \|\| \(appleStep === 'consent' && !agreed\)\}/.test(panel),
   'the account cannot be created until that action is taken');
+ok(/<input type="checkbox" checked=\{agreed\} data-testid="signup-agree"/.test(card) && /tx\('cloud\.consent'/.test(card)
+  && /href="\/privacy"/.test(card) && /href="\/terms"/.test(card),
+  'the sign-in card asks for the same affirmative agreement, with the notice and terms linked beside it');
+ok(/if \(!agreed\) \{ setError\(tLater\('signup\.agreeRequired'\)\); return; \}/.test(card)
+  && /if \(detailsReady\(\) && agreed && !account\) body\.profile = profile\(\);/.test(card),
+  'and the card sends no account-creating request without it');
 
 // ── 2 · The age declaration is asked, not inferred ───────────────────────────
 ok(/I am 18 or older/.test(panelCopy), 'the form asks whether the account holder is an adult');
 // And it is asked AT the point of consent: the adult question is the label of
 // the checkbox inside the register form, and the guardian explanation renders
 // exactly when that box is unticked, before the account exists.
-ok(/\{mode === 'register' && \([\s\S]{0,1500}<input type="checkbox" checked=\{form\.isAdult\}[\s\S]{0,200}?\/>\s*<span>\{t\('cloud\.isAdult'\)\}<\/span>/.test(panel),
+ok(/\{needsSignIn && appleStep === 'consent' && \([\s\S]{0,1500}<input type="checkbox" checked=\{form\.isAdult\}[\s\S]{0,200}?\/>\s*<span>\{t\('cloud\.isAdult'\)\}<\/span>/.test(panel),
   'the adult question is the checkbox label inside the register form');
+// The sign-in card asks the age outright (11–17, or 18 or older) and refuses to
+// go on without an answer: silence is never read as "adult".
+ok(/AGES\.map\(a => choice\(age === a/.test(card) && /'signup-age-18'/.test(card)
+  && /if \(age === null\) \{ setError\(tLater\('signup\.ageRequired'\)\); return; \}/.test(card)
+  && /isAdult: age === null \? undefined : age >= 18/.test(card),
+  'the sign-in card asks the age explicitly and never infers an adult');
 ok(/\{!form\.isAdult && \([\s\S]{0,300}tx\('cloud\.under18'/.test(panel),
   'and the under-18 explanation renders exactly when the box is unticked');
 ok(/isAdult/.test(panel) && /guardianName/.test(panel) && /guardianEmail/.test(panel),
@@ -61,8 +77,12 @@ ok(guardianInputs.every(tag => /\brequired\b/.test(tag)),
 // ── 3 · The declaration actually reaches the server ──────────────────────────
 // A form that asks and then drops the answer is worse than one that never
 // asked: the student believes a guardian will be emailed, and none is.
-ok(/registerCloudAccount\(user\.id, \{[\s\S]{0,240}isAdult/.test(panel),
-  'the age declaration is passed to registerCloudAccount');
+ok(/const appleDeclaration = \(\) => \(\{ year: user\?\.year, isAdult: form\.isAdult/.test(panel)
+  && /startAppleSignIn\(\{ declaration: appleStep === 'consent' \? appleDeclaration\(\) : null \}\)/.test(panel),
+  'the age declaration is passed to the account-creating request');
+ok(/cloud\.otpVerify\(\{[^}]*signupTicket: ticket[^}]*profile: profile\(\) \}\)/.test(card)
+  && /createAccount: true, name: p\.name, year: p\.year, isAdult: p\.isAdult, guardianLater: true/.test(card),
+  'and the sign-in card sends its declaration with the request that creates the account (code or provider)');
 ok(/guardianName: form\.guardianName/.test(panel) && /guardianEmail: form\.guardianEmail/.test(panel),
   'and so are the guardian details the student typed');
 ok(/year: user\?\.year/.test(panel),

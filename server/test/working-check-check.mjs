@@ -51,25 +51,35 @@ eq(normalizeResult({ lines: [{ index: 0, status: 'break', carried: false, why: '
 eq(WORKING_SCHEMA.properties.lines.items.properties.status.enum, ['ok', 'break', 'note'],
   'and speaks the same verdict vocabulary as the on-device checker');
 
-// ── 2 · Follow-through is enforced, not merely requested ─────────────────────
-// A model that marks four consecutive lines wrong has not followed the rule.
-// The student made one mistake and must be told so.
+// ── 2 · First mistake is a pointer, never a license to erase later errors ──
 const overzealous = normalizeResult({
   lines: [
     { index: 0, status: 'ok', carried: false, why: '' },
-    { index: 1, status: 'break', carried: false, why: 'you added 3 instead of subtracting it' },
-    { index: 2, status: 'break', carried: false, why: 'wrong' },
-    { index: 3, status: 'break', carried: false, why: 'wrong' },
-    { index: 4, status: 'break', carried: false, why: 'wrong' }
+    { index: 1, status: 'break', carried: false, why: 'first unsupported change' },
+    { index: 2, status: 'break', carried: false, why: 'independent arithmetic error' },
+    { index: 3, status: 'break', carried: false, why: 'another false equality' },
+    { index: 4, status: 'break', carried: false, why: 'still wrong' }
   ],
-  first_break: 1, hint: 'look again at line 2', confidence: 0.9
+  first_break: 1, hint: 'check line 2', confidence: 0.9
 }, { lineCount: 5, model: 'test', confidenceFloor: 0.75 });
 
-eq(overzealous.lines.filter(l => l.status === 'break').length, 1, 'one mistake is marked exactly once');
-eq(overzealous.firstBreak, 1, 'and it is the first one');
-ok(overzealous.lines.slice(2).every(l => l.status === 'ok' && l.carried),
-  'the lines after it are credited as correct work on the student’s own value');
-ok(overzealous.lines[2].why, 'and each says why it still counts');
+eq(overzealous.lines.map(l => l.status), ['ok','break','break','break','break'],
+  'all later proposed independent errors survive normalization');
+eq(overzealous.firstBreak, 1, 'first error remains the navigation index');
+ok(overzealous.lines.slice(1).every(l => !l.carried),
+  'a disproved line is never silently granted error-carried-forward credit');
+ok(overzealous.needsConfirmation, 'high model confidence cannot make AI-only feedback authoritative');
+const suggestedCarry = normalizeResult({
+  lines: [
+    { index: 0, status: 'break', carried: false, why: 'wrong value' },
+    { index: 1, status: 'ok', carried: true, why: '2 times the prior value' },
+    { index: 2, status: 'break', carried: true, why: 'wrong new arithmetic' }
+  ], confidence: 1
+}, { lineCount: 3, model: 'test', confidenceFloor: 0.7 });
+eq(suggestedCarry.lines.map(l => l.status), ['break','ok','break'],
+  'model may describe a claimed carried line but cannot erase a new false one');
+ok(suggestedCarry.lines[1].carried && !suggestedCarry.lines[2].carried && suggestedCarry.needsConfirmation,
+  'model-only carried proposals remain nonauthoritative and breaks are never carried');
 
 const clean = normalizeResult({
   lines: [{ index: 0, status: 'ok', carried: false, why: '' }, { index: 1, status: 'ok', carried: false, why: '' }],
@@ -103,7 +113,7 @@ const unsure = normalizeResult({ lines: [{ index: 0, status: 'break', carried: f
 ok(unsure.needsConfirmation, 'below the floor it must be confirmed rather than applied');
 const sure = normalizeResult({ lines: [{ index: 0, status: 'break', carried: false, why: 'sign' }], first_break: 0, hint: 'check the sign', confidence: 0.92 },
   { lineCount: 1, model: 'test', confidenceFloor: 0.75 });
-ok(!sure.needsConfirmation, 'above it, it stands');
+ok(sure.needsConfirmation, 'even high AI confidence remains advisory without independent math verification');
 
 // ── 5 · Bounds on what may be sent ───────────────────────────────────────────
 eq(validateWorking([' 2x = 8 ', '', '   ', 'x = 4']), ['2x = 8', 'x = 4'], 'blank lines are dropped and the rest trimmed');
@@ -244,5 +254,5 @@ try {
 
 console.log(failures.length
   ? `WORKING CHECK: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `WORKING CHECK: PASS — ${pass}/${pass} checks — answer-blind, one mistake marked once, no answer leaked, signed in and rate limited.`);
+  : `WORKING CHECK: PASS — ${pass}/${pass} checks — answer-blind, independent errors preserved, no AI-only marks, no answer leaked, signed in and rate limited.`);
 process.exit(failures.length ? 1 : 0);

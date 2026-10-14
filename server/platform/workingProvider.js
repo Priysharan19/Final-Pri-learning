@@ -159,10 +159,11 @@ export function validateWorking(lines) {
 /**
  * Bring a model's judgement back inside the rules, whatever it returned.
  *
- * The follow-through rule is enforced here rather than trusted: a model that
- * marks four consecutive lines "break" has not followed it, and re-marking the
- * later ones as carried is both what the student deserves and what the marks
- * calculation expects. There is exactly one break per request, ever.
+ * Preserve each proposed break: a later independent arithmetic or algebra
+ * error must never be converted into credit merely because an earlier one
+ * exists. "Carried" is a separate, untrusted model claim until deterministic
+ * verification demonstrates a valid transformation of the prior wrong value.
+ * firstBreak is only a navigation summary, not a one-error cap.
  */
 export function normalizeResult(parsed, { lineCount, model, confidenceFloor }) {
   const byIndex = new Map();
@@ -181,19 +182,10 @@ export function normalizeResult(parsed, { lineCount, model, confidenceFloor }) {
   let firstBreak = -1;
   for (let i = 0; i < lineCount; i += 1) {
     const judged = byIndex.get(i) || { status: 'note', carried: false, why: '' };
-    if (judged.status === 'break') {
-      if (firstBreak === -1) {
-        firstBreak = i;
-      } else {
-        // A second break is the first mistake still being counted. Downgrade it:
-        // right work on wrong numbers is credit-worthy, not another error.
-        judged.status = 'ok';
-        judged.carried = true;
-        if (!judged.why) judged.why = 'follows from your earlier line';
-      }
-    } else if (firstBreak !== -1 && judged.status === 'ok') {
-      judged.carried = true;
-    }
+    if (judged.status === 'break' && firstBreak === -1) firstBreak = i;
+    // Never auto-credit later lines as carried-forward: the model must not
+    // make an unverified arithmetic claim authoritative.
+    if (judged.status !== 'ok') judged.carried = false;
     lines.push({ index: i, ...judged });
   }
 
@@ -213,9 +205,10 @@ export function normalizeResult(parsed, { lineCount, model, confidenceFloor }) {
     hint,
     misconceptionId,
     confidence: Math.round(stated * 1000) / 1000,
-    // Below the floor this is a second opinion, not a verdict: the UI offers it
-    // and the marker does not act on it.
-    needsConfirmation: stated < confidenceFloor,
+    // A model's confidence, even above the numeric floor, is not independent
+    // mathematical evidence. Every AI-only line is advisory; only a separate
+    // deterministic checker may turn one into an authoritative mark.
+    needsConfirmation: true,
     model
   });
 }

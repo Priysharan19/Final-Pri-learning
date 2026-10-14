@@ -15,11 +15,18 @@
 // operation resolves as the typed outcome MARKING_TOO_COMPLEX. The request
 // thread never executes marker code, so no input can stop it answering others.
 //
-// WHAT A CUT-OFF MAY MEAN. Only "this could not be read". A terminated
-// operation never yields a verdict, a mark or anything derived from the
-// answer key; the stages it had already reported (markerOps.js `emit`) are
-// complete results of the same deterministic code and are kept. So the same
-// input gets the same verdict whenever it gets one at all.
+// WHAT A CUT-OFF MAY MEAN. Only "this could not be checked this time". Every
+// limit here is a wall clock, and how long marking takes depends on what else
+// the machine is doing — so a cut-off says nothing about what the student
+// wrote. A terminated operation never yields a verdict, a mark or anything
+// derived from the answer key, and it never LOWERS one either: a practice
+// submission that was stopped at any stage is not an attempt at all (nothing
+// spent, nothing written, the same key marks it again — practice.js), and a
+// paper with a stopped part is not finalised by that marking (exams.js). The
+// stages a stopped operation had already reported (markerOps.js `emit`) are
+// complete results of the same deterministic code; they are used only where
+// exams.js documents its ceiling, each flagged on the result. So the same
+// input gets the same marks whenever it gets marks at all.
 //
 // FAIRNESS. One account has at most one operation running at a time (the rest
 // of its operations wait behind it), so with two or more workers a single

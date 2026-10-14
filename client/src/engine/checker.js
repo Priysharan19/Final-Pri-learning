@@ -34,7 +34,7 @@ function malformedRatioInput(rawInput) {
 }
 
 export function checkAnswer(question, rawInput) {
-  return withEvaluationBudget(EVALUATION_BUDGET, () => checkAnswerWithinBudget(question, rawInput));
+  return unlessStopped(() => withEvaluationBudget(EVALUATION_BUDGET, () => checkAnswerWithinBudget(question, rawInput)), unverifiedAnswer);
 }
 function checkAnswerWithinBudget(question, rawInput) {
   if (question?.answerType === 'working') return checkWorking(question, String(rawInput ?? ''));
@@ -195,7 +195,7 @@ function readSolutionList(raw, meta) {
 }
 
 export function checkWorking(q, workingText) {
-  return withEvaluationBudget(EVALUATION_BUDGET, () => checkWorkingWithinBudget(q, workingText));
+  return unlessStopped(() => withEvaluationBudget(EVALUATION_BUDGET, () => checkWorkingWithinBudget(q, workingText)), unverifiedAnswer);
 }
 function checkWorkingWithinBudget(q, workingText) {
   const ans = q.answer;
@@ -432,24 +432,95 @@ function namesAValue(text, meta) {
 // mistake nor credit, and nothing after the budget is spent is credited. The
 // bound is on the text, not the clock, so the same working is always marked
 // the same way; the clock is only a backstop that these bounds keep idle.
+//
+// WHEN THE CLOCK DOES STOP A CHECK. How long a line takes depends on what else
+// the machine is doing, so a line the clock skipped is not a fact about the
+// working. It used to be returned as an ordinary unread line, which earns
+// nothing — and a short, valid page of working marked on a busy machine lost
+// marks it earns on an idle one (`(x-1)(x+3)=0`, `x-1=0`, `x+3=0` read 1 of 3).
+// A mark must be a function of what was written. So a check the clock stopped
+// has NO result: every public entry of this file says so, with
+// `unverified: true`, and gives no mark, no verdict and no line-by-line
+// report to read one from —
+//   · stepCheck:   { unverified: true, firstBreak: -1, lines: every line a note }
+//   · methodMarks: { unverified: true, awarded: 0, lines: [] }  (never a count of what happened to finish)
+//   · checkAnswer / checkWorking: { correct: false, invalid: true, unverified: true }
+// `invalid` is this engine's existing word for "not an attempt": no try is
+// spent and nothing is recorded, so the same entry can simply be sent again.
+// The 750 ms ceiling itself is unchanged.
 export const WORKING_LIMITS = Object.freeze({ lineChars: 200, lines: 100, work: 600000, backstopMs: 750 });
 const UNREAD = {
   long: `Not checked — this line is longer than ${WORKING_LIMITS.lineChars} characters. Write one step per line.`,
   many: 'Not checked — this is more working than can be checked. Keep to the steps of your method.'
 };
+/** What a check the clock stopped says: nothing was marked. */
+export const UNVERIFIED_NOTE = 'This could not be checked this time, so nothing was marked. Send it again.';
+// The clock the backstop reads. A test puts its own here to stop a check at a
+// chosen line; nothing else may (`setBackstopClockForTests`).
+let backstopClock = () => Date.now();
+export function setBackstopClockForTests(clock) {
+  const previous = backstopClock;
+  backstopClock = typeof clock === 'function' ? clock : () => Date.now();
+  return previous;
+}
+// How many times the clock has stopped a line since this module loaded. A
+// public entry compares it before and after: any change means its result is
+// not a result.
+let backstopTrips = 0;
+const unverifiedReport = (workingText, report = null) => ({
+  unverified: true, firstBreak: -1,
+  lines: (report?.lines?.length ? report.lines.map(l => String(l?.text ?? '')) : String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean))
+    .map(text => ({ text, status: 'note', note: UNVERIFIED_NOTE, unread: true }))
+});
+const unverifiedAnswer = () => ({ correct: false, invalid: true, unverified: true, feedback: UNVERIFIED_NOTE });
+const unverifiedMethod = report => ({ unverified: true, okLines: 0, progressLines: 0, restatedLines: 0, awarded: 0, note: UNVERIFIED_NOTE, lines: [], report });
+/** Run a check; if the clock stopped any line of it, return `whenStopped()` instead of what it produced. */
+function unlessStopped(check, whenStopped) {
+  const before = backstopTrips;
+  const out = check();
+  return backstopTrips === before ? out : whenStopped(out);
+}
 
 /** For each line of working, null when it is to be read, or the note saying why it is not. */
 function unreadLines(rawLines) {
   let spent = 0, closed = false;
-  const started = Date.now();
+  const started = backstopClock();
   return rawLines.map((line, index) => {
     if (line.length > WORKING_LIMITS.lineChars) return UNREAD.long;
     spent += line.length * line.length;
     if (closed || index >= WORKING_LIMITS.lines || spent > WORKING_LIMITS.work) { closed = true; return UNREAD.many; }
-    return () => (Date.now() - started > WORKING_LIMITS.backstopMs ? UNREAD.many : null);
+    return () => {
+      if (!(backstopClock() - started > WORKING_LIMITS.backstopMs)) return null;
+      backstopTrips += 1;
+      return UNREAD.many;
+    };
   });
 }
 const unreadNote = entry => (typeof entry === 'function' ? entry() : entry);
+
+/**
+ * Narrow, independently verified error-carried-forward arithmetic.
+ * A proven-wrong value `x = 4` may still support `2x + 3 = 11`;
+ * `2x + 3 = 12` is another error. No symbolic, branching, unbound-variable
+ * or model-only relationship is credited as ECF.
+ */
+function verifiedCarriedArithmetic(previous, current) {
+  const prior = String(previous || '').match(/^([a-zA-Z])\s*=\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))$/);
+  const next = String(current || '').match(/^(.+?)\s*=\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))$/);
+  if (!prior || !next) return false;
+  const variable = prior[1];
+  const lhs = next[1];
+  if (!lhs.includes(variable)) return false;
+  if (!/[+*\/-]/.test(lhs) || /[\^=<>]|\b(?:sqrt|log|ln|sin|cos)\b/i.test(lhs)) return false;
+  try {
+    const expr = parse(normalize(lhs));
+    if (expr.t === 'equation') return false;
+    const vars = variablesOf(expr);
+    if (vars.size !== 1 || !vars.has(variable)) return false;
+    const got = evaluate(expr, { [variable]: Number(prior[2]) });
+    return Number.isFinite(got) && numsClose(got, Number(next[2]), 1e-9);
+  } catch { return false; }
+}
 
 function stepCheckSingle(meta, workingText, system = null, { loneBranches = false } = {}) {
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
@@ -697,8 +768,17 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       note = 'Skipped — I couldn’t parse this line as maths.';
     }
 
+    let carried = false;
+    if (status === 'break' && firstBreak !== -1 && i > 0 &&
+        (out[i - 1]?.status === 'break' || out[i - 1]?.carried === true) &&
+        verifiedCarriedArithmetic(out[i - 1].text, line)) {
+      status = 'ok';
+      carried = true;
+      note = 'Arithmetic verified using your preceding value; the earlier error remains.';
+      lineDiagnosis = null;
+    }
     if (status === 'break' && firstBreak === -1) firstBreak = i;
-    out.push({ text: line, status, note, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
+    out.push({ text: line, status, note, ...(carried ? { carried: true } : {}), ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
   });
 
   // Branches were allowed on the promise that the working keeps every root.
@@ -724,13 +804,9 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
   }
 
   if (firstBreak === -1) return { lines: out, firstBreak, diagnosis: null };
-  for (let i = firstBreak + 1; i < out.length; i++) {
-    if (out[i].status === 'break' || out[i].branch) {
-      out[i].status = 'note';
-      out[i].note = 'Follows from the earlier slip.';
-      delete out[i].diagnosis;
-    }
-  }
+  // A disproved later claim stays disproved. The first error is a navigation
+  // index; it does not make every subsequent line a legitimate follow-through.
+  // Branch diagnostics are retained, never silently turned into notes.
 
   let prevText = null;
   for (let i = firstBreak - 1; i >= 0; i--) {
@@ -798,10 +874,77 @@ function derivativeSourceLine(stage, line) {
   } catch { return false; }
 }
 
+// Authored AP proof stages use the existing deterministic expression and
+// evaluation verifier. These are diagnoses, never a source of rubric marks.
+// A given or symbolic formula is a separate kind of line: do not let a valid
+// "a = 9, d = 3" be called a false *numeric* calculation.
+function assessAPTermGiven(stage, line) {
+  const text = String(line || '').trim().replace(/[−–—]/g, '-');
+  const clauses = text.split(/\s*[,;]\s*/).filter(Boolean);
+  if (!clauses.length || clauses.length > 2) return { status: 'note', trusted: false };
+  const values = Object.create(null);
+  for (const clause of clauses) {
+    const parsed = clause.match(/^([ad])\s*=\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))$/i);
+    if (!parsed) return { status: 'note', trusted: false };
+    const key = parsed[1].toLowerCase();
+    const got = Number(parsed[2]);
+    const expected = Number(stage[key]);
+    if (!Number.isFinite(got) || !Number.isFinite(expected)) return { status: 'note', trusted: false };
+    if (!numsClose(got, expected, 1e-9)) {
+      const diagnosis = {
+        code: 'ap-given-copied-incorrectly', title: 'A given value was copied incorrectly',
+        message: `The question gives ${key} = ${expected}, but this line says ${key} = ${got}.`,
+        fix: 'Copy the first term and common difference from the question before substituting.',
+        confidence: 'high'
+      };
+      return { status: 'break', trusted: false, note: diagnosis.message, diagnosis };
+    }
+    values[key] = got;
+  }
+  return { status: Object.keys(values).length ? 'ok' : 'note', trusted: Object.keys(values).length > 0 };
+}
+
+function assessAPTermFormula(stage, line) {
+  const text = String(line || '').trim().replace(/[−–—]/g, '-');
+  // Never classify a numerical substitution, a list of givens or unrelated
+  // algebra as a wrong symbolic AP formula.
+  if (!/^(?:t|a)\s*_\s*n\s*=/i.test(text)) return { status: 'note', trusted: false };
+  const checked = stepCheckSingle({ kind: 'expression', canonical: stage.canonical }, text);
+  const item = checked.lines?.[0];
+  return {
+    status: item?.status === 'ok' || item?.status === 'break' ? item.status : 'note',
+    trusted: item?.status === 'ok', note: item?.note,
+    ...(item?.diagnosis ? { diagnosis: item.diagnosis } : {})
+  };
+}
+
+function assessAPTermAddition(stage, line) {
+  const assessed = assessEvaluationLine({ text: line, meta: stage });
+  if (assessed.status !== 'break' || !Number.isFinite(assessed.value)) return assessed;
+  const { a, n, d } = stage.substitutions || {};
+  if (![a, n, d].every(Number.isSafeInteger)) return assessed;
+  const product = (n - 1) * d;
+  const expected = a + product;
+  if (!Number.isSafeInteger(product) || !Number.isSafeInteger(expected) ||
+      !numsClose(expected, Number(stage.expected), 1e-9)) return assessed;
+  // The preceding verified calculation and this student's final value are
+  // contrasted; the server does not infer a step that wasn't submitted.
+  const diagnosis = {
+    code: 'ap-final-arithmetic-slip', title: 'The final arithmetic is incorrect',
+    message: `${a} + (${product}) = ${expected}, not ${assessed.value}. Your final line needs the arithmetic corrected.`,
+    fix: 'Recalculate the sum of the first term and the common-difference contribution.',
+    confidence: 'high'
+  };
+  return { ...assessed, note: diagnosis.message, diagnosis };
+}
+
 function assessPlanStage(stage, line) {
   if (!stage || typeof stage !== 'object') {
     return { status: 'note', note: 'This proof stage is not configured safely.', trusted: false };
   }
+  if (stage.kind === 'ap-term-givens') return assessAPTermGiven(stage, line);
+  if (stage.kind === 'ap-term-formula') return assessAPTermFormula(stage, line);
+  if (stage.kind === 'ap-term-addition') return assessAPTermAddition(stage, line);
   if (stage.kind === 'evaluation') return assessEvaluationLine({ text: line, meta: stage });
   if (stage.kind === 'point') return assessPointLine({ text: line, meta: stage });
   if (stage.kind === 'chained-inequality') return assessRelationChainLine({ text: line, meta: stage });
@@ -859,6 +1002,30 @@ export function planRequirements(meta) {
   });
 }
 
+/** Prove an ECF evaluation against an authored formula and the submitted
+ * wrong variable value. Never simply accept an "ok" from a model. */
+function verifiedCarriedEvaluation(stage, text, wrongValues) {
+  if (stage?.kind !== 'evaluation' || typeof stage.source !== 'string') return false;
+  const claim = String(text || '').match(/^([a-zA-Z][a-zA-Z\/]*)\s*=\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))$/);
+  if (!claim || !Array.isArray(stage.labels) || !stage.labels.includes(claim[1])) return false;
+  const substitutions = stage.substitutions;
+  if (!substitutions || typeof substitutions !== 'object') return false;
+  try {
+    const source = parse(normalize(stage.source));
+    const correct = evaluate(source, substitutions);
+    if (!Number.isFinite(correct) || !numsClose(correct, Number(stage.expected), 1e-9)) return false;
+    const alternate = { ...substitutions };
+    let changed = false;
+    for (const [name, value] of wrongValues) {
+      if (Object.hasOwn(substitutions, name) && Number(substitutions[name]) !== value) {
+        alternate[name] = value; changed = true;
+      }
+    }
+    const carried = changed ? evaluate(source, alternate) : null;
+    return Number.isFinite(carried) && numsClose(carried, Number(claim[2]), 1e-9);
+  } catch { return false; }
+}
+
 function stepCheckPlan(meta, workingText) {
   const rawLines = String(workingText || '').split('\n').map(line => line.trim()).filter(Boolean);
   const stages = Array.isArray(meta?.stages) ? meta.stages.filter(Boolean) : [];
@@ -875,6 +1042,7 @@ function stepCheckPlan(meta, workingText) {
   let active = 0;
   let firstBreak = -1;
   let diagnosis = null;
+  const wrongValues = new Map(); // observed false assignments, not trusted mathematical facts
 
   const ready = idx => requires[idx].every(r => completed.has(r));
 
@@ -883,9 +1051,37 @@ function stepCheckPlan(meta, workingText) {
     const line = rawLines[i];
     const skipped = unreadNote(unread[i]);
     if (skipped) { out.push({ text: line, status: 'note', note: skipped, unread: true, stage: active }); continue; }
+    // Later lines still need proof. In particular, a second independent
+    // arithmetic error is NOT magically error-carried-forward credit.
+    // Stage prerequisites continue to apply; unsupported follow-through
+    // remains unverified rather than being asserted correct.
+
+    // ECF is only supported when an authored formula independently verifies
+    // this computation on a student's earlier incorrect value. It does not
+    // complete the authored stage, nor erase firstBreak.
     if (firstBreak !== -1) {
-      out.push({ text: line, status: 'note', note: 'Follows from the earlier slip.', stage: active });
-      continue;
+      // A subsequent chained inequality may be a provably equivalent
+      // transformation of an earlier *wrong boundary*. Check the two actual
+      // written regions, including endpoint inclusion, instead of treating
+      // agreement with the correct original question as the ECF criterion.
+      const prior = out[i - 1];
+      if (prior && (prior.status === 'break' || prior.carried === true) &&
+          /[<>]/.test(prior.text) && /[<>]/.test(line)) {
+        const carriedRelation = assessRelationChainLine({
+          text: line, meta: { kind: 'chained-inequality', source: prior.text, requireProgress: true }
+        });
+        if (carriedRelation.status === 'ok' && carriedRelation.trusted === true) {
+          out.push({ text: line, status: 'ok', carried: true, stage: active,
+            note: 'Equivalent to your preceding inequality; its earlier boundary error remains.' });
+          continue;
+        }
+      }
+      const carriedStage = stages.findIndex(stage => verifiedCarriedEvaluation(stage, line, wrongValues));
+      if (carriedStage !== -1) {
+        out.push({ text: line, status: 'ok', carried: true, stage: carriedStage,
+          note: 'This arithmetic is correct using your earlier value; that earlier error remains.' });
+        continue;
+      }
     }
 
     // Every verdict on this line is drawn once and kept.
@@ -928,9 +1124,10 @@ function stepCheckPlan(meta, workingText) {
     if (broken !== undefined) {
       const verdict = assess(broken);
       active = broken;
-      firstBreak = i;
-      diagnosis = verdict.diagnosis || null;
-      out.push({ text: line, status: 'break', stage: broken, note: verdict.note, ...(diagnosis ? { diagnosis } : {}) });
+      if (firstBreak === -1) { firstBreak = i; diagnosis = verdict.diagnosis || null; }
+      const wrongAssignment = line.match(/^([a-zA-Z])\s*=\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))$/);
+      if (wrongAssignment) wrongValues.set(wrongAssignment[1], Number(wrongAssignment[2]));
+      out.push({ text: line, status: 'break', stage: broken, note: verdict.note, ...(verdict.diagnosis ? { diagnosis: verdict.diagnosis } : {}) });
       continue;
     }
 
@@ -948,9 +1145,10 @@ function stepCheckPlan(meta, workingText) {
     const wrongRoot = done.find(idx => stages[idx].kind === 'equation' && assess(idx).status === 'break');
     if (wrongRoot !== undefined) {
       const verdict = assess(wrongRoot);
-      firstBreak = i;
-      diagnosis = verdict.diagnosis || null;
-      out.push({ text: line, status: 'break', stage: wrongRoot, note: verdict.note, ...(diagnosis ? { diagnosis } : {}) });
+      if (firstBreak === -1) { firstBreak = i; diagnosis = verdict.diagnosis || null; }
+      const wrongAssignment = line.match(/^([a-zA-Z])\s*=\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))$/);
+      if (wrongAssignment) wrongValues.set(wrongAssignment[1], Number(wrongAssignment[2]));
+      out.push({ text: line, status: 'break', stage: wrongRoot, note: verdict.note, ...(verdict.diagnosis ? { diagnosis: verdict.diagnosis } : {}) });
       continue;
     }
 
@@ -981,7 +1179,8 @@ function stepCheckPlan(meta, workingText) {
  * equations the question gives; without it, such a line is a note.
  */
 export function stepCheck(meta, workingText, options = null) {
-  return withEvaluationBudget(EVALUATION_BUDGET, () => stepCheckWithinBudget(meta, workingText, options));
+  return unlessStopped(() => withEvaluationBudget(EVALUATION_BUDGET, () => stepCheckWithinBudget(meta, workingText, options)),
+    report => unverifiedReport(workingText, report));
 }
 function stepCheckWithinBudget(meta, workingText, options = null) {
   if (meta?.kind === 'plan') return stepCheckPlan(meta, workingText);
@@ -2011,7 +2210,10 @@ const letterFree = claim => {
  * { okLines, progressLines, awarded, note, report }.
  */
 export function methodMarks(input = {}) {
-  return withEvaluationBudget(EVALUATION_BUDGET, () => methodMarksWithinBudget(input));
+  // A report the clock stopped is not evidence of anything, whoever made it.
+  if (input?.report?.unverified === true) return unverifiedMethod(input.report);
+  return unlessStopped(() => withEvaluationBudget(EVALUATION_BUDGET, () => methodMarksWithinBudget(input)),
+    () => unverifiedMethod(unverifiedReport(input?.working)));
 }
 function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = null } = {}) {
   if (!meta || working == null || !String(working).trim()) return null;
@@ -2067,8 +2269,8 @@ function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = n
   const sweepSize = Math.max(3, uniqueNumeric(meta.solutions).length + 1);
   const contradicted = new Set();
   let falseArithmetic = false;
+  const shapes = new Map();
   {
-    const shapes = new Map();
     allLines.forEach((l, index) => {
       const text = String(l.text ?? '').replace(/[−–—]/g, '-').replace(/\s+/g, '');
       const c = readClaim(l.text);
@@ -2088,9 +2290,6 @@ function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = n
       seen.lines.push(index);
       shapes.set(key, seen);
     });
-    for (const seen of shapes.values()) {
-      if (seen.values.size >= sweepSize) for (const index of seen.lines) contradicted.add(index);
-    }
     // The middle term split more than one way is a search for the pair, not
     // the pair found: every split of `bx` adds back to `bx`, so a wrong one
     // is never false, and only one of them factorises. None of them earns.
@@ -2146,13 +2345,52 @@ function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = n
   if (statedRoots) {
     const wanted = uniqueNumeric(meta.solutions);
     const values = [];
-    for (const l of allLines) {
-      if (l.status === 'break') continue;
+    for (const [index, l] of allLines.entries()) {
+      if (index === firstBreak && l.status === 'break') continue;
       const c = readClaim(l.text);
       const v = c?.kind === 'equation' ? statedRootOf(c, meta.variable) : null;
       if (v !== null && !values.some(x => numsClose(x, v))) values.push(v);
     }
     rootSweep = values.length >= 2 && values.some(v => !wanted.some(w => numsClose(w, v)));
+  }
+  // The sweep of one shape, decided here because it needs to know what a root
+  // of the question is. Where roots are read off, the first false line is,
+  // again, not one of the candidates when it is the only thing wrong with its
+  // shape. Roots of one sign are written in one shape, so both roots read off
+  // and then one slip made three values of `x = #` and voided the two roots
+  // above the slip: `(x-3)(x-5) = 0`, `x = 3`, `x = 5`, then `x = 7`, fell from
+  // three marks to one, where the same working on roots of opposite sign
+  // (`x = 2`, `x = -3` are two shapes) kept all three. The slip is set aside
+  // only when
+  //  · every other line of the shape states a root of the question — is true,
+  //    that is, and not merely unrefuted: a factorisation that shares one root
+  //    with the question is not — so a second wrong value is still a list of
+  //    candidates; and
+  //  · what is left is itself too few to be a sweep, so a slip can never
+  //    rescue a sweep it was added to.
+  // Setting it aside credits nothing: each root left standing still has to be
+  // read off something solved, once, and nothing after the slip earns.
+  // It is not done on a linear equation. There a line that pins the unknown
+  // (`x + 1 = 6`) stands as far on as the answer, so letting two of them stand
+  // beside a slip would leave every genuine step written after them a
+  // `repeat`: the sweep rule voiding them is what lets those steps earn.
+  {
+    const wanted = uniqueNumeric(meta.solutions);
+    const statesRoot = index => {
+      if (!statedRoots) return false;
+      const c = readClaim(allLines[index].text);
+      const v = c?.kind === 'equation' ? statedRootOf(c, meta.variable) : null;
+      return v !== null && wanted.some(w => numsClose(w, v));
+    };
+    const numbersOf = index => String(allLines[index].text ?? '').replace(/[−–—]/g, '-').replace(/\s+/g, '').match(/\d+(?:\.\d+)?/g).join(',');
+    for (const seen of shapes.values()) {
+      if (seen.values.size < sweepSize) continue;
+      if (statedRoots && firstBreak >= 0 && seen.lines.includes(firstBreak)) {
+        const rest = seen.lines.filter(index => index !== firstBreak);
+        if (rest.every(statesRoot) && new Set(rest.map(numbersOf)).size < sweepSize) continue;
+      }
+      for (const index of seen.lines) contradicted.add(index);
+    }
   }
   // The per-line mark vector: one entry per written line, in order, saying
   // what that line earned and why. Its marks always sum to `awarded`, so a

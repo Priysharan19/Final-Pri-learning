@@ -101,8 +101,9 @@ try {
   r = await h.request('/v1/sync/pull', { jar: studentJar });
   c.eq(r.data?.error?.code, 'GUARDIAN_CONSENT_PENDING', 'sync is refused while consent is pending');
 
-  // Recovery for a wrong age capture: the signed-in learner explicitly says
-  // 18+, using the same authenticated/rate-limited guardian action surface.
+  // A child who already declared Class 9 cannot escape pending consent by
+  // changing the declaration on their own authenticated session. This used
+  // to return ageCorrected:true and remove the server consent gate.
   const studentAccountId = raw.prepare("SELECT id FROM accounts WHERE email='new.student@example.test'").get().id;
   const historyBeforeCorrection = raw.prepare('SELECT * FROM guardian_consents WHERE account_id=?').get(studentAccountId);
   r = await h.request('/v1/account/guardian/state', { jar: studentJar });
@@ -111,24 +112,28 @@ try {
     ['child', 'pending', 'GUARDIAN_CONSENT_PENDING', true],
     'guardian state safely names the exact live blocker'
   );
+  c.deq([r.data?.accountId, r.data?.eligible, typeof r.data?.sessionBinding, r.data?.sessionId === r.data?.sessionBinding],
+    [studentAccountId, false, 'string', true],
+    'A pending minor receives their own server-bound, ineligible identity snapshot');
+  const minorBinding = r.data.sessionBinding;
+  c.ok(minorBinding.length === 64, 'the session binding is an opaque SHA-256 value, never the cookie token');
+
   r = await post('/guardian/request', { isAdult: true }, studentJar);
-  c.eq(r.status, 200, 'a pending learner can explicitly correct a wrongly captured age to adult');
-  c.deq(
-    [r.data?.ageCorrected, r.data?.ageBasis, r.data?.guardianConsent?.required, r.data?.guardianConsent?.blockerCode],
-    [true, 'adult', false, null],
-    'the correction returns the new server-authoritative eligibility'
-  );
-  c.eq(raw.prepare('SELECT age_basis FROM accounts WHERE id=?').get(studentAccountId).age_basis, 'adult', 'the server records the corrected age basis');
+  c.deq([r.status, r.data?.error?.code], [409, 'AGE_RECLASSIFICATION_REQUIRES_REVIEW'],
+    'a child cannot reclassify themself adult in a pending guardian ceremony');
+  c.eq(r.data?.ageCorrected, undefined, 'the refusal never claims server age correction');
+  c.eq(raw.prepare('SELECT age_basis FROM accounts WHERE id=?').get(studentAccountId).age_basis, 'child',
+    'the account keeps its server-recorded child age basis');
   const historyAfterCorrection = raw.prepare('SELECT * FROM guardian_consents WHERE account_id=?').get(studentAccountId);
   c.deq(
     [historyAfterCorrection.account_id, historyAfterCorrection.method, historyAfterCorrection.requested_at],
     [historyBeforeCorrection.account_id, historyBeforeCorrection.method, historyBeforeCorrection.requested_at],
-    'adult correction preserves the guardian-history row'
+    'the forbidden reclassification leaves guardian consent history unchanged'
   );
-  c.ok(raw.prepare("SELECT COUNT(*) n FROM audit_log WHERE actor_account_id=? AND action='account.age-declaration.update'").get(studentAccountId).n >= 1,
-    'and records the correction in the audit log');
+  c.eq(raw.prepare("SELECT COUNT(*) n FROM audit_log WHERE actor_account_id=? AND action='account.age-declaration.update'").get(studentAccountId).n, 0,
+    'a refused self-reclassification never records a successful age update');
   r = await h.request('/v1/sync/pull', { jar: studentJar });
-  c.ok(r.status !== 403, 'the corrected adult account passes the cloud gate immediately');
+  c.eq(r.data?.error?.code, 'GUARDIAN_CONSENT_PENDING', 'cloud data stays gated after the failed self-reclassification');
 
   // ── no enumeration: same answer for a known and an unknown address ──────
   resetLimits();
@@ -247,6 +252,11 @@ try {
   c.eq(r.data?.withdrawn, 1, 'the parent withdraws');
   r = await h.request('/v1/sync/pull', { jar: kidJar });
   c.eq(r.data?.error?.code, 'GUARDIAN_CONSENT_WITHDRAWN', 'and sync stops at once');
+  const withdrawnIdentity = await h.request('/v1/account/guardian/state', { jar: kidJar });
+  c.deq([withdrawnIdentity.data?.eligible, withdrawnIdentity.data?.state, withdrawnIdentity.data?.blockerCode],
+    [false, 'withdrawn', 'GUARDIAN_CONSENT_WITHDRAWN'],
+    'a guardian withdrawal invalidates onboarding permission in the same session');
+
   // Regression: the child cannot undo a withdrawal by naming a parent again.
   resetLimits();
   r = await post('/guardian/request', { guardianName: 'Someone', channel: 'sms', destination: '9811111111' }, kidJar);
@@ -297,6 +307,23 @@ try {
   r = await post('/guardian/request', { guardianName: 'X', channel: 'sms', destination: '9988776650' }, adultJar);
   c.eq(r.status, 409, 'and cannot start a consent request');
 
+  // One consent result must never authorize another logged-in identity.
+  // Read B and the pending minor A in alternating order (A -> B -> A).
+  const adultIdentity = await h.request('/v1/account/guardian/state', { jar: adultJar });
+  const pendingIdentity = await h.request('/v1/account/guardian/state', { jar: studentJar });
+  const adultId = raw.prepare("SELECT id FROM accounts WHERE email='adult@example.test'").get().id;
+  c.deq([adultIdentity.data.accountId, adultIdentity.data.eligible, adultIdentity.data.state],
+    [adultId, true, 'not-required'], 'adult B carries its OWN eligible identity');
+  c.ok(adultIdentity.data.sessionBinding !== minorBinding, 'A and B never share a session-binding token');
+  c.deq([pendingIdentity.data.accountId, pendingIdentity.data.eligible, pendingIdentity.data.sessionBinding],
+    [studentAccountId, false, minorBinding], 'returning to pending A cannot reuse B eligibility');
+  const [delayedA, concurrentB] = await Promise.all([
+    h.request('/v1/account/guardian/state', { jar: studentJar }),
+    h.request('/v1/account/guardian/state', { jar: adultJar })
+  ]);
+  c.deq([delayedA.data.accountId, delayedA.data.eligible, concurrentB.data.accountId, concurrentB.data.eligible],
+    [studentAccountId, false, adultId, true], 'overlapping A/B consent requests retain separate server accounts');
+
   // An older authenticated account with no age basis can complete setup as a
   // child through the same route; it remains blocked until that guardian acts.
   const adultAccountId = raw.prepare("SELECT id FROM accounts WHERE email='adult@example.test'").get().id;
@@ -319,6 +346,12 @@ try {
   resetLimits();
   r = await post('/request', { channel: 'email', destination: 'claims.parent@example.test' });
   r = await post('/verify', { channel: 'email', destination: 'claims.parent@example.test', challengeId: r.data.challengeId, code: lastCode('claims.parent@example.test'), profile: { name: 'Claim', role: 'parent' } });
+  // The right code proves the mailbox; a profile that is not complete creates
+  // nothing and earns the sign-up ticket (the profile is judged only after the
+  // code, so the answer never depends on whether the address had an account).
+  c.eq(r.data?.status, 'profile-required', 'a right code with no age declaration creates no account: the profile is asked for');
+  c.eq(raw.prepare("SELECT COUNT(*) n FROM accounts WHERE email='claims.parent@example.test'").get().n, 0, 'and nothing was written');
+  r = await post('/verify', { channel: 'email', destination: 'claims.parent@example.test', signupTicket: r.data.signupTicket, profile: { name: 'Claim', role: 'parent' } });
   c.eq(r.data?.error?.code, 'AGE_DECLARATION_REQUIRED', 'no explicit age declaration creates no account (fail closed)');
   c.eq(raw.prepare("SELECT COUNT(*) n FROM accounts WHERE email='claims.parent@example.test'").get().n, 0, 'and nothing was written');
 

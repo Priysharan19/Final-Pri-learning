@@ -28,17 +28,28 @@ concurrency:
 env:
   HEALTH_MODE: ${{ github.event_name == 'schedule' && 'deep' || (github.event_name == 'workflow_dispatch' && inputs.mode || 'fast') }}
   PRI_APP_URL: ${{ vars.PRI_APP_URL }}
+  # PR checkout uses the reviewed head, while GITHUB_SHA names GitHub's
+  # temporary merge commit. Keep the fail-closed exact-source identity gate
+  # pointed at the source actually checked out for app-health builds.
+  PRI_RELEASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   app:
     name: Mounted app, product contracts and repair report
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Build and compare the exact V1 shipping feature set. The mounted E2E
+    # runner independently enables non-V1 tracks in its own test-only build;
+    # those flags must not affect the packaged iPad source parity check.
     outputs:
       blocking: ${{ steps.health.outputs.blocking }}
       verdict: ${{ steps.health.outputs.verdict }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        # Check packaged source at reviewed PR head, not GitHub's
+        # ephemeral PR-merge commit; main CI checks merging separately.
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:

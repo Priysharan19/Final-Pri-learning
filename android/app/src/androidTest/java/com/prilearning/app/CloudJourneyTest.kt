@@ -179,11 +179,20 @@ class CloudJourneyTest {
     /** Move on (at most `max` questions) until one takes a typed final answer. */
     private fun openTypedQuestion(s: ActivityScenario<MainActivity>, max: Int = 12, advanceFirst: Boolean = false) {
         if (advanceFirst) nextQuestion(s)
+        val seen = mutableListOf<String>()
         for (i in 0 until max) {
-            if (typedEditor(s)) return
+            val typed = typedEditor(s)
+            val needsAccount = eval(s, QuestionCardJs.visible("[data-check-needs-account]")) == "true"
+            val unmarkable = eval(s, "document.querySelector('[data-check-unmarkable]')?.getAttribute('data-check-unmarkable') || ''").trim('"')
+            seen.add("${qid(s)}:typed=$typed,needsAccount=$needsAccount,unmarkable=$unmarkable")
+            // A locally linked profile whose session expired shows no *proactive*
+            // account notice (needsAccountToCheck checks the local link). Still
+            // demand a markable question, and the actual signed-out Submit
+            // must refuse with sign-in and create no server grade.
+            if (typed && unmarkable.isEmpty()) return
             nextQuestion(s)
         }
-        throw AssertionError("no question with a typed answer in $max")
+        throw AssertionError("no typed server-prepared question satisfying account gate; examined ${seen.joinToString(" | ")}")
     }
 
     /** Press Submit and wait for the check it starts to finish; what the card then shows. */
@@ -230,43 +239,73 @@ class CloudJourneyTest {
     /** What cloudSignInAndSync left for the runs after the process is killed. */
     private val gradedFile get() = java.io.File(context.filesDir, "pri-test-graded-question")
 
-    /** Sign up through Settings, sign in, then permanently delete the account. */
+    /** Real native OTP card: previously this test tried the REMOVED
+     * #cloud-name / password-registration form and never reached signup.
+     * The test-only oracle reads mail sent to an unrouteable fixture mailbox;
+     * it does not inspect the app's DOM, disclose OTPs to the page outside
+     * the real typed-code control, or bypass the server's verification. */
     @Test
     fun cloudSignUpThenDeleteAccount() {
         val email = args.getString("priCloudNewEmail", "")
-        val password = args.getString("priCloudNewPassword", "")
-        assertTrue("a never-registered fixture credential is given", email.isNotEmpty() && password.isNotEmpty())
+        assertTrue("a never-registered fixture mailbox is given", Regex("^native-new-[0-9]+@example[.]test$").matches(email))
+        assertFalse("fixture account has not yet been created", oracle("/native-new-account").getBoolean("exists"))
         ActivityScenario.launch(MainActivity::class.java).use { s ->
             reachHome(s)
             openSettings(s)
-            assertEquals("\"Not connected\"", waitFor(s, stateTag))
-            eval(s, "($byText)('Create account').click()")
-            setValue(s, "#cloud-name", "Android Adult")
-            setValue(s, "#cloud-email", email)
-            setValue(s, "#cloud-password", password)
-            eval(s, "(function(){[].slice.call(document.querySelector('#cloud-email').form.querySelectorAll('input[type=checkbox]')).forEach(function(b){if(!b.checked)b.click();});return true;})()")
-            Thread.sleep(300)
-            eval(s, "document.querySelector('#cloud-email').form.querySelector('button[type=submit]').click()")
-            // Registration creates a session: signing up connects the account.
-            waitFor(s, "$stateTag === 'Connected'")
-            // Positive control: the account can sign in on the server right now.
-            assertEquals("the new account can sign in before deletion", 200, loginStatus(email, password))
-            setValue(s, "#cloud-delete-password", password)
-            setValue(s, "#cloud-delete-phrase", "DELETE")
-            Thread.sleep(300)
-            eval(s, "document.querySelector('#cloud-delete-phrase').form.querySelector('button[type=submit]').click()")
-            waitFor(s, "/Cloud account deleted/.test(document.body.innerText) && $stateTag === 'Not connected'")
-            // Server-side proof: the same credentials that worked a moment ago are refused.
-            assertEquals("the server refuses the deleted account", 401, loginStatus(email, password))
-        }
-    }
+            assertEquals("\"Not signed in\"", waitFor(s, stateTag))
+            // The single in-place sign-in card handles both returning accounts
+            // and new addresses. There is no standalone Create account form.
+            waitFor(s, "document.querySelector('[data-signin-card=inline][data-signup-step=method]')")
+            setValue(s, "#signup-destination", email)
+            eval(s, "document.querySelector('[data-testid=signup-send-code]').click()")
+            waitFor(s, "document.querySelector('[data-signin-card=inline][data-signup-step=code]')")
+            val signupCode = oracle("/otp-code?purpose=sign-in").getString("code")
+            assertTrue("fixture email supplied six digits", Regex("^[0-9]{6}$").matches(signupCode))
+            setValue(s, "#signup-code-0", signupCode)
+            waitFor(s, "document.querySelector('[data-signin-card=inline][data-signup-step=age]')")
+            setValue(s, "#signup-flow-name", "Android Adult")
+            eval(s, "document.querySelector('[data-testid=signup-age-18]').click()")
+            // Each choice is React-controlled. evaluateJavascript's callback
+            // only proves the click ran, not that React committed its state:
+            // submitting in that gap sends neither the chosen age nor consent.
+            waitFor(s, "(function(){var n=document.querySelector('#signup-flow-name'),a=document.querySelector('[data-testid=signup-age-18]');return !!n && n.value==='Android Adult' && a && a.getAttribute('aria-pressed')==='true';})()")
+            eval(s, "document.querySelector('[data-testid=signup-agree]').click()")
+            waitFor(s, "(function(){var a=document.querySelector('[data-testid=signup-agree]');return !!a && a.checked && document.querySelector('[data-testid=signup-age-18]').getAttribute('aria-pressed')==='true';})()")
+            eval(s, "document.querySelector('[data-testid=signup-age-next]').click()")
+            try {
+                waitFor(s, "$stateTag === 'Signed in'")
+            } catch (failure: AssertionError) {
+                // Failure evidence without fixture address, session cookie or
+                // OTP: distinguish server-side creation from a form error or
+                // native-account link/refresh failure.
+                val state = eval(s, "(function(){var c=document.querySelector('[data-signin-card=inline]'),e=document.querySelector('[data-testid=signup-error]');return (c?.getAttribute('data-signup-step')||'closed')+'; '+(e?.textContent?.trim()||'no signup error');})()")
+                val serverCreated = oracle("/native-new-account").getBoolean("exists")
+                throw AssertionError("signup did not connect; UI=$state; server account exists=$serverCreated", failure)
+            }
+            val created = oracle("/native-new-account")
+            assertTrue("the email code created a verified adult account", created.getBoolean("exists") && created.getBoolean("verified"))
+            assertTrue("a code-created account starts without a password", created.getBoolean("passwordless"))
+            // The new account's session is genuinely usable server-side.
+            val host = java.net.URI(origin).host
+            val session = jarOnDisk().value(host, "pri_cloud_session")
+            assertNotNull("the new account has a native stored session", session)
+            assertEquals("the OTP-created session is accepted by the server", 200, meStatus(session!!))
 
-    private fun loginStatus(email: String, password: String): Int {
-        val conn = java.net.URL("$origin/v1/account/login").openConnection() as java.net.HttpURLConnection
-        conn.requestMethod = "POST"; conn.doOutput = true
-        conn.setRequestProperty("Content-Type", "application/json"); conn.setRequestProperty("X-Pri-Client", "android-native-v1")
-        conn.outputStream.use { it.write(org.json.JSONObject().put("email", email).put("password", password).toString().toByteArray()) }
-        return try { conn.responseCode } finally { conn.disconnect() }
+            // Passwordless accounts delete by reauthentication code, not a
+            // fictional password. The pending work stays protected until the
+            // server has validated this second independently issued OTP.
+            setValue(s, "#cloud-delete-phrase", "DELETE")
+            eval(s, "document.querySelector('[data-testid=cloud-delete-send-code]').click()")
+            waitFor(s, "document.querySelector('#cloud-delete-code-0')")
+            val deleteCode = oracle("/otp-code?purpose=reauth").getString("code")
+            assertTrue("deletion sent a separate six-digit code", Regex("^[0-9]{6}$").matches(deleteCode))
+            setValue(s, "#cloud-delete-code-0", deleteCode)
+            waitFor(s, "document.querySelector('[data-testid=cloud-delete-with-code]') && !document.querySelector('[data-testid=cloud-delete-with-code]').disabled")
+            eval(s, "document.querySelector('[data-testid=cloud-delete-with-code]').click()")
+            waitFor(s, "/Cloud account deleted/.test(document.body.innerText) && $stateTag === 'Not signed in'")
+            assertFalse("the account is removed from the server", oracle("/native-new-account").getBoolean("exists"))
+            assertEquals("the deleted session is revoked", 401, meStatus(session))
+        }
     }
 
     /** Runs while the cloud server is unreachable (the runner passes priCloudOffline). */
@@ -324,7 +363,7 @@ class CloudJourneyTest {
             assertEquals("the server's record is unchanged while it is stopped", graded.getString("server"), assertServerMarkedOnce("offline"))
             offlineDraftFile.writeText(draftId)
             openSettings(s)
-            waitFor(s, "$stateTag === 'Linked · offline'", 60_000)
+            waitFor(s, "$stateTag === 'Offline'", 60_000)
             assertEquals("true", waitFor(s, "!!document.querySelector('[data-cloud-offline]')"))
             assertEquals("Sync is not offered while offline", "true",
                 eval(s, "(function(){var b=($byText)('Sync now');return !b||b.disabled;})()"))
@@ -355,7 +394,14 @@ class CloudJourneyTest {
             // A question opened NOW, with the server reachable, is the server's.
             openTypedQuestion(s, advanceFirst = true)
             val preparedId = qid(s)
-            assertEquals("the card says checking needs an account", "true", waitFor(s, QuestionCardJs.visible("[data-check-needs-account]")))
+            // A fresh device-only profile shows the proactive notice. A
+            // previously linked profile may have lost its session; in that
+            // case the real server refusal below is the decisive safety gate.
+            val preflightNotice = eval(s, QuestionCardJs.visible("[data-check-needs-account]"))
+            assertTrue("preflight account notice is a boolean: $preflightNotice",
+                preflightNotice == "true" || preflightNotice == "false")
+            assertEquals("this question has no draft/teacher/legacy unmarkable warning", "false",
+                eval(s, "!!document.querySelector('[data-check-unmarkable]')"))
             setValue(s, ".editor-body input.answer-input", WRONG)
             assertEquals("Submit is refused signed out", "refused", submitAndWait(s))
             assertEquals("the refusal is the in-card sign-in", "\"sign-in\"", eval(s, QuestionCardJs.REFUSAL))
@@ -365,13 +411,29 @@ class CloudJourneyTest {
             assertEquals("signed out, the server issued and marked nothing for the account", 0, oracle("/marked").getInt("issued"))
 
             openSettings(s)
-            assertEquals("\"Not connected\"", waitFor(s, stateTag))
-            eval(s, "($byText)('Sign in').click()")
-            setValue(s, "#cloud-email", email)
-            setValue(s, "#cloud-password", password)
-            eval(s, "document.querySelector('#cloud-email').form.querySelector('button[type=submit]').click()")
-            waitFor(s, "$stateTag === 'Connected'")
-
+            val signedOutState = waitFor(s, "(function(){var t=$stateTag;return (t === 'Not signed in' || t === 'Signed out') ? t : false;})()")
+            assertTrue("session must be signed out before linking: $signedOutState",
+                signedOutState == "\"Not signed in\"" || signedOutState == "\"Signed out\"")
+            waitFor(s, "document.querySelector('[data-signin-card=inline] [data-testid=signup-use-password]')")
+            eval(s, "document.querySelector('[data-signin-card=inline] [data-testid=signup-use-password]').click()")
+            setValue(s, "#signup-password-email", email)
+            setValue(s, "#signup-password", password)
+            eval(s, "document.querySelector('[data-testid=signup-password-submit]').click()")
+            try {
+                waitFor(s, "$stateTag === 'Signed in'")
+            } catch (timeout: AssertionError) {
+                // Do not guess whether this is a form failure, a still-signed
+                // out session, or a stale test selector. Capture only safe
+                // UI state after the REAL login attempt; never passwords,
+                // session cookies, OTP codes or full account details.
+                val actualState = eval(s, stateTag)
+                val cardStep = eval(s, "document.querySelector('[data-signin-card]')?.getAttribute('data-signup-step') || ''")
+                val accountCard = eval(s, "!!document.querySelector('[data-cloud-sign-in]')")
+                val errorVisible = eval(s, "!!document.querySelector('#signup-error')")
+                throw AssertionError(
+                    "real sign-in did not establish the session; cloudState=$actualState cardStep=$cardStep " +
+                        "signInCardPresent=$accountCard errorVisible=$errorVisible", timeout)
+            }
 
             waitFor(s, "(function(){var b=($byText)('Sync now');if(!b||b.disabled)return false;b.click();return true;})()")
             val synced = waitFor(s, "(function(){var t=document.querySelector('section[aria-labelledby=\"cloud-account-title\"]').innerText;var m=t.match(/Sync complete[^\\n]*/);return m?m[0]:false;})()", 60_000)
@@ -529,7 +591,7 @@ class CloudJourneyTest {
         ActivityScenario.launch(MainActivity::class.java).use { s ->
             reachHome(s)
             openSettings(s)
-            waitFor(s, "$stateTag === 'Connected'")
+            waitFor(s, "$stateTag === 'Signed in'")
             // Reconnected (the same server came back). Nothing typed offline was
             // ever marked, so reconnecting has no mark to deliver: the server's
             // record is still exactly the one attempt it marked itself, and it
@@ -551,9 +613,9 @@ class CloudJourneyTest {
                 assertEquals("the offline draft is still not in History", "missing", historyVerdict(s, it))
             }
             openSettings(s)
-            waitFor(s, "$stateTag === 'Connected'")
+            waitFor(s, "$stateTag === 'Signed in'")
             eval(s, "($byText)('Disconnect').click()")
-            waitFor(s, "$stateTag === 'Not connected'")
+            waitFor(s, "$stateTag === 'Not signed in'")
             val end = System.currentTimeMillis() + 5_000
             while (jarOnDisk().value(host, "pri_cloud_session") != null && System.currentTimeMillis() < end) Thread.sleep(100)
             assertEquals("Disconnect cleared the device's session", null, jarOnDisk().value(host, "pri_cloud_session"))

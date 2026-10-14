@@ -2,5 +2,6 @@
   "placement": false,
   "tutor": false,
   "australia": false,
-  "extendedTracks": false
+  "extendedTracks": false,
+  "examHandwriting": false
 }

@@ -38,9 +38,12 @@ const TESTS = [
   },
   {
     id: 'ios-bundle-sync', modes: ['fast', 'deep'], subsystem: 'iPad packaged app', severity: 'P0', blocking: true,
-    command: ['npm', ['run', 'check:ios']], timeoutMs: 120000,
+    // Release identity is materialized only AFTER the content preflight in
+    // the CI/native pipeline; its ignored JSON must not be required here.
+    // Verify every shipping asset now, then the strict stamped identity later.
+    command: ['npm', ['run', 'check:ios:content']], timeoutMs: 120000,
     fixArea: 'ios/PriLearning*.swiftpm/Resources/Web and scripts/sync-ios.mjs',
-    action: 'Rebuild the client, run npm run sync:ios, then verify npm run check:ios. Commit both mirrored bundles together.'
+    action: 'Rebuild with V1 release flags, regenerate and commit both iPad mirrors, and verify npm run check:ios:content. Strict identity is verified after stamping in native CI.'
   },
   {
     id: 'backend', modes: ['fast', 'deep'], subsystem: 'Local backend / Practice API', severity: 'P0', blocking: true,
@@ -368,7 +371,7 @@ function reportMarkdown(report) {
   lines.push('## Evidence boundary');
   lines.push('');
   lines.push('- Browser E2E drives the mounted production build through real student flows; it is not a screenshot-only tour.');
-  lines.push('- `check:ios` verifies the packaged SwiftPM web bundle matches the current client build.');
+  lines.push('- `check:ios:content` compares every packaged V1 asset before stamping; native CI later verifies the release identity with `check:ios`.');
   lines.push('- Native mode builds/exercises the PencilKit/Vision iPad simulator path on macOS.');
   lines.push('- A simulator is not a physical Apple Pencil. Real-writer/physical release evidence remains a separate empirical gate.');
   if (skips.length) {
@@ -395,14 +398,18 @@ async function main() {
     process.stdout.write(`${result.status.toUpperCase()} (${formatDuration(result.durationMs)})\n`);
   }
 
-  let commit = process.env.GITHUB_SHA || 'unknown';
-  if (commit === 'unknown' && existsSync(path.join(ROOT, '.git'))) {
+  // PR health checks out the reviewed head, whereas GITHUB_SHA often
+  // names GitHub's ephemeral merge commit. Report the checked source, not
+  // an unrelated virtual commit identity.
+  let commit = 'unknown';
+  if (existsSync(path.join(ROOT, '.git'))) {
     const git = await runCommand({
       id: 'git-head', subsystem: 'metadata', severity: 'P2', blocking: false,
       command: ['git', ['rev-parse', 'HEAD']], timeoutMs: 5000, fixArea: '', action: ''
     });
     if (git.status === 'pass') commit = git.evidence.trim().split(/\s+/)[0];
   }
+  if (commit === 'unknown') commit = process.env.GITHUB_SHA || 'unknown';
 
   const failed = results.filter(r => r.status === 'fail');
   const blockingFailures = failed.filter(r => r.blocking).length;

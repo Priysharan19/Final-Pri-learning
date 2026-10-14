@@ -488,11 +488,22 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   eq(inkReaderUiState(null, { lines: [{ text: 'x=4' }], needsConfirmation: false }),
     { kind: INK_READER_STATE.READ_SUCCESS }, 'confident usable transcription is READ_SUCCESS');
   eq(inkReaderUiState(null, null), { kind: INK_READER_STATE.IDLE }, 'no current read state is IDLE');
-  ok(/freshReadiness: fresh/.test(src) && /scheduleRead\(strokesRef\.current, \{ immediate: true, fresh: true \}\)/.test(src),
-    'the ink surface asks the server afresh (not the cache) when the session, connection or focus comes back');
-  ok(/readinessIdentity\(user\)/.test(src) && /fresh: changed/.test(src),
-    'and when the signed-in profile changes under the kept ink');
-  ok(/ACCOUNT_BLOCKED_KEYS\.has\(status\.key\)/.test(src) && /to="\/settings"/.test(src),
+  // Read on request (owner decision): a read is sent because the student
+  // pressed "Read my answer" (or "Try again" after a refusal) and for no other
+  // reason. It still asks the server afresh, never a cached "not ready".
+  ok(/freshReadiness: true/.test(src) && /data-ink-read=/.test(src) && /onClick=\{readNow\}/.test(src),
+    'the ink surface asks the server afresh (not the cache) when the student presses Read my answer');
+  ok(!/scheduleRead|scheduleRetry|SETTLE_MS|setTimeout\(go/.test(src), 'no timer, pause or stroke sends a read: there is no scheduler left in the surface');
+  {
+    const sends = [...src.matchAll(/readWithCloud\(/g)].length;
+    const callers = [...src.matchAll(/(?<![A-Za-z])readNow\(\)|onClick=\{readNow\}/g)].length;
+    eq([sends, callers], [1, 2], 'one place sends a read, reached only from the Read my answer and Try again presses');
+  }
+  ok(/readinessIdentity\(user\)/.test(src) && /if \(changed\) setStatus\(/.test(src) && !/fresh: changed/.test(src),
+    'a signed-in profile changing under the kept ink clears the sign-in notice and reads nothing');
+  ok(/onCloudSessionChange\(\(\) => clearIf\(/.test(src) && /const onOnline = \(\) => \{ setOnline\(true\); clearIf\(\['offline'\]\); \}/.test(src),
+    'a session announcement or coming back online clears the reason and reads nothing');
+  ok(/ACCOUNT_BLOCKED_KEYS\.has\(shownStatus\.key\)/.test(src) && /to="\/settings"/.test(src),
     'an account blocker renders the way to Account settings beside the notice');
 
   // Default-on ink path, answer-blind: a signed-in profile that never chose is
@@ -528,8 +539,8 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   ok(!/inkResult\?\.afterWait/.test(qc) && !/autoMarkedRef/.test(qc), 'ink read after waiting is shown, never sent to be marked without the student\'s Submit');
   ok(/onReaderState=\{setInkReaderState\}/.test(qc) && /inkReaderState\?\.kind === INK_READER_STATE\.READ_FAILED/.test(qc),
     'the question-level “could not read” copy is driven by a genuine reader failure, never strokes-without-text alone');
-  ok(/setStatus\(prev => prev\?\.kind === 'empty' \? null : prev\)/.test(inkSrc),
-    'changing ink clears a stale genuine READ_FAILED before the next read settles');
+  ok(/emptyRef\.current !== signature\) \{ emptyRef\.current = null; setStatus\(prev => \(prev\?\.kind === 'empty' \? null : prev\)\); \}/.test(inkSrc),
+    'changing ink clears a stale genuine READ_FAILED: the changed page can be read');
 }
 
 // ── Review follow-ups: plausible placement, unbounded backoff, deferred mark ─
@@ -544,8 +555,11 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   eq([0, 1, 2, 3].map(retryDelayMs), [20000, 40000, 80000, 160000], 'retries back off by doubling');
   ok(retryDelayMs(4) === RETRY_CAP_MS && retryDelayMs(50) === RETRY_CAP_MS, 'and keep going at the cap rather than stopping');
   const ink = readFileSync(new URL('../src/ink/InkAnswer.jsx', import.meta.url), 'utf8');
-  ok(!/MAX_RETRIES/.test(ink) && /scheduleRetry\(seq\)/.test(ink), 'the ink surface has no retry ceiling');
-  ok(/'visibilitychange'/.test(ink) && /'focus'/.test(ink), 'and retries on focus and on a return to the tab');
+  // The backoff helpers remain for callers that poll; the ink surface no
+  // longer retries by itself at all — a refused or unanswered read waits for
+  // the student's own Try again.
+  ok(!/scheduleRetry|retryDelayMs|AUTO_RETRY_MAX/.test(ink), 'the ink surface never retries a read by itself');
+  ok(!/'visibilitychange'/.test(ink) && !/addEventListener\?\.\('focus'/.test(ink), 'and neither a focus nor a return to the tab sends one');
   ok(/plausibleLineMatch\(/.test(ink), 'and only places a reading on the ink when it plausibly matches');
   const qc = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
   ok(/const onInkRecognized = useCallback\(\(r\) => \{\s*if \(inkFrozenRef\.current\) return;\s*setInkResult\(r\);/.test(qc),
@@ -595,8 +609,8 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   // The surface wires it the same way: the correction handler publishes and
   // never reaches the reader.
   const inkAnswer = readFileSync(new URL('../src/ink/InkAnswer.jsx', import.meta.url), 'utf8');
-  const handler = inkAnswer.slice(inkAnswer.indexOf('const correctLine = useCallback('), inkAnswer.indexOf('}, [rec, publish]);'));
-  ok(handler.length > 50 && /applyLineCorrection\(rec, index, text\)/.test(handler) && /publish\(next, strokesRef\.current\)/.test(handler), 'InkAnswer applies a correction to the reading on screen and publishes it');
+  const handler = inkAnswer.slice(inkAnswer.indexOf('const correctLine = useCallback('), inkAnswer.indexOf('}, [rec, publish, stale]);'));
+  ok(handler.length > 50 && /applyLineCorrection\(rec, index, text\)/.test(handler) && /publish\(next, strokesRef\.current, \{ stale \}\)/.test(handler) && !/readNow|readWithCloud/.test(handler), 'InkAnswer applies a correction to the reading on screen and publishes it');
   ok(!/readWithCloud|sendToReader|scheduleRead|transport/.test(handler), 'and the correction handler never calls the reader');
   ok(/needsConfirmation: r\.needsConfirmation === true/.test(inkAnswer), 'the reader’s own doubt travels with the published reading');
   const card = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
@@ -608,8 +622,14 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
 {
   const en = (await import('../src/i18n/strings.en.js')).default;
   const hi = (await import('../src/i18n/strings.hi.js')).default;
-  ok(en['ink.waitingOffline'].startsWith('Saved. It will be read when you are back online.'), 'offline, the student is told plainly: saved, read when back online');
-  ok(hi['ink.waitingOffline'].startsWith('सहेज लिया गया। ऑनलाइन होते ही इसे पढ़ा जाएगा।'), 'in Hindi too');
+  // Reading is asked for now, so the sentence no longer promises it will
+  // happen by itself: saved, and what to press once back online.
+  ok(en['ink.waitingOffline'].startsWith('Saved. ') && /When you are back online, press Read my answer\./.test(en['ink.waitingOffline']) && !/will be read/.test(en['ink.waitingOffline']),
+    'offline, the student is told plainly: saved, and to press Read my answer when back online');
+  ok(hi['ink.waitingOffline'].startsWith('सहेज लिया गया। ') && /मेरा उत्तर पढ़ें/.test(hi['ink.waitingOffline']), 'in Hindi too');
+  for (const key of ['ink.waitingOffline', 'ink.waitingOfflinePlain', 'ink.waitingSignIn', 'ink.waitingVerifyEmail', 'ink.waitingServiceDown', 'ink.waitingServiceDownPlain']) {
+    ok(!/will be read|it will be read|tried again shortly|read once you have/i.test(en[key]) && !/पढ़ा जाएगा|फिर कोशिश होगी/.test(hi[key]), `${key} promises no automatic read or retry`);
+  }
   eq(inkReadingBlockedKey({ cloudLinked: true, cloudHandwriting: true }, { available: () => true, online: () => false }), 'ink.waitingOffline', 'and that is the key an offline page shows');
   const recovery = readFileSync(new URL('../src/components/practiceRecovery.js', import.meta.url), 'utf8');
   ok(/export \{ compactStrokes, saveInkDraft, readInkDraft, clearInkDraft \} from '\.\.\/local\/inkDrafts\.js';/.test(recovery), 'kept ink comes from the sealed IndexedDB store, not the localStorage draft store');

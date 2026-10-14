@@ -26,7 +26,7 @@ ok(/export const STILL_READING_MS = 5000;/.test(inkAnswer), 'the still-reading n
 ok(/t\(slowRead \? 'ink\.serverStillReading' : 'ink\.serverReading'\)/.test(inkAnswer), 'a slow read switches to the still-reading note');
 ok(typeof en['ink.serverStillReading'] === 'string' && typeof hi['ink.serverStillReading'] === 'string', 'the still-reading note exists in English and Hindi');
 const transport = read('client/src/platform/cloudTransport.js');
-const clientTimeout = Number(transport.match(/transcribeHandwriting: \(image, \{ signal = null, timeoutMs = (\d+) \}/)?.[1]);
+const clientTimeout = Number(transport.match(/transcribeHandwriting: \(image, \{ signal = null, timeoutMs = (\d+)\b/)?.[1]);
 const serverDefault = Number(read('server/platform/handwritingProvider.js').match(/const DEFAULT_TIMEOUT_MS = ([\d_]+);/)?.[1].replace(/_/g, ''));
 ok(serverDefault === 45000, 'the server reading budget defaults to 45 s');
 ok(clientTimeout > serverDefault && clientTimeout <= 60000, 'the client waits longer than the server budget, inside the 60 s transport cap');
@@ -69,7 +69,10 @@ ok(/\{featureEnabled\('australia'\) && \(\s*<div className="field" style=\{\{ ma
   'the onboarding link renders only when the flag is on');
 
 // ── 7 · A prefilled name is replaced, not appended to ────────────────────────
-ok(/id="cloud-name"[\s\S]{0,400}onFocus=\{e => \{ if \(e\.target\.value && e\.target\.value === \(user\?\.name \|\| ''\)\) e\.target\.select\(\); \}\}/.test(cloudPanel),
+// The account's name is asked on the sign-in card now (a new address, after
+// its code), prefilled from the profile the same way.
+const signInCard = read('client/src/components/SignUpFlow.jsx');
+ok(/id="signup-flow-name"[\s\S]{0,500}onFocus=\{e => \{ if \(e\.target\.value && e\.target\.value === String\(initialName \|\| ''\)\) e\.target\.select\(\); \}\}/.test(signInCard),
   'focusing the prefilled account name selects it');
 
 if (failures.length) {

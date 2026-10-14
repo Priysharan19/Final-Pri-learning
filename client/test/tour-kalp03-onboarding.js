@@ -359,10 +359,10 @@ export const flow = {
     await page.waitForSelector('[data-onboarding-step="5"]');
     await page.getByRole('button', { name: /Create profile & open Account/ }).click();
     await page.waitForSelector('#cloud-account-title', { timeout: 30000 });
-    await check('cloud intent reaches the real Account & cross-device sync panel',
-      /Account & cross-device sync/i.test(await page.locator('#cloud-account-title').innerText()));
+    await check('cloud intent reaches the real Pri account panel',
+      /Your Pri account/i.test(await page.locator('#cloud-account-title').innerText()));
     await check('new local profile is not falsely shown as cloud-connected',
-      /Not connected|no Pri cloud origin configured/i.test(
+      /Not signed in|no Pri cloud origin configured/i.test(
         await page.locator('section[aria-labelledby="cloud-account-title"]').innerText()));
 
     await switchProfile(page);

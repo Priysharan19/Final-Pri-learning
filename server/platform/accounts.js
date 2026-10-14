@@ -438,14 +438,24 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
   });
 
   router.get('/guardian/state', requireSession(db), async (req, res) => {
-    const state = await consentState(db, req.platformSession.account_id);
-    const account = await db.get('SELECT email_verified_at FROM accounts WHERE id = ?', [req.platformSession.account_id]);
+    // The guardian result alone is NEVER an onboarding credential. Bind its
+    // identity to the server-authenticated account AND current session so a
+    // late response for B cannot be consumed as permission for A.
+    const accountId = req.platformSession.account_id;
+    const sessionBinding = sha256(req.platformSession.id);
+    const state = await consentState(db, accountId);
     res.json({
+      accountId,
+      // Opaque server session identifier expected by the onboarding client.
+      // Neither this value nor sessionBinding is the bearer or CSRF token.
+      sessionId: sessionBinding,
+      sessionBinding,
+      eligible: !consentBlockerCode(state) && !!req.platformSession.email_verified_at,
       required: state.required,
       state: state.state,
       ageBasis: state.ageBasis,
       blockerCode: consentBlockerCode(state),
-      emailVerified: !!account?.email_verified_at,
+      emailVerified: !!req.platformSession.email_verified_at,
       guardianEmail: state.row ? maskEmail(state.row.guardian_email) : null,
       noticeVersion: state.row?.notice_version || null,
       method: state.row?.method || null

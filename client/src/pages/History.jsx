@@ -13,6 +13,7 @@ import { useT } from '../i18n/index.js';
 import TermGloss from '../components/TermGloss.jsx';
 import Icon from '../components/Icon.jsx';
 import { createHistoryLoadGate } from './historyLoadLifecycle.js';
+import { transcriptIsAnswer } from '../components/attemptEvidence.js';
 
 const FILTERS = [
   ['all', 'history.filterAll'],
@@ -210,7 +211,9 @@ function HistoryForProfile() {
                   </div>
                 )}
                 {open.detail.ink?.strokes?.length > 0 && <InkReplay strokes={open.detail.ink.strokes}
-                  label={open.detail.ink.recognized ? t('history.readAs', { text: open.detail.ink.recognized }) : t('history.yourHandwriting')} />}
+                  label={open.detail.ink.recognized
+                    ? t(item.viaInk && item.answerGiven !== '' && !transcriptIsAnswer(open.detail.ink.recognized, item.answerGiven) ? 'history.readAsNotAnswer' : 'history.readAs', { text: open.detail.ink.recognized })
+                    : t('history.yourHandwriting')} />}
                 {open.detail.ink?.scribble?.length > 0 && <InkReplay strokes={open.detail.ink.scribble} label={t('history.scribblePad')} height={120} />}
                 {open.detail.ink?.photo && (
                   <div style={{ marginTop: 8 }}>
