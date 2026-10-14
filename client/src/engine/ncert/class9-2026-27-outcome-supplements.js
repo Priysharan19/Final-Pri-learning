@@ -1,0 +1,82 @@
+/**
+ * Mission 004 / Original 2026–27 CBSE Class IX identified-competency supplements.
+ * Authored review SOURCE ONLY. Unwired. No private grading/rubric authority.
+ * Official chapter targets:
+ * https://cbseacademic.nic.in/web_material/CurriculumMain27/SecPart1/Maths_SecP1IX_2026-27.pdf
+ * pp. 7–12: graphing two lines, opposite-angle proof, SSA caveat, pyramids, investigations.
+ */
+export const class9OutcomeSupplements202627 = {
+ version:'2026.10.14.3',state:'source-only-pending-independent-examiner',
+ track:'CBSE-standard',grade:9,rights:'original-authorship',
+ workedExamples:[
+  {id:'pl9-m004-w-pyramid',chapter:'Surface Area and Volume',classification:'core',
+   prompt:'A square pyramid has base side 6 cm and perpendicular height 4 cm. Derive its slant height, full outer area and volume.',
+   steps:['The perpendicular height (4 cm), the base-centre-to-side-midpoint segment (3 cm) and the face slant height form a right triangle: slant = √(4²+3²) = 5 cm.','Four side triangles total area 4×(1/2)×6×5 = 60 cm², and the square base contributes 36 cm², giving 96 cm².','Volume is one third of base area times perpendicular height: (1/3)×36×4 = 48 cm³.'],
+   answer:'slant 5 cm; total area 96 cm²; volume 48 cm³',
+   data:{type:'square-pyramid',a:6,h:4,l:5,area:96,volume:48}},
+  {id:'pl9-m004-w-vertical-proof',chapter:'Lines and Angles',classification:'core',
+   prompt:'Prove from linear pairs that opposite angles at two intersecting straight lines are equal.',
+   steps:['Let AB and CD intersect at O, with A,O,B collinear and C,O,D collinear.','∠AOC + ∠COB = 180° and ∠COB + ∠BOD = 180°, by the linear-pair theorem.','Subtract the common ∠COB from both equations. Therefore ∠AOC=∠BOD. The same reasoning proves equality of the other opposite pair.'],
+   answer:'∠AOC=∠BOD, by equal remainders from straight-angle sums',
+   data:{type:'vertical-proof',first:'AOC',second:'BOD',shared:'COB'}}
+ ],
+ questions:[
+  {id:'pl9-m004-pyramid-1',archetype:'pyramid-slant-exterior-volume',chapter:'Surface Area and Volume',classification:'core',
+   prompt:'A right square pyramid has base side 8 cm and perpendicular height 3 cm. Calculate the slant height of a face, its complete exterior surface area and volume.',
+   hint:'Use the right triangle from the base centre to a side midpoint; the midpoint distance is half the side.',
+   steps:['Face slant = √(3²+4²)=5 cm.','Lateral area=4(1/2×8×5)=80 cm²; plus base 8²=64 cm² gives total area 144 cm².','Volume=(1/3)×8²×3=64 cm³.'],
+   answer:'slant 5 cm; total area 144 cm²; volume 64 cm³',
+   wrong:'Using perpendicular height 3 cm for each triangular face instead of slant height 5 cm.',
+   data:{type:'square-pyramid',a:8,h:3,l:5,area:144,volume:64}},
+  {id:'pl9-m004-pyramid-2',archetype:'pyramid-slant-exterior-volume',chapter:'Surface Area and Volume',classification:'core',
+   prompt:'A right square pyramid has a 10 cm square base and vertical height 12 cm. Determine its face slant height, full exterior surface area and volume.',
+   hint:'The base-to-face horizontal half-width is 5 cm.',
+   steps:['Face slant=√(12²+5²)=13 cm.','Four triangular sides total 4(1/2×10×13)=260 cm²; adding base 100 cm² gives 360 cm².','Volume=(1/3)×100×12=400 cm³.'],
+   answer:'slant 13 cm; total area 360 cm²; volume 400 cm³',
+   wrong:'A square pyramid has four triangular faces, not two; the base is also part of complete exterior area.',
+   data:{type:'square-pyramid',a:10,h:12,l:13,area:360,volume:400}},
+  {id:'pl9-m004-graph-1',archetype:'coordinate-two-line-plot',chapter:'Linear Equations in Two Variables',classification:'core',
+   prompt:'On equal-scale axes plot the lines 2x+y=7 and x−y=2 using two correct integer points per line. Read and check the intersection.',
+   hint:'Check the ordered pair you see in BOTH equations before naming the point.',
+   steps:['Line 2x+y=7 goes through (0,7) and (2,3). The line x−y=2 goes through (2,0) and (4,2).','The drawn lines cross at (3,1).','Check 2×3+1=7 and 3−1=2. Hence the unique graphical solution is (3,1).'],
+   answer:'intersection (3,1)',
+   wrong:'Plotting the intercepts of one equation but reading a point that is not on the second line.',
+   data:{type:'two-line-graph',equations:[[2,1,7],[1,-1,2]],plot:[[[0,7],[2,3]],[[2,0],[4,2]]],intersection:[3,1]}},
+  {id:'pl9-m004-graph-2',archetype:'coordinate-two-line-plot',chapter:'Linear Equations in Two Variables',classification:'core',
+   prompt:'Plot x+y=5 and x−y=1 on one coordinate grid, selecting two integer points on each line. State and verify their intersection.',
+   hint:'First rearrange to y=5−x and y=x−1.',
+   steps:['The first line passes through (0,5) and (5,0). The second passes through (1,0) and (3,2).','The intersection is (3,2).','Substitution gives 3+2=5 and 3−2=1, verifying both equations.'],
+   answer:'intersection (3,2)',
+   wrong:'Confusing a y-intercept with an intersection of the two lines.',
+   data:{type:'two-line-graph',equations:[[1,1,5],[1,-1,1]],plot:[[[0,5],[5,0]],[[1,0],[3,2]]],intersection:[3,2]}},
+  {id:'pl9-m004-ssa-1',archetype:'ssa-constructibility-cases',chapter:'Triangles — Congruence Theorems',classification:'core',
+   prompt:'An SSA construction specifies AB=10 cm, ∠BAC=30°, BC=7 cm and C on the ray from A making 30° with AB. Can two different triangles be constructed? Justify using intersections.',
+   hint:'Measure the perpendicular distance from B to the AC ray and compare it with BC and AB.',
+   steps:['The perpendicular distance from B to the ray is AB sin30°=5 cm.','The radius-7 circle centred at B cuts the ray at distances AC=5√3±2√6 cm; both distances are positive.','Thus two noncongruent triangles meet the same SSA data, so SSA is not a general congruence criterion.'],
+   answer:'two distinct triangles; AC=5√3±2√6 cm',
+   wrong:'Proving uniqueness from SSA even though a circle can meet a ray in two points.',
+   data:{type:'ssa-ray',adjacent:10,opposite:7,angleDeg:30,positiveRoots:2}},
+  {id:'pl9-m004-ssa-2',archetype:'ssa-constructibility-cases',chapter:'Triangles — Congruence Theorems',classification:'core',
+   prompt:'An SSA construction specifies AB=10 cm, ∠BAC=30°, BC=12 cm, with C on the indicated AC ray. Explain why only one triangle exists.',
+   hint:'A circle of radius larger than AB cannot meet the forward ray twice when A lies inside that circle.',
+   steps:['The perpendicular distance from B to the AC ray remains 10sin30°=5 cm.','AC=5√3±√119 cm. Since √119>5√3, only the plus root is positive.','Exactly one admissible C lies on the forward ray; uniqueness here does not make SSA a universal criterion.'],
+   answer:'one triangle; AC=5√3+√119 cm',
+   wrong:'Mistaking the exceptional one-solution case for a universal SSA congruence rule.',
+   data:{type:'ssa-ray',adjacent:10,opposite:12,angleDeg:30,positiveRoots:1}},
+  {id:'pl9-m004-stat-1',archetype:'statistical-investigation-plot-choice',chapter:'Statistics',classification:'core',
+   prompt:'Class A has 40 pupils, 16 of whom walk to school; Class B has 30 pupils, six of whom walk. Which is better for comparing the walking shares: an absolute-count stacked bar or a 100%-stacked bar? State both shares and a fair conclusion.',
+   hint:'The class sizes differ. Separate the number of walkers from the proportion who walk.',
+   steps:['Class A: 16/40=40%; Class B: 6/30=20%.','A 100%-stacked bar graph makes the relative walking shares directly comparable when totals differ.','Class A has a walking share 20 percentage points larger; the data alone do not explain why.'],
+   answer:'100%-stacked bars; 40% vs 20%; A is higher by 20 percentage points',
+   wrong:'Concluding that a difference in observed proportions establishes the cause of travel choices.',
+   data:{type:'stat-investigation',totals:[40,30],counts:[16,6],shares:[40,20],gap:20,chart:'100%-stacked'}},
+  {id:'pl9-m004-stat-2',archetype:'statistical-investigation-plot-choice',chapter:'Statistics',classification:'core',
+   prompt:'Two after-school clubs have membership 50 and 20. Respectively 15 and 12 members attend weekly. Select an honest chart for comparing attendance rates, calculate both rates and explain why raw counts are insufficient.',
+   hint:'The larger group can have more attendees yet a lower attendance proportion.',
+   steps:['Club 1: 15/50=30%; Club 2: 12/20=60%.','Use 100%-stacked bars (or equally scaled percentage bars) to compare attendance shares rather than absolute segment sizes.','Club 2 has the higher attendance rate by 30 percentage points, despite having fewer attendees.'],
+   answer:'100%-stacked bars; 30% vs 60%; Club 2 higher by 30 percentage points',
+   wrong:'Using the larger absolute attendance count to infer the larger attendance rate.',
+   data:{type:'stat-investigation',totals:[50,20],counts:[15,12],shares:[30,60],gap:30,chart:'100%-stacked'}}
+ ]
+};
+export default class9OutcomeSupplements202627;
