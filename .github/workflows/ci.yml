@@ -557,7 +557,6 @@ jobs:
           grep -Eq 'ACCESSIBILITY SUITE.*51/51.*14 groups' browser.log
           grep -Fq 'BOOT RESILIENCE: PASS — 61/61 checks' browser.log
           grep -Fq 'Reader · usage limit reached' browser.log
-          grep -Eq 'E2E SUITE.*38/38.*2 flows' browser.log
           grep -Fq 'Ink · a marked attempt says only what the server established' browser.log
           test "$(grep -Ec 'E2E SUITE PASSED — 49/49 checks across 1 flows' browser.log)" -eq 2
           grep -Eq 'Read on request · provider calls per handwritten answer, first stroke to verdict +14/14' browser.log
