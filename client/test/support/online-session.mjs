@@ -86,7 +86,10 @@ export async function startOnlinePlatform({ dist = DIST } = {}) {
   // request the provider module sends is kept so a flow can prove the reader
   // was sent the picture and nothing about the question. `down` makes the
   // provider hop fail the way an unreachable model does.
-  const reader = { text: '7', lines: null, confidence: 0.6, down: false, requests: [], refused: [] };
+  // `gate`, when a flow sets it to a promise, holds the reader's answer until
+  // it settles — a slow provider. The answer is the one scripted when the
+  // request ARRIVED, as a real reader's would be.
+  const reader = { text: '7', lines: null, confidence: 0.6, down: false, gate: null, requests: [], refused: [] };
   const realFetch = globalThis.fetch;
   globalThis.fetch = async (input, init = {}) => {
     const url = new URL(typeof input === 'string' ? input : input.url);
@@ -99,11 +102,13 @@ export async function startOnlinePlatform({ dist = DIST } = {}) {
       if (reader.down) return new Response(JSON.stringify({ error: { message: 'synthetic reader scripted down' } }), { status: 503, headers: { 'content-type': 'application/json' } });
       // `reader.lines` scripts whole line objects (per-line doubt, layout gap);
       // otherwise every line of `reader.text` is read at `reader.confidence`.
+      const confidence = reader.confidence;
       const lines = (Array.isArray(reader.lines) && reader.lines.length ? reader.lines : String(reader.text).split('\n').filter(Boolean).map(text => ({ text })))
-        .map(line => ({ text: line.text, latex: line.latex ?? line.text, confidence: line.confidence ?? reader.confidence,
+        .map(line => ({ text: line.text, latex: line.latex ?? line.text, confidence: line.confidence ?? confidence,
           uncertain: line.uncertain === true, doubt: line.doubt || '', gap_before: line.gap_before === true }));
+      if (reader.gate) await Promise.resolve(reader.gate).catch(() => {});
       return new Response(JSON.stringify({
-        output_text: JSON.stringify({ lines, confidence: reader.confidence, needs_confirmation: reader.confidence < 0.82 })
+        output_text: JSON.stringify({ lines, confidence, needs_confirmation: confidence < 0.82 })
       }), { status: 200, headers: { 'content-type': 'application/json' } });
     }
     reader.refused.push(url.origin + url.pathname);

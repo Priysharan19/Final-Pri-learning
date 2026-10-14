@@ -19,6 +19,7 @@ import { asStore } from './store.js';
 import { rateLimit, requireSession, requireVerifiedEmail } from './security.js';
 import { spendCeilingMissing } from './spendCeiling.js';
 import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
+import { issueReadReceipt } from './readReceipt.js';
 import { cachedServerReleaseIdentity } from './releaseIdentity.js';
 import { recordProviderCall } from './metrics.js';
 import { logEvent } from './observability.js';
@@ -50,7 +51,10 @@ export function validateRequestBody(body) {
       message: `Handwriting transcription is answer-blind; it never receives ${offending.join(', ')}.`
     };
   }
-  const allowed = new Set(['image', 'requestId']);
+  // `questionId` names the issued question the read is for, so the read
+  // receipt can be bound to it (readReceipt.js). It is never sent to the
+  // reader: the provider request is the picture alone.
+  const allowed = new Set(['image', 'requestId', 'questionId']);
   const unknown = Object.keys(body).filter(key => !allowed.has(key));
   if (unknown.length) {
     return { ok: false, code: 'HANDWRITING_BODY_INVALID', message: `Unexpected field: ${unknown.join(', ')}.` };
@@ -185,7 +189,18 @@ export function createHandwritingRouter(db, {
         const result = read.result;
         reused = read.reused;
         if (!reused) recordProviderCall('handwriting', { ok: true, ms: Date.now() - started });
+        // The read receipt: proof, with no readable text in it, that this
+        // account had this picture read for this question. Issued only for a
+        // question this account was issued; Submit verifies it (practice.js).
+        let receipt = null;
+        const forQuestion = typeof req.body.questionId === 'string' && /^[0-9a-f-]{36}$/i.test(req.body.questionId) ? req.body.questionId : null;
+        if (forQuestion && typeof result.text === 'string' && result.text) {
+          const owned = await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?",
+            [req.platformSession.account_id, forQuestion, Date.now()]);
+          if (owned) receipt = issueReadReceipt({ accountId: req.platformSession.account_id, questionId: forQuestion, image: req.body.image, text: result.text, needsConfirmation: result.needsConfirmation === true, env });
+        }
         res.json({
+          ...(receipt ? { receipt } : {}),
           // true: served from a read this account already paid for; no provider call.
           reused,
           transcription: {

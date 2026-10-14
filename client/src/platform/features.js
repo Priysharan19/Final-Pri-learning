@@ -38,11 +38,14 @@
 // needs coordinator approval, not a code change.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_EXTENDED_TRACKS__, __PRI_FEATURE_AUSTRALIA__ */
+/* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_EXTENDED_TRACKS__, __PRI_FEATURE_AUSTRALIA__, __PRI_FEATURE_EXAM_HANDWRITING__ */
 const BUILT = {
   placement: typeof __PRI_FEATURE_PLACEMENT__ === 'boolean' ? __PRI_FEATURE_PLACEMENT__ : null,
   extendedTracks: typeof __PRI_FEATURE_EXTENDED_TRACKS__ === 'boolean' ? __PRI_FEATURE_EXTENDED_TRACKS__ : null,
-  australia: typeof __PRI_FEATURE_AUSTRALIA__ === 'boolean' ? __PRI_FEATURE_AUSTRALIA__ : null
+  australia: typeof __PRI_FEATURE_AUSTRALIA__ === 'boolean' ? __PRI_FEATURE_AUSTRALIA__ : null,
+  // PRI_FEATURE_EXAM_HANDWRITING=1 — handwriting input in timed exams. OFF by
+  // default in a production build: a paper then offers Type only.
+  examHandwriting: typeof __PRI_FEATURE_EXAM_HANDWRITING__ === 'boolean' ? __PRI_FEATURE_EXAM_HANDWRITING__ : null
 };
 
 const productionBuild = () => {

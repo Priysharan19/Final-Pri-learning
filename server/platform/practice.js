@@ -34,6 +34,7 @@ import {
 import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../../client/src/engine/answer-forms.js';
 import { transcribeHandwriting, validateImage, HandwritingProviderError } from './handwritingProvider.js';
 import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
+import { verifyReadReceipt } from './readReceipt.js';
 
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
 const ID = /^[a-zA-Z0-9_-]{8,100}$/;
@@ -65,7 +66,7 @@ const DOTPOINT = /^[a-zA-Z0-9._:-]{1,80}$/;
 // nowhere else, and a suite can switch them off to exercise the real contract.
 const fixedSeedsAllowed = env => env.NODE_ENV === 'test' && env.PRI_PRACTICE_SERVER_SEEDS_ONLY !== '1';
 const GRADE_FIELDS = new Set(['submissionId', 'answer', 'mode', 'steps', 'transcriptionReceipt', 'ms']);
-const RECOGNITION_FIELDS = new Set(['image', 'mode']);
+const RECOGNITION_FIELDS = new Set(['image', 'mode', 'receipt', 'text']);
 const CORRECTION_FIELDS = new Set(['text']);
 const PUBLIC_Q = PUBLIC_QUESTION_FIELDS;
 
@@ -500,7 +501,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const qid = String(req.params.id || '');
     const body = req.body;
     if (!UUID.test(qid) || !plain(body) || unknown(body, RECOGNITION_FIELDS).length ||
-        !['ink', 'photo'].includes(body.mode) || typeof body.image !== 'string') {
+        !['ink', 'photo'].includes(body.mode) || typeof body.image !== 'string' ||
+        (body.receipt !== undefined && typeof body.receipt !== 'string') || (body.text !== undefined && !limitedText(body.text, 12000))) {
       return reject(res, 400, 'RECOGNITION_INVALID', 'Send only an ink/photo image and its input mode.');
     }
     const accountId = req.platformSession.account_id;
@@ -520,9 +522,25 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     let result;
     let reused = false;
     try {
-      const read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId: req.requestId });
-      if (read.refusal) return sendRecognitionRefusal(res, read.refusal);
-      ({ result, reused } = read);
+      // Submit is not a request to read. This route never starts a provider
+      // call: it binds the transcript the student was already shown (the kept
+      // read, or one still in flight). When that read is gone the answer is a
+      // named, retryable refusal and the student presses Read again.
+      const read = await recognitionOpsFor(db).read({ db, accountId, image: body.image, env, transcribe, requestId: req.requestId, paid: false });
+      if (read.missing) {
+        // The 15-minute kept read is gone. The student was given a read
+        // receipt when they had the page read (readReceipt.js): if it
+        // verifies — this account, this question, this picture, this reader,
+        // this text, recent enough — the read is proven and marking proceeds
+        // on the text they were shown. Otherwise: read again. Never a call.
+        const proven = verifyReadReceipt(body.receipt, { accountId, questionId: qid, image: body.image, text: body.text, env });
+        if (!proven.ok) return reject(res, 409, 'RECOGNITION_READ_EXPIRED', 'This page needs to be read again before it can be submitted. Press Read again.');
+        result = { text: body.text, lines: [], confidence: null, needsConfirmation: proven.needsConfirmation };
+        reused = true;
+      } else {
+        if (read.refusal) return sendRecognitionRefusal(res, read.refusal);
+        ({ result, reused } = read);
+      }
     } catch (error) {
       if (error instanceof HandwritingProviderError) return reject(res, error.status, error.code, error.message);
       return reject(res, 502, 'RECOGNITION_FAILED', 'The answer could not be read this time.');
