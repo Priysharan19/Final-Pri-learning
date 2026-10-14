@@ -95,7 +95,11 @@ export const flow = {
       // A missing fake endpoint used to keep this correct fail-closed UI stuck.
       if (path === '/v1/account/guardian/state' && method === 'GET') {
         return authenticated
-          ? respond(route, 200, { required: false, state: 'not-required' })
+          ? respond(route, 200, {
+              accountId: ADMIN.id, sessionBinding: 'a'.repeat(64),
+              emailVerified: ADMIN.emailVerified, eligible: true,
+              required: false, state: 'not-required'
+            })
           : respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
       }
 

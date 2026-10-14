@@ -91,6 +91,8 @@ export const flow = {
         try { sentBody = JSON.parse(body || '{}'); } catch { sentBody = {}; }
         if (!sentBody.signupTicket) return respond(route, 200, { status: 'profile-required', signupTicket: 'otp_e2e_ticket' });
         authenticated = true;
+        // A successful EMAIL OTP has already verified its mailbox.
+        emailVerified = true;
         return respond(route, 201, { status: 'signed-in', created: true, account: ACCOUNT, guardianConsent: { required: false, state: 'not-required' } }, {
           'set-cookie': 'pri_csrf=e2e-csrf; Path=/; SameSite=Lax'
         });
@@ -101,7 +103,11 @@ export const flow = {
       // making the secure fail-closed client look like a broken sign-in.
       if (path === '/v1/account/guardian/state' && method === 'GET') {
         return authenticated
-          ? respond(route, 200, { required: guardianPending, state: guardianPending ? 'pending' : 'not-required' })
+          ? respond(route, 200, {
+            accountId: ACCOUNT.id, sessionBinding: 'a'.repeat(64),
+            emailVerified, eligible: emailVerified && !guardianPending,
+            required: guardianPending, state: guardianPending ? 'pending' : 'not-required'
+          })
           : respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
       }
 
@@ -332,6 +338,9 @@ export const flow = {
     // Reproduce the production gate: /handwriting/status is refused before any
     // transcription request can leave the device.
     guardianPending = true;
+    // Independently exercise lost-email-verification after successful OTP
+    // onboarding, not the impossible claim that OTP itself left it unverified.
+    emailVerified = false;
     await page.getByRole('link', { name: 'Practice', exact: true }).first().click();
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
     await check('the same question and the kept handwriting come back, in writing mode',

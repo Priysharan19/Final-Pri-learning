@@ -73,7 +73,13 @@ export const flow = {
       if (path === '/v1/account/logout' && method === 'POST') return respond(route, 200, { ok: true });
       if (path === '/v1/account/identity') return respond(route, 200, { providers: [{ provider: 'google', linkedAt: Date.now() }] });
       if (path === '/v1/account/devices') return respond(route, 200, { devices: [] });
-      if (path === '/v1/account/guardian/state') return respond(route, 200, { required: false, state: 'not-required' });
+      if (path === '/v1/account/guardian/state') return authenticated
+        ? respond(route, 200, {
+            accountId: ACCOUNT.id, sessionBinding: 'a'.repeat(64),
+            emailVerified: ACCOUNT.emailVerified, eligible: true,
+            required: false, state: 'not-required'
+          })
+        : respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
       if (path === '/v1/assignments') return respond(route, 200, { assignments: [] });
       if (path === '/v1/classes') return respond(route, 200, { classes: [] });
       return respond(route, authenticated ? 404 : 401, { error: { code: authenticated ? 'NOT_FOUND' : 'AUTH_REQUIRED', message: `Unhandled E2E route ${method} ${path}` } });
