@@ -2452,6 +2452,7 @@ export default {
   'signup.accountChanged': "Your signed-in Pri account changed. Sign in again before connecting this profile.",
   'signup.consentCheckUnavailable': "We couldn't confirm your account's guardian approval. Please try again.",
   'signup.parentStillWaiting': "Guardian approval is still pending. Ask your parent to approve and check again.",
+  'signup.parentRevoked': "Your parent or guardian withdrew approval. This account cannot check answers or sync; your work remains on this device.",
   'signup.parentBeforeEntry': "Your parent or guardian must approve before you enter the app.",
   'signup.checkApproval': "Check approval now",
   'signup.parentTitle': "Now, a parent’s approval",

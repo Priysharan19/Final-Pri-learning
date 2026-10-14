@@ -23,6 +23,13 @@ export function decideOnboardingAuthority(expectedAccountId, response) {
   const permitted = response.emailVerified && (adult || approvedChild);
   if (response.eligible && !permitted) return { outcome: 'unavailable' };
   const consent = { required: response.required, state: response.state };
+  if (response.required && response.state === 'withdrawn') return { outcome: 'revoked', consent };
+  // An adult without a guardian requirement cannot fix an unverified account
+  // by inventing a parent. Neither can an already approved but ineligible
+  // child. Treat these as missing/contradictory authority, not consent pending.
+  if (!response.eligible && (!response.required || response.state === 'given')) {
+    return { outcome: 'unavailable' };
+  }
   if (!response.eligible || !permitted) return { outcome: 'waiting', consent };
   return { outcome: 'approved', consent, sessionId: response.sessionId };
 }

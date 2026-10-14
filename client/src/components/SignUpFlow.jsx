@@ -414,6 +414,11 @@ export default function SignUpFlow({
           return;
         }
         setConsent(authority.consent);
+        if (authority.outcome === 'revoked') {
+          if (step !== 'parent-wait') go('parent-wait');
+          setError(tLater('signup.parentRevoked'));
+          return;
+        }
         if (authority.outcome === 'waiting') {
           if (step !== 'parent' && step !== 'parent-wait') go('parent');
           setError(tLater('signup.parentStillWaiting'));
