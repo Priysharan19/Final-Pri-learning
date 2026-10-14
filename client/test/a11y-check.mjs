@@ -1154,17 +1154,21 @@ async function run() {
     }
 
     // ── the India exam room: a JEE Main paper sat partly by hand ────────────
-    // Move an authenticated student to Class XII/JEE via the real Settings
-    // editor, not an offline teacher/student wizard or a forged local profile.
+    // The Australian paper above consumed this verified learner's one free
+    // exam in the real server's 30-day entitlement window. A second paper on
+    // that SAME account must be refused. Start this independent JEE audit as a
+    // second verified learner, through the real public email-OTP flow and
+    // profile picker, instead of bypassing the free plan or forging storage.
     await step('india exam room · writing a numerical answer', '/exams/:id', async () => {
-      await goTo(page, BASE, '/settings');
-      const profileCard = page.locator('.card').filter({ has: page.getByRole('heading', { name: 'Profile Information' }) });
-      await profileCard.getByRole('button', { name: 'Edit', exact: true }).click();
-      await page.locator('#set-course').selectOption('in');
-      await page.locator('#set-year').selectOption('12');
-      await profileCard.getByRole('button', { name: /JEE Main/ }).click();
-      await profileCard.getByRole('button', { name: 'Save changes' }).click();
-      await page.locator('#set-year').waitFor({ state: 'detached', timeout: 15000 });
+      await goTo(page, BASE, '/');
+      await page.locator('.user-chip').click();
+      await page.getByRole('menuitem', { name: 'Switch profile' }).click();
+      await page.getByTestId('picker-create-account').waitFor({ state: 'visible', timeout: 15000 });
+      await createVerifiedProfile(page, platform, {
+        name: 'Accessibility JEE Student', year: 12, course: 'in',
+        track: 'jee-main', fromPicker: true
+      });
+      await online.signIn({ name: 'Accessibility JEE Student' });
       await goTo(page, BASE, '/exams');
       await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
       await page.waitForSelector('.exam-nav', { timeout: 60000 }).catch(async error => {
