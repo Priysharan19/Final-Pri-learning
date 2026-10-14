@@ -183,6 +183,16 @@ export const flow = {
           await page.getByText('Reading your handwriting needs a Pri account.', { exact: false }).count() === 0);
       }
 
+      // A normal page refresh must keep the same account linked: no return
+      // to Settings and no second OTP/guardian process.
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.shell', { timeout: 30000 });
+      await check('approved minor reopens Practice without a second sign-in',
+        new URL(page.url()).pathname === '/practice' &&
+        await page.locator('[data-testid="account-activation-gate"]').count() === 0);
+      await check('minor session survives refresh with authoritative cloud identity',
+        await page.evaluate(async () => (await fetch('/v1/account/me', { credentials: 'include' })).status) === 200);
+
       const given = h.db.prepare('SELECT method, confirmed_at FROM guardian_consents WHERE account_id=?').get(account.id);
       await check('guardian email approval is recorded on the server', given.method === 'guardian-email-otp' && given.confirmed_at > 0, JSON.stringify(given));
       await check('every step went through the real server', seen.includes('POST /v1/account/otp/verify') && seen.includes('POST /v1/account/otp/guardian/approve'));
@@ -228,6 +238,13 @@ export const flow = {
           adultState?.required === false && adultState?.state === 'not-required', JSON.stringify(adultState));
         await check('adult first sync has completed before entering the shell',
           await adult.locator('[data-testid="account-activation-gate"]').count() === 0);
+        await adult.reload({ waitUntil: 'domcontentloaded' });
+        await adult.waitForSelector('.home-greet', { timeout: 30000 });
+        await check('18+ returns to Home after refresh without verification or guardian prompts',
+          await adult.locator('.shell').isVisible() &&
+          await adult.locator('[data-testid="account-activation-gate"]').count() === 0 &&
+          await adult.locator('[data-signup-step="code"],[data-testid="activation-guardian"]').count() === 0);
+
       } finally { await adultCtx.close(); }
     } finally {
       await h.close();
