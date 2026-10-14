@@ -20,6 +20,8 @@ assert.match(login, /data-testid="hero-existing-device"/,
   'existing local profiles remain recoverable without wiping prior saved work');
 assert.match(app, /activated\?\.profileId !== user\.id[\s\S]*AccountActivationGate/,
   'the app shell is withheld until its local identity is explicitly activated');
+assert.match(app, /onCloudSessionChange\(\(\) => \{[\s\S]{0,320}setActivated\(null\)/,
+  'logging out or switching cloud identity must immediately relock the shell');
 assert.match(activation, /await verifyCloudSession\(pid\)/,
   'a local profile or link row cannot be accepted as an authenticated cloud session');
 assert.match(activation, /await cloud\.guardianState\(\)/,

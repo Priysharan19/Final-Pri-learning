@@ -173,6 +173,10 @@ export default function App() {
     let stop = () => {};
     try {
       stop = onCloudSessionChange(() => {
+        // The active cloud identity may have changed or signed out. Never
+        // display even one frame of the previously unlocked shell while its
+        // account binding is being refreshed.
+        setActivated(null);
         api.get('/me').then(r => { if (r?.user) setUser(r.user); }).catch(() => { });
       });
     } catch { /* non-browser runtimes */ }
