@@ -37,6 +37,7 @@ import { requestIdentityToken, socialProviderConfig } from '../platform/socialSi
 import { tLater, useT, useTx } from '../i18n/index.js';
 import OtpInput, { OTP_LENGTH } from './OtpInput.jsx';
 import { isNetworkFailure, signInErrorCopy } from './signInErrors.js';
+import { readOnboardingAuthority } from './onboardingAuthority.js';
 
 export { isNetworkFailure, signInErrorCopy };
 import './SignUpFlow.css';
@@ -399,24 +400,23 @@ export default function SignUpFlow({
           setError(tLater('signup.verifyFirst'));
           return;
         }
-        const state = await cloud.guardianState();
-        if (!state || typeof state.required !== 'boolean' || typeof state.state !== 'string') {
+        // A→B→A defeats two sequential calls to guardianState() and me().
+        // Require ONE server-authoritative guardian statement that binds the
+        // account, its live session, approval and eligibility in that reply.
+        // Older servers missing the binding are refused, not grandfathered in.
+        const authority = await readOnboardingAuthority(signedInAccount.id, () => cloud.guardianState());
+        if (authority.outcome === 'changed') {
+          setError(tLater('signup.accountChanged'));
+          return;
+        }
+        if (authority.outcome === 'unavailable') {
           setError(tLater('signup.consentCheckUnavailable'));
           return;
         }
-        setConsent({ required: state.required, state: state.state });
-        if (state.required && state.state !== 'given') {
+        setConsent(authority.consent);
+        if (authority.outcome === 'waiting') {
           if (step !== 'parent' && step !== 'parent-wait') go('parent');
           setError(tLater('signup.parentStillWaiting'));
-          return;
-        }
-        // A second tab/device can replace this browser's global session while
-        // guardianState() is in flight. Never link account A's local drafts to
-        // a live session for account B. Check the server's current identity
-        // immediately before calling either profile-creation/linking callback.
-        const current = await cloud.me();
-        if (!current?.account?.id || String(current.account.id) !== String(signedInAccount.id)) {
-          setError(tLater('signup.accountChanged'));
           return;
         }
         await onFinish({ account: signedInAccount, name: name.trim() || signedInAccount?.name || '', year: year || 9, track });
