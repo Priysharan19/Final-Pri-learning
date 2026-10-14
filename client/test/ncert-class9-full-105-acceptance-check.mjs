@@ -18,12 +18,14 @@ const equal=(a,b)=>assert.deepEqual(a,b);
 const length=v=>Math.hypot(...v);
 const show=(item,v)=>assert.ok(item.answer.includes(v),item.id+' displayed answer missing '+v);
 const coords=v=>'('+v.join(',')+')';
-let checks=0, premiseMutations=0, diagramMutations=0, answerMutations=0;
+let checks=0, premiseMutations=0, diagramMutations=0, answerMutations=0, stepMutations=0;
 const ids=new Set();
 function audit(item,section) {
  const w=item.proof||item.witness;
  assert.ok(item.id&&item.question&&item.answer,item.id+' empty material');
  assert.ok(item.steps?.length===3&&item.steps.join(' ').length>55,'inadequate or corrupted displayed steps');
+ const stepTarget=independentlyExpectedStepAnchor(item,section);
+ assert.ok(item.steps.join(' ').toLowerCase().includes(stepTarget.toLowerCase()),item.id+' worked steps omit calculated decisive claim: '+stepTarget);
  assert.ok(w&&typeof w.kind==='string','no theorem/parameter witness');
  if(item.figure)assert.ok(item.figure.alt?.length>=25,'missing figure or text equivalent');
  checks+=4;
@@ -179,6 +181,37 @@ function independentlyExpectedAnswerAnchor(item,type){
  }
  throw Error('No independent answer mutation anchor for '+item.id);
 }
+function independentlyExpectedStepAnchor(item,type){
+ const w=item.proof||item.witness,k=w.kind;
+ if(type==='euclid'){
+  if(k==='chain')return w.relation;
+  if(k==='chain-add')return 'a+4=c+4';
+  if(k==='segments-add')return item.id==='pl9-eucl-add-1'?'AC=DF':'GI=JL='+sum(w.left);
+  if(k==='segments-subtract')return ''+(w.whole[0]-w.part[0]);
+  if(k==='rectangle-area-countermodel'||k==='rectangle-perimeter-countermodel')return ''+(w.a[0]*w.a[1]);
+  if(k==='unique-line')return item.id==='pl9-eucl-incidence-1'?'coincide':'unique';
+  if(k==='playfair')return item.id==='pl9-eucl-parallel-2'?'unique':'unique';
+  if(k==='square')return w.side+'√2';
+ }
+ if(type==='angles'){
+  if(['linear-pair','co-interior','vertical'].includes(k)){
+   const [[a,b],[d,e]]=w.forms;return 'x='+(k==='vertical'?(e-b)/(a-d):(180-b-e)/(a+d));
+  }
+  if(k==='corresponding')return ''+w.corresponding;
+  if(k==='alternate-converse')return 'parallel';
+  if(k.startsWith('nonparallel'))return 'parallel';
+ }
+ if(type==='quadrilaterals'){
+  if(k==='fourth')return coords(sub(add(w.A,w.C),w.B));
+  if(k==='diagonals')return coords(mid(w.points[0],w.points[2]));
+  if(k==='midsegment')return w.DEtext;
+  if(k==='midpoint-converse')return ''+(w.length/2);
+  if(k==='centroid')return coords([(w.A[0]+w.B[0]+w.C[0])/3,(w.A[1]+w.B[1]+w.C[1])/3]);
+  if(k==='varignon')return coords(mid(w.points[0],w.points[1]));
+ }
+ throw Error('No independently derived step target for '+item.id);
+}
+
 function plausibleWrongAnswer(item,type){
  const anchor=independentlyExpectedAnswerAnchor(item,type);
  assert.ok(item.answer.includes(anchor),'expected derived answer anchor absent: '+item.id+' '+anchor);
@@ -194,6 +227,11 @@ for(const [type,pack] of [['euclid',euclid],['angles',angles],['quadrilaterals',
   assert.notEqual(wrongAnswer,original.answer);
   assert.throws(()=>audit({...original,answer:wrongAnswer},type),'derived-value wrong answer survived: '+original.id);
   answerMutations++;
+  const decisiveStep=independentlyExpectedStepAnchor(original,type);
+  const wrongSteps=original.steps.map(s=>s.replaceAll(decisiveStep,'ERRONEOUS DERIVATION'));
+  assert.notDeepEqual(wrongSteps,original.steps,'no matching calculated step token: '+original.id);
+  assert.throws(()=>audit({...original,steps:wrongSteps},type),'invalid decisive reasoning step survived: '+original.id);
+  stepMutations++;
   if(original.figure){
    assert.throws(()=>audit({...original,figure:{...original.figure,alt:''}},type),'missing accessibility description survived');
    diagramMutations++;
@@ -208,8 +246,8 @@ for(const [type,pack] of [['euclid',euclid],['angles',angles],['quadrilaterals',
  }
 }
 assert.equal(ids.size,45,'new 45-item coverage');
-assert.equal(answerMutations,45);
+assert.equal(answerMutations,45);assert.equal(stepMutations,45);
 console.log('PASS Mission 004 Class IX: 60 previous + 45 new = 105 displayed items checked.');
-console.log('New 45: '+checks+' calculated answer/premise/geometry validations, 45/45 domain-anchored plausible wrong answers rejected; worked-step proof audit pending.');
+console.log('New 45: '+checks+' calculated answer/premise/geometry validations, 45/45 domain-anchored plausible wrong answers rejected; 45/45 decisive computed step tokens corrupted and rejected; full line-by-line proof audit pending.');
 console.log('Also caught '+premiseMutations+' altered angle premises and '+diagramMutations+' missing required accessibility descriptions.');
 console.log('LIMIT: complete independent mathematical proof/historical review and rendered figure quality still pending; older 60 did not yet receive the new step/premise mutation protocol.');
