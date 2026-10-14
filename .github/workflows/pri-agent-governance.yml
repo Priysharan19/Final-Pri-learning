@@ -302,6 +302,9 @@ jobs:
         run: |
           set -euo pipefail
           node client/test/pri-governance-online-gates-regression.mjs
+          node --check scripts/pri-governor-ed25519.mjs
+          node --check scripts/pri-governor-ref.mjs
+          node client/test/pri-governor-ed25519-regression.mjs
           node scripts/pri-governance-online-gates.mjs review-pins
 
       - name: Classify PR diff and parse autonomous metadata
