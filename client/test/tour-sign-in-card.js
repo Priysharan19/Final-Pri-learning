@@ -824,6 +824,12 @@ export const minorFlow = {
 
   async run({ page, ctx, check, goto, note, online, browserName }) {
     note(`${EVIDENCE}: "Sign-in card · under 18" [${browserName || 'chromium'}] — the parent's code is read from the test mail sink; no guardian, child or real mailbox is involved. This is software behaviour, not evidence of a real parent's consent.`);
+    // Only the temporary 503 guardian test is network-layer mocked. In WebKit
+    // an active service worker can answer fetch outside Playwright page.route,
+    // yielding a false timeout instead of an observed server refusal.
+    await page.addInitScript(() => {
+      if (navigator.serviceWorker) navigator.serviceWorker.register = () => new Promise(() => {});
+    });
     clearLimits(online);
     const email = address('minor');
     const parent = address('parent');
