@@ -37,7 +37,7 @@ function audit(x){
  }else if(p.kind==='playfair'){
   assert.equal(p.pointOff,true);
   assert.equal(p.parallelCount,1);
-  assert.ok(/parallel/i.test(x.answer));n+=3;
+  assert.ok(/parallel|coincide/i.test(x.answer),'the student-facing answer must identify uniqueness or coincidence');n+=3;
  }else if(p.kind==='square'){
   assert.ok(p.side>0);
   assert.equal(p.diagonalSquared,2*p.side*p.side);
