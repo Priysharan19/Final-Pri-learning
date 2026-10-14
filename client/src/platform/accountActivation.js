@@ -40,7 +40,7 @@ export async function ensureAccountActivated(pid, { expectedAccountId = null, sy
   if (String(session.account.id) !== String(link.accountId)) {
     throw new ActivationBlocked('ACCOUNT_MISMATCH', 'The current session belongs to another account. Switch accounts before continuing.');
   }
-  if (session.account.emailVerified === false) {
+  if (session.account.emailVerified !== true) {
     throw new ActivationBlocked('EMAIL_UNVERIFIED', 'Verify your email address before entering Pri Learning.');
   }
   let guardian;

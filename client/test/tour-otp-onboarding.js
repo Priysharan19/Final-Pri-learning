@@ -197,6 +197,16 @@ export const flow = {
       await check('guardian email approval is recorded on the server', given.method === 'guardian-email-otp' && given.confirmed_at > 0, JSON.stringify(given));
       await check('every step went through the real server', seen.includes('POST /v1/account/otp/verify') && seen.includes('POST /v1/account/otp/guardian/approve'));
 
+      // Even after approval, a guardian withdrawal revokes access. It must be
+      // enforced by the live server state, not by the child's cached flags.
+      h.db.prepare('UPDATE guardian_consents SET withdrawn_at=? WHERE account_id=?').run(Date.now(), account.id);
+      await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+      await page.waitForSelector('[data-testid="account-activation-gate"]', { timeout: 15000 });
+      await check('guardian withdrawal relocks the previously approved account',
+        await page.locator('.shell').count() === 0 &&
+        await page.getByText('Account approval needs attention').isVisible());
+
+
       // Independently prove the 18+ branch on a fresh browser/account. There
       // must be no guardian row, pending screen or second sign-in prompt.
       const adultCtx = await ctx.browser().newContext({ viewport: { width: 1080, height: 820 }, reducedMotion: 'reduce' });
@@ -270,12 +280,17 @@ export const flow = {
 
         // A temporary 503 while rechecking consent is not an authority
         // revocation. Keep the working page mounted and retry when online.
-        await adult.route('**/v1/account/guardian/state', route => route.fulfill({
-          status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'temporary-outage' })
-        }));
+        let temporaryOutages = 0;
+        await adult.route('**/v1/account/guardian/state', route => {
+          temporaryOutages++;
+          return route.fulfill({
+            status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'temporary-outage' })
+          });
+        });
         await adult.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
         await adult.waitForTimeout(550);
         await check('temporary guardian-service outage never destroys the active shell',
+          temporaryOutages > 0 &&
           await adult.evaluate(() => document.querySelector('.shell') === window.__activationShellNode) &&
           await adult.locator('[data-testid="account-activation-gate"]').count() === 0);
         await adult.unroute('**/v1/account/guardian/state');

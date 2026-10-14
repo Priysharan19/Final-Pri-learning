@@ -24,6 +24,8 @@ assert.match(app, /onCloudSessionChange\(event => \{[\s\S]*if \(!sameIdentity\) 
   'logging out or changing cloud identity must relock, not same-account recovery');
 assert.match(activation, /await verifyCloudSession\(pid\)/,
   'a local profile or link row cannot be accepted as an authenticated cloud session');
+assert.match(activation, /session\.account\.emailVerified !== true/,
+  'an absent or unknown email verification flag must fail closed');
 assert.match(activation, /await cloud\.guardianState\(\)/,
   'the age and guardian verdict is checked against the server');
 assert.match(activation, /await syncNow\(pid\)/,
