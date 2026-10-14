@@ -29,6 +29,10 @@ export async function ensureAccountActivated(pid, { expectedAccountId = null, sy
   let session;
   try { session = await verifyCloudSession(pid); }
   catch (error) {
+    if (error?.code === 'CLOUD_LINK_CONFLICT' || error?.code === 'CLOUD_ACCOUNT_MISMATCH') {
+      throw new ActivationBlocked('ACCOUNT_MISMATCH',
+        'This device profile belongs to another account. Sign in to its own account to continue.');
+    }
     if (error?.status === 401) throw new ActivationBlocked('SIGN_IN_REQUIRED', 'Sign in again to continue.');
     if (error?.status === 403) throw new ActivationBlocked('ACCOUNT_ACCESS_DENIED', 'Your account is not permitted to enter yet.');
     throw new ActivationBlocked('SESSION_UNAVAILABLE', error?.message || 'Could not verify your account. Try again.');
