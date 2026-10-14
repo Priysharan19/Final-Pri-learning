@@ -61,7 +61,8 @@ class ShellJourneyTest {
             if (last != "null" && last != "false" && last != "\"\"" && !last.startsWith("\"ERR")) return last
             Thread.sleep(250)
         }
-        throw AssertionError("timed out waiting for: $js (last=$last)")
+        val diagnostic = eval(s, "JSON.stringify({path:location.pathname,ready:document.readyState,rootSize:(document.getElementById('root')||{}).innerHTML?.length||0,title:document.title,auth:!!document.querySelector('.auth-wrap'),shell:!!document.querySelector('.shell'),error:!!document.querySelector('[role=alert]'),host:!!window.__PRI_HOST__})")
+        throw AssertionError("timed out waiting for: $js (last=$last; page=$diagnostic)")
     }
 
     private fun click(s: ActivityScenario<MainActivity>, js: String) {
@@ -118,7 +119,7 @@ class ShellJourneyTest {
         ActivityScenario.launch(MainActivity::class.java).use { s ->
             assertEquals(
                 "\"https://appassets.androidplatform.net\"",
-                waitFor(s, """document.querySelector('[data-testid="hero-create-account"]') && location.origin""")
+                waitFor(s, """document.querySelector('[data-testid="hero-create-account"]') && location.origin""", 8_000)
             )
             assertEquals("true", eval(s, "!!window.__PRI_HOST__ && Object.isFrozen(window.__PRI_HOST__) && window.__PRI_HOST__.capabilities.lifecycle.backButton === true"))
             assertEquals("false", eval(s, "'platform' in window.__PRI_HOST__ || 'ink' in window.__PRI_HOST__.capabilities"))
