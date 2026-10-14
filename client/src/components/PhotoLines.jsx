@@ -20,7 +20,7 @@ const plain = value => String(value ?? '')
   .replace(/⇔/g, '<=>').replace(/[⇒⟹]/g, '=>').replace(/[→⟶]/g, '->')
   .replace(/²/g, '^2').replace(/³/g, '^3');
 
-export default function PhotoLines({ transcript, disabled = false, onEdit, onExclude, onIncludeAll }) {
+export default function PhotoLines({ transcript, disabled = false, lineVerdicts = null, onEdit, onExclude, onIncludeAll }) {
   const t = useT();
   const uid = useId();
   const lines = transcript?.lines || [];
@@ -42,6 +42,8 @@ export default function PhotoLines({ transcript, disabled = false, onEdit, onExc
         {lines.map((line, i) => {
           const noteId = `${uid}-note-${i}`;
           const asks = line.check && !line.edited && !line.excluded;
+          const verdict = !line.excluded ? lineVerdicts?.[i] : null;
+          const feedbackId = `${uid}-feedback-${i}`;
           return (
             <li key={i} className={`photo-line${line.excluded ? ' is-out' : ''}${asks ? ' is-check' : ''}`}
               data-photo-line={i} data-excluded={line.excluded ? 'true' : undefined}
@@ -49,7 +51,7 @@ export default function PhotoLines({ transcript, disabled = false, onEdit, onExc
               <span className="photo-line-n" aria-hidden="true">{i + 1}</span>
               <input className="input photo-line-text" data-photo-correct-transcript
                 aria-label={t('photo.lineFieldLabel', { n: i + 1 })}
-                aria-describedby={asks || line.edited || line.excluded ? noteId : undefined}
+                aria-describedby={[asks || line.edited || line.excluded ? noteId : null, verdict ? feedbackId : null].filter(Boolean).join(' ') || undefined}
                 value={prettyLine(line.text)}
                 disabled={disabled || line.excluded}
                 onChange={e => {
@@ -69,6 +71,16 @@ export default function PhotoLines({ transcript, disabled = false, onEdit, onExc
                   onClick={() => onExclude?.(i, !line.excluded)}>
                   {t(line.excluded ? 'photo.lineInclude' : 'photo.lineExclude')}
                 </button>
+              )}
+              {verdict && (
+                <span className={`photo-line-verdict ${verdict.status === 'break' ? 'is-break' : 'is-ok'}`}
+                  id={feedbackId} data-photo-step-verdict={verdict.status}>
+                  <span aria-hidden="true">{verdict.status === 'ok' ? '✓' : '✕'}</span>
+                  <span>{verdict.status === 'ok'
+                    ? t('ink.lineOkSpoken', { n: i + 1 })
+                    : `${t('verdict.lookHere')} — ${t('verdict.onLine', { n: i + 1 })}`}</span>
+                  {verdict.status === 'break' && verdict.note && <span className="photo-line-step-note"> — {verdict.note}</span>}
+                </span>
               )}
               {(asks || line.edited || line.excluded) && (
                 <span className="photo-line-note" id={noteId}>

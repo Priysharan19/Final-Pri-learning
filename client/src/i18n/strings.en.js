@@ -2731,7 +2731,7 @@ export default {
   'photo.linesTitle': "What was read on your page",
   'photo.linesHelp': "Check each line against your page. Edit a line that was read wrongly, and leave out any line that is not part of this answer.",
   'photo.lineCheck': "Check this line",
-  'photo.lineCheckDoubt': "Check this line: the reader was not sure ({doubt})",
+  'photo.lineCheckDoubt': "Check this line: the reading may be ambiguous ({doubt})",
   'photo.lineCheckNote': "A line marked to check is a doubt about how the page was read, not about your maths.",
   'photo.lineEdited': "Corrected by you",
   'photo.lineFieldLabel': "Line {n} as read",

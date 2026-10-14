@@ -198,7 +198,7 @@ export const ownerPageFlow = {
       await check('the strict signs are shown as the reader returned them — ">" is not turned into "≥" for the student',
         lines[6].text === '(x+3)² > 0' && lines[7].text === '(x+3)² + 6 > 6' && !/≥/.test(lines[6].text + lines[7].text), JSON.stringify([lines[6].text, lines[7].text]));
       await check('the line the reader doubted says "Check this line" as a doubt about the reading (≥ or >), not about the maths',
-        lines[6].check && /Check this line: the reader was not sure \(≥ or >\)/.test(lines[6].note) && !lines[7].check &&
+        lines[6].check && /Check this line: the reading may be ambiguous \(≥ or >\)/.test(lines[6].note) && !lines[7].check &&
           /doubt about how the page was read, not about your maths/i.test(await page.locator('[data-photo-reading-doubt]').innerText().catch(() => '')),
         JSON.stringify(lines[6]));
       const answerField = page.locator('[data-final-answer]');

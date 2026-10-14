@@ -21,6 +21,7 @@ import { cloudReadingEnabled, forgetCloudReads, setReadingQuestion, INK_READER_S
 import { retryClock } from '../ink/readerFailure.js';
 import { preparePhoto } from '../ink/photoRaster.js';
 import { buildTranscript, editLine, includeAll, includedLines, reviveTranscript, setLineExcluded, unreadablePage, workingOf } from '../photo/transcript.js';
+import { verifiedPhotoStepFeedback } from '../photo/stepFeedback.js';
 import { proposeFinalAnswer, readsAsWritten } from '../photo/finalAnswer.js';
 import { clearPhotoDraft, confirmPhotoDraftSaved, readPhotoDraft, savePhotoDraft } from '../local/photoDrafts.js';
 import PhotoLines from './PhotoLines.jsx';
@@ -1765,6 +1766,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     [resolved, res, judged]
   );
   const workEvidenceCopy = workingEvidenceCopy(workEvidence, { correct: res?.correct === true });
+  // Only the step report for the exact confirmed Photo revision may annotate it.
+  const photoStepFeedback = useMemo(() => verifiedPhotoStepFeedback({
+    response: state.res, submitted: judged, transcript: photoLines,
+    live: mode === 'photo' && !!judged?.revision && judged.revision === currentRevision &&
+      (state.phase === 'resolved' || (state.phase === 'retry' && !state.res?.technical)),
+    resolved
+  }), [state.res, state.phase, judged, photoLines, mode, currentRevision, resolved]);
   const cloudWorkingNote = useMemo(() => workingNote(cloudCheck), [cloudCheck]);
 
   // The misconception the cloud check proposed, as the deterministic engine
@@ -2353,7 +2361,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               )}
               {mode === 'photo' && photoOCR.phase === 'done' && photoLines && (
                 <>
-                  <PhotoLines transcript={photoLines} disabled={resolved || busy}
+                  <PhotoLines transcript={photoLines} disabled={resolved || busy} lineVerdicts={photoStepFeedback}
                     onEdit={(i, text) => changePhotoLines(editLine(photoLines, i, text))}
                     onExclude={(i, out) => changePhotoLines(setLineExcluded(photoLines, i, out))}
                     onIncludeAll={() => changePhotoLines(includeAll(photoLines))} />
