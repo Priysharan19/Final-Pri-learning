@@ -20,7 +20,7 @@ const requireProduct = (value, explanation) => {
 // their cloud account is missing. Without a recogniser answerLine, disabled
 // Submit cannot open its authRequired error recovery. The blocked-ink component
 // itself MUST show a non-navigating sign-in path.
-const blocker = ink.match(/ACCOUNT_BLOCKED_KEYS\.has\(status\.key\)[\s\S]*?\}\)\}/)?.[0] || '';
+const blocker = ink.match(/ACCOUNT_BLOCKED_KEYS\.has\((?:shownStatus|status)\.key\)[\s\S]*?\}\)\}/)?.[0] || '';
 requireProduct(blocker.length > 0, 'reader keeps authentication blocker explicit');
 requireProduct(/data-ink-account-recovery/.test(card), 'Question Card must show recovery alongside the existing ink canvas');
 requireProduct(/<button[^>]*data-ink-sign-in/.test(card),
