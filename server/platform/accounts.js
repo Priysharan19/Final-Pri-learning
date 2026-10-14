@@ -446,6 +446,9 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     const state = await consentState(db, accountId);
     res.json({
       accountId,
+      // Opaque server session identifier expected by the onboarding client.
+      // Neither this value nor sessionBinding is the bearer or CSRF token.
+      sessionId: sessionBinding,
       sessionBinding,
       eligible: !consentBlockerCode(state) && !!req.platformSession.email_verified_at,
       required: state.required,

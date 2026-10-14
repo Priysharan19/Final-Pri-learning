@@ -504,6 +504,9 @@ jobs:
           # viewport, sessions, the guardian gate — in both engines.
           node client/test/tour-sign-in-card.js --no-build 2>&1 | tee -a browser.log
           node client/test/tour-sign-in-card.js --no-build --browser=webkit 2>&1 | tee -a browser.log
+          # Same-response session and guardian authority: A→B→A never borrows
+          # another account's consent to complete onboarding.
+          node client/test/onboarding-authority-check.mjs 2>&1 | tee -a browser.log
       - name: Accessibility suite
         if: always()
         run: |

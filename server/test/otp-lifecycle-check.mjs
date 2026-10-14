@@ -112,8 +112,8 @@ try {
     ['child', 'pending', 'GUARDIAN_CONSENT_PENDING', true],
     'guardian state safely names the exact live blocker'
   );
-  c.deq([r.data?.accountId, r.data?.eligible, typeof r.data?.sessionBinding],
-    [studentAccountId, false, 'string'],
+  c.deq([r.data?.accountId, r.data?.eligible, typeof r.data?.sessionBinding, r.data?.sessionId === r.data?.sessionBinding],
+    [studentAccountId, false, 'string', true],
     'A pending minor receives their own server-bound, ineligible identity snapshot');
   const minorBinding = r.data.sessionBinding;
   c.ok(minorBinding.length === 64, 'the session binding is an opaque SHA-256 value, never the cookie token');
