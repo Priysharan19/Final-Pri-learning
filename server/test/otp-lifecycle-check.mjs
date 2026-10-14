@@ -319,6 +319,12 @@ try {
   resetLimits();
   r = await post('/request', { channel: 'email', destination: 'claims.parent@example.test' });
   r = await post('/verify', { channel: 'email', destination: 'claims.parent@example.test', challengeId: r.data.challengeId, code: lastCode('claims.parent@example.test'), profile: { name: 'Claim', role: 'parent' } });
+  // The right code proves the mailbox; a profile that is not complete creates
+  // nothing and earns the sign-up ticket (the profile is judged only after the
+  // code, so the answer never depends on whether the address had an account).
+  c.eq(r.data?.status, 'profile-required', 'a right code with no age declaration creates no account: the profile is asked for');
+  c.eq(raw.prepare("SELECT COUNT(*) n FROM accounts WHERE email='claims.parent@example.test'").get().n, 0, 'and nothing was written');
+  r = await post('/verify', { channel: 'email', destination: 'claims.parent@example.test', signupTicket: r.data.signupTicket, profile: { name: 'Claim', role: 'parent' } });
   c.eq(r.data?.error?.code, 'AGE_DECLARATION_REQUIRED', 'no explicit age declaration creates no account (fail closed)');
   c.eq(raw.prepare("SELECT COUNT(*) n FROM accounts WHERE email='claims.parent@example.test'").get().n, 0, 'and nothing was written');
 

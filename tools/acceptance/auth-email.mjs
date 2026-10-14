@@ -208,8 +208,14 @@ async function requestCode(id, label, recipient, { path = '/v1/account/otp/reque
     : /Enter this code in Pri Learning to continue\. It is valid for 10 minutes\. Do not share it with anyone\./;
   const text = String(codeMessage.message.text || '');
   const html = String(codeMessage.message.html || '');
+  // The accessible 480px OTP template uses a labelled <div> with three
+  // digits, a non-breaking space, then three digits. The old acceptance test
+  // falsely failed every real email by demanding an obsolete <p> element.
+  const codeShownAccessibly = html.includes(`aria-label="Code ${code.split('').join(' ')}"`)
+    && html.includes(`>${code.slice(0, 3)}&nbsp;${code.slice(3)}</div>`);
   check(`${id}d`, `${label}: subject and body are the expected ${purpose} message`,
-    codeMessage.message.subject === `${code}${subjectTail}` && bodyMarker.test(text) && html.includes(`>${code}</p>`) && /valid for 10 minutes/i.test(text),
+    codeMessage.message.subject === `${code}${subjectTail}` && text.startsWith(code + String.fromCharCode(10, 10))
+      && bodyMarker.test(text) && codeShownAccessibly && /valid for 10 minutes/i.test(text),
     'subject/body shape differs from server/platform/otpEmail.js');
   check(`${id}e`, `${label}: addressed to exactly the one recipient`, Array.isArray(codeMessage.message.to) && codeMessage.message.to.length === 1 && String(codeMessage.message.to[0]).toLowerCase() === recipient,
     'recipient list differs');
