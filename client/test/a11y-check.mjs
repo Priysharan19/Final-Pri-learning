@@ -834,10 +834,14 @@ async function run() {
     // signed in, but the account may not check yet: the server's own refusal
     // (email not verified), produced by the real server for this account.
     await step('practice · account blocker', '/practice', async () => {
+      // First reach a real written question with a valid verified session.
+      // Revoking email BEFORE navigation correctly invokes the top-level
+      // activation gate; this assertion instead exercises the server refusal
+      // while a student's existing question remains on screen.
+      const input = await typedQuestion();
       const verifiedAt = platform.db.prepare('SELECT email_verified_at AS at FROM accounts WHERE id=?').get(online.account.id).at;
       platform.db.prepare('UPDATE accounts SET email_verified_at=NULL WHERE id=?').run(online.account.id);
       try {
-        const input = await typedQuestion();
         await input.fill('99902');
         await pressSubmit();
         refusals.blocker = {
@@ -958,6 +962,14 @@ async function run() {
     await step('exams', '/exams', async () => { await goTo(page, BASE, '/exams'); });
 
     await step('exam room · sitting a paper', '/exams/:id', async () => {
+      // Australian papers are not available to CBSE profiles. Select NSW
+      // through the shipped profile editor without fabricating a second login.
+      await goTo(page, BASE, '/settings');
+      const profile = page.locator('.card').filter({ has: page.getByRole('heading', { name: 'Profile Information' }) });
+      await profile.getByRole('button', { name: 'Edit', exact: true }).click();
+      await page.locator('#set-course').selectOption('nsw');
+      await profile.getByRole('button', { name: 'Save changes' }).click();
+      await page.locator('#set-course').waitFor({ state: 'detached', timeout: 15000 });
       await goTo(page, BASE, '/exams');
       await click(page, 'button.btn-primary', { text: 'Start practice paper' });
       await page.waitForSelector('.exam-nav', { timeout: 60000 }).catch(async err => {
