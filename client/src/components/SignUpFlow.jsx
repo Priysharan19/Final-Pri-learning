@@ -265,8 +265,11 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
 
   const waitSeconds = Math.max(0, Math.ceil((resendAt - now) / 1000));
   const progress = Math.round(((index + 1) / steps.length) * 100);
+  // Standalone signup is the entire page and needs its own h1. During
+  // existing-account recovery, AccountActivationGate already owns the h1.
+  const StepHeading = reuseExistingProfile ? 'h2' : 'h1';
   const heading = (key, vars) => (
-    <h2 className="signup-title" tabIndex={-1} ref={headingRef} id="signup-step-title">{t(key, vars)}</h2>
+    <StepHeading className="signup-title" tabIndex={-1} ref={headingRef} id="signup-step-title">{t(key, vars)}</StepHeading>
   );
   const choice = (selected, label, onClick, testId, extra = '') => (
     <button type="button" className={`signup-choice${selected ? ' is-selected' : ''}${extra}`} aria-pressed={selected}
