@@ -264,7 +264,7 @@ class CloudJourneyTest {
             waitFor(s, "(function(){var a=document.querySelector('[data-testid=signup-agree]');return !!a && a.checked && document.querySelector('[data-testid=signup-age-18]').getAttribute('aria-pressed')==='true';})()")
             eval(s, "document.querySelector('[data-testid=signup-age-next]').click()")
             try {
-                waitFor(s, "$stateTag === 'Connected'")
+                waitFor(s, "$stateTag === 'Signed in'")
             } catch (failure: AssertionError) {
                 // Failure evidence without fixture address, session cookie or
                 // OTP: distinguish server-side creation from a form error or
@@ -354,7 +354,7 @@ class CloudJourneyTest {
             assertEquals("the server's record is unchanged while it is stopped", graded.getString("server"), assertServerMarkedOnce("offline"))
             offlineDraftFile.writeText(draftId)
             openSettings(s)
-            waitFor(s, "$stateTag === 'Linked · offline'", 60_000)
+            waitFor(s, "$stateTag === 'Offline'", 60_000)
             assertEquals("true", waitFor(s, "!!document.querySelector('[data-cloud-offline]')"))
             assertEquals("Sync is not offered while offline", "true",
                 eval(s, "(function(){var b=($byText)('Sync now');return !b||b.disabled;})()"))
@@ -400,7 +400,7 @@ class CloudJourneyTest {
             setValue(s, "#cloud-email", email)
             setValue(s, "#cloud-password", password)
             eval(s, "document.querySelector('#cloud-email').form.querySelector('button[type=submit]').click()")
-            waitFor(s, "$stateTag === 'Connected'")
+            waitFor(s, "$stateTag === 'Signed in'")
 
 
             waitFor(s, "(function(){var b=($byText)('Sync now');if(!b||b.disabled)return false;b.click();return true;})()")
@@ -559,7 +559,7 @@ class CloudJourneyTest {
         ActivityScenario.launch(MainActivity::class.java).use { s ->
             reachHome(s)
             openSettings(s)
-            waitFor(s, "$stateTag === 'Connected'")
+            waitFor(s, "$stateTag === 'Signed in'")
             // Reconnected (the same server came back). Nothing typed offline was
             // ever marked, so reconnecting has no mark to deliver: the server's
             // record is still exactly the one attempt it marked itself, and it
@@ -581,7 +581,7 @@ class CloudJourneyTest {
                 assertEquals("the offline draft is still not in History", "missing", historyVerdict(s, it))
             }
             openSettings(s)
-            waitFor(s, "$stateTag === 'Connected'")
+            waitFor(s, "$stateTag === 'Signed in'")
             eval(s, "($byText)('Disconnect').click()")
             waitFor(s, "$stateTag === 'Not signed in'")
             val end = System.currentTimeMillis() + 5_000
