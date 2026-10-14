@@ -298,6 +298,8 @@ function inspectLedger(issues, now = Date.now()) {
       if (values.length > 1 || (values.length === 1 && !values[0]))
         errors.push('malformed optional marker ' + key + ' in open issue #' + (issue.number ?? '?') + ' (count ' + values.length + ')');
     }
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(mission.id))
+      errors.push('malformed mission ID syntax in open issue #' + (issue.number ?? '?'));
     open.push({issue, mission});
   }
   // Unknown managed states and duplicate mission identities must never

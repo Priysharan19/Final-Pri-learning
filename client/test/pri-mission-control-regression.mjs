@@ -125,6 +125,8 @@ verify('Concurrent stale-snapshot admissions all deny',concurrent.every(x=>x==='
 const missingId={...e1,number:995,body:e1.body.replace(/^Pri-Mission-ID:.*\n/m,'')};
 const missingResult=checkLedger('missing-id.json',[reviewer,missingId],reviewer);
 verify('Managed mission missing ID remains inventoried and blocks',missingResult.code!==0&&missingResult.data.managed_count===2&&missingResult.data.errors.some(x=>x.includes('malformed required marker Pri-Mission-ID')));
+const badSyntaxId={...e1,number:994,body:e1.body.replace(/^Pri-Mission-ID:.*$/m,'Pri-Mission-ID: ../unsafe/mission')};
+verify('Malformed noncanonical mission ID syntax fails closed',checkLedger('bad-syntax-id.json',[reviewer,badSyntaxId],reviewer).data.errors.some(x=>x.includes('malformed mission ID syntax')));
 const blankId={...e1,number:996,body:e1.body.replace(/^Pri-Mission-ID:.*$/m,'Pri-Mission-ID: ')};
 verify('Blank mission ID fails closed',checkLedger('blank-id.json',[reviewer,blankId],reviewer).code!==0);
 const duplicateIdMarker={...e1,number:997,body:e1.body+'\nPri-Mission-ID: hidden-shadow'};
