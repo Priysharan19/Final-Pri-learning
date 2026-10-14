@@ -874,6 +874,28 @@ export const minorFlow = {
         && new URL(page.url()).pathname === '/'
         && consent().confirmed_at === null, await errorText(card));
 
+    // Network loss during a fresh consent check must be recoverable, and must
+    // never complete child onboarding based on a cached or pending flag.
+    const unavailableGuardian = async route => route.fulfill({
+      status: 503, contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Test guardian lookup offline.' } })
+    });
+    await page.route('**/v1/account/guardian/state', unavailableGuardian);
+    await card.getByTestId('signup-parent-check').click();
+    await page.waitForFunction(() => /server|try again/i.test(document.querySelector('#signup-error')?.textContent || ''), null, { timeout: 12000 });
+    await check('offline guardian-status check remains on the waiting card with a recoverable message',
+      await stepOf(card) === 'parent-wait'
+        && new URL(page.url()).pathname === '/'
+        && consent().confirmed_at === null
+        && /server|try again/i.test(await errorText(card)), await errorText(card));
+    await page.unroute('**/v1/account/guardian/state', unavailableGuardian);
+    await card.getByTestId('signup-parent-check').click();
+    await page.waitForFunction(() => /approval is still pending/i.test(document.querySelector('#signup-error')?.textContent || ''), null, { timeout: 12000 });
+    await check('the child may retry the check after the network recovers but cannot enter before approval',
+      await stepOf(card) === 'parent-wait'
+        && /approval is still pending/.test(await errorText(card))
+        && consent().confirmed_at === null);
+
     const parentCtx = await ctx.browser().newContext({ viewport: PHONE, reducedMotion: 'reduce' });
     try {
       const parentPage = await parentCtx.newPage();
