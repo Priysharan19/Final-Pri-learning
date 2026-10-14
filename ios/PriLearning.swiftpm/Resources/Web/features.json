@@ -1,6 +1,6 @@
 {
-  "placement": true,
+  "placement": false,
   "tutor": false,
-  "australia": true,
-  "extendedTracks": true
+  "australia": false,
+  "extendedTracks": false
 }
