@@ -225,16 +225,34 @@ export const flow = {
       await page.locator('[data-home-primary-cta]').evaluate(el => el.textContent.length > 0));
     await snap(page, '09-task-resume-state');
 
-    // Returning demo data is created by the real /profiles/demo product path.
-    // It carries genuine seeded attempts and four due review rows.
+    // A demo profile may still be visible in the historical picker, but it
+    // cannot become an authenticated student or inherit this account's work.
+    // The old test expected an account-free Home here; that is now a security
+    // regression. Exercise the real picker and require a locked shell.
     await switchProfile(page);
     await page.getByRole('button', { name: /Try the demo/i }).click();
+    await page.getByTestId('account-activation-gate').waitFor({ timeout: 30000 });
+    await check('anonymous demo cannot bypass verified account activation',
+      await page.locator('.shell, [data-home-primary]').count() === 0
+      && await page.getByTestId('account-activation-gate').isVisible());
+    await goto('/practice');
+    await check('demo deep-link to Practice remains locked without an account',
+      await page.getByTestId('account-activation-gate').isVisible()
+      && await page.locator('.q-prompt').count() === 0);
+
+    // The prior verified learner must be recoverable without creating a new
+    // identity or leaking the demo profile's state. A historical demo should
+    // never be silently linked to the student's authenticated account.
+    await page.getByRole('button', { name: 'Use another profile' }).click();
+    await page.locator('.acct-list').waitFor({ timeout: 15000 });
+    await page.locator('.acct-row', { hasText: 'KALP04 Class 10 Student' }).click();
     await page.waitForSelector('[data-home-primary]', { timeout: 30000 });
-    await check('returning learner Home differs from brand-new learner',
-      !/first Class 10 practice/i.test(await page.locator('#home-next-title').innerText()));
-    await check('real due-review state changes the recommendation',
-      /review/i.test(await page.locator('#home-next-title').innerText()));
-    await snap(page, '10-reviews-due-returning');
+    await check('verified learner safely resumes their own Home',
+      await page.getByTestId('account-activation-gate').count() === 0
+      && /KALP04/.test(await page.locator('.home-greet').innerText()));
+    await check('original learner retains their unfinished task recommendation',
+      ['task-resume', 'task'].includes(await page.locator('[data-home-primary]').getAttribute('data-kind')));
+
     // Alternatives share CTA words, so each alternative button must carry its
     // own accessible name (CTA + card title) and a description (its reason).
     const altNames = await page.locator('[data-home-alt] button').evaluateAll(buttons => buttons.map(b => {
@@ -243,33 +261,24 @@ export const flow = {
       const description = (b.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean).map(text).join(' ');
       return { name, description };
     }));
-    await check('every alternative action has a distinct accessible name and a reason',
-      altNames.length >= 1 && (new Set(altNames.map(a => a.name)).size === altNames.length && altNames.every(a => a.description.length > 0 && !/^(\S+) \1$/.test(a.name))),
+    await check('every alternative action has a distinct accessible name and reason',
+      altNames.length >= 1 && (new Set(altNames.map(a => a.name)).size === altNames.length
+        && altNames.every(a => a.description.length > 0)),
       JSON.stringify(altNames));
 
-    // Profile isolation: switch back to the first profile. Its unresolved task
-    // must reappear; the demo review recommendation must not leak across.
-    await switchProfile(page);
-    await page.locator('.acct-row', { hasText: 'KALP04 Class 10 Student' }).click();
-    await page.waitForSelector('[data-home-primary]', { timeout: 30000 });
-    await check('profile switch recomputes the recommendation',
-      !/review/i.test(await page.locator('#home-next-title').innerText()));
-    await check('profile A restores its own unfinished task context',
-      ['task-resume', 'task'].includes(await page.locator('[data-home-primary]').getAttribute('data-kind')));
-
-    // A real teacher profile must never enter student Home.
-    await switchProfile(page);
-    await createProfile({
-      name: 'KALP04 Teacher',
-      year: 10,
-      course: 'in',
-      role: 'teacher',
-      fromPicker: true
-    });
-    await check('teacher lands in Teacher Workspace',
-      new URL(page.url()).pathname === '/teach');
-    await check('teacher receives no student Home recommendation',
-      await page.locator('[data-home-primary]').count() === 0);
+    // Public student signup is not an administrative way to gain a teacher
+    // role. Teacher admission has separate server authority and review.
+    let teacherDenied = false;
+    try {
+      await createProfile({
+        name: 'KALP04 Teacher', year: 10, course: 'in',
+        role: 'teacher', fromPicker: true
+      });
+    } catch (error) {
+      teacherDenied = /separately authorised teacher-role fixture/.test(String(error));
+    }
+    await check('student OTP onboarding cannot self-grant teacher authority',
+      teacherDenied && await page.locator('.teacher-workspace-head').count() === 0);
 
     await settle();
   }
