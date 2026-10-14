@@ -3,7 +3,6 @@
  * governor GitHubCAS candidate. This module never grants a lease itself.
  * Calling it from pull_request or pull_request_target MUST fail closed.
  */
-import {createHash} from 'node:crypto';
 const R='Priysharan19/Final-Pri-learning';
 const BRANCH='pri-governor-state';
 const sha=/^[a-f0-9]{40}$/i;

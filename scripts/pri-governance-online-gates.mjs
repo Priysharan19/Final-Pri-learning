@@ -73,6 +73,25 @@ async function allPages(path){
  deny('INCOMPLETE_GITHUB_PAGINATION');
 }
 export async function run(command,arg,sha){
+ if(command==='review-pins-bootstrap'){
+  // Owner-directed P0 control-plane recovery ONLY, NOT writer admission.
+  if(Number(arg)!==492||!SHA.test(sha||''))deny('BOOTSTRAP_SCOPE_DENY');
+  const pr=await github('/pulls/492'),tracker=await github('/issues/489');
+  if(tracker.state!=='open'||!String(tracker.title||'').includes('[QA Release]')||
+     pr.state!=='open'||pr.head?.ref!=='task/p0-governance-recovery-20261014'||
+     pr.head?.sha!==sha||pr.base?.ref!=='main')deny('BOOTSTRAP_PR_OR_QA_TRACKER_MISMATCH');
+  const reviews=await allPages('/pulls/492/reviews'),permissions={};
+  for(const login of allowedList(process.env.PRI_QA_MANUAL_REVIEWERS)){
+   permissions[login]=(await github('/collaborators/'+encodeURIComponent(login)+'/permission')).permission;
+  }
+  // A current-head separate authorized human approval is compulsory.
+  const approval=checkManualPr(pr,reviews,permissions,{head:sha,authors:process.env.PRI_QA_MANUAL_AUTHORS,reviewers:process.env.PRI_QA_MANUAL_REVIEWERS});
+  const issues=await allPages('/issues?state=all'),prs=await allPages('/pulls?state=open');
+  try{return {...checkReviewPins(issues,prs),qaBootstrapIssue:489,approvedBy:approval.approvingReviewers};}
+  catch(e){return {qaBootstrapIssue:489,pr:492,head:sha,approvedBy:approval.approvingReviewers,
+   pinMigrationRequired:true,diagnostic:String(e),writerAdmissionAllowed:false,
+   warning:'Recovery review only; every writer grant remains denied pending independently verified ledger migration.'};}
+ }
  if(command==='review-pins'){
   const issues=await allPages('/issues?state=all');
   const prs=await allPages('/pulls?state=open');

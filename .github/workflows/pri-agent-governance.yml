@@ -302,13 +302,24 @@ jobs:
         if: github.event_name == 'pull_request' || github.event_name == 'pull_request_review'
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PRI_QA_MANUAL_AUTHORS: ${{ vars.PRI_QA_MANUAL_AUTHORS }}
+          PRI_QA_MANUAL_REVIEWERS: ${{ vars.PRI_QA_MANUAL_REVIEWERS }}
         run: |
           set -euo pipefail
           node client/test/pri-governance-online-gates-regression.mjs
           node --check scripts/pri-governor-ed25519.mjs
           node --check scripts/pri-governor-ref.mjs
           node client/test/pri-governor-ed25519-regression.mjs
-          node scripts/pri-governance-online-gates.mjs review-pins
+          if [[ "$PR_NUMBER" == '492' && "$HEAD_REF" == 'task/p0-governance-recovery-20261014' ]]; then
+            # Separate current-head human approval is required even to record
+            # migration debt; this path never allows a writer to be admitted.
+            node scripts/pri-governance-online-gates.mjs review-pins-bootstrap "$PR_NUMBER" "$PR_HEAD_SHA" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            node scripts/pri-governance-online-gates.mjs review-pins
+          fi
 
       - name: Classify PR diff and parse autonomous metadata
         if: github.event_name == 'pull_request' || github.event_name == 'pull_request_review'

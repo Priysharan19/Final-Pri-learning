@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {generateKeyPairSync,sign,createHash} from 'node:crypto';
-import {signedIssues,issueDigest,verifyTrustedState} from '../../scripts/pri-governor-ed25519.mjs';
+import {issueDigest,verifyTrustedState} from '../../scripts/pri-governor-ed25519.mjs';
 import {ProtectedGovernorRef} from '../../scripts/pri-governor-ref.mjs';
 const main='c'.repeat(40),now=Date.parse('2026-10-14T12:00:00Z');
 const {privateKey,publicKey}=generateKeyPairSync('ed25519');
