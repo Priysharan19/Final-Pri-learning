@@ -72,7 +72,7 @@ function audit(item,section) {
    if(w.kind==='vertical'){assert.equal(measured[0],measured[1]);assert.equal(measured[0],w.angle);}
    else {assert.equal(sum(measured),180);equal(measured,w.angles);}
    show(item,'x='+x);show(item,''+measured[0]);checks+=6;
-   const formulae=[...item.question.matchAll(/\((\d+)x([+−-]\d+)\)/g)].map(m=>[Number(m[1]),Number(m[2].replace('−','-'))]);
+   const formulae=[...item.question.matchAll(/\((\d*)x([+−-]\d+)\)/g)].map(m=>[Number(m[1]||'1'),Number(m[2].replace('−','-'))]);
    equal(formulae,w.forms);checks++;
   }else if(w.kind==='corresponding'){
    assert.equal(w.theta,w.corresponding);assert.equal(w.corresponding+w.adjacent,180);
