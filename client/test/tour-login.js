@@ -72,6 +72,9 @@ export const flow = {
       await page.locator('.shell').count() === 0 &&
       await page.locator('[data-testid="account-activation-gate"]').count() === 1);
 
+    // Advance only the test desk's OTP cooldown: production still enforces 30 s.
+    // The independent OTP lifecycle suite verifies cooldown and hourly caps.
+    platform.h.db.prepare("DELETE FROM rate_limits WHERE bucket LIKE 'otp-%'").run();
     const input = page.locator('#signup-destination');
     await input.waitFor({ timeout: 15000 });
     await input.fill(account.email);
