@@ -391,10 +391,12 @@ jobs:
           echo "mission=$mission" >> "$GITHUB_OUTPUT"
           echo "risk=$declared_risk" >> "$GITHUB_OUTPUT"
 
+      # Critical verification step selection MUST use the GitHub event's ref,
+      # never an output calculated by executable code from a PR checkout.
       # A task/* or feature/* prefix alone NEVER authenticates a human writer.
       # Execute the guard from protected main, not from the candidate PR.
       - name: Checkout protected manual-lane verifier
-        if: github.event_name == 'pull_request' && steps.meta.outputs.lane == 'manual-governed'
+        if: (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && (startsWith(github.event.pull_request.head.ref, 'task/') || startsWith(github.event.pull_request.head.ref, 'feature/'))
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: main
@@ -402,7 +404,7 @@ jobs:
           persist-credentials: false
 
       - name: Verify exact-head independent manual authorisation
-        if: github.event_name == 'pull_request' && steps.meta.outputs.lane == 'manual-governed'
+        if: (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && (startsWith(github.event.pull_request.head.ref, 'task/') || startsWith(github.event.pull_request.head.ref, 'feature/'))
         working-directory: trusted-manual-governor
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -413,7 +415,7 @@ jobs:
           node scripts/pri-manual-authorization.mjs
 
       - name: Snapshot GitHub-Issue mission ledger
-        if: (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && steps.meta.outputs.autonomous == 'true'
+        if: (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && startsWith(github.event.pull_request.head.ref, 'agent/mission/')
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
@@ -429,7 +431,7 @@ jobs:
       # PR code cannot forge its own writer grant. Verify using the trusted
       # protected-main controller and its signed protected-ref event lineage.
       - name: Checkout trusted protected-main admission authority
-        if: github.event_name == 'pull_request' && steps.meta.outputs.autonomous == 'true'
+        if: (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && startsWith(github.event.pull_request.head.ref, 'agent/mission/')
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: main
@@ -437,7 +439,7 @@ jobs:
           persist-credentials: false
 
       - name: Verify exact-PR signed authoritative writer grant
-        if: github.event_name == 'pull_request' && steps.meta.outputs.autonomous == 'true'
+        if: (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && startsWith(github.event.pull_request.head.ref, 'agent/mission/')
         working-directory: trusted-pri-admission
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -447,7 +449,7 @@ jobs:
         run: node scripts/pri-admission-github.mjs verify
 
       - name: Verify active writer lease
-        if: (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && steps.meta.outputs.autonomous == 'true'
+        if: (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && startsWith(github.event.pull_request.head.ref, 'agent/mission/')
         shell: bash
         env:
           EXPECTED_AGENT: ${{ steps.meta.outputs.agent }}
