@@ -197,6 +197,16 @@ export const flow = {
     await check('both attempts are on the same question',
       scores.every(t => t.includes('Finding the Unknown')),
       `rows read ${JSON.stringify(scores.map(t => t.replace(/\s+/g, ' ').slice(0, 60)))}`);
+    const historyTopics = await page.locator('.hist-row .hist-name').allInnerTexts();
+    await check('History identifies the NCERT maths topic rather than an internal generator or demo',
+      historyTopics.length === 2 && historyTopics.every(name => /Finding the Unknown/.test(name) && !/Pri demo|generator|iPad/i.test(name)),
+      JSON.stringify(historyTopics));
+    const historyDates = await page.locator('.hist-row .hist-top > .muted').allInnerTexts();
+    await check('India History uses day-month dates, not a US month-first format',
+      historyDates.length === 2 && historyDates.every(date => /^\d{1,2}\s+[A-Za-z]{3}$/.test(date.trim())),
+      JSON.stringify(historyDates));
+    await check('History never calls this Indian learner an iPad user',
+      !/\biPad\b/i.test(await page.locator('main').innerText()));
 
     // ── 6b · "Same question" from History: the server repeats it ─────────────
     // The missed question is tried again. The server — which chose it and
