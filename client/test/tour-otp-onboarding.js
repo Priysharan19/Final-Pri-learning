@@ -1,56 +1,28 @@
 // Pri Learning · E2E flow — email, code, age, class, guardian email approval,
 // synced profile, then Home and a working question.
 //
-// Nothing is mocked on the server side. Every /v1 request the browser makes is
-// forwarded to the real platform server (server/app.js, in this process, on an
-// in-memory SQLite database) with the SMS and email TEST adapters
-// (PRI_SMS_PROVIDER=test, PRI_AUTH_EMAIL_PROVIDER=test), which send nothing and
-// keep each code in memory. The test reads the code the way a phone would
-// receive it and types it into the shipped UI.
+// The real browser and real platform server share one origin and one
+// account database (the existing online-session harness). Email/SMS delivery
+// use the explicitly synthetic TEST adapters. No Playwright API proxy is
+// needed: native WebKit and Chromium use the same shipped HTTP/CSRF path.
 
 import { pathToFileURL } from 'node:url';
-
-const SERVER_ORIGIN_SEEN = 'http://localhost:5173';
-
-async function startPlatform() {
-  process.env.PRI_AUTH_DELIVERY_KEY = process.env.PRI_AUTH_DELIVERY_KEY || '33'.repeat(32);
-  process.env.PRI_SMS_PROVIDER = 'test';
-  process.env.PRI_AUTH_EMAIL_PROVIDER = 'test';
-  process.env.PRI_PUBLIC_ORIGIN = SERVER_ORIGIN_SEEN;
-  const { startApp } = await import('../../server/test/support/app-harness.mjs');
-  const sms = await import('../../server/platform/smsProvider.js');
-  return { h: await startApp(), sms };
-}
+import { authEmailMessage, buildAuthActionUrl } from '../../server/platform/authDelivery.js';
 
 export const flow = {
   id: 'otp-onboarding',
   name: 'Account · email first, child guardian approval, synced Home and working',
+  online: true,
 
-  async run({ page, ctx, base, check, goto, shot }) {
-    const { h, sms } = await startPlatform();
+  async run({ page, ctx, base, check, goto, shot, online }) {
+    const { h, sms } = online.platform;
     try {
-      await page.addInitScript(origin => { window.__PRI_CLOUD_ORIGIN__ = origin; }, base);
       const seen = [];
-      const proxy = async route => {
-        const request = route.request();
-        const url = new URL(request.url());
-        seen.push(`${request.method()} ${url.pathname}`);
-        const incoming = request.headers();
-        const headers = { Accept: 'application/json', Origin: SERVER_ORIGIN_SEEN };
-        for (const name of ['cookie', 'content-type', 'x-pri-csrf', 'x-pri-client', 'x-pri-request-id', 'idempotency-key']) {
-          if (incoming[name]) headers[name] = incoming[name];
-        }
-        const response = await fetch(`${h.origin}${url.pathname}${url.search}`, {
-          method: request.method(), headers, body: ['GET', 'HEAD'].includes(request.method()) ? undefined : request.postData() ?? undefined
-        });
-        const outHeaders = { 'content-type': response.headers.get('content-type') || 'application/json' };
-        const cookies = typeof response.headers.getSetCookie === 'function' ? response.headers.getSetCookie() : [];
-        if (cookies.length) outHeaders['set-cookie'] = cookies.join('\n');
-        const retry = response.headers.get('retry-after');
-        if (retry) outHeaders['retry-after'] = retry;
-        return route.fulfill({ status: response.status, headers: outHeaders, body: Buffer.from(await response.arrayBuffer()) });
+      const captureRequest = request => {
+        const target = new URL(request.url());
+        if (target.pathname.startsWith('/v1/')) seen.push(`${request.method()} ${target.pathname}`);
       };
-      await ctx.route('**/v1/**', proxy);
+      ctx.on('request', captureRequest);
 
       await goto('/');
       await page.getByRole('button', { name: 'Create your account' }).click();
@@ -110,15 +82,20 @@ export const flow = {
           await page.getByRole('button', { name: 'Approve' }).count() === 0);
       await check('and can ask for the code again once the cooldown ends', await page.getByTestId('signup-parent-resend').isDisabled());
       const parentSms = sms.readTestOutbox({ to: 'meera.guardian@example.com', channel: 'email' }).at(-1);
-      await check('the parent’s email got its consent code and independent approval page',
-        parentSms?.purpose === 'guardian-consent' && /^\d{6}$/.test(parentSms.code) && parentSms.body.includes('/guardian/consent'));
+      await check('the guardian test inbox received its separately addressed approval code',
+        parentSms?.purpose === 'guardian-consent' && /^\d{6}$/.test(parentSms?.code || ''));
+      const guardianAction = buildAuthActionUrl(base, 'guardian-consent', 'synthetic-template-only-token');
+      const guardianEmail = authEmailMessage('guardian-consent', guardianAction);
+      await check('the guardian email template directs independently to the same-origin consent page',
+        new URL(guardianAction).pathname === '/guardian/consent' &&
+        guardianEmail.text.includes(guardianAction) &&
+        guardianEmail.html.includes(guardianAction.replaceAll('&', '&amp;')));
 
       // The parent, on their own device: a separate browser context, no profile,
       // no session, nothing shared with the child's browser.
       const parentCtx = await ctx.browser().newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
       try {
-        await parentCtx.addInitScript(origin => { window.__PRI_CLOUD_ORIGIN__ = origin; }, base);
-        await parentCtx.route('**/v1/**', proxy);
+        parentCtx.on('request', captureRequest);
         const parentPage = await parentCtx.newPage();
         await parentPage.goto(`${base}/guardian/consent`, { waitUntil: 'domcontentloaded' });
         await parentPage.getByRole('heading', { name: 'What you are agreeing to' }).waitFor({ timeout: 20000 });
@@ -210,10 +187,15 @@ export const flow = {
 
       // Independently prove the 18+ branch on a fresh browser/account. There
       // must be no guardian row, pending screen or second sign-in prompt.
-      const adultCtx = await ctx.browser().newContext({ viewport: { width: 1080, height: 820 }, reducedMotion: 'reduce' });
+      // Playwright cannot intercept network requests owned by a service worker.
+      // Block only this isolated outage-injection context so the failed sync
+      // actually reaches the test's 503 handler in both Chromium and WebKit.
+      // The child, guardian and returning-session flows still use normal SWs.
+      const adultCtx = await ctx.browser().newContext({
+        viewport: { width: 1080, height: 820 }, reducedMotion: 'reduce', serviceWorkers: 'block'
+      });
       try {
-        await adultCtx.addInitScript(origin => { window.__PRI_CLOUD_ORIGIN__ = origin; }, base);
-        await adultCtx.route('**/v1/**', proxy);
+        adultCtx.on('request', captureRequest);
         const adult = await adultCtx.newPage();
         await adult.goto(base, { waitUntil: 'domcontentloaded' });
         await adult.getByTestId('hero-create-account').click();
@@ -241,7 +223,16 @@ export const flow = {
         };
         await adult.route('**/v1/sync/**', refuseInitialSync);
         await adult.getByTestId('signup-class-next').click();
-        await adult.getByRole('button', { name: 'Retry account setup' }).waitFor({ timeout: 15000 });
+        await adult.getByRole('button', { name: 'Retry account setup' }).waitFor({ timeout: 15000 }).catch(async error => {
+          const diagnostics = {
+            interceptedSync: refusedSyncRequests,
+            homeVisible: await adult.locator('.home-greet').isVisible().catch(() => false),
+            gateVisible: await adult.locator('[data-testid="account-activation-gate"]').isVisible().catch(() => false),
+            route: new URL(adult.url()).pathname
+          };
+          await adult.screenshot({ path: '/tmp/pri-otp-adult-sync-diagnostic.png' }).catch(() => {});
+          throw new Error(`Adult initial sync retry was not offered: ${JSON.stringify(diagnostics)}`, { cause: error });
+        });
         await check('a failed first sync does not unlock the account',
           refusedSyncRequests > 0 && await adult.locator('.shell').count() === 0 &&
           await adult.locator('[data-testid="account-activation-gate"]').isVisible());
@@ -336,7 +327,7 @@ export const flow = {
 
       } finally { await adultCtx.close(); }
     } finally {
-      await h.close();
+      // The shared server and email test adapter are closed by the harness.
     }
   }
 };
