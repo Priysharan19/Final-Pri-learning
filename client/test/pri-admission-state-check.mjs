@@ -71,6 +71,10 @@ const secondRequest={...request,issue_number:801,pr_number:479};
 denied('same-owner collision despite disjoint source',/OWNER_NOT_DISTINCT/,
  ()=>appendGrant(grant,secondRequest,[issue('ACTIVE','Pri-Lease-Grant-ID: '+grantId),secondIssue],
  secondPr,sha,'owner',123610,now+3000,privateKey,publicKey));
+denied('unknown issue status cannot evade signed writer enforcement',/UNKNOWN_MANAGED_ISSUE_STATUS_/,
+ ()=>assertLedgerMatchesGrants([issue('active')],inspectSignedLog(empty,publicKey,now),sha,now));
+denied('arbitrary managed status cannot evade signed writer enforcement',/UNKNOWN_MANAGED_ISSUE_STATUS_/,
+ ()=>assertLedgerMatchesGrants([issue('UNRECOGNISED')],inspectSignedLog(empty,publicKey,now),sha,now));
 const hidden={...issue('TRIAGED'),number:805,title:'deceptively renamed issue'};
 denied('hidden mission marker outside managed title blocks',/HIDDEN_MANAGED_ISSUE/,
  ()=>assertLedgerMatchesGrants([hidden],inspectSignedLog(empty,publicKey,now),sha,now));
