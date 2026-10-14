@@ -14,8 +14,11 @@ export async function createVerifiedProfile(page, platform, {
   // instead of receiving a real email. No test-only bypass is in the app.
   platform.h.db.prepare("DELETE FROM rate_limits WHERE bucket LIKE 'otp-%'").run();
   const address = email || ('browser.' + process.pid + '.' + (++serial) + '.' + Date.now().toString(36) + '@example.test');
-  if (fromPicker && !await page.getByTestId('hero-create-account').count()) {
-    throw new Error('New-account entry not visible from picker. Profile-switching test must explicitly sign out.');
+  if (fromPicker) {
+    // Picker is not permission to enter another profile. Its own visible
+    // welcome control exposes the supported account-first creation route.
+    await page.getByRole('button', { name: 'Back to the Pri Learning welcome screen' }).click();
+    await page.getByTestId('hero-create-account').waitFor({ timeout: 15000 });
   }
   await page.getByTestId('hero-create-account').click();
   await page.locator('[data-signup-step="method"]').waitFor({ timeout: 15000 });
