@@ -202,6 +202,7 @@ export const flow = {
       h.db.prepare('UPDATE guardian_consents SET withdrawn_at=? WHERE account_id=?').run(Date.now(), account.id);
       await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
       await page.waitForSelector('[data-testid="account-activation-gate"]', { timeout: 15000 });
+      await page.getByRole('heading', { name: 'Account approval needs attention' }).waitFor({ timeout: 15000 });
       await check('guardian withdrawal relocks the previously approved account',
         await page.locator('.shell').count() === 0 &&
         await page.getByText('Account approval needs attention').isVisible());
@@ -240,13 +241,13 @@ export const flow = {
         };
         await adult.route('**/v1/sync/**', refuseInitialSync);
         await adult.getByTestId('signup-class-next').click();
-        await adult.getByRole('alert').first().waitFor({ timeout: 15000 });
+        await adult.getByRole('button', { name: 'Retry account setup' }).waitFor({ timeout: 15000 });
         await check('a failed first sync does not unlock the account',
           refusedSyncRequests > 0 && await adult.locator('.shell').count() === 0 &&
-          await adult.locator('[data-signup-step="class"]').count() === 1);
+          await adult.locator('[data-testid="account-activation-gate"]').isVisible());
         const countBeforeRetry = h.db.prepare("SELECT count(*) AS n FROM accounts WHERE email='adult.onboarding@example.com'").get().n;
         await adult.unroute('**/v1/sync/**', refuseInitialSync);
-        await adult.getByTestId('signup-class-next').click();
+        await adult.getByRole('button', { name: 'Retry account setup' }).click();
         await adult.waitForSelector('.home-greet', { timeout: 30000 });
         await check('sync retry reuses the verified cloud account without duplication',
           countBeforeRetry === 1 &&
