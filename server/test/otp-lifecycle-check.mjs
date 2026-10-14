@@ -317,7 +317,10 @@ try {
   resetLimits();
   r = await post('/request', { channel: 'email', destination: 'claims.parent@example.test' });
   r = await post('/verify', { channel: 'email', destination: 'claims.parent@example.test', challengeId: r.data.challengeId, code: lastCode('claims.parent@example.test'), profile: { name: 'Claim', role: 'parent' } });
-  c.eq(r.data?.error?.code, 'AGE_DECLARATION_REQUIRED', 'no explicit age declaration creates no account (fail closed)');
+  c.eq(r.data?.status, 'profile-required', 'correct OTP earns a signup ticket before profile validation');
+  const pendingTicket = r.data.signupTicket;
+  r = await post('/verify', { channel: 'email', destination: 'claims.parent@example.test', signupTicket: pendingTicket, profile: { name: 'Claim', role: 'parent' } });
+  c.eq(r.data?.error?.code, 'AGE_DECLARATION_REQUIRED', 'no age declaration creates no account (fail closed)');
   c.eq(raw.prepare("SELECT COUNT(*) n FROM accounts WHERE email='claims.parent@example.test'").get().n, 0, 'and nothing was written');
 
   // ── deleting a passwordless account needs a fresh code ──────────────────

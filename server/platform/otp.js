@@ -121,6 +121,15 @@ export function createOtpRouter(db, {
     throw error;
   }
 
+  // Which code channels this deployment can actually send on, so the sign-in
+  // card offers only what works (an email code; a phone code only where an SMS
+  // provider is configured). Deployment configuration and nothing else: the
+  // same answer for every caller, no account, address or session is read.
+  router.get('/channels', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({ channels: { email: !!sendEmail, sms: !!sms } });
+  });
+
   router.post('/request', rateLimit(db, 'otp-request', { limit: 20, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const channel = req.body?.channel === 'sms' ? 'sms' : req.body?.channel === 'email' ? 'email' : null;
     const destination = channel ? normalizeDestination(channel, req.body?.destination) : null;
@@ -147,45 +156,52 @@ export function createOtpRouter(db, {
       const now = Date.now();
       const deviceId = String(req.body?.deviceId || 'web').slice(0, 160);
 
-      // Look the account up first so a new-address verify without a profile
-      // can answer "profile required" WITHOUT spending the code: the learner
-      // then fills in age and class and submits the same code once more.
+      // NO ENUMERATION BEFORE A CORRECT CODE. Whether an account exists decides
+      // what happens AFTER the code (or the sign-up ticket a code earned) has
+      // been checked, never before: until then an address with an account and
+      // one without get the same OTP_INVALID. In particular the sign-up
+      // profile is validated only once the caller has proved the mailbox — a
+      // profile error (PROFILE_NAME_REQUIRED, AGE_DECLARATION_REQUIRED) used
+      // to be answered first for unknown addresses only, which told anyone
+      // which addresses had no account.
       const existing = channel === 'email'
         ? await db.get(`SELECT * FROM accounts WHERE ${db.emailEquals('email')} AND deleted_at IS NULL`, [destination])
         : await db.get(`SELECT a.* FROM account_phones p JOIN accounts a ON a.id = p.account_id
             WHERE p.phone_e164 = ? AND a.deleted_at IS NULL`, [destination]);
-      const profile = existing ? null : profileFrom(req.body);
-      if (profile?.error) return bad(res, profile.error, profile.message || 'Tell us your name.');
-
-      if (!existing && !profile) {
-        // Peek only: is the code right? Counted as an attempt like any other,
-        // but not spent, so the same code completes sign-up.
-        const peek = await db.get('SELECT id FROM otp_challenges WHERE id = ? AND purpose = ? AND consumed_at IS NULL AND expires_at > ?', [challengeId.slice(0, 80), 'sign-in', now]);
-        if (!peek) return invalidCode(res);
-        const check = await verifyChallenge(db, { challengeId, channel, purpose: 'sign-in', destination, code: req.body?.code, delegatedCheck: delegatedCheck(channel), now });
-        if (!check.ok) return invalidCode(res, check.attemptsRemaining != null ? { attemptsRemaining: check.attemptsRemaining } : {});
-        // Re-open the challenge we just spent so the follow-up can spend it, and
-        // reissue it under a fresh id: the old id is dead, and only the client
-        // that proved the code learns the new one.
-        const reissued = id('otp');
-        await db.run(`UPDATE otp_challenges SET id = ?, consumed_at = NULL, code_hash = ?, expires_at = ?
-          WHERE id = ?`, [reissued, `ticket:${sha256(reissued)}`, Math.min(check.challenge.expires_at, now + OTP_TTL_MS), check.challenge.id]);
-        return res.json({ status: 'profile-required', signupTicket: reissued });
-      }
-
-      // A sign-up ticket (from profile-required) replaces the code.
       const ticket = String(req.body?.signupTicket || '');
+      let profile = null;
       let verified;
       if (ticket && !existing) {
+        // A sign-up ticket (from profile-required) replaces the code. It is
+        // checked first and spent last, so a profile that still needs fixing
+        // does not cost the learner the ticket their code earned.
         const row = await db.get('SELECT * FROM otp_challenges WHERE id = ?', [ticket.slice(0, 80)]);
         const okTicket = row && row.code_hash === `ticket:${sha256(ticket)}` && row.purpose === 'sign-in' && row.channel === channel
           && row.destination_hash === destinationHash(channel, destination) && !row.consumed_at && row.expires_at > now;
         if (!okTicket) return invalidCode(res);
+        profile = profileFrom(req.body);
+        if (!profile) return bad(res, 'PROFILE_NAME_REQUIRED', 'Tell us your name.');
+        if (profile.error) return bad(res, profile.error, profile.message || 'Tell us your name.');
         const spent = await db.run('UPDATE otp_challenges SET consumed_at = ? WHERE id = ? AND consumed_at IS NULL', [now, row.id]);
         if (spent.changes !== 1) return invalidCode(res);
         verified = { ok: true };
       } else {
         verified = await verifyChallenge(db, { challengeId, channel, purpose: 'sign-in', destination, code: req.body?.code, delegatedCheck: delegatedCheck(channel), now });
+        if (!verified.ok) return invalidCode(res, verified.attemptsRemaining != null ? { attemptsRemaining: verified.attemptsRemaining } : {});
+        if (!existing) {
+          // The code is right and the address has no account. With a complete
+          // profile the account is made now; without one (or with one that
+          // still needs fixing) the spent challenge is re-opened as a sign-up
+          // ticket under a fresh id — the old id is dead, and only the client
+          // that proved the code learns the new one.
+          profile = profileFrom(req.body);
+          if (!profile || profile.error) {
+            const reissued = id('otp');
+            await db.run(`UPDATE otp_challenges SET id = ?, consumed_at = NULL, code_hash = ?, expires_at = ?
+              WHERE id = ?`, [reissued, `ticket:${sha256(reissued)}`, Math.min(verified.challenge.expires_at, now + OTP_TTL_MS), verified.challenge.id]);
+            return res.json({ status: 'profile-required', signupTicket: reissued });
+          }
+        }
       }
       if (!verified.ok) return invalidCode(res, verified.attemptsRemaining != null ? { attemptsRemaining: verified.attemptsRemaining } : {});
 
