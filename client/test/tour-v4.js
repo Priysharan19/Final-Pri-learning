@@ -124,6 +124,22 @@ export const flow = {
     // can reach the server (owner decision 2026-10-10). The paper itself is
     // still marked by the bundled engine at the end of the sitting, which is
     // why this flow's oracle can still read the stored paper.
+    // The email-first first-run flow currently creates an India CBSE account.
+    // That curriculum deliberately does not offer the Australian practice-paper
+    // generator. Switch syllabus through the *shipped Settings form*, not by
+    // forging profile state or injecting an offline-only test account. The
+    // original verified cloud identity and its initial sync remain intact.
+    await page.goto(`${base}/settings`, { waitUntil: 'domcontentloaded' });
+    const profileCard = page.locator('.card').filter({ has: page.getByRole('heading', { name: 'Profile Information' }) });
+    await profileCard.getByRole('button', { name: 'Edit', exact: true }).click();
+    await page.locator('#set-course').selectOption('nsw');
+    await page.locator('#set-year').selectOption(String(YEAR));
+    await profileCard.getByRole('button', { name: 'Save changes' }).click();
+    await page.locator('#set-course').waitFor({ state: 'detached', timeout: 10000 });
+    const savedSyllabus = await profileCard.innerText();
+    await check('a verified user can switch to NSW syllabus through account Settings',
+      savedSyllabus.includes('Year ' + YEAR + ' · Stage 5') && savedSyllabus.includes('Year ' + YEAR),
+      savedSyllabus.slice(0, 250));
     await online.signIn({ name: 'Emmy Noether' });
     await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('button:has-text("Start practice paper")', { timeout: 30000 });
