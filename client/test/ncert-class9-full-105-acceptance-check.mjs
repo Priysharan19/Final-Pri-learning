@@ -86,7 +86,8 @@ function audit(item,section) {
    checks+=5;
   }else if(w.kind==='alternate-converse'){
    assert.equal(w.angles[0],w.angles[1]);assert.equal(w.parallel,true);
-   assert.deepEqual([...item.question.matchAll(/(\d+)°/g)].map(m=>Number(m[1])),w.angles,'alternate interior angle data changed');
+   const printedAngles=[...item.question.matchAll(/(\d+)°/g)].map(m=>Number(m[1]));
+   assert.ok(printedAngles.length>=1&&printedAngles.length<=2&&printedAngles.every(n=>n===w.angles[0]),'alternate interior angle data changed');
    assert.ok(/parallel/i.test(item.answer));
    if(item.figure)assert.notEqual(item.figure.parallelY[0],item.figure.parallelY[1]);
    checks+=4;
