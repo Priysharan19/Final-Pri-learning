@@ -66,6 +66,7 @@ import { join, extname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startOnlinePlatform } from './support/online-session.mjs';
+import { createVerifiedProfile } from './support/verified-onboarding.mjs';
 
 const CLIENT = fileURLToPath(new URL('../', import.meta.url));
 const APP_JSX = join(CLIENT, 'src', 'App.jsx');
@@ -460,34 +461,20 @@ async function click(page, selector, { text = null, timeout = 5000 } = {}) {
   await wait(page, SETTLE);
 }
 
-async function signInToDemo(page, base) {
+// Real account-first accessibility entry. Never creates an anonymous profile or
+// smuggles a session into storage; the same email OTP, class and first sync
+// are exercised as in the student-facing browser acceptance flow.
+async function signInToDemo(page, base, platform) {
   await page.goto(base, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.auth-wrap, .shell', { timeout: 20000 });
-  await wait(page, 500);
   if (await page.locator('.shell').count()) return;
-
-  const started = page.getByRole('button', { name: 'Use without an account' });
-  if (await started.count()) { await started.click(); await wait(page, 300); }
-  const addAnother = page.getByRole('button', { name: /Add another profile/ });
-  if (await addAnother.count()) { await addAnother.click(); await wait(page, 300); }
-
-  await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 10000 });
-  await page.getByRole('button', { name: 'Student', exact: true }).click();
-  await click(page, '.auth-card .btn-primary');
-  await page.waitForSelector('[data-onboarding-step="2"]');
-  await page.getByRole('button', { name: /Studying in Australia/ }).click();
-  await page.locator('#signup-course').selectOption('nsw');
-  await page.locator('#signup-year').selectOption('10');
-  await click(page, '.auth-card .btn-primary');
-  await page.waitForSelector('[data-onboarding-step="3"]');
-  await page.locator('#signup-name').fill('Accessibility Student');
-  await click(page, '.auth-card .btn-primary');
-  await page.waitForSelector('[data-onboarding-step="4"]');
-  await click(page, '.auth-card .btn-primary');
-  await page.waitForSelector('[data-onboarding-step="5"]');
-  await page.getByRole('button', { name: 'Start learning' }).click();
+  if (await page.locator('.acct-list').count()) {
+    await page.locator('.acct-row').first().click();
+    await page.waitForSelector('.shell', { timeout: 30000 });
+    return;
+  }
+  await createVerifiedProfile(page, platform, { name: 'Accessibility Student', year: 10, course: 'in' });
   await page.waitForSelector('.shell', { timeout: 30000 });
-  await wait(page, 900);
 }
 
 async function goTo(page, base, path) {
@@ -632,7 +619,7 @@ async function run() {
 
     // ── the skip link, measured on a page nothing has focused yet ────────────
     try {
-      await signInToDemo(page, BASE);
+      await signInToDemo(page, BASE, platform);
       await page.evaluate(() => document.body.focus());
       await page.keyboard.press('Tab');
       const first = await page.evaluate(() => {
@@ -678,7 +665,7 @@ async function run() {
     });
 
     // ── signed in ────────────────────────────────────────────────────────────
-    await signInToDemo(page, BASE);
+    await signInToDemo(page, BASE, platform);
 
     await step('home', '/', async () => { await goTo(page, BASE, '/'); });
 
