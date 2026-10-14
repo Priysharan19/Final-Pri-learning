@@ -25,7 +25,7 @@ for (const item of all) {
   assert.ok(w, 'missing independent witness ' + item.id);
   checks++;
   if (w.kind === 'unique') {
-    const [[a,b,c],[d,e,f]] = w.equations;
+    const [[a,b],[d,e]] = w.equations;
     assert.notEqual(a*e - b*d, 0, item.id + ' determinant vanishes');
     assert.ok(eq(w.equations[0], w.xy), item.id + ' first equation fails');
     assert.ok(eq(w.equations[1], w.xy), item.id + ' second equation fails');
@@ -56,10 +56,19 @@ for (const item of all) {
     assert.equal(Math.abs(cross)/2, w.area, 'figure cross-product area');
     checks += 8;
   } else if (w.kind === 'parameter') {
-    const [a,b,c] = w.equation;
-    assert.ok(Number.isFinite(a) && Number.isFinite(b) && Number.isFinite(c));
+    const [a,b,c] = w.equation, [d,e] = w.second || [];
+    assert.ok([a,b,c,d,e].every(Number.isFinite), 'parameter equation coefficients must be complete');
+    assert.notEqual(a*a+b*b, 0, 'degenerate first normal vector');
+    assert.equal(a*e-b*d, 0, 'non-proportional normal vectors');
+    assert.equal(d, a*w.factor, 'incorrect second x coefficient');
+    assert.equal(e, b*w.factor, 'incorrect second y coefficient');
     assert.equal(w.factor*c, w.k, 'incorrect dependent-system parameter');
-    checks += 2;
+    // A typo in the printed second equation must not pass only because the witness is correct.
+    const printed = item.question.replaceAll('−','-').replaceAll(' ','');
+    const expectedSecond = d+'x'+(e<0?e+'y':'+'+e+'y')+'=k';
+    assert.ok(printed.includes(expectedSecond), 'printed parameter equation differs from witnessed coefficients: '+item.id);
+    assert.ok(item.answer.includes('k='+w.k), 'printed student answer disagrees with computed k');
+    checks += 7;
   } else {
     assert.fail('unrecognized proof type '+w.kind);
   }
