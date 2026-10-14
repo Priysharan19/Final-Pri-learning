@@ -28,7 +28,7 @@
 // Run on its own:  node client/test/tour-sign-in-card.js [--no-build] [--browser=webkit]
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
-import { handwrite } from './fakeServerReader.js';
+import { handwrite, pressRead } from './fakeServerReader.js';
 
 const EVIDENCE = 'TEST-MAIL-SINK EVIDENCE';
 const PHONE = { width: 390, height: 844 };
@@ -382,7 +382,7 @@ export const returningFlow = {
     await card.getByTestId('signup-notice').waitFor({ timeout: 20000 });
     const second = mail(online, who.email);
     await check('after the countdown "Resend code" sends a new code and says the earlier one no longer works',
-      mailCount(online, who.email) === 2 && second.code !== undefined && /A new code is on its way to .*The earlier code no longer works\./.test((await card.getByTestId('signup-notice').innerText()).trim()),
+      mailCount(online, who.email) === 2 && second.code !== undefined && /A new code was requested for .*The earlier code no longer works\./.test((await card.getByTestId('signup-notice').innerText()).trim()),
       await card.getByTestId('signup-notice').innerText().catch(() => ''));
     if (first.code !== second.code) {
       await typeCode(page, card, first.code);
@@ -550,10 +550,9 @@ export const inlineInkFlow = {
     await typeCode(page, card, sent.code);
     await answerAbout(card, { age: 18 });
     await card.waitFor({ state: 'detached', timeout: 30000 });
-    // On this tree the reader may read the kept ink once the account is there
-    // (its existing behaviour). Give that a moment so what follows is settled.
-    await page.waitForSelector('.ink-line', { timeout: 30000 }).catch(() => {});
-    await page.waitForTimeout(1500);
+    // Signing in alone never spends on recognition. The student must
+    // deliberately press Read my answer on this unchanged ink.
+    await page.locator('[data-ink-read="first"]').waitFor({ state: 'visible', timeout: 30000 });
     await online.settled();
     const account = accountByEmail(online, email);
     await check('the new account took its name from this profile and was never asked the class again (the profile already has one)',
@@ -568,30 +567,27 @@ export const inlineInkFlow = {
     await check('the strokes are still on the canvas and unchanged in the draft store',
       inkAfter > 0 && Math.abs(inkAfter - inkBefore) <= Math.max(40, inkBefore * 0.05) && !!storedAfter && storedAfter.strokes === storedBefore.strokes,
       `canvas ${inkBefore} → ${inkAfter}; stored equal ${storedAfter?.strokes === storedBefore.strokes}`);
-    // ── DEFERRED TO THE READ-MY-ANSWER PR (#440) ─────────────────────────────
-    // "Signing in triggers ZERO paid reads" is a property of read-on-request,
-    // which is not on this tree: here the reader still reads kept ink once an
-    // account is present. These four assertions were written and passed on
-    // task/seamless-sign-in (stacked on task/read-on-request) and must be
-    // restored, verbatim, when that PR lands:
-    //   1. 'PAID-CALL COUNTER: signing in triggered ZERO reads — no provider
-    //      request, no recognise/transcribe call, no transcript'
-    //      (reader.requests unchanged; no /practice/:id/recognize,
-    //      /handwriting/transcribe, /working/*, /question-photo call; 0 .ink-line)
-    //   2. 'signing in issued and marked nothing either' — the ISSUE half
-    //      (no POST /v1/practice/issue); the "marked nothing" half is kept below
-    //   3. '"Read my answer" is offered for the kept ink' ([data-ink-read] visible)
-    //   4. 'one press reads it once' (reader.requests === before + 1)
-    // What this lane itself guarantees on this tree is asserted instead: the
-    // sign-in never submits, and it can never cause MORE than the one read the
-    // page's own rule allows.
-    const paidAfter = (await online.practiceCalls(/^\/v1\/(practice\/[^/]+\/recognize|handwriting\/transcribe|working\/|question-photo)/)).length;
-    await check('signing in marked nothing: no answer was submitted by it — Submit stays the student\'s own action',
-      (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/(?:submit|grade)$/)).length === 0 && await page.locator('.eval-card[data-outcome]').count() === 0);
-    await check('READ COUNTER (bounded): at most ONE read followed the sign-in — the card itself sends none and nothing is read twice [SYNTHETIC-READER EVIDENCE]',
-      reader.requests.length - readsBefore <= 1 && paidAfter - paidBefore <= 1, `provider ${reader.requests.length - readsBefore}; server ${paidAfter - paidBefore}`);
-    await check('the kept ink\'s reading is on the page, editable, beside the same strokes [SYNTHETIC-READER EVIDENCE]',
-      await page.locator('.ink-line').count() >= 1 && await inkOnCanvas(page) > 0, `${await page.locator('.ink-line').count()} line(s)`);
+    // Read-on-request is already integrated in the release candidate: do
+    // not inherit this branch's obsolete assumption of automatic paid OCR.
+    const paidAfterSignIn = (await online.practiceCalls(/^\/v1\/(practice\/[^/]+\/recognize|handwriting\/transcribe|working\/|question-photo)/)).length;
+    await check('PAID-CALL COUNTER: signing in triggers ZERO paid reads and submits nothing',
+      reader.requests.length === readsBefore && paidAfterSignIn === paidBefore
+        && await page.locator('.ink-line').count() === 0
+        && (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/(?:submit|grade)$/)).length === 0,
+      `provider ${reader.requests.length - readsBefore}; server ${paidAfterSignIn - paidBefore}`);
+    await check('Read my answer remains visible with the SAME saved ink and unchanged question',
+      await page.locator('[data-ink-read="first"]').isVisible() && await inkOnCanvas(page) > 0
+        && await shownId(page) === qid);
+    await pressRead(page);
+    await page.locator('.ink-line').first().waitFor({ state: 'visible', timeout: 30000 });
+    await online.settled();
+    const paidAfterRead = (await online.practiceCalls(/^\/v1\/(practice\/[^/]+\/recognize|handwriting\/transcribe|working\/|question-photo)/)).length;
+    await check('ONE deliberate read produces one recognition request, not an unrequested paid call [SYNTHETIC-READER EVIDENCE]',
+      reader.requests.length === readsBefore + 1 && paidAfterRead === paidBefore + 1,
+      `provider ${reader.requests.length - readsBefore}; server ${paidAfterRead - paidBefore}`);
+    await check('the kept ink reading is editable beside the same strokes [SYNTHETIC-READER EVIDENCE]',
+      await page.locator('.ink-line').count() >= 1 && await inkOnCanvas(page) > 0,
+      `${await page.locator('.ink-line').count()} line(s)`);
 
     // The question is still submittable under the server's authority.
     await page.waitForFunction(() => { const b = document.querySelector('.ws-actions .btn-primary'); return !!b && !b.disabled; }, null, { timeout: 20000 }).catch(() => {});
