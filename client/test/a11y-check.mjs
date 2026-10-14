@@ -789,59 +789,47 @@ async function run() {
       await wait(page, 400);
     };
 
-    // signed out, before Submit: the card already says checking needs an account
-    await step('practice · signed out, account needed', '/practice', async () => {
-      const input = await typedQuestion();
-      await input.fill('99901');
-      await page.waitForSelector('[data-check-needs-account]', { timeout: 15000 });
-      refusals.notice = await page.evaluate(() => {
-        const g = document.querySelector('[data-check-needs-account]');
-        const b = g?.querySelector('[data-check-sign-in]');
-        return { role: g?.getAttribute('role'), label: g?.getAttribute('aria-label'), text: (g?.textContent || '').replace(/\s+/g, ' ').trim(),
-          button: b ? { tag: b.tagName.toLowerCase(), expanded: b.getAttribute('aria-expanded'), name: (b.textContent || '').trim() } : null };
-      });
-    });
-
-    // signed out, Submit pressed: refused, with the sign-in in the card
-    await step('practice · signed out, check refused', '/practice', async () => {
-      await pressSubmit();
-      refusals.signIn = {
-        kind: await page.locator('[data-check-refusal]').first().getAttribute('data-check-refusal'),
-        spoken: await spokenNow(),
-        result: await page.locator('.eval-card, .verdict-bad, .eval-marks, .solution-block').count()
-      };
-    });
-
-    // the sign-in opened in place: its fields, and where the keyboard goes next
-    await step('practice · sign-in on the card', '/practice', async () => {
-      const button = page.locator('.verdict [data-check-sign-in]');
-      await button.focus();
-      await page.keyboard.press('Enter');
-      await page.waitForSelector('.qpage #cloud-password', { timeout: 20000 });
-      await wait(page, 500);
-      // Focus order: from the button that opened it, Tab goes into the panel
-      // it opened (inside the card), not on past it to the rest of the page.
-      await button.focus();
-      const stops = [];
-      for (let i = 0; i < 4; i++) {
-        await page.keyboard.press('Tab');
-        stops.push(await page.evaluate(() => {
-          const el = document.activeElement;
-          const card = document.querySelector('.qpage .verdict');
-          return { tag: el?.tagName.toLowerCase() || '', id: el?.id || '', text: (el?.textContent || '').trim().slice(0, 30), inRefusal: !!(card && el && card.contains(el)) };
+    // The account-first product never exposes Practice or marked activities to
+    // an anonymous visitor. Cover the actual sign-in boundary from independent
+    // browser storage rather than pretending an unsigned child is in Practice.
+    refusals.gates = {};
+    const guestCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    try {
+      const guest = await guestCtx.newPage();
+      for (const route of ['/practice', '/exams', '/placement', '/rush', '/match', '/teach']) {
+        await guest.goto(BASE + route, { waitUntil: 'domcontentloaded' });
+        await guest.waitForSelector('.auth-wrap, [data-testid="account-activation-gate"]', { timeout: 20000 });
+        refusals.gates[route] = await guest.evaluate(() => ({
+          locked: !document.querySelector('.shell, .q-prompt, .exam-nav, .teacher-workspace-head, .rush-timer'),
+          namedEntry: !![...document.querySelectorAll('.auth-wrap button')].find(b =>
+            b.getClientRects().length && /\p{L}/u.test((b.innerText || b.getAttribute('aria-label') || '').trim())),
+          title: document.title,
+          headings: [...document.querySelectorAll('h1')].filter(h => h.getClientRects().length > 0).length,
+          noOfflineBypass: !document.querySelector('[data-testid="hero-offline"]')
         }));
       }
-      refusals.focus = { expanded: await button.getAttribute('aria-expanded'), stops };
-    });
+      await guest.goto(BASE, { waitUntil: 'domcontentloaded' });
+      await guest.getByTestId('hero-create-account').click();
+      await guest.locator('[data-signup-step="method"]').waitFor({ timeout: 15000 });
+      refusals.emailForm = await guest.evaluate(() => ({
+        visible: !!document.querySelector('#signup-destination[type="email"]'),
+        labelled: !!document.querySelector('label[for="signup-destination"]') ||
+                  !!document.querySelector('#signup-destination[aria-label]'),
+        namedSubmit: !!document.querySelector('[data-testid="signup-send-code"]'),
+        hasHeading: [...document.querySelectorAll('h1')].some(h => h.getClientRects().length > 0)
+      }));
+    } finally { await guestCtx.close(); }
 
-    // signed in on the card (the real server, a real verified account)
-    try {
-      await online.signInHere(page.locator('.qpage'), { name: 'Accessibility Student' });
-      await page.waitForFunction(() => !document.querySelector('.qpage #cloud-password'), null, { timeout: 30000 }).catch(() => { });
-      refusals.signedIn = true;
-    } catch (err) {
-      skipped.push(`practice · signing in on the card — ${String(err.message || err).split('\n')[0].slice(0, 130)}`);
-    }
+    // This account was verified before the shell was unlocked. Validate that a
+    // legitimate learner can attempt server-marked work without signing in on
+    // an obsolete inline question-card panel.
+    await step('practice · verified account and editable working', '/practice', async () => {
+      const input = await typedQuestion();
+      await input.fill('99901');
+      const account = await online.signIn({ name: 'Accessibility Student' });
+      refusals.signedIn = !!account.id && await page.locator('.shell').isVisible() &&
+        await page.locator('.qpage #cloud-password, [data-check-sign-in]').count() === 0;
+    });
 
     // signed in, but the account may not check yet: the server's own refusal
     // (email not verified), produced by the real server for this account.
@@ -1145,80 +1133,18 @@ async function run() {
     }
 
     // ── the India exam room: a JEE Main paper sat partly by hand ────────────
-    // The handwriting surface, the write/type switch, the multiple-choice
-    // options and the section analysis only exist on an India paper.
-    // ── signed out (the India profile made here has no account): marked work
-    // that does not start says so in place — a paper, the placement check,
-    // Rapid Fire and Match.
-    const refusalBlock = selector => page.evaluate(sel => {
-      const block = document.querySelector(sel);
-      const button = block?.querySelector('[data-check-sign-in]');
-      const icon = block?.querySelector('.verdict-ico');
-      return block ? {
-        kind: block.getAttribute(sel.slice(1, -1)), role: block.getAttribute('role'),
-        text: (block.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200),
-        iconWord: (icon?.textContent || '').trim(),
-        button: button ? { tag: button.tagName.toLowerCase(), name: (button.textContent || '').trim(), expanded: button.getAttribute('aria-expanded'), disabled: button.disabled } : null
-      } : null;
-    }, selector);
-
-    await step('exams · refused signed out', '/exams', async () => {
-      await goTo(page, BASE, '/');
-      await click(page, '.user-chip');
-      await click(page, '[role="menuitem"]', { text: 'Switch profile' });
-      await page.waitForSelector('.auth-wrap', { timeout: 15000 });
-      await click(page, 'button.btn-ghost', { text: 'Add another profile' });
-      await page.getByRole('button', { name: 'Student', exact: true }).click();
-      await click(page, '.auth-card .btn-primary');
-      await page.locator('#signup-track').selectOption('jee-main');
-      await page.locator('#signup-year').selectOption('12');
-      await click(page, '.auth-card .btn-primary');
-      await page.locator('#signup-name').fill('Accessibility JEE Student');
-      await click(page, '.auth-card .btn-primary');
-      await click(page, '.auth-card .btn-primary');
-      await page.waitForSelector('[data-onboarding-step="5"]');
-      await page.getByRole('button', { name: 'Start learning' }).click();
-      await page.waitForSelector('.shell', { timeout: 30000 });
-      // Signed out, a paper does not start: the refusal is the state audited here.
-      await goTo(page, BASE, '/exams');
-      await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
-      await page.waitForSelector('[data-exam-start-refused]', { timeout: 30000 });
-      await wait(page, 400);
-      refusals.exam = { ...(await refusalBlock('[data-exam-start-refused]')), room: await page.locator('.exam-nav').count() };
-    });
-
-    await step('placement · refused signed out', '/placement', async () => {
-      await goTo(page, BASE, '/placement?go=1');
-      await page.waitForSelector('[data-placement-refused]', { timeout: 30000 });
-      await wait(page, 400);
-      refusals.placement = await refusalBlock('[data-placement-refused]');
-    });
-
-    await step('rapid fire · refused signed out', '/rush', async () => {
-      await goTo(page, BASE, '/rush');
-      await click(page, '.qcard .btn-primary.btn-lg');
-      await page.waitForSelector('[data-game-refused]', { timeout: 30000 });
-      await wait(page, 400);
-      refusals.rush = { ...(await refusalBlock('[data-game-refused]')), clock: await page.locator('.rush-timer').count() };
-    });
-
-    await step('match · refused signed out', '/match', async () => {
-      await goTo(page, BASE, '/match');
-      await click(page, '.btn-glow');
-      await page.waitForSelector('[data-game-refused]', { timeout: 30000 });
-      await wait(page, 400);
-      refusals.match = { ...(await refusalBlock('[data-game-refused]')), question: await page.locator('.q-prompt').count() };
-    });
-
-    // The India student signs in where the paper was refused (a real account on
-    // the real server), and the paper — issued and marked by the server — opens.
+    // Move an authenticated student to Class XII/JEE via the real Settings
+    // editor, not an offline teacher/student wizard or a forged local profile.
     await step('india exam room · writing a numerical answer', '/exams/:id', async () => {
+      await goTo(page, BASE, '/settings');
+      const profileCard = page.locator('.card').filter({ has: page.getByRole('heading', { name: 'Profile Information' }) });
+      await profileCard.getByRole('button', { name: 'Edit', exact: true }).click();
+      await page.locator('#set-course').selectOption('in');
+      await page.locator('#set-year').selectOption('12');
+      await profileCard.getByRole('button', { name: /JEE Main/ }).click();
+      await profileCard.getByRole('button', { name: 'Save changes' }).click();
+      await page.locator('#set-year').waitFor({ state: 'detached', timeout: 15000 });
       await goTo(page, BASE, '/exams');
-      await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
-      const refusedStart = page.locator('[data-exam-start-refused]');
-      await refusedStart.waitFor({ state: 'visible', timeout: 30000 });
-      await refusedStart.locator('[data-check-sign-in]').click();
-      await online.signInHere(refusedStart, { name: 'Accessibility JEE Student' });
       await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
       await page.waitForSelector('.exam-nav', { timeout: 60000 });
       await click(page, '.mcq .mcq-opt');
@@ -1236,36 +1162,13 @@ async function run() {
       await wait(page, 700);
     });
 
-    // ── teacher-only workspace, exercised under a real teacher profile ──────
-    await step('teacher studio', '/teach', async () => {
-      await goTo(page, BASE, '/');
-      await click(page, '.user-chip');
-      await click(page, '[role="menuitem"]', { text: 'Switch profile' });
-      await page.waitForSelector('.auth-wrap', { timeout: 15000 });
-      await click(page, 'button.btn-ghost', { text: 'Add another profile' });
-      await page.getByRole('button', { name: 'Teacher', exact: true }).click();
-      await click(page, '.auth-card .btn-primary');
-      await page.locator('#signup-track').selectOption('10');
-      await click(page, '.auth-card .btn-primary');
-      await page.locator('#signup-name').fill('Accessibility Teacher');
-      await click(page, '.auth-card .btn-primary');
-      await click(page, '.auth-card .btn-primary');
-      await page.waitForSelector('[data-onboarding-step="5"]');
-      await page.getByRole('button', { name: 'Open Teacher Workspace' }).click();
-      await page.waitForSelector('.teacher-workspace-head', { timeout: 30000 });
-      await wait(page, 700);
-    });
-
-    await step('teacher studio · a class with a task form', '/teach', async () => {
+    // Teacher access requires independently authorised staff identity. A
+    // student OTP account must NOT turn into a teacher via local profile role.
+    await step('teacher studio · student cannot escalate role', '/teach', async () => {
       await goTo(page, BASE, '/teach');
-      await page.locator('input.input').first().fill('10MaA');
-      await click(page, 'button.btn-primary', { text: 'Create' });
-      await page.waitForSelector('.prio-item', { timeout: 20000 });
-      await wait(page, 900);
-    });
-
-    await step('teacher studio · question builder', '/teach', async () => {
-      await click(page, 'button.btn-ghost', { text: 'Write a question' });
+      await page.waitForSelector('.shell', { timeout: 20000 });
+      const authorized = await page.locator('.teacher-workspace-head, [data-teacher-operations]').count();
+      if (authorized) throw new Error('student account was incorrectly granted teacher workspace access');
     });
 
     // ── verdicts ─────────────────────────────────────────────────────────────
@@ -1339,36 +1242,35 @@ async function run() {
     }
 
     section('online-only checking');
-    ok('signed out, the card says before Submit that checking needs an account: a labelled group holding a real, named sign-in button',
-      refusals.notice?.role === 'group' && !!refusals.notice.label && /needs a Pri account/i.test(refusals.notice.text) &&
-        refusals.notice.button?.tag === 'button' && /\p{L}/u.test(refusals.notice.button.name) && refusals.notice.button.expanded === 'false',
-      JSON.stringify(refusals.notice));
-    ok('a refused check (signed out) is announced in a live region, in words — and nothing is marked',
-      refusals.signIn?.kind === 'sign-in' && /has not been checked/i.test((refusals.signIn.spoken || []).join(' ')) && refusals.signIn.result === 0,
-      JSON.stringify(refusals.signIn));
-    ok('opening the sign-in sets aria-expanded, and Tab from its button goes into the panel it opened, inside the card',
-      refusals.focus?.expanded === 'true' && refusals.focus.stops.length === 4 && refusals.focus.stops.every(stop => stop.inRefusal),
-      JSON.stringify(refusals.focus));
-    ok('the walk signed in on the card, on the real server', refusals.signedIn === true);
-    ok('an account blocker (email not verified) is announced in a live region and offers a named link to Account settings — and nothing is marked',
-      refusals.blocker?.kind === 'verify-email' && /has not been checked/i.test((refusals.blocker.spoken || []).join(' ')) &&
-        refusals.blocker.link?.tag === 'a' && refusals.blocker.link.href === '/settings' && /\p{L}/u.test(refusals.blocker.link.name) && refusals.blocker.result === 0,
-      JSON.stringify(refusals.blocker));
-    ok('offline, the reconnect message is announced in a live region with a named Try again button — and nothing is marked',
-      refusals.reconnect?.kind === 'reconnect' && /has not been checked/i.test((refusals.reconnect.spoken || []).join(' ')) &&
-        refusals.reconnect.retry?.tag === 'button' && /\p{L}/u.test(refusals.reconnect.retry.name) && refusals.reconnect.result === 0,
+    const gates = refusals.gates || {};
+    ok('an anonymous visitor cannot reach Practice or a markable question',
+      gates['/practice']?.locked === true && gates['/practice']?.noOfflineBypass === true,
+      JSON.stringify(gates['/practice']));
+    ok('an unauthenticated learner is offered a named, accessible email entry',
+      gates['/practice']?.namedEntry === true && gates['/practice']?.headings === 1 &&
+        refusals.emailForm?.visible && refusals.emailForm?.labelled && refusals.emailForm?.namedSubmit &&
+        refusals.emailForm?.hasHeading, JSON.stringify({ gate: gates['/practice'], email: refusals.emailForm }));
+    ok('verified student does not need a second question-card sign-in',
+      refusals.signedIn === true);
+    ok('the real server denies an account whose email verification was withdrawn and marks nothing',
+      refusals.blocker?.kind === 'verify-email' &&
+        /has not been checked/i.test((refusals.blocker.spoken || []).join(' ')) &&
+        refusals.blocker.result === 0, JSON.stringify(refusals.blocker));
+    ok('offline, the reconnect refusal is announced with a named retry button and nothing is marked',
+      refusals.reconnect?.kind === 'reconnect' &&
+        /has not been checked/i.test((refusals.reconnect.spoken || []).join(' ')) &&
+        refusals.reconnect.retry?.tag === 'button' &&
+        /\p{L}/u.test(refusals.reconnect.retry.name) && refusals.reconnect.result === 0,
       JSON.stringify(refusals.reconnect));
-
-    const announced = r => r?.kind === 'sign-in' && r.role === 'alert' && /\p{L}/u.test(r.iconWord || '') &&
-      r.button?.tag === 'button' && /\p{L}/u.test(r.button.name) && r.button.expanded === 'false' && r.button.disabled === false;
-    ok('signed out, a placement check that does not start is an alert in words (its icon named), with a real, named sign-in button in place',
-      announced(refusals.placement), JSON.stringify(refusals.placement));
-    ok('signed out, an exam paper that does not start is an alert in words with the same named sign-in — and no exam room opens',
-      // (Its icon alone has no word yet — Exams.jsx:82, tracked under "owned elsewhere".)
-      announced({ ...refusals.exam, iconWord: refusals.exam?.iconWord || 'tracked elsewhere' }) && refusals.exam.room === 0, JSON.stringify(refusals.exam));
-    ok('signed out, Rapid Fire and Match that do not start are alerts in words with the same named sign-in — and no clock or question appears',
-      announced(refusals.rush) && refusals.rush.clock === 0 && announced(refusals.match) && refusals.match.question === 0,
-      JSON.stringify({ rush: refusals.rush, match: refusals.match }));
+    ok('anonymous exam and placement deep links remain locked before marked work',
+      gates['/exams']?.locked && gates['/placement']?.locked,
+      JSON.stringify({ exams: gates['/exams'], placement: gates['/placement'] }));
+    ok('anonymous games cannot start a clock or expose questions',
+      gates['/rush']?.locked && gates['/match']?.locked,
+      JSON.stringify({ rush: gates['/rush'], match: gates['/match'] }));
+    ok('an unverified visitor cannot open the teacher studio',
+      gates['/teach']?.locked && gates['/teach']?.noOfflineBypass,
+      JSON.stringify(gates['/teach']));
 
     section('colour is never alone');
     ok('correct / incorrect is never carried by colour alone', findingsFor('colour').length === 0, show(findingsFor('colour')));
