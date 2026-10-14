@@ -33,7 +33,7 @@ await test('Pending minor A cannot finish even with an existing verified session
   assert.equal((await readOnboardingAuthority('A', () => Promise.resolve(child()))).outcome, 'waiting');
 });
 await test('Revoked guardian approval cannot be reused', async () => {
-  assert.equal((await readOnboardingAuthority('A', () => Promise.resolve(child('withdrawn')))).outcome, 'waiting');
+  assert.equal((await readOnboardingAuthority('A', () => Promise.resolve(child('withdrawn')))).outcome, 'revoked');
 });
 await test('Previously approved session becomes pending: fresh result cancels permission', async () => {
   const approve = await readOnboardingAuthority('A', () => Promise.resolve(child('given')));
@@ -79,7 +79,7 @@ await test('Server must not mark unverified email eligible', async () => {
   assert.equal(decideOnboardingAuthority('A', { ...adult(), emailVerified: false, eligible: true }).outcome, 'unavailable');
 });
 await test('Server ineligible adult is never auto-admitted by client age declaration', async () => {
-  assert.equal(decideOnboardingAuthority('A', { ...adult(), eligible: false }).outcome, 'waiting');
+  assert.equal(decideOnboardingAuthority('A', { ...adult(), eligible: false }).outcome, 'unavailable');
 });
 await test('A response for account B is refused before any profile-writing callback', async () => {
   let callback = 0;
