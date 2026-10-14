@@ -407,6 +407,34 @@ eq(shape(asN).slice(0, 6), ['out:before-question', 'out:before-question', 'out:b
 eq(asN.lines.slice(5).map(l => [l.check, l.doubt, l.text.includes('n')]), [[true, 'x or n', true], [true, 'x or n', true], [true, 'x or n', true], [false, null, false]],
   'the lines with the letter the reader read differently from the question ask to be checked as "x or n" — and are not changed');
 
+// A high-confidence reader can still mistake a public equation's + sign for
+// a letter (owner case: 2x+35=105 read as 2xt35=105). Only raise a question:
+// the raw OCR must never be silently rewritten or used as verified maths.
+{
+  const publicOnly = { prompt: 'Solve $2x+35=105$.', answerType: 'numeric' };
+  const misread = T.buildTranscript({ confidenceFloor: 0.8,
+    lines: [{ text: '2xt35=105', confidence: 0.99 }] }, publicOnly);
+  eq([misread.lines[0].check, misread.lines[0].doubt, misread.lines[0].text, misread.lines[0].read],
+    [true, '+ or t', '2xt35=105', '2xt35=105'],
+    'ambiguous operator versus letter is flagged for manual confirmation even when OCR reports 0.99 confidence');
+  eq(T.linesToCheck(misread), 1, 'the student sees exactly one reading to inspect');
+  const corrected = T.editLine(misread, 0, '2x+35=105');
+  eq([corrected.lines[0].text, corrected.lines[0].read, corrected.lines[0].edited, T.linesToCheck(corrected)],
+    ['2x+35=105', '2xt35=105', true, 0],
+    'student correction stays explicit and preserves the original reader transcript');
+  const exact = T.buildTranscript({ confidenceFloor: 0.8,
+    lines: [{ text: '2x+35=105', confidence: 0.99 }] }, publicOnly);
+  eq([exact.lines[0].check, exact.lines[0].doubt], [false, null],
+    'an exact high-confidence equation does not generate a phantom OCR concern');
+  const mathDifference = T.buildTranscript({ confidenceFloor: 0.8,
+    lines: [{ text: '2x-35=105', confidence: 0.99 }] }, publicOnly);
+  eq([mathDifference.lines[0].check, mathDifference.lines[0].text], [false, '2x-35=105'],
+    'a different mathematically valid operator is not auto-corrected from the public question');
+  const unrelated = T.buildTranscript({ confidenceFloor: 0.8,
+    lines: [{ text: '2xt35=105', confidence: 0.99 }] }, { prompt: 'Solve $3x+21=57$.' });
+  eq(unrelated.lines[0].check, false, 'unrelated question text does not invent a specific symbol guess');
+}
+
 const REL = [
   ['notes after a labelled break', ['f(x) = (x+3)^2 + 6', '(x+3)^2 >= 0', 'least value = 6', { text: 'final:', gapBefore: true }, 'a = {10,99,30}', 'b = {100,500,600}'], ['in', 'in', 'in', 'out:after-break', 'out:after-break', 'out:after-break'], false],
   ['notes after a gap', ['f(x) = (x+3)^2 + 6', 'least value = 6', { text: 'p = 40 + 50', gapBefore: true }, 'q = 2p'], ['in', 'in', 'out:after-break', 'out:after-break'], false],

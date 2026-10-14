@@ -201,6 +201,30 @@ export function unreadablePage(transcription) {
 }
 
 /**
+ * Read-only OCR doubt: when a complete public equation and a transcription
+ * differ by exactly one operator-shaped character, ask the student to check
+ * the photo. E.g. public 2x+35=105 versus OCR 2xt35=105. Never substitute
+ * the question's text into the transcript or claim it proves an answer.
+ * The comparison uses the PUBLIC question only; no answer key is consulted.
+ */
+function suspiciousOperatorReading(raw, signature) {
+  const observed = compact(stripSentence(raw));
+  if (!observed || observed.length > MAX_LINE_CHARS) return null;
+  for (const shown of signature.anchors) {
+    if (shown.length !== observed.length) continue;
+    let at = -1;
+    let changes = 0;
+    for (let i = 0; i < observed.length; i += 1) {
+      if (observed[i] !== shown[i]) { at = i; changes++; if (changes > 1) break; }
+    }
+    if (changes === 1 && /[+*/-]/.test(shown[at]) && /[a-z]/.test(observed[at])) {
+      return `${shown[at]} or ${observed[at]}`;
+    }
+  }
+  return null;
+}
+
+/**
  * The transcript the card holds: the reader's lines, each with what the
  * reader doubted, and the proposal of which lines belong.
  *
@@ -223,16 +247,18 @@ export function buildTranscript(transcription, question = {}) {
     .filter(line => line.text)
     .slice(0, MAX_LINES);
   const relevance = proposeRelevance(read, question?.prompt);
+  const publicSignature = questionSignature(question?.prompt);
   const lines = read.map((line, index) => {
     const out = excludedAt(relevance, index);
     const letter = relevance.letterDoubts.find(d => d.index === index) || null;
+    const symbol = suspiciousOperatorReading(line.text, publicSignature);
     const below = line.confidence !== null && Number.isFinite(floor) && line.confidence < floor;
     return {
       text: line.text,
       read: line.text,                       // what the reader returned; kept beside every edit
       // Every one of these is a doubt about the READING of the page.
-      check: line.uncertain || below || !!letter,
-      doubt: line.doubt || (letter ? `${letter.question} or ${letter.read}` : null),
+      check: line.uncertain || below || !!letter || !!symbol,
+      doubt: line.doubt || (letter ? `${letter.question} or ${letter.read}` : symbol),
       gapBefore: line.gapBefore,
       excluded: !!out,
       why: out ? out.why : null,
