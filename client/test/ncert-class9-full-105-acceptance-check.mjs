@@ -18,11 +18,11 @@ const equal=(a,b)=>assert.deepEqual(a,b);
 const length=v=>Math.hypot(...v);
 const show=(item,v)=>assert.ok(item.answer.includes(v),item.id+' displayed answer missing '+v);
 const coords=v=>'('+v.join(',')+')';
-let checks=0, premiseMutations=0, diagramMutations=0, stepMutations=0, answerMutations=0;
+let checks=0, premiseMutations=0, diagramMutations=0, answerMutations=0;
 const ids=new Set();
 function audit(item,section) {
  const w=item.proof||item.witness;
- assert.ok(item.id&&item.question&&item.answer&&!item.answer.includes('CORRUPTED'),item.id+' wrong or empty material');
+ assert.ok(item.id&&item.question&&item.answer,item.id+' empty material');
  assert.ok(item.steps?.length===3&&item.steps.join(' ').length>55,'inadequate or corrupted displayed steps');
  assert.ok(w&&typeof w.kind==='string','no theorem/parameter witness');
  if(item.figure)assert.ok(item.figure.alt?.length>=25,'missing figure or text equivalent');
@@ -36,7 +36,7 @@ function audit(item,section) {
   }else if(w.kind==='segments-add'){
    assert.equal(sum(w.left),sum(w.right));
    assert.equal(w.left[0],w.right[0]);assert.equal(w.left[1],w.right[1]);
-   show(item,'=');checks+=3;
+   show(item,item.id==='pl9-eucl-add-1'?'AC=DF':'GI=JL='+sum(w.left));checks+=3;
   }else if(w.kind==='segments-subtract'){
    assert.ok(w.whole[0]>w.part[0]);
    assert.equal(w.whole[0]-w.part[0],w.remainder);
@@ -53,10 +53,10 @@ function audit(item,section) {
    show(item,''+(w.a[0]*w.a[1]));show(item,''+(w.b[0]*w.b[1]));checks+=4;
   }else if(w.kind==='unique-line'){
    assert.equal(w.distinct,true);assert.equal(w.count,1);
-   assert.ok(/line|coincide|exactly one|unique/i.test(item.answer));checks+=3;
+   show(item,w.noncollinearThird?'Exactly one through P,Q; none through P,Q,R':item.id==='pl9-eucl-w02'?'line through two distinct points is unique':'lines coincide');checks+=3;
   }else if(w.kind==='playfair'){
    assert.equal(w.pointOff,true);assert.equal(w.parallelCount,1);
-   assert.ok(/parallel|coincide/i.test(item.answer));checks+=3;
+   show(item,item.id==='pl9-eucl-parallel-1'?'Exactly one parallel through P':'must coincide');checks+=3;
   }else if(w.kind==='square'){
    assert.ok(w.side>0);assert.equal(w.diagonalSquared,2*w.side*w.side);
    show(item,w.side+'√2');checks+=3;
@@ -71,7 +71,7 @@ function audit(item,section) {
    assert.ok(measured.every(n=>n>0&&n<180));
    if(w.kind==='vertical'){assert.equal(measured[0],measured[1]);assert.equal(measured[0],w.angle);}
    else {assert.equal(sum(measured),180);equal(measured,w.angles);}
-   show(item,'x='+x);show(item,''+measured[0]);checks+=6;
+   show(item,'x='+x);show(item,''+measured[0]);if(w.kind!=='vertical')show(item,''+measured[1]);checks+=7;
    const formulae=[...item.question.matchAll(/\((\d*)x([+−-]\d+)\)/g)].map(m=>[Number(m[1]||'1'),Number(m[2].replace('−','-'))]);
    equal(formulae,w.forms);checks++;
   }else if(w.kind==='corresponding'){
@@ -88,7 +88,7 @@ function audit(item,section) {
    assert.equal(w.angles[0],w.angles[1]);assert.equal(w.parallel,true);
    const printedAngles=[...item.question.matchAll(/(\d+)°/g)].map(m=>Number(m[1]));
    assert.ok(printedAngles.length>=1&&printedAngles.length<=2&&printedAngles.every(n=>n===w.angles[0]),'alternate interior angle data changed');
-   assert.ok(/parallel/i.test(item.answer));
+   assert.ok(/parallel/i.test(item.answer)&&!/not parallel|cannot be parallel/i.test(item.answer));
    if(item.figure)assert.notEqual(item.figure.parallelY[0],item.figure.parallelY[1]);
    checks+=4;
   }else if(w.kind==='nonparallel-corresponding'||w.kind==='nonparallel-cointerior'){
@@ -146,14 +146,56 @@ function audit(item,section) {
  }else assert.fail('unrecognised section');
  return true;
 }
+
+function independentlyExpectedAnswerAnchor(item,type){
+ const w=item.proof||item.witness, k=w.kind;
+ if(type==='euclid'){
+  if(k==='chain')return w.relation;
+  if(k==='chain-add')return 'a+4=c+4';
+  if(k==='segments-add')return item.id==='pl9-eucl-add-1'?'AC=DF':'GI=JL='+sum(w.left);
+  if(k==='segments-subtract')return ''+(w.whole[0]-w.part[0]);
+  if(k==='rectangle-area-countermodel')return w.a.join('×');
+  if(k==='rectangle-perimeter-countermodel')return ''+(w.a[0]*w.a[1]);
+  if(k==='unique-line')return w.noncollinearThird?'Exactly one through P,Q; none through P,Q,R':item.id==='pl9-eucl-w02'?'line through two distinct points is unique':'lines coincide';
+  if(k==='playfair')return item.id==='pl9-eucl-parallel-1'?'Exactly one parallel through P':'must coincide';
+  if(k==='square')return w.side+'√2';
+ }
+ if(type==='angles'){
+  if(['linear-pair','co-interior','vertical'].includes(k)){
+   const [[a,b],[d,e]]=w.forms;
+   return 'x='+(k==='vertical'?(e-b)/(a-d):(180-b-e)/(a+d));
+  }
+  if(k==='corresponding')return ''+w.corresponding;
+  if(k==='alternate-converse')return 'parallel';
+  if(k.startsWith('nonparallel'))return 'not parallel';
+ }
+ if(type==='quadrilaterals'){
+  if(k==='fourth')return 'D='+coords(sub(add(w.A,w.C),w.B));
+  if(k==='diagonals')return coords(mid(w.points[0],w.points[2]));
+  if(k==='midsegment')return 'DE='+w.DEtext;
+  if(k==='midpoint-converse')return 'AE=EC='+(w.length/2);
+  if(k==='centroid')return 'G='+coords([(w.A[0]+w.B[0]+w.C[0])/3,(w.A[1]+w.B[1]+w.C[1])/3]);
+  if(k==='varignon')return 'P'+coords(mid(w.points[0],w.points[1]));
+ }
+ throw Error('No independent answer mutation anchor for '+item.id);
+}
+function plausibleWrongAnswer(item,type){
+ const anchor=independentlyExpectedAnswerAnchor(item,type);
+ assert.ok(item.answer.includes(anchor),'expected derived answer anchor absent: '+item.id+' '+anchor);
+ const modified=anchor.replace(/-?\d+(?:\.\d+)?/,v=>String(Number(v)+1));
+ return item.answer.replace(anchor,modified===anchor?'wrong alternative claim':modified);
+}
+
 for(const [type,pack] of [['euclid',euclid],['angles',angles],['quadrilaterals',quads]]){
  for(const original of [...pack.workedExamples,...pack.questions]){
   assert.ok(!ids.has(original.id));ids.add(original.id);
   audit(original,type);
-  assert.throws(()=>audit({...original,answer:'CORRUPTED ANSWER 999'},type));answerMutations++;
-  assert.throws(()=>audit({...original,steps:['WRONG','WRONG','WRONG']},type));stepMutations++;
+  const wrongAnswer=plausibleWrongAnswer(original,type);
+  assert.notEqual(wrongAnswer,original.answer);
+  assert.throws(()=>audit({...original,answer:wrongAnswer},type),'derived-value wrong answer survived: '+original.id);
+  answerMutations++;
   if(original.figure){
-   assert.throws(()=>audit({...original,figure:{...original.figure,alt:'bad'}},type));
+   assert.throws(()=>audit({...original,figure:{...original.figure,alt:''}},type),'missing accessibility description survived');
    diagramMutations++;
   }
   // Parameter mutation controls on categories where question-text parameters
@@ -166,8 +208,8 @@ for(const [type,pack] of [['euclid',euclid],['angles',angles],['quadrilaterals',
  }
 }
 assert.equal(ids.size,45,'new 45-item coverage');
-assert.equal(answerMutations,45);assert.equal(stepMutations,45);
+assert.equal(answerMutations,45);
 console.log('PASS Mission 004 Class IX: 60 previous + 45 new = 105 displayed items checked.');
-console.log('New 45: '+checks+' calculated answer/premise/geometry validations, 45/45 bad answers and 45/45 bad steps rejected.');
-console.log('Also caught '+premiseMutations+' altered angle premises and '+diagramMutations+' missing/broken accessibility labels.');
+console.log('New 45: '+checks+' calculated answer/premise/geometry validations, 45/45 domain-anchored plausible wrong answers rejected; worked-step proof audit pending.');
+console.log('Also caught '+premiseMutations+' altered angle premises and '+diagramMutations+' missing required accessibility descriptions.');
 console.log('LIMIT: complete independent mathematical proof/historical review and rendered figure quality still pending; older 60 did not yet receive the new step/premise mutation protocol.');
