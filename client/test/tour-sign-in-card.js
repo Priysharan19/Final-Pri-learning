@@ -831,6 +831,11 @@ export const minorFlow = {
     await check('the parent step explains, in the card, why a guardian is needed and what works meanwhile',
       (await card.locator('#signup-step-title').innerText()).trim() === 'Now, a parent’s approval'
         && /Because you are under 18, a parent or guardian approves your account\. Until they do, you can read questions, write and keep drafts on this device, but answers cannot be checked and nothing syncs\./.test(await card.innerText()));
+    await check('under-18 onboarding cannot skip the guardian step and enter practice',
+      await card.getByTestId('signup-parent-later').count() === 0
+        && await card.getByTestId('signup-parent-required').isVisible()
+        && /must approve before you enter the app/.test(await card.getByTestId('signup-parent-required').innerText())
+        && new URL(page.url()).pathname === '/');
     const gate = await page.evaluate(async () => {
       const csrf = decodeURIComponent((document.cookie.match(/pri_csrf=([^;]+)/) || [])[1] || '');
       const r = await fetch('/v1/sync/pull', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'X-Pri-CSRF': csrf }, body: '{}' });
@@ -857,6 +862,17 @@ export const minorFlow = {
     const childSide = { codeBoxes: await card.locator('input[autocomplete="one-time-code"]').count(), approve: await page.getByRole('button', { name: 'Approve', exact: true }).count(), step: await stepOf(card) };
     await check('the child\'s screen only waits: no code box, no approve button — a child cannot approve their own account',
       childSide.codeBoxes === 0 && childSide.approve === 0 && childSide.step === 'parent-wait', JSON.stringify(childSide));
+    await check('the waiting card offers approval-status checking, not a bypass into the application',
+      await card.getByTestId('signup-parent-continue').count() === 0
+        && await card.getByTestId('signup-parent-check').isVisible()
+        && new URL(page.url()).pathname === '/');
+    await card.getByTestId('signup-parent-check').click();
+    await card.getByTestId('signup-error').waitFor({ timeout: 15000 });
+    await check('checking before actual parental approval keeps the minor on the waiting card',
+      /approval is still pending/.test(await errorText(card))
+        && await stepOf(card) === 'parent-wait'
+        && new URL(page.url()).pathname === '/'
+        && consent().confirmed_at === null, await errorText(card));
 
     const parentCtx = await ctx.browser().newContext({ viewport: PHONE, reducedMotion: 'reduce' });
     try {

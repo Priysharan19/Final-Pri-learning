@@ -392,8 +392,27 @@ export default function SignUpFlow({
     setBusy('finish');
     finishing.current = (async () => {
       try {
+        // Never trust a remembered consent flag, a delayed account response or
+        // the "continue" UI as permission to enter the application. The
+        // server's CURRENT session is the authority at the very last step.
+        if (!signedInAccount?.id) {
+          setError(tLater('signup.verifyFirst'));
+          return;
+        }
+        const state = await cloud.guardianState();
+        if (!state || typeof state.required !== 'boolean' || typeof state.state !== 'string') {
+          setError(tLater('signup.consentCheckUnavailable'));
+          return;
+        }
+        setConsent({ required: state.required, state: state.state });
+        if (state.required && state.state !== 'given') {
+          if (step !== 'parent' && step !== 'parent-wait') go('parent');
+          setError(tLater('signup.parentStillWaiting'));
+          return;
+        }
         await onFinish({ account: signedInAccount, name: name.trim() || signedInAccount?.name || '', year: year || 9, track });
       } catch (err) { fail(err); }
+      finally { setBusy(''); }
     })().finally(() => { finishing.current = null; });
     return finishing.current;
   }
@@ -631,9 +650,7 @@ export default function SignUpFlow({
             {busy === 'parent' ? t('signup.sending') : t('signup.parentSend')}
           </button>
         </form>
-        <div className="signup-alt">
-          <button type="button" className="linklike" disabled={!!busy} onClick={() => finish()} data-testid="signup-parent-later">{t('signup.parentLater')}</button>
-        </div>
+        <p className="signup-hint" role="status" data-testid="signup-parent-required">{t('signup.parentBeforeEntry')}</p>
       </>
     );
   } else if (step === 'parent-wait') {
@@ -648,7 +665,7 @@ export default function SignUpFlow({
           <button type="button" className="linklike" disabled={waitSeconds > 0 || !!busy} onClick={askParent} data-testid="signup-parent-resend">
             {waitSeconds > 0 ? t('signup.resendIn', { n: waitSeconds }) : t('signup.resend')}
           </button>
-          <button type="button" className="linklike" disabled={busy === 'finish'} onClick={() => finish()} data-testid="signup-parent-continue">{t('signup.parentContinue')}</button>
+          <button type="button" className="linklike" disabled={!!busy} onClick={() => finish()} data-testid="signup-parent-check">{t('signup.checkApproval')}</button>
         </div>
       </>
     );
