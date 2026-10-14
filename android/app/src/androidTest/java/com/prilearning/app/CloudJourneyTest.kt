@@ -177,7 +177,7 @@ class CloudJourneyTest {
     }
 
     /** Move on (at most `max` questions) until one takes a typed final answer. */
-    private fun openTypedQuestion(s: ActivityScenario<MainActivity>, max: Int = 12, advanceFirst: Boolean = false, requireSignInGate: Boolean = false) {
+    private fun openTypedQuestion(s: ActivityScenario<MainActivity>, max: Int = 12, advanceFirst: Boolean = false) {
         if (advanceFirst) nextQuestion(s)
         val seen = mutableListOf<String>()
         for (i in 0 until max) {
@@ -185,9 +185,11 @@ class CloudJourneyTest {
             val needsAccount = eval(s, QuestionCardJs.visible("[data-check-needs-account]")) == "true"
             val unmarkable = eval(s, "document.querySelector('[data-check-unmarkable]')?.getAttribute('data-check-unmarkable') || ''").trim('"')
             seen.add("${qid(s)}:typed=$typed,needsAccount=$needsAccount,unmarkable=$unmarkable")
-            // Being typed-answer capable is not the same as being markable:
-            // restored offline drafts must never be mistaken for server-issued.
-            if (typed && (!requireSignInGate || needsAccount) && unmarkable.isEmpty()) return
+            // A locally linked profile whose session expired shows no *proactive*
+            // account notice (needsAccountToCheck checks the local link). Still
+            // demand a markable question, and the actual signed-out Submit
+            // must refuse with sign-in and create no server grade.
+            if (typed && unmarkable.isEmpty()) return
             nextQuestion(s)
         }
         throw AssertionError("no typed server-prepared question satisfying account gate; examined ${seen.joinToString(" | ")}")
@@ -390,9 +392,16 @@ class CloudJourneyTest {
             // Practice restores the question that was open last, which may be a
             // draft the shell journey opened with no server (never markable).
             // A question opened NOW, with the server reachable, is the server's.
-            openTypedQuestion(s, advanceFirst = true, requireSignInGate = true)
+            openTypedQuestion(s, advanceFirst = true)
             val preparedId = qid(s)
-            assertEquals("the card says checking needs an account", "true", waitFor(s, QuestionCardJs.visible("[data-check-needs-account]")))
+            // A fresh device-only profile shows the proactive notice. A
+            // previously linked profile may have lost its session; in that
+            // case the real server refusal below is the decisive safety gate.
+            val preflightNotice = eval(s, QuestionCardJs.visible("[data-check-needs-account]"))
+            assertTrue("preflight account notice is a boolean: $preflightNotice",
+                preflightNotice == "true" || preflightNotice == "false")
+            assertEquals("this question has no draft/teacher/legacy unmarkable warning", "false",
+                eval(s, "!!document.querySelector('[data-check-unmarkable]')"))
             setValue(s, ".editor-body input.answer-input", WRONG)
             assertEquals("Submit is refused signed out", "refused", submitAndWait(s))
             assertEquals("the refusal is the in-card sign-in", "\"sign-in\"", eval(s, QuestionCardJs.REFUSAL))
@@ -403,10 +412,11 @@ class CloudJourneyTest {
 
             openSettings(s)
             assertEquals("\"Not signed in\"", waitFor(s, stateTag))
-            eval(s, "($byText)('Sign in').click()")
-            setValue(s, "#cloud-email", email)
-            setValue(s, "#cloud-password", password)
-            eval(s, "document.querySelector('#cloud-email').form.querySelector('button[type=submit]').click()")
+            waitFor(s, "document.querySelector('[data-signin-card=inline] [data-testid=signup-use-password]')")
+            eval(s, "document.querySelector('[data-signin-card=inline] [data-testid=signup-use-password]').click()")
+            setValue(s, "#signup-password-email", email)
+            setValue(s, "#signup-password", password)
+            eval(s, "document.querySelector('[data-testid=signup-password-submit]').click()")
             waitFor(s, "$stateTag === 'Signed in'")
 
 

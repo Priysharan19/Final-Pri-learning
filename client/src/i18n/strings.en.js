@@ -2478,6 +2478,7 @@ export default {
   'signup.changeEmail': "Change email",
   'signup.genericError': "Something went wrong. Try again.",
   'signup.verifyFirst': "Verify your email before continuing.",
+  'signup.accountChanged': "Your signed-in Pri account changed. Sign in again before connecting this profile.",
   'signup.consentCheckUnavailable': "We couldn't confirm your account's guardian approval. Please try again.",
   'signup.parentStillWaiting': "Guardian approval is still pending. Ask your parent to approve and check again.",
   'signup.parentRevoked': "Your parent or guardian withdrew approval. This account cannot check answers or sync; your work remains on this device.",
