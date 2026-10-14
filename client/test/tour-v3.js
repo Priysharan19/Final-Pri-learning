@@ -266,6 +266,33 @@ export const flow = {
         await page.locator('[data-testid="account-activation-gate"]').count() === 0);
     }
 
+    // A full offline reload is distinct from a visibilitychange on an already
+    // mounted lesson. Exercise the installed service worker and activation
+    // boundary, then prove that restored connectivity recovers the same learner.
+    const beforeReload = await page.locator('.qpage').getAttribute('data-question-id');
+    let offlineReloadBooted = false;
+    let offlineState = '';
+    await ctx.setOffline(true);
+    try {
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 20000 });
+      offlineReloadBooted = await page.locator('.shell, .auth-wrap, [data-testid="account-activation-gate"]')
+        .first().waitFor({ state: 'attached', timeout: 15000 }).then(() => true).catch(() => false);
+      offlineState = (await page.locator('body').innerText().catch(() => '')).slice(0, 180);
+    } catch (error) {
+      offlineState = String(error).slice(0, 180);
+    } finally {
+      await ctx.setOffline(false);
+    }
+    await check('offline reload boots a safe account-aware screen instead of a blank or crashed page',
+      offlineReloadBooted && await page.locator('.crash-card').count() === 0,
+      `page ${page.url()}, state ${JSON.stringify(offlineState)}`);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.qpage .q-prompt', { timeout: 30000 });
+    await check('after offline reload the verified learner resumes the same question without another OTP',
+      await page.locator('.qpage').getAttribute('data-question-id') === beforeReload &&
+      await page.locator('[data-testid="account-activation-gate"]').count() === 0,
+      `before ${beforeReload}, after ${await page.locator('.qpage').getAttribute('data-question-id')}`);
+
   }
 };
 
