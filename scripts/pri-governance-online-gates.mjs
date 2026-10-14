@@ -47,7 +47,7 @@ export function checkManualPr(pr,reviews,perms,{head,authors,reviewers}={}){
  if(pr.user?.type==='Bot'||!a.has(submitter))deny('PR_AUTHOR_NOT_ALLOWED');
  const recent=new Map();
  for(const rev of reviews){
-  if(!rev.user?.login)continue;
+  if(!rev.user?.login||!['APPROVED','CHANGES_REQUESTED','DISMISSED'].includes(rev.state))continue;
   const prev=recent.get(rev.user.login);
   if(!prev || Date.parse(rev.submitted_at||0)>=Date.parse(prev.submitted_at||0))recent.set(rev.user.login,rev);
  }

@@ -9,6 +9,7 @@
 import {createHash,verify as cryptoVerify} from 'node:crypto';
 export const WRITER_STATES=new Set(['ACTIVE','IMPLEMENTING','TESTING','REPAIR']);
 export const FROZEN_STATES=new Set(['REVIEW','CI','MERGE_READY','REPAIR_PENDING']);
+export const NON_WRITING_STATES=new Set(['DISCOVERED','TRIAGED','BLOCKED_EXTERNAL','BLOCKED_AUTOMATION','DONE','ABANDONED']);
 export const MAX_WRITERS=2;
 export const MAX_TTL_MS=12*60*60*1000;
 const fullSHA=/^[a-f0-9]{40}$/i;
@@ -32,6 +33,7 @@ export function signedIssues(issues){
   if(x.state==='closed')continue;
   const m={number:x.number,state:x.state};
   for(const k of attrs)m[k]=mark(x.body,k);
+  if(!WRITER_STATES.has(m['Pri-Mission-Status'])&&!FROZEN_STATES.has(m['Pri-Mission-Status'])&&!NON_WRITING_STATES.has(m['Pri-Mission-Status']))fail('UNKNOWN_MISSION_STATUS');
   if(missions.has(m['Pri-Mission-ID'])||branches.has(m['Pri-Branch']))fail('DUPLICATE_MISSION_OR_BRANCH');
   missions.add(m['Pri-Mission-ID']);branches.add(m['Pri-Branch']);
   if(!fullSHA.test(m['Pri-Base-SHA']))fail('INVALID_BASE_SHA');

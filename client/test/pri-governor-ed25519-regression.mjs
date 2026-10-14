@@ -36,6 +36,7 @@ no({...request,signedState:sig({...state.payload,grants:[grant,grant]})},'MISSIN
 no({...request,signedState:sig({...state.payload,revision:0})},'REVISION');
 no({...request,issues:[{...record,state:'closed'}]},'LEDGER_MOVED');
 no({...request,issues:[{...record,state:'unknown'}]},'ISSUE_STATE');
+no({...request,issues:[{...record,body:record.body.replace('Pri-Mission-Status: ACTIVE','Pri-Mission-Status: active')}]},'UNKNOWN_MISSION_STATUS');
 const wrong=sig({...grant.payload,pathsHash:'f'.repeat(64)});
 no({...request,signedState:sig({...state.payload,grants:[wrong]})},'SCOPE');
 const stale=sig({...grant.payload,expiresAt:'2026-10-15T03:00:00Z'});
@@ -46,6 +47,8 @@ const old=process.env.GITHUB_EVENT_NAME;process.env.GITHUB_EVENT_NAME='pull_requ
 assert.throws(()=>new ProtectedGovernorRef({token:'x'.repeat(32)}),/UNTRUSTED_PR_JOB/);checks++;
 if(old===undefined)delete process.env.GITHUB_EVENT_NAME;else process.env.GITHUB_EVENT_NAME=old;
 assert.throws(()=>new ProtectedGovernorRef({token:''}),/RESTRICTED/);checks++;
+const saved=process.env.GITHUB_EVENT_NAME;delete process.env.GITHUB_EVENT_NAME;
 const gov=new ProtectedGovernorRef({token:'x'.repeat(32),fetcher:async()=>({ok:false,status:404,json:async()=>({})})});
+if(saved===undefined)delete process.env.GITHUB_EVENT_NAME;else process.env.GITHUB_EVENT_NAME=saved;
 await assert.rejects(()=>gov.ensureProtected(),/GITHUB_API_GET_404/);checks++;
 console.log('PASS '+checks+' Ed25519 signed grant/state and protected-ref fail-closed cases, no private keys stored.');
