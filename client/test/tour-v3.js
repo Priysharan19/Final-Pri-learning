@@ -24,8 +24,9 @@
 // Run on its own:  node client/test/tour-v3.js
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
+import { createVerifiedProfile } from './support/verified-onboarding.mjs';
 
-const TOPIC = 'y7-equations';
+const TOPIC = 'c7-finding-unknown-current';
 const SURELY_WRONG = '-987654';
 const MAX_SKIPS = 12;
 
@@ -48,7 +49,7 @@ export const flow = {
     await check('a question renders with a prompt', !!firstPrompt && firstPrompt.length > 8,
       `prompt reads ${JSON.stringify(firstPrompt)}`);
     await check('the card names the topic it came from',
-      (await page.locator('.q-topmeta').innerText()).includes('Linear Equations'),
+      (await page.locator('.q-topmeta').innerText()).includes('Finding the Unknown'),
       `topmeta reads ${JSON.stringify(await page.locator('.q-topmeta').innerText())}`);
     // Practice is deliberately untimed on screen: time on task is still
     // recorded with the attempt, but a running clock is pressure, not help.
@@ -194,7 +195,7 @@ export const flow = {
       scores.some(t => /\bCorrect\b/.test(t)) && scores.some(t => /\bIncorrect\b/.test(t)),
       `rows read ${JSON.stringify(scores.map(t => t.replace(/\s+/g, ' ').slice(0, 60)))}`);
     await check('both attempts are on the same question',
-      scores.every(t => t.includes('Linear Equations')),
+      scores.every(t => t.includes('Finding the Unknown')),
       `rows read ${JSON.stringify(scores.map(t => t.replace(/\s+/g, ' ').slice(0, 60)))}`);
 
     // ── 6b · "Same question" from History: the server repeats it ─────────────
@@ -220,36 +221,51 @@ export const flow = {
         `${String(JSON.stringify(repeated?.json)).slice(0, 240)}; repeat calls ${JSON.stringify((await online.practiceCalls(/^\/v1\/practice\/[^/]+\/repeat$/)).map(c => c.status))}`);
     }
 
-    // ── 7 · a question that comes with a diagram ─────────────────────────────
-    await page.goto(`${base}/practice?subtopic=y9-pythagoras`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.q-prompt', { timeout: 30000 });
-    let figure = false;
-    for (let i = 0; i < 6 && !figure; i++) {
-      figure = await page.locator('.q-figure svg').count() > 0;
-      if (figure) break;
-      await page.locator('.ctx-next').click();
-      await page.waitForSelector('.q-prompt', { timeout: 30000 });
-      await settle();
-    }
-    await check('a geometry question draws its own figure', figure,
-      'six Pythagoras questions and not one of them rendered an SVG figure');
+    // ── 7 · a grade-appropriate question with a real geometry figure ─────────
+    // Class 7 "Finding the Unknown" is deliberately text-only. Verify diagram
+    // output against Class 10 trigonometry with a second REAL verified account,
+    // not by silently assigning a Year 9 Australian syllabus to Class 7.
+    const diagramCtx = await ctx.browser().newContext({ viewport: { width: 1100, height: 850 }, reducedMotion: 'reduce' });
+    try {
+      const diagramPage = await diagramCtx.newPage();
+      await diagramPage.goto(base, { waitUntil: 'domcontentloaded' });
+      await createVerifiedProfile(diagramPage, online.platform, { name: 'Geometry Student', year: 10, course: 'in' });
+      await diagramPage.goto(`${base}/practice?subtopic=c10-trigonometry`, { waitUntil: 'domcontentloaded' });
+      await diagramPage.waitForSelector('.q-prompt', { timeout: 30000 });
+      let figure = false;
+      for (let i = 0; i < 12 && !figure; i++) {
+        figure = await diagramPage.locator('.q-figure svg').count() > 0;
+        if (figure) break;
+        await diagramPage.locator('.ctx-next').click();
+        await diagramPage.waitForSelector('.q-prompt', { timeout: 30000 });
+        await settle();
+      }
+      await check('a Class 10 trigonometry question renders its own SVG diagram', figure,
+        'twelve Class 10 trigonometry questions did not render an SVG diagram');
+    } finally { await diagramCtx.close(); }
 
-    // ── 8 · and all of it works with the network gone ───────────────────────
-    // The headline claim on the landing page. It rests on the service worker
-    // having precached the build, which is a thing only a browser can be asked.
-    await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.home-greet', { timeout: 30000 });
+    // ── 8 · connection loss must never erase the open authenticated lesson ───
+    await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
     const claimed = await page.waitForFunction(() => !!navigator.serviceWorker?.controller, null, { timeout: 30000 })
       .then(() => true).catch(() => false);
-    if (await check('the service worker takes charge of the page', claimed,
-      'no worker claimed the client, so nothing was cached to go offline with')) {
+    if (await check('the service worker takes charge of the authenticated app', claimed,
+      'no worker claimed the client')) {
+      await page.evaluate(() => { window.__lessonDuringOutage = document.querySelector('.qpage'); });
       await ctx.setOffline(true);
-      await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => { });
-      const up = await page.waitForSelector('.home-greet', { timeout: 30000 }).then(() => true).catch(() => false);
-      await check('the app opens again with the network switched off', up,
-        'a reload with the network down did not reach Home');
+      await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+      await page.waitForTimeout(700);
+      await check('temporary connection loss keeps the same question and mounted answer editor',
+        await page.evaluate(() => document.querySelector('.qpage') === window.__lessonDuringOutage) &&
+        await page.locator('[data-testid="account-activation-gate"]').count() === 0);
       await ctx.setOffline(false);
+      await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+      await page.waitForTimeout(500);
+      await check('reconnected authenticated learner can continue without another OTP',
+        await page.locator('.q-prompt').count() === 1 &&
+        await page.locator('[data-testid="account-activation-gate"]').count() === 0);
     }
+
   }
 };
 

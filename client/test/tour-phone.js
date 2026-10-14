@@ -206,42 +206,38 @@ export const flow = {
     });
     await check('no block on Home hides content it gives no way to scroll to', stripped.length === 0, JSON.stringify(stripped));
 
-    // ── 10 · and it still works with the network gone ────────────────────────
-    // This is the check that guards the install budget. Six years of question
-    // banks are no longer written by the install: api.js pulls the two a
-    // profile actually practises from — its own year and the revision year
-    // below it — the moment that profile signs in, and the worker's runtime
-    // rule keeps them. If that ever stops happening, the saving turns into a
-    // student who cannot practise on the bus, and this goes red rather than
-    // the byte count going quietly up.
+    // ── 10 · transient loss does not erase an authenticated practice session ──
+    // Online-only marking requires a verified account. Do not bypass that gate
+    // by expecting device-only practice after a cold offline reload. Instead,
+    // verify a brief connection loss does NOT unmount the student's current
+    // question/draft, and that it recovers when the connection returns.
     await goto('/practice');
-    await page.waitForSelector('.q-prompt', { timeout: 30000 }).catch(() => null);
-    await settle();
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
     const claimed = await page.waitForFunction(() => !!navigator.serviceWorker?.controller, null, { timeout: 30000 })
       .then(() => true).catch(() => false);
-    if (await check('a worker is in charge before the network is cut', claimed,
-      'no worker claimed the page, so nothing below would prove anything')) {
-      // Let the second pass finish, so this measures the state a student is in
-      // a few seconds after arriving rather than a race.
-      await page.evaluate(() => new Promise((done) => {
-        const channel = new MessageChannel();
-        channel.port1.onmessage = () => done(true);
-        navigator.serviceWorker.controller.postMessage({ type: 'pri-warm' }, [channel.port2]);
-        setTimeout(() => done(false), 60000);
-      })).catch(() => false);
+    await check('the authenticated app has a registered service worker', claimed);
+    await page.evaluate(() => {
+      window.__phoneQuestion = document.querySelector('.q-prompt');
+      window.__phoneShell = document.querySelector('.shell');
+    });
+    await ctx.setOffline(true);
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.waitForTimeout(600);
+    await check('the signed-in shell stays mounted during a temporary outage',
+      await page.evaluate(() => document.querySelector('.shell') === window.__phoneShell) &&
+      await page.locator('[data-testid="account-activation-gate"]').count() === 0,
+      'transient connection loss ejected the learner from the existing session');
+    await check('the existing practice question is not discarded while offline',
+      await page.evaluate(() => document.querySelector('.q-prompt') === window.__phoneQuestion),
+      'the current question was unmounted during a transient outage');
+    await ctx.setOffline(false);
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await page.waitForTimeout(600);
+    await check('practice remains available after connection restoration',
+      await page.locator('.q-prompt').count() === 1 &&
+      await page.locator('[data-testid="account-activation-gate"]').count() === 0,
+      'reconnection did not preserve practice');
 
-      await ctx.setOffline(true);
-      await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => { });
-      // /practice is a thinking-mode route: its shell is the workspace bar, not the bottom nav.
-      const shell = await page.waitForSelector('.ws-bar, .mobilenav', { timeout: 30000 }).then(() => true).catch(() => false);
-      await check('the app opens with the network switched off', shell, 'a reload with the network down never painted the shell');
-
-      await page.goto(`${base}/practice`, { waitUntil: 'domcontentloaded' }).catch(() => { });
-      const offlineQuestion = await page.waitForSelector('.q-prompt', { timeout: 30000 }).then(() => true).catch(() => false);
-      await check('and a question can still be drawn from the offline banks', offlineQuestion,
-        'the practice page did not produce a question with the network down — the year bank was not in the cache');
-      await ctx.setOffline(false);
-    }
   }
 };
 

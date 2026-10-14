@@ -506,13 +506,18 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     }
 
     const { linkSignedInAccount } = await import('../platform/cloudAccount.js');
+    const { ensureAccountActivated } = await import('../platform/accountActivation.js');
     await linkSignedInAccount(pid, account);
-    // POST /profiles returns the view from before the cloud link exists. Re-read
-    // it after linking so Practice never mounts with stale cloudLinked=false.
+    // No Practice or Home until the same server account is verified, guardian
+    // approval (where required) is confirmed, and the first sync has committed.
+    await ensureAccountActivated(pid, { expectedAccountId: account.id });
     const linkedUser = (await api.get('/me')).user;
+    if (linkedUser?.id !== pid || !linkedUser.cloudLinked) {
+      throw new Error('The profile is not connected to your verified account. Retry setup.');
+    }
     accountProfileRef.current = null;
     localStorage.setItem('pri-seen-hero', '1');
-    nav('/practice', { replace: true, flushSync: true });
+    nav('/', { replace: true, flushSync: true });
     flushSync(() => setUser(linkedUser));
     refreshDue();
   };
@@ -562,14 +567,13 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
           <div style={{ textAlign: 'center', marginTop: 14 }}>
             <button className="linklike" type="button" data-testid="hero-sign-in-code" onClick={() => openAccount('signin')}>{t('login.signInWithCode')}</button>
           </div>
-          <div style={{ textAlign: 'center', marginTop: 14 }}>
-            <button className="linklike" type="button" data-testid="hero-try-demo" disabled={busy} onClick={tryDemo}>
-              {t('login.tryDemoIndia')}
-            </button>
-          </div>
-          <div style={{ textAlign: 'center', marginTop: 12 }}>
-            <button className="linklike" type="button" data-testid="hero-offline" onClick={enter}>{t('signup.offline')}</button>
-          </div>
+          {profiles?.length > 0 && (
+            <div style={{ textAlign: 'center', marginTop: 12 }}>
+              <button className="linklike" type="button" data-testid="hero-existing-device" onClick={enter}>
+                {t('login.existingDeviceProfile')}
+              </button>
+            </div>
+          )}
           {error && <div className="error-box" role="alert" style={{ marginTop: 12 }}>{error}</div>}
           <p className="muted" style={{ marginTop: 26, textAlign: 'center' }}>{t('login.heroPrivacy')}</p>
           {appleEntry}
@@ -595,7 +599,6 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
             key={accountMode}
             initialMode={accountMode}
             onCancel={() => setStage('hero')}
-            onStartOffline={() => beginCreate(false)}
             onFinish={finishAccount}
           />
           </React.Suspense>
@@ -671,7 +674,11 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                   );
                 })}
               </div>
-              <button className="btn btn-ghost" type="button" style={{ width: '100%', marginTop: 14 }} disabled={busy}
+              <button className="btn btn-primary" type="button" style={{ width: '100%', marginTop: 14 }} disabled={busy}
+                data-testid="picker-create-account" onClick={() => openAccount('signup')}>
+                {t('login.createAnotherAccount')}
+              </button>
+              <button className="btn btn-ghost" type="button" style={{ width: '100%', marginTop: 10 }} disabled={busy}
                 onClick={() => beginCreate(cloudIntent)}>
                 {t('login.addAnother')}
               </button>

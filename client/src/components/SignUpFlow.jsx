@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · account sign-up and sign-in
 //
-//   who → age → class & track → how (phone · email · Google · Apple) → code
-//       → a parent's approval if under 18 → the first question
+//   email → verification code → age (new accounts) → class/profile
+//       → guardian approval if under 18 → verified profile sync → main app
 //
 // One step on screen at a time, moving forward or back with a short slide that
 // collapses to nothing under prefers-reduced-motion. Each step's heading takes
@@ -36,7 +36,7 @@ export const GUARDIAN_NOTICE_VERSION = '2026-10-02';
 function stepsFor({ mode, role, minor }) {
   if (role === 'parent') return ['role', 'parent-home'];
   if (mode === 'signin') return ['method', 'code', 'age', 'class', ...(minor ? ['parent', 'parent-wait'] : [])];
-  return ['role', 'age', 'class', 'method', 'code', ...(minor ? ['parent', 'parent-wait'] : [])];
+  return ['method', 'code', 'age', 'class', ...(minor ? ['parent', 'parent-wait'] : [])];
 }
 
 /** Read an SMS code through WebOTP where the browser offers it (Android Chrome). */
@@ -49,15 +49,15 @@ function listenForSmsCode(onCode) {
   return () => controller.abort();
 }
 
-export default function SignUpFlow({ initialMode = 'signup', initialName = '', onCancel, onFinish, onStartOffline }) {
+export default function SignUpFlow({ initialMode = 'signup', initialName = '', onCancel, onFinish, onStartOffline, reuseExistingProfile = false }) {
   const t = useT();
   const [mode, setMode] = useState(initialMode);
-  const [role, setRole] = useState(initialMode === 'signin' ? 'student' : '');
+  const [role, setRole] = useState('student');
   const [age, setAge] = useState(null);           // number, or 18 for "18 or older"
   const [year, setYear] = useState(null);
   const [track, setTrack] = useState('cbse');
   const [name, setName] = useState(() => String(initialName || '').slice(0, 80));
-  const [channel, setChannel] = useState('sms');
+  const [channel, setChannel] = useState('email');
   const [destination, setDestination] = useState('');
   const [challenge, setChallenge] = useState(null);
   const [code, setCode] = useState('');
@@ -65,7 +65,7 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
   const [account, setAccount] = useState(null);
   const [consent, setConsent] = useState(null);
   const [parentName, setParentName] = useState('');
-  const [parentChannel, setParentChannel] = useState('sms');
+  const [parentChannel, setParentChannel] = useState('email');
   const [parentDestination, setParentDestination] = useState('');
   const [resendAt, setResendAt] = useState(0);
   const [now, setNow] = useState(Date.now());
@@ -76,6 +76,7 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState('forward');
   const headingRef = useRef(null);
+  const finishingRef = useRef(false);
   const available = cloudAvailable();
 
   const minor = role !== 'parent' && age !== null && age < 18;
@@ -139,7 +140,6 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
 
   async function sendCode() {
     if (busy) return;
-    if (mode === 'signup' && !name.trim()) { setError(tLater('signup.nameRequired')); return; }
     setBusy('send'); setError('');
     try {
       const sent = await cloud.otpRequest({ channel, destination });
@@ -158,7 +158,7 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
     try {
       const deviceId = await cloudDeviceId();
       const body = { channel, destination, challengeId: challenge, code: submitted, deviceId };
-      if (mode === 'signup') body.profile = profile();
+      // Verify contact before asking for age; new addresses receive a signup ticket.
       const result = await cloud.otpVerify(body);
       if (result.status === 'profile-required') {
         // A sign-in for an address with no account: ask the sign-up questions,
@@ -168,7 +168,7 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
         setRole('student');
         setBusy('');
         setDirection('forward');
-        setIndex(stepsFor({ mode: 'signup', role: 'student', minor: false }).indexOf('role'));
+        setIndex(stepsFor({ mode: 'signup', role: 'student', minor: false }).indexOf('age'));
         return;
       }
       await signedIn(result);
@@ -181,6 +181,8 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
   }
 
   async function completeWithTicket() {
+    if (!name.trim()) { setError(tLater('signup.nameRequired')); return; }
+    if (age === null || year === null) { setError(tLater('signup.ageClassRequired')); return; }
     setBusy('verify'); setError('');
     try {
       const deviceId = await cloudDeviceId();
@@ -195,12 +197,17 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
     if (!name.trim() && result.account?.name) setName(result.account.name);
     setBusy('');
     const needsParent = result.guardianConsent?.required && result.guardianConsent.state !== 'given';
-    if (mode === 'signin' && !result.created) {
-      // Returning learner on a new device: we still need the class to set up
-      // this device's profile; age only matters if a parent is still pending.
+    if (!result.created) {
+      // A saved device profile already has its curriculum and local work.
+      // Re-authenticate that identity without asking for class again or
+      // replacing any ink/photo draft. A fresh device still chooses a class.
+      if (reuseExistingProfile && !needsParent) {
+        await finish(result.account);
+        return;
+      }
       setAge(needsParent ? 15 : 18);
       setDirection('forward');
-      setIndex(stepsFor({ mode: 'signin', role: 'student', minor: needsParent }).indexOf('class'));
+      setIndex(stepsFor({ mode, role: 'student', minor: needsParent }).indexOf(reuseExistingProfile ? 'parent' : 'class'));
       return;
     }
     if (needsParent) { go('parent'); return; }
@@ -218,7 +225,7 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
       const body = { ...token, deviceId, createAccount: mode === 'signup' };
       if (mode === 'signup') Object.assign(body, { name: p.name, year: p.year, isAdult: p.isAdult, guardianLater: true });
       const result = await cloud.socialSignIn(provider, body);
-      const state = result.created && minor ? { required: true, state: 'pending' } : null;
+      const state = await cloud.guardianState();
       await signedIn({ ...result, guardianConsent: state });
     } catch (err) { fail(err); }
   }
@@ -238,16 +245,31 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
   }
 
   async function finish(signedInAccount = account) {
-    setBusy('finish');
+    if (finishingRef.current) return;
+    if (!signedInAccount?.id) { setError(tLater('signup.verifyBeforeContinue')); return; }
+    finishingRef.current = true;
+    setBusy('finish'); setError('');
     try {
+      const state = await cloud.guardianState();
+      if (!state || typeof state.required !== 'boolean') throw new Error('Could not check your account permissions. Retry.');
+      if (state.required && state.state !== 'given') {
+        setBusy('');
+        if (step !== 'parent-wait') go('parent');
+        setError(tLater('signup.guardianBeforeHome'));
+        return;
+      }
       await onFinish({ account: signedInAccount, name: name.trim() || signedInAccount?.name || '', year: year || 9, track });
     } catch (err) { fail(err); }
+    finally { finishingRef.current = false; }
   }
 
   const waitSeconds = Math.max(0, Math.ceil((resendAt - now) / 1000));
   const progress = Math.round(((index + 1) / steps.length) * 100);
+  // Standalone signup is the entire page and needs its own h1. During
+  // existing-account recovery, AccountActivationGate already owns the h1.
+  const StepHeading = reuseExistingProfile ? 'h2' : 'h1';
   const heading = (key, vars) => (
-    <h2 className="signup-title" tabIndex={-1} ref={headingRef} id="signup-step-title">{t(key, vars)}</h2>
+    <StepHeading className="signup-title" tabIndex={-1} ref={headingRef} id="signup-step-title">{t(key, vars)}</StepHeading>
   );
   const choice = (selected, label, onClick, testId, extra = '') => (
     <button type="button" className={`signup-choice${selected ? ' is-selected' : ''}${extra}`} aria-pressed={selected}
@@ -326,13 +348,7 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
       <>
         {heading(mode === 'signin' ? 'signup.signinTitle' : 'signup.methodTitle')}
         {!available && <p className="signup-hint" role="status">{t('signup.cloudUnavailable')}</p>}
-        {mode === 'signup' && (
-          <>
-            <label className="label" htmlFor="signup-flow-name">{t('signup.nameLabel')}</label>
-            <input className="input" id="signup-flow-name" autoComplete="given-name" value={name} maxLength={80}
-              onChange={e => { setName(e.target.value); setError(''); }} />
-          </>
-        )}
+
         <div className="signup-segment signup-channel" role="radiogroup" aria-label={t('signup.channelLabel')}>
           <button type="button" role="radio" aria-checked={isSms} className={`signup-seg${isSms ? ' is-selected' : ''}`}
             onClick={() => { setChannel('sms'); setDestination(''); setError(''); }} data-testid="signup-channel-sms">{t('signup.channelPhone')}</button>
@@ -353,7 +369,7 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
             {busy === 'send' ? t('signup.sending') : t('signup.sendCode')}
           </button>
         </form>
-        {(providers.google || providers.apple) && (
+        {mode === 'signin' && (providers.google || providers.apple) && (
           <>
             <div className="signup-or"><span>{t('signup.or')}</span></div>
             <div className="signup-social">
@@ -413,9 +429,7 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
             {busy === 'parent' ? t('signup.sending') : t('signup.parentSend')}
           </button>
         </form>
-        <div className="signup-alt">
-          <button type="button" className="linklike" onClick={() => finish()} data-testid="signup-parent-later">{t('signup.parentLater')}</button>
-        </div>
+
       </>
     );
   } else if (step === 'parent-wait') {
@@ -430,7 +444,10 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
           <button type="button" className="linklike" disabled={waitSeconds > 0 || !!busy} onClick={askParent} data-testid="signup-parent-resend">
             {waitSeconds > 0 ? t('signup.resendIn', { n: waitSeconds }) : t('signup.resend')}
           </button>
-          <button type="button" className="linklike" onClick={() => finish()} data-testid="signup-parent-continue">{t('signup.parentLater')}</button>
+          <button type="button" className="linklike" onClick={() => void cloud.guardianState().then(state => {
+            if (state?.required === false || state?.state === 'given') void finish(account);
+            else setError(tLater('signup.stillWaitingApproval'));
+          }).catch(fail)} data-testid="signup-parent-check">{t('activation.checkApproval')}</button>
         </div>
       </>
     );

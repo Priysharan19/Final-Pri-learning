@@ -25,10 +25,10 @@ import { pathToFileURL } from 'node:url';
 import { TEMPLATES } from '../src/ink/templates.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
-const TOPIC = 'y7-equations';
+const TOPIC = 'c7-finding-unknown-current';
 // Whole-number answers with no Step Check metadata: wrong working here is the
 // case the on-device checker cannot place, which is when the server is asked.
-const UNPLACED_TOPIC = 'y7-integers';
+const UNPLACED_TOPIC = TOPIC;
 // Every working check the stub answers names itself, so a note on screen says
 // which request — and so which question — it came from.
 const noteFor = (n) => `STUB-NOTE-${n}`;

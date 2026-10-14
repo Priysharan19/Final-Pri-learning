@@ -23,7 +23,7 @@ import { pathToFileURL } from 'node:url';
 import { handwrite, readLines, turnOnServerReading } from './fakeServerReader.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
-const TOPIC = 'y7-equations';
+const TOPIC = 'c7-finding-unknown-current';
 const MAX_QUESTIONS = 8;
 
 const SUBMIT = { name: 'Submit Answer' };

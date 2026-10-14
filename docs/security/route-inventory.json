@@ -1781,6 +1781,20 @@
       "bodyLimit": "no-body"
     },
     {
+      "method": "GET",
+      "path": "/v1/account/otp/channels",
+      "auth": "none",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "public, identical for every visitor: two deployment-wide booleans saying whether email and SMS one-time-code delivery are configured; never reads, enumerates or returns student identity, provider keys, destination addresses or account state; response uses Cache-Control: no-store",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
       "method": "POST",
       "path": "/v1/account/otp/request",
       "auth": "none",

@@ -9,6 +9,7 @@ import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
 import { setLanguage, signInLanguage, useT } from './i18n/index.js';
 import Login from './pages/Login.jsx';
+import AccountActivationGate from './components/AccountActivationGate.jsx';
 import Home from './pages/Home.jsx';
 import Practice from './pages/Practice.jsx';
 import Icon from './components/Icon.jsx';
@@ -129,6 +130,11 @@ export function Logo({ large = false, onClick }) {
 
 export default function App() {
   const [user, setUser] = useState(undefined);
+  const [activated, setActivated] = useState(null);
+  // Session events can occur inside Practice during same-account recovery.
+  // Keep latest identity in a ref so its listener does not remount active work.
+  const latestActivation = useRef(null);
+  latestActivation.current = { profileId: user?.id, accountId: activated?.accountId };
   // Declared with the other top-level state: the app returns early for the
   // boot screen and the profile gate, and a hook after those would not run on
   // every render.
@@ -170,12 +176,53 @@ export default function App() {
   useEffect(() => {
     let stop = () => {};
     try {
-      stop = onCloudSessionChange(() => {
+      stop = onCloudSessionChange(event => {
+        const detail = event?.detail || {};
+        const current = latestActivation.current;
+        const sameIdentity = detail.connected === true && current?.accountId &&
+          String(detail.localProfileId) === String(current.profileId) &&
+          String(detail.accountId) === String(current.accountId);
+        // Relock immediately on disconnect or identity change. A same-account
+        // refresh must leave the route mounted (including its ink/photo draft).
+        if (!sameIdentity) setActivated(null);
         api.get('/me').then(r => { if (r?.user) setUser(r.user); }).catch(() => { });
       });
     } catch { /* non-browser runtimes */ }
     return () => { try { stop(); } catch { /* already gone */ } };
   }, []);
+
+  // A local profile is not permission to open Practice. Require the live
+  // platform session, adult/guardian decision and initial cloud sync first.
+  useEffect(() => { setActivated(null); }, [user?.id]);
+
+  // Only an authoritative rejection can eject the learner. A temporary
+  // outage, 429, 503 or dropped connection must not destroy unsaved work.
+  const accessDenied = new Set([
+    'SIGN_IN_REQUIRED', 'ACCOUNT_NOT_LINKED', 'ACCOUNT_MISMATCH',
+    'ACCOUNT_ACCESS_DENIED', 'GUARDIAN_CONSENT_PENDING',
+    'GUARDIAN_CONSENT_WITHDRAWN', 'AGE_DECLARATION_REQUIRED',
+    'EMAIL_UNVERIFIED', 'PROFILE_MISSING'
+  ]);
+
+  // Recheck a previously activated account when the app returns to the
+  // foreground. If consent is withdrawn or the session revoked, close the
+  // shell; ordinary sync stays with the auto-sync scheduler.
+  useEffect(() => {
+    if (!user?.id || activated?.profileId !== user.id) return undefined;
+    let live = true;
+    const recheck = async () => {
+      try {
+        const { ensureAccountActivated } = await import('./platform/accountActivation.js');
+        await ensureAccountActivated(user.id, { sync: false });
+      } catch (error) {
+        if (live && accessDenied.has(error?.code)) setActivated(null);
+      }
+    };
+    const visible = () => { if (document.visibilityState === 'visible') void recheck(); };
+    document.addEventListener('visibilitychange', visible);
+    const timer = setInterval(() => { if (document.visibilityState === 'visible') void recheck(); }, 60_000);
+    return () => { live = false; clearInterval(timer); document.removeEventListener('visibilitychange', visible); };
+  }, [user?.id, activated?.profileId]);
 
   // Guard months of practice from storage eviction — ask the browser once per boot.
   useEffect(() => { requestPersistentStorage(); }, []);
@@ -194,7 +241,7 @@ export default function App() {
   // cleanup covers both orders — the effect torn down before the module lands
   // (nothing to uninstall, and the late arrival installs nothing) and after.
   useEffect(() => {
-    if (!user?.id) return undefined;
+    if (!user?.id || activated?.profileId !== user.id) return undefined;
     const pid = user.id;
     let uninstall = null;
     let torn = false;
@@ -205,7 +252,7 @@ export default function App() {
       });
     }).catch(() => { });
     return () => { torn = true; if (uninstall) uninstall(); };
-  }, [user?.id, refreshUser, refreshDue, refreshRecent]);
+  }, [user?.id, activated?.profileId, refreshUser, refreshDue, refreshRecent]);
 
   // The interface follows the profile's own language. Before a profile is
   // chosen there is nothing to follow, so the sign-in screen falls back to the
@@ -345,6 +392,20 @@ export default function App() {
           </Routes>
         </React.Suspense>
         <ToastLayer toasts={toasts} />
+      </AppCtx.Provider>
+    );
+  }
+
+  if (activated?.profileId !== user.id) {
+    const switchLocal = async () => {
+      try { await api.post('/auth/logout'); } catch { /* local sign-out */ }
+      nav('/', { replace: true });
+      setActivated(null);
+      setUser(null);
+    };
+    return (
+      <AppCtx.Provider value={ctx}>
+        <AccountActivationGate user={user} onReady={setActivated} onSwitch={switchLocal} />
       </AppCtx.Provider>
     );
   }

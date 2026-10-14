@@ -7,14 +7,15 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
 const read = rel => readFile(join(ROOT, rel), 'utf8');
 
-const [login, backend, app, cloud, en, hi, e2e] = await Promise.all([
+const [login, backend, app, cloud, en, hi, e2e, verified] = await Promise.all([
   read('src/pages/Login.jsx'),
   read('src/local/backend.js'),
   read('src/App.jsx'),
   read('src/components/CloudAccountPanel.jsx'),
   read('src/i18n/strings.en.js'),
   read('src/i18n/strings.hi.js'),
-  read('test/e2e.mjs')
+  read('test/e2e.mjs'),
+  read('test/support/verified-onboarding.mjs')
 ]);
 
 // The cloud panel's copy lives in the i18n catalogue. Resolve the keys the
@@ -81,11 +82,31 @@ check('English has staged onboarding copy', en.includes("'login.stepRoleTitle'")
 check('Hindi has staged onboarding copy', hi.includes("'login.stepRoleTitle'"));
 check('English has local cloud honesty copy', en.includes("'login.localCloudHonesty'"));
 check('Hindi has local cloud honesty copy', hi.includes("'login.localCloudHonesty'"));
-check('browser helper uses staged first step', e2e.includes('data-onboarding-step="1"'));
-check('browser helper uses staged ready step', e2e.includes('data-onboarding-step="5"'));
-check('browser helper supports teacher role', e2e.includes("role === 'teacher'"));
-check('browser helper supports profile language', e2e.includes("language !== 'en'"));
-check('browser helper supports cloud handoff', e2e.includes('cloud-account-title'));
+// The old browser fixture staged an offline-only profile and sent learners to
+// Settings for cloud login. The current fixture must enter through genuine
+// email verification, validate server authority, and wait for first sync.
+check('browser suite uses verified onboarding instead of device-only entry',
+  e2e.includes("import { createVerifiedProfile } from './support/verified-onboarding.mjs'") &&
+  e2e.includes('createVerifiedProfile(page, await onlinePlatform(), options)'));
+check('browser fixture starts with public account signup rather than a local unlock',
+  verified.includes("getByTestId('hero-create-account').click()") &&
+  verified.includes('[data-signup-step="method"]') &&
+  !verified.includes('localStorage.setItem') && !verified.includes('addInitScript'));
+check('browser fixture verifies a server-issued six-digit email OTP and explicit adult age',
+  verified.includes("readTestOutbox({ to: address, channel: 'email' })") &&
+  verified.includes("getByTestId('signup-age-18').click()") &&
+  verified.includes('[data-signup-step="code"]'));
+check('browser fixture cannot mint an unauthorised teacher or substitute a different syllabus',
+  verified.includes("if (role !== 'student') throw new Error") &&
+  verified.includes("if (course !== 'in') throw new Error"));
+check('browser fixture verifies cloud identity and finished sync before entering Home',
+  verified.includes("fetch('/v1/account/me'") &&
+  verified.includes("me.status !== 200") &&
+  verified.includes('account-activation-gate') &&
+  verified.includes(".home-greet"));
+check('second profile creation must also use cloud-verified signup',
+  verified.includes("getByTestId('picker-create-account').click()") &&
+  verified.includes("fromPicker"));
 
 const total = passed + failures.length;
 console.log('');

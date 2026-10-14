@@ -38,6 +38,7 @@ import { tmpdir } from 'node:os';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { chromium, webkit } from '@playwright/test';
 import { onlinePlatform, closeOnlinePlatform } from './support/online-session.mjs';
+import { createVerifiedProfile } from './support/verified-onboarding.mjs';
 import { watchBoot, bootFailure, bootRecovery } from './support/boot-diagnostics.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -254,59 +255,9 @@ function helpers(page, base, flowId) {
     ).catch(() => { /* a screen with no lazy route never shows the fallback */ });
   };
 
-  /**
-   * Make a real local profile through KALP-03's staged first-run flow. No test
-   * reaches into IndexedDB: the same UI and /profiles authority a learner uses
-   * must create the identity that powers the rest of the journey.
-   */
-  const createProfile = async ({
-    name = 'E2E Student', year = 9, email = null, password = null,
-    course = 'nsw', track = null, role = 'student', language = 'en',
-    avatar = null, cloud = false, fromPicker = false
-  } = {}) => {
-    await page.getByRole('button', { name: fromPicker ? 'Add another profile' : 'Use without an account' }).click();
-    await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
-    await page.getByRole('button', { name: role === 'teacher' ? 'Teacher' : 'Student', exact: true }).click();
-    await page.locator('.auth-card .btn-primary').click();
-
-    await page.waitForSelector('[data-onboarding-step="2"]', { timeout: 15000 });
-    if (course === 'in') {
-      await page.locator('#signup-track').selectOption(track || String(year));
-      if (track) await page.locator('#signup-year').selectOption(String(year));
-    } else {
-      await page.getByRole('button', { name: role === 'teacher' ? /Teaching in Australia/ : /Studying in Australia/ }).click();
-      await page.locator('#signup-course').selectOption(course);
-      await page.locator('#signup-year').selectOption(String(year));
-    }
-    await page.locator('.auth-card .btn-primary').click();
-
-    await page.waitForSelector('[data-onboarding-step="3"]', { timeout: 15000 });
-    await page.locator('#signup-name').fill(name);
-    if (language !== 'en') await page.locator('.auth-card button[lang="' + language + '"]').click();
-    if (avatar) await page.locator('.avatar-pick').filter({ hasText: avatar }).click();
-    await page.locator('.auth-card .btn-primary').click();
-
-    await page.waitForSelector('[data-onboarding-step="4"]', { timeout: 15000 });
-    if (email) await page.locator('#signup-email').fill(email);
-    if (password) {
-      await page.locator('.check-row input[type=checkbox]').check();
-      await page.getByLabel('Password', { exact: true }).fill(password);
-      await page.getByLabel('Repeat password').fill(password);
-    }
-    if (cloud) await page.getByRole('button', { name: /Connect a Pri cloud account next/i }).click();
-    await page.locator('.auth-card .btn-primary').click();
-
-    await page.waitForSelector('[data-onboarding-step="5"]', { timeout: 15000 });
-    await page.locator('.auth-card .btn-primary').click();
-    if (cloud) {
-      await page.waitForSelector('#cloud-account-title', { timeout: 30000 });
-    } else if (role === 'teacher') {
-      await page.waitForURL(/\/teach(?:#.*)?$/, { timeout: 30000 });
-      await page.waitForSelector('.shell', { timeout: 30000 });
-    } else {
-      await page.waitForSelector('.home-greet', { timeout: 30000 });
-    }
-  };
+  // Shared fixture uses the public email -> OTP -> adult -> class -> sync UI,
+  // backed by the real test platform. There is no device-only shell entry.
+  const createProfile = async options => createVerifiedProfile(page, await onlinePlatform(), options);
 
   return { shot, check, mathText, goto, createProfile, settle: () => page.waitForTimeout(SETTLE) };
 }
@@ -345,17 +296,13 @@ async function runFlow(flow, { browser, base, opts }) {
   const crashes = [];
   page.on('pageerror', e => crashes.push(String(e?.message || e).slice(0, 200)));
 
-  // A flow that marks anything declares `online: true` and runs against the
-  // real platform server, which serves this same build from its own origin
-  // (support/online-session.mjs). Its `online` session signs the profile in
-  // through the app. Every other flow keeps the plain file server: a device
-  // with no Pri server behind it, which is what "signed out" means here.
-  let online = null;
-  if (flow.online) {
-    const platform = await onlinePlatform();
-    base = platform.origin;
-    online = platform.session(ctx, page);
-  }
+  // All historical browser journeys now receive the same real platform origin.
+  // Only the email/SMS delivery adapter is synthetic; sessions, consent, sync,
+  // routes and grading all run through the actual server. The optional online
+  // oracle remains limited to flows that explicitly request its sealed data.
+  const platform = await onlinePlatform();
+  base = platform.origin;
+  const online = flow.online ? platform.session(ctx, page) : null;
   const api = helpers(page, base, flow.id);
   try {
     await flow.run({ page, ctx, base, note, online, browserName: opts.browser, ...api });

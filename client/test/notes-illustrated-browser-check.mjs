@@ -1,13 +1,13 @@
 // Independent browser smoke for the live Notes surface. Source-count tests
 // cannot certify a rendered figure, a hidden answer or a functional tablet UI.
 import assert from 'node:assert/strict';
-import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join, dirname, extname, normalize, sep } from 'node:path';
+import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { chromium, webkit } from '@playwright/test';
+import { startOnlinePlatform } from './support/online-session.mjs';
+import { createVerifiedProfile } from './support/verified-onboarding.mjs';
 import { IN_CURRICULUM } from '../src/engine/curriculum-in.js';
 import { loadNotesForGrade } from '../src/notes/notesIndex.js';
 const root=join(dirname(fileURLToPath(import.meta.url)),'..');
@@ -17,18 +17,10 @@ if(!process.argv.includes('--no-build')) {
   assert.equal(b.status,0,'current client build must pass');
 }
 assert.ok(existsSync(join(dist,'index.html')),'built client missing');
-const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon','.woff2':'font/woff2','.webmanifest':'application/manifest+json'};
-const server=createServer(async(req,res)=>{
-  const pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
-  const safe=normalize(pathname).replace(/^\/+/, '');
-  if(safe==='..'||safe.startsWith('..'+sep)){res.writeHead(403).end();return;}
-  let file=join(dist,safe);
-  if(!existsSync(file)||safe==='')file=join(dist,'index.html');
-  try{const bytes=await readFile(file);res.writeHead(200,{'Content-Type':types[extname(file)]||'application/octet-stream'}).end(bytes);}
-  catch{res.writeHead(404).end();}
-});
-await new Promise(ok=>server.listen(0,'127.0.0.1',ok));
-const url='http://127.0.0.1:'+server.address().port;
+// Serve the built application and production /v1 middleware from one origin.
+// The email adapter is synthetic; the signup, session and first sync are real.
+const platform=await startOnlinePlatform({ dist });
+const url=platform.origin;
 // Two high-diagram chapters from EVERY grade: cover graphics, data, geometry,
  // trigonometry, distributions, and probability on desktop and Apple WebKit.
 const chapters=[
@@ -56,9 +48,7 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
  try {
   const page=await browser.newPage({viewport:{width:name==='webkit'?390:1024,height:844},reducedMotion:'reduce'});
   await page.goto(url+'/',{waitUntil:'domcontentloaded'});
-  await page.getByText('Try the demo',{exact:false}).first().click();
-  // The demo's greeting depends on time and timezone. The real app shell,
-  // rather than 'Good morning', is the stable sign-in/demo completion signal.
+  await createVerifiedProfile(page,platform,{name:'Illustrated Notes Learner',year:12});
   await page.locator('.shell').waitFor({state:'visible',timeout:20000});
   for(const id of selected){
    await page.goto(url+'/notes/'+id+'?track=cbse',{waitUntil:'domcontentloaded'});
@@ -99,4 +89,4 @@ for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
  } finally {await browser.close();}
 }
 console.log('NOTES VISUAL BROWSER: PASS — '+checks+' assertions across '+selected.length+' chapters spanning Classes 7–12, Chromium desktop and WebKit phone; bounded diagram rendering, accessible vectors, withheld solutions, reveal and safe references');
-} finally {await new Promise(ok=>server.close(ok));}
+} finally {await platform.close();}

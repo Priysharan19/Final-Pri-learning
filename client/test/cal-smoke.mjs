@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
 import { TEMPLATES } from '../src/ink/templates.js';
+import { onlinePlatform } from './support/online-session.mjs';
 
 const TEACH = ['0', '1'];             // the first two prompts the flow walks
 const GLYPH_W = 60;
@@ -46,7 +47,7 @@ export const flow = {
 
   async run({ page, base, check, goto, createProfile, settle }) {
     await goto('/');
-    await createProfile({ name: 'Sofia Kovalevskaya', year: 10 });
+    const firstAccount = await createProfile({ name: 'Sofia Kovalevskaya', year: 10, course: 'in' });
 
     // ── 1 · nothing is learned yet ───────────────────────────────────────────
     await page.goto(`${base}/settings`, { waitUntil: 'domcontentloaded' });
@@ -103,6 +104,18 @@ export const flow = {
     await page.getByRole('menuitem', { name: 'Switch profile' }).click();
     await page.waitForSelector('.acct-list', { timeout: 30000 });
     await page.locator('.acct-row', { hasText: 'Sofia Kovalevskaya' }).click();
+    await page.waitForSelector('[data-testid="account-activation-gate"]', { timeout: 30000 });
+    // Session is now bound to Maryam's account. Re-verify Sofia through the
+    // normal email code before opening her private handwriting templates.
+    const platform = await onlinePlatform();
+    platform.h.db.prepare("DELETE FROM rate_limits WHERE bucket LIKE 'otp-%'").run();
+    await page.locator('#signup-destination').fill(firstAccount.email);
+    await page.getByTestId('signup-send-code').click();
+    await page.locator('[data-signup-step="code"]').waitFor({ timeout: 15000 });
+    const code = platform.sms.readTestOutbox({ to: firstAccount.email, channel: 'email' }).at(-1)?.code;
+    if (!/^\d{6}$/.test(code || '')) throw new Error('Returning profile did not receive a verified OTP');
+    await page.locator('#signup-code-0').focus();
+    await page.keyboard.type(code);
     await page.waitForSelector('.user-chip:has-text("Sofia")', { timeout: 30000 });
     await page.goto(`${base}/settings`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.card:has-text("Personal templates learned")', { timeout: 30000 });
