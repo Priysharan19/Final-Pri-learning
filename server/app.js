@@ -20,6 +20,7 @@ import { trustedProxyHops } from './platform/config.js';
 import { securityHeaders } from './platform/headers.js';
 import { asStore } from './platform/store.js';
 import { logEvent, requestContext, routeTemplate, safeCode, safeLogFields } from './platform/observability.js';
+import { requestTiming, timingLogFields } from './platform/requestTiming.js';
 import { recordHttpResponse } from './platform/metrics.js';
 import { releaseShaForLogs } from './platform/releaseIdentity.js';
 import { rejectUnsafeText } from './platform/text.js';
@@ -66,7 +67,9 @@ export function requestLogger(log = null, { engine = null } = {}) {
         ms,
         code: res.locals.errorCode || undefined,
         release: releaseShaForLogs(),
-        db
+        db,
+        // Where the time went (requestTiming.js): counts and milliseconds only.
+        ...timingLogFields(req.priTiming)
       };
       const level = res.statusCode >= 500 ? 'error' : 'info';
       if (typeof log === 'function') log(safeLogFields({ ts: new Date().toISOString(), level, event: 'http_request', ...fields }));
@@ -113,6 +116,9 @@ export async function createServerApp(db, {
   // bytes and store only provider ids, statuses and digests; a 400 for a NUL in
   // a customer-controlled field (subscription notes) would make the provider
   // retry until it gives up, losing the entitlement change.
+  // After the body parsers: the timing context must be entered on the path
+  // that actually reaches the handlers (requestTiming.js).
+  app.use('/v1', requestTiming());
   app.use('/v1', rejectUnsafeText({ exemptBody: [/^\/sync\/push\/?$/, /^\/billing\/webhook\/[^/]+\/?$/] }));
 
   ensureBillingSchema(db);

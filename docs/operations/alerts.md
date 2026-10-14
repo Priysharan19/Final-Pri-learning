@@ -29,6 +29,24 @@ never ids or paths.
 Metrics are **per replica and in memory**: they reset on restart and on deploy. With more than
 one replica, query each or alert on logs instead.
 
+### Where one request's time went
+
+Every `http_request` log line also carries that request's own meter
+(`server/platform/requestTiming.js`) — counts and milliseconds only, never SQL, a parameter,
+an identifier or content:
+
+| Field | Meaning |
+|---|---|
+| `dbStatements`, `dbRoundTrips`, `dbTransactions` | the handler's statements; wire round trips including `BEGIN`/`COMMIT`, the account lock and the account scope; transactions begun |
+| `dbMs` | time inside those round trips. `dbMs / dbRoundTrips` is the app-to-database round-trip time: tens of milliseconds or more means the app and the database are in different regions |
+| `dbAcquireMs` | time waiting for a pooled connection (opening one included) or for an account's lock queue |
+| `authMs`, `eligibilityMs`, `limitMs`, `providerMs`, `markerMs`, `commitMs`, `serializeMs` | session lookup; guardian-consent gate; rate limit, AI allowance and paid ceiling; the paid reader; marker queue + marking; the committing transaction; writing the reply |
+
+`PRI_SERVER_TIMING=1` additionally sends the same numbers as a `Server-Timing` response header,
+only to a request that carried a valid session (never to an anonymous caller: a statement count is
+a precise side channel). Leave it unset in production unless diagnosing. The statement and
+round-trip counts of the hot paths are pinned by `server/test/hot-path-budget-check.mjs`.
+
 ## 2. The alerts
 
 The thresholds in the table are the code (`ALERT_RULES[].thresholds` in

@@ -83,7 +83,12 @@ const FIELD_SHAPES = Object.freeze({
   kind: value => KINDS.has(value),
   outcome: value => OUTCOMES.has(value),
   state: value => STATES.has(value),
-  retryable: value => typeof value === 'boolean'
+  retryable: value => typeof value === 'boolean',
+  // Where one request's time went (requestTiming.js). Bounded numbers only.
+  ...Object.fromEntries(['dbStatements', 'dbRoundTrips', 'dbTransactions']
+    .map(name => [name, value => Number.isInteger(value) && value >= 0 && value <= 1_000_000])),
+  ...Object.fromEntries(['dbMs', 'dbAcquireMs', 'authMs', 'eligibilityMs', 'limitMs', 'providerMs', 'markerMs', 'commitMs', 'serializeMs']
+    .map(name => [name, value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 3_600_000]))
 });
 
 export const LOG_FIELDS = Object.freeze(Object.keys(FIELD_SHAPES));
