@@ -395,14 +395,18 @@ async function main() {
     process.stdout.write(`${result.status.toUpperCase()} (${formatDuration(result.durationMs)})\n`);
   }
 
-  let commit = process.env.GITHUB_SHA || 'unknown';
-  if (commit === 'unknown' && existsSync(path.join(ROOT, '.git'))) {
+  // PR health checks out the reviewed head, whereas GITHUB_SHA often
+  // names GitHub's ephemeral merge commit. Report the checked source, not
+  // an unrelated virtual commit identity.
+  let commit = 'unknown';
+  if (existsSync(path.join(ROOT, '.git'))) {
     const git = await runCommand({
       id: 'git-head', subsystem: 'metadata', severity: 'P2', blocking: false,
       command: ['git', ['rev-parse', 'HEAD']], timeoutMs: 5000, fixArea: '', action: ''
     });
     if (git.status === 'pass') commit = git.evidence.trim().split(/\s+/)[0];
   }
+  if (commit === 'unknown') commit = process.env.GITHUB_SHA || 'unknown';
 
   const failed = results.filter(r => r.status === 'fail');
   const blockingFailures = failed.filter(r => r.blocking).length;

@@ -38,12 +38,9 @@ jobs:
     name: Mounted app, product contracts and repair report
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    # Audit the same supported release flags as browser and native package.
-    # Tutor and uncertified exam handwriting remain disabled.
-    env:
-      PRI_FEATURE_PLACEMENT: '1'
-      PRI_FEATURE_EXTENDED_TRACKS: '1'
-      PRI_FEATURE_AUSTRALIA: '1'
+    # Build and compare the exact V1 shipping feature set. The mounted E2E
+    # runner independently enables non-V1 tracks in its own test-only build;
+    # those flags must not affect the packaged iPad source parity check.
     outputs:
       blocking: ${{ steps.health.outputs.blocking }}
       verdict: ${{ steps.health.outputs.verdict }}
