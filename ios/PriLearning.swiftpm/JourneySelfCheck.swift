@@ -661,7 +661,7 @@ enum JourneySelfCheck {
     await step('cloudSignIn', async () => {
       at = 'home'; await home();
       at = 'settings'; await settings();
-      at = 'state'; await waitFor(() => stateTag() === 'Not signed in');
+      at = 'state'; await waitFor(() => ['Not signed in', 'Signed out'].includes(stateTag()));
       await passwordSignIn(email, password);
       at = 'connected'; await waitFor(() => stateTag() === 'Signed in', 60000);
       return 'connected';

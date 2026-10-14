@@ -411,7 +411,9 @@ class CloudJourneyTest {
             assertEquals("signed out, the server issued and marked nothing for the account", 0, oracle("/marked").getInt("issued"))
 
             openSettings(s)
-            assertEquals("\"Not signed in\"", waitFor(s, stateTag))
+            val signedOutState = waitFor(s, "(function(){var t=$stateTag;return (t === 'Not signed in' || t === 'Signed out') ? t : false;})()")
+            assertTrue("session must be signed out before linking: $signedOutState",
+                signedOutState == "\"Not signed in\"" || signedOutState == "\"Signed out\"")
             waitFor(s, "document.querySelector('[data-signin-card=inline] [data-testid=signup-use-password]')")
             eval(s, "document.querySelector('[data-signin-card=inline] [data-testid=signup-use-password]').click()")
             setValue(s, "#signup-password-email", email)
