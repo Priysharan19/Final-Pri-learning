@@ -3,9 +3,11 @@ import { cloud } from '../platform/cloudTransport.js';
 import { linkSignedInAccount } from '../platform/cloudAccount.js';
 import { ensureAccountActivated } from '../platform/accountActivation.js';
 import SignUpFlow from './SignUpFlow.jsx';
+import { tLater, useT } from '../i18n/index.js';
 
 /** Entirely outside the app's navigation shell; never mounts Practice behind a modal. */
 export default function AccountActivationGate({ user, onReady, onSwitch }) {
+  const t = useT();
   const [status, setStatus] = useState('checking');
   const [issue, setIssue] = useState('');
   const [error, setError] = useState('');
@@ -18,7 +20,7 @@ export default function AccountActivationGate({ user, onReady, onSwitch }) {
 
   const classify = useCallback((err) => {
     const code = err?.code || '';
-    setIssue(err?.message || 'We could not complete your account setup.');
+    setIssue(err?.message || tLater('activation.error'));
     if (code === 'ACCOUNT_NOT_LINKED' || code === 'SIGN_IN_REQUIRED' || code === 'ACCOUNT_MISMATCH') setStatus('signin');
     else if (code === 'GUARDIAN_CONSENT_PENDING') setStatus('guardian');
     else if (code === 'GUARDIAN_CONSENT_WITHDRAWN' || code === 'AGE_DECLARATION_REQUIRED' || code === 'ACCOUNT_ACCESS_DENIED') setStatus('blocked');
@@ -52,7 +54,7 @@ export default function AccountActivationGate({ user, onReady, onSwitch }) {
         if (state?.required === false || state?.state === 'given') void check();
         else if (state?.state === 'withdrawn') {
           setStatus('blocked');
-          setIssue('Your parent or guardian has withdrawn permission.');
+          setIssue(tLater('activation.withdrawn'));
         }
       }).catch(() => {});
     };
@@ -79,63 +81,63 @@ export default function AccountActivationGate({ user, onReady, onSwitch }) {
       });
       setRequestSent(true);
       if (result?.alreadyApproved) void check();
-    } catch (err) { setError(err?.message || 'Could not contact your guardian. Please try again.'); }
+    } catch (err) { setError(err?.message || tLater('activation.guardianSendError')); }
     finally { setSending(false); }
   }
 
   return (
     <div className="auth-wrap" data-testid="account-activation-gate">
       <div className="auth-col" style={{ maxWidth: 540, padding: '24px 18px' }}>
-        <div className="hero-kicker">PRI LEARNING · ACCOUNT SETUP</div>
-        <h1 style={{ margin: '18px 0 6px', fontSize: 'clamp(1.6rem, 4vw, 2.2rem)' }}>One account. Ready to learn.</h1>
-        <p className="muted" style={{ marginBottom: 20 }}>Finish account verification and sync before entering the app. Your saved work on this device will not be deleted.</p>
-        {status === 'checking' && <p role="status" data-testid="activation-checking">Checking your account and syncing your profile…</p>}
+        <div className="hero-kicker">{t('activation.kicker')}</div>
+        <h1 style={{ margin: '18px 0 6px', fontSize: 'clamp(1.6rem, 4vw, 2.2rem)' }}>{t('activation.title')}</h1>
+        <p className="muted" style={{ marginBottom: 20 }}>{t('activation.intro')}</p>
+        {status === 'checking' && <p role="status" data-testid="activation-checking">{t('activation.checking')}</p>}
         {status === 'signin' && (
           <>
-            <p role="status">{issue || 'Sign in to connect this profile.'}</p>
+            <p role="status">{issue || t('activation.signinHint')}</p>
             <SignUpFlow initialMode="signin" reuseExistingProfile onCancel={onSwitch} onFinish={finishExisting} />
           </>
         )}
         {status === 'guardian' && (
           <div className="card" data-testid="activation-guardian">
-            <h2>Waiting for parent or guardian approval</h2>
-            <p>Approval is required before this account can use the main app. We'll automatically continue when your parent confirms.</p>
+            <h2>{t('activation.waiting')}</h2>
+            <p>{t('activation.waitDetails')}</p>
             <form onSubmit={sendGuardian} className="signup-form">
-              <label className="label" htmlFor="activation-parent-name">Parent or guardian's name</label>
+              <label className="label" htmlFor="activation-parent-name">{t('signup.parentNameLabel')}</label>
               <input className="input" id="activation-parent-name" value={guardianName} maxLength={80}
                 onChange={e => setGuardianName(e.target.value)} required />
-              <label className="label" htmlFor="activation-parent-email">Their email address</label>
+              <label className="label" htmlFor="activation-parent-email">{t('signup.parentEmailLabel')}</label>
               <input className="input" id="activation-parent-email" type="email" value={guardianEmail}
                 onChange={e => setGuardianEmail(e.target.value)} maxLength={160} required />
               <button className="btn btn-primary" disabled={sending} type="submit">
-                {sending ? 'Sending…' : requestSent ? 'Resend approval email' : 'Send approval email'}
+                {sending ? t('signup.sending') : requestSent ? t('activation.resend') : t('activation.send')}
               </button>
             </form>
-            {requestSent && <p role="status">Request sent. Ask your parent to follow the link in their email. This screen checks automatically.</p>}
+            {requestSent && <p role="status">{t('activation.requestSent')}</p>}
             {error && <p className="error-box" role="alert">{error}</p>}
-            <button className="linklike" type="button" onClick={() => void check()}>Check approval now</button>
+            <button className="linklike" type="button" onClick={() => void check()}>{t('activation.checkApproval')}</button>
           </div>
         )}
         {status === 'blocked' && (
           <div className="card" role="alert">
-            <h2>Account approval needs attention</h2>
+            <h2>{t('activation.needsAttention')}</h2>
             <p>{issue}</p>
-            <p>For an incorrect age classification, contact support to request a secure correction. Changing a checkbox cannot override a guardian decision.</p>
-            <button className="btn btn-ghost" type="button" onClick={() => void check()}>Check again</button>
+            <p>{t('activation.ageCorrection')}</p>
+            <button className="btn btn-ghost" type="button" onClick={() => void check()}>{t('activation.checkAgain')}</button>
           </div>
         )}
         {status === 'retry' && (
           <div className="card" role="alert">
-            <h2>Setup is not complete</h2>
+            <h2>{t('activation.notComplete')}</h2>
             <p>{issue}</p>
-            <button className="btn btn-primary" type="button" onClick={() => void check()}>Retry account setup</button>
+            <button className="btn btn-primary" type="button" onClick={() => void check()}>{t('activation.retrySetup')}</button>
           </div>
         )}
         <div style={{ marginTop: 18 }}>
-          <button type="button" className="linklike" onClick={onSwitch}>Use another profile</button>
+          <button type="button" className="linklike" onClick={onSwitch}>{t('activation.switchProfile')}</button>
         </div>
         <p className="muted" style={{ marginTop: 16, fontSize: 12 }}>
-          <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
+          <a href="/privacy">{t('activation.privacy')}</a> · <a href="/terms">{t('activation.terms')}</a>
         </p>
       </div>
     </div>

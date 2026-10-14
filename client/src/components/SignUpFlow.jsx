@@ -182,7 +182,7 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
 
   async function completeWithTicket() {
     if (!name.trim()) { setError(tLater('signup.nameRequired')); return; }
-    if (age === null || year === null) { setError('Choose your age and class first.'); return; }
+    if (age === null || year === null) { setError(tLater('signup.ageClassRequired')); return; }
     setBusy('verify'); setError('');
     try {
       const deviceId = await cloudDeviceId();
@@ -246,7 +246,7 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
 
   async function finish(signedInAccount = account) {
     if (finishingRef.current) return;
-    if (!signedInAccount?.id) { setError('Verify your email before continuing.'); return; }
+    if (!signedInAccount?.id) { setError(tLater('signup.verifyBeforeContinue')); return; }
     finishingRef.current = true;
     setBusy('finish'); setError('');
     try {
@@ -255,7 +255,7 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
       if (state.required && state.state !== 'given') {
         setBusy('');
         if (step !== 'parent-wait') go('parent');
-        setError('Parent or guardian approval is required before entering the app.');
+        setError(tLater('signup.guardianBeforeHome'));
         return;
       }
       await onFinish({ account: signedInAccount, name: name.trim() || signedInAccount?.name || '', year: year || 9, track });
@@ -443,8 +443,8 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
           </button>
           <button type="button" className="linklike" onClick={() => void cloud.guardianState().then(state => {
             if (state?.required === false || state?.state === 'given') void finish(account);
-            else setError('Still waiting for approval. Ask your guardian to confirm their email.');
-          }).catch(fail)} data-testid="signup-parent-check">Check approval now</button>
+            else setError(tLater('signup.stillWaitingApproval'));
+          }).catch(fail)} data-testid="signup-parent-check">{t('activation.checkApproval')}</button>
         </div>
       </>
     );
