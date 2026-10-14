@@ -82,6 +82,9 @@ function audit(item,section){
    vals=[p.x];
   }else if(k==='stacked'){
    vals=p.groups.map(g=>100*g[p.focusIndex]/sum(g));
+   const winner=vals[0]>=vals[1]?'A':'B';
+   assert.ok(item.answer.includes('Class '+winner),'displayed winning class differs from fractions');
+   if(winner==='B')vals.reverse(); // student answer states winner first, then runner-up
    assert.equal(item.figure.groups.length,p.groups.length);
    item.figure.groups.forEach((f,i)=>assert.deepEqual(f.segments,p.groups[i]));
   }else if(k==='stacked-single')vals=[100*p.values[p.focusIndex]/sum(p.values)];
