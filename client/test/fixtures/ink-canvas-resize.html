@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<style>
+:root { --ink: #111; }
+body { background:#fff; color:#111; margin:20px; }
+.ink-wrap { position: relative; width:100%; }
+.ink-canvas { position:absolute; left:0; top:0; }
+.ink-canvas-base { pointer-events:none; }
+.ink-canvas-live { touch-action:none; }
+</style>
+</head>
+<body><div id="root"></div><script type="module" src="/test/fixtures/ink-canvas-resize.jsx"></script></body>
+</html>
