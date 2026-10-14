@@ -120,14 +120,14 @@ export const class9Linear202627 = {
       hint:'All three coefficients must have the same ratio.',
       steps:['The second left-hand side doubles the first.','The right-hand side must also double: k=12.','For any k other than 12, the lines are parallel and distinct.'],
       answer:'k=12, otherwise no solution',commonWrong:'Thinking a proportional normal vector gives one intersection.',
-      proof:{kind:'parameter',equation:[1,2,6],factor:2,k:12}
+      proof:{kind:'parameter',equation:[1,2,6],second:[2,4],factor:2,k:12}
     },
     {
       id:'pl9-lin-q12', archetype:'parameter-coincidence', question:'Determine k for infinitely many solutions of 3x-y=8 and 6x-2y=k. What if k differs?',
       hint:'Scale the constant along with both coefficients.',
       steps:['Twice the first equation is 6x-2y=16.','Therefore k=16 gives coincident lines.','Every other k gives inconsistent parallel lines.'],
       answer:'k=16, otherwise no solution',commonWrong:'Retaining constant 8 after doubling the left-hand side.',
-      proof:{kind:'parameter',equation:[3,-1,8],factor:2,k:16}
+      proof:{kind:'parameter',equation:[3,-1,8],second:[6,-2],factor:2,k:16}
     }
   ]
 };
