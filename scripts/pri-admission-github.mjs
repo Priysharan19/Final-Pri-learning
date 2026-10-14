@@ -8,7 +8,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {
-  appendGrant, assertLedgerMatchesGrants, inspectSignedLog, issueIdentity, eventDigest, assertAppendOnlyHistory, revokeAuthoritativeGrant
+  appendGrant, assertLedgerMatchesGrants, inspectSignedLog, issueIdentity, eventDigest, verifyAuthorityHistory, revokeAuthoritativeGrant
 } from './pri-admission-state.mjs';
 
 const REPO=process.env.GITHUB_REPOSITORY || '';
@@ -55,33 +55,23 @@ async function fileVersion(revision) {
 }
 async function readAuthority() {
   const head=await reference();
-  let cursor=head, child=null, current=null, genesis=false;
-  // A signed log may be rolled back by a normal fast-forward Git commit.
-  // Verify every append-only parent transition to its empty genesis.
-  for(let n=0;n<1000;n++) {
-    const commit=await get('commits/'+cursor);
-    ensure(Array.isArray(commit.parents) && commit.parents.length===1,
-      'AUTHORITY_MERGE_OR_ROOT_UNTRUSTED');
-    ensure(commit.files?.length===1 && commit.files[0].filename===FILE,
-      'AUTHORITY_UNRELATED_FILE_CHANGE');
-    const entry=await fileVersion(cursor);
-    if(child) assertAppendOnlyHistory(child,entry);
-    if(!current) current=entry;
-    if(Array.isArray(entry.events) && entry.events.length===0) {
-      try { await fileVersion(commit.parents[0].sha); }
-      catch(e) {
-        if(!String(e.message).includes('GITHUB_GET_404_')) throw e;
-        genesis=true;
-      }
-      ensure(genesis,'AUTHORITY_GENESIS_NOT_NEW');
-      break;
-    }
-    child=entry;
-    cursor=commit.parents[0].sha;
-  }
-  ensure(genesis && current,'MISSING_APPEND_ONLY_GENESIS');
-  return {head,log:current};
+  const genesisSha=process.env.PRI_AUTHORITY_GENESIS_SHA;
+  return verifyAuthorityHistory({
+    head,genesisSha,filePath:FILE,
+    loadCommit:sha=>get('commits/'+sha),
+    loadLog:sha=>fileVersion(sha)
+  });
 }
+async function assertProtectionReadOnly() {
+  const branch=await get('branches/'+encodeURIComponent(REF));
+  ensure(branch.protected===true,'AUTHORITY_REF_NOT_PROTECTED');
+  const rules=await get('rules/branches/'+encodeURIComponent(REF));
+  ensure(Array.isArray(rules) &&
+    rules.some(r=>r.type==='non_fast_forward') &&
+    rules.some(r=>r.type==='deletion'),
+    'AUTHORITY_FORCE_OR_DELETE_PROTECTION_MISSING');
+}
+
 async function assertProtection() {
   const branch=await get('branches/'+encodeURIComponent(REF)+'/protection');
   ensure(branch.enforce_admins?.enabled===true && branch.allow_force_pushes?.enabled===false
@@ -121,13 +111,47 @@ async function inspectRemote(nowMs, strict=true) {
   return {mainSha,issues,auth,replay,ledger};
 }
 async function verifyOnly() {
-  // Pull-request checks use a read-only token. Signatures, exact main and
-  // protected Git ancestry suffice here; only the privileged transaction
-  // must query admin-only branch-protection configuration.
+  await assertProtectionReadOnly();
   const inspected=await inspectRemote(Date.now());
-  ensure(inspected.ledger.live_writers<=2,'WRITER_CAP');
-  console.log(JSON.stringify({decision:'VERIFIED',main_sha:inspected.mainSha,
-    authority_head:inspected.auth.head,...inspected.ledger}));
+  const number=Number(process.env.EXPECTED_PR_NUMBER);
+  const head=process.env.EXPECTED_PR_HEAD;
+  ensure(Number.isInteger(number) && number>0 && /^[a-f0-9]{40}$/.test(String(head||'')),
+    'PR_EXACT_HEAD_PROVENANCE_REQUIRED');
+  const pr=await get('pulls/'+number);
+  ensure(pr.number===number && pr.state==='open' && pr.head?.sha===head &&
+    pr.head?.repo?.full_name===REPO && pr.base?.repo?.full_name===REPO &&
+    pr.base?.ref==='main' && pr.base?.sha===inspected.mainSha,
+    'PR_HEAD_OR_BASE_CHANGED');
+  const matching=inspected.issues.filter(x=>!x.pull_request && x.state==='open' &&
+    String(x.title||'').startsWith('[PRI-MISSION]') &&
+    issueIdentity(x).branch===pr.head.ref);
+  ensure(matching.length===1,'AMBIGUOUS_OR_MISSING_MISSION_ISSUE');
+  const mission=issueIdentity(matching[0]);
+  ensure(mission.branch==='agent/mission/'+mission.agent+'/'+mission.mission,
+    'MISSION_BRANCH_ID_MISMATCH');
+  const grant=inspected.replay.live.find(g=>g.issue_number===matching[0].number);
+  ensure(grant && grant.mission===mission.mission && grant.agent===mission.agent &&
+    grant.branch===mission.branch && grant.risk===mission.risk &&
+    grant.head_sha===head && grant.base_sha===mission.base_sha &&
+    grant.main_sha===inspected.mainSha &&
+    eventDigest(grant)===parseMarker(matching[0].body,'Pri-Lease-Grant-ID'),
+    'MISSING_SCOPE_BOUND_SIGNED_CURRENT_HEAD_GRANT');
+  const files=await allPages('pulls/'+number+'/files');
+  ensure(files.length>0 && files.length===pr.changed_files,'INCOMPLETE_EXACT_PR_DIFF');
+  for(const f of files) for(const filename of
+    [f.filename,...(f.previous_filename?[f.previous_filename]:[])]) {
+    ensure(mission.paths.some(p=>fileMatches(p,filename)),'WRITER_SCOPE_ESCAPES_'+filename);
+    const routed=run([join(process.cwd(),'scripts/pri-fleet.mjs'),'route',filename]);
+    ensure(routed.ok,'WRITER_FILE_OWNER_UNKNOWN_'+filename);
+    const owner=JSON.parse(routed.stdout);
+    ensure(owner.owned===true && owner.primary===mission.agent,
+      'WRITER_FILE_OWNER_MISMATCH_'+filename);
+  }
+  console.log(JSON.stringify({decision:'EXACT_PR_SIGNED_GRANT_VERIFIED',pr_number:number,
+    head_sha:head,issue_number:matching[0].number,mission:mission.mission,
+    agent:mission.agent,risk:mission.risk,paths:mission.paths,
+    expiry_ms:grant.expiry_ms,authority_head:inspected.auth.head,
+    event_digest:eventDigest(grant),checked_files:files.length}));
 }
 async function commitSignedTransaction(inspected,next,request,runId) {
   inspectSignedLog(next,PUBKEY,Date.now());
@@ -157,7 +181,7 @@ async function transactRevocation(request,inspected,actor,runId,nowMs,secret) {
   let current;
   try { current=await get('issues/'+request.issue_number); }
   catch(e) {
-    if(!String(e.message).includes('GITHUB_GET_404_')) throw e;
+    if(!/GITHUB_GET_(404|410)_/.test(String(e.message))) throw e;
     current={state:'missing'};
   }
   if(current.state==='open' && String(current.title||'').startsWith('[PRI-MISSION]')) {
