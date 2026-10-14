@@ -153,7 +153,10 @@ try {
   c.ok(logLines.every(line => typeof line.requestId === 'string' && line.requestId.length > 0), 'every log line carries a request id (minted when the client sent none)');
   c.ok(logLines.every(line => /^[0-9a-f]{40}$|^development-unknown$|^unknown$/.test(line.release) && line.db === 'sqlite'), 'every log line names the release SHA and the database engine');
   const allowedKeys = new Set(['ts', 'level', 'event', 'requestId', 'method', 'route', 'status', 'ms', 'code', 'release', 'db']);
-  c.ok(logLines.every(line => Object.keys(line).every(key => allowedKeys.has(key))), 'log lines carry no other fields');
+  // The request's own meter (platform/requestTiming.js): a closed list of
+  // names, and every value a non-negative number — never text.
+  const timingKeys = new Set(['dbStatements', 'dbRoundTrips', 'dbTransactions', 'dbMs', 'dbAcquireMs', 'authMs', 'eligibilityMs', 'limitMs', 'providerMs', 'markerMs', 'commitMs', 'serializeMs']);
+  c.ok(logLines.every(line => Object.keys(line).every(key => allowedKeys.has(key) || (timingKeys.has(key) && typeof line[key] === 'number' && line[key] >= 0))), 'log lines carry no other fields');
   c.ok(!serialized.includes('someone@example.test') && !serialized.includes('token=abc') && !serialized.includes('?'), 'query strings never reach the log');
   c.ok(!serialized.includes('headers.student@example.test') && !serialized.includes('correct-horse-battery') && !/pri_cloud_session/.test(serialized), 'bodies and cookies never reach the log');
   c.ok(logLines.some(line => line.requestId === 'req-abc.1'), 'a well-formed X-Pri-Request-Id is echoed for correlation');
