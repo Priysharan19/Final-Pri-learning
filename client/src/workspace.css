@@ -48,6 +48,9 @@
 .photo-line-n { font-size: 12px; color: var(--ink-3); text-align: right; font-variant-numeric: tabular-nums; }
 .photo-line-text { width: 100%; min-width: 0; }
 .photo-line-note { grid-column: 2 / -1; font-size: 12.5px; color: var(--ink-2); }
+.photo-line-verdict { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 5px; align-items: baseline; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); }
+.photo-line-verdict.is-break { color: var(--ink); font-weight: 600; }
+.photo-line-step-note { font-weight: 400; overflow-wrap: anywhere; }
 .photo-line.is-check .photo-line-text { border-color: var(--hairline-strong); border-style: dashed; }
 .photo-line.is-check .photo-line-note { color: var(--ink); font-weight: 600; }
 .photo-line.is-out .photo-line-text { text-decoration: line-through; color: var(--ink-3); }
