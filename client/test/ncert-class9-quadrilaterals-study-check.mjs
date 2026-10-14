@@ -26,7 +26,11 @@ for(const x of [...pack.workedExamples,...pack.questions]){
   eq(p.D,half(p.A,p.B),'D midpoint AB');
   eq(p.E,half(p.A,p.C),'E midpoint AC');
   eq(sub(p.C,p.B),sub(add(p.E,p.E),add(p.D,p.D)),'BC=2DE');
-  assert.ok(x.answer.includes('DE∥BC'));checks++;
+  const de=sub(p.E,p.D),bc=sub(p.C,p.B);
+  assert.equal(de[0]**2+de[1]**2,p.DE2,'DE squared from coordinates');
+  assert.equal(bc[0]**2+bc[1]**2,4*p.DE2,'BC squared from coordinates');
+  assert.ok(x.answer.includes('DE='+p.DEtext)&&x.answer.includes('BC='+p.BCtext),'incorrect student-facing midsegment lengths');
+  assert.ok(x.answer.includes('DE∥BC'));checks+=4;
  }else if(p.kind==='midpoint-converse'){
   assert.equal(p.onSegment,true);assert.equal(p.parallel,true);
   assert.equal(2*p.half,p.length);
