@@ -73,6 +73,8 @@ async function assertProtectionReadOnly() {
 }
 
 async function assertProtection() {
+  // Enforce the ruleset verified by read-only jobs as well as classic protection.
+  await assertProtectionReadOnly();
   const branch=await get('branches/'+encodeURIComponent(REF)+'/protection');
   ensure(branch.enforce_admins?.enabled===true && branch.allow_force_pushes?.enabled===false
     && branch.allow_deletions?.enabled===false,'AUTHORITY_REF_NOT_PROTECTED');
