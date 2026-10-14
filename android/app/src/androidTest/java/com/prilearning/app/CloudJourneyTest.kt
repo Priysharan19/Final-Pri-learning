@@ -177,13 +177,20 @@ class CloudJourneyTest {
     }
 
     /** Move on (at most `max` questions) until one takes a typed final answer. */
-    private fun openTypedQuestion(s: ActivityScenario<MainActivity>, max: Int = 12, advanceFirst: Boolean = false) {
+    private fun openTypedQuestion(s: ActivityScenario<MainActivity>, max: Int = 12, advanceFirst: Boolean = false, requireSignInGate: Boolean = false) {
         if (advanceFirst) nextQuestion(s)
+        val seen = mutableListOf<String>()
         for (i in 0 until max) {
-            if (typedEditor(s)) return
+            val typed = typedEditor(s)
+            val needsAccount = eval(s, QuestionCardJs.visible("[data-check-needs-account]")) == "true"
+            val unmarkable = eval(s, "document.querySelector('[data-check-unmarkable]')?.getAttribute('data-check-unmarkable') || ''").trim('"')
+            seen.add("${qid(s)}:typed=$typed,needsAccount=$needsAccount,unmarkable=$unmarkable")
+            // Being typed-answer capable is not the same as being markable:
+            // restored offline drafts must never be mistaken for server-issued.
+            if (typed && (!requireSignInGate || needsAccount) && unmarkable.isEmpty()) return
             nextQuestion(s)
         }
-        throw AssertionError("no question with a typed answer in $max")
+        throw AssertionError("no typed server-prepared question satisfying account gate; examined ${seen.joinToString(" | ")}")
     }
 
     /** Press Submit and wait for the check it starts to finish; what the card then shows. */
@@ -383,7 +390,7 @@ class CloudJourneyTest {
             // Practice restores the question that was open last, which may be a
             // draft the shell journey opened with no server (never markable).
             // A question opened NOW, with the server reachable, is the server's.
-            openTypedQuestion(s, advanceFirst = true)
+            openTypedQuestion(s, advanceFirst = true, requireSignInGate = true)
             val preparedId = qid(s)
             assertEquals("the card says checking needs an account", "true", waitFor(s, QuestionCardJs.visible("[data-check-needs-account]")))
             setValue(s, ".editor-body input.answer-input", WRONG)

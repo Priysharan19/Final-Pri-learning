@@ -112,6 +112,12 @@ try {
     ['child', 'pending', 'GUARDIAN_CONSENT_PENDING', true],
     'guardian state safely names the exact live blocker'
   );
+  c.deq([r.data?.accountId, r.data?.eligible, typeof r.data?.sessionBinding],
+    [studentAccountId, false, 'string'],
+    'A pending minor receives their own server-bound, ineligible identity snapshot');
+  const minorBinding = r.data.sessionBinding;
+  c.ok(minorBinding.length === 64, 'the session binding is an opaque SHA-256 value, never the cookie token');
+
   r = await post('/guardian/request', { isAdult: true }, studentJar);
   c.deq([r.status, r.data?.error?.code], [409, 'AGE_RECLASSIFICATION_REQUIRES_REVIEW'],
     'a child cannot reclassify themself adult in a pending guardian ceremony');
@@ -246,6 +252,11 @@ try {
   c.eq(r.data?.withdrawn, 1, 'the parent withdraws');
   r = await h.request('/v1/sync/pull', { jar: kidJar });
   c.eq(r.data?.error?.code, 'GUARDIAN_CONSENT_WITHDRAWN', 'and sync stops at once');
+  const withdrawnIdentity = await h.request('/v1/account/guardian/state', { jar: kidJar });
+  c.deq([withdrawnIdentity.data?.eligible, withdrawnIdentity.data?.state, withdrawnIdentity.data?.blockerCode],
+    [false, 'withdrawn', 'GUARDIAN_CONSENT_WITHDRAWN'],
+    'a guardian withdrawal invalidates onboarding permission in the same session');
+
   // Regression: the child cannot undo a withdrawal by naming a parent again.
   resetLimits();
   r = await post('/guardian/request', { guardianName: 'Someone', channel: 'sms', destination: '9811111111' }, kidJar);
@@ -295,6 +306,23 @@ try {
   c.deq(r.data.guardianConsent, { required: false, state: 'not-required' }, 'an adult needs no parent');
   r = await post('/guardian/request', { guardianName: 'X', channel: 'sms', destination: '9988776650' }, adultJar);
   c.eq(r.status, 409, 'and cannot start a consent request');
+
+  // One consent result must never authorize another logged-in identity.
+  // Read B and the pending minor A in alternating order (A -> B -> A).
+  const adultIdentity = await h.request('/v1/account/guardian/state', { jar: adultJar });
+  const pendingIdentity = await h.request('/v1/account/guardian/state', { jar: studentJar });
+  const adultId = raw.prepare("SELECT id FROM accounts WHERE email='adult@example.test'").get().id;
+  c.deq([adultIdentity.data.accountId, adultIdentity.data.eligible, adultIdentity.data.state],
+    [adultId, true, 'not-required'], 'adult B carries its OWN eligible identity');
+  c.ok(adultIdentity.data.sessionBinding !== minorBinding, 'A and B never share a session-binding token');
+  c.deq([pendingIdentity.data.accountId, pendingIdentity.data.eligible, pendingIdentity.data.sessionBinding],
+    [studentAccountId, false, minorBinding], 'returning to pending A cannot reuse B eligibility');
+  const [delayedA, concurrentB] = await Promise.all([
+    h.request('/v1/account/guardian/state', { jar: studentJar }),
+    h.request('/v1/account/guardian/state', { jar: adultJar })
+  ]);
+  c.deq([delayedA.data.accountId, delayedA.data.eligible, concurrentB.data.accountId, concurrentB.data.eligible],
+    [studentAccountId, false, adultId, true], 'overlapping A/B consent requests retain separate server accounts');
 
   // An older authenticated account with no age basis can complete setup as a
   // child through the same route; it remains blocked until that guardian acts.

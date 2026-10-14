@@ -232,7 +232,7 @@ jobs:
           # (existing accounts, limits, sessions, the guardian gate, the email).
           node server/test/otp-lifecycle-check.mjs 2>&1 | tee otp.log
           node server/test/otp-sign-in-check.mjs 2>&1 | tee -a otp.log
-          grep -Fq 'OTP lifecycle: 110/110 checks passed' otp.log
+          grep -Fq 'OTP lifecycle: 117/117 checks passed' otp.log
           grep -Fq "OTP SIGN-IN (the sign-in card's server contract): 151/151 checks passed" otp.log
           node server/test/security-headers-check.mjs
           node server/test/login-lockout-check.mjs
