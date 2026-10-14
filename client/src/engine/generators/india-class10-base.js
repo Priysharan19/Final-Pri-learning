@@ -133,6 +133,22 @@ export const indiaClass10 = {
       return {
         prompt: `An arithmetic progression has first term $${a}$ and common difference $${d}$. Find its $${n}$th term.`,
         answerType: 'numeric', answer: { value: term },
+        // Deterministic line-by-line educational diagnosis for this one-mark
+        // nth-term question. Four independently verified operations do not
+        // create method marks: marksPossibleFor still returns exactly one.
+        stepcheck: {
+          kind: 'plan',
+          stages: [
+            { kind: 'ap-term-givens', a, d, independent: true },
+            { kind: 'ap-term-formula', canonical: 'a+(n-1)*d', independent: true },
+            { kind: 'evaluation', source: 'a+(n-1)*d', substitutions: { a, n, d },
+              expected: term, labels: [`T_${n}`, `a_${n}`, `T${n}`], independent: true },
+            { kind: 'evaluation', source: 'a+(n-1)*d', substitutions: { a, n, d },
+              expected: term, labels: [`T_${n}`, `a_${n}`, `T${n}`], requires: [2] },
+            { kind: 'ap-term-addition', source: 'a+(n-1)*d', substitutions: { a, n, d },
+              expected: term, labels: [`T_${n}`, `a_${n}`, `T${n}`], requires: [3] }
+          ]
+        },
         traps: [{ value: a + n * d, why: `The formula is $a + (n-1)d$: the first term needs no steps, so the $${n}$th term is $${n - 1}$ steps along, not $${n}$.` }].filter(t => t.value !== term),
         hints: [
           'Each term is the one before it plus the common difference.',

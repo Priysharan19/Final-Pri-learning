@@ -845,10 +845,77 @@ function derivativeSourceLine(stage, line) {
   } catch { return false; }
 }
 
+// Authored AP proof stages use the existing deterministic expression and
+// evaluation verifier. These are diagnoses, never a source of rubric marks.
+// A given or symbolic formula is a separate kind of line: do not let a valid
+// "a = 9, d = 3" be called a false *numeric* calculation.
+function assessAPTermGiven(stage, line) {
+  const text = String(line || '').trim().replace(/[−–—]/g, '-');
+  const clauses = text.split(/\s*[,;]\s*/).filter(Boolean);
+  if (!clauses.length || clauses.length > 2) return { status: 'note', trusted: false };
+  const values = {};
+  for (const clause of clauses) {
+    const parsed = clause.match(/^([ad])\s*=\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))$/i);
+    if (!parsed) return { status: 'note', trusted: false };
+    const key = parsed[1].toLowerCase();
+    const got = Number(parsed[2]);
+    const expected = Number(stage[key]);
+    if (!Number.isFinite(got) || !Number.isFinite(expected)) return { status: 'note', trusted: false };
+    if (!numsClose(got, expected, 1e-9)) {
+      const diagnosis = {
+        code: 'ap-given-copied-incorrectly', title: 'A given value was copied incorrectly',
+        message: `The question gives ${key} = ${expected}, but this line says ${key} = ${got}.`,
+        fix: 'Copy the first term and common difference from the question before substituting.',
+        confidence: 'high'
+      };
+      return { status: 'break', trusted: false, note: diagnosis.message, diagnosis };
+    }
+    values[key] = got;
+  }
+  return { status: Object.keys(values).length ? 'ok' : 'note', trusted: Object.keys(values).length > 0 };
+}
+
+function assessAPTermFormula(stage, line) {
+  const text = String(line || '').trim().replace(/[−–—]/g, '-');
+  // Never classify a numerical substitution, a list of givens or unrelated
+  // algebra as a wrong symbolic AP formula.
+  if (!/^(?:t|a)\s*_\s*n\s*=/i.test(text)) return { status: 'note', trusted: false };
+  const checked = stepCheckSingle({ kind: 'expression', canonical: stage.canonical }, text);
+  const item = checked.lines?.[0];
+  return {
+    status: item?.status === 'ok' || item?.status === 'break' ? item.status : 'note',
+    trusted: item?.status === 'ok', note: item?.note,
+    ...(item?.diagnosis ? { diagnosis: item.diagnosis } : {})
+  };
+}
+
+function assessAPTermAddition(stage, line) {
+  const assessed = assessEvaluationLine({ text: line, meta: stage });
+  if (assessed.status !== 'break' || !Number.isFinite(assessed.value)) return assessed;
+  const { a, n, d } = stage.substitutions || {};
+  if (![a, n, d].every(Number.isSafeInteger)) return assessed;
+  const product = (n - 1) * d;
+  const expected = a + product;
+  if (!Number.isSafeInteger(product) || !Number.isSafeInteger(expected) ||
+      !numsClose(expected, Number(stage.expected), 1e-9)) return assessed;
+  // The preceding verified calculation and this student's final value are
+  // contrasted; the server does not infer a step that wasn't submitted.
+  const diagnosis = {
+    code: 'ap-final-arithmetic-slip', title: 'The final arithmetic is incorrect',
+    message: `${a} + (${product}) = ${expected}, not ${assessed.value}. Your final line needs the arithmetic corrected.`,
+    fix: 'Recalculate the sum of the first term and the common-difference contribution.',
+    confidence: 'high'
+  };
+  return { ...assessed, note: diagnosis.message, diagnosis };
+}
+
 function assessPlanStage(stage, line) {
   if (!stage || typeof stage !== 'object') {
     return { status: 'note', note: 'This proof stage is not configured safely.', trusted: false };
   }
+  if (stage.kind === 'ap-term-givens') return assessAPTermGiven(stage, line);
+  if (stage.kind === 'ap-term-formula') return assessAPTermFormula(stage, line);
+  if (stage.kind === 'ap-term-addition') return assessAPTermAddition(stage, line);
   if (stage.kind === 'evaluation') return assessEvaluationLine({ text: line, meta: stage });
   if (stage.kind === 'point') return assessPointLine({ text: line, meta: stage });
   if (stage.kind === 'chained-inequality') return assessRelationChainLine({ text: line, meta: stage });
