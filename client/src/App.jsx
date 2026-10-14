@@ -131,6 +131,10 @@ export function Logo({ large = false, onClick }) {
 export default function App() {
   const [user, setUser] = useState(undefined);
   const [activated, setActivated] = useState(null);
+  // Session events can occur inside Practice during same-account recovery.
+  // Keep latest identity in a ref so its listener does not remount active work.
+  const latestActivation = useRef(null);
+  latestActivation.current = { profileId: user?.id, accountId: activated?.accountId };
   // Declared with the other top-level state: the app returns early for the
   // boot screen and the profile gate, and a hook after those would not run on
   // every render.
@@ -172,11 +176,15 @@ export default function App() {
   useEffect(() => {
     let stop = () => {};
     try {
-      stop = onCloudSessionChange(() => {
-        // The active cloud identity may have changed or signed out. Never
-        // display even one frame of the previously unlocked shell while its
-        // account binding is being refreshed.
-        setActivated(null);
+      stop = onCloudSessionChange(event => {
+        const detail = event?.detail || {};
+        const current = latestActivation.current;
+        const sameIdentity = detail.connected === true && current?.accountId &&
+          String(detail.localProfileId) === String(current.profileId) &&
+          String(detail.accountId) === String(current.accountId);
+        // Relock immediately on disconnect or identity change. A same-account
+        // refresh must leave the route mounted (including its ink/photo draft).
+        if (!sameIdentity) setActivated(null);
         api.get('/me').then(r => { if (r?.user) setUser(r.user); }).catch(() => { });
       });
     } catch { /* non-browser runtimes */ }
@@ -186,6 +194,15 @@ export default function App() {
   // A local profile is not permission to open Practice. Require the live
   // platform session, adult/guardian decision and initial cloud sync first.
   useEffect(() => { setActivated(null); }, [user?.id]);
+
+  // Only an authoritative rejection can eject the learner. A temporary
+  // outage, 429, 503 or dropped connection must not destroy unsaved work.
+  const accessDenied = new Set([
+    'SIGN_IN_REQUIRED', 'ACCOUNT_NOT_LINKED', 'ACCOUNT_MISMATCH',
+    'ACCOUNT_ACCESS_DENIED', 'GUARDIAN_CONSENT_PENDING',
+    'GUARDIAN_CONSENT_WITHDRAWN', 'AGE_DECLARATION_REQUIRED',
+    'EMAIL_UNVERIFIED', 'PROFILE_MISSING'
+  ]);
 
   // Recheck a previously activated account when the app returns to the
   // foreground. If consent is withdrawn or the session revoked, close the
@@ -197,7 +214,9 @@ export default function App() {
       try {
         const { ensureAccountActivated } = await import('./platform/accountActivation.js');
         await ensureAccountActivated(user.id, { sync: false });
-      } catch { if (live) setActivated(null); }
+      } catch (error) {
+        if (live && accessDenied.has(error?.code)) setActivated(null);
+      }
     };
     const visible = () => { if (document.visibilityState === 'visible') void recheck(); };
     document.addEventListener('visibilitychange', visible);

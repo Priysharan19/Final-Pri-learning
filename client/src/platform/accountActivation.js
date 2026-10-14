@@ -28,7 +28,11 @@ export async function ensureAccountActivated(pid, { expectedAccountId = null, sy
   }
   let session;
   try { session = await verifyCloudSession(pid); }
-  catch (error) { throw new ActivationBlocked('SESSION_UNAVAILABLE', error?.message || 'Could not verify your account. Try again.'); }
+  catch (error) {
+    if (error?.status === 401) throw new ActivationBlocked('SIGN_IN_REQUIRED', 'Sign in again to continue.');
+    if (error?.status === 403) throw new ActivationBlocked('ACCOUNT_ACCESS_DENIED', 'Your account is not permitted to enter yet.');
+    throw new ActivationBlocked('SESSION_UNAVAILABLE', error?.message || 'Could not verify your account. Try again.');
+  }
   if (!session?.connected || !session.account?.id) {
     throw new ActivationBlocked(session?.reason === 'signed-out' ? 'SIGN_IN_REQUIRED' : 'SESSION_UNAVAILABLE',
       session?.reason === 'signed-out' ? 'Sign in to continue setting up your account.' : 'Could not check your session. Try again.');
@@ -41,7 +45,11 @@ export async function ensureAccountActivated(pid, { expectedAccountId = null, sy
   }
   let guardian;
   try { guardian = await cloud.guardianState(); }
-  catch (error) { throw new ActivationBlocked('CONSENT_UNAVAILABLE', error?.message || 'Could not check your account permissions. Try again.'); }
+  catch (error) {
+    if (error?.status === 401) throw new ActivationBlocked('SIGN_IN_REQUIRED', 'Sign in again to continue.');
+    if (error?.status === 403) throw new ActivationBlocked('ACCOUNT_ACCESS_DENIED', 'Your account permissions do not allow access yet.');
+    throw new ActivationBlocked('CONSENT_UNAVAILABLE', error?.message || 'Could not check your account permissions. Try again.');
+  }
   if (!guardian || typeof guardian.required !== 'boolean') {
     throw new ActivationBlocked('CONSENT_UNAVAILABLE', 'The server did not confirm your account permissions.');
   }
@@ -55,9 +63,12 @@ export async function ensureAccountActivated(pid, { expectedAccountId = null, sy
   }
   if (sync) {
     try {
-      await syncNow(pid);
+      const report = await syncNow(pid);
       const result = await cloudSyncStatus(pid);
-      if (!result.lastSyncAt || result.accountId !== link.accountId || result.pending > 0) {
+      // Initial reconciliation must finish, but permanently blocked or queued
+      // local mutations are retained for later retry, not used to trap a student.
+      if (!report?.lastSyncAt || !result.lastSyncAt ||
+          String(result.accountId) !== String(link.accountId) || result.requiresFullRescan) {
         throw new Error('Your profile has not finished syncing. Please retry.');
       }
     } catch (error) {

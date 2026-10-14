@@ -238,6 +238,48 @@ export const flow = {
           adultState?.required === false && adultState?.state === 'not-required', JSON.stringify(adultState));
         await check('adult first sync has completed before entering the shell',
           await adult.locator('[data-testid="account-activation-gate"]').count() === 0);
+
+        // A same-account verification refresh can happen from inside Practice;
+        // it must never unmount the route or discard a photo/ink draft.
+        const linkId = await adult.evaluate(accountId => new Promise(resolve => {
+          const open = indexedDB.open('pri-learning');
+          open.onerror = () => resolve(null);
+          open.onsuccess = () => {
+            const db = open.result;
+            const request = db.transaction('device').objectStore('device').getAll();
+            request.onsuccess = () => {
+              db.close();
+              const link = request.result.find(row =>
+                row.id?.startsWith('pri-cloud-account-link-v1:') && String(row.accountId) === String(accountId));
+              resolve(link?.id?.slice('pri-cloud-account-link-v1:'.length) || null);
+            };
+            request.onerror = () => { db.close(); resolve(null); };
+          };
+        }), adultAccount.id);
+        await check('real browser has the newly linked local profile', !!linkId);
+        await adult.evaluate(({ accountId, profileId }) => {
+          window.__activationShellNode = document.querySelector('.shell');
+          window.dispatchEvent(new CustomEvent('pri:cloud-session-change', {
+            detail: { connected: true, accountId: String(accountId), localProfileId: profileId }
+          }));
+        }, { accountId: adultAccount.id, profileId: linkId });
+        await adult.waitForTimeout(300);
+        await check('same-account session refresh preserves mounted work and stays in Home',
+          await adult.evaluate(() => document.querySelector('.shell') === window.__activationShellNode) &&
+          await adult.locator('[data-testid="account-activation-gate"]').count() === 0);
+
+        // A temporary 503 while rechecking consent is not an authority
+        // revocation. Keep the working page mounted and retry when online.
+        await adult.route('**/v1/account/guardian/state', route => route.fulfill({
+          status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'temporary-outage' })
+        }));
+        await adult.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+        await adult.waitForTimeout(550);
+        await check('temporary guardian-service outage never destroys the active shell',
+          await adult.evaluate(() => document.querySelector('.shell') === window.__activationShellNode) &&
+          await adult.locator('[data-testid="account-activation-gate"]').count() === 0);
+        await adult.unroute('**/v1/account/guardian/state');
+        await adult.evaluate(() => { delete window.__activationShellNode; });
         await adult.reload({ waitUntil: 'domcontentloaded' });
         await adult.waitForSelector('.home-greet', { timeout: 30000 });
         await check('18+ returns to Home after refresh without verification or guardian prompts',

@@ -20,14 +20,22 @@ assert.match(login, /data-testid="hero-existing-device"/,
   'existing local profiles remain recoverable without wiping prior saved work');
 assert.match(app, /activated\?\.profileId !== user\.id[\s\S]*AccountActivationGate/,
   'the app shell is withheld until its local identity is explicitly activated');
-assert.match(app, /onCloudSessionChange\(\(\) => \{[\s\S]{0,320}setActivated\(null\)/,
-  'logging out or switching cloud identity must immediately relock the shell');
+assert.match(app, /onCloudSessionChange\(event => \{[\s\S]*if \(!sameIdentity\) setActivated\(null\)/,
+  'logging out or changing cloud identity must relock, not same-account recovery');
 assert.match(activation, /await verifyCloudSession\(pid\)/,
   'a local profile or link row cannot be accepted as an authenticated cloud session');
 assert.match(activation, /await cloud\.guardianState\(\)/,
   'the age and guardian verdict is checked against the server');
 assert.match(activation, /await syncNow\(pid\)/,
   'the first sync must finish before main app access');
+assert.doesNotMatch(activation, /result\.pending\s*>\s*0/,
+  'legacy permanently blocked outbox entries must not prevent first activation');
+assert.match(activation, /result\.requiresFullRescan/,
+  'first activation must wait for the initial reconciliation');
+assert.match(app, /accessDenied\.has\(error\?\.code\)/,
+  'transient network errors must not eject the student from an active lesson');
+assert.match(gate, /busy\.current = false; \};/,
+  'StrictMode cleanup must allow activation to retry after effect remount');
 assert.match(gate, /onFinish=\{finishExisting\}/,
   'existing profiles use the same verified onboarding without being recreated');
 

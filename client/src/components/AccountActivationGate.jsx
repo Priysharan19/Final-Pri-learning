@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '../api.js';
 import { cloud } from '../platform/cloudTransport.js';
 import { linkSignedInAccount } from '../platform/cloudAccount.js';
 import { ensureAccountActivated } from '../platform/accountActivation.js';
@@ -22,7 +21,7 @@ export default function AccountActivationGate({ user, onReady, onSwitch }) {
     setIssue(err?.message || 'We could not complete your account setup.');
     if (code === 'ACCOUNT_NOT_LINKED' || code === 'SIGN_IN_REQUIRED' || code === 'ACCOUNT_MISMATCH') setStatus('signin');
     else if (code === 'GUARDIAN_CONSENT_PENDING') setStatus('guardian');
-    else if (code === 'GUARDIAN_CONSENT_WITHDRAWN' || code === 'AGE_DECLARATION_REQUIRED') setStatus('blocked');
+    else if (code === 'GUARDIAN_CONSENT_WITHDRAWN' || code === 'AGE_DECLARATION_REQUIRED' || code === 'ACCOUNT_ACCESS_DENIED') setStatus('blocked');
     else setStatus('retry');
   }, []);
 
@@ -42,7 +41,7 @@ export default function AccountActivationGate({ user, onReady, onSwitch }) {
 
   useEffect(() => {
     void check();
-    return () => { generation.current++; };
+    return () => { generation.current++; busy.current = false; };
   }, [check]);
 
   useEffect(() => {
