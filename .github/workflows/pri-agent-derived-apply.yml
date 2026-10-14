@@ -196,7 +196,7 @@ jobs:
           test "$declared_mission" = "$mission"
           [[ "$declared_risk" =~ ^R[1-4]$ ]]
           node trusted/scripts/pri-mission-control.mjs validate-ledger \
-            /tmp/pri-derived-issues-write.json "$agent" "$mission" "$HEAD_REF" "$declared_risk"
+            /tmp/pri-derived-issues-write.json "$agent" "$mission" "$HEAD_REF" "$declared_risk" "$HEAD_SHA"
 
           git -C candidate cat-file -e "$BASE_SHA^{commit}"
           mapfile -t source_files < <(git -C candidate diff --name-only "$BASE_SHA...$HEAD_SHA")

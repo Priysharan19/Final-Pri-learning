@@ -14,7 +14,11 @@
       "attempt": "Pri-Attempt",
       "failure_fingerprint": "Pri-Failure-Fingerprint",
       "paths": "Pri-Paths",
-      "dependencies": "Pri-Dependencies"
+      "dependencies": "Pri-Dependencies",
+      "lease_heartbeat_at": "Pri-Lease-Heartbeat-At",
+      "lease_heartbeat_ref": "Pri-Lease-Heartbeat-Ref",
+      "lease_heartbeat_by": "Pri-Lease-Heartbeat-By",
+      "review_head": "Pri-Review-Head"
     }
   },
   "lease": {
@@ -24,7 +28,11 @@
     "fallback_max_writers": 1,
     "renew_on_progress": true,
     "stale_action": "release_and_retriage",
-    "revalidate_after_main_move": true
+    "revalidate_after_main_move": true,
+    "heartbeat_field": "Pri-Lease-Heartbeat-At",
+    "progress_ref_field": "Pri-Lease-Heartbeat-Ref",
+    "heartbeat_agent_field": "Pri-Lease-Heartbeat-By",
+    "admission_mode": "serialized_only"
   },
   "retry_policy": {
     "max_identical_failure_attempts": 3,
@@ -39,6 +47,7 @@
     "TESTING",
     "REVIEW",
     "CI",
+    "REPAIR_PENDING",
     "REPAIR",
     "MERGE_READY",
     "BLOCKED_EXTERNAL",
@@ -47,19 +56,70 @@
     "ABANDONED"
   ],
   "transitions": {
-    "DISCOVERED": ["TRIAGED", "ABANDONED"],
-    "TRIAGED": ["ACTIVE", "BLOCKED_EXTERNAL", "ABANDONED"],
-    "ACTIVE": ["IMPLEMENTING", "BLOCKED_EXTERNAL", "BLOCKED_AUTOMATION"],
-    "IMPLEMENTING": ["TESTING", "REPAIR", "BLOCKED_EXTERNAL", "BLOCKED_AUTOMATION"],
-    "TESTING": ["REVIEW", "REPAIR", "BLOCKED_AUTOMATION"],
-    "REVIEW": ["CI", "REPAIR", "BLOCKED_AUTOMATION"],
-    "CI": ["MERGE_READY", "REPAIR", "BLOCKED_EXTERNAL", "BLOCKED_AUTOMATION"],
-    "REPAIR": ["IMPLEMENTING", "TESTING", "BLOCKED_AUTOMATION", "ABANDONED"],
-    "MERGE_READY": ["DONE", "REPAIR"],
-    "BLOCKED_EXTERNAL": ["TRIAGED", "ABANDONED"],
-    "BLOCKED_AUTOMATION": ["TRIAGED", "ABANDONED"],
+    "DISCOVERED": [
+      "TRIAGED",
+      "ABANDONED"
+    ],
+    "TRIAGED": [
+      "ACTIVE",
+      "BLOCKED_EXTERNAL",
+      "ABANDONED"
+    ],
+    "ACTIVE": [
+      "IMPLEMENTING",
+      "BLOCKED_EXTERNAL",
+      "BLOCKED_AUTOMATION",
+      "REVIEW"
+    ],
+    "IMPLEMENTING": [
+      "TESTING",
+      "REPAIR",
+      "BLOCKED_EXTERNAL",
+      "BLOCKED_AUTOMATION"
+    ],
+    "TESTING": [
+      "REVIEW",
+      "REPAIR",
+      "BLOCKED_AUTOMATION"
+    ],
+    "REVIEW": [
+      "CI",
+      "REPAIR",
+      "BLOCKED_AUTOMATION",
+      "REPAIR_PENDING"
+    ],
+    "CI": [
+      "MERGE_READY",
+      "REPAIR",
+      "BLOCKED_EXTERNAL",
+      "BLOCKED_AUTOMATION",
+      "REPAIR_PENDING"
+    ],
+    "REPAIR": [
+      "IMPLEMENTING",
+      "TESTING",
+      "BLOCKED_AUTOMATION",
+      "ABANDONED"
+    ],
+    "MERGE_READY": [
+      "DONE",
+      "REPAIR",
+      "REPAIR_PENDING"
+    ],
+    "BLOCKED_EXTERNAL": [
+      "TRIAGED",
+      "ABANDONED"
+    ],
+    "BLOCKED_AUTOMATION": [
+      "TRIAGED",
+      "ABANDONED"
+    ],
     "DONE": [],
-    "ABANDONED": []
+    "ABANDONED": [],
+    "REPAIR_PENDING": [
+      "ACTIVE",
+      "TRIAGED"
+    ]
   },
   "priority": {
     "preemption_order": [

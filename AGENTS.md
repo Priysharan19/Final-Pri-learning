@@ -53,7 +53,7 @@ Critical categories preempt normal feature work in this order:
 
 ### Specialist writer
 
-Exactly one specialist holds the writer lease. New autonomous branches must be:
+At most two specialist missions may hold valid writer leases, only for distinct primary owners with disjoint authority. Source or test edits require a newly admitted lease, not merely an open PR. New autonomous branches must be:
 
 `agent/mission/<agent-id>/<mission-id>`
 
@@ -77,11 +77,11 @@ The writer may not declare its own work release-ready.
 
 GitHub Issues are the durable mission ledger. A managed issue contains the canonical markers defined in `.pri-os/mission-control.json`, including mission ID, status, agent, branch, risk, base SHA, attempt count and failure fingerprint.
 
-Only one mission may be in a writer-holding state at a time. The lease expires after 12 hours without progress and must then be released/retriaged rather than silently remaining locked forever.
+At most two distinct-owner missions may hold writer leases concurrently; the current bounded pool still fails closed on conflicts. Only explicit, authorized progress heartbeats linked to full commit SHAs renew 12-hour writer leases. Issue updates, audit comments and review comments do not renew a lease. An expired or unprovable writer record must be reconciled before new admission.
 
 Writer-holding states are:
 
-`ACTIVE`, `IMPLEMENTING`, `TESTING`, `REVIEW`, `CI`, `REPAIR`, `MERGE_READY`.
+`ACTIVE`, `IMPLEMENTING`, `TESTING`, `REPAIR` only. `REVIEW`, `CI`, `MERGE_READY` and `REPAIR_PENDING` are code-writer-free and pin their reviewed PR head; editing code in these states requires a newly admitted writer. Closed historical issues never count as live writers, but contradictory markers are audit warnings. The current CLI admission is advisory and fails closed until a serialized GitHub admission transaction exists.
 
 Future autonomous PR governance verifies that exactly one active managed issue exists, that its mission/agent/branch/risk match the PR, that its required markers are well-formed, and that the issue has been updated inside the configured lease TTL.
 

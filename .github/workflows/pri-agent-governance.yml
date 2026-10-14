@@ -272,13 +272,18 @@ jobs:
           [
             {
               "number": 1,
+              "state": "open",
               "title": "[PRI-MISSION] smoke",
               "updated_at": "$now",
-              "body": "Pri-Mission-ID: smoke\nPri-Mission-Status: ACTIVE\nPri-Agent: qa-release\nPri-Branch: agent/mission/qa-release/smoke\nPri-Risk: R2\nPri-Base-SHA: 8458a735fda3637656a8e9e23329f235b5277fb6\nPri-Attempt: 0\nPri-Failure-Fingerprint: none"
+              "body": "Pri-Mission-ID: smoke\nPri-Mission-Status: ACTIVE\nPri-Agent: qa-release\nPri-Branch: agent/mission/qa-release/smoke\nPri-Risk: R2\nPri-Base-SHA: 8458a735fda3637656a8e9e23329f235b5277fb6\nPri-Attempt: 0\nPri-Failure-Fingerprint: none\nPri-Paths: server/test/concurrency-contract-check.mjs\nPri-Lease-Heartbeat-At: $now\nPri-Lease-Heartbeat-Ref: 8458a735fda3637656a8e9e23329f235b5277fb6\nPri-Lease-Heartbeat-By: qa-release"
             }
           ]
           JSON
           node scripts/pri-mission-control.mjs validate-ledger /tmp/pri-ledger-smoke.json qa-release smoke agent/mission/qa-release/smoke R2
+
+      - name: Deterministic lease and concurrent-admission regression
+        shell: bash
+        run: node client/test/pri-mission-control-regression.mjs
 
       - name: PR lane classifier self-test
         shell: bash
@@ -369,4 +374,4 @@ jobs:
           EXPECTED_RISK: ${{ steps.meta.outputs.risk }}
         run: |
           set -euo pipefail
-          node scripts/pri-mission-control.mjs validate-ledger /tmp/pri-issues.json "$EXPECTED_AGENT" "$EXPECTED_MISSION" "$EXPECTED_BRANCH" "$EXPECTED_RISK"
+          node scripts/pri-mission-control.mjs validate-ledger /tmp/pri-issues.json "$EXPECTED_AGENT" "$EXPECTED_MISSION" "$EXPECTED_BRANCH" "$EXPECTED_RISK" "${{ github.event.pull_request.head.sha }}"
