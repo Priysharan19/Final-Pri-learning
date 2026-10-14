@@ -911,6 +911,15 @@ async function run() {
     });
 
     await step('progress · overview', '/progress', async () => {
+      // The Australian Progress page owns Priorities and Knowledge map below.
+      // The verified email-first fixture starts as CBSE: switch curriculum via
+      // the shipped authenticated profile editor, not by mutating device data.
+      await goTo(page, BASE, '/settings');
+      const profileCard = page.locator('.card').filter({ has: page.getByRole('heading', { name: 'Profile Information' }) });
+      await profileCard.getByRole('button', { name: 'Edit', exact: true }).click();
+      await page.locator('#set-course').selectOption('nsw');
+      await profileCard.getByRole('button', { name: 'Save changes' }).click();
+      await page.locator('#set-course').waitFor({ state: 'detached', timeout: 15000 });
       await goTo(page, BASE, '/progress');
       await page.waitForSelector('.band-card, .skeleton', { timeout: 20000 });
       await wait(page, 900);
@@ -1158,7 +1167,10 @@ async function run() {
       await page.locator('#set-year').waitFor({ state: 'detached', timeout: 15000 });
       await goTo(page, BASE, '/exams');
       await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
-      await page.waitForSelector('.exam-nav', { timeout: 60000 });
+      await page.waitForSelector('.exam-nav', { timeout: 60000 }).catch(async error => {
+        const alerts = (await page.locator('[role="alert"]').allInnerTexts()).map(s => s.replace(/\s+/g, ' ').slice(0, 180));
+        throw new Error(`${String(error.message).split('\\n')[0]} · route ${new URL(page.url()).pathname} · alerts ${JSON.stringify(alerts)} · last server calls ${JSON.stringify(online.calls.slice(-6).map(c => `${c.status} ${c.path}`))}`);
+      });
       await click(page, '.mcq .mcq-opt');
       await page.locator('.exam-dot').nth(20).click();
       await page.getByRole('button', { name: '✍ Write by hand' }).click();
