@@ -49,7 +49,7 @@ function listenForSmsCode(onCode) {
   return () => controller.abort();
 }
 
-export default function SignUpFlow({ initialMode = 'signup', initialName = '', onCancel, onFinish, onStartOffline }) {
+export default function SignUpFlow({ initialMode = 'signup', initialName = '', onCancel, onFinish, onStartOffline, reuseExistingProfile = false }) {
   const t = useT();
   const [mode, setMode] = useState(initialMode);
   const [role, setRole] = useState('student');
@@ -198,11 +198,16 @@ export default function SignUpFlow({ initialMode = 'signup', initialName = '', o
     setBusy('');
     const needsParent = result.guardianConsent?.required && result.guardianConsent.state !== 'given';
     if (!result.created) {
-      // Returning learner on a new device: we still need the class to set up
-      // this device's profile; age only matters if a parent is still pending.
+      // A saved device profile already has its curriculum and local work.
+      // Re-authenticate that identity without asking for class again or
+      // replacing any ink/photo draft. A fresh device still chooses a class.
+      if (reuseExistingProfile && !needsParent) {
+        await finish(result.account);
+        return;
+      }
       setAge(needsParent ? 15 : 18);
       setDirection('forward');
-      setIndex(stepsFor({ mode, role: 'student', minor: needsParent }).indexOf('class'));
+      setIndex(stepsFor({ mode, role: 'student', minor: needsParent }).indexOf(reuseExistingProfile ? 'parent' : 'class'));
       return;
     }
     if (needsParent) { go('parent'); return; }

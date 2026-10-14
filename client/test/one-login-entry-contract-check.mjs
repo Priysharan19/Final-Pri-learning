@@ -38,6 +38,10 @@ assert.match(app, /accessDenied\.has\(error\?\.code\)/,
   'transient network errors must not eject the student from an active lesson');
 assert.match(gate, /busy\.current = false; \};/,
   'StrictMode cleanup must allow activation to retry after effect remount');
+assert.match(gate, /reuseExistingProfile/,
+  'recovery of a saved local profile must not ask for its curriculum again');
+assert.match(signup, /if \(reuseExistingProfile && !needsParent\)/,
+  'same account recovery finishes without class re-selection');
 assert.match(gate, /onFinish=\{finishExisting\}/,
   'existing profiles use the same verified onboarding without being recreated');
 

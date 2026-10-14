@@ -93,7 +93,7 @@ export default function AccountActivationGate({ user, onReady, onSwitch }) {
         {status === 'signin' && (
           <>
             <p role="status">{issue || 'Sign in to connect this profile.'}</p>
-            <SignUpFlow initialMode="signin" onCancel={onSwitch} onFinish={finishExisting} />
+            <SignUpFlow initialMode="signin" reuseExistingProfile onCancel={onSwitch} onFinish={finishExisting} />
           </>
         )}
         {status === 'guardian' && (
