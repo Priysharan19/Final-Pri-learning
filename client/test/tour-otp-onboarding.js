@@ -229,8 +229,28 @@ export const flow = {
         await adult.waitForSelector('[data-signup-step="class"]');
         await adult.getByTestId('signup-class-12').click();
         await adult.locator('#signup-flow-name').fill('Adult learner');
+        // Exercise the real first-sync retry contract. Refuse the platform
+        // sync at the transport boundary once, then restore it. A retry must
+        // reuse the already-created account and its one local profile.
+        let refusedSyncRequests = 0;
+        const refuseInitialSync = async route => {
+          refusedSyncRequests++;
+          await route.fulfill({ status: 503, contentType: 'application/json',
+            body: JSON.stringify({ error: { code: 'SYNC_TEMPORARILY_UNAVAILABLE', message: 'Test transport outage' } }) });
+        };
+        await adult.route('**/v1/sync/**', refuseInitialSync);
+        await adult.getByTestId('signup-class-next').click();
+        await adult.getByRole('alert').first().waitFor({ timeout: 15000 });
+        await check('a failed first sync does not unlock the account',
+          refusedSyncRequests > 0 && await adult.locator('.shell').count() === 0 &&
+          await adult.locator('[data-signup-step="class"]').count() === 1);
+        const countBeforeRetry = h.db.prepare("SELECT count(*) AS n FROM accounts WHERE email='adult.onboarding@example.com'").get().n;
+        await adult.unroute('**/v1/sync/**', refuseInitialSync);
         await adult.getByTestId('signup-class-next').click();
         await adult.waitForSelector('.home-greet', { timeout: 30000 });
+        await check('sync retry reuses the verified cloud account without duplication',
+          countBeforeRetry === 1 &&
+          h.db.prepare("SELECT count(*) AS n FROM accounts WHERE email='adult.onboarding@example.com'").get().n === 1);
         await check('18+ learner goes straight to Home, with no parent step',
           await adult.locator('[data-signup-step="parent"],[data-signup-step="parent-wait"],[data-testid="activation-guardian"]').count() === 0 &&
           await adult.locator('.shell').isVisible());
