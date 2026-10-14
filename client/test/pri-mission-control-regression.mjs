@@ -121,4 +121,33 @@ const concurrent=await Promise.all([1,2,3].map(async i=>{
   catch(e){const x=JSON.parse(e.stdout);return x.reason;}
 }));
 verify('Concurrent stale-snapshot admissions all deny',concurrent.every(x=>x==='SERIALIZED_ADMISSION_REQUIRED'));
+
+const missingId={...e1,number:995,body:e1.body.replace(/^Pri-Mission-ID:.*\n/m,'')};
+const missingResult=checkLedger('missing-id.json',[reviewer,missingId],reviewer);
+verify('Managed mission missing ID remains inventoried and blocks',missingResult.code!==0&&missingResult.data.managed_count===2&&missingResult.data.errors.some(x=>x.includes('malformed required marker Pri-Mission-ID')));
+const blankId={...e1,number:996,body:e1.body.replace(/^Pri-Mission-ID:.*$/m,'Pri-Mission-ID: ')};
+verify('Blank mission ID fails closed',checkLedger('blank-id.json',[reviewer,blankId],reviewer).code!==0);
+const duplicateIdMarker={...e1,number:997,body:e1.body+'\nPri-Mission-ID: hidden-shadow'};
+verify('Duplicate ID marker blocks ledger',checkLedger('double-id-marker.json',[reviewer,duplicateIdMarker],reviewer).data.errors.some(x=>x.includes('malformed required marker Pri-Mission-ID')));
+const duplicateCase={...e1,number:998,body:e1.body+'\nPRI-MISSION-ID: alternate'};
+verify('Case-insensitive duplicate ID marker rejected',checkLedger('case-id-marker.json',[reviewer,duplicateCase],reviewer).code!==0);
+const duplicateStatus={...e1,number:999,body:e1.body+'\nPri-Mission-Status: REVIEW'};
+verify('Duplicate status marker blocks ledger',checkLedger('double-status.json',[reviewer,duplicateStatus],reviewer).data.errors.some(x=>x.includes('malformed required marker Pri-Mission-Status')));
+const duplicateHead={...reviewer,number:999,body:reviewer.body+'\nPri-Review-Head: '+sha};
+verify('Duplicate review head marker fails closed',checkLedger('double-review-head.json',[duplicateHead],duplicateHead).code!==0);
+const duplicateHeartbeat={...e1,number:1000,body:e1.body+'\nPri-Lease-Heartbeat-At: '+at()};
+verify('Duplicate lease heartbeat rejected',checkLedger('double-heartbeat.json',[reviewer,duplicateHeartbeat],reviewer).code!==0);
+const missingStatus={...e1,number:1001,body:e1.body.replace(/^Pri-Mission-Status:.*\n/m,'')};
+verify('Missing status marker is not silently ignored',checkLedger('missing-status.json',[reviewer,missingStatus],reviewer).data.errors.some(x=>x.includes('malformed required marker Pri-Mission-Status')));
+const untrustedState={...e1,number:1002,state:'reopened'};
+verify('Malformed GitHub issue state denies ledger',checkLedger('bad-issue-state.json',[reviewer,untrustedState],reviewer).code!==0);
+const closedMalformed={number:1003,state:'closed',title:'[PRI-MISSION] old malformed',body:'Pri-Mission-Status: ACTIVE',updated_at:at()};
+verify('Closed historical incomplete markers do not consume writer capacity',checkLedger('closed-malformed.json',[closedMalformed,reviewer],reviewer).code===0);
+const noHead=run(['validate-ledger',file('head-omitted.json',[reviewer]),...Object.values(expected(reviewer))]);
+verify('PR validator requires exact head argument',noHead.code!==0);
+const shortHead=run(['validate-ledger',file('head-short.json',[reviewer]),...Object.values(expected(reviewer)),'abcd1234']);
+verify('PR validator rejects short head SHA',shortHead.code!==0);
+const spoofed={...e1,body:e1.body.replace(/^Pri-Lease-Heartbeat-Ref:.*$/m,'Pri-Lease-Heartbeat-Ref: '+'b'.repeat(40))};
+const spoofResult=run(['admit',file('spoof-candidate.json',{id:'student-new',agent:'student-experience',status:'ACTIVE',branch:'agent/mission/student-experience/student-new',base_sha:sha,risk:'R2',paths:[student],dependencies:[]}),file('spoof-ledger.json',[spoofed])]);
+verify('Editable forged-looking heartbeat cannot grant a new writer',spoofResult.code!==0&&spoofResult.data.decision==='DENY');
 console.log(`PASS: ${checks} deterministic governance regression assertions (isolated proposal; no GitHub write)`);

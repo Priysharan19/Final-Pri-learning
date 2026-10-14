@@ -148,9 +148,15 @@ function leaseStatus(record, now = Date.now()) {
   return freshness(record.lease_heartbeat_at, now);
 }
 
+function markerValues(body, key) {
+  // Do not let whitespace span lines or repeated values acquire authority.
+  const rx = new RegExp('^' + key + ':[ \t]*(.*)$', 'gmi');
+  return [...String(body || '').matchAll(rx)].map(match => match[1].trim());
+}
+
 function marker(body, key) {
-  const match = String(body || '').match(new RegExp(`^${key}:\\s*(.+)$`, 'mi'));
-  return match ? match[1].trim() : '';
+  const values = markerValues(body, key);
+  return values.length === 1 ? values[0] : '';
 }
 
 function listMarker(value) {
@@ -268,8 +274,13 @@ function issueMission(issue) {
 function inspectLedger(issues, now = Date.now()) {
   const errors = [], warnings = [];
   if (!Array.isArray(issues)) return { errors:['ledger snapshot must be an array'], warnings, managed:[], open:[], active:[] };
-  const managed = issues.filter(issue => !issue.pull_request && String(issue.title || '').startsWith(control.ledger.title_prefix) && marker(issue.body, 'Pri-Mission-ID'));
+  // Inventory membership is determined by title; deleting the ID cannot
+  // make an open writer disappear from admission or validation.
+  const managed = issues.filter(issue => !issue.pull_request && String(issue.title || '').startsWith(control.ledger.title_prefix));
   const open = [];
+  const requiredMarkers = ['Pri-Mission-ID','Pri-Mission-Status','Pri-Agent','Pri-Branch','Pri-Risk','Pri-Base-SHA','Pri-Attempt','Pri-Failure-Fingerprint'];
+  const optionalMarkers = ['Pri-Paths','Pri-Dependencies',control.ledger.record_markers.review_head,
+    control.lease.heartbeat_field,control.lease.progress_ref_field,control.lease.heartbeat_agent_field];
   for (const issue of managed) {
     const mission = issueMission(issue);
     if (String(issue.state || '').toLowerCase() === 'closed') {
@@ -277,6 +288,16 @@ function inspectLedger(issues, now = Date.now()) {
       continue;
     }
     if (String(issue.state || '').toLowerCase() !== 'open') { errors.push(`untrusted issue state for #${issue.number ?? '?'}`); continue; }
+    for (const key of requiredMarkers) {
+      const values = markerValues(issue.body, key);
+      if (values.length !== 1 || !values[0])
+        errors.push('malformed required marker ' + key + ' in open issue #' + (issue.number ?? '?') + ' (count ' + values.length + ')');
+    }
+    for (const key of optionalMarkers) {
+      const values = markerValues(issue.body, key);
+      if (values.length > 1 || (values.length === 1 && !values[0]))
+        errors.push('malformed optional marker ' + key + ' in open issue #' + (issue.number ?? '?') + ' (count ' + values.length + ')');
+    }
     open.push({issue, mission});
   }
   // Unknown managed states and duplicate mission identities must never
@@ -329,6 +350,8 @@ function inspectLedger(issues, now = Date.now()) {
 function validateLedger(issues, expected, now = Date.now()) {
   const snapshot = inspectLedger(issues, now);
   const errors = [...snapshot.errors];
+  if (!/^[0-9a-f]{40}$/i.test(String(expected.head_sha || '')))
+    errors.push('missing or invalid exact 40-character PR head SHA');
   const target = snapshot.open.find(({mission}) => mission.id === expected.mission);
   if (!target) errors.push('mission marker does not match an open managed issue');
   else {
@@ -338,7 +361,7 @@ function validateLedger(issues, expected, now = Date.now()) {
     if (m.agent !== expected.agent) errors.push('agent marker does not match PR');
     if (m.branch !== expected.branch) errors.push('branch marker does not match PR');
     if (m.risk !== expected.risk) errors.push('risk marker does not match PR');
-    if (WRITER_STATES.has(m.status) && expected.head_sha && m.lease_heartbeat_ref !== expected.head_sha) errors.push('active progress reference does not match exact PR head');
+    if (WRITER_STATES.has(m.status) && m.lease_heartbeat_ref !== expected.head_sha) errors.push('active progress reference does not match exact PR head');
     if (REVIEW_STATES.has(m.status) && (!/^[0-9a-f]{40}$/i.test(String(expected.head_sha || '')) || m.review_head !== expected.head_sha))
       errors.push('review head does not match exact PR head');
   }
@@ -392,7 +415,7 @@ if (command === 'validate') {
   if (errors.length) { for (const error of errors) console.error(`ERROR: ${error}`); process.exit(1); }
   console.log(`PASS: mission ${record.id} (${record.status}, ${record.agent}, ${record.risk})`);
 } else if (command === 'validate-ledger') {
-  if (!args[0] || !args[1] || !args[2] || !args[3] || !args[4]) throw new Error('validate-ledger requires issues.json agent mission branch risk [head_sha]');
+  if (!args[0] || !args[1] || !args[2] || !args[3] || !args[4] || !args[5]) throw new Error('validate-ledger requires issues.json agent mission branch risk head_sha');
   const result = validateLedger(readJson(path.resolve(args[0])), { agent: args[1], mission: args[2], branch: args[3], risk: args[4], head_sha: args[5] });
   console.log(JSON.stringify(result, null, 2)); if (!result.valid) process.exitCode = 1;
 } else if (command === 'transition') {

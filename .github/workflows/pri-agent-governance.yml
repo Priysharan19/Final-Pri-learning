@@ -279,7 +279,7 @@ jobs:
             }
           ]
           JSON
-          node scripts/pri-mission-control.mjs validate-ledger /tmp/pri-ledger-smoke.json qa-release smoke agent/mission/qa-release/smoke R2
+          node scripts/pri-mission-control.mjs validate-ledger /tmp/pri-ledger-smoke.json qa-release smoke agent/mission/qa-release/smoke R2 8458a735fda3637656a8e9e23329f235b5277fb6
 
       - name: Deterministic lease and concurrent-admission regression
         shell: bash

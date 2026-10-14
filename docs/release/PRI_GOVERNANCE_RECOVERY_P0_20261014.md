@@ -1,8 +1,8 @@
-# P0 Governance Recovery — unmerged proposal
+# P0 Governance Recovery — PR #492 under independent review
 
 Baseline main: `ce8d4b06c91736c82a0e9920917914fe086de6d3`
 Date: 2026-10-14
-Status: Isolated QA engineering proposal only. No writer admission, remote branch, PR, merge or application deployment.
+Historical proposal status before 14 October PR submission: isolated QA engineering proposal; at that stage there was no remote branch or PR. **Current status:** draft PR #492 exists and is **UNMERGED**, with no writer admission or application deployment.
 
 ## Root cause
 
@@ -44,9 +44,27 @@ The patch does not alter curriculum source, grading, authentication, student dat
 ## Verified local follow-up, 14 October
 
 - Exact baseline applied cleanly in separate full repository clone.
-- 34/34 deterministic regression assertions pass, including refusal to gain a lease through a normal state transition, stale transition denial, exact-head and status checks, dependency, derived root, wrong owner and concurrent attempts.
+- Original isolated patch: 34/34 deterministic regression assertions passed, including refusal to gain a lease through a normal state transition, stale transition denial, exact-head and status checks, dependency, derived root, wrong owner and concurrent attempts.
 - Live read-only GitHub snapshot: 490 issues total, 66 managed, 35 managed open; #470/#485 open ACTIVE, #483/#456 open REVIEW, #172/#207 closed historic writer-like markers.
 - Unmodified live snapshot: validator DENY (missing heartbeats, missing review-head pins, same-owner conflict).
 - Simulation-only ledger with #470 as single heartbeat-bound ACTIVE, #485 REPAIR_PENDING and #483/#456 REVIEW pinned to their own PR heads: validator PASS, active_count=1, historic closed records warning-only. This simulation grants no authority and does not change GitHub issue bodies.
 - This code may be submitted only through the owner-directed, manual-governed `task/*` lane as a DRAFT recovery proposal. It is not a fifth autonomous `agent/mission/*` writer, cannot be merged by its author alone, and cannot be used to declare P0 resolved.
 - Required independent acceptance: exact-head CI, QA/governance + security review, approved issue migration, authenticated heartbeat and CAS/serialized admission-controller design. Until admission is authenticated and serialized, new code-writer admissions remain DENIED.
+
+## P0 continuation: submitted recovery, adversarial closure and remaining security boundary
+
+- **Draft PR:** https://github.com/Priysharan19/Final-Pri-learning/pull/492, branch `task/p0-governance-recovery-20261014`, exact branch head must be independently re-read after each change. This is the explicitly reviewed, owner-directed recovery path, **not** a fifth automatic writer lease.
+- Original PR head `3042ae5978e692738ff84e030aecfcc902bf4552` received passing hosted CI, CodeQL, Fleet Governance, Concurrency Safety/Adversarial, App Health, browser and container acceptance. **These historic greens are invalid for any later head.**
+- Follow-up adversarial validation: title-based issue inventory; missing/blank/duplicated mission ID, duplicated required/optional markers, malformed issue state, and open records with missing status all fail closed. Historical closed records remain non-admitting. Exact 40-character PR head is a required CLI input even for active writer checks. **47/47 local regression assertions** at this checkpoint; rerun before merge.
+- `Pri-Lease-Heartbeat-At` is a well-formed timestamp, **not authoritative evidence of genuine progress**. `Pri-Lease-Heartbeat-Ref` is a plausible 40-character commit digest, **not proof that a commit exists, that GitHub accepted it, or that the agent owns it**. `Pri-Lease-Heartbeat-By` matching the marker's owner is **not identity authentication**; anyone with issue edit access might spoof all three. Plain GitHub comments cannot refresh the timestamp used for lease freshness under this patch, but authorized issue edits also need an independent actor-and-transaction audit.
+- Current validator can verify shape, local lease TTL, fleet ownership, exact source/PR-head equality in the call site, and overall conflict constraints. It **cannot** validate GitHub actor identity, historical branch ancestry, GitHub PR/commit existence, or transaction uniqueness against a mutable issue body. It is a **safety check**, not an admission grant. `admit` returns DENY on every eligible snapshot with `SERIALIZED_ADMISSION_REQUIRED`.
+- The primary GitHub Actions governance PR path forwards `github.event.pull_request.head.sha`; both derived sync and apply call sites pass their authenticated event `HEAD_SHA`; the deterministic smoke fixture now passes its explicit SHA. A direct CLI call without the exact SHA must fail.
+- **Minimum future admission controller:** an authenticated workflow with scoped issue/branch permissions and a single Git-controlled authoritative grant log or other proven CAS/serialized state; each transaction reads latest grants, atomically reserves the slot, emits unique grant ID and verifiable authenticated actor/workflow receipt, and rejects conflicts. Lease heartbeat, release, revocation, expiry and crash recovery are serialized through this authority; user-editable issue markers are synchronized views, never the sole grant store. Demonstrate overlapping concurrent requests for one slot (exactly one grant or both denied), stale snapshots, forged issue edits, crash-retry idempotence, owner/path conflict and branch-main revalidation. No capacity increase until that controller has independent security approval.
+- **Integration order:** independent QA/security approval and exact-head required hosted CI → protected merge if authorized → truthful real mission issue migration → independent verification of the live ledger → separate authenticated serialized admission controller → any new autonomous feature mission. Treat the October 15 milestone as an evidence checkpoint, not a release override.
+
+## Read-only, high-leverage work while waiting
+
+- P0 release: review #478, #480, #481 and the #490/#491 companion PRs against their own base/head; isolate exact-head auth, guardian, native/Android, student sync and graded Practice regressions.
+- P0 grading: review combined candidate #481, #439 and acceptance #482; preserve server-authoritative grading and answer-blind handwriting checks.
+- Study platform: inventory `c8-linear-equations` Notes-to-Practice route and versioned Pri Worlds research; no new code or second interactive engine before admission.
+- Curriculum production: independently verify PR #472 Class IX mathematics/figures, #484 CBSE answer-blind content and #486 JEE hints/rights; retain distinct author/reviewer separation.
