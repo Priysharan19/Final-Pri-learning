@@ -295,6 +295,15 @@ jobs:
           node scripts/pri-pr-lane.mjs simulate .github/workflows/ci.yml | grep -q '"lane":"governed-required"'
           node scripts/pri-pr-lane.mjs simulate unknown-unowned-path.txt | grep -q '"lane":"governed-required"'
 
+      - name: GitHub-reference verification and security regression
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node client/test/pri-governance-online-gates-regression.mjs
+          node scripts/pri-governance-online-gates.mjs review-pins
+
       - name: Classify PR diff and parse autonomous metadata
         if: github.event_name == 'pull_request'
         id: meta
@@ -303,6 +312,11 @@ jobs:
           HEAD_REF: ${{ github.head_ref }}
           BASE_REF: ${{ github.base_ref }}
           PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PRI_QA_MANUAL_AUTHORS: ${{ vars.PRI_QA_MANUAL_AUTHORS }}
+          PRI_QA_MANUAL_REVIEWERS: ${{ vars.PRI_QA_MANUAL_REVIEWERS }}
         run: |
           set -euo pipefail
           git fetch --no-tags origin "$BASE_REF"
@@ -322,6 +336,9 @@ jobs:
             # only apply to agent/mission/**. Branch protection + the ordinary
             # required CI checks still gate these PRs before main can move.
             if [[ "$HEAD_REF" == task/* || "$HEAD_REF" == feature/* ]]; then
+              # Name prefix is never writer authorization; missing independent
+              # current-head GitHub approval fails closed.
+              node scripts/pri-governance-online-gates.mjs manual-pr "$PR_NUMBER" "$PR_HEAD_SHA"
               echo "autonomous=false" >> "$GITHUB_OUTPUT"
               echo "lane=manual-governed" >> "$GITHUB_OUTPUT"
               exit 0
