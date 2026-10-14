@@ -419,8 +419,21 @@ class CloudJourneyTest {
             setValue(s, "#signup-password-email", email)
             setValue(s, "#signup-password", password)
             eval(s, "document.querySelector('[data-testid=signup-password-submit]').click()")
-            waitFor(s, "$stateTag === 'Signed in'")
-
+            try {
+                waitFor(s, "$stateTag === 'Signed in'")
+            } catch (timeout: AssertionError) {
+                // Do not guess whether this is a form failure, a still-signed
+                // out session, or a stale test selector. Capture only safe
+                // UI state after the REAL login attempt; never passwords,
+                // session cookies, OTP codes or full account details.
+                val actualState = eval(s, stateTag)
+                val cardStep = eval(s, "document.querySelector('[data-signin-card]')?.getAttribute('data-signup-step') || ''")
+                val accountCard = eval(s, "!!document.querySelector('[data-cloud-sign-in]')")
+                val errorVisible = eval(s, "!!document.querySelector('#signup-error')")
+                throw AssertionError(
+                    "real sign-in did not establish the session; cloudState=$actualState cardStep=$cardStep " +
+                        "signInCardPresent=$accountCard errorVisible=$errorVisible", timeout)
+            }
 
             waitFor(s, "(function(){var b=($byText)('Sync now');if(!b||b.disabled)return false;b.click();return true;})()")
             val synced = waitFor(s, "(function(){var t=document.querySelector('section[aria-labelledby=\"cloud-account-title\"]').innerText;var m=t.match(/Sync complete[^\\n]*/);return m?m[0]:false;})()", 60_000)
