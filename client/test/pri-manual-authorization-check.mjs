@@ -21,6 +21,7 @@ run('author lacks write permission',{...basic,permissions:{...basic.permissions,
 run('reviewer lacks write permission',{...basic,permissions:{...basic.permissions,'Kalp-Bajpai':'read'}},false);n++;
 run('self approval',{...basic,reviews:[{...validReview,user:{login:'Priysharan19',type:'User'}}]},false);n++;
 run('stale approval',{...basic,reviews:[{...validReview,commit_id:'b'.repeat(40)}]},false);n++;
+run('comment after approval remains valid',{...basic,reviews:[validReview,{...validReview,state:'COMMENTED',submitted_at:'2026-10-14T12:01:00Z'}]},true);n++;
 run('dismissed after approval',{...basic,reviews:[validReview,{...validReview,state:'DISMISSED',submitted_at:'2026-10-14T12:01:00Z'}]},false);n++;
 run('fake bot',{...basic,reviews:[{...validReview,user:{login:'Kalp-Bajpai',type:'Bot'}}]},false);n++;
 run('fork candidate',{...basic,pr:{...pr,head:{...pr.head,repo:{full_name:'another/repo'}}}},false);n++;

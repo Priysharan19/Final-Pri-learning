@@ -13,6 +13,7 @@ no(()=>checkManualPr(pr,[review],p,{...trusted,authors:''}),'ALLOWLIST');
 no(()=>checkManualPr(pr,[review],p,{...trusted,reviewers:''}),'ALLOWLIST');
 no(()=>checkManualPr(pr,[],p,trusted),'APPROVAL_MISSING');
 no(()=>checkManualPr(pr,[{...review,state:'COMMENTED'}],p,trusted),'APPROVAL_MISSING');
+yes(()=>assert.equal(checkManualPr(pr,[review,{...review,state:'COMMENTED',submitted_at:'2026-10-14T12:01:00Z'}],p,trusted).authorized,true));
 no(()=>checkManualPr(pr,[{...review,commit_id:'b'.repeat(40)}],p,trusted),'APPROVAL_MISSING');
 no(()=>checkManualPr(pr,[review],{'Kalp-Bajpai':'read'},trusted),'APPROVAL_MISSING');
 no(()=>checkManualPr(pr,[review,{...review,state:'CHANGES_REQUESTED',submitted_at:'2026-10-14T12:01:00Z'}],p,trusted),'APPROVAL_MISSING');

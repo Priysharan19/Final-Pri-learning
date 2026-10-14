@@ -29,6 +29,37 @@ const asPaths = v => {
   return v.split(',').map(x => x.trim()).filter(Boolean);
 };
 export const eventDigest = payload => sha(canonical(payload));
+export async function verifyAuthorityHistory({head,genesisSha,loadCommit,loadLog,filePath}) {
+  if (!hex40(head) || !hex40(genesisSha) || typeof loadCommit !== 'function' ||
+      typeof loadLog !== 'function' || !filePath)
+    throw new Error('AUTHORITY_GENESIS_NOT_PINNED');
+  let cursor=head, child=null, latest=null;
+  const seen=new Set();
+  for(let n=0;n<1000;n++) {
+    if(seen.has(cursor)) throw new Error('AUTHORITY_HISTORY_CYCLE');
+    seen.add(cursor);
+    const commit=await loadCommit(cursor);
+    if(!commit || !Array.isArray(commit.parents) || commit.parents.length!==1 ||
+        !Array.isArray(commit.files) || commit.files.length!==1 ||
+        commit.files[0].filename!==filePath)
+      throw new Error('AUTHORITY_HISTORY_CONTAINS_UNTRUSTED_CHANGE');
+    const entry=await loadLog(cursor);
+    if (!entry || entry.version!==1 || !Array.isArray(entry.events))
+      throw new Error('INVALID_AUTHORITY_LOG');
+    if(child) assertAppendOnlyHistory(child,entry);
+    if(!latest) latest=entry;
+    if(cursor===genesisSha) {
+      if(entry.events.length!==0) throw new Error('NONEMPTY_PINNED_AUTHORITY_GENESIS');
+      return {log:latest,head,genesisSha,commitsChecked:seen.size};
+    }
+    if(entry.events.length===0) throw new Error('UNPINNED_EMPTY_AUTHORITY_LOG');
+    child=entry;
+    cursor=commit.parents[0].sha;
+    if(!hex40(cursor)) throw new Error('INVALID_AUTHORITY_PARENT_SHA');
+  }
+  throw new Error('PINNED_AUTHORITY_GENESIS_UNREACHABLE');
+}
+
 export function assertAppendOnlyHistory(child, parent) {
   if (!child || !parent || child.version !== 1 || parent.version !== 1 ||
     !Array.isArray(child.events) || !Array.isArray(parent.events) ||
@@ -58,6 +89,7 @@ export function inspectSignedLog(log, publicKey, nowMs = Date.now()) {
     if (!Number.isInteger(p.issue_number) || p.issue_number < 1 || !p.mission || !p.agent || !p.branch)
       throw new Error('INVALID_GRANT_IDENTITY');
     if (p.operation === 'GRANT') {
+      if (!/^R[1-4]$/.test(String(p.risk||''))) throw new Error('INVALID_SIGNED_RISK');
       if (!hex40(p.head_sha) || !hex40(p.base_sha) || !Array.isArray(p.paths) || !p.paths.length
         || !Number.isSafeInteger(p.expiry_ms) || p.expiry_ms - p.timestamp_ms > TTL_MS
         || p.expiry_ms <= p.timestamp_ms || active.has(p.issue_number)) throw new Error('INVALID_GRANT');
@@ -71,7 +103,7 @@ export function inspectSignedLog(log, publicKey, nowMs = Date.now()) {
         if (!hex40(p.head_sha) || !Number.isSafeInteger(p.expiry_ms)
           || p.expiry_ms - p.timestamp_ms > TTL_MS || p.expiry_ms <= p.timestamp_ms
           || p.timestamp_ms > current.expiry_ms || p.base_sha !== current.base_sha
-          || p.main_sha !== current.main_sha || canonical(p.paths) !== canonical(current.paths))
+          || p.main_sha !== current.main_sha || p.risk !== current.risk || canonical(p.paths) !== canonical(current.paths))
           throw new Error('UNSAFE_RENEWAL');
         active.set(p.issue_number, p);
       }
@@ -121,14 +153,14 @@ export function assertLedgerMatchesGrants(issues, authority, mainSha, nowMs = Da
     if (WRITERS.has(id.status)) {
       if (!current) throw new Error('WRITER_WITHOUT_AUTHORITY_' + x.number);
       if (options.revocationRecovery === true) {
-        if (current.mission !== id.mission || current.agent !== id.agent || current.branch !== id.branch ||
+        if (current.mission !== id.mission || current.agent !== id.agent || current.risk !== id.risk || current.branch !== id.branch ||
           canonical(current.paths) !== canonical(id.paths)) throw new Error('WRITER_AUTHORITY_DRIFT_' + x.number);
         continue;
       }
       if (current.expiry_ms <= nowMs) throw new Error('WRITER_WITHOUT_AUTHORITY_' + x.number);
       if (current.main_sha !== mainSha || current.base_sha !== id.base_sha ||
-        current.mission !== id.mission || current.agent !== id.agent ||
-        current.branch !== id.branch || canonical(current.paths) !== canonical(id.paths) ||
+        current.mission !== id.mission || current.agent !== id.agent || current.risk !== id.risk ||
+        current.branch !== id.branch || current.risk !== id.risk || canonical(current.paths) !== canonical(id.paths) ||
         marker(x.body,'Pri-Lease-Grant-ID') !== eventDigest(current))
         throw new Error('WRITER_AUTHORITY_DRIFT_' + x.number);
     } else if (current && current.expiry_ms > nowMs && options.revocationRecovery !== true) {
@@ -160,11 +192,11 @@ export function appendGrant(log, request, issues, pr, mainSha, actor, runId, now
   } else if (!existing || (request.operation==='RENEW' && (existing.expiry_ms <= nowMs || !WRITERS.has(id.status)))) {
     throw new Error('NO_LIVE_GRANT_TO_MODIFY');
   }
-  if (existing && (existing.agent !== id.agent || existing.mission !== id.mission || existing.branch !== id.branch || canonical(existing.paths) !== canonical(id.paths)))
+  if (existing && (existing.agent !== id.agent || existing.mission !== id.mission || existing.branch !== id.branch || existing.risk !== id.risk || canonical(existing.paths) !== canonical(id.paths)))
     throw new Error('AUTHORITY_IDENTITY_DRIFT');
   const payload={
     seq:authority.nextSeq,prev:authority.prevHash,operation:request.operation,
-    issue_number:id.issue_number,mission:id.mission,agent:id.agent,branch:id.branch,
+    issue_number:id.issue_number,mission:id.mission,agent:id.agent,branch:id.branch,risk:id.risk,
     base_sha:id.base_sha,head_sha:request.head_sha,main_sha:mainSha,paths:id.paths,
     timestamp_ms:nowMs,expiry_ms:request.operation==='REVOKE'?nowMs:nowMs+TTL_MS,
     actor,run_id:runId

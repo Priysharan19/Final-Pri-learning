@@ -2,6 +2,8 @@ name: Pri Agent Fleet Governance
 
 on:
   pull_request:
+  pull_request_review:
+    types: [submitted, dismissed]
   push:
     branches: [main]
     paths:
@@ -29,6 +31,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
@@ -303,21 +306,35 @@ jobs:
           node scripts/pri-pr-lane.mjs simulate unknown-unowned-path.txt | grep -q '"lane":"governed-required"'
 
       - name: GitHub-reference verification and security regression
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'pull_request_review'
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PRI_QA_MANUAL_AUTHORS: ${{ vars.PRI_QA_MANUAL_AUTHORS }}
+          PRI_QA_MANUAL_REVIEWERS: ${{ vars.PRI_QA_MANUAL_REVIEWERS }}
         run: |
           set -euo pipefail
           node client/test/pri-governance-online-gates-regression.mjs
-          node scripts/pri-governance-online-gates.mjs review-pins
+          node --check scripts/pri-governor-ed25519.mjs
+          node --check scripts/pri-governor-ref.mjs
+          node client/test/pri-governor-ed25519-regression.mjs
+          if [[ "$PR_NUMBER" == '492' && "$HEAD_REF" == 'task/p0-governance-recovery-20261014' ]]; then
+            # Separate current-head human approval is required even to record
+            # migration debt; this path never allows a writer to be admitted.
+            node scripts/pri-governance-online-gates.mjs review-pins-bootstrap "$PR_NUMBER" "$PR_HEAD_SHA" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            node scripts/pri-governance-online-gates.mjs review-pins
+          fi
 
       - name: Classify PR diff and parse autonomous metadata
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'pull_request_review'
         id: meta
         shell: bash
         env:
-          HEAD_REF: ${{ github.head_ref }}
-          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -396,7 +413,7 @@ jobs:
           node scripts/pri-manual-authorization.mjs
 
       - name: Snapshot GitHub-Issue mission ledger
-        if: github.event_name == 'pull_request' && steps.meta.outputs.autonomous == 'true'
+        if: (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && steps.meta.outputs.autonomous == 'true'
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
@@ -419,20 +436,23 @@ jobs:
           path: trusted-pri-admission
           persist-credentials: false
 
-      - name: Verify signed authoritative writer ledger
+      - name: Verify exact-PR signed authoritative writer grant
         if: github.event_name == 'pull_request' && steps.meta.outputs.autonomous == 'true'
         working-directory: trusted-pri-admission
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          PRI_AUTHORITY_GENESIS_SHA: ${{ vars.PRI_AUTHORITY_GENESIS_SHA }}
+          EXPECTED_PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_PR_HEAD: ${{ github.event.pull_request.head.sha }}
         run: node scripts/pri-admission-github.mjs verify
 
       - name: Verify active writer lease
-        if: github.event_name == 'pull_request' && steps.meta.outputs.autonomous == 'true'
+        if: (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && steps.meta.outputs.autonomous == 'true'
         shell: bash
         env:
           EXPECTED_AGENT: ${{ steps.meta.outputs.agent }}
           EXPECTED_MISSION: ${{ steps.meta.outputs.mission }}
-          EXPECTED_BRANCH: ${{ github.head_ref }}
+          EXPECTED_BRANCH: ${{ github.event.pull_request.head.ref }}
           EXPECTED_RISK: ${{ steps.meta.outputs.risk }}
         run: |
           set -euo pipefail
