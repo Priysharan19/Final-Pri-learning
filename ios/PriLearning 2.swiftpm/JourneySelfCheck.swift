@@ -488,14 +488,18 @@ enum JourneySelfCheck {
     await step('signInOnCard', async () => {
       window.__priJourneySamePage = 'kept';
       at = 'open'; (await waitFor(() => allVis('[data-check-sign-in]').find(b => !b.disabled))).click();
-      at = 'panel'; await waitFor(() => q('section[aria-labelledby="cloud-account-title"]'), 30000);
-      const panel = () => q('section[aria-labelledby="cloud-account-title"]');
-      const signIn = [...panel().querySelectorAll('button')].find(b => b.textContent.trim() === 'Sign in');
-      if (signIn) { signIn.click(); await sleep(200); }
-      setValue(await waitFor(() => q('#cloud-email')), email);
-      setValue(q('#cloud-password'), password); await sleep(200);
-      at = 'submit'; (await waitFor(() => { const b = q('#cloud-email')?.form?.querySelector('button[type=submit]'); return b && !b.disabled ? b : null; })).click();
-      at = 'linked'; await waitFor(() => !refusalKind() && !q('[data-check-needs-account]') && !q('#cloud-email'), 60000);
+      // Existing fixture accounts sign in through the shipped inline card's
+      // password choice; never inject a session or alter the guardian gate.
+      at = 'card'; await waitFor(() => q('[data-signin-card] #signup-destination'), 30000);
+      at = 'password'; (await waitFor(() => q('[data-signin-card] [data-testid=signup-use-password]'))).click();
+      setValue(await waitFor(() => q('#signup-password-email')), email);
+      setValue(q('#signup-password'), password);
+      at = 'submit'; (await waitFor(() => {
+        const b = q('[data-testid=signup-password-submit]');
+        return b && !b.disabled ? b : null;
+      })).click();
+      at = 'linked'; await waitFor(() => !q('[data-signin-card]') &&
+        !refusalKind() && !q('[data-check-needs-account]'), 60000);
       if (location.pathname !== '/practice' || window.__priJourneySamePage !== 'kept') throw new Error('the student left the question: ' + location.pathname);
       if (qid() !== firstId) throw new Error('a different question after sign-in');
       if ((answerBox() || {}).value !== WRONG) throw new Error('typed answer lost in sign-in: ' + (answerBox() || {}).value);
