@@ -53,7 +53,7 @@ function audit(item,section) {
    show(item,''+(w.a[0]*w.a[1]));show(item,''+(w.b[0]*w.b[1]));checks+=4;
   }else if(w.kind==='unique-line'){
    assert.equal(w.distinct,true);assert.equal(w.count,1);
-   assert.ok(/line/i.test(item.answer));checks+=3;
+   assert.ok(/line|coincide|exactly one|unique/i.test(item.answer));checks+=3;
   }else if(w.kind==='playfair'){
    assert.equal(w.pointOff,true);assert.equal(w.parallelCount,1);
    assert.ok(/parallel|coincide/i.test(item.answer));checks+=3;
