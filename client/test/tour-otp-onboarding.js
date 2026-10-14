@@ -244,6 +244,17 @@ export const flow = {
           await adult.locator('.shell').isVisible() &&
           await adult.locator('[data-testid="account-activation-gate"]').count() === 0 &&
           await adult.locator('[data-signup-step="code"],[data-testid="activation-guardian"]').count() === 0);
+        await adult.goto(`${base}/settings`, { waitUntil: 'domcontentloaded' });
+        await adult.getByRole('button', { name: 'Disconnect', exact: true }).click();
+        await adult.waitForSelector('[data-testid="account-activation-gate"]', { timeout: 15000 });
+        await check('cloud account disconnect immediately relocks the entire main app',
+          await adult.locator('.shell').count() === 0 &&
+          await adult.locator('[data-testid="account-activation-gate"]').isVisible());
+        await adult.goto(`${base}/practice`, { waitUntil: 'domcontentloaded' });
+        await adult.waitForSelector('[data-testid="account-activation-gate"]', { timeout: 15000 });
+        await check('deep-linking to Practice after logout cannot bypass account activation',
+          await adult.locator('.shell').count() === 0);
+
 
       } finally { await adultCtx.close(); }
     } finally {
