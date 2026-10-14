@@ -25,7 +25,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
 
-const TOPIC = 'y7-equations';
+const TOPIC = 'c7-simple-equations';
 const SURELY_WRONG = '-987654';
 const MAX_SKIPS = 12;
 
@@ -48,7 +48,7 @@ export const flow = {
     await check('a question renders with a prompt', !!firstPrompt && firstPrompt.length > 8,
       `prompt reads ${JSON.stringify(firstPrompt)}`);
     await check('the card names the topic it came from',
-      (await page.locator('.q-topmeta').innerText()).includes('Linear Equations'),
+      (await page.locator('.q-topmeta').innerText()).includes('Simple Equations'),
       `topmeta reads ${JSON.stringify(await page.locator('.q-topmeta').innerText())}`);
     // Practice is deliberately untimed on screen: time on task is still
     // recorded with the attempt, but a running clock is pressure, not help.
@@ -194,7 +194,7 @@ export const flow = {
       scores.some(t => /\bCorrect\b/.test(t)) && scores.some(t => /\bIncorrect\b/.test(t)),
       `rows read ${JSON.stringify(scores.map(t => t.replace(/\s+/g, ' ').slice(0, 60)))}`);
     await check('both attempts are on the same question',
-      scores.every(t => t.includes('Linear Equations')),
+      scores.every(t => t.includes('Simple Equations')),
       `rows read ${JSON.stringify(scores.map(t => t.replace(/\s+/g, ' ').slice(0, 60)))}`);
 
     // ── 6b · "Same question" from History: the server repeats it ─────────────
