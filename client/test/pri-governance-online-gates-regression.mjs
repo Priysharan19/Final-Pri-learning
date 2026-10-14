@@ -24,8 +24,8 @@ no(()=>checkManualPr({...pr,user:{login:'intruder',type:'User'}},[review],p,trus
 no(()=>checkManualPr({...pr,user:{login:'Priysharan19',type:'Bot'}},[review],p,trusted),'AUTHOR_NOT_ALLOWED');
 const branch='agent/mission/india-curriculum/cbse-original-exam-blind-m004-20261014';
 const id='cbse-original-exam-blind-m004-20261014';
-const issue={number:483,state:'open',title:'[PRI-MISSION] CBSE',body:['Pri-Mission-Status: REVIEW','Pri-Branch: '+branch,'Pri-Agent: india-curriculum','Pri-Mission-ID: '+id,'Pri-Review-Head: '+head].join('\n')};
-const issuePr={number:484,state:'open',head:{ref:branch,sha:head,repo:{full_name:R}},base:{repo:{full_name:R}}};
+const issue={number:483,state:'open',title:'[PRI-MISSION] CBSE',body:['Pri-Mission-Status: REVIEW','Pri-Branch: '+branch,'Pri-Agent: india-curriculum','Pri-Mission-ID: '+id,'Pri-Risk: R3','Pri-Review-Head: '+head].join('\n')};
+const issuePr={number:484,state:'open',head:{ref:branch,sha:head,repo:{full_name:R}},base:{ref:'main',repo:{full_name:R}}};
 yes(()=>assert.equal(checkReviewPins([issue],[issuePr]).verified,1));
 no(()=>checkReviewPins([issue],[{...issuePr,head:{...issuePr.head,sha:'b'.repeat(40)}}]),'HEAD_MISMATCH');
 no(()=>checkReviewPins([{...issue,body:issue.body.replace('Pri-Review-Head: ','Pri-Review-Head: incomplete-')}],[issuePr]),'PIN');
@@ -35,4 +35,16 @@ no(()=>checkReviewPins([issue],[issuePr,{...issuePr,number:485}]),'MISSING_OPEN_
 no(()=>checkReviewPins([issue],[{...issuePr,head:{...issuePr.head,ref:'agent/mission/india-curriculum/wrong'}}]),'MISSING_OPEN_PR');
 no(()=>checkReviewPins([issue,{...issue}],[issuePr]),'DUPLICATE_ISSUE');
 no(()=>checkReviewPins([{...issue,body:issue.body.replace('Pri-Mission-ID: '+id,'Pri-Mission-ID: unrelated-id')}],[issuePr]),'BRANCH_ID_MISMATCH');
+const preserved='agent/mission/india-curriculum/cbse-exam-blind-m004-20261014';
+const frozen='74200a45ba1162095fb18bcf982637759abff51b';
+const legacy={...issue,body:[
+ 'Pri-Mission-Status: REVIEW','Pri-Branch: '+preserved,
+ 'Pri-Agent: india-curriculum','Pri-Mission-ID: '+id,
+ 'Pri-Risk: R3','Pri-Review-Head: '+frozen].join('\n')};
+const legacyPr={...issuePr,head:{...issuePr.head,ref:preserved,sha:frozen}};
+yes(()=>assert.equal(checkReviewPins([legacy],[legacyPr]).verified,1));
+no(()=>checkReviewPins([{...legacy,body:legacy.body.replace('Pri-Risk: R3','Pri-Risk: R1')}],[legacyPr]),'BRANCH_ID_MISMATCH');
+no(()=>checkReviewPins([{...legacy,number:484}],[legacyPr]),'BRANCH_ID_MISMATCH');
+no(()=>checkReviewPins([legacy],[{...legacyPr,head:{...legacyPr.head,sha:'a'.repeat(40)}}]),'HEAD_MISMATCH');
+no(()=>checkReviewPins([legacy],[{...legacyPr,base:{...legacyPr.base,ref:'feature/unsafe'}}]),'MISSING_OPEN_PR');
 console.log('PASS '+checks+' online authority gate controls; branch prefix and issue markers confer no admission.');
