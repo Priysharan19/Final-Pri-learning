@@ -8,7 +8,7 @@ export function decideOnboardingAuthority(expectedAccountId, response) {
   if (!expected) return { outcome: 'unavailable' };
   if (!response || typeof response !== 'object' ||
       typeof response.accountId !== 'string' || !response.accountId ||
-      typeof response.sessionId !== 'string' || !response.sessionId ||
+      typeof response.sessionBinding !== 'string' || !/^[a-f0-9]{64}$/i.test(response.sessionBinding) ||
       typeof response.required !== 'boolean' ||
       typeof response.state !== 'string' ||
       typeof response.eligible !== 'boolean' ||
@@ -31,7 +31,7 @@ export function decideOnboardingAuthority(expectedAccountId, response) {
     return { outcome: 'unavailable' };
   }
   if (!response.eligible || !permitted) return { outcome: 'waiting', consent };
-  return { outcome: 'approved', consent, sessionId: response.sessionId };
+  return { outcome: 'approved', consent, sessionBinding: response.sessionBinding };
 }
 
 /** Async seam permits deterministic control of out-of-order session answers. */

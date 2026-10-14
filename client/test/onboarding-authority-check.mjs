@@ -1,17 +1,17 @@
 // P0 A→B→A guardian authority: async proof with NO test-only bypass.
 // This tests the CLIENT acceptance boundary. The actual server response must
-// add accountId, opaque sessionId and eligible in the SAME guardian response.
+// add accountId, a hashed sessionBinding and eligible in the SAME response.
 import assert from 'node:assert/strict';
 import { readOnboardingAuthority, decideOnboardingAuthority } from '../src/components/onboardingAuthority.js';
 
 let count = 0;
 const test = async (name, fn) => { await fn(); count++; console.log('PASS', name); };
-const adult = (id = 'A', sessionId = 'sa') => ({
-  accountId: id, sessionId, required: false, state: 'not-required',
+const adult = (id = 'A', sessionBinding = 'a'.repeat(64)) => ({
+  accountId: id, sessionBinding, required: false, state: 'not-required',
   emailVerified: true, eligible: true
 });
 const child = (state = 'pending') => ({
-  accountId: 'A', sessionId: 'sa', required: true, state,
+  accountId: 'A', sessionBinding: 'a'.repeat(64), required: true, state,
   emailVerified: true, eligible: state === 'given'
 });
 const deferred = () => {
@@ -47,7 +47,7 @@ await test('A→B→A split identity cannot approve A based on B adult guardian 
   let localLinkCount = 0;
   const pending = readOnboardingAuthority(sequence[0], () => request.promise);
   sequence.shift();
-  request.release(adult('B', 'sb'));
+  request.release(adult('B', 'b'.repeat(64)));
   sequence.shift();
   const verdict = await pending;
   if (verdict.outcome === 'approved') localLinkCount++;
@@ -58,11 +58,11 @@ await test('A→B→A split identity cannot approve A based on B adult guardian 
 await test('Out-of-order B consent response after guardian revocation cannot admit A', async () => {
   const request = deferred();
   const pending = readOnboardingAuthority('A', () => request.promise);
-  request.release({ ...adult('B', 'sb'), eligible: true });
+  request.release({ ...adult('B', 'b'.repeat(64)), eligible: true });
   assert.equal((await pending).outcome, 'changed');
 });
 await test('Malformed/missing identity, session or eligibility defaults to unavailable', async () => {
-  for (const key of ['accountId','sessionId','required','state','emailVerified','eligible']) {
+  for (const key of ['accountId','sessionBinding','required','state','emailVerified','eligible']) {
     const value = adult();
     delete value[key];
     assert.equal(decideOnboardingAuthority('A', value).outcome, 'unavailable', key);
@@ -83,7 +83,7 @@ await test('Server ineligible adult is never auto-admitted by client age declara
 });
 await test('A response for account B is refused before any profile-writing callback', async () => {
   let callback = 0;
-  const read = await readOnboardingAuthority('A', async () => adult('B', 'sb'));
+  const read = await readOnboardingAuthority('A', async () => adult('B', 'b'.repeat(64)));
   if (read.outcome === 'approved') callback++;
   assert.equal(callback, 0);
 });
