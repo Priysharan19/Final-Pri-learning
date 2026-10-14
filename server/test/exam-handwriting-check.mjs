@@ -36,8 +36,11 @@ const picture = (label, behaviour = 'ok', filler = 'a') =>
   'data:image/png;base64,' + Buffer.from(`PICTURE|${behaviour}|${label}|` + filler.repeat(300)).toString('base64');
 const digestOf = image => createHash('sha256').update(Buffer.from(image.split(',')[1], 'base64')).digest('hex');
 
-const provider = { calls: new Map(), total: 0, held: new Map(), arrivals: new Map(), hanging: new Set(), doubting: new Set() };
+const provider = { calls: new Map(), images: new Map(), total: 0, held: new Map(), arrivals: new Map(), hanging: new Set(), doubting: new Set() };
 const callsFor = label => provider.calls.get(label) || 0;
+// Exact bitmap identity, not a label or global count: unrelated in-flight reads
+// may complete while a PostgreSQL transaction is settling this frozen page.
+const callsForImage = image => provider.images.get(digestOf(image)) || 0;
 function arrived(label) {
   return new Promise((resolve, reject) => {
     if (provider.held.has(label)) return resolve();
@@ -59,6 +62,7 @@ const fake = createServer((req, res) => {
     const [, behaviour, label] = Buffer.from(image.split(',')[1], 'base64').toString('utf8').split('|');
     provider.total += 1;
     provider.calls.set(label, callsFor(label) + 1);
+    provider.images.set(digestOf(image), callsForImage(image) + 1);
     const lines = label.split('\n').map(text => ({ text, latex: '', confidence: 0.96 }));
     const read = { lines, confidence: 0.96, needs_confirmation: false };
     if (behaviour === 'blank') return reply(res, sent.model, { lines: [], confidence: 0, needs_confirmation: true });
@@ -274,6 +278,7 @@ try {
     const open = await present(s.jar, s.exam.id, q2.id, image);
     eq([open.status, open.data?.error?.code], [409, 'EXAM_NOT_FINALISED'], 'while the paper is open nothing is read through the after-close route');
     const before = provider.total;
+    const beforeThisImage = callsForImage(image);
     skew += PAPER_MS + 30000;
     const body = { answers: { [q1.id]: rightAnswer(q1.payload) }, modes: { [q2.id]: 'ink' }, ink: { [q2.id]: digestOf(image) }, reason: 'deadline' };
     const done = await finish(s.jar, s.exam.id, body);
@@ -325,7 +330,7 @@ try {
     const resolved = await present(s.jar, s.exam.id, q2.id, image);
     const after = resolved.data.result;
     const r2 = lineOf(after, q2);
-    eq([resolved.status, resolved.data.attempted, provider.total - before, callsFor(right2)], [200, true, 1, 1],
+    eq([resolved.status, resolved.data.attempted, callsForImage(image) - beforeThisImage, callsFor(right2)], [200, true, 1, 1],
       `the frozen page is read after the deadline with exactly one provider call [${EVIDENCE}]`);
     eq([r2.pending, r2.outcome, r2.correct, r2.awarded, r2.given, r2.readAfterClose, typeof r2.attemptId, typeof r2.solution?.answerText],
       [undefined, 'correct', true, Number(q2.marking.correct), right2, true, 'string', 'string'],
@@ -343,10 +348,10 @@ try {
     eq([paperEvent.score, paperEvent.pendingHandwriting], [after.score, undefined], "and the paper's own event carries the score as it now is");
     // Duplicate requests after it is resolved cost nothing and change nothing.
     const twice = await Promise.all([present(s.jar, s.exam.id, q2.id, image), present(s.jar, s.exam.id, q2.id, image)]);
-    eq([twice.map(r => [r.status, r.data.attempted]), provider.total - before, (await read(s.jar, s.exam.id)).data.result],
+    eq([twice.map(r => [r.status, r.data.attempted]), callsForImage(image) - beforeThisImage, (await read(s.jar, s.exam.id)).data.result],
       [[[200, false], [200, false]], 1, after], 'presenting a resolved page again starts nothing and changes nothing');
     eq((await events(s.id, 'graded-attempt')).length, attemptsAfter.length, 'and writes no second attempt');
-    paidPerAnswer.unreadAtDeadline = provider.total - before;
+    paidPerAnswer.unreadAtDeadline = callsForImage(image) - beforeThisImage;
   }
 
   // ══ 3 · Several unread pages: right, wrong, and one the reader doubts ══════
