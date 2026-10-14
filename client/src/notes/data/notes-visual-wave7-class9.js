@@ -1,0 +1,364 @@
+// Wave 7: independently verifiable original vector-diagram practice.
+import { makeInquiryVisual } from '../visualInquiryFactory.js';
+const specs=[
+  {
+    "chapterId": "c9-coordinate-geometry",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        4,
+        0
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        1,
+        4
+      ]
+    ],
+    "context": "Lattice quadrilateral area 1"
+  },
+  {
+    "chapterId": "c9-coordinate-geometry",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        5,
+        0
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        1,
+        5
+      ]
+    ],
+    "context": "Lattice quadrilateral area 2"
+  },
+  {
+    "chapterId": "c9-coordinate-geometry",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        6,
+        0
+      ],
+      [
+        7,
+        5
+      ],
+      [
+        1,
+        6
+      ]
+    ],
+    "context": "Lattice quadrilateral area 3"
+  },
+  {
+    "chapterId": "c9-coordinate-geometry",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        7,
+        0
+      ],
+      [
+        8,
+        6
+      ],
+      [
+        1,
+        7
+      ]
+    ],
+    "context": "Lattice quadrilateral area 4"
+  },
+  {
+    "chapterId": "c9-coordinate-geometry",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        8,
+        0
+      ],
+      [
+        9,
+        7
+      ],
+      [
+        1,
+        8
+      ]
+    ],
+    "context": "Lattice quadrilateral area 5"
+  },
+  {
+    "chapterId": "c9-coordinate-geometry",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        9,
+        0
+      ],
+      [
+        10,
+        8
+      ],
+      [
+        1,
+        9
+      ]
+    ],
+    "context": "Lattice quadrilateral area 6"
+  },
+  {
+    "chapterId": "c9-coordinate-geometry",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        10,
+        0
+      ],
+      [
+        11,
+        9
+      ],
+      [
+        1,
+        10
+      ]
+    ],
+    "context": "Lattice quadrilateral area 7"
+  },
+  {
+    "chapterId": "c9-coordinate-geometry",
+    "kind": "polygonArea",
+    "vertices": [
+      [
+        0,
+        0
+      ],
+      [
+        11,
+        0
+      ],
+      [
+        12,
+        10
+      ],
+      [
+        1,
+        11
+      ]
+    ],
+    "context": "Lattice quadrilateral area 8"
+  },
+  {
+    "chapterId": "c9-linear-polynomials",
+    "kind": "scatterLine",
+    "m": -1,
+    "b": 2,
+    "points": [
+      -2,
+      0,
+      1,
+      3,
+      5
+    ],
+    "mode": "intercept",
+    "context": "Analytic line reading 1"
+  },
+  {
+    "chapterId": "c9-linear-polynomials",
+    "kind": "scatterLine",
+    "m": 2,
+    "b": 3,
+    "points": [
+      -2,
+      0,
+      1,
+      3,
+      5
+    ],
+    "mode": "slope",
+    "context": "Analytic line reading 2"
+  },
+  {
+    "chapterId": "c9-linear-polynomials",
+    "kind": "scatterLine",
+    "m": -3,
+    "b": 4,
+    "points": [
+      -2,
+      0,
+      1,
+      3,
+      5
+    ],
+    "mode": "intercept",
+    "context": "Analytic line reading 3"
+  },
+  {
+    "chapterId": "c9-linear-polynomials",
+    "kind": "scatterLine",
+    "m": 4,
+    "b": 5,
+    "points": [
+      -2,
+      0,
+      1,
+      3,
+      5
+    ],
+    "mode": "slope",
+    "context": "Analytic line reading 4"
+  },
+  {
+    "chapterId": "c9-linear-polynomials",
+    "kind": "scatterLine",
+    "m": -5,
+    "b": 6,
+    "points": [
+      -2,
+      0,
+      1,
+      3,
+      5
+    ],
+    "mode": "intercept",
+    "context": "Analytic line reading 5"
+  },
+  {
+    "chapterId": "c9-linear-polynomials",
+    "kind": "scatterLine",
+    "m": 6,
+    "b": 7,
+    "points": [
+      -2,
+      0,
+      1,
+      3,
+      5
+    ],
+    "mode": "slope",
+    "context": "Analytic line reading 6"
+  },
+  {
+    "chapterId": "c9-probability",
+    "kind": "histogram",
+    "counts": [
+      2,
+      4,
+      6,
+      8,
+      10
+    ],
+    "width": 3,
+    "mode": "total",
+    "context": "Outcome frequency tally 1"
+  },
+  {
+    "chapterId": "c9-probability",
+    "kind": "histogram",
+    "counts": [
+      3,
+      5,
+      7,
+      9,
+      11
+    ],
+    "width": 3,
+    "mode": "total",
+    "context": "Outcome frequency tally 2"
+  },
+  {
+    "chapterId": "c9-probability",
+    "kind": "histogram",
+    "counts": [
+      4,
+      6,
+      8,
+      10,
+      12
+    ],
+    "width": 3,
+    "mode": "total",
+    "context": "Outcome frequency tally 3"
+  },
+  {
+    "chapterId": "c9-probability",
+    "kind": "histogram",
+    "counts": [
+      5,
+      7,
+      9,
+      11,
+      13
+    ],
+    "width": 3,
+    "mode": "total",
+    "context": "Outcome frequency tally 4"
+  },
+  {
+    "chapterId": "c9-probability",
+    "kind": "histogram",
+    "counts": [
+      6,
+      8,
+      10,
+      12,
+      14
+    ],
+    "width": 3,
+    "mode": "total",
+    "context": "Outcome frequency tally 5"
+  },
+  {
+    "chapterId": "c9-probability",
+    "kind": "histogram",
+    "counts": [
+      7,
+      9,
+      11,
+      13,
+      15
+    ],
+    "width": 3,
+    "mode": "total",
+    "context": "Outcome frequency tally 6"
+  }
+];
+const data={};for(const {chapterId,kind,...p} of specs)(data[chapterId]||={examples:[]}).examples.push(makeInquiryVisual(kind,p));
+export default data;
