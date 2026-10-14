@@ -111,7 +111,14 @@ r = stepCheck(pointAtGradientPlan,
   'dy/dx = 2x + 1\n2x + 1 = 5\nx = 3\ny = 13\n(3, 13)');
 same('wrong solved x breaks before later arithmetic', r.firstBreak, 2);
 ok('wrong x has a high-confidence diagnosis', r.diagnosis?.confidence === 'high');
-same('later line after wrong x is downgraded to note', r.lines[3]?.status, 'note');
+same('arithmetic on an earlier wrong x is independently verified as ECF', r.lines[3]?.status, 'ok');
+same('and only the verified arithmetic receives a carried flag', r.lines[3]?.carried, true);
+r = stepCheck(pointAtGradientPlan,
+  'dy/dx = 2x + 1\n2x + 1 = 5\nx = 3\ny = 14');
+same('wrong x remains the first break despite a second independent mistake', r.firstBreak, 2);
+same('later arithmetic false even at the wrong x is a second break', r.lines[3]?.status, 'break');
+same('an erroneous later step is never marked carried', r.lines[3]?.carried, undefined);
+
 
 r = stepCheck(pointAtGradientPlan,
   'dy/dx = 2x + 1\n2x + 1 = 5\nx = 2\ny = 8\n(2, 8)');
@@ -127,6 +134,21 @@ r = stepCheck(pointAtGradientPlan,
   'dy/dx = 2x + 1\nx = 2\ny = 7\n(2, 7)');
 same('equation source may be omitted when solved equation is independently equivalent', r.firstBreak, -1);
 same('four stages still complete with compact working', r.completedStages, 4);
+
+// Deterministic ECF must distinguish a correct consequence of the wrong
+// value from a second independent arithmetic mistake, while keeping firstBreak.
+const earlierWrong = { kind: 'equation', variable: 'x', solutions: [5], source: 'x = 5' };
+r = stepCheck(earlierWrong, 'x = 4\n2x + 3 = 11');
+same('incorrect x itself is the first break', r.firstBreak, 0);
+same('11 is correctly calculated using x=4, without certifying x=4', r.lines[1]?.status, 'ok');
+same('correctly carried calculation is identified separately', r.lines[1]?.carried, true);
+r = stepCheck(earlierWrong, 'x = 4\n2x + 3 = 12');
+same('independent second arithmetic error is preserved', r.lines[1]?.status, 'break');
+same('first-error navigation index stays at original error', r.firstBreak, 0);
+r = stepCheck(earlierWrong, 'x = 4\nx = 3');
+same('another invented value is a second break, never follow-through', r.lines[1]?.status, 'break');
+r = stepCheck(earlierWrong, 'x = 4\n2x + 3 = 11\n2x + 3 = 12');
+same('later false equality after valid ECF is still a break', r.lines[2]?.status, 'break');
 
 // ── First-class domain constraints ──────────────────────────────────────────
 const nested = domainConstraintsFor('1/(1/x)');

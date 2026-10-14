@@ -161,7 +161,11 @@ same('all modulus plan stages complete', report.completedStages, 3);
 report = stepCheck(modulusPlan, '-7 <= 3x - 2 <= 7\n-5/3 <= x <= 3\ncount = 5');
 same('wrong modulus boundary breaks immediately', report.firstBreak, 0);
 same('wrong modulus boundary diagnosis survives plan', report.diagnosis?.code, 'inequality-boundary-changed');
-same('later work after modulus break is note', report.lines[1]?.status, 'note');
+same('verified inequality transformation carries the earlier incorrect boundary', report.lines[1]?.status, 'ok');
+same('and is identified as error carried forward, not a fresh mistake', report.lines[1]?.carried, true);
+report = stepCheck(modulusPlan, '-7 <= 3x - 2 <= 7\n-5/3 <= x <= 4');
+same('boundary error is still the first break when the next inequality also changes region', report.firstBreak, 0);
+same('independently changed upper bound is a second break, never carried', report.lines[1]?.status, 'break');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 if (failures.length) {

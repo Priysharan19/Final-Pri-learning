@@ -53,7 +53,7 @@ let sent = null;
 const spy = {
   checkWorking: async (prompt, lines, opts) => {
     sent = { prompt, lines, opts };
-    return { check: { lines: [{ index: 0, status: 'ok', carried: false, why: '' }, { index: 1, status: 'break', carried: false, why: 'you added 3 to the right instead of subtracting it' }, { index: 2, status: 'ok', carried: true, why: 'correct on your own value' }], firstBreak: 1, hint: 'Look at what you did to both sides.', confidence: 0.93, needsConfirmation: false } };
+    return { check: { lines: [{ index: 0, status: 'ok', carried: false, why: '' }, { index: 1, status: 'break', carried: false, why: 'you added 3 to the right instead of subtracting it' }, { index: 2, status: 'ok', carried: true, why: 'correct on your own value' }], firstBreak: 1, hint: 'Look at what you did to both sides.', confidence: 0.93, needsConfirmation: false, verifiedByDeterministic: true } };
   }
 };
 
@@ -68,7 +68,7 @@ eq(sent.prompt, 'Solve 2x + 3 = 11.', 'and the question, without which "does thi
 eq(Object.keys(sent.opts || {}), ['signal'], 'and nothing travels beside them but the cancel signal');
 eq(check.firstBreak, 1, 'the check comes back naming the first broken line');
 
-const proposing = { checkWorking: async () => ({ check: { lines: [{ index: 0, status: 'ok', carried: false, why: '' }, { index: 1, status: 'break', carried: false, why: 'sign' }], firstBreak: 1, hint: '', confidence: 0.9, misconceptionId: 'sign-on-transfer', needsConfirmation: false } }) };
+const proposing = { checkWorking: async () => ({ check: { lines: [{ index: 0, status: 'ok', carried: false, why: '' }, { index: 1, status: 'break', carried: false, why: 'sign' }], firstBreak: 1, hint: '', confidence: 0.9, misconceptionId: 'sign-on-transfer', needsConfirmation: false, verifiedByDeterministic: true } }) };
 const proposed = await checkWorkingWithCloud(['3x + 5 = 20', '', '3x = 20 + 5'], { user: { cloudMarking: true }, transport: proposing, available: there });
 eq(proposed.misconceptionId, 'sign-on-transfer', 'a proposed misconception ID travels with the check');
 eq(misconceptionProposal(proposed, ['3x + 5 = 20', '', '3x = 20 + 5'])?.body,
@@ -100,6 +100,15 @@ eq(unsureMerge, localQuiet, 'an unsure check puts no mark on any line');
 eq(mergeVerdicts(localQuiet, { error: { code: 'X' } }, { lineCount: 3 }), localQuiet, 'and a failed check changes nothing');
 eq(mergeVerdicts(null, check, { lineCount: 3 })[1].status, 'break', 'it also works where there were no local verdicts at all');
 
+// A high-confidence model alone can NEVER paint a cross/tick or record a
+// misconception as independently established.
+const llmOnly = { ...check, verifiedByDeterministic: false, needsConfirmation: false };
+eq(mergeVerdicts(localQuiet, llmOnly, { lineCount: 3 }), localQuiet,
+  'even a 99% confident AI-only verdict does not become an authoritative annotation');
+eq(workingNote(llmOnly).tone, 'maybe', 'AI-only suspected error remains hedged');
+ok(!misconceptionProposal({ ...proposed, verifiedByDeterministic: false }, ['3x + 5 = 20', '', '3x = 20 + 5']).body.confident,
+  'AI-only misconception cannot be declared confirmed');
+
 // ── 4b · A verdict must land on the line the student actually wrote ──────────
 // Blank lines are not sent, so the server counts only non-blank lines while the
 // ink surface indexes every line it read. Untranslated, a ✗ and "the mistake is
@@ -108,7 +117,7 @@ let sentLines = null;
 const blanksSpy = {
   checkWorking: async (prompt, lines) => {
     sentLines = lines;
-    return { check: { lines: [{ index: 0, status: 'ok', carried: false, why: '' }, { index: 1, status: 'ok', carried: false, why: '' }, { index: 2, status: 'break', carried: false, why: 'sign error' }], firstBreak: 2, hint: 'check the sign', confidence: 0.93, needsConfirmation: false } };
+    return { check: { lines: [{ index: 0, status: 'ok', carried: false, why: '' }, { index: 1, status: 'ok', carried: false, why: '' }, { index: 2, status: 'break', carried: false, why: 'sign error' }], firstBreak: 2, hint: 'check the sign', confidence: 0.93, needsConfirmation: false, verifiedByDeterministic: true } };
   }
 };
 const withBlanks = ['2x+3=9', '', '2x=6', '', 'x=2'];
@@ -141,8 +150,8 @@ eq(hedged.tone, 'maybe', 'an unsure one is presented as a suggestion');
 ok(/might be|not certain/i.test(hedged.text), 'in words that say so out loud');
 
 const noBreak = workingNote({ lines: [{ index: 0, status: 'ok', carried: false, why: '' }], firstBreak: -1, hint: '', confidence: 0.9, needsConfirmation: false });
-ok(/follows from the one before/.test(noBreak.text),
-  'when every line follows, the student is told the algebra was sound — which is the useful thing to know');
+ok(/does not prove that every step is correct/.test(noBreak.text),
+  'model-only all-clear cannot certify the algebra');
 ok(workingNote(null) === null && workingNote({ error: {} }) === null, 'nothing to say when there was no check');
 
 console.log(failures.length

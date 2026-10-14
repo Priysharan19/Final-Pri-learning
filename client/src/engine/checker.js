@@ -498,6 +498,30 @@ function unreadLines(rawLines) {
 }
 const unreadNote = entry => (typeof entry === 'function' ? entry() : entry);
 
+/**
+ * Narrow, independently verified error-carried-forward arithmetic.
+ * A proven-wrong value `x = 4` may still support `2x + 3 = 11`;
+ * `2x + 3 = 12` is another error. No symbolic, branching, unbound-variable
+ * or model-only relationship is credited as ECF.
+ */
+function verifiedCarriedArithmetic(previous, current) {
+  const prior = String(previous || '').match(/^([a-zA-Z])\s*=\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))$/);
+  const next = String(current || '').match(/^(.+?)\s*=\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))$/);
+  if (!prior || !next) return false;
+  const variable = prior[1];
+  const lhs = next[1];
+  if (!lhs.includes(variable)) return false;
+  if (!/[+*\/-]/.test(lhs) || /[\^=<>]|\b(?:sqrt|log|ln|sin|cos)\b/i.test(lhs)) return false;
+  try {
+    const expr = parse(normalize(lhs));
+    if (expr.t === 'equation') return false;
+    const vars = variablesOf(expr);
+    if (vars.size !== 1 || !vars.has(variable)) return false;
+    const got = evaluate(expr, { [variable]: Number(prior[2]) });
+    return Number.isFinite(got) && numsClose(got, Number(next[2]), 1e-9);
+  } catch { return false; }
+}
+
 function stepCheckSingle(meta, workingText, system = null, { loneBranches = false } = {}) {
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   const unread = unreadLines(rawLines);
@@ -744,8 +768,17 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       note = 'Skipped — I couldn’t parse this line as maths.';
     }
 
+    let carried = false;
+    if (status === 'break' && firstBreak !== -1 && i > 0 &&
+        (out[i - 1]?.status === 'break' || out[i - 1]?.carried === true) &&
+        verifiedCarriedArithmetic(out[i - 1].text, line)) {
+      status = 'ok';
+      carried = true;
+      note = 'Arithmetic verified using your preceding value; the earlier error remains.';
+      lineDiagnosis = null;
+    }
     if (status === 'break' && firstBreak === -1) firstBreak = i;
-    out.push({ text: line, status, note, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
+    out.push({ text: line, status, note, ...(carried ? { carried: true } : {}), ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
   });
 
   // Branches were allowed on the promise that the working keeps every root.
@@ -771,13 +804,9 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
   }
 
   if (firstBreak === -1) return { lines: out, firstBreak, diagnosis: null };
-  for (let i = firstBreak + 1; i < out.length; i++) {
-    if (out[i].status === 'break' || out[i].branch) {
-      out[i].status = 'note';
-      out[i].note = 'Follows from the earlier slip.';
-      delete out[i].diagnosis;
-    }
-  }
+  // A disproved later claim stays disproved. The first error is a navigation
+  // index; it does not make every subsequent line a legitimate follow-through.
+  // Branch diagnostics are retained, never silently turned into notes.
 
   let prevText = null;
   for (let i = firstBreak - 1; i >= 0; i--) {
@@ -973,6 +1002,30 @@ export function planRequirements(meta) {
   });
 }
 
+/** Prove an ECF evaluation against an authored formula and the submitted
+ * wrong variable value. Never simply accept an "ok" from a model. */
+function verifiedCarriedEvaluation(stage, text, wrongValues) {
+  if (stage?.kind !== 'evaluation' || typeof stage.source !== 'string') return false;
+  const claim = String(text || '').match(/^([a-zA-Z][a-zA-Z\/]*)\s*=\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))$/);
+  if (!claim || !Array.isArray(stage.labels) || !stage.labels.includes(claim[1])) return false;
+  const substitutions = stage.substitutions;
+  if (!substitutions || typeof substitutions !== 'object') return false;
+  try {
+    const source = parse(normalize(stage.source));
+    const correct = evaluate(source, substitutions);
+    if (!Number.isFinite(correct) || !numsClose(correct, Number(stage.expected), 1e-9)) return false;
+    const alternate = { ...substitutions };
+    let changed = false;
+    for (const [name, value] of wrongValues) {
+      if (Object.hasOwn(substitutions, name) && Number(substitutions[name]) !== value) {
+        alternate[name] = value; changed = true;
+      }
+    }
+    const carried = changed ? evaluate(source, alternate) : null;
+    return Number.isFinite(carried) && numsClose(carried, Number(claim[2]), 1e-9);
+  } catch { return false; }
+}
+
 function stepCheckPlan(meta, workingText) {
   const rawLines = String(workingText || '').split('\n').map(line => line.trim()).filter(Boolean);
   const stages = Array.isArray(meta?.stages) ? meta.stages.filter(Boolean) : [];
@@ -989,6 +1042,7 @@ function stepCheckPlan(meta, workingText) {
   let active = 0;
   let firstBreak = -1;
   let diagnosis = null;
+  const wrongValues = new Map(); // observed false assignments, not trusted mathematical facts
 
   const ready = idx => requires[idx].every(r => completed.has(r));
 
@@ -997,9 +1051,37 @@ function stepCheckPlan(meta, workingText) {
     const line = rawLines[i];
     const skipped = unreadNote(unread[i]);
     if (skipped) { out.push({ text: line, status: 'note', note: skipped, unread: true, stage: active }); continue; }
+    // Later lines still need proof. In particular, a second independent
+    // arithmetic error is NOT magically error-carried-forward credit.
+    // Stage prerequisites continue to apply; unsupported follow-through
+    // remains unverified rather than being asserted correct.
+
+    // ECF is only supported when an authored formula independently verifies
+    // this computation on a student's earlier incorrect value. It does not
+    // complete the authored stage, nor erase firstBreak.
     if (firstBreak !== -1) {
-      out.push({ text: line, status: 'note', note: 'Follows from the earlier slip.', stage: active });
-      continue;
+      // A subsequent chained inequality may be a provably equivalent
+      // transformation of an earlier *wrong boundary*. Check the two actual
+      // written regions, including endpoint inclusion, instead of treating
+      // agreement with the correct original question as the ECF criterion.
+      const prior = out[i - 1];
+      if (prior && (prior.status === 'break' || prior.carried === true) &&
+          /[<>]/.test(prior.text) && /[<>]/.test(line)) {
+        const carriedRelation = assessRelationChainLine({
+          text: line, meta: { kind: 'chained-inequality', source: prior.text, requireProgress: true }
+        });
+        if (carriedRelation.status === 'ok' && carriedRelation.trusted === true) {
+          out.push({ text: line, status: 'ok', carried: true, stage: active,
+            note: 'Equivalent to your preceding inequality; its earlier boundary error remains.' });
+          continue;
+        }
+      }
+      const carriedStage = stages.findIndex(stage => verifiedCarriedEvaluation(stage, line, wrongValues));
+      if (carriedStage !== -1) {
+        out.push({ text: line, status: 'ok', carried: true, stage: carriedStage,
+          note: 'This arithmetic is correct using your earlier value; that earlier error remains.' });
+        continue;
+      }
     }
 
     // Every verdict on this line is drawn once and kept.
@@ -1042,9 +1124,10 @@ function stepCheckPlan(meta, workingText) {
     if (broken !== undefined) {
       const verdict = assess(broken);
       active = broken;
-      firstBreak = i;
-      diagnosis = verdict.diagnosis || null;
-      out.push({ text: line, status: 'break', stage: broken, note: verdict.note, ...(diagnosis ? { diagnosis } : {}) });
+      if (firstBreak === -1) { firstBreak = i; diagnosis = verdict.diagnosis || null; }
+      const wrongAssignment = line.match(/^([a-zA-Z])\s*=\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))$/);
+      if (wrongAssignment) wrongValues.set(wrongAssignment[1], Number(wrongAssignment[2]));
+      out.push({ text: line, status: 'break', stage: broken, note: verdict.note, ...(verdict.diagnosis ? { diagnosis: verdict.diagnosis } : {}) });
       continue;
     }
 
@@ -1062,9 +1145,10 @@ function stepCheckPlan(meta, workingText) {
     const wrongRoot = done.find(idx => stages[idx].kind === 'equation' && assess(idx).status === 'break');
     if (wrongRoot !== undefined) {
       const verdict = assess(wrongRoot);
-      firstBreak = i;
-      diagnosis = verdict.diagnosis || null;
-      out.push({ text: line, status: 'break', stage: wrongRoot, note: verdict.note, ...(diagnosis ? { diagnosis } : {}) });
+      if (firstBreak === -1) { firstBreak = i; diagnosis = verdict.diagnosis || null; }
+      const wrongAssignment = line.match(/^([a-zA-Z])\s*=\s*([+-]?(?:\d+(?:\.\d+)?|\.\d+))$/);
+      if (wrongAssignment) wrongValues.set(wrongAssignment[1], Number(wrongAssignment[2]));
+      out.push({ text: line, status: 'break', stage: wrongRoot, note: verdict.note, ...(verdict.diagnosis ? { diagnosis: verdict.diagnosis } : {}) });
       continue;
     }
 
@@ -2261,8 +2345,8 @@ function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = n
   if (statedRoots) {
     const wanted = uniqueNumeric(meta.solutions);
     const values = [];
-    for (const l of allLines) {
-      if (l.status === 'break') continue;
+    for (const [index, l] of allLines.entries()) {
+      if (index === firstBreak && l.status === 'break') continue;
       const c = readClaim(l.text);
       const v = c?.kind === 'equation' ? statedRootOf(c, meta.variable) : null;
       if (v !== null && !values.some(x => numsClose(x, v))) values.push(v);

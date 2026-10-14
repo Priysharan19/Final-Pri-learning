@@ -538,7 +538,7 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
     // The slip in the middle or first: the working stops there, as it always did.
     ok(pos('(x-3)(x-5)=0\nx=3\nx=7\nx=5') === 2, 'slip in the middle: the factorisation and the root above the slip stand, the root after it earns nothing');
     ok(neg('(x+3)(x+5)=0\nx=-3\nx=-7\nx=-5') === 2, '…the same on two negative roots');
-    ok(why(...POS, '(x-3)(x-5)=0\nx=3\nx=7\nx=5') === 'progress,progress,break,note', '…line by line');
+    ok(why(...POS, '(x-3)(x-5)=0\nx=3\nx=7\nx=5') === 'progress,progress,break,after-mistake', '…line by line');
     ok(pos('(x-3)(x-5)=0\nx=7\nx=3\nx=5') === 1 && neg('(x+3)(x+5)=0\nx=-7\nx=-3\nx=-5') === 1, 'slip first: only the factorisation earns');
     // A repeated root has one value to read off.
     ok(rep('(x-4)^2=0\nx=4\nx=7') === 2 && rep('(x-4)^2=0\nx=4\nx=7') === rep('(x-4)^2=0\nx=4'), 'repeated root: the square, the root and a slip keep both marks');
@@ -551,7 +551,7 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
     ok(pos('x=3\nx=5') === 0 && pos('x-3=0\nx-5=0\nx-7=0') === 0 && pos('2x=6\n2x=10\n2x=14') === 0 && pos('x+1=4\nx+1=6\nx+1=8') === 0, 'nor do they in any other spelling');
     ok(rep('x=4\nx=7') === 0 && zero('x=0\nx=2\nx=4') === 0, 'nor a repeated root or a root at zero, guessed');
     ok(pos('(x-3)(x-5)=0\nx=3\nx=5\nx=7\nx=9') === 1 && neg('(x+3)(x+5)=0\nx=-3\nx=-5\nx=-7\nx=-9') === 1, 'two wrong values after the roots are a list of candidates: the roots lose their marks, the factorisation keeps its own');
-    ok(why(...POS, '(x-3)(x-5)=0\nx=3\nx=5\nx=7\nx=9') === 'progress,contradicted,contradicted,break,note', '…and the roots are marked as contradicted');
+    ok(why(...POS, '(x-3)(x-5)=0\nx=3\nx=5\nx=7\nx=9') === 'progress,contradicted,contradicted,break,break', '…and the roots are marked as contradicted');
     ok(pos('(x-3)(x-5)=0\nx=3\nx=5\nx=7\nx=7') === 1, 'the wrong value written twice is not a slip either');
     ok(pos('(x-3)(x-5)=0\nx=3\nx=7\nx=9') === 1 && pos('(x-3)(x-5)=0\nx=3\nx=7\nx=9\nx=5') === 1, 'a root followed by two wrong values is a list of candidates');
     ok(pos('(x-3)(x-5)=0\nx=1\nx=2\nx=3\nx=4\nx=5') === 1 && pos('(x-3)(x-5)=0\nx=5\nx=4\nx=3\nx=2\nx=1') === 1, 'a run of values through both roots is a sweep, in either order: only the factorisation earns');
@@ -587,7 +587,7 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
     // the line check, but it is not true either: it is not what sets a false
     // line beside it aside.
     ok(pos('(x-3)(x-5)=0\n(x-3)(x-4)=0\n(x-1)(x-2)=0\nx=3\nx=5') === 0 && pos('(x-3)(x-5)=0\n(x-3)(x-4)=0\n(x-1)(x-2)=0') === 0, 'three factorisations tried are a sweep even when the second shares a root with the question: none earns, nor the roots after them');
-    ok(why(...POS, '(x-3)(x-5)=0\n(x-3)(x-4)=0\n(x-1)(x-2)=0\nx=3\nx=5') === 'contradicted,contradicted,break,note,note', '…line by line');
+    ok(why(...POS, '(x-3)(x-5)=0\n(x-3)(x-4)=0\n(x-1)(x-2)=0\nx=3\nx=5') === 'contradicted,contradicted,break,after-mistake,after-mistake', '…line by line');
     ok(pos('(x-3)(x-4)=0\n(x-3)(x-5)=0\n(x-1)(x-2)=0') === 0 && pos('(x-3)(x-4)=0\n(x-1)(x-2)=0\n(x-3)(x-5)=0') === 0, '…in any order');
     ok(lin('3t=9\n3t=12\n3t=15') === 0 && lin('5t-2t=5+4\n3t=9\n3t=12\n3t=15') === 1 && lin('t=3\nt=4\nt=5') === 0, 'on a linear equation a true line and two wrong values of its shape are still candidates');
     // The slip is never worth anything: with it, never more than without it.
