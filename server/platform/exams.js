@@ -660,8 +660,46 @@ const solutionOf = (q, marks, grid) => ({ steps: q.steps || [], answerText: keye
 
 // ── A response the marker was stopped on ────────────────────────────────────
 // Each part of a paper is one pool operation with the hard deadline; the paper
-// as a whole has a marking budget (markerPool.js MARKER_LIMITS). A part that is
-// cut off is never given a verdict the engine did not reach:
+// as a whole has a marking budget (markerPool.js MARKER_LIMITS); and the engine
+// reads working under its own clock (checker.js WORKING_LIMITS.backstopMs).
+// All three are wall-clock limits: whether one is reached depends on what else
+// this machine is doing, not only on what the student wrote.
+//
+// So a paper with ANY part that was stopped is not finalised by that marking
+// at all (finalise, below): nothing is written, and the finish is answered
+// MARKING_BUSY — retry. The paper is marked again from the start, and when
+// every part completes, the result is the one an idle machine gives. A paper
+// is therefore either a VERIFIED result or not yet a result.
+//
+// A held paper is FROZEN. The first held finish saves the answers and working
+// it was marking, and from then on that paper is marked on exactly those:
+// a later finish cannot carry different ones and a save is refused. Otherwise
+// "held" would be a second sitting — and with working read only under a wrong
+// answer it was an answer oracle (right: finalised; wrong: held, open, answer
+// again). Working is now read whatever the answer was (markerOps.js
+// examAnswerStage), so whether a paper is held does not depend on any answer
+// being right, and a held paper cannot be changed in any case.
+//
+// The ceiling on that. An entry the engine can never mark inside its deadline
+// would otherwise keep its paper open for ever, and cost a paper's marking
+// budget on every retry and every sweep. After EXAM_UNVERIFIED_LIMIT COUNTED
+// stopped markings the paper IS finalised, and the parts that were stopped
+// that last time are recorded by the two rules below — each flagged on its
+// result line, never passed off as a marked part. A stopped marking is
+// counted only when
+//   · it had the whole paper budget. An account that is cooling down is given
+//     one deadline's worth for the paper, so most of its parts are never
+//     reached: that says nothing about the paper and is not counted; and
+//   · at least EXAM_UNVERIFIED_SPACING_MS (60 s) have passed since the last
+//     counted one. A device retries a held finish after two seconds; three
+//     retries are six seconds — one spike of load, not three observations.
+//     Sixty seconds is thirty such retries, far longer than a burst of
+//     marking lasts (a whole paper's budget is 8 s), and it is the shortest
+//     interval the server's own sweep may run at (housekeeping.js), so every
+//     sweep still counts. The ceiling is thus reached only by a paper that
+//     could not be marked at three moments spread over two minutes or more.
+// A marking that is not counted still holds the paper; it just does not bring
+// the ceiling nearer.
 //
 // RULE (the part's ANSWER was not marked in time, or the paper's budget was
 // already spent) — the part is UNREADABLE: it earns the grid's unanswered
@@ -680,14 +718,21 @@ const unreadableResponse = (q, grid) => ({
 const workingNotReadResponse = answered => ({
   ...answered, feedback: (answered.feedback ? answered.feedback + ' ' : '') + WORKING_NOT_READ_NOTE, workingNotRead: true
 });
+/** How many markings of one paper may be stopped before it is finalised with the stopped parts flagged. */
+export const EXAM_UNVERIFIED_LIMIT = 3;
+/** The least time between two stopped markings that both count towards that. */
+export const EXAM_UNVERIFIED_SPACING_MS = 60 * 1000;
 const cutOffFlags = r => ({ ...(r.unreadable ? { unreadable: true } : {}), ...(r.workingNotRead ? { workingNotRead: true } : {}) });
 
 /**
  * Mark every response of a paper in the marker pool. Returns the responses in
  * the exact order markPaper asks for them (it is markPaper itself that
- * enumerates them, so the two cannot drift), how many operations were stopped
- * at the deadline, or `{ busy: true }` when the pool refused one before it ran
- * (then nothing is known and nothing may be committed).
+ * enumerates them, so the two cannot drift), `kills` (how many workers had to
+ * be terminated — only those count towards the account's cooldown), `stopped`
+ * (how many parts have no complete marking: stopped at the deadline, stopped
+ * by the engine's own clock, or never started because the budget was spent),
+ * or `{ busy: true }` when the pool refused one before it ran (then nothing is
+ * known and nothing may be committed).
  */
 async function markResponsesIsolated(paper, responses, accountId, budgetMs = null) {
   const jobs = [];
@@ -695,22 +740,23 @@ async function markResponsesIsolated(paper, responses, accountId, budgetMs = nul
   markPaper(paper, responses, { now: 0, totalMs: 0, mark: (q, given, working, grid) => { jobs.push({ q, given, working, grid }); return placeholder; } });
   const pool = markerPool();
   let budget = budgetMs ?? pool.examPaperBudgetMs;
-  let kills = 0;
+  let kills = 0, stopped = 0;
   const results = [];
   for (const job of jobs) {
-    if (budget <= 0) { results.push(unreadableResponse(job.q, job.grid)); continue; }
+    if (budget <= 0) { stopped++; results.push(unreadableResponse(job.q, job.grid)); continue; }
     const allowed = Math.min(pool.deadlineMs, budget);
     const out = await pool.run('exam', job, { key: accountId, deadlineMs: allowed });
     if (!out.ok && out.code === MARKING_BUSY) return { busy: true, kills };
     // A part that was stopped has used all the time it was allowed.
     budget -= out.ok ? out.ms : Math.max(out.ms, allowed);
-    if (out.ok) { results.push(out.value.response); continue; }
-    kills++;
+    if (out.ok && out.value?.unverified !== true) { results.push(out.value.response); continue; }
+    stopped++;
+    if (!out.ok) kills++;
     const answered = out.partials.find(part => part?.response);
     // A stage-one response that was already final needed no working.
     results.push(answered ? (answered.final ? answered.response : workingNotReadResponse(answered.response)) : unreadableResponse(job.q, job.grid));
   }
-  return { results, kills };
+  return { results, kills, stopped };
 }
 
 /**
@@ -1002,9 +1048,13 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
     const saved = snapshot
       ? { answers: snapshot.answers || {}, workings: snapshot.workings || {}, times: snapshot.times || {}, modes: snapshot.modes || {} }
       : { answers: {}, workings: {}, times: {}, modes: {} };
+    // A paper a finish has been held on is marked on what that finish saved,
+    // whatever this request carries.
+    const hold = await readRecord(db, accountId, 'exam-marking-stopped', id, now);
+    const frozen = hold?.frozen === true;
     // In time: what the request carries, falling back to the snapshot for
     // anything it left out. Late: only what the server had already saved.
-    const responses = inTime ? {
+    const responses = inTime && !frozen ? {
       answers: body.answers === undefined || body.answers === null ? saved.answers : carried.answers,
       workings: body.workings === undefined || body.workings === null ? saved.workings : carried.workings,
       times: body.times === undefined || body.times === null ? saved.times : carried.times,
@@ -1012,7 +1062,7 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
     } : saved;
     // What was marked: the sealed paper and exactly these responses.
     const marking = digest(paperRow.response_json + '\n' + JSON.stringify(responses));
-    return { paper, inTime, snapshot, responses, marking };
+    return { paper, inTime, snapshot, responses, marking, hold, frozen };
   };
 
   // ── Mark first, with no transaction open; then commit under the lock ──────
@@ -1031,14 +1081,55 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
     const [consentBlockedBefore, cooling] = await Promise.all([
       authorise ? consentBlockedNow(db, accountId) : null, markerCooldownUntil(db, accountId)]);
     const marked = await markResponsesIsolated(forecast.paper, forecast.responses, accountId, cooling ? markerPool().deadlineMs : null);
+    marked.wholeBudget = !cooling;
     if (marked.kills) await recordMarkerKills(db, accountId, marked.kills);
     // Refused before a part ran: nothing is known about it, so nothing is
     // committed. A device retries; the sweep counts it and comes back.
     if (marked.busy) return { status: 503, code: MARKING_BUSY, message: BUSY_MESSAGE };
+    // A part was stopped by a clock: this marking is not a result (see "A
+    // response the marker was stopped on"). Nothing of it is committed unless
+    // this paper has now been stopped EXAM_UNVERIFIED_LIMIT times.
+    if (marked.stopped) {
+      const held = await holdUnverified(forecast, consentBlockedBefore, marked.wholeBudget === true);
+      if (held.again) continue;
+      if (!held.finalise) return held;
+    }
     const outcome = await commit(forecast, marked.results, consentBlockedBefore);
     if (!outcome.again) return outcome;
   }
   return { status: 503, code: MARKING_BUSY, message: BUSY_MESSAGE };
+
+  // Under the account's lock: freeze the paper on what was being marked, and
+  // count this stopped marking if it counts (see "A response the marker was
+  // stopped on"). A finish that arrived in time carries answers the server may
+  // not hold yet; they are saved here, once, and are from then on the only
+  // answers this paper is marked on — so a retry that arrives after the
+  // paper's time marks the same work, and no retry can mark different work.
+  // Returns { finalise: true } when the ceiling is reached, otherwise the
+  // MARKING_BUSY refusal.
+  function holdUnverified(forecast, consentBlockedBefore, wholeBudget) { return db.transaction(async () => {
+    if (authorise) {
+      const refused = await authorise(consentBlockedBefore);
+      if (refused) return refused;
+    }
+    const state = await read();
+    if (state.status || state.result || state.open) return state;
+    if (state.marking !== forecast.marking) return { again: true };
+    const prior = state.hold;
+    const counts = wholeBudget && (!Number.isFinite(Number(prior?.countedAt)) || now - Number(prior.countedAt) >= EXAM_UNVERIFIED_SPACING_MS);
+    const count = (Number(prior?.count) || 0) + (counts ? 1 : 0);
+    const json = JSON.stringify({ count, countedAt: counts ? now : prior?.countedAt ?? null, frozen: true, at: now });
+    await db.run(INSERT + ' ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json, request_digest=excluded.request_digest, created_at=excluded.created_at, expires_at=excluded.expires_at',
+      [accountId, 'exam-marking-stopped', id, json, digest(json), now, now + RECORD_TTL]);
+    if (!state.frozen) {
+      const kept = { ...state.responses, cur: state.snapshot?.cur ?? 0, rev: state.snapshot?.rev ?? -1, savedAt: now };
+      const keptJson = JSON.stringify(kept);
+      await db.run(INSERT + ' ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json, request_digest=excluded.request_digest',
+        [accountId, 'exam-answers', id, keptJson, digest(keptJson), now, now + RECORD_TTL]);
+    }
+    if (count >= EXAM_UNVERIFIED_LIMIT) return { finalise: true };
+    return { status: 503, code: MARKING_BUSY, message: BUSY_MESSAGE };
+  }, { accountScope: accountId, lock: syncLockKey(accountId) }); }
 
   function commit(forecast, results, consentBlockedBefore) { return db.transaction(async () => {
     if (authorise) {
@@ -1305,6 +1396,11 @@ export function createExamRouter(db) {
       const responses = readResponses(body, paper);
       if (!responses) return { status: 400, code: 'EXAM_ANSWERS_INVALID', message: 'Send the current answers, working and times for this paper only.' };
       if (await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='exam-result' AND key=?", [accountId, id])) {
+        return { status: 409, code: 'EXAM_FINALISED', message: 'This paper has been submitted — it can no longer change.' };
+      }
+      // A paper a finish has been held on is frozen on what that finish
+      // carried: it is waiting to be marked, not open to be answered again.
+      if ((await read(accountId, 'exam-marking-stopped', id, now))?.frozen === true) {
         return { status: 409, code: 'EXAM_FINALISED', message: 'This paper has been submitted — it can no longer change.' };
       }
       if (now > paper.deadline + FINISH_GRACE_MS) {
