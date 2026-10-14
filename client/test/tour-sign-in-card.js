@@ -888,8 +888,34 @@ export const minorFlow = {
       await card.getByTestId('signup-parent-continue').count() === 0
         && await card.getByTestId('signup-parent-check').isVisible()
         && new URL(page.url()).pathname === '/');
+
+    // A -> B -> A: the pending child A's tab sees a fresh guardian response for
+    // unrelated adult B, while the browser session can already be A again.
+    // A single *bound* response must not become a guardian bypass for A.
+    const wrongAdult = async route => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({
+        accountId: 'acct_unrelated_adult_B', sessionBinding: 'b'.repeat(64),
+        required: false, state: 'not-required', emailVerified: true, eligible: true
+      })
+    });
+    await page.route('**/v1/account/guardian/state', wrongAdult);
     await card.getByTestId('signup-parent-check').click();
-    await card.getByTestId('signup-error').waitFor({ timeout: 15000 });
+    await card.getByTestId('signup-error').waitFor({ state: 'visible', timeout: 15000 });
+    await check('A→B→A guardian-response race is refused before linking the pending child account',
+      /signed-in Pri account changed/.test(await errorText(card))
+        && await stepOf(card) === 'parent-wait'
+        && new URL(page.url()).pathname === '/'
+        && consent().confirmed_at === null,
+      await errorText(card));
+    await page.unroute('**/v1/account/guardian/state', wrongAdult);
+    await page.waitForFunction(() =>
+      !document.querySelector('[data-testid=signup-parent-check]')?.disabled,
+      null, { timeout: 15000 });
+
+    await card.getByTestId('signup-parent-check').click();
+    await page.waitForFunction(() => /approval is still pending/i.test(
+      document.querySelector('#signup-error')?.textContent || ''), null, { timeout: 15000 });
     await check('checking before actual parental approval keeps the minor on the waiting card',
       /approval is still pending/.test(await errorText(card))
         && await stepOf(card) === 'parent-wait'
