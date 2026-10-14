@@ -98,9 +98,18 @@ export const flow = {
     await check('navigation contains no HSC terminology', !HSC.test(nav) && !/\bYear\b/.test(nav));
 
     await goto('/progress');
+    // IndiaProgress waits for both the server curriculum and stats before it
+    // mounts its heading. The app shell can render first, so asserting the h1
+    // immediately races its honest loading skeleton on slower CI runners.
+    // An error is NOT treated as success: surface the real page state below.
+    await page.locator('main .pg-head h1, main [role="alert"]').first()
+      .waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    const progressHeadings = page.locator('main .pg-head h1');
+    const progressHeading = await progressHeadings.count() === 1
+      ? await progressHeadings.innerText() : '';
     await check('Class 10 learner can open the real progress page',
-      await page.locator('main h1').count() === 1 &&
-      /Class 10/.test(await page.locator('main h1').innerText()));
+      await progressHeadings.count() === 1 && /Class 10/.test(progressHeading),
+      `URL ${page.url()}, heading ${JSON.stringify(progressHeading)}, screen ${JSON.stringify((await page.locator('main').innerText().catch(() => '')).slice(0, 400))}`);
     await check('fresh profile does not pretend to have studied before',
       !/\bPri demo\b/i.test(await page.locator('main').innerText()));
     await goto('/history');
