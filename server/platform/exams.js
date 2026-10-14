@@ -1483,12 +1483,15 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
     if (state.status) return state;
     if (!mayAttempt(state.page, now, body.retry)) return asItStands(state);
     const attempts = Number(state.stored.attempts || 0) + 1;
+    // Refunded attempts reuse the quota slot, not the reservation identity.
+    // A late result from an earlier read must never commit into a new reservation.
+    const attemptGeneration = Number(state.stored.attemptGeneration || 0) + 1;
     await write(withPage(state.result, {
-      ...state.stored, attempts, autoUsed: true, lastAttemptAt: now,
+      ...state.stored, attempts, attemptGeneration, autoUsed: true, lastAttemptAt: now,
       nextAttemptAt: now + HANDWRITING_BACKOFF_MS[Math.min(attempts, HANDWRITING_BACKOFF_MS.length) - 1]
     }));
     // Whether a reading of this page has already come back (uncertain or empty).
-    return { attempts, paper: state.paper, result: state.result, hadRead: Array.isArray(state.stored.transcript) };
+    return { attempts, attemptGeneration, paper: state.paper, result: state.result, hadRead: Array.isArray(state.stored.transcript) };
   }, lock);
   if (!reserved.attempts) return reserved;
 
@@ -1527,10 +1530,14 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
       const job = { q: item.q, given: stated.given.slice(0, MAX_ANSWER), working: stated.working?.slice(0, MAX_WORKING), grid: item.grid };
       const pool = markerPool();
       const out = await pool.run('exam', job, { key: accountId, deadlineMs: pool.deadlineMs });
-      if (!out.ok && out.code === MARKING_BUSY) failure = { reason: 'marking-busy', code: MARKING_BUSY };
-      else {
-        if (!out.ok) await recordMarkerKills(db, accountId, 1);
-        response = out.ok ? out.value.response : stoppedResponse(out, job);
+      // Neither a worker cut-off nor an engine-clock UNVERIFIED is evidence of
+      // an answer. Never feed a missing response into markPaper and never
+      // permanently resolve frozen handwriting as unreadable during a spike.
+      if (!out.ok || out.value?.unverified === true || !out.value?.response) {
+        if (!out.ok && out.code !== MARKING_BUSY) await recordMarkerKills(db, accountId, 1);
+        failure = { reason: 'marking-busy', code: MARKING_BUSY };
+      } else {
+        response = out.value.response;
         located = { sq, job };
       }
     }
@@ -1542,14 +1549,14 @@ async function resolveHandwriting(db, accountId, id, body, { env, transcribe, re
     const state = await load();
     if (state.status) return state;
     // Settled meanwhile, or this is not the attempt the row is waiting on.
-    if (state.stored.state === 'resolved' || Number(state.stored.attempts) !== reserved.attempts) return asItStands(state);
+    if (state.stored.state === 'resolved' || Number(state.stored.attemptGeneration || 0) !== reserved.attemptGeneration) return asItStands(state);
     let result = state.result;
     let page;
     if (failure) {
       // A refusal that reached no provider (the spending ceiling or the
       // account's allowance said no) does not use up one of the tries; it
       // still sets when the next request may be made.
-      const refunded = failure.reason === 'capacity' ? 1 : 0;
+      const refunded = failure.reason === 'capacity' || failure.reason === 'marking-busy' ? 1 : 0;
       const spent = reserved.attempts - refunded >= HANDWRITING_MAX_ATTEMPTS;
       page = {
         ...state.stored, attempts: reserved.attempts - refunded, lastFailure: failure.code,
