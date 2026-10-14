@@ -151,5 +151,5 @@ const shortHead=run(['validate-ledger',file('head-short.json',[reviewer]),...Obj
 verify('PR validator rejects short head SHA',shortHead.code!==0);
 const spoofed={...e1,body:e1.body.replace(/^Pri-Lease-Heartbeat-Ref:.*$/m,'Pri-Lease-Heartbeat-Ref: '+'b'.repeat(40))};
 const spoofResult=run(['admit',file('spoof-candidate.json',{id:'student-new',agent:'student-experience',status:'ACTIVE',branch:'agent/mission/student-experience/student-new',base_sha:sha,risk:'R2',paths:[student],dependencies:[]}),file('spoof-ledger.json',[spoofed])]);
-verify('Editable forged-looking heartbeat cannot grant a new writer',spoofResult.code!==0&&spoofResult.data.decision==='DENY');
+verify('Forged-looking heartbeat is snapshot-eligible but blocked by serialized-admission requirement',spoofResult.code!==0&&spoofResult.data.decision==='DENY'&&spoofResult.data.reason==='SERIALIZED_ADMISSION_REQUIRED'&&spoofResult.data.eligible_on_snapshot===true);
 console.log(`PASS: ${checks} deterministic governance regression assertions (isolated proposal; no GitHub write)`);

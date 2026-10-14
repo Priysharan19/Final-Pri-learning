@@ -68,3 +68,7 @@ The patch does not alter curriculum source, grading, authentication, student dat
 - P0 grading: review combined candidate #481, #439 and acceptance #482; preserve server-authoritative grading and answer-blind handwriting checks.
 - Study platform: inventory `c8-linear-equations` Notes-to-Practice route and versioned Pri Worlds research; no new code or second interactive engine before admission.
 - Curriculum production: independently verify PR #472 Class IX mathematics/figures, #484 CBSE answer-blind content and #486 JEE hints/rights; retain distinct author/reviewer separation.
+
+### Review finding correction: forged heartbeat is not authenticated
+
+Independent automated code review on PR #492 correctly noted that a generic DENY assertion is not evidence of detecting a forged reference. The regression now explicitly checks that forged-looking but syntactically valid markers remain **eligible on the read-only snapshot** and that no grant occurs solely because the unimplemented serialized admission authority returns `SERIALIZED_ADMISSION_REQUIRED`. There is no commit-existence, actor-signature or heartbeat provenance validation in this patch. Do not treat its green result as proof of spoof detection.
