@@ -39,12 +39,24 @@ const SERVER_READ_ONLY = new Set(['sync_cursors']);
 // Tables the server may read and insert into but never change or delete from:
 // the audit trail is append-only (supabase/migrations/20261005000000).
 const SERVER_APPEND_ONLY = new Set(['audit_log']);
-// Account-scoped sync tables that carry, beside the permissive pri_server_all
-// policy, a RESTRICTIVE pri_account_scope policy keyed on the pri.account_id
-// session GUC (store.js transaction({ accountScope })). Compared on the
+// Row-Level Security fails closed (supabase/migrations/20261016000000): every
+// table carries, beside the permissive pri_server_all policy, a RESTRICTIVE
+// pri_scope_required policy (no rows unless the statement declared pri.scope),
+// and the tables whose every row belongs to one account also carry a
+// RESTRICTIVE pri_account_scope policy (system scope, or account scope for that
+// row's account — store.js transaction({ accountScope })). Compared on the
 // expression text, normalised the way canonicalScope() does.
-const ACCOUNT_SCOPED = new Set(['learning_events', 'sync_entities', 'idempotency_keys']);
-const SCOPE_EXPRESSION = "coalesce(current_setting('pri.account_id', true), '') = '' or account_id = current_setting('pri.account_id', true)";
+const ACCOUNT_SCOPED = new Set([
+  'account_identities', 'account_sessions', 'account_tokens', 'auth_delivery_outbox',
+  'guardian_consents', 'account_phones', 'account_mfa', 'account_mfa_recovery_codes',
+  'entitlement_snapshots', 'entitlement_support_grants',
+  'billing_subscriptions', 'billing_trial_claims', 'billing_apple_accounts',
+  'billing_google_accounts', 'billing_google_purchases',
+  'idempotency_keys', 'learning_events', 'sync_entities', 'operational_events'
+]);
+const REQUIRED_EXPRESSION = "current_setting('pri.scope', true) = ANY (ARRAY['system', 'account'])";
+const REQUIRED_EXPRESSION_ALT = "current_setting('pri.scope', true) in ('system', 'account')";
+const SCOPE_EXPRESSION = "current_setting('pri.scope', true) = 'system' or (current_setting('pri.scope', true) = 'account' and coalesce(current_setting('pri.account_id', true), '') <> '' and account_id = current_setting('pri.account_id', true))";
 function canonicalScope(expression) {
   return String(expression || '').toLowerCase().replace(/::text/g, '').replace(/[\s()]/g, '');
 }
@@ -279,9 +291,13 @@ export function compareSchemas(sqlite, postgres) {
     const scoped = ACCOUNT_SCOPED.has(table);
     const permissive = p.policies.filter(policy => policy.polpermissive === true);
     const restrictive = p.policies.filter(policy => policy.polpermissive !== true);
-    check(permissive.length === 1, `${table}: expected exactly one ${scoped ? 'permissive ' : ''}RLS policy, found ${permissive.length}`);
-    if (scoped) check(restrictive.length === 1 && restrictive[0].polname === 'pri_account_scope', `${table}: expected a restrictive pri_account_scope policy, found ${restrictive.map(x => x.polname).join(',') || 'none'}`);
-    else check(restrictive.length === 0, `${table}: expected exactly one RLS policy, found ${p.policies.length}`);
+    check(permissive.length === 1, `${table}: expected exactly one RLS policy granting access (permissive), found ${permissive.length}`);
+    const named = name => restrictive.filter(x => x.polname === name).length;
+    check(named('pri_scope_required') === 1, `${table}: expected a restrictive pri_scope_required policy, found ${named('pri_scope_required') ? 'more than one' : 'none'}`);
+    if (scoped) check(named('pri_account_scope') === 1, `${table}: expected a restrictive pri_account_scope policy, found ${named('pri_account_scope') ? 'more than one' : 'none'}`);
+    const allowed = new Set(scoped ? ['pri_scope_required', 'pri_account_scope'] : ['pri_scope_required']);
+    const extra = restrictive.filter(x => !allowed.has(x.polname)).map(x => x.polname);
+    check(extra.length === 0, `${table}: unexpected restrictive RLS policies ${extra.join(',')}`);
     for (const policy of p.policies) {
       check(policy.roles.length === 1 && policy.roles[0] === 'pri_server', `${table}: policy ${policy.polname} applies to ${policy.roles.join(',') || 'PUBLIC'}, not only pri_server`);
       // The server reads AND writes every table: a policy narrowed to SELECT
@@ -291,9 +307,13 @@ export function compareSchemas(sqlite, postgres) {
       check(command === 'ALL', `${table}: policy ${policy.polname} is for ${command}, not ALL`);
       if (policy.polpermissive === true) {
         check(String(policy.qual) === 'true' && String(policy.withcheck) === 'true', `${table}: policy ${policy.polname} is not USING (true) WITH CHECK (true)`);
+      } else if (policy.polname === 'pri_scope_required') {
+        // No declared scope (unset, '' or anything else) must mean no rows.
+        const ok = expression => [REQUIRED_EXPRESSION, REQUIRED_EXPRESSION_ALT].map(canonicalScope).includes(canonicalScope(expression));
+        check(ok(policy.qual) && ok(policy.withcheck), `${table}: policy ${policy.polname} does not require a declared pri.scope (USING ${policy.qual}; WITH CHECK ${policy.withcheck})`);
       } else {
-        // The scope policy must be a no-op while the GUC is unset ('' or NULL)
-        // and exactly the account filter when it is set, for reads and writes.
+        // System scope, or account scope for exactly this row's account; an
+        // unset or empty pri.account_id must never match, for reads and writes.
         check(canonicalScope(policy.qual) === canonicalScope(SCOPE_EXPRESSION) && canonicalScope(policy.withcheck) === canonicalScope(SCOPE_EXPRESSION),
           `${table}: policy ${policy.polname} does not scope rows to pri.account_id (USING ${policy.qual}; WITH CHECK ${policy.withcheck})`);
       }

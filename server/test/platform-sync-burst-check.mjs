@@ -239,10 +239,10 @@ try {
       const raw = async (client, cursor, id) => client.query(`INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,payload_json,created_at)
         VALUES ($1,$2,$3,'control-device',$4,'practice-attempt','{}',$5)`, [cursor, id, solo.id, cursor, Date.now()]);
       const startCursor = (await syncPullPage(store, solo.id, 0)).cursor;
-      await a.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
+      await a.query('BEGIN ISOLATION LEVEL SERIALIZABLE'); await a.query("SELECT set_config('pri.scope', 'system', true)");
       const low = Number((await a.query("SELECT nextval('sync_cursor_seq') AS v")).rows[0].v);
       await raw(a, low, 'control-low');
-      await b.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
+      await b.query('BEGIN ISOLATION LEVEL SERIALIZABLE'); await b.query("SELECT set_config('pri.scope', 'system', true)");
       const high = Number((await b.query("SELECT nextval('sync_cursor_seq') AS v")).rows[0].v);
       await raw(b, high, 'control-high');
       await b.query('COMMIT');

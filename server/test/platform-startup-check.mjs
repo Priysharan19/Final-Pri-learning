@@ -172,7 +172,7 @@ try {
         const health = JSON.parse(text);
         eq(response.status, 200, 'health responds');
         eq(health.database?.engine, 'postgres', '/v1/health reports database.engine = postgres');
-        eq(health.schemaVersion, '11', 'and the migrated schema version');
+        eq(health.schemaVersion, '12', 'and the migrated schema version');
         eq(leaks(text, parsed.username, parsed.hostname + ':' + parsed.port, scratch.name, 'postgres://').length, 0, 'health names no user, host, port, database or URL');
         ok(/platform_db_open \{ engine: 'postgres' \}/.test(booted.stdout), 'the boot log names only the engine');
         eq(leaks(booted.stdout + booted.stderr, parsed.username, scratch.name, 'postgres://').length, 0, 'and the logs carry nothing of the URL');
