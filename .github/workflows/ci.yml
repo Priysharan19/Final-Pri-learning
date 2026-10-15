@@ -231,6 +231,7 @@ jobs:
           node server/test/mfa-check.mjs
           node server/test/oidc-consent-check.mjs
           node server/test/security-hardening-check.mjs
+          node server/test/rls-fail-closed-check.mjs
       - name: Billing lifecycle, database operations and HTTP journeys
         run: |
           node server/test/billing-cancel-refund-check.mjs
