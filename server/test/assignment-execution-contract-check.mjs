@@ -1,3 +1,4 @@
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { openTestStore } from './support/engine.mjs';
 import {

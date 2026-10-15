@@ -27,6 +27,7 @@
 // The root is known to the test only by solving the PUBLIC prompt itself.
 // No model, no key, no network beyond 127.0.0.1, no spend.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { createServer } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

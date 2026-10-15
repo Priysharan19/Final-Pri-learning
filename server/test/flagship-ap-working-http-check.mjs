@@ -19,6 +19,7 @@
 //   · a twelve-thousand-character sum is marked in well under a second, and a
 //     sweep of middle-term splits on a quadratic earns nothing.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

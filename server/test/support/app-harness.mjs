@@ -9,6 +9,7 @@
 // server/platform/db.js resolves the platform database path at module load.
 
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import { createServerApp } from '../../app.js';
 import { createPlatformDb } from '../../platform/db.js';
 import { decryptDeliveryToken } from '../../platform/deliveryCrypto.js';
@@ -55,6 +56,62 @@ export async function startApp({
     listener.once('error', reject);
   });
   const origin = `http://127.0.0.1:${server.address().port}`;
+  // One keep-alive connection pool per harness, over node:http rather than the
+  // global fetch dispatcher. Global fetch (undici 7) stops reusing connections
+  // for the rest of the process after a DELETE that carries a body, so a long
+  // suite (abuse-limits: ~2,800 requests) opened a fresh loopback socket per
+  // request; with thousands of sockets in TIME_WAIT macOS intermittently
+  // stalled a loopback SYN and undici gave up with connect ETIMEDOUT — in that
+  // suite and in every other suite running beside it. Requests here reuse a
+  // bounded pool for the harness's lifetime, whatever methods they use.
+  const agent = new http.Agent({ keepAlive: true, maxSockets: 64 });
+  const { port } = server.address();
+
+  // This host's loopback occasionally refuses or times out a connect for a
+  // moment machine-wide (measured with bare net.connect, no app involved: every
+  // process stalls at the same instant). A connect that failed sent no bytes,
+  // so the request never reached the app and resending it is exactly what any
+  // client does; it proves nothing either way about the server. Anything that
+  // fails after the socket connected is reported as-is.
+  async function send(method, path, headers, payload) {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await sendOnce(method, path, headers, payload);
+      } catch (error) {
+        const connectFailure = error?.syscall === 'connect' && ['ETIMEDOUT', 'ECONNREFUSED', 'ECONNRESET'].includes(error.code);
+        if (!connectFailure || attempt >= 8) throw error;
+        await new Promise(resolve => setTimeout(resolve, 50 * (attempt + 1)));
+      }
+    }
+  }
+
+  function sendOnce(method, path, headers, payload) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const outgoing = { ...headers };
+      if (payload !== undefined) {
+        payload = Buffer.isBuffer(payload) ? payload : Buffer.from(String(payload));
+        outgoing['Content-Length'] = String(payload.length);
+      }
+      const req = http.request({ host: '127.0.0.1', port, method, path, headers: outgoing, agent }, res => {
+        const chunks = [];
+        res.on('data', chunk => chunks.push(chunk));
+        res.on('error', error => { if (!settled) { settled = true; reject(error); } });
+        res.on('end', () => {
+          if (settled) return;
+          settled = true;
+          const responseHeaders = new Headers();
+          for (let i = 0; i < res.rawHeaders.length; i += 2) responseHeaders.append(res.rawHeaders[i], res.rawHeaders[i + 1]);
+          const bytes = Buffer.concat(chunks);
+          resolve({ status: res.statusCode, headers: responseHeaders, text: async () => bytes.toString('utf8') });
+        });
+      });
+      // A server may answer (413, 400) and close before an oversized body is
+      // fully written; the answer that already arrived is the result.
+      req.on('error', error => { if (!settled) { settled = true; reject(error); } });
+      if (payload !== undefined) req.end(payload); else req.end();
+    });
+  }
   const browserOrigin = production ? String(process.env.PRI_PUBLIC_ORIGIN || '').trim() : '';
 
   async function request(path, { method = 'GET', body, rawBody, jar = {}, headers = {} } = {}) {
@@ -69,12 +126,14 @@ export async function startApp({
       if (jar.pri_csrf && !lower['x-pri-csrf']) sendHeaders['x-pri-csrf'] = jar.pri_csrf;
       if (browserOrigin && !lower.origin) sendHeaders.Origin = browserOrigin;
     }
-    const response = await fetch(`${origin}${path}`, {
-      method,
-      headers: sendHeaders,
-      body: rawBody !== undefined ? rawBody : (body === undefined ? undefined : JSON.stringify(body)),
-      redirect: 'manual'
-    });
+    let payload = rawBody !== undefined ? rawBody : (body === undefined ? undefined : JSON.stringify(body));
+    if (payload instanceof URLSearchParams) {
+      if (!lower['content-type']) sendHeaders['Content-Type'] = 'application/x-www-form-urlencoded;charset=UTF-8';
+      payload = payload.toString();
+    }
+    // The same URL normalisation fetch applies (percent-encoding, dot segments).
+    const target = new URL(`${origin}${path}`);
+    const response = await send(method, `${target.pathname}${target.search}`, sendHeaders, payload);
     absorbCookies(response, jar);
     const text = await response.text();
     let data = null;
@@ -84,6 +143,7 @@ export async function startApp({
 
   async function close() {
     await new Promise(resolve => {
+      agent.destroy();
       server.closeAllConnections?.();
       server.close(resolve);
     });

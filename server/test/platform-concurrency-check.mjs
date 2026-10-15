@@ -19,6 +19,7 @@
 //   · a rate-limit bucket and the deployment's paid-call budget — never
 //     overspent.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';

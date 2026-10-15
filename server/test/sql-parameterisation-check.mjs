@@ -9,6 +9,7 @@
 // reviewed and listed. The HTTP half (SQL-ish strings stored verbatim, never
 // executed) lives in security-acceptance-check.mjs.
 
+import './support/hermetic.mjs';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

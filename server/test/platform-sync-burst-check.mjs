@@ -32,6 +32,7 @@
 //   6. THE PUSH ACKNOWLEDGEMENT TELLS AN ACCOUNT ONLY ABOUT ITSELF: its cursor is
 //      that push's own highest cursor, never the global allocator.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

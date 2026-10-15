@@ -10,6 +10,7 @@
 // "sign in" never creates an account, and Apple's form_post callback is only
 // relayed to the same-origin callback page.
 
+import './support/hermetic.mjs';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 
 process.env.PRI_GOOGLE_CLIENT_IDS = 'pri-google-client,pri-google-client-ios';

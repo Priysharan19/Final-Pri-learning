@@ -18,6 +18,7 @@
 // No network call is made; the provider is a stub and time is a fake clock
 // where a clock is needed.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { readFileSync } from 'node:fs';

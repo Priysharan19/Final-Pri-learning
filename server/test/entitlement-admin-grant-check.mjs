@@ -12,6 +12,7 @@
 // The clock is pinned here so that collision is not a matter of how fast the
 // machine is: every grant below is issued in the same millisecond.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { openTestStore } from './support/engine.mjs';

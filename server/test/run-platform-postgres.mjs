@@ -14,6 +14,7 @@
 // A suite that does not report `engine: postgres` counts as a failure: a run
 // that silently fell back to SQLite proves nothing about Postgres.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

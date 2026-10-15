@@ -24,6 +24,7 @@
 // The provider is a stub except in §4, which drives the real request builder
 // against a recording fetch. No network call, no API key, no spend.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { readFileSync } from 'node:fs';
 import express from 'express';
 import cookieParser from 'cookie-parser';

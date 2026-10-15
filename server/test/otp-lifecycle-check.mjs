@@ -8,6 +8,7 @@
 // consent gate, parent approval and withdrawal by code, and deletion of a
 // passwordless account.
 
+import './support/hermetic.mjs';
 process.env.PRI_AUTH_DELIVERY_KEY = '22'.repeat(32);
 process.env.PRI_SMS_PROVIDER = 'test';
 process.env.PRI_AUTH_EMAIL_PROVIDER = 'test';

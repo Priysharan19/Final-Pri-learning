@@ -13,6 +13,7 @@
 //
 // Run through scripts/with-postgres.mjs (npm run test:platform:pg).
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { scratchDatabase } from './support/postgres.mjs';
 import { compareAccess, compareSchemas, compareSeeds, postgresSchema, sqliteSchema } from './support/pgSchemaParity.mjs';
 

@@ -1,3 +1,4 @@
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { createPlatformDb } from '../platform/db.js';
 import { encryptDeliveryToken } from '../platform/deliveryCrypto.js';
