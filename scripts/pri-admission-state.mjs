@@ -147,12 +147,16 @@ export function assertLedgerMatchesGrants(issues, authority, mainSha, nowMs = Da
       !authority.active.has(x.number)))
     throw new Error('HIDDEN_MANAGED_ISSUE_' + x.number);
   const managed = openIssues.filter(x => String(x.title || '').startsWith('[PRI-MISSION]'));
-  const seen = new Set();
+  const seen = new Set(), seenMissionIds = new Set(), seenBranches = new Set();
   for (const x of managed) {
     const id = issueIdentity(x);
     if (!STATES.has(id.status)) throw new Error('UNKNOWN_MANAGED_ISSUE_STATUS_' + x.number);
     if (seen.has(id.issue_number)) throw new Error('DUPLICATE_ISSUE');
+    if (seenMissionIds.has(id.mission)) throw new Error('DUPLICATE_MISSION_ID');
+    if (seenBranches.has(id.branch)) throw new Error('DUPLICATE_MISSION_BRANCH');
     seen.add(id.issue_number);
+    seenMissionIds.add(id.mission);
+    seenBranches.add(id.branch);
     const current = authority.active.get(x.number);
     if (WRITERS.has(id.status)) {
       if (!current) throw new Error('WRITER_WITHOUT_AUTHORITY_' + x.number);
