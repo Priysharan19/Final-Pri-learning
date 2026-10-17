@@ -8,6 +8,32 @@ const sensitive = path =>
   path.startsWith('.github/workflows/') || /^scripts\/pri-/.test(path) ||
   /(^|\/)(auth|session|permissions|security)(\/|\.|-|$)/i.test(path);
 
+// Check every side of a GitHub change. A rename from sensitive/out-of-scope
+// source into an ordinary-looking path must NEVER erase the old authority.
+const FILE_STATUSES = new Set(['added','modified','removed','renamed','copied','changed','unchanged']);
+const legitimatePath = p => typeof p === 'string' && p.length > 0 &&
+  !p.startsWith('/') && !p.includes('\\\\') && !/[\\x00-\\x1f\\x7f]/.test(p) &&
+  !p.split('/').some(segment => !segment || segment === '.' || segment === '..');
+
+export function changedFilePaths(files) {
+  if (!Array.isArray(files)) throw Error('FILE_INVENTORY_MISSING');
+  const paths = [];
+  for (const file of files) {
+    if (!file || !FILE_STATUSES.has(file.status) || !legitimatePath(file.filename))
+      throw Error('MALFORMED_CHANGE_RECORD');
+    const historical = file.status === 'renamed' || file.status === 'copied';
+    if (historical) {
+      if (!legitimatePath(file.previous_filename) || file.previous_filename === file.filename)
+        throw Error('MISSING_OR_INVALID_PREVIOUS_FILENAME');
+      paths.push(file.previous_filename);
+    } else if (file.previous_filename != null) {
+      throw Error('UNEXPECTED_PREVIOUS_FILENAME');
+    }
+    paths.push(file.filename);
+  }
+  return [...new Set(paths)];
+}
+
 export function manualDecision({pr,headSha,reviews,permissions,files,securityReviewers=['Kalp-Bajpai']}) {
   const deny=(reason)=>({authorized:false,reason});
   if (!pr || pr.state!=='open' || !/^[a-f0-9]{40}$/i.test(String(headSha||'')) ||
@@ -33,12 +59,15 @@ export function manualDecision({pr,headSha,reviews,permissions,files,securityRev
     r.state==='APPROVED' && r.commit_id===headSha && r.user.login!==owner &&
     r.user.type==='User' && permitted.has(permissions?.[r.user.login]));
   if(!humanApproved.length) return deny('INDEPENDENT_EXACT_HEAD_WRITER_APPROVAL_REQUIRED');
-  const sensitiveFiles=files.filter(f=>sensitive(f.filename));
+  let changedPaths;
+  try { changedPaths=changedFilePaths(files); }
+  catch (error) { return deny('INVALID_FILE_CHANGE_METADATA_'+error.message); }
+  const sensitiveFiles=changedPaths.filter(sensitive);
   if(sensitiveFiles.length && !humanApproved.some(r=>securityReviewers.includes(r.user.login)))
     return deny('SECURITY_OWNER_EXACT_HEAD_APPROVAL_REQUIRED');
   return {authorized:true,reason:'EXACT_HEAD_INDEPENDENT_MANUAL_REVIEW',
     source_head:headSha,reviewers:humanApproved.map(r=>r.user.login),
-    security_sensitive_paths:sensitiveFiles.map(f=>f.filename)};
+    security_sensitive_paths:sensitiveFiles};
 }
 
 async function live() {
