@@ -58,6 +58,8 @@ suites and `request-size-contract-check`.
 | mfa-check | 101/101 | 101/101 |
 | oidc-consent-check | 32/32 | 32/32 |
 | security-hardening-check | 141/141 | 144/144 (three Postgres-only RLS checks) |
+| rls-fail-closed-check | 122/122 | 257/257 (fail closed outside the store; per owned table read/update/delete/re-home/insert across accounts refused; shared-table behaviour pinned — threat-model §7) |
+| postgres-connection-config-check | 99/99 (transaction-mode poolers refused) | n/a (no database) |
 | secret scan | 1,126 tracked files + 95 `client/dist` files: 0 findings | — |
 | `npm audit --omit=dev` | client 0, server 0; root declares no dependencies | — |
 

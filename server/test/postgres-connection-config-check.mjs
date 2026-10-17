@@ -11,12 +11,16 @@
 // from PRI_DATABASE_SSL_ROOT_CERT. Limits: statement_timeout,
 // idle_in_transaction_session_timeout and the pool size come from the
 // environment with sane defaults, and anything unparseable stops the boot.
-// No error ever contains the URL or its password.
+// No error ever contains the URL or its password. Session mode only (#524): a
+// transaction-mode pooler URL (Supavisor :6543, pgbouncer=true, pool_mode=
+// transaction|statement) is refused before a pool exists
+// (PLATFORM_DB_TRANSACTION_POOLER); the staging shape (session pooler :5432)
+// passes.
 // ─────────────────────────────────────────────────────────────────────────────
 import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { postgresConnectionSettings, postgresSessionLimits } from '../platform/config.js';
-import { postgresPoolOptions } from '../platform/store.js';
+import { postgresPoolOptions, createPostgresPool, createPostgresStore } from '../platform/store.js';
 
 let checks = 0;
 const ok = (cond, label) => { assert.ok(cond, label); checks++; };
@@ -127,6 +131,11 @@ for (const [name, value] of [
     ok(/sslmode=verify-full/.test(message) && !message.includes(SECRET) && !message.includes(DB_HOST), `assertPlatformConfig names the TLS requirement and nothing of the URL (${message.slice(0, 120)})`);
     process.env.PRI_DATABASE_URL = `${BASE}?sslmode=verify-full`;
     eq(platformConfigStatus().ok, true, 'and is ok once the URL says sslmode=verify-full');
+    process.env.PRI_DATABASE_URL = `postgresql://pri_app.orudxrckgxyyraopyzmn:${SECRET}@${DB_HOST}:6543/postgres?sslmode=verify-full`;
+    eq(platformConfigStatus().ok, false, 'production config status is not ok with the transaction-mode pooler (:6543)');
+    let poolerMessage = '';
+    try { assertPlatformConfig(); } catch (error) { poolerMessage = error.message; }
+    ok(/transaction-mode pooler/.test(poolerMessage) && !poolerMessage.includes(SECRET) && !poolerMessage.includes(DB_HOST), `assertPlatformConfig names the session-mode requirement and nothing of the URL (${poolerMessage.slice(0, 120)})`);
   } finally {
     for (const name of names) {
       if (prior[name] === undefined) delete process.env[name];
@@ -135,4 +144,41 @@ for (const [name, value] of [
   }
 }
 
-console.log(`POSTGRES CONNECTION CONFIG: PASS — ${checks}/${checks} checks — production requires verified TLS (sslmode=verify-full, or require + CA), TLS is built explicitly from sslmode + PRI_DATABASE_SSL_ROOT_CERT, timeouts and pool size are validated, and no error leaks the URL.`);
+// ── Session mode only: transaction-mode poolers are refused at pool creation ──
+{
+  const POOLER_TX = `postgresql://pri_app.orudxrckgxyyraopyzmn:${SECRET}@${DB_HOST}:6543/postgres?sslmode=verify-full`;
+  const refusedUrls = [
+    [POOLER_TX, 'Supavisor transaction port 6543'],
+    [`postgresql://u:${SECRET}@db.example.test:6543/postgres?sslmode=verify-full`, 'port 6543 on any host'],
+    [`${BASE}?sslmode=verify-full&pgbouncer=true`, 'pgbouncer=true'],
+    [`${BASE}?pgbouncer=1&sslmode=verify-full`, 'pgbouncer=1'],
+    [`${BASE}?pgbouncer=&sslmode=verify-full`, 'an empty pgbouncer='],
+    [`${BASE}?sslmode=verify-full&pool_mode=transaction`, 'pool_mode=transaction'],
+    [`${BASE}?sslmode=verify-full&pool_mode=Transaction`, 'pool_mode=Transaction (any case)'],
+    [`${BASE}?sslmode=verify-full&pool_mode=statement`, 'pool_mode=statement']
+  ];
+  for (const [url, label] of refusedUrls) {
+    for (const env of [prod(), dev()]) {
+      const error = throwsCode(() => postgresConnectionSettings(url, env), 'PLATFORM_DB_TRANSACTION_POOLER', `${env.NODE_ENV}: ${label} is refused`);
+      ok(/session pooler \(port 5432\)/.test(error.message) && !error.message.includes(DB_HOST), `${env.NODE_ENV}: ${label}: the error says what to use instead and names no host`);
+    }
+    throwsCode(() => postgresPoolOptions(url, { env: prod() }), 'PLATFORM_DB_TRANSACTION_POOLER', `${label}: the pool options are refused too`);
+  }
+  // At pool creation: createPostgresPool / createPostgresStore refuse before any pg Pool (or connection) exists.
+  let poolError = null;
+  try { await createPostgresPool(POOLER_TX, { env: prod() }); } catch (error) { poolError = error; }
+  eq(poolError?.code, 'PLATFORM_DB_TRANSACTION_POOLER', 'createPostgresPool refuses a transaction-mode pooler URL before creating a pool');
+  let storeError = null;
+  try { await createPostgresStore(POOLER_TX, { env: prod() }); } catch (error) { storeError = error; }
+  eq(storeError?.code, 'PLATFORM_DB_TRANSACTION_POOLER', 'createPostgresStore (the boot path) refuses it with the same startup error');
+  ok(!String(storeError?.message).includes(SECRET), 'and the startup error carries no password');
+  // The staging URL's shape (Supabase session pooler, :5432) and a direct connection pass.
+  const STAGING_SHAPE = `${BASE}?sslmode=verify-full`;
+  eq(new URL(STAGING_SHAPE).host, 'aws-0-ap-south-1.pooler.supabase.com:5432', 'the staging shape is the ap-south-1 session pooler on 5432');
+  ok(postgresConnectionSettings(STAGING_SHAPE, prod()).connectionString.includes(':5432/'), 'the session pooler on 5432 is accepted in production');
+  ok(postgresConnectionSettings(`postgresql://postgres:${SECRET}@db.orudxrckgxyyraopyzmn.supabase.co:5432/postgres?sslmode=verify-full`, prod()).tlsMode === 'verify-full', 'a direct connection on 5432 is accepted');
+  ok(postgresConnectionSettings(`${BASE}?sslmode=verify-full&pgbouncer=false`, prod()).tlsMode === 'verify-full', 'pgbouncer=false states session semantics and is accepted');
+  ok(postgresConnectionSettings(`${BASE}?sslmode=verify-full&pool_mode=session`, prod()).tlsMode === 'verify-full', 'pool_mode=session is accepted');
+}
+
+console.log(`POSTGRES CONNECTION CONFIG: PASS — ${checks}/${checks} checks — production requires verified TLS (sslmode=verify-full, or require + CA), TLS is built explicitly from sslmode + PRI_DATABASE_SSL_ROOT_CERT, timeouts and pool size are validated, transaction-mode poolers are refused (session mode only), and no error leaks the URL.`);

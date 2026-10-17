@@ -131,12 +131,12 @@ const pgError = code => Object.assign(new Error(`fake ${code}`), { code });
   await rejects(() => starved.get('SELECT 1'), error => error.code === 'PLATFORM_DB_BUSY' && error.status === 503, 'pool exhaustion is PLATFORM_DB_BUSY');
 }
 {
-  // Every pooled session gets search_path and both timeouts before its first statement.
+  // Every pooled session gets search_path, the system RLS scope and both timeouts before its first statement.
   const pool = fakePool(() => undefined);
   const store = new PostgresStore(pool, { ownsPool: false, statementTimeoutMs: 15000, idleInTransactionTimeoutMs: 30000 });
   await store.get('SELECT 1');
-  eq(pool.log[0], 'SET search_path TO pri; SET statement_timeout = 15000; SET idle_in_transaction_session_timeout = 30000',
-    'session setup sets search_path, statement_timeout and idle_in_transaction_session_timeout');
+  eq(pool.log[0], "SET search_path TO pri; SET pri.scope = 'system'; SET pri.account_id = ''; SET statement_timeout = 15000; SET idle_in_transaction_session_timeout = 30000",
+    'session setup sets search_path, the session system scope (no account), statement_timeout and idle_in_transaction_session_timeout');
   eq(pool.log.filter(sql => sql.startsWith('SET ')).length, 1, 'once per connection, not per statement');
   await rejects(async () => new PostgresStore(pool, { statementTimeoutMs: '15s; DROP TABLE x' }), error => error.code === 'STORE_SESSION_INVALID', 'a non-integer timeout is refused, so nothing but a number reaches SET');
 }

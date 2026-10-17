@@ -93,6 +93,38 @@ function boundedInteger(env, name, fallback, min, max) {
   return value;
 }
 
+// ── Session-mode connections only (#524) ─────────────────────────────────────
+//
+// The store keeps per-connection SESSION state and relies on it: search_path,
+// statement/idle timeouts, the session-level `pri.scope = 'system'` that every
+// statement outside a transaction runs under (store.js sessionSetup), and
+// session advisory locks held across a transaction. A transaction-mode pooler
+// (Supabase Supavisor on port 6543, PgBouncer pool_mode=transaction) hands each
+// transaction to whichever backend is free, so that state would apply to some
+// other client's backend — wrong scope, lost locks, wrong schema. Such URLs are
+// refused before a pool exists. Supabase's session pooler (port 5432 on
+// *.pooler.supabase.com) or a direct connection (db.<ref>.supabase.co:5432) is
+// required; see docs/operations/postgres-cutover.md.
+export const SUPAVISOR_TRANSACTION_PORT = '6543';
+const TRANSACTION_POOL_MODES = new Set(['transaction', 'statement']);
+export function assertSessionModeUrl(connectionString) {
+  const url = new URL(String(connectionString));
+  const refuse = why => {
+    throw configError('PLATFORM_DB_TRANSACTION_POOLER',
+      `PRI_DATABASE_URL points at a transaction-mode pooler (${why}). The server needs a session per connection: use Supabase's session pooler (port 5432) or a direct connection.`);
+  };
+  if (url.port === SUPAVISOR_TRANSACTION_PORT) refuse(`port ${SUPAVISOR_TRANSACTION_PORT} is Supabase Supavisor transaction mode`);
+  for (const value of url.searchParams.getAll('pgbouncer')) {
+    if (String(value).trim().toLowerCase() !== 'false') refuse('pgbouncer= is set');
+  }
+  for (const name of ['pool_mode', 'pool-mode', 'poolmode']) {
+    for (const value of url.searchParams.getAll(name)) {
+      if (TRANSACTION_POOL_MODES.has(String(value).trim().toLowerCase())) refuse(`${name}=${String(value).trim().toLowerCase()}`);
+    }
+  }
+  return true;
+}
+
 /** Per-connection limits and pool size, from the environment, validated. */
 export function postgresSessionLimits(env = process.env) {
   return Object.freeze({
@@ -119,6 +151,7 @@ export function postgresSessionLimits(env = process.env) {
  */
 export function postgresConnectionSettings(connectionString, env = process.env) {
   if (!validPostgresUrl(connectionString)) throw configError('PLATFORM_DB_URL_INVALID', 'PRI_DATABASE_URL must be a postgres:// or postgresql:// URL with a host.');
+  assertSessionModeUrl(connectionString);
   const url = new URL(String(connectionString));
   for (const name of URL_TLS_FILES) {
     if (url.searchParams.has(name)) {

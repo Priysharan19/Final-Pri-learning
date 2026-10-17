@@ -67,9 +67,9 @@ try {
     record(sequence && Number(sequence.cache_size) === 1 && Number(sequence.increment_by) === 1 && sequence.cycle === false, 'sync_cursor_seq is CACHE 1, INCREMENT 1, NO CYCLE');
     // No cursor at or above the sequence may already exist: one issued by a
     // build that still allocated from sync_cursors would be skipped by pulls.
-    // A raw pooled client declares no pri.scope, so RLS shows it no rows
-    // (supabase/migrations/20261016000000): read the cursors in system scope,
-    // transaction-locally, exactly as the store would.
+    // Declare system scope transaction-locally rather than rely on the store's
+    // session scope (sessionSetup): a client the pool has just opened has none,
+    // and RLS (supabase/migrations/20261016000000) would show it no rows.
     await client.query("BEGIN READ ONLY; SELECT set_config('pri.scope', 'system', true)");
     const high = (await client.query(`SELECT
         (SELECT CASE WHEN is_called THEN last_value ELSE last_value - 1 END FROM pri.sync_cursor_seq) AS issued,
