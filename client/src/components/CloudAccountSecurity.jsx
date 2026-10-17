@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { cloud } from '../platform/cloudTransport.js';
-import { disconnectCloudAccount } from '../platform/cloudAccount.js';
+import { deleteCloudAccount, disconnectCloudAccount } from '../platform/cloudAccount.js';
 import { requestIdentityToken, socialProviderConfig } from '../platform/socialSignIn.js';
 import { tLater, useT } from '../i18n/index.js';
 import { downloadJSON } from '../lib/files.js';
@@ -133,8 +133,7 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
     start('delete');
     try {
       const token = await requestIdentityToken(provider, webProviders[provider]);
-      await cloud.deleteAccount({ provider, idToken: token.idToken, nonce: token.nonce });
-      await disconnectCloudAccount(pid);
+      await deleteCloudAccount(pid, { provider, idToken: token.idToken, nonce: token.nonce });
       setDeletePhrase('');
       setMessage(tLater('cloudSecurity.deleted'));
       await onDeleted?.({ cloudDeleted: true });
@@ -163,7 +162,7 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
     if (!canDeleteWithCode || busy) return;
     start('delete');
     try {
-      await cloud.deleteAccount({ otpChallengeId: codeChallenge, otpCode: code });
+      await deleteCloudAccount(pid, { otpChallengeId: codeChallenge, otpCode: code });
       setCode('');
       setCodeChallenge(null);
       setDeletePhrase('');
@@ -182,8 +181,7 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
     if (!canDeleteWithPassword) return;
     start('delete');
     try {
-      await cloud.deleteAccount({ password: deletePassword });
-      await disconnectCloudAccount(pid);
+      await deleteCloudAccount(pid, { password: deletePassword });
       setDeletePassword('');
       setDeletePhrase('');
       setMessage(tLater('cloudSecurity.deleted'));
