@@ -491,7 +491,7 @@ jobs:
           grep -Fq 'AI tutor · three levels, in order, with fallback' browser.log
           grep -Eq 'E2E SUITE.*33/33.*2 flows' browser.log
           grep -Fq 'Hindi · Practice, handwriting, Exams, exam room, Progress, Explain' browser.log
-          grep -Eq 'E2E SUITE.*58/58.*1 flows' browser.log
+          grep -Eq 'E2E SUITE.*63/63.*1 flows' browser.log
           grep -Fq 'Progress truth · rendered numbers = attempt ledger' browser.log
           grep -Eq 'E2E SUITE.*24/24.*1 flows' browser.log
           # Account deletion for a code-only account: in the app, and from the
