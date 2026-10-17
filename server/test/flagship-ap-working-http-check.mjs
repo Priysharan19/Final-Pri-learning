@@ -245,6 +245,16 @@ try {
     c.eq((await resolved('guessed-roots', [`x=${r1}`, `x=${r2}`, `x=${slip}`])).marksEarned, 0, `seed ${seed}: the roots stated with no working earn nothing, with a slip under them or not`);
     c.eq((await resolved('sweep', Array.from({ length: 21 }, (_, k) => `x=${k - 10}`))).marksEarned, 0, `seed ${seed}: twenty-one candidate values earn nothing`);
     c.eq((await resolved('sweep-under-factorisation', [factorised, ...Array.from({ length: 21 }, (_, k) => `x=${k - 10}`)])).marksEarned, 1, `seed ${seed}: and under a factorisation only the factorisation earns`);
+    // Issue #510: a second factorisation sharing one root with the question
+    // (`(x - r1)(x - other)`) was read as a branch and labelled `repeat`, so
+    // the roots below it were paid. It is the break.
+    const wrongFactorised = `${bracket(r1)}${bracket(other)}=0`;
+    const shared = await resolved('wrong-factorisation-sharing-a-root', [factorised, wrongFactorised, `x=${r1}`, `x=${r2}`]);
+    c.eq(shared.marksEarned, 1, `seed ${seed}: "${wrongFactorised}" under "${factorised}" is the break: only the factorisation above it earns (${shared.marksEarned}/3)`);
+    c.deq(shared.stepReport?.lines?.map(line => line.status), ['ok', 'break', 'note', 'note'], `seed ${seed}: and the report names it as the line that broke`);
+    c.deq(shared.partial?.lines?.map(line => line.reason), ['progress', 'break', 'note', 'note'], `seed ${seed}: with nothing after it paid`);
+    const repeated = await resolved('factorisation-written-twice', [factorised, factorised, `x=${r1}`, `x=${r2}`]);
+    c.eq(repeated.marksEarned, clean.marksEarned, `seed ${seed}: the right factorisation written twice is still worth what it was (${repeated.marksEarned}/3)`);
   }
 
   // On a linear equation the same three lines of one shape are still

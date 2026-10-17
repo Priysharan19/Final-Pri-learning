@@ -587,8 +587,64 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
     // the line check, but it is not true either: it is not what sets a false
     // line beside it aside.
     ok(pos('(x-3)(x-5)=0\n(x-3)(x-4)=0\n(x-1)(x-2)=0\nx=3\nx=5') === 0 && pos('(x-3)(x-5)=0\n(x-3)(x-4)=0\n(x-1)(x-2)=0') === 0, 'three factorisations tried are a sweep even when the second shares a root with the question: none earns, nor the roots after them');
-    ok(why(...POS, '(x-3)(x-5)=0\n(x-3)(x-4)=0\n(x-1)(x-2)=0\nx=3\nx=5') === 'contradicted,contradicted,break,note,note', '…line by line');
+    // (Since #510 the second factorisation, which also says x = 4, is itself
+    // the break, so the third follows from it; the first is still a candidate.)
+    ok(why(...POS, '(x-3)(x-5)=0\n(x-3)(x-4)=0\n(x-1)(x-2)=0\nx=3\nx=5') === 'contradicted,break,note,note,note', '…line by line: the sweep\'s first line a candidate, the second the break');
     ok(pos('(x-3)(x-4)=0\n(x-3)(x-5)=0\n(x-1)(x-2)=0') === 0 && pos('(x-3)(x-4)=0\n(x-1)(x-2)=0\n(x-3)(x-5)=0') === 0, '…in any order');
+    // Issue #510. Under a correct factorisation, a second factorisation that
+    // shares ONE root with the question was read as a branch — it is true of
+    // that root — and so labelled `repeat`, never `break`: `(x-3)(x-5) = 0`,
+    // `(x-3)(x-7) = 0`, `x = 3`, `x = 5` kept 3 of 4. A branch names roots of
+    // the question and nothing else; `(x-3)(x-7) = 0` also says x = 7, which
+    // solves nothing. It is where the working broke: the factorisation above
+    // it keeps its mark, nothing after it earns.
+    {
+      const MIX = [{ kind: 'equation', variable: 'x', solutions: [2, -3], source: 'x^2+x-6=0' }, '$x^2+x-6=0$'];
+      const mix = marker(...MIX);
+      const report = (meta, working) => stepCheck(meta, working);
+      ok(pos('(x-3)(x-5)=0\n(x-3)(x-7)=0\nx=3\nx=5') === 1, '#510: a factorisation sharing one root with the question, under the right one, is the break — 1 of 4, not 3');
+      ok(why(...POS, '(x-3)(x-5)=0\n(x-3)(x-7)=0\nx=3\nx=5') === 'progress,break,note,note', '…line by line: the factorisation, the break, and nothing after it');
+      {
+        const r = report(POS[0], '(x-3)(x-5)=0\n(x-3)(x-7)=0\nx=3\nx=5');
+        ok(r.firstBreak === 1 && r.lines[1].status === 'break' && r.lines[1].diagnosis?.code === 'extraneous-solution', '…and Step Check marks that line as the one that brought in a value that is not a root');
+        ok(/x = 7/.test(r.lines[1].note || '') && !/x = 5\b/.test(r.lines[1].note || ''), '…naming the value it brought in, and not the root it lost');
+      }
+      ok(pos('(x-3)(x-5)=0\n(x-5)(x-7)=0\nx=3\nx=5') === 1 && pos('(x-3)(x-5)=0\n(x-7)(x-3)=0\nx=3\nx=5') === 1, '#510: whichever root it shares, and whichever way round its factors are written');
+      ok(pos('(x-3)(x-5)=0\n(x-3)(x+5)=0\nx=3\nx=5') === 1 && pos('(x-3)(x-5)=0\n(x-3)(x-4)=0\nx=3\nx=5') === 1, '#510: a sign or a number changed in the second factor is the same break');
+      ok(pos('(x-3)(x-5)=0\nx^2-10x+21=0\nx=3\nx=5') === 1, '#510: the wrong product multiplied out is the same break');
+      ok(neg('(x+3)(x+5)=0\n(x+3)(x+7)=0\nx=-3\nx=-5') === 1 && neg('(x+3)(x+5)=0\n(x+5)(x-3)=0\nx=-3\nx=-5') === 1, '#510: two negative roots, the same');
+      ok(mix('(x-2)(x+3)=0\n(x-2)(x+4)=0\nx=2\nx=-3') === 1 && mix('(x-2)(x+3)=0\n(x+3)(x-1)=0\nx=2\nx=-3') === 1, '#510: roots of opposite sign, sharing either root, the same');
+      ok(why(...MIX, '(x-2)(x+3)=0\n(x-2)(x+4)=0\nx=2\nx=-3') === 'progress,break,note,note', '…line by line');
+      // Padding: the wrong factorisation wrapped in right working rescues nothing.
+      ok(pos('(x-3)(x-5)=0\n(x-3)(x-7)=0\n(x-3)(x-5)=0\nx=3\nx=5') === 1, '#510: the right factorisation written again after the wrong one does not undo the break');
+      ok(pos('(x-3)(x-5)=0\n(x-3)(x-7)=0\nx-3=0\nx-5=0') === 1, '#510: nor do branches written after it');
+      ok(pos('(x-3)(x-5)=0\nx=3\n(x-3)(x-7)=0\nx=5') === 2, '#510: written after one root is read off, the factorisation and that root stand, the root after it earns nothing');
+      ok(pos('(x-3)(x-5)=0\nx=3\nx=5\n(x-3)(x-7)=0') === 3 && pos('(x-3)(x-5)=0\nx=3\nx=5\n(x-3)(x-7)=0') === pos('(x-3)(x-5)=0\nx=3\nx=5'), '#510: written under the finished working it takes nothing back, as any slip there');
+      for (const [q, clean, wrongs] of [
+        [pos, '(x-3)(x-5)=0\nx=3\nx=5', ['(x-3)(x-7)=0', '(x-5)(x-7)=0', '(x-7)(x-3)=0', '(x-3)(x+5)=0', '(x-3)(x-4)=0', 'x^2-10x+21=0', '(x-3)(x-5)(x-7)=0']],
+        [neg, '(x+3)(x+5)=0\nx=-3\nx=-5', ['(x+3)(x+7)=0', '(x+5)(x+7)=0', '(x+5)(x-3)=0', 'x^2+10x+21=0']],
+        [mix, '(x-2)(x+3)=0\nx=2\nx=-3', ['(x-2)(x+4)=0', '(x+3)(x-1)=0', '(x-2)(x-3)=0', 'x^2+2x-8=0']]
+      ]) {
+        const without = q(clean);
+        for (const wrong of wrongs) {
+          const got = q(clean.replace('\n', `\n${wrong}\n`));
+          ok(got === 1 && got < without, `#510: "${wrong}" under "${clean.split('\n')[0]}" and before the roots leaves only the factorisation's mark (${got} against ${without} without it)`);
+        }
+      }
+      // What a genuine repeat, and a genuine branch, still earn: exactly as before.
+      ok(pos('(x-3)(x-5)=0\n(x-3)(x-5)=0\nx=3\nx=5') === 3 && why(...POS, '(x-3)(x-5)=0\n(x-3)(x-5)=0\nx=3\nx=5') === 'progress,repeat,progress,progress', 'the right factorisation written twice is a repeat, and still worth 3');
+      ok(pos('(x-3)(x-5)=0\n(x-5)(x-3)=0\nx=3\nx=5') === 3 && pos('(x-3)(x-5)=0\nx^2-8x+15=0\nx=3\nx=5') === 3, '…written the other way round, or multiplied back out');
+      ok(neg('(x+3)(x+5)=0\n(x+5)(x+3)=0\nx=-3\nx=-5') === 3 && mix('(x-2)(x+3)=0\n(x-2)(x+3)=0\nx=2\nx=-3') === 3, '…on negative roots and on roots of opposite sign');
+      ok(pos('(x-3)(x-5)=0\nx-3=0\nx-5=0\nx=3\nx=5') === 3 && mix('(x-2)(x+3)=0\nx-2=0\nx+3=0\nx=2\nx=-3') === 3, 'linear branches under the factorisation keep their marks');
+      ok(rep('(x-4)^2=0\n(x-4)(x-4)=0\nx=4') === 2 && rep('(x-4)^2=0\nx-4=0\nx=4') === 2, 'a repeated root written as a product, or as its branch, keeps both marks');
+      {
+        const CUB = { kind: 'equation', variable: 'x', solutions: [1, 2, 3], source: 'x^3-6x^2+11x-6=0' };
+        const cub = working => methodMarks({ meta: CUB, working, marks: 4, prompt: '$x^3-6x^2+11x-6=0$' })?.awarded ?? 0;
+        ok(cub('(x-1)(x^2-5x+6)=0\nx-1=0\nx^2-5x+6=0\n(x-2)(x-3)=0\nx=1\nx=2\nx=3') === 3 && cub('(x-1)(x-2)(x-3)=0\nx-1=0\n(x-2)(x-3)=0\nx=1\nx=2\nx=3') === 3, 'cubic: a quadratic branch whose roots are all roots of the question is a branch, not a break');
+        ok(report(CUB, '(x-1)(x-2)(x-3)=0\n(x-2)(x-3)=0\nx=1\nx=2\nx=3').firstBreak === -1, '…and Step Check finds no break in it');
+        ok(cub('(x-1)(x-2)(x-3)=0\n(x-2)(x-4)=0\nx=1\nx=2\nx=3') === 1, 'cubic: a quadratic branch that brings in x = 4 is the break');
+      }
+    }
     ok(lin('3t=9\n3t=12\n3t=15') === 0 && lin('5t-2t=5+4\n3t=9\n3t=12\n3t=15') === 1 && lin('t=3\nt=4\nt=5') === 0, 'on a linear equation a true line and two wrong values of its shape are still candidates');
     // The slip is never worth anything: with it, never more than without it.
     for (const [q, clean, slips] of [

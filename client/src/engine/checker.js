@@ -295,6 +295,103 @@ function solutionsSatisfying(ast, meta) {
   return held;
 }
 
+// ── A wrong factorisation is not a branch ────────────────────────────────────
+// Under `(x - 3)(x - 5) = 0` the branch rule above reads any line true of
+// some of the roots as one branch of the product. `x - 3 = 0` is; so is
+// `x^2 - 5x + 6 = 0` under `(x - 1)(x^2 - 5x + 6) = 0`, every root of which is
+// a root of the question. `(x - 3)(x - 7) = 0` is true of x = 3 too, but it
+// also says x = 7, which solves nothing: it is a different, wrong
+// factorisation that happens to share a root, and it was labelled `repeat`
+// (issue #510). Such a line is a break. Only a polynomial line of degree two
+// or more is examined, and only a real root actually found counts: a line
+// Pri cannot read as a polynomial is decided as before.
+
+function extraneousLineRootDiagnosis(variable, value) {
+  return {
+    code: 'extraneous-solution',
+    title: 'An extra solution was introduced',
+    message: `This line is also true for ${variable} = ${value}, which does not solve the original equation.`,
+    fix: 'Check each factor against the line above: every value a factor gives must solve the original equation.',
+    confidence: 'high'
+  };
+}
+
+/** `node` as a polynomial in `variable`, any part free of it (√3, a fraction) read as its value; null when it is not one. */
+function polynomialWithConstants(node, variable) {
+  const fold = n => {
+    if (!n || typeof n !== 'object' || n.t === 'num' || n.t === 'var') return n;
+    if (!variablesOf(n).size) {
+      let v;
+      try { v = evaluate(n, {}); } catch { return n; }
+      return Number.isFinite(v) ? { t: 'num', v } : n;
+    }
+    if (n.t === 'group' || n.t === 'neg') return { ...n, v: fold(n.v) };
+    if (n.t === 'bin') return { ...n, l: fold(n.l), r: fold(n.r) };
+    return n;
+  };
+  return polynomialIn(fold(node), variable);
+}
+
+/**
+ * A real value, not a root of the question, at which this equation line holds,
+ * or null when there is none or Pri cannot tell. Every root of the question is
+ * divided out as often as it divides; whatever real root the quotient has is
+ * one the line brought in.
+ */
+function extraneousRootOf(ast, variable, wanted) {
+  if (!ast || ast.t !== 'equation' || !variable) return null;
+  let p;
+  try { p = polynomialWithConstants({ t: 'bin', op: '-', l: ast.l, r: ast.r }, variable); } catch { return null; }
+  // Not a polynomial, or of degree below two: a linear line names one value,
+  // and the branch rule has already found that it is a root.
+  if (!p || p.length < 3 || !p.every(Number.isFinite)) return null;
+  for (const w of wanted) {
+    while (p.length > 1) {
+      const n = p.length - 1;
+      const q = new Array(n).fill(0);
+      let carry = p[n];
+      for (let k = n - 1; k >= 0; k--) { q[k] = carry; carry = p[k] + carry * w; }
+      const size = p.reduce((s, c, k) => s + Math.abs(c) * Math.abs(w) ** k, 0);
+      if (Math.abs(carry) > 1e-9 + 1e-7 * size) break;
+      p = q;
+    }
+  }
+  const degree = p.length - 1;
+  if (degree < 1 || numsClose(p[degree], 0, 1e-12)) return null;
+  const roots = [];
+  if (degree === 1) roots.push(-p[0] / p[1]);
+  else if (degree === 2) {
+    const [c, b, a] = p;
+    const disc = b * b - 4 * a * c;
+    if (disc >= -1e-9 * Math.max(1, b * b, Math.abs(4 * a * c))) {
+      const s = Math.sqrt(Math.max(0, disc));
+      roots.push((-b - s) / (2 * a), (-b + s) / (2 * a));
+    }
+  } else {
+    // Every real root lies within the Cauchy bound; a sign change on a fine
+    // grid is bisected. An odd degree always has one. A root that only
+    // touches zero is not looked for: that line is decided as before.
+    const f = x => p.reduce((s, c, k) => s + c * x ** k, 0);
+    const bound = 1 + Math.max(...p.slice(0, -1).map(c => Math.abs(c / p[degree])));
+    const N = 4000;
+    let x0 = -bound, y0 = f(x0);
+    for (let k = 1; k <= N && !roots.length; k++) {
+      const x1 = -bound + (2 * bound * k) / N, y1 = f(x1);
+      if (y0 === 0) roots.push(x0);
+      else if (Math.sign(y0) !== Math.sign(y1)) {
+        let a = x0, b = x1;
+        for (let j = 0; j < 80; j++) { const m = (a + b) / 2; if (Math.sign(f(m)) === Math.sign(y0)) a = m; else b = m; }
+        roots.push((a + b) / 2);
+      }
+      x0 = x1; y0 = y1;
+    }
+  }
+  const extra = roots.find(r => Number.isFinite(r) && !wanted.some(w => Math.abs(r - w) <= 1e-6 * Math.max(1, Math.abs(w))));
+  if (extra === undefined) return null;
+  const rounded = Math.round(extra);
+  return Math.abs(extra - rounded) <= 1e-9 * Math.max(1, Math.abs(extra)) ? rounded : Number(extra.toPrecision(10));
+}
+
 // ── A line about another unknown ─────────────────────────────────────────────
 // "Solve 3x + 5y = 5 and 5x − 2y = 29. Find the value of y" is marked against
 // y, but the working is in both letters: x = 5 is true, and so is −31x = −155.
@@ -622,6 +719,20 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             // is checked a line at a time, and one limit is not the pair.)
             const lone = loneBranches && !branchesOpen && wantedRoots.length > 1 && (valued || !!linearState({ kind: 'equation', ast }, meta.variable));
             const held = (branchesOpen || lone) && wantedRoots.length > 1 ? solutionsSatisfying(ast, meta) : [];
+            // A branch names roots of the question and nothing else. A line
+            // of higher degree that is true of one root but also of a value
+            // that solves nothing — `(x - 3)(x - 7) = 0` under
+            // `(x - 3)(x - 5) = 0` — is a wrong factorisation, not a branch
+            // of the right one (issue #510).
+            const extra = held.length && held.length < wantedRoots.length ? extraneousRootOf(ast, meta.variable, wantedRoots) : null;
+            if (extra !== null) {
+              status = 'break';
+              lineDiagnosis = extraneousLineRootDiagnosis(meta.variable, extra);
+              note = lineDiagnosis.message;
+              if (firstBreak === -1) firstBreak = i;
+              out.push({ text: line, status, note, diagnosis: lineDiagnosis });
+              return;
+            }
             if (held.length && held.length < wantedRoots.length) {
               // One branch of a factorisation already shown. It is true of the
               // roots it names; whether the working keeps the rest is settled
