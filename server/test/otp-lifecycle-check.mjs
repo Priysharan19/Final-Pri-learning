@@ -19,7 +19,7 @@ const {
   readTestOutbox, clearTestOutbox, createSmsProviderFromEnv, testModeAllowed, smsOtpBody,
   createMsg91Provider, createTwilioVerifyProvider
 } = await import('../platform/smsProvider.js');
-const { normalizePhone, OTP_MAX_ATTEMPTS, OTP_TTL_MS } = await import('../platform/otpCore.js');
+const { normalizeEmail, normalizePhone, OTP_MAX_ATTEMPTS, OTP_TTL_MS } = await import('../platform/otpCore.js');
 const { createOtpEmailSenderFromEnv } = await import('../platform/otpEmail.js');
 const { CONSENT_NOTICE_VERSION } = await import('../platform/guardianConsent.js');
 
@@ -38,6 +38,21 @@ try {
   c.eq(normalizePhone('12345'), null, 'a short number is refused');
   c.eq(normalizePhone('+91 12345 67890'), null, 'an Indian number must start 6-9');
   c.eq(normalizePhone('+1 415 555 0100'), '+14155550100', 'other countries pass with a +');
+  // CodeQL js/polynomial-redos (alert 13): the email pattern backtracks
+  // quadratically on '!@!.' + '!.'×n + '@'. It used to run before the 254-character
+  // ceiling, so one anonymous request near the 1 MB body limit held the event
+  // loop for minutes. The length is now checked first.
+  c.eq(normalizeEmail('Parent@Example.test '), 'parent@example.test', 'an email is trimmed and lower-cased');
+  c.eq(normalizeEmail(`${'a'.repeat(243)}@example.test`), null, 'an email past 254 characters is refused');
+  const evilEmail = `!@!.${'!.'.repeat(50_000)}@`;
+  let started = performance.now();
+  c.eq(normalizeEmail(evilEmail), null, 'a 100 KB backtracking email is refused');
+  c.ok(performance.now() - started < 50, `and refused at once (${Math.round(performance.now() - started)} ms; about 3 s before the fix, minutes at the body limit)`);
+  started = performance.now();
+  const evilRequest = await post('/request', { channel: 'email', destination: evilEmail });
+  c.deq([evilRequest.status, evilRequest.data?.error?.code], [400, 'OTP_DESTINATION_INVALID'], 'the OTP request route refuses it with a code');
+  c.ok(performance.now() - started < 2000, `without stalling the server (${Math.round(performance.now() - started)} ms)`);
+  await resetLimits();
 
   // ── the production gate on test adapters ─────────────────────────────────
   c.ok(!testModeAllowed({ NODE_ENV: 'production' }), 'test SMS is refused in production by default');

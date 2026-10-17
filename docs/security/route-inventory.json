@@ -1193,7 +1193,14 @@
       "guardianConsent": false,
       "mfa": false,
       "ownership": "public published content; key is pattern-validated",
-      "rateLimits": [],
+      "rateLimits": [
+        {
+          "key": "content-published",
+          "limit": 300,
+          "windowMs": 60000,
+          "identity": "ip"
+        }
+      ],
       "csrf": "not-applicable",
       "origin": "not-applicable",
       "bodyLimit": "no-body"

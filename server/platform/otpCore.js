@@ -61,7 +61,11 @@ export function ensureOtpSchema(db) {
 /** Lower-cased, trimmed email, or null. */
 export function normalizeEmail(value) {
   const normalized = String(value || '').trim().toLowerCase();
-  if (!EMAIL.test(normalized) || normalized.length > 254) return null;
+  // Length first: EMAIL backtracks quadratically on a long run of '!.' after
+  // an '@' (CodeQL js/polynomial-redos), and this runs on anonymous input up to
+  // the 1 MB body limit. 254 characters is the SMTP path ceiling, so testing
+  // the pattern only inside it bounds the work without changing what passes.
+  if (normalized.length > 254 || !EMAIL.test(normalized)) return null;
   return normalized;
 }
 

@@ -56,8 +56,11 @@ export function createContentRouter(db) {
   const atomically = fn => db.transaction(fn);
 
   // Published content is readable without a cloud account so downloaded packs
-  // can be refreshed before login and then remain usable offline.
-  router.get('/published/:contentKey(*)', async (req, res) => {
+  // can be refreshed before login and then remain usable offline. Anonymous and
+  // carrying the full body, it is bounded per caller like the index below; the
+  // ceiling is five times the index's because a refresh asks for one key at a
+  // time after reading an index page.
+  router.get('/published/:contentKey(*)', rateLimit(db, 'content-published', { limit: 300, windowMs: 60 * 1000 }), async (req, res) => {
     const contentKey = String(req.params.contentKey || '');
     if (!KEY.test(contentKey)) return res.status(400).json({ error: { code: 'CONTENT_KEY_INVALID', message: 'Content key is invalid.' } });
     const row = await db.get(`SELECT * FROM content_revisions WHERE content_key=? AND status='published'
