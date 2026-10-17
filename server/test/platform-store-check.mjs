@@ -32,7 +32,12 @@ function fakePool(script) {
   let released = 0;
   let destroyed = 0;
   const client = {
-    async query(sql) {
+    async query(text) {
+      // The store declares each transaction's RLS scope in the same simple query
+      // as its BEGIN (`BEGIN …; SET LOCAL pri.scope = …`, schema 12). These
+      // checks are about transaction semantics, so they see the BEGIN alone;
+      // the scope declaration is proven by rls-fail-closed-check.mjs.
+      const sql = /^BEGIN\b/.test(text) ? text.split('; SET LOCAL pri.scope = ')[0] : text;
       log.push(sql);
       const step = script(sql, log);
       if (step instanceof Error) throw step;

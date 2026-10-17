@@ -558,6 +558,19 @@ try {
   await badSave({ answers: { 'not-a-question': '1' }, rev: 3 }, 'an answer for a question outside the paper is refused');
   await badSave({ answers: { [first.id]: 'x'.repeat(4001) }, rev: 3 }, 'an overlong answer is refused');
   await badSave({ answers: { [first.id]: '1' }, marks: { [first.id]: 5 }, rev: 3 }, 'a snapshot cannot carry marks');
+  // A request key is never a property name: __proto__ / constructor keys in any
+  // response map are refused, nothing is stored, and Object.prototype is intact.
+  for (const [field, rawJson] of [
+    ['answers', `{"answers":{"__proto__":{"polluted":"yes"}},"rev":3}`],
+    ['workings', `{"answers":{},"workings":{"constructor":{"prototype":{"polluted":"yes"}}},"rev":3}`],
+    ['times', `{"answers":{},"times":{"__proto__":5000},"rev":3}`],
+    ['modes', `{"answers":{},"modes":{"__proto__":"ink","constructor":"type"},"rev":3}`]
+  ]) {
+    const polluted = await h.request(`/v1/exams/${exam.id}/answers`, { method: 'PUT', jar: a.jar, rawBody: rawJson });
+    eq([polluted.status, polluted.data?.error?.code], [400, 'EXAM_ANSWERS_INVALID'], `a prototype-pollution key in ${field} is refused as outside the paper`);
+  }
+  eq([Object.prototype.polluted, ({}).polluted, Object.getOwnPropertyNames(Object.prototype).includes('polluted')], [undefined, undefined, false], 'and Object.prototype is unchanged');
+  eq((await read(a.jar, exam.id)).data.snapshot.answers, { [first.id]: '41' }, 'and the stored snapshot is untouched');
   await badSave({ answers: { [first.id]: '1' } }, 'a snapshot without a revision is refused');
   eq((await read(a.jar, exam.id)).data.snapshot.rev, 2, 'refused snapshots change nothing');
 
