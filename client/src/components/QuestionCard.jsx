@@ -1067,8 +1067,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   // On a phone the question, the mode switch and the ink toolbar leave room
   // for only part of the sheet above the action bar. Choosing Write scrolls
-  // just far enough to show the whole sheet, and never so far that the mode
-  // switch goes under the top bar: the question stays as visible as it can.
+  // just far enough to show the whole sheet, so the question stays as visible
+  // as it can. The sheet wins over the mode switch: on a short phone (iPhone
+  // SE) the switch scrolls up under the bars rather than the sheet's foot
+  // staying under the action bar. The sheet's own top never goes under them.
   const revealWritingArea = (attempt = 0) => {
     if (typeof window === 'undefined' || !window.matchMedia?.('(max-width: 760px)').matches) return;
     const tools = toolsRef.current;
@@ -1081,8 +1083,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     }
     const barTop = tools.parentElement.querySelector('.ws-actions')?.getBoundingClientRect().top ?? window.innerHeight;
     const headBottom = (document.querySelector('.ws-bar')?.getBoundingClientRect().bottom ?? 0) + 48;
-    const needed = sheet.getBoundingClientRect().bottom - barTop + 8;
-    const room = tools.getBoundingClientRect().top - headBottom;
+    const box = sheet.getBoundingClientRect();
+    const needed = box.bottom - barTop + 8;
+    const room = box.top - headBottom;
     const by = Math.min(needed, room);
     if (by <= 0) return;
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;

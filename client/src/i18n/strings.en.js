@@ -2338,6 +2338,7 @@ export default {
   'plan.open': 'Open plan',
   'plan.start': 'Start session',
   'plan.startNamed': 'Start: {name}',
+  'plan.started': 'Started',
   'plan.allDone': 'Every session planned for today has been started. Tomorrow is already planned.',
   'plan.restDay': 'Rest day',
   'plan.examDay': 'Exam day',

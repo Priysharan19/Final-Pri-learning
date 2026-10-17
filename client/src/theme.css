@@ -2230,6 +2230,10 @@ html { background-color: var(--page); }
 .photo-pick-text { display: grid; gap: 2px; min-width: 0; }
 .photo-pick-help { font-size: 12.5px; font-weight: 400; line-height: 1.4; color: var(--ink-3); }
 
+/* A plan session that has been touched today is started, not finished. */
+.plan-started { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; font-size: 12px; font-weight: 500; color: var(--ink-3); white-space: nowrap; }
+.plan-started svg { color: var(--accent); }
+
 /* On a phone the demo is a short link and what it holds is said quietly
    beneath it; wider screens keep the one-line link. */
 .hero-demo-note { display: none; margin: 4px auto 0; max-width: 34ch; font-size: 13px; line-height: 1.45; color: var(--ink-3); text-align: center; }
@@ -2288,4 +2292,41 @@ html { background-color: var(--page); }
   .ws-actions .status-line > .ws-read-by { margin-left: 0; white-space: nowrap; }
 
   .photo-pick { width: 100%; padding-left: 16px; padding-right: 16px; }
+
+  /* The first screen's text links are finger-sized targets. */
+  .auth-wrap .linklike { min-height: var(--tap-min); padding: 0 8px; }
+
+  /* The two ends of the question bar are one pair: back and next are the
+     same 44px keycap, an arrow each. */
+  .ws-bar .ws-exit, .ws-bar .ctx-next {
+    min-width: var(--tap-min); min-height: var(--tap-min); padding: 0; justify-content: center;
+    border: 1px solid var(--hairline-strong); border-radius: var(--radius-sm);
+    background: var(--surface); color: var(--ink); box-shadow: 0 1px 0 var(--hairline-strong);
+  }
+
+  /* The ink toolbar stays one row down to a 375pt phone: 44px tools with no
+     inner padding and narrower separators; below 380px the separators go. */
+  .ink-toolbar .ink-tool { padding: 0; }
+  .ink-toolbar .ink-sep { margin: 0 2px; }
+}
+@media (max-width: 379px) {
+  .ink-toolbar .ink-sep { display: none; }
+}
+/* A phone at 200% zoom lays out in 190–215px. Nothing may run off the side:
+   the mode switch drops its icons and lets its words share the width, the
+   tools and the action buttons wrap, and a long inline formula scrolls
+   inside the question instead of widening the page (WCAG 1.4.10). */
+@media (max-width: 299px) {
+  .ws-tools .mode-tabs > .mode-tab { min-width: 0; padding: 0 4px; gap: 0; }
+  .ws-tools .mode-tabs > .mode-tab svg { display: none; }
+  .ws-tools-end { flex-wrap: wrap; justify-content: flex-end; }
+  /* Stuck to the foot, the action bar would take most of a 330px-tall
+     window: at this zoom it stays at the end of the page instead. */
+  .ws-actions { position: static; }
+  .ws-actions-btns { flex-wrap: wrap; }
+  .ws-actions .btn-primary, .ws-actions-btns .btn { min-width: 0; flex: 1 1 100%; }
+  .ws-context .q-prompt { overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; }
+  .ws-actions .status-line > .ws-read-by { white-space: normal; }
+  .answer-row .answer-input { min-width: 0; flex: 1 1 96px; }
+  .q-topmeta .tag { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
 }

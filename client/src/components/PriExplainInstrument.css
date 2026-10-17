@@ -137,7 +137,7 @@
 .pri-explain-rail button small { font-size: 12.5px; }
 
 /* Controls */
-.pri-explain-controls { padding: 12px 24px calc(14px + env(safe-area-inset-bottom)); }
+.pri-explain-controls { padding: 12px 24px calc(14px + var(--pri-inset-bottom)); }
 .pri-explain-settings label { font-size: 13.5px; }
 .pri-explain-settings select {
   border-radius: var(--radius-sm); border-color: var(--control-border); background: var(--surface-raised);

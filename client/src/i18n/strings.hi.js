@@ -2407,6 +2407,7 @@ export default {
   'plan.open': 'योजना खोलें',
   'plan.start': 'सत्र शुरू करें',
   'plan.startNamed': 'शुरू करें: {name}',
+  'plan.started': 'शुरू किया',
   'plan.allDone': 'आज के लिए तय हर सत्र शुरू हो चुका है। कल की योजना तैयार है।',
   'plan.restDay': 'विश्राम का दिन',
   'plan.examDay': 'परीक्षा का दिन',

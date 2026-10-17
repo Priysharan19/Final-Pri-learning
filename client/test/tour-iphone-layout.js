@@ -29,6 +29,11 @@ import { pathToFileURL } from 'node:url';
 const PHONE = { width: 393, height: 852 };
 // iPhone 16 portrait: the status bar with the Dynamic Island, and the home indicator.
 const INSETS = { top: 59, bottom: 34 };
+// iPhone SE (home button: no inset below) and iPhone 16 Pro Max.
+const OTHER_PHONES = [
+  { id: 'iPhone SE', width: 375, height: 667, insets: { top: 20, bottom: 0 } },
+  { id: 'iPhone 16 Pro Max', width: 430, height: 932, insets: { top: 59, bottom: 34 } },
+];
 const LARGER = [
   { id: 'iPad portrait', width: 820, height: 1180 },
   { id: 'iPad landscape', width: 1180, height: 820 },
@@ -49,6 +54,14 @@ const clearInsets = page => page.evaluate(() => {
 const toEnd = page => page.evaluate(() => { scrollTo(0, document.scrollingElement.scrollHeight); });
 const toTop = page => page.evaluate(() => { scrollTo(0, 0); });
 const overflowOf = page => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+/** What runs past the right edge, by the container that cannot hold it. */
+const overflowDetail = page => page.evaluate(() => {
+  const W = document.documentElement.clientWidth;
+  const spill = [...document.querySelectorAll('body *')]
+    .filter(e => e.clientWidth > 0 && e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflowX === 'visible')
+    .slice(-4).map(e => `${e.tagName}.${String(e.className).slice(0, 40)} ${e.scrollWidth}>${e.clientWidth}`);
+  return { over: document.documentElement.scrollWidth - W, spill };
+});
 
 /** Step through questions until `want(page)` holds (the draw is random). */
 async function questionWhere(page, settle, want) {
@@ -106,9 +119,12 @@ export const flow = {
       const lh = parseFloat(getComputedStyle(demo).lineHeight) || parseFloat(getComputedStyle(demo).fontSize) * 1.5;
       const logo = document.querySelector('.auth-wrap .auth-col')?.getBoundingClientRect();
       const field = getComputedStyle(document.querySelector('.mathfield')).backgroundImage;
-      return { demoH: demo.getBoundingClientRect().height, lh, logoTop: logo?.top, marginRule: /90deg/.test(field) };
+      const range = document.createRange(); range.selectNodeContents(demo);
+      const lines = new Set([...range.getClientRects()].filter(r => r.width > 0).map(r => Math.round(r.top))).size;
+      return { demoH: demo.getBoundingClientRect().height, lines, lh, logoTop: logo?.top, marginRule: /90deg/.test(field) };
     });
-    await check('welcome: "Try the demo" is one line, its description beneath it', hero.demoH < hero.lh * 1.6, JSON.stringify(hero));
+    await check('welcome: "Try the demo" is one line, its description beneath it', hero.lines === 1, JSON.stringify(hero));
+    await check('welcome: the text links are finger-sized (≥ 44px)', hero.demoH >= 44, JSON.stringify(hero));
     await check('welcome: no margin rule runs through the centred text', !hero.marginRule, JSON.stringify(hero));
     await check('welcome: the content starts below the status bar', hero.logoTop >= INSETS.top, JSON.stringify(hero));
     await check('welcome: no horizontal overflow', await overflowOf(page) <= 1);
@@ -289,6 +305,59 @@ export const flow = {
     });
     await check('Settings: at the foot, the last section ends above the tab bar', foot.last <= foot.nav, JSON.stringify(foot));
     await clearInsets(page);
+
+    // ── 4b · the smallest and the largest iPhone, at 100% and 200% ─────────
+    // 200% is the page zoomed to twice the size (WCAG 1.4.4): the layout
+    // viewport halves, and so do the insets in CSS pixels.
+    for (const d of OTHER_PHONES) {
+      for (const zoom of [1, 2]) {
+        const tag = `${d.id} ${d.width}×${d.height} at ${zoom * 100}%`;
+        const vp = { width: Math.round(d.width / zoom), height: Math.round(d.height / zoom) };
+        const insets = { top: Math.round(d.insets.top / zoom), bottom: Math.round(d.insets.bottom / zoom) };
+        await page.setViewportSize(vp);
+        await goto('/practice');
+        await page.waitForSelector('.q-prompt', { timeout: 30000 }).catch(() => null);
+        await settle();
+        await questionWhere(page, settle, hasModes);
+        await setInsets(page, insets);
+        await toTop(page);
+        const modes = await page.evaluate(() => {
+          const tabs = document.querySelector('.mode-tabs')?.getBoundingClientRect();
+          const tools = document.querySelector('.ws-tools')?.getBoundingClientRect();
+          return tabs && tools ? { tabsW: Math.round(tabs.width), toolsW: Math.round(tools.width) } : null;
+        });
+        await check(`${tag}: Type · Write · Photo spans the column`, !!modes && modes.tabsW >= modes.toolsW - 1, JSON.stringify(modes));
+        await page.getByRole('button', { name: 'Answer by typing' }).click();
+        await settle();
+        const typedFoot = await clearOfBarAtFoot(page, '.editor-body input, .editor-body textarea, .editor-shell');
+        await check(`${tag}: Type — at the foot every field ends above the action bar, which reaches the bottom edge`,
+          typedFoot.ok && Math.abs(typedFoot.barBottom - typedFoot.vh) <= 1, JSON.stringify(typedFoot));
+        await toTop(page);
+        await page.getByRole('button', { name: 'Answer by handwriting' }).click();
+        await page.waitForSelector('.editor-shell .ink-canvas', { timeout: 20000 }).catch(() => null);
+        await page.waitForTimeout(1200);
+        if (zoom === 1) {
+          const shown = await page.evaluate(() => {
+            const sheet = document.querySelector('.editor-shell').getBoundingClientRect();
+            const bar = document.querySelector('.ws-actions').getBoundingClientRect();
+            const head = document.querySelector('.ws-bar').getBoundingClientRect();
+            const peek = document.querySelector('.ws-qpeek.is-on')?.getBoundingClientRect();
+            const ceiling = Math.max(head.bottom, peek ? peek.bottom : 0);
+            const tops = [...document.querySelectorAll('.ink-toolbar .ink-tool')].filter(t => t.getClientRects().length).map(t => Math.round(t.getBoundingClientRect().top));
+            return { sheetTop: Math.round(sheet.top), sheetBottom: Math.round(sheet.bottom), barTop: Math.round(bar.top), ceiling: Math.round(ceiling), toolRows: new Set(tops).size };
+          });
+          await check(`${tag}: Write — choosing it shows the whole sheet between the top bars and the action bar`,
+            shown.sheetTop >= shown.ceiling - 1 && shown.sheetBottom <= shown.barTop + 1, JSON.stringify(shown));
+          await check(`${tag}: Write — the ink tools stay on one row`, shown.toolRows === 1, JSON.stringify(shown));
+        }
+        const inkFoot = await clearOfBarAtFoot(page, '.editor-shell');
+        await check(`${tag}: Write — at the foot the sheet ends above the action bar`, inkFoot.ok, JSON.stringify(inkFoot));
+        const spill = await overflowDetail(page);
+        await check(`${tag}: no horizontal overflow`, spill.over <= 1, JSON.stringify(spill));
+        await clearInsets(page);
+      }
+    }
+    await page.setViewportSize(PHONE);
 
     // ── 5 · iPad and desktop keep their composition ────────────────────────
     for (const vp of LARGER) {
