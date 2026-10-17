@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "bcryptjs": "^2.4.3",
+    "bcryptjs": "^3.0.3",
     "better-sqlite3": "12.10.0",
     "compression": "^1.8.2",
     "cookie-parser": "^1.4.7",
