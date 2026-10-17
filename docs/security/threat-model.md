@@ -113,6 +113,7 @@ compromised or malicious paid AI provider; a script holding a stolen session coo
 | Clear join code stored beside its hash | Low | Encrypted at rest | `security-hardening-check` L1 |
 | `PRI_CSRF_SECRET` accepted at any length | Low | ≥32 characters in production | `security-hardening-check` L2 |
 | Anonymous `/v1/health` listed configured providers and backlog counts | Low | Operator detail behind `PRI_METRICS_TOKEN` / admin health | `security-hardening-check` L3 |
+| TOTP confirmation spent a step unconditionally: two sessions of one account confirming with one code at once were both accepted on Postgres (SERIALIZABLE retry re-ran the write), verifying two sessions by one step, writing two `mfa.enrol` audits and replacing the first session's recovery codes (#445) | High | Confirmation is the same compare-and-set as verification: only a still-pending enrolment of the secret that matched is confirmed, the loser writes nothing and gets `MFA_CODE_INVALID`; every spend (confirm and verify) is bound to the secret that matched | `mfa-check` forced and simultaneous two-session races on SQLite and Postgres |
 
 ## 7. Per-account row-level security: exactly what is and is not covered
 
