@@ -146,6 +146,45 @@ const claimOf = async q => `${me.id}:resolved:${await blindHash(`practice-resolu
     'and submit takes that lock before it reads the row');
 }
 
+// 3h · a pull that lands while a submit holds the question writes nothing until
+//      the submit is done, and never puts the question back to unanswered
+//      (production: Sync · a pull overlapping a submit — the pull kept the
+//      server event by rewriting the whole row it had read before the submit
+//      resolved it; the finished question was served again and refused as
+//      "already finished").
+{
+  const { withMutationLock } = await import('../src/local/mutationLock.js');
+  const q = await question({});
+  const count = attemptsOf().length;
+  const rawRow = () => JSON.stringify(rawRows().questions.find(r => r.id === q.id));
+  let pulled = null, during = null, before = null;
+  // What a submit does, under the question lock it takes before it reads the
+  // row (3f): the grade goes in flight, the server answers, the row resolves.
+  await withMutationLock(`question:${q.id}`, async () => {
+    const row = await idb.get('questions', q.id);
+    await idb.put('questions', { ...row, pendingGrade: { submissionId: 's-overlapped-001', at: Date.now() } });
+    before = rawRow();
+    const pull = applyRemoteLearningEvents(me.id, [eventFor(q)]).then(out => { pulled = out; return out; });
+    for (let i = 0; i < 20; i++) await new Promise(r => setTimeout(r, 5));
+    during = { row: rawRow(), settled: pulled !== null };
+    await idb.put('questions', { ...row, answered: 1, resolvedAt: Date.now(), pendingGrade: null, serverReceipt: { attemptId: `attempt-${q.id}` } });
+    void pull;
+  });
+  while (pulled === null) await new Promise(r => setTimeout(r, 5));
+  eq([during.row === before, during.settled], [true, false],
+    'while the submit holds the question, the pull waits and writes nothing to its row');
+  const settled = await idb.get('questions', q.id);
+  eq([settled.answered, settled.pendingGrade ?? null, 'deferredGrade' in settled, !!settled.resolvedAt], [1, null, false, true],
+    'after it the question is still answered: the submit\'s resolution is not undone by the pull');
+  eq([pulled.applied, attemptsOf().length], [0, count], 'and the pull records nothing more');
+}
+{
+  const source = (await import('node:fs')).readFileSync(new URL('../src/platform/cloudSyncRestore.js', import.meta.url), 'utf8');
+  const writes = [...source.matchAll(/await put\('questions'/g)].length;
+  const locked = [...source.matchAll(/withMutationLock\(`question:\$\{(?:rowId|row\.id)\}`, async \(\) => \{\s*const (?:row|after) = await get\('questions'/g)].length;
+  eq([writes, locked], [2, 2], 'every question-row write in the sync restore reads and writes under the question lock');
+}
+
 // 4 · another device's attempt (no local question) is imported as before
 {
   const foreign = { id: 'local-none', serverQuestionId: '11111111-1111-4111-8111-111111111111' };
