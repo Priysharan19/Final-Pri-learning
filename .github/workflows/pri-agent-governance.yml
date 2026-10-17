@@ -288,6 +288,13 @@ jobs:
         shell: bash
         run: node client/test/pri-mission-control-regression.mjs
 
+      - name: Signed governor event lineage and competing-CAS regression
+        shell: bash
+        run: node client/test/pri-admission-state-check.mjs
+
+      - name: Manual lane exact-head approval regression
+        run: node client/test/pri-manual-authorization-check.mjs
+
       - name: PR lane classifier self-test
         shell: bash
         run: |
@@ -384,8 +391,31 @@ jobs:
           echo "mission=$mission" >> "$GITHUB_OUTPUT"
           echo "risk=$declared_risk" >> "$GITHUB_OUTPUT"
 
+      # Critical verification step selection MUST use the GitHub event's ref,
+      # never an output calculated by executable code from a PR checkout.
+      # A task/* or feature/* prefix alone NEVER authenticates a human writer.
+      # Execute the guard from protected main, not from the candidate PR.
+      - name: Checkout protected manual-lane verifier
+        if: (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && (startsWith(github.event.pull_request.head.ref, 'task/') || startsWith(github.event.pull_request.head.ref, 'feature/'))
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: main
+          path: trusted-manual-governor
+          persist-credentials: false
+
+      - name: Verify exact-head independent manual authorisation
+        if: (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && (startsWith(github.event.pull_request.head.ref, 'task/') || startsWith(github.event.pull_request.head.ref, 'feature/'))
+        working-directory: trusted-manual-governor
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          test -f scripts/pri-manual-authorization.mjs
+          node scripts/pri-manual-authorization.mjs
+
       - name: Snapshot GitHub-Issue mission ledger
-        if: (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && steps.meta.outputs.autonomous == 'true'
+        if: (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && startsWith(github.event.pull_request.head.ref, 'agent/mission/')
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
@@ -398,8 +428,28 @@ jobs:
             });
             fs.writeFileSync('/tmp/pri-issues.json', JSON.stringify(issues.filter(issue => !issue.pull_request), null, 2));
 
+      # PR code cannot forge its own writer grant. Verify using the trusted
+      # protected-main controller and its signed protected-ref event lineage.
+      - name: Checkout trusted protected-main admission authority
+        if: (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && startsWith(github.event.pull_request.head.ref, 'agent/mission/')
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: main
+          path: trusted-pri-admission
+          persist-credentials: false
+
+      - name: Verify exact-PR signed authoritative writer grant
+        if: (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && startsWith(github.event.pull_request.head.ref, 'agent/mission/')
+        working-directory: trusted-pri-admission
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PRI_AUTHORITY_GENESIS_SHA: ${{ vars.PRI_AUTHORITY_GENESIS_SHA }}
+          EXPECTED_PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/pri-admission-github.mjs verify
+
       - name: Verify active writer lease
-        if: (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && steps.meta.outputs.autonomous == 'true'
+        if: (github.event_name == 'pull_request' || github.event_name == 'pull_request_review') && startsWith(github.event.pull_request.head.ref, 'agent/mission/')
         shell: bash
         env:
           EXPECTED_AGENT: ${{ steps.meta.outputs.agent }}
