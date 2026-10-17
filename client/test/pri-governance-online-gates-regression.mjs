@@ -48,3 +48,7 @@ no(()=>checkReviewPins([{...legacy,number:484}],[legacyPr]),'BRANCH_ID_MISMATCH'
 no(()=>checkReviewPins([legacy],[{...legacyPr,head:{...legacyPr.head,sha:'a'.repeat(40)}}]),'HEAD_MISMATCH');
 no(()=>checkReviewPins([legacy],[{...legacyPr,base:{...legacyPr.base,ref:'feature/unsafe'}}]),'MISSING_OPEN_PR');
 console.log('PASS '+checks+' online authority gate controls; branch prefix and issue markers confer no admission.');
+// These source-security tests run before the intentional missing-review denial.
+// Never treat their success as human approval or a writer admission.
+await import('./pri-manual-authorization-check.mjs');
+await import('./pri-admission-state-check.mjs');
