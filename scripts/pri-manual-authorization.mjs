@@ -12,7 +12,7 @@ const sensitive = path =>
 // source into an ordinary-looking path must NEVER erase the old authority.
 const FILE_STATUSES = new Set(['added','modified','removed','renamed','copied','changed','unchanged']);
 const legitimatePath = p => typeof p === 'string' && p.length > 0 &&
-  !p.startsWith('/') && !p.includes('\\\\') && !/[\\x00-\\x1f\\x7f]/.test(p) &&
+  !p.startsWith('/') && !p.includes('\\') && !/[\x00-\x1f\x7f]/.test(p) &&
   !p.split('/').some(segment => !segment || segment === '.' || segment === '..');
 
 export function changedFilePaths(files) {
