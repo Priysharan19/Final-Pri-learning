@@ -22,7 +22,12 @@
 //    credential (account_tokens/auth_delivery_outbox admit 'guardian-withdraw'),
 //    audit_log append-only for pri_server and per-account restrictive RLS on
 //    the sync tables (supabase/migrations/20261007000000_security_hardening.sql).
-export const SCHEMA_VERSION = 11;
+// 12: Row-Level Security fails closed — every pri table requires a declared
+//    pri.scope ('system' | 'account'), and the account-owned tables admit only
+//    system scope or their own account (supabase/migrations/
+//    20261016000000_rls_fail_closed.sql). The store declares the scope for every
+//    statement; no SQLite structural change.
+export const SCHEMA_VERSION = 12;
 // Billing 4: billing_payments keeps its row when the account is deleted
 //    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
 //    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).

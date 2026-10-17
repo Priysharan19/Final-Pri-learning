@@ -1,6 +1,6 @@
 // swift-tools-version: 5.9
 
-// Pri Learning — native iPad app.
+// Pri Learning — native iPhone and iPad app.
 // Open this package in Swift Playgrounds 4+ on an iPad (no Mac needed) or in
 // Xcode 15+ on a Mac, press Run, and it installs as a full native app.
 import PackageDescription
@@ -20,11 +20,13 @@ let package = Package(
             bundleVersion: "2",
             appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.orange),
-            // V1 ships iPad-only (docs/release/PRI_V1_RELEASE_SCOPE.md, hard
-            // blocker #1). iPhone engineering builds add .phone in a scratch
-            // copy: node scripts/apple-shipping-target.mjs --engineering-package <dir>
+            // V1 ships on iPhone and iPad from this one package (owner scope
+            // change #504, docs/release/PRI_V1_RELEASE_SCOPE.md §22). Same
+            // bundle id, same prilearning://app origin, same on-device data.
+            // Guarded by node scripts/apple-shipping-target.mjs --check-v1.
             supportedDeviceFamilies: [
-                .pad
+                .pad,
+                .phone
             ],
             supportedInterfaceOrientations: [
                 // iPhone is portrait-only (CP-01/CP-04 decision); iPad keeps all four.
