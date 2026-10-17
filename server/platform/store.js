@@ -149,12 +149,14 @@ export function scopeStatement(accountScope) {
 }
 /**
  * The session scope of every pooled connection of the store, set once by
- * sessionSetup() (and re-asserted after exec()). A statement outside any
+ * sessionSetup() (and again after exec(), following DISCARD ALL). A statement outside any
  * transaction then runs as one round trip in system scope; a transaction's
  * SET LOCAL overrides it only until COMMIT/ROLLBACK. This needs a real session
  * per connection — a transaction-mode pooler is refused (assertSessionModeUrl).
  */
 export const SET_SESSION_SYSTEM_SCOPE = "SET pri.scope = 'system'; SET pri.account_id = ''";
+/** After exec(): refused inside an open or aborted transaction, so such a client is destroyed. */
+export const RESET_SESSION = 'DISCARD ALL';
 
 function lockOption(options) {
   const lock = options?.lock;
@@ -798,16 +800,24 @@ export class PostgresStore {
   async exec(sql) {
     const tx = this.#joined();
     if (tx) return tx.exec(sql);
-    // A script (tests/tools) may BEGIN/COMMIT, SET or RESET itself: it runs in
-    // the session's system scope, and the session scope is re-asserted after
-    // it; a client that cannot prove that is destroyed rather than pooled with
-    // an unknown scope.
+    // A script (tests/tools) may BEGIN/COMMIT, SET or RESET itself. It runs in
+    // the session's system scope; afterwards the session is reset to exactly
+    // what sessionSetup() gives a new connection. DISCARD ALL comes first, on
+    // its own: Postgres refuses it inside a transaction block (25001) or an
+    // aborted one (25P02), so a script that left a transaction open — whose
+    // session-level SETs would otherwise ride into the next request — fails
+    // the reset and the client is destroyed, never pooled.
     const client = await this._client();
     let broken;
     try {
       await client.query(sql);
     } finally {
-      try { await client.query(SET_SESSION_SYSTEM_SCOPE); } catch (resetError) { broken = resetError; }
+      try {
+        await client.query(RESET_SESSION);
+        await client.query(this.sessionSetup());
+      } catch (resetError) {
+        broken = resetError;
+      }
       client.release(broken);
     }
   }

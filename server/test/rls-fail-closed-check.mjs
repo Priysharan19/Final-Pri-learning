@@ -28,11 +28,11 @@
 //      row; the SHARED tables are pinned as readable and writable in account
 //      scope (docs/security/threat-model.md §7) so any change is deliberate.
 // ─────────────────────────────────────────────────────────────────────────────
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  PostgresStore, scopeStatement, SET_SESSION_SYSTEM_SCOPE
+  PostgresStore, scopeStatement, SET_SESSION_SYSTEM_SCOPE, RESET_SESSION
 } from '../platform/store.js';
 import { SCHEMA_VERSION } from '../platform/schemaVersions.js';
 import { requestedEngine } from './support/engine.mjs';
@@ -160,18 +160,63 @@ const pgError = code => Object.assign(new Error(`fake ${code}`), { code });
   ok(sqls(inner).includes('SELECT 1'), 'and its statement ran inside that transaction');
 }
 {
-  // exec(): runs in the session's system scope, which is re-asserted after the
-  // script (it may SET/RESET the scope itself); a client that cannot is destroyed.
+  // exec(): runs in the session's system scope; afterwards DISCARD ALL (refused
+  // inside an open or aborted transaction) and a fresh sessionSetup(). A client
+  // that cannot be reset is destroyed.
   const pool = fakePool();
-  await new PostgresStore(pool, { ownsPool: false }).exec('CREATE TEMP TABLE x(); DROP TABLE x');
-  eq(sqls(pool), ['CREATE TEMP TABLE x(); DROP TABLE x', SET_SESSION_SYSTEM_SCOPE], 'exec() runs its script and re-asserts the session system scope afterwards');
+  const store = new PostgresStore(pool, { ownsPool: false });
+  await store.exec('CREATE TEMP TABLE x(); DROP TABLE x');
+  eq(RESET_SESSION, 'DISCARD ALL', 'the post-exec reset is DISCARD ALL, which Postgres refuses inside a transaction block');
+  eq(pool.log.map(entry => entry.sql), [store.sessionSetup(), 'CREATE TEMP TABLE x(); DROP TABLE x', 'DISCARD ALL', store.sessionSetup()],
+    'exec() runs its script, then DISCARD ALL on its own, then the full session setup again (system scope included)');
   eq(pool.state, { released: 1, destroyed: 0 }, 'and returns the client');
   const failing = fakePool(sql => (sql.startsWith('BAD') ? pgError('42601') : undefined));
   await rejects(() => new PostgresStore(failing, { ownsPool: false }).exec('BAD SCRIPT'), error => error.code === '42601', 'a failing script reports its error');
-  ok(sqls(failing).at(-1) === SET_SESSION_SYSTEM_SCOPE && failing.state.released === 1, 'and the session scope is still re-asserted');
-  const stuck = fakePool(sql => (sql === SET_SESSION_SYSTEM_SCOPE ? pgError('25P02') : undefined));
+  ok(failing.log.at(-2).sql === 'DISCARD ALL' && failing.log.at(-1).sql.startsWith('SET search_path') && failing.state.released === 1, 'and the session is still reset');
+  const openTx = fakePool(sql => (sql === 'DISCARD ALL' ? pgError('25001') : undefined));
+  await new PostgresStore(openTx, { ownsPool: false }).exec('BEGIN; SET pri.scope = \'account\'');
+  eq(openTx.state, { released: 0, destroyed: 1 }, 'a script that leaves a transaction open (DISCARD ALL → 25001) gets its client destroyed, never pooled');
+  const aborted = fakePool(sql => (sql === 'DISCARD ALL' ? pgError('25P02') : undefined));
+  await new PostgresStore(aborted, { ownsPool: false }).exec('BEGIN; SELECT 1/0');
+  eq(aborted.state, { released: 0, destroyed: 1 }, 'so does one that leaves an aborted transaction (25P02)');
+  const stuck = fakePool((sql, params) => (stuck.log.filter(entry => entry.sql.startsWith('SET search_path')).length === 2 && sql.startsWith('SET search_path') ? pgError('57014') : undefined));
   await new PostgresStore(stuck, { ownsPool: false }).exec('SELECT 1');
-  eq(stuck.state, { released: 0, destroyed: 1 }, 'a client whose session scope cannot be re-asserted is destroyed, never pooled with an unknown scope');
+  eq(stuck.state, { released: 0, destroyed: 1 }, 'a client whose session setup cannot be re-run after exec() is destroyed, never pooled with an unknown scope');
+}
+{
+  // Only store.js declares pri.scope / pri.account_id. Under the session-default
+  // design a session-level SET (or set_config(…, false)) inside an account
+  // transaction would outlive its COMMIT and widen or misdirect every later
+  // statement on that pooled connection, so no other server source may contain
+  // one — handlers declare scope only through transaction({ accountScope }).
+  const SERVER = join(ROOT, 'server');
+  const files = [];
+  const walk = dir => {
+    for (const name of readdirSync(dir)) {
+      if (name === 'node_modules' || name.startsWith('.')) continue;
+      const path = join(dir, name);
+      if (statSync(path).isDirectory()) { if (path !== join(SERVER, 'test')) walk(path); }
+      else if (/\.(m?js|cjs)$/.test(name)) files.push(path);
+    }
+  };
+  walk(SERVER);
+  const SCOPE_WRITE = [/\b(?:re)?set\s+(?:session\s+|local\s+)?pri\./gi, /set_config\s*\(\s*['"`]pri\./gi];
+  const code = text => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
+  const found = {};
+  for (const file of files) {
+    const hits = SCOPE_WRITE.flatMap(re => code(readFileSync(file, 'utf8')).match(re) || []);
+    if (hits.length) found[file.slice(ROOT.length + 1)] = hits.length;
+  }
+  ok(files.length > 50 && files.some(f => f.endsWith(join('platform', 'store.js'))), `the scan covers the server sources (${files.length} files, store.js included)`);
+  // store.js: exactly the SET LOCAL pair in scopeStatement() and the session constant.
+  // postgres-target-check.mjs (an operator tool on a raw client): one transaction-local set_config(…, true).
+  eq(found, { 'server/platform/store.js': 4, 'server/tools/postgres-target-check.mjs': 1 },
+    'no server source outside store.js declares pri.scope or pri.account_id (the operator tool only transaction-locally)');
+  ok(/BEGIN READ ONLY; SELECT set_config\('pri\.scope', 'system', true\)/.test(readFileSync(join(SERVER, 'tools', 'postgres-target-check.mjs'), 'utf8')), 'and the tool\'s one declaration is transaction-local (is_local = true) inside its own READ ONLY transaction');
+  // The scan itself catches what it must: every spelling below is detected.
+  for (const probe of ["SET pri.scope = 'system'", "set session pri.account_id = 'x'", "RESET pri.scope", "SELECT set_config('pri.scope', 'system', false)", 'SELECT set_config( "pri.account_id", $1, false)', "SET LOCAL pri.scope = 'account'"]) {
+    ok(SCOPE_WRITE.some(re => new RegExp(re.source, 'i').test(probe)), `the scan detects ${probe}`);
+  }
 }
 
 // ── 2 · The migration's policies (static) ──────────────────────────────────
@@ -292,7 +337,21 @@ if (engine === 'postgres') {
       eq(await gucsOf(), { scope: 'system', account: '' }, 'after exec() of a script that set an account scope session-wide, the session is system again');
       await single.exec('RESET pri.scope; RESET pri.account_id');
       eq(await gucsOf(), { scope: 'system', account: '' }, 'and after one that reset it');
-      eq(single.stats.transactions, 3, 'all on one pooled session (three transactions, no extra connection)');
+      // A script that leaves a transaction open with a session-level account
+      // scope inside it: the post-exec DISCARD ALL is refused there, so that
+      // session is destroyed — the next statement runs on a fresh one.
+      const pidBefore = (await single.get('SELECT pg_backend_pid() AS pid')).pid;
+      await single.exec("BEGIN; SET pri.scope = 'account'; SET pri.account_id = 'acct-b'");
+      const pidAfter = (await single.get('SELECT pg_backend_pid() AS pid')).pid;
+      ok(pidAfter !== pidBefore, `a session left inside an open transaction by exec() is destroyed, not pooled (backend ${pidBefore} → ${pidAfter})`);
+      eq(await gucsOf(), { scope: 'system', account: '' }, 'and the replacement session is in system scope with no account');
+      let lingering = 1;
+      for (let i = 0; i < 40 && lingering; i++) {
+        lingering = Number((await scratch.client.query('SELECT count(*)::int AS n FROM pg_stat_activity WHERE pid = $1', [pidBefore])).rows[0].n);
+        if (lingering) await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      eq(lingering, 0, 'and the abandoned backend is gone (its open transaction rolled back)');
+      eq(single.stats.transactions, 3, 'three store transactions ran on the max-1 pool');
     } finally {
       await single.close();
     }

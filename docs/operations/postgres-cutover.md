@@ -30,7 +30,7 @@ printed):
 | URL is `postgres://` / `postgresql://` with a host | `config.js` | `PLATFORM_DB_URL_INVALID` |
 | **Production:** verified TLS — `sslmode=verify-full` (preferred), or `sslmode=require` **with** `PRI_DATABASE_SSL_ROOT_CERT` | `config.js postgresConnectionSettings` | `PLATFORM_DB_TLS_REQUIRED` (no/weak sslmode) / `PLATFORM_DB_TLS_UNVERIFIED` (`require` without the CA) |
 | No `sslrootcert`/`sslcert`/`sslkey`/`ssl=` in the URL (CA goes in `PRI_DATABASE_SSL_ROOT_CERT`) | same | `PLATFORM_DB_TLS_INVALID` |
-| **Session mode only:** not Supavisor's transaction port **6543**, no `pgbouncer=` (other than `false`), no `pool_mode=transaction`/`statement` | `config.js assertSessionModeUrl` (from `postgresConnectionSettings`, before any pool exists) | `PLATFORM_DB_TRANSACTION_POOLER` |
+| **Session mode only:** not Supavisor's transaction port **6543** (authority, `?port=` or `PGPORT`), no `pgbouncer=` (other than `false`), no `pool_mode=transaction`/`statement` | `config.js assertSessionModeUrl` (from `postgresConnectionSettings`, before any pool exists) | `PLATFORM_DB_TRANSACTION_POOLER` |
 | Reachable, migrated (`platform_meta.schema_version` present) | `store.js createPostgresStore` | `PLATFORM_DB_UNAVAILABLE` / `PLATFORM_DB_NOT_MIGRATED` |
 | `schema_version` = **12** and `billing_schema_version` = **6** exactly (`server/platform/schemaVersions.js`) | `store.js assertSchemaVersions` | `PLATFORM_DB_SCHEMA_MISMATCH` |
 | `pri.sync_cursor_seq` exists (migration `20261002000000`) | same | `PLATFORM_DB_SCHEMA_MISMATCH` |
@@ -54,8 +54,10 @@ that needs a real session per connection.
 * **Never** the transaction-mode pooler (port **6543**): the session settings above — including
   the RLS scope — would apply to whichever backend served the previous transaction, advisory
   locks would be lost between statements, and the per-account cursor ordering guarantee would not
-  hold. The server **refuses to start** with such a URL: port 6543, `pgbouncer=true` (or any value
-  but `false`), or `pool_mode=transaction`/`statement` stop the boot with
+  hold. The server **refuses to start** with such a URL: port 6543 from any source node-postgres
+  reads (the authority port, a `?port=` query parameter — which overrides it — or `PGPORT` for a
+  URL with neither), `pgbouncer=` with any value but `false`, or `pool_mode=transaction`/`statement`
+  (parameter names in any case) stop the boot with
   `PLATFORM_DB_TRANSACTION_POOLER` before a pool is created, and production readiness reports it.
   `server/test/postgres-connection-config-check.mjs` pins the refusals and that the staging shape
   passes.
@@ -194,7 +196,13 @@ cannot read the migrated tables at all (its statements declare no `pri.scope`, s
 nothing). Railway deploys `main` automatically when a PR merges, and **a failed post-merge deploy
 removes the previous deployment**: on 18 Oct 2026 the post-merge staging deploy of #522 crashed
 on schema 11 and staging served nothing until the migration was applied and the service
-redeployed. So, for every PR that changes `SCHEMA_VERSION` or `BILLING_SCHEMA_VERSION`:
+redeployed. **A short outage between merge and migrate is unavoidable for a scope-changing migration.** The
+old build cannot read the migrated schema and the new build will not boot on the old one, so
+there is no order in which both work: from the moment the first of the two happens until the
+second completes, the service answers nothing useful. The procedure below keeps that window to
+the minutes the two steps take; it cannot remove it. Announce it, and pick a quiet hour.
+
+So, for every PR that changes `SCHEMA_VERSION` or `BILLING_SCHEMA_VERSION`:
 
 1. Before merging, have §2.5.1–2.5.3 done (dry run lists only the new file) and the operator at
    the terminal.

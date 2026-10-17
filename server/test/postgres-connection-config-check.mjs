@@ -155,14 +155,24 @@ for (const [name, value] of [
     [`${BASE}?pgbouncer=&sslmode=verify-full`, 'an empty pgbouncer='],
     [`${BASE}?sslmode=verify-full&pool_mode=transaction`, 'pool_mode=transaction'],
     [`${BASE}?sslmode=verify-full&pool_mode=Transaction`, 'pool_mode=Transaction (any case)'],
-    [`${BASE}?sslmode=verify-full&pool_mode=statement`, 'pool_mode=statement']
+    [`${BASE}?sslmode=verify-full&pool_mode=statement`, 'pool_mode=statement'],
+    // node-postgres resolves the target itself: a `port` query parameter
+    // overrides the authority port, `host` + `port` parameters replace both,
+    // a portless URL takes PGPORT, and parameter keys are matched by any case
+    // here so a variant spelling cannot slip through (review of #536).
+    [`${BASE}?sslmode=verify-full&port=6543`, '?port=6543 overriding the authority :5432'],
+    [`${BASE}?sslmode=verify-full&host=aws-0-ap-south-1.pooler.supabase.com&port=6543`, '?host=…&port=6543'],
+    [`postgresql://pri_app.orudxrckgxyyraopyzmn:${SECRET}@${DB_HOST}/postgres?sslmode=verify-full`, 'a portless URL with PGPORT=6543', { PGPORT: '6543' }],
+    [`${BASE}?sslmode=verify-full&PGBOUNCER=true`, 'PGBOUNCER=true (uppercase key)'],
+    [`${BASE}?sslmode=verify-full&Pool_Mode=transaction`, 'Pool_Mode=transaction (mixed-case key)'],
+    [`${BASE}?sslmode=verify-full&PORT=6543`, '?PORT=6543 (uppercase key)']
   ];
-  for (const [url, label] of refusedUrls) {
-    for (const env of [prod(), dev()]) {
+  for (const [url, label, extraEnv = {}] of refusedUrls) {
+    for (const env of [prod(extraEnv), dev(extraEnv)]) {
       const error = throwsCode(() => postgresConnectionSettings(url, env), 'PLATFORM_DB_TRANSACTION_POOLER', `${env.NODE_ENV}: ${label} is refused`);
       ok(/session pooler \(port 5432\)/.test(error.message) && !error.message.includes(DB_HOST), `${env.NODE_ENV}: ${label}: the error says what to use instead and names no host`);
     }
-    throwsCode(() => postgresPoolOptions(url, { env: prod() }), 'PLATFORM_DB_TRANSACTION_POOLER', `${label}: the pool options are refused too`);
+    throwsCode(() => postgresPoolOptions(url, { env: prod(extraEnv) }), 'PLATFORM_DB_TRANSACTION_POOLER', `${label}: the pool options are refused too`);
   }
   // At pool creation: createPostgresPool / createPostgresStore refuse before any pg Pool (or connection) exists.
   let poolError = null;
@@ -179,6 +189,9 @@ for (const [name, value] of [
   ok(postgresConnectionSettings(`postgresql://postgres:${SECRET}@db.orudxrckgxyyraopyzmn.supabase.co:5432/postgres?sslmode=verify-full`, prod()).tlsMode === 'verify-full', 'a direct connection on 5432 is accepted');
   ok(postgresConnectionSettings(`${BASE}?sslmode=verify-full&pgbouncer=false`, prod()).tlsMode === 'verify-full', 'pgbouncer=false states session semantics and is accepted');
   ok(postgresConnectionSettings(`${BASE}?sslmode=verify-full&pool_mode=session`, prod()).tlsMode === 'verify-full', 'pool_mode=session is accepted');
+  ok(postgresConnectionSettings(`${BASE}?sslmode=verify-full`, prod({ PGPORT: '6543' })).tlsMode === 'verify-full', 'PGPORT=6543 does not matter when the URL names its port (5432), exactly as pg resolves it');
+  ok(postgresConnectionSettings(`${BASE}?sslmode=verify-full&port=5432`, prod()).tlsMode === 'verify-full', '?port=5432 (session mode) is accepted');
+  ok(postgresConnectionSettings(`postgresql://u:${SECRET}@${DB_HOST}/postgres?sslmode=verify-full`, prod({ PGPORT: '5432' })).tlsMode === 'verify-full', 'a portless URL with PGPORT=5432 is accepted');
 }
 
 console.log(`POSTGRES CONNECTION CONFIG: PASS — ${checks}/${checks} checks — production requires verified TLS (sslmode=verify-full, or require + CA), TLS is built explicitly from sslmode + PRI_DATABASE_SSL_ROOT_CERT, timeouts and pool size are validated, transaction-mode poolers are refused (session mode only), and no error leaks the URL.`);
