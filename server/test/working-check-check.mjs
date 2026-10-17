@@ -15,6 +15,7 @@
 //
 // The provider is a stub. No network call, no API key, no spend.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { createPlatformDb } from '../platform/db.js';

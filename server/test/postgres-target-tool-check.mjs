@@ -10,6 +10,7 @@
 //
 // Run through scripts/with-postgres.mjs (npm run test:platform:pg).
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';

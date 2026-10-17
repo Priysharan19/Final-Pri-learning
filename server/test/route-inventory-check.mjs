@@ -15,6 +15,7 @@
 // A self-test proves the comparison catches an unlisted route and a dropped
 // guard, so the check cannot pass by comparing nothing.
 
+import './support/hermetic.mjs';
 import { createPlatformDb } from '../platform/db.js';
 import { createPlatformRouter } from '../platform/router.js';
 import { listRoutes } from '../platform/routePolicy.js';

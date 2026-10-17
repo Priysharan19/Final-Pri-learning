@@ -20,6 +20,7 @@
 //
 // Run: node server/test/migration-transaction-check.mjs
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -19,6 +19,7 @@
 //   5. Over HTTP: /v1/account/otp/request answers an explicit 503 "could not be sent"
 //      (never a silent 202), identically for a known and an unknown address.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

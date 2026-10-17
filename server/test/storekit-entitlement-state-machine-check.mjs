@@ -20,6 +20,7 @@
 // HTTP through the production app (session, CSRF, webhook route, native-client
 // checkout refusal). Part 3 runs the operator reconciliation CLI (SQLite).
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';

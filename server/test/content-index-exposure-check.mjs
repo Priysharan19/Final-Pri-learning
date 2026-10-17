@@ -12,6 +12,7 @@
 // A catalogue needs the keys, not the contents: one page at a time, no source,
 // no body, and a limit per caller.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

@@ -25,6 +25,7 @@
 //
 // docs/operations/drills.md lists the manual versions for staging/production.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { createServer as createHttpServer } from 'node:http';
 import { createServer as createTcpServer, connect } from 'node:net';

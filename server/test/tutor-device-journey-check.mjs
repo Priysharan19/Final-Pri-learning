@@ -22,6 +22,7 @@
 //      cut off from the server — shows the question's bundled hint, coded, with
 //      no model call, and the help is still counted on the row.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { createServer } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

@@ -61,6 +61,7 @@
 // extra forms over the client's banks; the marker comes straight from the
 // client, because the client's checker IS the marker a student is graded by and
 // naming it here leaves no doubt about which function the round-trip used.
+import './support/hermetic.mjs';
 import { GENERATORS, generateQuestion } from '../engine/generators/index.js';
 import { MULTIPART, generateMultipart } from '../engine/generators/multipart.js';
 import { checkAnswer } from '../../client/src/engine/checker.js';

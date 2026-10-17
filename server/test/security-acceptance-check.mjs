@@ -32,6 +32,7 @@
 
 // Secret-shaped values are assembled at runtime so the repository secret scan
 // (tools/secret-scan.mjs) never sees one committed.
+import './support/hermetic.mjs';
 const shaped = (prefix, body) => `${prefix}${body}`;
 const SECRETS = {
   PRI_HANDWRITING_API_KEY: shaped('sk-', 'proj-ACCEPTANCEhandwritingSECRET0123456789abcdef'),

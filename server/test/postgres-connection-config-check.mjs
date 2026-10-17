@@ -13,6 +13,7 @@
 // environment with sane defaults, and anything unparseable stops the boot.
 // No error ever contains the URL or its password.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { postgresConnectionSettings, postgresSessionLimits } from '../platform/config.js';
 import { postgresPoolOptions } from '../platform/store.js';

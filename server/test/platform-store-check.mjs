@@ -13,6 +13,7 @@
 // SERIALIZABLE plus retry, which this run must actually exercise), and the
 // dialect helpers give both engines the same answers.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import {
   PostgresStore, assertNoOpenTransaction, createPostgresStore, databaseOverload, inStoreTransaction, isDatabaseOverload,
