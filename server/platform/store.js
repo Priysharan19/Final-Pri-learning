@@ -91,10 +91,17 @@ export function assertNoOpenTransaction(what = 'This network call') {
 
 /**
  * The account a transaction is for, when it says so. On Postgres the store sets
- * the session GUC `pri.account_id` for the transaction (SET LOCAL semantics), and
- * the restrictive RLS policies on the sync tables (supabase/migrations/
- * 20261005000000) then refuse any row of another account — defence in depth
- * under the handlers' own WHERE account_id = ?. On SQLite it is recorded only.
+ * the GUCs `pri.scope = 'account'` and `pri.account_id` for the transaction
+ * (SET LOCAL semantics), and the restrictive RLS policies on the account-owned
+ * tables (supabase/migrations/20261016000000_rls_fail_closed.sql) then refuse
+ * any row of another account — defence in depth under the handlers' own
+ * WHERE account_id = ?. On SQLite it is recorded only.
+ *
+ * Every other statement the Postgres store runs — joined to no transaction, or
+ * in a transaction without an account scope — runs with `pri.scope = 'system'`,
+ * set transaction-locally too. A statement that reaches the database any other
+ * way (a raw client, a pooled connection after its transaction ended) has no
+ * declared scope and the policies give it no rows: RLS fails closed.
  */
 function accountScopeOption(options) {
   const scope = options?.accountScope;
@@ -102,7 +109,35 @@ function accountScopeOption(options) {
   if (typeof scope !== 'string' || !scope || scope.length > 200) throw storeError('STORE_ACCOUNT_SCOPE_INVALID', 'A transaction account scope must be a non-empty string of at most 200 characters.');
   return scope;
 }
-const SET_ACCOUNT_SCOPE = "SELECT set_config('pri.account_id', $1, true)";
+// Both GUCs are always set together, transaction-locally, so a transaction can
+// never inherit the other kind of scope from anywhere. They are declared with
+// SET LOCAL in the same simple query as BEGIN: one round trip, and — unlike a
+// SELECT set_config(...) — a utility command that takes no snapshot, so a
+// REPEATABLE READ / SERIALIZABLE transaction's snapshot is still taken by its
+// own first statement, exactly as before the scope existed. (Taking it one round
+// trip early widened every serializable transaction's conflict window and
+// exhausted the 40001 retries on the hot rate_limits rows under a sync burst.)
+const SCOPE_INVALID = () => storeError('STORE_ACCOUNT_SCOPE_INVALID', 'A transaction account scope must be a non-empty string of at most 200 characters.');
+/** A Postgres string literal that is correct whatever standard_conforming_strings is. */
+function scopeLiteral(value) {
+  const text = String(value);
+  if (text.includes('\0')) throw SCOPE_INVALID();
+  const quoted = text.replace(/'/g, "''");
+  return text.includes('\\') ? `E'${quoted.replace(/\\/g, '\\\\')}'` : `'${quoted}'`;
+}
+function scopeParams(accountScope) {
+  return accountScope ? ['account', accountScope] : ['system', ''];
+}
+/** SET LOCAL statements declaring a transaction's scope: its account, or system with no account. */
+export function scopeStatement(accountScope) {
+  const [scope, account] = scopeParams(accountScope);
+  return `SET LOCAL pri.scope = '${scope}'; SET LOCAL pri.account_id = ${scopeLiteral(account)}`;
+}
+/** The statement that opens a store statement run outside any transaction, in system scope. */
+export const BEGIN_SYSTEM_STATEMENT = `BEGIN; ${scopeStatement(null)}`;
+/** exec() runs a script that may manage its own transactions: session-level system scope, reset after. */
+export const SET_SESSION_SYSTEM_SCOPE = "SELECT set_config('pri.scope', 'system', false), set_config('pri.account_id', '', false)";
+export const RESET_SESSION_SCOPE = 'RESET pri.scope; RESET pri.account_id';
 
 function lockOption(options) {
   const lock = options?.lock;
@@ -704,17 +739,36 @@ export class PostgresStore {
     return client;
   }
 
+  /**
+   * One statement outside any transaction. It runs in its own short READ
+   * COMMITTED transaction (the isolation an autocommit statement has) that
+   * declares system scope first, so the scope is transaction-local and can never
+   * outlive the statement on the pooled connection.
+   */
   async #query(sql, params) {
+    const values = asParams(params);
     const client = await this._client();
     let broken;
+    let begun = false;
     try {
-      return await client.query(toPostgresPlaceholders(sql), asParams(params));
+      // Set before the query: if BEGIN succeeds and the SET LOCAL after it does
+      // not, the session is in an aborted transaction and still needs ROLLBACK.
+      begun = true;
+      await client.query(BEGIN_SYSTEM_STATEMENT);
+      const result = await client.query(toPostgresPlaceholders(sql), values);
+      await client.query('COMMIT');
+      begun = false;
+      return result;
     } catch (error) {
       // A statement error leaves the session usable; a lost connection does not.
       if (client.__priLost) { broken = client.__priLost; throw databaseOverload(client.__priLost); }
       if (!error?.code || String(error.code).startsWith('08') || error.code === '57P01' || error.code === '25P03') broken = error;
       throw databaseOverload(error);
     } finally {
+      if (begun && !broken) {
+        // A client whose ROLLBACK fails is in an unknown state: destroy it.
+        try { await client.query('ROLLBACK'); } catch (rollbackError) { broken = rollbackError; }
+      }
       client.release(broken);
     }
   }
@@ -740,8 +794,18 @@ export class PostgresStore {
   async exec(sql) {
     const tx = this.#joined();
     if (tx) return tx.exec(sql);
+    // A script (tests/tools) may BEGIN/COMMIT itself, so the scope is set for
+    // the session and reset afterwards; a client that cannot prove the reset is
+    // destroyed rather than returned to the pool still in system scope.
     const client = await this._client();
-    try { await client.query(sql); } finally { client.release(); }
+    let broken;
+    try {
+      await client.query(SET_SESSION_SYSTEM_SCOPE);
+      await client.query(sql);
+    } finally {
+      try { await client.query(RESET_SESSION_SCOPE); } catch (resetError) { broken = resetError; }
+      client.release(broken);
+    }
   }
 
   async transaction(fn, options = {}) {
@@ -786,14 +850,16 @@ export class PostgresStore {
           }
           if (!locked) throw overloaded('PLATFORM_DB_BUSY', 1, { code: 'LOCK_WAIT_TIMEOUT' });
         }
-        await client.query(readOnly
+        // Every transaction declares its scope — the account, or system — in
+        // its BEGIN. SET LOCAL reverts at COMMIT/ROLLBACK, so a pooled
+        // connection never carries one request's scope into the next; it is
+        // re-declared on every retry and takes no snapshot (see scopeStatement).
+        const begin = readOnly
           ? 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY'
-          : isolation === 'repeatable read' ? 'BEGIN ISOLATION LEVEL REPEATABLE READ' : 'BEGIN ISOLATION LEVEL SERIALIZABLE');
-        begun = true;
-        // Transaction-local (is_local = true): reverts to '' at COMMIT/ROLLBACK,
-        // so a pooled connection never carries one request's account into the
-        // next. Re-run with the transaction on every retry.
-        if (accountScope) await client.query(SET_ACCOUNT_SCOPE, [accountScope]);
+          : isolation === 'repeatable read' ? 'BEGIN ISOLATION LEVEL REPEATABLE READ' : 'BEGIN ISOLATION LEVEL SERIALIZABLE';
+        const scope = scopeStatement(accountScope);
+        begun = true; // a failure part-way through the BEGIN query still gets its ROLLBACK
+        await client.query(`${begin}; ${scope}`);
         const result = await txContext.run({ store: this, tx }, () => fn(tx));
         tx.closed = true;
         await client.query('COMMIT');
