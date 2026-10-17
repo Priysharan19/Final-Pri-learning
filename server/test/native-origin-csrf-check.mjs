@@ -1,3 +1,4 @@
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 
 process.env.NODE_ENV = 'production';

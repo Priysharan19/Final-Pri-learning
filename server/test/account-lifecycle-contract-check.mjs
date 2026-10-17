@@ -1,3 +1,4 @@
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 
 // Delivery encryption is production-shaped even in this in-process contract.

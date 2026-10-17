@@ -191,10 +191,10 @@ export async function markCloudSynced(pid, at = Date.now()) {
   await put('device', { ...prior, lastSyncAt: at });
 }
 
-export async function disconnectCloudAccount(pid) {
-  try { if (cloudAvailable()) await cloud.logout(); } catch { /* local unlink must remain possible during a cloud outage */ }
-  // Offline, the logout above cannot reach the server; the device must still
-  // stop holding the session (the native shells keep it outside the page).
+/** The device half of ending a link: native session, replica state, link row. */
+async function forgetCloudAccountLocally(pid) {
+  // The device must stop holding the session even when the server cannot be
+  // told (the native shells keep it outside the page).
   await forgetNativeCloudSession();
 
   // Fail closed locally: first remove account-specific replica metadata and put
@@ -209,4 +209,29 @@ export async function disconnectCloudAccount(pid) {
   await del('device', linkRowId(pid));
   announceLink(pid, null, false);
   return { connected: false };
+}
+
+export async function disconnectCloudAccount(pid) {
+  try { if (cloudAvailable()) await cloud.logout(); } catch { /* local unlink must remain possible during a cloud outage */ }
+  return forgetCloudAccountLocally(pid);
+}
+
+/**
+ * Delete the cloud account this profile is linked to, and forget it here.
+ *
+ * `proof` is whatever the server asks for to re-authenticate the deletion —
+ * `{ password }`, `{ provider, idToken, nonce }` or `{ otpChallengeId, otpCode }`
+ * — and is sent as given. Once the server confirms, the device always drops the
+ * link, the account's replica state and the native session, whichever proof was
+ * used: a link left behind names an account that no longer exists, and every
+ * later sign-in and sync on this profile is refused while it stays (#500). No
+ * logout is sent; the deletion has already ended every session of the account.
+ * If the server refuses, nothing on the device changes and the error (with its
+ * server code) reaches the caller.
+ */
+export async function deleteCloudAccount(pid, proof) {
+  linkRowId(pid); // never delete an account this device could not then forget
+  await cloud.deleteAccount(proof);
+  await forgetCloudAccountLocally(pid);
+  return { deleted: true, connected: false };
 }

@@ -337,6 +337,39 @@ correct(smallInteger, '36/3', 'small integer: a calculation');
 correct(smallInteger, 'sqrt(144)', 'small integer: a surd that lands on it');
 wrong(smallInteger, '12.01', 'small integer: a hundredth out is wrong');
 
+// A relative band grows with the target. Without an absolute cap the default
+// 1e-4 band accepted 98770 for 98765.4 and ₹1234.6 for ₹1234.5.
+const largeDecimal = { answerType: 'numeric', answer: { value: 98765.4 } };
+correct(largeDecimal, '98765.4', 'large decimal: itself');
+correct(largeDecimal, '98765.40', 'large decimal: a trailing zero');
+correct(largeDecimal, '493827/5', 'large decimal: a calculation that lands on it');
+for (const [input, label] of [
+  ['98770', 'rounded to the nearest ten'],
+  ['98765', 'rounded to a whole number'],
+  ['98765.5', 'one in the last place'],
+  ['98766.4', 'one whole unit out'],
+]) wrong(largeDecimal, input, `large decimal: ${label}`);
+
+const rupeeAmount = { answerType: 'numeric', answer: { value: 1234.5 } };
+correct(rupeeAmount, '1234.50', 'rupees: paise written out');
+wrong(rupeeAmount, '1234.6', 'rupees: ten paise out');
+wrong(rupeeAmount, '1234.4', 'rupees: ten paise under');
+
+const paiseAmount = { answerType: 'numeric', answer: { value: 1234.56 } };
+correct(paiseAmount, '1234.56', 'paise: itself');
+wrong(paiseAmount, '1234.6', 'paise: rounded away from the paise');
+wrong(paiseAmount, '1234.57', 'paise: one paisa out');
+
+const longDecimal = { answerType: 'numeric', answer: { value: 1414.2135623730951 } };
+correct(longDecimal, '1414.21', 'long decimal: rounded to two places');
+correct(longDecimal, '1414.2', 'long decimal: rounded to one place');
+wrong(longDecimal, '1414', 'long decimal: rounded to a whole number');
+wrong(longDecimal, '1414.3', 'long decimal: wrong in the first place');
+
+const third = { answerType: 'numeric', answer: { value: 1 / 3 } };
+correct(third, '0.3333', 'small decimal: the relative band still forgives rounding');
+wrong(third, '0.333', 'small decimal: too coarse is still wrong');
+
 // ── 10. A percentage written with its sign ───────────────────────────────────
 const percentage = {
   answerType: 'numeric',

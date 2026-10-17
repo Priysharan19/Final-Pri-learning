@@ -21,6 +21,7 @@
 //   5. what was adopted is what is graded: the root solved from the public
 //      prompt is marked correct on both issuances.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

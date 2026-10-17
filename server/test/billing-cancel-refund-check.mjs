@@ -1,3 +1,4 @@
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';

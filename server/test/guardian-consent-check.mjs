@@ -17,6 +17,7 @@
 //   · and the schema migration that carries it does not destroy unsent email,
 //     which it did on my first attempt.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { readFileSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import express from 'express';

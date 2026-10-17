@@ -15,6 +15,7 @@
 // injected transcriber for what needs no HTTP (what is stored, restart, refunds).
 // Nothing here measures reading accuracy, and nothing here is deployed.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { createServer } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

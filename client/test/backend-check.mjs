@@ -1404,7 +1404,10 @@ async function run() {
     // before the seek starts, so its cost is bounded here: a cell stops being
     // probed once its yield has saturated, and the bound keeps the budget from
     // creeping back towards the full 48 seeds on every cell.
-    const { trapProbeStatsForTests } = await import(`${SRC}local/backend.js`);
+    const { trapProbeStatsForTests, resetTrapYieldCacheForTests } = await import(`${SRC}local/backend.js`);
+    // Earlier steps may already have hunted this cell from whatever they were
+    // served; clear the yield cache so this really is the first hunt (#453).
+    resetTrapYieldCacheForTests();
     const probeBefore = trapProbeStatsForTests();
     const mapped = await servedWhere([MS], (s) => mappedProbes(s.payload).has(M), 40);
     const probeAfter = trapProbeStatsForTests();

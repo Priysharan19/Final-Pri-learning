@@ -17,6 +17,7 @@
 //   · the Play client signs its service-account JWT correctly, pins the token
 //     endpoint, never follows redirects and refuses to run inside a transaction.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { createSign, generateKeyPairSync, verify } from 'node:crypto';
 import { openTestStore } from './support/engine.mjs';

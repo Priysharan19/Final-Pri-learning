@@ -12,6 +12,7 @@
 //
 // No database server is needed: the migration SQL is read as text.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';

@@ -1,3 +1,4 @@
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { createPlatformDb, nextSyncCursor, syncLockKey } from '../platform/db.js';
 import { asStore } from '../platform/store.js';

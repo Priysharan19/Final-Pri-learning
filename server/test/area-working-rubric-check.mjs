@@ -6,6 +6,7 @@
 // seed 4 — "area enclosed between y = x² and y = 7x", 3 marks, answer 343/6.
 //
 //   node server/test/area-working-rubric-check.mjs
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
