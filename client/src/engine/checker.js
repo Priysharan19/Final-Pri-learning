@@ -2067,8 +2067,8 @@ function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = n
   const sweepSize = Math.max(3, uniqueNumeric(meta.solutions).length + 1);
   const contradicted = new Set();
   let falseArithmetic = false;
+  const shapes = new Map();
   {
-    const shapes = new Map();
     allLines.forEach((l, index) => {
       const text = String(l.text ?? '').replace(/[−–—]/g, '-').replace(/\s+/g, '');
       const c = readClaim(l.text);
@@ -2088,9 +2088,6 @@ function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = n
       seen.lines.push(index);
       shapes.set(key, seen);
     });
-    for (const seen of shapes.values()) {
-      if (seen.values.size >= sweepSize) for (const index of seen.lines) contradicted.add(index);
-    }
     // The middle term split more than one way is a search for the pair, not
     // the pair found: every split of `bx` adds back to `bx`, so a wrong one
     // is never false, and only one of them factorises. None of them earns.
@@ -2153,6 +2150,45 @@ function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = n
       if (v !== null && !values.some(x => numsClose(x, v))) values.push(v);
     }
     rootSweep = values.length >= 2 && values.some(v => !wanted.some(w => numsClose(w, v)));
+  }
+  // The sweep of one shape, decided here because it needs to know what a root
+  // of the question is. Where roots are read off, the first false line is,
+  // again, not one of the candidates when it is the only thing wrong with its
+  // shape. Roots of one sign are written in one shape, so both roots read off
+  // and then one slip made three values of `x = #` and voided the two roots
+  // above the slip: `(x-3)(x-5) = 0`, `x = 3`, `x = 5`, then `x = 7`, fell from
+  // three marks to one, where the same working on roots of opposite sign
+  // (`x = 2`, `x = -3` are two shapes) kept all three. The slip is set aside
+  // only when
+  //  · every other line of the shape states a root of the question — is true,
+  //    that is, and not merely unrefuted: a factorisation that shares one root
+  //    with the question is not — so a second wrong value is still a list of
+  //    candidates; and
+  //  · what is left is itself too few to be a sweep, so a slip can never
+  //    rescue a sweep it was added to.
+  // Setting it aside credits nothing: each root left standing still has to be
+  // read off something solved, once, and nothing after the slip earns.
+  // It is not done on a linear equation. There a line that pins the unknown
+  // (`x + 1 = 6`) stands as far on as the answer, so letting two of them stand
+  // beside a slip would leave every genuine step written after them a
+  // `repeat`: the sweep rule voiding them is what lets those steps earn.
+  {
+    const wanted = uniqueNumeric(meta.solutions);
+    const statesRoot = index => {
+      if (!statedRoots) return false;
+      const c = readClaim(allLines[index].text);
+      const v = c?.kind === 'equation' ? statedRootOf(c, meta.variable) : null;
+      return v !== null && wanted.some(w => numsClose(w, v));
+    };
+    const numbersOf = index => String(allLines[index].text ?? '').replace(/[−–—]/g, '-').replace(/\s+/g, '').match(/\d+(?:\.\d+)?/g).join(',');
+    for (const seen of shapes.values()) {
+      if (seen.values.size < sweepSize) continue;
+      if (statedRoots && firstBreak >= 0 && seen.lines.includes(firstBreak)) {
+        const rest = seen.lines.filter(index => index !== firstBreak);
+        if (rest.every(statesRoot) && new Set(rest.map(numbersOf)).size < sweepSize) continue;
+      }
+      for (const index of seen.lines) contradicted.add(index);
+    }
   }
   // The per-line mark vector: one entry per written line, in order, saying
   // what that line earned and why. Its marks always sum to `awarded`, so a

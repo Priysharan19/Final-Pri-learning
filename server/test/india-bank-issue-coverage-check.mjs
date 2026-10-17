@@ -5,6 +5,7 @@
 // signed-in student's 3D-geometry questions silently stayed device-marked.
 // Over real HTTP: every India class generator the client ships is issued (201)
 // from that bank, under the caller's account, with no seed disclosed.
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 
 process.env.PRI_AUTH_DELIVERY_KEY = process.env.PRI_AUTH_DELIVERY_KEY || '55'.repeat(32);

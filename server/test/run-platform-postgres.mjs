@@ -14,6 +14,7 @@
 // A suite that does not report `engine: postgres` counts as a failure: a run
 // that silently fell back to SQLite proves nothing about Postgres.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -89,7 +90,10 @@ export const ENGINE_SUITES = [
   // join-code encryption, guardian withdrawal credential, health exposure).
   'mfa-check.mjs',
   'oidc-consent-check.mjs',
-  'security-hardening-check.mjs'
+  'security-hardening-check.mjs',
+  // Row-Level Security fails closed: unscoped access sees nothing, account
+  // scope only its own rows, and no scope outlives its transaction.
+  'rls-fail-closed-check.mjs'
 ];
 
 let failed = 0;

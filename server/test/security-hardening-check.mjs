@@ -24,6 +24,7 @@
 // SQLite by default; `--engine=postgres` runs it on a migrated Postgres, where
 // the M5 policies are proven against the real catalogue.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

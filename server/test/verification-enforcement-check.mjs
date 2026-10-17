@@ -5,6 +5,7 @@
 // sync pull stays open so a device can still read back. Verifying the mailbox
 // opens each gate on the same session.
 
+import './support/hermetic.mjs';
 const { startApp, registerAccount, verifyEmail, checks } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
 

@@ -1,3 +1,4 @@
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { assertPlatformConfig, platformConfigStatus, platformDatabasePath } from '../platform/config.js';

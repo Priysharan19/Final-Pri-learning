@@ -8,6 +8,7 @@
 //
 // Run through scripts/with-postgres.mjs (npm run test:platform:pg).
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { migrationFiles, scratchDatabase } from './support/postgres.mjs';
 import { compareAccess, compareSchemas, compareSeeds, postgresSchema, sqliteSchema } from './support/pgSchemaParity.mjs';
 
@@ -158,6 +159,17 @@ const MUTATIONS = [
     label: 'a later migration loosens the per-account scope policy on sync_entities',
     migrations: laterMigration("drop policy pri_account_scope on pri.sync_entities;\ncreate policy pri_account_scope on pri.sync_entities as restrictive for all to pri_server using (true) with check (true);"),
     expect: /sync_entities: policy pri_account_scope does not scope rows to pri\.account_id/
+  },
+  {
+    // 20261016000000: an unset scope must mean no rows, not every row.
+    label: 'a later migration restores the allow-when-unset scope policy on learning_events',
+    migrations: laterMigration("drop policy pri_account_scope on pri.learning_events;\ncreate policy pri_account_scope on pri.learning_events as restrictive for all to pri_server using (coalesce(current_setting('pri.account_id', true), '') = '' or account_id = current_setting('pri.account_id', true)) with check (coalesce(current_setting('pri.account_id', true), '') = '' or account_id = current_setting('pri.account_id', true));"),
+    expect: /learning_events: policy pri_account_scope does not scope rows to pri\.account_id/
+  },
+  {
+    label: 'a later migration drops the declared-scope requirement on accounts',
+    migrations: laterMigration('drop policy pri_scope_required on pri.accounts;'),
+    expect: /accounts: expected a restrictive pri_scope_required policy, found none/
   },
   {
     // Always the LAST migration that moves schema_version, whichever that is,

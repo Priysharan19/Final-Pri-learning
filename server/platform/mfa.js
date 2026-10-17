@@ -17,6 +17,10 @@
 //     Codes are accepted from the previous, current and next step (clock drift)
 //     and a step that has been used cannot be used again (last_used_counter),
 //     so a code observed over someone's shoulder is dead the moment it is used.
+//     The counter is one per ACCOUNT, not per session, and a step is spent by
+//     one conditional write bound to the secret that matched — confirmation
+//     included — so of two sessions presenting one code at once, on SQLite or
+//     on SERIALIZABLE Postgres, exactly one is accepted (#445).
 //   · STEP-UP. Role promotion and a Premium grant ask for a code again unless
 //     one was accepted in the last 15 minutes (security.js requireMfa).
 //   · The gate itself is in security.js: a staff account that has not enrolled
@@ -242,10 +246,17 @@ export function createMfaRouter(db) {
         if (err?.code === 'MFA_NOT_CONFIGURED') return res.status(503).json({ error: { code: err.code, message: err.message } });
         throw err;
       }
-      await db.run(`INSERT INTO account_mfa(account_id, secret_ciphertext, created_at, confirmed_at, last_used_counter, updated_at)
+      // The read above is only the fast answer. A confirm from another session
+      // can commit between it and this write, so the upsert itself replaces
+      // only a still-pending row: a factor confirmed mid-request is never reset
+      // to pending under a new secret (which would leave the confirming session
+      // verified against a factor that is no longer the account's).
+      const written = await db.run(`INSERT INTO account_mfa(account_id, secret_ciphertext, created_at, confirmed_at, last_used_counter, updated_at)
         VALUES (?, ?, ?, NULL, NULL, ?)
         ON CONFLICT(account_id) DO UPDATE SET secret_ciphertext = excluded.secret_ciphertext, created_at = excluded.created_at,
-          confirmed_at = NULL, last_used_counter = NULL, updated_at = excluded.updated_at`, [accountId, ciphertext, now, now]);
+          confirmed_at = NULL, last_used_counter = NULL, updated_at = excluded.updated_at
+        WHERE account_mfa.confirmed_at IS NULL`, [accountId, ciphertext, now, now]);
+      if (written.changes !== 1) return res.status(409).json({ error: { code: 'MFA_ALREADY_ENROLLED', message: 'An authenticator app is already set up for this account.' } });
       const encoded = base32Encode(secret);
       res.set('Cache-Control', 'no-store');
       res.status(201).json({
@@ -265,15 +276,26 @@ export function createMfaRouter(db) {
     const step = matchTotp(decryptMfaSecret(row.secret_ciphertext, accountId), req.body?.code, { nowMs: now });
     if (step === null) return invalidCode(res);
     const recoveryCodes = mintRecoveryCodes();
-    await db.transaction(async () => {
-      await db.run('UPDATE account_mfa SET confirmed_at = ?, last_used_counter = ?, updated_at = ? WHERE account_id = ?', [now, step, now, accountId]);
+    // Confirming spends the step, so it is the same compare-and-set as /verify:
+    // only a still-pending enrolment of the very secret that matched is
+    // confirmed. Two sessions confirming with one code at once used to both be
+    // accepted — seen unforced on Postgres, where the SERIALIZABLE retry re-ran
+    // an unconditional UPDATE, and on either engine once both had read the
+    // pending row: two sessions verified by one step, a second mfa.enrol audit
+    // and the first session's recovery codes silently replaced. The loser now
+    // writes nothing and is refused like any other spent code (#445).
+    const confirmed = await db.transaction(async () => {
+      const spent = await db.run('UPDATE account_mfa SET confirmed_at = ?, last_used_counter = ?, updated_at = ? WHERE account_id = ? AND confirmed_at IS NULL AND secret_ciphertext = ?', [now, step, now, accountId, row.secret_ciphertext]);
+      if (spent.changes !== 1) return false;
       await db.run('DELETE FROM account_mfa_recovery_codes WHERE account_id = ?', [accountId]);
       for (const code of recoveryCodes) {
         await db.run('INSERT INTO account_mfa_recovery_codes(account_id, code_hash, created_at) VALUES (?, ?, ?)', [accountId, recoveryCodeHash(accountId, code), now]);
       }
       await db.run('UPDATE account_sessions SET mfa_verified_at = ? WHERE id = ?', [now, req.platformSession.id]);
       await audit(db, accountId, 'mfa.enrol', accountId, { method: 'totp' }, now);
+      return true;
     });
+    if (!confirmed) return invalidCode(res);
     res.set('Cache-Control', 'no-store');
     res.json({ enrolled: true, verifiedAt: now, recoveryCodes });
   });
@@ -296,8 +318,10 @@ export function createMfaRouter(db) {
     const step = matchTotp(decryptMfaSecret(row.secret_ciphertext, accountId), req.body?.code, { nowMs: now, lastUsedCounter: row.last_used_counter });
     if (step === null) return invalidCode(res);
     // Spend the step before answering: of two requests presenting one code at
-    // once, exactly one is accepted.
-    const spent = await db.run('UPDATE account_mfa SET last_used_counter = ?, updated_at = ? WHERE account_id = ? AND (last_used_counter IS NULL OR last_used_counter < ?)', [step, now, accountId, step]);
+    // once — from one session or from two sessions of the account — exactly one
+    // is accepted. The write is bound to the confirmed secret that matched, so
+    // a factor reset or replaced between the read and the write spends nothing.
+    const spent = await db.run('UPDATE account_mfa SET last_used_counter = ?, updated_at = ? WHERE account_id = ? AND confirmed_at IS NOT NULL AND secret_ciphertext = ? AND (last_used_counter IS NULL OR last_used_counter < ?)', [step, now, accountId, row.secret_ciphertext, step]);
     if (spent.changes !== 1) return invalidCode(res);
     await db.run('UPDATE account_sessions SET mfa_verified_at = ? WHERE id = ?', [now, req.platformSession.id]);
     res.json({ verified: true, verifiedAt: now, method: 'totp' });

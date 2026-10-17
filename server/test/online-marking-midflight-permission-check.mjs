@@ -1,5 +1,6 @@
 // Test-only held local OCR provider. Verify server rechecks student authority after external awaits.
 // This cannot certify real OCR transcription or human-written accuracy.
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';

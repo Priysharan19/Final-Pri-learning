@@ -15,6 +15,7 @@
 // the local reading", so a spent budget costs a student a slightly worse reader
 // and not a broken app. That is what makes a hard ceiling acceptable at all.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { createPlatformDb } from '../platform/db.js';

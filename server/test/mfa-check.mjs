@@ -19,6 +19,8 @@
 //     deployment that has staff accounts and no key.
 // SQLite by default; `--engine=postgres` runs it on a migrated Postgres.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
+import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -105,6 +107,44 @@ const code = r => r.data?.error?.code;
 // in a test, so "a minute passes" is simulated by winding the spent-step marker
 // back to the previous step; the code for the CURRENT step is then unspent.
 const minutePasses = accountId => db.run('UPDATE account_mfa SET last_used_counter=? WHERE account_id=?', [totpCounter(Date.now()) - 1, accountId]);
+// The step the account has spent, as the server recorded it. A replay is
+// presented as exactly that step's code (hotp), never as "the code for now":
+// a 30-second boundary falling between two requests turns totp(now) into the
+// NEXT, unspent step, which the server rightly accepts — the #445 CI failure
+// was that, at 22:51:00.05 UTC, not a replay the server let through.
+const spentStep = async accountId => Number((await db.get('SELECT last_used_counter FROM account_mfa WHERE account_id=?', [accountId])).last_used_counter);
+const inWindow = step => Math.abs(totpCounter(Date.now()) - step) <= 1;
+// Hold the first `parties` reads of a matching statement until all of them have
+// read, so concurrent requests are forced to interleave read-before-write at the
+// database boundary — deterministically, on either engine. h.db is the very
+// store the router queries.
+function holdReads(pattern, parties) {
+  const original = db.get;
+  let waiting = [];
+  db.get = async function (sql, params) {
+    const row = await original.call(this, sql, params);
+    if (!pattern.test(sql) || parties <= 0) return row;
+    parties -= 1;
+    await new Promise(resolve => { waiting.push(resolve); if (parties === 0) { waiting.forEach(r => r()); waiting = []; } });
+    return row;
+  };
+  return () => { db.get = original; };
+}
+// After the first read of a matching statement returns, run `between` before
+// handing the row back: something changed between the read and the write.
+function afterRead(pattern, between) {
+  const original = db.get;
+  let armed = true;
+  db.get = async function (sql, params) {
+    const row = await original.call(this, sql, params);
+    if (armed && pattern.test(sql)) { armed = false; await between(); }
+    return row;
+  };
+  return () => { db.get = original; };
+}
+const CONFIRM_READ = /^SELECT \* FROM account_mfa WHERE account_id = \?$/;
+const VERIFY_READ = /^SELECT \* FROM account_mfa WHERE account_id = \? AND confirmed_at IS NOT NULL$/;
+const ENROL_READ = /^SELECT confirmed_at FROM account_mfa WHERE account_id = \?$/;
 
 try {
   // A student cannot enrol, and has no factor to speak of.
@@ -153,10 +193,13 @@ try {
   c.ok(!JSON.stringify(afterConfirm.data).includes(reEnrol.data.secret), 'status never carries the secret');
 
   // Replay: the confirming step is spent; the code cannot be presented again.
-  c.eq(code(await h.request('/v1/account/mfa/verify', { method: 'POST', jar: admin.jar, body: { code: totp(secret2) } })), 'MFA_CODE_INVALID', 'the code that confirmed cannot be replayed to verify');
-  const nextStep = await h.request('/v1/account/mfa/verify', { method: 'POST', jar: admin.jar, body: { code: totp(secret2, Date.now() + 30_000) } });
+  const confirmedStep = await spentStep(admin.id);
+  c.ok(inWindow(confirmedStep), 'confirming recorded the step it spent, inside the acceptance window');
+  c.eq(code(await h.request('/v1/account/mfa/verify', { method: 'POST', jar: admin.jar, body: { code: hotp(secret2, confirmedStep) } })), 'MFA_CODE_INVALID', 'the code that confirmed cannot be replayed to verify');
+  const nextStep = await h.request('/v1/account/mfa/verify', { method: 'POST', jar: admin.jar, body: { code: hotp(secret2, confirmedStep + 1) } });
   c.eq(nextStep.status, 200, 'the next step\'s code verifies');
-  c.eq(code(await h.request('/v1/account/mfa/verify', { method: 'POST', jar: admin.jar, body: { code: totp(secret2, Date.now() + 30_000) } })), 'MFA_CODE_INVALID', 'and is dead once used');
+  c.eq(await spentStep(admin.id), confirmedStep + 1, 'and is recorded as the account\'s spent step');
+  c.eq(code(await h.request('/v1/account/mfa/verify', { method: 'POST', jar: admin.jar, body: { code: hotp(secret2, confirmedStep + 1) } })), 'MFA_CODE_INVALID', 'and is dead once used');
 
   // A new sign-in has no verified factor until a code is presented.
   await resetLimits();
@@ -167,7 +210,14 @@ try {
   c.deq([(await h.request('/v1/account/me', { jar: laptop })).status, (await h.request('/v1/classes/', { jar: laptop })).status], [200, 200], 'but the ordinary account routes of an enrolled admin work');
   c.eq(code(await h.request('/v1/account/mfa/verify', { method: 'POST', jar: laptop, body: { code: '111111' } })), 'MFA_CODE_INVALID', 'a wrong code is refused');
   // The steps the other session spent are spent for this one too (one counter per account).
-  c.eq(code(await h.request('/v1/account/mfa/verify', { method: 'POST', jar: laptop, body: { code: totp(secret2, Date.now() + 30_000) } })), 'MFA_CODE_INVALID', 'a step spent by another session of the account is spent for this one');
+  const spentByOther = await spentStep(admin.id);
+  c.eq(spentByOther, confirmedStep + 1, 'the other session\'s spend is the account\'s, not the session\'s');
+  const refusedHere = await h.request('/v1/account/mfa/verify', { method: 'POST', jar: laptop, body: { code: hotp(secret2, spentByOther) } });
+  c.ok(inWindow(spentByOther), 'the spent step is still inside the window, so only its being spent can refuse it');
+  c.deq([refusedHere.status, code(refusedHere)], [401, 'MFA_CODE_INVALID'], 'a step spent by another session of the account is spent for this one');
+  const earlier = await h.request('/v1/account/mfa/verify', { method: 'POST', jar: laptop, body: { code: hotp(secret2, confirmedStep) } });
+  c.deq([earlier.status, code(earlier)], [401, 'MFA_CODE_INVALID'], 'and so is every earlier step');
+  c.eq((await db.get('SELECT mfa_verified_at FROM account_sessions WHERE device_id=? AND account_id=?', ['laptop', admin.id])).mfa_verified_at, null, 'the refused session is still unverified');
   await minutePasses(admin.id);
   const verified = await h.request('/v1/account/mfa/verify', { method: 'POST', jar: laptop, body: { code: totp(secret2) } });
   c.eq(verified.status, 200, 'a valid, unspent code verifies the new session');
@@ -201,6 +251,118 @@ try {
   c.eq(code(await h.request('/v1/account/mfa/verify', { method: 'POST', jar: laptop, body: { recoveryCode: recovery } })), 'MFA_CODE_INVALID', 'the same recovery code cannot be used twice');
   c.eq(code(await h.request('/v1/account/mfa/verify', { method: 'POST', jar: laptop, body: { recoveryCode: '00000-00000' } })), 'MFA_CODE_INVALID', 'an unknown recovery code is refused');
   c.ok((await db.all("SELECT 1 FROM audit_log WHERE action='mfa.recovery-code' AND target_id=?", [admin.id])).length === 1, 'recovery-code use is audited');
+
+  // Two sessions of one account presenting one code at once (#445): exactly one
+  // is accepted, on SQLite and on SERIALIZABLE Postgres as pri_server.
+  // (a) Forced interleaving — both requests read the account's factor before
+  //     either writes — so the outcome rests on the write alone.
+  await minutePasses(admin.id);
+  await db.run('UPDATE account_sessions SET mfa_verified_at=NULL WHERE account_id=?', [admin.id]);
+  await resetLimits();
+  const raceStep = totpCounter(Date.now());
+  let release = holdReads(VERIFY_READ, 2);
+  let race;
+  try {
+    race = await Promise.all([admin.jar, laptop].map(jar => h.request('/v1/account/mfa/verify', { method: 'POST', jar, body: { code: hotp(secret2, raceStep) } })));
+  } finally { release(); }
+  c.deq(race.map(r => r.status).sort(), [200, 401], 'two sessions that both read before either spent: exactly one is accepted');
+  c.eq(code(race.find(r => r.status === 401)), 'MFA_CODE_INVALID', 'and the other is refused with the coded MFA_CODE_INVALID');
+  c.eq(await spentStep(admin.id), raceStep, 'the step is spent once, for the account');
+  c.eq((await db.all('SELECT id FROM account_sessions WHERE account_id=? AND mfa_verified_at IS NOT NULL', [admin.id])).length, 1, 'exactly one session was verified by the one code');
+  // (b) Unforced: rounds of four simultaneous submissions across the two sessions.
+  for (let round = 0; round < 4; round++) {
+    await minutePasses(admin.id);
+    await resetLimits();
+    const step = totpCounter(Date.now());
+    const burst = await Promise.all([admin.jar, laptop, admin.jar, laptop].map(jar => h.request('/v1/account/mfa/verify', { method: 'POST', jar, body: { code: hotp(secret2, step) } })));
+    c.deq([burst.filter(r => r.status === 200).length, burst.filter(r => r.status === 401 && code(r) === 'MFA_CODE_INVALID').length], [1, 3], `simultaneous double-submit round ${round + 1}: one accepted, three coded refusals`);
+  }
+  // (c) The factor replaced between the read and the write spends nothing: the
+  //     code matched a secret that is no longer the account's.
+  await minutePasses(admin.id);
+  await resetLimits();
+  const beforeSwap = await db.get('SELECT secret_ciphertext, last_used_counter FROM account_mfa WHERE account_id=?', [admin.id]);
+  const swapStep = totpCounter(Date.now());
+  release = afterRead(VERIFY_READ, () => db.run('UPDATE account_mfa SET secret_ciphertext=? WHERE account_id=?', [encryptMfaSecret(randomBytes(20), admin.id), admin.id]));
+  let swapped;
+  try {
+    swapped = await h.request('/v1/account/mfa/verify', { method: 'POST', jar: laptop, body: { code: hotp(secret2, swapStep) } });
+  } finally { release(); }
+  c.deq([swapped.status, code(swapped)], [401, 'MFA_CODE_INVALID'], 'a code for a factor replaced mid-request is refused');
+  c.eq(await spentStep(admin.id), Number(beforeSwap.last_used_counter), 'and spends no step of the factor that replaced it');
+  await db.run('UPDATE account_mfa SET secret_ciphertext=? WHERE account_id=?', [beforeSwap.secret_ciphertext, admin.id]);
+
+  // Confirmation spends a step too. Two sessions of an account with a pending
+  // enrolment confirm with one code at once: before #445 both were accepted on
+  // Postgres, the second replacing the first session's recovery codes.
+  for (let round = 0; round < 2; round++) {
+    const pending = await account('admin');
+    await resetLimits();
+    const other = {};
+    c.eq((await h.request('/v1/account/login', { method: 'POST', jar: other, body: { email: pending.email, password: pending.password, deviceId: `second-${round}` } })).status, 200, `confirm race ${round + 1}: the admin is signed in on a second device`);
+    const pendingEnrol = await h.request('/v1/account/mfa/totp/enrol', { method: 'POST', jar: pending.jar, body: {} });
+    const pendingSecret = base32Decode(pendingEnrol.data.secret);
+    const confirmStep = totpCounter(Date.now());
+    const forced = round === 0;
+    const releaseConfirm = forced ? holdReads(CONFIRM_READ, 2) : () => {};
+    let confirms;
+    try {
+      confirms = await Promise.all([pending.jar, other].map(jar => h.request('/v1/account/mfa/totp/confirm', { method: 'POST', jar, body: { code: hotp(pendingSecret, confirmStep) } })));
+    } finally { releaseConfirm(); }
+    const winner = confirms.find(r => r.status === 200);
+    const loser = confirms.find(r => r !== winner);
+    const label = forced ? 'both read the pending enrolment first' : 'simultaneous';
+    c.eq(confirms.filter(r => r.status === 200).length, 1, `confirm race (${label}): exactly one session confirms`);
+    c.ok(forced ? (loser.status === 401 && code(loser) === 'MFA_CODE_INVALID') : ((loser.status === 401 && code(loser) === 'MFA_CODE_INVALID') || (loser.status === 409 && code(loser) === 'MFA_ALREADY_ENROLLED')), `confirm race (${label}): the other is a coded refusal (${loser.status} ${code(loser)})`);
+    c.ok(!('recoveryCodes' in (loser.data || {})), `confirm race (${label}): the refused session is shown no recovery codes`);
+    const pendingHashes = (await db.all('SELECT code_hash FROM account_mfa_recovery_codes WHERE account_id=?', [pending.id])).map(r => r.code_hash).sort();
+    c.deq(pendingHashes, winner.data.recoveryCodes.map(rc => recoveryCodeHash(pending.id, rc)).sort(), `confirm race (${label}): the recovery codes stored are exactly the ones the confirming session was shown`);
+    c.deq([(await db.all("SELECT 1 FROM audit_log WHERE action='mfa.enrol' AND target_id=?", [pending.id])).length, (await db.all('SELECT id FROM account_sessions WHERE account_id=? AND mfa_verified_at IS NOT NULL', [pending.id])).length, await spentStep(pending.id)], [1, 1, confirmStep], `confirm race (${label}): one audit, one verified session, the step spent once`);
+  }
+  // A pending secret superseded between the read and the write is not confirmed.
+  {
+    const pending = await account('admin');
+    const first = base32Decode((await h.request('/v1/account/mfa/totp/enrol', { method: 'POST', jar: pending.jar, body: {} })).data.secret);
+    const releaseSwap = afterRead(CONFIRM_READ, () => db.run('UPDATE account_mfa SET secret_ciphertext=? WHERE account_id=?', [encryptMfaSecret(randomBytes(20), pending.id), pending.id]));
+    let superseded;
+    try {
+      superseded = await h.request('/v1/account/mfa/totp/confirm', { method: 'POST', jar: pending.jar, body: { code: totp(first) } });
+    } finally { releaseSwap(); }
+    c.deq([superseded.status, code(superseded)], [401, 'MFA_CODE_INVALID'], 'a pending secret superseded mid-request is not confirmed by the old secret\'s code');
+    c.deq(Object.values(await db.get('SELECT confirmed_at, last_used_counter FROM account_mfa WHERE account_id=?', [pending.id])), [null, null], 'and the replacement stays pending and unspent');
+    c.eq((await db.all('SELECT 1 FROM account_mfa_recovery_codes WHERE account_id=?', [pending.id])).length, 0, 'with no recovery codes minted');
+  }
+
+  // Enrolment never overwrites a factor confirmed mid-request: session B's
+  // enrol reads the still-pending row, session A's confirm commits, and only
+  // then does B's upsert run. It used to reset the factor to pending under B's
+  // secret, leaving A's session verified against a factor no longer the
+  // account's; now the upsert touches only a pending row and B gets a 409.
+  {
+    const racer = await account('admin');
+    await resetLimits();
+    const sessionB = {};
+    c.eq((await h.request('/v1/account/login', { method: 'POST', jar: sessionB, body: { email: racer.email, password: racer.password, deviceId: 'enrol-racer-b' } })).status, 200, 'enrol race: the admin is signed in on a second device');
+    const enrolA = await h.request('/v1/account/mfa/totp/enrol', { method: 'POST', jar: racer.jar, body: {} });
+    const secretA = base32Decode(enrolA.data.secret);
+    const stepA = totpCounter(Date.now());
+    let confirmA;
+    const releaseEnrol = afterRead(ENROL_READ, async () => {
+      confirmA = await h.request('/v1/account/mfa/totp/confirm', { method: 'POST', jar: racer.jar, body: { code: hotp(secretA, stepA) } });
+    });
+    let enrolB;
+    try {
+      enrolB = await h.request('/v1/account/mfa/totp/enrol', { method: 'POST', jar: sessionB, body: {} });
+    } finally { releaseEnrol(); }
+    c.eq(confirmA?.status, 200, 'enrol race: session A confirms between B\'s read and B\'s write');
+    c.deq([enrolB.status, code(enrolB)], [409, 'MFA_ALREADY_ENROLLED'], 'enrol race: B\'s enrolment is refused once the factor is confirmed, not written over it');
+    c.ok(!('secret' in (enrolB.data || {})), 'enrol race: B is shown no secret');
+    const kept = await db.get('SELECT * FROM account_mfa WHERE account_id=?', [racer.id]);
+    c.ok(kept.confirmed_at !== null && Number(kept.last_used_counter) === stepA && decryptMfaSecret(kept.secret_ciphertext, racer.id).equals(secretA), 'enrol race: the factor stays confirmed, under A\'s secret, with A\'s step spent');
+    c.deq((await db.all('SELECT code_hash FROM account_mfa_recovery_codes WHERE account_id=?', [racer.id])).map(r => r.code_hash).sort(), confirmA.data.recoveryCodes.map(rc => recoveryCodeHash(racer.id, rc)).sort(), 'enrol race: the recovery codes are still the ones A was shown');
+    const bVerifies = await h.request('/v1/account/mfa/verify', { method: 'POST', jar: sessionB, body: { code: hotp(secretA, stepA + 1) } });
+    c.eq(bVerifies.status, 200, 'enrol race: the account\'s factor is A\'s — B verifies with A\'s next code');
+  }
 
   // Support: content authoring and the triage queue need the factor; students' routes do not change.
   const support = await account('support');

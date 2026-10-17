@@ -31,6 +31,7 @@
 // This is synthetic evidence from an in-process server. It says nothing about
 // production hardware, real students or real load.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

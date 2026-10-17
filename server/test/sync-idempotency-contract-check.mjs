@@ -16,6 +16,7 @@
 // Both must be conflicts the client can act on, and no 500 may ever hand a
 // driver's error code to a student's iPad.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

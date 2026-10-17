@@ -1,6 +1,7 @@
 // P0 online grading: exercises the production Express router over a real loopback
 // socket and the real SQLite/Postgres transaction store. No mocked 200 receipts.
 // Deliberately RED until the platform-owned issue/grade/receipt routes are implemented.
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
