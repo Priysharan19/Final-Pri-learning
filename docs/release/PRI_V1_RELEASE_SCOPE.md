@@ -1,6 +1,6 @@
 # Dream Pri Learning — V1 Release Scope
 
-**Status:** FROZEN — coordinator-authoritative V1 release boundary  
+**Status:** FROZEN — coordinator-authoritative V1 release boundary; **platform boundary amended 2026-10-16 by owner scope change #504 (§22)**  
 **Repository:** `Priysharan19/Final-Pri-learning`  
 **Scope-freeze date:** 2026-10-02 (Australia/Sydney)  
 **Repository authority at freeze:** `main`  
@@ -43,6 +43,8 @@ An open or merged implementation is V1 only when it is required by this scope, r
 
 ## 3. Public V1 definition
 
+> **Amended 2026-10-16 (§22, #504):** "iPad-only" below is superseded. V1 is one student product on **iPhone, iPad, Android phones and Android tablets**, and the minimum student-facing scope in §22.2 is what blocks release.
+
 Dream Pri Learning V1 is an **India-first, student-facing, iPad-only learning product** with:
 
 - CBSE / NCERT Classes 7–12;
@@ -61,6 +63,8 @@ English is sufficient for the initial V1 boundary.
 There are no default public beta surfaces in V1.
 
 ## 4. Platforms
+
+> **Amended 2026-10-16 (§22, #504):** the "In V1" / "Not in V1" lists below are the 2 October record. They are superseded by §22.1: iPhone, iPad, Android phones and Android tablets are all in V1. Real-device certification is required for **each** device class, not only iPad; the Apple Pencil path stays mandatory on iPad and finger input becomes mandatory on phones.
 
 ### In V1
 
@@ -293,7 +297,7 @@ Production must not remain sourced from a feature branch.
 The frozen V1 IN-scope set includes:
 
 - India-first public launch;
-- iPad-only public native support;
+- iPad-only public native support; *(superseded by §22: iPhone, iPad, Android phone and Android tablet public native support)*
 - CBSE / NCERT Classes 7–12;
 - JEE Main;
 - JEE Advanced;
@@ -315,8 +319,8 @@ The frozen V1 IN-scope set includes:
 
 The following are outside the public V1 boundary:
 
-- iPhone public release;
-- Android public release;
+- iPhone public release; *(moved into V1 by §22)*
+- Android public release; *(moved into V1 by §22)*
 - 41-year JEE historical corpus;
 - NSW HSC public launch;
 - VCE/QCE/WACE/SACE and broader Australian public curricula;
@@ -334,8 +338,8 @@ Out-of-scope code may remain in the repository if it does not create security, p
 
 The canonical post-V1 set includes at minimum:
 
-- iPhone public release;
-- Android public release;
+- iPhone public release; *(moved into V1 by §22)*
+- Android public release; *(moved into V1 by §22)*
 - 41-year JEE corpus recovery/review/rights/publication programme;
 - current NSW HSC;
 - broader Australian curricula;
@@ -354,17 +358,17 @@ Feature scope and release blockers are distinct. The V1 can be correctly scoped 
 
 The hard release blockers at this freeze are:
 
-1. The shipping target must become genuinely iPad-only.
+1. The shipping target must become genuinely iPad-only. *(Replaced 2026-10-16 by §22.4 (Blockers), #504: the shipping targets must be iPhone + iPad from one Apple package and Android phone + tablet from the shared Android shell, from one verified source identity.)*
 2. The exact release SHA must be nominated later.
 3. Railway/production must stop deriving release authority from a feature branch.
 4. Production Postgres cutover and validation must be completed.
-5. Physical iPad + Apple Pencil certification must be completed on the exact candidate.
-6. Archive/signing/TestFlight/App Store certification must be completed.
-7. Premium StoreKit production configuration and transaction certification must be completed.
+5. Physical iPad + Apple Pencil certification must be completed on the exact candidate. *(Amended by §22.4 (16 Oct 2026, #504): physical certification of the §22.2 journey on iPhone, iPad, Android phone and Android tablet; the Apple Pencil path stays required on iPad.)*
+6. Archive/signing/TestFlight/App Store certification must be completed. *(Amended by §22.4 (16 Oct 2026, #504): also Android signing, Play internal testing and Play Store listing; the Apple listing is universal iPhone + iPad.)*
+7. Premium StoreKit production configuration and transaction certification must be completed. *(Unchanged; see §22.4 (18 Oct 2026): Premium is offered at launch, and Google Play Billing parity is additionally required for Android.)*
 8. PR #243 / the expression-domain grading correctness defect must receive deliberate disposition: independent review, correctness verification, regression coverage and integration if accepted, with no unresolved release-severity grading defect.
 9. Legal/public policy artifacts must be completed with real owner/contact/effective information and appropriate review.
 10. Privacy wording must be reconciled with the actual cloud handwriting data path.
-11. Native accessibility acceptance must be completed.
+11. Native accessibility acceptance must be completed. *(Amended by §22.4 (16 Oct 2026, #504): on a physical device of each class — VoiceOver / TalkBack and Dynamic Type / font scale.)*
 12. Account deletion/recovery release evidence must be completed.
 13. Production email/account-recovery evidence must be completed.
 14. Final security acceptance must be completed.
@@ -403,6 +407,15 @@ exact action is named. No blocker below is marked closed. The ordered owner path
 
 Nothing in this table closes a blocker. A row changes only by appending a dated note when a human
 has produced the evidence named in its last column.
+
+**Update 2026-10-18 (append-only; row 1 above is the 2 October record):** row 1's "iPad-only software-complete"
+no longer describes the target. Under §22 (#504) blocker #1 is the cross-device target. Apple side:
+**software-complete** — both `Package.swift` declare `supportedDeviceFamilies: [.pad, .phone]`, iPhone
+portrait-only, iPad all orientations, bundle id `com.prilearning.app`; guarded by
+`node scripts/apple-shipping-target.mjs --check-v1` (fails on iPad-only) and
+`node client/test/apple-shipping-target-check.mjs`. Android phone + tablet side: **not complete** — Android
+release controls and device acceptance are still open. Remaining human action: universal Apple listing and
+Play listing confirmed at submission (#6, as amended).
 
 ## 19. Non-blocking open work
 
@@ -478,3 +491,94 @@ Mandatory release acceptance includes, as applicable:
 - no unresolved P0/P1 release defects.
 
 Only after those gates are satisfied for the nominated immutable `main` SHA may the release candidate be considered ready to ship.
+
+## 22. Scope change — cross-device V1 (owner decision, 2026-10-16, issue #504)
+
+Recorded under §20. This section is the reviewed documentation update that §20 item 4 requires; issue
+[#504](https://github.com/Priysharan19/Final-Pri-learning/issues/504) records items 1–3. Where this section
+and §3, §4, §15–§18 disagree, this section governs. Everything not named here is unchanged, including §2,
+§9 (handwriting and AI boundaries), §14 (release authority) and §21 (release acceptance).
+
+### 22.1 Decision (§20 item 1)
+
+The product owner (coordinator authority for this boundary) decided on **16 October 2026** that Pri Learning
+V1 is **one unified student product, using the existing shared application and server**, distributed on:
+
+- **iPhone** (supported iOS versions and screen sizes);
+- **iPad** (existing native PencilKit path);
+- **Android phones**;
+- **Android tablets**.
+
+### 22.2 Minimum student-facing scope that blocks release
+
+Only this journey blocks the cross-device V1:
+
+install → email sign-in / OTP → required guardian consent → account-bound sync and recovery →
+server-issued question → finger or stylus handwriting, or camera photo → explicit transcript correction /
+confirmation → server-authoritative, mathematically fair grading and criterion feedback → History and
+persistent sync.
+
+Account isolation, data deletion, security, app privacy and store compliance remain mandatory. Other planned
+features (§3, §15) do not block this reduced scope unless its own safety or quality contracts actually require
+them. They stay in the repository and may ship when they meet §21; they are not release blockers.
+Exception: Premium is offered at launch (owner decision, 18 Oct 2026; §22.4), so StoreKit and Google Play
+Billing certification are release blockers.
+
+### 22.3 Reason (§20 item 2)
+
+- The owner directed that Pri Learning no longer ship as an iPad-only experience (#504): a student should be
+  able to use the same product, account and History on a phone or a tablet, Apple or Android. (No market
+  or usage figures are claimed here; none were measured.)
+- The architecture already supports it: one shared web application inside thin native shells
+  (`docs/architecture/authoritative-architecture.md`, ADR-0001 online-first). The client lays out from the
+  viewport alone (`client/test/form-factor-check.mjs`), the iPhone shell has been built and exercised on the
+  simulator in CI since CP-04 (`.github/workflows/native-ink.yml`), and an Android shell exists at
+  `android/app`.
+- Grading is online-only and server-authoritative, so phones and tablets mark through the same server path;
+  no device-specific marking authority is introduced.
+
+### 22.4 Implications (§20 item 3)
+
+**Blockers.** §18 #1 is replaced by: *the shipping targets must be iPhone + iPad from one Apple package and
+Android phone + tablet from the shared Android shell, all from one verified source identity.* §18 #5 and #11
+widen from iPad to **every** device class: physical iPhone, iPad, Android phone and Android tablet
+certification of the §22.2 journey on the exact candidate; physical-device accessibility (VoiceOver /
+TalkBack, Dynamic Type / font scale) on each class. §18 #6 widens to the Play Store: Android signing,
+Play internal testing and listing, in addition to Apple. §18 #7 (StoreKit) **stays a release blocker, unchanged**:
+the owner decided on 18 October 2026 (relayed by the coordinator) that Premium **is** offered at launch, at the
+approved prices of ₹199 / month and ₹1,499 / year. On 18 Oct 2026 the App Store Connect subscription group "Pri Premium" and products `com.prilearning.app.premium.monthly` and `com.prilearning.app.premium.annual` were created through the App Store Connect API; their prices cannot be set until the Paid Apps Agreement (tax and banking) is active, so they are not yet sellable. Because Premium
+launches on Android too, **Google Play Billing parity** (products, server-authoritative entitlement
+verification, restore, and sandbox/licence-tester certification on a physical Android device) is an additional
+release blocker under §18 #7. All other §18 blockers are unchanged.
+
+**Open reviews that still gate release.** [#499](https://github.com/Priysharan19/Final-Pri-learning/issues/499)
+— independent mathematical examiner certification of the marking rubric policies — is open; until it approves,
+the reviewed method-rubric production flag stays OFF and no unsupported marking claim is shown (#504 step 4).
+[#498](https://github.com/Priysharan19/Final-Pri-learning/issues/498) — the platform-security abuse-limits
+localhost-timeout release blocker named in #504 — is **closed**, fixed by PR #509 (merged 2026-10-17,
+`f1c3b9cce8990f9ab8a83124f58c74a6b5f4b48d`); it no longer blocks.
+
+**Apple configuration (done in code by the PR that adds this section).** Both `ios/PriLearning.swiftpm` and
+`ios/PriLearning 2.swiftpm` declare `supportedDeviceFamilies: [.pad, .phone]`; iPhone is portrait-only
+(landscape and upside-down restricted to iPad); iPad keeps all four orientations. The bundle identifier
+`com.prilearning.app`, the `prilearning://app` web origin and the persistent website data store are
+unchanged, so existing iPad installs keep their on-device data. `node scripts/apple-shipping-target.mjs
+--check-v1` enforces exactly this and now **fails** on the old iPad-only declaration. CI builds the canonical
+package itself; the scratch "engineering copy" is retired.
+
+**Security / privacy.** No new data types: finger ink and camera photos follow the same answer-blind,
+server-read path as iPad (§9, `docs/legal/privacy.md`). Account isolation (Row-Level Security plus server
+authorization) applies identically. The App Store privacy label and the Play Data safety form must both
+describe the cloud handwriting/photo path; counsel's §18 #10 confirmation covers both stores.
+
+**Test / evidence.** Simulator and emulator runs remain synthetic evidence (§21) and never stand in for
+device evidence. Existing iPad evidence must not be relabelled as iPhone or Android evidence. Known
+phone-layout defects found on the iPhone simulator are tracked as UX-parity work before release (no
+horizontally clipped controls at the smallest supported width, largest text size).
+
+**Commercial / store.** Universal iPhone + iPad listing (iPhone screenshots required), Play Store listing,
+version strategy shared across shells (`scripts/release-matrix.mjs`). Store review timing is external.
+
+**Authority.** This scope change is not a writer grant, a PR approval, a release authorization or permission
+to bypass CI (#504). §14 and §21 still govern release: one immutable `main` SHA, required CI, independent
+review, and human-authorized TestFlight / Play internal test.

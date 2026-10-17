@@ -121,6 +121,8 @@ The rows below update §2 and §3 with what is implemented and automatically che
 
 **Scope note:** `docs/release/PRI_V1_RELEASE_SCOPE.md` makes V1 iPad-only, and the release policy ships only an exact `main` SHA. So `main` itself declares **iPad only**, which closes V1 hard blocker #1 in code, and `--check-v1` runs in CI. iPhone engineering builds a scratch copy that adds the iPhone family: `node scripts/apple-shipping-target.mjs --engineering-package <dir>`. That copy is used for simulator CI and is never archived. A public iPhone release needs the V1 scope-change procedure, then a reviewed change to `main`, **and** the §4 physical gates.
 
+**Scope note, 2026-10-18:** the owner made that scope change on 2026-10-16 (#504, `PRI_V1_RELEASE_SCOPE.md` §22). `main` now declares **iPhone + iPad** in both packages (iPhone portrait-only, iPad all orientations, bundle id unchanged), `--check-v1` enforces that and fails on iPad-only, and CI builds the canonical package directly — the engineering copy and `--engineering-package` are retired. The §4 physical gates still apply.
+
 ## 6. CP-05 — iPhone automated certification
 
 `node scripts/iphone-journey.mjs --family iphone --cloud --dynamic-type --lifecycle --a11y` drives the real app in the real WKWebView on an iPhone simulator. The cloud steps run against a **real Pri server** (`scripts/cloud-fixture-server.mjs`: the real `server/index.js` on a throwaway database, fixture accounts only). Every step writes a machine-readable record (SHA, simulator, runtime, workflow, timestamp, per-step result) labelled `SYNTHETIC_SIMULATOR` with `physicalDevice: false`. CI (`native-ink.yml`) uploads the records as `native-simulator-evidence`.
