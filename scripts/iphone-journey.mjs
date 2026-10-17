@@ -148,7 +148,7 @@ function builtApp(derived) {
 // read that blocks the runner would hold the switch back past the page's own
 // wait (#528). `duringDeadlineMs` bounds that hold; after it the log is read
 // as usual and the page reports its own failure.
-function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = null, duringAfterMs = 20_000, duringWhen = null, duringDeadlineMs = 150_000, tick = null, loops = 75 } = {}) {
+function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = null, duringAfterMs = 20_000, duringWhen = null, duringDeadlineMs = 240_000, tick = null, loops = 75 } = {}) {
   const started = localStamp(new Date(Date.now() - 2000));
   // SIMCTL_CHILD_* reaches the app's environment (DEBUG builds read the cloud
   // origin override and the journey's fixture account from it).
@@ -308,11 +308,13 @@ if (WANT_LIFECYCLE) {
   backgroundLines = launchAndRead(udid, bundleId, '--journey-background', 'background', { PRI_JOURNEY_ORACLE_DIR: relay }, {
     duringWhen: () => existsSync(join(relay, 'ask-1.json')),
     during: () => {
+      const t = Date.now();
       let switched = true, reason = '';
-      try { run('xcrun', ['simctl', 'launch', udid, 'com.apple.Preferences']); } catch (e) { switched = false; reason = String(e?.message || e).split('\n')[0].slice(0, 80); }
+      try { run('xcrun', ['simctl', 'launch', udid, 'com.apple.Preferences'], { timeout: 240_000 }); } catch (e) { switched = false; reason = String(e?.message || e).split('\n')[0].slice(0, 80); }
       execSync('sleep 4');
-      try { run('xcrun', ['simctl', 'launch', udid, bundleId]); } catch { /* already running: brought forward */ }
-      writeFileSync(join(relay, 'reply-1.json'), JSON.stringify({ n: 1, switched, reason }));
+      try { run('xcrun', ['simctl', 'launch', udid, bundleId], { timeout: 240_000 }); } catch { /* already running: brought forward */ }
+      writeFileSync(join(relay, 'reply-1.json'), JSON.stringify({ n: 1, switched, reason, ms: Date.now() - t }));
+      console.log(`  (switched to Settings and back in ${((Date.now() - t) / 1000).toFixed(1)} s)`);
     },
   });
   for (const line of backgroundLines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);

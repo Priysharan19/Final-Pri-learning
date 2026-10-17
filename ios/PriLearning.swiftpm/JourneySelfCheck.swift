@@ -783,12 +783,18 @@ enum JourneySelfCheck {
       at = 'runner';
       window.__priJourneyReply = null;
       window.__priJourneyAsk = { n: 1, kind: 'background' };
+      // The runner answers once it has brought the app back; on a loaded
+      // machine `simctl launch` alone can take minutes, so the page waits on
+      // that answer (bounded by the runner's own deadline), then for the
+      // lifecycle it must have produced.
       try {
+        at = 'runner';
+        try { await waitFor(() => window.__priJourneyReply, 300000); }
+        catch (e) { throw new Error('the runner never answered'); }
+        if (!window.__priJourneyReply.switched) throw new Error('the runner could not switch apps: ' + window.__priJourneyReply.reason);
         at = 'lifecycle';
-        await waitFor(() => log.includes('hidden') && log[log.length - 1] === 'visible' && document.visibilityState === 'visible' && window.__priJourneyReply, 90000);
-      } catch (e) {
-        const r = window.__priJourneyReply;
-        throw new Error('no background and return seen (runner ' + (r ? (r.switched ? 'switched apps' : 'could not switch: ' + r.reason) : 'never answered') + '; lifecycle ' + (log.join('>') || 'none') + ')');
+        try { await waitFor(() => log.includes('hidden') && log[log.length - 1] === 'visible' && document.visibilityState === 'visible', 30000); }
+        catch (e) { throw new Error('no background and return seen after the switch (' + window.__priJourneyReply.ms + ' ms); lifecycle ' + (log.join('>') || 'none')); }
       } finally { window.__priNativeReceive = prior; }
       at = 'draft';
       const kept = (q('.editor-body input.answer-input') || {}).value;
@@ -796,7 +802,6 @@ enum JourneySelfCheck {
       if (atHide !== 'x+42') throw new Error('draft not on disk when the app went away: ' + atHide);
       const disk = onDisk();
       if (disk !== 'x+42') throw new Error('draft lost on disk after resume: ' + disk);
-      if (!window.__priJourneyReply.switched) throw new Error('lifecycle seen but the runner could not switch apps: ' + window.__priJourneyReply.reason);
       return 'lifecycle ' + log.join('>') + '; draft on disk as it left, on screen and disk after resume';
     });
     return JSON.stringify(steps);
