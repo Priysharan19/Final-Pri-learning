@@ -64,9 +64,11 @@ const expiredRelease=appendGrant(grant,release,[issue('ACTIVE','Pri-Lease-Grant-
  pr,sha,'Priysharan19',123600,now+13*3600000,privateKey,publicKey);
 ok('expired granted writer can still be revoked',()=>
  assert.equal(inspectSignedLog(expiredRelease,publicKey,now+13*3600000+1).live.length,0));
+const secondBranch='agent/mission/student-experience/signup2';
 const secondIssue={...issue('TRIAGED'),number:801,title:'[PRI-MISSION] signup2',
- body:body('TRIAGED').replace('Pri-Mission-ID: signup','Pri-Mission-ID: signup2')};
-const secondPr={...pr,number:479,head:{...pr.head}};
+ body:body('TRIAGED').replace('Pri-Mission-ID: signup','Pri-Mission-ID: signup2')
+   .replace('Pri-Branch: '+branch,'Pri-Branch: '+secondBranch)};
+const secondPr={...pr,number:479,head:{...pr.head,ref:secondBranch}};
 const secondRequest={...request,issue_number:801,pr_number:479};
 denied('same-owner collision despite disjoint source',/OWNER_NOT_DISTINCT/,
  ()=>appendGrant(grant,secondRequest,[issue('ACTIVE','Pri-Lease-Grant-ID: '+grantId),secondIssue],
