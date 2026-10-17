@@ -405,20 +405,18 @@ async function applyRunEvent(pid, event, store, fields) {
 }
 
 /**
- * Add XP to the profile row as it is at write time. Browsers with Web Locks
- * (every shipped target) take the same lock backend.js's withProfileRow takes,
- * so a concurrent answer's XP and this restore's XP cannot roll each other back.
+ * Add XP to the profile row as it is at write time, under the same lock
+ * backend.js's withProfileRow takes (local/mutationLock.js: Web Locks, or the
+ * shared in-process queue where there are none), so a concurrent answer's XP
+ * and this restore's XP cannot roll each other back.
  */
 async function creditXp(pid, xp) {
   if (!xp) return;
-  const work = async () => {
+  await withMutationLock(`profile-row:${pid}`, async () => {
     const row = await get('profiles', pid).catch(() => null);
     if (!row) return;
     await put('profiles', { ...row, xp: num(row.xp, 0) + xp });
-  };
-  const locks = globalThis.navigator?.locks;
-  if (locks?.request) return locks.request(`pri-learning:profile-row:${pid}`, work);
-  return work();
+  });
 }
 
 /**
