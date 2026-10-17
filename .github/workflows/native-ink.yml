@@ -23,6 +23,7 @@ on:
       - 'scripts/journey-oracle.mjs'
       - 'scripts/synthetic-reader-server.mjs'
       - 'scripts/apple-shipping-target.mjs'
+      - 'scripts/ci-provision-simulators.mjs'
       - 'client/test/apple-shipping-target-check.mjs'
       - 'scripts/ink-native-check.mjs'
       - 'scripts/check-native-package-sync.mjs'
@@ -39,6 +40,7 @@ on:
       - 'scripts/journey-oracle.mjs'
       - 'scripts/synthetic-reader-server.mjs'
       - 'scripts/apple-shipping-target.mjs'
+      - 'scripts/ci-provision-simulators.mjs'
       - 'client/test/apple-shipping-target-check.mjs'
       - 'scripts/ink-native-check.mjs'
       - 'scripts/check-native-package-sync.mjs'
@@ -66,16 +68,14 @@ jobs:
       - name: Canonical native source has no stale duplicate
         run: node scripts/check-native-package-sync.mjs
 
+      # V1 needs both families (#504). Hosted images do not always ship an
+      # iPad device, so create any missing one from the installed iOS runtime
+      # and boot both; fails only when no runtime/device type exists.
       - name: Apple toolchain, iPad and iPhone simulators
         run: |
           set -euo pipefail
           xcodebuild -version
-          for family in iPad iPhone; do
-            xcrun simctl list devices available | grep -m 1 "$family" >/dev/null || {
-              echo "::error::No $family simulator is available on this runner"
-              exit 1
-            }
-          done
+          node scripts/ci-provision-simulators.mjs
 
       - name: JS ↔ Swift ink contract
         run: npm run test:ink:bridge
