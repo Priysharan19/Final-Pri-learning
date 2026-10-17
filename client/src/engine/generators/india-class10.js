@@ -11,6 +11,8 @@ import { currentClass10Trigonometry, currentClass10TrigApplications } from './in
 import { currentLinearSolutionConditions, currentQuadraticDiscriminant, currentTrigBoundaryRelations } from './india-class10-production-gaps.js';
 // The three outcomes that were still served by an NSW Year 8/Year 10 generator.
 import { indiaClass10Core } from './india-class10-core.js';
+// Hardest-level (D3) forms, tranche 1 — see curriculum-in-hardest-covers.js.
+import { class10HardestForms } from './india-class10-hardest.js';
 
 const basePolynomialZeroes = baseIndiaClass10['c10-polynomial-zeroes'];
 
@@ -33,5 +35,6 @@ export const indiaClass10 = Object.freeze({
   'c10-surface-area-combo': currentSurfaceAreaCombination,
   'c10-trigonometry-current': currentClass10Trigonometry,
   'c10-trig-boundary-relations': currentTrigBoundaryRelations,
-  'c10-trig-applications-current': currentClass10TrigApplications
+  'c10-trig-applications-current': currentClass10TrigApplications,
+  ...class10HardestForms
 });

@@ -20,25 +20,23 @@ levels that do exist, and serves a question only after the student chooses one.
 
 | Track | Window | Chapters | Chapters with no form at the hardest level | Dot points | Dot points with no form at the hardest level | Dot points with no form anywhere in the window |
 |---|---|---:|---:|---:|---:|---:|
-| CBSE / NCERT | D1–D3 | 77 | 1 | 237 | 103 | 24 |
-| JEE Main | D2–D4 | 27 | 0 | 81 | 23 | 3 |
-| JEE Advanced | D3–D4 | 27 | 0 | 81 | 23 | 13 |
+| CBSE / NCERT | D1–D3 | 77 | 0 | 237 | 81 | 20 |
+| JEE Main | D2–D4 | 27 | 0 | 81 | 23 | 2 |
+| JEE Advanced | D3–D4 | 27 | 0 | 81 | 23 | 9 |
 | Olympiad (PRMO → RMO → INMO) | D1–D4 | 7 | 0 | 21 | 0 | 0 |
-| **All** | | **138** | **1** | **420** | **149** | **40** |
+| **All** | | **138** | **0** | **420** | **127** | **31** |
 
-Chapter × track cells where the hardest level rests on a **single** authored form: 109 of 138.
+Chapter × track cells where the hardest level rests on a **single** authored form: 100 of 138.
 
 ## Chapter × track cells with no authored form at the hardest level
 
-| Track | Class | Chapter | Hardest level | Levels that do have a form |
-|---|---:|---|---|---|
-| CBSE / NCERT | 10 | Coordinate Geometry (`c10-coordinate-geometry`) | D3 | D1 D2 |
+None.
 
 ## Chapter × track cells where some dot point has no form at the hardest level
 
 `Forms at hardest` counts the distinct authored (generator, dot-point) forms at the hardest level for the chapter.
 
-### CBSE / NCERT — 52 of 77 chapters
+### CBSE / NCERT — 35 of 77 chapters
 
 | Class | Chapter | Chapter levels | Forms at hardest | Dot points without the hardest level (levels they do have) |
 |---:|---|---|---:|---|
@@ -68,18 +66,6 @@ Chapter × track cells where the hardest level rests on a **single** authored fo
 | 8 | Direct and Inverse Proportions (`c8-proportions`) | D1 D2 D3 | 1 | 1. Recognise direct proportion by a constant ratio and solve direct-proportion tables and applications (D1)<br>2. Recognise inverse proportion by a constant product and solve inverse-proportion tables and applications (D2) |
 | 8 | Factorisation (`c8-factorisation`) | D1 D2 D3 | 1 | 1. Factorise algebraic expressions by taking common factors and by regrouping terms (D1)<br>2. Factorise using standard algebraic identities and recognise factor patterns such as x²+(a+b)x+ab (D2) |
 | 8 | Introduction to Graphs (`c8-graphs`) | D1 D2 D3 | 1 | 1. Read and interpret line graphs, including scales, trends, intersections and interpolation between plotted observations (D2)<br>2. Plot ordered pairs and draw graphs from tabulated relationships using correctly labelled axes and scales (D1) |
-| 10 | Polynomials (`c10-polynomials`) | D1 D2 D3 | 1 | 1. Find zeroes of a polynomial graphically and algebraically (D1 D2) |
-| 10 | Pair of Linear Equations in Two Variables (`c10-pair-linear-equations`) | D1 D2 D3 | 3 | 4. Model and solve simple situational problems using a pair of linear equations (—) |
-| 10 | Quadratic Equations (`c10-quadratic-equations`) | D1 D2 D3 | 3 | 1. Solve real-root quadratic equations by factorisation (D1 D2) |
-| 10 | Arithmetic Progressions (`c10-arithmetic-progressions`) | D1 D2 D3 | 1 | 2. Find the sum of the first n terms of an arithmetic progression (D2)<br>3. Apply arithmetic progressions to daily-life situations (—) |
-| 10 | Triangles (`c10-triangles`) | D1 D2 D3 | 1 | 1. Prove and apply the Basic Proportionality Theorem and its converse (D1 D2) |
-| 10 | Coordinate Geometry (`c10-coordinate-geometry`) | D1 D2 | 0 | 1. Solve problems using the distance formula (D1)<br>2. Use the section formula for internal division of a line segment (D2) |
-| 10 | Introduction to Trigonometry (`c10-trigonometry`) | D1 D2 D3 | 2 | 1. Use trigonometric ratios of an acute angle in a right triangle (D1)<br>2. Use the exact trigonometric values at 30°, 45° and 60° (D2) |
-| 10 | Circles (`c10-circles`) | D1 D2 D3 | 1 | 2. Prove and apply that tangents drawn from an external point have equal lengths (—) |
-| 10 | Areas Related to Circles (`c10-areas-circles`) | D1 D2 D3 | 1 | 1. Find areas and perimeters of sectors of a circle (D1 D2) |
-| 10 | Surface Areas and Volumes (`c10-surface-volume`) | D1 D2 D3 | 1 | 2. Find volumes of combinations of two prescribed solids (D1 D2) |
-| 10 | Statistics (`c10-statistics`) | D1 D2 D3 | 1 | 1. Find the mean of grouped data using direct, assumed-mean and step-deviation methods (D1)<br>2. Find the mode of grouped data algebraically (D2) |
-| 10 | Probability (`c10-probability`) | D1 D2 D3 | 1 | 1. Use the classical definition of probability (D1 D2) |
 | 11 | Relations and Functions (`c11-relations-functions`) | D1 D2 D3 | 2 | 1. Find the Cartesian product and represent a relation (D1) |
 | 11 | Trigonometric Functions (`c11-trig-functions`) | D1 D2 D3 | 1 | 1. Convert between degrees and radians and use the unit circle (D1 D2)<br>3. Find the general solution of a trigonometric equation (—) |
 | 11 | Complex Numbers and Quadratic Equations (`c11-complex-numbers`) | D1 D2 D3 | 1 | 1. Operate on complex numbers and find modulus and conjugate (D1 D2)<br>3. Solve quadratic equations with complex roots (—) |
@@ -89,11 +75,6 @@ Chapter × track cells where the hardest level rests on a **single** authored fo
 | 11 | Limits and Derivatives (`c11-limits-derivatives`) | D1 D2 D3 | 1 | 1. Evaluate limits algebraically and use the standard trigonometric limits (D1 D2)<br>3. Differentiate polynomials, and products and quotients (—) |
 | 11 | Statistics (`c11-statistics`) | D1 D2 D3 | 1 | 1. Find the mean deviation about the mean and median (D1)<br>3. Compare two data sets by the coefficient of variation (—) |
 | 11 | Probability (`c11-probability`) | D1 D2 D3 | 1 | 1. Describe a sample space and events for a random experiment (D1 D2)<br>3. Find probabilities of compound events (—) |
-| 12 | Relations and Functions (`c12-relations-functions`) | D1 D2 D3 | 2 | 2. Determine whether a function is one-one, onto or a bijection (D2) |
-| 12 | Inverse Trigonometric Functions (`c12-inverse-trigonometric`) | D1 D2 D3 | 2 | 1. State the domain, range and principal value branch of each inverse ratio (D1 D2) |
-| 12 | Continuity and Differentiability (`c12-continuity-differentiability`) | D1 D2 D3 | 2 | 1. Test continuity and differentiability at a point (D1 D2) |
-| 12 | Application of Derivatives (`c12-applications-derivatives`) | D1 D2 D3 | 1 | 1. Find rates of change and approximations (D1)<br>3. Find local and absolute maxima and minima and solve optimisation problems (—) |
-| 12 | Vector Algebra (`c12-vector-algebra`) | D1 D2 D3 | 2 | 1. Add vectors and find magnitude, direction cosines and unit vectors (D1 D2) |
 
 ### JEE Main — 14 of 27 chapters
 
@@ -109,10 +90,10 @@ Chapter × track cells where the hardest level rests on a **single** authored fo
 | 11 | Statistics (`c11-statistics`) | D2 D3 D4 | 1 | 1. Find the mean deviation about the mean and median (—)<br>2. Find the variance and standard deviation of grouped and ungrouped data (D2 D3) |
 | 11 | Probability (`c11-probability`) | D2 D3 D4 | 2 | 1. Describe a sample space and events for a random experiment (D2) |
 | 12 | Relations and Functions (`c12-relations-functions`) | D2 D3 D4 | 2 | 3. Compose functions and find an inverse function (D3) |
-| 12 | Inverse Trigonometric Functions (`c12-inverse-trigonometric`) | D2 D3 D4 | 1 | 1. State the domain, range and principal value branch of each inverse ratio (D2)<br>2. Evaluate expressions involving inverse trigonometric functions (D2 D3) |
-| 12 | Continuity and Differentiability (`c12-continuity-differentiability`) | D2 D3 D4 | 2 | 1. Test continuity and differentiability at a point (D2) |
-| 12 | Application of Derivatives (`c12-applications-derivatives`) | D2 D3 D4 | 1 | 1. Find rates of change and approximations (—)<br>2. Find intervals of increase and decrease, and tangents and normals (D2 D3) |
-| 12 | Vector Algebra (`c12-vector-algebra`) | D2 D3 D4 | 2 | 1. Add vectors and find magnitude, direction cosines and unit vectors (D2) |
+| 12 | Inverse Trigonometric Functions (`c12-inverse-trigonometric`) | D2 D3 D4 | 1 | 1. State the domain, range and principal value branch of each inverse ratio (D2 D3)<br>2. Evaluate expressions involving inverse trigonometric functions (D2 D3) |
+| 12 | Continuity and Differentiability (`c12-continuity-differentiability`) | D2 D3 D4 | 2 | 1. Test continuity and differentiability at a point (D2 D3) |
+| 12 | Application of Derivatives (`c12-applications-derivatives`) | D2 D3 D4 | 1 | 1. Find rates of change and approximations (D3)<br>2. Find intervals of increase and decrease, and tangents and normals (D2 D3) |
+| 12 | Vector Algebra (`c12-vector-algebra`) | D2 D3 D4 | 2 | 1. Add vectors and find magnitude, direction cosines and unit vectors (D2 D3) |
 
 ### JEE Advanced — 14 of 27 chapters
 
@@ -128,10 +109,10 @@ Chapter × track cells where the hardest level rests on a **single** authored fo
 | 11 | Statistics (`c11-statistics`) | D3 D4 | 1 | 1. Find the mean deviation about the mean and median (—)<br>2. Find the variance and standard deviation of grouped and ungrouped data (D3) |
 | 11 | Probability (`c11-probability`) | D3 D4 | 2 | 1. Describe a sample space and events for a random experiment (—) |
 | 12 | Relations and Functions (`c12-relations-functions`) | D3 D4 | 2 | 3. Compose functions and find an inverse function (D3) |
-| 12 | Inverse Trigonometric Functions (`c12-inverse-trigonometric`) | D3 D4 | 1 | 1. State the domain, range and principal value branch of each inverse ratio (—)<br>2. Evaluate expressions involving inverse trigonometric functions (D3) |
-| 12 | Continuity and Differentiability (`c12-continuity-differentiability`) | D3 D4 | 2 | 1. Test continuity and differentiability at a point (—) |
-| 12 | Application of Derivatives (`c12-applications-derivatives`) | D3 D4 | 1 | 1. Find rates of change and approximations (—)<br>2. Find intervals of increase and decrease, and tangents and normals (D3) |
-| 12 | Vector Algebra (`c12-vector-algebra`) | D3 D4 | 2 | 1. Add vectors and find magnitude, direction cosines and unit vectors (—) |
+| 12 | Inverse Trigonometric Functions (`c12-inverse-trigonometric`) | D3 D4 | 1 | 1. State the domain, range and principal value branch of each inverse ratio (D3)<br>2. Evaluate expressions involving inverse trigonometric functions (D3) |
+| 12 | Continuity and Differentiability (`c12-continuity-differentiability`) | D3 D4 | 2 | 1. Test continuity and differentiability at a point (D3) |
+| 12 | Application of Derivatives (`c12-applications-derivatives`) | D3 D4 | 1 | 1. Find rates of change and approximations (D3)<br>2. Find intervals of increase and decrease, and tangents and normals (D3) |
+| 12 | Vector Algebra (`c12-vector-algebra`) | D3 D4 | 2 | 1. Add vectors and find magnitude, direction cosines and unit vectors (D3) |
 
 ### Olympiad (PRMO → RMO → INMO) — 0 of 7 chapters
 

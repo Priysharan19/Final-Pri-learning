@@ -27,6 +27,7 @@ import {
 import { NCERT_CLASS9_SYLLABUS as NCERT_CLASS9_CHAPTERS } from './ncert/class9-syllabus.js';
 import { CBSE_CLASS10_2026_27_CHAPTERS } from './ncert/class10-2026-27-production.js';
 import { INDIA_NATIVE_COVERS } from './curriculum-in-native-covers.js';
+import { INDIA_HARDEST_COVERS } from './curriculum-in-hardest-covers.js';
 
 function replaceClass7() {
   const group = IN_CURRICULUM.find(g => g.grade === 7);
@@ -179,5 +180,31 @@ function installNativeCovers() {
 }
 
 installNativeCovers();
+
+// Hardest-level forms, tranche 1 (curriculum-in-hardest-covers.js): one D3 form
+// for each Class X / Class XII dot point that had none. These are APPENDED —
+// nothing a chapter already had is removed or re-labelled — and installed on
+// every view of the chapter, exactly like the native covers above. An entry
+// naming a dot point the chapter does not have, or a generator the chapter
+// already lists, is a load-time error rather than a silent no-op.
+function installHardestCovers() {
+  for (const [chapterId, covers] of Object.entries(INDIA_HARDEST_COVERS)) {
+    const views = new Set([
+      IN_CURRICULUM.flatMap(group => group.chapters).find(chapter => chapter.id === chapterId),
+      IN_CHAPTER_BY_ID[chapterId],
+      IN_CHAPTERS.find(chapter => chapter.id === chapterId)
+    ].filter(Boolean));
+    if (!views.size) throw new Error(`${chapterId} is not a chapter of this curriculum`);
+    for (const chapter of views) {
+      for (const entry of covers) {
+        if (entry.dp.some(i => !Number.isInteger(i) || i < 0 || i >= chapter.dotpoints.length)) throw new Error(`${chapterId}: hardest cover ${entry.gen} names a dot point the chapter does not have`);
+        if (chapter.covers.some(c => c.gen === entry.gen)) throw new Error(`${chapterId}: ${entry.gen} is already a cover of this chapter`);
+      }
+      chapter.covers = [...chapter.covers, ...covers.map(entry => ({ gen: entry.gen, dp: [...entry.dp], diff: [...entry.diff] }))];
+    }
+  }
+}
+
+installHardestCovers();
 
 export * from './curriculum-in-base.js';

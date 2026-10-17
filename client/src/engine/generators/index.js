@@ -41,7 +41,10 @@ const BANKS = {
   // banks rather than an overlay on india-senior, because india-senior is the
   // "corners nothing else covered" bank and these are whole chapters.
   'india-class11': () => import('./india-class11.js').then(m => m.indiaClass11),
-  'india-class12': () => import('./india-class12.js').then(m => m.indiaClass12)
+  'india-class12': () => Promise.all([import('./india-class12.js'), import('./india-class12-hardest.js')])
+    // The hardest-level (D3) forms of tranche 1 (curriculum-in-hardest-covers.js)
+    // ride in the same bank: they serve the same chapters.
+    .then(([base, hardest]) => ({ ...base.indiaClass12, ...hardest.class12HardestForms }))
 };
 
 // Subtopic ids are namespaced by the bank that authors them: y9-surds lives in
@@ -163,6 +166,23 @@ const INDIA_BANK_OF = {
   'c10-linear-pair-methods': 'india-class10',
   'c10-quadratic-roots': 'india-class10',
   'c10-probability-classical': 'india-class10',
+  // Hardest-level (D3) forms, tranche 1.
+  'c10-polynomial-zeroes-reasoning': 'india-class10',
+  'c10-linear-pair-situations-reasoning': 'india-class10',
+  'c10-quadratic-factorisation-reasoning': 'india-class10',
+  'c10-ap-sum-reasoning': 'india-class10',
+  'c10-ap-daily-life-reasoning': 'india-class10',
+  'c10-bpt-reasoning': 'india-class10',
+  'c10-distance-reasoning': 'india-class10',
+  'c10-section-reasoning': 'india-class10',
+  'c10-trig-ratio-reasoning': 'india-class10',
+  'c10-trig-standard-reasoning': 'india-class10',
+  'c10-tangent-length-reasoning': 'india-class10',
+  'c10-sector-reasoning': 'india-class10',
+  'c10-volume-combination-reasoning': 'india-class10',
+  'c10-grouped-mean-reasoning': 'india-class10',
+  'c10-grouped-mode-reasoning': 'india-class10',
+  'c10-probability-reasoning': 'india-class10',
   'c11-relations-functions': 'india-class11',
   'c11-trig-functions': 'india-class11',
   'c11-complex-numbers': 'india-class11',
@@ -180,6 +200,13 @@ const INDIA_BANK_OF = {
   'c12-vector-dot-product': 'india-class12',
   'c12-conditional-probability': 'india-class12',
   'c12-random-variable': 'india-class12',
+  // Hardest-level (D3) forms, tranche 1.
+  'c12-bijection-reasoning': 'india-class12',
+  'c12-principal-value-reasoning': 'india-class12',
+  'c12-differentiability-reasoning': 'india-class12',
+  'c12-related-rates-reasoning': 'india-class12',
+  'c12-optimisation-reasoning': 'india-class12',
+  'c12-vector-magnitude-reasoning': 'india-class12',
   'c11-sequence-means': 'india-senior',
   'c11-statistics': 'india-senior',
   'c12-relations-equivalence': 'india-senior',
