@@ -22,6 +22,7 @@
 //     under a wrong last line whether the roots share a sign or not, while
 //     guessed roots, a list of candidates and a sweep still earn nothing.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

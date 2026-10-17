@@ -8,6 +8,7 @@
 // configuration is a production boot problem. The second half drives the REAL
 // /v1 router: an old shell signs in, cannot sync, exports, and deletes.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { clientCompatibility, compatibilityConfigProblems, compatibilityStatus } from '../platform/clientCompatibility.js';

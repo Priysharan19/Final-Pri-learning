@@ -18,6 +18,7 @@
 // without it, and this contract proves both halves: the boot gate, and that a
 // spoofed X-Forwarded-For cannot buy a second rate bucket.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

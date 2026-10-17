@@ -6,6 +6,7 @@
 // attempts, records its run for /v1/health, runs at startup, and is exposed
 // as server/tools/housekeeping.mjs.
 
+import './support/hermetic.mjs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';

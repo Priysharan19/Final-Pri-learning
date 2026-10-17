@@ -14,6 +14,7 @@
 //
 // SQLite by default; --engine=postgres runs it on a migrated Postgres.
 
+import './support/hermetic.mjs';
 delete process.env.PRI_HANDWRITING_API_KEY;
 // The AI tutor ships dark (PRI_FEATURE_TUTOR); its declared limit is measured with it on.
 process.env.PRI_FEATURE_TUTOR = '1';

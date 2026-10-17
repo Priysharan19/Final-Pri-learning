@@ -17,6 +17,7 @@
 // security-headers-check.mjs owns the header values themselves; this file owns
 // their coverage across routes and the browser-boundary negatives.
 
+import './support/hermetic.mjs';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

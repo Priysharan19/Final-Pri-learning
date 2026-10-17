@@ -15,6 +15,7 @@
 //   3. wrong try, resolving try, same-key replays -> one server progress event
 //   4. further syncing cannot create another authoritative grade
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

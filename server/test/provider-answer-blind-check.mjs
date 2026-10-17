@@ -27,6 +27,7 @@
 // No network call is made. The canaries are chosen so a substring search is
 // exact; the test is deterministic and runs with no API key.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { readFileSync } from 'node:fs';

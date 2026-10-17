@@ -5,6 +5,7 @@
 // byte-identical responses and comparable timing (one bcrypt comparison always
 // runs). The per-IP rate limit is unchanged and still fires.
 
+import './support/hermetic.mjs';
 import { performance } from 'node:perf_hooks';
 
 const { startApp, registerAccount, checks } = await import('./support/app-harness.mjs');
