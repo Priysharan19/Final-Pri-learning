@@ -73,8 +73,10 @@ async function send(h, path, options) {
     try {
       return await h.request(path, options);
     } catch (error) {
-      const cause = error?.cause;
-      if (attempt < 20 && cause?.syscall === 'connect' && ['ECONNRESET', 'ECONNREFUSED'].includes(cause.code)) {
+      // The harness already resends a failed connect a few times (counted in
+      // h.connectRetries); this outer loop covers a longer kernel reset storm.
+      const cause = error?.syscall ? error : error?.cause;
+      if (attempt < 20 && cause?.syscall === 'connect' && ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT'].includes(cause.code)) {
         connectResets++;
         await sleep(10 + attempt * 10);
         continue;
@@ -168,8 +170,8 @@ try {
 
   const total = ACCOUNTS * PUSHES_PER_ACCOUNT;
   const summary = [...statuses].map(([s, n]) => `${s}×${n}`).join(' ');
-  console.log(`burst: ${total} pushes in ${burstMs} ms — statuses ${summary}; ${overloads.length} overload answers; ${connectResets} kernel connect resets resent; store retries ${h.db.stats?.retries ?? 0}`);
-  c.eq(statuses.get(500) || 0, 0, `no push of ${total} concurrent pushes answers 500 (${summary}, ${burstMs} ms, ${connectResets} kernel connect resets resent)`);
+  console.log(`burst: ${total} pushes in ${burstMs} ms — statuses ${summary}; ${overloads.length} overload answers; ${connectResets + h.connectRetries} kernel connect resets resent; store retries ${h.db.stats?.retries ?? 0}`);
+  c.eq(statuses.get(500) || 0, 0, `no push of ${total} concurrent pushes answers 500 (${summary}, ${burstMs} ms, ${connectResets + h.connectRetries} kernel connect resets resent)`);
   c.ok(overloads.every(o => /^\d+$/.test(String(o.retryAfter)) && /^PLATFORM_DB_(BUSY|TIMEOUT)$/.test(String(o.code)) && o.retryable === true),
     `every overload answer is a coded, retryable 503 with Retry-After (${overloads.length} seen)`);
   c.ok(finals.every(r => r.status === 200), `every push is accepted, resent where told to (${finals.filter(r => r.status !== 200).map(r => `${r.status}:${r.data?.error?.code}`).join(',') || 'all 200'})`);

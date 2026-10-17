@@ -47,6 +47,17 @@ try {
     assert.throws(() => serverReleaseIdentity({ env: { ...env, PRI_RELEASE_SHA: 'a'.repeat(40) }, readBuilt, root: fixture }),
       /does not match checked-out Git SHA/, 'production refuses a release SHA that is not the checkout');
     writeFileSync(join(fixture, 'untracked.txt'), 'dirty\n');
+    // The default itself, proved where hermetic.mjs never ran: a fresh process
+    // that imports only the production resolver must refuse the dirty tree.
+    const { spawnSync } = await import('node:child_process');
+    const { pathToFileURL } = await import('node:url');
+    const resolver = pathToFileURL(join(repoRoot, 'server', 'platform', 'releaseIdentity.js')).href;
+    const child = spawnSync(process.execPath, ['--input-type=module', '-e',
+      `const { serverReleaseIdentity } = await import(${JSON.stringify(resolver)});\n` +
+      `serverReleaseIdentity({ env: { NODE_ENV: 'production' }, readBuilt: () => null, root: ${JSON.stringify(fixture)} });`],
+    { encoding: 'utf8', env: { PATH: process.env.PATH, HOME: process.env.HOME } });
+    assert.notEqual(child.status, 0, 'a fresh production process refuses a dirty source tree without any test switch');
+    assert.match(child.stderr, /source tree is dirty/, 'the refusal names the dirty source tree');
     assert.throws(() => serverReleaseIdentity({ env, readBuilt, root: fixture }), /source tree is dirty/,
       'production refuses a dirty source tree by default');
     setReleaseSourceVerification(false);

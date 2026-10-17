@@ -64,7 +64,11 @@ export async function startApp({
   // stalled a loopback SYN and undici gave up with connect ETIMEDOUT — in that
   // suite and in every other suite running beside it. Requests here reuse a
   // bounded pool for the harness's lifetime, whatever methods they use.
-  const agent = new http.Agent({ keepAlive: true, maxSockets: 64 });
+  // No socket cap: burst suites (platform-sync-burst: 150 pushes at once) must
+  // reach the server with their full concurrency; pooling alone ends the churn.
+  const agent = new http.Agent({ keepAlive: true, maxSockets: Infinity });
+  // Connects resent below, so suites can report them instead of hiding them.
+  let connectRetries = 0;
   const { port } = server.address();
 
   // This host's loopback occasionally refuses or times out a connect for a
@@ -80,6 +84,7 @@ export async function startApp({
       } catch (error) {
         const connectFailure = error?.syscall === 'connect' && ['ETIMEDOUT', 'ECONNREFUSED', 'ECONNRESET'].includes(error.code);
         if (!connectFailure || attempt >= 8) throw error;
+        connectRetries += 1;
         await new Promise(resolve => setTimeout(resolve, 50 * (attempt + 1)));
       }
     }
@@ -90,7 +95,8 @@ export async function startApp({
       let settled = false;
       const outgoing = { ...headers };
       if (payload !== undefined) {
-        payload = Buffer.isBuffer(payload) ? payload : Buffer.from(String(payload));
+        if (!Buffer.isBuffer(payload) && typeof payload !== 'string') throw new TypeError('app harness bodies are strings or Buffers');
+        payload = Buffer.isBuffer(payload) ? payload : Buffer.from(payload);
         outgoing['Content-Length'] = String(payload.length);
       }
       const req = http.request({ host: '127.0.0.1', port, method, path, headers: outgoing, agent }, res => {
@@ -157,7 +163,7 @@ export async function startApp({
   }
 
   // url: the pri_server-member connection URL on Postgres (null on SQLite).
-  return { app, db, server, origin, request, close, adminExec, engine: testStore?.engine || 'sqlite', url: testStore?.url || null };
+  return { app, db, server, origin, request, close, adminExec, engine: testStore?.engine || 'sqlite', url: testStore?.url || null, get connectRetries() { return connectRetries; } };
 }
 
 export async function registerAccount(harness, {
