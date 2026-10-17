@@ -14,7 +14,8 @@ const MANUAL_NON_WRITER_PATHS = new Set(['README.md', 'docs/RELEASE.md']);
 // the same indentation with only the SHA and `# tag` changed.
 const DEPENDENCY_MANIFEST = /^(?:(?:client|server|ad)\/)?package(?:-lock)?\.json$/;
 const WORKFLOW_FILE = /^\.github\/workflows\/[^/]+\.ya?ml$/;
-const WORKFLOW_PIN_LINE = /^(\s*(?:-\s+)?)uses:\s*([A-Za-z0-9_-][\w.-]*\/[\w./-]+)@([0-9a-f]{40})(?:\s+#\s*\S+)?\s*$/;
+// Spaces and tabs only: a bare CR would let YAML see an extra line.
+const WORKFLOW_PIN_LINE = /^([ \t]*(?:-[ \t]+)?)uses:[ \t]*([A-Za-z0-9_-][\w.-]*\/[\w./-]+)@([0-9a-f]{40})(?:[ \t]+#[ \t]*v?[\w.+-]+)?[ \t]*$/;
 
 function changedFiles(base = 'origin/main') {
   // --no-renames lists both sides of a rename, so a deleted path is never hidden.
@@ -65,7 +66,12 @@ function classifyDependency(files, workflowDiffText = () => '') {
   if (!files.length) return { lane: 'empty', authorized: false, files: [] };
   const outside = files.filter(file => !DEPENDENCY_MANIFEST.test(file) && !WORKFLOW_FILE.test(file));
   const unpinned = files.filter(file => WORKFLOW_FILE.test(file))
-    .flatMap(file => nonPinWorkflowChanges(workflowDiffText(file)).map(problem => `${file}: ${problem}`));
+    .flatMap(file => {
+      const text = workflowDiffText(file);
+      // A listed workflow with no diff text is unexplained: fail closed.
+      if (!text.trim()) return [`${file}: empty diff`];
+      return nonPinWorkflowChanges(text).map(problem => `${file}: ${problem}`);
+    });
   if (outside.length || unpinned.length) {
     return { lane: 'governed-required', authorized: false, files, outside_dependency_paths: outside, non_pin_workflow_lines: unpinned };
   }

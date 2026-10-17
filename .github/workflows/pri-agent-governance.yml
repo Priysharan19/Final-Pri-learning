@@ -306,6 +306,12 @@ jobs:
           node scripts/pri-pr-lane.mjs simulate-workflow-diff /tmp/pri-pin-new-step.diff | grep -q '"lane":"governed-required"'
           printf '%s\n' '@@ -11,0 +12,2 @@' '+---' '++evil: 1' > /tmp/pri-pin-dashes.diff
           node scripts/pri-pr-lane.mjs simulate-workflow-diff /tmp/pri-pin-dashes.diff | grep -q '"lane":"governed-required"'
+          printf '%s\n' '@@ -7 +7 @@' \
+            '-      - uses: actions/checkout@1111111111111111111111111111111111111111 # v4.0.0' \
+            "+      - uses: actions/checkout@3333333333333333333333333333333333333333 #$(printf '\r')ref: evil" > /tmp/pri-pin-cr.diff
+          node scripts/pri-pr-lane.mjs simulate-workflow-diff /tmp/pri-pin-cr.diff | grep -q '"lane":"governed-required"'
+          : > /tmp/pri-pin-empty.diff
+          node scripts/pri-pr-lane.mjs simulate-workflow-diff /tmp/pri-pin-empty.diff | grep -q '"lane":"governed-required"'
 
       - name: Classify PR diff and parse autonomous metadata
         if: github.event_name == 'pull_request'
