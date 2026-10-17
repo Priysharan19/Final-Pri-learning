@@ -15,11 +15,17 @@
 // right. Every case is authored. Nothing here is generated.
 // ─────────────────────────────────────────────────────────────────────────────
 import { checkAnswer } from '../src/engine/checker.js';
+import { generateMultipart } from '../src/engine/generators/multipart.js';
+import { generateQuestion, loadAllBanks } from '../src/engine/generators/index.js';
+await loadAllBanks();
 
 let pass = 0;
 const failures = [];
 const classes = new Map();
 
+function ok(cond, label) {
+  if (cond) pass++; else failures.push(label);
+}
 function note(cls, okay) {
   const row = classes.get(cls) || { pass: 0, fail: 0 };
   if (okay) row.pass++; else row.fail++;
@@ -89,8 +95,10 @@ function rejected(cls, question, input, label = input) {
   // An authored degree answer: a bare number is in degrees, radians are read
   // when written as such or as a multiple of π.
   const deg = { answerType: 'numeric', prompt: 'Find the angle.', answerSuffix: '°', answer: { value: 60 } };
-  for (const s of ['60', '60°', '60 degrees', '60 deg', 'π/3 rad', 'pi/3 radians', 'π/3', '1.0472 rad']) accepted(C, deg, s);
-  for (const s of ['30°', '60 rad', 'π/6', '1.0472', '120°', '2π/3', '59', '61°']) rejected(C, deg, s);
+  // On a question that asks in degrees a radian answer is read only when its
+  // unit is written: a bare π/3 is not 60° (owner decision, review of #513).
+  for (const s of ['60', '60°', '60 degrees', '60 deg', 'π/3 rad', 'pi/3 radians', '1.0472 rad']) accepted(C, deg, s);
+  for (const s of ['30°', '60 rad', 'π/6', '1.0472', '120°', '2π/3', '59', '61°', 'π/3', 'pi/3', '(1/3)π']) rejected(C, deg, s);
 
   // An authored radian answer: a bare number is in radians, and 60° converts.
   const rad = { answerType: 'numeric', prompt: 'Find the angle in radians.', answer: { value: Math.PI / 3, angle: 'rad' } };
@@ -272,6 +280,79 @@ function rejected(cls, question, input, label = input) {
   // ported here: see the PR that brought this suite onto the online engine.)
   for (const s of ['a^7', 'a^6 * a', 'a*a^6', 'a^3*a^3*a']) accepted(C, index, s);
   for (const s of ['a^6', 'a^8', 'a^5', '7a', 'a^9']) rejected(C, index, s);
+}
+
+// ── Review of #513: paise only on a money question; π in a degree answer ─────
+{
+  const C = 'units';
+  // "paise" was divided by 100 on every numeric question, so 500 paise was 5 m.
+  // On a question that is not about Indian money it is a wrong unit.
+  const unitRefused = (question, input, label) => {
+    let v;
+    try { v = checkAnswer(question, input); } catch (e) { v = { correct: false, feedback: String(e?.message || e) }; }
+    const okay = v.correct === false && /^Check the unit/.test(v.feedback || '');
+    note(C, okay);
+    if (okay) pass++;
+    else failures.push(`[${C}] expected "Check the unit" for ${JSON.stringify(label || input)} — got ${v.correct} (${v.feedback || ''})`);
+  };
+  const metres = { answerType: 'numeric', prompt: 'How long is the fence?', answerSuffix: 'm', answer: { value: 5 } };
+  const angle = { answerType: 'numeric', prompt: 'Find x.', answerSuffix: '°', answer: { value: 60 } };
+  const percent = { answerType: 'numeric', prompt: 'What percentage was spent?', answerSuffix: '%', answer: { value: 20, percent: true } };
+  const bare = { answerType: 'numeric', prompt: 'Solve $x - 4 = 8$.', answerPrefix: 'x =', answer: { value: 12 } };
+  const dollars = { answerType: 'numeric', prompt: 'How much does she spend?', answerPrefix: '$', answer: { value: 17.5, tol: 0.005 } };
+  const plain = { answerType: 'numeric', prompt: 'Find the value.', answer: { value: 12 } };
+  for (const [q, s] of [[metres, '500 paise'], [metres, '5 paise'], [angle, '6000 paise'], [angle, '60 paise'], [percent, '2000 paise'], [percent, '20 paise'],
+    [bare, '1200 paise'], [bare, '12 paise'], [dollars, '1750 paise'], [dollars, '17.5 paise'], [plain, '1200 paise'], [plain, '12 paise']]) unitRefused(q, s, `${s} on ${q.answerSuffix || q.answerPrefix || 'a bare number'}`);
+  accepted(C, metres, '5 m'); accepted(C, angle, '60°'); accepted(C, dollars, '$17.50'); accepted(C, plain, '12');
+  // The money questions are still read in rupees.
+  const promptRupees = { answerType: 'numeric', prompt: 'A pen costs ₹4 and a notebook ₹5.75. What do both cost together?', answer: { value: 9.75 } };
+  accepted(C, promptRupees, '975 paise'); rejected(C, promptRupees, '9.75 paise');
+  const rsPrompt = { answerType: 'numeric', prompt: 'A pen costs Rs 4 more than a pencil costing Rs 5.75. Find the cost of the pen.', answer: { value: 9.75 } };
+  accepted(C, rsPrompt, '975 paise'); rejected(C, rsPrompt, '9.75 paise');
+  // Issued multipart parts: every numeric part refuses a paise answer.
+  for (const id of ['mp-y7-money', 'mp-y7-angles', 'mp-y8-circle']) {
+    for (const seed of [1, 2, 3]) {
+      const q = generateMultipart(id, seed);
+      for (const part of q.parts.filter(p => p.answerType === 'numeric' && Number.isFinite(p.answer?.value) && !p.answer.simplestFraction)) {
+        const question = { ...part, prompt: `${q.stem} ${part.prompt}` };
+        const v = part.answer.value;
+        const cents = Number((v * 100).toPrecision(12));
+        unitRefused(question, `${cents} paise`, `${id}(${part.key}) seed ${seed}: ${cents} paise`);
+        unitRefused(question, `${v} paise`, `${id}(${part.key}) seed ${seed}: ${v} paise`);
+      }
+    }
+  }
+}
+{
+  const C = 'degrees-radians';
+  // π in a degree answer is a number of degrees: 360/π° is about 114.6°, not
+  // a radian measure. On main these were accepted; the angle reader refused them.
+  const q360 = { answerType: 'numeric', prompt: 'Find the angle in degrees.', answerSuffix: '°', answer: { value: 360 / Math.PI } };
+  for (const s of ['360/π', '360/π°', '360/pi degrees', '360/π deg', '114.59']) accepted(C, q360, s);
+  for (const s of ['360/π rad', '2π', '360π', '114']) rejected(C, q360, s);
+  const q90 = { answerType: 'numeric', prompt: 'Find the angle.', answerSuffix: 'degrees', answer: { value: 90 / Math.PI } };
+  for (const s of ['90/π', '90/π°', '90/pi']) accepted(C, q90, s);
+  for (const s of ['π/2', 'π/2 rad', '90']) rejected(C, q90, s);
+  const q45pi = { answerType: 'numeric', prompt: 'Find the angle.', answerSuffix: '°', answer: { value: 45 * Math.PI } };
+  for (const s of ['45π', '45π°', '45pi degrees']) accepted(C, q45pi, s);
+  for (const s of ['45π rad', '45', 'π/4']) rejected(C, q45pi, s);
+  // A radian question is unchanged: π is radians, and degrees convert.
+  const rad = { answerType: 'numeric', prompt: 'Find the angle in radians.', answer: { value: Math.PI / 2, angle: 'rad' } };
+  for (const s of ['π/2', 'pi/2', '1.5708', '90°', '90 degrees', 'π/2 rad']) accepted(C, rad, s);
+  for (const s of ['90', 'π/3', '90 rad']) rejected(C, rad, s);
+  // The live "in degrees" question: c12-inverse-trigonometric D1.
+  const ends = new Set();
+  for (let seed = 1; seed <= 60; seed++) {
+    const q = generateQuestion('c12-inverse-trigonometric', 1, seed);
+    if (!/in degrees/.test(q.prompt) || q.answerSuffix !== 'degrees') continue;
+    const v = q.answer.value;
+    if (ends.has(v) || v === 0) continue;
+    ends.add(v);
+    const piForm = { 90: 'π/2', '-90': '-π/2', 180: 'π' }[v];
+    for (const s of [String(v), `${v}°`, `${v} degrees`, `${piForm} rad`, `${piForm} radians`]) accepted(C, q, `${s}`);
+    for (const s of [piForm, `${piForm}°`, `${-v}`, `${v} rad`]) rejected(C, q, s);
+  }
+  ok(ends.size >= 3, `c12-inverse-trigonometric D1 issued the branch ends 90, -90 and 180 within 60 seeds (got ${[...ends]})`);
 }
 
 // ── Report ───────────────────────────────────────────────────────────────────

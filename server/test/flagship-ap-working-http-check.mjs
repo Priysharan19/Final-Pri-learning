@@ -311,6 +311,16 @@ try {
     const hundredth = await once('paise-for-rupees', `${price} paise`);
     c.deq([hundredth.correct, hundredth.marksEarned], [false, 0], `seed ${seed}: ${price} paise is a hundredth of ₹${price}, and not correct`);
   }
+  // Paise are money: on the term-number question (n = 24) neither 2400 paise
+  // nor 24 paise is an answer — the unit is wrong (the engine says "Check the
+  // unit"; an open question's reply says nothing about why).
+  for (const answer of ['2400 paise', '24 paise']) {
+    const q = await issue();
+    const r = await submit(q.id, `ap-paise-${answer.replace(/\s+/g, '-')}`, answer, []);
+    c.deq([r.status, r.data.correct, r.data.marksEarned], [200, false, 0], `"${answer}" on a question that is not about money is not correct`);
+    const again = await submit(q.id, `ap-paise-${answer.replace(/\s+/g, '-')}-two`, answer, []);
+    c.deq([again.status, again.data.correct, again.data.resolved, again.data.marksEarned], [200, false, true, 0], `…and written again it resolves the question at 0 of 3`);
+  }
 } finally {
   await h.close();
   rmSync(scratch, { recursive: true, force: true });

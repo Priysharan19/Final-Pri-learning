@@ -117,6 +117,11 @@ const ASKS_PERCENT = /\bper\s?cent(?:age)?s?\b/i;
 // whatever the prompt mentions on the way; otherwise a prompt that talks in
 // paise ("How many paise are there in half a rupee?") asks in paise.
 const RUPEE_MARK = /₹|\bRs\b|\bINR\b|\brupees?\b/i;
+/** Is the question about Indian money at all (a rupee mark beside the box or in the prompt, or paise named)? */
+function moneyQuestion(question) {
+  const prefix = String(question?.answerPrefix ?? ''), suffix = String(question?.answerSuffix ?? ''), prompt = String(question?.prompt ?? '');
+  return RUPEE_MARK.test(prefix) || RUPEE_MARK.test(suffix) || RUPEE_MARK.test(prompt) || /paise/i.test(suffix) || /\bpaise\b/i.test(prompt);
+}
 /** Does the question itself ask in paise (so "50 paise" is 50, not ₹0.50)? */
 function paiseAsked(question) {
   const prefix = String(question?.answerPrefix ?? ''), suffix = String(question?.answerSuffix ?? '');
@@ -404,7 +409,7 @@ function checkAnswerWithinBudget(question, rawInput) {
         const angleUnit = ans.angle || angleUnitOfSuffix(question.answerSuffix);
         let angleRead = null;
         if (angleUnit && typeof rawInput === 'string') {
-          angleRead = angleUnitWritten(rawInput);
+          angleRead = angleUnitWritten(rawInput, { implicitPi: angleUnit === 'rad' });
           if (angleRead) rawInput = withoutAngleUnit(rawInput);
         }
         // the question's own unit in any spelling ("12 metres", "60 km/hr") is read off first
@@ -418,7 +423,16 @@ function checkAnswerWithinBudget(question, rawInput) {
         // asks in paise the word is the question's own unit and nothing moves.
         // (Before this, the word was stripped and ignored, so "9.75 paise" —
         // under a tenth of a rupee — was marked ₹9.75.)
-        if (meta.paise && !paiseAsked(question)) value /= 100;
+        // Paise are money: on a question that is not about Indian money they
+        // are a wrong unit, never stripped and never rescaled (500 paise is not 5 m).
+        if (meta.paise) {
+          if (!moneyQuestion(question)) {
+            return { correct: false, feedback: question.answerSuffix
+              ? `Check the unit — this question asks for the answer in ${String(question.answerSuffix).trim()}.`
+              : 'Check the unit — this question does not ask for an amount in paise.' };
+          }
+          if (!paiseAsked(question)) value /= 100;
+        }
         let target = ans.value;
         // A converted angle was written rounded in the other unit (1.0472 rad
         // for 60°), so an exact whole-number band would refuse it: a converted

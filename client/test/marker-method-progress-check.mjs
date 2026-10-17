@@ -627,7 +627,8 @@ ok(award('2x-7=-11', 'x', -2, '2x-7=-11\n2x=-4\nx=-2') === 2, 'the reported 2x-7
       ]) {
         const without = q(clean);
         for (const wrong of wrongs) {
-          const got = q(clean.replace('\n', `\n${wrong}\n`));
+          const [head, ...tail] = clean.split('\n');
+          const got = q([head, wrong, ...tail].join('\n'));
           ok(got === 1 && got < without, `#510: "${wrong}" under "${clean.split('\n')[0]}" and before the roots leaves only the factorisation's mark (${got} against ${without} without it)`);
         }
       }

@@ -192,12 +192,21 @@ export function unitWritten(expectedSuffix, texts) {
 const DEG_TAIL = /(?:°|º|˚|\bdeg(?:ree)?s?\.?)\s*$/i;
 const RAD_TAIL = /(?:\brad(?:ian)?s?\.?|ᶜ)\s*$/i;
 
-/** 'deg' | 'rad' | null — the angle unit a student wrote, if any. */
-export function angleUnitWritten(answerText) {
+// A rational multiple of π — `π`, `2π`, `π/3`, `2π/3`, `(1/3)π`, `-π/2` — is a
+// radian measure. π anywhere else (`360/π`, `90/π`) is just a number.
+const PI_MULTIPLE = /^[-+]?\s*(?:(?:\d+(?:\.\d+)?|\(\s*\d+\s*\/\s*\d+\s*\))\s*\*?\s*)?(?:π|pi)(?:\s*\/\s*\d+(?:\.\d+)?)?$/i;
+
+/**
+ * 'deg' | 'rad' | null — the angle unit a student wrote, if any. A written
+ * unit always counts. With `implicitPi` a bare rational multiple of π is
+ * radians too; it is off on a question that asks in degrees, where a radian
+ * answer is read only with its unit written ("π/3 rad", not "π/3").
+ */
+export function angleUnitWritten(answerText, { implicitPi = true } = {}) {
   const s = String(answerText ?? '').trim();
   if (DEG_TAIL.test(s)) return 'deg';
   if (RAD_TAIL.test(s)) return 'rad';
-  if (/π|\bpi\b/i.test(s)) return 'rad';
+  if (implicitPi && PI_MULTIPLE.test(s.replace(/\s+/g, ''))) return 'rad';
   return null;
 }
 
