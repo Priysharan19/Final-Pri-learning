@@ -296,7 +296,10 @@ try {
   c.eq(relayed.status, 200, 'Apple callback answers with a page, not a redirect');
   c.eq(relayed.headers.get('location'), null, 'and no Location header');
   c.ok(/text\/html/.test(relayed.headers.get('content-type') || ''), 'an HTML page');
-  c.ok(relayed.text.includes('<script src="/auth/callback.js"></script>') && !/<script>/.test(relayed.text), 'that loads the same-origin callback script and no inline script');
+  // Every script tag, in any case and with any attributes, is the one same-origin src.
+  const scriptTags = relayed.text.match(/<script\b[^>]*>/gi) || [];
+  c.ok(relayed.text.includes('<script src="/auth/callback.js"></script>'), 'that loads the same-origin callback script');
+  c.deq(scriptTags, ['<script src="/auth/callback.js">'], 'and no other script, inline or otherwise');
   c.eq(relayed.headers.get('cache-control'), 'no-store', 'never cached');
   const relayedFields = relayFields(relayed);
   c.eq(relayedFields.get('provider'), 'apple', 'provider relayed');
