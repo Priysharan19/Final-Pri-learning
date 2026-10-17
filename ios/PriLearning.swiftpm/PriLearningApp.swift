@@ -32,11 +32,24 @@ struct PriLearningApp: App {
 }
 
 struct ContentView: View {
+    /// The edges the web page extends under: all of them on iPhone, none on iPad.
+    static var edgeToEdge: Edge.Set {
+        UIDevice.current.userInterfaceIdiom == .phone ? .all : []
+    }
+
     var body: some View {
         ZStack {
             Color(red: 14 / 255, green: 17 / 255, blue: 23 / 255)
                 .ignoresSafeArea()
+            // On iPhone the page runs edge to edge, under the status bar and
+            // the home indicator, so the paper (or night) the student chose is
+            // what fills those strips instead of this near-black backdrop. The
+            // page already has viewport-fit=cover and pads its bars with
+            // env(safe-area-inset-*), which are only non-zero when the web view
+            // reaches the edges. Only the container region is ignored, so the
+            // keyboard still resizes the web view. iPad keeps its current frame.
             WebShell()
+                .ignoresSafeArea(.container, edges: Self.edgeToEdge)
         }
         .persistentSystemOverlays(.hidden)
         // Universal Links (account actions) reach the shell here. They need

@@ -148,7 +148,7 @@
 .session-done-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
 .exam-page { min-height: 100vh; background: var(--page); }
 .exam-head { position: sticky; top: 0; z-index: 60; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  padding: calc(8px + env(safe-area-inset-top)) 16px 8px 10px; border-bottom: 1px solid var(--hairline);
+  padding: calc(8px + var(--pri-inset-top)) 16px 8px 10px; border-bottom: 1px solid var(--hairline);
   border-radius: 0; margin: 0; }
 .exam-head-title { min-width: 0; flex: 1; display: grid; line-height: 1.25; }
 .exam-head-title b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -188,11 +188,11 @@
 .exam-head { padding-inline: 6px 10px; gap: 8px; }
 .exam-body { padding: 12px 12px 120px; }
 .exam-paper { padding: 18px 14px 14px; }
-.exam-foot { position: fixed; left: 0; right: 0; bottom: 0; margin: 0; z-index: 30; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: var(--page); border-top: 1px solid var(--hairline); }
+.exam-foot { position: fixed; left: 0; right: 0; bottom: 0; margin: 0; z-index: 30; padding: 10px 12px calc(10px + var(--pri-inset-bottom)); background: var(--page); border-top: 1px solid var(--hairline); }
 }
 .ws-page > .pri-explain-launch { position: static; margin: 18px auto 0; width: min(820px, calc(100% - 32px)); justify-content: flex-start; text-align: left; }
 @media (max-width: 760px) {
-.ws-page > .pri-explain-launch { margin-bottom: calc(130px + env(safe-area-inset-bottom)); }
+.ws-page > .pri-explain-launch { margin-bottom: calc(24px + var(--pri-inset-bottom)); }
 }
 .board-award .set-row { display: flex; align-items: flex-start; gap: 12px; }
 .board-award .set-row .set-k { display: block; flex: 1; min-width: 0; }
