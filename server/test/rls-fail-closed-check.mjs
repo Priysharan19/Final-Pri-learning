@@ -272,6 +272,146 @@ if (engine === 'postgres') {
   }
 }
 
+// ── 4 · Upgrade of a populated schema-11 database, and the documented rollback ──
+// The forward migration runs on a database that already holds rows for two
+// accounts in every account-owned table and in the shared tables — what a
+// staging or production database looks like when `supabase db push` applies it.
+// It must change no row, give an unscoped pri_server connection nothing, give
+// account scope exactly its own rows in each of the 19 tables (read, update,
+// delete and re-home all refused across accounts), and the documented rollback
+// must restore the schema-11 state, again without touching a row.
+const ROLLBACK = join(ROOT, 'docs', 'release', 'rollback', '20261016000000_rls_fail_closed.rollback.sql');
+{
+  const rollbackSql = readFileSync(ROLLBACK, 'utf8');
+  ok(/^begin;$/m.test(rollbackSql) && /^commit;$/m.test(rollbackSql) && /update pri\.platform_meta set value = '11' where key = 'schema_version';/.test(rollbackSql),
+    'the documented rollback is one transaction that returns schema_version to 11');
+}
+if (engine === 'postgres') {
+  const { scratchDatabase, serverRoleUrl, pgModule, migrationFiles } = await import('./support/postgres.mjs');
+  const { createPostgresStore } = await import('../platform/store.js');
+  const pg = await pgModule();
+  const FORWARD = '20261016000000_rls_fail_closed.sql';
+  const all = migrationFiles();
+  const forward = all.find(m => m.name === FORWARD);
+  ok(!!forward && all.at(-1).name === FORWARD, `${FORWARD} is the last migration, after every existing one`);
+  const scratch = await scratchDatabase('rls_upgrade', { migrations: all.filter(m => m.name < FORWARD) });
+  const su = scratch.client;
+  const url = await serverRoleUrl(scratch.name);
+  const raw = new pg.Client({ connectionString: url });
+  await raw.connect();
+  let store = null;
+  try {
+    await raw.query('SET search_path TO pri');
+    eq((await su.query("SELECT value FROM pri.platform_meta WHERE key = 'schema_version'")).rows[0]?.value, '11', 'the upgrade starts from a schema-11 database');
+    // Guard: every pri table whose rows each belong to one account through a
+    // NOT NULL account_id is in the owned list — a new one must be added there.
+    const mandatory = (await su.query(`SELECT table_name FROM information_schema.columns
+      WHERE table_schema = 'pri' AND column_name = 'account_id' AND is_nullable = 'NO' ORDER BY table_name`)).rows.map(r => r.table_name);
+    eq(mandatory, [...OWNED].sort(), 'the account-owned list is exactly the pri tables with a NOT NULL account_id');
+
+    // Seed two accounts with a row in every owned table, plus shared rows.
+    const NOW = 1_790_000_000_000;
+    const seed = (A, n) => `
+      INSERT INTO pri.accounts(id,email,name,role,created_at,updated_at) VALUES ('${A}','${A}@example.test','${A}','student',${NOW},${NOW});
+      INSERT INTO pri.account_identities(provider,provider_subject,account_id,linked_at) VALUES ('password','${A}','${A}',${NOW});
+      INSERT INTO pri.account_sessions(id,account_id,token_hash,device_id,created_at,last_seen_at,expires_at) VALUES ('s-${A}','${A}','th-${A}','dev-${A}',${NOW},${NOW},${NOW + 1000});
+      INSERT INTO pri.account_tokens(id,account_id,purpose,token_hash,created_at,expires_at) VALUES ('t-${A}','${A}','verify-email','tk-${A}',${NOW},${NOW + 1000});
+      INSERT INTO pri.auth_delivery_outbox(id,account_id,kind,destination,token_id,token_ciphertext,created_at) VALUES ('o-${A}','${A}','verify-email','${A}@example.test','t-${A}','ct',${NOW});
+      INSERT INTO pri.guardian_consents(account_id,guardian_name,guardian_email,notice_version,requested_at,method) VALUES ('${A}','G','g-${A}@example.test','v1',${NOW},'email-link');
+      INSERT INTO pri.account_phones(account_id,phone_e164,verified_at) VALUES ('${A}','+9198765432${n}0',${NOW});
+      INSERT INTO pri.account_mfa(account_id,secret_ciphertext,created_at,updated_at) VALUES ('${A}','ct',${NOW},${NOW});
+      INSERT INTO pri.account_mfa_recovery_codes(account_id,code_hash,created_at) VALUES ('${A}','rc-${A}',${NOW});
+      INSERT INTO pri.entitlement_snapshots(account_id,updated_at) VALUES ('${A}',${NOW});
+      INSERT INTO pri.entitlement_support_grants(event_id,account_id,period_end,created_at) VALUES ('g-${A}','${A}',${NOW},${NOW});
+      INSERT INTO pri.billing_subscriptions(provider,provider_subscription_id,account_id,product_id,created_at,updated_at) VALUES ('web','sub-${A}','${A}','premium',${NOW},${NOW});
+      INSERT INTO pri.billing_trial_claims(account_id,provider,provider_subscription_id,claimed_at) VALUES ('${A}','web','sub-${A}',${NOW});
+      INSERT INTO pri.billing_apple_accounts(account_id,app_account_token,created_at) VALUES ('${A}','aat-${A}',${NOW});
+      INSERT INTO pri.billing_google_accounts(account_id,obfuscated_account_id,created_at) VALUES ('${A}','goa-${A}',${NOW});
+      INSERT INTO pri.billing_google_purchases(purchase_token,account_id,product_id,created_at,updated_at) VALUES ('gp-${A}','${A}','premium',${NOW},${NOW});
+      INSERT INTO pri.idempotency_keys(account_id,scope,key,response_json,created_at,expires_at) VALUES ('${A}','sync','k1','{}',${NOW},${NOW + 1000});
+      INSERT INTO pri.learning_events(server_cursor,id,account_id,device_id,device_seq,kind,occurred_at,payload_json,created_at) VALUES (${n},'e1','${A}','dev-${A}',1,'attempt',${NOW},'{}',${NOW});
+      INSERT INTO pri.sync_entities(account_id,kind,entity_id,version,server_cursor,body_json,updated_at) VALUES ('${A}','progress','p1',1,${10 + n},'{}',${NOW});
+      INSERT INTO pri.operational_events(id,account_id,event_type,metadata_json,created_at) VALUES ('op-${A}','${A}','sync.push','{}',${NOW});
+      INSERT INTO pri.billing_payments(provider,payment_id,provider_subscription_id,account_id,amount,captured_at,created_at,updated_at) VALUES ('web','pay-${A}','sub-${A}','${A}',49900,${NOW},${NOW},${NOW});`;
+    await su.query(`BEGIN; ${seed('acct-a', 1)} ${seed('acct-b', 2)}
+      INSERT INTO pri.accounts(id,email,name,role,created_at,updated_at) VALUES ('acct-t','acct-t@example.test','T','teacher',${NOW},${NOW});
+      INSERT INTO pri.classes(id,teacher_account_id,name,join_code_hash,created_at) VALUES ('c1','acct-t','9B','jch-1',${NOW});
+      INSERT INTO pri.class_members(class_id,student_account_id,joined_at) VALUES ('c1','acct-a',${NOW}), ('c1','acct-b',${NOW});
+      INSERT INTO pri.audit_log(actor_account_id,action,target_kind,target_id,created_at) VALUES ('acct-t','class.create','class','c1',${NOW});
+      INSERT INTO pri.rate_limits(bucket,window_start,count) VALUES ('register:ip:1',${NOW},3);
+      UPDATE pri.sync_cursors SET value = 20 WHERE id = 1;
+      COMMIT;`);
+    const tables = (await su.query("SELECT tablename FROM pg_tables WHERE schemaname = 'pri' ORDER BY tablename")).rows.map(r => r.tablename);
+    const snapshot = async () => {
+      const out = {};
+      for (const t of tables) out[t] = (await su.query(`SELECT md5(coalesce(string_agg(x::text, '|' ORDER BY x::text), '')) AS h, count(*)::int AS n FROM pri.${t} x`)).rows[0];
+      return out;
+    };
+    const before = await snapshot();
+    ok(OWNED.every(t => before[t].n === 2), 'seed: every account-owned table holds one row for each of two accounts');
+    // The defect being fixed: on schema 11 an unscoped pri_server connection sees every account.
+    eq(Number((await raw.query('SELECT count(*)::int AS n FROM account_sessions')).rows[0].n), 2, 'schema 11 (before): an unscoped pri_server connection sees both accounts\' sessions — the defect');
+
+    // Apply the forward migration exactly as the harness applies every migration.
+    await su.query(forward.sql);
+    eq((await su.query("SELECT value FROM pri.platform_meta WHERE key = 'schema_version'")).rows[0]?.value, '12', 'upgrade: schema_version is 12');
+    const after = await snapshot();
+    eq(tables.filter(t => t !== 'platform_meta' && JSON.stringify(before[t]) !== JSON.stringify(after[t])), [], 'upgrade: no row of any table changed (content hash per table)');
+    const rls = (await su.query("SELECT relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'pri' AND c.relkind = 'r' AND NOT c.relrowsecurity")).rows.map(r => r.relname);
+    eq(rls, [], 'upgrade: row-level security is enabled on every pri table, so every policy takes effect');
+
+    // Unscoped: nothing, on any table, populated or not.
+    const visible = [];
+    for (const t of tables) if (Number((await raw.query(`SELECT count(*)::int AS n FROM ${t}`)).rows[0].n)) visible.push(t);
+    eq(visible, [], `upgrade: an unscoped pri_server connection sees no row of any of ${tables.length} pri tables`);
+    const touched = [];
+    for (const t of OWNED) if ((await raw.query(`UPDATE ${t} SET account_id = account_id`)).rowCount) touched.push(t);
+    eq(touched, [], 'upgrade: an unscoped update reaches no row of any owned table');
+
+    // System scope (the store) sees the data exactly as before.
+    store = await createPostgresStore(url, { max: 2 });
+    const systemCounts = {};
+    for (const t of tables) systemCounts[t] = Number((await store.get(`SELECT count(*)::int AS n FROM ${t}`)).n);
+    eq(tables.filter(t => systemCounts[t] !== after[t].n), [], 'upgrade: the schema-12 store (system scope) sees every existing row of every table');
+
+    // Account scope, table by table: own row only; nothing of the other account can be read, changed, deleted or claimed.
+    for (const t of OWNED) {
+      const view = await store.transaction(async tx => ({
+        own: Number((await tx.get(`SELECT count(*)::int AS n FROM ${t} WHERE account_id = 'acct-a'`)).n),
+        other: Number((await tx.get(`SELECT count(*)::int AS n FROM ${t} WHERE account_id <> 'acct-a'`)).n),
+        updated: (await tx.run(`UPDATE ${t} SET account_id = account_id WHERE account_id = 'acct-b'`)).changes,
+        deleted: (await tx.run(`DELETE FROM ${t} WHERE account_id = 'acct-b'`)).changes
+      }), { accountScope: 'acct-a' });
+      eq(view, { own: 1, other: 0, updated: 0, deleted: 0 }, `${t}: account scope reads its own row and cannot read, update or delete the other account's`);
+      const rehome = await store.transaction(tx => tx.run(`UPDATE ${t} SET account_id = 'acct-b' WHERE account_id = 'acct-a'`), { accountScope: 'acct-a' }).catch(error => error);
+      ok(String(rehome?.dbCode || rehome?.code) === '42501', `${t}: account scope cannot move its own row to another account (got ${rehome?.dbCode || rehome?.code || 'no error'})`);
+    }
+    // A scope that names no existing account, or another one, sees nothing of acct-a.
+    const stranger = await store.transaction(async tx => Number((await tx.get("SELECT count(*)::int AS n FROM account_sessions WHERE account_id = 'acct-a'")).n), { accountScope: 'acct-zzz' });
+    eq(stranger, 0, 'an account scope for another account sees none of acct-a\'s rows');
+    eq(JSON.stringify(await snapshot()) === JSON.stringify(after), true, 'the cross-account attempts changed no row');
+    await store.close();
+    store = null;
+
+    // The documented rollback restores schema 11, again touching no row.
+    await su.query(readFileSync(ROLLBACK, 'utf8'));
+    eq((await su.query("SELECT value FROM pri.platform_meta WHERE key = 'schema_version'")).rows[0]?.value, '11', 'rollback: schema_version is 11');
+    const restored = await snapshot();
+    eq(tables.filter(t => t !== 'platform_meta' && JSON.stringify(before[t]) !== JSON.stringify(restored[t])), [], 'rollback: no row of any table changed');
+    const policyNames = (await su.query(`SELECT c.relname AS t, p.polname AS name FROM pg_policy p JOIN pg_class c ON c.oid = p.polrelid
+      JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'pri' AND p.polname IN ('pri_scope_required','pri_account_scope') ORDER BY 1, 2`)).rows.map(r => `${r.t}.${r.name}`);
+    eq(policyNames, ['idempotency_keys.pri_account_scope', 'learning_events.pri_account_scope', 'sync_entities.pri_account_scope'], 'rollback: exactly the three schema-11 pri_account_scope policies remain');
+    eq(Number((await raw.query('SELECT count(*)::int AS n FROM account_sessions')).rows[0].n), 2, 'rollback: the schema-11 behaviour is back (a schema-11 build works unchanged)');
+    // And the forward migration applies again cleanly after a rollback.
+    await su.query(forward.sql);
+    eq(Number((await raw.query('SELECT count(*)::int AS n FROM account_sessions')).rows[0].n), 0, 're-upgrade after rollback: fail-closed again');
+  } finally {
+    if (store) await store.close().catch(() => {});
+    await raw.end().catch(() => {});
+    await scratch.drop();
+  }
+}
+
 console.log(`engine: ${engine}`);
 if (failures.length) {
   console.error(`RLS FAIL-CLOSED: FAIL — ${failures.length} of ${passed + failures.length}\n  · ${failures.join('\n  · ')}`);
