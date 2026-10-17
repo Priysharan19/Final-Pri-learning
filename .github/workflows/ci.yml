@@ -98,6 +98,7 @@ jobs:
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 174/174 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
+          grep -Fq 'ACCOUNT DELETION LINK: PASS — 46/46 checks' suites.log
           grep -Fq 'MARK PREDICTOR: PASS — 42/42 checks' suites.log
           grep -Fq 'PDF WORKING: PASS — 25/25 checks' suites.log
           grep -Fq 'MCQ DISTINCTNESS: PASS — 14/14 checks' suites.log
@@ -496,10 +497,12 @@ jobs:
           grep -Fq 'Progress truth · rendered numbers = attempt ledger' browser.log
           grep -Eq 'E2E SUITE.*24/24.*1 flows' browser.log
           # Account deletion for a code-only account: in the app, and from the
-          # public page (Apple 5.1.1(v), Play "Delete account"). Two flows.
+          # public page (Apple 5.1.1(v), Play "Delete account"). Two flows. The
+          # in-app flow also proves the persisted account link is gone after the
+          # deletion and after a reload (#500).
           grep -Fq 'Account · deletion from the public page, no sign-in, by email code' browser.log
           grep -Fq 'Account · a code-only account deletes itself in Settings with a fresh code' browser.log
-          grep -Eq 'E2E SUITE.*31/31.*2 flows' browser.log
+          grep -Eq 'E2E SUITE.*36/36.*2 flows' browser.log
           # Online-only, server-authoritative grading (owner decision
           # 2026-10-10): the marking flows run signed in against the real /v1
           # server; these journeys assert the refusals. Signed out (Write, Type),

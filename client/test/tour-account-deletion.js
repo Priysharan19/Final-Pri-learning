@@ -64,6 +64,24 @@ async function makeCodeOnlyAccount(h, sms, email, name) {
   return { id: verified.data.account.id, jar };
 }
 
+/** The persisted account-link rows in the page's IndexedDB device store: what a relaunch restores. */
+const accountLinkRows = page => page.evaluate(() => new Promise((resolve, reject) => {
+  const open = indexedDB.open('pri-learning');
+  open.onerror = () => reject(open.error);
+  open.onsuccess = () => {
+    const db = open.result;
+    if (!db.objectStoreNames.contains('device')) { db.close(); resolve([]); return; }
+    const read = db.transaction('device', 'readonly').objectStore('device').getAll();
+    read.onerror = () => { db.close(); reject(read.error); };
+    read.onsuccess = () => {
+      db.close();
+      resolve(read.result
+        .filter(row => String(row?.id || '').startsWith('pri-cloud-account-link-v1:'))
+        .map(row => ({ id: row.id, accountId: row.accountId || null })));
+    };
+  };
+}));
+
 export const flows = [
   {
     id: 'account-delete-public',
@@ -193,6 +211,9 @@ export const flows = [
         await page.goto(`${base}/settings#cloud-account-title`, { waitUntil: 'domcontentloaded' });
         await page.waitForSelector('#cloud-account-title', { timeout: 30000 });
         await page.getByTestId('cloud-delete-send-code').waitFor({ timeout: 30000 });
+        const linkedBefore = await accountLinkRows(page);
+        await check('signing up linked this device’s profile to the new account (one persisted link row)',
+          linkedBefore.length === 1 && linkedBefore[0].accountId === account.id);
         await check('the Account panel offers deletion by a code sent to the account’s own address',
           await page.getByText('This account has no password', { exact: false }).isVisible());
         await check('and tells an Apple subscriber to cancel in Apple ID settings as well',
@@ -228,7 +249,25 @@ export const flows = [
           seen.includes('POST /v1/account/otp/reauth-request') && seen.includes('DELETE /v1/account'));
         await check('the local profile on the device is untouched (deletion is of the cloud account, not the device)',
           (await page.evaluate(async () => (await indexedDB.databases()).map(d => d.name || ''))).some(name => /pri/i.test(name)));
+        // #500: the code path deleted the account but left the persisted link,
+        // so a relaunch restored a link to an account that no longer exists.
+        await check('the deleted account’s persisted link row is gone from this device',
+          (await accountLinkRows(page)).length === 0);
         await shot('deleted');
+
+        // A real reload (same URL, so goto would only move the hash): the panel
+        // now reads its state back from IndexedDB, as a relaunch does.
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await page.waitForSelector('#cloud-account-title', { timeout: 30000 });
+        await page.getByText('Not connected', { exact: true }).waitFor({ timeout: 30000 }).catch(() => {});
+        await check('the reload is a fresh page: the deletion message is not carried over',
+          await page.getByText('Cloud account deleted.', { exact: false }).count() === 0);
+        await check('after a relaunch no link to the deleted account is restored',
+          (await accountLinkRows(page)).length === 0);
+        await check('and the Account panel says not connected, never “sign-in required” for the deleted account',
+          await page.getByText('Not connected', { exact: true }).isVisible()
+          && await page.getByText('Linked · sign-in required', { exact: true }).count() === 0);
+        await shot('relaunched');
       } finally {
         await h.close();
       }
