@@ -62,10 +62,12 @@ function nonPinWorkflowChanges(diffText) {
   return problems;
 }
 
-function classifyDependency(files, workflowDiffText = () => '') {
+// workflowDiffText = null is a path-only simulation (simulate-dependency);
+// the real classifier always supplies the diff text.
+function classifyDependency(files, workflowDiffText = null) {
   if (!files.length) return { lane: 'empty', authorized: false, files: [] };
   const outside = files.filter(file => !DEPENDENCY_MANIFEST.test(file) && !WORKFLOW_FILE.test(file));
-  const unpinned = files.filter(file => WORKFLOW_FILE.test(file))
+  const unpinned = files.filter(file => workflowDiffText && WORKFLOW_FILE.test(file))
     .flatMap(file => {
       const text = workflowDiffText(file);
       // A listed workflow with no diff text is unexplained: fail closed.
