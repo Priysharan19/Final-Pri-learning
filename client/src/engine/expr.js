@@ -1021,11 +1021,25 @@ function exprEquivalentUncached(a, b, opts) {
  * is not a whole number is the result of a real calculation and keeps the
  * relative 1e-4 band that forgives a student's rounding. The exact band is
  * capped well below a half so no other whole number can ever fall inside it.
+ *
+ * A relative band grows with the target, so on its own it let 98770 pass for
+ * 98765.4 and ₹1234.6 pass for ₹1234.5. The band is therefore also capped in
+ * absolute terms: a target written to one or two decimal places is exact to
+ * half a unit of its last place, and any longer decimal (π, √2, 1/3) is never
+ * forgiven more than rounding to one decimal place.
  */
 export function numsClose(a, b, tol) {
   if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
   const t = tol ?? (Number.isInteger(b)
     ? Math.min(0.25, Math.max(1e-9, Math.abs(b) * 1e-9))
-    : Math.max(1e-6, Math.abs(b) * 1e-4));
+    : Math.min(decimalCap(b), Math.max(1e-6, Math.abs(b) * 1e-4)));
   return Math.abs(a - b) <= t;
+}
+
+// Half a unit of the last decimal place for a target authored to one or two
+// places; 0.05 (one-place rounding) for every longer or non-terminating value.
+function decimalCap(b) {
+  const text = String(Math.abs(b));
+  const places = /e/i.test(text) ? Infinity : (text.split('.')[1] || '').length;
+  return places <= 2 ? 0.5 * 10 ** -places : 0.05;
 }
