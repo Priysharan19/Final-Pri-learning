@@ -10,8 +10,8 @@ account), it is marked **OWNER**.
 |---|---|---|
 | Bundle id | `com.prilearning.app` | `ios/PriLearning.swiftpm/Package.swift` |
 | Source version / build | `4.0` (`2`) — **OWNER** decides whether App Store Connect's first version is 1.0 or 4.0 (`docs/release/V1_COMPLETION_LEDGER.md` surface 22) | `Package.swift` |
-| Device family in the current build | **iPad only** (`supportedDeviceFamilies: [.pad]`) | `Package.swift`; `PRI_V1_RELEASE_SCOPE.md` §4 |
-| iPhone | Planned. Adding `.phone` is a scope change (§20 of the scope document) and makes the iPhone screenshot set in §7 mandatory | — |
+| Device families in the current build | **iPhone and iPad** (`supportedDeviceFamilies: [.pad, .phone]`; iPhone portrait-only) since #523 | `Package.swift`; `PRI_V1_RELEASE_SCOPE.md` §22 (owner scope change #504) |
+| Consequence | Both the iPad and the iPhone screenshot sets in §7 are mandatory | — |
 | Subscription products | `com.prilearning.app.premium.monthly`, `com.prilearning.app.premium.annual` — created in App Store Connect, **not yet priced** | owner; server reads them from `PRI_APPLE_MONTHLY_PRODUCT_ID` / `PRI_APPLE_ANNUAL_PRODUCT_ID` (`server/platform/appleBilling.js`) |
 | Intended prices | ₹199 / month, ₹1,499 / year — **OWNER** sets them in App Store Connect; copy below must match what is set | owner |
 | Primary market | India first (`PRI_V1_RELEASE_SCOPE.md` §5) | — |
@@ -59,9 +59,9 @@ account), it is marked **OWNER**.
 >
 > FREE AND PREMIUM
 > The free plan includes 20 practice questions a day and one exam simulation every 30 days, for
-> CBSE / NCERT and JEE Main. Pri Learning Premium removes the daily limit and adds more exam
-> simulations, the JEE Advanced track, step-by-step explanations that adapt to you, and more
-> detailed progress views. Premium is ₹199 a month or ₹1,499 a year.
+> CBSE / NCERT and JEE Main. Pri Learning Premium removes the daily practice limit and the
+> exam-simulation limit, and includes the JEE Advanced track. Premium is ₹199 a month or ₹1,499
+> a year.
 >
 > WHAT PRI NEEDS
 > Checking answers needs a Pri account and an internet connection. Your ink and drafts are kept
@@ -73,7 +73,9 @@ account), it is marked **OWNER**.
 > PRIVACY
 > No ads. No tracking. We do not sell your data. To read your handwriting or photo, Pri's server
 > sends the image to an outside AI reading service (OpenAI); it is never sent with the question,
-> the answer or your name, and Pri keeps no copy of the image. You can switch server reading off
+> the answer or your name, and Pri keeps no copy of the image. If you turn on the optional
+> working check, the lines of your working and the text of the question are also sent to the
+> same service to find where a mistake is. You can switch server reading off
 > in Settings and type your answers instead. You can delete your account in the app at any time.
 >
 > Pri Learning follows the NCERT syllabus and public examination patterns. It is not endorsed by,
@@ -139,20 +141,21 @@ audience: the intended students are about 12 to 18. Do **not** tick "Made for Ki
 
 ## 5. Decision: not in the Kids Category
 
-Recommended: **Education, not Kids Category.** Reasons, for the owner and counsel to confirm:
+Recommended: **Education, not Kids Category.** Reasons, all for the owner and counsel to confirm:
 
-1. Apple's Kids Category is for apps designed for children 11 and under (age bands 5 and under,
+1. On the owner's reading, Apple's Kids Category is for apps designed for children 11 and under (age bands 5 and under,
    6–8, 9–11). Pri's students start at Class 7 (about 12) and run through JEE (17–18 and adult
    repeaters). The app is not designed for under-11s.
-2. Kids Category apps may not send personally identifiable information to third parties and face
+2. As we read Guidelines 1.3 and 5.1.4, Kids Category apps may not send personally identifiable information to third parties and face
    strict limits on third-party services (Guidelines 1.3 and 5.1.4). Pri sends handwriting images
    and photos to OpenAI for reading; the category would be incompatible with the core feature.
 3. Kids Category requires a parental gate before links out and purchases. Pri's guardian flow is
    account-level consent, not a parental gate.
 
-Not choosing the Kids Category does **not** remove obligations toward minors: Guideline 5.1.4
-still applies to an app that collects data from children, and India's DPDP Act treats every
-under-18 as a child. Those questions are in `docs/legal/counsel/COUNSEL-INFORMATION-PACK.md`.
+These are engineering readings of Apple's guidelines **for counsel to confirm**, not settled
+interpretations. Not choosing the Kids Category is not believed to remove obligations toward
+minors: on the owner's reading Guideline 5.1.4 may still apply to an app that collects data from
+children, and India's DPDP Act defines a child as under 18 (counsel to confirm both). Those questions are in `docs/legal/counsel/COUNSEL-INFORMATION-PACK.md`.
 
 ## 6. App Review information
 
@@ -196,9 +199,9 @@ Required sizes (confirm current specifications in App Store Connect):
 
 | Device | Required? | Size (portrait) |
 |---|---|---|
-| iPad 13-inch | **Yes** (iPad build) | 2064 × 2752 or 2048 × 2732 |
-| iPhone 6.9-inch | Only if `.phone` is added | 1320 × 2868 or 1290 × 2796 |
-| iPhone 6.5-inch | Only if Apple still requires it when 6.9-inch is absent | 1284 × 2778 or 1242 × 2688 |
+| iPad 13-inch | **Yes** | 2064 × 2752 or 2048 × 2732 |
+| iPhone 6.9-inch | **Yes** | 1320 × 2868 or 1290 × 2796 |
+| iPhone 6.5-inch | Only if App Store Connect still asks for it when 6.9-inch is supplied | 1284 × 2778 or 1242 × 2688 |
 
 Rules: real screens from the release build on the production deployment with demo data; no real
 student names, emails or photos; no device frames with fake notifications; captions state only
@@ -218,7 +221,7 @@ must never appear.
 | 9 | Plan screen (free vs Premium, prices) | Free plan, or Premium | Only after prices are set |
 | 10 | Settings → Handwriting privacy text | You choose whether the server reads your writing | Optional; supports the privacy answers |
 
-iPhone set (if `.phone` is added): shots 1, 2, 3, 4, 6, 7 in portrait.
+iPhone set (portrait only — the iPhone build does not rotate): shots 1 (handwriting with a finger, not Pencil), 2, 3, 4, 6, 7 and 8. Caption 1 on iPhone: "Write your working with your finger". Capture on a physical iPhone from the release build; no simulator status bars.
 
 App preview video: optional; if made, a 15–30 s screen recording of shots 1–3 with no voice-over
 claims.
@@ -240,8 +243,10 @@ claims.
 | Reading proposes, student can correct | `practice.js` `/:id/recognition/:receipt/confirm` |
 | Marks decided by the deterministic engine | `server/platform/markerOps.js`, `markerPool.js`; ADR-0001 |
 | Free: 20 questions/day, one exam simulation per 30 days | `client/src/local/backend.js` (free tier comment), `client/src/engine/examAllowance.js` |
-| Premium features | `client/src/platform/entitlements.js`, `client/src/local/entitlementGate.js` |
-| JEE Advanced is Premium | `entitlementGate.js` (`JEE_ADVANCED` message) |
+| Premium lifts the daily practice cap | `client/src/local/entitlementGate.js` (`UNLIMITED_PRACTICE`, device-local counter at `POST /practice/next` and `/history/:id/retry`) |
+| Premium lifts the exam-simulation limit | `server/platform/exams.js` `entitlementRefusal` (`premium-exams`); `client/src/local/indiaExamBackend.js` |
+| JEE Advanced is Premium | `client/src/local/backend.js` (`requireCapability(…, JEE_ADVANCED)`), `indiaExamBackend.js`, `exams.js` |
+| Not claimed | `advanced-pri-explain` and `advanced-analytics` are declared in `entitlements.js` but not enforced as gates today, so the listing does not advertise them. Add them to the copy only when a gate exists |
 | Needs account + connection; ink kept offline | `client/src/i18n/strings.en.js` `settings.localPlanSub`, `verdict.statusSavedWaitingSignIn`; `authoritative-architecture.md` |
 | Under-18 guardian confirmation by link or code | `guardianConsent.js`, `otp.js` |
 | Server reading can be switched off | `client/src/ink/cloudReader.js`; `settings.cloudHandwritingCopy` |

@@ -24,8 +24,8 @@ notice; (3) answer the questions in §11. Engineering will then change the produ
 | Name | Pri Learning (App Store bundle `com.prilearning.app`) |
 | What it is | A maths practice app. Students answer questions by handwriting (Apple Pencil or finger), by photographing paper working, or by typing. The server reads the handwriting, marks the answer and records progress |
 | Who it is for | Students in India: CBSE / NCERT Classes 7–12 (about ages 12–18) and JEE Main / JEE Advanced aspirants (about 16–18, plus adult repeaters). **Most users are expected to be minors.** |
-| Launch scope | India first; iPad first (iPhone and Android planned) (`docs/release/PRI_V1_RELEASE_SCOPE.md`) |
-| Price | Free tier (20 practice questions a day, one exam simulation every 30 days). Premium subscription, intended ₹199 / month or ₹1,499 / year, sold through Apple's App Store (and later Google Play). Web purchasing via Razorpay exists in code but is out of the first release |
+| Launch scope | India first; iPhone, iPad, Android phones and Android tablets (owner scope change of 2026-10-16, `docs/release/PRI_V1_RELEASE_SCOPE.md` §22, #504) |
+| Price | Free tier (20 practice questions a day, one exam simulation every 30 days). Premium subscription, intended ₹199 / month or ₹1,499 / year, sold through Apple's App Store and Google Play. Web purchasing via Razorpay exists in code but is out of the first release |
 | Operator | **To be decided by the owner** — the legal entity, its country and registered address are placeholders (`{{OWNER_LEGAL_NAME}}`, `{{OWNER_ADDRESS}}` in `docs/legal/*.md`). The owner is based in Sydney, Australia; the market is India. This matters for §6 and §7 |
 | Ads / tracking | None. No advertising or analytics SDK; the app can talk only to its own server (`tools/check-client-network-boundary.mjs`; `NSPrivacyTracking = false`) |
 
@@ -60,7 +60,8 @@ notice; (3) answer the questions in §11. Engineering will then change the produ
 | Handwriting / photo reading, working check, tutor | OpenAI API (`api.openai.com`) | Outside India; region and contracting entity to be confirmed | Requests set `store: false`. OpenAI's API terms allow it to keep inputs for a limited period for abuse monitoring; Pri has **no zero-data-retention arrangement** on record (`docs/privacy/data-retention.md` §4) |
 | Email (sign-in links, codes, guardian emails) | Resend | US provider; sending domain `mail.prilearning.com` | Sees address and message |
 | SMS (codes) | MSG91 or Twilio Verify — **not yet chosen** | Provider-dependent | Only if configured (`server/platform/smsProvider.js`) |
-| Payments | Apple App Store (StoreKit); later Google Play | Provider | Pri never sees card details (`server/platform/appleBilling.js`) |
+| Payments | Apple App Store (StoreKit) and Google Play Billing | Provider | Pri never sees card details (`server/platform/appleBilling.js`, `googleBilling.js`) |
+| Web payments (code present, **outside V1**) | Razorpay | India | If web checkout were enabled, Razorpay would receive the account's email (`notify_info.notify_email`) and the opaque account id (`server/platform/razorpay.js` ~line 380). Not configured for V1; native clients are refused web checkout |
 | Sign-in with Apple / Google | Apple, Google | Provider | Only when the student taps them (`client/src/platform/socialSignIn.js`) |
 
 ---
@@ -158,7 +159,7 @@ Areas the owner believes are relevant (questions in §11):
 | Grievance officer / contact | Placeholder `{{GRIEVANCE_OFFICER_NAME}}`, `{{GRIEVANCE_OFFICER_EMAIL}}` (`docs/legal/grievance.md`) | Whether a named officer, a Data Protection Officer or an India-resident contact is required |
 | Retention and erasure | Account data until deletion; grade records 90 days; exam records up to 5 years; telemetry 90 days; payment ledger unlinked, proposed 8 years; audit log proposed 2 years; no automatic deletion of inactive accounts | Whether erasure is required when the purpose is served (e.g. inactivity), and the periods |
 | Cross-border transfer | OpenAI and Resend outside India; production database currently in Amsterdam until cutover | Whether any transfer restriction applies; whether the guardian notice's "servers in India" statement must change |
-| Processors | Railway, Supabase, OpenAI, Resend, SMS provider, Apple | Whether processor contracts (DPAs) are required and with what terms; whether processors must be named in the notice |
+| Processors | Railway, Supabase, OpenAI, Resend, SMS provider, Apple, Google; Razorpay only if web purchasing is later enabled (code present, outside V1) | Whether processor contracts (DPAs) are required and with what terms; whether processors must be named in the notice |
 | Security safeguards and breach notice | Hashing of passwords/tokens/codes, HTTPS, RLS, server authorisation (`docs/security/threat-model.md`, `acceptance.md`); no external penetration test yet (`accepted-risks.md` R-12) | What is "reasonable security"; breach-notification timelines to the Board and to users |
 | Significant Data Fiduciary | Not assessed | Whether the volume of children's data could lead to designation |
 
@@ -349,6 +350,7 @@ Engineering can demonstrate any of these on a staging deployment with test accou
 16. Are there restrictions on transferring Indian users' data to the US (OpenAI, Resend) or to the
     Netherlands (current Railway volume)? Must production move to Mumbai before launch?
 17. Which processor agreements must be in place, and must processors be named in the notice?
+17a. A problem report about a question can contain free text the student types (`issue_reports.note`). For the App Store label and Play Data safety, should that be declared as "Customer Support" data as well as user content?
 
 **Rights, retention, grievance**
 

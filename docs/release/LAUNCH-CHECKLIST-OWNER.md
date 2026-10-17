@@ -12,18 +12,18 @@ chat. Record *that* a value was set, not the value. Every destructive or irrever
 
 ---
 
-## A. Already done (as recorded by earlier sessions — re-check before relying on it)
+## A. Already done (each row cites where it can be checked — re-check before relying on it)
 
 | Item | State | Recorded in |
 |---|---|---|
-| Bundle id `com.prilearning.app`; build is iPad-only | Done in code | `ios/PriLearning.swiftpm/Package.swift` |
-| App Store subscription products `com.prilearning.app.premium.monthly` and `.annual` | **Created, not priced** | owner |
-| Railway Pro, Supabase (Mumbai, staging + production projects), OpenAI API credits | Paid for / created | memory `online-first-infra` |
+| Bundle id `com.prilearning.app`; build ships on iPhone and iPad | Done in code (#523) | `ios/PriLearning.swiftpm/Package.swift`; `PRI_V1_RELEASE_SCOPE.md` §22 |
+| App Store subscription products `com.prilearning.app.premium.monthly` and `.annual` | **Created, not priced** (stated by the owner; check in App Store Connect → Subscriptions) | App Store Connect |
+| Railway Pro, Supabase, OpenAI chosen as the platform | Decided | `docs/architecture/adr-0001-online-first-runtime.md` |
+| Supabase projects `pri-learning-staging` and `pri-learning-production-india`, both `ap-south-1`, `ACTIVE_HEALTHY` | Created (observed 2026-10-04) | `docs/release/production-cutover-checklist.md` "Observed state" |
 | Staging on Supabase Postgres, deploying `main` | Running | `production-cutover-checklist.md` |
 | Production | Deploys branch `deploy/production` on **SQLite** (Railway volume); production Supabase has no `pri` schema yet | `V1_COMPLETION_LEDGER.md` surface 16, 22 |
-| Email: `prilearning.com`, Resend domain `mail.prilearning.com` verified, production sender set | Done | memory `release-418-state-2026-10-10` |
-| Paid-call ceilings | Production raised by the owner to 120/hour, 300/day for testing; the agreed launch figure was 20/hour, 50/day. **Decide the launch value** | same |
-| Logo (P′) | Chosen | memory `owner-product-decisions-2026-10-02` |
+| Auth email on staging | Ready (`/v1/ready` auth-email check `ok`, 2026-10-04) | `production-cutover-checklist.md`; re-check with `GET <staging>/v1/ready`. Production email readiness is not recorded in the repository — verify it the same way after cutover |
+| Logo (P′) | Chosen | `docs/release/PRI_FINISH_LINE_TASK_LEDGER.md` |
 | Store listing, privacy label, Data safety, counsel pack, examiner email | Drafted (this PR) | `docs/release/store/`, `docs/release/app-store-privacy-labels.md`, `play-data-safety.md`, `docs/legal/counsel/COUNSEL-INFORMATION-PACK.md`, `EXAMINER-REQUEST.md` |
 
 ---
@@ -38,6 +38,7 @@ chat. Record *that* a value was set, not the value. Every destructive or irrever
 | B4 | Decide whether to ask OpenAI for zero data retention, and record the answer | <https://platform.openai.com/settings/organization/general> (organisation settings; contact OpenAI sales/support for ZDR) | Decision recorded; counsel told |
 | B5 | Choose the SMS provider (MSG91 or Twilio Verify), or confirm SMS stays off for launch | provider sites | Choice recorded in `docs/release/otp-sign-in.md` |
 | B6 | Decide whether the AI tutor is on at launch (default: off) | — | Recorded; listing and privacy answers follow |
+| B7 | Decide the launch values of the paid-call ceilings `PRI_PAID_CALLS_PER_HOUR` / `PRI_PAID_CALLS_PER_DAY` on production, and confirm what is set now | Railway → production → Variables (names only) | Values recorded in the release record |
 
 ---
 
@@ -59,7 +60,7 @@ chat. Record *that* a value was set, not the value. Every destructive or irrever
 | # | Action | Link | Done when |
 |---|---|---|---|
 | D1 | Put the production project `pri-learning-production-india` on **Supabase Pro** (backups and point-in-time recovery) | <https://supabase.com/dashboard/project/mgmlvkesbwmipmvnzufk/settings/billing> (or the organisation's Billing page) | Plan shows Pro; PITR enabled if chosen |
-| D2 | Decide: migrate the existing production SQLite data, or start production Postgres empty | — | Decision written in the cutover log (`postgres-cutover.md` §6a) |
+| D2 | Decide: migrate the existing production SQLite data, or start production Postgres empty | — | Decision written in the cutover log (`docs/operations/postgres-cutover.md` §6a) |
 | D3 | Give the explicit **"Yes, run the production cutover"** — the go-ahead for applying the platform migrations to production Supabase and switching Railway production to Postgres | reply in the session that runs `production-cutover-checklist.md` | Cutover log §7 filled; `/v1/health` reports `database.engine: "postgres"` |
 | D4 | Point Railway production at `main` (or keep `deploy/production` as the promotion branch, as now) with *Wait for CI* on, and deploy the nominated SHA | <https://railway.com/dashboard> → production service → Settings → Source | `/v1/health` `releaseIdentity.releaseSha` = nominated SHA |
 | D5 | Choose the production public origin (Railway domain or `prilearning.com` custom domain) | Railway → Settings → Networking; DNS at Vercel | Origin recorded; fills `<PRI_PUBLIC_ORIGIN>` in the store drafts |
@@ -73,8 +74,8 @@ chat. Record *that* a value was set, not the value. Every destructive or irrever
 |---|---|---|---|
 | E1 | Nominate the release SHA on `main` | — | Written in `RELEASE.md` §11 |
 | E2 | Archive and upload from Xcode on the nominated SHA (`npm run build && npm run sync:ios` first) | Xcode → Product → Archive → Distribute | Build appears in App Store Connect |
-| E3 | **TestFlight internal testing** with the owner's own Apple ID and test accounts | <https://appstoreconnect.apple.com/apps> → Pri Learning → TestFlight | Installed on a physical iPad |
-| E4 | Physical iPad + Apple Pencil checks; VoiceOver / Dynamic Type; sandbox purchase, restore, cancel, reinstall | sandbox tester: <https://appstoreconnect.apple.com/access/users> → Sandbox | Results recorded in the release record (never as simulator evidence) |
+| E3 | **TestFlight internal testing** with the owner's own Apple ID and test accounts | <https://appstoreconnect.apple.com/apps> → Pri Learning → TestFlight | Installed on a physical iPhone and a physical iPad |
+| E4 | Physical iPad + Apple Pencil and physical iPhone finger-writing checks; VoiceOver / Dynamic Type; sandbox purchase, restore, cancel, reinstall | sandbox tester: <https://appstoreconnect.apple.com/access/users> → Sandbox | Results recorded in the release record (never as simulator evidence) |
 | E5 | Create the **App Review demo accounts** on production (adult, verified; optional confirmed child account) | the app | Credentials entered only in App Store Connect's App Review fields |
 
 ---
@@ -86,14 +87,14 @@ chat. Record *that* a value was set, not the value. Every destructive or irrever
 | F1 | Counsel-approved privacy notice and terms published at `<origin>/privacy` and `/terms`; placeholders filled | — | `node tools/legal-status.mjs` → 0 placeholders; banner gone |
 | F2 | Enter the App Privacy answers | App Store Connect → app → App Privacy | Matches `docs/release/app-store-privacy-labels.md` |
 | F3 | Enter name, subtitle, description, keywords, URLs, category, age rating | App Store Connect → app → the version page; App Information | Matches `docs/release/store/app-store-listing.md` |
-| F4 | Upload iPad 13-inch screenshots (shot list §7) | same | All required slots filled |
+| F4 | Upload iPad 13-inch and iPhone 6.9-inch screenshots (shot list §7) | same | All required slots filled |
 | F5 | Attach the two subscriptions to the version (first subscription must be submitted with a binary) | version page → In-App Purchases and Subscriptions | Both attached |
 | F6 | **Submit for Review**, with release set to "Manually release this version" | version page → Add for Review → Submit | Status "Waiting for Review" |
 | F7 | After approval, release manually when production is verified | same | Live |
 
 ---
 
-## G. Google Play (post-V1 — only when Android is promoted)
+## G. Google Play (Android is in V1 since §22 / #504; Play Billing certification blocks release)
 
 | # | Action | Link |
 |---|---|---|

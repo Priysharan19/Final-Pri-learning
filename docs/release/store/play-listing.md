@@ -1,15 +1,15 @@
-# Google Play listing — Pri Learning (draft, post-V1)
+# Google Play listing — Pri Learning (draft)
 
-**Status:** draft prepared 2026-10-18. Android is **post-V1** (`docs/release/PRI_V1_RELEASE_SCOPE.md`
-§4, §16, §17): this listing is prepared so the text is ready and true when the owner promotes
-Android through the scope-change procedure. **Not entered in Play Console.** The same truthfulness
+**Status:** draft prepared 2026-10-18. Android phones and tablets are **in V1** since the owner's
+scope change of 2026-10-16 (`docs/release/PRI_V1_RELEASE_SCOPE.md` §22, issue #504); Google Play
+Billing certification is a release blocker (§22.2). **Not entered in Play Console.** The same truthfulness
 rules as `app-store-listing.md` apply: no superiority, accuracy, syllabus-complete or
 production-ready claims.
 
 | Fact | Value |
 |---|---|
 | Package name | `com.prilearning.app` — **OWNER** confirms against `android/app/build.gradle` `applicationId` before creating the app (the package name cannot be changed later) |
-| Devices | Android phones and tablets (planned) |
+| Devices | Android phones and tablets (V1, §22.1) |
 | Billing | Google Play Billing (`server/platform/googleBilling.js`); web/Razorpay purchasing is out of V1 |
 | Intended prices | ₹199 / month, ₹1,499 / year — **OWNER** creates and prices the Play subscription products; they are separate from the App Store products |
 
@@ -44,9 +44,9 @@ production-ready claims.
 >
 > FREE AND PREMIUM
 > The free plan includes 20 practice questions a day and one exam simulation every 30 days, for
-> CBSE / NCERT and JEE Main. Pri Learning Premium removes the daily limit and adds more exam
-> simulations, the JEE Advanced track, step-by-step explanations that adapt to you, and more
-> detailed progress views. Premium is ₹199 a month or ₹1,499 a year, billed through Google Play
+> CBSE / NCERT and JEE Main. Pri Learning Premium removes the daily practice limit and the
+> exam-simulation limit, and includes the JEE Advanced track. Premium is ₹199 a month or ₹1,499
+> a year, billed through Google Play
 > and renewing automatically until you cancel in Google Play.
 >
 > WHAT PRI NEEDS
@@ -56,7 +56,9 @@ production-ready claims.
 > PRIVACY
 > No ads. No tracking. We do not sell your data. To read your handwriting or photo, Pri's server
 > sends the image to an outside AI reading service (OpenAI); it is never sent with the question,
-> the answer or your name, and Pri keeps no copy of the image. You can switch server reading off
+> the answer or your name, and Pri keeps no copy of the image. If you turn on the optional
+> working check, the lines of your working and the text of the question are also sent to the
+> same service to find where a mistake is. You can switch server reading off
 > and type your answers instead. You can delete your account in the app or at
 > <PRI_PUBLIC_ORIGIN>/account/delete-request.
 >
@@ -113,13 +115,14 @@ Play asks which age groups the app targets: 5 and under, 6–8, 9–12, 13–15,
 
 - Pri's students start at **Class 7, about 12 years old**, and run through JEE (17–18 and adult
   repeaters). A truthful answer is **9–12 (for Class 7 students who are 12), 13–15, 16–17 and 18+.**
-- Selecting any group under 13 brings the app under the **Families policy**. That requires, among
-  other things: the app and its SDKs comply with Families requirements; personal data from
+- On the owner's reading of Play's policy (**for counsel to confirm**), selecting any group under
+  13 brings the app under the **Families policy**, which as we understand it requires, among other
+  things: the app and its SDKs comply with Families requirements; personal data from
   children is collected only with disclosure and in line with applicable law; no transmission of
   device identifiers such as the advertising ID from children; content appropriate for children;
   and the Families self-certified ads SDK rule (Pri has no ads, so that part is satisfied).
-- Excluding 9–12 would be inaccurate if Class 7 students are 12, and Play treats misdeclared
-  audiences as a policy violation.
+- Excluding 9–12 would be inaccurate if Class 7 students are 12; our understanding (counsel to
+  confirm) is that Play treats a misdeclared audience as a policy violation.
 - Pri sends a child's handwriting images to OpenAI after guardian confirmation. Whether that is
   acceptable under the Families policy's data rules, with the current (non-verifiable)
   confirmation, is a question for counsel (`docs/legal/counsel/COUNSEL-INFORMATION-PACK.md` §11 question 26).

@@ -10,9 +10,9 @@ the reader is told — currently outdated, see `docs/legal/counsel/COUNSEL-INFOR
 If the code changes what leaves the device, change this file, the Apple label document,
 `PrivacyInfo.xcprivacy` and the privacy notice together. This file is not machine-checked.
 
-The Android shell is post-V1 (`docs/release/PRI_V1_RELEASE_SCOPE.md` §4, §16). The form is
-prepared so the answers are ready and true when the owner lifts that boundary; the data flows are
-the same server flows the iPad app uses.
+Android phones and tablets are in V1 since the owner's scope change of 2026-10-16
+(`docs/release/PRI_V1_RELEASE_SCOPE.md` §22, #504). The data flows are the same server flows the
+iPhone and iPad apps use.
 
 ## 1. Overview questions
 
@@ -22,7 +22,7 @@ the same server flows the iPad app uses.
 | Is all of the user data collected by your app encrypted in transit? | **Yes** | HTTPS/HSTS in production (`server/platform/headers.js`, `server/test/security-headers-check.mjs`); the Android manifest refuses cleartext (`android/app/src/main/AndroidManifest.xml`). |
 | Do you provide a way for users to request that their data is deleted? | **Yes** | In-app: Settings → Account → Delete (`DELETE /v1/account`, every sign-in method). Public URL: **`<PRI_PUBLIC_ORIGIN>/account/delete-request`** (`AccountDeleteRequest.jsx`, `otp.js`). Immediate (`deleteAccountRows()`). |
 | Account deletion URL | **OWNER:** the production origin (expected `https://prilearning.com`). The path is fixed: `/account/delete-request`. | `client/src/main.jsx`; `server/app.js` serves the SPA for non-`/v1` paths. |
-| Target audience and Families policy | **OWNER / counsel — see `docs/release/store/play-listing.md` §5.** Class 7 students are about 12, so a truthful target audience includes the 9–12 band, which brings the app under the Families policy. | Child accounts are gated server-side until a guardian confirms (`requireGuardianConsent` in `router.js`); the confirmation is not DPDP-verifiable (`guardianConsent.js` header). |
+| Target audience and Families policy | **OWNER / counsel — see `docs/release/store/play-listing.md` §5.** Class 7 students are about 12, so a truthful target audience includes the 9–12 band; on our reading (for counsel to confirm) that brings the app under the Families policy. | Child accounts are gated server-side until a guardian confirms (`requireGuardianConsent` in `router.js`); the confirmation is not DPDP-verifiable (`guardianConsent.js` header). |
 
 ## 2. Data types collected
 
@@ -41,7 +41,7 @@ Every type below is **linked to the account**, **not used for tracking or advert
 | **Personal info → Email address** | Yes (unless the account signed up by phone) | Yes — email delivery provider (Resend) | Required (email or phone) | Account management | `accounts.js`; `authDelivery.js`; `otpEmail.js`. A guardian's email for a child's account. |
 | **Personal info → Phone number** | Yes, if the student or guardian uses an SMS code | Yes — SMS provider (MSG91 or Twilio Verify; **OWNER** names it) | Optional (alternative to email) | Account management | `otp.js` (`account_phones.phone_e164`), `smsProvider.js`; only when `PRI_SMS_PROVIDER` is configured. |
 | **Personal info → User IDs** | Yes | No | Required | Account management, App functionality | Opaque `acct_…` id (`security.js`). |
-| **Personal info → Other info** | Yes, for an under-18 account | Guardian email/phone with the delivery provider | Required for a child's account | App functionality (guardian confirmation) | The "18 or older" declaration (`accounts.age_basis`), class/track, the consent record (`guardianConsent.js`). |
+| **Personal info → Other info** | Yes, from every account (the "18 or older" declaration, class and track); plus, for an under-18 account, the guardian-consent record | Guardian email/phone with the delivery provider (child accounts only) | Age declaration, class and track: required for every account. Consent record: required for a child's account | App functionality (age gate, which maths to set, guardian confirmation) | `accounts.age_basis` (a registration with no age decision is refused, `AGE_DECLARATION_REQUIRED`); class/track in the synced profile (`syncWorker.js safeProfile`); the consent record (`guardianConsent.js`). Matches the Apple "Other Data" row. |
 | **Financial info → Purchase history** | Yes, if the student subscribes | No | Optional | App functionality | `appleBilling.js`, `googleBilling.js`, `billing.js`; `billing_payments` retained unlinked after deletion. Card details never reach Pri. |
 | **Photos and videos → Photos** | Yes, when the student photographs paper working or a textbook question | **Yes — OpenAI**, `store: false`; the provider may retain for abuse monitoring under its own terms; Pri keeps no copy of the image | Optional (the student can type instead; Settings → Handwriting switches reading off) | App functionality | `PractisePhoto.jsx` (`capture="environment"`); `practice.js` `/:id/recognize`; `questionPhoto.js` → `questionPhotoProvider.js`. The whole frame is sent, answer-blind. |
 | **App activity → Other user-generated content** | Yes | **Yes — OpenAI** (handwriting image; working lines + question text only if the opt-in working check is on) | Handwriting reading: optional (on by default, switchable off; then answers are typed). Typed answers for grading: required to be marked | App functionality | (a) Ink image: `cloudRaster.js` → `/v1/handwriting/transcribe` or `/v1/practice/:id/recognize` (answer-blind, `FORBIDDEN_FIELDS`). (b) Answers and working submitted for grading (`practice.js`, `exams.js exam-answers`). (c) The returned transcription and any student correction, kept 90 days with the recognition receipt (`practice.js` `practice-recognition`). (d) Problem reports (`reports.js`); synced settings/bookmarks/tasks/custom questions (`syncContract.js`). |
@@ -82,6 +82,7 @@ to the privacy notice before release.
 | Resend | Address + message for links and codes | US provider (sending domain `mail.prilearning.com`) | `authDelivery.js`, `otpEmail.js` | `PRI_AUTH_EMAIL_PROVIDER` |
 | MSG91 or Twilio Verify | Phone number + code | Provider-dependent | `smsProvider.js` | `PRI_SMS_PROVIDER` — **OWNER** |
 | Google Play Billing / App Store | Subscription state; an opaque account token | Provider | `googleBilling.js`, `appleBilling.js` | billing env |
+| Razorpay (**code present, outside V1** — web purchasing is out of scope, §12) | If web checkout were enabled: the account's email (`notify_info.notify_email`) and the opaque account id in subscription notes | Provider (India) | `server/platform/razorpay.js` (~line 380) | Razorpay env; not configured for V1. Native clients are refused web checkout (`BILLING_WEB_CHECKOUT_NATIVE_REFUSED`) |
 | Supabase (processor) | The platform database after cutover | Mumbai (`ap-south-1`) | `docs/architecture/adr-0001-online-first-runtime.md` | `PRI_DATABASE_URL` |
 | Railway (processor) | Hosting; request logs (method, path, status, latency — no bodies) | **OWNER** confirms the service region. On 2026-10-04 the production SQLite volume was observed in region `ams` (`docs/release/production-cutover-checklist.md`); until the Postgres cutover, production account data lives there, not in India | `server/app.js requestLogger` | deployment |
 
@@ -94,6 +95,7 @@ the providers' own identity endpoints only when the student taps them.
 2. Target audience / Families policy (`docs/release/store/play-listing.md` §5).
 3. Whether service-provider transfers are declared as "shared" (this draft: yes).
 4. Which SMS provider is live.
+4a. Whether problem-report free text (`issue_reports.note`, `reports.js`) is declared as user-generated content (this draft) or under a support/communications category. **OWNER / counsel.**
 5. Whether the AI tutor flag is on.
 6. Whether a zero-data-retention arrangement exists with OpenAI.
 7. Rewrite and counsel review of `docs/legal/privacy.md`.

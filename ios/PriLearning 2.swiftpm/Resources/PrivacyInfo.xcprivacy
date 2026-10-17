@@ -47,7 +47,7 @@
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
             </array>
         </dict>
-        <!-- Account id, session and the random app-generated device identifier that keeps the person signed in (not the device's own id). -->
+        <!-- The opaque account id (acct_...) and the session it is bound to. The per-install device identifier has its own DeviceID entry below. -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeUserID</string>
