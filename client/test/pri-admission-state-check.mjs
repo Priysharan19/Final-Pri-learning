@@ -130,4 +130,35 @@ const duplicateBranchIssue={...duplicateMissionIssue,number:808,
 denied('distinct mission ids cannot share one canonical branch',/DUPLICATE_MISSION_BRANCH/,
   ()=>assertLedgerMatchesGrants([issue('TRIAGED'),duplicateBranchIssue],
     inspectSignedLog(empty,publicKey,now),sha,now));
+
+denied('re-signed foreign repository grant cannot replay',/SIGNED_TRUST_DOMAIN_INVALID/,
+  ()=>inspectSignedLog({version:1,events:[signEvent({
+    ...signed.payload,repository:'another-company/another-project'},privateKey)]},publicKey,now));
+denied('re-signed old policy grant cannot replay',/SIGNED_TRUST_DOMAIN_INVALID/,
+  ()=>inspectSignedLog({version:1,events:[signEvent({
+    ...signed.payload,policy_version:'pri-writer-admission/v1'},privateKey)]},publicKey,now));
+denied('re-signed grant missing unique identifier cannot replay',/SIGNED_TRUST_DOMAIN_INVALID/,
+  ()=>inspectSignedLog({version:1,events:[signEvent({
+    ...signed.payload,grant_id:''},privateKey)]},publicKey,now));
+const followupGrant=(prior,updates)=>({
+  ...prior,seq:prior.seq+1,prev:eventDigest(prior),
+  timestamp_ms:prior.timestamp_ms+1000,grant_id:'123e4567-e89b-42d3-a456-426614174001',
+  issue_number:802,mission:'other',agent:'qa-release',
+  branch:'agent/mission/qa-release/other',...updates
+});
+const signedSecond=followupGrant(signed.payload,{});
+const thirdGrant=followupGrant(signedSecond,{
+  grant_id:'123e4567-e89b-42d3-a456-426614174002',
+  issue_number:803,mission:'third',agent:'platform',
+  branch:'agent/mission/platform/third'});
+denied('signed unsafe historical cap cannot be hidden by later expiration',/HISTORICAL_WRITER_CAP/,
+ ()=>inspectSignedLog({version:1,events:[
+   signed,signEvent(signedSecond,privateKey),signEvent(thirdGrant,privateKey)
+ ]},publicKey,now+13*3600000));
+denied('signed same-owner parallel history denied',/HISTORICAL_OWNER_NOT_DISTINCT/,
+ ()=>inspectSignedLog({version:1,events:[signed,signEvent(followupGrant(signed.payload,{
+   agent:'student-experience'}),privateKey)]},publicKey,now+2000));
+denied('signed event sequence cannot backdate timestamp',/INVALID_EVENT_TIME/,
+ ()=>inspectSignedLog({version:1,events:[signed,signEvent(followupGrant(signed.payload,{
+   timestamp_ms:now-1}),privateKey)]},publicKey,now+2000));
 console.log('PASS: '+checks+' signed-grant/CAS security assertions');
