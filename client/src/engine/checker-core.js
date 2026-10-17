@@ -15,9 +15,10 @@ import { diagnoseStep } from './diagnose.js';
 import {
   parseIntervalInput, authoredRegion, sameRegion, sameRegionIgnoringEndpoints,
   parseMatrixInput, sameMatrix, transposeMatrix,
-  parseVectorInput, sameVector
+  parseVectorInput, sameVector,
+  parseComplexInput, sameComplex
 } from './answer-forms.js';
-import { unitContradicts, withoutUnit } from './units.js';
+import { unitContradicts, withoutUnit, angleUnitWritten, withoutAngleUnit, angleUnitOfSuffix, convertAngle } from './units.js';
 
 const UNIT_TAIL = /(cm³|m³|mm³|cm²|m²|mm²|km²|km\/h|m\/s|cm|mm|km|kg|ml|l\b|m\b|s\b|h\b|hours?|mins?|minutes?|seconds?|degrees?|deg|°|units?²?|sq units)\s*$/i;
 
@@ -109,6 +110,25 @@ function fractionFormDemanded(question, ans) {
 // giving it a second chance would mark a wrong answer right. The word, not the
 // symbol: prompts quote percentages in their data all the time.
 const ASKS_PERCENT = /\bper\s?cent(?:age)?s?\b/i;
+
+// "975 paise" is ₹9.75. Whether the word is a hundredth of the rupee or the
+// question's own unit depends on what the question asks in: a suffix in paise
+// asks in paise; a rupee sign or word beside the answer box asks in rupees,
+// whatever the prompt mentions on the way; otherwise a prompt that talks in
+// paise ("How many paise are there in half a rupee?") asks in paise.
+const RUPEE_MARK = /₹|\bRs\b|\bINR\b|\brupees?\b/i;
+/** Is the question about Indian money at all (a rupee mark beside the box or in the prompt, or paise named)? */
+function moneyQuestion(question) {
+  const prefix = String(question?.answerPrefix ?? ''), suffix = String(question?.answerSuffix ?? ''), prompt = String(question?.prompt ?? '');
+  return RUPEE_MARK.test(prefix) || RUPEE_MARK.test(suffix) || RUPEE_MARK.test(prompt) || /paise/i.test(suffix) || /\bpaise\b/i.test(prompt);
+}
+/** Does the question itself ask in paise (so "50 paise" is 50, not ₹0.50)? */
+function paiseAsked(question) {
+  const prefix = String(question?.answerPrefix ?? ''), suffix = String(question?.answerSuffix ?? '');
+  if (/paise/i.test(suffix)) return true;
+  if (RUPEE_MARK.test(prefix) || RUPEE_MARK.test(suffix)) return false;
+  return /\bpaise\b/i.test(String(question?.prompt ?? ''));
+}
 
 function percentAnswerWanted(question, ans) {
   if (ans && typeof ans.percent === 'boolean') return ans.percent;
@@ -211,7 +231,7 @@ export function parseNumericInput(raw) {
   // 12 34 567. "1,2,3", "0 1 2 3", "(1,2,3)" and three lines "1", "2", "3" are
   // lists, not 123.
   if (brokenDigitGroups(s)) throw new Error('Not a single number');
-  const meta = { isPercent: /%\s*$/.test(s), text: s };
+  const meta = { isPercent: /%\s*$/.test(s), text: s, paise: /\bpaise\s*$/i.test(String(raw ?? '').trim()) };
 
   // mixed numeral: "2 1/2" or "-2 1/2" — also the handwritten form "2 (1)/(2)"
   const mixed = s.match(/^(-?)(\d+)\s+(\d+)\s*\/\s*(\d+)$/) ||
@@ -248,8 +268,17 @@ function splitList(raw) {
   s = cleanInput(s)
     .replace(/\bor\b/gi, ',')
     .replace(/\band\b/gi, ',')
-    .replace(/;/g, ',');
-  return s.split(',').map(p => p.trim()).filter(Boolean);
+    .replace(/;/g, ',')
+    .replace(/\+\/-|\+-(?=\s*[\d(√s])/g, '±');
+  // "2 ± √3" is the pair 2 + √3, 2 − √3 — and "±4" the pair 4, −4. One ± per
+  // entry: a second one has no single reading and is left to fail to parse.
+  return s.split(',').map(p => p.trim()).filter(Boolean).flatMap(p => {
+    const pm = (p.match(/[±∓]/g) || []).length;
+    if (pm !== 1) return [p];
+    const plus = p.replace(/[±∓]/, '+').replace(/^\s*\+/, '');
+    const minus = p.replace(/[±∓]/, '-');
+    return [plus, minus];
+  });
 }
 
 function matchTraps(question, studentValue, studentRaw, shape = null) {
@@ -262,6 +291,7 @@ function matchTraps(question, studentValue, studentRaw, shape = null) {
           && sameRegion(shape.intervals, authoredRegion(trap), trap.tol)) return trap.why;
       if (shape?.rows && Array.isArray(trap.rows) && sameMatrix(shape.rows, trap.rows, trap.tol)) return trap.why;
       if (shape?.components && Array.isArray(trap.components) && sameVector(shape.components, trap.components, trap.tol)) return trap.why;
+      if (shape && 're' in shape && trap.re !== undefined && trap.im !== undefined && sameComplex(shape, { re: trap.re, im: trap.im }, trap.tol)) return trap.why;
     } catch { /* keep trying */ }
   }
   return null;
@@ -270,7 +300,8 @@ function matchTraps(question, studentValue, studentRaw, shape = null) {
 const READ_HELP = {
   interval: 'I couldn’t read that as a solution set — write it like x > 3, 2 < x ≤ 5, (2, 5] or x < 1 or x > 4.',
   matrix: 'I couldn’t read that as a matrix — write the rows like [[1, 2], [3, 4]] or 1 2; 3 4.',
-  vector: 'I couldn’t read that as a vector — write it like (1, 2, 3) or i − 2j + 3k.'
+  vector: 'I couldn’t read that as a vector — write it like (1, 2, 3) or i − 2j + 3k.',
+  complex: 'I couldn’t read that as a complex number — write it like 3 + 4i, or in polar form like 5(cos 53° + i sin 53°) or 5 cis 53°.'
 };
 
 /**
@@ -286,6 +317,9 @@ const READ_HELP = {
  *               "(3, ∞)", "x ∈ (3, ∞)", "2 < x ≤ 5", "(2, 5]", unions with "or"/∪
  *  matrix     { rows: [[..], [..]], tol? }      — "[[1,2],[3,4]]", "1 2; 3 4", a pmatrix
  *  vector     { components: [x, y, z], tol? }   — "(1, 2, 3)", "i − 2j + 3k", "1i−2j+3k"
+ *  complex    { re, im, tol? }                   — "3 + 4i", "5(cos θ + i sin θ)", "5 cis θ", "5e^{iθ}"
+ *  numeric answers may also carry:
+ *             angle: 'deg'|'rad'                 — 60° and π/3 are one answer; a bare number is in this unit
  * Returns { correct, feedback?, normalized? }
  */
 // ── How long a final answer may be ───────────────────────────────────────────
@@ -316,7 +350,7 @@ function checkAnswerWithinBudget(question, rawInput) {
   try {
     // NCERT answer forms a numeric box cannot hold. Each parser throws on
     // input it cannot read, and the message a student sees names the form.
-    if (type === 'interval' || type === 'matrix' || type === 'vector') {
+    if (type === 'interval' || type === 'matrix' || type === 'vector' || type === 'complex') {
       return checkForm(question, rawInput);
     }
     // Optional form guard: reject inputs matching a forbidden pattern
@@ -368,11 +402,44 @@ function checkAnswerWithinBudget(question, rawInput) {
         if (question.answerSuffix && unitContradicts(question.answerSuffix, rawInput)) {
           return { correct: false, feedback: `Check the unit — this question asks for the answer in ${String(question.answerSuffix).trim()}.` };
         }
+        // An angle: 60° and π/3 are one answer. The unit the student wrote
+        // decides how the number is read; a bare number is in the question's
+        // unit, and the value is converted — never the other way round, so
+        // 60 rad is not 60°.
+        const angleUnit = ans.angle || angleUnitOfSuffix(question.answerSuffix);
+        let angleRead = null;
+        if (angleUnit && typeof rawInput === 'string') {
+          angleRead = angleUnitWritten(rawInput, { implicitPi: angleUnit === 'rad' });
+          if (angleRead) rawInput = withoutAngleUnit(rawInput);
+        }
         // the question's own unit in any spelling ("12 metres", "60 km/hr") is read off first
-        if (question.answerSuffix && typeof rawInput === 'string') rawInput = withoutUnit(rawInput);
-        const { value, meta } = parseNumericInput(rawInput);
+        if (question.answerSuffix && typeof rawInput === 'string' && !angleRead) rawInput = withoutUnit(rawInput);
+        const parsed = parseNumericInput(rawInput);
+        const { meta } = parsed;
+        let value = parsed.value;
+        if (angleUnit && angleRead && angleRead !== angleUnit) value = convertAngle(value, angleRead, angleUnit);
+        // "975 paise" on a question priced in rupees is ₹9.75: the word names a
+        // hundredth of the rupee, so the value is divided. On a question that
+        // asks in paise the word is the question's own unit and nothing moves.
+        // (Before this, the word was stripped and ignored, so "9.75 paise" —
+        // under a tenth of a rupee — was marked ₹9.75.)
+        // Paise are money: on a question that is not about Indian money they
+        // are a wrong unit, never stripped and never rescaled (500 paise is not 5 m).
+        if (meta.paise) {
+          if (!moneyQuestion(question)) {
+            return { correct: false, feedback: question.answerSuffix
+              ? `Check the unit — this question asks for the answer in ${String(question.answerSuffix).trim()}.`
+              : 'Check the unit — this question does not ask for an amount in paise.' };
+          }
+          if (!paiseAsked(question)) value /= 100;
+        }
         let target = ans.value;
-        let ok = numsClose(value, target, ans.tol);
+        // A converted angle was written rounded in the other unit (1.0472 rad
+        // for 60°), so an exact whole-number band would refuse it: a converted
+        // value is compared in the relative band a non-integer target gets.
+        const converted = Boolean(angleUnit && angleRead && angleRead !== angleUnit);
+        const tolUsed = ans.tol ?? (converted ? Math.max(1e-6, Math.abs(target) * 1e-4) : undefined);
+        let ok = numsClose(value, target, tolUsed);
         let matched = ok ? value : null;
         let wantsExactValue = false;
         // Fraction questions that demand simplest form (e.g. simplify 12/18 → 2/3)
@@ -587,6 +654,27 @@ function checkForm(question, rawInput) {
     let wrong = 0;
     got.rows.forEach((r, i) => r.forEach((v, j) => { if (!numsClose(v, want[i][j], ans.tol)) wrong++; }));
     return { correct: false, feedback: wrong === 1 ? 'One entry is wrong — recheck each entry against its row and column.' : `${wrong} entries are wrong — recompute each entry from its row and column.` };
+  }
+
+  if (type === 'complex') {
+    const want = { re: Number(ans.re), im: Number(ans.im) };
+    if (!Number.isFinite(want.re) || !Number.isFinite(want.im)) return { correct: false, feedback: 'This question has no authored complex number.' };
+    let got;
+    try { got = parseComplexInput(raw); }
+    catch { return { correct: false, invalid: true, feedback: READ_HELP.complex }; }
+    // A polar answer carries its argument to a few decimal places of a degree;
+    // the band allows for that and nothing more.
+    const mod = Math.hypot(want.re, want.im);
+    const tol = got.polar ? Math.max(ans.tol || 0, 2e-3 * Math.max(1, mod)) : ans.tol;
+    if (sameComplex(got, want, tol)) return { correct: true };
+    const why = matchTraps(question, null, raw, got);
+    if (why) return { correct: false, feedback: why };
+    if (sameComplex(got, { re: want.re, im: -want.im }, tol)) return { correct: false, feedback: 'That is the conjugate — the imaginary part has the wrong sign.' };
+    if (sameComplex(got, { re: want.im, im: want.re }, tol)) return { correct: false, feedback: 'Real and imaginary parts are swapped — the real part is the term without i.' };
+    if (sameComplex(got, { re: -want.re, im: -want.im }, tol)) return { correct: false, feedback: 'Every part has the wrong sign — check the sign of the whole number.' };
+    if (Math.abs(got.im) < 1e-9 && numsClose(got.re, mod, tol)) return { correct: false, feedback: 'That is the modulus |z|, not the number itself — write it as a + bi.' };
+    // The sentence does not print the number: said after a wrong try, it would be the answer.
+    return { correct: false, feedback: 'Not the required complex number — check the real and imaginary parts separately.' };
   }
 
   // vector

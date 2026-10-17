@@ -31,7 +31,7 @@ import {
   markerPool, markerCooldownUntil, recordMarkerKills, sendMarkerCooldown, sendMarkerBusy,
   MARKING_TOO_COMPLEX, MARKING_BUSY, TOO_COMPLEX_MESSAGE, WORKING_NOT_READ_NOTE
 } from './markerPool.js';
-import { authoredRegion, formatRegion, formatMatrix, formatVector } from '../../client/src/engine/answer-forms.js';
+import { authoredRegion, formatRegion, formatMatrix, formatVector, formatComplex } from '../../client/src/engine/answer-forms.js';
 import { transcribeHandwriting, validateImage, HandwritingProviderError } from './handwritingProvider.js';
 import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
 
@@ -160,6 +160,7 @@ function answerTextFor(q) {
     }
     case 'matrix': return Array.isArray(a.rows) ? formatMatrix(a.rows) : '';
     case 'vector': return Array.isArray(a.components) ? formatVector(a.components) : '';
+    case 'complex': return Number.isFinite(Number(a.re)) && Number.isFinite(Number(a.im)) ? formatComplex({ re: Number(a.re), im: Number(a.im) }) : '';
     default: return '';
   }
 }
