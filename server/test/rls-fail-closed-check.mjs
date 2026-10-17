@@ -24,7 +24,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  PostgresStore, SET_SCOPE, BEGIN_SYSTEM_STATEMENT, SET_SESSION_SYSTEM_SCOPE, RESET_SESSION_SCOPE
+  PostgresStore, scopeStatement, BEGIN_SYSTEM_STATEMENT, SET_SESSION_SYSTEM_SCOPE, RESET_SESSION_SCOPE
 } from '../platform/store.js';
 import { SCHEMA_VERSION } from '../platform/schemaVersions.js';
 import { requestedEngine } from './support/engine.mjs';
@@ -64,8 +64,8 @@ const pgError = code => Object.assign(new Error(`fake ${code}`), { code });
   const store = new PostgresStore(pool, { ownsPool: false });
   await store.get('SELECT 1 FROM accounts WHERE id = ?', ['a']);
   eq(sqls(pool), [BEGIN_SYSTEM_STATEMENT, 'SELECT 1 FROM accounts WHERE id = $1', 'COMMIT'], 'a statement outside a transaction runs inside BEGIN + system scope … COMMIT');
-  ok(/set_config\('pri\.scope', 'system', true\)/.test(BEGIN_SYSTEM_STATEMENT) && /set_config\('pri\.account_id', '', true\)/.test(BEGIN_SYSTEM_STATEMENT),
-    'and that system scope is transaction-local (is_local = true) with no account');
+  eq(BEGIN_SYSTEM_STATEMENT, "BEGIN; SET LOCAL pri.scope = 'system'; SET LOCAL pri.account_id = ''",
+    'and that system scope is transaction-local (SET LOCAL) with no account, in the same round trip as BEGIN');
   ok(!/ISOLATION LEVEL/.test(BEGIN_SYSTEM_STATEMENT), 'and keeps the READ COMMITTED isolation of an autocommit statement');
   for (const method of ['all', 'run']) {
     const p = fakePool();
@@ -86,23 +86,39 @@ const pgError = code => Object.assign(new Error(`fake ${code}`), { code });
   eq(broken.state, { released: 0, destroyed: 1 }, 'and that client is destroyed');
 }
 {
-  // Transactions: the scope is the first statement after BEGIN, every attempt.
+  // Transactions: the scope is declared in the BEGIN itself, every attempt,
+  // with SET LOCAL (a utility command: no snapshot, no extra round trip).
+  const SYSTEM_SCOPE = "SET LOCAL pri.scope = 'system'; SET LOCAL pri.account_id = ''";
+  const ACCOUNT_A = "SET LOCAL pri.scope = 'account'; SET LOCAL pri.account_id = 'acct-a'";
+  eq(scopeStatement(null), SYSTEM_SCOPE, 'system scope: both GUCs set together, transaction-locally, no account');
+  eq(scopeStatement('acct-a'), ACCOUNT_A, 'account scope: both GUCs set together, transaction-locally, for exactly that account');
+  ok(!/\bSELECT\b/i.test(scopeStatement('acct-a')) && !/\bSELECT\b/i.test(BEGIN_SYSTEM_STATEMENT), 'declaring a scope runs no SELECT, so it cannot take a REPEATABLE READ / SERIALIZABLE snapshot');
+  eq(scopeStatement("o'brien\\x"), "SET LOCAL pri.scope = 'account'; SET LOCAL pri.account_id = E'o''brien\\\\x'", 'an account id with a quote or a backslash is a single escaped literal');
+  await rejects(async () => scopeStatement('a\0b'), error => error.code === 'STORE_ACCOUNT_SCOPE_INVALID', 'an account id with a NUL is refused');
   const pool = fakePool();
   const store = new PostgresStore(pool, { ownsPool: false });
   await store.transaction(async tx => { await tx.get('SELECT 1'); });
-  const sys = pool.log.findIndex(entry => entry.sql === SET_SCOPE);
-  ok(sys === pool.log.findIndex(entry => entry.sql.startsWith('BEGIN ISOLATION')) + 1, 'a transaction declares its scope immediately after BEGIN');
-  eq(pool.log[sys]?.params, ['system', ''], 'a transaction without accountScope runs in system scope with no account');
-  ok(/set_config\('pri\.scope', \$1, true\)/.test(SET_SCOPE) && /set_config\('pri\.account_id', \$2, true\)/.test(SET_SCOPE), 'both GUCs are set together and transaction-locally');
+  eq(sqls(pool), [`BEGIN ISOLATION LEVEL SERIALIZABLE; ${SYSTEM_SCOPE}`, 'SELECT 1', 'COMMIT'],
+    'a transaction without accountScope declares system scope in its BEGIN — no round trip beyond BEGIN, the statements and COMMIT');
 
   const scoped = fakePool();
   await new PostgresStore(scoped, { ownsPool: false }).transaction(async tx => { await tx.get('SELECT 1'); }, { accountScope: 'acct-a' });
-  eq(scoped.log.find(entry => entry.sql === SET_SCOPE)?.params, ['account', 'acct-a'], 'an accountScope transaction declares account scope for exactly that account');
+  eq(sqls(scoped), [`BEGIN ISOLATION LEVEL SERIALIZABLE; ${ACCOUNT_A}`, 'SELECT 1', 'COMMIT'], 'an accountScope transaction declares account scope for exactly that account in its BEGIN');
+  const ro = fakePool();
+  await new PostgresStore(ro, { ownsPool: false }).transaction(async tx => { await tx.get('SELECT 1'); }, { accountScope: 'acct-a', readOnly: true });
+  eq(sqls(ro)[0], `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; ${ACCOUNT_A}`, 'and so does a read-only transaction');
 
   let commits = 0;
   const retried = fakePool(sql => (sql === 'COMMIT' && ++commits === 1 ? pgError('40001') : undefined));
   await new PostgresStore(retried, { ownsPool: false }).transaction(async () => {}, { accountScope: 'acct-a' });
-  eq(retried.log.filter(entry => entry.sql === SET_SCOPE).map(entry => entry.params), [['account', 'acct-a'], ['account', 'acct-a']], 'a retried transaction re-declares its scope on every attempt');
+  eq(sqls(retried).filter(sql => sql.startsWith('BEGIN')), [`BEGIN ISOLATION LEVEL SERIALIZABLE; ${ACCOUNT_A}`, `BEGIN ISOLATION LEVEL SERIALIZABLE; ${ACCOUNT_A}`], 'a retried transaction re-declares its scope on every attempt');
+  // BEGIN succeeding and its SET LOCAL failing leaves an aborted transaction: it is rolled back.
+  const halfBegun = fakePool(sql => (sql.startsWith('BEGIN') ? pgError('22023') : undefined));
+  await rejects(() => new PostgresStore(halfBegun, { ownsPool: false }).get('SELECT 1'), error => String(error.dbCode || error.code) === '22023', 'a failed scope declaration outside a transaction reports its error');
+  ok(sqls(halfBegun).at(-1) === 'ROLLBACK' && halfBegun.state.released === 1, 'and is rolled back before the client is pooled');
+  const halfTx = fakePool(sql => (sql.startsWith('BEGIN') ? pgError('22023') : undefined));
+  await rejects(() => new PostgresStore(halfTx, { ownsPool: false }).transaction(async () => {}), error => String(error.dbCode || error.code) === '22023', 'a failed scope declaration in a transaction reports its error');
+  ok(sqls(halfTx).at(-1) === 'ROLLBACK', 'and is rolled back too');
 
   // A nested transaction joins the outer scope and cannot change it.
   const nested = fakePool();
@@ -113,7 +129,7 @@ const pgError = code => Object.assign(new Error(`fake ${code}`), { code });
   const innerStore = new PostgresStore(inner, { ownsPool: false });
   const seen = await innerStore.transaction(() => innerStore.transaction(async () => { await innerStore.get('SELECT 1'); return innerStore.accountScope(); }), { accountScope: 'acct-a' });
   eq(seen, 'acct-a', 'a nested transaction without a scope inherits the outer account scope (it is not widened to system)');
-  eq(inner.log.filter(entry => entry.sql === SET_SCOPE).length, 1, 'and declares no scope of its own');
+  eq(inner.log.filter(entry => entry.sql.includes('SET LOCAL pri.scope')).length, 1, 'and declares no scope of its own');
   ok(!inner.log.some(entry => entry.sql === BEGIN_SYSTEM_STATEMENT), 'and a store call inside it joins the transaction rather than running in system scope');
 }
 {
@@ -256,6 +272,22 @@ if (engine === 'postgres') {
     } finally {
       afterError.release();
     }
+
+    // (d2) Declaring the scope takes no snapshot: a SERIALIZABLE / REPEATABLE READ
+    // transaction's snapshot is still taken by its own first statement, so a row
+    // committed between BEGIN and that statement is visible — exactly as before
+    // the scope existed. (A SELECT set_config(...) after BEGIN took the snapshot
+    // one round trip early, widening every serializable conflict window: CI
+    // exhausted the 40001 retries on rate_limits under the sync burst.)
+    for (const [label, options] of [['system-scope serializable', {}], ['account-scope serializable', { accountScope: 'acct-a' }], ['account-scope read-only', { accountScope: 'acct-a', readOnly: true }]]) {
+      const id = `op-snap-${label.replace(/[^a-z]/g, '')}`;
+      const seenRow = await store.transaction(async tx => {
+        await scratch.client.query("INSERT INTO pri.operational_events(id,account_id,event_type,metadata_json,created_at) VALUES ($1,'acct-a','snap','{}',1)", [id]);
+        return Number((await tx.get('SELECT COUNT(*)::int AS n FROM operational_events WHERE id = ?', [id])).n);
+      }, options);
+      eq(seenRow, 1, `${label}: the scope declaration takes no snapshot (a row committed before the first statement is seen)`);
+    }
+    await scratch.client.query("DELETE FROM pri.operational_events WHERE event_type = 'snap'");
 
     // (e) A nested transaction cannot widen the scope, even with raw SQL inside a savepoint rollback.
     const nestedView = await store.transaction(async () => {
