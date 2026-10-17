@@ -33,7 +33,20 @@
 // if one does.
 // ─────────────────────────────────────────────────────────────────────────────
 import { ri, rc, nz, gcd, makeRng } from '../qhelpers.js';
-import { exact, frac, fracTex, traps } from './india-native-helpers.js';
+import { exact as exactForm, frac, fracTex, traps } from './india-native-helpers.js';
+
+/**
+ * An exact answer that also accepts its exact decimal. The marker reads any
+ * \dfrac in a prompt as a demand for a fraction answer, and these prompts carry
+ * \dfrac in their GIVEN data (π = 22/7, sec A = 13/12, a codomain value), not
+ * in what they ask for — so the demand is switched off explicitly. The keyed
+ * simplest fraction is unchanged and is still accepted.
+ */
+function exact(f, suffix) {
+  const out = exactForm(f, suffix);
+  if (out.answer.simplestFraction) out.answer = { ...out.answer, requireFraction: false };
+  return out;
+}
 
 const sg = k => (k >= 0 ? `+ ${k}` : `- ${Math.abs(k)}`);
 const cx = (c, v = 'x') => (c === 1 ? v : c === -1 ? `-${v}` : `${c}${v}`);
@@ -272,7 +285,8 @@ function differentiabilityReasoning(rng) {
 
 // ── 4 · Rates of change — a relation set up before it is differentiated ─────
 const TRIPLES = [[3, 4, 5], [6, 8, 10], [5, 12, 13], [8, 15, 17], [9, 12, 15], [12, 16, 20], [7, 24, 25]];
-const PERSONS = [[3, 2, '1.5'], [8, 5, '1.6'], [9, 5, '1.8'], [2, 1, '2']];
+// Adult heights, as NCERT sets the lamp-post problem.
+const PERSONS = [[3, 2, '1.5'], [8, 5, '1.6'], [17, 10, '1.7'], [9, 5, '1.8']];
 
 function relatedRatesReasoning(rng) {
   const kind = rc(rng, ['ladder', 'shadow', 'cube']);
@@ -308,14 +322,14 @@ function relatedRatesReasoning(rng) {
     const tip = rng() < 0.5;
     const rate = tip ? frac(H * v * hd, gap) : frac(hn * v, gap);
     return {
-      prompt: `A girl of height $${hText}$ m walks away from the base of a lamp post at a steady $${v}$ m/s. The lamp is $${H}$ m above the ground. At what rate is ${tip ? 'the tip of her shadow moving away from the lamp post' : 'the length of her shadow increasing'}?`,
+      prompt: `A man of height $${hText}$ m walks away from the base of a lamp post at a steady $${v}$ m/s. The lamp is $${H}$ m above the ground. At what rate is ${tip ? 'the tip of his shadow moving away from the lamp post' : 'the length of his shadow increasing'}?`,
       answerType: 'numeric', ...exact(rate, 'm/s'),
       traps: traps(rate.value, tip
-        ? [{ value: frac(hn * v, gap).value, why: 'That is the rate at which the shadow LENGTHENS. The tip is further out by the girl\'s own distance from the post.' }, { value: v, why: 'The tip moves faster than the girl.' }]
-        : [{ value: frac(H * v * hd, gap).value, why: 'That is the speed of the TIP of the shadow; the length is that minus her own walking speed.' }, { value: v, why: 'The shadow does not grow at the walking speed.' }]),
+        ? [{ value: frac(hn * v, gap).value, why: 'That is the rate at which the shadow LENGTHENS. The tip is further out by the man\'s own distance from the post.' }, { value: v, why: 'The tip moves faster than the man.' }]
+        : [{ value: frac(H * v * hd, gap).value, why: 'That is the speed of the TIP of the shadow; the length is that minus his own walking speed.' }, { value: v, why: 'The shadow does not grow at the walking speed.' }]),
       hints: [
-        'Let her distance from the post be $x$ and the length of her shadow be $s$.',
-        'Similar triangles (lamp and post, girl and shadow) give a linear relation between $s$ and $x$.',
+        'Let his distance from the post be $x$ and the length of his shadow be $s$.',
+        'Similar triangles (lamp and post, man and shadow) give a linear relation between $s$ and $x$.',
         tip ? 'The tip is at distance $x + s$ from the post; differentiate that.' : 'Differentiate the relation with respect to time.'
       ],
       steps: [
@@ -323,7 +337,7 @@ function relatedRatesReasoning(rng) {
         { h: 'Differentiate', d: `$\\dfrac{ds}{dt} = ${fracTex(hn, gap)} \\times ${v} = ${fracTex(hn * v, gap)}$ m/s` },
         tip
           ? { h: 'The tip', d: `$\\dfrac{d}{dt}(x + s) = ${v} + ${fracTex(hn * v, gap)} = ${fracTex(rate.n, rate.d)}$ m/s` }
-          : { h: 'Answer', d: `The shadow lengthens at $${fracTex(rate.n, rate.d)}$ m/s, whatever her distance from the post.` }
+          : { h: 'Answer', d: `The shadow lengthens at $${fracTex(rate.n, rate.d)}$ m/s, whatever his distance from the post.` }
       ],
       kind
     };

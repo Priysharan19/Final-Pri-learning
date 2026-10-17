@@ -34,7 +34,20 @@
 // fails if one ever does, so the label a student sees is always D3.
 // ─────────────────────────────────────────────────────────────────────────────
 import { ri, rc, nz, gcd, makeRng } from '../qhelpers.js';
-import { exact, frac, fracTex, traps, twoNames } from './india-native-helpers.js';
+import { exact as exactForm, frac, fracTex, traps, twoNames } from './india-native-helpers.js';
+
+/**
+ * An exact answer that also accepts its exact decimal. The marker reads any
+ * \dfrac in a prompt as a demand for a fraction answer, and these prompts carry
+ * \dfrac in their GIVEN data (π = 22/7, sec A = 13/12, a codomain value), not
+ * in what they ask for — so the demand is switched off explicitly. The keyed
+ * simplest fraction is unchanged and is still accepted.
+ */
+function exact(f, suffix) {
+  const out = exactForm(f, suffix);
+  if (out.answer.simplestFraction) out.answer = { ...out.answer, requireFraction: false };
+  return out;
+}
 
 // ── Formatting ───────────────────────────────────────────────────────────────
 
@@ -678,12 +691,13 @@ function trigStandardReasoning(rng) {
       const terms = [];
       for (let i = 0; i < 3; i++) {
         const f = rc(rng, Object.keys(SQUARED)), ang = rc(rng, [0, 30, 45, 60, 90]);
-        if (!SQUARED[f][ang]) { i--; continue; }
+        if (!SQUARED[f][ang] || terms.some(t => t.f === f && t.ang === ang)) { i--; continue; }
         terms.push({ f, ang, c: i === 2 ? -ri(rng, 1, 4) : ri(rng, 1, 5), v: frac(...SQUARED[f][ang]) });
       }
       const dens = [];
       for (let i = 0; i < 2; i++) {
         const f = rc(rng, ['sin', 'cos', 'tan', 'sec', 'cot']), ang = rc(rng, [30, 45, 60]);
+        if (dens.some(t => t.f === f && t.ang === ang)) { i--; continue; }
         dens.push({ f, ang, c: ri(rng, 1, 4), v: frac(...SQUARED[f][ang]) });
       }
       const top = terms.reduce((s, t) => addF(s, mulF(t.v, t.c)), frac(0, 1));
@@ -830,12 +844,44 @@ function tangentLengthReasoning(rng) {
 }
 
 // ── 12 · Sectors — perimeter or area given, the rest recovered ──────────────
-const SECTOR_ANGLES = [30, 45, 60, 72, 90, 120, 135, 150];
+const SECTOR_ANGLES = [18, 30, 36, 40, 45, 54, 60, 72, 80, 90, 100, 108, 120, 135, 140, 144, 150, 160, 210, 240, 270];
 
 function sectorReasoning(rng) {
+  if (rng() < 0.3) {
+    // A clock's minute hand: the angle has to be worked out from the time first.
+    for (let guard = 0; guard < 400; guard++) {
+      const r = rc(rng, [7, 10, 12, 14, 15, 18, 21, 28, 35]), t = ri(rng, 5, 55);
+      const area = frac(22 * 6 * t * r * r, 7 * 360);       // θ = 6t degrees
+      if (t % 15 === 0) continue;
+      const arc = frac(44 * 6 * t * r, 7 * 360);
+      const askArc = rng() < 0.4;
+      const ans = askArc ? arc : area;
+      return {
+        prompt: `The minute hand of a clock is $${r}$ cm long. Find the ${askArc ? 'distance travelled by its tip' : 'area swept by it'} in $${t}$ minutes. ${PI_NOTE}`,
+        answerType: 'numeric', ...exact(ans, askArc ? 'cm' : 'cm²'),
+        traps: traps(ans.value, [
+          { value: askArc ? frac(44 * t * r, 7 * 360).value : frac(22 * t * r * r, 7 * 360).value, why: `In ${t} minutes the hand turns through $6^\\circ$ per minute, not $1^\\circ$ per minute.` },
+          { value: askArc ? area.value : arc.value, why: askArc ? 'That is the area swept, not the distance moved by the tip.' : 'That is the length of the arc, not the area.' }
+        ]),
+        hints: [
+          'The minute hand turns through $360^\\circ$ in 60 minutes, so find the angle it turns through first.',
+          'The hand sweeps out a sector whose radius is the length of the hand.',
+          askArc ? 'The tip moves along the arc: arc length $= \\dfrac{\\theta}{360^\\circ} \\times 2\\pi r$.' : 'Area of a sector $= \\dfrac{\\theta}{360^\\circ}\\pi r^2$.'
+        ],
+        steps: [
+          { h: 'Angle turned', d: `$${t} \\times 6^\\circ = ${6 * t}^\\circ$` },
+          { h: 'Sector', d: `radius $${r}$ cm, angle $${6 * t}^\\circ$` },
+          askArc
+            ? { h: 'Arc length', d: `$\\dfrac{${6 * t}}{360} \\times 2 \\times \\dfrac{22}{7} \\times ${r} = ${fracTex(arc.n, arc.d)}$ cm` }
+            : { h: 'Area', d: `$\\dfrac{${6 * t}}{360} \\times \\dfrac{22}{7} \\times ${r * r} = ${fracTex(area.n, area.d)}$ cm²` }
+        ],
+        reasoning: 'minute-hand'
+      };
+    }
+  }
   for (let guard = 0; guard < 400; guard++) {
     const theta = rc(rng, SECTOR_ANGLES);
-    const ks = [1, 2, 3, 4, 5, 6].filter(k => (k * theta) % 90 === 0);
+    const ks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].filter(k => (k * theta) % 90 === 0);
     if (!ks.length) continue;
     const k = rc(rng, ks), r = 7 * k;
     const arc = (11 * k * theta) / 90;            // θ/360 · 2 · 22/7 · 7k
@@ -1117,7 +1163,7 @@ const sumWays = s => (s >= 2 && s <= 12 ? 6 - Math.abs(s - 7) : 0);
 
 function probabilityReasoning(rng) {
   if (rng() < 0.55) {
-    const event = rc(rng, ['prime', 'multiple', 'difference', 'at-least-one-six', 'sum-at-least']);
+    const event = rc(rng, ['prime', 'multiple', 'difference', 'face', 'face', 'product', 'sum-at-least', 'sum-less-than']);
     let text, favourable, how;
     if (event === 'prime') {
       text = 'the sum of the two numbers is a prime number';
@@ -1134,10 +1180,26 @@ function probabilityReasoning(rng) {
       text = `the two numbers differ by exactly $${m}$`;
       favourable = 2 * (6 - m);
       how = `For each of the $${6 - m}$ ordered pairs with the first number larger, there is a mirror pair.`;
-    } else if (event === 'at-least-one-six') {
-      text = 'at least one of the dice shows a $6$';
-      favourable = 36 - 25;
-      how = 'Neither die shows a 6 in $5 \\times 5 = 25$ outcomes; the rest have at least one 6.';
+    } else if (event === 'face') {
+      const k = ri(rng, 1, 6), kind = rc(rng, ['at least one', 'exactly one', 'neither']);
+      text = kind === 'neither' ? `neither die shows a $${k}$` : `${kind} of the dice shows a $${k}$`;
+      favourable = kind === 'neither' ? 25 : kind === 'exactly one' ? 10 : 11;
+      how = kind === 'neither'
+        ? `Each die avoids $${k}$ in 5 ways: $5 \\times 5 = 25$ outcomes.`
+        : kind === 'exactly one'
+          ? `The first die shows $${k}$ and the second does not (5 ways), or the other way round (5 ways).`
+          : `Neither die shows $${k}$ in $5 \\times 5 = 25$ outcomes; the other $11$ have at least one $${k}$.`;
+    } else if (event === 'product') {
+      const even = rng() < 0.5;
+      text = `the product of the two numbers is ${even ? 'even' : 'odd'}`;
+      favourable = even ? 27 : 9;
+      how = even ? 'The product is odd only when both numbers are odd ($3 \\times 3 = 9$ outcomes); the other $27$ are even.' : 'Both numbers must be odd: $3 \\times 3 = 9$ outcomes.';
+    } else if (event === 'sum-less-than') {
+      const s = ri(rng, 4, 7);
+      const sums = [2, 3, 4, 5, 6].filter(v => v < s);
+      text = `the sum of the two numbers is less than $${s}$`;
+      favourable = sums.reduce((t, v) => t + sumWays(v), 0);
+      how = `Sums $${sums.join(', ')}$ occur in $${sums.map(sumWays).join(', ')}$ ways.`;
     } else {
       const s = ri(rng, 8, 11);
       text = `the sum of the two numbers is at least $${s}$`;

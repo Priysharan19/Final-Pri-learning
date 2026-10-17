@@ -37,6 +37,7 @@ const { IN_CHAPTERS, IN_CHAPTER_BY_ID, OWN_GENERATOR } = await import(`${SRC}eng
 const { INDIA_HARDEST_COVERS, INDIA_HARDEST_PROVENANCE } = await import(`${SRC}engine/curriculum-in-hardest-covers.js`);
 const { indiaRequestableDifficulties, indiaChapterGrade, indiaDifficultyWindow } = await import(`${SRC}engine/indiaProduct.js`);
 const { BOX_SHEETS_FOR_CHECK } = await import(`${SRC}engine/generators/india-class12-hardest.js`);
+const { checkAnswer } = await import(`${SRC}engine/checker.js`);
 
 const DRAWS = Number(process.argv[2]) || 300;
 
@@ -440,7 +441,14 @@ const SOLVE = {
   'c10-sector-reasoning'(q) {
     const p = q.prompt;
     const pi = 22 / 7;
-    let m = p.match(/radius \$(\d+)\$ cm is \$(\d+)\$ cm\. Find the area/);
+    let m = p.match(/minute hand of a clock is \$(\d+)\$ cm long\. Find the (distance travelled by its tip|area swept by it) in \$(\d+)\$ minutes/);
+    if (m) {
+      // The fraction of a full turn is minutes / 60.
+      const r = Number(m[1]), share = Number(m[3]) / 60;
+      const v = m[2].startsWith('distance') ? share * 2 * pi * r : share * pi * r * r;
+      return close(v, q.answer.value, 1e-9) ? [] : [`clock fraction gives ${v} vs ${q.answer.value}`];
+    }
+    m = p.match(/radius \$(\d+)\$ cm is \$(\d+)\$ cm\. Find the area/);
     if (m) {
       const r = Number(m[1]), P = Number(m[2]);
       const theta = ((P - 2 * r) * 360) / (2 * pi * r);
@@ -524,14 +532,18 @@ const SOLVE = {
         [/sum of the two numbers is a prime number/, (a, b) => [2, 3, 5, 7, 11].includes(a + b)],
         [/sum of the two numbers is a multiple of \$(\d+)\$/, (a, b, k) => (a + b) % k === 0],
         [/two numbers differ by exactly \$(\d+)\$/, (a, b, k) => Math.abs(a - b) === k],
-        [/at least one of the dice shows a \$6\$/, (a, b) => a === 6 || b === 6],
+        [/at least one of the dice shows a \$(\d)\$/, (a, b, k) => a === k || b === k],
+        [/exactly one of the dice shows a \$(\d)\$/, (a, b, k) => (a === k) !== (b === k)],
+        [/neither die shows a \$(\d)\$/, (a, b, k) => a !== k && b !== k],
+        [/product of the two numbers is (even|odd)/, (a, b, _k, m) => ((a * b) % 2 === 0) === (m === 'even')],
+        [/sum of the two numbers is less than \$(\d+)\$/, (a, b, k) => a + b < k],
         [/sum of the two numbers is at least \$(\d+)\$/, (a, b, k) => a + b >= k]
       ];
       for (const [re, fn] of tests) {
         const m = p.match(re);
         if (!m) continue;
         let fav = 0;
-        for (let a = 1; a <= 6; a++) for (let b = 1; b <= 6; b++) if (fn(a, b, Number(m[1]))) fav++;
+        for (let a = 1; a <= 6; a++) for (let b = 1; b <= 6; b++) if (fn(a, b, Number(m[1]), m[1])) fav++;
         return answerIs(q, Q(fav, 36)) ? [] : [`enumeration ${fav}/36 vs ${q.answer.value}`];
       }
       return ['could not read the event'];
@@ -622,7 +634,7 @@ const SOLVE = {
       const y = t => Math.sqrt(L * L - (x + v * t) ** 2);
       return close(-rate(y), q.answer.value, 1e-5) ? [] : [`simulation ${-rate(y)} vs ${q.answer.value}`];
     }
-    m = p.match(/girl of height \$([0-9.]+)\$ m walks away .* steady \$(\d+)\$ m\/s\. The lamp is \$(\d+)\$ m above the ground\. At what rate is (the tip|the length)/);
+    m = p.match(/man of height \$([0-9.]+)\$ m walks away .* steady \$(\d+)\$ m\/s\. The lamp is \$(\d+)\$ m above the ground\. At what rate is (the tip|the length)/);
     if (m) {
       const h = Number(m[1]), v = Number(m[2]), H = Number(m[3]);
       // The shadow's tip is where the ray from the lamp through her head meets
@@ -733,6 +745,7 @@ const answerTokens = q => {
   return out;
 };
 const stats = {};
+let decimalsAccepted = 0;
 for (const id of ids) {
   const prompts = new Set();
   let verified = 0, inspected = 0;
@@ -760,6 +773,20 @@ for (const id of ids) {
       const present = significant && new RegExp(`(^|[^0-9.])${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![0-9.])`).test(hintText);
       ok(`${id} seed ${seed}: no hint states the answer`, !stated && !present, `${token} in: ${hintText.slice(0, 160)}`);
     }
+    // A keyed fraction whose decimal terminates is accepted as that exact
+    // decimal too. A \dfrac in the GIVEN data (π = 22/7, sec A = 13/12) must
+    // not turn into a demand that the answer be written as a fraction.
+    const sf = q.answerType === 'numeric' && q.answer.simplestFraction;
+    if (sf) {
+      let d = sf.d; while (d % 2 === 0) d /= 2; while (d % 5 === 0) d /= 5;
+      if (d === 1) {
+        const decimal = String(Number((sf.n / sf.d).toFixed(10)));
+        let verdict;
+        try { verdict = checkAnswer(q, decimal); } catch (err) { verdict = { correct: false, feedback: err.message }; }
+        ok(`${id} seed ${seed}: the exact decimal ${decimal} of ${sf.n}/${sf.d} is accepted`, verdict.correct, verdict.feedback || '');
+        decimalsAccepted++;
+      }
+    }
     // Numbers the student is given are whole, or decimals of at most two places.
     const decimals = (q.prompt.match(/\d+\.\d+/g) || []).filter(x => x.split('.')[1].length > 2);
     ok(`${id} seed ${seed}: given data is to at most two decimal places`, decimals.length === 0, decimals.join(', '));
@@ -768,11 +795,13 @@ for (const id of ids) {
   }
   ok(`${id} varies with the seed`, prompts.size >= Math.min(40, DRAWS / 4), `${prompts.size} distinct prompts in ${DRAWS}`);
   stats[id] = { verified, inspected, distinct: prompts.size };
+  if (process.env.HARDEST_STATS) console.log(`${id}: ${prompts.size} distinct prompts in ${DRAWS}`);
 }
+ok('terminating-decimal answers were exercised', decimalsAccepted >= DRAWS, String(decimalsAccepted));
 ok('the box-sheet table the optimisation form draws on is non-empty', BOX_SHEETS_FOR_CHECK.length >= 5, String(BOX_SHEETS_FOR_CHECK.length));
 
 const total = Object.values(stats).reduce((s, v) => s + v.verified, 0);
 console.log(failures.length
   ? `INDIA HARDEST FORMS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.slice(0, 25).join('\n  · ')}`
-  : `INDIA HARDEST FORMS: PASS — ${pass}/${pass} checks — ${ids.length} D3 forms for ${entries.length} CBSE Class X/XII dot points, ${total} questions re-derived from their prompts by an independent route.`);
+  : `INDIA HARDEST FORMS: PASS — ${pass}/${pass} checks — ${ids.length} D3 forms for ${entries.length} CBSE Class X/XII dot points, ${total} questions re-derived from their prompts by an independent route, ${decimalsAccepted} exact decimals of keyed fractions accepted.`);
 process.exit(failures.length ? 1 : 0);

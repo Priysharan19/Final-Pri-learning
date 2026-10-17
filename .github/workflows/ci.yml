@@ -53,7 +53,7 @@ jobs:
           grep -Fq '✔ INDIA SUITE PASSED — 1964/1964 checks' suites.log
           grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 36264/36264 checks' suites.log
           # Hardest-level forms, tranche 1: every D3 answer re-derived from its prompt.
-          grep -Fq 'INDIA HARDEST FORMS: PASS — 49143/49143 checks — 22 D3 forms for 22 CBSE Class X/XII dot points' suites.log
+          grep -Fq 'INDIA HARDEST FORMS: PASS — 49637/49637 checks — 22 D3 forms for 22 CBSE Class X/XII dot points' suites.log
           grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 112804 prompts, 362 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
           grep -Fq '46200 questions from 462 declared (generator, difficulty) pairs × 100 draws — 46200 marked correct by their own marker, 46200 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
