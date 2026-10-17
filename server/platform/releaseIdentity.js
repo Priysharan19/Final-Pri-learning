@@ -14,9 +14,21 @@ function readBuiltClientRelease() {
   }
 }
 
-export function serverReleaseIdentity({ env: sourceEnv = process.env, readBuilt = readBuiltClientRelease } = {}) {
+// Whether production resolution verifies the checked-out source (HEAD equals
+// the release SHA, working tree clean). On by default and never configurable
+// from the environment: only in-process test harnesses
+// (server/test/support/hermetic.mjs) switch it off, so a suite's verdict does
+// not depend on the developer's working tree.
+let sourceVerification = true;
+export function setReleaseSourceVerification(enabled) {
+  sourceVerification = Boolean(enabled);
+  identityCache = null;
+}
+
+export function serverReleaseIdentity({ env: sourceEnv = process.env, readBuilt = readBuiltClientRelease, root, verifySource = sourceVerification } = {}) {
   const production = sourceEnv.NODE_ENV === 'production';
-  if (!production) return resolveReleaseIdentity({ production: false, env: sourceEnv });
+  const rootOption = root ? { root } : {};
+  if (!production) return resolveReleaseIdentity({ ...rootOption, production: false, env: sourceEnv });
 
   const railwayRuntime = Boolean(sourceEnv.RAILWAY_DEPLOYMENT_ID);
   // The same precedence the client build applied (release/release-identity.mjs):
@@ -26,14 +38,14 @@ export function serverReleaseIdentity({ env: sourceEnv = process.env, readBuilt 
 
   let identity;
   try {
-    identity = resolveReleaseIdentity({ production: true, env });
+    identity = resolveReleaseIdentity({ ...rootOption, production: true, verifySource, env });
   } catch (error) {
     if (!String(error?.message || '').includes('Production build timestamp is missing')) throw error;
     const built = readBuilt();
     if (!built) throw new Error('Production build timestamp is missing and built client release identity is unavailable');
     assertReleaseIdentity(built, { production: true });
     env.PRI_BUILD_TIMESTAMP = built.buildTimestamp;
-    identity = resolveReleaseIdentity({ production: true, env });
+    identity = resolveReleaseIdentity({ ...rootOption, production: true, verifySource, env });
   }
 
   // Railway runtime images must agree with the release identity baked by the
@@ -67,7 +79,7 @@ const IDENTITY_ENV_KEYS = [
 let identityCache = null;
 
 export function cachedServerReleaseIdentity(env = process.env) {
-  const key = IDENTITY_ENV_KEYS.map(name => `${name}=${env[name] ?? ''}`).join('\n');
+  const key = `verify=${sourceVerification}\n` + IDENTITY_ENV_KEYS.map(name => `${name}=${env[name] ?? ''}`).join('\n');
   if (!identityCache || identityCache.key !== key) {
     try {
       identityCache = { key, value: serverReleaseIdentity({ env }), error: null };

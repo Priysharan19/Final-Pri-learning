@@ -6,6 +6,7 @@
 // after a resolved answer), the server seals it as a repeat, and both the
 // receipt and the server's own graded-attempt event say so. Another account's
 // first sitting of that content is not a repeat.
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

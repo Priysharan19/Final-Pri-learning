@@ -14,6 +14,7 @@
 //   · deleting an account afterwards keeps its payment with account_id NULL,
 //     while other tables still cascade.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

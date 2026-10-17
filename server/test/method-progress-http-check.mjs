@@ -20,6 +20,7 @@
 // "Both sides +k" is neutral only when k cancels nothing: on `6t - 1=-t - 22`
 // adding 1 removes the constant and is a real step, so k is chosen to avoid it.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

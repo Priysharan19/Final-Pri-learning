@@ -19,6 +19,7 @@
 //     deployment that has staff accounts and no key.
 // SQLite by default; `--engine=postgres` runs it on a migrated Postgres.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

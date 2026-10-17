@@ -6,6 +6,7 @@
 //  · one eligible account binds that question once, gets the same question,
 //    and can be marked on it; a second account cannot take it up;
 //  · a forged or altered token is refused.
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

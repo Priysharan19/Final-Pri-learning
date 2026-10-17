@@ -21,6 +21,7 @@
 // paper's content is seen (a practice copy is a repeat) and an item already
 // seen is flagged a repeat on the paper; and deleting the account removes
 // every exam row.
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

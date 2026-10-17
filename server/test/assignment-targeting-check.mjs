@@ -9,6 +9,7 @@
 // flags — and never a raw submission key.
 //
 // Usage: node server/test/assignment-targeting-check.mjs
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import express from 'express';
 import cookieParser from 'cookie-parser';

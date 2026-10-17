@@ -1,3 +1,4 @@
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import Database from 'better-sqlite3';
 import { execFileSync, spawn } from 'node:child_process';

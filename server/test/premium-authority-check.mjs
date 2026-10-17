@@ -13,6 +13,7 @@
 //   · kinds are separate, accounts are separate, and the window resets;
 //   · clients cannot push entitlement or subscription state through sync.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import express from 'express';
 import cookieParser from 'cookie-parser';

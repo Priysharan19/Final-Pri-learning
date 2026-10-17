@@ -11,6 +11,7 @@
 // produce zero securitypolicyviolation events across the sign-up flow, the
 // practice page (KaTeX, ink canvas) and settings.
 
+import './support/hermetic.mjs';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';

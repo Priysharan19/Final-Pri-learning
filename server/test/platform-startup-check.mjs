@@ -12,6 +12,7 @@
 // URL's password, user or host. On a migrated Postgres it boots, /v1/health
 // names the engine — and only the engine — and SIGTERM drains the pool.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
