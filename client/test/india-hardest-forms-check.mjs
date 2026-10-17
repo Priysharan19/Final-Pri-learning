@@ -55,8 +55,6 @@ const gcd = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b,
 /** A rational as [n, d], d > 0, lowest terms. */
 const Q = (n, d = 1) => { if (d < 0) { n = -n; d = -d; } const g = gcd(n, d); return [n / g, d / g]; };
 const qadd = ([a, b], [c, d]) => Q(a * d + c * b, b * d);
-const qmul = ([a, b], [c, d]) => Q(a * c, b * d);
-const qdiv = ([a, b], [c, d]) => Q(a * d, b * c);
 const qeq = (x, y) => x[0] === y[0] && x[1] === y[1];
 const close = (x, y, tol = 1e-7) => Math.abs(x - y) <= tol * Math.max(1, Math.abs(x), Math.abs(y));
 /** The keyed numeric answer as an exact rational when it declares one. */
@@ -71,7 +69,6 @@ function answerIs(q, r) {
   const k = keyedRational(q);
   return !!k && qeq(k, r) && close(q.answer.value, r[0] / r[1], 1e-12);
 }
-const nums = text => (String(text).match(/-?\d+(?:\.\d+)?/g) || []).map(Number);
 /** A LaTeX number or \dfrac{a}{b} / -\dfrac{a}{b} as a rational. */
 function texRational(t) {
   const s = String(t).trim();

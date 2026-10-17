@@ -55,8 +55,6 @@ function exact(f, suffix) {
 const sg = k => (k >= 0 ? `+ ${k}` : `- ${Math.abs(k)}`);
 /** "x + 3", "x - 2", "x". */
 const lin = (k, v = 'x') => (k === 0 ? v : `${v} ${sg(k)}`);
-/** A coefficient times a variable, written the way it is read. */
-const cx = (c, v = 'x') => (c === 1 ? v : c === -1 ? `-${v}` : `${c}${v}`);
 
 /** Descending-power polynomial from integer coefficients [a_n, …, a_0]. */
 function polyTex(coeffs, v = 'x') {
