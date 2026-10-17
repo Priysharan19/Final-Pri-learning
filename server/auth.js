@@ -52,7 +52,9 @@ authRouter.post('/register', (req, res) => {
   if (String(password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
   const y = Math.min(12, Math.max(7, Number(year) || 9));
   const em = String(email).trim().toLowerCase();
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) return res.status(400).json({ error: 'That email doesn’t look right.' });
+  // Length before the pattern, as in platform/otpCore.js: the pattern
+  // backtracks quadratically on long input (CodeQL js/polynomial-redos).
+  if (em.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) return res.status(400).json({ error: 'That email doesn’t look right.' });
   const exists = db.prepare('SELECT id FROM users WHERE email = ?').get(em);
   if (exists) return res.status(409).json({ error: 'An account with that email already exists.' });
   const hash = bcrypt.hashSync(String(password), 10);

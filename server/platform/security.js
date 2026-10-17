@@ -285,7 +285,12 @@ export function rateLimit(db, key, options) {
     const verdict = await consumeRateLimit(db, `${key}:${sha256(identity).slice(0, 24)}`, options);
     res.set('RateLimit-Remaining', String(verdict.remaining));
     res.set('RateLimit-Reset', String(Math.ceil(verdict.resetAt / 1000)));
-    if (!verdict.allowed) return res.status(429).json({ error: { code: 'RATE_LIMITED', message: 'Too many requests. Try again later.' } });
+    if (!verdict.allowed) {
+      // RFC 9110 Retry-After in whole seconds, as the login lockout and the AI
+      // allowance already send: a client told when to retry does not hammer.
+      res.set('Retry-After', String(Math.max(1, Math.ceil((verdict.resetAt - Date.now()) / 1000))));
+      return res.status(429).json({ error: { code: 'RATE_LIMITED', message: 'Too many requests. Try again later.' } });
+    }
     next();
   }), { rateLimit: { key, limit: options.limit, windowMs: options.windowMs } });
 }

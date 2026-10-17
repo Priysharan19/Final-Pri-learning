@@ -18,6 +18,7 @@ import { createRazorpayBilling } from './platform/razorpay.js';
 import { createPlatformRouter } from './platform/router.js';
 import { trustedProxyHops } from './platform/config.js';
 import { securityHeaders } from './platform/headers.js';
+import { rateLimit } from './platform/security.js';
 import { asStore } from './platform/store.js';
 import { logEvent, requestContext, routeTemplate, safeCode, safeLogFields } from './platform/observability.js';
 import { recordHttpResponse } from './platform/metrics.js';
@@ -128,9 +129,12 @@ export async function createServerApp(db, {
 
   if (legacy && !production) {
     // Local development only: the historical account API that predates /v1.
+    // It is still reachable from a LAN dev server, so it sits behind the same
+    // limiter as /v1: the bcrypt sign-in routes at the /v1 login ceiling, the
+    // rest at the admin router's.
     const [{ authRouter }, { api }] = await Promise.all([import('./auth.js'), import('./routes/api.js')]);
-    app.use('/api/auth', authRouter);
-    app.use('/api', api);
+    app.use('/api/auth', rateLimit(db, 'legacy-auth', { limit: 12, windowMs: 15 * 60 * 1000 }), authRouter);
+    app.use('/api', rateLimit(db, 'legacy-api', { limit: 300, windowMs: 60 * 1000 }), api);
   } else {
     app.use('/api', (req, res) => {
       res.status(410).json({ error: { code: 'LEGACY_API_REMOVED', message: 'The legacy API is not available. Use /v1.' } });

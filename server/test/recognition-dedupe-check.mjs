@@ -73,7 +73,8 @@ const fake = createServer((req, res) => {
     }
     if (behaviour === 'hold') {
       provider.held.set(label, () => reply(res, { model: sent.model, reading: read }));
-      provider.arrivals.get(label)?.();
+      const arrived = provider.arrivals.get(label);
+      if (typeof arrived === 'function') arrived();
       provider.arrivals.delete(label);
       return;
     }
