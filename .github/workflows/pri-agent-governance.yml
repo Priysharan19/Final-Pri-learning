@@ -289,6 +289,29 @@ jobs:
           node scripts/pri-pr-lane.mjs simulate docs/README.md client/src/styles/app.css | grep -q '"lane":"governed-required"'
           node scripts/pri-pr-lane.mjs simulate .github/workflows/ci.yml | grep -q '"lane":"governed-required"'
           node scripts/pri-pr-lane.mjs simulate unknown-unowned-path.txt | grep -q '"lane":"governed-required"'
+          node scripts/pri-pr-lane.mjs simulate-dependency client/package.json client/package-lock.json .github/workflows/ci.yml | grep -q '"lane":"dependency-update"'
+          node scripts/pri-pr-lane.mjs simulate-dependency server/package.json client/src/engine/checker.js | grep -q '"lane":"governed-required"'
+          node scripts/pri-pr-lane.mjs simulate-dependency scripts/pri-fleet.mjs | grep -q '"lane":"governed-required"'
+          # Workflow diffs: only a one-for-one re-pin of the same action passes.
+          printf '%s\n' '@@ -7 +7 @@' \
+            '-      - uses: actions/checkout@1111111111111111111111111111111111111111 # v4.0.0' \
+            '+      - uses: actions/checkout@3333333333333333333333333333333333333333 # v4.1.0' > /tmp/pri-pin-ok.diff
+          node scripts/pri-pr-lane.mjs simulate-workflow-diff /tmp/pri-pin-ok.diff | grep -q '"lane":"dependency-update"'
+          printf '%s\n' '@@ -7 +7 @@' \
+            '-      - uses: actions/checkout@1111111111111111111111111111111111111111 # v4.0.0' \
+            '+      - uses: evil/checkout@3333333333333333333333333333333333333333 # v4.1.0' > /tmp/pri-pin-swap.diff
+          node scripts/pri-pr-lane.mjs simulate-workflow-diff /tmp/pri-pin-swap.diff | grep -q '"lane":"governed-required"'
+          printf '%s\n' '@@ -11,0 +12 @@' \
+            '+      - uses: evil/action@4444444444444444444444444444444444444444 # v1' > /tmp/pri-pin-new-step.diff
+          node scripts/pri-pr-lane.mjs simulate-workflow-diff /tmp/pri-pin-new-step.diff | grep -q '"lane":"governed-required"'
+          printf '%s\n' '@@ -11,0 +12,2 @@' '+---' '++evil: 1' > /tmp/pri-pin-dashes.diff
+          node scripts/pri-pr-lane.mjs simulate-workflow-diff /tmp/pri-pin-dashes.diff | grep -q '"lane":"governed-required"'
+          printf '%s\n' '@@ -7 +7 @@' \
+            '-      - uses: actions/checkout@1111111111111111111111111111111111111111 # v4.0.0' \
+            "+      - uses: actions/checkout@3333333333333333333333333333333333333333 #$(printf '\r')ref: evil" > /tmp/pri-pin-cr.diff
+          node scripts/pri-pr-lane.mjs simulate-workflow-diff /tmp/pri-pin-cr.diff | grep -q '"lane":"governed-required"'
+          : > /tmp/pri-pin-empty.diff
+          node scripts/pri-pr-lane.mjs simulate-workflow-diff /tmp/pri-pin-empty.diff | grep -q '"lane":"governed-required"'
 
       - name: Classify PR diff and parse autonomous metadata
         if: github.event_name == 'pull_request'
@@ -298,6 +321,7 @@ jobs:
           HEAD_REF: ${{ github.head_ref }}
           BASE_REF: ${{ github.base_ref }}
           PR_BODY: ${{ github.event.pull_request.body }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           set -euo pipefail
           git fetch --no-tags origin "$BASE_REF"
@@ -320,6 +344,23 @@ jobs:
               echo "autonomous=false" >> "$GITHUB_OUTPUT"
               echo "lane=manual-governed" >> "$GITHUB_OUTPUT"
               exit 0
+            fi
+            # Dependabot PRs are not missions either (.github/dependabot.yml).
+            # A PR opened by dependabot[bot] takes the reviewed lane only when
+            # its paths are npm manifests/lockfiles or workflow files whose
+            # hunks re-pin existing actions one for one. Manifest CONTENTS are
+            # not inspected here: review and required CI gate the merge.
+            if [[ "$HEAD_REF" == dependabot/* && "$PR_AUTHOR" == "dependabot[bot]" ]]; then
+              dep_json="$(node scripts/pri-pr-lane.mjs classify-dependency "origin/$BASE_REF")"
+              printf '%s\n' "$dep_json" >> "$GITHUB_STEP_SUMMARY"
+              dep_lane="$(printf '%s' "$dep_json" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s).lane))")"
+              if [[ "$dep_lane" == "dependency-update" ]]; then
+                echo "autonomous=false" >> "$GITHUB_OUTPUT"
+                echo "lane=dependency-update" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              echo "Dependabot PR changes more than dependency pins: $dep_json" >&2
+              exit 1
             fi
             echo "Non-mission branch '$HEAD_REF' touches governed product/release/config/runtime or unowned paths; use task/<task>, feature/<feature>, or agent/mission/<agent>/<mission-id>." >&2
             exit 1
