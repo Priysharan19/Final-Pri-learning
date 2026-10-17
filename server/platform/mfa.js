@@ -246,10 +246,17 @@ export function createMfaRouter(db) {
         if (err?.code === 'MFA_NOT_CONFIGURED') return res.status(503).json({ error: { code: err.code, message: err.message } });
         throw err;
       }
-      await db.run(`INSERT INTO account_mfa(account_id, secret_ciphertext, created_at, confirmed_at, last_used_counter, updated_at)
+      // The read above is only the fast answer. A confirm from another session
+      // can commit between it and this write, so the upsert itself replaces
+      // only a still-pending row: a factor confirmed mid-request is never reset
+      // to pending under a new secret (which would leave the confirming session
+      // verified against a factor that is no longer the account's).
+      const written = await db.run(`INSERT INTO account_mfa(account_id, secret_ciphertext, created_at, confirmed_at, last_used_counter, updated_at)
         VALUES (?, ?, ?, NULL, NULL, ?)
         ON CONFLICT(account_id) DO UPDATE SET secret_ciphertext = excluded.secret_ciphertext, created_at = excluded.created_at,
-          confirmed_at = NULL, last_used_counter = NULL, updated_at = excluded.updated_at`, [accountId, ciphertext, now, now]);
+          confirmed_at = NULL, last_used_counter = NULL, updated_at = excluded.updated_at
+        WHERE account_mfa.confirmed_at IS NULL`, [accountId, ciphertext, now, now]);
+      if (written.changes !== 1) return res.status(409).json({ error: { code: 'MFA_ALREADY_ENROLLED', message: 'An authenticator app is already set up for this account.' } });
       const encoded = base32Encode(secret);
       res.set('Cache-Control', 'no-store');
       res.status(201).json({
