@@ -546,7 +546,7 @@ certification of the §22.2 journey on the exact candidate; physical-device acce
 TalkBack, Dynamic Type / font scale) on each class. §18 #6 widens to the Play Store: Android signing,
 Play internal testing and listing, in addition to Apple. §18 #7 (StoreKit) **stays a release blocker, unchanged**:
 the owner decided on 18 October 2026 (relayed by the coordinator) that Premium **is** offered at launch, at the
-approved prices of ₹199 / month and ₹1,499 / year, with the App Store subscriptions created. Because Premium
+approved prices of ₹199 / month and ₹1,499 / year. On 18 Oct 2026 the App Store Connect subscription group "Pri Premium" and products `com.prilearning.app.premium.monthly` and `com.prilearning.app.premium.annual` were created through the App Store Connect API; their prices cannot be set until the Paid Apps Agreement (tax and banking) is active, so they are not yet sellable. Because Premium
 launches on Android too, **Google Play Billing parity** (products, server-authoritative entitlement
 verification, restore, and sandbox/licence-tester certification on a physical Android device) is an additional
 release blocker under §18 #7. All other §18 blockers are unchanged.
