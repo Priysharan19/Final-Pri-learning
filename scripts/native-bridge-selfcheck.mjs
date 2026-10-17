@@ -19,7 +19,6 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { engineeringPackage } from './apple-shipping-target.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, '../ios/PriLearning.swiftpm');
@@ -103,15 +102,14 @@ const device = sim.udid;
 const udid = device;
 console.log(`priNative bridge self-check on ${sim.name} (${sim.udid}) (synthetic simulator evidence)\n`);
 ensureBooted(sim);
-// `main` is iPad-only (the V1 shipping target); an iPhone simulator run builds
-// the engineering copy that adds the iPhone family. --app reuses a prebuilt
+// `main` declares iPhone + iPad (the V1 shipping target, #504), so both
+// families build the canonical package itself. --app reuses a prebuilt
 // simulator .app (CI builds once and runs every step against it).
 let app = argOf('app');
 if (!app) {
   const derived = mkdtempSync(join(tmpdir(), 'pri-sim-'));
-  const pkg = /iPhone/.test(sim.name) ? engineeringPackage(join(derived, 'pkg')) : PACKAGE;
-  console.log(`Building ${pkg === PACKAGE ? 'the canonical package' : 'the iPhone engineering copy'}…`);
-  run('xcodebuild', ['-scheme', 'PriLearning', '-destination', `platform=iOS Simulator,id=${udid}`, '-derivedDataPath', derived, 'build'], { cwd: pkg });
+  console.log('Building the canonical package…');
+  run('xcodebuild', ['-scheme', 'PriLearning', '-destination', `platform=iOS Simulator,id=${udid}`, '-derivedDataPath', derived, 'build'], { cwd: PACKAGE });
   app = builtApp(derived);
 }
 const bundleId = run('/usr/bin/plutil', ['-extract', 'CFBundleIdentifier', 'raw', '-o', '-', join(app, 'Info.plist')]).trim();
