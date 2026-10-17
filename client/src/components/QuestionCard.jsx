@@ -1884,7 +1884,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <p className="q-credit">{t('verdict.creditAvailable', { percent: Math.round(credit * 100), marks: Math.round(totalMarks * credit * 10) / 10 })}</p>
         )}
 
-        <div ref={promptRef}>
+        {/* Question content is English by design under any interface language;
+            lang="en" tells a screen reader on a Hindi page to switch voice. */}
+        <div ref={promptRef} lang="en">
           <MathText block className="q-prompt" text={question.prompt} />
         </div>
         {figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: figure }} />}
@@ -1973,7 +1975,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               return (
                 <button key={i} className={cls} disabled={resolved} aria-pressed={!resolved ? mcqSel === i : undefined} onClick={() => chooseOption(i)}>
                   <span className="mcq-key">{'ABCD'[i]}</span>
-                  <MathText text={opt} />
+                  <span lang="en"><MathText text={opt} /></span>
                   {mark && <span className="mcq-mark">{mark}</span>}
                 </button>
               );
@@ -2181,13 +2183,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 <div className="ink-final-answer" data-ink-answer-proposal={inkAnswerEdit !== null ? 'student' : inkProposal.status}>
                   <label className="sc-label" style={{ display: 'block' }} htmlFor={`ink-final-${question.id}`}>{t('verdict.finalAnswer')}</label>
                   <div className="answer-row">
-                    {question.answerPrefix && <span className="answer-prefix"><MathText text={question.answerPrefix} /></span>}
+                    {question.answerPrefix && <span className="answer-prefix" lang="en"><MathText text={question.answerPrefix} /></span>}
                     <input id={`ink-final-${question.id}`} className="answer-input" data-ink-final-answer
                       aria-describedby={`ink-final-note-${question.id}`}
                       value={inkAnswer} disabled={busy}
                       onChange={e => { setInkAnswerEdit(e.target.value); noteEdited(submissionContentKey(String(e.target.value).trim(), inkResult.lines.join('\n'))); }}
                       autoCapitalize="none" autoCorrect="off" spellCheck={false} inputMode="text" enterKeyHint="go" />
-                    {question.answerSuffix && <span className="answer-suffix">{question.answerSuffix}</span>}
+                    {question.answerSuffix && <span className="answer-suffix" lang="en">{question.answerSuffix}</span>}
                   </div>
                   <p className="photo-lines-note" id={`ink-final-note-${question.id}`} role="status" style={{ marginTop: 8 }}>
                     {inkProposal.status === 'proposed'
