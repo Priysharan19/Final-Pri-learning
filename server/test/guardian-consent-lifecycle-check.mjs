@@ -1,3 +1,4 @@
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 
 process.env.PRI_AUTH_DELIVERY_KEY = '11'.repeat(32);

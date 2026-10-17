@@ -25,6 +25,7 @@
 // The provider is a scripted async generator except in §2, which drives the
 // real streaming request builder against a fake fetch. No network, no key.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { SESSION_COOKIE, sha256 } from '../platform/security.js';

@@ -8,6 +8,7 @@
 // self-contained unit, that housekeeping ran at startup, that the request log
 // is method/path/status/ms only, and that the Dockerfile drops root.
 
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

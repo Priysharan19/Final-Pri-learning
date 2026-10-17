@@ -11,6 +11,7 @@
 // that already exists signs in with no declaration at all.
 // SQLite by default; `--engine=postgres` runs it on a migrated Postgres.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 
 process.env.PRI_GOOGLE_CLIENT_IDS = 'pri-google-client';

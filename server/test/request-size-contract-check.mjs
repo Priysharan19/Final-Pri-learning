@@ -16,6 +16,7 @@
 // transport and above the client's own budget, and a body that does overrun
 // the parser must still come back with a code.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

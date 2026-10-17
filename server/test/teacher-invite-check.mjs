@@ -8,6 +8,7 @@
 // Codes are stored only as a SHA-256 hash plus a display prefix, are single
 // use, and expire.
 
+import './support/hermetic.mjs';
 const { startApp, registerAccount, verifyEmail, checks, promoteRole } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
 const { sha256 } = await import('../platform/security.js');

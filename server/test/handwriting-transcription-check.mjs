@@ -16,6 +16,7 @@
 // No network call is made here. The provider is a stub, so this runs in CI with
 // no API key and no spend.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { createPlatformDb } from '../platform/db.js';

@@ -14,6 +14,7 @@
 // The provider sources are also scanned so a new strict schema cannot be sent
 // without being registered here.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { TRANSCRIPTION_SCHEMA, normalizeResult } from '../platform/handwritingProvider.js';

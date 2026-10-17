@@ -15,6 +15,7 @@
 //   5. The alert rules fire at their thresholds, expire with their windows,
 //      and match docs/operations/alerts.md one for one.
 // ─────────────────────────────────────────────────────────────────────────────
+import './support/hermetic.mjs';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';

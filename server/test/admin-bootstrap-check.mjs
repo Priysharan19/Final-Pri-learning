@@ -6,6 +6,7 @@
 // the setting is inert. Operators can also promote via
 // server/tools/promote-role.mjs, which audits with via:'cli'.
 
+import './support/hermetic.mjs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';

@@ -2,6 +2,7 @@
 // of the India syllabus, because the production image ships no client source.
 // A snapshot that drifts from the curriculum would refuse real chapters or
 // accept retired ones, so this regenerates it and compares byte for byte.
+import './support/hermetic.mjs';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
