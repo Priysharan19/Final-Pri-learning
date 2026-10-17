@@ -54,7 +54,7 @@ function derivedRuleFor(policy, file) {
   return found[0] || null;
 }
 function changedFiles(base = 'origin/main') {
-  const text = execFileSync('git', ['diff', '--name-only', `${base}...HEAD`], { cwd: ROOT, encoding: 'utf8' }).trim();
+  const text = execFileSync('git', ['diff', '--name-only', '--no-renames', `${base}...HEAD`], { cwd: ROOT, encoding: 'utf8' }).trim();
   return text ? text.split('\n').filter(Boolean) : [];
 }
 function isCollaborativeTest(file, owner, agentId) {
