@@ -289,6 +289,9 @@ jobs:
           node scripts/pri-pr-lane.mjs simulate docs/README.md client/src/styles/app.css | grep -q '"lane":"governed-required"'
           node scripts/pri-pr-lane.mjs simulate .github/workflows/ci.yml | grep -q '"lane":"governed-required"'
           node scripts/pri-pr-lane.mjs simulate unknown-unowned-path.txt | grep -q '"lane":"governed-required"'
+          node scripts/pri-pr-lane.mjs simulate-dependency client/package.json client/package-lock.json .github/workflows/ci.yml | grep -q '"lane":"dependency-update"'
+          node scripts/pri-pr-lane.mjs simulate-dependency server/package.json client/src/engine/checker.js | grep -q '"lane":"governed-required"'
+          node scripts/pri-pr-lane.mjs simulate-dependency scripts/pri-fleet.mjs | grep -q '"lane":"governed-required"'
 
       - name: Classify PR diff and parse autonomous metadata
         if: github.event_name == 'pull_request'
@@ -298,6 +301,7 @@ jobs:
           HEAD_REF: ${{ github.head_ref }}
           BASE_REF: ${{ github.base_ref }}
           PR_BODY: ${{ github.event.pull_request.body }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           set -euo pipefail
           git fetch --no-tags origin "$BASE_REF"
@@ -320,6 +324,22 @@ jobs:
               echo "autonomous=false" >> "$GITHUB_OUTPUT"
               echo "lane=manual-governed" >> "$GITHUB_OUTPUT"
               exit 0
+            fi
+            # Dependabot PRs are not missions either (.github/dependabot.yml):
+            # only a PR opened by dependabot[bot] whose diff moves nothing but
+            # npm manifests/lockfiles and workflow `uses:` SHA pins takes the
+            # reviewed lane; required CI still gates it before main can move.
+            if [[ "$HEAD_REF" == dependabot/* && "$PR_AUTHOR" == "dependabot[bot]" ]]; then
+              dep_json="$(node scripts/pri-pr-lane.mjs classify-dependency "origin/$BASE_REF")"
+              printf '%s\n' "$dep_json" >> "$GITHUB_STEP_SUMMARY"
+              dep_lane="$(printf '%s' "$dep_json" | node -e "let s='';process.stdin.on('data',d=>s+=d);process.stdin.on('end',()=>process.stdout.write(JSON.parse(s).lane))")"
+              if [[ "$dep_lane" == "dependency-update" ]]; then
+                echo "autonomous=false" >> "$GITHUB_OUTPUT"
+                echo "lane=dependency-update" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              echo "Dependabot PR changes more than dependency pins: $dep_json" >&2
+              exit 1
             fi
             echo "Non-mission branch '$HEAD_REF' touches governed product/release/config/runtime or unowned paths; use task/<task>, feature/<feature>, or agent/mission/<agent>/<mission-id>." >&2
             exit 1
