@@ -358,17 +358,17 @@ Feature scope and release blockers are distinct. The V1 can be correctly scoped 
 
 The hard release blockers at this freeze are:
 
-1. The shipping target must become genuinely iPad-only. *(Replaced 2026-10-16 by §22.3 #1: the shipping targets must be iPhone + iPad from one Apple package and Android phone + tablet from the shared Android shell, from one verified source identity.)*
+1. The shipping target must become genuinely iPad-only. *(Replaced 2026-10-16 by §22.4 (Blockers), #504: the shipping targets must be iPhone + iPad from one Apple package and Android phone + tablet from the shared Android shell, from one verified source identity.)*
 2. The exact release SHA must be nominated later.
 3. Railway/production must stop deriving release authority from a feature branch.
 4. Production Postgres cutover and validation must be completed.
-5. Physical iPad + Apple Pencil certification must be completed on the exact candidate.
-6. Archive/signing/TestFlight/App Store certification must be completed.
-7. Premium StoreKit production configuration and transaction certification must be completed.
+5. Physical iPad + Apple Pencil certification must be completed on the exact candidate. *(Amended by §22.4 (16 Oct 2026, #504): physical certification of the §22.2 journey on iPhone, iPad, Android phone and Android tablet; the Apple Pencil path stays required on iPad.)*
+6. Archive/signing/TestFlight/App Store certification must be completed. *(Amended by §22.4 (16 Oct 2026, #504): also Android signing, Play internal testing and Play Store listing; the Apple listing is universal iPhone + iPad.)*
+7. Premium StoreKit production configuration and transaction certification must be completed. *(Unchanged; see §22.4 (18 Oct 2026): Premium is offered at launch, and Google Play Billing parity is additionally required for Android.)*
 8. PR #243 / the expression-domain grading correctness defect must receive deliberate disposition: independent review, correctness verification, regression coverage and integration if accepted, with no unresolved release-severity grading defect.
 9. Legal/public policy artifacts must be completed with real owner/contact/effective information and appropriate review.
 10. Privacy wording must be reconciled with the actual cloud handwriting data path.
-11. Native accessibility acceptance must be completed.
+11. Native accessibility acceptance must be completed. *(Amended by §22.4 (16 Oct 2026, #504): on a physical device of each class — VoiceOver / TalkBack and Dynamic Type / font scale.)*
 12. Account deletion/recovery release evidence must be completed.
 13. Production email/account-recovery evidence must be completed.
 14. Final security acceptance must be completed.
@@ -407,6 +407,15 @@ exact action is named. No blocker below is marked closed. The ordered owner path
 
 Nothing in this table closes a blocker. A row changes only by appending a dated note when a human
 has produced the evidence named in its last column.
+
+**Update 2026-10-18 (append-only; row 1 above is the 2 October record):** row 1's "iPad-only software-complete"
+no longer describes the target. Under §22 (#504) blocker #1 is the cross-device target. Apple side:
+**software-complete** — both `Package.swift` declare `supportedDeviceFamilies: [.pad, .phone]`, iPhone
+portrait-only, iPad all orientations, bundle id `com.prilearning.app`; guarded by
+`node scripts/apple-shipping-target.mjs --check-v1` (fails on iPad-only) and
+`node client/test/apple-shipping-target-check.mjs`. Android phone + tablet side: **not complete** — Android
+release controls and device acceptance are still open. Remaining human action: universal Apple listing and
+Play listing confirmed at submission (#6, as amended).
 
 ## 19. Non-blocking open work
 
@@ -512,6 +521,8 @@ persistent sync.
 Account isolation, data deletion, security, app privacy and store compliance remain mandatory. Other planned
 features (§3, §15) do not block this reduced scope unless its own safety or quality contracts actually require
 them. They stay in the repository and may ship when they meet §21; they are not release blockers.
+Exception: Premium is offered at launch (owner decision, 18 Oct 2026; §22.4), so StoreKit and Google Play
+Billing certification are release blockers.
 
 ### 22.3 Reason (§20 item 2)
 
@@ -533,9 +544,19 @@ Android phone + tablet from the shared Android shell, all from one verified sour
 widen from iPad to **every** device class: physical iPhone, iPad, Android phone and Android tablet
 certification of the §22.2 journey on the exact candidate; physical-device accessibility (VoiceOver /
 TalkBack, Dynamic Type / font scale) on each class. §18 #6 widens to the Play Store: Android signing,
-Play internal testing and listing, in addition to Apple. §18 #7 (StoreKit) is outside §22.2, so under #504 it
-does not block unless Premium is offered at launch; if it is, Google Play Billing parity becomes a blocker too.
-All other §18 blockers are unchanged.
+Play internal testing and listing, in addition to Apple. §18 #7 (StoreKit) **stays a release blocker, unchanged**:
+the owner decided on 18 October 2026 (relayed by the coordinator) that Premium **is** offered at launch, at the
+approved prices of ₹199 / month and ₹1,499 / year, with the App Store subscriptions created. Because Premium
+launches on Android too, **Google Play Billing parity** (products, server-authoritative entitlement
+verification, restore, and sandbox/licence-tester certification on a physical Android device) is an additional
+release blocker under §18 #7. All other §18 blockers are unchanged.
+
+**Open reviews that still gate release.** [#499](https://github.com/Priysharan19/Final-Pri-learning/issues/499)
+— independent mathematical examiner certification of the marking rubric policies — is open; until it approves,
+the reviewed method-rubric production flag stays OFF and no unsupported marking claim is shown (#504 step 4).
+[#498](https://github.com/Priysharan19/Final-Pri-learning/issues/498) — the platform-security abuse-limits
+localhost-timeout release blocker named in #504 — is **closed**, fixed by PR #509 (merged 2026-10-17,
+`f1c3b9cce8990f9ab8a83124f58c74a6b5f4b48d`); it no longer blocks.
 
 **Apple configuration (done in code by the PR that adds this section).** Both `ios/PriLearning.swiftpm` and
 `ios/PriLearning 2.swiftpm` declare `supportedDeviceFamilies: [.pad, .phone]`; iPhone is portrait-only

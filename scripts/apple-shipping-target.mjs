@@ -42,15 +42,18 @@ export function familiesOf(source) {
   return [...m[1].matchAll(/\.(pad|phone|mac|tv|watch|vision)\b/g)].map(x => x[1]);
 }
 
-/** Map of orientation → device families it is restricted to ('all' when unconditional). */
-export function orientationsOf(source) {
+/** Every declared orientation in order, as [name, families | 'all'] (duplicates kept). */
+export function orientationEntries(source) {
   const m = stripComments(source).match(ORIENTATIONS);
   if (!m) throw new Error('Package.swift declares no supportedInterfaceOrientations');
-  const out = {};
-  for (const x of m[1].matchAll(/\.(portrait|portraitUpsideDown|landscapeLeft|landscapeRight)\b(\(\.when\(deviceFamilies:\s*\[([^\]]*)\]\)\))?/g)) {
-    out[x[1]] = x[2] ? [...x[3].matchAll(/\.(\w+)/g)].map(y => y[1]) : 'all';
-  }
-  return out;
+  return [...m[1].matchAll(/\.(\w+)\b(\(\.when\(deviceFamilies:\s*\[([^\]]*)\]\)\))?/g)]
+    .filter(x => !['when'].includes(x[1]) && !/^(pad|phone|mac|tv|watch|vision)$/.test(x[1]))
+    .map(x => [x[1], x[2] ? [...x[3].matchAll(/\.(\w+)/g)].map(y => y[1]) : 'all']);
+}
+
+/** Map of orientation → device families it is restricted to ('all' when unconditional). */
+export function orientationsOf(source) {
+  return Object.fromEntries(orientationEntries(source));
 }
 
 export function bundleIdOf(source) {
@@ -65,6 +68,10 @@ export function shippingProblems(source) {
   if (JSON.stringify(families) !== JSON.stringify(REQUIRED_FAMILIES)) {
     problems.push(`device families are [${families.join(', ')}], V1 requires [${REQUIRED_FAMILIES.join(', ')}] (iPhone and iPad, #504)`);
   }
+  const entries = orientationEntries(source);
+  const names = entries.map(([k]) => k);
+  const repeated = [...new Set(names.filter((k, i) => names.indexOf(k) !== i))];
+  if (repeated.length) problems.push(`orientation declared more than once (an unconditional duplicate would allow iPhone landscape): ${repeated.join(', ')}`);
   const o = orientationsOf(source);
   if (o.portrait !== 'all') problems.push('portrait must be supported on every device family');
   for (const k of ['landscapeLeft', 'landscapeRight', 'portraitUpsideDown']) {
@@ -86,17 +93,18 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     process.exit(2);
   }
   let failed = false;
-  let seen = 0;
   for (const rel of PACKAGES) {
-    if (!existsSync(join(ROOT, rel))) continue;
-    seen++;
+    if (!existsSync(join(ROOT, rel))) {
+      console.log(`${rel}: MISSING — both tracked Apple packages must exist and declare the shipping target`);
+      failed = true;
+      continue;
+    }
     const source = readFileSync(join(ROOT, rel), 'utf8');
     const problems = shippingProblems(source);
     console.log(`${rel}: ${familiesOf(source).join(', ')}${problems.length ? ' — NOT the V1 shipping target' : ' — V1 shipping target (iPhone portrait + iPad all orientations)'}`);
     for (const p of problems) console.log(`  · ${p}`);
     if (problems.length) failed = true;
   }
-  if (!seen) { console.log('no Apple package found'); failed = true; }
   if (mode === '--check-v1') {
     console.log(failed
       ? 'APPLE SHIPPING TARGET: FAIL — both packages must declare iPhone + iPad, iPhone portrait-only, bundle id com.prilearning.app'

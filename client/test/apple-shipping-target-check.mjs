@@ -44,6 +44,10 @@ ok(shippingProblems(canon.replace(/,\s*\.landscapeLeft\(\.when\(deviceFamilies: 
 ok(shippingProblems(canon.replace('.portrait,', '.portrait(.when(deviceFamilies: [.pad])),')).length > 0,
   'an iPhone with no portrait orientation is refused');
 ok(shippingProblems(canon.replace(`"${BUNDLE_ID}"`, '"com.prilearning.phone"')).length > 0, 'a different bundle id is refused');
+ok(shippingProblems(canon.replace('.landscapeLeft(.when(deviceFamilies: [.pad]))', '.landscapeLeft,\n                .landscapeLeft(.when(deviceFamilies: [.pad]))')).length > 0,
+  'an unconditional orientation hidden before its iPad-only duplicate is refused (repeated keys)');
+ok(shippingProblems(canon.replace('.portrait,', '.portrait,\n                .portrait,')).length > 0,
+  'any orientation declared twice is refused');
 
 let threw = false;
 try { familiesOf('let x = 1'); } catch { threw = true; }
