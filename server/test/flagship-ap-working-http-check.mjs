@@ -281,6 +281,35 @@ try {
     c.deq(disguised.partial?.lines?.map(line => line.reason), ['contradicted', 'contradicted', 'progress', 'progress', 'break'], 'linear: the disguised lines are the candidates, and the steps are what is paid');
     c.eq((await resolved('disguised-and-slip', ['m+1=-13', 'm+2=-12', 'm+3=-5'])).marksEarned, 0, 'linear: the disguised root and a slip with no step earn nothing');
   }
+  // Money on a question priced in rupees. The word "paise" was stripped and
+  // ignored, so the right number of paise for a price in rupees — 45 paise
+  // for ₹45, a hundredth of the price — was marked correct. Paise are a
+  // hundredth of a rupee: 4500 paise is ₹45, 45 paise is not.
+  for (const seed of [1, 2, 3]) {
+    const sample = { generator: 'c10-linear-pair-methods', difficulty: 4, seed, curriculum: 'in' };
+    const issueMoney = async () => {
+      const r = await h.request('/v1/practice/issue', { method: 'POST', jar: a.jar, body: sample });
+      assert.equal(r.status, 201, `seed ${seed}: the server issues the kirana-shop pair`);
+      return r.data.question;
+    };
+    const probeMoney = await issueMoney();
+    // The prompt carries the pair: m1 of one, n1 of the other for ₹bill1; m2, n2 for ₹bill2.
+    const n = [...String(probeMoney.prompt).matchAll(/\$₹?(\d+)\$/g)].map(m => Number(m[1]));
+    assert.equal(n.length, 6, `seed ${seed}: the prompt states two bills of two goods (${probeMoney.prompt})`);
+    const [m1, n1, bill1, m2, n2, bill2] = n;
+    const price = (bill1 * n2 - n1 * bill2) / (m1 * n2 - n1 * m2);
+    assert.ok(Number.isInteger(price) && price > 0, `seed ${seed}: the price solves to a whole number of rupees (${price})`);
+    const once = async (label, answer) => {
+      const q = await issueMoney();
+      const r = await submit(q.id, `money-${seed}-${label}`, answer, []);
+      c.eq(r.status, 200, `seed ${seed} ${label}: "${answer}" is graded`);
+      return r.data;
+    };
+    c.eq((await once('rupees', `₹${price}`)).correct, true, `seed ${seed}: ₹${price} is correct`);
+    c.eq((await once('in-paise', `${price * 100} paise`)).correct, true, `seed ${seed}: ${price * 100} paise is ₹${price}, and correct`);
+    const hundredth = await once('paise-for-rupees', `${price} paise`);
+    c.deq([hundredth.correct, hundredth.marksEarned], [false, 0], `seed ${seed}: ${price} paise is a hundredth of ₹${price}, and not correct`);
+  }
 } finally {
   await h.close();
   rmSync(scratch, { recursive: true, force: true });
