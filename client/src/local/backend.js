@@ -218,6 +218,10 @@ const trapYieldCache = new Map();
 // bound about the trap probe specifically.
 const trapProbeStats = { generations: 0, cells: 0 };
 export function trapProbeStatsForTests() { return { ...trapProbeStats }; }
+// The cache outlives a single hunt, so a check that bounds the cost of a FIRST
+// hunt clears it first; otherwise an earlier hunt of the same cell (from
+// whatever questions were served before) leaves nothing to measure.
+export function resetTrapYieldCacheForTests() { trapYieldCache.clear(); }
 function trapYield(subtopicId, dotpointId, difficulty, trapKey) {
   const k = `${subtopicId}|${dotpointId || ''}|${difficulty}|${trapKey}`;
   if (trapYieldCache.has(k)) return trapYieldCache.get(k);
