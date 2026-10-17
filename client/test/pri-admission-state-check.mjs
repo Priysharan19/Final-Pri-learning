@@ -118,4 +118,16 @@ await assert.rejects(verifyAuthorityHistory({...history,head:activeSha,genesisSh
 checks++;
 denied('risk tampering breaks signature',/INVALID_EVENT_SIGNATURE/,()=>inspectSignedLog({version:1,events:[{...signed,payload:{...signed.payload,risk:'R1'}}]},publicKey,now));
 denied('invalid signed risk rejected',/INVALID_SIGNED_RISK/,()=>inspectSignedLog({version:1,events:[signEvent({...signed.payload,risk:'R9'},privateKey)]},publicKey,now));
+
+const duplicateMissionIssue={...issue('TRIAGED'),number:807,
+  title:'[PRI-MISSION] duplicate issue number',
+  body:body('TRIAGED')};
+denied('distinct issues cannot reuse canonical Pri-Mission-ID',/DUPLICATE_MISSION_ID/,
+  ()=>assertLedgerMatchesGrants([issue('TRIAGED'),duplicateMissionIssue],
+    inspectSignedLog(empty,publicKey,now),sha,now));
+const duplicateBranchIssue={...duplicateMissionIssue,number:808,
+  body:body('TRIAGED').replace('Pri-Mission-ID: signup','Pri-Mission-ID: other-mission')};
+denied('distinct mission ids cannot share one canonical branch',/DUPLICATE_MISSION_BRANCH/,
+  ()=>assertLedgerMatchesGrants([issue('TRIAGED'),duplicateBranchIssue],
+    inspectSignedLog(empty,publicKey,now),sha,now));
 console.log('PASS: '+checks+' signed-grant/CAS security assertions');
