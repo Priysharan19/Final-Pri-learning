@@ -160,6 +160,8 @@ This is the durable ledger for CP-02 → CP-12 and SEC-COMM-01. Each CP's own PR
 - The package drift gate widened to `Info.plist`, models and assets (36 files). The stale `PriLearning.swiftpm.zip` was removed.
 - `native-ink.yml` runs on the macOS runner: `--check-v1`, one engineering build, the iPhone bridge self-check, the iPhone and iPad journeys, and an uploaded evidence artefact.
 
+**Update 2026-10-18:** owner scope change #504 (`PRI_V1_RELEASE_SCOPE.md` §22) puts iPhone, iPad and Android phones/tablets in V1. `main` now declares iPhone + iPad; `--check-v1` requires both (iPhone portrait-only) and CI builds the canonical package with no engineering copy. The two bullets above and the paragraph below are the earlier record.
+
 **V1 scope reconciliation:** `docs/release/PRI_V1_RELEASE_SCOPE.md` (owner, PR #257) makes V1 iPad-only. CP-04's iPhone work therefore ships only as engineering capability on `main`. A public iPhone release needs the V1 scope-change procedure (**BLOCKED_GOVERNANCE**) and the physical gates in [IPHONE_GAP_REPORT.md](IPHONE_GAP_REPORT.md) §4.
 
 **Simulator evidence (S2, synthetic):** local runs on 2026-10-01 UTC were 11/11 journey steps on an iPhone 18 Pro simulator and on an iPad Pro 13-inch (M5) simulator, both iOS 27.0, plus the bridge self-check 8/8 on both. CI repeats these on its own simulators and uploads the evidence records.

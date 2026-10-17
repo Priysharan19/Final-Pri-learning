@@ -1,74 +1,114 @@
 #!/usr/bin/env node
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · Apple shipping target (CP-04 × V1 scope freeze)
+// Pri Learning · Apple shipping target (CP-04 × V1 scope, amended by #504)
 //
-// docs/release/PRI_V1_RELEASE_SCOPE.md makes V1 iPad-only (hard blocker #1),
-// and docs/release/release-policy.md releases only an exact `main` SHA. So
-// `main` itself declares iPad only — it is always the V1 shipping target — and
-// iPhone engineering (finger ink, iPhone simulator CI) builds from a scratch
-// copy that adds the iPhone family. Nothing is ever archived from that copy.
+// docs/release/PRI_V1_RELEASE_SCOPE.md §22 (owner scope change, 16 Oct 2026,
+// issue #504) makes the V1 Apple target iPhone + iPad from one package, and
+// docs/release/release-policy.md releases only an exact `main` SHA. So `main`
+// itself declares both families and CI builds exactly that package — there is
+// no scratch "engineering copy" any more.
+//
+// The gate (both tracked packages, which check-native-package-sync.mjs keeps
+// byte-identical) requires:
+//   · supportedDeviceFamilies is exactly [.pad, .phone];
+//   · iPhone is portrait-only: .portrait is unconditional, and landscape left,
+//     landscape right and portrait upside-down are each restricted to .pad
+//     (so iPad keeps all four orientations);
+//   · bundle identifier stays com.prilearning.app — changing it would make the
+//     iPhone build a different app and orphan on-device student data.
 //
 //   node scripts/apple-shipping-target.mjs --status
-//   node scripts/apple-shipping-target.mjs --check-v1           # exit 1 unless iPad-only
-//   node scripts/apple-shipping-target.mjs --engineering-package <dir>
-//        copies ios/PriLearning.swiftpm to <dir>/PriLearning.swiftpm with
-//        iPad + iPhone families and prints the package path (simulator CI only)
+//   node scripts/apple-shipping-target.mjs --check-v1   # exit 1 unless the above holds
 //
-// A public iPhone release needs the V1 scope-change procedure, then a reviewed
-// change to `main`, not this helper.
+// Passing this gate is configuration evidence only. It is not iPhone device,
+// accessibility, store-listing or release acceptance (PRI_V1_RELEASE_SCOPE §21).
 // ─────────────────────────────────────────────────────────────────────────────
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const PACKAGES = ['ios/PriLearning.swiftpm/Package.swift', 'ios/PriLearning 2.swiftpm/Package.swift'];
+export const PACKAGES = ['ios/PriLearning.swiftpm/Package.swift', 'ios/PriLearning 2.swiftpm/Package.swift'];
+export const BUNDLE_ID = 'com.prilearning.app';
+export const REQUIRED_FAMILIES = ['pad', 'phone'];
 const FAMILIES = /supportedDeviceFamilies:\s*\[([^\]]*)\]/;
+const ORIENTATIONS = /supportedInterfaceOrientations:\s*\[([\s\S]*?)\n\s*\]/;
+
+const stripComments = s => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 
 export function familiesOf(source) {
-  const m = source.match(FAMILIES);
+  const m = stripComments(source).match(FAMILIES);
   if (!m) throw new Error('Package.swift declares no supportedDeviceFamilies');
-  return [...m[1].matchAll(/\.(pad|phone)/g)].map(x => x[1]);
+  return [...m[1].matchAll(/\.(pad|phone|mac|tv|watch|vision)\b/g)].map(x => x[1]);
 }
 
-function withFamilies(source, families) {
-  if (!FAMILIES.test(source)) throw new Error('Package.swift declares no supportedDeviceFamilies');
-  const list = families.map(f => `                .${f}`).join(',\n');
-  return source.replace(FAMILIES, `supportedDeviceFamilies: [\n${list}\n            ]`);
+/** Every declared orientation in order, as [name, families | 'all'] (duplicates kept). */
+export function orientationEntries(source) {
+  const m = stripComments(source).match(ORIENTATIONS);
+  if (!m) throw new Error('Package.swift declares no supportedInterfaceOrientations');
+  return [...m[1].matchAll(/\.(\w+)\b(\(\.when\(deviceFamilies:\s*\[([^\]]*)\]\)\))?/g)]
+    .filter(x => !['when'].includes(x[1]) && !/^(pad|phone|mac|tv|watch|vision)$/.test(x[1]))
+    .map(x => [x[1], x[2] ? [...x[3].matchAll(/\.(\w+)/g)].map(y => y[1]) : 'all']);
 }
-export const ipadOnly = source => withFamilies(source, ['pad']);
-export const withPhone = source => withFamilies(source, ['pad', 'phone']);
 
-/** Copy the canonical package to <dir> with the iPhone family added. */
-export function engineeringPackage(dir) {
-  const out = join(resolve(dir), 'PriLearning.swiftpm');
-  mkdirSync(resolve(dir), { recursive: true });
-  cpSync(join(ROOT, 'ios/PriLearning.swiftpm'), out, { recursive: true });
-  const pkg = join(out, 'Package.swift');
-  writeFileSync(pkg, withPhone(readFileSync(pkg, 'utf8')));
-  return out;
+/** Map of orientation → device families it is restricted to ('all' when unconditional). */
+export function orientationsOf(source) {
+  return Object.fromEntries(orientationEntries(source));
+}
+
+export function bundleIdOf(source) {
+  const m = stripComments(source).match(/bundleIdentifier:\s*"([^"]+)"/);
+  return m ? m[1] : null;
+}
+
+/** Every reason this Package.swift is not the V1 Apple shipping target; [] when it is. */
+export function shippingProblems(source) {
+  const problems = [];
+  const families = familiesOf(source);
+  if (JSON.stringify(families) !== JSON.stringify(REQUIRED_FAMILIES)) {
+    problems.push(`device families are [${families.join(', ')}], V1 requires [${REQUIRED_FAMILIES.join(', ')}] (iPhone and iPad, #504)`);
+  }
+  const entries = orientationEntries(source);
+  const names = entries.map(([k]) => k);
+  const repeated = [...new Set(names.filter((k, i) => names.indexOf(k) !== i))];
+  if (repeated.length) problems.push(`orientation declared more than once (an unconditional duplicate would allow iPhone landscape): ${repeated.join(', ')}`);
+  const o = orientationsOf(source);
+  if (o.portrait !== 'all') problems.push('portrait must be supported on every device family');
+  for (const k of ['landscapeLeft', 'landscapeRight', 'portraitUpsideDown']) {
+    if (JSON.stringify(o[k]) !== '["pad"]') {
+      problems.push(`${k} must be declared and restricted to iPad (iPhone is portrait-only; iPad keeps all four) — found ${JSON.stringify(o[k] ?? 'absent')}`);
+    }
+  }
+  const extra = Object.keys(o).filter(k => !['portrait', 'landscapeLeft', 'landscapeRight', 'portraitUpsideDown'].includes(k));
+  if (extra.length) problems.push(`unexpected orientations: ${extra.join(', ')}`);
+  const id = bundleIdOf(source);
+  if (id !== BUNDLE_ID) problems.push(`bundle identifier is ${id}, must stay ${BUNDLE_ID}`);
+  return problems;
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const mode = process.argv[2] || '--status';
-  if (mode === '--engineering-package') {
-    const dir = process.argv[3];
-    if (!dir) { console.error('usage: --engineering-package <dir>'); process.exit(2); }
-    console.log(engineeringPackage(dir));
-    process.exit(0);
-  }
   if (!['--status', '--check-v1'].includes(mode)) {
-    console.error(`unknown mode ${mode} (use --status, --check-v1 or --engineering-package <dir>)`);
+    console.error(`unknown mode ${mode} (use --status or --check-v1)`);
     process.exit(2);
   }
   let failed = false;
   for (const rel of PACKAGES) {
-    if (!existsSync(join(ROOT, rel))) continue;
-    const families = familiesOf(readFileSync(join(ROOT, rel), 'utf8'));
-    const v1 = families.length === 1 && families[0] === 'pad';
-    console.log(`${rel}: ${families.join(', ')}${v1 ? ' — V1 shipping target (iPad-only)' : ' — NOT the V1 shipping target'}`);
-    if (!v1) failed = true;
+    if (!existsSync(join(ROOT, rel))) {
+      console.log(`${rel}: MISSING — both tracked Apple packages must exist and declare the shipping target`);
+      failed = true;
+      continue;
+    }
+    const source = readFileSync(join(ROOT, rel), 'utf8');
+    const problems = shippingProblems(source);
+    console.log(`${rel}: ${familiesOf(source).join(', ')}${problems.length ? ' — NOT the V1 shipping target' : ' — V1 shipping target (iPhone portrait + iPad all orientations)'}`);
+    for (const p of problems) console.log(`  · ${p}`);
+    if (problems.length) failed = true;
   }
-  if (mode === '--check-v1') console.log(failed ? 'APPLE SHIPPING TARGET: FAIL — main must be iPad-only for V1' : 'APPLE SHIPPING TARGET: PASS — both packages are iPad-only');
+  if (mode === '--check-v1') {
+    console.log(failed
+      ? 'APPLE SHIPPING TARGET: FAIL — both packages must declare iPhone + iPad, iPhone portrait-only, bundle id com.prilearning.app'
+      : 'APPLE SHIPPING TARGET: PASS — both packages ship iPhone (portrait) + iPad (all orientations) as com.prilearning.app');
+  }
   process.exit(mode === '--check-v1' && failed ? 1 : 0);
 }
