@@ -10,6 +10,7 @@ import {spawnSync} from 'node:child_process';
 import {
   appendGrant, assertLedgerMatchesGrants, inspectSignedLog, issueIdentity, eventDigest, verifyAuthorityHistory, revokeAuthoritativeGrant
 } from './pri-admission-state.mjs';
+import {changedFilePaths} from './pri-manual-authorization.mjs';
 
 const REPO=process.env.GITHUB_REPOSITORY || '';
 const GH_TOKEN=process.env.GITHUB_TOKEN || '';
@@ -140,8 +141,7 @@ async function verifyOnly() {
     'MISSING_SCOPE_BOUND_SIGNED_CURRENT_HEAD_GRANT');
   const files=await allPages('pulls/'+number+'/files');
   ensure(files.length>0 && files.length===pr.changed_files,'INCOMPLETE_EXACT_PR_DIFF');
-  for(const f of files) for(const filename of
-    [f.filename,...(f.previous_filename?[f.previous_filename]:[])]) {
+  for (const filename of changedFilePaths(files)) {
     ensure(mission.paths.some(p=>fileMatches(p,filename)),'WRITER_SCOPE_ESCAPES_'+filename);
     const routed=run([join(process.cwd(),'scripts/pri-fleet.mjs'),'route',filename]);
     ensure(routed.ok,'WRITER_FILE_OWNER_UNKNOWN_'+filename);
@@ -254,12 +254,14 @@ async function transact() {
   const files=await allPages('pulls/'+request.pr_number+'/files');
   ensure(files.length>0 && Number.isInteger(pr.changed_files) &&
     files.length===pr.changed_files,'EMPTY_OR_INCOMPLETE_SOURCE_SCOPE');
-  for (const f of files) {
-    ensure(mission.paths.some(p=>fileMatches(p,f.filename)),'PR_SCOPE_ESCAPES_MISSION_'+f.filename);
-    const route=run([join(process.cwd(),'scripts/pri-fleet.mjs'),'route',f.filename]);
-    ensure(route.ok,'NO_CANONICAL_OWNER_'+f.filename);
+  for (const filename of changedFilePaths(files)) {
+    ensure(mission.paths.some(p=>fileMatches(p,filename)),
+      'PR_SCOPE_ESCAPES_MISSION_'+filename);
+    const route=run([join(process.cwd(),'scripts/pri-fleet.mjs'),'route',filename]);
+    ensure(route.ok,'NO_CANONICAL_OWNER_'+filename);
     const parsed=JSON.parse(route.stdout);
-    ensure(parsed.owned===true && parsed.primary===mission.agent,'CANONICAL_OWNER_MISMATCH_'+f.filename);
+    ensure(parsed.owned===true && parsed.primary===mission.agent,
+      'CANONICAL_OWNER_MISMATCH_'+filename);
   }
   if (request.operation==='GRANT') {
     // Every issue remains part of the full, live GitHub snapshot. The CLI
