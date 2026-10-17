@@ -2,13 +2,15 @@
 // Trusted-controller core. Imported by protected main workflow, never by PR code.
 // A GitHub issue body or comment is never a grant. Only a signed, hash-chained
 // event committed through the protected serialized ref can hold a writer lease.
-import { createHash, sign, verify } from 'node:crypto';
+import { createHash, sign, verify, randomUUID } from 'node:crypto';
 
 const WRITERS = new Set(['ACTIVE', 'IMPLEMENTING', 'TESTING', 'REPAIR']);
 const STATES = new Set(['DISCOVERED','TRIAGED','ACTIVE','IMPLEMENTING','TESTING',
   'REVIEW','CI','REPAIR_PENDING','REPAIR','MERGE_READY','BLOCKED_EXTERNAL',
   'BLOCKED_AUTOMATION','DONE','ABANDONED']);
 const MAX_WRITERS = 2;
+const TRUSTED_REPOSITORY = 'Priysharan19/Final-Pri-learning';
+const SIGNED_POLICY = 'pri-writer-admission/v2';
 const TTL_MS = 12 * 3600 * 1000;
 const sha = text => createHash('sha256').update(text).digest('hex');
 const sorted = v => Array.isArray(v) ? v.map(sorted) :
@@ -77,7 +79,8 @@ export function signEvent(payload, privateKey) {
 export function inspectSignedLog(log, publicKey, nowMs = Date.now()) {
   if (!log || log.version !== 1 || !Array.isArray(log.events)) throw new Error('INVALID_AUTHORITY_LOG');
   const active = new Map();
-  let prev = '0'.repeat(64), index = 0;
+  let prev = '0'.repeat(64), index = 0, lastTimestamp = -1;
+  const grantedIds = new Set();
   for (const entry of log.events) {
     if (!entry || !entry.payload || typeof entry.signature !== 'string') throw new Error('INVALID_GRANT_EVENT');
     const p = entry.payload;
@@ -85,8 +88,13 @@ export function inspectSignedLog(log, publicKey, nowMs = Date.now()) {
       throw new Error('BROKEN_EVENT_CHAIN');
     if (!verify(null, Buffer.from(canonical(p)), publicKey, Buffer.from(entry.signature, 'base64')))
       throw new Error('INVALID_EVENT_SIGNATURE');
-    if (!Number.isSafeInteger(p.timestamp_ms) || p.timestamp_ms < 0 || p.timestamp_ms > nowMs + 120000)
+    if (!Number.isSafeInteger(p.timestamp_ms) || p.timestamp_ms < lastTimestamp ||
+        p.timestamp_ms > nowMs + 120000)
       throw new Error('INVALID_EVENT_TIME');
+    lastTimestamp = p.timestamp_ms;
+    if (p.repository !== TRUSTED_REPOSITORY || p.policy_version !== SIGNED_POLICY ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(p.grant_id || '')))
+      throw new Error('SIGNED_TRUST_DOMAIN_INVALID');
     if (!Number.isSafeInteger(p.run_id) || p.run_id <= 0 || !p.actor || !hex40(p.main_sha))
       throw new Error('INVALID_GOVERNOR_PROVENANCE');
     if (!Number.isInteger(p.issue_number) || p.issue_number < 1 || !p.mission || !p.agent || !p.branch)
@@ -96,10 +104,14 @@ export function inspectSignedLog(log, publicKey, nowMs = Date.now()) {
       if (!hex40(p.head_sha) || !hex40(p.base_sha) || !Array.isArray(p.paths) || !p.paths.length
         || !Number.isSafeInteger(p.expiry_ms) || p.expiry_ms - p.timestamp_ms > TTL_MS
         || p.expiry_ms <= p.timestamp_ms || active.has(p.issue_number)) throw new Error('INVALID_GRANT');
+      if (grantedIds.has(p.grant_id)) throw new Error('DUPLICATE_SIGNED_GRANT_ID');
+      grantedIds.add(p.grant_id);
       active.set(p.issue_number, p);
     } else {
       const current = active.get(p.issue_number);
-      if (!current || current.mission !== p.mission || current.agent !== p.agent || current.branch !== p.branch)
+      if (!current || current.mission !== p.mission || current.agent !== p.agent ||
+          current.branch !== p.branch || current.grant_id !== p.grant_id ||
+          current.repository !== p.repository || current.policy_version !== p.policy_version)
         throw new Error('UNMATCHED_RENEW_OR_REVOKE');
       if (p.operation === 'REVOKE') active.delete(p.issue_number);
       else {
@@ -110,6 +122,17 @@ export function inspectSignedLog(log, publicKey, nowMs = Date.now()) {
           throw new Error('UNSAFE_RENEWAL');
         active.set(p.issue_number, p);
       }
+    }
+    // Each signed state must be safe at the moment it was created, even
+    // if an invalid historical grant would have expired before inspection.
+    const historicalLive = [...active.values()].filter(x => x.expiry_ms > p.timestamp_ms);
+    if (historicalLive.length > MAX_WRITERS) throw new Error('HISTORICAL_WRITER_CAP');
+    for (let i=0;i<historicalLive.length;i++) for (let j=i+1;j<historicalLive.length;j++) {
+      if (historicalLive[i].agent === historicalLive[j].agent)
+        throw new Error('HISTORICAL_OWNER_NOT_DISTINCT');
+      if (historicalLive[i].base_sha !== historicalLive[j].base_sha ||
+          historicalLive[i].main_sha !== historicalLive[j].main_sha)
+        throw new Error('HISTORICAL_WRITER_BASE_MISMATCH');
     }
     prev = eventDigest(p);
   }
@@ -204,6 +227,8 @@ export function appendGrant(log, request, issues, pr, mainSha, actor, runId, now
     throw new Error('AUTHORITY_IDENTITY_DRIFT');
   const payload={
     seq:authority.nextSeq,prev:authority.prevHash,operation:request.operation,
+    repository:TRUSTED_REPOSITORY,policy_version:SIGNED_POLICY,
+    grant_id:existing?.grant_id || randomUUID(),
     issue_number:id.issue_number,mission:id.mission,agent:id.agent,branch:id.branch,risk:id.risk,
     base_sha:id.base_sha,head_sha:request.head_sha,main_sha:mainSha,paths:id.paths,
     timestamp_ms:nowMs,expiry_ms:request.operation==='REVOKE'?nowMs:nowMs+TTL_MS,
