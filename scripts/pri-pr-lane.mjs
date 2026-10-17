@@ -1,20 +1,24 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MANUAL_NON_WRITER_PATHS = new Set(['README.md', 'docs/RELEASE.md']);
-// Dependabot may only move dependency pins: npm manifests/lockfiles of the
-// three npm trees and the `uses:` pins of workflow files. Anything else in a
-// Dependabot PR falls back to the governed lane.
+// Dependabot may only touch npm manifests/lockfiles of the npm trees and
+// re-pin existing workflow actions. Manifest contents are NOT inspected here:
+// review and required CI gate them. A workflow change qualifies only when
+// every hunk swaps pin lines one for one, each pair naming the same action at
+// the same indentation with only the SHA and `# tag` changed.
 const DEPENDENCY_MANIFEST = /^(?:(?:client|server|ad)\/)?package(?:-lock)?\.json$/;
 const WORKFLOW_FILE = /^\.github\/workflows\/[^/]+\.ya?ml$/;
-const WORKFLOW_PIN_LINE = /^\s*(?:-\s+)?uses:\s*[\w.-]+\/[\w./-]+@[0-9a-f]{40}(?:\s+#\s*\S+)?\s*$/;
+const WORKFLOW_PIN_LINE = /^(\s*(?:-\s+)?)uses:\s*([A-Za-z0-9_-][\w.-]*\/[\w./-]+)@([0-9a-f]{40})(?:\s+#\s*\S+)?\s*$/;
 
 function changedFiles(base = 'origin/main') {
-  const text = execFileSync('git', ['diff', '--name-only', `${base}...HEAD`], {
+  // --no-renames lists both sides of a rename, so a deleted path is never hidden.
+  const text = execFileSync('git', ['diff', '--name-only', '--no-renames', `${base}...HEAD`], {
     cwd: ROOT,
     encoding: 'utf8'
   }).trim();
@@ -25,16 +29,43 @@ function isManualNonWriterPath(file) {
   return MANUAL_NON_WRITER_PATHS.has(file);
 }
 
-function changedWorkflowLines(base, file) {
-  const text = execFileSync('git', ['diff', '-U0', `${base}...HEAD`, '--', file], { cwd: ROOT, encoding: 'utf8' });
-  return text.split('\n').filter(line => /^[+-](?![+-]{2})/.test(line)).map(line => line.slice(1));
+function workflowDiff(base, file) {
+  return execFileSync('git', ['diff', '-U0', '--no-renames', `${base}...HEAD`, '--', file], { cwd: ROOT, encoding: 'utf8' });
 }
 
-function classifyDependency(files, workflowLines = () => []) {
+// Returns the reasons a unified -U0 diff of one workflow file is not a pure
+// pin swap; an empty list means every hunk only re-pins existing actions.
+function nonPinWorkflowChanges(diffText) {
+  const problems = [];
+  const hunks = [];
+  let hunk = null;
+  for (const line of diffText.split('\n')) {
+    if (line.startsWith('@@')) { hunk = { removed: [], added: [] }; hunks.push(hunk); continue; }
+    if (!hunk) {
+      if (/^(?:new|deleted) file mode|^Binary files|^(?:old|new) mode/.test(line)) problems.push(line);
+      continue;
+    }
+    if (line.startsWith('\\')) continue;
+    if (line.startsWith('-')) hunk.removed.push(line.slice(1));
+    else if (line.startsWith('+')) hunk.added.push(line.slice(1));
+  }
+  if (!hunks.length && !problems.length && diffText.trim()) problems.push('no reviewable hunks');
+  for (const { removed, added } of hunks) {
+    if (removed.length !== added.length) { problems.push(`hunk changes ${removed.length} line(s) into ${added.length}`); continue; }
+    removed.forEach((before, i) => {
+      const a = WORKFLOW_PIN_LINE.exec(before), b = WORKFLOW_PIN_LINE.exec(added[i]);
+      if (!a || !b) problems.push(`not a pin line: ${(a ? added[i] : before).trim()}`);
+      else if (a[1] !== b[1] || a[2] !== b[2]) problems.push(`pin swaps action or indentation: ${before.trim()} -> ${added[i].trim()}`);
+    });
+  }
+  return problems;
+}
+
+function classifyDependency(files, workflowDiffText = () => '') {
   if (!files.length) return { lane: 'empty', authorized: false, files: [] };
   const outside = files.filter(file => !DEPENDENCY_MANIFEST.test(file) && !WORKFLOW_FILE.test(file));
   const unpinned = files.filter(file => WORKFLOW_FILE.test(file))
-    .flatMap(file => workflowLines(file).filter(line => !WORKFLOW_PIN_LINE.test(line)).map(line => `${file}: ${line.trim()}`));
+    .flatMap(file => nonPinWorkflowChanges(workflowDiffText(file)).map(problem => `${file}: ${problem}`));
   if (outside.length || unpinned.length) {
     return { lane: 'governed-required', authorized: false, files, outside_dependency_paths: outside, non_pin_workflow_lines: unpinned };
   }
@@ -64,7 +95,7 @@ function classify(files) {
 }
 
 function usage() {
-  console.error('Usage: pri-pr-lane.mjs classify [base] | simulate <paths...> | classify-dependency [base] | simulate-dependency <paths...>');
+  console.error('Usage: pri-pr-lane.mjs classify [base] | simulate <paths...> | classify-dependency [base] | simulate-dependency <paths...> | simulate-workflow-diff <diff-file>');
 }
 
 const [command, ...args] = process.argv.slice(2);
@@ -79,13 +110,21 @@ if (command === 'classify') {
   result = classify(args);
 } else if (command === 'classify-dependency') {
   const base = args[0] || 'origin/main';
-  result = classifyDependency(changedFiles(base), file => changedWorkflowLines(base, file));
+  result = classifyDependency(changedFiles(base), file => workflowDiff(base, file));
 } else if (command === 'simulate-dependency') {
   if (!args.length) {
     usage();
     process.exit(2);
   }
   result = classifyDependency(args);
+} else if (command === 'simulate-workflow-diff') {
+  // simulate-workflow-diff <diff-file>: classify one workflow's -U0 diff text.
+  if (args.length !== 1) {
+    usage();
+    process.exit(2);
+  }
+  const file = '.github/workflows/simulated.yml';
+  result = classifyDependency([file], () => readFileSync(path.resolve(args[0]), 'utf8'));
 } else {
   usage();
   process.exit(2);

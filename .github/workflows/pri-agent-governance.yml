@@ -292,6 +292,20 @@ jobs:
           node scripts/pri-pr-lane.mjs simulate-dependency client/package.json client/package-lock.json .github/workflows/ci.yml | grep -q '"lane":"dependency-update"'
           node scripts/pri-pr-lane.mjs simulate-dependency server/package.json client/src/engine/checker.js | grep -q '"lane":"governed-required"'
           node scripts/pri-pr-lane.mjs simulate-dependency scripts/pri-fleet.mjs | grep -q '"lane":"governed-required"'
+          # Workflow diffs: only a one-for-one re-pin of the same action passes.
+          printf '%s\n' '@@ -7 +7 @@' \
+            '-      - uses: actions/checkout@1111111111111111111111111111111111111111 # v4.0.0' \
+            '+      - uses: actions/checkout@3333333333333333333333333333333333333333 # v4.1.0' > /tmp/pri-pin-ok.diff
+          node scripts/pri-pr-lane.mjs simulate-workflow-diff /tmp/pri-pin-ok.diff | grep -q '"lane":"dependency-update"'
+          printf '%s\n' '@@ -7 +7 @@' \
+            '-      - uses: actions/checkout@1111111111111111111111111111111111111111 # v4.0.0' \
+            '+      - uses: evil/checkout@3333333333333333333333333333333333333333 # v4.1.0' > /tmp/pri-pin-swap.diff
+          node scripts/pri-pr-lane.mjs simulate-workflow-diff /tmp/pri-pin-swap.diff | grep -q '"lane":"governed-required"'
+          printf '%s\n' '@@ -11,0 +12 @@' \
+            '+      - uses: evil/action@4444444444444444444444444444444444444444 # v1' > /tmp/pri-pin-new-step.diff
+          node scripts/pri-pr-lane.mjs simulate-workflow-diff /tmp/pri-pin-new-step.diff | grep -q '"lane":"governed-required"'
+          printf '%s\n' '@@ -11,0 +12,2 @@' '+---' '++evil: 1' > /tmp/pri-pin-dashes.diff
+          node scripts/pri-pr-lane.mjs simulate-workflow-diff /tmp/pri-pin-dashes.diff | grep -q '"lane":"governed-required"'
 
       - name: Classify PR diff and parse autonomous metadata
         if: github.event_name == 'pull_request'
@@ -325,10 +339,11 @@ jobs:
               echo "lane=manual-governed" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            # Dependabot PRs are not missions either (.github/dependabot.yml):
-            # only a PR opened by dependabot[bot] whose diff moves nothing but
-            # npm manifests/lockfiles and workflow `uses:` SHA pins takes the
-            # reviewed lane; required CI still gates it before main can move.
+            # Dependabot PRs are not missions either (.github/dependabot.yml).
+            # A PR opened by dependabot[bot] takes the reviewed lane only when
+            # its paths are npm manifests/lockfiles or workflow files whose
+            # hunks re-pin existing actions one for one. Manifest CONTENTS are
+            # not inspected here: review and required CI gate the merge.
             if [[ "$HEAD_REF" == dependabot/* && "$PR_AUTHOR" == "dependabot[bot]" ]]; then
               dep_json="$(node scripts/pri-pr-lane.mjs classify-dependency "origin/$BASE_REF")"
               printf '%s\n' "$dep_json" >> "$GITHUB_STEP_SUMMARY"
