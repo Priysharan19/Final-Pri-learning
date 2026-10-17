@@ -144,6 +144,7 @@ function afterRead(pattern, between) {
 }
 const CONFIRM_READ = /^SELECT \* FROM account_mfa WHERE account_id = \?$/;
 const VERIFY_READ = /^SELECT \* FROM account_mfa WHERE account_id = \? AND confirmed_at IS NOT NULL$/;
+const ENROL_READ = /^SELECT confirmed_at FROM account_mfa WHERE account_id = \?$/;
 
 try {
   // A student cannot enrol, and has no factor to speak of.
@@ -330,6 +331,37 @@ try {
     c.deq([superseded.status, code(superseded)], [401, 'MFA_CODE_INVALID'], 'a pending secret superseded mid-request is not confirmed by the old secret\'s code');
     c.deq(Object.values(await db.get('SELECT confirmed_at, last_used_counter FROM account_mfa WHERE account_id=?', [pending.id])), [null, null], 'and the replacement stays pending and unspent');
     c.eq((await db.all('SELECT 1 FROM account_mfa_recovery_codes WHERE account_id=?', [pending.id])).length, 0, 'with no recovery codes minted');
+  }
+
+  // Enrolment never overwrites a factor confirmed mid-request: session B's
+  // enrol reads the still-pending row, session A's confirm commits, and only
+  // then does B's upsert run. It used to reset the factor to pending under B's
+  // secret, leaving A's session verified against a factor no longer the
+  // account's; now the upsert touches only a pending row and B gets a 409.
+  {
+    const racer = await account('admin');
+    await resetLimits();
+    const sessionB = {};
+    c.eq((await h.request('/v1/account/login', { method: 'POST', jar: sessionB, body: { email: racer.email, password: racer.password, deviceId: 'enrol-racer-b' } })).status, 200, 'enrol race: the admin is signed in on a second device');
+    const enrolA = await h.request('/v1/account/mfa/totp/enrol', { method: 'POST', jar: racer.jar, body: {} });
+    const secretA = base32Decode(enrolA.data.secret);
+    const stepA = totpCounter(Date.now());
+    let confirmA;
+    const releaseEnrol = afterRead(ENROL_READ, async () => {
+      confirmA = await h.request('/v1/account/mfa/totp/confirm', { method: 'POST', jar: racer.jar, body: { code: hotp(secretA, stepA) } });
+    });
+    let enrolB;
+    try {
+      enrolB = await h.request('/v1/account/mfa/totp/enrol', { method: 'POST', jar: sessionB, body: {} });
+    } finally { releaseEnrol(); }
+    c.eq(confirmA?.status, 200, 'enrol race: session A confirms between B\'s read and B\'s write');
+    c.deq([enrolB.status, code(enrolB)], [409, 'MFA_ALREADY_ENROLLED'], 'enrol race: B\'s enrolment is refused once the factor is confirmed, not written over it');
+    c.ok(!('secret' in (enrolB.data || {})), 'enrol race: B is shown no secret');
+    const kept = await db.get('SELECT * FROM account_mfa WHERE account_id=?', [racer.id]);
+    c.ok(kept.confirmed_at !== null && Number(kept.last_used_counter) === stepA && decryptMfaSecret(kept.secret_ciphertext, racer.id).equals(secretA), 'enrol race: the factor stays confirmed, under A\'s secret, with A\'s step spent');
+    c.deq((await db.all('SELECT code_hash FROM account_mfa_recovery_codes WHERE account_id=?', [racer.id])).map(r => r.code_hash).sort(), confirmA.data.recoveryCodes.map(rc => recoveryCodeHash(racer.id, rc)).sort(), 'enrol race: the recovery codes are still the ones A was shown');
+    const bVerifies = await h.request('/v1/account/mfa/verify', { method: 'POST', jar: sessionB, body: { code: hotp(secretA, stepA + 1) } });
+    c.eq(bVerifies.status, 200, 'enrol race: the account\'s factor is A\'s — B verifies with A\'s next code');
   }
 
   // Support: content authoring and the triage queue need the factor; students' routes do not change.
