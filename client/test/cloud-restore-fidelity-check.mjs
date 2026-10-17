@@ -18,7 +18,7 @@ import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 // device's own answers at "now" plus a few seconds, and then asserts that each
 // cluster lands on one calendar day in the profile's timezone (Asia/Kolkata).
 // Read straight off the wall clock, a CI run whose "an hour ago" fell within
-// minutes of IST midnight (about 18:30 UTC) split a cluster across two days and
+// minutes of IST midnight (18:30 UTC, so runs starting about 19:30 UTC) split a cluster across two days and
 // failed — the product filed every answer on the right day; the fixture's
 // assumption was wrong. So the check starts at 12:00 IST on today's IST date
 // and lets the clock advance in real time from there: the date stays current,
