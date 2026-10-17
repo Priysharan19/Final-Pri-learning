@@ -161,6 +161,17 @@ const MUTATIONS = [
     expect: /sync_entities: policy pri_account_scope does not scope rows to pri\.account_id/
   },
   {
+    // 20261016000000: an unset scope must mean no rows, not every row.
+    label: 'a later migration restores the allow-when-unset scope policy on learning_events',
+    migrations: laterMigration("drop policy pri_account_scope on pri.learning_events;\ncreate policy pri_account_scope on pri.learning_events as restrictive for all to pri_server using (coalesce(current_setting('pri.account_id', true), '') = '' or account_id = current_setting('pri.account_id', true)) with check (coalesce(current_setting('pri.account_id', true), '') = '' or account_id = current_setting('pri.account_id', true));"),
+    expect: /learning_events: policy pri_account_scope does not scope rows to pri\.account_id/
+  },
+  {
+    label: 'a later migration drops the declared-scope requirement on accounts',
+    migrations: laterMigration('drop policy pri_scope_required on pri.accounts;'),
+    expect: /accounts: expected a restrictive pri_scope_required policy, found none/
+  },
+  {
     // Always the LAST migration that moves schema_version, whichever that is,
     // so a later migration (tutor cache: 8) cannot make this mutation vacuous.
     label: `schema_version left behind by its last bump (${LAST_SCHEMA_BUMP.name})`,
