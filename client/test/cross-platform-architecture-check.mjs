@@ -217,10 +217,10 @@ ok(sniffers.length === 0, `no shared client code sniffs navigator.userAgent/plat
 // ── 8 · The iPad baseline and its data origin stay put ───────────────────────
 const IOS = 'ios/PriLearning.swiftpm';
 const pkg = read(`${IOS}/Package.swift`);
-ok(/supportedDeviceFamilies:\s*\[[^\]]*\.pad/.test(pkg), 'the Apple package still declares iPad (regression baseline)');
-ok(!/supportedDeviceFamilies:\s*\[[^\]]*\.phone/.test(stripComments(pkg)),
-  'main declares iPad only: V1 ships iPad-only from main (PRI_V1_RELEASE_SCOPE hard blocker #1); iPhone engineering builds a scratch copy');
-ok(existsSync(at('scripts/apple-shipping-target.mjs')), 'the iPhone engineering-package helper exists');
+ok(/supportedDeviceFamilies:\s*\[[^\]]*\.pad/.test(stripComments(pkg)), 'the Apple package still declares iPad (regression baseline)');
+ok(/supportedDeviceFamilies:\s*\[[^\]]*\.phone/.test(stripComments(pkg)),
+  'main declares iPhone too: V1 ships iPhone + iPad from main (owner scope change #504, PRI_V1_RELEASE_SCOPE §22)');
+ok(existsSync(at('scripts/apple-shipping-target.mjs')), 'the Apple shipping-target gate exists');
 const shell = read(`${IOS}/WebShell.swift`);
 ok(/forURLScheme:\s*"prilearning"/.test(shell), 'the shell still serves the app from the prilearning:// scheme');
 const shellCode = stripComments(shell);

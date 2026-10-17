@@ -1,4 +1,4 @@
-# Native iPad handwriting validation.
+# Native iPhone + iPad handwriting validation.
 # Canonical Swift source, duplicate-package drift, JS↔Swift transport and the
 # installed simulator app are all gated independently.
 #
@@ -23,6 +23,7 @@ on:
       - 'scripts/journey-oracle.mjs'
       - 'scripts/synthetic-reader-server.mjs'
       - 'scripts/apple-shipping-target.mjs'
+      - 'client/test/apple-shipping-target-check.mjs'
       - 'scripts/ink-native-check.mjs'
       - 'scripts/check-native-package-sync.mjs'
       - '.github/workflows/native-ink.yml'
@@ -38,6 +39,7 @@ on:
       - 'scripts/journey-oracle.mjs'
       - 'scripts/synthetic-reader-server.mjs'
       - 'scripts/apple-shipping-target.mjs'
+      - 'client/test/apple-shipping-target-check.mjs'
       - 'scripts/ink-native-check.mjs'
       - 'scripts/check-native-package-sync.mjs'
       - '.github/workflows/native-ink.yml'
@@ -64,14 +66,16 @@ jobs:
       - name: Canonical native source has no stale duplicate
         run: node scripts/check-native-package-sync.mjs
 
-      - name: Apple toolchain and iPad simulator
+      - name: Apple toolchain, iPad and iPhone simulators
         run: |
           set -euo pipefail
           xcodebuild -version
-          xcrun simctl list devices available | grep -m 1 'iPad' >/dev/null || {
-            echo '::error::No iPad simulator is available on this runner'
-            exit 1
-          }
+          for family in iPad iPhone; do
+            xcrun simctl list devices available | grep -m 1 "$family" >/dev/null || {
+              echo "::error::No $family simulator is available on this runner"
+              exit 1
+            }
+          done
 
       - name: JS ↔ Swift ink contract
         run: npm run test:ink:bridge
@@ -85,17 +89,21 @@ jobs:
       - name: priNative bridge self-check (iPad simulator)
         run: node scripts/native-bridge-selfcheck.mjs --family ipad
 
-      # CP-04: main is the iPad-only V1 shipping target (PRI_V1_RELEASE_SCOPE).
-      - name: Apple shipping target is iPad-only (V1)
+      # CP-04 × #504: main is the V1 Apple shipping target — iPhone (portrait)
+      # and iPad (all orientations), bundle id com.prilearning.app
+      # (PRI_V1_RELEASE_SCOPE §22).
+      - name: Apple shipping target is iPhone + iPad (V1)
         run: node scripts/apple-shipping-target.mjs --check-v1
 
-      # iPhone engineering: one simulator build of a scratch copy that adds the
-      # iPhone family (never archived), reused by every step below.
-      - name: Build the simulator app (iPad + iPhone engineering copy)
+      - name: Apple shipping-target gate refuses wrong declarations
+        run: node client/test/apple-shipping-target-check.mjs
+
+      # One simulator build of the canonical shipping package itself (no
+      # scratch copy), reused by every step below on iPhone and iPad.
+      - name: Build the simulator app (canonical iPhone + iPad package)
         run: |
           set -euo pipefail
-          ENG="$(node scripts/apple-shipping-target.mjs --engineering-package "$RUNNER_TEMP/eng")"
-          (cd "$ENG" && xcodebuild -scheme PriLearning -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/dd" build -quiet)
+          (cd ios/PriLearning.swiftpm && xcodebuild -scheme PriLearning -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/dd" build -quiet)
           APP="$(find "$RUNNER_TEMP/dd/Build/Products" -maxdepth 2 -name '*.app' -path '*iphonesimulator*' | head -1)"
           test -n "$APP"
           echo "PRI_SIM_APP=$APP" >> "$GITHUB_ENV"
