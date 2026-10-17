@@ -15,7 +15,7 @@
     "katex": "0.18.9",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "remotion": "4.0.530",
+    "remotion": "4.0.535",
     "zod": "3.23.8"
   },
   "devDependencies": {
