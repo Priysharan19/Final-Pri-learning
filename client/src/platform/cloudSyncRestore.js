@@ -25,6 +25,7 @@
 //     Match). Shared class/assignment records never enter through here.
 
 import { add, atomicBatch, byIndex, get, put } from '../local/idb.js';
+import { withMutationLock } from '../local/mutationLock.js';
 import { dayKey, timezoneOf } from '../lib/locale.js';
 import { START_RATING, gradeFor, scheduleReview, updateRating, xpFor } from '../engine/adaptive.js';
 import { indiaNameOf } from '../engine/indiaProduct.js';
@@ -404,20 +405,18 @@ async function applyRunEvent(pid, event, store, fields) {
 }
 
 /**
- * Add XP to the profile row as it is at write time. Browsers with Web Locks
- * (every shipped target) take the same lock backend.js's withProfileRow takes,
- * so a concurrent answer's XP and this restore's XP cannot roll each other back.
+ * Add XP to the profile row as it is at write time, under the same lock
+ * backend.js's withProfileRow takes (local/mutationLock.js: Web Locks, or the
+ * shared in-process queue where there are none), so a concurrent answer's XP
+ * and this restore's XP cannot roll each other back.
  */
 async function creditXp(pid, xp) {
   if (!xp) return;
-  const work = async () => {
+  await withMutationLock(`profile-row:${pid}`, async () => {
     const row = await get('profiles', pid).catch(() => null);
     if (!row) return;
     await put('profiles', { ...row, xp: num(row.xp, 0) + xp });
-  };
-  const locks = globalThis.navigator?.locks;
-  if (locks?.request) return locks.request(`pri-learning:profile-row:${pid}`, work);
-  return work();
+  });
 }
 
 /**
@@ -445,15 +444,27 @@ export function registerIssuedAttemptRecorder(fn) { recordIssuedAttempt = typeof
  * Settle an issued question from its server event. Returns the usual outcome,
  * or 'deferred' when it must wait: the device's own submit is in flight, or
  * the recorder is not loaded yet. A deferred event is kept on the row.
+ *
+ * Every write to the row happens under the question's lock, the one a submit
+ * holds from before it reads the row until its last write. Keeping the event
+ * with the row is a read-modify-write of the whole row: done outside the lock,
+ * a copy read while the submit was in flight and put back after the submit
+ * resolved the question undid the resolution (unanswered again, its grade
+ * still "in flight"), so the finished question was served again and its next
+ * Submit refused as already finished.
  */
 async function settleIssued(pid, rowId, event) {
-  const row = await get('questions', rowId).catch(() => null);
-  if (!row || row.answered) return 'duplicate';
-  if (gradeInFlight(row) || !recordIssuedAttempt) {
+  const listed = await get('questions', rowId).catch(() => null);
+  if (!listed || listed.answered) return 'duplicate';
+  // The recorder takes the lock itself, and defers under it when a submit
+  // that got in first is still waiting on the server.
+  if (recordIssuedAttempt) return recordIssuedAttempt(pid, rowId, event);
+  return withMutationLock(`question:${rowId}`, async () => {
+    const row = await get('questions', rowId).catch(() => null);
+    if (!row || row.answered) return 'duplicate';
     if (!row.deferredGrade || row.deferredGrade.event?.id !== event.id) await put('questions', { ...row, deferredGrade: { event, at: Date.now() } });
     return 'deferred';
-  }
-  return recordIssuedAttempt(pid, rowId, event);
+  });
 }
 
 /**
@@ -490,9 +501,12 @@ export async function reconcileDeferredGrades(pid) {
       if (outcome && outcome.applied) { applied++; xp += num(outcome.xp, 0); }
     } else if (!row.answered && !recordIssuedAttempt) continue;
     // Whatever happened, the copy kept with the row is no longer needed. Strip
-    // it from the row as it stands after that write.
-    const after = await get('questions', row.id).catch(() => null);
-    if (after?.deferredGrade) { const { deferredGrade: _dropped, ...rest } = after; await put('questions', rest); }
+    // it from the row as it stands after that write — read and written under
+    // the question's lock, so a submit's resolution cannot land in between.
+    await withMutationLock(`question:${row.id}`, async () => {
+      const after = await get('questions', row.id).catch(() => null);
+      if (after?.deferredGrade) { const { deferredGrade: _dropped, ...rest } = after; await put('questions', rest); }
+    });
   }
   if (xp > 0) await creditXp(pid, xp);
   return applied;

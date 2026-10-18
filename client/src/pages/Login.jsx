@@ -563,9 +563,12 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
             <button className="linklike" type="button" data-testid="hero-sign-in-code" onClick={() => openAccount('signin')}>{t('login.signInWithCode')}</button>
           </div>
           <div style={{ textAlign: 'center', marginTop: 14 }}>
+            {/* Wide screens read one link; on a phone the link is the two words
+                and what the demo holds is said beneath it (theme.css). */}
             <button className="linklike" type="button" data-testid="hero-try-demo" disabled={busy} onClick={tryDemo}>
-              {t('login.tryDemoIndia')}
+              {t('login.tryDemo')}<span className="hero-demo-detail"> {t('login.tryDemoDetail')}</span>
             </button>
+            <p className="hero-demo-note">{t('login.tryDemoNote')}</p>
           </div>
           <div style={{ textAlign: 'center', marginTop: 12 }}>
             <button className="linklike" type="button" data-testid="hero-offline" onClick={enter}>{t('signup.offline')}</button>

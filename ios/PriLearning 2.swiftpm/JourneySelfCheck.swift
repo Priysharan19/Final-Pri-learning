@@ -750,7 +750,13 @@ enum JourneySelfCheck {
     """
 
     // Backgrounded by another app and brought back: the page saw the
-    // lifecycle and an unsent typed answer is still there.
+    // lifecycle, the unsent typed answer was already in the draft store when
+    // the app went away, and it is still on the card and on disk afterwards.
+    // (The flush of a still-pending write on hide is pinned deterministically
+    // by client/test/background-draft-flush-check.mjs.)
+    // The runner switches apps when THIS page asks for it (the relay below),
+    // not at a fixed time: on a loaded runner a fixed-time switch could land
+    // after the wait had already given up (#528).
     private static let background = cloudHelpers + """
     await step('backgroundDraftKept', async () => {
       await home();
@@ -758,10 +764,16 @@ enum JourneySelfCheck {
       document.addEventListener('visibilitychange', () => log.push(document.visibilityState));
       // The shell's own lifecycle events (priBridge envelope), alongside the
       // page's visibility — either proves the app went away and came back.
+      // `leaving` (set once the answer is typed) reads the draft store the
+      // first time the page hears it is going away — after the store's own
+      // handler for that same signal has run.
+      let leaving = null;
       const prior = window.__priNativeReceive;
       window.__priNativeReceive = m => {
-        try { if (m && m.event === 'lifecycle.state') log.push(m.payload?.state === 'background' ? 'hidden' : m.payload?.state === 'active' ? 'visible' : 'inactive'); } catch (e) {}
+        let state = null;
+        try { if (m && m.event === 'lifecycle.state') { state = m.payload?.state; log.push(state === 'background' ? 'hidden' : state === 'active' ? 'visible' : 'inactive'); } } catch (e) {}
         if (prior) prior(m);
+        if (leaving && (state === 'inactive' || state === 'background')) leaving();
       };
       history.pushState({}, '', '/practice'); dispatchEvent(new PopStateEvent('popstate'));
       await waitFor(() => q('.q-prompt'));
@@ -772,13 +784,48 @@ enum JourneySelfCheck {
         if (!input) { q('.ctx-next')?.click(); await sleep(900); }
       }
       if (!input) throw new Error('no typed question');
+      const id = (q('.qpage[data-question-id]') || {}).getAttribute?.('data-question-id') || '';
+      if (!id) throw new Error('no question id');
+      // What the draft store holds for this question, read from disk.
+      const onDisk = () => {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('pri.draft.') && k.endsWith('.question.' + id)) {
+            try { return JSON.parse(localStorage.getItem(k)).data?.typed ?? null; } catch (e) { return 'unreadable'; }
+          }
+        }
+        return null;
+      };
       setValue(input, 'x+42');
-      // The runner now switches to another app and back (it allows ~20 s for setup).
-      try { await waitFor(() => log.includes('hidden') && log[log.length - 1] === 'visible', 90000); }
-      finally { window.__priNativeReceive = prior; }
+      // Registered after the first keystroke, so after the draft store's own
+      // listener: this sees what was on disk once the page was hidden.
+      let atHide = 'never told it was leaving';
+      leaving = () => { if (leaving) { atHide = onDisk(); leaving = null; } };
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && leaving) leaving(); });
+      // Ask the runner to switch to another app and back, and wait for it.
+      at = 'runner';
+      window.__priJourneyReply = null;
+      window.__priJourneyAsk = { n: 1, kind: 'background' };
+      // The runner answers once it has brought the app back; on a loaded
+      // machine `simctl launch` alone can take minutes, so the page waits on
+      // that answer (bounded by the runner's own deadline), then for the
+      // lifecycle it must have produced.
+      try {
+        at = 'runner';
+        try { await waitFor(() => window.__priJourneyReply, 300000); }
+        catch (e) { throw new Error('the runner never answered'); }
+        if (!window.__priJourneyReply.switched) throw new Error('the runner could not switch apps: ' + window.__priJourneyReply.reason);
+        at = 'lifecycle';
+        try { await waitFor(() => log.includes('hidden') && log[log.length - 1] === 'visible' && document.visibilityState === 'visible', 30000); }
+        catch (e) { throw new Error('no background and return seen after the switch (' + window.__priJourneyReply.ms + ' ms); lifecycle ' + (log.join('>') || 'none')); }
+      } finally { window.__priNativeReceive = prior; }
+      at = 'draft';
       const kept = (q('.editor-body input.answer-input') || {}).value;
-      if (kept !== 'x+42') throw new Error('draft lost: ' + kept);
-      return 'lifecycle ' + log.join('>') + ', draft kept';
+      if (kept !== 'x+42') throw new Error('draft lost on screen: ' + kept);
+      if (atHide !== 'x+42') throw new Error('draft not on disk when the app went away: ' + atHide);
+      const disk = onDisk();
+      if (disk !== 'x+42') throw new Error('draft lost on disk after resume: ' + disk);
+      return 'lifecycle ' + log.join('>') + '; draft on disk as it left, on screen and disk after resume';
     });
     return JSON.stringify(steps);
     """
