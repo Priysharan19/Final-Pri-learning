@@ -64,7 +64,7 @@
     "test:ink:structure:joint": "python3 tools/ink-foundation/test_structural_joint_decode.py",
     "test:ink:corpus": "node client/test/ink-corpus-audit.mjs",
     "test:ink:corpus:strict": "node client/test/ink-corpus-audit.mjs --strict",
-    "test:ink:bridge": "node client/test/native-ink-check.mjs",
+    "test:ink:bridge": "node client/test/native-ink-check.mjs && node client/test/journey-selfcheck-syntax-check.mjs",
     "test:simulator:fleet": "node client/test/simulator-fleet-check.mjs",
     "test:photo:bridge": "node client/test/photo-ocr-bridge-check.mjs",
     "test:ink:interaction": "node client/test/ink-interaction-guard-check.mjs && node client/test/ink-pen-buttons-check.mjs",
