@@ -18,6 +18,7 @@ import { cloudDeviceId } from '../platform/cloudAccount.js';
 import { requestIdentityToken, socialProviderConfig } from '../platform/socialSignIn.js';
 import { tLater, useT } from '../i18n/index.js';
 import OtpInput, { OTP_LENGTH } from './OtpInput.jsx';
+import { priNative } from '../platform/native/index.js';
 import './SignUpFlow.css';
 
 const CLASSES = [7, 8, 9, 10, 11, 12];
@@ -39,8 +40,20 @@ function stepsFor({ mode, role, minor }) {
   return ['role', 'age', 'class', 'method', 'code', ...(minor ? ['parent', 'parent-wait'] : [])];
 }
 
-/** Read an SMS code through WebOTP where the browser offers it (Android Chrome). */
+/**
+ * Read an SMS code where the platform offers it: the Android app through the
+ * shell (SMS User Consent; a WebView has no WebOTP), Android Chrome through
+ * WebOTP. iOS offers the code on the keyboard from autocomplete="one-time-code".
+ * Either way the person agrees first, and the server still verifies the code.
+ */
 function listenForSmsCode(onCode) {
+  if (priNative.otp.smsAvailable()) {
+    const controller = new AbortController();
+    priNative.otp.smsCode({ signal: controller.signal })
+      .then(code => onCode(code))
+      .catch(() => { /* declined, cancelled or timed out: the boxes still work */ });
+    return () => controller.abort();
+  }
   if (typeof window === 'undefined' || !('OTPCredential' in window) || !navigator.credentials?.get) return () => {};
   const controller = new AbortController();
   navigator.credentials.get({ otp: { transport: ['sms'] }, signal: controller.signal })
