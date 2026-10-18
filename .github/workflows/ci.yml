@@ -325,7 +325,9 @@ jobs:
           set -o pipefail
           node server/test/observability-check.mjs 2>&1 | tee ops.log
           node server/test/failure-drills-check.mjs 2>&1 | tee -a ops.log
+          node server/test/alert-notifier-check.mjs 2>&1 | tee -a ops.log
           grep -Fq 'OBSERVABILITY: PASS' ops.log
+          grep -Fq 'ALERT NOTIFIER: PASS — 15/15 checks' ops.log
           grep -Fq 'FAILURE DRILLS: PASS' ops.log
       # V1 blocker #14: every /v1 route is in the reviewed inventory with the
       # guards really mounted on it; every object-level route fails closed for

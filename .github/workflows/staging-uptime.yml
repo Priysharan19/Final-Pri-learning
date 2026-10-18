@@ -1,0 +1,44 @@
+name: Staging uptime (SERVER_DOWN)
+
+# External SERVER_DOWN check for the staging /v1 server (docs/operations/alerts.md).
+# Every 5 minutes it asks /v1/health (liveness) and /v1/ready (readiness), each
+# twice with retries; the job fails when either is down. GitHub emails the repo
+# owner when a scheduled run fails. No checkout, no secrets, read-only token.
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-uptime
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      BASE_URL: https://pri-learning-staging-staging.up.railway.app
+    steps:
+      - name: Probe /v1/health and /v1/ready
+        run: |
+          set -u
+          failed=0
+          for path in /v1/health /v1/ready; do
+            for attempt in 1 2; do
+              code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
+                --retry 3 --retry-delay 5 --retry-all-errors \
+                "${BASE_URL}${path}" || echo 000)"
+              echo "SERVER_DOWN probe ${path} attempt ${attempt}: HTTP ${code}"
+              if [ "${code}" != "200" ]; then failed=1; fi
+              sleep 5
+            done
+          done
+          if [ "${failed}" -ne 0 ]; then
+            echo "::error::SERVER_DOWN — staging /v1/health or /v1/ready did not answer 200"
+            exit 1
+          fi
+          echo "staging up"
