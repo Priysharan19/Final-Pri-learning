@@ -63,7 +63,7 @@ import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
 import { cloud, nativeCloudAvailable } from '../platform/cloudTransport.js';
 import { withMutationLock } from './mutationLock.js';
-import { serveAvoidingRepeat } from './retargetOnRepeat.js';
+import { serveAvoidingRepeat, chapterRetarget } from './retargetOnRepeat.js';
 import { registerIssuedAttemptRecorder, registerRestoreSanitisers } from '../platform/cloudSyncRestore.js';
 import { publicQuestionFields } from '../engine/publicQuestion.js';
 import {
@@ -1042,7 +1042,8 @@ async function createIndiaQuestion(pid, chapter, target, mode, trackId, examId =
   // has fresh questions (retargetOnRepeat.js; issue #540). Not while a
   // misconception is being worked on: the slip lives on this dot point, and a
   // repeat that can spring it outranks a fresh question that cannot — the
-  // same order drawDistinct keeps for a draft.
+  // same order drawDistinct keeps for a draft, whose re-resolutions the
+  // picker keeps on the hunted dot point (chapterRetarget).
   const { out, target: issued } = await serveAvoidingRepeat(t => serveQuestion(pid, {
     generator: t.generator, difficulty: t.difficulty, mode,
     trap: trapKey ? { owner: chapter.id, key: trapKey } : null
@@ -1298,30 +1299,26 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   }
   // Where a request goes when the cell it landed on has nothing fresh left: a
   // re-resolution on the same terms (difficulty, archive status, inside the
-  // window), each call naming the next place to try. A dot point the student
-  // named has only its own cells to offer. A chapter — the student's by name,
-  // or the optimiser's — was narrowed to one dot point by the picker above, so
-  // after that dot point's own cells the chapter's other dot points follow,
-  // next-best first: Class X Quadratic Equations has three cells at D2 and the
-  // one behind its fourth dot point holds twelve items, fewer than the repeat
-  // window, so a chapter request that landed there was served a flagged repeat
-  // while the chapter had 1,400 fresh questions (issue #540).
+  // window), each call naming the next place to try (chapterRetarget). A dot
+  // point the student named has only its own cells to offer. A chapter — the
+  // student's by name, or the optimiser's — was narrowed to one dot point by
+  // the picker above, so after that dot point's own cells the chapter's other
+  // dot points follow, next-best first: Class X Quadratic Equations has three
+  // cells at D2 and the one behind its fourth dot point holds twelve items,
+  // fewer than the repeat window, so a chapter request that landed there was
+  // served a flagged repeat while the chapter had 1,400 fresh questions (issue
+  // #540). A misconception hunt stays on its dot point, online and in the
+  // device's offline draft alike: the slip lives there.
   const onTerms = t => (t && t.difficulty === target.difficulty && !!t.pyq === !!target.pyq && (t.windowed !== false) === (target.windowed !== false) ? t : null);
-  const sameDotpoint = () => onTerms(resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly }));
-  let retarget = sameTerms(target, () => resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly }));
-  if (dp && asked == null) {
-    const others = dpPool.filter(d => d !== dp && d.index !== dp.index);
-    let sameTried = false;
-    retarget = () => {
-      if (!sameTried) { sameTried = true; return sameDotpoint(); }
-      const next = pickDotpoint(others, { rand, nowMs: now, recent: recentlyServedDotpoints(p.id) });
-      if (!next) return null;
-      others.splice(others.indexOf(next), 1);
-      return onTerms(resolveIndiaTarget(c, { dotpoint: next.index, difficulty: want, track: trackId, grade, pyqOnly }));
-    };
-  }
+  const retarget = chapterRetarget({
+    sameDotpoint: sameTerms(target, () => resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly })),
+    others: dp && asked == null ? dpPool.filter(d => d !== dp && d.index !== dp.index) : null,
+    pickNext: remaining => pickDotpoint(remaining, { rand, nowMs: now, recent: recentlyServedDotpoints(p.id) }),
+    resolveAt: next => onTerms(resolveIndiaTarget(c, { dotpoint: next.index, difficulty: want, track: trackId, grade, pyqOnly })),
+    hunting: !!choice.trap?.key
+  });
   return {
-    chapter: c, target, dotpointKey: target.dotpointIndex != null ? indiaDotpointKey(c.id, target.dotpointIndex) : null,
+    chapter: c, target,
     retarget, whyFor,
     reason: choice.reason, reasonTag: choice.reasonTag, why: whyFor(target), nextUp: choice.nextUp, trap: choice.trap,
     successTarget: choice.target, mastery: st.mastery || 0, explicit: choice.explicit, aheadUnlocked

@@ -14,12 +14,16 @@
 //   5. a resolver that never names another cell spends `resolveTries` and stops
 //   6. a device draft is never re-asked (its own draw already re-targeted),
 //      nor is a request that cannot be re-resolved
-//   7. a retry that comes back as a draft is kept with the cell it was asked on
+//   7. a retry that comes back as a draft ends the retries and is kept
+//   8. chapterRetarget, which builds the resolver a request gets: a chapter
+//      tries its own dot point first, then each other dot point once,
+//      next-best first; a named dot point and a misconception hunt never
+//      leave their dot point (the hunt's offline draft included)
 //
 // Usage: node client/test/retarget-on-repeat-check.mjs
 // ─────────────────────────────────────────────────────────────────────────────
 import assert from 'node:assert/strict';
-import { serveAvoidingRepeat } from '../src/local/retargetOnRepeat.js';
+import { serveAvoidingRepeat, chapterRetarget } from '../src/local/retargetOnRepeat.js';
 
 let n = 0;
 const ok = (condition, message) => { assert.ok(condition, message); n++; };
@@ -111,12 +115,56 @@ function resolver(sequence) {
   eq([s2.asked, got2.out.repeat], [['context'], true], 'with no resolver the flagged repeat is kept as it is');
 }
 
-// ── 7. A retry that comes back as a draft is kept with its cell ─────────────
+// ── 7. A retry that comes back as a draft ends the retries and is kept ──────
+// (The helper returns the cell the draft was asked on; local/backend.js names
+// a draft's row by the cell the draft itself was drawn from, draftTarget, so
+// that returned cell is not what a draft's row records.)
 {
   const s = server({ context: { repeat: true }, roots: { repeat: true, fields: { draftOnly: true } } });
   const got = await serveAvoidingRepeat(s.serve, cell('context'), resolver([cell('roots'), cell('discriminant')]).retarget);
   eq(s.asked, ['context', 'roots'], 'the connection went away mid-way: the draft ends the retries');
-  eq([got.out.fields.draftOnly, got.target.generator], [true, 'roots'], 'and is kept with the cell it was asked on, so the row names the draft\'s own cell');
+  eq([got.out.fields.draftOnly, got.target.generator], [true, 'roots'], 'and the draft is the reply kept, reported against the cell it was asked on');
+}
+
+// ── 8. chapterRetarget: where a request may look next ───────────────────────
+{
+  const dot = index => ({ index, id: `dp${index}` });
+  /** A same-dot-point resolver that names one of the picked dot point's cells per call, and counts its calls. */
+  const ownCells = (dotpointIndex, generators) => {
+    let calls = 0;
+    const fn = () => cell(generators[calls++ % generators.length], 2, dotpointIndex);
+    return { fn, get calls() { return calls; } };
+  };
+  // pickNext: the best remaining dot point is the one with the lowest index here.
+  const pickNext = remaining => remaining.slice().sort((a, b) => a.index - b.index)[0] || null;
+  const resolveAt = d => cell(`cell-of-dp${d.index}`, 2, d.index);
+
+  // A chapter: its own dot point first, then each other dot point once, best first, then nothing.
+  const own = ownCells(3, ['context']);
+  const walk = chapterRetarget({ sameDotpoint: own.fn, others: [dot(2), dot(0), dot(1)], pickNext, resolveAt });
+  const named = Array.from({ length: 6 }, () => walk());
+  eq(named.map(t => t && t.dotpointIndex), [3, 0, 1, 2, null, null], 'a chapter request tries its own dot point once, then every other dot point once, next-best first, then stops');
+  eq(own.calls, 1, 'the picked dot point is re-resolved once before the walk moves on');
+  const others = [dot(0), dot(1)];
+  const walk2 = chapterRetarget({ sameDotpoint: ownCells(3, ['context']).fn, others, pickNext, resolveAt });
+  walk2(); walk2(); walk2();
+  eq(others.map(d => d.index), [0, 1], 'the caller\'s list of dot points is never consumed');
+  // A pickNext that names something outside the list ends the walk rather than dropping a dot point.
+  const stray = chapterRetarget({ sameDotpoint: ownCells(3, ['context']).fn, others: [dot(0)], pickNext: () => dot(9), resolveAt });
+  stray();
+  eq(stray(), null, 'a dot point the walk was not offered is never resolved');
+
+  // A misconception hunt: every call stays on the hunted dot point, however many draws ask.
+  const hunted = ownCells(3, ['context', 'context-b']);
+  const hunt = chapterRetarget({ sameDotpoint: hunted.fn, others: [dot(0), dot(1), dot(2)], pickNext, resolveAt, hunting: true });
+  const hunts = Array.from({ length: 30 }, () => hunt());
+  ok(hunts.every(t => t && t.dotpointIndex === 3), `a misconception hunt never names another dot point — got ${JSON.stringify([...new Set(hunts.map(t => t && t.dotpointIndex))])}`);
+  eq([hunt === hunted.fn, hunted.calls], [true, 30], 'the hunt\'s resolver is the picked dot point\'s own, used for every draw (the offline draft\'s included)');
+
+  // A dot point the student named: only its own cells, with or without a hunt.
+  const mine = ownCells(1, ['roots']);
+  eq(chapterRetarget({ sameDotpoint: mine.fn, others: null, pickNext, resolveAt }), mine.fn, 'a named dot point has only its own cells to offer');
+  eq(chapterRetarget({ sameDotpoint: mine.fn, others: null, pickNext, resolveAt, hunting: true }), mine.fn, 'and so does a hunt on a named dot point');
 }
 
 console.log(`RETARGET ON REPEAT: PASS — ${n} checks`);

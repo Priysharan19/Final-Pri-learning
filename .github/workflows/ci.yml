@@ -124,6 +124,8 @@ jobs:
           # 7–12, JEE Main, JEE Advanced) served, validated, versioned and
           # end-to-end through the local backend; the path count may only grow.
           # 172: 23 checks added — a chapter request that lands on a spent cell is answered from another cell of the same terms (issue #540).
+          # A served repeat is re-asked on another cell of the same terms; a misconception hunt never leaves its dot point (issue #540).
+          grep -Fq 'RETARGET ON REPEAT: PASS — 28 checks' suites.log
           grep -Fq 'CONTENT CERTIFICATION REGRESSIONS: PASS — 172/172 checks' suites.log
           grep -Fq 'CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — ' suites.log
           grep -Fq '8/8 exam selections' suites.log
