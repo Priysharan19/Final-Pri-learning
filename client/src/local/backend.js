@@ -53,7 +53,7 @@ import {
 } from './examSession.js';
 import {
   assertExamAllowed, assertPracticeAllowed, examAllowance, practiceAllowance,
-  planView, profileCloudAccountId, profileCloudLinked, recordExamSimulation, recordPracticeServed, requireCapability, usageView
+  planView, profileCloudAccountId, profileCloudLinked, recordExamSimulation, recordPracticeServed, requireCapability, serverGateRefusal, usageView
 } from './entitlementGate.js';
 import { ENTITLEMENTS } from '../platform/entitlements.js';
 import { featureEnabled } from '../platform/features.js';
@@ -4528,7 +4528,14 @@ const routes = {
       try {
         const again = await cloud.repeatPractice(row.serverQuestionId);
         if (again?.question?.id) out = { q: again.question, fields: { serverQuestionId: again.question.id, repeatOf: row.id }, same: true };
-      } catch { out = null; }
+      } catch (cause) {
+        // A repeat is a practice question of the account's day (#537): the
+        // server's cap refusal stands, rather than being tried again as a
+        // fresh question it would refuse the same way.
+        const gate = serverGateRefusal(cause);
+        if (gate) throw gate;
+        out = null;
+      }
     }
     if (!out) {
       const fresh = await serveQuestion(p.id, { generator, difficulty: row.difficulty, mode: 'practice' },
@@ -5556,7 +5563,15 @@ async function serveQuestion(pid, { generator, difficulty, mode, dotpoint = null
         // that try spent; the card must say one try is left, as the server will.
         return { q: out.question, fields: { serverQuestionId: out.question.id, ...(out.triesLeft === 1 ? { tries: 1 } : {}) }, trapDelivered: out.trapDelivered === true, repeat: out.repeat === true };
       }
-    } catch { /* not issuable right now: prepared or draft below */ }
+    } catch (cause) {
+      // The server's own daily cap (#537), or a Premium gate, is the account's
+      // answer for today: it is explained as such (FreeCapNotice), never worked
+      // around with a prepared question or a draft the account could not have
+      // marked anyway.
+      const gate = serverGateRefusal(cause);
+      if (gate) throw gate;
+      /* not issuable right now: prepared or draft below */
+    }
   }
   try {
     const out = await cloud.preparePractice(body);
@@ -5584,6 +5599,11 @@ async function requireServerIssue(row) {
   // another profile's account is refused by the server before the prepared
   // question is taken up, so it stays bindable by the right one.
   try { out = await cloud.issuePractice({ prepared: row.prepared, account: linkedAccount }); } catch (cause) {
+    // Binding would make this a creditable question, and the account's free
+    // day is used up (#537): the server refused, nothing is marked, the work
+    // is kept, and the card says what ran out and when it comes back.
+    const gate = serverGateRefusal(cause);
+    if (gate) throw gate;
     if (cause?.code === 'PRACTICE_ACCOUNT_MISMATCH') throw checkUnavailable('sign-in', cause);
     if (cause?.status === 401) throw checkUnavailable('sign-in', cause);
     if (cause?.status === 403 || cause?.status === 426) throw checkUnavailable('refused', cause);
