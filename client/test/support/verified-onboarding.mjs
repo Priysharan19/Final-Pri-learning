@@ -124,7 +124,7 @@ export async function signInOnCard(scope, platform, { email, name = null, age = 
  * never silently honoured with a different identity.
  */
 export async function createVerifiedProfile(page, platform, {
-  name = 'E2E Student', year = 9, email = null, track = null, course = 'in', role = 'student',
+  name = 'E2E Student', year = 9, email = null, track = null, course = 'nsw', role = 'student',
   language = 'en', fromPicker = false, age = 18, landing = 'home', note = null
 } = {}) {
   const say = message => { if (typeof note === 'function') note(message); };

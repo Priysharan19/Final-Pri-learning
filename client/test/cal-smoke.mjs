@@ -14,6 +14,8 @@
 // Run on its own:  node client/test/cal-smoke.mjs
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
+import { onlinePlatform } from './support/online-session.mjs';
+import { signInOnCard } from './support/verified-onboarding.mjs';
 import { TEMPLATES } from '../src/ink/templates.js';
 
 const TEACH = ['0', '1'];             // the first two prompts the flow walks
@@ -46,7 +48,7 @@ export const flow = {
 
   async run({ page, base, check, goto, createProfile, settle }) {
     await goto('/');
-    await createProfile({ name: 'Sofia Kovalevskaya', year: 10 });
+    const sofia = await createProfile({ name: 'Sofia Kovalevskaya', year: 10 });
 
     // ── 1 · nothing is learned yet ───────────────────────────────────────────
     await page.goto(`${base}/settings`, { waitUntil: 'domcontentloaded' });
@@ -103,7 +105,13 @@ export const flow = {
     await page.getByRole('menuitem', { name: 'Switch profile' }).click();
     await page.waitForSelector('.acct-list', { timeout: 30000 });
     await page.locator('.acct-row', { hasText: 'Sofia Kovalevskaya' }).click();
-    await page.waitForSelector('.user-chip:has-text("Sofia")', { timeout: 30000 });
+    // Maryam's account holds the device's live session: Sofia's profile opens
+    // only once Sofia signs in as herself (the gate, issue #477).
+    await page.locator('[data-testid="account-activation-gate"]').waitFor({ timeout: 30000 });
+    await check('another account\'s live session does not open her profile: the gate asks her to sign in as herself',
+      await page.locator('.shell').count() === 0);
+    await signInOnCard(page.locator('[data-testid="account-activation-gate"] [data-signin-card="inline"]'), await onlinePlatform(), { email: sofia.email });
+    await page.waitForSelector('.user-chip:has-text("Sofia")', { timeout: 60000 });
     await page.goto(`${base}/settings`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.card:has-text("Personal templates learned")', { timeout: 30000 });
     await check('switching back finds the learned handwriting where it was left',
