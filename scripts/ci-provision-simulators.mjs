@@ -6,28 +6,37 @@
 // job needs one available simulator of EACH family. Hosted macOS images do not
 // always ship one (a run logged "No iPad simulator is available on this
 // runner"), so for each family with no available device this creates one from
-// the newest installed iOS runtime and a device type that runtime supports,
-// then boots every chosen device and waits for it. It fails clearly only when
-// no iOS runtime is installed or no device type of a family is supported.
+// the newest installed iOS runtime and a device type that runtime supports.
+// It fails clearly only when no iOS runtime is installed or no device type of
+// a family is supported.
 //
-//   node scripts/ci-provision-simulators.mjs            # iPhone + iPad
-//   node scripts/ci-provision-simulators.mjs --no-boot  # create only
-//   node scripts/ci-provision-simulators.mjs --create   # always create (tests the create path)
+// A hosted runner carries ONE booted simulator (scripts/simulator-fleet.mjs):
+// booting both families for the whole job starved boots, `log show` reads and
+// one `simctl install` for 24 minutes. So this creates both devices and boots
+// at most the one family the next step needs; the harness scripts boot their
+// own target and shut the other family down when they take over.
+//
+//   node scripts/ci-provision-simulators.mjs               # create both, boot none
+//   node scripts/ci-provision-simulators.mjs --boot ipad   # create both, boot the iPad only
+//   node scripts/ci-provision-simulators.mjs --create      # always create (tests the create path)
 // ─────────────────────────────────────────────────────────────────────────────
-import { execFileSync } from 'node:child_process';
+import { FAMILIES, bootFamily, keepOnlySimulator, simctl } from './simulator-fleet.mjs';
 
-const FAMILIES = ['iPhone', 'iPad'];
 // Preferred device types, in order: a standard 6.1" iPhone (393pt, the width
 // the journey's Dynamic Type step was certified at) and a standard iPad.
 const PREFERRED = {
   iPhone: ['iPhone 16', 'iPhone 17', 'iPhone 16 Pro', 'iPhone 17 Pro', 'iPhone 15'],
   iPad: ['iPad (A16)', 'iPad Air 11-inch (M4)', 'iPad Pro 11-inch (M5)', 'iPad Pro 11-inch (M4)', 'iPad (10th generation)'],
 };
-const simctl = (...args) => execFileSync('xcrun', ['simctl', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-const json = (...args) => JSON.parse(simctl('list', ...args, '-j'));
+const json = (...args) => JSON.parse(simctl(['list', ...args, '-j']));
 const version = v => String(v).split('.').map(Number);
 const newer = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i++) { const d = (b[i] || 0) - (a[i] || 0); if (d) return d; } return 0; };
 const fail = msg => { console.log(`::error::${msg}`); process.exit(1); };
+
+// Which family to leave booted, decided before anything is created so a bad
+// flag fails the step at once.
+let toBoot = null;
+try { toBoot = bootFamily(process.argv); } catch (error) { fail(String(error?.message || error)); }
 
 const runtimes = json('runtimes').runtimes
   .filter(r => r.isAvailable !== false && (r.platform === 'iOS' || /SimRuntime\.iOS-/.test(r.identifier)))
@@ -60,20 +69,25 @@ for (const family of FAMILIES) {
     if (!type) fail(`No ${family} device type is supported by ${rt.name} (${rt.identifier})`);
     const name = `Pri CI ${type.name}`;
     console.log(`Creating ${name} (${type.identifier}) on ${rt.name}`);
-    const udid = simctl('create', name, type.identifier, rt.identifier).trim();
-    pick = { name, udid, state: 'Shutdown', runtime: rt };
+    const udid = simctl(['create', name, type.identifier, rt.identifier]).trim();
+    pick = { name, udid, state: 'Shutdown', runtime: rt, family };
   }
+  pick.family = family;
   console.log(`${family}: ${pick.name} (${pick.udid}) on ${pick.runtime.name}`);
   chosen.push(pick);
 }
 
-if (!process.argv.includes('--no-boot')) {
-  for (const d of chosen) {
-    if (d.state !== 'Booted') {
-      try { simctl('boot', d.udid); } catch (e) { if (!/current state: Booted/.test(String(e.stderr))) throw e; }
-    }
-    simctl('bootstatus', d.udid, '-b');
-    console.log(`Booted ${d.name}`);
+let booted = null;
+if (toBoot) {
+  const d = chosen.find(x => x.family === toBoot);
+  // Anything else left booted on the runner (an image sometimes ships one) is
+  // shut down first, so the lane starts with exactly one.
+  keepOnlySimulator(d.udid);
+  if (d.state !== 'Booted') {
+    try { simctl(['boot', d.udid]); } catch (e) { if (!/current state: Booted/.test(String(e.stderr))) throw e; }
   }
+  simctl(['bootstatus', d.udid, '-b']);
+  booted = d.name;
+  console.log(`Booted ${d.name}`);
 }
-console.log(`SIMULATORS: PASS — ${chosen.map(d => d.name).join(' + ')}`);
+console.log(`SIMULATORS: PASS — ${chosen.map(d => d.name).join(' + ')} (booted: ${booted || 'none yet; each step boots its own and keeps one'})`);
