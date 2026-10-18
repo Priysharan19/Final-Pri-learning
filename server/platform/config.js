@@ -109,32 +109,45 @@ export const SUPAVISOR_TRANSACTION_PORT = '6543';
 const TRANSACTION_POOL_MODES = new Set(['transaction', 'statement']);
 const POOL_MODE_KEYS = new Set(['pool_mode', 'pool-mode', 'poolmode']);
 /**
- * The port node-postgres will actually connect to, from every source it reads,
- * in its own order (pg-connection-string, then pg's ConnectionParameters): a
- * `port` query parameter (the last one wins) overrides the authority port, and
- * a URL with neither falls back to PGPORT, then 5432. Every candidate is
- * returned so a refusal does not depend on which one pg ends up preferring.
+ * Every port node-postgres might connect to, from every source it reads, in its
+ * own order: pg-connection-string takes the LAST `port` query parameter (exact
+ * key) or, when that is empty, the authority port; pg's ConnectionParameters
+ * then falls back to PGPORT, then 5432, when that is empty too. So PGPORT is a
+ * candidate whenever neither of the first two gives a port — an uppercase
+ * `PORT=` or an earlier non-empty `port=` does not stop pg using PGPORT.
+ * `port` parameters in any case are returned as well, so a refusal does not
+ * depend on which spelling pg (or a pooler in front of it) prefers.
  */
 function effectivePorts(url, env) {
-  const query = [];
-  for (const [key, value] of url.searchParams.entries()) if (key.toLowerCase() === 'port') query.push(String(value).trim());
-  const ports = [...query];
+  const ports = [];
+  let pgQueryPort = '';
+  for (const [key, value] of url.searchParams.entries()) {
+    if (key.toLowerCase() === 'port') ports.push(value);
+    if (key === 'port') pgQueryPort = value;
+  }
   if (url.port) ports.push(url.port);
-  if (!query.some(Boolean) && !url.port) {
+  if (!pgQueryPort && !url.port) {
     for (const source of new Set([env, process.env])) {
-      const value = String(source?.PGPORT ?? '').trim();
+      const value = String(source?.PGPORT ?? '');
       if (value) ports.push(value);
     }
   }
   return ports;
 }
+/**
+ * The port number pg connects to for one candidate: ConnectionParameters runs
+ * parseInt(value, 10), which skips leading whitespace, accepts a sign and
+ * leading zeros, and stops at the first non-digit — "6543.0", "+6543",
+ * " 6543", "06543", "6543abc" and "6543e0" are all 6543. Compared the same way.
+ */
+const pgPortNumber = value => Number.parseInt(String(value), 10);
 export function assertSessionModeUrl(connectionString, env = process.env) {
   const url = new URL(String(connectionString));
   const refuse = why => {
     throw configError('PLATFORM_DB_TRANSACTION_POOLER',
       `PRI_DATABASE_URL points at a transaction-mode pooler (${why}). The server needs a session per connection: use Supabase's session pooler (port 5432) or a direct connection.`);
   };
-  if (effectivePorts(url, env).some(port => port.replace(/^0+/, '') === SUPAVISOR_TRANSACTION_PORT)) {
+  if (effectivePorts(url, env).some(port => pgPortNumber(port) === Number(SUPAVISOR_TRANSACTION_PORT))) {
     refuse(`port ${SUPAVISOR_TRANSACTION_PORT} is Supabase Supavisor transaction mode`);
   }
   // Parameter keys in any case: pg passes unknown keys through, and a pooler or

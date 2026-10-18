@@ -361,7 +361,7 @@ jobs:
           node server/test/platform-sync-burst-check.mjs
           set -o pipefail
           node server/test/postgres-connection-config-check.mjs | tee postgres-connection-config.log
-          grep -Fq 'POSTGRES CONNECTION CONFIG: PASS — 132/132 checks' postgres-connection-config.log
+          grep -Fq 'POSTGRES CONNECTION CONFIG: PASS — 227/227 checks' postgres-connection-config.log
           node server/test/platform-startup-check.mjs
       - name: Supabase migrations and every engine-agnostic platform suite on real Postgres
         run: |
