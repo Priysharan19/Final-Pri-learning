@@ -361,4 +361,10 @@ console.log(`Equivalence classes (accepted + rejected per class):\n${table}`);
 console.log(failures.length
   ? `EQUIVALENCE CLASSES: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
   : `EQUIVALENCE CLASSES: PASS — ${pass}/${pass} checks across ${classes.size} classes — fractions/decimals/surds, degrees/radians, units and rupees, interval and set notation, matrices and vectors, complex numbers in a + bi and polar form, inequality direction and "or" solutions, ± answers and equivalent algebraic forms, each with its false positives refused.`);
-process.exit(failures.length ? 1 : 0);
+if (failures.length) process.exit(1);
+
+// The fraction ≡ exact-decimal class is also swept, not only authored: every
+// keyed fraction on every live generator at every difficulty (#527). The sweep
+// is the second half of this gate; it reports its own PASS/FAIL line and exits
+// non-zero on any failing check. `npm run test:marker:equivalence` runs both.
+await import('./marker-decimal-sweep-check.mjs');
