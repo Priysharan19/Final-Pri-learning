@@ -16,6 +16,9 @@
 // thumbnail wait must report what the attach pipeline shows, and its 20 s
 // budget is neither raised nor lowered.
 //
+// It checks itself first: a non-raw literal's escapes are read once, left to
+// right, the way Swift reads them (see `unescapeSwift`).
+//
 // Run on its own:  node client/test/journey-selfcheck-syntax-check.mjs
 //                  node client/test/journey-selfcheck-syntax-check.mjs <file.swift>…
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,6 +37,25 @@ let pass = 0;
 const failures = [];
 const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
 
+/** Swift's single-character escapes (a backslash before a newline joins the lines). */
+const SWIFT_ESCAPES = { '\\': '\\', '"': '"', "'": "'", n: '\n', t: '\t', r: '\r', 0: '\0', '\n': '' };
+
+/**
+ * The text a non-raw Swift string literal denotes. One pass, left to right:
+ * every backslash sequence is consumed exactly once and its replacement is
+ * never scanned again, so `\\"` is `\"` (a backslash, then a quote) — never `"`.
+ * Interpolation cannot be composed off-device and an unknown escape would not
+ * compile in Swift, so both are errors here rather than silently kept.
+ */
+export function unescapeSwift(name, body) {
+  return body.replace(/\\(?:u\{([0-9A-Fa-f]{1,8})\}|([\s\S]))/g, (seq, hex, esc) => {
+    if (hex !== undefined) return String.fromCodePoint(parseInt(hex, 16));
+    if (esc === '(') throw new Error(`${name}: string interpolation \\( cannot be composed off-device`);
+    if (esc === undefined || !Object.hasOwn(SWIFT_ESCAPES, esc)) throw new Error(`${name}: unknown Swift escape ${JSON.stringify(seq)}`);
+    return SWIFT_ESCAPES[esc];
+  });
+}
+
 /**
  * Every `private static let <name> = [<part> + …] """…"""` literal: its name,
  * the literals it is prefixed with, and its text with Swift's escapes applied
@@ -47,7 +69,7 @@ export function extractLiterals(swift) {
     const [, name, prefix, rawOpen, body, rawClose] = m;
     if (rawOpen !== rawClose) throw new Error(`${name}: raw string delimiters do not match`);
     const parts = prefix.split('+').map(s => s.trim()).filter(Boolean);
-    const text = rawOpen ? body : body.replace(/\\\\/g, '\\').replace(/\\"/g, '"');
+    const text = rawOpen ? body : unescapeSwift(name, body);
     literals.set(name, { parts, text });
   }
   return literals;
@@ -58,6 +80,39 @@ export function compose(literals, name) {
   const literal = literals.get(name);
   if (!literal) throw new Error(`no literal named ${name}`);
   return literal.parts.map(part => compose(literals, part)).concat(literal.text).join('\n');
+}
+
+// ── the harness reads Swift escapes the way Swift does, once ─────────────────
+// Regression for the sequential `replace(/\\\\/g).replace(/\\"/g)` this check
+// first shipped with (CodeQL js/double-escaping): its first pass turned `\\"`
+// into `\"`, which its second pass then read as an escaped quote. A journey that
+// ended a JS string with a backslash would have been "parsed" as something else.
+{
+  const sample = [
+    'private static let plain = """',
+    '  s(/\\\\s+/, "\\\\"", \'\\n\', "\\t\\u{41}");',
+    '  """',
+    'private static let raw = #"""',
+    '  r(/\\\\s+/, "\\\\"", \'\\n\');',
+    '  """#',
+    'private static let both = plain + raw + """',
+    '  b();',
+    '  """'
+  ].join('\n');
+  const lits = extractLiterals(sample);
+  ok(lits.get('plain')?.text === '  s(/\\s+/, "\\"", \'\n\', "\tA");',
+    'a non-raw literal: `\\\\` is one backslash, `\\\\"` is a backslash then a quote, `\\n` `\\t` `\\u{…}` are the characters they name');
+  ok(lits.get('raw')?.text === '  r(/\\\\s+/, "\\\\"", \'\\n\');',
+    'a raw #""" literal is kept byte for byte');
+  ok(compose(lits, 'both') === [lits.get('plain').text, lits.get('raw').text, '  b();'].join('\n'),
+    'a literal composed from parts is their texts in order, each on its own line');
+  let interpolation = null;
+  try { unescapeSwift('x', 'a \\(value) b'); } catch (e) { interpolation = e; }
+  ok(/interpolation/.test(interpolation?.message || ''), 'string interpolation is refused, not kept as text');
+  let unknown = null;
+  try { unescapeSwift('x', 'a \\q b'); } catch (e) { unknown = e; }
+  ok(/unknown Swift escape/.test(unknown?.message || ''), 'an escape Swift would not compile is refused');
+  ok(unescapeSwift('x', 'one \\\ntwo') === 'one two', 'a backslash before a newline joins the lines');
 }
 
 const scratch = mkdtempSync(path.join(tmpdir(), 'pri-journey-js-'));
