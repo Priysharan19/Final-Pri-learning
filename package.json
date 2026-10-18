@@ -118,7 +118,7 @@
     "test:secrets": "node tools/secret-scan.test.mjs && node tools/secret-scan.mjs",
     "test:platform:commerce": "node server/test/billing-cancel-refund-check.mjs && node server/test/billing-webhook-router-check.mjs && node server/test/storekit-entitlement-state-machine-check.mjs && node server/test/platform-db-operations-check.mjs && node server/test/platform-http-journeys-check.mjs",
     "test:marker:forms": "node client/test/marker-ncert-forms-check.mjs",
-    "test:marker:equivalence": "node client/test/marker-equivalence-classes-check.mjs",
+    "test:marker:equivalence": "node client/test/marker-equivalence-classes-check.mjs && node client/test/marker-decimal-sweep-check.mjs",
     "test:engine:regex": "node client/test/engine-regex-equivalence-check.mjs",
     "test:marker:method": "node client/test/marker-method-marks-check.mjs",
     "test:hints:leak": "node client/test/input-hint-leak-check.mjs",
