@@ -7,7 +7,10 @@
 // targets at least 44 CSS px — on Home, Practice, Progress and Settings, at the
 // device's own size, each audited once its own landmark has rendered. And the
 // system font size reaches the page: text is measurably larger at 1.3×.
-// TalkBack itself stays a physical/manual gate.
+// Nothing clips horizontally: phone portrait and tablet landscape, at 1.0× and
+// 1.3× font scale, no screen scrolls sideways and no visible control or heading
+// is cut by the viewport edge (content inside its own horizontal scroller is
+// exempt). TalkBack itself stays a physical/manual gate.
 // SYNTHETIC / EMULATOR evidence.
 // ─────────────────────────────────────────────────────────────────────────────
 package com.prilearning.app
@@ -114,6 +117,51 @@ class WebViewAccessibilityTest {
             assertTrue("text at system font scale 1.3 is larger than at 1.0 ($large vs $base CSS px)", large > base * 1.15)
         } finally {
             fontScale("1.0")
+        }
+    }
+
+    private val clipAudit = """(function(where){
+      var p=[],w=window.innerWidth;
+      if(document.documentElement.scrollWidth>w+1)p.push(where+': page is '+document.documentElement.scrollWidth+'px wide in a '+w+'px viewport');
+      var scroller=function(el){for(var a=el.parentElement;a&&a!==document.body;a=a.parentElement){var o=getComputedStyle(a).overflowX;if(o==='auto'||o==='scroll')return true;}return false;};
+      [].slice.call(document.querySelectorAll('button, a[href], input:not([type=hidden]), select, textarea, h1, h2, h3, [role=button], [role=heading]')).forEach(function(el){
+        if(!(el.offsetParent||el.getClientRects().length)||getComputedStyle(el).visibility==='hidden')return;
+        var r=el.getBoundingClientRect();if(r.width===0||r.height===0||scroller(el))return;
+        if(r.left<-1||r.right>w+1)p.push(where+': '+el.tagName.toLowerCase()+' '+(el.textContent||el.getAttribute('aria-label')||'').trim().slice(0,24)+' spans '+Math.round(r.left)+'..'+Math.round(r.right));});
+      return p.join(' | ')||'clean';})"""
+
+    /** Phone portrait / tablet landscape, at 1.0× and 1.3× font scale: no screen clips sideways. */
+    @Test
+    fun noScreenClipsHorizontally() {
+        val ui = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
+        fun sh(c: String) = ui.executeShellCommand(c).close()
+        val tablet = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.resources.configuration.smallestScreenWidthDp >= 600
+        // Natural orientation: portrait on a phone, landscape on pixel_tablet.
+        sh("settings put system accelerometer_rotation 0"); sh("settings put system user_rotation 0")
+        try {
+            for (scale in listOf("1.0", "1.3")) {
+                sh("settings put system font_scale $scale"); Thread.sleep(1500)
+                ActivityScenario.launch(MainActivity::class.java).use { s ->
+                    var ok = false
+                    s.onActivity { ok = it.webView != null }
+                    assumeTrue("the WebView is below the floor on this image", ok)
+                    val state = waitFor(s, """(function(){if(document.querySelector('.home-greet'))return 'home';
+                        var b=[].slice.call(document.querySelectorAll('.auth-card button')).find(function(x){return /Android Student/.test(x.textContent);});
+                        if(b){b.click();return 'picker';}return false;})()""")
+                    assertTrue(state, state == "\"home\"" || state == "\"picker\"")
+                    waitFor(s, "document.querySelector('.home-greet')")
+                    val landscape = eval(s, "window.innerWidth > window.innerHeight")
+                    assertEquals(if (tablet) "the tablet runs landscape" else "the phone runs portrait", if (tablet) "true" else "false", landscape)
+                    for ((path, landmark) in listOf("/" to ".home-greet", "/practice" to ".q-prompt", "/progress" to ".card .sc-label", "/review" to "h1, h2", "/settings" to "#cloud-account-title")) {
+                        eval(s, "(function(){history.pushState({},'','$path');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
+                        waitFor(s, "location.pathname === '$path' && !!document.querySelector('$landmark')")
+                        Thread.sleep(400)
+                        assertEquals("horizontal clipping on $path at font scale $scale (${if (tablet) "tablet landscape" else "phone portrait"})", "\"clean\"", eval(s, "$clipAudit('$path')"))
+                    }
+                }
+            }
+        } finally {
+            sh("settings put system font_scale 1.0"); sh("settings put system accelerometer_rotation 1")
         }
     }
 }
