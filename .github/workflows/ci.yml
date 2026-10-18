@@ -68,6 +68,18 @@ jobs:
           grep -Fq 'METHOD MARKS: PASS — 53/53 checks' suites.log
           grep -Fq 'METHOD PROGRESS: PASS — 1002/1002 checks' suites.log
           grep -Fq 'WORKING BRANCHES: PASS — 32/32 checks' suites.log
+          # Issue #430: the first wrong AP line is named, method marks before it stay, error is carried forward once,
+          # the answer mark is never paid for a wrong answer, and the adversarial corpus earns nothing it did not show.
+          # 2140 → 4396 (review round 1): every reviewer page is now a corpus case (formula lines carrying their
+          # arithmetic, prose and comma-less givens, listed terms, a last term slipped through continuations, n(…)/2),
+          # and each swept seed also checks three prose spellings of its givens, its one-line formula slip and n(…)/2.
+          # 4396 → 4795 (review round 2): D4 carries a slipped last term into the sum as D2 does (four D4 pages),
+          # and each swept sum seed also checks a last term slipped on its formula line and summed correctly.
+          # 4795 → 4885 (review round 2, adversarial): 22 pages where a line Pri may have misread (a part with no
+          # value, two statements run together, a word beside the working, a hedged given) is judged nowhere, and a
+          # listed line on a gradient plan (y11-diff) is not a derivative mistake.
+          grep -Fq 'AP FIRST ERROR + ECF: PASS — 4885/4885 checks' suites.log
+          grep -Fq 'WORKING EVIDENCE: PASS — 25/25 checks' suites.log
           grep -Fq 'Pri Reason V1 precision gate: PASS' suites.log
           grep -Fq 'Pri Reason V2 safety gate: PASS' suites.log
           grep -Fq 'Pri Reason V3 regression gate: PASS' suites.log
@@ -288,6 +300,8 @@ jobs:
           set -o pipefail
           node server/test/method-progress-http-check.mjs 2>&1 | tee practice-http.log
           node server/test/flagship-ap-working-http-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/owner-ap-first-mistake-contract-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/ap-term-firstbreak-regression-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-seed-reissue-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-server-question-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-repeat-credit-check.mjs 2>&1 | tee -a practice-http.log
@@ -295,6 +309,8 @@ jobs:
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1192/1192 checks' practice-http.log
           grep -Fq 'FLAGSHIP AP WORKING OVER HTTP: PASS — 301/301 checks' practice-http.log
+          grep -Fq 'OWNER AP FIRST-MISTAKE CONTRACT: PASS — 29/29 checks' practice-http.log
+          grep -Fq 'AP FIRST-BREAK REGRESSION: PASS — 4081/4081 checks over 120 seeds' practice-http.log
           grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
           grep -Fq 'SERVER-CHOSEN QUESTIONS: PASS — 34/34 checks' practice-http.log
           grep -Fq 'REPEAT CREDIT: PASS — 295/295 checks' practice-http.log
