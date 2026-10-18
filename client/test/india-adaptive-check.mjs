@@ -152,15 +152,26 @@ async function run() {
   }
 
   // Marking runs in a server worker under a hard deadline (server/platform/
-  // markerPool.js). A worker stopped at that deadline — a starved CI runner,
-  // never the answer — comes back as an unreadable entry: invalid, unresolved,
-  // `tooComplex`, nothing spent and nothing recorded. The card tells the
-  // student to try again; this suite does the same, a few times, and if the
-  // marking still does not finish it is reported at the end with the question
-  // named. It used to be revealed silently: a stalled marker then read as a
-  // wrong answer, the chapter never left acquisition, and the picker was
-  // entitled to serve it three in a row (#544).
-  const MARK_RETRIES = 4;
+  // markerPool.js). A worker stopped at that deadline comes back as an
+  // unreadable entry: invalid, unresolved, `tooComplex`, nothing spent and
+  // nothing recorded. Had that happened here it would have been revealed
+  // silently and read as a wrong answer, so this suite sends such an answer
+  // again, a few times, and reports any that still did not finish at the end
+  // with the question named. This is hardening against a trigger that was NOT
+  // what #544 was: the failing CI run logged no MARKER_DEADLINE_KILL at all
+  // (the platform logger prints every kill in this harness) and ran at normal
+  // speed. #544's cause was the server's unseeded question dice
+  // (crypto.randomInt in practice.js chooseQuestion), which made every run a
+  // different sitting; the online authority now seeds them from
+  // PRI_SUITE_SEED, so a sitting replays exactly.
+  // Each re-send carries a NEW submissionId (POST mints one per call), so it
+  // is a fresh submission, not an idempotent replay of the first — harmless,
+  // because the server records nothing for a marking stopped at its deadline.
+  // Three re-sends keep one stalled answer at four deadline stops, under the
+  // account's marker cooldown (MARKER_COOLDOWN.limit, five per window), so a
+  // persistently stalled question fails through the named `stalled` check
+  // rather than as a cascade of 429 MARKING_COOLDOWN refusals.
+  const MARK_RETRIES = 3;
   const stalled = [];
   async function submitMarked(s, input) {
     let r = null;
@@ -255,6 +266,13 @@ async function run() {
     ok('new ground is the first reason a fresh profile hears', log[0].reasonTag === 'new-ground', log[0].reasonTag);
     const seen = new Set(log.map(e => e.chapter));
     ok('smart practice covered the whole class before the sitting ended', seen.size === ownIds.size, `${seen.size}/${ownIds.size} chapters`);
+    // The ≤2 bound is a pin on this seeded sitting, not a property the engine
+    // guarantees: interleavePenalty (adaptive.js) suppresses a long run with a
+    // score multiplier, never a ban, and lets a chapter still in acquisition
+    // run to INTERLEAVE.acquisitionRun (4) — the wider bound the next check
+    // holds. Whether "off three-in-a-row" (adaptive-14) should also hold
+    // during acquisition is triaged separately, never settled by loosening
+    // this pin.
     ok('interleaving: never three consecutive picks of one chapter', longestRun(log) <= 2, `longest run ${longestRun(log)} — ${runDetail(log)}`);
     ok('interleaving: never beyond the engine\'s acquisition run', longestRun(log) <= INTERLEAVE.acquisitionRun, runDetail(log));
     ok('the sitting mixes reasons beyond new ground', new Set(log.map(e => e.reasonTag)).size >= 2, show([...new Set(log.map(e => e.reasonTag))]));
