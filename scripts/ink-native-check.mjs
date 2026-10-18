@@ -3,11 +3,12 @@
 // reports what it scored. Needs Xcode and a Mac; everything else in the test
 // suite runs anywhere.
 //
-// It builds the app, discovers the product and bundle identifier from the
-// actual build output, installs it, launches it with --ink-selfcheck, and reads
-// the result back out of the system log. Discovering these values matters: a
-// stale hard-coded bundle id previously let the app build and install and then
-// made the release gate fail at launch with FrontBoard "application unknown".
+// It builds the app (or takes the one CI has already built, --app), discovers
+// the product and bundle identifier from the actual build output, installs it,
+// launches it with --ink-selfcheck, and reads the result back out of the
+// system log. Discovering these values matters: a stale hard-coded bundle id
+// previously let the app build and install and then made the release gate
+// fail at launch with FrontBoard "application unknown".
 //
 // The native benchmark is deterministic synthetic ink. It is not a claim about
 // arbitrary real handwriting, but it IS a regression gate for the full shipped
@@ -16,12 +17,14 @@
 // structure away while hiding behind a high per-character percentage.
 //
 // Usage: npm run test:ink:native [-- --device "iPad Air 11-inch (M4)"]
+//        node scripts/ink-native-check.mjs --app "$PRI_SIM_APP"   # CI: no second xcodebuild
 // ─────────────────────────────────────────────────────────────────────────────
 import { execFileSync, execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { installApp, keepOnlySimulator, parseDevices } from './simulator-fleet.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, '../ios/PriLearning.swiftpm');
@@ -44,26 +47,25 @@ const run = (cmd, args, opts = {}) =>
 
 function pickDevice() {
   const named = argOf('device');
-  if (named) return named;
-  const list = run('xcrun', ['simctl', 'list', 'devices', 'available']);
-  const booted = list.split('\n').find(l => /iPad/.test(l) && /Booted/.test(l));
-  const any = list.split('\n').find(l => /iPad/.test(l));
-  const line = booted || any;
-  if (!line) throw new Error('no iPad simulator is available');
-  return line.trim().replace(/\s*\([0-9A-F-]{36}\).*$/i, '');
+  const rows = parseDevices(run('xcrun', ['simctl', 'list', 'devices', 'available']));
+  const matching = rows.filter(d => (named ? d.name === named : /iPad/.test(d.name)));
+  const pick = matching.find(d => d.state === 'Booted') || matching[0];
+  if (!pick) throw new Error(`no ${named || 'iPad'} simulator is available`);
+  return pick;
 }
 
-function ensureBooted(device) {
-  const list = run('xcrun', ['simctl', 'list', 'devices']);
-  if (new RegExp(`${device.replace(/[()]/g, '\\$&')}.*Booted`).test(list)) return;
-  console.log(`Booting ${device}…`);
-  try { run('xcrun', ['simctl', 'boot', device]); } catch { /* already booting */ }
-  for (let i = 0; i < 60; i++) {
-    if (/Booted/.test(run('xcrun', ['simctl', 'list', 'devices']).split('\n')
-      .filter(l => l.includes(device)).join('\n'))) return;
-    execSync('sleep 2');
-  }
-  throw new Error(`${device} did not boot`);
+function ensureBooted({ name, udid }) {
+  const booted = () => run('xcrun', ['simctl', 'list', 'devices']).split('\n').some(l => l.includes(udid) && /\(Booted\)/.test(l));
+  // A CI runner carries one booted simulator, whether or not this one must
+  // boot: another family left booted by an earlier step starves this one
+  // (scripts/simulator-fleet.mjs). A person's own simulators are never touched.
+  keepOnlySimulator(udid);
+  if (booted()) return;
+  console.log(`Booting ${name}…`);
+  try { run('xcrun', ['simctl', 'boot', udid]); } catch { /* already booting */ }
+  try { run('xcrun', ['simctl', 'bootstatus', udid, '-b'], { timeout: 600_000 }); } catch { /* poll below */ }
+  for (let i = 0; i < 60 && !booted(); i++) execSync('sleep 2');
+  if (!booted()) throw new Error(`${name} did not boot`);
 }
 
 function builtApp(derived) {
@@ -95,26 +97,34 @@ function verifyInstalled(device, bundleId) {
   throw new Error(`simulator did not register installed app ${bundleId}`);
 }
 
-const device = pickDevice();
-console.log(`Native ink self-check on ${device}\n`);
-ensureBooted(device);
+const sim = pickDevice();
+const device = sim.udid;
+console.log(`Native ink self-check on ${sim.name} (${device})\n`);
+ensureBooted(sim);
 
-const derived = mkdtempSync(join(tmpdir(), 'pri-ink-'));
-console.log('Building…');
-run('xcodebuild', [
-  '-scheme', 'PriLearning',
-  '-destination', `platform=iOS Simulator,name=${device}`,
-  '-derivedDataPath', derived,
-  'build'
-], { cwd: PACKAGE, maxBuffer: 64 * 1024 * 1024 });
+// CI builds the canonical package once and hands the .app to every step
+// (--app); a second xcodebuild here cost 4–5 minutes of a 60-minute job.
+let app = argOf('app');
+if (app) {
+  if (!existsSync(join(app, 'Info.plist'))) throw new Error(`--app is not a built simulator app: ${app}`);
+} else {
+  const derived = mkdtempSync(join(tmpdir(), 'pri-ink-'));
+  console.log('Building…');
+  run('xcodebuild', [
+    '-scheme', 'PriLearning',
+    '-destination', `platform=iOS Simulator,id=${device}`,
+    '-derivedDataPath', derived,
+    'build'
+  ], { cwd: PACKAGE, maxBuffer: 64 * 1024 * 1024 });
+  app = builtApp(derived);
+}
 
-const app = builtApp(derived);
 const bundleId = bundleIdentifier(app);
-console.log(`Built ${app.split('/').pop()} (${bundleId})`);
+console.log(`${argOf('app') ? 'Using' : 'Built'} ${app.split('/').pop()} (${bundleId})`);
 try { run('xcrun', ['simctl', 'terminate', device, bundleId]); } catch { /* not running */ }
-run('xcrun', ['simctl', 'install', device, app]);
+const install = installApp(device, app);
 const installed = verifyInstalled(device, bundleId);
-console.log(`Installed ${bundleId} at ${installed}`);
+console.log(`Installed ${bundleId} at ${installed} (${(install.ms / 1000).toFixed(1)} s, attempt ${install.attempt})`);
 console.log('Running…');
 run('xcrun', ['simctl', 'launch', device, bundleId, '--ink-selfcheck']);
 
