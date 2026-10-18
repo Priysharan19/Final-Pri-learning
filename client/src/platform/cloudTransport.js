@@ -11,6 +11,8 @@ const DEFAULT_TIMEOUT_MS = 12_000;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const PATH = /^\/v1\/[A-Za-z0-9/_-]{1,180}$/;
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,160}$/;
+// An IANA zone name, as an entitlement refusal says whose midnight it lifts at.
+const TIME_ZONE = /^[A-Za-z_]+(?:\/[A-Za-z0-9_+-]+){0,2}$/;
 
 // Cloud origin discovery, in order of authority:
 //   1. the origin that served this page, when it is the Pri platform server
@@ -241,6 +243,7 @@ export async function cloudRequest(path, {
       // An entitlement refusal names what it is about and when it lifts.
       if (typeof data?.error?.capability === 'string') err.capability = data.error.capability.slice(0, 60);
       for (const k of ['nextAt', 'used', 'limit', 'windowDays']) if (Number.isFinite(Number(data?.error?.[k]))) err[k] = Number(data.error[k]);
+      if (typeof data?.error?.timeZone === 'string' && TIME_ZONE.test(data.error.timeZone)) err.timeZone = data.error.timeZone;
       if (typeof data?.error?.openExamId === 'string' && SAFE_ID.test(data.error.openExamId)) err.openExamId = data.error.openExamId;
       err.requestId = result?.requestId || rid;
       throw err;
@@ -303,6 +306,7 @@ export async function cloudRequest(path, {
       // An entitlement refusal names what it is about and when it lifts.
       if (typeof data?.error?.capability === 'string') err.capability = data.error.capability.slice(0, 60);
       for (const k of ['nextAt', 'used', 'limit', 'windowDays']) if (Number.isFinite(Number(data?.error?.[k]))) err[k] = Number(data.error[k]);
+      if (typeof data?.error?.timeZone === 'string' && TIME_ZONE.test(data.error.timeZone)) err.timeZone = data.error.timeZone;
       if (typeof data?.error?.openExamId === 'string' && SAFE_ID.test(data.error.openExamId)) err.openExamId = data.error.openExamId;
       err.requestId = response.headers.get('x-pri-request-id') || rid;
       throw err;

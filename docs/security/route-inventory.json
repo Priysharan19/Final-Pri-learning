@@ -2005,7 +2005,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "eligible student; the server chooses and issues an authored, private per-account question (or binds a prepared one, once); sealed server question record; a caller-chosen seed is refused outside NODE_ENV=test",
+      "ownership": "eligible student; the server chooses and issues an authored, private per-account question (or binds a prepared one, once); sealed server question record; a caller-chosen seed is refused outside NODE_ENV=test; the free plan's daily cap (20 practice/review/task questions per account per Asia/Kolkata day, server/platform/practiceAllowance.js) is decided here from the server's own entitlement record and count — 402 FREE_CAP_REACHED with Retry-After, nothing escrowed, replays never counted twice",
       "rateLimits": [
         {
           "key": "practice-issue",
@@ -2097,7 +2097,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "eligible student; re-issues to the same account a question it has already resolved, flagged as a repeat so its attempt is never new credit; another account's or an unresolved question id is refused",
+      "ownership": "eligible student; re-issues to the same account a question it has already resolved, flagged as a repeat so its attempt is never new credit; another account's or an unresolved question id is refused; counts toward, and is refused at, the account's free daily practice cap (402 FREE_CAP_REACHED, server/platform/practiceAllowance.js)",
       "rateLimits": [
         {
           "key": "practice-repeat",

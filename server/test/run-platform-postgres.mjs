@@ -50,6 +50,10 @@ export const ENGINE_SUITES = [
   // account: the one-account claim and the sealed copy must hold on Postgres.
   'practice-server-question-check.mjs',
   'practice-repeat-credit-check.mjs',
+  // The free plan's daily cap is decided per account where a question is
+  // issued: the count, its exactly-once under two racing devices and the
+  // account-scoped reads must hold on SERIALIZABLE Postgres under RLS too.
+  'practice-daily-cap-check.mjs',
   // The marker runs off the request thread under a hard deadline, and a
   // submission is read → marked → committed with the state re-read under the
   // account's lock. The re-check and the exactly-once guarantees under

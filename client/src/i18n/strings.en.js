@@ -2664,6 +2664,8 @@ export default {
   'check.accountHint': 'Account settings shows what the account still needs.',
   'check.questionTitle': 'This question cannot be checked right now',
   'check.questionHint': 'Try again, or go to the next question.',
+  'check.freeCapTitle': 'Today’s free questions are used up',
+  'check.freeCapHint': 'Checking this one would be another of today’s free practice questions, and the free plan includes 20 a day. They come back at midnight (India time), and Premium removes the daily cap.',
   'check.placementNotStarted': 'The placement check has not started, and nothing was marked.',
   'check.gameNotStarted': 'The game has not started, and nothing was marked.',
   'check.newQuestionTitle': 'This question cannot be marked',
