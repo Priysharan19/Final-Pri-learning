@@ -482,6 +482,12 @@ jobs:
           # The owner's photographed page (scripted reader): transcript, unrelated lines,
           # corrected line, proposed answer, durable draft; and the usage-limit state.
           node client/test/tour-photo-answer.js --no-build 2>&1 | tee -a browser.log
+          # #449/#550: handwriting never vanishes under the pen — same-size
+          # resize callbacks, re-subscribe mid-stroke, cancelled strokes, theme
+          # flips and the default-bitmap first mount, with real bitmaps and
+          # pointer input. Chromium + WebKit × dpr 1.25/1.5 × mouse/pen, dark.
+          # Emulated scale factors, not Windows 11 hardware evidence.
+          node client/test/ink-canvas-loss-browser-check.mjs 2>&1 | tee -a browser.log
       - name: Accessibility suite
         if: always()
         run: |
@@ -560,6 +566,8 @@ jobs:
           grep -Fq 'BOOT RESILIENCE: PASS — 61/61 checks' browser.log
           grep -Fq 'Reader · usage limit reached' browser.log
           grep -Eq 'E2E SUITE.*38/38.*2 flows' browser.log
+          # Ink canvas loss (#449/#550): both engines, 200 checks, none failed.
+          grep -Fq 'INK CANVAS LOSS (emulated Windows scale factors, dark theme, mouse + pen; not Windows 11 hardware evidence): 200 passed, 0 failed' browser.log
           grep -Fq 'E2E BROWSER: webkit' browser.log
           test "$(grep -c 'Responsive matrix · 6 viewports, critical routes, write/type, actions' browser.log)" -ge 2
           test "$(grep -Ec 'E2E SUITE PASSED — 158/158 checks across 1 flows' browser.log)" -eq 2
