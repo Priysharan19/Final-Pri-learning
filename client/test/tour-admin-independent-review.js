@@ -5,6 +5,7 @@
 // approval into client-only success or expose Publish after the rejection.
 
 import { pathToFileURL } from 'node:url';
+import { enterThroughCard, mockAccountServer } from './support/mock-account.mjs';
 import { createMfaMock } from './support/totp.mjs';
 import { enrolStaffMfaThroughPanel } from './support/staff-mfa-tour.mjs';
 
@@ -29,8 +30,10 @@ export const flow = {
   id: 'admin-independent-review',
   name: 'Cloud admin · independent-review rejection',
 
-  async run({ page, ctx, base, check, goto, createProfile }) {
-    let authenticated = false;
+  async run({ page, ctx, base, check, goto }) {
+    // The admin's account, session and the activation handshake (card, gate,
+    // first sync) are answered by the shared stand-in; the console routes below.
+    const mock = mockAccountServer({ account: ADMIN, csrf: 'e2e-independent-review-csrf' });
     const requests = [];
     // The staff second factor as server/platform/mfa.js + security.js behave:
     // no staff route answers until a code from the authenticator is confirmed.
@@ -54,6 +57,8 @@ export const flow = {
       const method = request.method();
       const headers = request.headers();
       requests.push({ path, method, headers, body: request.postData() || '' });
+      if (await mock.handle(route)) return;
+      const authenticated = mock.state.authenticated;
 
       if (path === '/v1/billing/config' && method === 'GET') {
         return respond(route, 200, {
@@ -62,18 +67,7 @@ export const flow = {
         });
       }
 
-      if (path === '/v1/account/login' && method === 'POST') {
-        authenticated = true;
-        return respond(route, 200, { account: ADMIN }, {
-          'set-cookie': 'pri_csrf=e2e-independent-review-csrf; Path=/; SameSite=Lax'
-        });
-      }
 
-      if (path === '/v1/account/me' && method === 'GET') {
-        return authenticated
-          ? respond(route, 200, { account: ADMIN })
-          : respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
-      }
 
       if (path.startsWith('/v1/account/mfa/')) {
         if (!authenticated) return respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
@@ -155,15 +149,11 @@ export const flow = {
       });
     });
 
+    // The admin enters as every account does: the landing card, then the
+    // gate; Settings is reached signed in.
     await goto('/');
-    await createProfile({ name: 'Admin Review Profile', year: 10 });
+    await enterThroughCard(page, { email: ADMIN.email, year: 10 });
     await goto('/settings');
-
-    const accountPanel = page.locator('section', { has: page.locator('#cloud-account-title') });
-    await accountPanel.getByLabel('Email').fill(ADMIN.email);
-    await accountPanel.getByLabel('Password').fill('admin-e2e-password-42');
-    await accountPanel.getByRole('button', { name: 'Connect account' }).click();
-    await accountPanel.getByText('Connected', { exact: true }).waitFor({ timeout: 15_000 });
 
     // The authenticator gate comes first: enrol through the real panel.
     await enrolStaffMfaThroughPanel({ page, check });

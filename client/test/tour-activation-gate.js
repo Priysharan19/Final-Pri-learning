@@ -138,15 +138,17 @@ export const flow = {
     await page.locator(GATE).waitFor({ timeout: 20000 });
     await check('signing out relocks at once: the shell is gone and the gate shows the sign-in card',
       await page.locator('.shell').count() === 0 && await gateStatus(page) === 'signin' && await page.locator(`${GATE} ${INLINE}`).count() === 1);
+    let lastLink = '/';
     for (const link of DEEP_LINKS.slice(0, 3)) {
       await page.goto(`${base}${link}`, { waitUntil: 'domcontentloaded' });
       await page.locator(GATE).waitFor({ timeout: 20000 });
       await check(`signed out, a deep link to ${link.split('?')[0]} is the gate, not the page`, await page.locator('.shell').count() === 0 && await gateStatus(page) === 'signin');
+      lastLink = link.split('?')[0];
     }
     const signedBack = await signInOnCard(page.locator(`${GATE} ${INLINE}`), platform, { email: adultEmail });
     await page.locator('.shell').waitFor({ timeout: 60000 });
     await check('the same email signs back in on the gate, into the deep-linked route, with no second account',
-      !signedBack.newAccount && accountsFor(platform, adultEmail) === 1 && new URL(page.url()).pathname === '/practice' && await page.locator(GATE).count() === 0);
+      !signedBack.newAccount && accountsFor(platform, adultEmail) === 1 && new URL(page.url()).pathname === lastLink && await page.locator(GATE).count() === 0, page.url());
     await check('the recovered session is the same account', String(await page.evaluate(async () => (await (await fetch('/v1/account/me', { credentials: 'include' })).json()).account?.id)) === String(adult.id));
 
     // ── 2 · a new under-18, on the landing card ──────────────────────────────
@@ -176,8 +178,11 @@ export const flow = {
       await check('the child\'s screen only waits: no code box, no approve button',
         await child.getByTestId('signup-parent-waiting').isVisible() && await child.locator('input[autocomplete="one-time-code"]').count() === 0 && await child.getByRole('button', { name: 'Approve' }).count() === 0);
       const parentMail = platform.sms.readTestOutbox({ to: parentEmail, channel: 'email' }).at(-1);
-      await check('the parent was sent an approval code (to their own address) and the address of their own page',
-        parentMail?.purpose === 'guardian-consent' && /^\d{6}$/.test(parentMail?.code || '') && /\/guardian\/consent/.test(parentMail?.body || parentMail?.text || parentMail?.html || ''), JSON.stringify(Object.keys(parentMail || {})));
+      // The mail names the parent's own page: as a link only when this
+      // deployment's public origin is configured (otpEmail.js), never a
+      // caller-supplied one; this harness runs without one, so it is named in words.
+      await check('the parent was sent an approval code (to their own address) that points them to their own page',
+        parentMail?.purpose === 'guardian-consent' && /^\d{6}$/.test(parentMail?.code || '') && /\/guardian\/consent|parent page/i.test(parentMail?.body || ''), JSON.stringify(parentMail?.body || '').slice(0, 200));
 
       // every route, while pending: the card, never the shell
       for (const link of DEEP_LINKS) {
@@ -290,9 +295,17 @@ export const flow = {
     await page.getByRole('menuitem', { name: 'Switch profile' }).click();
     await page.locator('.acct-list').waitFor({ timeout: 15000 });
     await page.locator('.acct-row', { hasText: 'Asha Adult' }).click();
-    await page.locator(GATE).waitFor({ timeout: 20000 }).catch(() => {});
+    await page.locator(GATE).waitFor({ timeout: 20000 });
+    // The device's live session is the child's. Asha's profile is linked to
+    // HER account, so the server's answer is a mismatch: nothing of hers opens
+    // on another account's session — she signs in as herself.
+    await check('choosing the adult\'s saved profile while another account\'s session is live is refused as a mismatch: the gate, not her Home',
+      await gateStatus(page) === 'signin' && /not this profile’s/.test(await page.locator(GATE).innerText()) && await page.locator('.shell').count() === 0,
+      (await page.locator(GATE).innerText()).slice(0, 160));
+    await signInOnCard(page.locator(`${GATE} ${INLINE}`), platform, { email: adultEmail });
     await page.locator('.shell').waitFor({ timeout: 60000 });
-    await check('choosing the adult\'s saved profile opens the app: her account is live and the server lets it in', await page.locator(GATE).count() === 0 && await meStatus(page) === 200);
+    await check('signed in as herself, her saved profile opens: her account is live and the server lets it in',
+      await page.locator(GATE).count() === 0 && await meStatus(page) === 200 && accountsFor(platform, adultEmail) === 1);
     await page.goto(`${base}/progress`, { waitUntil: 'domcontentloaded' });
     await page.locator('.shell').waitFor({ timeout: 30000 });
     await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => {});

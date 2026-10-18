@@ -25,7 +25,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** One scripted account. `guardian` is 'not-required' | 'pending' | 'given' | 'withdrawn'. */
-export function mockAccountServer({ account, guardian = 'not-required', emailVerified = true, providers = { google: null, apple: null }, channels = { email: true, sms: false } } = {}) {
+export function mockAccountServer({ account, guardian = 'not-required', emailVerified = true, providers = { google: null, apple: null }, channels = { email: true, sms: false }, csrf = 'e2e-csrf' } = {}) {
   const state = { authenticated: false, guardian, emailVerified, account: { ...account, emailVerified }, verifies: 0, syncPushes: 0, syncPulls: 0, codes: [] };
   let cursor = 0;
   const respond = (route, status, value, headers = {}) => route.fulfill({ status, contentType: 'application/json', headers, body: JSON.stringify(value) });
@@ -57,7 +57,7 @@ export function mockAccountServer({ account, guardian = 'not-required', emailVer
       await respond(route, 200, {
         status: 'signed-in', account: { ...state.account, emailVerified: state.emailVerified }, created: false,
         guardianConsent: { required: state.guardian !== 'not-required', state: state.guardian }
-      }, { 'set-cookie': 'pri_csrf=e2e-csrf; Path=/; SameSite=Lax' });
+      }, { 'set-cookie': `pri_csrf=${csrf}; Path=/; SameSite=Lax` });
       return true;
     }
     if (path === '/v1/account/me' && method === 'GET') {
