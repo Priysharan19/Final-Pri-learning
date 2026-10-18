@@ -428,7 +428,7 @@ const OPERATION = { '+': 'addition', '-': 'subtraction', '*': 'multiplication', 
 export function chainDiagnosis(fromText, fromAst, fromValue, toText, toValue) {
   // The computed side names the operation; the bare number is what it was called.
   if (isNumberText(fromText) && !isNumberText(toText)) {
-    [fromText, fromAst, fromValue, toText, toValue] = [toText, null, toValue, fromText, fromValue];
+    [fromText, fromValue, toText, toValue] = [toText, toValue, fromText, fromValue];
     fromAst = astOf(fromText);
   }
   const op = OPERATION[unwrap(fromAst)?.op] || 'arithmetic';
