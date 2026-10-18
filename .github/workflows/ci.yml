@@ -273,7 +273,7 @@ jobs:
       # issuing by seed is deterministic, answer-free and per-account — which is
       # what lets the server adopt a question a device started. Both also run on
       # Postgres below.
-      - name: Server-issued practice over HTTP (method progress, seed re-issue, tutor grounding negatives)
+      - name: Server-issued practice over HTTP (method progress, seed re-issue, the free daily cap, tutor grounding negatives)
         run: |
           set -o pipefail
           node server/test/method-progress-http-check.mjs 2>&1 | tee practice-http.log
@@ -282,7 +282,9 @@ jobs:
           node server/test/practice-server-question-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/practice-repeat-credit-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/india-bank-issue-coverage-check.mjs 2>&1 | tee -a practice-http.log
+          node server/test/practice-daily-cap-check.mjs 2>&1 | tee -a practice-http.log
           grep -Fq 'INDIA BANK ISSUE COVERAGE: PASS' practice-http.log
+          grep -Fq 'DAILY PRACTICE CAP: PASS — 98/98 checks' practice-http.log
           grep -Fq 'METHOD PROGRESS OVER HTTP: PASS — 1192/1192 checks' practice-http.log
           grep -Fq 'FLAGSHIP AP WORKING OVER HTTP: PASS — 301/301 checks' practice-http.log
           grep -Fq 'PRACTICE SEED REISSUE: PASS — 106/106 checks' practice-http.log
