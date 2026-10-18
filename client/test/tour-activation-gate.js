@@ -116,6 +116,7 @@ export const flow = {
     await check('JEE is not offered below Class 11', await page.getByTestId('signup-track-jee-main').isDisabled());
     await page.getByTestId('signup-class-next').click();
     await page.locator('.shell').waitFor({ timeout: 60000 });
+    await page.waitForURL(/\/practice/, { timeout: 30000 }).catch(() => {});
     const adult = accountRow(platform, adultEmail);
     await check('an adult lands in the app with no guardian step and no Settings detour',
       new URL(page.url()).pathname === '/practice' && await page.locator(`${GATE}, [data-signup-step="parent"], [data-testid="activation-guardian"]`).count() === 0, page.url());
