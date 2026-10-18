@@ -772,7 +772,7 @@ for (const id of ids.filter(id => !ONLY || id.startsWith(ONLY))) {
     if (i < 20) {
       for (const d of [1, 2, 4]) ok(`${id} D${d} returns the D3 form`, generateQuestion(id, d, seed).prompt === q.prompt);
     }
-    const why = SOLVE[id](q);
+    const why = SOLVE[id] ? SOLVE[id](q) : [`no independent solver for ${id}`];
     if (ok(`${id} seed ${seed} is re-derived from its prompt`, why.length === 0, `${why.join('; ')} :: ${q.prompt.slice(0, 160)}`)) verified++;
     // Hints guide; they never state the result.
     const hintText = (q.hints || []).join(' \n ');
