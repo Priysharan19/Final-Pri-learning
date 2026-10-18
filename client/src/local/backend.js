@@ -62,6 +62,7 @@ import { requestTutorHelp } from './tutorBridge.js';
 import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
 import { cloud, nativeCloudAvailable } from '../platform/cloudTransport.js';
+import { withMutationLock } from './mutationLock.js';
 import { registerIssuedAttemptRecorder, registerRestoreSanitisers } from '../platform/cloudSyncRestore.js';
 import { publicQuestionFields } from '../engine/publicQuestion.js';
 import {
@@ -5776,25 +5777,6 @@ registerIssuedAttemptRecorder((pid, rowId, event) => withMutationLock(`question:
   }
   return { applied: true, xp: 0 };
 }));
-
-const mutationQueues = new Map();
-
-async function withMutationLock(name, work) {
-  if (globalThis.navigator?.locks?.request) {
-    return globalThis.navigator.locks.request(`pri-learning:${name}`, work);
-  }
-  const prior = mutationQueues.get(name) || Promise.resolve();
-  let release;
-  const gate = new Promise(resolve => { release = resolve; });
-  const tail = prior.catch(() => undefined).then(() => gate);
-  mutationQueues.set(name, tail);
-  await prior.catch(() => undefined);
-  try { return await work(); }
-  finally {
-    release();
-    if (mutationQueues.get(name) === tail) mutationQueues.delete(name);
-  }
-}
 
 async function runGated(method, pattern, handler, body, params) {
   const key = `${method} ${pattern}`;
