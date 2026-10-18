@@ -24,6 +24,7 @@ import { buildTranscript, editLine, includeAll, includedLines, reviveTranscript,
 import { proposeFinalAnswer, readsAsWritten } from '../photo/finalAnswer.js';
 import { clearPhotoDraft, confirmPhotoDraftSaved, readPhotoDraft, savePhotoDraft } from '../local/photoDrafts.js';
 import PhotoLines from './PhotoLines.jsx';
+import { everyLineVerified, lineMarks } from './workingEvidence.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
@@ -1508,6 +1509,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   const verdictGood = resolved && res.correct;
   const activeReport = state.res?.stepReport;
+  // Photo: the server's verdicts pinned to the transcript lines they judged
+  // (#430, #475). The report indexes the lines that were sent — the included,
+  // non-blank ones in page order — and is used only when its text is exactly
+  // theirs, so a ✗ never lands on a line that was edited or left out since.
+  const photoMarks = useMemo(() => {
+    if (!resolved || mode !== 'photo' || !photoLines?.lines?.length || !res?.stepReport || res?.revealed || res?.invalid) return null;
+    const kept = photoLines.lines.map((l, i) => i).filter(i => !photoLines.lines[i].excluded && String(photoLines.lines[i].text).trim());
+    return lineMarks(res.stepReport, includedLines(photoLines), { count: photoLines.lines.length, indexOf: i => kept[i] });
+  }, [resolved, mode, photoLines, res]);
   // Teacher-style pin: per-line verdicts on the student's own ink. Step Check
   // pinpoints the exact line where the maths breaks; if every line is
   // consistent but the answer is still wrong, the final line gets the ✗ — the
@@ -2146,7 +2156,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               )}
               {mode === 'photo' && photoOCR.phase === 'done' && photoLines && (
                 <>
-                  <PhotoLines transcript={photoLines} disabled={resolved || busy}
+                  <PhotoLines transcript={photoLines} disabled={resolved || busy} marks={photoMarks}
                     onEdit={(i, text) => changePhotoLines(editLine(photoLines, i, text))}
                     onExclude={(i, out) => changePhotoLines(setLineExcluded(photoLines, i, out))}
                     onIncludeAll={() => changePhotoLines(includeAll(photoLines))} />
@@ -2547,8 +2557,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {res.partial && !verdictGood &&
                   (!serverAuthoritative || showCommittedMethodAwardNote(res, committedGrade)) &&
                   <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{res.partial.note}</div>}
-                {verdictGood && writeMode && inkResult?.lines?.length > 1 && (
-                  <div>{t('verdict.everyLineChecked', { count: inkResult.lines.length, n: inkResult.lines.length })}</div>
+                {/* Said only when the server's step report is of exactly these
+                    lines and verifies every one of them (#448): a right answer
+                    alone establishes nothing about the working. */}
+                {verdictGood && writeMode && inkResult?.lines?.length > 1 && everyLineVerified(res.stepReport, inkResult.lines) && (
+                  <div data-every-line-verified>{t('verdict.everyLineChecked', { count: inkResult.lines.length, n: inkResult.lines.length })}</div>
                 )}
                 {!verdictGood && res.solution && (
                   <div className="eval-expected">{t('verdict.expected')} <b><MathText text={res.solution.answerText} /></b></div>
@@ -2692,14 +2705,19 @@ function StepReport({ report }) {
   const t = useT();
   if (!report?.lines?.length) return null;
   // The first meaningful break leads, with its diagnosis. Every other line is
-  // one tap away rather than competing with it for attention.
+  // one tap away rather than competing with it for attention. "Look here" is
+  // the FIRST mistake only; a later line that is false on its own is marked as
+  // also wrong, and a line that is right on the student's own earlier value
+  // (error carried forward) keeps its tick and says so.
   const first = report.lines.findIndex(l => l.status === 'break');
   const line = (l, i) => (
     <React.Fragment key={i}>
-      <div className={`stepcheck-line sc-${l.status}`}>
+      <div className={`stepcheck-line sc-${l.status}${l.status === 'ok' && l.ecf === true ? ' sc-ecf' : ''}`}
+        data-stepcheck-line={i} data-stepcheck-status={l.status} data-stepcheck-ecf={l.status === 'ok' && l.ecf === true ? 'true' : undefined}>
         <span aria-hidden="true">{l.status === 'ok' ? '✓' : l.status === 'break' ? '✗' : '·'}</span>
         <span>{l.text}</span>
-        {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.mistakeIsHere')}</b>}
+        {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t(i === first ? 'verdict.mistakeIsHere' : 'verdict.alsoWrong')}</b>}
+        {l.status === 'ok' && l.ecf === true && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.carriedForward')}</b>}
         {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — {l.note}</span>}
       </div>
       {l.diagnosis && <Diagnosis d={l.diagnosis} line={i + 1} />}

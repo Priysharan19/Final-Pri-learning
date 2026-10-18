@@ -516,6 +516,10 @@ export default {
   'verdict.showSolution': 'Show solution',
   'verdict.stepCheck': 'Step check on your working',
   'verdict.mistakeIsHere': 'look here',
+  // A later line that is false on its own, after the first mistake.
+  'verdict.alsoWrong': 'also wrong',
+  // A line that is right on the student's own earlier value (error carried forward).
+  'verdict.carriedForward': 'carried forward',
 
   // The symbol palette announces each key by name, so a screen reader says
   // "square root" rather than "open bracket backslash".

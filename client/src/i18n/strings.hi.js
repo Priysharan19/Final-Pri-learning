@@ -587,6 +587,8 @@ export default {
   'verdict.showSolution': 'हल देखें',
   'verdict.stepCheck': 'आपके हल की चरण-दर-चरण जाँच',
   'verdict.mistakeIsHere': 'यहाँ देखें',
+  'verdict.alsoWrong': 'यह भी गलत',
+  'verdict.carriedForward': 'आगे ले गए',
 
   // चिह्न पट्टी हर कुंजी का नाम बोलकर बताती है।
   'sym.pi': 'पाई',

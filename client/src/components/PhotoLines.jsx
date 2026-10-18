@@ -20,7 +20,14 @@ const plain = value => String(value ?? '')
   .replace(/⇔/g, '<=>').replace(/[⇒⟹]/g, '=>').replace(/[→⟶]/g, '->')
   .replace(/²/g, '^2').replace(/³/g, '^3');
 
-export default function PhotoLines({ transcript, disabled = false, onEdit, onExclude, onIncludeAll }) {
+// After marking, the server's verdict on each line it judged may be pinned to
+// the line (`marks`, aligned to `transcript.lines`, from the card's
+// workingEvidence rules): the first mistake, a tick, a line carried forward.
+// Nothing is pinned unless the card established the report is of these lines.
+const MARK_GLYPH = { ok: '✓', ecf: '✓', break: '✗', also: '✗' };
+const MARK_KEY = { break: 'verdict.mistakeIsHere', also: 'verdict.alsoWrong', ecf: 'verdict.carriedForward' };
+
+export default function PhotoLines({ transcript, disabled = false, onEdit, onExclude, onIncludeAll, marks = null }) {
   const t = useT();
   const uid = useId();
   const lines = transcript?.lines || [];
@@ -42,10 +49,12 @@ export default function PhotoLines({ transcript, disabled = false, onEdit, onExc
         {lines.map((line, i) => {
           const noteId = `${uid}-note-${i}`;
           const asks = line.check && !line.edited && !line.excluded;
+          const mark = Array.isArray(marks) && marks[i] && MARK_GLYPH[marks[i].kind] ? marks[i] : null;
           return (
-            <li key={i} className={`photo-line${line.excluded ? ' is-out' : ''}${asks ? ' is-check' : ''}`}
+            <li key={i} className={`photo-line${line.excluded ? ' is-out' : ''}${asks ? ' is-check' : ''}${mark ? ` is-marked pm-${mark.kind}` : ''}`}
               data-photo-line={i} data-excluded={line.excluded ? 'true' : undefined}
-              data-check={asks ? 'true' : undefined} data-edited={line.edited ? 'true' : undefined}>
+              data-check={asks ? 'true' : undefined} data-edited={line.edited ? 'true' : undefined}
+              data-photo-mark={mark ? mark.kind : undefined}>
               <span className="photo-line-n" aria-hidden="true">{i + 1}</span>
               <input className="input photo-line-text" data-photo-correct-transcript
                 aria-label={t('photo.lineFieldLabel', { n: i + 1 })}
@@ -75,6 +84,13 @@ export default function PhotoLines({ transcript, disabled = false, onEdit, onExc
                   {line.excluded ? t('photo.lineLeftOut')
                     : line.edited ? t('photo.lineEdited')
                       : line.doubt ? t('photo.lineCheckDoubt', { doubt: prettyLine(line.doubt) }) : t('photo.lineCheck')}
+                </span>
+              )}
+              {mark && (
+                <span className={`photo-line-mark pm-${mark.kind}`} role={mark.kind === 'break' ? 'status' : undefined}>
+                  <span aria-hidden="true">{MARK_GLYPH[mark.kind]}</span>
+                  {MARK_KEY[mark.kind] && <b>{t(MARK_KEY[mark.kind])}</b>}
+                  {mark.note && <span className="photo-line-mark-note">{mark.note}</span>}
                 </span>
               )}
             </li>
