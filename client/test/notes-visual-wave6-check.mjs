@@ -14,7 +14,7 @@ const load={
   12:()=>import('../src/notes/data/notes-visual-wave6-class12.js')
 };
 const gradeCases=Object.freeze({7:45,8:55,9:65,10:80,11:90,12:100});
-const gradeExamples=Object.freeze({7:192,8:216,9:185,10:239,11:273,12:266});
+const gradeExamples=Object.freeze({7:262,8:296,9:275,10:339,11:393,12:406});
 const eq=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<=1e-6*Math.max(1,Math.abs(a),Math.abs(b));
 const n=x=>evalNumeric(String(x));
 const num=x=>typeof x==='number' && Number.isFinite(x);
@@ -94,7 +94,7 @@ for(const group of IN_CURRICULUM){
 assert.equal(checked,435,'435 new inquiry questions must survive content loading');
 assert.equal(chapters,77,'expected all curriculum chapters');
 assert.equal(visuallyCovered,77,'all 77 chapters must contain a proper visual study question');
-assert.equal(all,1371,'1,251 total authored worked examples expected');
-assert.equal(visual,1005,'885 diagram-led examples expected');
+assert.equal(all,1971,'1,251 total authored worked examples expected');
+assert.equal(visual,1605,'885 diagram-led examples expected');
 assert.ok(shapes.size>=9,'source diagram diversity regressed');
 console.log('WAVE 6 PASS: '+checked+'/435 newly-authored graphical studies; '+all+' worked; '+visual+' visuals; '+visuallyCovered+'/77 chapters covered');
