@@ -33,7 +33,7 @@
 //                     student has already substituted.
 //   · givensLine    — `a = 9, d = 3` read as copied givens, each right or wrong.
 // ─────────────────────────────────────────────────────────────────────────────
-import { normalize, parse, evaluate, variablesOf, numsClose } from './expr.js';
+import { normalize, parse, evaluate, variablesOf } from './expr.js';
 
 const SUBSCRIPT = { '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4', '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9', 'ₙ': 'n', 'ₐ': 'a', 'ₖ': 'k', 'ₘ': 'm', 'ᵢ': 'i', 'ⱼ': 'j' };
 const RELATION = /[<>≤≥≠]|<=|>=|!=/;
