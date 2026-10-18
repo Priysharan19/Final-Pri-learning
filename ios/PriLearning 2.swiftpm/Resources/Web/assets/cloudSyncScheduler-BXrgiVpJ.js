@@ -1,0 +1,1 @@
+import{l as e}from"./cloudSyncScheduler-slotISp8.js";export{e as installAutoSync};
