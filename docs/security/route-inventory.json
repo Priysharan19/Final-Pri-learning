@@ -326,6 +326,27 @@
       "bodyLimit": "1mb"
     },
     {
+      "method": "POST",
+      "path": "/v1/account/reauth",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "own account only: proves the session account's own credential (password, one-time code to its own address, or a fresh linked Apple/Google token with a consumed nonce); on success sets the pri_step_up cookie bound to this session id for 10 minutes and writes an account.reauth audit row naming the method only; nothing is read or changed about any other account",
+      "rateLimits": [
+        {
+          "key": "account-reauth",
+          "limit": 10,
+          "windowMs": 900000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
       "method": "GET",
       "path": "/v1/account/export",
       "auth": "session",
@@ -333,7 +354,10 @@
       "verifiedEmail": false,
       "guardianConsent": false,
       "mfa": false,
-      "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request",
+      "recentAuth": {
+        "freshMs": 600000
+      },
+      "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; requires the credential proven inside 10 minutes (the sign-in, or POST /v1/account/reauth's session-bound step-up cookie), else 401 REAUTH_REQUIRED naming the proofs the account can offer; every export leaves an account.export audit receipt with the format and per-section row counts only",
       "rateLimits": [
         {
           "key": "account-export",

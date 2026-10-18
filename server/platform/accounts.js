@@ -2,9 +2,11 @@ import { asyncRouter } from './asyncRouter.js';
 import { asStore, isDatabaseOverload, isUniqueViolation, sqliteHandle } from './store.js';
 import bcrypt from 'bcryptjs';
 import {
-  clearSessionCookies, consumeRateLimit, createSession, id, opaqueToken, rateLimit, requireSession,
-  sessionFromRequest, setSessionCookies, sha256
+  REAUTH_FRESH_MS, clearSessionCookies, consumeRateLimit, createSession, freshProofAt, id, issueStepUp, opaqueToken, rateLimit,
+  requireSession, sessionFromRequest, setSessionCookies, sha256
 } from './security.js';
+import { asyncHandler } from './asyncRouter.js';
+import { tagPolicy } from './routePolicy.js';
 import { encryptDeliveryToken } from './deliveryCrypto.js';
 import { verifyIdentityToken } from './oidc.js';
 import { clearLoginFailures, loginLockStatus, recordLoginFailure } from './loginLockout.js';
@@ -149,10 +151,13 @@ function reauthError(code, message, status = 401) {
 }
 
 /**
- * Destructive account deletion always requires fresh proof of the account's
- * authentication method. A long-lived session cookie is not enough on its own.
+ * Fresh proof of the account's own authentication method — a password, a
+ * one-time code to its own address, or a fresh Apple/Google identity token —
+ * for an action a long-lived session cookie must not be enough for: deleting
+ * the account, or (POST /reauth) a sensitive read inside REAUTH_FRESH_MS.
+ * `action` only changes the words of a refusal.
  */
-export async function authorizeAccountDeletion(db, accountId, body = {}, identityVerifier = verifyIdentityToken) {
+export async function authorizeFreshProof(db, accountId, body = {}, identityVerifier = verifyIdentityToken, { action = 'deleting the account' } = {}) {
   db = asStore(db);
   const row = await db.get('SELECT password_hash FROM accounts WHERE id = ? AND deleted_at IS NULL', [accountId]);
   if (!row) throw reauthError('ACCOUNT_NOT_FOUND', 'Account not found.', 404);
@@ -160,7 +165,7 @@ export async function authorizeAccountDeletion(db, accountId, body = {}, identit
   if (row.password_hash) {
     const password = String(body?.password || '');
     if (!password || !(await bcrypt.compare(password, row.password_hash))) {
-      throw reauthError('REAUTH_REQUIRED', 'Confirm your password before deleting the account.');
+      throw reauthError('REAUTH_REQUIRED', `Confirm your password before ${action}.`);
     }
     return { method: 'password' };
   }
@@ -174,10 +179,10 @@ export async function authorizeAccountDeletion(db, accountId, body = {}, identit
 
   const provider = String(body?.provider || '');
   if (!['google', 'apple'].includes(provider)) {
-    throw reauthError('SOCIAL_REAUTH_REQUIRED', 'Confirm your Apple or Google identity again before deleting the account.');
+    throw reauthError('SOCIAL_REAUTH_REQUIRED', `Confirm your Apple or Google identity again before ${action}.`);
   }
   const idToken = String(body?.idToken || '');
-  if (!idToken) throw reauthError('SOCIAL_REAUTH_REQUIRED', 'A fresh identity token is required before deleting the account.');
+  if (!idToken) throw reauthError('SOCIAL_REAUTH_REQUIRED', `A fresh identity token is required before ${action}.`);
 
   let identity;
   try {
@@ -192,6 +197,51 @@ export async function authorizeAccountDeletion(db, accountId, body = {}, identit
     WHERE provider=? AND provider_subject=? AND account_id=?`, [provider, identity.subject, accountId]);
   if (!linked) throw reauthError('SOCIAL_IDENTITY_MISMATCH', 'The confirmed identity is not linked to this Pri Learning account.');
   return { method: provider, subject: identity.subject };
+}
+
+/**
+ * Destructive account deletion always requires fresh proof of the account's
+ * authentication method. A long-lived session cookie is not enough on its own.
+ */
+export function authorizeAccountDeletion(db, accountId, body = {}, identityVerifier = verifyIdentityToken) {
+  return authorizeFreshProof(db, accountId, body, identityVerifier, { action: 'deleting the account' });
+}
+
+/**
+ * The proofs an account can offer, by the same rule authorizeFreshProof
+ * applies: an account with a password proves itself with that password only;
+ * one without may use a linked provider or a one-time code to its own address.
+ */
+export async function proofMethods(db, accountId) {
+  db = asStore(db);
+  const row = await db.get('SELECT password_hash FROM accounts WHERE id = ? AND deleted_at IS NULL', [accountId]);
+  if (row?.password_hash) return ['password'];
+  const linked = await db.all("SELECT provider FROM account_identities WHERE account_id = ? AND provider IN ('google','apple') ORDER BY provider", [accountId]);
+  return [...linked.map(identity => identity.provider), 'otp'];
+}
+
+/**
+ * The credential proven on this session inside `freshMs` (security.js
+ * freshProofAt): the sign-in itself, or a step-up cookie POST /reauth issued to
+ * this very session. Otherwise 401 REAUTH_REQUIRED naming the proofs this
+ * account can offer, so the client asks for the right one. Mounted after
+ * requireSession; tagged so the route inventory states where it stands.
+ */
+export function requireRecentAuth(db, { freshMs = REAUTH_FRESH_MS } = {}) {
+  db = asStore(db);
+  const window = Math.max(1000, Math.floor(Number(freshMs)));
+  return tagPolicy(asyncHandler(async (req, res, next) => {
+    const session = req.platformSession;
+    if (!session) return res.status(401).json({ error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
+    const at = freshProofAt(req, session, Date.now(), { freshMs: window });
+    if (at) {
+      req.platformFreshProofAt = at;
+      return next();
+    }
+    const proofs = await proofMethods(db, session.account_id);
+    res.set('Cache-Control', 'no-store');
+    return res.status(401).json({ error: { code: 'REAUTH_REQUIRED', message: 'Confirm it is you before continuing.', proofs, freshMs: window } });
+  }), { recentAuth: { freshMs: window } });
 }
 
 /**
@@ -548,14 +598,44 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     res.json({ revoked: info.changes === 1, current });
   });
 
+  // Fresh proof of the credential for a sensitive read (the data export, #368
+  // port): the same proofs deletion takes — the password, a one-time code sent
+  // to the account's own address (POST /otp/reauth-request), or a fresh
+  // Apple/Google token with the same nonce rule. Success sets the step-up
+  // cookie bound to this session for REAUTH_FRESH_MS (security.js issueStepUp)
+  // and leaves one audit row naming the method only. Bounded per account so a
+  // stolen session cannot be used to guess the password here instead of at
+  // /login (which locks).
+  router.post('/reauth', requireSession(db), rateLimit(db, 'account-reauth', { limit: 10, windowMs: 15 * 60 * 1000 }), async (req, res, next) => {
+    try {
+      const body = req.body || {};
+      if (body.provider && !(await consumeOidcNonce(db, body.nonce))) {
+        return res.status(401).json({ error: { code: 'OIDC_NONCE_INVALID', message: 'Request a fresh sign-in nonce before confirming your identity.' } });
+      }
+      const accountId = req.platformSession.account_id;
+      const proof = await authorizeFreshProof(db, accountId, body, undefined, { action: 'continuing' });
+      const now = Date.now();
+      const freshUntil = issueStepUp(res, req.platformSession.id, now);
+      await audit(db, accountId, 'account.reauth', 'account', accountId, { method: proof.method }, now);
+      res.set('Cache-Control', 'no-store');
+      res.json({ ok: true, method: proof.method, freshUntil });
+    } catch (error) {
+      if (isDatabaseOverload(error)) return next(error);
+      if (error?.status) return res.status(error.status).json({ error: { code: error.code || 'REAUTH_REQUIRED', message: error.message } });
+      next(error);
+    }
+  });
+
   // Everything the server holds that is this account's own, and nothing that is
   // a secret (password/token/session hashes, delivery envelopes) or another
   // person's (a guardian's address is masked exactly as /guardian/state masks it;
   // a class shows its name, never its teacher or classmates). See
   // docs/privacy/data-retention.md for the table-by-table account.
   // Bounded so a stolen session cannot be used to pull the whole learning
-  // history over and over, and one account cannot monopolise the database.
-  router.get('/export', requireSession(db), rateLimit(db, 'account-export', { limit: 10, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+  // history over and over, and one account cannot monopolise the database — and
+  // behind fresh proof of the credential (requireRecentAuth), so a stolen or
+  // forgotten session cookie alone cannot pull it at all.
+  router.get('/export', requireSession(db), rateLimit(db, 'account-export', { limit: 10, windowMs: 60 * 60 * 1000 }), requireRecentAuth(db), async (req, res) => {
     const accountId = req.platformSession.account_id;
     const account = await db.get('SELECT id,email,name,role,email_verified_at,created_at,updated_at FROM accounts WHERE id = ?', [accountId]);
     const identities = await db.all('SELECT provider,linked_at FROM account_identities WHERE account_id = ? ORDER BY linked_at', [accountId]);
@@ -580,6 +660,16 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     const entitlementRow = await db.get('SELECT * FROM entitlement_snapshots WHERE account_id=?', [accountId]);
     const entitlement = publicEntitlement(entitlementRow || { plan: 'free', status: 'free', provider: 'none' });
     const consent = await consentState(db, accountId);
+    // A receipt with no personal data: the format and how many rows each
+    // section carried, so a bulk read of an account is visible in the audit
+    // trail without copying any of it.
+    await audit(db, accountId, 'account.export', 'account', accountId, {
+      format: 'pri-account-export-v1',
+      counts: {
+        identities: identities.length, learningEvents: events.length, entities: entities.length, classes: classes.length,
+        assignmentSubmissions: submissions.length, assignmentFeedback: feedback.length, telemetry: telemetry.length, issueReports: reports.length
+      }
+    }, Date.now());
     res.set('Cache-Control', 'no-store');
     res.json({
       format: 'pri-account-export-v1',

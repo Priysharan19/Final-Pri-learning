@@ -32,7 +32,7 @@ const ROUTE_SEGMENT = /^(?:[a-z0-9][a-z0-9._-]*|:[A-Za-z][A-Za-z0-9]*|<[a-z-]+>|
 
 /** Every event this server logs. Anything else is logged as `unlisted_event`. */
 export const LOG_EVENTS = Object.freeze([
-  'http_request', 'platform_error', 'server_error', 'provider_call_failed', 'auth_email_failed',
+  'http_request', 'platform_error', 'server_error', 'provider_call_failed', 'auth_email_failed', 'security_email_failed',
   'auth_delivery_failed', 'auth_delivery_worker_error', 'platform_db_pool_error', 'housekeeping_error', 'provider_usage', 'unlisted_event'
 ]);
 const PROVIDERS = new Set(['handwriting', 'working', 'web', 'apple', 'google', 'unsupported', 'resend']);
