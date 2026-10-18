@@ -31,6 +31,8 @@ jobs:
         run: node tools/ci-workflow-policy-check.mjs
       - name: Native Ink lane keeps one booted simulator, one Swift build and bounded installs
         run: node client/test/simulator-fleet-check.mjs
+      - name: Main Integrity retries the merged-PR lookup and still requires every PR workflow green
+        run: node tools/main-integrity-lookup-check.mjs
       - name: Native shells enforce the server Content-Security-Policy
         run: node client/test/native-shell-csp-check.mjs
       - name: Install client dependencies
