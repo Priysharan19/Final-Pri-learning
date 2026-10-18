@@ -1,3 +1,9 @@
+# Acceptance tools
+
+Two runners live here. **Deployed staging/production acceptance (steps 0, A–F, `staging-acceptance.mjs`)** is
+documented in [Staging acceptance A–D (deployed host)](#staging-acceptance-ad-deployed-host) further down;
+the section directly below is the older flagship localhost journey.
+
 # Flagship handwriting acceptance
 
 **Evidence class: real provider, real localhost HTTP server, simulated handwriting images; not staging, not physical device.**
@@ -135,7 +141,7 @@ The letters are this tool's names for the parts of the §22.2 journey
 | B | child sign-up by code → refused a question (`GUARDIAN_CONSENT_PENDING`) → `otp/guardian/request` to the parent's address → **HUMAN STEP: the parent reads the code** → `otp/guardian/approve` (no child session) → state `given` → issued a question | yes: both mailboxes (plus-addressed into one by default) |
 | C | issue → SIMULATED ink of the term number worked out from the printed question → `handwriting/transcribe` (body exactly `{ image }`) → `practice/:id/recognize` (reuses the paid read) → confirm if needed → `submit` (authoritative mark, replay returns the same attempt) → `sync/pull` shows the attempt | no |
 | D | the same with a SIMULATED "photo" of a page of working (ruled, unevenly lit), mode `photo` | no |
-| E | no-session pull 401; student B2, a second adult test account signed up by code on the `pri-iso` plus-address → **HUMAN STEP: read its code** → verified → sees none of A's events; its submit and recognize on A's question are refused `404 QUESTION_NOT_FOUND` (the ownership refusal — `403 EMAIL_UNVERIFIED` would not count); cannot revoke A's session; both exports have the `pri-account-export-v1` shape (`learningEvents[]`, `entities[]`) and B2's holds none of A's `entity_id`s | yes: the mailbox (plus-addressed into the same one by default) |
+| E | no-session pull 401; student B2, a second adult test account signed up by code on the `pri-iso` plus-address → **HUMAN STEP: read its code** → verified → sees none of A's events; its submit, recognize, reveal and repeat on A's question are each refused `404 QUESTION_NOT_FOUND` (the ownership refusal — `403 EMAIL_UNVERIFIED` would not count); cannot revoke A's session; both exports have the `pri-account-export-v1` shape (`learningEvents[]`, `entities[]`) and B2's holds none of A's `entity_id`s | yes: the mailbox (plus-addressed into the same one by default) |
 | F | cleanup: deletes only accounts this run created; every account is a code account, so each needs a deletion code (**HUMAN STEP** × 3: A, the child, B2) | yes, when on |
 
 ```bash
@@ -151,8 +157,9 @@ node tools/acceptance/staging-acceptance.mjs --target production --sha <40-hex> 
 
 Options: `--sha` (assert the running SHA), `--guardian-email` / `--child-email` (when the mailbox
 provider drops `+tags`), `--skip B,E`, `--cleanup` / `--no-cleanup` (staging default off; production
-always on), `--max-reads` (provider reads this run may spend, default 4; a run spends 2 when the server reuses
-the transcribe read for recognize, up to 4 when it does not — each of C and D reserves 2 before it starts),
+always on), `--max-reads` (provider reads this run may spend, default 4, minimum 2; a run spends 2 when the server reuses
+the transcribe read for recognize, up to 4 when it does not — each of C and D reserves 2 before it starts, so
+2 runs C and leaves D NOT VERIFIED with its budget note),
 `--out <dir>` (pictures `SIMULATED-*.png` and `report.json`), `--json`.
 
 Exit code: `0` every attempted step passed · `1` a check failed · `3` nothing failed but a step is

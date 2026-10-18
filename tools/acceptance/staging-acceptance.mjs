@@ -112,7 +112,8 @@ export function parseArgs(argv) {
   if (!Object.hasOwn(TARGETS, args.target)) throw new Error('--target must be staging or production');
   if (args.sha !== null && !SHA.test(String(args.sha).toLowerCase())) throw new Error('--sha must be a full 40-hex commit');
   if (args.sha) args.sha = args.sha.toLowerCase();
-  if (!Number.isInteger(args.maxReads) || args.maxReads < 1 || args.maxReads > 10) throw new Error('--max-reads must be a whole number from 1 to 10');
+  // C and D each reserve 2 reads before they start; a budget of 1 would silently skip both.
+  if (!Number.isInteger(args.maxReads) || args.maxReads < 2 || args.maxReads > 10) throw new Error('--max-reads must be a whole number from 2 to 10 (each of C and D reserves 2 reads)');
   for (const id of args.skip) if (!['A', 'B', 'C', 'D', 'E', 'F'].includes(id)) throw new Error(`--skip names an unknown step: ${id}`);
   if (args.target === 'production') {
     if (!args.sha) throw new Error('--target production needs --sha <nominated 40-hex main SHA>');
@@ -605,15 +606,22 @@ export async function runAcceptance(args, deps = {}) {
         const leakedEvents = (pullB.data?.events || []).filter(ev => A.questionIds.has(ev.entityId) || A.attemptIds.has(ev.id) || A.attemptIds.has(ev.entityId));
         check(e, pullB.status === 200 && Array.isArray(pullB.data?.events) && leakedEvents.length === 0 && pullB.data.events.length === 0, 'student B2\'s sync pull holds none of student A\'s questions or attempts', `status ${pullB.status}, ${(pullB.data?.events || []).length} event(s), ${leakedEvents.length} of A's`);
         const [qid] = [...A.questionIds];
-        if (!qid) note(e, 'A issued no question this run; the cross-account question probes have nothing to aim at');
-        else if (!ISO.verified) {
-          human(e, 'student B2 is not verified: the two cross-account question probes were NOT run (an unverified account is refused EMAIL_UNVERIFIED before ownership is checked, which proves nothing about isolation).');
+        if (!qid) {
+          human(e, 'A issued no question this run (C and D were skipped or stopped early): the cross-account question probes were NOT run and E cannot read PASS without them.');
+          e.pending = true;
+        } else if (!ISO.verified) {
+          human(e, 'student B2 is not verified: the four cross-account question probes were NOT run (an unverified account is refused EMAIL_UNVERIFIED before ownership is checked, which proves nothing about isolation).');
           e.pending = true;
         } else {
           const steal = await http(`/v1/practice/${qid}/submit`, { method: 'POST', jar: ISO.jar, body: { submissionId: `accept-E-${tag}`, answer: '0', mode: 'typed' } });
           check(e, isOwnershipRefusal(steal), `verified student B2 submitting to student A's question is refused by ownership (${OWNERSHIP_REFUSAL.status} ${OWNERSHIP_REFUSAL.code})`, `status ${steal.status} ${steal.code || ''}`);
           const peek = await http(`/v1/practice/${qid}/recognize`, { method: 'POST', jar: ISO.jar, body: { mode: 'ink', image: 'data:image/png;base64,iVBORw0KGgo=' } });
           check(e, isOwnershipRefusal(peek), `verified student B2 minting a reading receipt on student A's question is refused by ownership (${OWNERSHIP_REFUSAL.status} ${OWNERSHIP_REFUSAL.code})`, `status ${peek.status} ${peek.code || ''}`);
+          // /:id/reveal and /:id/repeat carry the same per-account check (server/platform/practice.js).
+          const reveal = await http(`/v1/practice/${qid}/reveal`, { method: 'POST', jar: ISO.jar, body: {} });
+          check(e, isOwnershipRefusal(reveal), `verified student B2 revealing student A's question is refused by ownership (${OWNERSHIP_REFUSAL.status} ${OWNERSHIP_REFUSAL.code})`, `status ${reveal.status} ${reveal.code || ''}`);
+          const repeat = await http(`/v1/practice/${qid}/repeat`, { method: 'POST', jar: ISO.jar, body: {} });
+          check(e, isOwnershipRefusal(repeat), `verified student B2 repeating student A's question is refused by ownership (${OWNERSHIP_REFUSAL.status} ${OWNERSHIP_REFUSAL.code})`, `status ${repeat.status} ${repeat.code || ''}`);
         }
         if (A.sessionId) {
           const revoke = await http(`/v1/account/devices/${A.sessionId}`, { method: 'DELETE', jar: ISO.jar });

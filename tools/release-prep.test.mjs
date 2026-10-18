@@ -221,6 +221,8 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   assert.throws(() => parseAcceptanceArgs(['--skip', 'Z']), /unknown step/, 'unknown skip ids are refused'); count += 1;
   assert.throws(() => parseAcceptanceArgs(['--origin', 'http://staging.example']), /https/, 'plain http is only for loopback'); count += 1;
   assert.throws(() => parseAcceptanceArgs(['--email', 'not-an-address']), /email/, 'a malformed mailbox is refused'); count += 1;
+  assert.throws(() => parseAcceptanceArgs(['--max-reads', '1']), /2 to 10/, '--max-reads 1 is refused: C and D each reserve 2 reads, so 1 would silently skip both'); count += 1;
+  eq(parseAcceptanceArgs(['--max-reads', '2']).maxReads, 2, '--max-reads 2 is the minimum');
   const prod = parseAcceptanceArgs(['--target', 'production', '--sha', SHA.toUpperCase(), '--email', 'o@example.test']);
   ok(prod.cleanup === true && prod.sha === SHA && prod.origin === PRODUCTION_ORIGIN, 'production forces cleanup and normalises the SHA');
   eq(plusAddress('owner@example.test', 'pri-child-ab12'), 'owner+pri-child-ab12@example.test', 'plus-addressing');
@@ -403,12 +405,14 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         state.reads.add(key);
         return send(200, { reused, transcription: { engine: 'fake-reader', text, lines: text.split('\n'), confidence: 0.98, needsConfirmation: false, latencyMs: 12 } });
       }
-      const practice = path.match(/^\/v1\/practice\/([^/]+)\/(recognize|submit|recognition\/([^/]+)\/confirm)$/);
+      const practice = path.match(/^\/v1\/practice\/([^/]+)\/(recognize|submit|reveal|repeat|recognition\/([^/]+)\/confirm)$/);
       if (method === 'POST' && practice) {
         if (!requireVerified() || !requireConsent()) return;
         const [, qid, action, sourceReceipt] = practice;
         const q = state.questions.get(qid);
         if (!q || (!skipOwnership && q.accountId !== account.id)) return fail(404, 'QUESTION_NOT_FOUND');
+        if (action === 'reveal') return send(200, { questionId: qid, revealed: true });
+        if (action === 'repeat') return send(201, { questionId: qid, repeat: true });
         if (action === 'recognize') {
           const text = decodeLines(body.image);
           if (text === null) return fail(400, 'RECOGNITION_IMAGE_INVALID');
@@ -490,14 +494,14 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       ok(accounts.length === 3 && accounts.filter(a => a.ageBasis === 'child').length === 1 && accounts.every(a => a.verified === true), 'the run made exactly three test accounts: A (adult), the child, the isolation account — all verified by code (none through /register)');
       ok(report.accounts.every(a => a.email && !a.email.includes('owner@')), 'account rows in the report are masked');
       const e = report.steps.find(s => s.id === 'E');
-      ok(e.checks.length >= 10 && e.checks.every(ch => ch.ok), `E: ${e.checks.length} isolation probes all held`);
+      ok(e.checks.length >= 12 && e.checks.every(ch => ch.ok), `E: ${e.checks.length} isolation probes all held`);
       const ownership = e.checks.filter(ch => /refused by ownership \(404 QUESTION_NOT_FOUND\)/.test(ch.label));
-      ok(ownership.length === 2 && ownership.every(ch => ch.ok && /status 404 QUESTION_NOT_FOUND/.test(ch.detail)), 'E: both cross-account question probes reached the ownership check (404 QUESTION_NOT_FOUND), not EMAIL_UNVERIFIED');
+      ok(ownership.length === 4 && ownership.every(ch => ch.ok && /status 404 QUESTION_NOT_FOUND/.test(ch.detail)), 'E: all four cross-account question probes (submit, recognize, reveal, repeat) reached the ownership check (404 QUESTION_NOT_FOUND), not EMAIL_UNVERIFIED');
       ok(e.checks.some(ch => /pri-account-export-v1 shape/.test(ch.label) && ch.ok) && e.checks.some(ch => /export holds none of student A/.test(ch.label) && ch.ok && /^1 event\(s\)/.test(ch.detail) === false), 'E: the export probe read learningEvents[] of the real shape');
       ok(!e.pending, 'E: no probe was left NOT VERIFIED on a verified isolation account');
       const isoId = report.accounts.find(a => a.role === 'B2 (isolation)').accountId;
       const practiceByIso = state.log.filter(r => /^\/v1\/practice\//.test(r.path) && r.accountId === isoId);
-      ok(practiceByIso.length === 2 && practiceByIso.every(r => r.status === 404), 'the fake host saw exactly two practice calls from the isolation account and refused both with 404');
+      ok(practiceByIso.length === 4 && practiceByIso.every(r => r.status === 404), 'the fake host saw exactly four practice calls from the isolation account (submit, recognize, reveal, repeat) and refused each with 404');
     } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
   }
 
@@ -573,8 +577,9 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       eq(e.status, STATUS.FAIL, 'E FAILS when a verified second account can act on A\'s question');
       const failed = e.checks.filter(ch => !ch.ok);
       const ownershipFailed = failed.filter(ch => /refused by ownership/.test(ch.label));
-      ok(ownershipFailed.length === 2 && /status 200/.test(ownershipFailed[0].detail), `both ownership probes failed, the submit having been accepted (${failed.map(ch => ch.detail).join('; ')})`);
-      ok(failed.length === 3 && /export holds none of student A/.test(failed[2].label) && /1 of A's/.test(failed[2].detail), 'and the accepted foreign submit then shows up as A\'s row in B2\'s export — the export probe counts real rows');
+      ok(ownershipFailed.length === 4 && ownershipFailed.filter(ch => /status 20[01]/.test(ch.detail)).length === 3 && ownershipFailed.every(ch => !/QUESTION_NOT_FOUND/.test(ch.detail)), `all four ownership probes (submit, recognize, reveal, repeat) failed: submit, reveal and repeat were accepted, none was refused by ownership (${failed.map(ch => ch.detail).join('; ')})`);
+      const exportFailed = failed.filter(ch => /export holds none of student A/.test(ch.label));
+      ok(failed.length === 5 && exportFailed.length === 1 && /1 of A's/.test(exportFailed[0].detail), 'and the accepted foreign submit then shows up as A\'s row in B2\'s export — the export probe counts real rows');
       ok(['0', 'A', 'B', 'C', 'D'].every(id => report.steps.find(s => s.id === id).status === STATUS.PASS), 'the other steps still pass: the defect is pinned on E');
       eq(exitCodeFor(report), 1, 'exit 1: a missing ownership check is a failed release gate');
     } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
@@ -608,6 +613,20 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       ok(!e.checks.some(ch => /refused by ownership/.test(ch.label)), 'E does not run the ownership probes on an unverified account (EMAIL_UNVERIFIED proves nothing)');
       ok(e.pending && report.humanSteps.some(h => h.step === 'E' && /NOT run/.test(h.text)), 'the skipped probes are named as NOT run, for a human');
       ok(e.status !== STATUS.PASS, `E is ${e.status}, never PASS, on an unverified isolation account`);
+    } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
+  }
+
+  // ── 3d⁗′ · --skip C,D leaves A without a question: E must not read PASS ───
+  {
+    const { server, state, origin } = await fakeHost();
+    const outDir = mkdtempSync(join(tmpdir(), 'pri-accept-test-'));
+    try {
+      const report = await runAcceptance(baseArgs(origin, { skip: new Set(['C', 'D']) }), { prompt: humanFor(state), log: () => {}, pictures: fakePictures, outDir });
+      const e = report.steps.find(s => s.id === 'E');
+      ok(!e.checks.some(ch => /refused by ownership/.test(ch.label)), 'E runs no ownership probe when A issued no question');
+      ok(e.pending && report.humanSteps.some(h => h.step === 'E' && /NOT run/.test(h.text)), 'the unrun probes are named as NOT run, for a human');
+      eq(e.status, STATUS.NOT_VERIFIED, 'E is NOT VERIFIED, never PASS, without the ownership probes');
+      eq(exitCodeFor(report), 3, 'exit 3: nothing failed but E is open');
     } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
   }
 
@@ -771,6 +790,9 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const practiceSrc = read('server/platform/practice.js');
   ok(/router\.use\(requireSession\(db\), requireVerifiedEmail, requireRole\('student'\)\)/.test(practiceSrc), 'the practice router refuses unverified accounts before any ownership lookup (why step E signs B2 up by code)');
   ok(/404, 'QUESTION_NOT_FOUND', 'This question does not belong to this account\.'/.test(practiceSrc), 'the ownership refusal is 404 QUESTION_NOT_FOUND — what step E asserts');
+  for (const route of ['/:id/recognize', '/:id/repeat', '/:id/reveal', '/:id/submit']) ok(practiceSrc.includes(`router.post('${route}'`), `${route} is a practice route (the four ownership probes of step E)`);
+  const syncSrc = read('server/platform/sync.js');
+  ok(/return \{ schemaVersion: SCHEMA, cursor: cutoff, hasMore: [^}]*, events, entities \};/.test(syncSrc), 'GET /v1/sync/pull answers { …, events, entities } — the key step E reads from B2\'s pull');
   const readme = read('tools/acceptance/README.md');
   ok(/# Staging acceptance A–D/.test(readme) && /HUMAN STEP/.test(readme) && /SYNTHETIC/.test(readme), 'tools/acceptance/README.md documents the staging acceptance and its evidence classes');
   ok(/QUESTION_NOT_FOUND/.test(readme) && /EMAIL_UNVERIFIED/.test(readme) && !/needs no action/.test(readme), 'the README says E uses a verified code account and asserts the ownership refusal, not merely non-success');
