@@ -133,7 +133,18 @@ export function Logo({ large = false, onClick }) {
 }
 
 export default function App() {
-  const [user, setUser] = useState(undefined);
+  const [user, setUserState] = useState(undefined);
+  // The profile most recently handed to setUser, read by `activate` below.
+  // Onboarding hands over the profile and its activation in one batch
+  // (flushSync(() => { setUser(u); activate(ready); })): App has not rendered
+  // in between, so a value refreshed only at render would still name the
+  // previous profile (none) and drop a valid activation, reopening the gate for
+  // a second check. A function updater leaves it to the next render.
+  const userIdRef = useRef(undefined);
+  const setUser = useCallback((next) => {
+    if (typeof next !== 'function') userIdRef.current = next?.id;
+    setUserState(next);
+  }, []);
   // Which profile the server has let in, in this session, and as which
   // account: { profileId, accountId, guardian } from ensureAccountActivated.
   // A local profile alone is never permission to open the shell.
@@ -143,6 +154,7 @@ export default function App() {
   // the render the listener was made in.
   const latestActivation = useRef(null);
   latestActivation.current = { profileId: user?.id, accountId: activated?.accountId };
+  userIdRef.current = user?.id;
   // Declared with the other top-level state: the app returns early for the
   // boot screen and the profile gate, and a hook after those would not run on
   // every render.
@@ -197,7 +209,15 @@ export default function App() {
           String(detail.localProfileId) === String(current.profileId) &&
           String(detail.accountId) === String(current.accountId);
         if (!sameIdentity) setActivated(null);
-        api.get('/me').then(r => { if (r?.user) setUser(r.user); }).catch(() => { });
+        // Only a profile that is already chosen is refreshed here. With none
+        // (the sign-in card), the card owns the transition: linking the
+        // account it has just verified fires this event before the card has
+        // finished, and adopting /me's profile here would unmount the card,
+        // mount the gate for a second check of the same sign-in and open the
+        // shell on "/" before the card returns the student where they were
+        // going.
+        if (userIdRef.current == null) return;
+        api.get('/me').then(r => { if (r?.user && userIdRef.current != null) setUser(r.user); }).catch(() => { });
       });
     } catch { /* non-browser runtimes */ }
     return () => { try { stop(); } catch { /* already gone */ } };
@@ -379,10 +399,10 @@ export default function App() {
   // It accepts only an ensureAccountActivated result for the profile that is
   // current; anything else leaves the gate shut.
   const activate = useCallback((ready) => {
-    setActivated(ready && ready.profileId && ready.accountId && String(ready.profileId) === String(latestActivation.current?.profileId) ? ready : null);
+    setActivated(ready && ready.profileId && ready.accountId && userIdRef.current != null && String(ready.profileId) === String(userIdRef.current) ? ready : null);
   }, []);
   const ctx = useMemo(() => ({ user, setUser, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent, activate }),
-    [user, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent, activate]);
+    [user, setUser, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent, activate]);
 
   if (user === undefined) {
     return (

@@ -159,7 +159,9 @@ export const flow = {
       // One stroke. Handwriting is read only by the server reader (owner
       // decision), and the student entered signed in (the activation gate,
       // issue #477): the page is sent to the server's reader — a scripted
-      // stand-in in this suite — and what came back is said in Hindi.
+      // stand-in in this suite — and what came back is said in Hindi: either an
+      // ink.* reader status or InkAnswer's cloud provenance note
+      // (verdict.readOnServer, drawn in .ink-status when rec.cloud is true).
       const box = await page.locator('.ink-canvas-live').boundingBox();
       await page.mouse.move(box.x + 60, box.y + 30);
       await page.mouse.down();
@@ -173,7 +175,7 @@ export const flow = {
         online.calls.some(c => /^\/v1\/handwriting\//.test(c.path) || /\/recogni[sz]e$/.test(c.path)) && await page.locator('.ink-answer [role="note"]').count() === 0,
         JSON.stringify(online.calls.slice(-4).map(c => `${c.status} ${c.path}`)));
       await check('Handwriting: what the reader did is said in Hindi',
-        DEVANAGARI.test(inkStatus) && Object.keys(hi).some(k => k.startsWith('ink.') && hi[k] === inkStatus), JSON.stringify(inkStatus));
+        DEVANAGARI.test(inkStatus) && Object.keys(hi).some(k => (k.startsWith('ink.') || k === 'verdict.readOnServer') && hi[k] === inkStatus), JSON.stringify(inkStatus));
       await audit('Practice handwriting');
       await page.locator(`.ink-tool[title="${hi['ink.clear']}"]`).click();
       await settle();

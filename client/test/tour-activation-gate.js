@@ -192,6 +192,9 @@ export const flow = {
         await check(`pending approval, a deep link to ${link.split('?')[0]} does not open the app`, await child.locator('.shell, .q-prompt').count() === 0);
       }
       await child.goto(`${base}/privacy`, { waitUntil: 'domcontentloaded' });
+      // The legal page is a lazy chunk behind the boot read of the profile:
+      // waited for, not sampled at domcontentloaded (WebKit paints it later).
+      await child.locator('main, article, .legal').first().waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
       await check('the privacy page stays public meanwhile', await child.locator('main, article, .legal').first().isVisible().catch(() => false) && await child.locator('.shell').count() === 0);
 
       // reload mid-onboarding: the same account, back at the parent step
@@ -325,14 +328,37 @@ export const flow = {
 
     // a 503 on the recheck never ejects; a revoked session, noticed, does
     await page.locator('.q-prompt').waitFor({ timeout: 30000 });
+    // The 503 is scripted at the network in Chromium. In WebKit, Playwright
+    // does not intercept requests from a page a service worker controls (this
+    // one is: the worker passes /v1/ through, but the request still leaves
+    // from the worker's side), so there the same 503 is answered by the
+    // page's fetch — the very call cloudTransport makes — for the same path.
     let outages = 0;
     const outage = route => { outages++; return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'scripted outage' } }) }); };
-    await page.route('**/v1/account/me', outage);
+    const scriptInPage = browserName === 'webkit';
+    if (scriptInPage) {
+      await page.evaluate(() => {
+        window.__outages = 0;
+        window.__realFetch = window.fetch;
+        window.fetch = (input, init) => {
+          const url = new URL(typeof input === 'string' ? input : input.url, location.href);
+          if (url.pathname === '/v1/account/me') {
+            window.__outages++;
+            return Promise.resolve(new Response(JSON.stringify({ error: { code: 'SERVICE_UNAVAILABLE', message: 'scripted outage' } }), { status: 503, headers: { 'content-type': 'application/json' } }));
+          }
+          return window.__realFetch(input, init);
+        };
+      });
+    } else {
+      await page.route('**/v1/account/me', outage);
+    }
     await page.evaluate(() => { window.__gateShell = document.querySelector('.shell'); document.dispatchEvent(new Event('visibilitychange')); });
     await settle(); await settle();
+    if (scriptInPage) outages = await page.evaluate(() => window.__outages);
     await check('a 503 while rechecking in the foreground keeps the student inside, the same shell mounted',
       outages >= 1 && await page.evaluate(() => document.querySelector('.shell') === window.__gateShell) && await page.locator(GATE).count() === 0, `${outages} refused /me calls`);
-    await page.unroute('**/v1/account/me', outage);
+    if (scriptInPage) await page.evaluate(() => { window.fetch = window.__realFetch; });
+    else await page.unroute('**/v1/account/me', outage);
     endSessions(platform, adult.id);
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     await page.locator(`${GATE}[data-activation-status="signin"]`).waitFor({ timeout: 20000 }).catch(() => {});
@@ -346,10 +372,22 @@ export const flow = {
     const claimed = await workerInCharge(page);
     if (await check('the service worker is in charge of the page, so an offline open can paint anything at all', claimed)) {
       await ctx.setOffline(true);
+      // Marks this document, so a reload that never happened cannot be read
+      // as the app's answer: the old shell would still be on screen.
+      await page.evaluate(() => { window.__beforeOfflineReload = true; });
       await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+      const reloaded = !(await page.evaluate(() => window.__beforeOfflineReload === true).catch(() => false));
+      if (!reloaded && browserName === 'webkit') {
+        // Playwright's offline emulation in WebKit fails the service worker's
+        // navigation ("WebKit encountered an internal error"): no offline
+        // document is ever loaded, so the offline open is not exercised in
+        // this engine. Said, not passed; Chromium runs it.
+        note('offline open: NOT exercised in WebKit — Playwright\'s offline emulation fails the service-worker navigation, so the page never reloaded');
+        await ctx.setOffline(false);
+      } else {
       const shown = await page.locator(`${GATE}, .shell, .auth-wrap`).first().waitFor({ timeout: 30000 }).then(() => true).catch(() => false);
       await check('opened offline, the app paints — and it is the gate, not the shell: the server could not confirm anything',
-        shown && await page.locator('.shell').count() === 0 && await page.locator(GATE).count() === 1, shown ? `status ${await gateStatus(page)}` : 'nothing painted');
+        reloaded && shown && await page.locator('.shell').count() === 0 && await page.locator(GATE).count() === 1, shown ? `status ${await gateStatus(page)}` : 'nothing painted');
       await page.locator(`${GATE}[data-activation-status="retry"]`).waitFor({ timeout: 30000 }).catch(() => {});
       await check('it says the server cannot be reached, that nothing is lost, and offers a retry — never a sign-out',
         await gateStatus(page) === 'retry' && /can’t be reached|isn’t answering/.test(await page.locator(GATE).innerText()) &&
@@ -360,6 +398,7 @@ export const flow = {
       if (!(await page.locator('.shell').count())) { await page.getByTestId('activation-retry-button').click().catch(() => {}); await page.locator('.shell').waitFor({ timeout: 60000 }).catch(() => {}); }
       await check('back online, the gate asks again and the same student is inside, with no sign-in asked for',
         await page.locator('.shell').count() === 1 && await page.locator(GATE).count() === 0 && await meStatus(page) === 200);
+      }
     }
     await check('throughout, one account per address: nothing was duplicated', accountsFor(platform, adultEmail) === 1 && accountsFor(platform, kabirEmail) === 1);
   }
