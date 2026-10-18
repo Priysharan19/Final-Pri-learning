@@ -93,10 +93,21 @@ export function cleanInput(raw, { stripUnits = true } = {}) {
   return s.trim();
 }
 
-// A prompt demands the fraction when it says so. `simplestFraction` on its own
-// is how a generator states the canonical fraction for display — it is not a
-// licence to refuse the exact decimal of a question that never asked for one.
-const ASKS_FRACTION = /fraction|simplest form|lowest terms|simplify|in the form|\\d?frac/i;
+// A prompt demands the fraction when it asks for one: "as a fraction", "in
+// simplest form", "in lowest terms", "simplify", "in the form p/q". The
+// decision is read from the words that ask for the answer, never from the
+// data the question gives: a \frac in the prompt ("Take π = 22/7", a given
+// probability of 6/18, sin A = 3/5) says nothing about the form of the answer,
+// and "partial-fraction" names a method. `simplestFraction` on its own is how
+// a generator states the canonical fraction for display — it is not a licence
+// to refuse the exact decimal of a question that never asked for one. A
+// generator that does want the fraction says so in the prompt and sets
+// `requireFraction: true`, which this reading never overrides.
+//
+// It was /fraction|simplest form|lowest terms|simplify|in the form|\\d?frac/,
+// and the last alternative refused 0.8 for cos A = 4/5 on nineteen live
+// generators because the given sin A was typeset as a fraction (#527).
+const ASKS_FRACTION = /(?<!partial[- ])\bfractions?\b|simplest[- ]form|lowest[- ]terms|\bsimplif|in the form/i;
 
 /** Does this question actually demand its answer as a fraction? */
 function fractionFormDemanded(question, ans) {
