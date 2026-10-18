@@ -86,7 +86,11 @@ explicit production-infrastructure actions and were not performed by this recove
 ## 0. Nominate the release SHA — ANYONE
 
 - [ ] Pick one `main` SHA. All four required CI contexts in `release-policy.md` are green on it,
-      and `Production Container` (`deployment-image.yml`) is green on it.
+      and `Production Container` (`deployment-image.yml`) is green on it:
+      `node scripts/release-nominate.mjs <sha>` checks all of that plus that staging serves exactly
+      this SHA on Postgres at that commit's schema versions and that `deploy/production → sha` is a
+      fast-forward, then prints the promotion commands. It pushes nothing. The order from here to the
+      promotion, with the 24 h soak gate, is `docs/operations/postgres-cutover.md` §4.6.
 - [ ] On a checkout of that SHA: `node tools/verify-release-identity.mjs` passes and
       `npm run test:deploy` passes.
 - [ ] On a checkout of that SHA: `npm run test:platform:pg` prints
@@ -139,6 +143,11 @@ Follow `docs/operations/postgres-cutover.md` exactly, in this order:
 - [ ] Test-account journey (§4.4 step 4 of the cutover runbook): register, receive and click the
       verification email, sign in, sync between two devices, teacher class + assignment, account
       export, account deletion. Test accounts only; record results as synthetic evidence.
+      Scripted part: `node tools/acceptance/staging-acceptance.mjs --email <owner mailbox> --tester "<name>"`
+      runs steps 0 and A–E (one-time-code sign-in with a real mailbox, guardian confirmation,
+      handwriting and photo read + server mark with SYNTHETIC pictures, the A/B isolation probe) and
+      prints a `HUMAN STEP` line for every code a person must read. Device steps are
+      `docs/release/device-matrix.md`.
 - [ ] 24 hours with no `/v1` 500, no `platform_db_pool_error`, no unexplained 503 (§4.5).
 
 ## 5. Production prerequisites — OWNER
