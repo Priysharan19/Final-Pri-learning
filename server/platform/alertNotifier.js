@@ -198,7 +198,9 @@ export function createAlertNotifier({
           if (!enabled) { count(rule.id, 'disabled'); continue; }
           if (at - s.lastFiringSentAt < cooldownMs) { count(rule.id, 'suppressed_cooldown'); continue; }
           if (await deliver(rule, 'firing', at)) { s.notified = true; s.lastFiringSentAt = at; }
-        } else if (firing && s.firing && enabled && !s.notified && s.retryAfter && at >= s.retryAfter) {
+        } else if (firing && s.firing && enabled && !s.notified && at >= s.retryAfter && at - s.lastFiringSentAt >= cooldownMs) {
+          // A failed send whose retry delay passed, or an episode suppressed by
+          // the cooldown that is still firing once the cooldown has elapsed.
           s.retryAfter = 0;
           if (await deliver(rule, 'firing', at)) { s.notified = true; s.lastFiringSentAt = at; }
         } else if (!firing && s.firing) {

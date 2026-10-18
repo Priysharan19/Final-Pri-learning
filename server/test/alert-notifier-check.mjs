@@ -92,6 +92,17 @@ await check('cooldown suppresses a re-fire inside 30 minutes, allows it after', 
   assert.match(h.sent[2].subject, /FIRING/);
 });
 
+await check('a cooldown-suppressed episode still firing after the cooldown sends one email', async () => {
+  const h = harness();
+  fireDb(h.registry); await h.notifier.tick();          // fire @0 (sent)
+  h.clock.advance(6 * 60_000); await h.notifier.tick(); // resolve @6 (sent)
+  h.clock.advance(60_000);
+  for (let m = 7; m <= 40; m += 1) { fireDb(h.registry); await h.notifier.tick(); h.clock.advance(60_000); } // keeps firing
+  assert.equal(h.sent.length, 3);
+  assert.match(h.sent[2].subject, /FIRING/);
+  assert.equal(outcome(h.registry, 'DB_CONNECTIVITY', 'suppressed_cooldown'), 1);
+});
+
 await check('disabled (PRI_ALERT_EMAIL unset) is a counted no-op', async () => {
   const h = harness({ env: { PRI_ALERT_ENVIRONMENT: 'staging' } });
   assert.equal(h.notifier.enabled, false);
