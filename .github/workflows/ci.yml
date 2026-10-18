@@ -64,7 +64,15 @@ jobs:
           grep -Fq 'WORKING BRANCHES: PASS — 32/32 checks' suites.log
           # Issue #430: the first wrong AP line is named, method marks before it stay, error is carried forward once,
           # the answer mark is never paid for a wrong answer, and the adversarial corpus earns nothing it did not show.
-          grep -Fq 'AP FIRST ERROR + ECF: PASS — 2140/2140 checks' suites.log
+          # 2140 → 4396 (review round 1): every reviewer page is now a corpus case (formula lines carrying their
+          # arithmetic, prose and comma-less givens, listed terms, a last term slipped through continuations, n(…)/2),
+          # and each swept seed also checks three prose spellings of its givens, its one-line formula slip and n(…)/2.
+          # 4396 → 4795 (review round 2): D4 carries a slipped last term into the sum as D2 does (four D4 pages),
+          # and each swept sum seed also checks a last term slipped on its formula line and summed correctly.
+          # 4795 → 4885 (review round 2, adversarial): 22 pages where a line Pri may have misread (a part with no
+          # value, two statements run together, a word beside the working, a hedged given) is judged nowhere, and a
+          # listed line on a gradient plan (y11-diff) is not a derivative mistake.
+          grep -Fq 'AP FIRST ERROR + ECF: PASS — 4885/4885 checks' suites.log
           grep -Fq 'WORKING EVIDENCE: PASS — 25/25 checks' suites.log
           grep -Fq 'Pri Reason V1 precision gate: PASS' suites.log
           grep -Fq 'Pri Reason V2 safety gate: PASS' suites.log

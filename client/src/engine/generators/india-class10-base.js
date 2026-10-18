@@ -46,25 +46,47 @@ const apTermLabels = n => ['T_n', 'a_n', 't_n', `T_${n}`, `a_${n}`, `t_${n}`, 'n
 const apSumLabels = n => ['S_n', 'S', `S_${n}`, 'sum', 'total'];
 const AP_TERM_FORM = { expr: 'a + (n-1)*d', letters: ['a', 'n', 'd'] };
 const AP_SUM_FORMS = [{ expr: 'n/2*(2*a+(n-1)*d)', letters: ['n', 'a', 'd'] }, { expr: 'n/2*(a+l)', letters: ['n', 'a', 'l'] }];
-const AP_TERM_WHY = 'The nth term is a + (n − 1)d: the first term needs no steps, so the nth term is n − 1 steps along, not n.';
+// A wrong formula is told the right one; a recognisable wrong one (the formula
+// `traps`) is told what went wrong in it.
+const AP_TERM_WHY = 'The nth term of an AP is a + (n − 1)d: start at a and add d once for each step after the first term.';
+const AP_TERM_FORMULA_TRAPS = [{ expr: 'a + n*d', why: 'The nth term is a + (n − 1)d: the first term needs no steps, so the nth term is n − 1 steps along, not n.' }];
 const AP_SUM_WHY = 'The sum of the first n terms is n/2 (2a + (n − 1)d) — or n/2 (a + l), with l the last term.';
+const AP_SUM_FORMULA_TRAPS = [
+  { expr: 'n*(a+l)', why: 'That adds every term twice: the sum is n/2 (a + l) — n times the average of the first and last terms.' },
+  { expr: 'n/2*(a+(n-1)*d)', why: 'The bracket is the first term plus the last term, 2a + (n − 1)d, not a + (n − 1)d: the sum is n/2 (2a + (n − 1)d).' }
+];
+// A substitution under the label of the student's own n (`T_8 = …` after n
+// was copied as 8) is read as error carried forward, not passed over.
+const AP_TERM_INDEX = { letter: 'n', stems: ['T_', 'a_', 't_'] };
+const AP_SUM_INDEX = { letter: 'n', stems: ['S_'] };
 /** The nth-term stage: the formula, then its substitution (with the `a + nd` slip named). */
 function apTermStages(a, d, n, { yields = null } = {}) {
   const labels = apTermLabels(n);
   return [
-    { kind: 'formula', labels, forms: [AP_TERM_FORM], why: AP_TERM_WHY },
-    { kind: 'evaluation', source: AP_TERM_FORM.expr, substitutions: { a, n, d }, expected: a + (n - 1) * d, labels,
+    { kind: 'formula', labels, forms: [AP_TERM_FORM], why: AP_TERM_WHY, traps: AP_TERM_FORMULA_TRAPS },
+    { kind: 'evaluation', source: AP_TERM_FORM.expr, substitutions: { a, n, d }, expected: a + (n - 1) * d, labels, indexLabels: AP_TERM_INDEX,
       evidence: 'substitution', ...(yields ? { yields } : {}),
       traps: [{ source: 'a + n*d', why: `The formula is a + (n − 1)d: the first term needs no steps, so the ${ordinal(n)} term is ${n - 1} steps along, not ${n}.` }] }
   ];
 }
-/** The sum stage: the formula, then its substitution — by either form, and carrying a slipped last term forward. */
+/**
+ * The last term on the way to n/2 (a + l): supporting stages that earn nothing
+ * alone, but whose value — right or slipped — is the `l` the sum carries.
+ */
+function apLastTermStages(a, d, n) {
+  return apTermStages(a, d, n, { yields: ['l'] }).map(stage => ({ ...stage, supporting: true, labels: [...stage.labels, 'l', 'last term'] }));
+}
+/**
+ * The sum stage: the formula, then its substitution — by either form, the /2
+ * written first or last (`n/2 (…)`, `n(…)/2`: one shape, reason-chain.js
+ * shapeKey), and carrying a slipped last term forward.
+ */
 function apSumStages(a, d, n) {
   const labels = apSumLabels(n);
   return [
-    { kind: 'formula', labels, forms: AP_SUM_FORMS, why: AP_SUM_WHY },
+    { kind: 'formula', labels, forms: AP_SUM_FORMS, why: AP_SUM_WHY, traps: AP_SUM_FORMULA_TRAPS },
     { kind: 'evaluation', source: AP_SUM_FORMS[0].expr, sources: [AP_SUM_FORMS[1].expr], substitutions: { n, a, d, l: a + (n - 1) * d },
-      expected: (n * (2 * a + (n - 1) * d)) / 2, labels, evidence: 'substitution',
+      expected: (n * (2 * a + (n - 1) * d)) / 2, labels, indexLabels: AP_SUM_INDEX, evidence: 'substitution',
       ecf: { source: AP_SUM_FORMS[1].expr, bind: ['l'] },
       traps: [
         { source: 'n*(a+(n-1)*d)', why: 'That is n times the last term. The sum uses the average of the first and last terms: n/2 (a + l).' },
@@ -208,7 +230,7 @@ export const indiaClass10 = {
         stepcheck: {
           kind: 'plan', chain: true, anyOrder: true, creditPerStage: true, ecf: 'method',
           givens: { a, d, n }, derived: { l: a + (n - 1) * d }, aliases: AP_ALIASES,
-          stages: [...apSumStages(a, d, n), ...apTermStages(a, d, n, { yields: ['l'] }).map(stage => ({ ...stage, supporting: true, labels: [...stage.labels, 'l', 'last term'] }))]
+          stages: [...apSumStages(a, d, n), ...apLastTermStages(a, d, n)]
         },
         traps: [{ value: n * (a + (n - 1) * d), why: `That is $n$ times the *last* term. The sum uses the average of the first and last: $S_n = \\dfrac{n}{2}(a + a_n)$.` }].filter(t => t.value !== sum),
         hints: [
@@ -260,7 +282,7 @@ export const indiaClass10 = {
         kind: 'plan', chain: true, anyOrder: true, creditPerStage: true, ecf: 'method',
         givens: { a: first, d: step, n: months }, derived: { l: first + (months - 1) * step }, aliases: AP_ALIASES,
         givensWhy: { a: `She saves ₹${first} in the first month, so a = ${first}.`, d: `Her saving grows by ₹${step} each month, so d = ${step}.`, n: `The total is asked after ${months} months, so n = ${months}.` },
-        stages: [{ kind: 'identify', letters: ['a', 'd', 'n'] }, ...apSumStages(first, step, months)]
+        stages: [{ kind: 'identify', letters: ['a', 'd', 'n'] }, ...apSumStages(first, step, months), ...apLastTermStages(first, step, months)]
       },
       traps: [
         { value: first + (months - 1) * step, why: 'That is what she saves in the last month alone — the question asks for the total across all the months.' },

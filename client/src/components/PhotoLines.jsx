@@ -87,7 +87,7 @@ export default function PhotoLines({ transcript, disabled = false, onEdit, onExc
                 </span>
               )}
               {mark && (
-                <span className={`photo-line-mark pm-${mark.kind}`} role={mark.kind === 'break' ? 'status' : undefined}>
+                <span className={`photo-line-mark pm-${mark.kind}`}>
                   <span aria-hidden="true">{MARK_GLYPH[mark.kind]}</span>
                   {MARK_KEY[mark.kind] && <b>{t(MARK_KEY[mark.kind])}</b>}
                   {mark.note && <span className="photo-line-mark-note">{mark.note}</span>}

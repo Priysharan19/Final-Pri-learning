@@ -30,8 +30,15 @@
 //   · assessFormulaLine — a labelled line that states a formula in letters
 //                     (`T_n = a + (n-1)d`) is proved or disproved against the
 //                     authored forms, with the givens fixed for letters the
-//                     student has already substituted.
-//   · givensLine    — `a = 9, d = 3` read as copied givens, each right or wrong.
+//                     student has already substituted; numbers written on the
+//                     same line (`= 9 + 8 × 3 = 35`) are its arithmetic, and a
+//                     false one breaks the line.
+//   · givensLine    — `a = 9, d = 3` (or `a = 9 and d = 3`, `Given a = 9 d = 3`)
+//                     read as copied givens, each right or wrong.
+//   · listsValues   — `9, 12, 15` lists values; it is not one number.
+//
+// Words are never read as letters multiplied together: `9 and d` is not
+// 9·a·n·d. A line Pri cannot read as one chain is not judged, never blamed.
 // ─────────────────────────────────────────────────────────────────────────────
 import { normalize, parse, evaluate, variablesOf } from './expr.js';
 
@@ -61,12 +68,95 @@ export function cleanLine(text, { letters = [] } = {}) {
   return s;
 }
 
-const isNumberText = s => /^[-+]?\d+(?:\.\d+)?$/.test(String(s).trim());
+/** Is this text a number and nothing else (`33`, `-4.5`, `5,941`)? */
+export const isNumberText = s => {
+  const t = String(s ?? '').trim();
+  return /^[-+]?\d+(?:\.\d+)?$/.test(listsValues(t) ? t : t.replace(/,/g, ''));
+};
 const IDENTIFIER = /^[A-Za-z][A-Za-z0-9_{}₀-₉ₙₐₖₘᵢⱼ]*(?:\s+[A-Za-z]+)*$/;
 
 function astOf(text) {
   try { return parse(normalize(text)); } catch { return null; }
 }
+
+// ── Lists and words ──────────────────────────────────────────────────────────
+// The expression engine drops every comma (a thousands separator) and reads a
+// run of letters as letters multiplied together. On a page of working neither
+// is safe: `9, 12, 15` is three terms, not 91215, and `a = 9 and d = 3` is
+// prose, not a = 9·a·n·d.
+
+/** A comma inside a number written in groups: `5,941`, `12,345`, `1,00,000` (not `9,12`, not `9, 12`). */
+function groupingComma(s, i) {
+  const digit = k => k >= 0 && k < s.length && /\d/.test(s[k]);
+  if (!digit(i - 1) || !digit(i + 1)) return false;
+  // The number around it: digits, and commas with a digit on both sides.
+  let lo = i, hi = i;
+  while (digit(lo - 1) || (s[lo - 1] === ',' && digit(lo - 2))) lo--;
+  while (digit(hi + 1) || (s[hi + 1] === ',' && digit(hi + 2))) hi++;
+  const run = s.slice(lo, hi + 1);
+  return /^\d{1,3}(?:,\d{3})+$/.test(run) || /^\d{1,2}(?:,\d{2})*,\d{3}$/.test(run);
+}
+
+/**
+ * Does the text list several things (`9, 12, 15`, `a = 9; d = 3`) rather than
+ * write one? A comma that groups the digits of one number, or that sits inside
+ * brackets (`C(5, 2)`), does not list.
+ */
+export function listsValues(text) {
+  const s = String(text ?? '');
+  let depth = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === '(' || c === '[' || c === '{') depth++;
+    else if (c === ')' || c === ']' || c === '}') depth = Math.max(0, depth - 1);
+    else if (depth === 0 && c === ';') return true;
+    else if (depth === 0 && c === ',' && !groupingComma(s, i)) return true;
+  }
+  return false;
+}
+
+/** The text with every listing comma (not a digit-grouping one, not one in brackets) replaced by `mark`. */
+function markListCommas(text, mark) {
+  const s = String(text ?? '');
+  let depth = 0, out = '';
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === '(' || c === '[' || c === '{') depth++;
+    else if (c === ')' || c === ']' || c === '}') depth = Math.max(0, depth - 1);
+    out += depth === 0 && (c === ';' || (c === ',' && !groupingComma(s, i))) ? mark : c;
+  }
+  return out;
+}
+
+// Names the expression engine reads as one thing (expr.js FUNCTIONS and
+// constants). A run of three or more letters is a word unless it is one of
+// them, or one of them applied to a single letter (`sinx`): `expand` is not
+// exp·a·n·d, `secand` not sec·a·n·d.
+const MATH_NAMES = ['arcsin', 'arccos', 'arctan', 'cosec', 'alpha', 'theta', 'asin', 'acos', 'atan', 'sqrt', 'cbrt', 'floor', 'ceil', 'beta',
+  'sin', 'cos', 'tan', 'cot', 'sec', 'csc', 'log', 'exp', 'abs', 'ncr', 'npr', 'ln', 'pi'];
+function hasWord(text) {
+  const runs = String(text ?? '').match(/[A-Za-z]{3,}/g) || [];
+  return runs.some(run => {
+    const r = run.toLowerCase();
+    return !MATH_NAMES.some(name => r === name || (r.length === name.length + 1 && r.startsWith(name)));
+  });
+}
+
+/** A comma that neither groups digits (`5,941`) nor sits outside every bracket: `(20, 71)` is not 2071. */
+function strayComma(text) {
+  const s = String(text ?? '');
+  for (let i = 0; i < s.length; i++) if (s[i] === ',' && !groupingComma(s, i)) return true;
+  return false;
+}
+
+/** `9 d`, `9. d`: a number and a letter side by side with a space or a full stop between — prose, or a lost comma, as likely as a product. */
+const AMBIGUOUS_JUXTAPOSITION = /\d\.?\s+[A-Za-z]|\d\.[A-Za-z]|\)\.?\s+[A-Za-z]{2,}/;
+/**
+ * A second `letter =` clause after the first `=`, set apart from what stands
+ * before it (`a + (n-1)d  n = 9`, `… = 33 d = 3`, `(n-1)d. a = 9`): two
+ * statements run together, a lost comma — not one chain.
+ */
+const SECOND_CLAUSE = /[\w)]\.?\s+[A-Za-z][A-Za-z0-9_{}₀-₉ₙₐₖₘᵢⱼ]*\s*=/;
 
 /** Rewrite whole-word aliases (`a_n`, `an`, `T_n` → `l`) so an expression engine can read them. */
 export function rewriteAliases(text, aliases = null) {
@@ -87,19 +177,21 @@ export function rewriteAliases(text, aliases = null) {
 /**
  * Read a line as a chain of equalities.
  * Returns null for a line that is not one (a relation, prose with no `=` and
- * no readable expression, or more than one `=`-chain such as `a = 9, d = 3`).
+ * no readable expression, or a list such as `a = 9, d = 3` or `9, 12, 15`).
  *
- *   { continuation, label, labelKey, segments: [{ text, ast, letters }] }
+ *   { continuation, label, labelKey, segments: [{ text, ast, letters, ambiguous }] }
  *
  * `label` is the first part when it names a result rather than computing one:
  * a known label of the plan (`T_9`), or an identifier the engine cannot
  * evaluate under the plan's letters (`S`, `tn`). `letters` are the free
- * letters of each segment.
+ * letters of each segment. A segment with a word in it (`9 and d`) is not
+ * read (`ast: null`); one with a number and a letter side by side across a
+ * space or a full stop (`9 d`, `9. d`) is read but flagged `ambiguous`.
  */
 export function readChain(text, { labels = new Set(), letters = [], aliases = null } = {}) {
   const raw = cleanLine(text, { letters });
   if (!raw || RELATION.test(raw.replace(/<=>/g, ''))) return null;
-  if (raw.includes(',') || raw.includes(';')) return null;
+  if (listsValues(raw)) return null;
   const continuation = raw.startsWith('=');
   const parts = raw.split('=').map(p => p.trim());
   if (continuation) parts.shift();
@@ -126,9 +218,11 @@ export function readChain(text, { labels = new Set(), letters = [], aliases = nu
   }
   const bodies = label === null ? parts : reversed ? parts.slice(0, -1) : parts.slice(1);
   if (!bodies.length) return null;
+  const runTogether = SECOND_CLAUSE.test(raw.slice(raw.indexOf('=') + 1));
   const segments = bodies.map(part => {
-    const ast = astOf(rewriteAliases(part, aliases));
-    return { text: part, ast, letters: ast ? [...variablesOf(ast)] : null };
+    const rewritten = rewriteAliases(part, aliases);
+    const ast = hasWord(rewritten) || strayComma(rewritten) ? null : astOf(rewritten);
+    return { text: part, ast, letters: ast ? [...variablesOf(ast)] : null, ambiguous: runTogether || AMBIGUOUS_JUXTAPOSITION.test(part) };
   });
   // `clause` is the line with its label first, as every assessor reads one.
   const clause = label === null ? raw : `${label} = ${segments.map(seg => seg.text).join(' = ')}`;
@@ -194,9 +288,24 @@ function commutative(node, op, acc = []) {
   acc.push(n);
   return acc;
 }
+/**
+ * A product with its divisions, as two multisets of factors: `n/2 × (…)`,
+ * `n × (…) / 2` and `(…) × n/2` are one product, n and (…) over 2. Dividing by
+ * a quotient multiplies by its reciprocal, so its factors change sides.
+ */
+function productFactors(node, num, den) {
+  const n = unwrap(node);
+  if (n && n.t === 'bin' && n.op === '*') { productFactors(n.l, num, den); productFactors(n.r, num, den); return; }
+  if (n && n.t === 'bin' && n.op === '/') { productFactors(n.l, num, den); productFactors(n.r, den, num); return; }
+  num.push(n);
+}
 const fmt = v => String(Number(Number(v).toPrecision(12)));
 
-/** The shape of an expression as written. */
+/**
+ * The shape of an expression as written. The order of a sum is free; so is
+ * the order of a product, and where in it a division is written — the
+ * textbook's `n/2 (2a + (n − 1)d)` and `n(2a + (n − 1)d)/2` are one shape.
+ */
 export function shapeKey(node) {
   const n = unwrap(node);
   if (!n || typeof n !== 'object') return '?';
@@ -212,9 +321,12 @@ export function shapeKey(node) {
     case 'fact': return `!(${shapeKey(n.v)})`;
     case 'call': return `${n.fn}(${(Array.isArray(n.args) ? n.args : [n.arg]).map(shapeKey).join(',')})`;
     case 'bin': {
-      if (n.op === '+' || n.op === '-' || n.op === '*') {
-        const op = n.op === '-' ? '+' : n.op;
-        return `${op}(${commutative(n, op).map(shapeKey).sort().join(',')})`;
+      if (n.op === '+' || n.op === '-') return `+(${commutative(n, '+').map(shapeKey).sort().join(',')})`;
+      if (n.op === '*' || n.op === '/') {
+        const num = [], den = [];
+        productFactors(n, num, den);
+        const top = `*(${num.map(shapeKey).sort().join(',')})`;
+        return den.length ? `${top}/(${den.map(shapeKey).sort().join(',')})` : top;
       }
       return `${n.op}(${shapeKey(n.l)},${shapeKey(n.r)})`;
     }
@@ -321,9 +433,25 @@ export function chainDiagnosis(fromText, fromAst, fromValue, toText, toValue) {
   }
   const op = OPERATION[unwrap(fromAst)?.op] || 'arithmetic';
   const toIsNumber = isNumberText(toText);
-  const message = toIsNumber
-    ? `Check the ${op}: ${fromText} equals ${fmt(fromValue)}, not ${fmt(toValue)}.`
-    : `Check the ${op}: ${fromText} equals ${fmt(fromValue)}, but ${toText} equals ${fmt(toValue)}.`;
+  // Two bare values (`T_9 = 33` then `= 35`): nothing was computed between them.
+  if (toIsNumber && isNumberText(fromText)) {
+    return {
+      code: 'arithmetic-slip',
+      title: 'A value changed between lines',
+      message: `${fmt(toValue)} does not follow: the working above reached ${fmt(fromValue)}.`,
+      fix: 'Carry the value the working reached, or redo the step that changed it.',
+      confidence: 'high'
+    };
+  }
+  // A formula in letters (`a + (n - 1)d = 35`) is wrong once its values are put in.
+  const lettered = !!fromAst && fromAst.t !== 'equation' && variablesOf(fromAst).size > 0;
+  const message = lettered
+    ? (toIsNumber
+      ? `Put the values into ${fromText}: it equals ${fmt(fromValue)}, not ${fmt(toValue)}.`
+      : `Put the values into ${fromText}: it equals ${fmt(fromValue)}, but ${toText} equals ${fmt(toValue)}.`)
+    : toIsNumber
+      ? `Check the ${op}: ${fromText} equals ${fmt(fromValue)}, not ${fmt(toValue)}.`
+      : `Check the ${op}: ${fromText} equals ${fmt(fromValue)}, but ${toText} equals ${fmt(toValue)}.`;
   return {
     code: 'arithmetic-slip',
     title: 'Arithmetic slip',
@@ -352,16 +480,55 @@ function sameFunction(a, b, free, fixed) {
   return checked >= 3;
 }
 
+/** Is this segment one of the forms, the letters the student has put numbers in for fixed by `env`? */
+function statesForm(seg, forms, env) {
+  const free = seg.letters || [];
+  return forms.some(({ letters: formLetters = [], ast }) => {
+    if (!ast || !free.every(v => formLetters.includes(v))) return false;
+    // Letters of the form the student has not kept must be fixed by `env`.
+    const fixed = {};
+    for (const name of formLetters) {
+      if (free.includes(name)) continue;
+      if (!Object.hasOwn(env, name)) return false;
+      fixed[name] = env[name];
+    }
+    return sameFunction(seg.ast, ast, free, fixed);
+  });
+}
+
+/**
+ * The values of a chain's segments under `env`, and the first segment that
+ * disagrees with the last evaluable one before it (`at`, −1 when none does).
+ * A segment with a letter `env` has no value for is passed over.
+ */
+function walkChain(segments, env) {
+  const values = segments.map(seg => valueUnder(seg.ast, env));
+  let last = -1;
+  for (let k = 0; k < values.length; k++) {
+    if (values[k] === null) continue;
+    if (last !== -1 && !sameValue(values[last], values[k])) return { values, at: k, from: last, last: k };
+    last = k;
+  }
+  return { values, at: -1, from: -1, last };
+}
+
 /**
  * A labelled formula line against the authored forms.
  *   meta: { kind: 'formula', labels: ['T_n', 'a_n'], forms: [{ expr: 'a + (n-1)*d', letters: ['a','n','d'] }],
- *           givens: { a: 9, d: 3 }, why: 'The nth term is a + (n − 1)d …' }
- * ok     — the right-hand side is one of the forms (or one with givens put in);
- * break  — it is written in the forms' letters and is a different function;
- *          `written` is that right-hand side, so a plan can carry it forward
+ *           givens: { a: 9, d: 3, n: 9 }, carried: { a: 10 }, why: 'The nth term is a + (n − 1)d.',
+ *           traps: [{ expr: 'a + n*d', why: '…n − 1 steps along, not n.' }] }
+ * ok     — the right-hand side is one of the forms (or one with givens put in),
+ *          and every number written after it on the line agrees with it: with
+ *          the question's values, or (`ecf: true`) with the values the student
+ *          carried from an earlier slip (`meta.carried`);
+ * break  — it is written in the forms' letters and is a different function
+ *          (`written` is that right-hand side, so a plan can carry it forward
  *          and read the substitution below it as true of the student's own
- *          formula (error carried forward);
+ *          formula — error carried forward), or the formula is right and a
+ *          number written after it on the same line is not (`= 9 + 8 × 3 = 35`);
  * note   — anything else (no label, letters the forms do not have, no letters).
+ * `value` is what the line reaches with the student's values; `trueValue` what
+ * the right formula is worth on the question, when the givens fix every letter.
  */
 export function assessFormulaLine({ text, meta = null, chain = null } = {}) {
   const forms = Array.isArray(meta?.forms) ? meta.forms.filter(f => f && typeof f.expr === 'string') : [];
@@ -373,72 +540,111 @@ export function assessFormulaLine({ text, meta = null, chain = null } = {}) {
     return { status: 'note', trusted: false, note: 'Pri reads a formula only under its own label (for example T_n = …).' };
   }
   const givens = meta.givens && typeof meta.givens === 'object' ? meta.givens : {};
-  let sawLetters = false, broke = false, written = null;
+  const carried = meta.carried && typeof meta.carried === 'object' ? meta.carried : {};
+  const carrying = Object.keys(carried).length > 0;
+  const working = { ...givens, ...carried };
+  const authored = forms.map(form => ({ letters: form.letters || [], ast: astOf(form.expr) }));
+  let sawLetters = false, ecf = false, wrong = null;
   for (const seg of read.segments) {
-    if (!seg.ast || seg.ast.t === 'equation') return { status: 'note', trusted: false, note: 'Skipped — I couldn’t read this formula safely.' };
-    const free = seg.letters || [];
-    if (!free.length) continue;                              // numbers only: a substitution, not the formula
-    sawLetters = true;
-    const matched = forms.some(form => {
-      const formLetters = form.letters || [];
-      if (!free.every(v => formLetters.includes(v))) return false;
-      // Letters of the form the student has not kept must be fixed by the givens.
-      const fixed = {};
-      for (const name of formLetters) {
-        if (free.includes(name)) continue;
-        if (!Object.hasOwn(givens, name)) return false;
-        fixed[name] = givens[name];
-      }
-      const formAst = astOf(form.expr);
-      return !!formAst && sameFunction(seg.ast, formAst, free, fixed);
-    });
-    if (!matched) {
-      // In the forms' own letters (`n/2 (a + l) d` mixes the two sums') and
-      // not the same function as any: a wrong formula.
-      const inLetters = free.every(v => letters.includes(v));
-      if (inLetters) { broke = true; written = rewriteAliases(seg.text, meta.aliases || null); break; }
-      return { status: 'note', trusted: false, note: 'This uses a letter the formula does not, so Pri has not judged it.' };
+    if (!seg.ast || seg.ast.t === 'equation' || seg.ambiguous) return { status: 'note', trusted: false, note: 'Skipped — I couldn’t read this formula safely.' };
+    // `35/0`, `sqrt(-4)`: a value that does not exist is not judged, never ticked.
+    if ((seg.letters || []).every(v => Object.hasOwn(givens, v) || Object.hasOwn(carried, v)) && valueUnder(seg.ast, { ...givens, ...carried }) === null) {
+      return { status: 'note', trusted: false, note: 'Part of this line has no value, so Pri has not judged it.' };
     }
+    const free = seg.letters || [];
+    if (!free.length) continue;                              // numbers only: the line's arithmetic, judged below
+    sawLetters = true;
+    if (statesForm(seg, authored, givens)) continue;
+    // The formula with a value the student carried from an earlier slip put in (`T_n = 10 + (n-1)3` after `a = 10`).
+    if (carrying && statesForm(seg, authored, working)) { ecf = true; continue; }
+    // In the forms' own letters (`n/2 (a + l) d` mixes the two sums') and
+    // not the same function as any: a wrong formula.
+    if (free.every(v => letters.includes(v))) { wrong = seg; break; }
+    return { status: 'note', trusted: false, note: 'This uses a letter the formula does not, so Pri has not judged it.' };
   }
   if (!sawLetters) return { status: 'note', trusted: false, note: 'Numbers only here — judged as a substitution, not as the formula.' };
-  if (broke) {
+  // What the right formula is worth on this question (null when a letter has no given).
+  const trueValue = authored.map(form => valueUnder(form.ast, givens)).find(v => v !== null) ?? null;
+  const inWorking = walkChain(read.segments, working);
+  const reached = inWorking.last === -1 ? null : inWorking.values[inWorking.last];
+  if (wrong) {
+    // A recognisable wrong formula (`a + nd`) is named; any other is told the right one.
+    const traps = (Array.isArray(meta.traps) ? meta.traps : [])
+      .filter(trap => trap && typeof trap.expr === 'string')
+      .map(trap => ({ letters, ast: astOf(trap.expr), why: trap.why }));
+    const trap = traps.find(t => statesForm(wrong, [t], givens));
+    const message = trap && typeof trap.why === 'string' && trap.why ? trap.why
+      : typeof meta.why === 'string' && meta.why ? meta.why : 'This is not the formula the question needs.';
     const diagnosis = {
       code: 'formula-error',
       title: 'The formula is not right',
-      message: typeof meta.why === 'string' && meta.why ? meta.why : 'This is not the formula the question needs.',
+      message,
       fix: 'Write the formula from the chapter, then substitute.',
       confidence: 'high'
     };
-    return { status: 'break', trusted: false, note: diagnosis.message, diagnosis, written };
+    return { status: 'break', trusted: false, note: diagnosis.message, diagnosis, written: rewriteAliases(wrong.text, meta.aliases || null), value: reached, trueValue };
   }
-  return { status: 'ok', trusted: true };
+  // The formula is right. The numbers written after it on the same line are
+  // its substitution and arithmetic, and each must agree with what stands
+  // before it — with the question's values, or with the student's carried ones.
+  if (!ecf) {
+    const inQuestion = walkChain(read.segments, givens);
+    if (inQuestion.at === -1) {
+      const value = inQuestion.last === -1 ? null : inQuestion.values[inQuestion.last];
+      return { status: 'ok', trusted: true, value, trueValue: trueValue ?? value };
+    }
+  }
+  if (carrying && inWorking.at === -1) {
+    return { status: 'ok', trusted: false, ecf: true, value: reached, trueValue, note: 'Correct, carrying the earlier slip forward.' };
+  }
+  const ev = carrying ? inWorking : walkChain(read.segments, givens);
+  const from = read.segments[ev.from], to = read.segments[ev.at];
+  const diagnosis = chainDiagnosis(from.text, from.ast, ev.values[ev.from], to.text, ev.values[ev.at]);
+  return { status: 'break', trusted: false, note: diagnosis.message, diagnosis, value: ev.values[ev.last], trueValue };
 }
 
 // ── Givens ───────────────────────────────────────────────────────────────────
+// `Given:`, `Here,`, `Let`, `We have`, `first term`: words that lead into a
+// given, not part of it.
+const LEAD_IN = /^(?:(?:given|that|here|let|we|have|where|with|the|first|last|common|number|of|terms?|difference)\b[\s:,.-]*)+/i;
+const CLAUSE_BREAK = /\u0000|\s+(?:and|&)\s+|\s*&\s*|(?<=[\w.%°])\s+(?=[A-Za-z][A-Za-z0-9_{}₀-₉ₙₐₖₘᵢⱼ]*\s*=)/i;
+
 /**
- * Read `a = 9, d = 3` (or `a = 9` alone) as copied givens.
+ * Read `a = 9, d = 3` (or `a = 9` alone, `a = 9 and d = 3`, `a = 9 d = 3`,
+ * `Given: a = 9; d = 3.`) as copied givens.
  * Returns null when the line is not of that shape; otherwise
- *   { clauses: [{ letter, text, value, right }] }
- * `value` is the number written (null when unreadable); `right` whether it is
- * the given.
+ *   { clauses: [{ letter, text, value, right, derived }] }
+ * `value` is the number written; `right` whether it is the given. A clause for
+ * a letter in `derived` (the last term, beside the givens) is read the same
+ * way, `derived: true`; a line of derived letters alone is not a givens line.
  */
-export function givensLine(text, givens = {}, { letters = [], aliases = null } = {}) {
+export function givensLine(text, givens = {}, { letters = [], aliases = null, derived = {} } = {}) {
   const raw = cleanLine(text, { letters });
   if (!raw || RELATION.test(raw.replace(/<=>/g, ''))) return null;
-  const clauses = raw.split(/[,;]/).map(c => c.trim()).filter(Boolean);
+  const known = { ...(derived && typeof derived === 'object' ? derived : {}), ...givens };
+  const clauses = markListCommas(raw.replace(LEAD_IN, ''), '\u0000')
+    .split(CLAUSE_BREAK)
+    .map(c => String(c ?? '').trim().replace(LEAD_IN, '').replace(/[.:]+$/, '').trim())
+    .filter(Boolean);
   if (!clauses.length) return null;
   const out = [];
   for (const clause of clauses) {
     const m = clause.match(/^([A-Za-z][A-Za-z0-9_{}₀-₉ₙₐₖₘᵢⱼ]*)\s*=\s*([^=]+)$/);
     if (!m) return null;
-    const letter = Object.keys(givens).find(name => labelKey(name) === labelKey(m[1]))
+    const letter = Object.keys(known).find(name => labelKey(name) === labelKey(m[1]))
       ?? Object.entries(aliases || {}).find(([, spellings]) => (spellings || []).some(s => labelKey(s) === labelKey(m[1])))?.[0];
-    if (!letter || !Object.hasOwn(givens, letter)) return null;
+    if (!letter || !Object.hasOwn(known, letter)) return null;
     // `₹150`, `12 months`: the number, without its currency sign or unit word.
-    const written = m[2].trim().replace(/^(?:[₹$]|Rs\.?|INR)\s*/i, '').replace(/^([-+]?\d+(?:\.\d+)?)\s+[A-Za-z%°]+.*$/, '$1');
+    // Only a unit word, and nothing after it: `289 or 300`, `289 to 300` are not a given.
+    const amount = m[2].trim().replace(/^(?:[₹$]|Rs\.?|INR)\s*/i, '');
+    const unit = amount.match(/^([-+]?\d[\d,]*(?:\.\d+)?)\s*(?:rupees?|rs\.?|paise|months?|years?|days?|weeks?|terms?|cm|mm|km|m|kg|g|litres?|liters?|%|°)?\s*\.?$/i);
+    const written = unit ? unit[1] : amount;
+    if (listsValues(written) || hasWord(written)) return null;
     const value = valueUnder(astOf(written), {});
     if (value === null) return null;                       // not a number: not a copied given
-    out.push({ letter, text: m[2].trim(), value, right: sameValue(value, Number(givens[letter])) });
+    const isDerived = !Object.hasOwn(givens, letter);
+    out.push({ letter, text: m[2].trim(), value, right: sameValue(value, Number(known[letter])), derived: isDerived });
   }
+  if (!out.some(c => !c.derived)) return null;
   return { clauses: out };
 }
