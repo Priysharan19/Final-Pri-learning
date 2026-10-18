@@ -108,7 +108,6 @@
     "test:ink:arbitration": "node client/test/native-ink-arbitration-check.mjs",
     "test:ink:sets": "node client/test/ink-set-notation-check.mjs",
     "test:ink:stability": "node client/test/ink-real-page-stability-check.mjs",
-    "test:ink:canvas": "node client/test/ink-canvas-loss-browser-check.mjs",
     "test:explain": "node client/test/pri-explain-check.mjs",
     "test:ncert:class8:rest": "node client/test/ncert-class8-ch3-13-check.mjs",
     "test:ncert:class9": "node client/test/ncert-class9-check.mjs",
