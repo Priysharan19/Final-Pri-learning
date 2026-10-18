@@ -6,14 +6,18 @@
 # Installs the debug app + test APKs once (no uninstall between runs, unlike
 # connectedAndroidTest), runs ShellJourneyTest#journey, kills the app process
 # with `am force-stop`, then runs ShellJourneyTest#relaunchAfterProcessDeath
-# against the data the first run left. Regenerate the fixture for every run
-# (the run stops its servers). With PRI_CLOUD_ORIGIN/EMAIL/PASSWORD set
-# (scripts/cloud-fixture-server.mjs), it then runs the cloud journey
-# against that real server the same way: sign in + sync and a server-marked
-# answer (the right answer comes from scripts/journey-oracle.mjs, outside the
-# page), an offline draft that says it cannot be marked, offers no Submit or
-# Show solution, is kept and is never marked, force-stop, then the
-# session survives and Disconnect clears it. SYNTHETIC / EMULATOR evidence.
+# against the data the first run left (no server: only the sign-in card or the
+# gate may show — the app is account-first, issue #477). With
+# PRI_CLOUD_ORIGIN/EMAIL/DB set (scripts/cloud-fixture-server.mjs), it then runs
+# the cloud journey against that real server: a new account on the card (the
+# server's emailed code, read by scripts/journey-oracle.mjs from its test
+# outbox) deleted with a code; the fixture account on the card, Sync now and a
+# server-marked answer (the right answer from the oracle, outside the page);
+# then, signed in, the shell checks (routing, Back, rotation), share/picker/
+# camera/print, finger + stylus ink and the accessibility smoke; the server
+# stopped: the gate says retry and nothing is lost; restart, force-stop, the
+# session survives and Disconnect clears it. Without a server only the
+# no-account journey runs. SYNTHETIC / EMULATOR evidence.
 set -euo pipefail
 EXPECT="${1:-any}"; shift || true
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
@@ -63,13 +67,9 @@ sleep 2
 if adb shell pidof com.prilearning.app >/dev/null 2>&1; then echo "the app process survived force-stop" >&2; exit 1; fi
 run relaunchAfterProcessDeath "$@"
 summary="journey, process death, relaunch"
-if [ "$EXPECT" != "floor" ]; then
-  run "com.prilearning.app.FileExchangeTest#shareFilePickerCameraAndPrint" "$@"
-  run "com.prilearning.app.InkInputTest#fingerAndStylusWriteThroughTheSharedCanvas" "$@"
-  run "com.prilearning.app.WebViewAccessibilityTest#theProductPassesTheAccessibilitySmokeInTheShell" "$@"
-  run "com.prilearning.app.WebViewAccessibilityTest#theSystemFontScaleReachesThePage" "$@"
-  summary="$summary, share/picker/camera/print, finger + stylus ink, accessibility smoke"
-fi
+# Account-first (#477): nothing behind the shell opens without an account, so
+# the share/ink/accessibility tests run below, against the fixture server,
+# after CloudJourneyTest has signed the student in on the card.
 
 if [ -n "${PRI_CLOUD_ORIGIN:-}" ] && [ "$EXPECT" != "floor" ]; then
   CLOUD="com.prilearning.app.CloudJourneyTest"
@@ -97,7 +97,14 @@ if [ -n "${PRI_CLOUD_ORIGIN:-}" ] && [ "$EXPECT" != "floor" ]; then
   cloud_args+=(-e priOracle "http://$ORACLE_HOST:$ORACLE_PORT" -e priOracleToken "$ORACLE_TOKEN")
   run "$CLOUD#cloudSignUpThenDeleteAccount" "${cloud_args[@]}" "$@"
   run "$CLOUD#cloudSignInAndSync" "${cloud_args[@]}" "$@"
-  summary="$summary, sign-up + delete, signed-out refusal, sign-in + sync and a server-marked answer (sealed-answer oracle) against the real server"
+  # Signed in on the card (the server's emailed code): the shell's own checks.
+  run "$CLASS#shellRoutingBackAndRotationSignedIn" "${cloud_args[@]}" "$@"
+  run "com.prilearning.app.FileExchangeTest#shareFilePickerCameraAndPrint" "${cloud_args[@]}" "$@"
+  run "com.prilearning.app.InkInputTest#fingerAndStylusWriteThroughTheSharedCanvas" "${cloud_args[@]}" "$@"
+  run "com.prilearning.app.WebViewAccessibilityTest#theProductPassesTheAccessibilitySmokeInTheShell" "${cloud_args[@]}" "$@"
+  run "com.prilearning.app.WebViewAccessibilityTest#theSystemFontScaleReachesThePage" "${cloud_args[@]}" "$@"
+  summary="$summary, signed-in routing/Back/rotation, share/picker/camera/print, finger + stylus ink, accessibility smoke"
+  summary="$summary, card sign-up + code delete, card sign-in + sync and a server-marked answer (sealed-answer oracle) against the real server"
   if [ -n "${PRI_CLOUD_DB:-}" ] && [ -n "${PRI_CLOUD_SERVER_PID:-}" ]; then
     # Offline: the cloud server goes away.
     kill "$PRI_CLOUD_SERVER_PID" 2>/dev/null || true
@@ -106,7 +113,7 @@ if [ -n "${PRI_CLOUD_ORIGIN:-}" ] && [ "$EXPECT" != "floor" ]; then
     # Reconnect: the same server and database come back.
     node "$HERE/../scripts/cloud-fixture-server.mjs" --port "$PRI_CLOUD_PORT" --db "$PRI_CLOUD_DB" --restart --out "$OUT/restart.env"
     RESTARTED_PID="$(sed -n 's/^PRI_CLOUD_SERVER_PID=//p' "$OUT/restart.env")"
-    summary="$summary, offline draft said to be unmarkable (no Submit or Show solution), kept and never marked"
+    summary="$summary, opened offline: the gate says retry and the server's record is unchanged"
   fi
   adb shell am force-stop com.prilearning.app
   sleep 2

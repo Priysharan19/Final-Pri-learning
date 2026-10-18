@@ -5,30 +5,38 @@
 // moves through it, and logs one PRIJOURNEY line per step for
 // scripts/iphone-journey.mjs.
 //
-// Grading is online-only and server-authoritative (owner decision 2026-10-10,
-// ADR-0001). The journey therefore has two legs:
+// The app is account-first (issue #477): the landing screen is one sign-in
+// card (email → the six-digit code in the same card → for a new address
+// name, age, class) and an activation gate stands in front of every route
+// until the server has confirmed the session, the age/guardian decision and
+// a first sync. There is no device-only entry. Grading is online-only and
+// server-authoritative (owner decision 2026-10-10, ADR-0001). So:
 //
-//   · `--journey-selfcheck` — a device with NO server. Onboarding → Practice →
-//     a typed answer and working → strokes on the real PencilKit surface (the
-//     native bridge captures them, the page seals them in IndexedDB and the
-//     one save status follows that readback) → a photo attached. The question
-//     is an offline draft: the card says BEFORE any work that it cannot be
-//     marked and offers NO Submit and NO Show solution; its one action, "Try
-//     for a markable question", asks first when there is work on the page and,
-//     with no server to open one, changes nothing. No verdict, marks or
-//     solution exist. `--journey-relaunch` proves the profile, the question,
-//     the typed work and the strokes survived the relaunch.
+//   · `--journey-selfcheck` — a fresh install with NO server: the app opens to
+//     the card (or the gate), and nothing opens without an account — no
+//     shell, no Practice behind a deep link, nothing drafted or marked.
+//     `--journey-relaunch` proves the same after a relaunch.
 //
 //   · `--journey-marking` — a real local Pri server (PRI_CLOUD_ORIGIN, DEBUG
-//     builds only) whose handwriting reader is a SYNTHETIC stand-in. A
-//     signed-out student is shown a server-prepared question, is refused a
-//     check until they sign in ON the card, and is then marked by the server:
-//     wrong → 0 with a try left, right → full marks; a handwritten page is
-//     read by the server, corrected by the student and marked. The right
-//     answer never comes from the page: the test process reads the server's
-//     sealed copy of the issued question and hands it over through the
-//     oracle directory. `--journey-marking-relaunch` finds the results in
-//     History.
+//     builds only) whose handwriting reader is a SYNTHETIC stand-in. A new
+//     student enters through the card: the email code is the one the
+//     server's TEST email adapter issued, handed over by the test process
+//     from the server's outbox (never invented, never in the page until the
+//     student types it). Then the server marks the work: wrong → 0 with a
+//     try left, right → full marks; a handwritten page is read by the
+//     server, corrected by the student and marked. The right answer never
+//     comes from the page: the test process reads the server's sealed copy
+//     of the issued question and hands it over through the oracle
+//     directory. `--journey-marking-relaunch` finds the results in History.
+//
+//   · `--journey-offline-draft` — the same signed-in student; once inside,
+//     the test process stops the server (asked through the oracle). The
+//     question is then an offline draft: typed work, strokes on the real
+//     PencilKit surface (sealed in IndexedDB with one truthful save status)
+//     and a photo are kept, the card says before any work that it cannot be
+//     marked and offers no Submit and no Show solution. `--journey-offline-
+//     relaunch` (server still down): the gate says "retry", the shell does
+//     not open, and the draft is still on the device.
 //
 // Simulator evidence with programmatic strokes and a synthetic reader. It
 // never stands in for a physical device, an Apple Pencil or a real provider.
@@ -42,6 +50,8 @@ enum JourneySelfCheck {
         let args = ProcessInfo.processInfo.arguments
         if args.contains("--journey-marking-relaunch") { return "markingRelaunch" }
         if args.contains("--journey-marking") { return "marking" }
+        if args.contains("--journey-offline-draft") { return "offlineDraft" }
+        if args.contains("--journey-offline-relaunch") { return "offlineRelaunch" }
         if args.contains("--journey-cloud-signup") { return "cloudSignUp" }
         if args.contains("--journey-offline") { return "offline" }
         if args.contains("--journey-background") { return "background" }
@@ -126,18 +136,19 @@ enum JourneySelfCheck {
     const writeMode = () => openMode('Write: answer by handwriting', 'write');
     const photoMode = () => openMode('Photo: answer with a photo of your working', 'photo');
     async function route(path) { history.pushState({}, '', path); dispatchEvent(new PopStateEvent('popstate')); await sleep(400); }
-    async function onboard() {
-      at = 'explicit-offline'; (await waitFor(() => q('[data-testid=hero-offline]'))).click();
-      at = 'step1'; await waitFor(() => q('[data-onboarding-step="1"]'));
-      at = 'student'; (await waitFor(() => byLabel('Student'))).click(); await sleep(150); q('.auth-card .btn-primary').click();
-      at = 'step2'; await waitFor(() => q('[data-onboarding-step="2"]'));
-      at = 'track'; setValue(await waitFor(() => q('#signup-track')), '10'); await sleep(200); q('.auth-card .btn-primary').click();
-      at = 'step3'; await waitFor(() => q('[data-onboarding-step="3"]'));
-      at = 'name'; setValue(await waitFor(() => q('#signup-name')), 'Journey Student'); await sleep(200); q('.auth-card .btn-primary').click();
-      at = 'step4'; await waitFor(() => q('[data-onboarding-step="4"]')); await sleep(150); q('.auth-card .btn-primary').click();
-      at = 'step5'; await waitFor(() => q('[data-onboarding-step="5"]')); await sleep(150); q('.auth-card .btn-primary').click();
-      at = 'home'; await waitFor(() => q('.home-greet'));
-      return document.documentElement.dataset.ff || '';
+    // Account-first (issue #477): what stands in front of the app when it
+    // has not let a student in. Never the old device-only entry.
+    const GATE = '[data-testid=account-activation-gate]';
+    const CARD = '[data-signin-card]';
+    const gateStatus = () => { const g = q(GATE); return g ? g.getAttribute('data-activation-status') : null; };
+    const cardStep = () => { const c = q(CARD); return c ? c.getAttribute('data-signup-step') : null; };
+    const shellOpen = () => !!(q('.shell') || q('.home-greet'));
+    function assertHeld(when) {
+      if (shellOpen()) throw new Error(when + ': the shell opened without an account');
+      if (q('[data-testid=hero-offline]') || q('[data-onboarding-step]')) throw new Error(when + ': a device-only entry is offered');
+      if (q('.q-prompt') || q('.qpage')) throw new Error(when + ': a question is on screen without an account');
+      if (!q(CARD) && !q(GATE)) throw new Error(when + ': neither the sign-in card nor the gate is on screen');
+      return (q(GATE) ? 'gate=' + gateStatus() : 'card=' + cardStep());
     }
     // Everything a marker, and only a marker, puts on a question card.
     function markedTraces() {
@@ -267,9 +278,248 @@ enum JourneySelfCheck {
     const pressReveal = async () => { (await waitFor(revealBtn)).click(); await sleep(450); const again = revealBtn(); if (again) again.click(); };
     """#
 
+    // Leg 1 · a fresh install and no server: nothing opens without an account.
     private static let firstLaunch = helpers + cardHelpers + #"""
-    await step('launch', async () => { await waitFor(() => q('[data-testid=hero-offline]') || q('.auth-card') || q('.home-greet')); return location.href; });
-    await step('onboarding', onboard);
+    await step('launch', async () => {
+      await waitFor(() => q(CARD) || q(GATE) || shellOpen(), 40000);
+      await sleep(1500);   // the gate's first check settles
+      return assertHeld('launch') + ' at ' + location.pathname;
+    });
+    await step('noEntryWithoutAccount', async () => {
+      // With no server the card cannot send a code (its field is disabled and
+      // it says so) or the gate cannot reach the server ("retry"). Either way
+      // there is nothing to press that opens the app.
+      const field = q('#signup-destination');
+      const said = q(GATE) ? gateStatus() : (field && field.disabled ? 'card field disabled' : 'card field enabled');
+      if (q(GATE) && !['retry', 'checking', 'signin'].includes(gateStatus())) throw new Error('the gate reads ' + gateStatus());
+      if (field && !field.disabled && !q(GATE)) {
+        // A field that is open must still not open the app: the send fails.
+        setValue(field, 'nobody@example.test'); await sleep(200);
+        const send = q('[data-testid=signup-send-code]');
+        if (send && !send.disabled) { send.click(); await sleep(4000); }
+        if (cardStep() === 'code') throw new Error('a code step opened with no server');
+      }
+      await sleep(3000);
+      return assertHeld('waited') + '; ' + said;
+    });
+    await step('deepLinkHeld', async () => {
+      const seenAt = [];
+      for (const path of ['/practice?subtopic=c10-pair-linear-equations', '/progress', '/review', '/settings']) {
+        at = path; await route(path); await sleep(1200);
+        seenAt.push(path.split('?')[0] + ':' + assertHeld(path));
+      }
+      return seenAt.join(' ');
+    });
+    await step('nothingMarked', async () => {
+      assertUnmarked('no account');
+      if (document.querySelectorAll('.hist-row').length) throw new Error('History rows exist without an account');
+      const drafts = Object.keys(localStorage).filter(k => k.startsWith('pri.draft.'));
+      if (drafts.length) throw new Error(drafts.length + ' draft(s) were stored without an account');
+      return 'no marks, no History, no drafts';
+    });
+    await step('persistenceMarker', async () => { localStorage.setItem('pri-journey-marker', 'kept'); return 'written'; });
+    return JSON.stringify(steps);
+    """#
+
+    private static let relaunch = helpers + cardHelpers + #"""
+    await step('relaunchStillHeld', async () => {
+      await waitFor(() => q(CARD) || q(GATE) || shellOpen(), 40000);
+      await sleep(2500);
+      return assertHeld('relaunch');
+    });
+    await step('relaunchMarker', async () => {
+      if (localStorage.getItem('pri-journey-marker') !== 'kept') throw new Error('marker lost');
+      return location.origin;
+    });
+    return JSON.stringify(steps);
+    """#
+
+    // ── The signed-in leg: a real local server marks the work ────────────────
+    // `oracle` asks the TEST PROCESS (never the page, never the app) for the
+    // server's sealed copy of the question this account was last issued.
+    private static let oracleHelpers = #"""
+    let asked = 0;
+    async function oracle(payload) {
+      const n = ++asked;
+      window.__priJourneyReply = null;
+      window.__priJourneyAsk = { n, ...payload };
+      try { return await waitFor(() => { const r = window.__priJourneyReply; return r && r.n === n && r; }, 60000); }
+      catch (e) { throw new Error('the test oracle did not answer'); }
+    }
+    const graded = [];
+    // Enter through the one sign-in card, the way a student does. The code is
+    // the one the server's TEST email adapter issued to this address, handed
+    // over by the test process from the server's outbox — never invented.
+    async function cardOnboard(address) {
+      at = 'card'; await waitFor(() => q(CARD) || shellOpen(), 40000);
+      if (shellOpen()) throw new Error('the shell was already open on a fresh install');
+      at = 'email'; const field = await waitFor(() => { const f = q('#signup-destination'); return f && !f.disabled && f; }, 40000);
+      setValue(field, address); await sleep(200);
+      (await waitFor(() => { const b = q('[data-testid=signup-send-code]'); return b && !b.disabled && b; })).click();
+      at = 'code step'; await waitFor(() => q('#signup-code-0'), 30000);
+      at = 'code'; const sent = await oracle({ kind: 'emailCode', to: address });
+      if (!/^\d{6}$/.test(sent.code || '')) throw new Error('the server sent no six-digit code: ' + (sent.reason || 'none'));
+      setValue(q('#signup-code-0'), sent.code);
+      await sleep(1500);
+      if (cardStep() === 'code') { const v = q('[data-testid=signup-verify]'); if (v && !v.disabled) v.click(); }
+      at = 'verified'; await waitFor(() => !q(CARD) || cardStep() !== 'code' || q('[data-testid=signup-error]'), 30000);
+      if (q('[data-testid=signup-error]')) throw new Error('the card refused: ' + seen('[data-testid=signup-error]'));
+      const fresh = cardStep() === 'age';
+      if (fresh) {
+        at = 'about'; setValue(q('#signup-flow-name'), 'Journey Student');
+        (await waitFor(() => q('[data-testid=signup-age-18]'))).click(); await sleep(150);
+        const agree = q('[data-testid=signup-agree]'); if (!agree.checked) agree.click(); await sleep(150);
+        q('[data-testid=signup-age-next]').click();
+      }
+      at = 'class'; await waitFor(() => cardStep() === 'class' || shellOpen(), 30000);
+      if (cardStep() === 'class') {
+        (await waitFor(() => q('[data-testid=signup-class-10]'))).click(); await sleep(150);
+        (await waitFor(() => { const b = q('[data-testid=signup-class-next]'); return b && !b.disabled && b; })).click();
+      }
+      at = 'gate'; await waitFor(() => q('.home-greet') && !q(GATE), 90000);
+      return (fresh ? 'new account' : 'returning account') + ' entered through the card with the code the server sent';
+    }
+    async function signedInHome() {
+      await waitFor(() => q('.home-greet') || q(GATE), 60000);
+      if (!q('.home-greet')) await waitFor(() => q('.home-greet') && !q(GATE), 60000);
+    }
+    const fullMarks = () => { const m = seen('.eval-marks').match(/^(\d+(?:\.\d+)?) \/ (\d+(?:\.\d+)?) marks?/); return m && m[1] === m[2] && Number(m[2]) > 0 ? m[0] : null; };
+    """#
+
+    private static let marking = helpers + cardHelpers + oracleHelpers + #"""
+    await step('cardOnboarding', async () => cardOnboard(email));
+    await step('firstQuestion', async () => {
+      await nav('/practice'); await waitFor(() => q('.q-prompt') && qid(), 40000);
+      const n = await openTypedQuestion();
+      if (allVis('[data-check-needs-account]').length) throw new Error('a signed-in student is told checking needs an account');
+      if (unmarkableKind()) throw new Error('the question says it cannot be marked (' + unmarkableKind() + ')');
+      setValue(answerBox(), WRONG); await typeWorking(WORKING);
+      await sleep(500);
+      assertUnmarked('before any check');
+      return 'question ' + n + ' of the pinned chapter, signed in, markable; nothing marked before a check';
+    });
+    // A wrong answer then the right one, on a question whose sealed answer the
+    // oracle can state. The first candidate is the first question opened.
+    let typedEscrow = null, typedLocal = '';
+    await step('typedWrongZero', async () => {
+      const passed = [];
+      for (let i = 0; i < 12; i++) {
+        at = 'question ' + (i + 1) + ' (passed over: ' + passed.join(',') + ')';
+        if (i > 0) {
+          await nextQuestion();
+          const typing = byLabel('Type: answer by typing'); if (typing) { typing.click(); await sleep(350); }
+          if (!answerBox()) { passed.push('no-typed-answer'); continue; }
+          const peek = await oracle({ kind: 'answer' });
+          if (!peek.supported) { passed.push(peek.answerType || peek.reason || 'unstatable'); continue; }
+          setValue(answerBox(), WRONG);
+        }
+        const got = await checked(pressSubmit);
+        if (got === 'refused' || got === 'technical') throw new Error('the signed-in check was refused (' + (refusalKind() || 'technical') + '): ' + seen('.verdict').slice(0, 110));
+        const escrow = await oracle({ kind: 'answer' });
+        if (got !== 'miss' || !escrow.supported) { passed.push(got + '/' + (escrow.answerType || 'unstatable')); continue; }   // unreadable for this answer type, or no statable answer
+        if (q('.eval-card') || q('.solution-panel')) throw new Error('a first miss resolved the question');
+        if (!answerBox() || answerBox().disabled) throw new Error('no second try offered');
+        typedEscrow = escrow; typedLocal = qid();
+        return 'server marked the wrong answer: "' + seen('.verdict .verdict-title') + '", question still open' + (i === 0 ? ' (the first question opened)' : ' (issued question ' + (i + 1) + ')');
+      }
+      throw new Error('no question with a statable numeric answer in 12: ' + passed.join(','));
+    });
+    await step('typedCorrectFull', async () => {
+      if (!typedEscrow) throw new Error('no question was left open by a server-marked miss');
+      setValue(answerBox(), typedEscrow.text); await sleep(300);
+      const got = await checked(pressSubmit);
+      if (got !== 'evaluated') throw new Error('expected an evaluation, got ' + got + ': ' + seen('.verdict').slice(0, 100));
+      const card = q('.eval-card');
+      if (card.getAttribute('data-outcome') !== 'correct') throw new Error('outcome ' + card.getAttribute('data-outcome'));
+      if (q('[data-grade-unavailable]') || !fullMarks()) throw new Error('marks shown: ' + JSON.stringify(seen('.eval-marks')));
+      graded.push({ id: typedLocal, server: typedEscrow.serverQuestionId, mode: 'typed' });
+      return 'server marked the right answer: ' + fullMarks();
+    });
+    let inkEscrow = null;
+    await step('inkServerReading', async () => {
+      const passed = [];
+      // Smart practice across the syllabus: the pinned chapter turns to
+      // multiple choice once its typed question is answered correctly.
+      at = 'practice'; await route('/practice'); await waitFor(() => q('.q-prompt') && qid(), 40000); await sleep(500);
+      for (let i = 0; i < 12; i++) {
+        at = 'question ' + (i + 1) + ' (passed over: ' + passed.join(',') + ')';
+        await nextQuestion();
+        if (!byLabel('Write: answer by handwriting')) { passed.push('no-write-tab'); continue; }
+        const escrow = await oracle({ kind: 'answer' });
+        if (!escrow.supported) { passed.push(escrow.answerType || escrow.reason || 'unstatable'); continue; }
+        const id = qid();
+        at = 'write'; await writeMode();
+        const echoed = await writeOnNativeSurface();
+        at = 'saved'; await inkSavedTruthfully(id);
+        at = 'reading'; await waitFor(() => q('.ink-preview .ink-line'), 60000);
+        const lines = [...document.querySelectorAll('.ink-preview .ink-line')].map(n => ({ text: n.getAttribute('data-text'), low: n.classList.contains('ink-line-low') }));
+        if (lines.length !== 1 || lines[0].text !== escrow.readerText) throw new Error('transcript ' + JSON.stringify(lines) + ', the stand-in reader answered ' + JSON.stringify(escrow.readerText));
+        if (!lines[0].low || !q('.ink-line .ink-correct-btn')) throw new Error('a doubtful line is not editable');
+        assertUnmarked('reading');
+        inkEscrow = escrow; graded.push({ id, server: escrow.serverQuestionId, mode: 'ink' });
+        return echoed + ' strokes read by the server (synthetic reader): transcript ' + JSON.stringify(lines[0].text) + ', doubtful, editable';
+      }
+      throw new Error('no handwriting question with a statable numeric answer in 12: ' + passed.join(','));
+    });
+    await step('inkCorrectedMarked', async () => {
+      if (!inkEscrow) throw new Error('no server reading to correct');
+      at = 'correct'; q('.ink-line .ink-correct-btn').click();
+      setValue(await waitFor(() => q('.ink-line form.ink-correct input')), inkEscrow.text); await sleep(200);
+      q('.ink-line form.ink-correct button[type=submit]').click();
+      await waitFor(() => { const l = q('.ink-line[data-corrected="true"]'); return l && l.getAttribute('data-text') === inkEscrow.text; });
+      at = 'submit';
+      let got = null;
+      for (let press = 0; press < 3 && got !== 'evaluated'; press++) {
+        got = await checked(pressSubmit);
+        if (got !== 'confirm') break;
+      }
+      if (got !== 'evaluated') throw new Error('expected an evaluation, got ' + got + ': ' + seen('.verdict, .ws-check').slice(0, 110));
+      if (q('.eval-card').getAttribute('data-outcome') !== 'correct' || !fullMarks()) throw new Error('outcome ' + q('.eval-card').getAttribute('data-outcome') + ' marks ' + JSON.stringify(seen('.eval-marks')));
+      return 'corrected transcript marked by the server: ' + fullMarks();
+    });
+    const historyVerdicts = async ids => {
+      await route('/review');
+      await waitFor(() => location.pathname === '/review' && q('.hist-row'), 30000);
+      await sleep(800);
+      return ids.map(id => [...document.querySelectorAll('.hist-row[data-question-id="' + id + '"] .hist-verdict .sr-only')].map(n => n.textContent.trim()).join('+') || 'missing');
+    };
+    await step('historyRecorded', async () => {
+      if (graded.length !== 2) throw new Error('only ' + graded.length + ' question(s) were marked');
+      localStorage.setItem('pri-journey-graded', JSON.stringify(graded));
+      const verdicts = await historyVerdicts(graded.map(g => g.id));
+      if (verdicts.join() !== 'Correct,Correct') throw new Error('History shows ' + verdicts.join());
+      return 'History: typed Correct, handwritten Correct ' + JSON.stringify(graded.map(g => g.server));
+    });
+    return JSON.stringify(steps);
+    """#
+
+    private static let markingRelaunch = helpers + cardHelpers + oracleHelpers + #"""
+    await step('historyAfterRelaunch', async () => {
+      at = 'gate'; await signedInHome();
+      const graded = JSON.parse(localStorage.getItem('pri-journey-graded') || '[]');
+      if (graded.length !== 2) throw new Error('the marking launch recorded ' + graded.length + ' result(s)');
+      at = 'history'; await route('/review');
+      await waitFor(() => location.pathname === '/review' && q('.hist-row'), 30000);
+      await sleep(800);
+      const verdicts = graded.map(g => [...document.querySelectorAll('.hist-row[data-question-id="' + g.id + '"] .hist-verdict .sr-only')].map(n => n.textContent.trim()).join('+') || 'missing');
+      if (verdicts.join() !== 'Correct,Correct') throw new Error('after relaunch History shows ' + verdicts.join());
+      return 'both server-marked results in History after relaunch';
+    });
+    return JSON.stringify(steps);
+    """#
+
+    // Signed in, then the connection goes: the work stays on the device as an
+    // offline draft that says it cannot be marked. The test process stops the
+    // server when the page asks (the oracle relay), never at a fixed time.
+    private static let offlineDraft = helpers + cardHelpers + oracleHelpers + #"""
+    await step('offlineAfterEntry', async () => {
+      at = 'gate'; await signedInHome();
+      at = 'server stop'; const r = await oracle({ kind: 'goOffline' });
+      if (!r.offline) throw new Error('the test process could not stop the server: ' + (r.reason || 'unknown'));
+      await sleep(1500);
+      if (!shellOpen() || q(GATE)) throw new Error('a dropped connection closed the shell');
+      return 'entered with the server up; the server is now stopped and the shell stays open';
+    });
     await step('practice', async () => {
       await nav('/practice'); await waitFor(() => q('.q-prompt'));
       const n = await openTypedQuestion();
@@ -406,250 +656,46 @@ enum JourneySelfCheck {
       at = 'history'; await route('/review');
       await waitFor(() => location.pathname === '/review' && q('main'));
       await sleep(1500);
-      const rows = document.querySelectorAll('.hist-row').length;
-      if (rows) throw new Error(rows + ' attempt(s) recorded with no server');
-      return 'History holds no attempt';
+      // History holds the marking leg's two server-marked results; the draft
+      // must not be among them.
+      const rows = document.querySelectorAll('.hist-row[data-question-id="' + id + '"]').length;
+      if (rows) throw new Error(rows + ' attempt(s) recorded for the offline draft');
+      return 'History holds no attempt for the draft (' + document.querySelectorAll('.hist-row').length + ' server-marked row(s) from before)';
     });
-    await step('progress', async () => {
-      at = 'home'; await route('/'); await waitFor(() => location.pathname === '/' && q('.home-greet'));
-      const link = () => [...document.querySelectorAll('a[href="/progress"]')].find(a => a.offsetParent);
-      if (!link()) { q('.mobilenav button[aria-expanded]')?.click(); await waitFor(link); }
-      link().click();
-      await waitFor(() => location.pathname === '/progress' && q('main'));
-      return 'progress shown';
-    });
-    await step('persistenceMarker', async () => { localStorage.setItem('pri-journey-marker', 'kept'); return 'written'; });
+
     return JSON.stringify(steps);
     """#
 
-    private static let relaunch = helpers + cardHelpers + #"""
-    await step('relaunchProfile', async () => {
-      await waitFor(() => q('.home-greet') || q('.auth-card'));
-      if (!q('.home-greet')) {
-        // A profile picker is also proof the profile survived.
-        const picker = [...document.querySelectorAll('.auth-card button')].find(b => /Journey Student/.test(b.textContent));
-        if (!picker) throw new Error('profile not found after relaunch');
-        picker.click(); await waitFor(() => q('.home-greet'));
-      }
-      return 'profile survived';
+    // Relaunched while the server is still down: the gate cannot confirm the
+    // account, so nothing opens — and nothing on the device was lost.
+    private static let offlineRelaunch = helpers + cardHelpers + #"""
+    await step('offlineRelaunchHeld', async () => {
+      await waitFor(() => q(GATE) || shellOpen(), 40000);
+      await waitFor(() => gateStatus() === 'retry' || shellOpen(), 60000);
+      if (shellOpen()) throw new Error('the shell opened while the server could not confirm the account');
+      return assertHeld('offline relaunch');
     });
-    await step('relaunchMarker', async () => {
-      if (localStorage.getItem('pri-journey-marker') !== 'kept') throw new Error('marker lost');
-      return location.origin;
-    });
-    await step('relaunchDraftKept', async () => {
+    await step('offlineDraftOnDisk', async () => {
       const draft = JSON.parse(localStorage.getItem('pri-journey-draft') || 'null');
-      if (!draft || !draft.id) throw new Error('the first launch recorded no draft');
-      // The sealed ink draft is restored onto a fresh native sheet, and the
-      // surface reports the same three strokes back. Listening starts before
-      // Practice opens: a card holding saved ink opens in Write by itself.
-      at = 'ink'; if (await inkDraft(draft.id) !== 'kept') throw new Error('sealed ink draft lost');
-      const echoed = await nativeStrokeEcho(async () => {
-        at = 'practice'; await nav('/practice'); await waitFor(() => q('.q-prompt') && qid(), 40000);
-        if (qid() !== draft.id) throw new Error('a different question came back: ' + qid() + ' (was ' + draft.id + ')');
-        at = 'write'; await writeMode();
-      }, STROKES.length, 30000);
-      at = 'saved'; await inkSavedTruthfully(draft.id);
-      at = 'typed'; await typeMode();
-      await waitFor(answerBox);
-      if (answerBox().value !== '12345') throw new Error('typed answer lost: ' + JSON.stringify(answerBox().value));
-      const working = await shownWorking();
-      if (working !== WORKING) throw new Error('typed working lost: ' + JSON.stringify(working));
-      assertUnmarked('relaunch');
-      assertDraftCard('relaunch');
-      // Observed, not required: an attached photo is held by the open card
-      // only (drafts.js keeps answers and working, never images).
-      at = 'photo'; await photoMode();
-      const photo = vis(q('.photo-attach .photo-thumb')) ? 'kept' : 'not kept (not a draft)';
-      return 'same question, typed answer, working and ' + echoed + ' strokes restored; unmarked; photo ' + photo;
-    });
-    return JSON.stringify(steps);
-    """#
-
-    // ── The signed-in leg: a real local server marks the work ────────────────
-    // `oracle` asks the TEST PROCESS (never the page, never the app) for the
-    // server's sealed copy of the question this account was last issued.
-    private static let oracleHelpers = #"""
-    let asked = 0;
-    async function oracle(payload) {
-      const n = ++asked;
-      window.__priJourneyReply = null;
-      window.__priJourneyAsk = { n, ...payload };
-      try { return await waitFor(() => { const r = window.__priJourneyReply; return r && r.n === n && r; }, 60000); }
-      catch (e) { throw new Error('the test oracle did not answer'); }
-    }
-    const graded = [];
-    const fullMarks = () => { const m = seen('.eval-marks').match(/^(\d+(?:\.\d+)?) \/ (\d+(?:\.\d+)?) marks?/); return m && m[1] === m[2] && Number(m[2]) > 0 ? m[0] : null; };
-    """#
-
-    private static let marking = helpers + cardHelpers + oracleHelpers + #"""
-    await step('onlineOnboarding', async () => {
-      await waitFor(() => q('[data-testid=hero-offline]') || q('.auth-card') || q('.home-greet'));
-      await onboard();
-      return 'profile created, signed out, server reachable';
-    });
-    await step('preparedQuestion', async () => {
-      await nav('/practice'); await waitFor(() => q('.q-prompt') && qid(), 40000);
-      const n = await openTypedQuestion();
-      at = 'notice'; await waitFor(() => vis(q('[data-check-needs-account]')));
-      assertUnmarked('signed out');
-      return 'question ' + n + ' shown signed out; the card says checking needs an account';
-    });
-    let firstId = '';
-    await step('signedOutRefusal', async () => {
-      firstId = qid();
-      setValue(answerBox(), WRONG); await typeWorking(WORKING);
-      await sleep(500);
-      at = 'submit'; const got = await checked(pressSubmit);
-      if (got !== 'refused' || refusalKind() !== 'sign-in') throw new Error('expected the in-card sign-in, got ' + got + '/' + refusalKind() + ': ' + seen('.verdict').slice(0, 100));
-      assertUnmarked('signed out submit');
-      at = 'reveal'; const shown = await checked(pressReveal);
-      if (shown !== 'refused' || refusalKind() !== 'sign-in') throw new Error('Show solution was not refused with the sign-in (' + shown + '/' + refusalKind() + ')');
-      assertUnmarked('signed out reveal');
-      return 'Submit and Show solution refused with the in-card sign-in; nothing marked';
-    });
-    await step('signInOnCard', async () => {
-      window.__priJourneySamePage = 'kept';
-      at = 'open'; (await waitFor(() => allVis('[data-check-sign-in]').find(b => !b.disabled))).click();
-      at = 'panel'; await waitFor(() => q('section[aria-labelledby="cloud-account-title"]'), 30000);
-      const panel = () => q('section[aria-labelledby="cloud-account-title"]');
-      const signIn = [...panel().querySelectorAll('button')].find(b => b.textContent.trim() === 'Sign in');
-      if (signIn) { signIn.click(); await sleep(200); }
-      setValue(await waitFor(() => q('#cloud-email')), email);
-      setValue(q('#cloud-password'), password); await sleep(200);
-      at = 'submit'; (await waitFor(() => { const b = q('#cloud-email')?.form?.querySelector('button[type=submit]'); return b && !b.disabled ? b : null; })).click();
-      at = 'linked'; await waitFor(() => !refusalKind() && !q('[data-check-needs-account]') && !q('#cloud-email'), 60000);
-      if (location.pathname !== '/practice' || window.__priJourneySamePage !== 'kept') throw new Error('the student left the question: ' + location.pathname);
-      if (qid() !== firstId) throw new Error('a different question after sign-in');
-      if ((answerBox() || {}).value !== WRONG) throw new Error('typed answer lost in sign-in: ' + (answerBox() || {}).value);
-      if (await shownWorking() !== WORKING) throw new Error('typed working lost in sign-in');
-      assertUnmarked('sign-in alone');
-      return 'signed in on the card; same question, answer and working kept; nothing marked yet';
-    });
-    // A wrong answer then the right one, on a question whose sealed answer the
-    // oracle can state. The first candidate is the question prepared signed out.
-    let typedEscrow = null, typedLocal = '';
-    await step('typedWrongZero', async () => {
-      const passed = [];
-      for (let i = 0; i < 12; i++) {
-        at = 'question ' + (i + 1) + ' (passed over: ' + passed.join(',') + ')';
-        if (i > 0) {
-          await nextQuestion();
-          const typing = byLabel('Type: answer by typing'); if (typing) { typing.click(); await sleep(350); }
-          if (!answerBox()) { passed.push('no-typed-answer'); continue; }
-          const peek = await oracle({ kind: 'answer' });
-          if (!peek.supported) { passed.push(peek.answerType || peek.reason || 'unstatable'); continue; }
-          setValue(answerBox(), WRONG);
-        }
-        const got = await checked(pressSubmit);
-        if (got === 'refused' || got === 'technical') throw new Error('the signed-in check was refused (' + (refusalKind() || 'technical') + '): ' + seen('.verdict').slice(0, 110));
-        const escrow = await oracle({ kind: 'answer' });
-        if (i === 0 && !escrow.fromPrepared) throw new Error('the server did not bind the prepared question');
-        if (got !== 'miss' || !escrow.supported) { passed.push(got + '/' + (escrow.answerType || 'unstatable')); continue; }   // unreadable for this answer type, or no statable answer
-        if (q('.eval-card') || q('.solution-panel')) throw new Error('a first miss resolved the question');
-        if (!answerBox() || answerBox().disabled) throw new Error('no second try offered');
-        typedEscrow = escrow; typedLocal = qid();
-        return 'server marked the wrong answer: "' + seen('.verdict .verdict-title') + '", question still open' + (i === 0 ? ' (the question prepared signed out)' : ' (issued question ' + (i + 1) + ')');
-      }
-      throw new Error('no question with a statable numeric answer in 12: ' + passed.join(','));
-    });
-    await step('typedCorrectFull', async () => {
-      if (!typedEscrow) throw new Error('no question was left open by a server-marked miss');
-      setValue(answerBox(), typedEscrow.text); await sleep(300);
-      const got = await checked(pressSubmit);
-      if (got !== 'evaluated') throw new Error('expected an evaluation, got ' + got + ': ' + seen('.verdict').slice(0, 100));
-      const card = q('.eval-card');
-      if (card.getAttribute('data-outcome') !== 'correct') throw new Error('outcome ' + card.getAttribute('data-outcome'));
-      if (q('[data-grade-unavailable]') || !fullMarks()) throw new Error('marks shown: ' + JSON.stringify(seen('.eval-marks')));
-      graded.push({ id: typedLocal, server: typedEscrow.serverQuestionId, mode: 'typed' });
-      return 'server marked the right answer: ' + fullMarks();
-    });
-    let inkEscrow = null;
-    await step('inkServerReading', async () => {
-      const passed = [];
-      // Smart practice across the syllabus: the pinned chapter turns to
-      // multiple choice once its typed question is answered correctly.
-      at = 'practice'; await route('/practice'); await waitFor(() => q('.q-prompt') && qid(), 40000); await sleep(500);
-      for (let i = 0; i < 12; i++) {
-        at = 'question ' + (i + 1) + ' (passed over: ' + passed.join(',') + ')';
-        await nextQuestion();
-        if (!byLabel('Write: answer by handwriting')) { passed.push('no-write-tab'); continue; }
-        const escrow = await oracle({ kind: 'answer' });
-        if (!escrow.supported) { passed.push(escrow.answerType || escrow.reason || 'unstatable'); continue; }
-        const id = qid();
-        at = 'write'; await writeMode();
-        const echoed = await writeOnNativeSurface();
-        at = 'saved'; await inkSavedTruthfully(id);
-        at = 'reading'; await waitFor(() => q('.ink-preview .ink-line'), 60000);
-        const lines = [...document.querySelectorAll('.ink-preview .ink-line')].map(n => ({ text: n.getAttribute('data-text'), low: n.classList.contains('ink-line-low') }));
-        if (lines.length !== 1 || lines[0].text !== escrow.readerText) throw new Error('transcript ' + JSON.stringify(lines) + ', the stand-in reader answered ' + JSON.stringify(escrow.readerText));
-        if (!lines[0].low || !q('.ink-line .ink-correct-btn')) throw new Error('a doubtful line is not editable');
-        assertUnmarked('reading');
-        inkEscrow = escrow; graded.push({ id, server: escrow.serverQuestionId, mode: 'ink' });
-        return echoed + ' strokes read by the server (synthetic reader): transcript ' + JSON.stringify(lines[0].text) + ', doubtful, editable';
-      }
-      throw new Error('no handwriting question with a statable numeric answer in 12: ' + passed.join(','));
-    });
-    await step('inkCorrectedMarked', async () => {
-      if (!inkEscrow) throw new Error('no server reading to correct');
-      at = 'correct'; q('.ink-line .ink-correct-btn').click();
-      setValue(await waitFor(() => q('.ink-line form.ink-correct input')), inkEscrow.text); await sleep(200);
-      q('.ink-line form.ink-correct button[type=submit]').click();
-      await waitFor(() => { const l = q('.ink-line[data-corrected="true"]'); return l && l.getAttribute('data-text') === inkEscrow.text; });
-      at = 'submit';
-      let got = null;
-      for (let press = 0; press < 3 && got !== 'evaluated'; press++) {
-        got = await checked(pressSubmit);
-        if (got !== 'confirm') break;
-      }
-      if (got !== 'evaluated') throw new Error('expected an evaluation, got ' + got + ': ' + seen('.verdict, .ws-check').slice(0, 110));
-      if (q('.eval-card').getAttribute('data-outcome') !== 'correct' || !fullMarks()) throw new Error('outcome ' + q('.eval-card').getAttribute('data-outcome') + ' marks ' + JSON.stringify(seen('.eval-marks')));
-      return 'corrected transcript marked by the server: ' + fullMarks();
-    });
-    const historyVerdicts = async ids => {
-      await route('/review');
-      await waitFor(() => location.pathname === '/review' && q('.hist-row'), 30000);
-      await sleep(800);
-      return ids.map(id => [...document.querySelectorAll('.hist-row[data-question-id="' + id + '"] .hist-verdict .sr-only')].map(n => n.textContent.trim()).join('+') || 'missing');
-    };
-    await step('historyRecorded', async () => {
-      if (graded.length !== 2) throw new Error('only ' + graded.length + ' question(s) were marked');
-      localStorage.setItem('pri-journey-graded', JSON.stringify(graded));
-      const verdicts = await historyVerdicts(graded.map(g => g.id));
-      if (verdicts.join() !== 'Correct,Correct') throw new Error('History shows ' + verdicts.join());
-      return 'History: typed Correct, handwritten Correct ' + JSON.stringify(graded.map(g => g.server));
-    });
-    return JSON.stringify(steps);
-    """#
-
-    private static let markingRelaunch = helpers + cardHelpers + #"""
-    await step('historyAfterRelaunch', async () => {
-      await waitFor(() => q('.home-greet') || q('.auth-card'));
-      if (!q('.home-greet')) {
-        const picker = [...document.querySelectorAll('.auth-card button')].find(b => /Journey Student/.test(b.textContent));
-        if (!picker) throw new Error('profile not found after relaunch');
-        picker.click(); await waitFor(() => q('.home-greet'));
-      }
-      const graded = JSON.parse(localStorage.getItem('pri-journey-graded') || '[]');
-      if (graded.length !== 2) throw new Error('the marking launch recorded ' + graded.length + ' result(s)');
-      at = 'history'; await route('/review');
-      await waitFor(() => location.pathname === '/review' && q('.hist-row'), 30000);
-      await sleep(800);
-      const verdicts = graded.map(g => [...document.querySelectorAll('.hist-row[data-question-id="' + g.id + '"] .hist-verdict .sr-only')].map(n => n.textContent.trim()).join('+') || 'missing');
-      if (verdicts.join() !== 'Correct,Correct') throw new Error('after relaunch History shows ' + verdicts.join());
-      return 'both server-marked results in History after relaunch';
+      if (!draft || !draft.id) throw new Error('the offline launch recorded no draft');
+      const key = Object.keys(localStorage).find(k => k.endsWith('.question.' + draft.id));
+      const data = key && (JSON.parse(localStorage.getItem(key)) || {}).data;
+      if (!data || data.typed !== '12345' || data.working !== WORKING) throw new Error('typed draft lost: ' + JSON.stringify(data || null).slice(0, 80));
+      if (await inkDraft(draft.id) !== 'kept') throw new Error('sealed ink draft lost');
+      return 'typed answer, working and the sealed ink draft are still on the device';
     });
     return JSON.stringify(steps);
     """#
 
     // Shared by the cloud phases: Home with the journey's profile, then Settings.
     private static let cloudHelpers = helpers + """
+    // Account-first (#477): Home is reached only by a student the gate has
+    // let in — these phases run on the install the marking leg signed in.
     async function home() {
-      await waitFor(() => q('.home-greet') || q('.auth-card'));
-      if (!q('.home-greet')) {
-        const picker = [...document.querySelectorAll('.auth-card button')].find(b => /Journey Student/.test(b.textContent));
-        if (!picker) throw new Error('profile not found');
-        picker.click(); await waitFor(() => q('.home-greet'));
+      try { await waitFor(() => q('.home-greet') && !q('[data-testid=account-activation-gate]'), 90000); }
+      catch (e) {
+        const g = q('[data-testid=account-activation-gate]');
+        throw new Error('Home did not open: ' + (g ? 'the gate reads ' + g.getAttribute('data-activation-status') : q('[data-signin-card]') ? 'the sign-in card is shown (no account on this install)' : 'nothing recognisable'));
       }
     }
     async function settings() {
@@ -664,90 +710,62 @@ enum JourneySelfCheck {
     const submit = () => { const b = q('#cloud-email')?.form?.querySelector('button[type=submit]'); return b && !b.disabled ? b : null; };
     """
 
-    // Sign in through the real Settings UI against a real Pri server (the
-    // DEBUG-only PRI_CLOUD_ORIGIN override), then Sync now.
-    private static let cloud = cloudHelpers + """
-    await step('cloudSignIn', async () => {
-      at = 'home'; await home();
+    // The account phases (--cloud): Settings and the card on one page, and the
+    // oracle relay for the codes the server's TEST email adapter issued.
+
+    // A NEW address enters through the card (no password, no device-only
+    // profile), then deletes the account in Settings with an emailed code.
+    private static let cloudSignUp = cloudHelpers + cardHelpers + oracleHelpers + #"""
+    await step('cloudSignUp', async () => {
+      const said = await cardOnboard(newEmail);
       at = 'settings'; await settings();
-      at = 'state'; await waitFor(() => stateTag() === 'Not connected');
-      byText('Sign in')?.click();
-      setValue(await waitFor(() => q('#cloud-email')), email);
-      setValue(q('#cloud-password'), password);
-      await sleep(150);
-      (await waitFor(submit)).click();
+      at = 'state'; await waitFor(() => stateTag() === 'Connected', 60000);
+      return said + '; Settings reads Connected';
+    });
+    await step('cloudDeleteAccount', async () => {
+      at = 'phrase'; setValue(await waitFor(() => q('#cloud-delete-phrase')), 'DELETE'); await sleep(150);
+      at = 'send'; (await waitFor(() => { const b = q('[data-testid=cloud-delete-send-code]'); return b && !b.disabled && b; })).click();
+      at = 'code box'; await waitFor(() => q('#cloud-delete-code-0'), 30000);
+      at = 'code'; const sent = await oracle({ kind: 'emailCode', to: newEmail, purpose: 'reauth' });
+      if (!/^\d{6}$/.test(sent.code || '')) throw new Error('the server sent no six-digit deletion code');
+      setValue(q('#cloud-delete-code-0'), sent.code); await sleep(300);
+      at = 'delete'; (await waitFor(() => { const b = q('[data-testid=cloud-delete-with-code]'); return b && !b.disabled && b; })).click();
+      at = 'deleted'; await waitFor(() => /Cloud account deleted/.test(document.body.innerText) || q(GATE), 30000);
+      return 'deleted with the emailed code; ' + (q(GATE) ? 'the gate took the screen (' + gateStatus() + ')' : 'the panel says so');
+    });
+    return JSON.stringify(steps);
+    """#
+
+    // The fixture (returning) address on the card, then Sync now.
+    private static let cloud = cloudHelpers + cardHelpers + oracleHelpers + #"""
+    await step('cloudSignIn', async () => {
+      const said = await cardOnboard(email);
+      at = 'settings'; await settings();
       at = 'connected'; await waitFor(() => stateTag() === 'Connected', 60000);
-      return 'connected';
+      return said + '; connected';
     });
     await step('cloudSync', async () => {
       (await waitFor(() => enabled('Sync now'), 60000)).click();
-      const done = await waitFor(() => { const t = q('section[aria-labelledby="cloud-account-title"]').innerText; const m = t.match(/Sync complete[^\\n]*/); return m && m[0]; }, 60000);
+      const done = await waitFor(() => { const t = q('section[aria-labelledby="cloud-account-title"]').innerText; const m = t.match(/Sync complete[^\n]*/); return m && m[0]; }, 60000);
       await sleep(800);
       // Syncing must not drop a connected account back to "sign in" or "checking".
       if (stateTag() !== 'Connected') throw new Error('after sync the account reads ' + stateTag());
       return done;
     });
     return JSON.stringify(steps);
-    """
+    """#
 
-    // Sign up through Settings, sign in, then permanently delete the account
-    // (password + typed DELETE). Uses a fresh, never-registered email.
-    private static let cloudSignUp = cloudHelpers + """
-    const signIn = async (e, p) => {
-      byText('Sign in')?.click();
-      setValue(await waitFor(() => q('#cloud-email')), e); setValue(q('#cloud-password'), p); await sleep(150);
-      (await waitFor(submit)).click();
-    };
-    await step('cloudSignUp', async () => {
-      at = 'home'; await home(); await settings();
-      at = 'state'; await waitFor(() => stateTag() === 'Not connected');
-      (await waitFor(() => enabled('Create account'))).click();
-      setValue(await waitFor(() => q('#cloud-name')), 'Journey Adult');
-      setValue(q('#cloud-email'), newEmail); setValue(q('#cloud-password'), newPassword);
-      const boxes = [...q('#cloud-email').form.querySelectorAll('input[type=checkbox]')];
-      for (const b of boxes) if (!b.checked) { b.click(); await sleep(120); }
-      (await waitFor(submit)).click();
-      at = 'connected'; await waitFor(() => stateTag() === 'Connected', 60000);
-      return stateTag();
-    });
-    await step('cloudLogin', async () => {
-      // Log out and sign the new account back in through the form.
-      (await waitFor(() => enabled('Disconnect'), 60000)).click();
-      await waitFor(() => stateTag() === 'Not connected', 20000);
-      await signIn(newEmail, newPassword);
-      await waitFor(() => stateTag() === 'Connected', 60000);
-      return 'signed back in as the new account';
-    });
-    await step('cloudDeleteAccount', async () => {
-      setValue(await waitFor(() => q('#cloud-delete-password')), newPassword);
-      setValue(q('#cloud-delete-phrase'), 'DELETE'); await sleep(150);
-      q('#cloud-delete-phrase').form.querySelector('button[type=submit]').click();
-      await waitFor(() => /Cloud account deleted/.test(document.body.innerText) && stateTag() === 'Not connected', 30000);
-      return 'deleted; offline profile kept';
+    // Opened while the cloud server is unreachable: account-first, the gate
+    // cannot confirm the account, so it says "retry" and the shell stays shut.
+    private static let offline = cloudHelpers + cardHelpers + oracleHelpers + #"""
+    await step('offlineGateHolds', async () => {
+      await waitFor(() => q(GATE) || shellOpen(), 40000);
+      await waitFor(() => gateStatus() === 'retry' || shellOpen(), 60000);
+      await sleep(2000);
+      return assertHeld('opened offline');
     });
     return JSON.stringify(steps);
-    """
-
-    // The cloud server is unreachable: learning still works and Sync fails
-    // safely, keeping the local work.
-    private static let offline = cloudHelpers + """
-    await step('offlinePractice', async () => {
-      await home();
-      history.pushState({}, '', '/practice'); dispatchEvent(new PopStateEvent('popstate'));
-      await waitFor(() => q('.q-prompt'));
-      return 'practice works offline';
-    });
-    await step('offlineSyncSafe', async () => {
-      await settings();
-      // Unreachable is "offline", not "sign in again", and work stays local.
-      await waitFor(() => stateTag() === 'Linked · offline', 60000);
-      const note = await waitFor(() => q('[data-cloud-offline]'));
-      const sync = byText('Sync now');
-      if (sync && !sync.disabled) throw new Error('Sync offered while offline');
-      return stateTag() + ' · ' + (note.innerText || '').slice(0, 60);
-    });
-    return JSON.stringify(steps);
-    """
+    """#
 
     // Backgrounded by another app and brought back: the page saw the
     // lifecycle, the unsent typed answer was already in the draft store when
@@ -890,8 +908,10 @@ enum JourneySelfCheck {
     });
     await step('cloudDisconnect', async () => {
       (await waitFor(() => enabled('Disconnect'), 60000)).click();
-      await waitFor(() => stateTag() === 'Not connected', 20000);
-      return 'disconnected';
+      // Account-first: signed out, the gate takes the screen again (or the panel says so).
+      const gate = () => q('[data-testid=account-activation-gate]');
+      await waitFor(() => stateTag() === 'Not connected' || gate(), 20000);
+      return gate() ? 'disconnected; the gate reads ' + gate().getAttribute('data-activation-status') : 'disconnected';
     });
     return JSON.stringify(steps);
     """
@@ -943,6 +963,8 @@ enum JourneySelfCheck {
         case "relaunch": script = relaunch
         case "marking": script = marking
         case "markingRelaunch": script = markingRelaunch
+        case "offlineDraft": script = offlineDraft
+        case "offlineRelaunch": script = offlineRelaunch
         case "cloud": script = cloud
         case "cloudRelaunch": script = cloudRelaunch
         case "dynamicType": script = dynamicType
