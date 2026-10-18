@@ -1,10 +1,16 @@
 # Postgres cutover: Supabase (Mumbai) behind the Railway `/v1` server
 
-Status: **procedure only — nothing here has been run against Supabase or Railway** (as of
-2026-10-02; the live service still logs `platform_db_open { engine: 'sqlite' }`, see
-`docs/release/PRI_R1_SCOPE_EVIDENCE.md` §2.10). The software side — migrations, driver, target
-check, the SQLite data export in §6a and its tests — is complete; every hosted step is
-`BLOCKED_EXTERNAL` on the owner and is listed in order in `docs/release/LAUNCH-RUNBOOK.md`.
+Status: **staging has run this procedure; production has not.** Staging
+(`https://pri-learning-staging-staging.up.railway.app`) serves `main` on Supabase Postgres at
+schema **12** / billing **6** (`/v1/health` and `/v1/ready`, read on 2026-10-19; the schema-12
+migration was applied on 2026-10-18 through the placeholder workdir of §2.5). Production
+(`https://final-pri-learning-production.up.railway.app`) still runs SQLite on a Railway volume with
+no `PRI_DATABASE_URL`; its Supabase project has no `pri` schema. The software side — migrations,
+driver, target check, the SQLite data export in §6a, `scripts/release-nominate.mjs` and
+`npm run verify:deployment` — is complete; every production step is `BLOCKED_EXTERNAL` on the
+owner and is listed in order in `docs/release/LAUNCH-RUNBOOK.md` and
+`docs/release/production-cutover-checklist.md`. The promotion order, with its 24-hour soak gate,
+is §4.6 below.
 Schema version numbers in this document are those of `server/platform/schemaVersions.js`
 (`SCHEMA_VERSION`, `BILLING_SCHEMA_VERSION`) and the migrations under `supabase/migrations/`;
 if they ever disagree with that module, the module is right and this document is stale.
@@ -35,6 +41,29 @@ printed):
 | `schema_version` = **12** and `billing_schema_version` = **6** exactly (`server/platform/schemaVersions.js`) | `store.js assertSchemaVersions` | `PLATFORM_DB_SCHEMA_MISMATCH` |
 | `pri.sync_cursor_seq` exists (migration `20261002000000`) | same | `PLATFORM_DB_SCHEMA_MISMATCH` |
 | Timeouts, lock wait and pool size parse as whole numbers in range | `config.js postgresSessionLimits` | `PLATFORM_DB_CONFIG_INVALID` |
+
+### Schema versions and the migrations that set them
+
+`server/platform/schemaVersions.js` is the authority; this table is its reading at schema **12** /
+billing **6**. A deployed build boots only against a database at exactly these numbers
+(`PLATFORM_DB_SCHEMA_MISMATCH` otherwise), so a schema-changing merge and its migration are one
+back-to-back operation (§2.6).
+
+| Version | Migration (`supabase/migrations/`) | What it adds | Rollback |
+|---|---|---|---|
+| schema 6 / billing 3 | `20261001000000_platform_schema.sql` | every `pri` table, RLS on, the `pri_server` role, `platform_meta`, `sync_cursors` | none written: the first production push runs against an empty schema |
+| schema 7 | `20261002000000_sync_cursor_sequence.sql` | `pri.sync_cursor_seq`; `sync_cursors` closed to `pri_server` | §5.3 |
+| schema 8 | `20261002010000_tutor_cache.sql` | the 24-hour AI tutor reply cache | §5.2a |
+| billing 4 | `20261003000000_billing_payment_retention.sql` | payments outlive their account (`ON DELETE SET NULL`) | §5.3a |
+| billing 5 | `20261003010000_storekit_entitlement_state.sql` | subscription lifecycle state, Apple signed-data ledger, support grants | owner-approved, written at the time (§5.2a note) |
+| billing 6 | `20261004000000_google_play_billing.sql` | Google Play tables | owner-approved, written at the time |
+| schema 9 | `20261005000000_account_age_basis.sql` | `accounts.age_basis`, the age decision at creation | owner-approved, written at the time |
+| schema 10 | `20261006000000_otp_sign_in.sql` | `otp_challenges`, `account_phones`, `guardian_consents.guardian_phone` | owner-approved, written at the time |
+| schema 11 | `20261007000000_security_hardening.sql` | staff MFA, guardian-withdraw credential, append-only `audit_log`, per-account RLS on the sync tables | owner-approved, written at the time |
+| **schema 12** | `20261016000000_rls_fail_closed.sql` (#522) | **RLS deny-by-default**: every `pri` table requires a declared `pri.scope` (`system` or `account`); the 19 account-owned tables admit only system scope or their own account; the store declares the scope on every statement | `docs/release/rollback/20261016000000_rls_fail_closed.rollback.sql` |
+
+Applied on staging: all ten, in this order (schema 12 on 2026-10-18 by §2.5). Applied on
+production: none.
 
 ### Connection: session mode only (mandatory, enforced at boot)
 
@@ -287,7 +316,7 @@ unset PRI_DATABASE_URL PRI_DATABASE_SSL_ROOT_CERT
 `server/tools/postgres-target-check.mjs` connects exactly as the server does and changes nothing
 that persists. It must print `POSTGRES TARGET: PASS` with every line ticked:
 
-* boot checks (TLS policy, `schema_version` 11 / `billing_schema_version` 6, cursor sequence);
+* boot checks (TLS policy, `schema_version` 12 / `billing_schema_version` 6, cursor sequence);
 * TLS negotiated (`pg_stat_ssl`), `statement_timeout` / `idle_in_transaction_session_timeout` applied;
 * login role is a `pri_server` member, not superuser, not BYPASSRLS;
 * the live schema gate — every table, column type, key, CHECK expression, index, RLS policy
@@ -350,6 +379,31 @@ Against staging itself, the equivalent evidence is §4.2 plus §4.4.
 All of §4.2 and §4.4 pass, and staging has run for at least 24 hours of normal test traffic
 with no `500` from `/v1`, no `platform_db_pool_error`, and no unexplained 503s.
 
+### 4.6 Staging → production promotion order (the 24 h soak gate)
+
+Production deploys the branch `deploy/production`, a pointer that is only ever fast-forwarded to an
+exact `main` SHA certified on staging (`docs/release/release-policy.md`, "Staging first, production by
+promotion"). Staging deploys every push to `main`, so **the soak clock belongs to one SHA**: it starts
+when staging first serves that SHA and is reset by the next merge to `main`, because staging then
+serves something else. A 24 h soak therefore needs either a 24 h merge freeze on `main` or a
+decision that the SHA staging has served for the last 24 h is the candidate. The order, each step a
+gate for the next:
+
+| # | Step | Who | Gate / evidence |
+|---|---|---|---|
+| 1 | **Nominate** one `main` SHA: `node scripts/release-nominate.mjs <sha>` | anyone | prints `NOMINATION: PASS` — the SHA is on `origin/main`, every workflow on it completed green, the four required contexts and Production Container are green, staging serves exactly it on Postgres at the schema versions that commit's `schemaVersions.js` states, and `deploy/production → sha` is a fast-forward. The tool pushes nothing |
+| 2 | **Verify staging** at that SHA: `npm run verify:deployment -- --origin https://pri-learning-staging-staging.up.railway.app --sha <sha> --engine postgres --auth-email-proven` from a checkout at the SHA | anyone | `DEPLOYMENT VERIFIED: PASS` |
+| 3 | **Staging acceptance A–D**: `node tools/acceptance/staging-acceptance.mjs --email <owner mailbox> --tester "<name>"` (`tools/acceptance/README.md`) | a named human at the terminal | `STAGING ACCEPTANCE: PASS`; its report labels each step's evidence class (real mailbox / synthetic picture / test accounts) |
+| 4 | **Device matrix** on the TestFlight / Play build of the same SHA (`docs/release/device-matrix.md`) | named testers on real hardware | `node scripts/device-matrix-record.mjs report --sha <sha>`: no `fail`; families without hardware recorded `blocked`, never omitted |
+| 5 | **24 h soak** on staging at that SHA (§4.5) | operator watches | no `/v1` 500, no `platform_db_pool_error`, no unexplained 503 for 24 h, recorded in §7 with the start and end times |
+| 6 | **Production database at the same schema**: first cutover §5.4 (§2–§4 against the production project, backup §6 first); later releases that change `SCHEMA_VERSION` / `BILLING_SCHEMA_VERSION` use §2.6's back-to-back migrate + redeploy against production | owner (`BLOCKED_EXTERNAL`) | `verify:platform:pg-target` → `POSTGRES TARGET: PASS` against production; owner's explicit "Yes" for the window |
+| 7 | **Promote**: the commands `release-nominate.mjs` printed — `git merge-base --is-ancestor <sha> origin/main`, `git merge-base --is-ancestor origin/deploy/production <sha>`, `git push origin <sha>:refs/heads/deploy/production` | the approver the release record names | branch protection on `deploy/production` refuses a commit without the four green contexts; the push is a fast-forward or it is refused |
+| 8 | **Verify production**: `npm run verify:deployment -- --origin https://final-pri-learning-production.up.railway.app --sha <sha> --engine postgres --auth-email-proven`; one smoke registration with an owner-controlled address, then delete that account (`staging-acceptance.mjs --target production --sha <sha>` refuses unless step 1 passes and deletes what it creates) | anyone, then the owner for the smoke mailbox | `DEPLOYMENT VERIFIED: PASS`; §7 row filled |
+| 9 | **Rollback stance written before traffic**: before real data, remove `PRI_DATABASE_URL` and redeploy (§5.1); after real data, forward-fix only (§5.2); the application build rolls back only to a build with the same schema versions as the database | operator | the stance in §7 |
+
+Nothing in this order is a launch: legal/privacy sign-off, DPDP consent evidence, store certification
+and the handwriting evidence programmes remain separate blockers (`PRI_V1_RELEASE_SCOPE.md` §18).
+
 ---
 
 ## 5. Rollback and forward-fix
@@ -373,7 +427,9 @@ cutover do not exist in the SQLite file. So after real traffic:
   build disagree. Deploy the build that matches the database, or apply the missing migration —
   do not edit `platform_meta` by hand to make the error go away.
 * **Rolling back the application build** is safe only to a build with the same
-  `SCHEMA_VERSION` / `BILLING_SCHEMA_VERSION` as the database (today 11 / 6). Builds with the
+  `SCHEMA_VERSION` / `BILLING_SCHEMA_VERSION` as the database (today 12 / 6; a build from before
+  schema 12 declares no `pri.scope`, so under deny-by-default RLS it reads nothing even where it
+  boots). Builds with the
   version check refuse a database at any other version. Builds from **before** that check (the #247-era driver) only
   check that a `schema_version` exists, so they **do boot** against this database — but they
   allocate sync cursors from `pri.sync_cursors`, on which `pri_server` no longer has `UPDATE`:
@@ -386,7 +442,9 @@ cutover do not exist in the SQLite file. So after real traffic:
 ### 5.2a Undoing migration `20261002010000_tutor_cache`
 
 Only for a build that predates the AI tutor, and before undoing anything older (migrations come
-off newest first: `20261007000000_security_hardening` (schema 11), `20261006000000_otp_sign_in` (schema 10),
+off newest first: `20261016000000_rls_fail_closed` (schema 12; its reviewed rollback is
+`docs/release/rollback/20261016000000_rls_fail_closed.rollback.sql`, owner-approved only),
+`20261007000000_security_hardening` (schema 11), `20261006000000_otp_sign_in` (schema 10),
 `20261005000000_account_age_basis` (schema 9), `20261004000000_google_play_billing`
 (billing 6) and `20261003010000_storekit_entitlement_state` (billing 5) each need their own
 owner-approved rollback written at the time, against the exact build being restored; none is
@@ -533,6 +591,11 @@ in the cutover log; students then re-register and the SQLite backup is retained 
 
 | Step | Environment | Commit | Who | When | Result / evidence |
 |---|---|---|---|---|---|
+| 2.5 `db push --linked` (placeholder workdir), schema 12 | staging | `#522` merge | operator | 2026-10-18 | `/v1/ready` 200 on schema 12 / billing 6 after the redeploy (`LAUNCH-RUNBOOK.md` 2.2a; outage window recorded there) |
+| 4.6 step 1 nominate | — | | | | `NOMINATION: PASS` from `scripts/release-nominate.mjs` |
+| 4.6 step 3 staging acceptance A–D | staging | | | | `STAGING ACCEPTANCE: PASS`; report path; tester |
+| 4.6 step 4 device matrix | TestFlight / Play build | | | | `device-matrix-record.mjs report --sha` summary line |
+| 4.6 step 5 soak 24 h | staging | | | start → end (UTC) | no 500 / pool error / unexplained 503 |
 | 2.4 `db push` | staging | | | | |
 | 3 login role created | staging | | | | (role name only) |
 | 4.2 target check | staging | | | | `POSTGRES TARGET: PASS — n/n` |
