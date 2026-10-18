@@ -19,9 +19,37 @@ The canonical release identity is defined by `release/metadata.json` plus the ex
 | Repository | Classification | Authority |
 | --- | --- | --- |
 | `Priysharan19/Final-Pri-learning` | current production repository | **authoritative** on `main` |
-| `Priysharan19/Pri-Learning-India` | historical/migration source | non-authoritative; code may be considered only by explicit SHA-level reconciliation |
+| `Priysharan19/Pri-Learning-India` | historical/migration source | non-authoritative; code may be considered only by explicit SHA-level reconciliation. Its hosted shell at `pri-learning-staging.vercel.app` is a **retired host** (below) |
 | `Priysharan19/Pri-Forge` | separate engineering/automation project | not a Pri Learning production predecessor |
 | `Priysharan19/Pri-money` | separate project | not a Pri Learning production predecessor |
+
+## Hosted origins
+
+The only hosts whose running build can be release evidence are the two Railway services that
+deploy this repository (`docs/release/release-policy.md`, "Staging first, production by promotion"):
+
+| Role | Origin | Deploys |
+| --- | --- | --- |
+| **Staging** | `https://pri-learning-staging-staging.up.railway.app` | every push to `main` |
+| **Production** | `https://final-pri-learning-production.up.railway.app` | the branch `deploy/production`, a pointer fast-forwarded to a certified `main` SHA |
+
+A host is authoritative for a claim only when its `/v1/health` `releaseIdentity` names this
+repository and `main` and reports the exact SHA under discussion; `node scripts/release-nominate.mjs <sha>`
+and `npm run verify:deployment` check exactly that.
+
+### Retired host: `pri-learning-staging.vercel.app` (issue #427)
+
+`https://pri-learning-staging.vercel.app` is the Vercel deployment of the **predecessor repository
+`Priysharan19/Pri-Learning-India`** (branch `release/v1`). On 10 October 2026 it was observed serving
+that repository's Next.js "Pri Learning India" shell at Vercel SHA `0216aae8f3c301c2c8f6dab7d7e5ea21247c4483`:
+typed answers only, no handwriting or photo reading, not the examiner's-notebook product on `main`
+(issue [#427](https://github.com/Priysharan19/Final-Pri-learning/issues/427)). It never deployed this
+repository.
+
+Classification: **retired, non-authoritative.** Nothing observed on it is evidence about Pri Learning,
+and no checklist, acceptance run or release record may cite it. Staging means the Railway staging origin
+above. Taking the Vercel deployment down or redirecting it is an owner action on the Vercel account
+(`BLOCKED_EXTERNAL`); until then the host may still answer, and still proves nothing.
 
 ## PRI-01 live audit
 
