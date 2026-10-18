@@ -27,7 +27,8 @@
 //      comes from this process reading the server's sealed copy of the
 //      issued question, never from the page;
 //   3. offline after entry (--journey-offline-draft, --journey-offline-
-//      relaunch; the same signed-in install): the page asks, this process
+//      relaunch; a fresh install, a second new address entered through the
+//      card, a question opened online): the page asks, this process
 //      stops the server, and the question is an offline draft — typed work,
 //      strokes on the native PencilKit surface (sealed in IndexedDB with one
 //      truthful save status) and a photo kept, not read on the device; the
@@ -61,7 +62,7 @@
 import { execFileSync, execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { openServerDesk } from './journey-oracle.mjs';
 import { installApp, keepOnlySimulator } from './simulator-fleet.mjs';
@@ -78,7 +79,7 @@ const MARKING = ['cardOnboarding', 'firstQuestion', 'typedWrongZero', 'typedCorr
 const MARKING_SERVER = ['serverAccountFromCard', 'serverGrades', 'serverReaderAnswerBlind'];
 const MARKING_RELAUNCH = ['historyAfterRelaunch'];
 // Leg 3 · signed in, then the server goes away.
-const OFFLINE_DRAFT = ['offlineAfterEntry', 'practice', 'nativeInk', 'typedDraft', 'photoDraft', 'noCheckOffered', 'replaceKeepsWork', 'nothingRecorded', 'progress', 'persistenceMarker'];
+const OFFLINE_DRAFT = ['offlineAfterEntry', 'practice', 'nativeInk', 'typedDraft', 'photoDraft', 'noCheckOffered', 'replaceKeepsWork', 'nothingRecorded', 'offlineProgress', 'offlinePersistenceMarker'];
 const OFFLINE_RELAUNCH = ['offlineRelaunchHeld', 'offlineDraftOnDisk'];
 const TIER = 'SIMULATOR + SYNTHETIC READER';
 const SIGNUP = ['cloudSignUp', 'cloudDeleteAccount'];
@@ -303,6 +304,9 @@ if (WANT_CLOUD) try {
     signupLines = launchAndRead(udid, bundleId, '--journey-cloud-signup', 'cloudSignUp', childEnv, { tick: codeTick });
     show(signupLines);
   }
+  // A new launch numbers its asks from 1 again: start the relay empty.
+  for (const name of readdirSync(codeDir)) rmSync(join(codeDir, name), { force: true });
+  served.clear();
   cloudLines = launchAndRead(udid, bundleId, '--journey-cloud', 'cloud', childEnv, { tick: codeTick });
   show(cloudLines);
   if (cloudServer?.PRI_CLOUD_SERVER_PID && fixture.PRI_CLOUD_DB) {
@@ -407,6 +411,7 @@ let offlineRelaunchLines = [];
     // the Android journey's relay, scripts/journey-oracle.mjs).
     const student = String(server.PRI_CLOUD_NEW_EMAIL || '').toLowerCase();
     if (!/@example\.test$/.test(student)) throw new Error('the local server named no fresh fixture address for the student');
+    const offlineStudent = `journey-offline-${Date.now()}@example.test`;
     const desk = openServerDesk({ dbPath: server.PRI_CLOUD_DB, email: student, avoid: [READER_TEXT, WRONG], outboxPath: server.PRI_CLOUD_OUTBOX });
     const { db, rows, completed } = desk;
     /** The sealed answer of the question this account was issued last. */
@@ -423,7 +428,7 @@ let offlineRelaunchLines = [];
         if (ask.kind === 'emailCode') {
           // Only the code the server issued to the student's address, from its
           // test outbox; until it is there, ask again on the next tick.
-          const code = ask.to === student ? desk.emailCode(student) : null;
+          const code = [student, offlineStudent].includes(ask.to) ? desk.emailCode(ask.to) : null;
           if (!code) continue;
           writeFileSync(join(oracleDir, `reply-${n}.json`), JSON.stringify({ n: Number(n), code }));
           answered.add(n);
@@ -504,9 +509,19 @@ let offlineRelaunchLines = [];
 
     // Leg 3 · the page asks, this process stops the server (goOffline above).
     console.log('\nLeg 3 · offline after entry: the work is an unmarkable draft and stays on the device …');
-    offlineDraftLines = launchAndRead(udid, bundleId, '--journey-offline-draft', 'offlineDraft', childEnv, { tick, loops: 120 });
+    // Each launch numbers its asks from 1 again: start the relay empty, so an
+    // old reply is never read as this launch's answer.
+    for (const name of readdirSync(oracleDir)) rmSync(join(oracleDir, name), { force: true });
+    answered.clear();
+    // Its own fresh install and address: the daily free-question cap is real
+    // product behaviour, and the marking profile has used much of it.
+    try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* not running */ }
+    try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
+    installApp(udid, app);
+    const offlineEnv = { ...childEnv, PRI_JOURNEY_NEW_EMAIL: offlineStudent };
+    offlineDraftLines = launchAndRead(udid, bundleId, '--journey-offline-draft', 'offlineDraft', offlineEnv, { tick, loops: 120 });
     for (const line of offlineDraftLines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
-    offlineRelaunchLines = launchAndRead(udid, bundleId, '--journey-offline-relaunch', 'offlineRelaunch', childEnv);
+    offlineRelaunchLines = launchAndRead(udid, bundleId, '--journey-offline-relaunch', 'offlineRelaunch', offlineEnv);
     for (const line of offlineRelaunchLines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
     db.close();
   } catch (error) {

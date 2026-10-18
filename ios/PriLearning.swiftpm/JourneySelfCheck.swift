@@ -29,7 +29,8 @@
 //     of the issued question and hands it over through the oracle
 //     directory. `--journey-marking-relaunch` finds the results in History.
 //
-//   · `--journey-offline-draft` — the same signed-in student; once inside,
+//   · `--journey-offline-draft` — a fresh install and a second new address
+//     entered through the card; once a question is open,
 //     the test process stops the server (asked through the oracle). The
 //     question is then an offline draft: typed work, strokes on the real
 //     PencilKit surface (sealed in IndexedDB with one truthful save status)
@@ -376,7 +377,10 @@ enum JourneySelfCheck {
         (await waitFor(() => q('[data-testid=signup-class-10]'))).click(); await sleep(150);
         (await waitFor(() => { const b = q('[data-testid=signup-class-next]'); return b && !b.disabled && b; })).click();
       }
-      at = 'gate'; await waitFor(() => q('.home-greet') && !q(GATE), 90000);
+      // The gate lets the student in; the shell may open on Home or straight
+      // on Practice. Either way the journey continues from Home.
+      at = 'gate'; await waitFor(() => (q('.shell') || q('.home-greet')) && !q(GATE), 90000);
+      if (!q('.home-greet')) { at = 'home'; await route('/'); await waitFor(() => q('.home-greet'), 30000); }
       return (fresh ? 'new account' : 'returning account') + ' entered through the card with the code the server sent';
     }
     async function signedInHome() {
@@ -512,23 +516,56 @@ enum JourneySelfCheck {
     // offline draft that says it cannot be marked. The test process stops the
     // server when the page asks (the oracle relay), never at a fixed time.
     private static let offlineDraft = helpers + cardHelpers + oracleHelpers + #"""
+    let onlineId = '';
+    // Typed working where the draft card offers it ('' where it does not).
+    let draftWorking = '';
     await step('offlineAfterEntry', async () => {
-      at = 'gate'; await signedInHome();
+      // Its own fresh install and address, entered through the card: the
+      // marking leg's profile has spent much of the day's free questions.
+      at = 'card'; await cardOnboard(newEmail);
+      // A question card is opened while the server is up (the pinned chapter);
+      // only then does the connection go, as it would for a student.
+      at = 'online question'; await route(CHAPTER); await waitFor(() => q('.q-prompt') && qid(), 40000); await sleep(800);
+      onlineId = qid();
       at = 'server stop'; const r = await oracle({ kind: 'goOffline' });
       if (!r.offline) throw new Error('the test process could not stop the server: ' + (r.reason || 'unknown'));
       await sleep(1500);
       if (!shellOpen() || q(GATE)) throw new Error('a dropped connection closed the shell');
-      return 'entered with the server up; the server is now stopped and the shell stays open';
+      return 'entered and opened question ' + onlineId + ' with the server up; the server is now stopped and the shell stays open';
     });
     await step('practice', async () => {
-      await nav('/practice'); await waitFor(() => q('.q-prompt'));
-      const n = await openTypedQuestion();
+      // Offline: say what the card shows when no question arrives.
+      const state = () => 'prompt=' + !!q('.q-prompt') + ' qid=' + (qid() || '-') + ' mode=' + cardMode() + ' unmarkable=' + unmarkableKind() +
+        ' tabs=' + [byLabel('Type: answer by typing'), byLabel('Write: answer by handwriting'), byLabel('Photo: answer with a photo of your working')].map(b => b ? 1 : 0).join('') +
+        ' main="' + seen('main').slice(90, 330) + '"';
+      let n;
+      try {
+        // Next on the open card, offline: the app can only offer a draft of its own.
+        if (!q('.q-prompt') || !qid()) throw new Error('the question opened online is gone');
+        at = 'next offline';
+        // Each Next spends one of the day's free questions (the cap is 20), so
+        // the search is short and says what each card lacked.
+        const lacked = [];
+        for (n = 1; ; n++) {
+          await nextQuestion();
+          const typing = byLabel('Type: answer by typing');
+          const tabs = [typing, byLabel('Write: answer by handwriting'), byLabel('Photo: answer with a photo of your working')].map(b => b ? 1 : 0).join('');
+          if (tabs === '111') {
+            typing.click(); await sleep(600);
+            // An offline draft offers a typed answer; typed working is shown
+            // only where the card has it (drafts observed have none).
+            if (answerBox()) { draftWorking = q('.editor-body [data-working-area]') ? WORKING : ''; break; }
+          }
+          lacked.push(tabs + '/' + (answerBox() ? 'a' : '-') + (q('.editor-body [data-working-area]') ? 'w' : '-') + '/' + cardMode());
+          if (n >= 8) throw new Error('no offline question with a typed answer in 8: ' + lacked.join(' '));
+        }
+      } catch (e) { throw new Error(String(e && e.message || e) + ' at ' + at + ' · ' + state()); }
       assertUnmarked('opening');
       // Said before any work goes in: with no server this copy cannot be marked.
       at = 'draft notice'; await waitFor(() => unmarkableKind());
       assertDraftCard('opening');
       if (replaceBtn().textContent.trim() !== 'Try for a markable question' || q('[data-check-replace-confirm]')) throw new Error('before any work the action reads: ' + replaceBtn().textContent.trim());
-      return 'question ' + n + ' of the pinned chapter takes a typed answer, working, ink and a photo; said to be an unmarkable draft before any work';
+      return 'offline Next ' + n + ' from the online card takes a typed answer' + (draftWorking ? ', working' : ' (no working box)') + ', ink and a photo; said to be an unmarkable draft before any work';
     });
     // Ink first, on an untouched card: the one save status is then about the
     // ink alone, so it can be held to the sealed row strictly.
@@ -553,17 +590,17 @@ enum JourneySelfCheck {
     await step('typedDraft', async () => {
       const id = qid();
       at = 'answer'; await typeMode(); setValue(await waitFor(answerBox), '12345');
-      at = 'working'; await typeWorking(WORKING);
-      // The typed draft itself, as stored: both fields, under this question.
+      if (draftWorking) { at = 'working'; await typeWorking(draftWorking); }
+      // The typed draft itself, as stored, under this question.
       at = 'stored'; await waitFor(() => {
         const key = Object.keys(localStorage).find(k => k.endsWith('.question.' + id));
         const data = key && (JSON.parse(localStorage.getItem(key)) || {}).data;
-        return data && data.typed === '12345' && data.working === WORKING;
+        return data && data.typed === '12345' && (data.working || '') === draftWorking;
       }, 15000);
       at = 'status'; try { await waitFor(() => { const c = saveClaim(); return c.saved && !c.notSaved; }, 10000); }
       catch (e) { throw new Error('typed work stored but the status reads: ' + saveClaim().shown); }
       assertUnmarked('typing');
-      return 'answer and working stored on this device; status "' + seen('.ws-actions .status-line').slice(0, 30) + '"';
+      return 'answer ' + (draftWorking ? 'and working ' : '(the draft card offers no working box) ') + 'stored on this device; status "' + seen('.ws-actions .status-line').slice(0, 30) + '"';
     });
     await step('photoDraft', async () => {
       // The product reads photos only on the server (ADR-0001). Attach one and
@@ -643,7 +680,7 @@ enum JourneySelfCheck {
       at = 'kept';
       if (qid() !== id) throw new Error('a different question is on the card: ' + qid() + ' (was ' + id + ')');
       if ((answerBox() || {}).value !== '12345') throw new Error('typed answer lost: ' + JSON.stringify((answerBox() || {}).value));
-      if (await shownWorking() !== WORKING) throw new Error('typed working lost');
+      if (draftWorking && await shownWorking() !== draftWorking) throw new Error('typed working lost');
       if (await inkDraft(id) !== 'kept') throw new Error('sealed ink draft lost');
       if (refusalKind()) throw new Error('a check was refused: ' + refusalKind());
       assertDraftCard('after a declined replace');
@@ -652,16 +689,24 @@ enum JourneySelfCheck {
     });
     await step('nothingRecorded', async () => {
       const id = qid();
-      localStorage.setItem('pri-journey-draft', JSON.stringify({ id, answer: (answerBox() || {}).value || '' }));
+      localStorage.setItem('pri-journey-draft', JSON.stringify({ id, answer: (answerBox() || {}).value || '', working: draftWorking }));
       at = 'history'; await route('/review');
       await waitFor(() => location.pathname === '/review' && q('main'));
       await sleep(1500);
-      // History holds the marking leg's two server-marked results; the draft
-      // must not be among them.
+      // The draft must not be in History.
       const rows = document.querySelectorAll('.hist-row[data-question-id="' + id + '"]').length;
       if (rows) throw new Error(rows + ' attempt(s) recorded for the offline draft');
-      return 'History holds no attempt for the draft (' + document.querySelectorAll('.hist-row').length + ' server-marked row(s) from before)';
+      return 'History holds no attempt for the draft (' + document.querySelectorAll('.hist-row').length + ' row(s) in all)';
     });
+    await step('offlineProgress', async () => {
+      at = 'home'; await route('/'); await waitFor(() => location.pathname === '/' && q('.home-greet'));
+      const link = () => [...document.querySelectorAll('a[href="/progress"]')].find(a => a.offsetParent);
+      if (!link()) { q('.mobilenav button[aria-expanded]')?.click(); await waitFor(link); }
+      link().click();
+      await waitFor(() => location.pathname === '/progress' && q('main'));
+      return 'progress shown offline';
+    });
+    await step('offlinePersistenceMarker', async () => { localStorage.setItem('pri-journey-marker', 'kept'); return 'written'; });
 
     return JSON.stringify(steps);
     """#
@@ -680,7 +725,7 @@ enum JourneySelfCheck {
       if (!draft || !draft.id) throw new Error('the offline launch recorded no draft');
       const key = Object.keys(localStorage).find(k => k.endsWith('.question.' + draft.id));
       const data = key && (JSON.parse(localStorage.getItem(key)) || {}).data;
-      if (!data || data.typed !== '12345' || data.working !== WORKING) throw new Error('typed draft lost: ' + JSON.stringify(data || null).slice(0, 80));
+      if (!data || data.typed !== '12345' || (data.working || '') !== (draft.working || '')) throw new Error('typed draft lost: ' + JSON.stringify(data || null).slice(0, 80));
       if (await inkDraft(draft.id) !== 'kept') throw new Error('sealed ink draft lost');
       return 'typed answer, working and the sealed ink draft are still on the device';
     });
