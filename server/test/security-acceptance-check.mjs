@@ -76,6 +76,7 @@ for (const stream of [process.stdout, process.stderr]) {
 }
 
 const { startApp, registerAccount, verifyEmail, checks, cookieHeader, enrolMfa } = await import('./support/app-harness.mjs');
+const { secretShaped } = await import('./support/secret-shapes.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
 const { decryptDeliveryToken } = await import('../platform/deliveryCrypto.js');
 const { loadInventory } = await import('./support/route-inventory.mjs');
@@ -759,9 +760,15 @@ try {
     c.ok(crash.status === 400, 'parse failure answered');
 
     const haystack = responses.join('\n') + '\n' + captured.join('');
+    // The exact search runs on everything, cookie values included.
     const leaked = Object.entries(SECRETS).filter(([, value]) => haystack.includes(value)).map(([name]) => name);
     c.deq(leaked, [], 'no configured secret appears in any response, header, error body or server log line');
-    c.ok(!/sk-(?:proj-)?[A-Za-z0-9]{20,}|rzp_(?:live|test)_[A-Za-z0-9]{10,}|re_[A-Za-z0-9]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(haystack), 'nothing secret-shaped appears in responses or logs');
+    // The shape search is for a key that is NOT one of the configured ones.
+    // It reads whole tokens only, and never the server's own random session /
+    // CSRF values (support/secret-shapes.mjs; pinned by secret-shape-check.mjs):
+    // a random base64url token used to contain `re_` or `sk-` plus twenty
+    // alphanumerics about once in 150 runs and fail this check on nothing (#526).
+    c.deq(secretShaped(haystack), [], 'nothing secret-shaped appears in responses or logs');
     c.ok(!/pri_cloud_session=[A-Za-z0-9_-]{20}/.test(captured.join('')), 'no session cookie value was logged');
     c.ok(responses.length > 500, `${responses.length} responses searched`);
   }
