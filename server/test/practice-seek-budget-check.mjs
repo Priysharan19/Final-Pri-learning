@@ -56,16 +56,17 @@ const CONTRACT_POOL = 1.5 * WINDOW;
 const OLD_FLAT_BUDGET = 12;
 
 // ── 1. The budget ───────────────────────────────────────────────────────────
-// While a fresh item exists the pool holds at least k + 1 for k avoided, so a
-// draw finds one with chance at least 1 / (k + 1): fourteen draws per such
-// chance miss a surviving fresh item below once in a million, whatever the
-// pool size.
+// While a fresh item exists the pool holds at least k + 1 for k avoided, so —
+// when the generator draws its items about evenly — a draw finds one with
+// chance at least 1 / (k + 1): fourteen draws per such chance miss a surviving
+// fresh item below once in a million for any pool size. (An item reached from
+// few seeds can be missed more often; it is then served as a flagged repeat.)
 eq(seekBudget(0), 14, 'with nothing to avoid: fourteen draws (above the old flat twelve, which stays the floor for seeking a trap or a written form)');
 eq(seekBudget(1), 28, 'one avoided item: two chances of fourteen');
 eq(seekBudget(WINDOW - 1), 280, 'a full window less the item being replaced: 14 × 20');
 eq(seekBudget(-4), 14, 'the budget never drops below its floor');
 eq(seekBudget(2.9), 42, 'a non-integer count is truncated, never rounded up into extra draws');
-eq(seekBudget(60), 300, 'the server accepts at most 60 avoided items; the budget is capped at ~5 ms of drawing');
+eq(seekBudget(60), 300, 'the server accepts at most 60 avoided items; the budget is capped at 300 draws');
 ok(seekBudget(WINDOW) < 300, `the shipped client's window (${WINDOW}) never reaches the cap (${seekBudget(WINDOW)} draws)`);
 const bound = k => Math.pow(k / (k + 1), seekBudget(k));
 ok([1, 5, 11, 19, 20].every(k => bound(k) < 1e-6), `a surviving fresh item is missed below once in a million for every window size (worst ${Math.max(...[1, 5, 11, 19, 20].map(bound)).toExponential(1)})`);

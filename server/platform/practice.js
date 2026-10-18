@@ -61,14 +61,23 @@ const PREPARED_CONTEXT = 'practice-prepared-v1';
 // is small the picker gave up on a fresh item it could still have found and
 // the student was handed a repeat (issue #540). The server does not know the
 // pool; it knows how many items, k, it is avoiding — and while a fresh item
-// exists at all, the pool holds at least k + 1, so every draw finds one with
-// chance at least 1 / (k + 1). Fourteen draws per such chance (≈ ln 10^6)
-// therefore miss a surviving fresh item below once in a million whatever the
-// pool size — the last of twelve as surely as the eleventh of thirty — and
-// the budget is spent only when the cell is nearly exhausted: a draw that is
-// fresh ends the seek. Capped at ~5 ms of drawing (0.002–0.015 ms a draw, so
-// the shipped client's 20-item window, k ≤ 20, never reaches the cap). A pool
-// genuinely smaller than the window is served a flagged repeat, as before.
+// exists at all, the pool holds at least k + 1. When a generator draws its
+// items about evenly, every draw therefore finds a fresh one with chance at
+// least 1 / (k + 1), and fourteen draws per such chance (≈ ln 10^6) miss a
+// surviving fresh item below once in a million for any pool size — the last
+// of twelve as surely as the eleventh of thirty. An item a generator reaches
+// from few seeds can still be missed more often; the student is then served a
+// repeat flagged as one, never one passed off as new. The budget is spent
+// only when the cell is nearly exhausted: a draw that is fresh ends the seek.
+// Capped at 300 draws (the shipped client's 20-item window, k ≤ 20, stays
+// below the cap at 294). A draw costs ~0.025 ms on the median cell; measured
+// on a development machine, a request that spends the whole cap costs ≈20 ms
+// on the slowest India cells (c12-applications-integrals, ~0.06 ms a draw)
+// and up to ≈50–60 ms on the slowest cell a client's 60-hash avoid list can
+// exhaust (y9-algebra at D4, ~0.16 ms a draw), against at most 12 draws
+// before. The practice-issue and practice-prepare rate limits bound how often
+// one account can make the server spend it. A pool genuinely smaller than the
+// window is served a flagged repeat, as before.
 const SEEK_TRIES = 12;                   // the floor: a trap or a written form is sought at least this far
 const SEEK_TRIES_PER_FRESH_CHANCE = 14;  // ≈ ln(10^6)
 const SEEK_TRIES_CAP = 300;
