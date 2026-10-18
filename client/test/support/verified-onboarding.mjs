@@ -71,7 +71,9 @@ export async function typeCode(scope, code, { idPrefix = 'signup-code' } = {}) {
  */
 export async function signInOnCard(scope, platform, { email, name = null, age = 18, agree = true } = {}) {
   resetOtpLimits(platform);
-  await scope.locator('[data-signup-step="method"] #signup-destination').waitFor({ timeout: 20000 });
+  // The step attribute sits on the card's root, so it is read there, not
+  // searched for beneath it.
+  await scope.locator('#signup-destination').waitFor({ timeout: 20000 });
   await scope.locator('#signup-destination').fill(email);
   await scope.getByTestId('signup-send-code').click();
   await scope.locator('[data-signup-step="code"]').waitFor({ timeout: 20000 });
