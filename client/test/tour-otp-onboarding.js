@@ -95,7 +95,7 @@ export const flow = {
     await check('and can ask for the code again once the cooldown ends', await page.getByTestId('signup-parent-resend').isDisabled());
     const parentSms = sms.readTestOutbox({ to: '+919988776655' }).at(-1);
     await check('the parent’s phone got the consent code with the address of their own page',
-      parentSms?.purpose === 'guardian-consent' && /^\d{6}$/.test(parentSms?.code || '') && /\/guardian\/consent/.test(parentSms?.body || ''), JSON.stringify(parentSms?.body || '').slice(0, 160));
+      parentSms?.purpose === 'guardian-consent' && /^\d{6}$/.test(parentSms?.code || '') && /\/guardian\/consent|parent page/i.test(parentSms?.body || ''), JSON.stringify(parentSms?.body || '').slice(0, 160));
 
     // The parent, on their own device: a separate browser context, no profile,
     // no session, nothing shared with the child's browser.

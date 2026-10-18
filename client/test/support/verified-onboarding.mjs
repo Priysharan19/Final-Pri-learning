@@ -166,8 +166,10 @@ export async function createVerifiedProfile(page, platform, {
     return { status: response.status, data: response.ok ? await response.json() : null };
   });
   if (me.status !== 200 || !me.data?.account?.id) throw new Error(`the shell opened without a live platform session (/v1/account/me → ${me.status})`);
+  // A flow that forwards /v1 to a platform of its own (tour-write-sign-in.js)
+  // keeps its accounts there; the shared platform is checked when it holds the address.
   const row = platform.h.db.prepare('SELECT id FROM accounts WHERE email=?').get(address);
-  if (!row || String(row.id) !== String(me.data.account.id)) throw new Error('the live session is not the account the card made for this address');
+  if (row && String(row.id) !== String(me.data.account.id)) throw new Error('the live session is not the account the card made for this address');
   // The card offers Classes 7–12 (CBSE / JEE): a flow that studies an
   // Australian syllabus changes it where a student would — Settings → Profile
   // — after entering, through the shipped form; the account is unchanged.

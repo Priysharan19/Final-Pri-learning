@@ -255,17 +255,18 @@ export const flows = [
         await shot('deleted');
 
         // A real reload (same URL, so goto would only move the hash): the panel
-        // now reads its state back from IndexedDB, as a relaunch does.
+        // now reads its state back from IndexedDB, as a relaunch does. With
+        // the account gone the device profile has no account: the app is the
+        // activation gate (issue #477), never Settings for a deleted account.
         await page.reload({ waitUntil: 'domcontentloaded' });
-        await page.waitForSelector('#cloud-account-title', { timeout: 30000 });
-        await page.getByText('Not connected', { exact: true }).waitFor({ timeout: 30000 }).catch(() => {});
+        await page.waitForSelector('[data-testid="account-activation-gate"]', { timeout: 30000 });
         await check('the reload is a fresh page: the deletion message is not carried over',
           await page.getByText('Cloud account deleted.', { exact: false }).count() === 0);
         await check('after a relaunch no link to the deleted account is restored',
           (await accountLinkRows(page)).length === 0);
-        await check('and the Account panel says not connected, never “sign-in required” for the deleted account',
-          await page.getByText('Not connected', { exact: true }).isVisible()
-          && await page.getByText('Linked · sign-in required', { exact: true }).count() === 0);
+        await check('and the gate says the profile has no account, never “sign-in required” for the deleted account',
+          await page.getByText('not connected to a Pri account', { exact: false }).isVisible()
+          && await page.getByText('You’ve been signed out', { exact: false }).count() === 0 && await page.locator('.shell').count() === 0);
         await shot('relaunched');
       } finally {
         await h.close();

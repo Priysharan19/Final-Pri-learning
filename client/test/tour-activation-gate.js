@@ -222,7 +222,7 @@ export const flow = {
       // a guardian's withdrawal relocks the app on the server's say-so
       platform.h.db.prepare('UPDATE guardian_consents SET withdrawn_at=? WHERE account_id=?').run(Date.now(), minor.id);
       await child.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-      await child.locator(GATE).waitFor({ timeout: 20000 });
+      await child.locator(`${GATE}[data-activation-status="blocked"]`).waitFor({ timeout: 20000 }).catch(() => {});
       await check('a guardian\'s withdrawal, noticed on the next recheck, closes the app: the "needs attention" screen, nothing to tap around',
         await gateStatus(child) === 'blocked' && await child.locator('.shell').count() === 0 && await child.getByTestId('activation-blocked').isVisible());
     } finally { await childCtx.close(); }
@@ -315,7 +315,7 @@ export const flow = {
     // the server ends the session (revoked elsewhere): a deep link is the gate
     const ended = endSessions(platform, adult.id);
     await page.goto(`${base}/practice?subtopic=c10-polynomials`, { waitUntil: 'domcontentloaded' });
-    await page.locator(GATE).waitFor({ timeout: 30000 });
+    await page.locator(`${GATE}[data-activation-status="signin"]`).waitFor({ timeout: 30000 }).catch(() => {});
     await check('with the session revoked on the server, a deep link opens the gate\'s sign-in — the page itself never shows',
       ended >= 1 && await gateStatus(page) === 'signin' && await page.locator('.shell').count() === 0 && /You’ve been signed out/.test(await page.locator(GATE).innerText()));
     await signInOnCard(page.locator(`${GATE} ${INLINE}`), platform, { email: adultEmail });
@@ -334,7 +334,7 @@ export const flow = {
     await page.unroute('**/v1/account/me', outage);
     endSessions(platform, adult.id);
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-    await page.locator(GATE).waitFor({ timeout: 20000 });
+    await page.locator(`${GATE}[data-activation-status="signin"]`).waitFor({ timeout: 20000 }).catch(() => {});
     await check('the server\'s own refusal (401: session gone), noticed in the foreground, relocks the gate', await gateStatus(page) === 'signin' && await page.locator('.shell').count() === 0);
     await signInOnCard(page.locator(`${GATE} ${INLINE}`), platform, { email: adultEmail });
     await page.locator('.shell').waitFor({ timeout: 60000 });
