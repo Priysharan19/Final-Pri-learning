@@ -151,6 +151,39 @@ async function run() {
     return { ...res, payload: await online.answerKey(row), row };
   }
 
+  // Marking runs in a server worker under a hard deadline (server/platform/
+  // markerPool.js). A worker stopped at that deadline comes back as an
+  // unreadable entry: invalid, unresolved, `tooComplex`, nothing spent and
+  // nothing recorded. Had that happened here it would have been revealed
+  // silently and read as a wrong answer, so this suite sends such an answer
+  // again, a few times, and reports any that still did not finish at the end
+  // with the question named. This is hardening against a trigger that was NOT
+  // what #544 was: the failing CI run logged no MARKER_DEADLINE_KILL at all
+  // (the platform logger prints every kill in this harness) and ran at normal
+  // speed. #544's cause was the server's unseeded question dice
+  // (crypto.randomInt in practice.js chooseQuestion), which made every run a
+  // different sitting; the online authority now seeds them from
+  // PRI_SUITE_SEED, so a sitting replays exactly.
+  // Each re-send carries a NEW submissionId (POST mints one per call), so it
+  // is a fresh submission, not an idempotent replay of the first — harmless,
+  // because the server records nothing for a marking stopped at its deadline.
+  // Three re-sends keep one stalled answer at four deadline stops, under the
+  // account's marker cooldown (MARKER_COOLDOWN.limit, five per window), so a
+  // persistently stalled question fails through the named `stalled` check
+  // rather than as a cascade of 429 MARKING_COOLDOWN refusals.
+  const MARK_RETRIES = 3;
+  const stalled = [];
+  async function submitMarked(s, input) {
+    let r = null;
+    for (let i = 0; i <= MARK_RETRIES; i++) {
+      r = await POST(`/practice/${s.question.id}/submit`, { answer: input, ms: 15000 });
+      if (!(r.invalid && r.tooComplex === true)) return r;
+      await new Promise(resolve => setTimeout(resolve, 100 * (i + 1)));
+    }
+    stalled.push(`${s.question.subtopic} (${s.row.generator} D${s.question.difficulty}) · "${input}"`);
+    return r;
+  }
+
   /** Resolve a served question with the wanted outcome where the form allows it; returns what actually happened. */
   async function answer(s, wantCorrect) {
     const q = s.payload;
@@ -164,8 +197,8 @@ async function run() {
       await POST(`/practice/${s.question.id}/reveal`, { ms: 1000 });
       return { correct: false, revealed: true };
     }
-    let r = await POST(`/practice/${s.question.id}/submit`, { answer: input, ms: 15000 });
-    if (!r.resolved && !r.invalid) r = await POST(`/practice/${s.question.id}/submit`, { answer: input, ms: 15000 });
+    let r = await submitMarked(s, input);
+    if (!r.resolved && !r.invalid) r = await submitMarked(s, input);
     if (!r.resolved) { await POST(`/practice/${s.question.id}/reveal`, { ms: 1000 }); return { correct: false, revealed: true }; }
     return r;
   }
@@ -187,7 +220,12 @@ async function run() {
       const want = (correctBy[chapter] || 0) < 2 ? true : Math.random() < 0.65;
       const r = await answer(s, want);
       if (r.correct) correctBy[chapter] = (correctBy[chapter] || 0) + 1;
-      log.push({ chapter, reason: s.reason, reasonTag: s.reasonTag, why: s.why, nextUp: s.nextUp, difficulty: s.question.difficulty, year: s.question.year, dotpoint: s.dotpoint, windowed: s.windowed, correct: !!r.correct });
+      log.push({
+        chapter, reason: s.reason, reasonTag: s.reasonTag, why: s.why, nextUp: s.nextUp, difficulty: s.question.difficulty, year: s.question.year,
+        dotpoint: s.dotpoint, windowed: s.windowed, correct: !!r.correct, revealed: r.revealed === true,
+        // What the oracle saw, so a sitting that forks on an unanswerable form says which form.
+        form: `${s.payload.answerType}${s.payload.answer?.requireExact ? '·exact' : ''}${s.payload.multipart ? '·multipart' : ''} ${s.question.subtopic}/${s.row.generator}`
+      });
       tick(90000);
     }
     return log;
@@ -197,6 +235,13 @@ async function run() {
     let best = 0, run = 0, prev = null;
     for (const e of log) { run = e.chapter === prev ? run + 1 : 1; prev = e.chapter; best = Math.max(best, run); }
     return best;
+  };
+  /** The longest run spelled out — chapter, position and what happened on each pick — so a break names its cause. */
+  const runDetail = (log) => {
+    let best = { at: 0, n: 0 }, run = 0, prev = null;
+    log.forEach((e, i) => { run = e.chapter === prev ? run + 1 : 1; prev = e.chapter; if (run > best.n) best = { at: i - run + 1, n: run }; });
+    const picks = log.slice(best.at, best.at + best.n).map((e, k) => `#${best.at + k + 1} ${e.reasonTag} ${e.revealed ? 'revealed' : e.correct ? 'correct' : 'wrong'} (${e.form || '?'})`);
+    return `${log[best.at]?.chapter}: ${picks.join(' → ')}`;
   };
 
   /** The checks every Indian profile has to pass after a sitting. */
@@ -221,8 +266,15 @@ async function run() {
     ok('new ground is the first reason a fresh profile hears', log[0].reasonTag === 'new-ground', log[0].reasonTag);
     const seen = new Set(log.map(e => e.chapter));
     ok('smart practice covered the whole class before the sitting ended', seen.size === ownIds.size, `${seen.size}/${ownIds.size} chapters`);
-    ok('interleaving: never three consecutive picks of one chapter', longestRun(log) <= 2, `longest run ${longestRun(log)}`);
-    ok('interleaving: never beyond the engine\'s acquisition run', longestRun(log) <= INTERLEAVE.acquisitionRun);
+    // The ≤2 bound is a pin on this seeded sitting, not a property the engine
+    // guarantees: interleavePenalty (adaptive.js) suppresses a long run with a
+    // score multiplier, never a ban, and lets a chapter still in acquisition
+    // run to INTERLEAVE.acquisitionRun (4) — the wider bound the next check
+    // holds. Whether "off three-in-a-row" (adaptive-14) should also hold
+    // during acquisition is triaged separately, never settled by loosening
+    // this pin.
+    ok('interleaving: never three consecutive picks of one chapter', longestRun(log) <= 2, `longest run ${longestRun(log)} — ${runDetail(log)}`);
+    ok('interleaving: never beyond the engine\'s acquisition run', longestRun(log) <= INTERLEAVE.acquisitionRun, runDetail(log));
     ok('the sitting mixes reasons beyond new ground', new Set(log.map(e => e.reasonTag)).size >= 2, show([...new Set(log.map(e => e.reasonTag))]));
 
     // Evidence rows.
@@ -522,7 +574,7 @@ async function run() {
     belowFloor?.code === 'DIFFICULTY_UNAVAILABLE' && belowFloor.detail?.difficultyRequested === 1
       && belowFloor.detail.available.length > 0 && belowFloor.detail.available.every(a => a.difficulty >= 3 && a.difficulty <= 4),
     show({ code: belowFloor?.code, detail: belowFloor?.detail }));
-  ok('JEE Advanced keeps interleaving', longestRun(j12log) <= 2, `longest run ${longestRun(j12log)}`);
+  ok('JEE Advanced keeps interleaving', longestRun(j12log) <= 2, `longest run ${longestRun(j12log)} — ${runDetail(j12log)}`);
   ok('JEE Advanced rating rows are chapter-keyed', ratingRowsOf(j12.id).every(r => IN_CHAPTER_BY_ID[r.subtopic]));
 
   // ── Olympiad ──────────────────────────────────────────────────────────────
@@ -545,6 +597,8 @@ async function run() {
   ok('every resolved question carries the server\'s authoritative receipt', resolvedRows.length > 300 && resolvedRows.every(r => r.serverQuestionId && r.serverReceipt?.authoritative === true),
     `${resolvedRows.filter(r => !r.serverReceipt?.authoritative).length}/${resolvedRows.length} without a receipt`);
   ok('the server marked or revealed every one of them', online.traffic.grade + online.traffic.reveal >= resolvedRows.length, show(online.traffic));
+  eq('every typed answer was marked — none was stopped at the marker deadline after retries', stalled, []);
+  const { seed } = online;
   await online.close();
 
   // ── Verdict ───────────────────────────────────────────────────────────────
@@ -552,10 +606,10 @@ async function run() {
   if (failures.length) {
     console.log('\nfailures:');
     for (const f of failures) console.log('  ' + f);
-    console.log(`\nINDIA ADAPTIVE: FAIL — ${pass}/${total} checks`);
+    console.log(`\nINDIA ADAPTIVE: FAIL — ${pass}/${total} checks (seed ${seed})`);
     return 1;
   }
-  console.log(`INDIA ADAPTIVE: PASS — ${pass}/${total} checks`);
+  console.log(`INDIA ADAPTIVE: PASS — ${pass}/${total} checks (seed ${seed})`);
   return 0;
 }
 
