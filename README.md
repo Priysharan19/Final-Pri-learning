@@ -143,7 +143,7 @@ row is something the suites or the tools can speak to; the numbers are in
 | **Exams** | CBSE Class 10 Standard and Basic and Class 12 at 80 marks, Sections A–E with internal choice; JEE Main at +4/−1/0; JEE Advanced Paper 1 with partial marking; IOQM's 30 integer answers. |
 | **Adaptation** | Elo mastery per chapter and dot point, FSRS-5 spaced review, misconception pressure, interleaving — and the reason this question came next, in words. |
 | **Progress** | Chapter mastery, priorities, activity and streaks in the student's own timezone. No invented board mark or percentile: the India product refuses to show one. |
-| **Teachers** | Classes and assignments targeted at a chapter, dot point and difficulty; class analytics; intervention flags with reasons; printable reports; offline task packs and cloud classrooms. |
+| **Teachers** | Classes and assignments targeted at a chapter, dot point and difficulty; class analytics; intervention flags with reasons; printable reports; offline task packs and cloud classrooms. Not part of the public V1 product (`docs/release/PRI_V1_RELEASE_SCOPE.md`). |
 | **Offline** | The app opens and keeps typed and written work on the device with the network off; nothing is checked or marked until the student is signed in and online. The bundled engine only previews notation and reads results recorded by earlier versions. |
 | **Account, required for marking** | Verified email accounts, Google and Apple sign-in on the web, cross-device sync, Razorpay and Apple subscriptions with cancellation, a content CMS with independent review. |
 
