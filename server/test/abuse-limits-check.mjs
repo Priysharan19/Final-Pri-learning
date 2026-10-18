@@ -2,7 +2,8 @@
 //
 // Behavioural proof of every rate limit the route inventory declares: for each
 // distinct limiter bucket, exactly `limit` requests pass the limiter inside the
-// window and the next one is a coded 429 RATE_LIMITED with RateLimit headers.
+// window and the next one is a coded 429 RATE_LIMITED with RateLimit headers
+// and a Retry-After (whole seconds, inside the window).
 // Then the abuse paths that matter most on their own:
 //   · login lockout per submitted email (10 failures), even with the right
 //     password afterwards, with Retry-After;
@@ -98,6 +99,10 @@ try {
     if (lastResponse.headers.get('ratelimit-remaining') !== '0' || !/^\d+$/.test(lastResponse.headers.get('ratelimit-reset') || '')) {
       failures.push(`${key}: 429 without RateLimit-Remaining: 0 / RateLimit-Reset`);
     }
+    const retryAfter = lastResponse.headers.get('retry-after') || '';
+    if (!/^\d+$/.test(retryAfter) || Number(retryAfter) < 1 || Number(retryAfter) > Math.ceil(limit.windowMs / 1000)) {
+      failures.push(`${key}: 429 without a Retry-After inside its ${limit.windowMs}ms window (got ${JSON.stringify(retryAfter)})`);
+    }
     const reset = Number(lastResponse.headers.get('ratelimit-reset')) * 1000;
     if (!(reset > Date.now() && reset <= Date.now() + limit.windowMs + 2000)) failures.push(`${key}: RateLimit-Reset is not inside the declared window`);
   }
@@ -174,6 +179,30 @@ try {
     c.deq(statuses, [200, 200, 200, 200, 200, 429, 429], 'verification resend: 5 an hour per account');
     const pending = (await db.get("SELECT COUNT(*) AS n FROM auth_delivery_outbox WHERE account_id=? AND kind='verify-email' AND delivered_at IS NULL", [unverified.account.id])).n;
     c.eq(Number(pending), 1, 'resends replace the pending email rather than stacking them');
+  }
+
+  // ── The development-only legacy /api stack sits behind the same limiter ───
+  // (CodeQL js/missing-rate-limiting on server/auth.js and server/routes/api.js.)
+  // Production never mounts it (security-production-mode-check: 410); a LAN dev
+  // server does. Refused-before-the-database bodies keep this off the legacy file.
+  {
+    const dev = await startApp({ production: false, legacy: true });
+    try {
+      const statuses = [];
+      let limited = null;
+      for (let i = 0; i < 13; i += 1) {
+        const r = await dev.request('/api/auth/register', { method: 'POST', body: {} });
+        statuses.push(r.status);
+        if (r.status === 429) limited = r;
+      }
+      c.deq(statuses, [...Array(12).fill(400), 429], 'legacy /api/auth: 12 per 15 minutes per address, like /v1 login');
+      c.deq([limited?.data?.error?.code, /^\d+$/.test(limited?.headers.get('retry-after') || '') && Number(limited.headers.get('retry-after')) <= 15 * 60], ['RATE_LIMITED', true], 'a coded 429 with Retry-After');
+      const curriculum = await dev.request('/api/curriculum');
+      c.eq(curriculum.status, 401, 'the rest of legacy /api has its own bucket');
+      c.ok(/^\d+$/.test(curriculum.headers.get('ratelimit-remaining') || ''), 'and is counted by the limiter');
+    } finally {
+      await dev.close();
+    }
   }
 } finally {
   await h.close();

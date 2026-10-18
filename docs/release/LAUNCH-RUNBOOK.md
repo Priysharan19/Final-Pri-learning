@@ -187,7 +187,7 @@ remaining decisions are the owner's, recorded in `docs/security/accepted-risks.m
 
 | Step | Who | Action | Evidence | Gate |
 |---|---|---|---|---|
-| 9.1 | release governor | Confirm iPad-only shipping target (`Package.swift` `.pad`; `scripts/apple-shipping-target.mjs`) | `npm run release:matrix` | blocker #1 |
+| 9.1 | release governor | Confirm the iPhone + iPad Apple shipping target (`Package.swift` `.pad, .phone`, iPhone portrait-only; `node scripts/apple-shipping-target.mjs --check-v1`) and the Android phone + tablet target (scope §22, #504) | `npm run release:matrix`; Native Ink CI; physical-device reports per device class | blocker #1 (as replaced by scope §22) |
 | 9.2 | release governor | Record the disposition of the expression-domain known limitation (far tangential hole of a non-polynomial guard, `client/test/marker-ncert-forms-check.mjs`): release-severity or not | the decision | blocker #8 |
 | 9.3 | operator | Delete and recover **test accounts** on production after §1–§2; confirm the survivors list of `docs/privacy/data-retention.md` §2 | recorded | blocker #12 |
 | 9.4 | release governor | Review the issue ledger at the nominated SHA; record the P0/P1 count | the count | blocker #17 |

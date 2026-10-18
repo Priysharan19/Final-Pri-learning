@@ -16,86 +16,31 @@
 //     English interface string from the catalogue (the fallback this flow
 //     exists to catch), and no raw catalogue key has leaked onto the page.
 //
-// What it does not flag, on purpose: question text, worked solutions, chapter
-// names and anything else the engine and curriculum supply. Those stay English
-// by design (see client/test/i18n-check.mjs), and this flow compares against
+// What it does not flag, on purpose: question text, answer options, worked
+// solutions, chapter names and anything else the engine and curriculum supply.
+// Those stay English by design (see client/test/i18n-check.mjs) and the app
+// declares them lang="en"; this flow compares the rest of the screen against
 // the interface catalogue only, so it cannot mistake mathematics for a bug.
+// Before it opens the app, the flow proves its own matcher on fixed fixtures:
+// declared English content holding a catalogue word ("$2$ points") passes, and
+// a genuinely untranslated interface string still fails.
 //
 // Run on its own:  node client/test/tour-hindi.js
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
 import en from '../src/i18n/strings.en.js';
 import hi from '../src/i18n/strings.hi.js';
+import { englishInterfaceForms, leaksOnPage, renderFixture } from './support/hindi-fallback.mjs';
 
 // JEE Main is the India track whose exam is released (a source-checked
 // Mathematics-section paper), so the exam room can be entered and audited.
 const STUDENT = { name: 'Ananya Gupta', year: 12, course: 'in', track: 'jee-main', language: 'hi' };
 const DEVANAGARI = /[ऀ-ॿ]/;
 
-// Every English interface string whose Hindi is different — i.e. every string
-// whose appearance on a Hindi screen is a fallback. Templates become patterns
-// with their placeholders as wildcards; a template with too little fixed text
-// to be distinctive ("{n}%", "{a} · {b}") is left out rather than matching
-// half the page.
-const flat = v => (typeof v === 'string' ? [v] : Object.values(v || {}));
-const ENGLISH = [];
-for (const [key, value] of Object.entries(en)) {
-  const hiFlat = flat(hi[key]).join('\u0000');
-  for (const form of flat(value)) {
-    if (hiFlat === form || hiFlat.split('\u0000').includes(form)) continue;
-    const fixed = form.replace(/\{\w+\}/g, ' ').replace(/[^A-Za-z]+/g, ' ').trim();
-    if (fixed.split(' ').filter(w => w.length >= 2).length < (form.includes('{') ? 2 : 1) || fixed.length < 4) continue;
-    ENGLISH.push({ key, form });
-  }
-}
+// Every English interface string whose Hindi is different — the strings whose
+// appearance on a Hindi screen is a fallback (support/hindi-fallback.mjs).
+const ENGLISH = englishInterfaceForms(en, hi);
 const KEYS = Object.keys(en);
-
-/**
- * In the page: every English catalogue string that is on screen, and every raw
- * key. Text inside KaTeX is skipped — it is typeset mathematics.
- */
-function leaksOnPage({ english, keys }) {
-  const norm = s => String(s || '').replace(/\s+/g, ' ').trim();
-  const patterns = english.map(({ key, form }) => {
-    if (!form.includes('{')) return { key, form: norm(form), re: null };
-    const parts = norm(form).split(/\{\w+\}/).map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-    return { key, form, re: new RegExp(`^${parts.join('.+?')}$`) };
-  });
-  const keySet = new Set(keys);
-  const seen = [];
-  const consider = (text, where) => {
-    const t = norm(text);
-    if (!t || !/[A-Za-z]/.test(t)) return;
-    if (keySet.has(t)) { seen.push(`raw key ${t} (${where})`); return; }
-    for (const p of patterns) {
-      if (p.re ? p.re.test(t) : p.form === t) { seen.push(`“${t.slice(0, 70)}” = ${p.key} (${where})`); return; }
-    }
-  };
-  const visible = el => {
-    if (!el) return false;
-    const style = getComputedStyle(el);
-    if (style.display === 'none' || style.visibility === 'hidden') return false;
-    return el.getClientRects().length > 0;
-  };
-  const root = document.querySelector('.shell') || document.body;
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  let node;
-  while ((node = walker.nextNode())) {
-    const parent = node.parentElement;
-    if (!parent || parent.closest('.katex, script, style, noscript')) continue;
-    // Content the app marks as English on purpose (curriculum names, engine
-    // text) carries lang="en"; it is declared, not a fallback.
-    if (parent.closest('[lang]')?.getAttribute('lang') === 'en' && parent.closest('[lang]') !== document.documentElement) continue;
-    if (!visible(parent)) continue;
-    consider(node.nodeValue, parent.tagName.toLowerCase());
-  }
-  for (const el of root.querySelectorAll('[aria-label], [title], [placeholder], [alt]')) {
-    for (const attr of ['aria-label', 'title', 'placeholder', 'alt']) {
-      if (el.hasAttribute(attr)) consider(el.getAttribute(attr), `${el.tagName.toLowerCase()}[${attr}]`);
-    }
-  }
-  return [...new Set(seen)];
-}
 
 /** How much of the screen is in Devanagari — enough to show it is not just tagged hi. */
 function devanagariOnPage() {
@@ -121,6 +66,51 @@ export const flow = {
       await check(`${screen}: no English interface string or raw key falls back onto the screen`,
         leaks.length === 0, leaks.slice(0, 8).join(' · '));
     };
+
+    // ── The matcher, proved on fixed fixtures before it judges the app ──────────
+    // The exam room once failed here on a JEE Main option "$2$ points": the
+    // text node " points" equals explain.seq.points, and the option was not yet
+    // declared English. Question content must pass; interface chrome must not.
+    const leaksIn = async (html, english = ENGLISH) => {
+      await renderFixture(page, html);
+      return page.evaluate(leaksOnPage, { english, keys: KEYS });
+    };
+    const OPTION = '<span class="mcq-key">B</span><span><span class="katex">2</span> points</span>';
+    {
+      const leaks = await leaksIn(`<section class="exam-paper"><div lang="en"><div class="q-prompt">The circle meets the co-ordinate axes at</div></div>
+        <button class="mcq-opt"><span class="mcq-key">B</span><span lang="en"><span><span class="katex">2</span> points</span></span></button>
+        <div class="answer-row"><input class="answer-input"><span class="answer-suffix" lang="en">degrees</span></div>
+        <button>${hi['examRoom.next']}</button></section>`);
+      await check('Matcher: English question content holding interface words ("points", "degrees") is not a fallback',
+        leaks.length === 0, leaks.join(' · '));
+    }
+    {
+      const leaks = await leaksIn(`<section class="exam-paper"><button class="mcq-opt">${OPTION}</button></section>`);
+      await check('Matcher: the same option NOT declared English is still seen (the matcher does not skip content by guesswork)',
+        leaks.some(l => l.includes('explain.seq.points')), leaks.join(' · ') || 'nothing seen');
+    }
+    {
+      // A Hindi key that is missing makes t() fall back to the English. Remove
+      // one from a copy of the catalogue (the real file is untouched), render
+      // what the app would then show beside declared English content, and the
+      // matcher built from that catalogue must name the key.
+      const missing = { ...hi };
+      delete missing['examRoom.previous'];
+      delete missing['examRoom.questionOf'];
+      const english = englishInterfaceForms(en, missing);
+      const shown = key => missing[key] ?? en[key];
+      const leaks = await leaksIn(`<section class="exam-paper">
+        <span class="tag">${shown('examRoom.questionOf').replace('{n}', '1').replace('{total}', '25')}</span>
+        <div lang="en"><div class="q-prompt">How many points lie above the line?</div></div>
+        <button class="mcq-opt"><span class="mcq-key">A</span><span lang="en">${OPTION}</span></button>
+        <button class="btn btn-ghost">${shown('examRoom.previous')}</button></section>`, english);
+      await check('Matcher: an interface string whose Hindi is missing still fails, beside English content',
+        leaks.some(l => l.includes('= examRoom.previous (button)')) && leaks.some(l => l.includes('= examRoom.questionOf (span)')) && leaks.length === 2,
+        leaks.join(' · ') || 'nothing seen');
+      const raw = await leaksIn('<button class="btn">examRoom.next</button>');
+      await check('Matcher: a raw catalogue key on the interface still fails',
+        raw.length === 1 && raw[0].startsWith('raw key examRoom.next'), raw.join(' · ') || 'nothing seen');
+    }
 
     await goto('/');
     await createProfile(STUDENT);
@@ -250,6 +240,13 @@ export const flow = {
     await page.waitForURL(/\/exams\/[^/]+$/, { timeout: 30000 });
     await page.waitForSelector('.q-prompt, .exam-q, .shell main h1, .shell main h2', { timeout: 30000 });
     await audit('Exam room');
+    // The answers on the paper are its English content, declared as such like
+    // the prompt above them — for a screen reader and for the audit above.
+    const options = await page.locator('.exam-paper .mcq-opt').evaluateAll(els => els.map(el =>
+      [...el.childNodes].filter(n => !(n.nodeType === 1 && n.classList.contains('mcq-key')) && (n.textContent || '').trim())
+        .every(n => (n.nodeType === 1 ? n : n.parentElement).closest('[lang]')?.getAttribute('lang') === 'en')));
+    await check('Exam room: every answer option is declared English content (lang="en")',
+      options.every(Boolean), `${options.filter(x => !x).length} of ${options.length} options undeclared`);
 
     // ── Progress ───────────────────────────────────────────────────────────────
     await page.goto(`${base}/progress`, { waitUntil: 'domcontentloaded' });

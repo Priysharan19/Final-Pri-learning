@@ -688,14 +688,18 @@ export default function ExamRoom() {
   const qNumber = cur + 1;
 
   /** One answer control: native for objective items, write-or-type for written ones. */
+  // The answers a student chooses between are question content too: an option
+  // such as "$2$ points", a matching-list entry and a unit are the paper's
+  // English, so each is declared lang="en" exactly like the prompt above it.
+  // Only the labels around them (List-I, the mode buttons) are interface.
   function answerControl(key, item, label) {
     if (!item) return null;
     const value = answers[key] || '';
     const set = v => setAnswers(a => ({ ...a, [key]: v }));
     const matchList = item.matchList ? (
       <div className="grid cols-2" style={{ gap: 10, margin: '6px 0 12px', fontSize: 14 }}>
-        <div><b>{t('examRoom.listOne')}</b>{item.matchList.left.map(r => <div key={r.key} style={{ marginTop: 4 }}>{r.key}. <MathText text={r.text} /></div>)}</div>
-        <div><b>{t('examRoom.listTwo')}</b>{item.matchList.right.map(r => <div key={r.key} style={{ marginTop: 4 }}>{r.key}. <MathText text={r.text} /></div>)}</div>
+        <div><b>{t('examRoom.listOne')}</b>{item.matchList.left.map(r => <div key={r.key} lang="en" style={{ marginTop: 4 }}>{r.key}. <MathText text={r.text} /></div>)}</div>
+        <div><b>{t('examRoom.listTwo')}</b>{item.matchList.right.map(r => <div key={r.key} lang="en" style={{ marginTop: 4 }}>{r.key}. <MathText text={r.text} /></div>)}</div>
       </div>
     ) : null;
 
@@ -710,7 +714,7 @@ export default function ExamRoom() {
                 aria-pressed={value === String(j)}
                 onClick={() => set(value === String(j) ? '' : String(j))}>
                 <span className="mcq-key">{'ABCD'[j]}</span>
-                <MathText text={opt} />
+                <span lang="en"><MathText text={opt} /></span>
               </button>
             ))}
           </div>
@@ -735,7 +739,7 @@ export default function ExamRoom() {
                 aria-pressed={chosen.has(String(j))}
                 onClick={() => toggle(j)}>
                 <span className="mcq-key">{'ABCD'[j]}</span>
-                <MathText text={opt} />
+                <span lang="en"><MathText text={opt} /></span>
               </button>
             ))}
           </div>
@@ -755,13 +759,13 @@ export default function ExamRoom() {
       </>
     ) : (
       <div className="answer-row">
-        {item.answerPrefix && <span className="answer-prefix"><MathText text={item.answerPrefix} /></span>}
+        {item.answerPrefix && <span className="answer-prefix" lang="en"><MathText text={item.answerPrefix} /></span>}
         <input className="input answer-input" inputMode="text" enterKeyHint="done" autoCapitalize="none" autoCorrect="off" spellCheck={false} disabled={locked}
           placeholder={item.inputHint || t('verdict.answerPlaceholder')}
           aria-label={t(mode === 'ink' ? 'examRoom.answerAriaInk' : 'examRoom.answerAriaFor', { label })}
           value={value} onChange={e => set(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && cur < exam.questions.length - 1) setCur(c => c + 1); }} />
-        {item.answerSuffix && <span className="answer-suffix">{item.answerSuffix}</span>}
+        {item.answerSuffix && <span className="answer-suffix" lang="en">{item.answerSuffix}</span>}
       </div>
     );
     const saved = inks[key];

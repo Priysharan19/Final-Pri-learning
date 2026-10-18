@@ -233,6 +233,7 @@ jobs:
           node server/test/mfa-check.mjs
           node server/test/oidc-consent-check.mjs
           node server/test/security-hardening-check.mjs
+          node server/test/rls-fail-closed-check.mjs
       - name: Billing lifecycle, database operations and HTTP journeys
         run: |
           node server/test/billing-cancel-refund-check.mjs
@@ -334,7 +335,7 @@ jobs:
         run: |
           set -o pipefail
           node server/test/exam-authority-check.mjs 2>&1 | tee exam-authority.log
-          grep -Fq 'EXAM AUTHORITY: PASS — 365/365 checks' exam-authority.log
+          grep -Fq 'EXAM AUTHORITY: PASS — 371/371 checks' exam-authority.log
       - name: Commercial platform schema contract
         run: node server/test/platform-schema-check.mjs
       - name: Supabase migrations are self-contained transactions (supabase db push)
@@ -352,7 +353,7 @@ jobs:
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 46/46 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 47/47 suites' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
@@ -369,10 +370,11 @@ jobs:
           grep -Fq '✓ google-billing-check.mjs' platform-postgres.log
           grep -Fq '✓ practice-attempt-sync-check.mjs' platform-postgres.log
           grep -Fq 'ACCOUNT LIFECYCLE JOURNEY: PASS' platform-postgres.log
-          grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 29/29' platform-postgres.log
+          grep -Fq 'POSTGRES SCHEMA MUTATIONS: PASS — 31/31' platform-postgres.log
           grep -Fq 'PLATFORM SYNC BURST: PASS' platform-postgres.log
           grep -Fq '✓ failure-drills-check.mjs' platform-postgres.log
           grep -Fq '✓ storekit-entitlement-state-machine-check.mjs' platform-postgres.log
+          grep -Fq '✓ rls-fail-closed-check.mjs' platform-postgres.log
       - name: Platform migration contract
         run: node server/test/platform-migration-check.mjs
       - name: Billing v3 to v4 payment-retention rebuild on a populated SQLite database
@@ -492,7 +494,7 @@ jobs:
           grep -Fq 'AI tutor · three levels, in order, with fallback' browser.log
           grep -Eq 'E2E SUITE.*33/33.*2 flows' browser.log
           grep -Fq 'Hindi · Practice, handwriting, Exams, exam room, Progress, Explain' browser.log
-          grep -Eq 'E2E SUITE.*58/58.*1 flows' browser.log
+          grep -Eq 'E2E SUITE.*63/63.*1 flows' browser.log
           grep -Fq 'Progress truth · rendered numbers = attempt ledger' browser.log
           grep -Eq 'E2E SUITE.*24/24.*1 flows' browser.log
           # Account deletion for a code-only account: in the app, and from the
