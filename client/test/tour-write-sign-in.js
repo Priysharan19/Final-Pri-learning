@@ -98,9 +98,6 @@ const inkOnCanvas = page => page.evaluate(() => {
   return inked;
 });
 
-/** The canonical answer the server escrowed for a question it issued. */
-const practiceCalls = (calls, re) => calls.filter(c => c.method === 'POST' && re.test(c.path));
-
 /** Correct the doubtful line the reader returned to what the student "wrote". */
 async function correctReading(page, text) {
   await page.locator('.ink-line .ink-correct-btn').first().click();
@@ -117,6 +114,16 @@ async function pressSubmit(page) {
 }
 
 /** History: the rows for one question, as a student reads them. */
+async function historyRows(page, questionId) {
+  await page.waitForSelector('.hist-row, .muted', { timeout: 30000 });
+  await page.waitForFunction(() => !document.querySelector('[role="status"]')?.textContent?.startsWith('Loading'), null, { timeout: 15000 }).catch(() => {});
+  await page.waitForSelector('.hist-row', { timeout: 15000 }).catch(() => {});
+  const all = await page.locator('.hist-row').count();
+  const mine = page.locator(`.hist-row[data-question-id="${questionId}"]`);
+  const texts = (await mine.allInnerTexts()).map(t => t.replace(/\s+/g, ' ').trim().replace(/\d{1,2}:\d{2}.*$/, ''));
+  return { all, mine: await mine.count(), texts, verdicts: await mine.locator('.hist-verdict .sr-only').allInnerTexts() };
+}
+
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
 
 /** Class 10 Arithmetic Progressions, signed out, on a written-answer question. */
@@ -144,15 +151,220 @@ async function openWrittenAPQuestion(page, base, settle) {
  * browser that loses the write after saying yes). Only the ink-draft store is
  * touched, and only while the flow asks for it.
  */
+const installInkWriteFault = page => page.addInitScript(() => {
+  const put = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function (value, ...rest) {
+    const fault = this.name === 'inkDrafts' ? globalThis.__PRI_E2E_INK_WRITE__ : null;
+    if (fault === 'throw') throw new DOMException('synthetic: the device store is full', 'QuotaExceededError');
+    if (fault === 'drop') return this.count();
+    return put.call(this, value, ...rest);
+  };
+  // Every distinct thing the status line said, in order, since the last reset.
+  globalThis.__PRI_E2E_STATUS__ = [];
+  setInterval(() => {
+    const el = document.querySelector('.qpage .ws-actions .status-line');
+    if (!el) return;
+    const now = `${el.getAttribute('data-work-state')}|${el.innerText.replace(/\s+/g, ' ').trim()}`;
+    const log = globalThis.__PRI_E2E_STATUS__;
+    if (log[log.length - 1] !== now) log.push(now);
+  }, 25);
+});
+const resetStatusLog = page => page.evaluate(() => { globalThis.__PRI_E2E_STATUS__ = []; });
+const statusLog = page => page.evaluate(() => globalThis.__PRI_E2E_STATUS__.slice());
+/** What the status line said from the moment the new stroke began to be saved. */
+const sinceSaving = log => { const at = log.findIndex(l => l.startsWith('saving|')); return at < 0 ? log : log.slice(at); };
+/** Wait for the one work state to be `state` (or any of an array); true when it is, false at the timeout. */
+const waitWorkState = (page, state, timeout = 20000) => page.waitForFunction(
+  want => want.includes(document.querySelector('.qpage .ws-actions .status-line')?.getAttribute('data-work-state')),
+  [].concat(state), { timeout }).then(() => true, () => false);
+const SAVED_WORDS = /saved on this device|\bis saved\b|^saved\b/i;
+/** Signed in, a kept page that has been read settles on "read" (or "saved" before a reading lands). */
+const SETTLED = ['read', 'saved'];
+
+/** Largest coordinate difference between two stored pages with the same shape, or null. */
+function geometryDrift(a, b) {
+  let A, B; try { A = JSON.parse(a); B = JSON.parse(b); } catch { return null; }
+  if (!Array.isArray(A) || !Array.isArray(B) || A.length !== B.length) return null;
+  let worst = 0;
+  for (let i = 0; i < A.length; i++) {
+    const pa = A[i].points, pb = B[i].points;
+    if (!Array.isArray(pa) || !Array.isArray(pb) || pa.length !== pb.length) return null;
+    for (let j = 0; j < pa.length; j++) worst = Math.max(worst, Math.abs(pa[j][0] - pb[j][0]), Math.abs(pa[j][1] - pb[j][1]));
+  }
+  return worst;
+}
+const strokeCount = s => { try { const a = JSON.parse(s); return Array.isArray(a) ? a.length : -1; } catch { return -1; } };
+
 const endServerSession = online => online.platform.h.db.prepare('DELETE FROM account_sessions WHERE account_id=?').run(online.account.id).changes;
 const OUTAGE_WORDS = /isn’t answering right now|isn't answering right now|Photo reading isn’t working/i;
 const NEEDS_ACCOUNT_WORDS = /needs a Pri account/i;
 const cardText = page => visibleText(page, '.qpage .ws-work');
 
+// ── One true save state, signed in ───────────────────────────────────────────
+// Since the activation gate (issue #477) every student writing is signed in,
+// so the page is saved AND read. What the save line says must still be the
+// device store's truth: never "saved" without a row behind it, a refused or
+// silently dropped write said as a failed save with "Save again", and the
+// strokes kept through a mode switch, a resize, an offline blip and a reload.
+export const saveTruthFlow = {
+  id: 'ink-save-truth',
+  online: true,
+  name: 'Write · one true save state: ink survives reload, mode switch, resize, offline; a failed write says so and retries',
+
+  async run({ page, ctx, base, check, goto, createProfile, mathText, settle, note, online, browserName }) {
+    note(`${EVIDENCE}: "Write · one true save state…" [${browserName || 'chromium'}] is browser automation of the device store (a real IndexedDB in a Playwright ${browserName || 'chromium'} context, with write faults injected by the test); the page is read by the scripted stand-in reader and nothing is submitted. Not evidence about a physical device, Safari itself, a real provider or real handwriting.`);
+    const { reader } = online;
+    Object.assign(reader, { text: '5', lines: null, confidence: 0.97, down: false });
+    await installInkWriteFault(page);
+    await goto('/');
+    await createProfile({ name: 'Save Truth', course: 'in', year: 10 });
+    await online.signIn({ name: 'Save Truth' });
+    if (!await check('signed in, India Class 10 practice (Arithmetic Progressions) serves a written-answer question',
+      await openWrittenAPQuestion(page, base, settle), `${MAX_SKIPS} questions and none took a written answer`)) return;
+
+    await page.getByRole('button', { name: 'Answer by handwriting' }).click();
+    await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+    const qid = await shownId(page);
+    const prompt = await mathText('.q-prompt');
+    const inkBlank = await inkOnCanvas(page);
+    const blank = await saveTruth(page, qid);
+    await check('before a stroke: nothing is claimed saved or unsaved, and nothing is stored',
+      !blank.saved && !blank.notSaved && !blank.kept && blank.state === 'idle', JSON.stringify(blank));
+
+    // ── draw ─────────────────────────────────────────────────────────────────
+    await resetStatusLog(page);
+    await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '5');
+    await page.waitForSelector('.ink-line', { timeout: 30000 }).catch(() => {});
+    const settledFirst = await waitWorkState(page, SETTLED);
+    const first = await saveTruth(page, qid);
+    const firstLog = await statusLog(page);
+    await check('the status goes saving → settled, and never says the save failed',
+      settledFirst && firstLog.some(l => l.startsWith('saving|')) && !firstLog.some(l => l.startsWith('save-failed|') || /couldn.t save|not saved/i.test(l)),
+      JSON.stringify(firstLog));
+    await check('the page is in the store, readable through a fresh IndexedDB connection, and nothing says it is not saved',
+      first.kept && first.store === 'read' && first.strokes !== null && strokeCount(first.strokes) >= 1 && !first.notSaved,
+      JSON.stringify({ ...first, strokes: strokeCount(first.strokes) }));
+    await check('"saved" and "not saved" are never on screen together', !(first.saved && first.notSaved), first.shown);
+    await check(`and, signed in, the kept page is read [${EVIDENCE}]`,
+      await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null) === '5' && first.state === 'read',
+      JSON.stringify({ state: first.state, lines: await page.locator('.ink-line').count() }));
+    const written = await inkOnCanvas(page);
+
+    // ── mode switches ────────────────────────────────────────────────────────
+    await page.getByRole('button', { name: 'Answer by typing' }).click();
+    await page.locator('.editor-body input.answer-input, .editor-body textarea').first().waitFor({ timeout: 15000 });
+    await page.getByRole('button', { name: /answer with a photo/i }).click();
+    await page.locator('.editor-body input[type="file"]').waitFor({ state: 'attached', timeout: 15000 });
+    await page.getByRole('button', { name: 'Answer by handwriting' }).click();
+    await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+    // Coming back to the pen re-saves the page (saving → settled): wait for
+    // the state after that write, not the one carried over from before.
+    await page.waitForTimeout(900);
+    await waitWorkState(page, SETTLED);
+    const afterModes = await saveTruth(page, qid);
+    await check('Type → Photo → Write: the same strokes are on the page and in the store',
+      written > inkBlank && await inkOnCanvas(page) === written && afterModes.strokes === first.strokes && SETTLED.includes(afterModes.state),
+      `painted ${await inkOnCanvas(page)} (was ${written}); stored same ${afterModes.strokes === first.strokes}; state ${afterModes.state}`);
+
+    // ── resize: the sheet narrows, then returns ──────────────────────────────
+    const viewport = page.viewportSize();
+    await page.setViewportSize({ width: 1100, height: 800 });
+    await page.waitForTimeout(500);
+    await waitWorkState(page, SETTLED);
+    const narrow = await saveTruth(page, qid);
+    await page.setViewportSize(viewport);
+    await page.waitForTimeout(500);
+    await waitWorkState(page, SETTLED);
+    const wide = await saveTruth(page, qid);
+    const narrowDrift = geometryDrift(first.strokes, narrow.strokes);
+    const drift = geometryDrift(first.strokes, wide.strokes);
+    await check('resize: every stroke and point survives the narrower sheet, and the original geometry returns with the original width (±2px)',
+      narrowDrift !== null && narrow.kept && drift !== null && drift <= 2 && await inkOnCanvas(page) > inkBlank && !wide.notSaved,
+      `narrow drift ${narrowDrift}; restored drift ${drift}`);
+
+    // ── a brief offline blip ─────────────────────────────────────────────────
+    await resetStatusLog(page);
+    await ctx.setOffline(true);
+    await page.waitForTimeout(900);
+    const off = await saveTruth(page, qid);
+    await ctx.setOffline(false);
+    await page.waitForTimeout(900);
+    await waitWorkState(page, SETTLED);
+    const back = await saveTruth(page, qid);
+    const blipLog = await statusLog(page);
+    await check('offline for a moment and back: strokes still on the page and in the store, and the save is never called failed',
+      off.kept && back.kept && back.strokes === wide.strokes && await inkOnCanvas(page) > inkBlank && SETTLED.includes(back.state) &&
+        !blipLog.some(l => l.startsWith('save-failed|')), JSON.stringify({ state: back.state, log: blipLog }));
+
+    // ── reload ───────────────────────────────────────────────────────────────
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
+    await page.waitForSelector('.ink-canvas-live', { timeout: 30000 }).catch(() => {});
+    await waitWorkState(page, SETTLED);
+    const reloaded = await saveTruth(page, qid);
+    await check('reload: the same question comes back in Write mode with the strokes restored from IndexedDB, geometry unchanged',
+      await shownId(page) === qid && await mathText('.q-prompt') === prompt && await page.locator('.ink-canvas-live').count() === 1 &&
+        await inkOnCanvas(page) > inkBlank && reloaded.strokes === back.strokes && SETTLED.includes(reloaded.state),
+      `id ${await shownId(page)} (was ${qid}); painted ${await inkOnCanvas(page)}; stored same ${reloaded.strokes === back.strokes}; state ${reloaded.state}`);
+
+    // ── the device store refuses the write ───────────────────────────────────
+    const beforeFault = await inkOnCanvas(page);
+    await page.evaluate(() => { globalThis.__PRI_E2E_INK_WRITE__ = 'throw'; });
+    await resetStatusLog(page);
+    await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '2', { x: 140 });
+    const failed = await waitWorkState(page, 'save-failed');
+    const refused = await saveTruth(page, qid);
+    const refusedLog = await statusLog(page);
+    const retry = page.locator('.ws-actions [data-save-retry]');
+    await check('a refused write is said as a failed save, with "Save again" — and "saved" is never shown for it',
+      failed && /Couldn’t save on this device/.test(refused.shown) && !refused.saved && await retry.isVisible() &&
+        (await retry.innerText()).trim() === 'Save again' && refusedLog.some(l => l.startsWith('saving|')) && !sinceSaving(refusedLog).some(l => SAVED_WORDS.test(l.split('|')[1] || '')),
+      JSON.stringify({ shown: refused.shown, log: refusedLog }));
+    await check('the new stroke is still on the page (never dropped) and the stored page is still the earlier one',
+      await inkOnCanvas(page) > beforeFault && refused.strokes === reloaded.strokes && refused.state === 'save-failed' &&
+        !SAVED_WORDS.test(await visibleText(page, '.qpage .ink-status')),
+      `painted ${await inkOnCanvas(page)} (was ${beforeFault}); state ${refused.state}; stored same ${refused.strokes === reloaded.strokes}`);
+    await retry.click();
+    await page.waitForTimeout(1200);
+    const stillRefused = await saveTruth(page, qid);
+    await check('"Save again" while the store still refuses: still a failed save, still not "saved"',
+      stillRefused.state === 'save-failed' && !stillRefused.saved && stillRefused.strokes === reloaded.strokes, JSON.stringify({ state: stillRefused.state, shown: stillRefused.shown }));
+    await page.evaluate(() => { globalThis.__PRI_E2E_INK_WRITE__ = null; });
+    await retry.click();
+    const recovered = await waitWorkState(page, SETTLED);
+    const healed = await saveTruth(page, qid);
+    await check('once the store accepts it, "Save again" saves BOTH strokes and the failure is gone, from a fresh readback',
+      recovered && !healed.notSaved && healed.strokes !== reloaded.strokes && strokeCount(healed.strokes) > strokeCount(reloaded.strokes) &&
+        await retry.count() === 0, JSON.stringify({ state: healed.state, shown: healed.shown, strokes: strokeCount(healed.strokes) }));
+
+    // ── the store acknowledges the write and keeps nothing ───────────────────
+    await page.evaluate(() => { globalThis.__PRI_E2E_INK_WRITE__ = 'drop'; });
+    await resetStatusLog(page);
+    await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '3', { x: 240 });
+    const caught = await waitWorkState(page, 'save-failed');
+    const droppedLog = await statusLog(page);
+    const dropped = await saveTruth(page, qid);
+    await check('an acknowledged write that kept nothing is caught by the readback: failed save, never "saved"',
+      caught && droppedLog.some(l => l.startsWith('saving|')) && !sinceSaving(droppedLog).some(l => SAVED_WORDS.test(l.split('|')[1] || '')) &&
+        dropped.strokes === healed.strokes && await retry.isVisible(),
+      JSON.stringify({ log: droppedLog, stored: strokeCount(dropped.strokes) }));
+    await page.evaluate(() => { globalThis.__PRI_E2E_INK_WRITE__ = null; });
+    await retry.click();
+    const resaved = await waitWorkState(page, SETTLED);
+    const final = await saveTruth(page, qid);
+    await check('and is saved by "Save again" once the store really writes',
+      resaved && strokeCount(final.strokes) > strokeCount(healed.strokes) && await retry.count() === 0,
+      JSON.stringify({ state: final.state, strokes: strokeCount(final.strokes) }));
+    await check('through all of it nothing was submitted or marked, and no provider outside the stand-in was reached',
+      (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length === 0 && online.ledger().completions === 0 && reader.refused.length === 0,
+      JSON.stringify({ ledger: online.ledger(), refused: reader.refused }));
+  }
+};
+
 export const sessionEndedWriteFlow = {
   id: 'write-session-ended',
   online: true,
-  name: 'Write · session ended before reading: "sign in again" beside the work, then read and marked; a real outage still says so, with a retry',
+  name: 'Write · session ended before reading: "sign in again" beside the work, then read, corrected and marked over two tries; a real outage still says so, with a retry',
 
   async run({ page, base, check, goto, createProfile, mathText, settle, note, online, browserName }) {
     note(`${EVIDENCE}: "Write · session ended…" [${browserName || 'chromium'}] ends a real server session (its row is deleted from the server's SQLite) and scripts the stand-in reader up and down; server, sign-in, recognise and grade routes are real. Not real-provider, real-handwriting, production or real-device evidence.`);
@@ -225,15 +437,71 @@ export const sessionEndedWriteFlow = {
       `${await page.locator('.ink-line').count()} lines; ${reader.requests.length - readsBefore} provider requests`);
     const right = await online.answerOf();
     if (!await check('the right answer is known only from the server\'s sealed copy', typeof right.text === 'string' && right.text.length > 0, JSON.stringify({ kind: right.kind }))) return;
+    const sid = right.serverQuestionId;
+    const grades = () => online.practiceCalls(new RegExp(`^/v1/practice/${sid}/submit$`));
+
+    // ── first try: the student states a wrong reading and submits ────────────
+    const readLine = await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null);
+    await correctReading(page, SURELY_WRONG);
+    await pressSubmit(page);
+    await page.waitForSelector('.verdict-bad, .eval-card', { timeout: 30000 }).catch(() => {});
+    const recognized = await online.practiceCalls(new RegExp(`^/v1/practice/${sid}/recognize$`));
+    const confirmed = await online.practiceCalls(new RegExp(`^/v1/practice/${sid}/recognition/[^/]+/confirm$`));
+    await check('the correction is recorded by the server as the student\'s, on top of the reader\'s receipt (recognize, then recognition/:id/confirm)',
+      recognized.some(c => c.status === 201 && c.json?.transcription?.text === readLine) &&
+        confirmed.some(c => c.status < 300 && c.body?.text === SURELY_WRONG),
+      JSON.stringify({ readLine, recognize: recognized.map(c => `${c.status} ${c.json?.transcription?.text}`), confirm: confirmed.map(c => `${c.status} ${c.body?.text}`) }));
+    const firstGrade = (await grades()).at(-1);
+    await check('a wrong answer: server-authoritative, 0 marks, not resolved, one try remaining, graded as handwriting under the receipt',
+      firstGrade?.status === 200 && firstGrade.json?.authoritative === true && firstGrade.json.correct === false &&
+        firstGrade.json.resolved === false && firstGrade.json.triesLeft === 1 && firstGrade.json.marksEarned === 0 &&
+        firstGrade.json.marksPossible >= 1 && firstGrade.body?.mode === 'ink' && typeof firstGrade.body?.transcriptionReceipt === 'string',
+      JSON.stringify(firstGrade && { status: firstGrade.status, json: firstGrade.json }).slice(0, 400));
+    await check('the card shows that miss and keeps the question open for the second try',
+      await page.locator('.verdict-bad').count() >= 1 && await page.locator('.eval-card').count() === 0 && await shownId(page) === qid &&
+        online.ledger(sid).thisDone === 0, (await visibleText(page, '.verdict-bad')).slice(0, 200));
+
+    // ── second try: the page is rewritten and the right answer stated ────────
+    await page.locator('.ink-answer').getByRole('button', { name: /clear/i }).first().click();
+    await page.waitForFunction(() => document.querySelectorAll('.ink-line').length === 0, null, { timeout: 10000 }).catch(() => {});
+    // The stand-in may now be handed a picture it has already read for this
+    // account; the server would rightly answer with the read it kept. A real
+    // reader does not change its mind, so the desk says "a different reader".
+    online.forgetKeptReads();
+    reader.text = '7';
+    const readsBeforeSecond = reader.requests.length;
+    await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '7');
+    await page.waitForSelector('.ink-line .ink-correct-btn', { timeout: 30000 }).catch(() => {});
+    await check(`the cleared page is rewritten and read again for the second try [${EVIDENCE}]`,
+      await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null) === '7' && reader.requests.length > readsBeforeSecond,
+      `${await page.locator('.ink-line').count()} lines; ${reader.requests.length - readsBeforeSecond} provider requests`);
     await correctReading(page, right.text);
     await pressSubmit(page);
     await page.waitForSelector('.eval-card', { timeout: 30000 }).catch(() => {});
-    const grade = (await online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/submit$`))).at(-1);
-    await check('Submit then works: the server marks it — authoritative, correct, resolved once',
+    const allGrades = await grades();
+    const grade = allGrades.at(-1);
+    await check('the second try is marked by the server: authoritative, correct, full marks, resolved',
       grade?.status === 200 && grade.json?.authoritative === true && grade.json.correct === true && grade.json.resolved === true &&
-        await page.locator('.eval-card[data-outcome="correct"]').count() === 1 && online.ledger(right.serverQuestionId).thisDone === 1,
+        grade.json.marksEarned === grade.json.marksPossible && await page.locator('.eval-card[data-outcome="correct"]').count() === 1,
       JSON.stringify(grade && { status: grade.status, json: grade.json }).slice(0, 300));
+    const ledger = online.ledger(sid);
+    await check('no duplicate attempts on the server: one completion for the question, two graded submissions',
+      ledger.thisDone === 1 && ledger.completions === 1 && allGrades.filter(c => c.status === 200).length === 2,
+      `${JSON.stringify(ledger)}; ${allGrades.length} grade requests`);
     await check('no outbound request was refused: nothing tried to reach a real provider', reader.refused.length === 0, JSON.stringify(reader.refused));
+
+    // ── History, then a reload ───────────────────────────────────────────────
+    await page.goto(`${base}/history`, { waitUntil: 'domcontentloaded' });
+    const before = await historyRows(page, qid);
+    await check('History holds exactly one resolved attempt, for this question, marked correct',
+      before.all === 1 && before.mine === 1 && before.verdicts.join() === 'Correct', JSON.stringify(before));
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    const after = await historyRows(page, qid);
+    const ledgerAfter = online.ledger(sid);
+    await check('after a reload History still shows that one attempt, and the server still holds the one completion',
+      after.all === 1 && after.mine === 1 && after.verdicts.join() === 'Correct' && after.texts.join('|') === before.texts.join('|') &&
+        ledgerAfter.completions === 1 && ledgerAfter.thisDone === 1 && (await grades()).length === allGrades.length,
+      `before ${JSON.stringify(before)} after ${JSON.stringify(after)} ${JSON.stringify(ledgerAfter)}`);
   }
 };
 
@@ -370,7 +638,67 @@ export const sessionEndedSubmitFlow = {
   }
 };
 
-export const flows = [sessionEndedWriteFlow, sessionEndedPhotoFlow, sessionEndedSubmitFlow];
+// ── Typed work survives a reload ─────────────────────────────────────────────
+export const typedReloadFlow = {
+  id: 'type-reload',
+  online: true,
+  name: 'Type · typed answer and working survive a reload, then the same question is server-marked',
+
+  async run({ page, base, check, goto, createProfile, mathText, settle, online }) {
+    const WORKING = '2 + 2 = 4\n3 + 3 = 6';
+    await goto('/');
+    await createProfile({ name: 'Type Reload', course: 'in', year: 12 });
+    await online.signIn({ name: 'Type Reload' });
+    await page.goto(`${base}/practice?subtopic=c12-integrals`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
+    const answerBox = page.locator('.editor-body input.answer-input');
+    const workingBox = page.locator('.editor-body textarea');
+    let right = null;
+    for (let skips = 0; skips <= MAX_SKIPS && !right; skips++) {
+      const typeTab = page.getByRole('button', { name: 'Answer by typing' });
+      if (await typeTab.count()) { await typeTab.click(); await settle(); }
+      if (await answerBox.count() === 1 && await page.locator('.editor-body .btn-disclose').count() === 1) {
+        const known = await online.answerOf();
+        if (known.kind === 'text' && known.text) { right = known; break; }
+      }
+      const leaving = await shownId(page);
+      await page.locator('.ctx-next').click();
+      await page.waitForFunction(id => document.querySelector('.qpage[data-question-id]')?.getAttribute('data-question-id') !== id, leaving, { timeout: 30000 });
+      await settle();
+    }
+    if (!await check('signed in, a server-issued question takes a typed answer and typed working', !!right)) return;
+    const qid = await shownId(page);
+    const prompt = await mathText('.q-prompt');
+    await answerBox.fill(SURELY_WRONG);
+    await page.locator('.editor-body .btn-disclose').click();
+    await workingBox.fill(WORKING);
+    await page.waitForFunction(() => /saved on this device/i.test(document.querySelector('.ws-actions .status-line')?.innerText || ''), null, { timeout: 10000 }).catch(() => {});
+    await check('the typed answer and working are said saved on this device, with a draft behind the claim',
+      /saved on this device/i.test(await visibleText(page, '.ws-actions .status-line')) &&
+        await page.evaluate(id => Object.keys(localStorage).some(k => k.endsWith(`.question.${id}`)), qid),
+      await visibleText(page, '.ws-actions .status-line'));
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
+    if (await page.getByRole('button', { name: 'Answer by typing' }).count() && !await answerBox.count()) await page.getByRole('button', { name: 'Answer by typing' }).click();
+    await answerBox.waitFor({ timeout: 15000 }).catch(() => {});
+    if (await answerBox.count() && !await workingBox.count()) await page.locator('.editor-body .btn-disclose').click().catch(() => {});
+    await check('after a reload: the same question, the typed answer and the typed working are all back',
+      await shownId(page) === qid && await mathText('.q-prompt') === prompt &&
+        await answerBox.inputValue().catch(() => null) === SURELY_WRONG && await workingBox.inputValue().catch(() => null) === WORKING,
+      JSON.stringify({ id: await shownId(page), answer: await answerBox.inputValue().catch(() => null), working: await workingBox.inputValue().catch(() => null) }));
+    await answerBox.fill(right.text);
+    await pressSubmit(page);
+    await page.waitForSelector('.eval-card', { timeout: 30000 }).catch(() => {});
+    const grade = (await online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/submit$`))).at(-1);
+    await check('then it is marked by the server once, as typed, with the restored working attached',
+      grade?.status === 200 && grade.json?.authoritative === true && grade.json.correct === true && grade.body?.mode === 'typed' &&
+        grade.body?.steps === WORKING && online.ledger(right.serverQuestionId).thisDone === 1,
+      JSON.stringify(grade && { status: grade.status, body: { mode: grade.body?.mode, steps: grade.body?.steps }, json: grade.json }).slice(0, 300));
+  }
+};
+
+export const flows = [saveTruthFlow, sessionEndedWriteFlow, sessionEndedPhotoFlow, sessionEndedSubmitFlow, typedReloadFlow];
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const { runFlows } = await import('./e2e.mjs');

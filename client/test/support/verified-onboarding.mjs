@@ -224,10 +224,14 @@ async function createTeacherProfile(page, platform, { name, year, email, languag
   // The device profile exists; the gate asks for its account before anything opens.
   const gate = page.locator('[data-testid="account-activation-gate"]');
   await gate.waitFor({ timeout: 30000 });
-  await gate.locator('[data-activation-status="signin"], [data-testid="activation-signin"]').first().waitFor({ timeout: 30000 }).catch(() => {});
+  await gate.locator('[data-activation-status="signin"], [data-testid="activation-signin"]').first().waitFor({ timeout: 30000 }).catch(err => {
+    throw new Error(`the activation gate did not ask the teacher profile to sign in: ${err.message.split('\n')[0]}`);
+  });
   await signInOnCard(gate.locator('[data-signin-card="inline"]'), platform, { email: address, age: 18 });
   await page.locator('.shell').waitFor({ timeout: 60000 });
-  await page.waitForURL(/\/teach(?:[#?].*)?$/, { timeout: 30000 }).catch(() => {});
+  await page.waitForURL(/\/teach(?:[#?].*)?$/, { timeout: 30000 }).catch(() => {
+    throw new Error(`the teacher profile did not land on /teach after the gate (it is at ${page.url()})`);
+  });
   if (typeof note === 'function') note(`teacher "${name}": a device teacher profile linked to the verified account ${address} (the server knows no teacher role for it)`);
   const row = platform.h.db.prepare('SELECT id FROM accounts WHERE email=?').get(address);
   return { email: address, accountId: row ? String(row.id) : null, year, name, pending: false };
