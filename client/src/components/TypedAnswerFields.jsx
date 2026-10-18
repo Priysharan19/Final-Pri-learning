@@ -40,7 +40,7 @@ export default function TypedAnswerFields({
         ? <div className="sc-label" style={{ display: 'block' }} data-final-answer-label>{t('verdict.finalAnswer')}</div>
         : <label className="sc-label" style={{ display: 'block' }} htmlFor={answerId} data-final-answer-label>{t('verdict.finalAnswer')}</label>}
       <div className="answer-row">
-        {question.answerPrefix && <span className="answer-prefix"><MathText text={question.answerPrefix} /></span>}
+        {question.answerPrefix && <span className="answer-prefix" lang="en"><MathText text={question.answerPrefix} /></span>}
         <input
           id={answerId} ref={inputRef} className="answer-input" data-final-answer
           aria-label={question.answerSuffix ? t('verdict.answerAriaWithUnit', { unit: question.answerSuffix }) : t('verdict.answerAria')}
@@ -56,7 +56,7 @@ export default function TypedAnswerFields({
           // its Enter key as the submit action.
           inputMode="text" enterKeyHint="go"
         />
-        {question.answerSuffix && <span className="answer-suffix">{question.answerSuffix}</span>}
+        {question.answerSuffix && <span className="answer-suffix" lang="en">{question.answerSuffix}</span>}
       </div>
       {previewTex && !resolved && (
         <div className="typed-preview" data-typed-preview>{t('verdict.readsAs')}&nbsp; <MathText text={`$${previewTex}$`} /></div>
