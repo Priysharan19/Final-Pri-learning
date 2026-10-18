@@ -125,7 +125,11 @@ check('tablet touch controls reach at least 44px',
   /pointer:\s*coarse[\s\S]*\.mode-tab[\s\S]*min-height:\s*44px/s.test(theme));
 check('thinking mode removes the navigation furniture', /\.shell\.is-focus \.sidebar/.test(theme) && /is-focus/.test(app));
 check('landscape tablets get the split workspace', /orientation:\s*landscape\)\s*\{[\s\S]*?\.qpage\.ws-split\s*\{\s*grid-template-columns:\s*minmax\(330px,\s*38fr\)\s*minmax\(0,\s*62fr\)/.test(theme));
-check('phone recomposes the action bar to the bottom safe area', /max-width:\s*760px[\s\S]*\.ws-actions\s*\{\s*position:\s*fixed[^}]*env\(safe-area-inset-bottom\)/.test(theme));
+// The phone action bar stays in the page's flow (sticky), so it is its own
+// spacer and never covers the last field; it pads itself into the home
+// indicator through the inset token, which is env(safe-area-inset-bottom).
+check('phone recomposes the action bar to the bottom safe area', /max-width:\s*760px[\s\S]*\.ws-actions\s*\{\s*position:\s*sticky;\s*bottom:\s*0[^}]*var\(--pri-inset-bottom\)/.test(theme)
+  && /--pri-inset-bottom:\s*env\(safe-area-inset-bottom/.test(theme));
 check('phone layout has an explicit breakpoint', /@media\s*\(max-width:\s*760px\)/.test(theme));
 check('single-column questions keep a readable measure', /\.ws-single \.ws-context, \.ws-single \.ws-work \{ width: min\(820px, 100%\)/.test(theme) && /--measure:\s*68ch/.test(theme));
 check('Pri Explain uses the same surface system', /\.pri-explain-dialog[\s\S]*background:\s*var\(--surface\)/s.test(theme));

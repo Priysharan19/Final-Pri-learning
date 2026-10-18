@@ -468,6 +468,11 @@ jobs:
           # engine behind every Apple web view).
           node client/test/tour-responsive-matrix.js --no-build 2>&1 | tee -a browser.log
           node client/test/tour-responsive-matrix.js --no-build --browser=webkit 2>&1 | tee -a browser.log
+          # iPhone portrait (393 × 852): safe areas, the sticky action bar as
+          # its own spacer, the full-width mode switch, Write and Photo space,
+          # and iPad/desktop composition unchanged. Both engines.
+          node client/test/tour-iphone-layout.js --no-build 2>&1 | tee -a browser.log
+          node client/test/tour-iphone-layout.js --no-build --browser=webkit 2>&1 | tee -a browser.log
           # The owner's photographed page (scripted reader): transcript, unrelated lines,
           # corrected line, proposed answer, durable draft; and the usage-limit state.
           node client/test/tour-photo-answer.js --no-build 2>&1 | tee -a browser.log
@@ -491,6 +496,8 @@ jobs:
           grep -Fq 'India exam · the clock runs out and the paper submits itself' browser.log
           grep -Fq 'Placement · onboarding → diagnostic → evidence map' browser.log
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
+          grep -Fq 'iPhone portrait · safe areas, sticky bar, mode switch, write and photo space' browser.log
+          test "$(grep -Ec 'E2E SUITE PASSED.*62/62.*1 flows' browser.log)" -ge 2
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
           grep -Eq 'E2E SUITE.*37/37.*1 flows' browser.log
