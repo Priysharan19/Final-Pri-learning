@@ -36,8 +36,10 @@ const throwsCode = (fn, code, label) => {
 };
 
 const SECRET = 'Sup3rS3cretDbPassw0rd';
-const DB_HOST = 'aws-0-ap-south-1.pooler.supabase.com';
-const BASE = `postgresql://pri_app.orudxrckgxyyraopyzmn:${SECRET}@${DB_HOST}:5432/postgres`;
+const BASE = `postgresql://pri_app.orudxrckgxyyraopyzmn:${SECRET}@aws-0-ap-south-1.pooler.supabase.com:5432/postgres`;
+// Parsed, not a literal: the leak assertions below check the host is ABSENT
+// from error messages, which is not a URL sanitisation check.
+const DB_HOST = new URL(BASE).hostname;
 const prod = (extra = {}) => ({ NODE_ENV: 'production', ...extra });
 const dev = (extra = {}) => ({ NODE_ENV: 'development', ...extra });
 const CA = '-----BEGIN CERTIFICATE-----\nMIIBszCCAVmgAwIBAgIUTEST\n-----END CERTIFICATE-----';
