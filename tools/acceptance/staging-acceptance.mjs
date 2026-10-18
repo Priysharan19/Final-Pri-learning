@@ -370,7 +370,7 @@ export async function runAcceptance(args, deps = {}) {
         const consent = verified.data?.guardianConsent;
         if (consent?.required && consent.state !== 'given') note(a, `this account needs guardian consent (${consent.state}); C and D will be gated until it is given`);
         A.sessionId = await sessionIdOf(A.jar);
-        report.accounts.push({ role: 'A', email: maskEmail(A.email), accountId: A.accountId, created: A.created, ageBasis: 'adult' });
+        report.accounts.push({ role: 'A', email: maskEmail(A.email), accountId: A.accountId, created: A.created, ageBasis: consent?.required ? 'child' : 'adult' });
         note(a, `account ${A.accountId} ${A.created ? 'CREATED by this run' : 'already existed (signed in; it will NOT be deleted)'}`);
       }
     }
