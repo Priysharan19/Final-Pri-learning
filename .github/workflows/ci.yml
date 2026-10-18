@@ -94,6 +94,7 @@ jobs:
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
           grep -Fq 'TUTOR UI: PASS — 71/71 checks' suites.log
+          grep -Fq 'ERROR REPORTS: PASS — 36/36 checks' suites.log
           grep -Fq 'APPLE SIGN IN: PASS — 66/66 checks' suites.log
           grep -Fq 'ONBOARDING SCOPE: PASS — 40/40 checks' suites.log
           grep -Fq 'STUDY PLAN: PASS — 211/211 checks' suites.log
@@ -325,8 +326,12 @@ jobs:
           set -o pipefail
           node server/test/observability-check.mjs 2>&1 | tee ops.log
           node server/test/failure-drills-check.mjs 2>&1 | tee -a ops.log
+          node server/test/error-telemetry-check.mjs 2>&1 | tee -a ops.log
+          node server/test/static-caching-check.mjs 2>&1 | tee -a ops.log
           grep -Fq 'OBSERVABILITY: PASS' ops.log
           grep -Fq 'FAILURE DRILLS: PASS' ops.log
+          grep -Fq 'ERROR TELEMETRY: PASS — 73/73 checks' ops.log
+          grep -Fq 'STATIC CACHING: PASS — 55/55 checks' ops.log
       # V1 blocker #14: every /v1 route is in the reviewed inventory with the
       # guards really mounted on it; every object-level route fails closed for
       # no session, revoked sessions, wrong account, wrong role, unverified
