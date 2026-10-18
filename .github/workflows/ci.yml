@@ -259,6 +259,7 @@ jobs:
           node server/test/tutor-device-journey-check.mjs
           node server/test/tutor-issued-grounding-check.mjs
           node server/test/tutor-stream-check.mjs
+          node server/test/tutor-guard-complexity-check.mjs
           node server/test/spend-ceiling-check.mjs
           # One paid read per unchanged picture: refresh, double click, two tabs,
           # transcript-then-Submit; never shared across accounts.
