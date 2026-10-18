@@ -63,9 +63,12 @@ ok(server.size >= 13, `server policy parsed into ${server.size} directives`);
 ok(server.get('script-src')?.join(' ') === "'self'", "server script-src is exactly 'self'");
 ok(server.get('object-src')?.join(' ') === "'none'", "server object-src is exactly 'none'");
 ok(server.get('frame-ancestors')?.join(' ') === "'none'", "server frame-ancestors is exactly 'none'");
-// #260: no nested browsing context, so no same-origin child frame can reach the
-// parent's bridge handlers (parent.webkit.messageHandlers.*) and be credited to
-// the main frame by the shells' sender gate.
+// #260: no URL-loaded nested browsing context. This directive is defence in
+// depth: it does NOT stop a same-origin srcdoc child from reaching the parent's
+// bridge handlers (parent.webkit.messageHandlers.*) on WebKit, and such a call
+// is credited to the main frame by the shells' sender gate — threat-model T19,
+// measured by BridgeSelfCheck.swift. What holds is that the child inherits the
+// shell CSP (no inline script) and the client never creates child frames.
 ok(server.get('frame-src')?.join(' ') === "'none'", "server frame-src is exactly 'none'");
 
 function notWeakerThanServer(label, directives) {

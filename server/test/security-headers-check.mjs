@@ -49,8 +49,9 @@ function expectHardened(headers, label, { hsts = true } = {}) {
   c.ok(csp, `${label}: Content-Security-Policy present`);
   const d = directives(csp);
   c.deq(d['frame-ancestors'], ["'none'"], `${label}: frame-ancestors 'none'`);
-  // #260: no nested browsing context, so no same-origin child frame can reach
-  // the parent's native bridge handlers through parent.webkit.*.
+  // #260: no URL-loaded nested browsing context. Defence in depth, not the
+  // mitigation for a child reaching parent.webkit.*: threat-model T19 records
+  // that WebKit does not apply it to a srcdoc child (BridgeSelfCheck.swift).
   c.deq(d['frame-src'], ["'none'"], `${label}: frame-src 'none'`);
   c.eq(headers.get('x-content-type-options'), 'nosniff', `${label}: nosniff`);
   c.eq(headers.get('referrer-policy'), 'no-referrer', `${label}: Referrer-Policy`);

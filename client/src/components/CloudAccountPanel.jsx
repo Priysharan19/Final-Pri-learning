@@ -139,7 +139,10 @@ export default function CloudAccountPanel() {
       setSession(verified);
       // A deletion this device asked for earlier has now been confirmed and the
       // link forgotten (#521): show "not connected", not "sign-in required".
-      if (verified.reason === 'deleted') setLink(await cloudAccountLink(user.id));
+      if (verified.reason === 'deleted') {
+        setLink(await cloudAccountLink(user.id));
+        setMessage(tLater('cloud.deletedUnconfirmed'));
+      }
       if (verified.connected) {
         const nextEntitlement = await refreshCloudEntitlement(user.id).catch(() => null);
         if (nextEntitlement) setLink(await cloudAccountLink(user.id));
@@ -589,14 +592,16 @@ export default function CloudAccountPanel() {
     finally { setBusy(''); }
   }
 
-  async function securityDisconnected({ cloudDeleted = false } = {}) {
+  async function securityDisconnected({ cloudDeleted = false, confirmedBy = null } = {}) {
     setLink(null);
     setStatus(null);
     setSession(null);
     setAppleBootstrap(null);
     setAppleProducts([]);
+    // A deletion the server never answered is inferred from the dead session
+    // (cloudAccount.js, confirmedBy 'probe'): say so, not "deleted".
     setMessage(cloudDeleted
-      ? tLater('cloud.deletedOffline')
+      ? tLater(confirmedBy === 'probe' ? 'cloud.deletedUnconfirmed' : 'cloud.deletedOffline')
       : tLater('cloud.sessionEnded'));
   }
 

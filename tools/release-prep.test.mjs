@@ -21,7 +21,7 @@ import {
   CASES, DEFAULT_LEDGER, FAMILIES, JOURNEY, casesMarkdown, problemsWith, readLedger, recordResult, reportMarkdown, summarise, validateLedger
 } from '../scripts/device-matrix-record.mjs';
 import {
-  EVIDENCE, STATUS, TARGETS, deriveAddresses, exitCodeFor, expectedFromPrompt, exportedForeignRows, makeHttp, maskEmail, parseArgs as parseAcceptanceArgs, plusAddress, runAcceptance
+  EVIDENCE, EXPORT_FRESH_MS, STATUS, TARGETS, deriveAddresses, exitCodeFor, expectedFromPrompt, exportedForeignRows, makeHttp, maskEmail, parseArgs as parseAcceptanceArgs, plusAddress, runAcceptance
 } from './acceptance/staging-acceptance.mjs';
 import { PNG_SIGNATURE, crc32, encodeGreyPng, pngDimensions, simulatedInkPng, simulatedPhotoPng, toDataUrl } from './acceptance/synthetic-png.mjs';
 
@@ -247,8 +247,12 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   function fakeHost({ sha = SHA, schemaVersion = SCHEMA_VERSION, skipOwnership = false, leakExport = false } = {}) {
     const state = {
       accounts: new Map(), sessions: new Map(), challenges: new Map(), mailbox: [], questions: new Map(), receipts: new Map(),
-      grades: new Map(), reads: new Set(), log: [], transcribeBodies: [], originMisses: 0, csrfMisses: 0, codeSeq: 0
+      grades: new Map(), reads: new Set(), log: [], transcribeBodies: [], originMisses: 0, csrfMisses: 0, codeSeq: 0,
+      // One clock for the host and the runner (passed as its `now`), so a test
+      // can age student A's session past the export's fresh-proof window.
+      clockOffsetMs: 0
     };
+    state.now = () => Date.now() + state.clockOffsetMs;
     const NOTICE = 'v3';
     const PROMPT = 'An AP has first term $16$ and common difference $-6$, which term is equal to $-122$? Give the term number.';
     const EXPECTED_N = 24;
@@ -279,7 +283,7 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       entry.accountId = account?.id || null;
       const issueSession = (acct, deviceId) => {
         const token = randomUUID().replace(/-/g, '');
-        state.sessions.set(token, { id: `sess-${token.slice(0, 8)}`, accountId: acct.id, deviceId });
+        state.sessions.set(token, { id: `sess-${token.slice(0, 8)}`, accountId: acct.id, deviceId, createdAt: state.now() });
         headers['set-cookie'] = [`pri_cloud_session=${token}; Path=/; HttpOnly`, `pri_csrf=csrf-${token}; Path=/`];
         return token;
       };
@@ -367,6 +371,10 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         return send(200, { revoked: !!entry, current: id === session.id });
       }
       if (method === 'GET' && path === '/v1/account/export') {
+        // The real gate (accounts.js requireRecentAuth): the credential proven
+        // inside EXPORT_FRESH_MS, else 401 REAUTH_REQUIRED naming the proofs a
+        // code-only account can offer. Nothing of the export leaks on refusal.
+        if (state.now() - session.createdAt > EXPORT_FRESH_MS) { headers['cache-control'] = 'no-store'; return send(401, { error: { code: 'REAUTH_REQUIRED', message: 'Confirm it is you before continuing.', proofs: ['otp'], freshMs: EXPORT_FRESH_MS } }); }
         // The real shape (server/platform/accounts.js): rows keyed by SQL column names.
         const own = account.events.map(ev => ({ id: ev.id, device_id: 'd', device_seq: ev.serverCursor, kind: ev.kind, entity_id: ev.entityId, occurred_at: 't', payload_json: '{}', created_at: 't' }));
         const leaked = leakExport ? [...state.accounts.values()].filter(a => a.id !== account.id).flatMap(a => a.events.map(ev => ({ id: ev.id, device_id: 'd', device_seq: ev.serverCursor, kind: ev.kind, entity_id: ev.entityId, occurred_at: 't', payload_json: '{}', created_at: 't' }))) : [];
@@ -463,7 +471,7 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const outDir = mkdtempSync(join(tmpdir(), 'pri-accept-test-'));
     const lines = [];
     try {
-      const report = await runAcceptance(baseArgs(origin), { prompt: humanFor(state), log: line => lines.push(line), pictures: fakePictures, outDir });
+      const report = await runAcceptance(baseArgs(origin), { prompt: humanFor(state), log: line => lines.push(line), pictures: fakePictures, outDir, now: state.now });
       const status = Object.fromEntries(report.steps.map(s => [s.id, s.status]));
       const failures = report.steps.flatMap(s => s.checks.filter(c => !c.ok).map(c => `${s.id}: ${c.label} (${c.detail || ''})`));
       ok(status['0'] === STATUS.PASS && status.A === STATUS.PASS && status.B === STATUS.PASS && status.C === STATUS.PASS && status.D === STATUS.PASS && status.E === STATUS.PASS,
@@ -498,6 +506,7 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const ownership = e.checks.filter(ch => /refused by ownership \(404 QUESTION_NOT_FOUND\)/.test(ch.label));
       ok(ownership.length === 4 && ownership.every(ch => ch.ok && /status 404 QUESTION_NOT_FOUND/.test(ch.detail)), 'E: all four cross-account question probes (submit, recognize, reveal, repeat) reached the ownership check (404 QUESTION_NOT_FOUND), not EMAIL_UNVERIFIED');
       ok(e.checks.some(ch => /pri-account-export-v1 shape/.test(ch.label) && ch.ok) && e.checks.some(ch => /export holds none of student A/.test(ch.label) && ch.ok && /^1 event\(s\)/.test(ch.detail) === false), 'E: the export probe read learningEvents[] of the real shape');
+      ok(e.checks.some(ch => /inside the fresh-proof window, is student A's/.test(ch.label) && ch.ok && /status 200/.test(ch.detail)), 'E: a quick run (A signed in moments ago) reads A\'s own export');
       ok(!e.pending, 'E: no probe was left NOT VERIFIED on a verified isolation account');
       const isoId = report.accounts.find(a => a.role === 'B2 (isolation)').accountId;
       const practiceByIso = state.log.filter(r => /^\/v1\/practice\//.test(r.path) && r.accountId === isoId);
@@ -596,6 +605,34 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const failed = e.checks.filter(ch => !ch.ok);
       ok(failed.length === 1 && /export holds none of student A/.test(failed[0].label) && /2 of A's/.test(failed[0].detail), `exactly the export-row probe failed and it counted A's rows (${failed[0]?.detail})`);
       eq(exitCodeFor(report), 1, 'exit 1 on a leaking export');
+    } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
+  }
+
+  // ── 3d″′ · a slow run: A's session is older than the export's fresh-proof window ──
+  // Three human mailbox reads sit between A's sign-in and E's export, so on
+  // staging A's session is usually past EXPORT_FRESH_MS by then. The contract
+  // the branch of #521 made (requireRecentAuth) is that the cookie alone is
+  // then refused 401 REAUTH_REQUIRED naming otp — E PASSES on that refusal and
+  // does not report a false FAIL for the old "A exports 200" expectation.
+  {
+    const { server, state, origin } = await fakeHost();
+    const outDir = mkdtempSync(join(tmpdir(), 'pri-accept-test-'));
+    const readCodes = humanFor(state);
+    // The scripted human takes eleven minutes to find B2's code (the third read).
+    const slowHuman = async () => { const item = state.mailbox.find(m => !m.read); if (item && /pri-iso/.test(item.to)) state.clockOffsetMs += EXPORT_FRESH_MS + 60_000; return readCodes(); };
+    try {
+      const report = await runAcceptance(baseArgs(origin), { prompt: slowHuman, log: () => {}, pictures: fakePictures, outDir, now: state.now });
+      const e = report.steps.find(s => s.id === 'E');
+      const failures = e.checks.filter(ch => !ch.ok).map(ch => `${ch.label} (${ch.detail})`);
+      eq(e.status, STATUS.PASS, `E PASSES when A's session has aged past the window (failures: ${failures.join(' | ') || 'none'})`);
+      ok(state.clockOffsetMs > EXPORT_FRESH_MS, 'the clock really was advanced past the window before E\'s export');
+      const refused = e.checks.find(ch => /older session is refused the export/.test(ch.label));
+      ok(refused?.ok && /status 401 REAUTH_REQUIRED/.test(refused.detail) && /"otp"/.test(refused.detail), `E: A's stale cookie was refused 401 REAUTH_REQUIRED naming otp (${refused?.detail})`);
+      ok(!e.checks.some(ch => /inside the fresh-proof window/.test(ch.label)), 'E: the quick-run expectation (A exports 200) was not applied to a stale session');
+      ok(e.checks.some(ch => /pri-account-export-v1 shape/.test(ch.label) && ch.ok), 'E: the shape probe still ran on B2, whose sign-in is fresh');
+      const exportsByA = state.log.filter(r => r.path === '/v1/account/export' && r.accountId === report.accounts.find(a => a.role === 'A')?.accountId);
+      ok(exportsByA.length === 1 && exportsByA[0].status === 401, `the fake host saw exactly one export call from A and refused it (${JSON.stringify(exportsByA)})`);
+      eq(exitCodeFor(report), 0, 'exit 0: a refusal the contract requires is not a failure');
     } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
   }
 
@@ -787,6 +824,10 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const accountsSrc = read('server/platform/accounts.js');
   ok(/format:\s*'pri-account-export-v1'/.test(accountsSrc) && /learningEvents:\s*events/.test(accountsSrc) && /\bentities\b/.test(accountsSrc) && !/^\s*events,\s*$/m.test(accountsSrc.split("router.get('/export'")[1] || ''), 'GET /v1/account/export answers { format: pri-account-export-v1, learningEvents, entities } — the keys step E reads');
   ok(/SELECT id,device_id,device_seq,kind,entity_id,/.test(accountsSrc), 'export learningEvents rows carry entity_id (the column step E filters on)');
+  ok(/requireSession\(db\), requireRecentAuth\(db\)/.test(accountsSrc.split("router.get('/export'")[1] || ''), 'GET /v1/account/export is behind requireRecentAuth — the fresh-proof contract step E holds A\'s export to');
+  const securitySrc = read('server/platform/security.js');
+  const serverWindow = securitySrc.match(/export const REAUTH_FRESH_MS = ([^;]+);/)?.[1];
+  eq(serverWindow && Function(`return (${serverWindow})`)(), EXPORT_FRESH_MS, `the runner's EXPORT_FRESH_MS equals the server's REAUTH_FRESH_MS (${serverWindow})`);
   const practiceSrc = read('server/platform/practice.js');
   ok(/router\.use\(requireSession\(db\), requireVerifiedEmail, requireRole\('student'\)\)/.test(practiceSrc), 'the practice router refuses unverified accounts before any ownership lookup (why step E signs B2 up by code)');
   ok(/404, 'QUESTION_NOT_FOUND', 'This question does not belong to this account\.'/.test(practiceSrc), 'the ownership refusal is 404 QUESTION_NOT_FOUND — what step E asserts');

@@ -74,8 +74,10 @@ object AssetOrigin {
         "object-src 'none'",
         "base-uri 'self'",
         "form-action 'self'",
-        // No nested browsing context at all (#260): a same-origin child frame
-        // could otherwise reach the parent's bridge object through `parent`.
+        // No URL-loaded nested browsing context (#260). Defence in depth only:
+        // threat-model T19 records that a srcdoc child is not refused by this
+        // directive on WebKit; what holds is that the child inherits this CSP
+        // (no inline script) and the client never creates child frames.
         "frame-src 'none'",
         "frame-ancestors 'none'"
     )
