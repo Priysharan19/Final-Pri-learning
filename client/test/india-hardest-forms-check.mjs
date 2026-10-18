@@ -156,7 +156,7 @@ const TEX_VALUE = {
   '\\sqrt{3}': Math.sqrt(3), '-\\sqrt{3}': -Math.sqrt(3), '\\dfrac{1}{\\sqrt{3}}': 1 / Math.sqrt(3), '-\\dfrac{1}{\\sqrt{3}}': -1 / Math.sqrt(3)
 };
 
-const SOLVE = {
+const SOLVE_T1 = {
   'c10-polynomial-zeroes-reasoning'(q) {
     const tex = q.prompt.match(/p\(x\) = ([^$]+)\$/)?.[1];
     const P = tex && parsePoly(tex);
@@ -694,10 +694,21 @@ const SOLVE = {
   }
 };
 
+// Tranche 3 (Classes VII, VIII and XI): one solver module per bank, each
+// written apart from the generator it checks. NEAR_MISS lists, per form,
+// answers a student could plausibly write that must be marked WRONG.
+const TRANCHE3 = await Promise.all(['class7', 'class7-part2', 'class8', 'class11']
+  .map(name => import(`./support/india-hardest-${name}-solvers.mjs`)));
+const SOLVE = Object.assign({}, SOLVE_T1, ...TRANCHE3.map(m => m.SOLVE));
+const NEAR_MISS = Object.assign({}, ...TRANCHE3.map(m => m.NEAR_MISS || {}));
+/** The bank each class's hardest forms live in. */
+const BANK_FOR_GRADE = { 7: 'india-class7-hardest', 8: 'india-class8-hardest', 10: 'india-class10', 11: 'india-class11-hardest', 12: 'india-class12' };
+const TRANCHE1_GRADES = new Set([10, 12]);
+
 // ── 1 · The coverage table is honest ────────────────────────────────────────
 const entries = Object.entries(INDIA_HARDEST_COVERS).flatMap(([chapterId, covers]) => covers.map(c => ({ chapterId, ...c })));
 const ids = entries.map(e => e.gen);
-ok('the table names twenty-two dot points', entries.length === 22, String(entries.length));
+ok('the table names 103 dot points (22 in tranche 1, 81 in tranche 3)', entries.length === 103, String(entries.length));
 ok('one generator per dot point, none reused', new Set(ids).size === ids.length);
 ok('every generator in the table has an independent solver here', ids.every(id => SOLVE[id]), ids.filter(id => !SOLVE[id]).join(', '));
 ok('provenance states the forms are original and awaiting human review',
@@ -708,10 +719,10 @@ for (const e of entries) {
   const where = `${e.chapterId}#${e.dp.join('+')}`;
   if (!ok(`${where} is a live chapter`, !!chapter)) continue;
   const grade = indiaChapterGrade(chapter);
-  ok(`${where} is a Class 10 or Class 12 chapter`, grade === 10 || grade === 12, String(grade));
+  ok(`${where} is a Class 7, 8, 10, 11 or 12 chapter`, Object.hasOwn(BANK_FOR_GRADE, grade), String(grade));
   ok(`${e.gen} is named by the India convention`, OWN_GENERATOR.test(e.gen));
   ok(`${e.gen} is registered`, typeof GENERATORS[e.gen] === 'function');
-  ok(`${e.gen} resolves to its class bank`, bankOf(e.gen) === (grade === 10 ? 'india-class10' : 'india-class12'), String(bankOf(e.gen)));
+  ok(`${e.gen} resolves to its class bank`, bankOf(e.gen) === BANK_FOR_GRADE[grade], String(bankOf(e.gen)));
   ok(`${where} names exactly one dot point at exactly D3`, e.dp.length === 1 && JSON.stringify(e.diff) === '[3]', JSON.stringify(e));
   const { ceiling } = indiaDifficultyWindow('cbse', grade);
   ok(`${where}: D3 is the CBSE track's hardest level`, ceiling === 3);
@@ -742,8 +753,12 @@ const answerTokens = q => {
   return out;
 };
 const stats = {};
-let decimalsAccepted = 0;
-for (const id of ids) {
+let decimalsAccepted = 0, nearMissesRejected = 0;
+const gradeOf = Object.fromEntries(entries.map(e => [e.gen, indiaChapterGrade(IN_CHAPTER_BY_ID[e.chapterId])]));
+const verdictOf = (q, text) => { try { return checkAnswer(q, text); } catch (err) { return { correct: false, feedback: err.message }; } };
+const ONLY = process.env.HARDEST_ONLY;
+for (const id of ids.filter(id => !ONLY || id.startsWith(ONLY))) {
+  const tranche3 = !TRANCHE1_GRADES.has(gradeOf[id]);
   const prompts = new Set();
   let verified = 0, inspected = 0;
   for (let i = 0; i < DRAWS; i++) {
@@ -785,20 +800,45 @@ for (const id of ids) {
       }
     }
     // Numbers the student is given are whole, or decimals of at most two places.
-    const decimals = (q.prompt.match(/\d+\.\d+/g) || []).filter(x => x.split('.')[1].length > 2);
-    ok(`${id} seed ${seed}: given data is to at most two decimal places`, decimals.length === 0, decimals.join(', '));
-    if (q.answerType === 'numeric') ok(`${id} seed ${seed}: keyed numeric answer is whole or an exact fraction`, Number.isInteger(q.answer.value) || !!q.answer.simplestFraction, JSON.stringify(q.answer));
+    // (Class VII and VIII place value goes to thousandths, so three places there.)
+    const maxPlaces = tranche3 && gradeOf[id] <= 8 ? 3 : 2;
+    const decimals = (q.prompt.match(/\d+\.\d+/g) || []).filter(x => x.split('.')[1].length > maxPlaces);
+    ok(`${id} seed ${seed}: given data is to at most ${maxPlaces} decimal places`, decimals.length === 0, decimals.join(', '));
+    if (q.answerType === 'numeric') {
+      const a = q.answer;
+      // A tranche-3 decimal key is a terminating decimal held to an exact band
+      // (tol ≤ 1e-9), so a neighbouring decimal can never be accepted.
+      const exactDecimal = tranche3 && !Number.isInteger(a.value) && !a.simplestFraction && typeof a.tol === 'number' && a.tol <= 1e-9
+        && Number(a.value.toFixed(4)) === a.value;
+      ok(`${id} seed ${seed}: keyed numeric answer is whole, an exact fraction or an exactly-keyed decimal`, Number.isInteger(a.value) || !!a.simplestFraction || exactDecimal, JSON.stringify(a));
+      // Near misses: off by one, a place-value slip, and one unit in the last
+      // decimal place. Every one must be marked wrong; the key itself right.
+      if (tranche3) {
+        const v = a.value;
+        const places = Number.isInteger(v) ? 0 : String(v).split('.')[1].length;
+        const ulp = 10 ** -places;
+        const probes = [v + 1, v - 1, v * 10, v / 10, ...(places ? [v + ulp, v - ulp] : [])]
+          .map(x => Number(x.toFixed(10))).filter(x => x !== v);
+        for (const wrong of new Set(probes)) {
+          if (ok(`${id} seed ${seed}: near miss ${wrong} (key ${v}) is marked wrong`, !verdictOf(q, String(wrong)).correct)) nearMissesRejected++;
+        }
+        if (!a.simplestFraction) ok(`${id} seed ${seed}: the key ${v} itself is accepted`, verdictOf(q, String(v)).correct);
+      }
+    }
+    for (const wrong of NEAR_MISS[id]?.(q) || []) {
+      if (ok(`${id} seed ${seed}: form-specific near miss "${wrong}" is marked wrong`, !verdictOf(q, String(wrong)).correct)) nearMissesRejected++;
+    }
     ok(`${id} seed ${seed}: has hints and worked steps`, (q.hints || []).length >= 3 && (q.steps || []).length >= 3);
   }
   ok(`${id} varies with the seed`, prompts.size >= Math.min(40, DRAWS / 4), `${prompts.size} distinct prompts in ${DRAWS}`);
   stats[id] = { verified, inspected, distinct: prompts.size };
   if (process.env.HARDEST_STATS) console.log(`${id}: ${prompts.size} distinct prompts in ${DRAWS}`);
 }
-ok('terminating-decimal answers were exercised', decimalsAccepted >= DRAWS, String(decimalsAccepted));
+if (!ONLY) ok('terminating-decimal answers were exercised', decimalsAccepted >= DRAWS, String(decimalsAccepted));
 ok('the box-sheet table the optimisation form draws on is non-empty', BOX_SHEETS_FOR_CHECK.length >= 5, String(BOX_SHEETS_FOR_CHECK.length));
 
 const total = Object.values(stats).reduce((s, v) => s + v.verified, 0);
 console.log(failures.length
   ? `INDIA HARDEST FORMS: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.slice(0, 25).join('\n  · ')}`
-  : `INDIA HARDEST FORMS: PASS — ${pass}/${pass} checks — ${ids.length} D3 forms for ${entries.length} CBSE Class X/XII dot points, ${total} questions re-derived from their prompts by an independent route, ${decimalsAccepted} exact decimals of keyed fractions accepted.`);
+  : `INDIA HARDEST FORMS: PASS — ${pass}/${pass} checks — ${ids.length} D3 forms for ${entries.length} CBSE Class VII/VIII/X/XI/XII dot points, ${total} questions re-derived from their prompts by an independent route, ${decimalsAccepted} exact decimals of keyed fractions accepted, ${nearMissesRejected} near misses rejected.`);
 process.exit(failures.length ? 1 : 0);
