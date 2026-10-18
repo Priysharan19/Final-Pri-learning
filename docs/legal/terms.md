@@ -60,8 +60,9 @@ examination authority.
 ## Availability
 
 We try to keep the service running, but we do not promise it will always be
-available. The learning half works offline; the cloud half needs a network and
-may be interrupted for maintenance.
+available. Answers are checked online by our server, so checking needs an
+account and a network, and may be interrupted for maintenance. Work you do while
+offline is kept on your device until it can be checked.
 
 ## Liability
 

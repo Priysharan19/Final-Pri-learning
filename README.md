@@ -64,12 +64,17 @@ applied.
 
 **Teachers.** Classes, assignments targeted at a chapter, dot point and difficulty, class
 analytics without a fabricated predicted mark, and intervention flags with the reason spelled
-out. Both offline (AirDrop task packs) and cloud classrooms.
+out. Both offline (AirDrop task packs) and cloud classrooms. Teacher tools are not part of the
+public V1 product (`docs/release/PRI_V1_RELEASE_SCOPE.md`).
 
-**The cloud, when you want it.** 71 handlers under `/v1`: accounts with verified email, Google
+**The server, which marks every answer.** An account and a connection are required to have an
+answer checked: the server issues each question and its deterministic engine sets the mark
+(`docs/architecture/adr-0001-online-first-runtime.md`). 71 handlers under `/v1`: accounts with verified email, Google
 and Apple sign-in on the web (the native shells still use email), cross-device sync, Razorpay and Apple subscriptions with cancellation, classes
 and assignments, a content CMS with independent review, and an admin surface. It runs as one
-container against a persistent SQLite volume and fails closed without its configuration.
+container against a persistent SQLite volume and fails closed without its configuration. Production
+runs on Railway; on 2026-10-04 its database volume was in region `ams` (Amsterdam). The planned
+move is to Supabase Postgres in Mumbai (`ap-south-1`); until it happens, data is not stored in India.
 
 
 ## Quick start
@@ -81,11 +86,11 @@ npm start         # serves at http://localhost:4000
 ```
 
 Open **http://localhost:4000** — create a profile or hit **“Try the demo”** (`demoSeed.js` walks 46
-days, just over six weeks, and builds every attempt on-device with the same engine that sets and
-marks your questions). It runs in the browser against IndexedDB, so nothing in this repo can time it
+days, just over six weeks, and builds every attempt on-device with the same deterministic engine the
+server uses to mark questions; demo marks are not server marks). It runs in the browser against IndexedDB, so nothing in this repo can time it
 from the command line and no timing is quoted for it. On an iPad, open it in Safari and use
-**Share → Add to Home Screen**: it installs as a full-screen app and works completely offline from
-then on. All data lives in the device's IndexedDB, protected from eviction via the Persistent
+**Share → Add to Home Screen**: it installs as a full-screen app. Offline, it opens and keeps your
+work, but nothing is checked or marked until you are signed in and online. The device copy lives in IndexedDB, protected from eviction via the Persistent
 Storage API — and one tap exports a full backup file.
 
 > `npm start` runs `server/index.js`. It static-hosts `client/dist` and mounts the **`/v1` cloud
@@ -132,15 +137,15 @@ row is something the suites or the tools can speak to; the numbers are in
 | **Questions** | 258 of 258 Indian dot points have a generator; every question is built from a seed rather than drawn from a fixed pool. Classes 8, 9 and 10 are authored against their NCERT textbooks exercise by exercise; Class 7 follows the current Ganita Prakash. Four difficulty tiers, with per-track windows. |
 | **Marking** | Equivalence marking across seven answer types, plus the forms NCERT and JEE actually use: solution sets, inequality and interval notation interchangeably, matrices, vectors in ijk form, n!, nCr, nPr, sec, cosec, cot. |
 | **Working, not just answers** | Step Check finds the first line that stops being true; a diagnosis engine names which mistake was made and the rule it breaks, and abstains rather than guessing. Method marks for correct reasoning behind a wrong answer. |
-| **Handwriting** | On-device recognition of Pencil ink: digits, letters, Greek, operators, fractions, roots, powers, multi-line working, ∫, !, ≡, ∞. Recognised working feeds Step Check, and ✓/✗ annotations land on the student's own ink. With a cloud account, a rasterised image of the ink is also read on the server (OpenAI) unless the student turns that off; the device still decides the mark. |
+| **Handwriting** | Read online: a rasterised image of the ink (or a photo) is sent to Pri's server and read by OpenAI, answer-blind; the student can correct the reading, and the server's deterministic engine decides the mark. Turning reading off means typing answers. Recognised working feeds Step Check, and ✓/✗ annotations land on the student's own ink. |
 | **Video-style solutions** | The worked solution plays back as a narrated, step-by-step lesson with play, pause and speed, built deterministically from the verified solution — no model writes the maths. |
 | **Animated graphs** | Where a question states a function, the curve is drawn on screen with its roots, turning points, tangent or shaded area. The curve must be one the question or its solution states. |
 | **Exams** | CBSE Class 10 Standard and Basic and Class 12 at 80 marks, Sections A–E with internal choice; JEE Main at +4/−1/0; JEE Advanced Paper 1 with partial marking; IOQM's 30 integer answers. |
 | **Adaptation** | Elo mastery per chapter and dot point, FSRS-5 spaced review, misconception pressure, interleaving — and the reason this question came next, in words. |
 | **Progress** | Chapter mastery, priorities, activity and streaks in the student's own timezone. No invented board mark or percentile: the India product refuses to show one. |
 | **Teachers** | Classes and assignments targeted at a chapter, dot point and difficulty; class analytics; intervention flags with reasons; printable reports; offline task packs and cloud classrooms. |
-| **Offline** | The whole learning loop runs with the network off, installed as a PWA or as the native iPad app. |
-| **Cloud, optional** | Verified email accounts, Google and Apple sign-in on the web, cross-device sync, Razorpay and Apple subscriptions with cancellation, a content CMS with independent review. |
+| **Offline** | The app opens and keeps typed and written work on the device with the network off; nothing is checked or marked until the student is signed in and online. The bundled engine only previews notation and reads results recorded by earlier versions. |
+| **Account, required for marking** | Verified email accounts, Google and Apple sign-in on the web, cross-device sync, Razorpay and Apple subscriptions with cancellation, a content CMS with independent review. |
 
 
 ## The handwriting engine
@@ -621,10 +626,12 @@ what a reader would reasonably assume is here and is not. None of it is hidden a
   traps are not uploaded at all. Practise on an iPad and then on a phone and the second device
   still shows an empty history.
 
-- **Premium buys nothing yet.** Six premium capabilities are declared in
-  `client/src/platform/entitlements.js` and the billing lifecycle is implemented and tested end to
-  end, but nothing in the app is gated on them: there is no free-tier cap, no paywall, and no
-  configured price. Settings still tells the student everything is unlocked.
+- **Free and Premium.** The free tier (`FREE_TIER` in `client/src/local/entitlementGate.js`) is
+  CBSE / NCERT and JEE Main with 20 practice questions a day, one exam simulation every 30 days and
+  basic Pri Explain. Premium (`client/src/platform/entitlements.js`) removes the practice and exam
+  limits and unlocks JEE Advanced, advanced Pri Explain and advanced analytics. The reserved
+  `additional-ai-usage` capability has no consumer and is not marketed. No price is configured in
+  the repository.
 
 - **Guardian consent is an email confirmation, not verification.** India's Digital Personal Data
   Protection Act 2023 treats everyone under 18 as a child. A cloud account for someone under 18
