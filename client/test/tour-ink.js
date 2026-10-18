@@ -142,9 +142,10 @@ export const flow = {
     await page.mouse.up();
     await page.waitForTimeout(1500);
     const inkAfterResize = await inkPixels('.ink-canvas-base');
+    const liveAfterResize = await inkPixels('.ink-canvas-live');
     await check('a stroke written while the window was resized is committed and every line stays painted (#449)',
-      inkAfterResize > 0 && inkAfterResize > inkBeforeResize * 0.5 && await inkPixels('.ink-canvas-live') === 0,
-      `base ${inkBeforeResize} → ${inkAfterResize} px; live ${await inkPixels('.ink-canvas-live')} px`);
+      inkAfterResize > 0 && inkAfterResize > inkBeforeResize * 0.5 && liveAfterResize === 0,
+      `base ${inkBeforeResize} → ${inkAfterResize} px; live ${liveAfterResize} px`);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.waitForTimeout(300);
     const inkRestored = await inkPixels('.ink-canvas-base');

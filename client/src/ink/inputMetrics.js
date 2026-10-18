@@ -63,6 +63,8 @@ export function strokeMoved(e, samples) {
   } catch { /* metrics never interfere with writing */ }
 }
 
+/** `cancelled` is true for every stroke that did not end in a pointerup: a
+ *  pointercancel, and a lostpointercapture that arrived without one. */
 export function strokeEnded(e, { cancelled = false, kept = 0 } = {}) {
   try {
     const out = sink();

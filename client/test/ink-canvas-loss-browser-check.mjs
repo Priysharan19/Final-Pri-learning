@@ -16,7 +16,10 @@
 //   · a real resize must redraw committed AND in-progress ink;
 //   · a cancelled stroke (pointercancel) must commit what was written and must
 //     not leave the canvas deaf to the next pen-down;
-//   · a theme flip repaints committed ink in the new colour, never loses it.
+//   · a theme flip repaints committed ink in the new colour, never loses it;
+//   · a canvas whose first real pixel size equals a fresh <canvas>'s default
+//     300×150 bitmap (the scribble pad at 75 % zoom) still paints: "the
+//     bitmap did not change" is not "the contexts are ready".
 //
 // Matrix: Chromium and WebKit × devicePixelRatio 1.25 and 1.5 (Windows scale
 // factors) × mouse (trusted input) and pen (Chromium: trusted pen via CDP with
@@ -224,7 +227,9 @@ async function runCell({ browser, browserName, url, dpr, pointer }) {
     const base2 = await page.evaluate(scan, '.ink-canvas-base');
     check(`${tag} · both lines are on the base layer`, base2.ink > baseResized.ink, `${baseResized.ink} → ${base2.ink} px`);
     const writes2 = await page.evaluate(() => window.__bitmapWrites);
-    check(`${tag} · the real resize touched each bitmap once`, writes2 > 0 && writes2 <= 4, `${writes2} assignments`);
+    // The height is unchanged, so the true value is one width assignment per
+    // layer: a height write here would be a needless clear of both bitmaps.
+    check(`${tag} · the real resize touched each bitmap once (width only)`, writes2 === 2, `${writes2} assignments`);
 
     // ── 3 · a cancelled stroke keeps what was written and the next one works ─
     box = await liveBox(page);
@@ -268,6 +273,54 @@ async function runCell({ browser, browserName, url, dpr, pointer }) {
   }
 }
 
+// ── Default-bitmap first mount ───────────────────────────────────────────────
+// A fresh <canvas> already has a 300×150 bitmap. When the first real size is
+// exactly that, the sizing pass finds nothing to change — and must still prime
+// the contexts, or every stroke is recorded (Submit opens) but never painted.
+// Two sizes that land there: a 150 px sheet in a 300 px column at dpr 1, and
+// the QuestionCard scribble pad (height 200) in a 400 px column at Chrome's
+// 75 % zoom (dpr 0.75).
+const DEFAULT_BITMAP_CELLS = [
+  { height: 150, width: 300, dpr: 1 },
+  { height: 200, width: 400, dpr: 0.75 }
+];
+
+async function runDefaultBitmapCell({ browser, browserName, url, height, width, dpr }) {
+  const tag = `${browserName} dpr=${dpr} mouse · first mount at ${width}×${height} CSS px (default 300×150 bitmap)`;
+  const ctx = await browser.newContext({ viewport: { width: 1100, height: 720 }, deviceScaleFactor: dpr, colorScheme: 'dark' });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e?.message || e)));
+  try {
+    await page.goto(`${url}?height=${height}&width=${width}`);
+    await page.waitForSelector('.ink-canvas-live');
+    await page.waitForFunction(() => document.querySelector('.ink-canvas-base')?.width > 0);
+    const base0 = await page.evaluate(scan, '.ink-canvas-base');
+    // The premise: this cell really sits on the default bitmap. If it does not,
+    // the cell proves nothing and says so rather than passing by accident.
+    check(`${tag} · the pixel size is the default bitmap`, base0.width === 300 && base0.height === 150, JSON.stringify(base0));
+    await page.evaluate(instrument);
+    const drv = await driverFor(page, 'mouse', browserName);
+    const box = await liveBox(page);
+    await drv.down(box.x + box.width * 0.15, box.y + box.height * 0.40);
+    await trace(page, drv, box, { y: 0.40, from: 0.15, to: 0.70, steps: 8 });
+    await frames(page);
+    const liveMid = await page.evaluate(scan, '.ink-canvas-live');
+    check(`${tag} · the stroke under the pen is painted on the live layer`, liveMid.ink > 20, `${liveMid.ink} px`);
+    await drv.up(box.x + box.width * 0.70, box.y + box.height * 0.40);
+    check(`${tag} · the stroke is committed`, await waitStrokes(page, 1), `strokes ${await strokeCount(page)}`);
+    const base1 = await page.evaluate(scan, '.ink-canvas-base');
+    check(`${tag} · committed ink is painted on the base layer — not a blank sheet behind an open Submit`, base1.ink > 50, `${base1.ink} px`);
+    const writes = await page.evaluate(() => window.__bitmapWrites);
+    check(`${tag} · no bitmap was reset to get there`, writes === 0, `${writes} assignments`);
+    check(`${tag} · no uncaught error reached the page`, errors.length === 0, errors.slice(0, 2).join(' · '));
+  } catch (err) {
+    check(`${tag} · the cell ran to the end`, false, String(err?.stack || err).split('\n').slice(0, 3).join(' | '));
+  } finally {
+    await ctx.close();
+  }
+}
+
 // ── Entry ────────────────────────────────────────────────────────────────────
 
 const server = await createServer({
@@ -287,6 +340,7 @@ try {
     }
     try {
       for (const dpr of DPRS) for (const pointer of POINTERS) await runCell({ browser, browserName, url, dpr, pointer });
+      for (const cell of DEFAULT_BITMAP_CELLS) await runDefaultBitmapCell({ browser, browserName, url, ...cell });
     } finally {
       await browser.close();
     }

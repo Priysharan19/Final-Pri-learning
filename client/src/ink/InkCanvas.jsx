@@ -248,6 +248,11 @@ const InkCanvas = forwardRef(function InkCanvas({
           // The width can change between pen-down and pen-up (a split view
           // dragged, the keyboard, a rotation): the unfinished line moves with
           // the page too, and is painted again from its first point.
+          // The 1€ filter inside `live` keeps its last position in pre-scale
+          // coordinates, so the first sample after a resize is smoothed against
+          // a point that is off by the scale factor: a one-sample wobble at
+          // most, never a lost point, and the filter is converged again by the
+          // next sample. Not worth a reset that would drop the smoothing state.
           if (live) { live.points = live.points.map(scalePoint); live.drawnTo = 0; }
           rescaled = true;
           // A resolved (disabled) answer is never re-read: its marked reading
@@ -261,12 +266,21 @@ const InkCanvas = forwardRef(function InkCanvas({
       const canvases = [baseRef.current, liveRef.current].filter(Boolean);
       // Assigning canvas.width or canvas.height clears the bitmap — the
       // committed page and the stroke under the pen — even when the value is
-      // the one already there. ResizeObserver fires for a layout that moved by
-      // a fraction of a CSS pixel (fluid widths under Windows' 125 % / 150 %
-      // scale factors) and for every re-observe, none of which changes the
-      // pixel size. So the bitmaps are touched only when their pixel size
-      // really changes, and then both layers are painted again.
+      // the one already there. ResizeObserver fires for a layout whose
+      // contentRect moved by a fraction of a CSS pixel (fluid widths under
+      // Windows' 125 % / 150 % scale factors; clientWidth itself is an integer)
+      // and for every re-observe, none of which changes the pixel size. So the
+      // bitmaps are touched only when their pixel size really changes, and
+      // then both layers are painted again.
       const bitmapChanged = canvases.some(c => c.width !== pxW || c.height !== pxH);
+      // A <canvas> is born with a 300×150 bitmap. When the first real size is
+      // exactly that (a 300 px sheet at dpr 1; the 200 px scribble pad in a
+      // 400 px column at 75 % zoom), nothing above differs — but the contexts
+      // have never been primed, and an unprimed context paints nothing while
+      // the strokes are still recorded: ink written on a blank sheet. Priming
+      // is therefore owed whenever it has not happened yet, not only on a
+      // bitmap change.
+      const unprimed = !ctxRef.current.base || !ctxRef.current.live;
       for (const c of canvases) {
         if (c.width !== pxW) c.width = pxW;
         if (c.height !== pxH) c.height = pxH;
@@ -274,8 +288,8 @@ const InkCanvas = forwardRef(function InkCanvas({
         if (c.style.width !== cssW) c.style.width = cssW;
         if (c.style.height !== cssH) c.style.height = cssH;
       }
-      if (!bitmapChanged && !rescaled) return;
-      if (bitmapChanged) primeContexts();   // a resized canvas resets its transform
+      if (!bitmapChanged && !rescaled && !unprimed) return;
+      if (bitmapChanged || unprimed) primeContexts();   // a resized canvas resets its transform
       predRectRef.current = null;
       predictedRef.current = [];
       redrawBase();
