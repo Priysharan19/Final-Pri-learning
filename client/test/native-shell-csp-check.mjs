@@ -90,7 +90,7 @@ function notWeakerThanServer(label, directives) {
   ok(!script.some(src => WEAKENERS.has(src) || HOST_SOURCE.test(src)), `${label}: script-src carries no weakening source`);
   ok((shell.get('object-src') || []).join(' ') === "'none'", `${label}: object-src 'none'`);
   ok((shell.get('frame-ancestors') || []).join(' ') === "'none'", `${label}: frame-ancestors 'none'`);
-  ok((shell.get('frame-src') || []).join(' ') === "'none'", `${label}: frame-src 'none' (no child frame can reach the parent's bridge)`);
+  ok((shell.get('frame-src') || []).join(' ') === "'none'", `${label}: frame-src 'none' (no URL-loaded child frame; a srcdoc child inherits the policy)`);
   ok((shell.get('base-uri') || []).join(' ') === "'self'", `${label}: base-uri 'self'`);
   ok((shell.get('default-src') || []).join(' ') === "'self'", `${label}: default-src 'self'`);
   // The native shells route every /v1 call through the native cloud bridge

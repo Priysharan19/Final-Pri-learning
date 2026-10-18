@@ -8,10 +8,16 @@
 //   · it advertises capabilities and carries no OS identity;
 //   · a main-frame envelope round-trips through priBridge;
 //   · a same-origin SUBFRAME is refused (no reply, ever);
-//   · the shell CSP (frame-src 'none') keeps a child frame from existing at
-//     all, so no child frame can reach the parent's bridge through
-//     `parent.webkit.messageHandlers.*` and be credited to the main frame (#260).
-//     If a frame does load, the reach-through is attempted and must be refused.
+//   · a same-origin child frame inherits the shell CSP, so an inline script
+//     injected into it never runs (#260). Measured on the simulator: WebKit does
+//     NOT apply frame-src 'none' to an about:srcdoc child, and a call the child
+//     makes on `parent.webkit.messageHandlers.*` is attributed to the PARENT
+//     frame, so the Swift sender gate cannot refuse it. That reach-through needs
+//     script already running in a same-origin child, which the inherited CSP
+//     limits to the bundle's own files — the same privilege the main frame has —
+//     and the client never creates child frames (sanitize.js strips iframes).
+//     The attribution is logged as `info subframeReachThroughCredited`, not
+//     claimed as refused.
 // Synthetic simulator evidence only; it says nothing about physical devices.
 // ─────────────────────────────────────────────────────────────────────────────
 #if DEBUG
@@ -35,14 +41,14 @@ enum BridgeSelfCheck {
     const original = window.__priNativeReceive;
     window.__priNativeReceive = msg => { if (msg && msg.id) replies[msg.id] = msg; if (original) original(msg); };
     send(window, 'selfcheck-main', 'storage', 'status');
-    // A child frame under the shell CSP (frame-src 'none'): WebKit refuses the
-    // navigation, so the load event never fires and no document exists. The
-    // violation event is the positive signal; a 1.5 s silence is the fallback.
+    // A same-origin srcdoc child. WebKit lets it exist despite frame-src 'none'
+    // (measured; the violation event is still recorded if a build ever blocks it)
+    // but the child inherits the parent's CSP, so its inline script must not run.
     const cspBlocked = [];
     const onViolation = e => { if (e.effectiveDirective === 'frame-src' || e.violatedDirective === 'frame-src') cspBlocked.push(e.blockedURI || 'frame'); };
     document.addEventListener('securitypolicyviolation', onViolation);
     const frame = document.createElement('iframe');
-    frame.srcdoc = '<!doctype html><title>x</title>';
+    frame.srcdoc = '<!doctype html><title>x</title><script>window.__priInlineRan = true;</script>';
     document.body.appendChild(frame);
     const loaded = await new Promise(r => {
       const timer = setTimeout(() => r(false), 1500);
@@ -54,6 +60,8 @@ enum BridgeSelfCheck {
     const childHasDocument = !!child && !!frame.contentDocument && frame.contentDocument.readyState === 'complete' && frame.contentDocument.title === 'x';
     out.subframeBlockedByCsp = cspBlocked.length > 0 || !childHasDocument;
     out.subframeHasHost = !!child && !!child.__PRI_HOST__;
+    // The gate: either no child document exists, or its inline script was refused by the inherited CSP.
+    out.subframeInheritsCsp = !childHasDocument || child.__priInlineRan !== true;
     if (childHasDocument) {
       // Direct post from the child's own bridge object (must be refused: not the main frame).
       try { send(child, 'selfcheck-subframe', 'storage', 'status'); out.subframeCouldPost = true; } catch (e) { out.subframeCouldPost = false; }
@@ -73,8 +81,8 @@ enum BridgeSelfCheck {
     frame.remove();
     out.mainRoundTrip = replies['selfcheck-main']?.ok === true && replies['selfcheck-main'].result?.durable === true;
     out.subframeRefused = !replies['selfcheck-subframe'];
-    // Passes when no child frame could exist (CSP) or when the reach-through got no reply.
-    out.subframeReachThroughRefused = !replies['selfcheck-reachthrough'];
+    // Informational: WebKit credits a call on the parent's handler object to the parent frame.
+    out.subframeReachThroughCredited = !!replies['selfcheck-reachthrough'];
     return JSON.stringify(out);
     """
 
@@ -91,7 +99,7 @@ enum BridgeSelfCheck {
                     return
                 }
                 var failures = 0
-                for key in ["hostPresent", "deepFrozen", "notReplaceable", "noOsIdentity", "mainRoundTrip", "subframeRefused", "subframeReachThroughRefused"] {
+                for key in ["hostPresent", "deepFrozen", "notReplaceable", "noOsIdentity", "mainRoundTrip", "subframeRefused", "subframeInheritsCsp"] {
                     let ok = out[key] as? Bool == true
                     if !ok { failures += 1 }
                     NSLog("PRIBRIDGE %@ %@", ok ? "ok" : "FAIL", key)
@@ -116,9 +124,11 @@ enum BridgeSelfCheck {
                 let subframeHost = out["subframeHasHost"] as? Bool == true
                 if subframeHost { failures += 1 }
                 NSLog("PRIBRIDGE %@ subframeHasNoHost", subframeHost ? "FAIL" : "ok")
-                // Informational: whether the shell CSP stopped the child frame from
-                // existing (expected under frame-src 'none'); the gate above is the pass/fail.
+                // Informational, not gated: whether WebKit blocked the srcdoc child outright
+                // (it does not, as measured), and whether a call the child made on the
+                // parent's handler object was credited to the parent (it is; see header).
                 NSLog("PRIBRIDGE info subframeBlockedByCsp %@", out["subframeBlockedByCsp"] as? Bool == true ? "true" : "false")
+                NSLog("PRIBRIDGE info subframeReachThroughCredited %@", out["subframeReachThroughCredited"] as? Bool == true ? "true" : "false")
                 NSLog("PRIBRIDGE capabilities %@", out["capabilities"] as? String ?? "")
                 NSLog("PRIBRIDGE summary %d failure(s)", failures)
             case .failure(let error):
