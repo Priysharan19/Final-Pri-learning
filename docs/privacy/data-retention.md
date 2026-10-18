@@ -87,7 +87,7 @@ person. Location for every row is the platform database: SQLite on the Railway v
 | `guardian_consents` | guardian name and email, notice version, confirmation/withdrawal times |
 | `learning_events` | synced attempts, progress and mastery events |
 | `sync_entities` | synced profile, settings, bookmarks, favourites, tasks, custom questions |
-| `idempotency_keys` | cached sync responses; server-issued practice questions, completions and reading receipts; and, under scope `recognition-read`, the transcript of a handwriting/photo read kept for 15 minutes so the same picture is not paid for twice (never the image; `docs/operations/recognition-cost.md` §7) |
+| `idempotency_keys` | cached sync responses; server-issued practice questions, grade responses, completions and reading receipts — a `practice-recognition` receipt holds the **transcription text** of a handwriting/photo read and any correction the student typed, and lives 90 days (`practice.js` `MAX_AGE`); exam papers, saved exam answers and results (`exams.js` `RECORD_TTL`, 5 years); and, under scope `recognition-read`, the transcript of a handwriting/photo read kept for 15 minutes so the same picture is not paid for twice (never the image; `docs/operations/recognition-cost.md` §7). Expired rows are purged by housekeeping (`housekeeping.js`) |
 | `entitlement_snapshots` | current plan |
 | `operational_events` | allow-listed telemetry |
 | `class_members` | class memberships (as a student) |
