@@ -63,6 +63,7 @@ import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
 import { cloud, nativeCloudAvailable } from '../platform/cloudTransport.js';
 import { withMutationLock } from './mutationLock.js';
+import { serveAvoidingRepeat } from './retargetOnRepeat.js';
 import { registerIssuedAttemptRecorder, registerRestoreSanitisers } from '../platform/cloudSyncRestore.js';
 import { publicQuestionFields } from '../engine/publicQuestion.js';
 import {
@@ -1035,12 +1036,19 @@ async function createIndiaQuestion(pid, chapter, target, mode, trackId, examId =
     draftTarget = targetOf.get(picked.q) || target;
     return { q: picked.q, repeat: picked.repeat };
   };
-  const out = await serveQuestion(pid, {
-    generator: target.generator, difficulty: target.difficulty, mode,
+  // The server draws inside the one cell it is given. When it flags a repeat
+  // and the request can be re-resolved to another cell on the same terms, ask
+  // again there rather than hand a student a repeat on a chapter that still
+  // has fresh questions (retargetOnRepeat.js; issue #540). Not while a
+  // misconception is being worked on: the slip lives on this dot point, and a
+  // repeat that can spring it outranks a fresh question that cannot — the
+  // same order drawDistinct keeps for a draft.
+  const { out, target: issued } = await serveAvoidingRepeat(t => serveQuestion(pid, {
+    generator: t.generator, difficulty: t.difficulty, mode,
     trap: trapKey ? { owner: chapter.id, key: trapKey } : null
-  }, localDraft);
+  }, localDraft), target, trapKey ? null : retarget);
   const q = out.q;
-  const served = out.fields.draftOnly ? draftTarget : target;
+  const served = out.fields.draftOnly ? draftTarget : issued;
   const delivered = trapKey && out.trapDelivered ? trapKey : null;
   const picked = { repeat: out.repeat };
   const row = {
@@ -1215,8 +1223,9 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   // chapter has it (issue #408).
   const namedDifficulty = difficulty != null && difficulty !== '' && Number.isFinite(Number(difficulty));
   const namedRung = namedDifficulty ? clampToIndiaWindow(Number(difficulty), trackId, grade) : null;
+  let dpPool = [];
   if (asked == null && !pyqOnly) {
-    let dpPool = indiaDotpointStates(c, chapterRow, trackId, grade, ratings, now);
+    dpPool = indiaDotpointStates(c, chapterRow, trackId, grade, ratings, now);
     // With a named difficulty, the dot point is chosen among those authored at
     // that rung, so "this chapter at D3" is not answered with a D1 question
     // because the picker landed on a dot point that has no D3 form.
@@ -1272,20 +1281,49 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
   if (!target) {
     throw Object.assign(new Error(`That India ${ordinal != null ? 'dot point' : 'chapter'} has no authored question form at this track yet.`), { status: 409, code: 'INDIA_TARGET_UNCOVERED' });
   }
-  let why = INDIA_WHY[choice.reason](c, choice.trap, trackName);
-  if (target.pyq) why += ' This one is a real previous-year question.';
-  if (target.dotpointIndex != null) why += ` Dot point: ${c.dotpoints[target.dotpointIndex]}`;
-  if (target.windowed === false) why += ` (Served at D${target.difficulty} — this dot point has no authored form at ${trackName} depth yet.)`;
+  // What is said about a question describes the cell that answers it — which
+  // may not be `target` when that cell is spent (retargetOnRepeat.js).
+  const whyFor = t => {
+    let why = INDIA_WHY[choice.reason](c, choice.trap, trackName);
+    if (t.pyq) why += ' This one is a real previous-year question.';
+    if (t.dotpointIndex != null) why += ` Dot point: ${c.dotpoints[t.dotpointIndex]}`;
+    if (t.windowed === false) why += ` (Served at D${t.difficulty} — this dot point has no authored form at ${trackName} depth yet.)`;
+    if (diagnosticStart) why += ' Your placement check suggested starting here — that was diagnostic evidence, not a mark.';
+    return why;
+  };
   // Last line of defence: whatever chose the target, a named level is served
   // at exactly that level inside the track's window or not at all.
   if (askedLevel != null && (target.difficulty !== askedLevel || target.windowed === false)) {
     throw difficultyUnavailable(askedLevel, levelsOf(c, asked), { subtopic: c.id, dotpoint: asked, track: trackId });
   }
-  if (diagnosticStart) why += ' Your placement check suggested starting here — that was diagnostic evidence, not a mark.';
+  // Where a request goes when the cell it landed on has nothing fresh left: a
+  // re-resolution on the same terms (difficulty, archive status, inside the
+  // window), each call naming the next place to try. A dot point the student
+  // named has only its own cells to offer. A chapter — the student's by name,
+  // or the optimiser's — was narrowed to one dot point by the picker above, so
+  // after that dot point's own cells the chapter's other dot points follow,
+  // next-best first: Class X Quadratic Equations has three cells at D2 and the
+  // one behind its fourth dot point holds twelve items, fewer than the repeat
+  // window, so a chapter request that landed there was served a flagged repeat
+  // while the chapter had 1,400 fresh questions (issue #540).
+  const onTerms = t => (t && t.difficulty === target.difficulty && !!t.pyq === !!target.pyq && (t.windowed !== false) === (target.windowed !== false) ? t : null);
+  const sameDotpoint = () => onTerms(resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly }));
+  let retarget = sameTerms(target, () => resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly }));
+  if (dp && asked == null) {
+    const others = dpPool.filter(d => d !== dp && d.index !== dp.index);
+    let sameTried = false;
+    retarget = () => {
+      if (!sameTried) { sameTried = true; return sameDotpoint(); }
+      const next = pickDotpoint(others, { rand, nowMs: now, recent: recentlyServedDotpoints(p.id) });
+      if (!next) return null;
+      others.splice(others.indexOf(next), 1);
+      return onTerms(resolveIndiaTarget(c, { dotpoint: next.index, difficulty: want, track: trackId, grade, pyqOnly }));
+    };
+  }
   return {
     chapter: c, target, dotpointKey: target.dotpointIndex != null ? indiaDotpointKey(c.id, target.dotpointIndex) : null,
-    retarget: sameTerms(target, () => resolveIndiaTarget(c, { dotpoint: ordinal, difficulty: want, track: trackId, grade, pyqOnly })),
-    reason: choice.reason, reasonTag: choice.reasonTag, why, nextUp: choice.nextUp, trap: choice.trap,
+    retarget, whyFor,
+    reason: choice.reason, reasonTag: choice.reasonTag, why: whyFor(target), nextUp: choice.nextUp, trap: choice.trap,
     successTarget: choice.target, mastery: st.mastery || 0, explicit: choice.explicit, aheadUnlocked
   };
 }
@@ -3360,18 +3398,25 @@ const routes = {
         chapter, dotpoint, difficulty: difficulty != null && difficulty !== '' ? difficulty : null,
         pyqOnly: !!pyqOnly, rand: Math.random()
       });
-      const { row, payload, trapKey, repeat } = await createIndiaQuestion(
+      const made = await createIndiaQuestion(
         p.id, pick.chapter, pick.target, pick.reason === 'review' ? 'review' : 'practice', trackId, null, null, pick.trap?.key || null, pick.retarget
       );
+      const { row, payload, trapKey, repeat } = made;
+      // The cell that answered: the one the picker chose, unless that one was
+      // spent and the request was answered from another on the same terms
+      // (retargetOnRepeat.js), or the device drew its own draft elsewhere.
+      // Everything said about the question describes the cell that served it.
+      const served = made.target || pick.target;
+      const dotpointKey = served.dotpointIndex != null ? indiaDotpointKey(pick.chapter.id, served.dotpointIndex) : null;
       // Only what the optimiser chose feeds the interleaving memory: a chapter
       // the student asked for by name is their sitting, not the picker's.
-      if (!pick.explicit) { noteServed(p.id, pick.chapter.id); noteServedDotpoint(p.id, pick.dotpointKey); }
+      if (!pick.explicit) { noteServed(p.id, pick.chapter.id); noteServedDotpoint(p.id, dotpointKey); }
       return {
-        question: sanitize(payload, row), reason: pick.reason, reasonTag: pick.reasonTag, why: pick.why, nextUp: pick.nextUp,
-        dotpoint: pick.target.dotpointIndex, target: pick.successTarget ?? null,
+        question: sanitize(payload, row), reason: pick.reason, reasonTag: pick.reasonTag, why: served === pick.target ? pick.why : pick.whyFor(served), nextUp: pick.nextUp,
+        dotpoint: served.dotpointIndex, target: pick.successTarget ?? null,
         misconception: trapKey ? pick.trap?.label || null : null,
-        windowed: pick.target.windowed !== false, aheadUnlocked: pick.aheadUnlocked,
-        pyq: !!pick.target.pyq, repeat: !!repeat,
+        windowed: served.windowed !== false, aheadUnlocked: pick.aheadUnlocked,
+        pyq: !!served.pyq, repeat: !!repeat,
         ...difficultyServedAs(difficulty, payload.difficulty ?? row.difficulty)
       };
     }

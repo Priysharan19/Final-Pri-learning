@@ -14,7 +14,7 @@
     "test:engine": "node server/test/selfcheck.mjs",
     "test:notes": "node client/test/notes-content-check.mjs && node client/test/notes-expansion-depth-check.mjs && node client/test/notes-diagram-content-check.mjs && node client/test/notes-visual-wave5-check.mjs && node client/test/notes-visual-wave6-check.mjs && node client/test/notes-visual-wave7-check.mjs && node client/test/notes-resource-shelf-check.mjs && node client/test/study-journey-check.mjs",
     "test:e2e:notes": "node client/test/tour-notes.js && node client/test/tour-study-journey.js",
-    "test:content:cert": "node client/test/content-certification-check.mjs && node client/test/content-certify.mjs",
+    "test:content:cert": "node client/test/retarget-on-repeat-check.mjs && node client/test/content-certification-check.mjs && node client/test/content-certify.mjs",
     "content:certify": "node client/test/content-certify.mjs --full",
     "content:digest": "node client/test/content-certify.mjs --write-digest",
     "test:engine:quick": "node server/test/selfcheck.mjs --quick",
