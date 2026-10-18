@@ -48,8 +48,65 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
+import { createRequire, syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
+// ── The server's dice ────────────────────────────────────────────────────────
+// A suite seeds Math.random and drives the clock, and still had one input it
+// could not fix: the server chooses every issued question's seed with
+// crypto.randomInt (server/platform/practice.js, chooseQuestion), so the same
+// sitting drew different questions on every run. Which question is drawn
+// decides what the suite's oracle can type, hence which answers are right,
+// hence every rating and every later pick — the whole sitting forked on it
+// (issue #544), and the repeat window was measured against a different pool
+// every time (#540).
+//
+// So the server's dice are seeded here too, for the length of the authority:
+// node:crypto's randomInt is replaced by a seeded generator with the same
+// contract (uniform integers on [min, max), the callback form included) and
+// the builtin's live ESM bindings are re-synced so the server's own
+// `import { randomInt } from 'node:crypto'` sees it. Nothing in production is
+// touched — this is test support, in the test process — and randomBytes /
+// randomUUID (session tokens, ids) stay real: they never choose content.
+// PRI_SUITE_SEED picks the sequence, so a failing seed can be replayed and a
+// sweep can walk many; the default is the seed the client suites already use.
+const nodeCrypto = createRequire(import.meta.url)('node:crypto');
+const realRandomInt = nodeCrypto.randomInt;
+export const DEFAULT_SUITE_SEED = 20260906;
+export function suiteSeed() {
+  const n = Number.parseInt(process.env.PRI_SUITE_SEED ?? '', 10);
+  return Number.isSafeInteger(n) ? n : DEFAULT_SUITE_SEED;
+}
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+let diceHolders = 0;
+function seedServerDice(seed) {
+  const next = mulberry32(seed);
+  const seeded = function randomInt(min, max, callback) {
+    if (typeof max === 'function' || max === undefined) { callback = max; max = min; min = 0; }
+    if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max) || max <= min) {
+      throw new RangeError(`randomInt: invalid range ${min}..${max}`);
+    }
+    const value = min + Math.floor(next() * (max - min));
+    if (typeof callback === 'function') { process.nextTick(callback, null, value); return undefined; }
+    return value;
+  };
+  nodeCrypto.randomInt = seeded;
+  syncBuiltinESMExports();
+  diceHolders += 1;
+  return () => {
+    if (--diceHolders > 0) return;
+    nodeCrypto.randomInt = realRandomInt;
+    syncBuiltinESMExports();
+  };
+}
 
 const ENV_NAMES = ['NODE_ENV', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLIC_ORIGIN',
   'PRI_HANDWRITING_API_KEY', 'PRI_HANDWRITING_ENDPOINT', 'PRI_HANDWRITING_MODEL', 'PRI_HANDWRITING_FALLBACK_MODEL',
@@ -108,6 +165,9 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
   for (const [name, value] of Object.entries(env)) {
     if (value === undefined || value === null) delete process.env[name]; else process.env[name] = String(value);
   }
+  // Seeded before the server is imported, so even its first draw is replayable.
+  const seed = suiteSeed();
+  const restoreDice = seedServerDice(seed);
 
   const harness = await import('../../../server/test/support/app-harness.mjs');
   const app = await harness.startApp({ engine: 'sqlite' });
@@ -397,6 +457,7 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
     current = null;
     await app.close();
     if (reader.server) await new Promise(resolve => { reader.server.closeAllConnections?.(); reader.server.close(resolve); });
+    restoreDice();
     globalThis.fetch = realFetch;
     if (ownsDocument) delete globalThis.document;
     rmSync(scratch, { recursive: true, force: true });
@@ -406,7 +467,7 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
   }
 
   const authority = {
-    app, origin: app.origin, db: app.db, traffic, reader,
+    app, origin: app.origin, db: app.db, traffic, reader, seed,
     link, linkExisting, setEntitlement, ageExamPapers, answerKey, sealedQuestion, examPaper, examResult, examSnapshot, resetRateLimits, close,
     accountOf: pid => accounts.get(pid) || null,
     /** Pin the device session to `pid`'s account; `undefined` follows the selected profile again. */
