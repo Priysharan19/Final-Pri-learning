@@ -360,13 +360,19 @@ export function createOtpRouter(db, {
         return bad(res, 'GUARDIAN_CONSENT_WITHDRAWN', 'A parent or guardian withdrew permission. Only they can change that.', 409);
       }
 
-      // Recovery for a wrong/missing age capture. This is intentionally part of
-      // the existing authenticated + rate-limited guardian action surface, not
-      // a bypass around requireGuardianConsent. Only an explicit boolean true
-      // declares 18+, matching account creation. The historical guardian row is
-      // preserved; live confirmation bearers/challenges are retired so they
-      // cannot mutate it after the correction.
+      // A first age declaration for an older account that has none on record.
+      // Only an explicit boolean true declares 18+, matching account creation.
+      // An account already recorded as a child is NOT reclassified from its
+      // own session (issue #477): that would let the learner skip the very
+      // approval it is waiting for. A genuinely misclassified adult is
+      // corrected through support, outside the learner's session. The
+      // historical guardian row is preserved; live confirmation
+      // bearers/challenges are retired so they cannot mutate it afterwards.
       if (req.body?.isAdult === true) {
+        if (state.ageBasis === 'child') {
+          return bad(res, 'AGE_CORRECTION_REQUIRES_SUPPORT',
+            'This account is recorded as under 18. A parent or guardian approves it, or support can correct a wrongly recorded age.', 409);
+        }
         const now = Date.now();
         await db.transaction(async () => {
           await db.run(`DELETE FROM auth_delivery_outbox
