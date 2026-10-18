@@ -362,6 +362,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const mountedRef = useRef(true);
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   const inputRef = useRef(null);
+  const toolsRef = useRef(null);
   const scribbleRef = useRef(null);
   const photoInputRef = useRef(null);
   const promptRef = useRef(null);
@@ -1057,6 +1058,33 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     return t('verdict.checkCloseCallPlain');
   }, [doubt, t]);
 
+  // On a phone the question, the mode switch and the ink toolbar leave room
+  // for only part of the sheet above the action bar. Choosing Write scrolls
+  // just far enough to show the whole sheet, so the question stays as visible
+  // as it can. The sheet wins over the mode switch: on a short phone (iPhone
+  // SE) the switch scrolls up under the bars rather than the sheet's foot
+  // staying under the action bar. The sheet's own top never goes under them.
+  const revealWritingArea = (attempt = 0) => {
+    if (typeof window === 'undefined' || !window.matchMedia?.('(max-width: 760px)').matches) return;
+    const tools = toolsRef.current;
+    const sheet = tools?.parentElement?.querySelector('.editor-shell');
+    if (!tools || !sheet) return;
+    // The ink surface is still loading: measure it once it is there.
+    if (sheet.querySelector('.skeleton')) {
+      if (attempt < 12) setTimeout(() => revealWritingArea(attempt + 1), 150);
+      return;
+    }
+    const barTop = tools.parentElement.querySelector('.ws-actions')?.getBoundingClientRect().top ?? window.innerHeight;
+    const headBottom = (document.querySelector('.ws-bar')?.getBoundingClientRect().bottom ?? 0) + 48;
+    const box = sheet.getBoundingClientRect();
+    const needed = box.bottom - barTop + 8;
+    const room = box.top - headBottom;
+    const by = Math.min(needed, room);
+    if (by <= 0) return;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollBy({ top: by, behavior: reduce ? 'auto' : 'smooth' });
+  };
+
   const flipMode = (m) => {
     setMode(m);
     // Explicitly changing to typing abandons the Photo provenance. A later
@@ -1076,6 +1104,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (m === 'type' && !resolved) stash(answer, working); else setSaveState(null);
     }
     if (m === 'type') setTimeout(() => inputRef.current?.focus(), 60);
+    if (m === 'write') setTimeout(() => revealWritingArea(), 60);
     if (m === 'photo' && !photo) setTimeout(() => photoInputRef.current?.click(), 120);
   };
 
@@ -1918,7 +1947,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <button type="button" className="btn btn-quiet btn-sm" tabIndex={peek ? 0 : -1} onClick={() => setPeekOpen(true)}>{t('verdict.showQuestion')}</button>
         </div>
 
-        <div className="ws-tools no-print">
+        <div className="ws-tools no-print" ref={toolsRef}>
           {!isMcq && (
             <div className="mode-tabs seg" role="group" aria-label={t('verdict.answerModes')}>
               <button type="button" className={`mode-tab ${mode === 'type' ? 'on' : ''}`} aria-pressed={mode === 'type'} title={t('verdict.modeTypeTitle')}
@@ -2021,7 +2050,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                         message => { if (live()) setPhotoOCR({ phase: 'failed', text: '', confidence: 0, engine: null, error: message }); });
                     }} />
                   {!photo && photoOCR.phase === 'idle'
-                    ? <button className="btn btn-ghost" onClick={() => photoInputRef.current?.click()}>{t('verdict.photographWorking')}<span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2, fontWeight: 400 }}>{photoSupportedFormats(language)}</span></button>
+                    ? <button className="btn btn-ghost photo-pick" onClick={() => photoInputRef.current?.click()}>
+                        <Icon name="photo" size={18} />
+                        <span className="photo-pick-text">
+                          <span className="photo-pick-title">{t('verdict.photographWorking')}</span>
+                          <span className="photo-pick-help">{photoSupportedFormats(language)}</span>
+                        </span>
+                      </button>
                     : (
                       <div className="photo-attach">
                         {/* A PDF sets no thumbnail until its pages render, and the whole

@@ -10,21 +10,29 @@
 // scope or their own account; server/platform/store.js declares the scope for
 // every statement it runs. Each property below is a deterministic regression:
 //
-//   1. (no database) the store declares system scope for every statement outside
-//      a transaction, transaction-locally; a transaction declares its account or
-//      system scope first; exec() resets the session scope or destroys the client.
+//   1. (no database) every pooled session is put in system scope by
+//      sessionSetup() before its first statement, so a statement outside a
+//      transaction is one round trip; a transaction declares its account or
+//      system scope with SET LOCAL in its BEGIN; an account id outside
+//      ^[A-Za-z0-9_.:-]{1,200}$ is refused before any SQL is sent; exec()
+//      re-asserts the session scope or destroys the client.
 //   2. (no database) the migration's policy text: every table, fail closed, and
 //      no allow-when-unset expression survives.
 //   3. (Postgres, as a pri_server member) an unscoped connection sees and writes
 //      nothing; account scope sees and writes only its own rows; system scope
-//      sees all; no scope survives COMMIT or ROLLBACK on a pooled connection; a
-//      nested transaction cannot widen the scope.
+//      sees all; an account scope never survives COMMIT or ROLLBACK on a pooled
+//      connection (it reverts to the session's system scope); a nested
+//      transaction cannot widen the scope.
+//   4. (Postgres) on a populated schema-11 → 12 upgrade: per owned table, account
+//      scope cannot read, update, delete, re-home or INSERT another account's
+//      row; the SHARED tables are pinned as readable and writable in account
+//      scope (docs/security/threat-model.md §7) so any change is deliberate.
 // ─────────────────────────────────────────────────────────────────────────────
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  PostgresStore, scopeStatement, BEGIN_SYSTEM_STATEMENT, SET_SESSION_SYSTEM_SCOPE, RESET_SESSION_SCOPE
+  PostgresStore, scopeStatement, SET_SESSION_SYSTEM_SCOPE, RESET_SESSION
 } from '../platform/store.js';
 import { SCHEMA_VERSION } from '../platform/schemaVersions.js';
 import { requestedEngine } from './support/engine.mjs';
@@ -63,27 +71,50 @@ const pgError = code => Object.assign(new Error(`fake ${code}`), { code });
   const pool = fakePool();
   const store = new PostgresStore(pool, { ownsPool: false });
   await store.get('SELECT 1 FROM accounts WHERE id = ?', ['a']);
-  eq(sqls(pool), [BEGIN_SYSTEM_STATEMENT, 'SELECT 1 FROM accounts WHERE id = $1', 'COMMIT'], 'a statement outside a transaction runs inside BEGIN + system scope … COMMIT');
-  eq(BEGIN_SYSTEM_STATEMENT, "BEGIN; SET LOCAL pri.scope = 'system'; SET LOCAL pri.account_id = ''",
-    'and that system scope is transaction-local (SET LOCAL) with no account, in the same round trip as BEGIN');
-  ok(!/ISOLATION LEVEL/.test(BEGIN_SYSTEM_STATEMENT), 'and keeps the READ COMMITTED isolation of an autocommit statement');
+  eq(SET_SESSION_SYSTEM_SCOPE, "SET pri.scope = 'system'; SET pri.account_id = ''", 'the session scope is system with no account, set with SET (session level)');
+  eq(pool.log.map(entry => entry.sql), [store.sessionSetup(), 'SELECT 1 FROM accounts WHERE id = $1'],
+    'a new pooled session runs sessionSetup() before its first statement; a statement outside a transaction is then ONE round trip');
+  ok(store.sessionSetup().includes(SET_SESSION_SYSTEM_SCOPE) && store.sessionSetup().startsWith('SET search_path TO pri;'),
+    'and sessionSetup() declares the system scope together with search_path, in the same round trip');
+  await store.get('SELECT 2');
+  eq(pool.log.map(entry => entry.sql).filter(sql => sql === store.sessionSetup()).length, 1, 'the session setup runs once per connection, not per statement');
   for (const method of ['all', 'run']) {
     const p = fakePool();
     await new PostgresStore(p, { ownsPool: false })[method]('UPDATE t SET n = 1');
-    eq(sqls(p), [BEGIN_SYSTEM_STATEMENT, 'UPDATE t SET n = 1', 'COMMIT'], `${method}() outside a transaction is scoped the same way`);
+    eq(sqls(p), ['UPDATE t SET n = 1'], `${method}() outside a transaction is one round trip the same way`);
   }
+  // A session whose setup fails is never used: the statement does not run.
+  const setupFails = fakePool(sql => (sql.startsWith('SET search_path') ? pgError('57014') : undefined));
+  await rejects(() => new PostgresStore(setupFails, { ownsPool: false }).get('SELECT 1'), error => String(error.dbCode || error.code) === '57014' || error.status === 503, 'a failed session setup reports an error');
+  eq([setupFails.log.length, setupFails.state], [1, { released: 0, destroyed: 1 }], 'and that client is destroyed before any statement runs on it, never pooled without its scope');
 }
 {
-  // A failing statement rolls its scope back with it; the client stays usable.
+  // A failing statement opens no transaction: nothing to roll back, the client stays usable.
   const pool = fakePool(sql => (sql.startsWith('INSERT') ? pgError('23505') : undefined));
   const store = new PostgresStore(pool, { ownsPool: false });
-  await rejects(() => store.run('INSERT INTO t VALUES (1)'), error => error.code === '23505', 'a failing unscoped-by-caller statement reports its own error');
-  eq(sqls(pool), [BEGIN_SYSTEM_STATEMENT, 'INSERT INTO t VALUES (1)', 'ROLLBACK'], 'and its system-scope transaction is rolled back');
+  await rejects(() => store.run('INSERT INTO t VALUES (1)'), error => error.code === '23505', 'a failing statement outside a transaction reports its own error');
+  eq(sqls(pool), ['INSERT INTO t VALUES (1)'], 'and sends nothing else (no BEGIN, no ROLLBACK)');
   eq(pool.state, { released: 1, destroyed: 0 }, 'and the client goes back to the pool');
-  // A client whose ROLLBACK fails is destroyed, never reused with unknown state.
-  const broken = fakePool(sql => (sql.startsWith('INSERT') ? pgError('22P02') : sql === 'ROLLBACK' ? pgError('XX000') : undefined));
-  await rejects(() => new PostgresStore(broken, { ownsPool: false }).run('INSERT INTO t VALUES (1)'), error => error.code === '22P02', 'a statement error is reported even when ROLLBACK fails');
-  eq(broken.state, { released: 0, destroyed: 1 }, 'and that client is destroyed');
+  // A lost connection is destroyed, never reused with unknown state.
+  const lost = fakePool(sql => (sql.startsWith('INSERT') ? pgError('08006') : undefined));
+  await rejects(() => new PostgresStore(lost, { ownsPool: false }).run('INSERT INTO t VALUES (1)'), error => String(error.dbCode || error.code) === '08006' || error.status === 503, 'a lost connection is reported');
+  eq(lost.state, { released: 0, destroyed: 1 }, 'and that client is destroyed');
+}
+{
+  // Account ids: only ^[A-Za-z0-9_.:-]{1,200}$ — refused before any SQL is sent.
+  const ACCEPTED = ['acct_8d0c7a4e-3b1f-4c2a-9e55-0f6b2d9a1c37', 'acct-a', 'a', 'A.b:c-d_9', 'x'.repeat(200)];
+  for (const id of ACCEPTED) ok(scopeStatement(id) === `SET LOCAL pri.scope = 'account'; SET LOCAL pri.account_id = '${id}'`, `account id ${JSON.stringify(id.slice(0, 40))} is accepted as one plain literal`);
+  const HOSTILE = [
+    "o'brien", "acct'; RESET pri.scope; --", "acct' OR '1'='1", 'a\\b', "E'\\x27'", 'a\0b', 'acct a', 'acct\na', 'acct\ta', ' acct', 'acct;',
+    '$$', '$q$x$q$', 'acct"a', 'acct/*x*/', 'açct', 'acct\u2028', 'acct\uFF07', '%27', 'acct_a\n', 'acct_a\r', '', 'x'.repeat(201)
+  ];
+  for (const id of [...HOSTILE, 123, {}, [], true]) {
+    const p = fakePool();
+    const st = new PostgresStore(p, { ownsPool: false });
+    await rejects(() => st.transaction(async () => 'ran', { accountScope: id }), error => error.code === 'STORE_ACCOUNT_SCOPE_INVALID', `hostile account id ${JSON.stringify(typeof id === 'string' ? id.slice(0, 30) : id)} is refused with STORE_ACCOUNT_SCOPE_INVALID`);
+    ok(p.log.length === 0, `and no SQL at all was sent for ${JSON.stringify(typeof id === 'string' ? id.slice(0, 30) : id)}`);
+    if (typeof id === 'string' && id) await rejects(async () => scopeStatement(id), error => error.code === 'STORE_ACCOUNT_SCOPE_INVALID', `scopeStatement() itself refuses ${JSON.stringify(id.slice(0, 30))} (defence in depth)`);
+  }
 }
 {
   // Transactions: the scope is declared in the BEGIN itself, every attempt,
@@ -92,9 +123,7 @@ const pgError = code => Object.assign(new Error(`fake ${code}`), { code });
   const ACCOUNT_A = "SET LOCAL pri.scope = 'account'; SET LOCAL pri.account_id = 'acct-a'";
   eq(scopeStatement(null), SYSTEM_SCOPE, 'system scope: both GUCs set together, transaction-locally, no account');
   eq(scopeStatement('acct-a'), ACCOUNT_A, 'account scope: both GUCs set together, transaction-locally, for exactly that account');
-  ok(!/\bSELECT\b/i.test(scopeStatement('acct-a')) && !/\bSELECT\b/i.test(BEGIN_SYSTEM_STATEMENT), 'declaring a scope runs no SELECT, so it cannot take a REPEATABLE READ / SERIALIZABLE snapshot');
-  eq(scopeStatement("o'brien\\x"), "SET LOCAL pri.scope = 'account'; SET LOCAL pri.account_id = E'o''brien\\\\x'", 'an account id with a quote or a backslash is a single escaped literal');
-  await rejects(async () => scopeStatement('a\0b'), error => error.code === 'STORE_ACCOUNT_SCOPE_INVALID', 'an account id with a NUL is refused');
+  ok(!/\bSELECT\b/i.test(scopeStatement('acct-a')) && !/\bSELECT\b/i.test(scopeStatement(null)), 'declaring a scope runs no SELECT, so it cannot take a REPEATABLE READ / SERIALIZABLE snapshot');
   const pool = fakePool();
   const store = new PostgresStore(pool, { ownsPool: false });
   await store.transaction(async tx => { await tx.get('SELECT 1'); });
@@ -113,9 +142,6 @@ const pgError = code => Object.assign(new Error(`fake ${code}`), { code });
   await new PostgresStore(retried, { ownsPool: false }).transaction(async () => {}, { accountScope: 'acct-a' });
   eq(sqls(retried).filter(sql => sql.startsWith('BEGIN')), [`BEGIN ISOLATION LEVEL SERIALIZABLE; ${ACCOUNT_A}`, `BEGIN ISOLATION LEVEL SERIALIZABLE; ${ACCOUNT_A}`], 'a retried transaction re-declares its scope on every attempt');
   // BEGIN succeeding and its SET LOCAL failing leaves an aborted transaction: it is rolled back.
-  const halfBegun = fakePool(sql => (sql.startsWith('BEGIN') ? pgError('22023') : undefined));
-  await rejects(() => new PostgresStore(halfBegun, { ownsPool: false }).get('SELECT 1'), error => String(error.dbCode || error.code) === '22023', 'a failed scope declaration outside a transaction reports its error');
-  ok(sqls(halfBegun).at(-1) === 'ROLLBACK' && halfBegun.state.released === 1, 'and is rolled back before the client is pooled');
   const halfTx = fakePool(sql => (sql.startsWith('BEGIN') ? pgError('22023') : undefined));
   await rejects(() => new PostgresStore(halfTx, { ownsPool: false }).transaction(async () => {}), error => String(error.dbCode || error.code) === '22023', 'a failed scope declaration in a transaction reports its error');
   ok(sqls(halfTx).at(-1) === 'ROLLBACK', 'and is rolled back too');
@@ -130,20 +156,67 @@ const pgError = code => Object.assign(new Error(`fake ${code}`), { code });
   const seen = await innerStore.transaction(() => innerStore.transaction(async () => { await innerStore.get('SELECT 1'); return innerStore.accountScope(); }), { accountScope: 'acct-a' });
   eq(seen, 'acct-a', 'a nested transaction without a scope inherits the outer account scope (it is not widened to system)');
   eq(inner.log.filter(entry => entry.sql.includes('SET LOCAL pri.scope')).length, 1, 'and declares no scope of its own');
-  ok(!inner.log.some(entry => entry.sql === BEGIN_SYSTEM_STATEMENT), 'and a store call inside it joins the transaction rather than running in system scope');
+  eq(sqls(inner).filter(sql => /^BEGIN\b/.test(sql)), [`BEGIN ISOLATION LEVEL SERIALIZABLE; ${ACCOUNT_A}`], 'and a store call inside it joins the transaction (one BEGIN, the account one) rather than running in system scope');
+  ok(sqls(inner).includes('SELECT 1'), 'and its statement ran inside that transaction');
 }
 {
-  // exec(): session scope, always reset; a client that cannot reset is destroyed.
+  // exec(): runs in the session's system scope; afterwards DISCARD ALL (refused
+  // inside an open or aborted transaction) and a fresh sessionSetup(). A client
+  // that cannot be reset is destroyed.
   const pool = fakePool();
-  await new PostgresStore(pool, { ownsPool: false }).exec('CREATE TEMP TABLE x(); DROP TABLE x');
-  eq(sqls(pool), [SET_SESSION_SYSTEM_SCOPE, 'CREATE TEMP TABLE x(); DROP TABLE x', RESET_SESSION_SCOPE], 'exec() sets system scope for its script and resets it afterwards');
+  const store = new PostgresStore(pool, { ownsPool: false });
+  await store.exec('CREATE TEMP TABLE x(); DROP TABLE x');
+  eq(RESET_SESSION, 'DISCARD ALL', 'the post-exec reset is DISCARD ALL, which Postgres refuses inside a transaction block');
+  eq(pool.log.map(entry => entry.sql), [store.sessionSetup(), 'CREATE TEMP TABLE x(); DROP TABLE x', 'DISCARD ALL', store.sessionSetup()],
+    'exec() runs its script, then DISCARD ALL on its own, then the full session setup again (system scope included)');
   eq(pool.state, { released: 1, destroyed: 0 }, 'and returns the client');
   const failing = fakePool(sql => (sql.startsWith('BAD') ? pgError('42601') : undefined));
   await rejects(() => new PostgresStore(failing, { ownsPool: false }).exec('BAD SCRIPT'), error => error.code === '42601', 'a failing script reports its error');
-  ok(sqls(failing).at(-1) === RESET_SESSION_SCOPE && failing.state.released === 1, 'and the scope is still reset');
-  const stuck = fakePool(sql => (sql === RESET_SESSION_SCOPE ? pgError('25P02') : undefined));
+  ok(failing.log.at(-2).sql === 'DISCARD ALL' && failing.log.at(-1).sql.startsWith('SET search_path') && failing.state.released === 1, 'and the session is still reset');
+  const openTx = fakePool(sql => (sql === 'DISCARD ALL' ? pgError('25001') : undefined));
+  await new PostgresStore(openTx, { ownsPool: false }).exec('BEGIN; SET pri.scope = \'account\'');
+  eq(openTx.state, { released: 0, destroyed: 1 }, 'a script that leaves a transaction open (DISCARD ALL → 25001) gets its client destroyed, never pooled');
+  const aborted = fakePool(sql => (sql === 'DISCARD ALL' ? pgError('25P02') : undefined));
+  await new PostgresStore(aborted, { ownsPool: false }).exec('BEGIN; SELECT 1/0');
+  eq(aborted.state, { released: 0, destroyed: 1 }, 'so does one that leaves an aborted transaction (25P02)');
+  const stuck = fakePool((sql, params) => (stuck.log.filter(entry => entry.sql.startsWith('SET search_path')).length === 2 && sql.startsWith('SET search_path') ? pgError('57014') : undefined));
   await new PostgresStore(stuck, { ownsPool: false }).exec('SELECT 1');
-  eq(stuck.state, { released: 0, destroyed: 1 }, 'a client whose scope reset fails is destroyed, never pooled still in system scope');
+  eq(stuck.state, { released: 0, destroyed: 1 }, 'a client whose session setup cannot be re-run after exec() is destroyed, never pooled with an unknown scope');
+}
+{
+  // Only store.js declares pri.scope / pri.account_id. Under the session-default
+  // design a session-level SET (or set_config(…, false)) inside an account
+  // transaction would outlive its COMMIT and widen or misdirect every later
+  // statement on that pooled connection, so no other server source may contain
+  // one — handlers declare scope only through transaction({ accountScope }).
+  const SERVER = join(ROOT, 'server');
+  const files = [];
+  const walk = dir => {
+    for (const name of readdirSync(dir)) {
+      if (name === 'node_modules' || name.startsWith('.')) continue;
+      const path = join(dir, name);
+      if (statSync(path).isDirectory()) { if (path !== join(SERVER, 'test')) walk(path); }
+      else if (/\.(m?js|cjs)$/.test(name)) files.push(path);
+    }
+  };
+  walk(SERVER);
+  const SCOPE_WRITE = [/\b(?:re)?set\s+(?:session\s+|local\s+)?pri\./gi, /set_config\s*\(\s*['"`]pri\./gi];
+  const code = text => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
+  const found = {};
+  for (const file of files) {
+    const hits = SCOPE_WRITE.flatMap(re => code(readFileSync(file, 'utf8')).match(re) || []);
+    if (hits.length) found[file.slice(ROOT.length + 1)] = hits.length;
+  }
+  ok(files.length > 50 && files.some(f => f.endsWith(join('platform', 'store.js'))), `the scan covers the server sources (${files.length} files, store.js included)`);
+  // store.js: exactly the SET LOCAL pair in scopeStatement() and the session constant.
+  // postgres-target-check.mjs (an operator tool on a raw client): one transaction-local set_config(…, true).
+  eq(found, { 'server/platform/store.js': 4, 'server/tools/postgres-target-check.mjs': 1 },
+    'no server source outside store.js declares pri.scope or pri.account_id (the operator tool only transaction-locally)');
+  ok(/BEGIN READ ONLY; SELECT set_config\('pri\.scope', 'system', true\)/.test(readFileSync(join(SERVER, 'tools', 'postgres-target-check.mjs'), 'utf8')), 'and the tool\'s one declaration is transaction-local (is_local = true) inside its own READ ONLY transaction');
+  // The scan itself catches what it must: every spelling below is detected.
+  for (const probe of ["SET pri.scope = 'system'", "set session pri.account_id = 'x'", "RESET pri.scope", "SELECT set_config('pri.scope', 'system', false)", 'SELECT set_config( "pri.account_id", $1, false)', "SET LOCAL pri.scope = 'account'"]) {
+    ok(SCOPE_WRITE.some(re => new RegExp(re.source, 'i').test(probe)), `the scan detects ${probe}`);
+  }
 }
 
 // ── 2 · The migration's policies (static) ──────────────────────────────────
@@ -243,34 +316,60 @@ if (engine === 'postgres') {
     }, { accountScope: 'acct-a', readOnly: true });
     eq(leaks, [], 'account scope: no owned table shows another account\'s row');
 
-    // (d) Nothing survives on a pooled connection: max 2, so the same clients are reused.
+    // (d) An account scope never survives on a pooled connection: SET LOCAL
+    // reverts to the session's system scope (sessionSetup) at COMMIT and at
+    // ROLLBACK. One connection, so every step below is on the same session.
+    const single = await createPostgresStore(url, { max: 1 });
+    try {
+      const gucsOf = sql => single.get(sql || "SELECT current_setting('pri.scope', true) AS scope, current_setting('pri.account_id', true) AS account");
+      eq(await gucsOf(), { scope: 'system', account: '' }, 'a pooled session of the store is in system scope with no account (sessionSetup)');
+      const inside = await single.transaction(tx => tx.get("SELECT current_setting('pri.scope', true) AS scope, current_setting('pri.account_id', true) AS account"), { accountScope: 'acct-a' });
+      eq(inside, { scope: 'account', account: 'acct-a' }, 'inside an account transaction the same session is in account scope for exactly that account');
+      eq(await gucsOf(), { scope: 'system', account: '' }, 'after its COMMIT the session is back in system scope with no account');
+      await single.transaction(async tx => { await tx.get('SELECT 1'); throw Object.assign(new Error('rollback'), { code: 'PROBE' }); }, { accountScope: 'acct-a' }).catch(() => {});
+      eq(await gucsOf(), { scope: 'system', account: '' }, 'after a ROLLBACK too');
+      await single.transaction(tx => tx.get('SELECT nope FROM missing_table'), { accountScope: 'acct-a' }).catch(() => {});
+      eq(await gucsOf(), { scope: 'system', account: '' }, 'and after a statement error aborted the account transaction');
+      await single.get('SELECT nope FROM missing_table').catch(() => {});
+      eq(await gucsOf(), { scope: 'system', account: '' }, 'a failed statement outside a transaction leaves the session scope as it was');
+      // A script that changes the session scope itself: exec() re-asserts system scope after it.
+      await single.exec("SET pri.scope = 'account'; SET pri.account_id = 'acct-b'");
+      eq(await gucsOf(), { scope: 'system', account: '' }, 'after exec() of a script that set an account scope session-wide, the session is system again');
+      await single.exec('RESET pri.scope; RESET pri.account_id');
+      eq(await gucsOf(), { scope: 'system', account: '' }, 'and after one that reset it');
+      // A script that leaves a transaction open with a session-level account
+      // scope inside it: the post-exec DISCARD ALL is refused there, so that
+      // session is destroyed — the next statement runs on a fresh one.
+      const pidBefore = (await single.get('SELECT pg_backend_pid() AS pid')).pid;
+      await single.exec("BEGIN; SET pri.scope = 'account'; SET pri.account_id = 'acct-b'");
+      const pidAfter = (await single.get('SELECT pg_backend_pid() AS pid')).pid;
+      ok(pidAfter !== pidBefore, `a session left inside an open transaction by exec() is destroyed, not pooled (backend ${pidBefore} → ${pidAfter})`);
+      eq(await gucsOf(), { scope: 'system', account: '' }, 'and the replacement session is in system scope with no account');
+      let lingering = 1;
+      for (let i = 0; i < 40 && lingering; i++) {
+        lingering = Number((await scratch.client.query('SELECT count(*)::int AS n FROM pg_stat_activity WHERE pid = $1', [pidBefore])).rows[0].n);
+        if (lingering) await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      eq(lingering, 0, 'and the abandoned backend is gone (its open transaction rolled back)');
+      eq(single.stats.transactions, 3, 'three store transactions ran on the max-1 pool');
+    } finally {
+      await single.close();
+    }
     for (let i = 0; i < 4; i++) {
       await store.transaction(tx => tx.get('SELECT 1'), { accountScope: 'acct-a' });
       await store.transaction(() => { throw Object.assign(new Error('rollback'), { code: 'PROBE' }); }, { accountScope: 'acct-a' }).catch(() => {});
     }
-    const after = await store.pool.connect();
+    // A connection that is not one of the store's sessions declares nothing and
+    // sees nothing — whatever the store did before on other sessions.
+    const outsider = new pg.Client({ connectionString: url });
+    await outsider.connect();
     try {
-      const gucs = (await after.query("SELECT current_setting('pri.scope', true) AS scope, current_setting('pri.account_id', true) AS account")).rows[0];
-      ok(!gucs.scope && !gucs.account, `after COMMIT and ROLLBACK a pooled connection carries no scope (scope=${JSON.stringify(gucs.scope)}, account=${JSON.stringify(gucs.account)})`);
-      eq(await count(after, 'operational_events'), 0, 'and used directly, outside the store, it sees no rows');
+      await outsider.query('SET search_path TO pri');
+      const gucs = (await outsider.query("SELECT current_setting('pri.scope', true) AS scope, current_setting('pri.account_id', true) AS account")).rows[0];
+      ok(!gucs.scope && !gucs.account, `a new pri_server connection outside the store carries no scope (scope=${JSON.stringify(gucs.scope)}, account=${JSON.stringify(gucs.account)})`);
+      eq([await count(outsider, 'operational_events'), await count(outsider, 'accounts')], [0, 0], 'and sees no rows');
     } finally {
-      after.release();
-    }
-    await store.exec('SELECT 1');
-    const afterExec = await store.pool.connect();
-    try {
-      eq((await afterExec.query("SELECT current_setting('pri.scope', true) AS s")).rows[0].s || '', '', 'after exec() the session scope is reset');
-    } finally {
-      afterExec.release();
-    }
-    await store.get('SELECT 1').catch(() => {});
-    await store.get('SELECT nope FROM missing_table').catch(() => {});
-    const afterError = await store.pool.connect();
-    try {
-      const s = (await afterError.query("SELECT current_setting('pri.scope', true) AS s")).rows[0].s || '';
-      eq(s, '', 'after a failed unscoped-by-caller statement the connection carries no scope');
-    } finally {
-      afterError.release();
+      await outsider.end();
     }
 
     // (d2) Declaring the scope takes no snapshot: a SERIALIZABLE / REPEATABLE READ
@@ -418,6 +517,64 @@ if (engine === 'postgres') {
       const rehome = await store.transaction(tx => tx.run(`UPDATE ${t} SET account_id = 'acct-b' WHERE account_id = 'acct-a'`), { accountScope: 'acct-a' }).catch(error => error);
       ok(String(rehome?.dbCode || rehome?.code) === '42501', `${t}: account scope cannot move its own row to another account (got ${rehome?.dbCode || rehome?.code || 'no error'})`);
     }
+    // INSERT for another account, per owned table: acct-a's own row copied with
+    // account_id = 'acct-b' is refused by the policy's WITH CHECK (42501). The
+    // control — the same copy for acct-a itself — is NOT refused by RLS (it hits
+    // a unique key or succeeds and is rolled back), so the refusal is the
+    // account check and nothing else.
+    const ROLLBACK_PROBE = Object.assign(new Error('rollback probe'), { code: 'PROBE' });
+    const copyAs = (t, account) => `INSERT INTO ${t} SELECT * FROM jsonb_populate_record(NULL::${t},
+      (SELECT to_jsonb(x) || jsonb_build_object('account_id', '${account}') FROM ${t} x WHERE account_id = 'acct-a' LIMIT 1))`;
+    for (const t of OWNED) {
+      const smuggled = await store.transaction(tx => tx.run(copyAs(t, 'acct-b')), { accountScope: 'acct-a' }).catch(error => error);
+      ok(String(smuggled?.dbCode || smuggled?.code) === '42501' && /row-level security/.test(String(smuggled?.cause?.message || smuggled?.message)),
+        `${t}: account scope cannot INSERT a row for another account — refused by the RLS policy (got ${smuggled?.dbCode || smuggled?.code || 'no error'} ${String(smuggled?.cause?.message || smuggled?.message || '').slice(0, 80)})`);
+      const control = await store.transaction(async tx => { await tx.run(copyAs(t, 'acct-a')); throw ROLLBACK_PROBE; }, { accountScope: 'acct-a' }).catch(error => error);
+      ok(String(control?.dbCode || control?.code) !== '42501', `${t}: control — the same INSERT for its own account is not refused by RLS (got ${control?.dbCode || control?.code})`);
+    }
+
+    // SHARED tables (no NOT NULL account_id): account scope reads and writes
+    // them exactly as system scope does. This is the current, documented
+    // behaviour (docs/security/threat-model.md §7, "Not covered — shared tables
+    // in account scope"); it is pinned here so that any change — tightening a shared
+    // table, or a new table landing unclassified — is a deliberate edit.
+    const SHARED = [
+      'accounts', 'assignment_feedback', 'assignment_submissions', 'assignments', 'audit_log',
+      'billing_apple_signed_events', 'billing_events', 'billing_google_notifications', 'billing_payments', 'billing_refunds',
+      'class_members', 'classes', 'content_revisions', 'feature_flags', 'issue_reports', 'login_attempts', 'oidc_nonces',
+      'otp_challenges', 'platform_meta', 'rate_limits', 'sync_cursors', 'teacher_invites', 'tutor_cache'
+    ];
+    eq(tables.filter(t => !OWNED.includes(t)), SHARED, 'the shared (not account-owned) pri tables are exactly the pinned list');
+    // audit_log: UPDATE/DELETE revoked (20261007000000_security_hardening.sql);
+    // sync_cursors: writes revoked once the sequence took over (20261002000000).
+    const SHARED_APPEND_ONLY = ['audit_log', 'sync_cursors'];
+    const firstColumn = Object.fromEntries((await su.query(`SELECT table_name, column_name FROM information_schema.columns
+      WHERE table_schema = 'pri' AND ordinal_position = 1`)).rows.map(r => [r.table_name, r.column_name]));
+    const sharedView = {};
+    await store.transaction(async tx => {
+      for (const t of SHARED) {
+        const col = firstColumn[t];
+        // Each write in its own savepoint: a table without an UPDATE grant
+        // (append-only ledgers) refuses by privilege, not by RLS.
+        const updated = await tx.transaction(inner => inner.run(`UPDATE ${t} SET ${col} = ${col}`)).then(r => r.changes, error => `refused ${error?.dbCode || error?.code}${/permission denied for table/.test(String(error?.message)) ? ' (grant)' : ''}`);
+        sharedView[t] = { read: Number((await tx.get(`SELECT count(*)::int AS n FROM ${t}`)).n), updated };
+      }
+      await tx.run("INSERT INTO accounts(id,email,name,role,created_at,updated_at) VALUES ('acct-x','acct-x@example.test','X','student',1,1)");
+      await tx.run("INSERT INTO class_members(class_id,student_account_id,joined_at) VALUES ('c1','acct-x',1)");
+      await tx.run("UPDATE accounts SET name = 'renamed' WHERE id = 'acct-b'");
+      sharedView.written = {
+        members: Number((await tx.get("SELECT count(*)::int AS n FROM class_members WHERE class_id = 'c1'")).n),
+        renamed: (await tx.get("SELECT name FROM accounts WHERE id = 'acct-b'")).name
+      };
+      throw ROLLBACK_PROBE;
+    }, { accountScope: 'acct-a' }).catch(error => { if (error !== ROLLBACK_PROBE && error?.code !== 'PROBE') throw error; });
+    eq(SHARED.filter(t => sharedView[t].read !== after[t].n), [], 'shared tables: account scope reads every row, exactly as system scope (pinned current behaviour)');
+    const notUpdatable = SHARED.filter(t => typeof sharedView[t].updated !== 'number');
+    eq(SHARED.filter(t => typeof sharedView[t].updated === 'number' && sharedView[t].updated !== after[t].n), [], 'shared tables: where pri_server may UPDATE at all, account scope updates every row, exactly as system scope (pinned current behaviour)');
+    eq(notUpdatable, SHARED_APPEND_ONLY, 'shared tables: the ones account scope cannot update are exactly the append-only ones');
+    eq(notUpdatable.map(t => sharedView[t].updated), SHARED_APPEND_ONLY.map(() => 'refused 42501 (grant)'), 'and they are refused by the table grant, not by RLS');
+    eq(sharedView.written, { members: 3, renamed: 'renamed' }, 'shared tables: account scope can insert an account and a class membership, and rename another account (pinned current behaviour; rolled back)');
+
     // A scope that names no existing account, or another one, sees nothing of acct-a.
     const stranger = await store.transaction(async tx => Number((await tx.get("SELECT count(*)::int AS n FROM account_sessions WHERE account_id = 'acct-a'")).n), { accountScope: 'acct-zzz' });
     eq(stranger, 0, 'an account scope for another account sees none of acct-a\'s rows');
@@ -449,4 +606,4 @@ if (failures.length) {
   console.error(`RLS FAIL-CLOSED: FAIL — ${failures.length} of ${passed + failures.length}\n  · ${failures.join('\n  · ')}`);
   process.exit(1);
 }
-console.log(`RLS FAIL-CLOSED: PASS — ${passed}/${passed} checks — every store statement declares a scope; unscoped access sees nothing${engine === 'postgres' ? '; account scope sees only its own rows, system scope all, and no scope outlives its transaction on Postgres as pri_server' : ' (run with --engine=postgres for the live proof)'}.`);
+console.log(`RLS FAIL-CLOSED: PASS — ${passed}/${passed} checks — every store statement declares a scope; unscoped access sees nothing${engine === 'postgres' ? '; account scope sees and inserts only its own rows, shared tables pinned, system scope all, and no account scope outlives its transaction on Postgres as pri_server' : ' (run with --engine=postgres for the live proof)'}.`);

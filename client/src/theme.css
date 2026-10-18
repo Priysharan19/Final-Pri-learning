@@ -823,7 +823,7 @@ select.input {
 
 /* ── Mobile nav ────────────────────────────────────────────────────────── */
 .mobilenav {
-  display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 80; padding: 8px 6px calc(8px + env(safe-area-inset-bottom));
+  display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 80; padding: 8px 6px calc(8px + var(--pri-inset-bottom));
   justify-content: space-around}
 .mnav-item { display: grid; place-items: center; gap: 2px; font-size: 10.5px; background: none; border: none; font-family: inherit; padding: 4px 10px; border-radius: 4px; }
 
@@ -848,8 +848,8 @@ select.input {
 @media (min-width: 1000px) { .qcard.split { max-width: none; } }
 html { -webkit-text-size-adjust: 100%; }
 body { overscroll-behavior-y: none; }
-.topbar { padding-top: max(0px, env(safe-area-inset-top)); }
-@media (display-mode: standalone) { .topbar { padding-top: max(4px, env(safe-area-inset-top)); } }
+.topbar { padding-top: max(0px, var(--pri-inset-top)); }
+@media (display-mode: standalone) { .topbar { padding-top: max(4px, var(--pri-inset-top)); } }
 
 /* qcard compat (exam room uses it) */
 .qcard { max-width: 820px; margin: 0 auto; }
@@ -1036,7 +1036,7 @@ body { overscroll-behavior-y: none; }
 }
 .mnav-sheet {
   position: fixed; z-index: 82; left: 8px; right: 8px;
-  bottom: calc(64px + env(safe-area-inset-bottom));
+  bottom: calc(64px + var(--pri-inset-bottom));
   background: var(--surface); border: 1px solid var(--hairline-strong);
   border-radius: var(--radius); box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
   padding: 8px; display: grid; gap: 2px;
@@ -1234,7 +1234,7 @@ h3 { font-size: 16.5px; line-height: 1.3; }
    the app's furniture leaves. The page keeps one way out. */
 .shell.is-focus .sidebar, .shell.is-focus ~ .mobilenav { display: none !important; }
 .shell.is-focus .topbar { display: none; }
-.shell.is-focus .content { max-width: none; padding: 0 0 calc(24px + env(safe-area-inset-bottom)); }
+.shell.is-focus .content { max-width: none; padding: 0 0 calc(24px + var(--pri-inset-bottom)); }
 
 /* ── Surfaces ─────────────────────────────────────────────────────────────── */
 .card, .home-card, .goal-card, .auth-card, .auth-panel, .editor-shell, .pri-explain-dialog {
@@ -1406,7 +1406,7 @@ h3 { font-size: 16.5px; line-height: 1.3; }
   .sheet {
     left: 0; right: 0; top: auto; bottom: 0; transform: none; width: 100%;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0; max-height: 86vh;
-    padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+    padding: 18px 16px calc(18px + var(--pri-inset-bottom));
     animation: sheetUp var(--motion-sheet) var(--ease-standard);
   }
   
@@ -1554,7 +1554,7 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 
 .ws-bar {
   position: sticky; top: 0; z-index: 60; display: flex; align-items: center; gap: 12px;
-  min-height: 52px; padding: calc(6px + env(safe-area-inset-top)) 16px 6px 10px;
+  min-height: 52px; padding: calc(6px + var(--pri-inset-top)) 16px 6px 10px;
   background: var(--paper);
   border-bottom: 1px solid var(--hairline);
 }
@@ -1681,7 +1681,7 @@ h3 { font-size: 16.5px; line-height: 1.3; }
 /* The one dominant next move */
 .ws-actions {
   position: sticky; bottom: 0; z-index: 25; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  margin: 6px calc(-1 * var(--ws-pad)) 0; padding: 12px var(--ws-pad) calc(12px + env(safe-area-inset-bottom));
+  margin: 6px calc(-1 * var(--ws-pad)) 0; padding: 12px var(--ws-pad) calc(12px + var(--pri-inset-bottom));
   background: var(--paper);
   border-top: 1px solid var(--hairline);
 }
@@ -1836,7 +1836,7 @@ html.theme-switching, html.theme-switching * {
 .pri-explain-progress > i { background: var(--accent); }
 
 .mobilenav {
-  min-height: calc(62px + env(safe-area-inset-bottom));
+  min-height: calc(62px + var(--pri-inset-bottom));
   border-top: 1px solid var(--hairline)}
 .mnav-item { min-height: 50px; color: var(--ink-3); font-weight: 550; }
 .mnav-item.active { color: var(--ink); }
@@ -1875,7 +1875,7 @@ html.theme-switching, html.theme-switching * {
 @media (max-width: 760px) {
   :root { --content-gutter: 16px; --text-math: 18px; }
   .topbar { min-height: 54px; height: 54px; padding-inline: 12px; }
-  .content { padding: 18px var(--content-gutter) calc(92px + env(safe-area-inset-bottom)); }
+  .content { padding: 18px var(--content-gutter) calc(92px + var(--pri-inset-bottom)); }
   .home-wrap { padding-top: 4px; }
   .home-next { padding: 22px 18px 20px; }
   .home-next-cta .btn-primary { width: 100%; }
@@ -1891,11 +1891,22 @@ html.theme-switching, html.theme-switching * {
   .ws-work { padding: 4px 12px 0; gap: 12px; }
   .ws-tools { gap: 6px; }
   .ws-tools .seg > button { padding: 0 10px; }
-  .ws-actions { position: fixed; left: 0; right: 0; bottom: 0; margin: 0; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
+  /* The action bar stays in the page's flow (sticky, not fixed), so it is its
+     own spacer: at the foot of the page it sits beneath the last field or
+     option instead of over it, whatever its height (one line of status or
+     two, a retry button, a larger text size). */
+  .ws-work { --ws-pad: 12px; }
+  .ws-actions { position: sticky; bottom: 0; margin: auto -12px 0; padding: 10px 12px calc(10px + var(--pri-inset-bottom)); }
+  /* A short question still puts the bar at the foot of the screen: the work
+     column takes the page's remaining height and the bar its last place. */
+  .ws-page { min-height: 100vh; min-height: 100dvh; }
+  .qpage.ws { display: flex; flex-direction: column; }
+  .qpage.ws > .ws-work { flex: 1 0 auto; }
   .ws-actions .status-line { min-width: 0; flex-basis: 100%; order: 2; font-size: 12.5px; }
   .ws-actions-btns { width: 100%; margin: 0; }
   .ws-actions-btns .btn-primary { flex: 1; min-height: 48px; }
-  .qpage.ws { padding-bottom: calc(118px + env(safe-area-inset-bottom)); }
+  .qpage.ws { padding-bottom: 0; }
+  .shell.is-focus .content:has(.ws-actions) { padding-bottom: 0; }
   .ws-qpeek { margin: 0 -12px -40px; padding: 8px 12px; top: 52px; }
   
   
@@ -1934,12 +1945,12 @@ html.theme-switching, html.theme-switching * {
 /* Pri Explain's launcher is a quiet secondary action, docked above the
    action bar rather than floating over the work. */
 .pri-explain-launch {
-  right: 20px; bottom: calc(86px + env(safe-area-inset-bottom)); border-radius: var(--radius);
+  right: 20px; bottom: calc(86px + var(--pri-inset-bottom)); border-radius: var(--radius);
   border-color: var(--hairline-strong); box-shadow: var(--shadow-sm); padding: 8px 12px; animation: none;
 }
 .pri-explain-launch:hover { transform: none; }
 .pri-explain-play { background: var(--ink); color: var(--surface); width: 28px; height: 28px; font-size: 10px; }
-@media (max-width: 760px) { .pri-explain-launch { right: 12px; bottom: calc(132px + env(safe-area-inset-bottom)); } }
+@media (max-width: 760px) { .pri-explain-launch { right: 12px; bottom: calc(132px + var(--pri-inset-bottom)); } }
 
 /* Pri Explain's launcher sits in the page flow under the marked work: a quiet
    secondary action, never a card floating over the student's reasoning. */
@@ -2185,4 +2196,137 @@ html.theme-switching, html.theme-switching * {
     animation: none !important;
   }
   .btn, .btn:active:not(:disabled) { transform: none; transition: none; }
+}
+
+/* ── iPhone portrait: edge to edge, and nothing under a bar ─────────────────
+   On iPhone the native shell lets the page run under the status bar and the
+   home indicator (ios/PriLearning.swiftpm/PriLearningApp.swift), as an
+   installed web app with viewport-fit=cover always has. The page background
+   fills those strips, and every bar and full-screen layer pads itself with the
+   --pri-inset-* tokens (0 on desktop, on iPad and in a plain browser tab).
+   The workspace's sticky bar heights are tokens too, so a scroll into view
+   (focus, find, the Settings section menu) lands below the top bar and above
+   the bottom one. Layout changes below are COMPACT-only (≤ 760px):
+   docs/design/PRI-DREAM-INTERFACE.md §8. iPad and desktop are unchanged.
+   client/test/tour-iphone-layout.js holds every rule here to account.
+   ────────────────────────────────────────────────────────────────────────── */
+:root { --ws-bar-h: 52px; --mobilenav-h: 66px; --topbar-h: 58px; }
+html { background-color: var(--page); }
+
+/* Full-screen layers keep their content out of the status bar and the home
+   indicator. With the insets at 0 these are the existing values. */
+.drawer, .paper-overlay { padding-top: var(--pri-inset-top); padding-bottom: var(--pri-inset-bottom); }
+.skip-link { top: calc(8px + var(--pri-inset-top)); transform: translateY(calc(-100% - 16px - var(--pri-inset-top))); }
+:root .pri-explain-backdrop { padding: calc(14px + var(--pri-inset-top)) 14px calc(14px + var(--pri-inset-bottom)); }
+:root .nt-cards-scrim { padding: calc(16px + var(--pri-inset-top)) 16px calc(16px + var(--pri-inset-bottom)); }
+@media (max-width: 820px) {
+  :root .pri-explain-dialog { height: min(97dvh, calc(100dvh - 28px - var(--pri-inset-top) - var(--pri-inset-bottom))); }
+}
+
+/* Photo: one obvious target. The instruction leads and the formats sit under
+   it, never squeezed into a column beside it. */
+.photo-pick { justify-content: flex-start; align-items: flex-start; gap: 12px; text-align: left; white-space: normal; height: auto; padding-top: 12px; padding-bottom: 12px; }
+.photo-pick > svg { flex: none; margin-top: 2px; }
+.photo-pick-text { display: grid; gap: 2px; min-width: 0; }
+.photo-pick-help { font-size: 12.5px; font-weight: 400; line-height: 1.4; color: var(--ink-3); }
+
+/* A plan session that has been touched today is started, not finished. */
+.plan-started { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; font-size: 12px; font-weight: 500; color: var(--ink-3); white-space: nowrap; }
+.plan-started svg { color: var(--accent); }
+
+/* On a phone the demo is a short link and what it holds is said quietly
+   beneath it; wider screens keep the one-line link. */
+.hero-demo-note { display: none; margin: 4px auto 0; max-width: 34ch; font-size: 13px; line-height: 1.45; color: var(--ink-3); text-align: center; }
+
+@media (max-width: 760px) {
+  :root { --ws-bar-h: 60px; }
+
+  /* Shell pages: anything scrolled into view clears the sticky top bar and
+     the fixed bottom bar. */
+  :root:has(.shell:not(.is-focus)) {
+    scroll-padding: calc(var(--topbar-h) + var(--pri-inset-top) + 8px) 0 calc(var(--mobilenav-h) + var(--pri-inset-bottom) + 8px);
+  }
+  .mobilenav { min-height: calc(var(--mobilenav-h) + var(--pri-inset-bottom)); }
+
+  /* First entry: clear of the status bar and the home indicator. Ruled paper
+     keeps its feint lines; the margin rule, at 8vw, ran through centred text
+     on a phone, so it is drawn only where there is a margin to rule. */
+  .auth-wrap { padding: calc(18px + var(--pri-inset-top)) 18px calc(18px + var(--pri-inset-bottom)); }
+  .mathfield { background-image: repeating-linear-gradient(180deg, transparent 0 31px, var(--paper-rule) 31px 32px); }
+  .hero-demo-detail { display: none; }
+  .hero-demo-note { display: block; }
+
+  /* Workspace top bar: one fixed height, so the question recall bar and every
+     scroll into view know where it ends. The way out is its chevron alone
+     (its accessible name is unchanged) and the topic may take two lines. */
+  .ws-bar {
+    height: calc(var(--ws-bar-h) + var(--pri-inset-top)); min-height: 0;
+    padding-top: calc(4px + var(--pri-inset-top)); padding-bottom: 4px;
+  }
+  .ws-bar .ws-exit > span { display: none; }
+  .ws-bar .ctx-pill-name {
+    white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+    line-height: 1.22; overflow-wrap: anywhere;
+  }
+  /* The question recall bar hangs from the top bar. Sticky inside the work
+     column it sat at its place in the flow until the column reached the top,
+     and there it lay over the mode switch; fixed, it only ever covers what
+     has already scrolled up under the top bar. */
+  .shell.is-focus .ws-qpeek { position: fixed; left: 0; right: 0; top: calc(var(--ws-bar-h) + var(--pri-inset-top)); margin: 0; }
+  /* A question inside the shell (the placement check) has the app's own top
+     and bottom bars: the recall bar hangs below the one, the action bar sits
+     above the other instead of under it. */
+  .shell:not(.is-focus) .ws-qpeek { top: calc(var(--topbar-h) + var(--pri-inset-top)); }
+  .shell:not(.is-focus) .ws-actions { bottom: calc(var(--mobilenav-h) + var(--pri-inset-bottom)); padding-bottom: 10px; }
+  :root:has(.shell.is-focus) {
+    scroll-padding: calc(var(--ws-bar-h) + var(--pri-inset-top) + 48px) 0 calc(128px + var(--pri-inset-bottom));
+  }
+
+  /* Type · Write · Photo spans the column: three equal, finger-sized parts. */
+  .ws-tools .mode-tabs { display: flex; flex: 1 1 100%; }
+  .ws-tools .mode-tabs > .mode-tab { flex: 1 1 0; justify-content: center; }
+
+  /* The status under the primary action: each statement on one line of its
+     own instead of two narrow columns that each wrap. */
+  .ws-actions .status-line { flex-wrap: wrap; column-gap: 12px; row-gap: 2px; line-height: 1.35; }
+  .ws-actions .status-line > .ws-read-by { margin-left: 0; white-space: nowrap; }
+
+  .photo-pick { width: 100%; padding-left: 16px; padding-right: 16px; }
+
+  /* The first screen's text links are finger-sized targets. */
+  .auth-wrap .linklike { min-height: var(--tap-min); padding: 0 8px; }
+
+  /* The two ends of the question bar are one pair: back and next are the
+     same 44px keycap, an arrow each. */
+  .ws-bar .ws-exit, .ws-bar .ctx-next {
+    min-width: var(--tap-min); min-height: var(--tap-min); padding: 0; justify-content: center;
+    border: 1px solid var(--hairline-strong); border-radius: var(--radius-sm);
+    background: var(--surface); color: var(--ink); box-shadow: 0 1px 0 var(--hairline-strong);
+  }
+
+  /* The ink toolbar stays one row down to a 375pt phone: 44px tools with no
+     inner padding and narrower separators; below 380px the separators go. */
+  .ink-toolbar .ink-tool { padding: 0; }
+  .ink-toolbar .ink-sep { margin: 0 2px; }
+}
+@media (max-width: 379px) {
+  .ink-toolbar .ink-sep { display: none; }
+}
+/* A phone at 200% zoom lays out in 190–215px. Nothing may run off the side:
+   the mode switch drops its icons and lets its words share the width, the
+   tools and the action buttons wrap, and a long inline formula scrolls
+   inside the question instead of widening the page (WCAG 1.4.10). */
+@media (max-width: 299px) {
+  .ws-tools .mode-tabs > .mode-tab { min-width: 0; padding: 0 4px; gap: 0; }
+  .ws-tools .mode-tabs > .mode-tab svg { display: none; }
+  .ws-tools-end { flex-wrap: wrap; justify-content: flex-end; }
+  /* Stuck to the foot, the action bar would take most of a 330px-tall
+     window: at this zoom it stays at the end of the page instead. */
+  .ws-actions { position: static; }
+  .ws-actions-btns { flex-wrap: wrap; }
+  .ws-actions .btn-primary, .ws-actions-btns .btn { min-width: 0; flex: 1 1 100%; }
+  .ws-context .q-prompt { overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; }
+  .ws-actions .status-line > .ws-read-by { white-space: normal; }
+  .answer-row .answer-input { min-width: 0; flex: 1 1 96px; }
+  .q-topmeta .tag { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
 }

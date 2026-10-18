@@ -58,6 +58,8 @@ suites and `request-size-contract-check`.
 | mfa-check | 101/101 | 101/101 |
 | oidc-consent-check | 32/32 | 32/32 |
 | security-hardening-check | 141/141 | 144/144 (three Postgres-only RLS checks) |
+| rls-fail-closed-check | 134/134 | 272/272 (only store.js declares the scope; exec() never pools a session left in a transaction; fail closed outside the store; per owned table read/update/delete/re-home/insert across accounts refused; shared-table behaviour pinned — threat-model §7) |
+| postgres-connection-config-check | 132/132 (transaction-mode poolers refused: authority/`?port=`/`PGPORT`, any key case) | n/a (no database) |
 | secret scan | 1,126 tracked files + 95 `client/dist` files: 0 findings | — |
 | `npm audit --omit=dev` | client 0, server 0; root declares no dependencies | — |
 

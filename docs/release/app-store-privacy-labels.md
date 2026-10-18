@@ -1,92 +1,120 @@
 # App Store "App Privacy" (nutrition label) — answers derived from the code
 
-**Status:** engineering draft, derived from the code on the branch that adds it. **Not entered in
-App Store Connect, not legally reviewed.** Every row cites the code path that justifies it; a row
-marked **OWNER** is a decision the repository cannot make. The machine-readable twin of this
-document is the privacy manifest `ios/PriLearning.swiftpm/PrivacyInfo.xcprivacy` (PR #304 /
-CP-12), which `scripts/store-readiness-check.mjs` holds to a fixed set of data types; the two must
-stay in step. Companions: `docs/release/play-data-safety.md` (the Play form),
-`docs/release/STORE_READINESS.md`, `docs/legal/privacy.md`, `docs/privacy/data-retention.md`.
+**Status:** engineering draft, reconciled with the code on `main` at `7bef402f7` (2026-10-18,
+Phase 6 preparation). **Not entered in App Store Connect, not legally reviewed.** Every row cites
+the code path that justifies it; a row marked **OWNER** is a decision the repository cannot make.
 
-Apple's definitions: **Collected** = transmitted off the device in a way that identifies the user,
-or linked to them server-side. **Linked to the user** = associated with the account. **Tracking** =
-linking with third-party data for advertising or sharing with data brokers. **Third-party data
-sharing** is declared inside each type.
+The machine-readable twin of this document is the privacy manifest
+`ios/PriLearning.swiftpm/Resources/PrivacyInfo.xcprivacy` (byte-identical copy in
+`ios/PriLearning 2.swiftpm/Resources/`, enforced by `scripts/check-native-package-sync.mjs`). The
+two must stay in step: if the code changes what leaves the device, change this file,
+`docs/release/play-data-safety.md`, the manifest and `docs/legal/privacy.md` together.
+Companions: `docs/privacy/data-retention.md`, `docs/legal/counsel/COUNSEL-INFORMATION-PACK.md`.
+
+Apple's definitions: **Collected** = transmitted off the device in a way that lets the developer
+or its partners access it for longer than needed to service the request in real time. **Linked
+to the user** = associated with the account. **Tracking** = linking with third-party data for
+targeted advertising or advertising measurement, or sharing with a data broker.
+
+## 0. What changed in this reconciliation (2026-10-18)
+
+The previous draft was written before online-only server grading (ADR-0001 amendment,
+2026-10-10). The mismatches found and fixed are listed in §5. In short: the manifest was missing
+six data types that the code collects; the draft claimed manifest entries that did not exist; and
+several rows said marks are decided on the device, which is no longer true.
 
 ## 1. Headline answers
 
 | App Store Connect question | Answer | Why (code) |
 |---|---|---|
-| Do you or your third-party partners collect data from this app? | **Yes** | A cloud account sends data to the Pri server (`server/platform/accounts.js`, `sync.js`, `handwriting.js`). Without an account the client makes no `/v1` call that carries user data (`client/src/platform/cloudTransport.js`). |
-| Is any data used to track the user? | **No** | No advertising/analytics SDK; `NSPrivacyTracking = false` and an empty `NSPrivacyTrackingDomains` (`PrivacyInfo.xcprivacy`, enforced by `store-readiness-check`); the client may reach only its own origin (`tools/check-client-network-boundary.mjs`). |
-| Privacy policy URL | `<PRI_PUBLIC_ORIGIN>/privacy` (EN; the page offers Hindi). **OWNER:** production origin; the placeholders must be filled and the notice reviewed first (`node tools/legal-status.mjs`). | `client/src/pages/Legal.jsx`, `docs/legal/privacy.md`, `client/test/legal-pages-check.mjs`. |
-| Account deletion (Guideline 5.1.1(v)) | In-app for every sign-in method: Settings → Account → Delete cloud account — password, Apple/Google re-auth, or a fresh one-time code to the account's own email/phone. Also at `<PRI_PUBLIC_ORIGIN>/account/delete-request` for someone without the app. Immediate; no grace period. | `client/src/components/CloudAccountSecurity.jsx` → `DELETE /v1/account` (`accounts.js authorizeAccountDeletion`); `client/src/pages/AccountDeleteRequest.jsx` → `POST /v1/account/otp/delete-request` + `/delete-confirm` (`otp.js`); `deleteAccountRows()`; `server/test/account-deletion-public-check.mjs`; `client/test/tour-account-deletion.js`. |
-| Sign in with Apple (Guideline 4.8) | Offered on the web; **OWNER:** confirm the native iPad shell exposes it, since the app also offers Google sign-in. | `client/src/platform/socialSignIn.js`, `server/platform/identities.js`, `oidc.js`. |
+| Do you or your third-party partners collect data from this app? | **Yes** | Checking any answer needs a signed-in account and a connection: the server issues each question and grades it (`server/platform/practice.js`, `exams.js`). Sign-in, sync and reading also send data (`accounts.js`, `sync.js`, `handwriting.js`). A signed-out device can browse but nothing is marked and no `/v1` call carries user data (`client/src/platform/cloudTransport.js`). |
+| Is any data used to track the user? | **No** | No advertising or analytics SDK; `NSPrivacyTracking = false`, empty `NSPrivacyTrackingDomains`; the client may reach only its own origin (`tools/check-client-network-boundary.mjs`). |
+| Privacy policy URL | `<PRI_PUBLIC_ORIGIN>/privacy` (expected `https://prilearning.com/privacy` — **OWNER** confirms the production origin). The notice is **outdated** (see `COUNSEL-INFORMATION-PACK.md` §8) and must be rewritten and reviewed before this URL is entered. | `client/src/pages/Legal.jsx`, `docs/legal/privacy.md`. |
+| Account deletion (Guideline 5.1.1(v)) | In-app for every sign-in method: Settings → Account → Delete cloud account (password, Apple/Google re-auth, or a fresh one-time code). Also `<PRI_PUBLIC_ORIGIN>/account/delete-request` for someone without the app. Immediate; no grace period. | `CloudAccountSecurity.jsx` → `DELETE /v1/account`; `AccountDeleteRequest.jsx` → `/v1/account/otp/delete-request` + `/delete-confirm`; `server/test/account-deletion-public-check.mjs`. |
+| Sign in with Apple (Guideline 4.8) | Present in the native shell (`ios/PriLearning.swiftpm/AppleSignInBridge.swift`) alongside Google; **OWNER** confirms both are configured on the release build. | `client/src/platform/socialSignIn.js`, `server/platform/identities.js`, `oidc.js`. |
+| Sharing personal data with third-party AI (Guideline 5.1.2(i), as the owner reads it — counsel to confirm) | Handwriting images and photos go to OpenAI; with the opt-in working check, working lines and question text too. Disclosure is in Settings → Handwriting and the privacy notice; server reading is **on by default** for a signed-in adult. **OWNER / counsel:** decide whether default-on plus disclosure is the "explicit permission" Apple asks for, or whether a one-time consent prompt is needed before the first read. | `client/src/ink/cloudReader.js` rule 1; `settings.cloudHandwritingCopy` in `client/src/i18n/strings.en.js`. |
 
 ## 2. Data types — what to tick, and under which purpose
 
-All collected types below are **Linked to you** and **not used for tracking**. The only purpose
-is **App Functionality** (sign-in, sync, reading, billing). Nothing is used for Third-Party
-Advertising, Developer's Advertising, Analytics-for-marketing, or Product Personalisation in
-Apple's sense (choosing the next maths question is done on the device from the local attempt
-ledger, `client/src/engine/`, and is not a cross-user profile).
+Every collected type is **Linked to you** and **Not used to track you**. Purposes are **App
+Functionality** unless the row adds **Analytics** (the allow-listed operational telemetry).
+Nothing is used for Third-Party Advertising, Developer's Advertising or Marketing, and nothing for
+Product Personalisation in Apple's cross-user sense. The server does choose each next question
+(`practice.js chooseQuestion`) from the account's own attempt history; **OWNER / counsel:** decide
+whether that is "Product Personalisation" for the label (it is per-account adaptivity, not a
+profile shared or used for marketing). Declaring it is the conservative answer.
 
-| Apple data type | Collect? | Manifest type (`PrivacyInfo.xcprivacy`) | Third party receives it? | Why (code) |
+| Apple data type | Tick? | Manifest type | Third party receives it | Why (code) |
 |---|---|---|---|---|
-| **Contact Info → Email Address** | Yes, with a cloud account | `NSPrivacyCollectedDataTypeEmailAddress` | Email delivery provider (Resend), to send links/codes | `accounts.js`; `authDelivery.js`; `otpEmail.js`. |
-| **Contact Info → Phone Number** | Yes, if the student signs in by SMS code | **Not yet in the manifest — OWNER / follow-up:** add `NSPrivacyCollectedDataTypePhoneNumber` (App Functionality, linked, no tracking) to `PrivacyInfo.xcprivacy` and `scripts/store-readiness-check.mjs` when the SMS sign-in is enabled for the iPad build | SMS provider (MSG91 / Twilio Verify) | `otp.js` (`account_phones`), `smsProvider.js`. Only if `PRI_SMS_PROVIDER` is configured; otherwise phone codes answer 503 and no number is ever collected. |
-| **Contact Info → Name** | Yes, with a cloud account | `NSPrivacyCollectedDataTypeName` | No | `accounts.name`; sync profile (`syncWorker.js safeProfile`). |
-| **Contact Info → Physical Address** | **No** | — | — | Never asked for. Payment providers handle any billing address. |
-| **Identifiers → User ID** | Yes | `NSPrivacyCollectedDataTypeUserID` | No | Opaque `acct_…` id (`security.js`). |
-| **Identifiers → Device ID** | Yes | `NSPrivacyCollectedDataTypeDeviceID` | No | A random per-install id the app generates (`cloudAccount.js` `device-<uuid>`), **not** IDFV/IDFA; plus a SHA-256 of the user-agent string (`security.js createSession`). |
-| **Financial Info → Purchase History** | Yes, if the student subscribes | `NSPrivacyCollectedDataTypePurchaseHistory` | No (StoreKit tells Pri via the App Store Server API; Pri sends Apple only an opaque `appAccountToken`) | `appleBilling.js`, `appleSignedData.js`, `billing_apple_accounts`; `billing_payments` retained unlinked after deletion (`data-retention.md` §2). |
-| **Financial Info → Payment Info** | **No** | — | — | Checkout happens in StoreKit / at Razorpay; Pri stores provider ids and amounts only (`billingSchema.js`). |
-| **User Content → Other User Content** (learning events: attempts, marks, chapter, time taken; synced profile/settings/bookmarks/tasks/custom questions; problem reports; typed working lines) | Yes, with a cloud account; working check is opt-in | `NSPrivacyCollectedDataTypeOtherUserContent` | Working lines + question text → OpenAI, only while the opt-in working check is on | `sync.js`, `client/src/platform/syncContract.js`; `reports.js`; `working.js` → `workingProvider.js` (`store: false`). Marks are decided on the device before sync. |
-| **User Content → Photos or Videos** (a photo of paper working; and the rasterised image of Pencil ink, which Apple's categories fit best here) | Yes, when server reading is on (default on for a signed-in account; switchable off in Settings → Handwriting; off for an under-18 account until a guardian confirms) | `NSPrivacyCollectedDataTypePhotosorVideos` | **Yes — OpenAI** (default `api.openai.com`, `PRI_HANDWRITING_ENDPOINT`), `store: false`; the provider may retain for abuse monitoring under its own terms; Pri's server keeps no copy | `client/src/ink/cloudRaster.js` → `POST /v1/handwriting/transcribe` (`handwriting.js`, answer-blind) → `handwritingProvider.js`; `questionPhoto.js`/`questionPhotoProvider.js`; `data-retention.md` §4. Camera access is requested only when the student opens the photo path (`client/src/native/photo.js`). |
-| **User Content → Audio Data, Emails or Text Messages, Gameplay Content, Customer Support** | **No** | — | — | No microphone, no messaging, no in-app support chat. The grievance address is an email the student writes to themselves (`docs/legal/grievance.md`). |
-| **Usage Data → Product Interaction** | Yes (allow-listed telemetry; not for a child until consent) | `NSPrivacyCollectedDataTypeOtherDataTypes` covers it in the current manifest; **OWNER:** decide whether to declare `ProductInteraction` explicitly instead | No | `server/platform/telemetry.js`: ten event types, allow-listed metadata keys, 90-day retention. |
-| **Usage Data → Advertising Data, Other Usage Data** | **No** | — | — | No ads; nothing beyond the allow-list is accepted (`TELEMETRY_EVENT_UNSUPPORTED`). |
-| **Diagnostics → Crash Data / Performance Data** | Partly, through the `client-error` and `performance-sample` telemetry types; no crash-reporting SDK | within `OtherDataTypes` as above | No | `telemetry.js`. **OWNER:** if MetricKit/Crashlytics is added to the shell, declare Crash Data. |
-| **Other Data** (a parent/guardian's name and email or phone; the "18 or older" declaration; class and track) | Yes, for an under-18 account | `NSPrivacyCollectedDataTypeOtherDataTypes` | Guardian email/phone → delivery provider, to send the consent link/code | `guardianConsent.js`; `accounts.age_basis`; `syncWorker.js safeProfile`. |
-| **Location, Health & Fitness, Sensitive Info, Contacts, Browsing History, Search History** | **No** | — | — | No such API is used; the client's network boundary is its own origin only. |
+| **Contact Info → Email Address** | Yes | `EmailAddress` | Resend (email delivery), for links and codes | `accounts.js`; `authDelivery.js`; `otpEmail.js`. Includes a guardian's email for a child's account (`guardianConsent.js`). |
+| **Contact Info → Phone Number** | Yes | `PhoneNumber` (**added**) | SMS provider (MSG91 or Twilio Verify — **OWNER** names the live one) | `otp.js` (`account_phones`), guardian phone code (`GUARDIAN_PHONE_METHOD`), `smsProvider.js`. Collected only when `PRI_SMS_PROVIDER` is configured; declared because the shipped client offers the path. |
+| **Contact Info → Name** | Yes | `Name` | No | `accounts.name`; guardian name (`guardian_consents.guardian_name`). |
+| **Contact Info → Physical Address, Other Contact Info** | No | — | — | Never asked for. |
+| **Identifiers → User ID** | Yes | `UserID` | No (Apple receives only an opaque `appAccountToken` for StoreKit) | Opaque `acct_…` id (`security.js`). |
+| **Identifiers → Device ID** | Yes (conservative) | `DeviceID` (**added**) | No | A random per-install id the app generates (`cloudAccount.js` `device-<uuid>`), not IDFV/IDFA, stored with sessions and synced events; plus a SHA-256 of the user-agent (`security.js createSession`). |
+| **Financial Info → Purchase History** | Yes, if the student subscribes | `PurchaseHistory` | No | `appleBilling.js`, `appleSignedData.js`; `billing_payments` retained unlinked after deletion (`data-retention.md` §2). |
+| **Financial Info → Payment Info, Credit Info, Other Financial Info** | No | — | — | StoreKit handles payment; Pri stores provider ids and amounts only (`billingSchema.js`). |
+| **User Content → Photos or Videos** | Yes | `PhotosorVideos` (**added**) | **OpenAI**, `store: false`; the provider may retain for abuse monitoring under its own terms; Pri's server keeps no copy of the image | A camera photo of paper working (`practice.js` `/:id/recognize` mode `photo`, `questionPhoto`), or of a textbook question for "Practise this" (`server/platform/questionPhoto.js` → `questionPhotoProvider.js`). Camera only when the student opens the photo path (`client/src/pages/PractisePhoto.jsx`). |
+| **User Content → Other User Content** | Yes | `OtherUserContent` | **OpenAI** for the handwriting image and, if the opt-in working check is on, the working lines with the question text; nothing else | (a) The rasterised image of Pencil/finger ink sent for reading (`client/src/ink/cloudRaster.js` → `/v1/handwriting/transcribe` or `/v1/practice/:id/recognize`; answer-blind: `FORBIDDEN_FIELDS`). (b) Typed answers and working submitted for server grading (`practice.js` grade; `exams.js` `exam-answers`). (c) The transcription text the server keeps with each recognition receipt and any student correction — **90 days** (`practice.js` scope `practice-recognition`, `MAX_AGE`). (d) Synced profile/settings/bookmarks/tasks/custom questions (`syncContract.js`). (e) Problem reports (`reports.js`). |
+| **User Content → Audio, Emails or Text Messages, Gameplay Content** | No | — | — | No microphone, no messaging. |
+| **User Content → Customer Support** | **OWNER / counsel** — this draft says No and counts problem reports under Other User Content | — | No | A problem report about a question carries free text the student types (`issue_reports.note`, `reports.js`; cleared on deletion). Whether Apple's "data generated by the user during a customer support request" covers it is undecided; ticking Customer Support as well is the conservative answer. |
+| **Usage Data → Product Interaction** | Yes (not for a child until a guardian confirms) | `ProductInteraction` (**added**) | No | `telemetry.js` events `feature-used`, `exam-completed`, `trial-started`, `subscription-state`; allow-listed metadata; 90-day retention. Purposes: Analytics, App Functionality. |
+| **Usage Data → Other Usage Data** | Yes | `OtherUsageData` | No | Server-graded attempt records (`learning_events` kind `graded-attempt`: question id, correct, marks, subtopic, difficulty, mode, input mode) kept until account deletion; exam papers and results (`exams.js`, record TTL 5 years, deleted with the account). |
+| **Usage Data → Advertising Data** | No | — | — | No ads. |
+| **Diagnostics → Performance Data** | Yes | `PerformanceData` (**added**) | No | `telemetry.js` `performance-sample`. Purposes: Analytics, App Functionality. |
+| **Diagnostics → Other Diagnostic Data** | Yes | `OtherDiagnosticData` | No | `telemetry.js` `client-error`, `sync-failure`, `api-failure`, `recognition-failure`, `bad-question-opened`. |
+| **Diagnostics → Crash Data** | No | — | — | No crash-reporting SDK. **OWNER:** if MetricKit/Crashlytics is added, declare it. |
+| **Other Data** | Yes | `OtherDataTypes` (**added**) | Guardian email/phone → the delivery provider | The "18 or older" declaration (`accounts.age_basis`), class and track, and the guardian-consent record (method, notice version, times). |
+| **Location, Health & Fitness, Sensitive Info, Contacts, Browsing History, Search History** | No | — | — | No such API; the client network boundary is its own origin. |
 
 ### Not collected (and why the label can say so)
 
-- Handwriting **strokes** and the personal handwriting model never leave the device
-  (`client/src/local/idb.js`; only `cloudRaster.js`'s PNG does, and only for server reading).
+- Handwriting **strokes** stay on the device (`client/src/local/idb.js`); only the rasterised
+  image leaves, for reading.
 - The **expected answer, solution and marks** never accompany anything sent for reading
   (`FORBIDDEN_FIELDS` in `handwriting.js`, `working.js`, `questionPhoto.js`).
-- Passwords, session tokens and one-time codes are stored only as hashes (`accounts.js`,
-  `security.js`, `otpCore.js`).
-- Local profiles, progress and ink stay in IndexedDB and are deleted from Settings on the device,
-  not by the server (`data-retention.md` §2 "Not deleted by account deletion").
+- Passwords, session tokens and one-time codes are stored only as hashes.
 
 ### The AI tutor — **OWNER**
 
-`server/platform/tutor.js` sends the question prompt, its verified solution steps and the answer to
-the model provider when the student asks for a hint; it is behind `PRI_FEATURE_TUTOR` and dark by
-default in a production build (`client/test/tour-ai-tutor.js`). If enabled, "Other User Content →
-shared with OpenAI" grows to include the question text and `docs/legal/privacy.md` needs a paragraph
-for it before release.
+`server/platform/tutor.js` sends the question, its verified solution steps and the student's
+message to the model provider. It is compiled out of production builds unless
+`PRI_FEATURE_TUTOR=1` (`client/vite.config.js`). If it is enabled, the "Other User Content →
+OpenAI" row grows to include tutor messages, the 2025 App Store age-rating questions about AI
+assistants must be answered Yes, and `docs/legal/privacy.md` needs a paragraph before release.
 
 ## 3. Required-reason APIs and other manifest facts
 
 | Fact | Where | Enforced by |
 |---|---|---|
-| `NSPrivacyTracking = false`; no tracking domains | `ios/PriLearning.swiftpm/PrivacyInfo.xcprivacy` (+ the `PriLearning 2` mirror) | `scripts/store-readiness-check.mjs`, `scripts/check-native-package-sync.mjs` |
-| Required-reason API: `UserDefaults` → `CA92.1` (the app's own settings) | same | same |
-| Collected types in the manifest today: EmailAddress, Name, UserID, DeviceID, OtherDataTypes, PurchaseHistory, OtherUserContent, PhotosorVideos — each App Functionality, linked, no tracking | same | same |
-| **Gap:** PhoneNumber is not declared; see §2 | — | **OWNER / follow-up** before shipping SMS sign-in on iPad |
+| `NSPrivacyTracking = false`; no tracking domains | `ios/PriLearning.swiftpm/Resources/PrivacyInfo.xcprivacy` (+ mirror) | `scripts/check-native-package-sync.mjs` (identity of the two copies only) |
+| Required-reason API: `UserDefaults` → `CA92.1` | same | same |
+| Collected types after this reconciliation: EmailAddress, PhoneNumber, Name, UserID, DeviceID, PurchaseHistory, PhotosorVideos, OtherUserContent, ProductInteraction, OtherUsageData, PerformanceData, OtherDiagnosticData, OtherDataTypes — all linked, none tracking | same | **No content check exists.** Earlier drafts cited `scripts/store-readiness-check.mjs`; that script is not in the repository. **Follow-up:** add a check that holds this table and the manifest together. |
 
 ## 4. Owner decisions before the label is entered
 
 1. Production origin for the privacy policy and deletion URLs.
-2. Add `PhoneNumber` to the manifest and the readiness check if SMS sign-in ships on iPad (§2).
-3. Whether to declare `ProductInteraction`/`CrashData` explicitly rather than under
-   `OtherDataTypes` (§2).
-4. Whether the AI tutor flag is on in production (§2).
-5. Which SMS provider is live, so the third party named in the phone-number row is right.
-6. Whether a zero-data-retention arrangement exists with OpenAI (`data-retention.md` §4 records
-   none); if one is made, the "third party receives it" cells and the notice change.
-7. Legal review of `docs/legal/privacy.md`; the placeholders (`node tools/legal-status.mjs`).
-8. Confirm Sign in with Apple is exposed in the native iPad shell (Guideline 4.8).
+2. Rewrite and counsel review of `docs/legal/privacy.md` (it still says marking runs on the device).
+3. Guideline 5.1.2(i): whether default-on server reading needs an explicit first-use consent.
+4. Whether to tick Product Personalisation for server-side question selection (§2).
+4a. Whether problem-report free text is also declared as Customer Support (§2).
+5. Which SMS provider is live (phone-number row), or confirm SMS is off.
+6. Whether the AI tutor flag is on in production.
+7. Whether a zero-data-retention arrangement exists with OpenAI (`data-retention.md` §4 records
+   none); if one is made, the third-party cells and the notice change.
+
+## 5. Mismatches found and fixed on 2026-10-18
+
+| # | Mismatch | Fix |
+|---|---|---|
+| 1 | Manifest lacked **PhotosorVideos**, yet a camera photo of working or of a question is sent to OpenAI; this file claimed the manifest declared it | Added to both manifests |
+| 2 | Manifest lacked **PhoneNumber** (SMS sign-in, guardian phone code) | Added to both manifests |
+| 3 | This file claimed the manifest declared **DeviceID**; it did not | Added (conservative) |
+| 4 | This file claimed the manifest declared **OtherDataTypes** (age declaration, guardian record); it did not | Added |
+| 5 | Product-interaction and performance telemetry were folded into OtherDiagnosticData only | Added **ProductInteraction** and **PerformanceData**; OtherDiagnosticData keeps the error/failure events |
+| 6 | Manifest declares **OtherUsageData** (learning events); this file did not list it | Listed (§2) |
+| 7 | Rows said "Marks are decided on the device before sync" and that question choice happens on the device | Rewritten: the server issues and grades every question (online-only grading) |
+| 8 | Server-side retention of the **transcription text** (90 days with the recognition receipt) and of **exam answers/results** (5-year record TTL, deleted with the account) was not mentioned; "the server keeps no copy" was true only of the image | Stated in the Other User Content and Other Usage Data rows; `data-retention.md` idempotency row updated |
+| 9 | "Practise this" (photo of a textbook question to OpenAI, `questionPhoto.js`) was not described | Added to the Photos row |
+| 10 | Manifest path cited without `Resources/`; `scripts/store-readiness-check.mjs` cited as an enforcing check but does not exist | Paths corrected; check gap recorded as a follow-up |
+| 11 | Manifest comment on OtherUserContent said server reading is opt-in ("when the person switches on") and that the mark is decided on the device | Comment rewritten in both copies (on by default, switchable off; server engine decides) |

@@ -93,7 +93,10 @@ export const ENGINE_SUITES = [
   'security-hardening-check.mjs',
   // Row-Level Security fails closed: unscoped access sees nothing, account
   // scope only its own rows, and no scope outlives its transaction.
-  'rls-fail-closed-check.mjs'
+  'rls-fail-closed-check.mjs',
+  // Round trips per hot request (practice issue/submit, sync push/pull): a
+  // statement outside a transaction is one round trip (#524 item 3).
+  'db-round-trips-check.mjs'
 ];
 
 let failed = 0;

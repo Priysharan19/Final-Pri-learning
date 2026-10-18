@@ -13,6 +13,24 @@
 
 import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 
+// The clock this check runs on. The fixture below files answers at "an hour
+// ago" and a few minutes after it, "yesterday" at the same time, and this
+// device's own answers at "now" plus a few seconds, and then asserts that each
+// cluster lands on one calendar day in the profile's timezone (Asia/Kolkata).
+// Read straight off the wall clock, a CI run whose "an hour ago" fell within
+// minutes of IST midnight (18:30 UTC, so runs starting about 19:30 UTC) split a cluster across two days and
+// failed — the product filed every answer on the right day; the fixture's
+// assumption was wrong. So the check starts at 12:00 IST on today's IST date
+// and lets the clock advance in real time from there: the date stays current,
+// the time of day the fixture sits at never depends on when CI runs.
+{
+  const realNow = Date.now.bind(Date);
+  const istDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(realNow()));
+  const start = Date.parse(`${istDate}T12:00:00+05:30`);
+  const startedAt = realNow();
+  Date.now = () => start + (realNow() - startedAt);
+}
+
 installBrowserEnv();
 resetStorage();
 globalThis.__PRI_CLOUD_ORIGIN__ = 'https://pri.example.test';
@@ -426,6 +444,34 @@ ok('the local answer keeps its own id', !!(await get('attempts', localAttemptId)
   eq('R1: a server mark that cannot be recorded is surfaced, not skipped — after everything else was applied', [s2.threw, s2.ids, s2.summary?.applied, s2.summary?.rejected], ['RESTORE_SERVER_EVENT_FAILED', ['throw-server-mark'], 1, 0]);
   ok('R1: …so the mark that followed it is on disk, and a retry applies nothing twice', (await byIndex('attempts', 'pid', 'p1')).some(a => a.remoteEventId === 'attempt-after-server-throw') &&
     (await applyRemoteLearningEvents('p1', [good('attempt-after-server-throw', poisonAt + 4000)])).duplicates === 1);
+}
+
+// ── Midnight: a restored answer is filed on the day it happened ─────────────
+// The fixture above sits at noon so its clusters never straddle a day. This
+// pins the boundary itself, at fixed instants: two server marks one second
+// apart across the profile's own midnight are two study days — in the India
+// default, in Sydney during daylight saving, and in UTC — whatever the wall
+// clock of the machine running the check reads.
+{
+  const { applyRemoteLearningEvents } = await import('../src/platform/cloudSyncRestore.js');
+  const cases = [
+    ['p-mid-in', { course: 'in', indiaTrack: 'cbse' }, 'Asia/Kolkata', Date.parse('2026-10-18T00:00:00+05:30')],
+    ['p-mid-au', { course: 'nsw', timezone: 'Australia/Sydney' }, 'Australia/Sydney', Date.parse('2026-10-18T00:00:00+11:00')],
+    ['p-mid-utc', { course: 'nsw', timezone: 'UTC' }, 'UTC', Date.parse('2026-10-18T00:00:00Z')]
+  ];
+  for (const [pid, where, zone, midnight] of cases) {
+    await put('profiles', { id: pid, name: 'M', avatar: '🙂', year: 10, role: 'student', theme: 'dark', dailyGoal: 10, handwriting: true, xp: 0, ...where });
+    const mark = (n, at) => ({ id: `attempt-${pid}-${n}`, deviceId: GRADER, deviceSeq: n, serverCursor: n, kind: 'graded-attempt', entityId: `q-${pid}-${n}`, occurredAt: at,
+      payload: { attemptId: `attempt-${pid}-${n}`, questionId: `q-${pid}-${n}`, subtopic: 'linear', difficulty: 2, correct: true, ms: 1000, hintsUsed: 0, tutorLevel: 0, support: 'independent', mode: 'practice', createdAt: at } });
+    const before = midnight - 500;
+    const after = midnight + 500;
+    const summary = await applyRemoteLearningEvents(pid, [mark(1, before), mark(2, after)]);
+    eq(`${zone}: both marks either side of midnight are restored`, summary.applied, 2);
+    const rows = (await byIndex('activity', 'pid', pid)).sort((a, b) => a.date.localeCompare(b.date));
+    eq(`${zone}: 23:59:59.5 and 00:00:00.5 are filed on their own two days`, rows.map(r => [r.date, r.questions, r.correct]), [['2026-10-17', 1, 1], ['2026-10-18', 1, 1]]);
+    eq(`${zone}: and read as a two-day streak just after midnight`, await streakFor(pid, after, zone), 2);
+    eq(`${zone}: the profile's own timezone is the one the streak reads by default`, await streakFor(pid, after), 2);
+  }
 }
 
 console.log(`\nCloud restore fidelity — ${pass}/${pass + fail} checks`);
