@@ -302,6 +302,7 @@ jobs:
         run: |
           node server/test/account-deletion-reauth-check.mjs
           node server/test/account-deletion-public-check.mjs
+          node server/test/account-deletion-session-binding-check.mjs
           node server/test/native-origin-csrf-check.mjs
           node server/test/billing-config-check.mjs
           node server/test/content-review-contract-check.mjs

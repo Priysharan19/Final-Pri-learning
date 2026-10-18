@@ -608,6 +608,14 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
   router.delete('/', requireSession(db), rateLimit(db, 'account-delete', { limit: 3, windowMs: 24 * 60 * 60 * 1000 }), async (req, res, next) => {
     try {
       const body = req.body || {};
+      // The session cookie is device-wide and can change between the panel
+      // being drawn and the click (another local profile signs in from a second
+      // tab). The client names the account it means to delete; a session for
+      // any other account is refused before any proof is spent (#521 item 3).
+      // The id never selects what is deleted — only the session does.
+      if (body.accountId != null && String(body.accountId) !== String(req.platformSession.account_id)) {
+        return res.status(409).json({ error: { code: 'ACCOUNT_MISMATCH', message: 'The signed-in account is not the one this profile is linked to. Sign in to that account again before deleting it.' } });
+      }
       if (body.provider && !(await consumeOidcNonce(db, body.nonce))) {
         return res.status(401).json({ error: { code: 'OIDC_NONCE_INVALID', message: 'Request a fresh sign-in nonce before confirming your identity.' } });
       }

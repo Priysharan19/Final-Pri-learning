@@ -354,7 +354,7 @@
       "verifiedEmail": false,
       "guardianConsent": false,
       "mfa": false,
-      "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; requires fresh password or linked OIDC re-authentication",
+      "ownership": "own account only: every query is keyed by the session account id; the optional body accountId never selects what is deleted — it is the account the client means, and a session for any other account is refused 409 ACCOUNT_MISMATCH before any proof is spent (#521); requires fresh password, one-time code or linked OIDC re-authentication",
       "rateLimits": [
         {
           "key": "account-delete",
