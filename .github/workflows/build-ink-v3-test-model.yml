@@ -13,7 +13,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: ink-v3-test-model
+  # Keyed by ref: with one repository-wide group, two Dependabot PRs rebased in
+  # the same minute cancelled each other's run (#462 was cancelled ten times
+  # within seconds of #468's run starting). Superseded heads on the same ref
+  # are still cancelled.
+  group: ink-v3-test-model-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

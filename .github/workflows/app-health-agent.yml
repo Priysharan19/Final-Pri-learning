@@ -23,7 +23,11 @@ permissions:
 
 concurrency:
   group: pri-app-health-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer head supersedes a pull-request run. Main's evidence is never
+  # dropped: on 2026-10-17 seven consecutive main runs were cancelled by the
+  # next merge while the macOS job waited 35–62 min for a runner, and the
+  # consolidated report then failed with "Artifact not found: app-health-native".
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   HEALTH_MODE: ${{ github.event_name == 'schedule' && 'deep' || (github.event_name == 'workflow_dispatch' && inputs.mode || 'fast') }}
