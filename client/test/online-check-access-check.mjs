@@ -148,7 +148,10 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   for (const key of ['login.heroSub', 'login.heroPrivacy', 'login.point4', 'login.localOnlySub', 'login.authFoot', 'cloud.created', 'cloud.offlineNote', 'cloud.intro', 'cloud.disabled', 'cloud.under18', 'signup.cloudUnavailable', 'signup.parentLead', 'settings.cloudMarkingUnavailable', 'home.cloudUnavailable', 'home.reason.practiceOffline', 'ink.waitingSignIn', 'ink.waitingOffline', 'ink.waitingGuardian', 'ink.waitingVerifyEmail', 'verdict.photoReadingSignIn', 'verdict.photoReadingOffline', 'verdict.photoReadingGuardian', 'verdict.photoReadingVerifyEmail']) {
     ok(typeof en[key] === 'string' && !promised.test(en[key]), `${key} no longer promises checking without an account or a connection`);
   }
-  ok(/Pri account/.test(en['login.localOnlySub']) && /checking answers/.test(en['login.localOnlySub']), 'device-only mode says checking answers needs a Pri account');
+  // Issue #477: there is no device-only mode any more. A device profile says
+  // that nothing opens until it is signed in to a Pri account.
+  ok(/Pri account/.test(en['login.localOnlySub']) && /Before anything opens/.test(en['login.localOnlySub']) && !/[Dd]evice-only mode/.test(en['login.localOnlySub']),
+    'a device profile says nothing opens before it is signed in to a Pri account');
   const html = read('index.html');
   ok(!/marked on your device|Offline-first|account is optional/.test(html) && /checked by Pri’s server/.test(html), 'the page description says answers are checked by Pri\'s server');
   const manifest = read('public/manifest.webmanifest');
