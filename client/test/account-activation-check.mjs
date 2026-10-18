@@ -247,14 +247,23 @@ server.push = () => refusal(403, 'GUARDIAN_CONSENT_PENDING');
 eq('a guardian refusal during the first sync is GUARDIAN_CONSENT_PENDING', (await gate('p3')).code, 'GUARDIAN_CONSENT_PENDING');
 server.push = null;
 
-// ── 7 · no server configured at all ──────────────────────────────────────────
+// ── 7 · no server origin known: offline at open, or truly none ───────────────
 {
   const origin = globalThis.__PRI_CLOUD_ORIGIN__;
   delete globalThis.__PRI_CLOUD_ORIGIN__;
   const r = await gate('p1');
-  eq('a build with no Pri server is CLOUD_UNAVAILABLE', r.code, 'CLOUD_UNAVAILABLE');
+  eq('with no origin found and the device online, it is CLOUD_UNAVAILABLE (the probe found no server)', r.code, 'CLOUD_UNAVAILABLE');
   ok('retryable, not an eviction', r.retryable && !r.denied);
+  // Opened offline: the boot-time probe found nothing, but that is the
+  // connection, not the build — said as "can't be reached", retryable.
+  const hadNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  Object.defineProperty(globalThis, 'navigator', { value: { onLine: false }, configurable: true, writable: true });
+  const offline = await gate('p1');
+  eq('with no origin found and the device OFFLINE, it is SESSION_UNAVAILABLE', offline.code, 'SESSION_UNAVAILABLE');
+  ok('retryable, with a network cause (the gate then says "can’t be reached", not "no server configured")', offline.retryable && !offline.denied && offline.cause === null);
+  if (hadNavigator) Object.defineProperty(globalThis, 'navigator', hadNavigator); else delete globalThis.navigator;
   globalThis.__PRI_CLOUD_ORIGIN__ = origin;
+  ok('with the origin back, the same profile is let in again', !!(await gate('p1')).ready);
 }
 
 if (failures.length) {

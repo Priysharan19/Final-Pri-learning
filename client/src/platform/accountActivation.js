@@ -27,7 +27,7 @@
 // SESSION_UNAVAILABLE / CONSENT_UNAVAILABLE, which the caller shows as a
 // retry, never as a sign-out.
 // ─────────────────────────────────────────────────────────────────────────────
-import { cloud, cloudAvailable } from './cloudTransport.js';
+import { cloud, cloudAvailable, discoverCloudOrigin } from './cloudTransport.js';
 import { cloudAccountLink, verifyCloudSession } from './cloudAccount.js';
 import { decideOnboardingAuthority } from '../components/onboardingAuthority.js';
 
@@ -63,7 +63,19 @@ export const isActivationDenied = (error) => ACTIVATION_DENIED_CODES.includes(er
  */
 export async function ensureAccountActivated(pid, { expectedAccountId = null, sync = true } = {}) {
   if (!pid) throw new ActivationBlocked('PROFILE_MISSING');
-  if (!cloudAvailable()) throw new ActivationBlocked('CLOUD_UNAVAILABLE', { retryable: true });
+  if (!cloudAvailable()) {
+    // The serving origin is found by probing /v1/health at boot
+    // (cloudTransport.js discoverCloudOrigin). An app opened offline finds
+    // nothing then, and only a successful probe is remembered — so the gate
+    // probes again here, which is also how the connection's return is noticed.
+    // Offline, the honest answer is "can't be reached, try again", not "this
+    // build has no server": that is said only when the probe itself finds none.
+    await discoverCloudOrigin().catch(() => null);
+    if (!cloudAvailable()) {
+      if (globalThis.navigator?.onLine === false) throw new ActivationBlocked('SESSION_UNAVAILABLE', { cause: new TypeError('offline'), retryable: true });
+      throw new ActivationBlocked('CLOUD_UNAVAILABLE', { retryable: true });
+    }
+  }
 
   const link = await cloudAccountLink(pid);
   if (!link?.accountId) throw new ActivationBlocked('ACCOUNT_NOT_LINKED');

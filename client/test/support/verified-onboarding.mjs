@@ -56,6 +56,19 @@ async function cardOf(scope) {
   return scope.locator('[data-signin-card]').first();
 }
 
+/** Wait until the card (its root carries the step) stands on `step`. */
+export async function waitForStep(scope, step, { timeout = 20000 } = {}) {
+  const card = await cardOf(scope);
+  const page = typeof scope.page === 'function' ? scope.page() : scope;
+  for (const deadline = Date.now() + timeout; Date.now() < deadline;) {
+    if (await card.count() && (await card.getAttribute('data-signup-step')) === step) return;
+    await page.waitForTimeout(100);
+  }
+  const now = await card.count() ? await card.getAttribute('data-signup-step') : 'no card on screen';
+  const refused = await scope.locator('[data-testid="signup-error"]').innerText().catch(() => '');
+  throw new Error(`the card did not reach the "${step}" step within ${timeout} ms (it is at "${now}"${refused ? `; it says: ${refused.trim()}` : ''})`);
+}
+
 /** Type a six-digit code into the card's boxes, digit by digit, from the first box. */
 export async function typeCode(scope, code, { idPrefix = 'signup-code' } = {}) {
   const page = typeof scope.page === 'function' ? scope.page() : scope;
@@ -115,7 +128,6 @@ export async function createVerifiedProfile(page, platform, {
   language = 'en', fromPicker = false, age = 18, landing = 'home', note = null
 } = {}) {
   const say = message => { if (typeof note === 'function') note(message); };
-  if (course !== 'in') say(`verified onboarding: the card offers Classes 7–12 (CBSE / JEE) only; "${course}" became Class ${year} CBSE`);
   const classOf = JEE_TRACKS.has(track) ? Math.max(11, Math.min(12, Number(year) || 12)) : Math.max(7, Math.min(12, Number(year) || 9));
   if (role === 'teacher') return createTeacherProfile(page, platform, { name, year: classOf, email, language, note });
 
@@ -133,15 +145,15 @@ export async function createVerifiedProfile(page, platform, {
   if (signedIn.newAccount && age < 18) {
     // A child: the parent's approval step is where the card now stands; the
     // caller drives the rest (tour-activation-gate.js).
-    await card.locator('[data-signup-step="class"]').waitFor({ timeout: 20000 });
+    await waitForStep(card, 'class');
     await card.getByTestId(`signup-class-${classOf}`).click();
     if (track && track !== 'cbse') await card.getByTestId(`signup-track-${track}`).click();
     await card.getByTestId('signup-class-next').click();
-    await card.locator('[data-signup-step="parent"]').waitFor({ timeout: 20000 });
+    await waitForStep(card, 'parent');
     return { email: address, accountId: null, year: classOf, name, pending: true };
   }
   // A class is asked once per device profile — here, where the profile is made.
-  await card.locator('[data-signup-step="class"]').waitFor({ timeout: 20000 });
+  await waitForStep(card, 'class', { timeout: 30000 });
   await card.getByTestId(`signup-class-${classOf}`).click();
   if (track && track !== 'cbse') await card.getByTestId(`signup-track-${track}`).click();
   await card.getByTestId('signup-class-next').click();
@@ -156,11 +168,31 @@ export async function createVerifiedProfile(page, platform, {
   if (me.status !== 200 || !me.data?.account?.id) throw new Error(`the shell opened without a live platform session (/v1/account/me → ${me.status})`);
   const row = platform.h.db.prepare('SELECT id FROM accounts WHERE email=?').get(address);
   if (!row || String(row.id) !== String(me.data.account.id)) throw new Error('the live session is not the account the card made for this address');
+  // The card offers Classes 7–12 (CBSE / JEE): a flow that studies an
+  // Australian syllabus changes it where a student would — Settings → Profile
+  // — after entering, through the shipped form; the account is unchanged.
+  if (course !== 'in') {
+    await switchSyllabus(page, platform, { course, year: Number(year) || classOf });
+    say(`verified onboarding: "${name}" entered as Class ${classOf} and switched to ${course.toUpperCase()} Year ${Number(year) || classOf} in Settings`);
+  }
   if (landing === 'home') {
     await page.goto(`${platform.origin}/`, { waitUntil: 'domcontentloaded' });
     await page.locator('.home-greet').waitFor({ timeout: 30000 });
   }
-  return { email: address, accountId: String(me.data.account.id), year: classOf, name, pending: false };
+  return { email: address, accountId: String(me.data.account.id), year: course !== 'in' ? Number(year) || classOf : classOf, name, pending: false };
+}
+
+/** Change the signed-in profile's syllabus and year through Settings → Profile Information → Edit. */
+export async function switchSyllabus(page, platform, { course, year }) {
+  await page.goto(`${platform.origin}/settings`, { waitUntil: 'domcontentloaded' });
+  const card = page.locator('.card', { has: page.getByRole('heading', { name: 'Profile Information' }) });
+  await card.waitFor({ timeout: 30000 });
+  await card.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.locator('#set-course').waitFor({ timeout: 15000 });
+  await page.locator('#set-course').selectOption(course);
+  await page.locator('#set-year').selectOption(String(year));
+  await card.getByRole('button', { name: 'Save changes' }).click();
+  await page.locator('#set-course').waitFor({ state: 'detached', timeout: 15000 });
 }
 
 /**
