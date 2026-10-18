@@ -3822,6 +3822,13 @@ const routes = {
         correct: false, resolved: false,
         triesLeft: authoritative.triesLeft,
         invalid: true, feedback, stepReport,
+        // An entry the marker could not read, and an entry the marker was
+        // stopped on at its deadline (server markerPool.js), come back in the
+        // same shape — nothing spent, nothing recorded — but they are not the
+        // same thing to the student or to a suite: the second is worth sending
+        // again as it is. The server says which; the card and the suites can
+        // now read it instead of taking a stalled marker for a wrong answer.
+        ...(authoritative.tooComplex === true ? { tooComplex: true, code: authoritative.code || 'MARKING_TOO_COMPLEX' } : {}),
         // The card matches a server receipt to the submission it sent. Without
         // this an unreadable answer on a server-issued question was shown as
         // "the server response did not match this submission".
