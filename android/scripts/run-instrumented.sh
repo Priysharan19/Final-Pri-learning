@@ -26,6 +26,16 @@ mkdir -p "$OUT"
 [ -f "$APP" ] && [ -f "$TEST" ] || { echo "build first: ./gradlew assembleDebug assembleDebugAndroidTest" >&2; exit 2; }
 
 adb wait-for-device
+# adb answers before Android has finished booting (#278/#327: "adb daemon
+# unreachable", the emulator lost mid-journey). The package manager and the
+# system UI the journey needs come up with sys.boot_completed; wait for it,
+# bounded, and name a boot that never completes as infrastructure.
+booted() { [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; }
+for _ in $(seq 1 150); do booted && break; sleep 2; done
+if ! booted; then
+  echo "INFRASTRUCTURE: the emulator did not finish booting (sys.boot_completed != 1 after 300 s); not a product failure" >&2
+  exit 1
+fi
 adb uninstall com.prilearning.app >/dev/null 2>&1 || true
 adb uninstall com.prilearning.app.test >/dev/null 2>&1 || true
 adb install -r -t "$APP" >/dev/null
