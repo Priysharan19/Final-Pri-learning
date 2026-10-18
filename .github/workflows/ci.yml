@@ -48,12 +48,14 @@ jobs:
         run: |
           set -euo pipefail
           test -s suites.log
-          grep -Fq '1704000/1704000 self-checks passed across 213 subtopics' suites.log
+          grep -Fq '1880000/1880000 self-checks passed across 235 subtopics' suites.log
           grep -Fq '21000/21000 multipart part-checks passed' suites.log
-          grep -Fq '✔ INDIA SUITE PASSED — 1832/1832 checks' suites.log
-          grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 35861/35861 checks' suites.log
-          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 102244 prompts, 362 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
-          grep -Fq '44000 questions from 440 declared (generator, difficulty) pairs × 100 draws — 44000 marked correct by their own marker, 44000 well formed' suites.log
+          grep -Fq '✔ INDIA SUITE PASSED — 1964/1964 checks' suites.log
+          grep -Fq 'INDIA DIFFICULTY TRUTH: PASS — 36264/36264 checks' suites.log
+          # Hardest-level forms, tranche 1: every D3 answer re-derived from its prompt.
+          grep -Fq 'INDIA HARDEST FORMS: PASS — 49637/49637 checks — 22 D3 forms for 22 CBSE Class X/XII dot points' suites.log
+          grep -Fq 'PROMPT VARIABLE CONSISTENCY: PASS — 112804 prompts, 362 claim prompts, 1713 stated solutions, 0 inconsistent' suites.log
+          grep -Fq '46200 questions from 462 declared (generator, difficulty) pairs × 100 draws — 46200 marked correct by their own marker, 46200 well formed' suites.log
           grep -Fq '258/258 dot points have a generator behind them; 0 do not' suites.log
           grep -Fq 'NCERT ANSWER FORMS: PASS — 438/438 checks' suites.log
           grep -Fq 'EQUIVALENCE CLASSES: PASS — 649/649 checks across 9 classes' suites.log
@@ -233,7 +235,9 @@ jobs:
           node server/test/mfa-check.mjs
           node server/test/oidc-consent-check.mjs
           node server/test/security-hardening-check.mjs
-          node server/test/rls-fail-closed-check.mjs
+          set -o pipefail
+          node server/test/rls-fail-closed-check.mjs | tee rls-fail-closed.log
+          grep -Fq 'RLS FAIL-CLOSED: PASS — 134/134 checks' rls-fail-closed.log
       - name: Billing lifecycle, database operations and HTTP journeys
         run: |
           node server/test/billing-cancel-refund-check.mjs
@@ -347,13 +351,15 @@ jobs:
           node server/test/platform-store-check.mjs
           node server/test/platform-concurrency-check.mjs
           node server/test/platform-sync-burst-check.mjs
-          node server/test/postgres-connection-config-check.mjs
+          set -o pipefail
+          node server/test/postgres-connection-config-check.mjs | tee postgres-connection-config.log
+          grep -Fq 'POSTGRES CONNECTION CONFIG: PASS — 132/132 checks' postgres-connection-config.log
           node server/test/platform-startup-check.mjs
       - name: Supabase migrations and every engine-agnostic platform suite on real Postgres
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          grep -Fq 'PLATFORM ON POSTGRES: PASS — 47/47 suites' platform-postgres.log
+          grep -Fq 'PLATFORM ON POSTGRES: PASS — 48/48 suites' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log
@@ -375,6 +381,8 @@ jobs:
           grep -Fq '✓ failure-drills-check.mjs' platform-postgres.log
           grep -Fq '✓ storekit-entitlement-state-machine-check.mjs' platform-postgres.log
           grep -Fq '✓ rls-fail-closed-check.mjs' platform-postgres.log
+          grep -Fq 'RLS FAIL-CLOSED: PASS — 272/272 checks' platform-postgres.log
+          grep -Fq 'DB ROUND TRIPS: PASS — 10/10 checks' platform-postgres.log
       - name: Platform migration contract
         run: node server/test/platform-migration-check.mjs
       - name: Billing v3 to v4 payment-retention rebuild on a populated SQLite database
@@ -460,6 +468,11 @@ jobs:
           # engine behind every Apple web view).
           node client/test/tour-responsive-matrix.js --no-build 2>&1 | tee -a browser.log
           node client/test/tour-responsive-matrix.js --no-build --browser=webkit 2>&1 | tee -a browser.log
+          # iPhone portrait (393 × 852): safe areas, the sticky action bar as
+          # its own spacer, the full-width mode switch, Write and Photo space,
+          # and iPad/desktop composition unchanged. Both engines.
+          node client/test/tour-iphone-layout.js --no-build 2>&1 | tee -a browser.log
+          node client/test/tour-iphone-layout.js --no-build --browser=webkit 2>&1 | tee -a browser.log
           # The owner's photographed page (scripted reader): transcript, unrelated lines,
           # corrected line, proposed answer, durable draft; and the usage-limit state.
           node client/test/tour-photo-answer.js --no-build 2>&1 | tee -a browser.log
@@ -483,6 +496,8 @@ jobs:
           grep -Fq 'India exam · the clock runs out and the paper submits itself' browser.log
           grep -Fq 'Placement · onboarding → diagnostic → evidence map' browser.log
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
+          grep -Fq 'iPhone portrait · safe areas, sticky bar, mode switch, write and photo space' browser.log
+          test "$(grep -Ec 'E2E SUITE PASSED.*62/62.*1 flows' browser.log)" -ge 2
           grep -Fq 'India · onboarding, class labels, demo, cloud entry' browser.log
           grep -Fq 'Cloud · account, live Settings refresh, assignment hand-off' browser.log
           grep -Eq 'E2E SUITE.*37/37.*1 flows' browser.log

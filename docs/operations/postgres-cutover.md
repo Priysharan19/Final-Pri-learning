@@ -30,25 +30,37 @@ printed):
 | URL is `postgres://` / `postgresql://` with a host | `config.js` | `PLATFORM_DB_URL_INVALID` |
 | **Production:** verified TLS — `sslmode=verify-full` (preferred), or `sslmode=require` **with** `PRI_DATABASE_SSL_ROOT_CERT` | `config.js postgresConnectionSettings` | `PLATFORM_DB_TLS_REQUIRED` (no/weak sslmode) / `PLATFORM_DB_TLS_UNVERIFIED` (`require` without the CA) |
 | No `sslrootcert`/`sslcert`/`sslkey`/`ssl=` in the URL (CA goes in `PRI_DATABASE_SSL_ROOT_CERT`) | same | `PLATFORM_DB_TLS_INVALID` |
+| **Session mode only:** not Supavisor's transaction port **6543** (authority, `?port=` or `PGPORT`), no `pgbouncer=` (other than `false`), no `pool_mode=transaction`/`statement` | `config.js assertSessionModeUrl` (from `postgresConnectionSettings`, before any pool exists) | `PLATFORM_DB_TRANSACTION_POOLER` |
 | Reachable, migrated (`platform_meta.schema_version` present) | `store.js createPostgresStore` | `PLATFORM_DB_UNAVAILABLE` / `PLATFORM_DB_NOT_MIGRATED` |
-| `schema_version` = **9** and `billing_schema_version` = **6** exactly (`server/platform/schemaVersions.js`) | `store.js assertSchemaVersions` | `PLATFORM_DB_SCHEMA_MISMATCH` |
+| `schema_version` = **12** and `billing_schema_version` = **6** exactly (`server/platform/schemaVersions.js`) | `store.js assertSchemaVersions` | `PLATFORM_DB_SCHEMA_MISMATCH` |
 | `pri.sync_cursor_seq` exists (migration `20261002000000`) | same | `PLATFORM_DB_SCHEMA_MISMATCH` |
 | Timeouts, lock wait and pool size parse as whole numbers in range | `config.js postgresSessionLimits` | `PLATFORM_DB_CONFIG_INVALID` |
 
-### Connection: session mode only
+### Connection: session mode only (mandatory, enforced at boot)
 
 The server holds one connection per transaction, takes **session-level advisory locks**
 (per-account sync lock, with `pg_try_advisory_lock`; waiters for the same account queue inside
 the server process without holding a connection), runs **SERIALIZABLE / REPEATABLE READ** transactions across several
-statements and issues **`SET`** for `search_path`, `statement_timeout` and
-`idle_in_transaction_session_timeout` once per connection. All of that needs a real session.
+statements and issues **`SET`** once per connection for `search_path`, `statement_timeout`,
+`idle_in_transaction_session_timeout` and the **row-level-security scope** `pri.scope = 'system'`
+(every statement outside a transaction runs in it as a single round trip; account transactions
+override it with `SET LOCAL` until COMMIT/ROLLBACK — `docs/security/threat-model.md` §7). All of
+that needs a real session per connection.
 
 * Use the **direct connection** (`db.<ref>.supabase.co:5432`) if Railway can reach it (Supabase
   direct connections are IPv6 unless the IPv4 add-on is enabled), **or** the Supavisor
   **session-mode** pooler (`aws-0-ap-south-1.pooler.supabase.com`, **port 5432**, user
-  `<role>.<ref>`).
-* **Never** the transaction-mode pooler (port **6543**): advisory locks and `SET` would leak
-  between clients and the per-account cursor ordering guarantee would not hold.
+  `<role>.<ref>`). Staging uses the session pooler on 5432.
+* **Never** the transaction-mode pooler (port **6543**): the session settings above — including
+  the RLS scope — would apply to whichever backend served the previous transaction, advisory
+  locks would be lost between statements, and the per-account cursor ordering guarantee would not
+  hold. The server **refuses to start** with such a URL: port 6543 from any source node-postgres
+  reads (the authority port, a `?port=` query parameter — which overrides it — or `PGPORT` for a
+  URL with neither), `pgbouncer=` with any value but `false`, or `pool_mode=transaction`/`statement`
+  (parameter names in any case) stop the boot with
+  `PLATFORM_DB_TRANSACTION_POOLER` before a pool is created, and production readiness reports it.
+  `server/test/postgres-connection-config-check.mjs` pins the refusals and that the staging shape
+  passes.
 
 ### TLS
 
@@ -123,7 +135,8 @@ npx supabase@latest link --project-ref orudxrckgxyyraopyzmn
 #        20261005000000_account_age_basis.sql            (schema 9: accounts.age_basis, the age decision at account creation)
 #        20261006000000_otp_sign_in.sql                  (schema 10: otp_challenges, account_phones, guardian_consents.guardian_phone)
 #        20261007000000_security_hardening.sql           (schema 11: staff MFA, guardian-withdraw credential, append-only audit_log, per-account RLS)
-#      The list must end at the versions schemaVersions.js states (schema 11 / billing 6);
+#        20261016000000_rls_fail_closed.sql              (schema 12: every table requires a declared pri.scope; 19 account-owned tables fail closed)
+#      The list must end at the versions schemaVersions.js states (schema 12 / billing 6);
 #      `ls supabase/migrations/` at the deployed commit is the authority if this comment lags.
 npx supabase@latest migration list
 npx supabase@latest db push --dry-run
@@ -133,6 +146,73 @@ npx supabase@latest db push --dry-run
 #      that file unapplied and stops the push there.
 npx supabase@latest db push
 ```
+
+### 2.5 The shared Supabase project: remote-only migration versions
+
+The staging project (and any project shared the same way) also holds the migration history of
+the **Pri-Learning-India** repository — on staging, 38 versions `20260910…`–`20260928…` that
+this repository does not have. `db push` then refuses ("Remote migration versions not found in
+local migrations directory"). Observed on staging on 18 Oct 2026 while applying
+`20261016000000_rls_fail_closed.sql`.
+
+* **Never run `supabase migration repair`** for those versions: it rewrites the remote history
+  that the other repository owns, and its next push would then re-run or skip the wrong files.
+* **Never** add placeholder files to this repository's `supabase/migrations/`.
+
+What worked on staging, and what production must do the same way — a throwaway working
+directory holding this repository's migrations plus an **empty** placeholder per remote-only
+version (never executed: those versions are already recorded remotely, so the CLI only checks
+that a local file with that version exists):
+
+```bash
+# 2.5.1  From the checkout at the commit being deployed, list what the remote has that we do not.
+npx supabase@latest migration list --linked
+#        → note every version with a Remote column and no Local column (the other repo's).
+
+# 2.5.2  A throwaway workdir: our migrations + one empty placeholder per remote-only version.
+WORK="$(mktemp -d)"; mkdir -p "$WORK/supabase/migrations"
+cp supabase/migrations/*.sql "$WORK/supabase/migrations/"
+for v in <each remote-only version from 2.5.1>; do
+  : > "$WORK/supabase/migrations/${v}_remote_only_placeholder.sql"
+done
+
+# 2.5.3  Link the workdir to the SAME project (password typed at the prompt) and dry-run.
+#        The dry run must list ONLY the new file(s) from this repository — nothing else.
+#        Any other file listed: stop; do not push.
+(cd "$WORK" && npx supabase@latest link --project-ref <project-ref> && npx supabase@latest db push --linked --dry-run)
+
+# 2.5.4  Apply — only as step 1 of the back-to-back sequence in §2.6.
+(cd "$WORK" && npx supabase@latest db push --linked)
+
+# 2.5.5  Remove the workdir (it holds the CLI's link state for the project).
+rm -rf "$WORK"
+```
+
+### 2.6 Migration and redeploy are one back-to-back operation
+
+The server refuses to boot unless `platform_meta.schema_version` equals the build's
+(`assertSchemaVersions`), and a build from before a scope-changing migration such as schema 12
+cannot read the migrated tables at all (its statements declare no `pri.scope`, so RLS shows them
+nothing). Railway deploys `main` automatically when a PR merges, and **a failed post-merge deploy
+removes the previous deployment**: on 18 Oct 2026 the post-merge staging deploy of #522 crashed
+on schema 11 and staging served nothing until the migration was applied and the service
+redeployed. **A short outage between merge and migrate is unavoidable for a scope-changing migration.** The
+old build cannot read the migrated schema and the new build will not boot on the old one, so
+there is no order in which both work: from the moment the first of the two happens until the
+second completes, the service answers nothing useful. The procedure below keeps that window to
+the minutes the two steps take; it cannot remove it. Announce it, and pick a quiet hour.
+
+So, for every PR that changes `SCHEMA_VERSION` or `BILLING_SCHEMA_VERSION`:
+
+1. Before merging, have §2.5.1–2.5.3 done (dry run lists only the new file) and the operator at
+   the terminal.
+2. Merge, then **immediately** apply (§2.5.4, or §2.4 on a project with no foreign history).
+3. **Immediately** redeploy the service (Railway → Deployments → Redeploy) — do not wait for a
+   crash loop to back off.
+4. Verify `GET /v1/ready` → 200 with Postgres ready and the new `schemaVersion`, then a signed-in
+   `GET /v1/account/me` → 200 and `GET /v1/sync/pull/0` → 200 with a test account.
+5. Record the times of 2–4 in the cutover log. If 2 fails, the rollback file for that migration
+   (`docs/release/rollback/`) plus a redeploy of the previous build is the way back.
 
 `db push` reads `supabase/migrations/` from the linked checkout. The migrations create schema
 `pri`, the `NOLOGIN` role `pri_server`, every table with RLS on and a single
@@ -226,7 +306,7 @@ role, and therefore **cannot and must not be pointed at Supabase**. Run it on th
 being deployed and keep the output:
 
 ```bash
-npm run test:platform:pg   # expect the exact line ci.yml pins: PLATFORM ON POSTGRES: PASS — 35/35 suites
+npm run test:platform:pg   # expect the exact line ci.yml pins: PLATFORM ON POSTGRES: PASS — 48/48 suites
 ```
 
 Against staging itself, the equivalent evidence is §4.2 plus §4.4.
@@ -240,7 +320,7 @@ Against staging itself, the equivalent evidence is §4.2 plus §4.4.
 1. Redeploy the staging service. The boot log must show `platform_db_open { engine: 'postgres' }`;
    any `platform_db_unavailable {"code":…}` line means the variables or migrations are wrong —
    fix and redeploy, nothing has been written.
-2. `GET /v1/health` → `database.engine = "postgres"`, `schemaVersion = "9"`, `billingSchemaVersion = "6"`;
+2. `GET /v1/health` → `database.engine = "postgres"`, `schemaVersion = "12"`, `billingSchemaVersion = "6"`;
    `GET /v1/ready` → 200 with `database` reported ready (503 + `Retry-After` means the replica
    cannot serve: read its coded state, not the logs' guesses).
 3. **Once no instance of an older build is left** (after any overlapping deploy has drained),
@@ -456,7 +536,7 @@ in the cutover log; students then re-register and the SQLite backup is retained 
 | 2.4 `db push` | staging | | | | |
 | 3 login role created | staging | | | | (role name only) |
 | 4.2 target check | staging | | | | `POSTGRES TARGET: PASS — n/n` |
-| 4.3 `test:platform:pg` | local/CI | | | | `35/35 suites` |
+| 4.3 `test:platform:pg` | local/CI | | | | `48/48 suites` |
 | 4.4 smoke | staging | | | | |
 | 6 backup + restore drill | production | | | | |
 | 6a export + import + verify.sql | production (if SQLite held real data) | | | | `manifest.json` row totals; `verify.sql` all `ok`/`true` |

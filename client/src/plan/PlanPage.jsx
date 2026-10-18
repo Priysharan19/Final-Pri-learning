@@ -6,6 +6,7 @@ import { formatDate, formatWeekday } from '../lib/locale.js';
 import { usePlan } from './usePlan.js';
 import { PLAN_LIMITS } from './studyPlan.js';
 import { SESSION_TYPE_KEYS, reasonText, sessionHref } from './copy.js';
+import Icon from '../components/Icon.jsx';
 
 // The Plan page: every week of the plan as a list of days, each day's sessions
 // with the reason each was chosen, and the three settings that shape it. Days
@@ -70,10 +71,11 @@ export default function PlanPage() {
                 {d.rest && <span className="muted">{t('plan.restDay')}</span>}
                 {!d.rest && !d.examDay && !d.afterExam && !d.sessions.length && <span className="muted">{t('plan.noSessions')}</span>}
                 {d.sessions.map(s => (
-                  <div key={s.id} data-plan-session={s.type} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', opacity: done.has(s.id) ? 0.6 : 1 }}>
+                  <div key={s.id} data-plan-session={s.type} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                     <span className="tag" style={{ flex: 'none' }}>{t(SESSION_TYPE_KEYS[s.type])}</span>
                     <span style={{ flex: '1 1 160px', minWidth: 0 }}>
-                      <span style={{ fontWeight: 600, textDecoration: done.has(s.id) ? 'line-through' : 'none' }}>{s.name || t('plan.type.mock')}</span>
+                      <span style={{ fontWeight: 600 }}>{s.name || t('plan.type.mock')}</span>
+                      {done.has(s.id) && <> {<span className="plan-started" data-plan-started><Icon name="check" size={13} />{t('plan.started')}</span>}</>}
                       <span className="muted" style={{ display: 'block', fontSize: 12.5 }}>{reasonText(t, s, v => formatDate(Date.parse(`${v}T12:00:00Z`), user))}</span>
                     </span>
                     <span className="muted" style={{ flex: 'none', fontSize: 13 }}>{t('plan.minutes', { n: s.minutes, count: s.minutes })}</span>
