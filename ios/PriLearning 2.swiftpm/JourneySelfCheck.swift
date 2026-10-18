@@ -322,24 +322,47 @@ enum JourneySelfCheck {
       let nativeReads = 0;
       const original = window.__priPhotoReceive;
       window.__priPhotoReceive = p => { nativeReads += 1; if (original) original(p); };
+      const t0 = Date.now();
+      // When the thumbnail does not come, say what the attach pipeline shows
+      // instead of the page header: the card's mode, whether the attach block,
+      // its placeholder and an <img> exist, the status text, the page's
+      // visibility and the time spent — so a failure names its sub-step
+      // (three runs in October 2026 said only "timed out at thumbnail").
+      const where = () => 'mode=' + cardMode() + ' attach=' + (q('.photo-attach') ? 'yes' : 'no') + ' thumb=' + (q('.photo-attach .photo-thumb') ? 'yes' : 'no') +
+        ' img=' + (q('.photo-attach .photo-thumb img') ? (vis(q('.photo-attach .photo-thumb img')) ? 'visible' : 'hidden') : 'none') +
+        ' status="' + seen('.photo-attach [role=status]').slice(0, 60) + '" visibility=' + document.visibilityState + ' after ' + (Date.now() - t0) + ' ms';
       try {
         at = 'mode'; await photoMode();
-        const input = await waitFor(() => q('.editor-body input[type=file]'));
-        const c = document.createElement('canvas'); c.width = 900; c.height = 220;
-        const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+        let input = await waitFor(() => q('.editor-body input[type=file]'));
+        at = 'canvas'; const c = document.createElement('canvas'); c.width = 900; c.height = 220;
+        const g = c.getContext('2d');
+        if (!g) throw new Error('the test canvas has no 2d context (' + where() + ')');
+        g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
         g.fillStyle = '#000'; g.font = 'bold 96px Helvetica, Arial, sans-serif'; g.fillText('2x + 3 = 11', 40, 145);
-        const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+        // A canvas with no backing store encodes to null: that would have made
+        // an empty, unopenable File and shown as a missing thumbnail.
+        at = 'blob'; const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+        if (!blob || !blob.size) throw new Error('the test canvas encoded ' + (blob ? 'an empty' : 'no') + ' PNG, so no picture was attached (' + where() + ')');
+        // The card may have re-rendered while the picture was encoded: attach
+        // to the input that is on the page now, never to a detached one.
+        at = 'input'; if (!input.isConnected) input = q('.editor-body input[type=file]');
+        if (!input || !input.isConnected) throw new Error('the file input left the page while the picture was encoded (' + where() + ')');
         const files = new DataTransfer(); files.items.add(new File([blob], 'working.png', { type: 'image/png' }));
         input.files = files.files;
         input.dispatchEvent(new Event('change', { bubbles: true }));
-        at = 'thumbnail'; await waitFor(() => vis(q('.photo-attach .photo-thumb img')), 20000);
-        at = 'unread'; const said = await waitFor(() => !/reading your work/i.test(seen('.photo-attach [role=status]')) && seen('.photo-attach [role=status] .verdict-body'), 30000);
+        at = 'thumbnail';
+        try { await waitFor(() => vis(q('.photo-attach .photo-thumb img')), 20000); }
+        catch (e) { throw new Error('no thumbnail for a ' + blob.size + '-byte PNG: ' + where()); }
+        const shown = Date.now() - t0;
+        at = 'unread'; let said;
+        try { said = await waitFor(() => !/reading your work/i.test(seen('.photo-attach [role=status]')) && seen('.photo-attach [role=status] .verdict-body'), 30000); }
+        catch (e) { throw new Error('the status never settled: ' + where()); }
         if (q('[data-photo-correct-transcript]')) throw new Error('a photo transcript appeared with no server');
         await sleep(800);
         if (nativeReads) throw new Error('the on-device photo reader answered ' + nativeReads + ' time(s)');
         if (submitBtn()) throw new Error('an unread photo can be submitted');
         assertUnmarked('photo');
-        return 'attached, not read on device: "' + said.slice(0, 70) + '"';
+        return 'attached (thumbnail in ' + shown + ' ms), not read on device: "' + said.slice(0, 60) + '"';
       } finally { window.__priPhotoReceive = original; }
     });
     await step('noCheckOffered', async () => {
