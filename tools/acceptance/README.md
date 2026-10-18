@@ -117,8 +117,12 @@ That the request the server forwards to the provider carries only the image is p
 **Evidence class: per step, printed and written to the report.** Step 0 reads the REAL deployed host.
 A and B are REAL mailbox deliveries whose codes a named human reads; the accounts are TEST accounts.
 C and D read SYNTHETIC pictures (simulated pen strokes from `synthetic-png.mjs`, rasterised in Node
-without a browser) with the REAL deployed reader and marker. E observes server authorisation and
-Postgres RLS from outside with TEST accounts. Nothing here is a student, a physical device, Apple
+without a browser) with the REAL deployed reader and marker. E observes the server's per-account
+ownership authorisation (and, behind it, Postgres RLS) from outside with TEST accounts: a second
+*verified* account is refused with the ownership refusal itself (`404 QUESTION_NOT_FOUND`), never
+merely "not 200" — the practice router turns every unverified account away first with
+`403 EMAIL_UNVERIFIED`, which proves nothing about isolation, so an unverified B2 leaves those probes
+NOT VERIFIED rather than PASS. Nothing here is a student, a physical device, Apple
 Pencil or a camera: that is `docs/release/device-matrix.md`.
 
 The letters are this tool's names for the parts of the §22.2 journey
@@ -131,14 +135,14 @@ The letters are this tool's names for the parts of the §22.2 journey
 | B | child sign-up by code → refused a question (`GUARDIAN_CONSENT_PENDING`) → `otp/guardian/request` to the parent's address → **HUMAN STEP: the parent reads the code** → `otp/guardian/approve` (no child session) → state `given` → issued a question | yes: both mailboxes (plus-addressed into one by default) |
 | C | issue → SIMULATED ink of the term number worked out from the printed question → `handwriting/transcribe` (body exactly `{ image }`) → `practice/:id/recognize` (reuses the paid read) → confirm if needed → `submit` (authoritative mark, replay returns the same attempt) → `sync/pull` shows the attempt | no |
 | D | the same with a SIMULATED "photo" of a page of working (ruled, unevenly lit), mode `photo` | no |
-| E | no-session pull 401; a second adult test account made with `/v1/account/register` sees none of A's events, cannot submit or mint a receipt on A's question, cannot revoke A's session; exports are each account's own | no (its verification email needs no action) |
-| F | cleanup: deletes only accounts this run created; OTP accounts need a deletion code (**HUMAN STEP**) | yes, when on |
+| E | no-session pull 401; student B2, a second adult test account signed up by code on the `pri-iso` plus-address → **HUMAN STEP: read its code** → verified → sees none of A's events; its submit and recognize on A's question are refused `404 QUESTION_NOT_FOUND` (the ownership refusal — `403 EMAIL_UNVERIFIED` would not count); cannot revoke A's session; both exports have the `pri-account-export-v1` shape (`learningEvents[]`, `entities[]`) and B2's holds none of A's `entity_id`s | yes: the mailbox (plus-addressed into the same one by default) |
+| F | cleanup: deletes only accounts this run created; every account is a code account, so each needs a deletion code (**HUMAN STEP** × 3: A, the child, B2) | yes, when on |
 
 ```bash
 # staging (default); the person at the terminal reads the codes
 node tools/acceptance/staging-acceptance.mjs --email <your mailbox> --tester "<your name>"
 
-# without a terminal: prints every HUMAN STEP, marks A–E NOT VERIFIED, exits 3
+# without a terminal: prints every HUMAN STEP, marks A NOT VERIFIED (B–E are skipped for want of a session), exits 3
 node tools/acceptance/staging-acceptance.mjs --email <mailbox> --non-interactive
 
 # production: refused unless the SHA is nominated (scripts/release-nominate.mjs); always cleans up
@@ -147,14 +151,24 @@ node tools/acceptance/staging-acceptance.mjs --target production --sha <40-hex> 
 
 Options: `--sha` (assert the running SHA), `--guardian-email` / `--child-email` (when the mailbox
 provider drops `+tags`), `--skip B,E`, `--cleanup` / `--no-cleanup` (staging default off; production
-always on), `--max-reads` (provider reads this run may spend, default 4; a run spends 2),
+always on), `--max-reads` (provider reads this run may spend, default 4; a run spends 2 when the server reuses
+the transcribe read for recognize, up to 4 when it does not — each of C and D reserves 2 before it starts),
 `--out <dir>` (pictures `SIMULATED-*.png` and `report.json`), `--json`.
 
 Exit code: `0` every attempted step passed · `1` a check failed · `3` nothing failed but a step is
 NOT VERIFIED (a human step is open) · `2` refused (production not nominated, no tester, bad arguments).
 
+**Point `--email` at a mailbox of your own, never a shared staging account.** Step A signs the address
+in by code; if that address already holds an *unverified* password account, the server's
+pre-registration takeover applies (the password is cleared and its sessions revoked — `otp.js`), so
+the run would change an account somebody else made. An address with a verified account is simply
+signed in and never deleted.
+
 Codes are typed at the prompt and never printed, logged or saved. Mutations carry the deployed
 origin as `Origin`, exactly as the web app on that origin sends them; the tool never claims to be a
 native shell. Rate limits that apply: 5 codes per address per hour, 30 s between codes, 8
 registrations per IP per hour, so a mailbox can be reused across a handful of runs a day. Its unit
-test (`npm run test:release:prep`) drives the whole flow against a fake origin with a scripted human.
+test (`npm run test:release:prep`) drives the whole flow against a fake origin with a scripted human,
+and drives it again against a fake with no ownership check and a fake whose export leaks another
+account's rows, asserting that E FAILS both times; the fake's export and refusal shapes are pinned to
+`server/platform/accounts.js` and `server/platform/practice.js` by the same test.

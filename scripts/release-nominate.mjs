@@ -7,9 +7,13 @@
 //
 //   · the commit exists and is on origin/main (git);
 //   · every GitHub Actions run on that exact SHA has completed and none
-//     failed; the four required CI contexts and the Production Container job
-//     are present and green (gh api — the operator's own gh login, no token
-//     is read or stored here);
+//     failed — EVERY run, scheduled and agent workflows included (a red
+//     "Pri App Health Agent" run on the tip blocks nomination until it is
+//     green or rerun; this is deliberate: the tool does not decide which
+//     workflows are code gates); the four required CI contexts and the
+//     Production Container job are present and green (gh api — the operator's
+//     own gh login, no token is read or stored here; listings are paginated so
+//     a SHA with more than 100 runs or check runs cannot hide a context);
 //   · staging (/v1/health, /v1/ready, /release.json) serves exactly that SHA on
 //     Postgres, ready, at the schema versions THAT commit's
 //     server/platform/schemaVersions.js states;
@@ -130,6 +134,25 @@ async function defaultGh(path) {
   return JSON.parse(stdout);
 }
 
+const GH_PAGE = 100;
+const GH_MAX_PAGES = 20;
+/**
+ * Every item of a paginated GitHub list: `path` already carries per_page=100;
+ * pages are fetched until one comes back short. A list that is still full at
+ * GH_MAX_PAGES is refused (thrown) rather than silently truncated, so the
+ * caller fails closed instead of missing a context.
+ */
+export async function ghAll(gh, path, key) {
+  const items = [];
+  for (let page = 1; page <= GH_MAX_PAGES; page += 1) {
+    const body = await gh(`${path}&page=${page}`);
+    const chunk = Array.isArray(body?.[key]) ? body[key] : [];
+    items.push(...chunk);
+    if (chunk.length < GH_PAGE) return items;
+  }
+  throw new Error(`${key}: more than ${GH_MAX_PAGES * GH_PAGE} items on one SHA; refusing to decide on a truncated list`);
+}
+
 async function getJson(fetchImpl, url) {
   const response = await fetchImpl(url, { headers: { accept: 'application/json' }, redirect: 'error', signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   let body = null;
@@ -190,8 +213,8 @@ export async function nominate({
 
   // ── GitHub Actions on exactly this SHA ─────────────────────────────────────
   try {
-    const runs = await gh(`repos/${repo}/actions/runs?head_sha=${expected}&per_page=100`);
-    const verdict = evaluateRuns(runs?.workflow_runs);
+    const runs = await ghAll(gh, `repos/${repo}/actions/runs?head_sha=${expected}&per_page=${GH_PAGE}`, 'workflow_runs');
+    const verdict = evaluateRuns(runs);
     const describe = list => list.map(run => `${run.name}: ${run.status}${run.conclusion ? '/' + run.conclusion : ''}`).join('; ');
     check(verdict.relevant.length > 0, 'GitHub Actions ran on this SHA', verdict.relevant.length ? `${verdict.relevant.length} run(s)` : 'no workflow run has this head SHA');
     check(verdict.pending.length === 0, 'every workflow run on this SHA has completed', verdict.pending.length ? `still running: ${describe(verdict.pending)}` : undefined);
@@ -202,7 +225,7 @@ export async function nominate({
     check(false, 'GitHub Actions runs readable (gh api)', error?.message || String(error));
   }
   try {
-    const checks = latestCheckRuns((await gh(`repos/${repo}/commits/${expected}/check-runs?per_page=100`))?.check_runs);
+    const checks = latestCheckRuns(await ghAll(gh, `repos/${repo}/commits/${expected}/check-runs?per_page=${GH_PAGE}`, 'check_runs'));
     for (const name of REQUIRED_CONTEXTS) {
       const run = checks.get(name);
       check(run?.status === 'completed' && run?.conclusion === 'success', `required context green: ${name}`,

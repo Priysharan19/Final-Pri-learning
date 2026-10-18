@@ -14,14 +14,14 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BILLING_SCHEMA_VERSION, SCHEMA_VERSION } from '../server/platform/schemaVersions.js';
 import {
-  CONTAINER_CONTEXT, PRODUCTION_ORIGIN, REQUIRED_CONTEXTS, STAGING_ORIGIN, evaluateRuns, latestCheckRuns, nominate,
+  CONTAINER_CONTEXT, PRODUCTION_ORIGIN, REQUIRED_CONTEXTS, STAGING_ORIGIN, evaluateRuns, ghAll, latestCheckRuns, nominate,
   parseArgs as parseNominateArgs, parseSchemaVersions, promotionCommands
 } from '../scripts/release-nominate.mjs';
 import {
   CASES, DEFAULT_LEDGER, FAMILIES, JOURNEY, casesMarkdown, problemsWith, readLedger, recordResult, reportMarkdown, summarise, validateLedger
 } from '../scripts/device-matrix-record.mjs';
 import {
-  EVIDENCE, STATUS, TARGETS, deriveAddresses, exitCodeFor, expectedFromPrompt, makeHttp, maskEmail, parseArgs as parseAcceptanceArgs, plusAddress, runAcceptance
+  EVIDENCE, STATUS, TARGETS, deriveAddresses, exitCodeFor, expectedFromPrompt, exportedForeignRows, makeHttp, maskEmail, parseArgs as parseAcceptanceArgs, plusAddress, runAcceptance
 } from './acceptance/staging-acceptance.mjs';
 import { PNG_SIGNATURE, crc32, encodeGreyPng, pngDimensions, simulatedInkPng, simulatedPhotoPng, toDataUrl } from './acceptance/synthetic-png.mjs';
 
@@ -141,6 +141,16 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   ok(good.gitCalls.every(call => !/\bpush\b/.test(call)), 'nominate never runs git push');
   ok(good.gitCalls.some(call => call.startsWith('fetch')), 'nominate fetches origin first');
   ok(good.ghCalls.some(p => p.includes(`head_sha=${SHA}`)), 'nominate asks GitHub for the runs on exactly this SHA');
+  {
+    // Pagination: a required context on page 2 of 101 check runs is found; a list
+    // that never ends is refused, not truncated.
+    const pages = [];
+    const paged = async path => { const page = Number(new URL(`https://x/${path}`).searchParams.get('page')); pages.push(page); return { check_runs: page === 1 ? Array.from({ length: 100 }, (_, i) => ({ name: `filler-${i}` })) : [{ name: 'the one' }] }; };
+    const all = await ghAll(paged, 'repos/r/commits/s/check-runs?per_page=100', 'check_runs');
+    ok(all.length === 101 && all.at(-1).name === 'the one' && pages.join(',') === '1,2', 'ghAll follows pages until a short one and keeps every item');
+    eq((await ghAll(async () => ({ workflow_runs: [{ name: 'a' }] }), 'p?per_page=100', 'workflow_runs')).length, 1, 'a single short page is one call');
+    await assert.rejects(ghAll(async () => ({ check_runs: Array.from({ length: 100 }, () => ({})) }), 'p?per_page=100', 'check_runs'), /truncated/, 'an endless list is refused'); count += 1;
+  }
   ok(pass.results.some(r => r.label.startsWith('position on origin/main') && /behind/.test(r.detail)), 'a certified SHA need not be the tip; the position is informational');
 
   const drifts = [
@@ -149,6 +159,7 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     ['a red workflow', w => { w.runs.push({ name: 'CodeQL', path: 'c.yml', status: 'completed', conclusion: 'failure' }); }, /failed or was cancelled/],
     ['a required context missing', w => { w.checks = w.checks.filter(c => c.name !== REQUIRED_CONTEXTS[0]); }, new RegExp(`required context green: ${escapeRe(REQUIRED_CONTEXTS[0])}`)],
     ['a required context red', w => { w.checks.find(c => c.name === REQUIRED_CONTEXTS[2]).conclusion = 'failure'; }, new RegExp(`required context green: ${escapeRe(REQUIRED_CONTEXTS[2])}`)],
+    ['an unrelated scheduled workflow red on the SHA', w => { w.runs.push({ name: 'Pri App Health Agent', path: '.github/workflows/app-health-agent.yml', status: 'completed', conclusion: 'failure' }); }, /no workflow run on this SHA failed or was cancelled/],
     ['Production Container absent (path-filtered)', w => { w.checks = w.checks.filter(c => c.name !== CONTAINER_CONTEXT); }, /Production Container green/],
     ['staging running another SHA', w => { w.staging.health.releaseIdentity.releaseSha = OTHER; }, /staging runs the nominated SHA/],
     ['staging web bundle from another build', w => { w.staging.web.releaseSha = OTHER; }, /release\.json/],
@@ -214,7 +225,7 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   ok(prod.cleanup === true && prod.sha === SHA && prod.origin === PRODUCTION_ORIGIN, 'production forces cleanup and normalises the SHA');
   eq(plusAddress('owner@example.test', 'pri-child-ab12'), 'owner+pri-child-ab12@example.test', 'plus-addressing');
   eq(plusAddress('owner+x@example.test', 't'), 'owner+t@example.test', 'an existing tag is replaced');
-  eq(maskEmail('impriysharan@icloud.com'), 'im…@icloud.com', 'addresses are masked in reports');
+  eq(maskEmail('owner@example.test'), 'ow…@example.test', 'addresses are masked in reports');
   const addr = deriveAddresses({ email: 'owner@example.test', guardianEmail: 'parent@example.test' }, 'ab12');
   ok(addr.child === 'owner+pri-child-ab12@example.test' && addr.guardian === 'parent@example.test' && addr.isolation === 'owner+pri-iso-ab12@example.test', 'derived addresses honour explicit ones');
   assert.deepEqual(expectedFromPrompt('An AP has first term $16$ and common difference $-6$, which term is equal to $-122$? Give the term number.'), { a: 16, d: -6, term: -122, n: 24 }, 'the expected term number is worked out from the printed question'); count += 1;
@@ -225,7 +236,13 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   ok(/send\.origin = origin/.test(acceptanceSource), 'mutations carry the deployed origin as a browser on it would');
 
   // ── the fake deployed host ─────────────────────────────────────────────────
-  function fakeHost({ sha = SHA, schemaVersion = SCHEMA_VERSION } = {}) {
+  /**
+   * A well-behaved deployment, with two defects it can be told to have so the
+   * tool's isolation probes are shown to catch them: `skipOwnership` answers
+   * practice calls for any verified account's question (no per-account check);
+   * `leakExport` puts another account's learning rows into every export.
+   */
+  function fakeHost({ sha = SHA, schemaVersion = SCHEMA_VERSION, skipOwnership = false, leakExport = false } = {}) {
     const state = {
       accounts: new Map(), sessions: new Map(), challenges: new Map(), mailbox: [], questions: new Map(), receipts: new Map(),
       grades: new Map(), reads: new Set(), log: [], transcribeBodies: [], originMisses: 0, csrfMisses: 0, codeSeq: 0
@@ -243,9 +260,10 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const url = new URL(req.url, 'http://x');
       const path = url.pathname;
       const method = req.method;
-      state.log.push({ method, path });
+      const entry = { method, path, status: null, accountId: null };
+      state.log.push(entry);
       const headers = {};
-      const send = (status, payload) => { res.writeHead(status, { 'content-type': 'application/json', ...headers }); res.end(JSON.stringify(payload)); };
+      const send = (status, payload) => { entry.status = status; res.writeHead(status, { 'content-type': 'application/json', ...headers }); res.end(JSON.stringify(payload)); };
       const fail = (status, code) => send(status, { error: { code, message: code } });
       const mutation = !['GET', 'HEAD'].includes(method);
       const myOrigin = `http://127.0.0.1:${server.address().port}`;
@@ -256,6 +274,7 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         if (req.headers['x-pri-csrf'] !== `csrf-${cookies.pri_cloud_session}` || cookies.pri_csrf !== `csrf-${cookies.pri_cloud_session}`) { state.csrfMisses += 1; return fail(403, 'CSRF_REJECTED'); }
       }
       const account = session ? state.accounts.get(session.accountId) : null;
+      entry.accountId = account?.id || null;
       const issueSession = (acct, deviceId) => {
         const token = randomUUID().replace(/-/g, '');
         state.sessions.set(token, { id: `sess-${token.slice(0, 8)}`, accountId: acct.id, deviceId });
@@ -298,7 +317,7 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         }
         if (existing) { issueSession(existing, body.deviceId); return send(200, { status: 'signed-in', created: false, account: publicAccount(existing), guardianConsent: consentOf(existing) }); }
         const child = body.profile.isAdult !== true;
-        const acct = { id: `acct-${randomUUID().slice(0, 8)}`, email: body.destination, name: body.profile.name, verified: true, ageBasis: child ? 'child' : 'adult', consent: child ? 'pending' : 'not-required', password: null, events: [] };
+        const acct = { id: `acct-${randomUUID().slice(0, 8)}`, email: body.destination, name: body.profile.name, verified: !(state.unverifiedSignups && /pri-iso/.test(body.destination)), ageBasis: child ? 'child' : 'adult', consent: child ? 'pending' : 'not-required', password: null, events: [] };
         state.accounts.set(acct.id, acct);
         issueSession(acct, body.deviceId);
         return send(201, { status: 'signed-in', created: true, account: publicAccount(acct), guardianConsent: consentOf(acct) });
@@ -345,7 +364,12 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         if (entry) state.sessions.delete(entry[0]);
         return send(200, { revoked: !!entry, current: id === session.id });
       }
-      if (method === 'GET' && path === '/v1/account/export') return send(200, { account: { id: account.id }, events: account.events });
+      if (method === 'GET' && path === '/v1/account/export') {
+        // The real shape (server/platform/accounts.js): rows keyed by SQL column names.
+        const own = account.events.map(ev => ({ id: ev.id, device_id: 'd', device_seq: ev.serverCursor, kind: ev.kind, entity_id: ev.entityId, occurred_at: 't', payload_json: '{}', created_at: 't' }));
+        const leaked = leakExport ? [...state.accounts.values()].filter(a => a.id !== account.id).flatMap(a => a.events.map(ev => ({ id: ev.id, device_id: 'd', device_seq: ev.serverCursor, kind: ev.kind, entity_id: ev.entityId, occurred_at: 't', payload_json: '{}', created_at: 't' }))) : [];
+        return send(200, { format: 'pri-account-export-v1', exportedAt: 't', account: { id: account.id, email: account.email, name: account.name, role: 'student' }, identities: [], learningEvents: [...own, ...leaked], entities: [], classes: [], assignmentSubmissions: [], issueReports: [], guardianConsent: null, entitlements: [] });
+      }
       if (method === 'DELETE' && path === '/v1/account') {
         if (!account.password || body?.password !== account.password) return fail(401, 'REAUTH_REQUIRED');
         state.accounts.delete(account.id);
@@ -384,7 +408,7 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         if (!requireVerified() || !requireConsent()) return;
         const [, qid, action, sourceReceipt] = practice;
         const q = state.questions.get(qid);
-        if (!q || q.accountId !== account.id) return fail(404, 'QUESTION_NOT_FOUND');
+        if (!q || (!skipOwnership && q.accountId !== account.id)) return fail(404, 'QUESTION_NOT_FOUND');
         if (action === 'recognize') {
           const text = decodeLines(body.image);
           if (text === null) return fail(400, 'RECOGNITION_IMAGE_INVALID');
@@ -442,11 +466,11 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         `steps 0, A–E pass against a well-behaved host (failures: ${failures.join(' | ') || 'none'}; statuses ${JSON.stringify(status)})`);
       eq(status.F, STATUS.SKIPPED, 'cleanup is off on staging unless asked');
       eq(exitCodeFor(report), 0, 'exit 0 when every attempted step passed');
-      ok(report.humanSteps.filter(h => h.step === 'A').length === 1 && report.humanSteps.filter(h => h.step === 'B').length === 2, 'A names one human step (the code), B names two (the child\'s code and the parent\'s)');
+      ok(report.humanSteps.filter(h => h.step === 'A').length === 1 && report.humanSteps.filter(h => h.step === 'B').length === 2 && report.humanSteps.filter(h => h.step === 'E').length === 1, 'A names one human step (the code), B names two (the child\'s code and the parent\'s), E names one (the isolation account\'s code)');
       ok(lines.some(l => l.startsWith('HUMAN STEP [A]:')) && lines.some(l => l.startsWith('HUMAN STEP [B]:')), 'HUMAN STEP lines are printed');
       const codes = state.mailbox.map(m => m.code);
-      ok(codes.length >= 3 && lines.every(line => !codes.some(code => line.includes(code))), 'no code the human typed appears in the output');
-      ok(!JSON.stringify(report).split('').some(() => false) && codes.every(code => !JSON.stringify(report).includes(code)), 'no code appears in the report');
+      ok(codes.length >= 4 && lines.every(line => !codes.some(code => line.includes(code))), 'no code the human typed appears in the output');
+      ok(codes.every(code => !JSON.stringify(report).includes(code)), 'no code appears in the report');
       ok(!JSON.stringify(report).includes('owner@example.test'), 'the report masks the mailbox address');
       ok(state.transcribeBodies.length === 2 && state.transcribeBodies.every(b => Object.keys(b).join(',') === 'image'), 'every transcribe body was exactly { image }');
       eq(report.providerReads, 2, 'C and D each spent one provider read; recognize reused it');
@@ -463,10 +487,17 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       ok(d.checks.some(ch => /explicit transcript correction/.test(ch.label) && ch.ok), 'D: a multi-line photo reading goes through the explicit confirmation of the final line');
       ok(d.checks.some(ch => /right term number is marked right/.test(ch.label) && ch.ok), 'D: the confirmed final line is marked right');
       const accounts = [...state.accounts.values()];
-      ok(accounts.length === 3 && accounts.filter(a => a.ageBasis === 'child').length === 1, 'the run made exactly three test accounts: A (adult), the child, the isolation account');
+      ok(accounts.length === 3 && accounts.filter(a => a.ageBasis === 'child').length === 1 && accounts.every(a => a.verified === true), 'the run made exactly three test accounts: A (adult), the child, the isolation account — all verified by code (none through /register)');
       ok(report.accounts.every(a => a.email && !a.email.includes('owner@')), 'account rows in the report are masked');
       const e = report.steps.find(s => s.id === 'E');
-      ok(e.checks.length >= 7 && e.checks.every(ch => ch.ok), `E: ${e.checks.length} isolation probes all held`);
+      ok(e.checks.length >= 10 && e.checks.every(ch => ch.ok), `E: ${e.checks.length} isolation probes all held`);
+      const ownership = e.checks.filter(ch => /refused by ownership \(404 QUESTION_NOT_FOUND\)/.test(ch.label));
+      ok(ownership.length === 2 && ownership.every(ch => ch.ok && /status 404 QUESTION_NOT_FOUND/.test(ch.detail)), 'E: both cross-account question probes reached the ownership check (404 QUESTION_NOT_FOUND), not EMAIL_UNVERIFIED');
+      ok(e.checks.some(ch => /pri-account-export-v1 shape/.test(ch.label) && ch.ok) && e.checks.some(ch => /export holds none of student A/.test(ch.label) && ch.ok && /^1 event\(s\)/.test(ch.detail) === false), 'E: the export probe read learningEvents[] of the real shape');
+      ok(!e.pending, 'E: no probe was left NOT VERIFIED on a verified isolation account');
+      const isoId = report.accounts.find(a => a.role === 'B2 (isolation)').accountId;
+      const practiceByIso = state.log.filter(r => /^\/v1\/practice\//.test(r.path) && r.accountId === isoId);
+      ok(practiceByIso.length === 2 && practiceByIso.every(r => r.status === 404), 'the fake host saw exactly two practice calls from the isolation account and refused both with 404');
     } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
   }
 
@@ -528,8 +559,65 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const failures = report.steps.flatMap(s => s.checks.filter(c => !c.ok).map(c => `${s.id}: ${c.label} (${c.detail || ''})`));
       ok(['0', 'A', 'B', 'C', 'D', 'E', 'F'].every(id => status[id] === STATUS.PASS), `a nominated production run passes every step including cleanup (failures: ${failures.join(' | ') || 'none'})`);
       eq(state.accounts.size, 0, 'cleanup deleted every account the run created');
-      ok(report.humanSteps.filter(h => h.step === 'F').length === 2, 'cleanup names the two deletion codes a human reads (A and the child; the password account needs none)');
+      ok(report.humanSteps.filter(h => h.step === 'F').length === 3, 'cleanup names the three deletion codes a human reads (A, the child and the isolation account: all are code accounts)');
     } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
+  }
+
+  // ── 3d′ · a host without the per-account ownership check FAILS step E ─────
+  {
+    const { server, state, origin } = await fakeHost({ skipOwnership: true });
+    const outDir = mkdtempSync(join(tmpdir(), 'pri-accept-test-'));
+    try {
+      const report = await runAcceptance(baseArgs(origin), { prompt: humanFor(state), log: () => {}, pictures: fakePictures, outDir });
+      const e = report.steps.find(s => s.id === 'E');
+      eq(e.status, STATUS.FAIL, 'E FAILS when a verified second account can act on A\'s question');
+      const failed = e.checks.filter(ch => !ch.ok);
+      const ownershipFailed = failed.filter(ch => /refused by ownership/.test(ch.label));
+      ok(ownershipFailed.length === 2 && /status 200/.test(ownershipFailed[0].detail), `both ownership probes failed, the submit having been accepted (${failed.map(ch => ch.detail).join('; ')})`);
+      ok(failed.length === 3 && /export holds none of student A/.test(failed[2].label) && /1 of A's/.test(failed[2].detail), 'and the accepted foreign submit then shows up as A\'s row in B2\'s export — the export probe counts real rows');
+      ok(['0', 'A', 'B', 'C', 'D'].every(id => report.steps.find(s => s.id === id).status === STATUS.PASS), 'the other steps still pass: the defect is pinned on E');
+      eq(exitCodeFor(report), 1, 'exit 1: a missing ownership check is a failed release gate');
+    } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
+  }
+
+  // ── 3d″ · an export that leaks one of A's rows FAILS step E ───────────────
+  {
+    const { server, state, origin } = await fakeHost({ leakExport: true });
+    const outDir = mkdtempSync(join(tmpdir(), 'pri-accept-test-'));
+    try {
+      const report = await runAcceptance(baseArgs(origin), { prompt: humanFor(state), log: () => {}, pictures: fakePictures, outDir });
+      const e = report.steps.find(s => s.id === 'E');
+      eq(e.status, STATUS.FAIL, 'E FAILS when student B2\'s export carries one of A\'s learningEvents rows');
+      const failed = e.checks.filter(ch => !ch.ok);
+      ok(failed.length === 1 && /export holds none of student A/.test(failed[0].label) && /2 of A's/.test(failed[0].detail), `exactly the export-row probe failed and it counted A's rows (${failed[0]?.detail})`);
+      eq(exitCodeFor(report), 1, 'exit 1 on a leaking export');
+    } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
+  }
+
+  // ── 3d‴ · an unverified second account must not count as an isolation PASS ──
+  {
+    // A host that signs an OTP account in without marking it verified: the
+    // ownership probes are not run and E stays NOT VERIFIED (exit 3), never PASS.
+    const { server, state, origin } = await fakeHost();
+    const outDir = mkdtempSync(join(tmpdir(), 'pri-accept-test-'));
+    try {
+      state.unverifiedSignups = true;
+      const report = await runAcceptance(baseArgs(origin, { skip: new Set(['B']) }), { prompt: humanFor(state), log: () => {}, pictures: fakePictures, outDir });
+      const e = report.steps.find(s => s.id === 'E');
+      ok(e.checks.some(ch => /mailbox counts as verified/.test(ch.label) && !ch.ok), 'E records that the isolation account is not verified');
+      ok(!e.checks.some(ch => /refused by ownership/.test(ch.label)), 'E does not run the ownership probes on an unverified account (EMAIL_UNVERIFIED proves nothing)');
+      ok(e.pending && report.humanSteps.some(h => h.step === 'E' && /NOT run/.test(h.text)), 'the skipped probes are named as NOT run, for a human');
+      ok(e.status !== STATUS.PASS, `E is ${e.status}, never PASS, on an unverified isolation account`);
+    } finally { server.close(); rmSync(outDir, { recursive: true, force: true }); }
+  }
+
+  // ── 3d⁗ · exportedForeignRows reads the real column names ────────────────
+  {
+    const A = { questionIds: new Set(['q1']), attemptIds: new Set(['a1']) };
+    eq(exportedForeignRows({ learningEvents: [{ id: 'x', entity_id: 'q9' }], entities: [{ entity_id: 'e2' }] }, A).length, 0, 'own rows are not foreign');
+    eq(exportedForeignRows({ learningEvents: [{ id: 'a1', entity_id: 'q9' }, { id: 'x', entity_id: 'q1' }], entities: [{ entity_id: 'q1' }] }, A).length, 3, 'rows keyed by A\'s attempt id or question id (entity_id, in learningEvents or entities) are foreign');
+    eq(exportedForeignRows({ learningEvents: [{ entityId: 'q1' }] }, A).length, 1, 'a camelCased entityId is read too');
+    eq(exportedForeignRows({}, A).length, 0, 'no arrays, no rows (the shape check, not this helper, fails that case)');
   }
 
   // ── 3e · a pre-existing account is signed in, never deleted ───────────────
@@ -596,6 +684,9 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   ok(/PHYSICAL-HUMAN/.test(doc) && /never written into this matrix/.test(doc), 'the doc states the evidence class and the simulator rule');
   ok(/PRI_V1_RELEASE_SCOPE\.md.*§22\.2/.test(doc), 'the doc cites the §22.2 journey');
   ok(/results\.jsonl/.test(doc) && /device-matrix-record\.mjs/.test(doc), 'the doc names the ledger and the recorder');
+  ok(/## What this matrix does not cover \(issue #10 stays open\)/.test(doc) && /Backup restore/.test(doc) && /Exam flows/.test(doc) && /Stage Manager/.test(doc) && /severity/.test(doc) && /Soak-test duration/.test(doc) && /must not close #10/.test(doc), 'the doc states which #10 gates this matrix does not cover and that #10 stays open');
+  ok(/NOT_A_HUMAN/.test(doc) && /no\s+override/i.test(doc), 'the doc documents the fail-closed tester word list');
+  ok(existsSync(join(ROOT, 'docs/release/evidence/device-matrix/README.md')) && /results\.jsonl/.test(read('docs/release/evidence/device-matrix/README.md')), 'the ledger directory is committed with a README naming the ledger');
 
   const dir = mkdtempSync(join(tmpdir(), 'pri-dm-'));
   const ledger = join(dir, 'results.jsonl');
@@ -609,6 +700,7 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       ['a pass by an agent', { ...base, tester: 'Claude agent' }, /does not name a human/],
       ['a pass by "CI"', { ...base, tester: 'CI' }, /does not name a human/],
       ['a placeholder tester', { ...base, tester: 'tester' }, /does not name a human/],
+      ['a real surname that is a refused word (fail-closed, the word is named)', { ...base, tester: 'Anita Tester' }, /the word "Tester" marks/],
       ['a simulator device', { ...base, device: 'iPhone 16 Pro Simulator' }, /simulator\/emulator/],
       ['an emulator device', { ...base, case: 'DM-AND-02-OTP', device: 'Pixel 6 emulator (API 36)' }, /simulator\/emulator/],
       ['a missing OS', { ...base, os: '' }, /needs --os/],
@@ -671,8 +763,18 @@ const escapeRe = text => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
   const checklist = read('docs/release/production-cutover-checklist.md');
   ok(/release-nominate\.mjs/.test(checklist) && /staging-acceptance\.mjs/.test(checklist) && /device-matrix\.md/.test(checklist), 'the cutover checklist points at the three tools');
+  // The fake host of §3 mirrors these two server contracts; this pins them to the
+  // source so a renamed field or a reordered guard shows up here, not on staging.
+  const accountsSrc = read('server/platform/accounts.js');
+  ok(/format:\s*'pri-account-export-v1'/.test(accountsSrc) && /learningEvents:\s*events/.test(accountsSrc) && /\bentities\b/.test(accountsSrc) && !/^\s*events,\s*$/m.test(accountsSrc.split("router.get('/export'")[1] || ''), 'GET /v1/account/export answers { format: pri-account-export-v1, learningEvents, entities } — the keys step E reads');
+  ok(/SELECT id,device_id,device_seq,kind,entity_id,/.test(accountsSrc), 'export learningEvents rows carry entity_id (the column step E filters on)');
+  const practiceSrc = read('server/platform/practice.js');
+  ok(/router\.use\(requireSession\(db\), requireVerifiedEmail, requireRole\('student'\)\)/.test(practiceSrc), 'the practice router refuses unverified accounts before any ownership lookup (why step E signs B2 up by code)');
+  ok(/404, 'QUESTION_NOT_FOUND', 'This question does not belong to this account\.'/.test(practiceSrc), 'the ownership refusal is 404 QUESTION_NOT_FOUND — what step E asserts');
   const readme = read('tools/acceptance/README.md');
   ok(/# Staging acceptance A–D/.test(readme) && /HUMAN STEP/.test(readme) && /SYNTHETIC/.test(readme), 'tools/acceptance/README.md documents the staging acceptance and its evidence classes');
+  ok(/QUESTION_NOT_FOUND/.test(readme) && /EMAIL_UNVERIFIED/.test(readme) && !/needs no action/.test(readme), 'the README says E uses a verified code account and asserts the ownership refusal, not merely non-success');
+  ok(/takeover|pre-registration/i.test(readme), 'the README warns about the unverified-password-account takeover on step A');
   const pkg = JSON.parse(read('package.json'));
   ok(pkg.scripts['test:release:prep']?.includes('tools/release-prep.test.mjs') && pkg.scripts['test:release:prep'].includes('device-matrix-record.mjs validate'), 'test:release:prep runs this file and the ledger validation');
   ok(pkg.scripts.test.includes('npm run test:release:prep'), 'npm test (the CI deterministic suite) runs test:release:prep');

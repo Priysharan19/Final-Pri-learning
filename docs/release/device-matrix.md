@@ -17,6 +17,29 @@ It does **not** replace the handwriting evidence programmes (`LAUNCH-RUNBOOK.md`
 physical iPad study), the StoreKit / Play Billing certification runs, or `ios/PriLearning.swiftpm/RELEASE.md`
 §7's TestFlight evidence gate; it is the journey check those rows point at.
 
+## What this matrix does not cover (issue #10 stays open)
+
+This ledger is the §22.2 journey only. GitHub issue #10 ("iPad Production: physical-device QA,
+TestFlight and soak-test matrix") asks for more, and **none of the following has a case id or a row
+here**; a complete report from this recorder is therefore *not* #10's completed protocol, and a PR
+carrying this matrix must not close #10:
+
+| #10 scope or gate | Here? | Where it would go |
+|---|---|---|
+| Pencil, marking, persistence (the journey) | yes: `*-05-WRITE` (Pencil on `IPD`), `*-08-MARK`, `*-09-HISTORY` | — |
+| **Backup restore** | **no** | a `RESTORE` case group (sign out / reinstall / sign in; History intact) |
+| **Exam flows** (long exams, large handwriting histories) | **no** | an `EXAM` case group with a recorded duration and page count |
+| Portrait / landscape, Split View, Stage Manager (`IPD`) | no | an `ORIENTATION` group |
+| Offline transitions beyond the `*-04-ISSUE` aeroplane-mode check; background / foreground; storage pressure; low-memory recovery | no | a `LIFECYCLE` group |
+| Camera / import / export / share | partly: `*-06-PHOTO` is the camera; import, export and share are not cases | an `EXPORT` group |
+| TestFlight cohort protocol | no | `ios/PriLearning.swiftpm/RELEASE.md` §7 |
+| Defect severity taxonomy; a `severity` on every `fail` | no: `fail` rows carry free-text `--notes` only | the recorder, when the taxonomy is written |
+| Soak-test duration and failure counts | no: the ledger has no soak record | a separate soak record with duration, device, build and failure count |
+| Simulator and physical evidence reported separately | yes: the recorder refuses simulator rows; CI holds simulator evidence | — |
+
+Until those groups exist, this document is the evidence for the journey rows of #10's "critical
+cases" gate and nothing else.
+
 ## Before a session
 
 1. The build is a nominated `main` SHA (`node scripts/release-nominate.mjs <sha>`) installed from its
@@ -110,11 +133,16 @@ node scripts/device-matrix-record.mjs report --sha <40-hex> --markdown
 node scripts/device-matrix-record.mjs validate      # every ledger line re-checked; runs in npm test
 ```
 
-The recorder appends to `docs/release/evidence/device-matrix/results.jsonl` and **refuses, writing
-nothing**, when:
+The recorder appends to `docs/release/evidence/device-matrix/results.jsonl` (that directory holds
+a README naming the ledger; the ledger itself is created by the first recorded row) and **refuses,
+writing nothing**, when:
 
 - a `pass` or `fail` has no `--tester`, or the tester is not a person (agent, Claude, CI, bot,
-  simulator, placeholder names);
+  simulator, placeholder names). The word list is `NOT_A_HUMAN` in the recorder and is matched as
+  whole words, case-insensitively, so a real person whose name contains one of them (a surname
+  "Test" or "Tester", initials "CI") is refused too; the message names the word. There is no
+  override: write the name another way (a middle name, or "Tester, A." becomes "A. Tester-Smith"
+  only if that is their name) or ask a colleague to record the row;
 - the `--device` is a simulator, emulator or browser automation;
 - `--os` is missing, or `--sha` is not a full 40-hex commit;
 - `DM-IPD-05-WRITE` is passed without `--pencil`;

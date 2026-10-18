@@ -74,7 +74,8 @@ export function problemsWith(record) {
   if (record?.result === 'pass' || record?.result === 'fail') {
     const tester = String(record?.tester || '').trim();
     if (!tester) problems.push(`a ${record.result} needs --tester "<the named human who ran it>"; it is refused without one (no fabricated evidence)`);
-    else if (tester.length < 3 || NOT_A_HUMAN.test(tester)) problems.push(`--tester ${JSON.stringify(tester)} does not name a human; agent, CI, simulator and placeholder names are refused`);
+    else if (NOT_A_HUMAN.test(tester)) problems.push(`--tester ${JSON.stringify(tester)} does not name a human: the word ${JSON.stringify(tester.match(NOT_A_HUMAN)[0])} marks an agent, CI, simulator or placeholder name and is refused whole-word, case-insensitively, with no override (docs/release/device-matrix.md "Recording a result")`);
+    else if (tester.length < 3) problems.push(`--tester ${JSON.stringify(tester)} is too short to name a human`);
     const device = String(record?.device || '').trim();
     if (device.length < 3) problems.push(`a ${record.result} needs --device "<the physical device model>"`);
     else if (NOT_PHYSICAL.test(device)) problems.push(`--device ${JSON.stringify(device)} is a simulator/emulator; that evidence belongs to CI, never to this matrix`);

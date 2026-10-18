@@ -20,7 +20,8 @@
 //   B  guardian confirmation for a child account (a human reads the parent's code)
 //   C  handwriting read + server mark   (a SYNTHETIC picture, the REAL reader and marker)
 //   D  photo read + server mark         (a SYNTHETIC "photo", the REAL reader and marker)
-//   E  account isolation probe — student B never sees, marks or revokes student A
+//   E  account isolation probe — a VERIFIED student B2 (code sign-up, HUMAN STEP) never sees,
+//      marks or revokes student A; refusals must be the ownership refusal (404 QUESTION_NOT_FOUND)
 //   F  cleanup — delete the TEST accounts this run created (never a pre-existing one)
 //
 // Evidence classes (AGENTS.md: synthetic evidence stays separate from real
@@ -72,7 +73,7 @@ export const STEPS = Object.freeze({
   B: 'Guardian confirmation for a child account',
   C: 'Handwriting read and server mark',
   D: 'Photo read and server mark',
-  E: 'Account isolation probe (RLS and server authorisation)',
+  E: 'Account isolation probe (server ownership authorisation and RLS, observed over HTTP with a verified second test account)',
   F: 'Cleanup: delete the test accounts this run created'
 });
 export const EVIDENCE = Object.freeze({
@@ -158,6 +159,20 @@ export function deriveAddresses({ email, childEmail = null, guardianEmail = null
     guardian: guardianEmail || plusAddress(email, `pri-guardian-${tag}`),
     isolation: plusAddress(email, `pri-iso-${tag}`)
   };
+}
+
+/**
+ * Rows of a pri-account-export-v1 body that belong to another account A: any
+ * learningEvents or entities row whose entity_id/entityId is one of A's questions,
+ * or whose id/entity_id is one of A's attempts. Used by step E against the real
+ * export shape (server/platform/accounts.js: `learningEvents`, `entities`).
+ */
+export function exportedForeignRows(body, A) {
+  const rows = [...(Array.isArray(body?.learningEvents) ? body.learningEvents : []), ...(Array.isArray(body?.entities) ? body.entities : [])];
+  return rows.filter(row => {
+    const entity = row?.entity_id ?? row?.entityId;
+    return A.questionIds.has(entity) || A.attemptIds.has(entity) || A.attemptIds.has(row?.id);
+  });
 }
 
 /** The expected term number from the printed question, or null when the prompt is another form. */
@@ -459,7 +474,8 @@ export async function runAcceptance(args, deps = {}) {
    * form is not the one this tool can work out.
    */
   async function readAndMark(step, { mode, linesFor, render }) {
-    if (!spend(step, 1)) return;
+    // transcribe + recognize are two paid reads unless the server reuses the first.
+    if (!spend(step, 2)) return;
     const issued = await issueQuestion(step);
     if (!issued) return;
     const { q, expected } = issued;
@@ -487,19 +503,23 @@ export async function runAcceptance(args, deps = {}) {
     check(step, recognised.data.reused === true, 'the receipt reused the read already paid for (one provider call for transcribe + recognize)');
     // The client: the answer is the last line; ink working is sent only when
     // more than one line was written; a photo's whole reading is the working.
-    const readLines = String(recognised.data.transcription?.text || t.text).split('\n').map(x => x.trim()).filter(Boolean);
-    const expectedAnswer = String(lines[lines.length - 1]).replace(/\s+/g, ' ').trim();
-    let answer = readLines.at(-1) || '';
+    const receiptText = String(recognised.data.transcription?.text ?? t.text);
+    const readLines = receiptText.split('\n').map(x => x.trim()).filter(Boolean);
+    // The student vouches for what they wrote (the last line). The shipped client
+    // (client/src/local/backend.js) confirms unless the receipt text is EXACTLY the
+    // answer string; the server compares the same way, so so does this tool —
+    // a stray space or a different dash in the receipt is a confirmation, not a
+    // spurious RECOGNITION_RECEIPT_MISMATCH.
+    const answer = String(lines[lines.length - 1]).replace(/\s+/g, ' ').trim();
     let receipt = recognised.data.receipt;
-    const needsCorrection = answer.replace(/[−–—\s]/g, '-') !== expectedAnswer.replace(/[−–—\s]/g, '-') || recognised.data.transcription?.needsConfirmation === true || readLines.length !== 1;
+    const needsCorrection = receiptText !== answer || recognised.data.transcription?.needsConfirmation === true;
     if (needsCorrection) {
       // §22.2: explicit transcript correction / confirmation. The student vouches
       // for the final line; the server records the original reading too.
-      answer = expectedAnswer;
       const confirmed = await http(`/v1/practice/${q.id}/recognition/${receipt}/confirm`, { method: 'POST', jar: A.jar, body: { text: answer } });
       if (!check(step, confirmed.status === 201 && confirmed.data?.receipt, 'the explicit transcript correction/confirmation is recorded as a new receipt (201)', `status ${confirmed.status} ${confirmed.code || ''}`)) return;
       receipt = confirmed.data.receipt;
-      note(step, readLines.length !== 1 ? 'the receipt text is the whole page; the final line was confirmed as the answer' : 'the reading was corrected to what was written (as the product lets a student do)');
+      note(step, readLines.length !== 1 ? 'the receipt text is the whole page; the final line was confirmed as the answer' : 'the receipt text is not exactly what was written; it was confirmed as what was written (as the product lets a student do)');
     }
     const steps = mode === 'photo' ? readLines.join('\n') : (readLines.length > 1 ? readLines.join('\n') : undefined);
     const submissionId = `accept-${step.id}-${tag}-${randomBytes(4).toString('hex')}`;
@@ -548,40 +568,73 @@ export async function runAcceptance(args, deps = {}) {
   }
 
   // ══ E · account isolation ══════════════════════════════════════════════════
-  const ISO = { jar: {}, accountId: null, created: false, email: addresses.isolation, password: null };
+  // Student B2 is signed up the same way as A (a code read from the plus-addressed
+  // pri-iso mailbox) so that its mailbox is VERIFIED: the practice router refuses
+  // every unverified account with 403 EMAIL_UNVERIFIED before it looks the question
+  // up, so only a verified B2 reaches the per-account ownership check this step
+  // is about. The ownership refusal is 404 QUESTION_NOT_FOUND; any other refusal
+  // (EMAIL_UNVERIFIED included) does not prove isolation and is not counted.
+  const ISO = { jar: {}, accountId: null, created: false, email: addresses.isolation, verified: false };
+  const OWNERSHIP_REFUSAL = Object.freeze({ status: 404, code: 'QUESTION_NOT_FOUND' });
+  const isOwnershipRefusal = res => res.status === OWNERSHIP_REFUSAL.status && res.code === OWNERSHIP_REFUSAL.code && res.data?.authoritative !== true;
   if (needA('E')) {
     const e = open('E', EVIDENCE.TEST_ACCOUNTS);
     try {
       const anon = await http('/v1/sync/pull/0');
       check(e, anon.status === 401, 'no session: GET /v1/sync/pull is refused (401)', `status ${anon.status} ${anon.code || ''}`);
-      ISO.password = randomBytes(18).toString('base64url');
-      const registered = await http('/v1/account/register', { method: 'POST', jar: ISO.jar, body: { email: ISO.email, name: `Acceptance Isolation ${tag}`, password: ISO.password, isAdult: true, deviceId: `acceptance-E-${tag}` } });
-      ISO.created = registered.status === 201;
-      ISO.accountId = registered.data?.account?.id || null;
-      note(e, `student B is a password TEST account made through /v1/account/register (its verification email goes to ${maskEmail(ISO.email)} and needs no action)`);
-      if (check(e, registered.status === 201 && ISO.accountId && ISO.accountId !== A.accountId, 'student B registered as a separate adult test account (201)', `status ${registered.status} ${registered.code || ''}`)) {
-        report.accounts.push({ role: 'B2 (isolation)', email: maskEmail(ISO.email), accountId: ISO.accountId, created: ISO.created, ageBasis: 'adult' });
+      const requested = await http('/v1/account/otp/request', { method: 'POST', body: { channel: 'email', destination: ISO.email } });
+      if (check(e, requested.status === 202 && requested.data?.challengeId, 'otp/request accepted (202) for the isolation address', `status ${requested.status} ${requested.code || ''}`)) {
+        const code = await ask(e, `open the mailbox ${maskEmail(ISO.email)} (student B2, the isolation account); read the 6-digit sign-in code that just arrived.`);
+        if (code) {
+          const body = { channel: 'email', destination: ISO.email, challengeId: requested.data.challengeId, code, deviceId: `acceptance-E-${tag}` };
+          let verified = await http('/v1/account/otp/verify', { method: 'POST', jar: ISO.jar, body });
+          if (verified.status === 200 && verified.data?.status === 'profile-required') {
+            verified = await http('/v1/account/otp/verify', { method: 'POST', jar: ISO.jar, body: { ...body, code: undefined, signupTicket: verified.data.signupTicket, profile: { name: `Acceptance Isolation B2 ${tag}`, isAdult: true } } });
+            ISO.created = verified.status === 201;
+          }
+          ISO.accountId = verified.data?.account?.id || null;
+          check(e, [200, 201].includes(verified.status) && verified.data?.status === 'signed-in' && ISO.accountId && ISO.accountId !== A.accountId, 'student B2 signed in by code as a separate adult test account', `status ${verified.status} ${verified.code || ''}`);
+          const me = await http('/v1/account/me', { jar: ISO.jar });
+          ISO.verified = me.status === 200 && me.data?.account?.id === ISO.accountId && me.data?.account?.emailVerified === true;
+          check(e, ISO.verified, 'student B2\'s mailbox counts as verified (so the practice router\'s ownership check, not EMAIL_UNVERIFIED, is what refuses it below)', `status ${me.status}, emailVerified ${me.data?.account?.emailVerified}`);
+          report.accounts.push({ role: 'B2 (isolation)', email: maskEmail(ISO.email), accountId: ISO.accountId, created: ISO.created, ageBasis: 'adult' });
+        }
+      }
+      if (ISO.accountId) {
         const pullB = await http('/v1/sync/pull/0', { jar: ISO.jar });
         const leakedEvents = (pullB.data?.events || []).filter(ev => A.questionIds.has(ev.entityId) || A.attemptIds.has(ev.id) || A.attemptIds.has(ev.entityId));
-        check(e, pullB.status === 200 && leakedEvents.length === 0 && (pullB.data?.events || []).length === 0, 'student B\'s sync pull holds none of student A\'s questions or attempts', `status ${pullB.status}, ${(pullB.data?.events || []).length} event(s), ${leakedEvents.length} of A's`);
+        check(e, pullB.status === 200 && Array.isArray(pullB.data?.events) && leakedEvents.length === 0 && pullB.data.events.length === 0, 'student B2\'s sync pull holds none of student A\'s questions or attempts', `status ${pullB.status}, ${(pullB.data?.events || []).length} event(s), ${leakedEvents.length} of A's`);
         const [qid] = [...A.questionIds];
-        if (qid) {
+        if (!qid) note(e, 'A issued no question this run; the cross-account question probes have nothing to aim at');
+        else if (!ISO.verified) {
+          human(e, 'student B2 is not verified: the two cross-account question probes were NOT run (an unverified account is refused EMAIL_UNVERIFIED before ownership is checked, which proves nothing about isolation).');
+          e.pending = true;
+        } else {
           const steal = await http(`/v1/practice/${qid}/submit`, { method: 'POST', jar: ISO.jar, body: { submissionId: `accept-E-${tag}`, answer: '0', mode: 'typed' } });
-          check(e, steal.status !== 200 && steal.data?.authoritative !== true, 'student B cannot submit to student A\'s question', `status ${steal.status} ${steal.code || ''}`);
+          check(e, isOwnershipRefusal(steal), `verified student B2 submitting to student A's question is refused by ownership (${OWNERSHIP_REFUSAL.status} ${OWNERSHIP_REFUSAL.code})`, `status ${steal.status} ${steal.code || ''}`);
           const peek = await http(`/v1/practice/${qid}/recognize`, { method: 'POST', jar: ISO.jar, body: { mode: 'ink', image: 'data:image/png;base64,iVBORw0KGgo=' } });
-          check(e, ![200, 201].includes(peek.status), 'student B cannot mint a reading receipt on student A\'s question', `status ${peek.status} ${peek.code || ''}`);
+          check(e, isOwnershipRefusal(peek), `verified student B2 minting a reading receipt on student A's question is refused by ownership (${OWNERSHIP_REFUSAL.status} ${OWNERSHIP_REFUSAL.code})`, `status ${peek.status} ${peek.code || ''}`);
         }
         if (A.sessionId) {
           const revoke = await http(`/v1/account/devices/${A.sessionId}`, { method: 'DELETE', jar: ISO.jar });
-          check(e, revoke.data?.revoked !== true, 'student B cannot revoke student A\'s session', `status ${revoke.status} revoked ${revoke.data?.revoked}`);
+          check(e, revoke.data?.revoked !== true, 'student B2 cannot revoke student A\'s session', `status ${revoke.status} revoked ${revoke.data?.revoked}`);
           const stillA = await http('/v1/account/me', { jar: A.jar });
           check(e, stillA.status === 200 && stillA.data?.account?.id === A.accountId, 'student A\'s session still works afterwards', `status ${stillA.status}`);
         }
+        // GET /v1/account/export answers { format: 'pri-account-export-v1', account,
+        // learningEvents, entities, … } (server/platform/accounts.js). Rows carry
+        // entity_id (SQL column names) — entityId is accepted too so a renamed
+        // column cannot make the probe vacuous; a missing array FAILS, never passes.
         const exportB = await http('/v1/account/export', { jar: ISO.jar });
-        const foreign = (exportB.data?.events || []).filter(ev => A.questionIds.has(ev.entityId) || A.questionIds.has(ev.entity_id));
-        check(e, exportB.status === 200 && exportB.data?.account?.id === ISO.accountId && foreign.length === 0, 'student B\'s export is student B\'s rows only', `status ${exportB.status}, ${(exportB.data?.events || []).length} event(s)`);
+        const rowsB = exportB.data || {};
+        const exportShape = exportB.status === 200 && rowsB.format === 'pri-account-export-v1' && rowsB.account?.id === ISO.accountId && Array.isArray(rowsB.learningEvents) && Array.isArray(rowsB.entities);
+        check(e, exportShape, 'student B2\'s export has the pri-account-export-v1 shape (account, learningEvents[], entities[])', `status ${exportB.status} ${exportB.code || ''}, format ${rowsB.format}, learningEvents ${Array.isArray(rowsB.learningEvents) ? rowsB.learningEvents.length : 'missing'}, entities ${Array.isArray(rowsB.entities) ? rowsB.entities.length : 'missing'}`);
+        if (exportShape) {
+          const foreign = exportedForeignRows(rowsB, A);
+          check(e, foreign.length === 0, 'student B2\'s export holds none of student A\'s questions or attempts', `${rowsB.learningEvents.length} event(s), ${rowsB.entities.length} entit(y/ies), ${foreign.length} of A's`);
+        }
         const exportA = await http('/v1/account/export', { jar: A.jar });
-        check(e, exportA.status === 200 && exportA.data?.account?.id === A.accountId, 'student A\'s export is student A\'s', `status ${exportA.status}`);
+        check(e, exportA.status === 200 && exportA.data?.format === 'pri-account-export-v1' && exportA.data?.account?.id === A.accountId && Array.isArray(exportA.data?.learningEvents), 'student A\'s export is student A\'s', `status ${exportA.status}, ${Array.isArray(exportA.data?.learningEvents) ? exportA.data.learningEvents.length : 'no'} event(s)`);
       }
     } catch (error) { check(e, false, 'E ran to completion', error?.message || String(error)); }
     settle(e);
@@ -592,11 +645,7 @@ export async function runAcceptance(args, deps = {}) {
     skipped('F', !want('F') ? 'skipped by --skip' : `cleanup is off for ${args.target} (pass --cleanup to delete the accounts this run created)`);
   } else {
     const f = open('F', EVIDENCE.TEST_ACCOUNTS);
-    if (ISO.created && ISO.accountId) {
-      const gone = await http('/v1/account', { method: 'DELETE', jar: ISO.jar, body: { password: ISO.password } });
-      check(f, gone.status === 200 && gone.data?.deleted === true, 'student B (password test account) deleted with its password', `status ${gone.status} ${gone.code || ''}`);
-    }
-    for (const [label, acct] of [['A', A], ['B (child)', B]]) {
+    for (const [label, acct] of [['A', A], ['B (child)', B], ['B2 (isolation)', ISO]]) {
       if (!acct.created || !acct.accountId) { if (acct.accountId) note(f, `${label} existed before this run and is left alone`); continue; }
       const requested = await http('/v1/account/otp/delete-request', { method: 'POST', body: { email: acct.email } });
       if (!check(f, requested.status === 202 && requested.data?.challengeId, `${label}: a deletion code was requested (202)`, `status ${requested.status} ${requested.code || ''}`)) continue;

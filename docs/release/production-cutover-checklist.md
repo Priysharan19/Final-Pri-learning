@@ -89,7 +89,10 @@ explicit production-infrastructure actions and were not performed by this recove
       and `Production Container` (`deployment-image.yml`) is green on it:
       `node scripts/release-nominate.mjs <sha>` checks all of that plus that staging serves exactly
       this SHA on Postgres at that commit's schema versions and that `deploy/production → sha` is a
-      fast-forward, then prints the promotion commands. It pushes nothing. The order from here to the
+      fast-forward, then prints the promotion commands. It pushes nothing. It counts *every* workflow
+      run on the SHA, scheduled and agent workflows included: an unrelated red run (for example a
+      failed `Pri App Health Agent` schedule on the tip) blocks nomination until it is green or
+      rerun; it does not pick which workflows are code gates. The order from here to the
       promotion, with the 24 h soak gate, is `docs/operations/postgres-cutover.md` §4.6.
 - [ ] On a checkout of that SHA: `node tools/verify-release-identity.mjs` passes and
       `npm run test:deploy` passes.
