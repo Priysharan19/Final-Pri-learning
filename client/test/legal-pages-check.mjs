@@ -220,8 +220,34 @@ ok(/sends the lines of\s+working you wrote/i.test(privacy),
   'the notice describes the optional working check and what it sends');
 ok(/expected answer is never sent with it/i.test(privacy),
   'and that the expected answer is never sent with it');
-ok(/Two\s+optional settings/i.test(privacy),
-  'and the summary counts both, so a reader is not surprised by the second');
+ok(/A second setting, off unless you turn\s+it on/i.test(privacy),
+  'and the summary names the second setting, so a reader is not surprised by it');
+// #284: the notice must say what the product does — an account is required to
+// be marked, marking is server-side, handwriting goes to OpenAI, and the data
+// location is stated without claiming India before the Supabase move happens.
+ok(/need a Pri Learning account, and a connection, to have answers checked/.test(privacy),
+  'the notice says an account and a connection are needed to be marked');
+ok(/Marking is done online by our server/.test(privacy) && /never sets the mark/.test(privacy),
+  'the notice says marking is server-side and the on-device engine never sets the mark');
+ok(/Railway's `ams` region/.test(privacy) && /Supabase in its Mumbai region/.test(privacy),
+  'the notice states where data is stored today and where it is planned to move');
+ok(!/whole app without an account|servers in India|on your own device\.|so a teacher can set work/i.test(privacy),
+  'the notice no longer claims an account-free app, Indian servers, on-device marking or a teacher product');
+// #283: plan copy may only promise what FREE_TIER / PLAN_CAPABILITIES enforce.
+// The numbers come from the placeholders, never from literals in the copy.
+for (const [lang, cat] of [['en', en], ['hi', hi]]) {
+  const plan = Object.entries(cat).filter(([k]) => k.startsWith('settings.')).map(([, v]) => v).join(' \n ');
+  ok(!/everything else unlimited|all courses|all features|बाकी सब असीमित|सभी कोर्स/i.test(plan),
+    `${lang}: settings plan copy never promises "everything else unlimited", "all courses" or "all features"`);
+  ok(/\{limit\}/.test(cat['settings.localPlanSub']) && /\{exams\}/.test(cat['settings.localPlanSub']) && /\{days\}/.test(cat['settings.localPlanSub']),
+    `${lang}: the free-plan line takes its daily cap and exam allowance from FREE_TIER`);
+  ok(!/additional AI|extra AI|अतिरिक्त/i.test(cat['settings.premiumAdds'] || ''),
+    `${lang}: Premium copy does not advertise the reserved additional-ai-usage capability`);
+}
+for (const [lang, key] of [['en', 'signup.noticeWhat'], ['hi', 'signup.noticeWhat']]) {
+  ok(!/in India|भारत में/.test((lang === 'en' ? en : hi)[key]),
+    `${lang}: the guardian consent notice does not say data is stored in India before it is`);
+}
 ok(/90 days/.test(privacy), 'the notice states the telemetry retention window');
 ok(/without a password is not encrypted|profile without a password is not/i.test(privacy),
   'the notice admits that a profile without a password is not encrypted');
@@ -379,8 +405,8 @@ for (const [slug] of PAGES) {
 
 // The fold itself, asserted on a sentence that spans lines in each language.
 const foldedEnglish = blocksOf(readDoc('privacy', 'en'))
-  .find(b => b.kind === 'p' && b.text.includes('built to work without sending your work anywhere'));
-ok(foldedEnglish && /checking your working, which is off unless you turn it on\. Without an account, neither runs\./.test(foldedEnglish.text),
+  .find(b => b.kind === 'p' && b.text.includes('Your handwriting and photos are read online'));
+ok(foldedEnglish && /in\s+which case you type your answers instead\. A second setting, off unless you turn\s+it on/.test(foldedEnglish.text),
   'a paragraph wrapped across six source lines renders as one paragraph');
 const foldedHindi = blocksOf(readDoc('privacy', 'hi'))
   .find(b => b.kind === 'p' && b.text.includes(ENGLISH_GOVERNS));

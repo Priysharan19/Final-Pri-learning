@@ -158,8 +158,15 @@ for (const open of ['/curriculum', '/content']) {
 const url = buildAuthActionUrl('https://learn.pri.example', 'guardian-consent', 'tok');
 const mail = authEmailMessage('guardian-consent', url);
 ok(/child/i.test(mail.subject), 'the subject tells a parent it is about their child');
-ok(/works on their device without an account/i.test(mail.text),
-  'the body says the app works without the account, so a parent is not pressured by a false urgency');
+// #284: the old line ("works on their device without an account") stopped
+// being true when marking moved to the server; the body now says plainly what
+// confirming enables and what doing nothing means, without false urgency.
+ok(/Pri's server marks them/.test(mail.text) && /read by OpenAI/.test(mail.text),
+  'the body says answers are marked by the server and handwriting is read by OpenAI');
+ok(/If you do nothing, nothing of theirs is sent, their answers are not checked/.test(mail.text),
+  'and says what doing nothing means, so a parent decides on facts rather than urgency');
+ok(!/works on their device without an account/i.test(mail.text),
+  'and no longer claims the app works without an account');
 ok(/if you do nothing/i.test(mail.text), 'and says plainly what happens if they ignore it');
 ok(/withdraw/i.test(mail.text), 'and that they can withdraw');
 
