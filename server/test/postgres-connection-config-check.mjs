@@ -196,4 +196,71 @@ for (const [name, value] of [
   ok(postgresConnectionSettings(`postgresql://u:${SECRET}@${DB_HOST}/postgres?sslmode=verify-full`, prod({ PGPORT: '5432' })).tlsMode === 'verify-full', 'a portless URL with PGPORT=5432 is accepted');
 }
 
+// ── The port is compared the way node-postgres resolves it (#524 follow-up) ──
+// pg turns the port into a number with parseInt(value, 10), so "6543.0",
+// "+6543", " 6543", "6543abc" and "6543e0" all connect to 6543; and it takes
+// the LAST exact-case `port` parameter, falling back to the authority port and
+// then PGPORT when that is empty — an uppercase `PORT=` or an earlier `port=`
+// does not stop PGPORT from being used. Each case below was accepted before the
+// fix while pg itself resolved it to 6543.
+{
+  const H = `postgresql://u:${SECRET}@${DB_HOST}`;
+  const named = [
+    [`${H}:5432/postgres?sslmode=verify-full&port=6543.0`, '?port=6543.0 (parseInt → 6543)'],
+    [`${H}:5432/postgres?sslmode=verify-full&port=%2B6543`, '?port=+6543 (parseInt → 6543)'],
+    [`${H}:5432/postgres?sslmode=verify-full&port=6543abc`, '?port=6543abc (parseInt → 6543)'],
+    [`${H}:5432/postgres?sslmode=verify-full&port=6543e0`, '?port=6543e0 (parseInt → 6543)'],
+    [`${H}:5432/postgres?sslmode=verify-full&port=6543%zz`, '?port=6543%zz (an invalid escape; parseInt → 6543)'],
+    [`${H}/postgres?sslmode=verify-full&PORT=5432`, 'a portless URL with PORT=5432 (not the key pg reads) and PGPORT=6543', { PGPORT: '6543' }],
+    [`${H}/postgres?sslmode=verify-full&port=5432&port=`, 'a portless URL whose last port= is empty and PGPORT=6543', { PGPORT: '6543' }],
+    [`${H}/postgres?sslmode=verify-full`, 'a portless URL with PGPORT=6543.0', { PGPORT: '6543.0' }],
+    [`${H}/postgres?sslmode=verify-full`, 'a portless URL with PGPORT=+6543', { PGPORT: '+6543' }]
+  ];
+  for (const [url, label, extraEnv = {}] of named) {
+    throwsCode(() => postgresConnectionSettings(url, prod(extraEnv)), 'PLATFORM_DB_TRANSACTION_POOLER', `${label} is refused`);
+  }
+
+  // Differential: node-postgres's own ConnectionParameters is the oracle. For
+  // every URL × PGPORT below, either the settings refuse it, or the connection
+  // string the pool receives resolves (in pg, with that PGPORT) to a port other
+  // than 6543.
+  const { default: ConnectionParameters } = await import('pg/lib/connection-parameters.js');
+  const pgPort = (connectionString, pgport) => {
+    const saved = process.env.PGPORT;
+    if (pgport === undefined) delete process.env.PGPORT; else process.env.PGPORT = pgport;
+    try { return new ConnectionParameters({ connectionString }).port; } finally {
+      if (saved === undefined) delete process.env.PGPORT; else process.env.PGPORT = saved;
+    }
+  };
+  const SPELLINGS = ['6543', '06543', '6543.0', '6543.9', '+6543', ' 6543', '6543 ', '6543abc', '6543e0', '6543,5432', '65430', '0x1993', '5432', ''];
+  const enc = value => encodeURIComponent(value);
+  const corpus = [];
+  for (const s of SPELLINGS) {
+    corpus.push([`${H}:5432/postgres?sslmode=verify-full&port=${enc(s)}`]);
+    corpus.push([`${H}/postgres?sslmode=verify-full&port=${enc(s)}`, '6543']);
+    corpus.push([`${H}/postgres?sslmode=verify-full&PORT=${enc(s)}`, '6543']);
+    corpus.push([`${H}/postgres?sslmode=verify-full&port=5432&port=${enc(s)}`, '6543']);
+    corpus.push([`${H}:5432/postgres?sslmode=verify-full&port=${enc(s)}&port=5432`]);
+    corpus.push([`${H}/postgres?sslmode=verify-full`, s]);
+  }
+  corpus.push([`${H}:06543/postgres?sslmode=verify-full`]);
+  let refused = 0;
+  let pgWouldUse6543 = 0;
+  for (const [url, pgport] of corpus) {
+    const env = prod(pgport === undefined ? {} : { PGPORT: pgport });
+    if (pgPort(url, pgport) === 6543) pgWouldUse6543++;
+    let settings = null;
+    let error = null;
+    try { settings = postgresConnectionSettings(url, env); } catch (caught) { error = caught; }
+    if (error) {
+      eq(error.code, 'PLATFORM_DB_TRANSACTION_POOLER', `differential: ${url.slice(url.indexOf('/postgres'))} PGPORT=${JSON.stringify(pgport)} is refused only as a pooler`);
+      refused++;
+      continue;
+    }
+    ok(pgPort(settings.connectionString, pgport) !== 6543,
+      `differential: ${url.slice(url.indexOf('/postgres'))} PGPORT=${JSON.stringify(pgport)} is accepted, so pg must not resolve the pool's connection string to 6543 (it resolves to ${pgPort(settings.connectionString, pgport)})`);
+  }
+  ok(pgWouldUse6543 >= 40 && refused >= pgWouldUse6543, `the differential corpus exercises the refusal (${corpus.length} cases; pg resolves ${pgWouldUse6543} of them to 6543; ${refused} refused)`);
+}
+
 console.log(`POSTGRES CONNECTION CONFIG: PASS — ${checks}/${checks} checks — production requires verified TLS (sslmode=verify-full, or require + CA), TLS is built explicitly from sslmode + PRI_DATABASE_SSL_ROOT_CERT, timeouts and pool size are validated, transaction-mode poolers are refused (session mode only), and no error leaks the URL.`);
