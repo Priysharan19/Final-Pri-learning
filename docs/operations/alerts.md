@@ -26,6 +26,14 @@ images, signed URLs and provider keys have no field to travel in;
 appears. Metrics labels come from fixed alphabets (status class, provider name, coded error),
 never ids or paths.
 
+| Alert emails — `server/platform/alertNotifier.js` evaluates every rule in §2 each 60 s; a rule turning firing sends one `FIRING` email, its clearing one `RESOLVED` email (only for a notified episode), with a 30-minute per-rule cooldown on firing emails and a 5-minute retry after a failed send. Sent through the auth-email Resend path (`PRI_RESEND_API_KEY`, `PRI_AUTH_EMAIL_FROM`) to `PRI_ALERT_EMAIL`; unset or invalid = disabled (counted as `outcome=disabled`). The body carries only rule id, severity, thresholds, window counts, release SHA and environment name (`PRI_ALERT_ENVIRONMENT`, else `RAILWAY_ENVIRONMENT_NAME`). Counted on `/v1/metrics` as `alert_notifications_total{rule,outcome}` (`firing_sent`, `resolved_sent`, `failed`, `suppressed_cooldown`, `disabled`) | email to the operator | the owner's inbox |
+| `SERVER_DOWN` external check — `.github/workflows/staging-uptime.yml` probes staging `/v1/health` and `/v1/ready` every 5 minutes (and on demand); a failed scheduled run is emailed by GitHub to the repository owner. Staging only; production needs its own check | GitHub Actions | the repository owner |
+
+The alert emails are evaluated inside the server process, so they cannot report the server
+being down — that is what the external `SERVER_DOWN` check is for. Built and tested
+(`server/test/alert-notifier-check.mjs`); **not configured anywhere until the owner sets the
+variables in §3 and records it in §5.**
+
 Metrics are **per replica and in memory**: they reset on restart and on deploy. With more than
 one replica, query each or alert on logs instead.
 
@@ -86,7 +94,14 @@ lines, search Railway logs for it, and read the `route`, `code` and `release` it
 2. Set the service **healthcheck path** to `/v1/ready` so a deploy whose database or schema is
    wrong never receives traffic. (The container `HEALTHCHECK` stays on `/v1/health`: liveness
    must not restart a process because the database is down.)
-3. Create the log alerts in §2 (Railway → Observability → Alerts, or a log drain to the
+3. To receive the §2 alerts by email without a monitoring tool, set `PRI_ALERT_EMAIL` (one
+   address) on the service, with `PRI_AUTH_EMAIL_PROVIDER=resend`, `PRI_RESEND_API_KEY` and
+   `PRI_AUTH_EMAIL_FROM` already set for auth email. Optionally set `PRI_ALERT_ENVIRONMENT` to name
+   the environment in the subject (defaults to `RAILWAY_ENVIRONMENT_NAME`). Confirm on
+   `/v1/metrics` that `alert_notifications_total` shows no `disabled` outcome after a drill.
+   For `SERVER_DOWN`, keep the `Staging uptime` workflow enabled and GitHub's failed-workflow
+   email notifications on for the owner's account.
+4. Alternatively/additionally create the log alerts in §2 (Railway → Observability → Alerts, or a log drain to the
    monitoring tool the owner chooses) and route them to the owner's on-call channel.
 
 ## 4. Supabase configuration (owner action)
