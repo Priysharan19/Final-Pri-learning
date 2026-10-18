@@ -76,7 +76,8 @@ export async function signInOnCard(scope, platform, { email, name = null, age = 
   await scope.locator('#signup-destination').waitFor({ timeout: 20000 });
   await scope.locator('#signup-destination').fill(email);
   await scope.getByTestId('signup-send-code').click();
-  await scope.locator('[data-signup-step="code"]').waitFor({ timeout: 20000 });
+  // The six boxes are the code step (the step attribute is on the card's root).
+  await scope.locator('#signup-code-0').waitFor({ timeout: 20000 });
   const code = lastEmailCode(platform, email);
   if (!code) throw new Error(`the real server did not send a six-digit email code to ${email}`);
   await typeCode(scope, code);
