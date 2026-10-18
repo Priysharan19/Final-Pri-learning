@@ -25,7 +25,8 @@ import { cloudAccountLink, cloudDeviceId, linkSignedInAccount, verifyCloudSessio
 import {
   ACTIVATION_BLOCKED_CODES, ACTIVATION_GUARDIAN_CODES, ACTIVATION_SIGN_IN_CODES, ensureAccountActivated
 } from '../platform/accountActivation.js';
-import { appleSignInOffered, AppleSignInButton, Logo } from '../pages/Login.jsx';
+import { Logo } from '../App.jsx';
+import { appleSignInOffered, AppleSignInButton } from '../pages/Login.jsx';
 import { signInWithApple } from '../platform/native/appleSignIn.js';
 import { tLater, useT } from '../i18n/index.js';
 import { isNetworkFailure, signInErrorCopy } from './signInErrors.js';
