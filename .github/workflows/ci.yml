@@ -334,8 +334,14 @@ jobs:
       # response or a log. The two engine-agnostic suites also run on Postgres below.
       - name: Security acceptance (route inventory, BOLA/authz negatives, abuse limits, production boundary)
         run: |
+          set -o pipefail
           node server/test/route-inventory-check.mjs
           node server/test/sql-parameterisation-check.mjs
+          # What the secret sweep below counts as a leaked key (support/secret-shapes.mjs):
+          # every real key shape is still read, the server's own session/CSRF mints never
+          # are (issue #526). Without this pin a loosened shape would make the sweep vacuous.
+          node server/test/secret-shape-check.mjs 2>&1 | tee secret-shapes.log
+          grep -Fq 'SECRET SHAPES — PASS — 69 checks' secret-shapes.log
           node server/test/security-acceptance-check.mjs
           node server/test/abuse-limits-check.mjs
           node server/test/security-production-mode-check.mjs

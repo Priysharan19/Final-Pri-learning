@@ -766,8 +766,9 @@ try {
     // The shape search is for a key that is NOT one of the configured ones.
     // It reads whole tokens only, and never the server's own random session /
     // CSRF values (support/secret-shapes.mjs; pinned by secret-shape-check.mjs):
-    // a random base64url token used to contain `re_` or `sk-` plus twenty
-    // alphanumerics about once in 150 runs and fail this check on nothing (#526).
+    // a random base64url token can contain `re_` or `sk-` plus twenty
+    // alphanumerics, which failed this check on nothing in ~0.7 % of runs
+    // (issue #526's simulation over a captured run).
     c.deq(secretShaped(haystack), [], 'nothing secret-shaped appears in responses or logs');
     c.ok(!/pri_cloud_session=[A-Za-z0-9_-]{20}/.test(captured.join('')), 'no session cookie value was logged');
     c.ok(responses.length > 500, `${responses.length} responses searched`);

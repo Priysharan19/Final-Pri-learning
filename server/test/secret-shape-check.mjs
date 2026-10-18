@@ -1,8 +1,9 @@
 // The secret-shape sweep (security-acceptance-check.mjs, F) must read a real
 // provider key wherever it appears and must never read the server's own random
 // tokens as one (issue #526: a session/CSRF value — 32 bytes of base64url —
-// contained `re_` or `sk-` followed by twenty letters and digits in about one
-// run in 150, and the suite failed on nothing).
+// can contain `re_` or `sk-` followed by twenty letters and digits, and the
+// issue's simulation over a captured run had the suite failing on nothing in
+// ~0.7 % of runs).
 //
 // Deterministic: every random-looking token below is drawn from a seeded
 // generator, and every leaked key is crafted here. Secret-shaped values are
@@ -88,6 +89,11 @@ const sessionLine = value => `201 {"set-cookie":"pri_cloud_session=${value}; Htt
   const pem = pemHeader('RSA');
   eq(secretShaped(`{"key":"${pem}\\nMIIEowIBAAKCAQEA\\n-----END RSA PRIVATE KEY-----"}`), [pem], 'a PEM private-key header is read as a leak');
   eq(secretShaped(`${pemHeader(null)}\nMIIE`), [pemHeader(null)], 'an unlabelled PEM private-key header is read as a leak');
+  // A header glued to its body (the newline collapsed by a logger or a JSON
+  // flattening) is still a leak: the PEM shape is not held to token
+  // boundaries, because no random token can contain one (it has spaces).
+  eq(secretShaped(`log: ${pemHeader(null)}MIIEvQIBADANBgkqhkiG9w0BAQEFAASC`), [pemHeader(null)], 'a PEM header glued to its base64 body is read as a leak');
+  eq(secretShaped(`x${pem}`), [pem], 'a PEM header glued to a preceding token character is read as a leak');
   // Several leaks in one haystack are all reported, once each.
   const two = `${placements['log line'](keys.Resend)}\n${placements['JSON string'](keys['OpenAI project'])}`;
   eq(secretShaped(two), [keys.Resend, keys['OpenAI project']], 'every leak in a haystack is reported');
