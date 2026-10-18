@@ -246,6 +246,16 @@ try {
     c.eq((await resolved('guessed-roots', [`x=${r1}`, `x=${r2}`, `x=${slip}`])).marksEarned, 0, `seed ${seed}: the roots stated with no working earn nothing, with a slip under them or not`);
     c.eq((await resolved('sweep', Array.from({ length: 21 }, (_, k) => `x=${k - 10}`))).marksEarned, 0, `seed ${seed}: twenty-one candidate values earn nothing`);
     c.eq((await resolved('sweep-under-factorisation', [factorised, ...Array.from({ length: 21 }, (_, k) => `x=${k - 10}`)])).marksEarned, 1, `seed ${seed}: and under a factorisation only the factorisation earns`);
+    // Issue #510: a second factorisation sharing one root with the question
+    // (`(x - r1)(x - other)`) was read as a branch and labelled `repeat`, so
+    // the roots below it were paid. It is the break.
+    const wrongFactorised = `${bracket(r1)}${bracket(other)}=0`;
+    const shared = await resolved('wrong-factorisation-sharing-a-root', [factorised, wrongFactorised, `x=${r1}`, `x=${r2}`]);
+    c.eq(shared.marksEarned, 1, `seed ${seed}: "${wrongFactorised}" under "${factorised}" is the break: only the factorisation above it earns (${shared.marksEarned}/3)`);
+    c.deq(shared.stepReport?.lines?.map(line => line.status), ['ok', 'break', 'note', 'note'], `seed ${seed}: and the report names it as the line that broke`);
+    c.deq(shared.partial?.lines?.map(line => line.reason), ['progress', 'break', 'note', 'note'], `seed ${seed}: with nothing after it paid`);
+    const repeated = await resolved('factorisation-written-twice', [factorised, factorised, `x=${r1}`, `x=${r2}`]);
+    c.eq(repeated.marksEarned, clean.marksEarned, `seed ${seed}: the right factorisation written twice is still worth what it was (${repeated.marksEarned}/3)`);
   }
 
   // On a linear equation the same three lines of one shape are still
@@ -271,6 +281,45 @@ try {
     c.eq(disguised.marksEarned, 2, 'linear: the root disguised twice before them and a slip after them take nothing from the steps');
     c.deq(disguised.partial?.lines?.map(line => line.reason), ['contradicted', 'contradicted', 'progress', 'progress', 'break'], 'linear: the disguised lines are the candidates, and the steps are what is paid');
     c.eq((await resolved('disguised-and-slip', ['m+1=-13', 'm+2=-12', 'm+3=-5'])).marksEarned, 0, 'linear: the disguised root and a slip with no step earn nothing');
+  }
+  // Money on a question priced in rupees. The word "paise" was stripped and
+  // ignored, so the right number of paise for a price in rupees — 45 paise
+  // for ₹45, a hundredth of the price — was marked correct. Paise are a
+  // hundredth of a rupee: 4500 paise is ₹45, 45 paise is not.
+  for (const seed of [1, 2, 3]) {
+    const sample = { generator: 'c10-linear-pair-methods', difficulty: 4, seed, curriculum: 'in' };
+    const issueMoney = async () => {
+      const r = await h.request('/v1/practice/issue', { method: 'POST', jar: a.jar, body: sample });
+      assert.equal(r.status, 201, `seed ${seed}: the server issues the kirana-shop pair`);
+      return r.data.question;
+    };
+    const probeMoney = await issueMoney();
+    // The prompt carries the pair: m1 of one, n1 of the other for ₹bill1; m2, n2 for ₹bill2.
+    const n = [...String(probeMoney.prompt).matchAll(/\$₹?(\d+)\$/g)].map(m => Number(m[1]));
+    assert.equal(n.length, 6, `seed ${seed}: the prompt states two bills of two goods (${probeMoney.prompt})`);
+    const [m1, n1, bill1, m2, n2, bill2] = n;
+    const price = (bill1 * n2 - n1 * bill2) / (m1 * n2 - n1 * m2);
+    assert.ok(Number.isInteger(price) && price > 0, `seed ${seed}: the price solves to a whole number of rupees (${price})`);
+    const once = async (label, answer) => {
+      const q = await issueMoney();
+      const r = await submit(q.id, `money-${seed}-${label}`, answer, []);
+      c.eq(r.status, 200, `seed ${seed} ${label}: "${answer}" is graded`);
+      return r.data;
+    };
+    c.eq((await once('rupees', `₹${price}`)).correct, true, `seed ${seed}: ₹${price} is correct`);
+    c.eq((await once('in-paise', `${price * 100} paise`)).correct, true, `seed ${seed}: ${price * 100} paise is ₹${price}, and correct`);
+    const hundredth = await once('paise-for-rupees', `${price} paise`);
+    c.deq([hundredth.correct, hundredth.marksEarned], [false, 0], `seed ${seed}: ${price} paise is a hundredth of ₹${price}, and not correct`);
+  }
+  // Paise are money: on the term-number question (n = 24) neither 2400 paise
+  // nor 24 paise is an answer — the unit is wrong (the engine says "Check the
+  // unit"; an open question's reply says nothing about why).
+  for (const answer of ['2400 paise', '24 paise']) {
+    const q = await issue();
+    const r = await submit(q.id, `ap-paise-${answer.replace(/\s+/g, '-')}`, answer, []);
+    c.deq([r.status, r.data.correct, r.data.marksEarned], [200, false, 0], `"${answer}" on a question that is not about money is not correct`);
+    const again = await submit(q.id, `ap-paise-${answer.replace(/\s+/g, '-')}-two`, answer, []);
+    c.deq([again.status, again.data.correct, again.data.resolved, again.data.marksEarned], [200, false, true, 0], `…and written again it resolves the question at 0 of 3`);
   }
 } finally {
   await h.close();
