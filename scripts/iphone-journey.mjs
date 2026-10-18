@@ -48,6 +48,7 @@ import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { openServerDesk } from './journey-oracle.mjs';
+import { installApp, keepOnlySimulator } from './simulator-fleet.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
@@ -118,15 +119,11 @@ function pickDevice() {
 
 function ensureBooted({ name, udid }) {
   const booted = () => run('xcrun', ['simctl', 'list', 'devices']).split('\n').some(l => l.includes(udid) && /\(Booted\)/.test(l));
+  // A CI runner carries one booted simulator, whether or not this one must
+  // boot: the other family left booted by an earlier step starves this one
+  // (scripts/simulator-fleet.mjs). A person's own simulators are never touched.
+  keepOnlySimulator(udid);
   if (booted()) return;
-  // On a CI runner a second booted simulator (the iPad from earlier steps)
-  // starves this boot; a person's own simulators are never touched locally.
-  if (process.env.CI) {
-    for (const line of run('xcrun', ['simctl', 'list', 'devices']).split('\n')) {
-      const other = line.match(/\(([0-9A-F-]{36})\) \(Booted\)/i)?.[1];
-      if (other && other !== udid) { console.log(`  shutting down booted simulator ${other} (CI)`); try { run('xcrun', ['simctl', 'shutdown', other]); } catch { /* already down */ } }
-    }
-  }
   console.log(`Booting ${name}…`);
   if (process.env.CI) { try { console.log(run('xcrun', ['simctl', 'list', 'runtimes']).trim().split('\n').map(l => `  ${l}`).join('\n')); } catch { /* diagnostics only */ } }
   try { run('xcrun', ['simctl', 'boot', udid], { timeout: 900_000 }); } catch { /* already booting */ }
@@ -198,7 +195,7 @@ if (!app) {
 const bundleId = run('/usr/bin/plutil', ['-extract', 'CFBundleIdentifier', 'raw', '-o', '-', join(app, 'Info.plist')]).trim();
 try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* not running */ }
 try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
-run('xcrun', ['simctl', 'install', udid, app]);
+installApp(udid, app);
 
 console.log('Leg 1 · no server: drafts are kept, nothing is checked, marked or revealed …');
 const first = launchAndRead(udid, bundleId, '--journey-selfcheck', 'first', {}, { loops: 110 });
@@ -357,7 +354,7 @@ let markingNotMeasured = null;
 
     try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* not running */ }
     try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
-    run('xcrun', ['simctl', 'install', udid, app]);
+    installApp(udid, app);
     const childEnv = { PRI_CLOUD_ORIGIN: server.PRI_CLOUD_ORIGIN, PRI_JOURNEY_EMAIL: server.PRI_CLOUD_EMAIL, PRI_JOURNEY_PASSWORD: server.PRI_CLOUD_PASSWORD, PRI_JOURNEY_ORACLE_DIR: oracleDir };
     markingLines = launchAndRead(udid, bundleId, '--journey-marking', 'marking', childEnv, { tick, loops: 130 });
     for (const line of markingLines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
