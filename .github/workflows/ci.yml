@@ -463,6 +463,11 @@ jobs:
           # The owner's photographed page (scripted reader): transcript, unrelated lines,
           # corrected line, proposed answer, durable draft; and the usage-limit state.
           node client/test/tour-photo-answer.js --no-build 2>&1 | tee -a browser.log
+          # #449: handwriting never vanishes — same-size ResizeObserver churn,
+          # callback-identity re-renders, a real resize and a pointercancel
+          # under the pen, in Chromium and WebKit at Windows scale factors
+          # (emulated; not Windows 11 hardware evidence).
+          npm run test:ink:canvas 2>&1 | tee -a browser.log
       - name: Accessibility suite
         if: always()
         run: |

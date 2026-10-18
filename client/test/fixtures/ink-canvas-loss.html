@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>InkCanvas · stroke-loss fixture</title>
+<style>
+  /* The same ink variable the app's theme.css gives the canvas (dark: #edebe4). */
+  :root { --ink: #111; }
+  :root[data-theme="dark"] { --ink: #edebe4; }
+  body { margin: 20px; background: #fff; color: #111; }
+  :root[data-theme="dark"] body { background: #14130f; color: #edebe4; }
+  /* theme.css · Ink / handwriting — copied so the fixture sizes exactly as the app does */
+  .ink-wrap { position: relative; border-radius: 0; overflow: hidden; border: none; background: none; }
+  .ink-canvas {
+    position: absolute; inset: 0; display: block; touch-action: none;
+    cursor: crosshair; -webkit-user-select: none; user-select: none;
+  }
+  .ink-canvas-live { z-index: 2; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/test/fixtures/ink-canvas-loss.jsx"></script>
+</body>
+</html>

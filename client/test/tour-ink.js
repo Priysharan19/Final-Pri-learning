@@ -118,6 +118,42 @@ export const flow = {
 
     await check('the footer says the server read it',
       /Read by Pri’s server reader/.test(await page.locator('.editor-foot').innerText().catch(() => '')));
+    // ── 3a · the window is resized under the pen (#449) ─────────────────────
+    // The owner saw a blank canvas straight after writing on Windows Chrome.
+    // A layout change while the pen is down used to re-create the bitmaps and
+    // take the stroke under the pen with it. Here the viewport changes width
+    // mid-stroke on the real page: the stroke must commit, the committed ink
+    // must still be painted afterwards, and the live layer must be clear.
+    const inkPixels = (selector) => page.evaluate(sel => {
+      const c = document.querySelector(sel);
+      const data = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      let ink = 0;
+      for (let i = 3; i < data.length; i += 4) if (data[i] > 0) ink++;
+      return ink;
+    }, selector);
+    const inkBeforeResize = await inkPixels('.ink-canvas-base');
+    await page.mouse.move(box.x + 300, box.y + 70);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 330, box.y + 100, { steps: 4 });
+    await page.setViewportSize({ width: 1240, height: 900 });
+    await page.waitForTimeout(200);
+    const boxResized = await canvas.boundingBox();
+    await page.mouse.move(boxResized.x + 340, boxResized.y + 130, { steps: 4 });
+    await page.mouse.up();
+    await page.waitForTimeout(1500);
+    const inkAfterResize = await inkPixels('.ink-canvas-base');
+    await check('a stroke written while the window was resized is committed and every line stays painted (#449)',
+      inkAfterResize > 0 && inkAfterResize > inkBeforeResize * 0.5 && await inkPixels('.ink-canvas-live') === 0,
+      `base ${inkBeforeResize} → ${inkAfterResize} px; live ${await inkPixels('.ink-canvas-live')} px`);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.waitForTimeout(300);
+    const inkRestored = await inkPixels('.ink-canvas-base');
+    await check('and the page keeps its ink when the window comes back', inkRestored > 0, `${inkRestored} px`);
+    // The rescaled page is a different picture and is read afresh; let those
+    // reads land before the counting below starts.
+    for (let seen = -1; seen !== reader.requests.length;) { seen = reader.requests.length; await page.waitForTimeout(1500); }
+    await readingArrives(page);
+
     // One read of one picture is one provider call; more ink is a different
     // picture and is read afresh — exactly one more call.
     const firstRead = (await readCalls()).at(-1);

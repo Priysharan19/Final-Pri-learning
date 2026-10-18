@@ -62,7 +62,16 @@ const InkCanvas = forwardRef(function InkCanvas({
   disabledRef.current = disabled;
   fingerRef.current = fingerMode;
 
-  const notify = useCallback(() => { onStrokesChange?.(strokesRef.current); }, [onStrokesChange]);
+  // The parent's callback is read through a ref so `notify` never changes
+  // identity. The sizing and pointer effects below depend on it; when it was
+  // rebuilt from the prop, every parent render that rebuilt the callback
+  // (InkAnswer does, whenever a reading arrives or clears) re-ran both effects
+  // mid-stroke: the ResizeObserver was torn down and re-attached, its initial
+  // callback re-assigned canvas.width — which clears a bitmap even when the
+  // value is unchanged — and the live stroke vanished under the pen (#449).
+  const onStrokesChangeRef = useRef(onStrokesChange);
+  onStrokesChangeRef.current = onStrokesChange;
+  const notify = useCallback(() => { onStrokesChangeRef.current?.(strokesRef.current); }, []);
 
   /** Reading a CSS custom property forces a style recalc, so it never happens
    *  in the frame loop — only when the theme actually changes. */
@@ -78,8 +87,14 @@ const InkCanvas = forwardRef(function InkCanvas({
     const out = { base: null, live: null };
     for (const [key, el] of [['base', baseRef.current], ['live', liveRef.current]]) {
       if (!el) continue;
-      // desynchronized: bypasses compositor queueing where supported — lower pen latency
-      const ctx = el.getContext('2d', { desynchronized: true }) || el.getContext('2d');
+      // desynchronized: bypasses compositor queueing where supported — lower
+      // pen latency. Only the live layer asks for it: that is the layer the
+      // nib is on, and it is the topmost element. The base layer is repainted
+      // only when a stroke commits, gains nothing from the hint, and sits
+      // under the live canvas — Chrome documents the hint for a translucent
+      // canvas as valid only with no DOM element above it, which the base
+      // layer always has. (Context attributes are fixed at first getContext.)
+      const ctx = (key === 'live' && el.getContext('2d', { desynchronized: true })) || el.getContext('2d');
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -202,6 +217,10 @@ const InkCanvas = forwardRef(function InkCanvas({
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
       const w = wrap.clientWidth;
+      // A hidden panel or a tab in the background can report a zero width for
+      // a moment. A zero-sized bitmap is the ink gone and the geometry it was
+      // written in forgotten; the last real size stays until a real one comes.
+      if (!Number.isFinite(w) || w <= 0) return;
       // Rotation, split view or a resized window changes the width under ink
       // that was written in CSS pixels. Scale it uniformly with the width so
       // the work keeps its shape instead of being clipped (CP-03).
@@ -209,41 +228,71 @@ const InkCanvas = forwardRef(function InkCanvas({
       // lowest point stays inside the canvas height. Points are copied, never
       // mutated, so snapshots held elsewhere keep their coordinates.
       const prev = widthRef.current;
-      if (prev > 0 && w > 0 && Math.abs(w - prev) >= 1 && strokesRef.current.length) {
+      const live = currentRef.current;
+      let rescaled = false;
+      if (prev > 0 && Math.abs(w - prev) >= 1 && (strokesRef.current.length || live)) {
         let f = w / prev;
         if (f > 1) {
           let maxY = 0;
           for (const stroke of strokesRef.current) for (const pt of stroke?.points || []) maxY = Math.max(maxY, pt.y);
+          for (const pt of live?.points || []) maxY = Math.max(maxY, pt.y);
           if (maxY > 0) f = Math.max(1, Math.min(f, (height - 8) / maxY));
         }
         if (Math.abs(f - 1) > 1e-3) {
+          const scalePoint = pt => ({ ...pt, x: pt.x * f, y: pt.y * f });
           const scale = list => list.map(stroke => ({
-            ...stroke, points: (stroke?.points || []).map(pt => ({ ...pt, x: pt.x * f, y: pt.y * f }))
+            ...stroke, points: (stroke?.points || []).map(scalePoint)
           }));
           strokesRef.current = scale(strokesRef.current);
           redoRef.current = scale(redoRef.current);
+          // The width can change between pen-down and pen-up (a split view
+          // dragged, the keyboard, a rotation): the unfinished line moves with
+          // the page too, and is painted again from its first point.
+          if (live) { live.points = live.points.map(scalePoint); live.drawnTo = 0; }
+          rescaled = true;
           // A resolved (disabled) answer is never re-read: its marked reading
           // and verdict geometry stay exactly as they were marked.
           if (!disabledRef.current) queueMicrotask(notify);
         }
       }
-      if (w > 0) widthRef.current = w;
-      for (const c of [baseRef.current, liveRef.current]) {
-        if (!c) continue;
-        c.width = Math.round(w * dpr);
-        c.height = Math.round(height * dpr);
-        c.style.width = w + 'px';
-        c.style.height = height + 'px';
+      widthRef.current = w;
+      const pxW = Math.round(w * dpr);
+      const pxH = Math.round(height * dpr);
+      const canvases = [baseRef.current, liveRef.current].filter(Boolean);
+      // Assigning canvas.width or canvas.height clears the bitmap — the
+      // committed page and the stroke under the pen — even when the value is
+      // the one already there. ResizeObserver fires for a layout that moved by
+      // a fraction of a CSS pixel (fluid widths under Windows' 125 % / 150 %
+      // scale factors) and for every re-observe, none of which changes the
+      // pixel size. So the bitmaps are touched only when their pixel size
+      // really changes, and then both layers are painted again.
+      const bitmapChanged = canvases.some(c => c.width !== pxW || c.height !== pxH);
+      for (const c of canvases) {
+        if (c.width !== pxW) c.width = pxW;
+        if (c.height !== pxH) c.height = pxH;
+        const cssW = w + 'px', cssH = height + 'px';
+        if (c.style.width !== cssW) c.style.width = cssW;
+        if (c.style.height !== cssH) c.style.height = cssH;
       }
-      primeContexts();
+      if (!bitmapChanged && !rescaled) return;
+      if (bitmapChanged) primeContexts();   // a resized canvas resets its transform
       predRectRef.current = null;
+      predictedRef.current = [];
       redrawBase();
+      // The live layer is empty now (or its points moved): the stroke in
+      // progress is painted again from its first point on the next frame.
+      if (currentRef.current) {
+        if (!bitmapChanged) clearLive();
+        currentRef.current.drawnTo = 0;
+        dirtyRef.current = true;
+        scheduleFrame();
+      }
     };
     resize();
     const ro = new ResizeObserver(resize);
     ro.observe(wrap);
     return () => ro.disconnect();
-  }, [height, redrawBase, primeContexts, notify]);
+  }, [height, redrawBase, primeContexts, notify, scheduleFrame, clearLive]);
 
   // repaint committed ink when the theme flips (this also refreshes cached ink)
   useEffect(() => {
@@ -322,7 +371,13 @@ const InkCanvas = forwardRef(function InkCanvas({
     const down = (e) => {
       if (!mayDraw(e) || activePtrRef.current !== null) return;
       activePtrRef.current = e.pointerId;
-      canvas.setPointerCapture?.(e.pointerId);
+      // Capture keeps the stroke's events coming when the pen leaves the
+      // canvas. It can throw (a pointer the browser no longer counts as
+      // active, a canvas detached in the same tick); a stroke that fails to
+      // capture must still be a stroke — and must never leave activePtrRef
+      // pointing at a pointer that will never finish, which is a canvas that
+      // ignores every pen-down after it.
+      try { canvas.setPointerCapture?.(e.pointerId); } catch { /* uncaptured stroke; window listeners finish it */ }
       hwEraseRef.current = penWantsEraser(e);
       e.preventDefault();
       if (erasing()) { erase(e); return; }
@@ -396,6 +451,15 @@ const InkCanvas = forwardRef(function InkCanvas({
       scheduleFrame();
     };
 
+    /**
+     * The stroke ends — pen lifted, or taken away (pointercancel: the browser
+     * claimed the gesture; lostpointercapture without an up: the pointer went
+     * away under us). Whatever ended it, what was written is committed: a
+     * cancelled stroke is the student's ink up to the moment it was cancelled,
+     * never silently dropped. Either way the canvas is free for the next
+     * pen-down. A second notice for the same pointer (the canvas's and the
+     * window's listener, or lostpointercapture after pointerup) is a no-op.
+     */
     const finish = (e) => {
       if (activePtrRef.current !== e.pointerId) return;
       activePtrRef.current = null;
@@ -411,7 +475,7 @@ const InkCanvas = forwardRef(function InkCanvas({
           notify();
         }
         // Measured only after the stroke is safely committed.
-        strokeEnded(e, { cancelled: e.type === 'pointercancel', kept: points.length });
+        strokeEnded(e, { cancelled: e.type !== 'pointerup', kept: points.length });
         clearLive();
         force(x => x + 1);
       }
@@ -422,15 +486,24 @@ const InkCanvas = forwardRef(function InkCanvas({
     canvas.addEventListener('pointermove', onMove, { passive: false });
     canvas.addEventListener('pointerup', finish);
     canvas.addEventListener('pointercancel', finish);
+    canvas.addEventListener('lostpointercapture', finish);
+    // A stroke whose capture failed ends wherever the pointer is lifted.
+    window.addEventListener('pointerup', finish);
+    window.addEventListener('pointercancel', finish);
     return () => {
       canvas.removeEventListener('pointerdown', down);
       if (RAW_UPDATE) canvas.removeEventListener('pointerrawupdate', onRaw);
       canvas.removeEventListener('pointermove', onMove);
       canvas.removeEventListener('pointerup', finish);
       canvas.removeEventListener('pointercancel', finish);
+      canvas.removeEventListener('lostpointercapture', finish);
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', finish);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = 0;
     };
+    // Every dependency is identity-stable (callbacks over refs), so this runs
+    // once per mount: the listeners are never torn down under a live stroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notify, redrawBase, scheduleFrame, clearLive]);
 
