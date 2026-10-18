@@ -137,6 +137,9 @@ export default function CloudAccountPanel() {
       // a status other than 401 means it answered but cannot serve right now.
       const verified = await verifyCloudSession(user.id).catch(err => ({ connected: false, reason: err?.status ? 'unavailable' : 'offline' }));
       setSession(verified);
+      // A deletion this device asked for earlier has now been confirmed and the
+      // link forgotten (#521): show "not connected", not "sign-in required".
+      if (verified.reason === 'deleted') setLink(await cloudAccountLink(user.id));
       if (verified.connected) {
         const nextEntitlement = await refreshCloudEntitlement(user.id).catch(() => null);
         if (nextEntitlement) setLink(await cloudAccountLink(user.id));

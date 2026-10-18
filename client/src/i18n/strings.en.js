@@ -2411,6 +2411,7 @@ export default {
   'cloudError.assignmentSpecInvalid': 'That assignment could not be saved: its specification is incomplete or not one the server accepts.',
   'cloudError.guardianEmailSameAsStudent': 'A parent or guardian’s email must be different from the student’s own email.',
   'cloudError.consentDeclarationRequired': 'Tell us whether the learner is 18 or older, or their class with a parent or guardian’s name and email, then try again.',
+  'cloudError.accountMismatch': 'The account signed in on this device is not the one this profile is linked to. Sign in to that account again, then delete it.',
   'mfa.title': 'Authenticator app',
   'mfa.checking': 'Checking your second factor…',
   'mfa.enrolRequired': 'Staff accounts must set up an authenticator app before using the console. Nothing else here works until a code from the app has been confirmed.',

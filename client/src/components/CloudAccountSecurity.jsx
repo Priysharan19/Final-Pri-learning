@@ -4,7 +4,7 @@ import { deleteCloudAccount, disconnectCloudAccount } from '../platform/cloudAcc
 import { requestIdentityToken, socialProviderConfig } from '../platform/socialSignIn.js';
 import { tLater, useT } from '../i18n/index.js';
 import { downloadJSON } from '../lib/files.js';
-import { cloudErrorCopy } from '../platform/cloudErrorCopy.js';
+import { cloudErrorCopy, cloudErrorText } from '../platform/cloudErrorCopy.js';
 import OtpInput, { OTP_LENGTH } from './OtpInput.jsx';
 
 function when(value, t) {
@@ -141,7 +141,7 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
       setError(err?.code === 'SOCIAL_CANCELLED' ? tLater('cloud.socialCancelled')
         : err?.code === 'SOCIAL_POPUP_BLOCKED' ? tLater('cloud.socialPopupBlocked')
           : err?.code?.startsWith?.('SOCIAL_') ? tLater('cloud.socialFailed')
-            : (err.message || tLater('cloudSecurity.deleteFailed')));
+            : cloudErrorText(err, tLater, err.message || tLater('cloudSecurity.deleteFailed')));
     } finally { setBusy(''); }
   }
 
@@ -172,7 +172,7 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
       const wrongCode = err?.code === 'OTP_REAUTH_FAILED';
       setCodeInvalid(wrongCode);
       setCode('');
-      setError(wrongCode ? tLater('cloudSecurity.codeInvalid') : (err.message || tLater('cloudSecurity.deleteFailed')));
+      setError(wrongCode ? tLater('cloudSecurity.codeInvalid') : cloudErrorText(err, tLater, err.message || tLater('cloudSecurity.deleteFailed')));
     } finally { setBusy(''); }
   }
 
@@ -186,7 +186,7 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
       setDeletePhrase('');
       setMessage(tLater('cloudSecurity.deleted'));
       await onDeleted?.({ cloudDeleted: true });
-    } catch (err) { setError(err.message || tLater('cloudSecurity.deleteFailed')); }
+    } catch (err) { setError(cloudErrorText(err, tLater, err.message || tLater('cloudSecurity.deleteFailed'))); }
     finally { setBusy(''); }
   }
 
