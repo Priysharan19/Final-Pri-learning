@@ -5792,7 +5792,15 @@ async function runGated(method, pattern, handler, body, params) {
     || key === 'POST /practice/:id/hint'
     || key === 'POST /practice/:id/tutor'
     || key === 'POST /practice/:id/discard'
+    || key === 'POST /practice/:id/misconception'
   )) return withMutationLock(`question:${params.id}`, work);
+
+  // A Rush or Match answer is marked by the server and resolves its row with
+  // a whole-row write, like a practice submit: it holds the same question lock
+  // so a sync pull settling that row can never interleave with it.
+  if (key === 'POST /rush/answer' && body?.id) {
+    return withMutationLock(`question:${body.id}`, work);
+  }
 
   if (key === 'POST /practice/next') {
     return withMutationLock(`next:${currentPid() || 'none'}`, work);
