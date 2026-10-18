@@ -22,7 +22,7 @@ import { tmpdir } from 'node:os';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, '../ios/PriLearning.swiftpm');
-const EXPECTED = ['hostPresent', 'deepFrozen', 'notReplaceable', 'noOsIdentity', 'mainRoundTrip', 'subframeRefused', 'subframeHasNoHost', 'inkPlacementZoom'];
+const EXPECTED = ['hostPresent', 'deepFrozen', 'notReplaceable', 'noOsIdentity', 'mainRoundTrip', 'subframeRefused', 'subframeReachThroughRefused', 'subframeHasNoHost', 'inkPlacementZoom'];
 
 // `log show --start` takes LOCAL time; a UTC stamp would re-read hours of old runs.
 const localStamp = d => { const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; };
