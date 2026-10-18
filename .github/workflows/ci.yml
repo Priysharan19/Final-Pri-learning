@@ -107,7 +107,7 @@ jobs:
           grep -Fq 'CLOUD HANDWRITING CLIENT: PASS — 174/174 checks' suites.log
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
-          grep -Fq 'ACCOUNT DELETION LINK: PASS — 46/46 checks' suites.log
+          grep -Fq 'ACCOUNT DELETION LINK: PASS — 102/102 checks' suites.log
           grep -Fq 'MARK PREDICTOR: PASS — 42/42 checks' suites.log
           grep -Fq 'PDF WORKING: PASS — 25/25 checks' suites.log
           grep -Fq 'MCQ DISTINCTNESS: PASS — 14/14 checks' suites.log
