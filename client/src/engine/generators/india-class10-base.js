@@ -35,6 +35,45 @@ function exact(f, suffix) {
 const TRIPLES = [[3, 4, 5], [5, 12, 13], [8, 15, 17], [6, 8, 10], [9, 12, 15], [7, 24, 25], [20, 21, 29]];
 const RADII = [7, 14, 21, 28];
 
+// ── Arithmetic progressions: the page as a Class 10 student writes it ────────
+// The nth-term and sum questions are not equations to solve, so their working
+// is read as a plan of chained equalities (checker.js stepCheckPlan, `chain`):
+// the givens copied from the question, the formula under its own label, the
+// substitution with the numbers in it, and the arithmetic that follows. Every
+// value here is the generator's own; nothing is inferred from difficulty.
+const ordinal = n => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th'}`;
+const apTermLabels = n => ['T_n', 'a_n', 't_n', `T_${n}`, `a_${n}`, `t_${n}`, 'nth term', `${n}th term`, `${ordinal(n)} term`];
+const apSumLabels = n => ['S_n', 'S', `S_${n}`, 'sum', 'total'];
+const AP_TERM_FORM = { expr: 'a + (n-1)*d', letters: ['a', 'n', 'd'] };
+const AP_SUM_FORMS = [{ expr: 'n/2*(2*a+(n-1)*d)', letters: ['n', 'a', 'd'] }, { expr: 'n/2*(a+l)', letters: ['n', 'a', 'l'] }];
+const AP_TERM_WHY = 'The nth term is a + (n − 1)d: the first term needs no steps, so the nth term is n − 1 steps along, not n.';
+const AP_SUM_WHY = 'The sum of the first n terms is n/2 (2a + (n − 1)d) — or n/2 (a + l), with l the last term.';
+/** The nth-term stage: the formula, then its substitution (with the `a + nd` slip named). */
+function apTermStages(a, d, n, { yields = null } = {}) {
+  const labels = apTermLabels(n);
+  return [
+    { kind: 'formula', labels, forms: [AP_TERM_FORM], why: AP_TERM_WHY },
+    { kind: 'evaluation', source: AP_TERM_FORM.expr, substitutions: { a, n, d }, expected: a + (n - 1) * d, labels,
+      evidence: 'substitution', ...(yields ? { yields } : {}),
+      traps: [{ source: 'a + n*d', why: `The formula is a + (n − 1)d: the first term needs no steps, so the ${ordinal(n)} term is ${n - 1} steps along, not ${n}.` }] }
+  ];
+}
+/** The sum stage: the formula, then its substitution — by either form, and carrying a slipped last term forward. */
+function apSumStages(a, d, n) {
+  const labels = apSumLabels(n);
+  return [
+    { kind: 'formula', labels, forms: AP_SUM_FORMS, why: AP_SUM_WHY },
+    { kind: 'evaluation', source: AP_SUM_FORMS[0].expr, sources: [AP_SUM_FORMS[1].expr], substitutions: { n, a, d, l: a + (n - 1) * d },
+      expected: (n * (2 * a + (n - 1) * d)) / 2, labels, evidence: 'substitution',
+      ecf: { source: AP_SUM_FORMS[1].expr, bind: ['l'] },
+      traps: [
+        { source: 'n*(a+(n-1)*d)', why: 'That is n times the last term. The sum uses the average of the first and last terms: n/2 (a + l).' },
+        { source: 'n*a', why: 'The terms are not all equal: each is d more than the one before, so the sum is n/2 (2a + (n − 1)d).' }
+      ] }
+  ];
+}
+const AP_ALIASES = { l: ['a_n', 't_n', 'T_n', 'an', 'tn', 'last term'] };
+
 export const indiaClass10 = {
 
   // ── Class 10 · Polynomials: zeroes and coefficients ───────────────────────
@@ -133,6 +172,14 @@ export const indiaClass10 = {
       return {
         prompt: `An arithmetic progression has first term $${a}$ and common difference $${d}$. Find its $${n}$th term.`,
         answerType: 'numeric', answer: { value: term },
+        // One mark: the answer. The plan is for the step report (issue #430):
+        // which line first goes wrong, with the formula and substitution above
+        // it verified. A one-mark rubric pays no method marks.
+        stepcheck: {
+          kind: 'plan', chain: true, anyOrder: true, creditPerStage: true, ecf: 'method',
+          givens: { a, d, n }, givensWhy: { n: `The question asks for the ${ordinal(n)} term, so n = ${n}.` },
+          stages: apTermStages(a, d, n)
+        },
         traps: [{ value: a + n * d, why: `The formula is $a + (n-1)d$: the first term needs no steps, so the $${n}$th term is $${n - 1}$ steps along, not $${n}$.` }].filter(t => t.value !== term),
         hints: [
           'Each term is the one before it plus the common difference.',
@@ -153,6 +200,16 @@ export const indiaClass10 = {
       return {
         prompt: `An arithmetic progression has first term $${a}$ and common difference $${d}$. Find the sum of its first $${n}$ terms.`,
         answerType: 'numeric', answer: { value: sum },
+        // Two marks: one for the answer, one for the method — the sum formula
+        // or its substitution, or the last term found on the way to n/2 (a + l).
+        // A last term slipped and then summed correctly is error carried
+        // forward. The last term is a supporting stage: alone, with no sum
+        // method shown, it is the nth term found, not the sum begun.
+        stepcheck: {
+          kind: 'plan', chain: true, anyOrder: true, creditPerStage: true, ecf: 'method',
+          givens: { a, d, n }, derived: { l: a + (n - 1) * d }, aliases: AP_ALIASES,
+          stages: [...apSumStages(a, d, n), ...apTermStages(a, d, n, { yields: ['l'] }).map(stage => ({ ...stage, supporting: true, labels: [...stage.labels, 'l', 'last term'] }))]
+        },
         traps: [{ value: n * (a + (n - 1) * d), why: `That is $n$ times the *last* term. The sum uses the average of the first and last: $S_n = \\dfrac{n}{2}(a + a_n)$.` }].filter(t => t.value !== sum),
         hints: [
           'Pairing terms from the two ends gives the same total each time.',
@@ -197,6 +254,14 @@ export const indiaClass10 = {
     return {
       prompt: `Priya saves $₹${first}$ in the first month and increases her saving by $₹${step}$ every month after that. How much has she saved in total after $${months}$ months?`,
       answerType: 'numeric', answer: { value: total },
+      // Three marks: recognising the progression (a, d, n from the words), the
+      // sum formula, its substitution; the answer mark is the third.
+      stepcheck: {
+        kind: 'plan', chain: true, anyOrder: true, creditPerStage: true, ecf: 'method',
+        givens: { a: first, d: step, n: months }, derived: { l: first + (months - 1) * step }, aliases: AP_ALIASES,
+        givensWhy: { a: `She saves ₹${first} in the first month, so a = ${first}.`, d: `Her saving grows by ₹${step} each month, so d = ${step}.`, n: `The total is asked after ${months} months, so n = ${months}.` },
+        stages: [{ kind: 'identify', letters: ['a', 'd', 'n'] }, ...apSumStages(first, step, months)]
+      },
       traps: [
         { value: first + (months - 1) * step, why: 'That is what she saves in the last month alone — the question asks for the total across all the months.' },
         { value: first * months, why: 'The monthly amount is not constant; it grows by a fixed step, which makes it an arithmetic progression.' }

@@ -7,6 +7,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { normalize, parse, evaluate, numsClose, variablesOf } from './expr.js';
+import { labelKey } from './reason-chain.js';
 
 function cleanText(value) {
   return String(value ?? '')
@@ -29,8 +30,9 @@ function finiteValue(ast, env = {}) {
   } catch { return null; }
 }
 
+// `T_9`, `T₉`, `t_{9}` and `t9` are one label (reason-chain.js labelKey).
 function compactLabel(text) {
-  return cleanText(text).toLowerCase().replace(/\s+/g, '');
+  return labelKey(cleanText(text));
 }
 
 function labelAllowed(text, labels = []) {
@@ -39,7 +41,7 @@ function labelAllowed(text, labels = []) {
 }
 
 function simpleIdentifier(text) {
-  return /^[a-z][a-z0-9_]*$/i.test(cleanText(text));
+  return /^[a-z][a-z0-9_{}₀-₉ₙₐₖₘᵢⱼ]*(?:\s+[a-z]+)*$/i.test(cleanText(text));
 }
 
 function substitutionDiagnosis(expected, got) {
@@ -113,7 +115,7 @@ export function assessEvaluationLine({ text, meta = null } = {}) {
     }
     if (!numsClose(value, expected, 1e-9)) {
       const diagnosis = substitutionDiagnosis(expected, value);
-      return { status: 'break', trusted: false, note: diagnosis.message, diagnosis };
+      return { status: 'break', trusted: false, value: got, note: diagnosis.message, diagnosis };
     }
   }
 
