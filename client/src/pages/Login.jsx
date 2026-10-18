@@ -1,15 +1,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Landing + profile entry
-// Pri has one normal account flow on this screen: create/sign in to the Pri
-// account, then bind it to this device's local profile before entering Practice.
-// Device-only profiles still exist for explicit offline use, but are labelled as
-// such and are never presented as a signed-in account.
+// Pri has one account flow on this screen: the sign-in card (an emailed
+// six-digit code for new and returning students alike), which then binds the
+// account to this device's local profile. Nothing opens until the server has
+// confirmed the account, the age/guardian decision and the first sync
+// (platform/accountActivation.js, through App.jsx's activation gate). Profiles
+// saved on this device are listed so a returning student keeps their work; each
+// one still passes the same gate before anything opens.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
-import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLanguage, useT, useTx } from '../i18n/index.js';
+import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLanguage, useT } from '../i18n/index.js';
 import { featureEnabled } from '../platform/features.js';
 import { cloudAvailable } from '../platform/cloudTransport.js';
 import { appleSignInAvailable, rememberAppleSignInIntent } from '../platform/native/appleSignIn.js';
@@ -251,10 +254,9 @@ function LanguagePicker() {
 }
 
 export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
-  const { setUser, refreshDue } = useApp();
+  const { setUser, refreshDue, activate } = useApp();
   const nav = useNavigate();
   const t = useT();
-  const tx = useTx();
   // Resolved per render, not at module load, so a development override of the
   // flag (features.js) is honoured; a production build compiles it to a constant.
   const extended = featureEnabled('extendedTracks');
@@ -262,8 +264,8 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
   const roles = useMemo(() => roleOptions(extended), [extended]);
   const appleOffered = appleSignInOffered();
   const [profiles, setProfiles] = useState(null);
-  const [stage, setStage] = useState(initialStage);   // hero | pick | create | account
-  const [accountMode, setAccountMode] = useState('signup');
+  const [stage, setStage] = useState(initialStage);   // hero | pick | create
+  const [cardStep, setCardStep] = useState('method');
   const [createStep, setCreateStep] = useState(initialStep);
   const [form, setForm] = useState(freshProfileDraft);
   const [australia, setAustralia] = useState(false);
@@ -281,9 +283,13 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
   const load = () => api.get('/profiles').then(r => setProfiles(r.profiles)).catch(() => setProfiles([]));
   useEffect(() => { load(); }, []);
 
-  // Returning users skip the hero
+  // Returning users open on their saved profiles — once, when the list arrives.
+  // After that the picker's "Create another Pri account" may show the card.
+  const autoPicked = useRef(false);
   useEffect(() => {
-    if (profiles && profiles.length && stage === 'hero' && localStorage.getItem('pri-seen-hero')) setStage('pick');
+    if (autoPicked.current || !profiles) return;
+    autoPicked.current = true;
+    if (profiles.length && stage === 'hero' && localStorage.getItem('pri-seen-hero')) setStage('pick');
   }, [profiles, stage]);
 
   useEffect(() => {
@@ -350,20 +356,10 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     setStage('create');
   };
 
+  /** A profile saved on this device: the picker. (With none saved there is nothing to pick.) */
   const enter = () => {
     localStorage.setItem('pri-seen-hero', '1');
     if (profiles?.length) setStage('pick');
-    else beginCreate(false);
-  };
-
-  /** The README's "Try the demo": one tap from the welcome screen to a seeded
-      Class 10 student, without first creating a profile of your own. */
-  const tryDemo = () => {
-    localStorage.setItem('pri-seen-hero', '1');
-    // A cloud sign-in started earlier and backed out of must not send the
-    // demo student to the account page.
-    setCloudIntent(false);
-    void go('/profiles/demo', {}, { cloud: false });
   };
 
   /** Open/select the local profile first, then hand it to the real cloud account panel. */
@@ -485,7 +481,14 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     }
   };
 
-  /** The account flow is done: make this device's profile, link it, and open the first question. */
+  /**
+   * The card signed in: make this device's profile, link it, and open the app
+   * only once the server has confirmed the account, the age/guardian decision
+   * and the first sync for THAT profile (ensureAccountActivated). The card
+   * stays mounted while this runs, so a failure is shown there and retried
+   * from there; nothing of the shell is reached with an unlinked, stale or
+   * unconfirmed profile.
+   */
   const finishAccount = async ({ account, name, year, track }) => {
     if (!account?.id) throw new Error(t('signup.genericError'));
 
@@ -506,33 +509,29 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     }
 
     const { linkSignedInAccount } = await import('../platform/cloudAccount.js');
+    const { ensureAccountActivated } = await import('../platform/accountActivation.js');
     await linkSignedInAccount(pid, account);
+    // Not opened on the link alone: the server's live session for THIS account,
+    // its age/guardian statement and the first sync, in that order. A refusal
+    // throws out of here into the card, which says so and offers the retry.
+    const ready = await ensureAccountActivated(pid, { expectedAccountId: account.id });
     // POST /profiles returns the view from before the cloud link exists. Re-read
     // it after linking so Practice never mounts with stale cloudLinked=false.
     const linkedUser = (await api.get('/me')).user;
+    if (linkedUser?.id !== pid || !linkedUser.cloudLinked) throw new Error(t('signup.linkIncomplete'));
     accountProfileRef.current = null;
     localStorage.setItem('pri-seen-hero', '1');
     nav('/practice', { replace: true, flushSync: true });
-    flushSync(() => setUser(linkedUser));
+    // The profile and its confirmed activation are handed over together, so
+    // the gate does not ask the server the same question a second time.
+    flushSync(() => { setUser(linkedUser); activate?.(ready); });
     refreshDue();
-  };
-
-  const openAccount = (mode) => {
-    localStorage.setItem('pri-seen-hero', '1');
-    setAccountMode(mode);
-    setError('');
-    setStage('account');
   };
 
   const cloudNote = cloudIntent && (
     <p className="muted cloud-intent" role="status" style={{ fontSize: 12.5, marginBottom: 12 }}>
       {t('login.cloudIntent')}
     </p>
-  );
-  const cloudLink = !cloudIntent && (
-    <div style={{ textAlign: 'center', marginTop: 10 }}>
-      <button className="linklike" disabled={busy} onClick={cloudSignIn}>{t('login.cloudSignIn')}</button>
-    </div>
   );
   const appleEntry = appleOffered && !cloudIntent && (
     <div style={{ marginTop: 12 }}>
@@ -542,63 +541,53 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
   );
 
   /* ── hero ── */
+  /* The landing is one sign-in card: email, then the six-digit code in the
+     same card, then — for a new address — a name, an age and a class. There is
+     no demo and no device-only entry: nothing opens without an account. */
   if (stage === 'hero') {
+    // The card keeps its own steps (email → code → a few questions) in place.
+    // While it is past its first step the welcome copy and the side doors step
+    // back, so the code boxes are the only thing asking for attention.
+    const atStart = cardStep === 'method';
     return (
       <div className="auth-wrap">
         <MathField />
         <div className="auth-col fade-in">
           <Logo large />
-          <div className="hero-kicker">{featureEnabled('extendedTracks') ? 'CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD' : 'CBSE · NCERT · JEE MAIN · JEE ADVANCED'}</div>
-          {/* The gold word is a slot, not a tail fragment: Hindi puts the verb
-              last, so "marked" cannot be the last word of the sentence there. */}
-          <h1 className="hero-title">{tx('login.heroTitle', {
-            br: <br />,
-            marked: <span className="gold">{t('login.heroMarked')}</span>
-          })}</h1>
-          <p className="hero-sub">{t('login.heroSub')}</p>
-          <div className="row" style={{ marginTop: 34 }}>
-            <button className="btn btn-primary btn-lg" data-testid="hero-create-account" onClick={() => openAccount('signup')}>{t('login.createAccount')}</button>
+          {atStart && (
+            <>
+              <div className="hero-kicker">{featureEnabled('extendedTracks') ? 'CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD' : 'CBSE · NCERT · JEE MAIN · JEE ADVANCED'}</div>
+              <h1 className="hero-title">{t('login.welcomeTitle')}</h1>
+              <p className="hero-sub">{t('login.welcomeSub')}</p>
+            </>
+          )}
+          <div className="card signin-landing" data-testid="hero-sign-in">
+            <React.Suspense fallback={<p className="signup-hint" role="status">{t('common.loading')}</p>}>
+              <SignUpFlow variant="page" onFinish={finishAccount} onStep={setCardStep} />
+            </React.Suspense>
           </div>
-          <div style={{ textAlign: 'center', marginTop: 14 }}>
-            <button className="linklike" type="button" data-testid="hero-sign-in-code" onClick={() => openAccount('signin')}>{t('login.signInWithCode')}</button>
-          </div>
-          <div style={{ textAlign: 'center', marginTop: 14 }}>
-            <button className="linklike" type="button" data-testid="hero-try-demo" disabled={busy} onClick={tryDemo}>
-              {t('login.tryDemoIndia')}
-            </button>
-          </div>
-          <div style={{ textAlign: 'center', marginTop: 12 }}>
-            <button className="linklike" type="button" data-testid="hero-offline" onClick={enter}>{t('signup.offline')}</button>
-          </div>
-          {error && <div className="error-box" role="alert" style={{ marginTop: 12 }}>{error}</div>}
-          <p className="muted" style={{ marginTop: 26, textAlign: 'center' }}>{t('login.heroPrivacy')}</p>
-          {appleEntry}
-          <LanguagePicker />
-          {/* A store reviewer, a payment provider and a parent all look for
-              these, and each is required of us before the app can be sold. */}
-          <p className="muted" style={{ marginTop: 22, textAlign: 'center', fontSize: 12.5 }}>
-            <Link to="/privacy">{t('login.privacy')}</Link> · <Link to="/terms">{t('login.terms')}</Link> ·{' '}
-            <Link to="/refund-policy">{t('login.refunds')}</Link> · <Link to="/grievance">{t('login.grievances')}</Link>
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  /* ── account: phone / email / Google / Apple, then a parent if needed ── */
-  if (stage === 'account') {
-    return (
-      <div className="auth-wrap">
-        <div className="auth-col">
-          <React.Suspense fallback={<p className="muted" role="status">{t('common.loading')}</p>}>
-          <SignUpFlow
-            key={accountMode}
-            initialMode={accountMode}
-            onCancel={() => setStage('hero')}
-            onStartOffline={() => beginCreate(false)}
-            onFinish={finishAccount}
-          />
-          </React.Suspense>
+          {atStart && (
+            <>
+              {profiles?.length > 0 && (
+                <div style={{ textAlign: 'center', marginTop: 16 }}>
+                  <button className="linklike" type="button" data-testid="hero-existing-device" onClick={enter}>
+                    {t('login.existingDeviceProfile')}
+                  </button>
+                </div>
+              )}
+              {error && <div className="error-box" role="alert" style={{ marginTop: 12 }}>{error}</div>}
+              <p className="muted" style={{ marginTop: 26, textAlign: 'center' }}>{t('login.heroPrivacy')}</p>
+              <p className="muted" style={{ marginTop: 10, textAlign: 'center', fontSize: 13 }}>{t('login.heroSub')}</p>
+              {appleEntry}
+              <LanguagePicker />
+              {/* A store reviewer, a payment provider and a parent all look for
+                  these, and each is required of us before the app can be sold. */}
+              <p className="muted" style={{ marginTop: 22, textAlign: 'center', fontSize: 12.5 }}>
+                <Link to="/privacy">{t('login.privacy')}</Link> · <Link to="/terms">{t('login.terms')}</Link> ·{' '}
+                <Link to="/refund-policy">{t('login.refunds')}</Link> · <Link to="/grievance">{t('login.grievances')}</Link>
+              </p>
+            </>
+          )}
         </div>
       </div>
     );
@@ -671,16 +660,17 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                   );
                 })}
               </div>
-              <button className="btn btn-ghost" type="button" style={{ width: '100%', marginTop: 14 }} disabled={busy}
+              {/* Another student on this device: the same card, a new account,
+                  a new profile linked to it. The device-only wizard below makes
+                  a profile that still has to pass the gate before anything opens. */}
+              <button className="btn btn-primary" type="button" style={{ width: '100%', marginTop: 14 }} disabled={busy}
+                data-testid="picker-create-account" onClick={() => { setError(''); setStage('hero'); }}>
+                {t('login.createAnotherAccount')}
+              </button>
+              <button className="btn btn-ghost" type="button" style={{ width: '100%', marginTop: 10 }} disabled={busy}
                 onClick={() => beginCreate(cloudIntent)}>
                 {t('login.addAnother')}
               </button>
-              <div style={{ textAlign: 'center', marginTop: 10 }}>
-                <button className="linklike" type="button" disabled={busy} onClick={() => void go('/profiles/demo', {})}>
-                  {t('login.tryDemoIndia')}
-                </button>
-              </div>
-              {cloudLink}
               {appleEntry}
             </div>
           )}

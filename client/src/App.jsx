@@ -51,6 +51,11 @@ const PLACEMENT_ON = featureEnabled('placement');
 // "Practise this": an on-demand chunk (ON_DEMAND in vite.config.js) — it needs
 // a connection to do anything, so it is never part of the install.
 const PractisePhoto = React.lazy(() => import('./pages/PractisePhoto.jsx'));
+// The activation gate: shown between choosing a profile and the shell, for
+// every route, until the server says the profile's account may enter. It
+// carries the sign-in card and the sync worker with it, so it arrives when a
+// profile is chosen rather than riding in the install.
+const AccountActivationGate = React.lazy(() => import('./components/AccountActivationGate.jsx'));
 
 export const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);
@@ -129,6 +134,15 @@ export function Logo({ large = false, onClick }) {
 
 export default function App() {
   const [user, setUser] = useState(undefined);
+  // Which profile the server has let in, in this session, and as which
+  // account: { profileId, accountId, guardian } from ensureAccountActivated.
+  // A local profile alone is never permission to open the shell.
+  const [activated, setActivated] = useState(null);
+  // Read by the cloud-session listener below, which is installed once: the
+  // identity it compares against has to be the current one, not the one from
+  // the render the listener was made in.
+  const latestActivation = useRef(null);
+  latestActivation.current = { profileId: user?.id, accountId: activated?.accountId };
   // Declared with the other top-level state: the app returns early for the
   // boot screen and the profile gate, and a hook after those would not run on
   // every render.
@@ -167,15 +181,55 @@ export default function App() {
   // Signing in or out of a cloud account changes what the profile view reports
   // (cloudLinked, which decides default server reading). A failed re-read here
   // keeps the current profile rather than signing the student out.
+  //
+  // It also decides whether the shell stays open. A sign-out, or a sign-in as
+  // some other account or for some other profile — here or in another tab of
+  // this device (cloudSession.js relays it) — relocks the gate at once; a
+  // refresh of the same profile under the same account leaves the route, and
+  // whatever is being written on it, mounted.
   useEffect(() => {
     let stop = () => {};
     try {
-      stop = onCloudSessionChange(() => {
+      stop = onCloudSessionChange(event => {
+        const detail = event?.detail || {};
+        const current = latestActivation.current;
+        const sameIdentity = detail.connected === true && !!current?.accountId &&
+          String(detail.localProfileId) === String(current.profileId) &&
+          String(detail.accountId) === String(current.accountId);
+        if (!sameIdentity) setActivated(null);
         api.get('/me').then(r => { if (r?.user) setUser(r.user); }).catch(() => { });
       });
     } catch { /* non-browser runtimes */ }
     return () => { try { stop(); } catch { /* already gone */ } };
   }, []);
+
+  // A different profile is a different question: its activation starts over.
+  // (An activation handed over together with its profile — onboarding — is
+  // kept: it is already for the profile that is now current.)
+  useEffect(() => { setActivated(a => (a && user?.id && a.profileId === user.id ? a : null)); }, [user?.id]);
+
+  // A profile already inside is asked about again when the app returns to the
+  // foreground and once a minute while visible, without the first-sync step.
+  // Only the server's own refusal — the session revoked, the account unlinked
+  // or swapped, a guardian's approval withdrawn — closes the shell; a 429, a
+  // 503, a timeout or a dropped connection never does (work on screen stays).
+  useEffect(() => {
+    if (!user?.id || activated?.profileId !== user.id) return undefined;
+    let live = true;
+    const recheck = async () => {
+      let activation;
+      try { activation = await import('./platform/accountActivation.js'); } catch { return; }
+      try {
+        await activation.ensureAccountActivated(user.id, { sync: false });
+      } catch (error) {
+        if (live && activation.isActivationDenied(error)) setActivated(null);
+      }
+    };
+    const visible = () => { if (document.visibilityState === 'visible') void recheck(); };
+    document.addEventListener('visibilitychange', visible);
+    const timer = setInterval(() => { if (document.visibilityState === 'visible') void recheck(); }, 60_000);
+    return () => { live = false; clearInterval(timer); document.removeEventListener('visibilitychange', visible); };
+  }, [user?.id, activated?.profileId]);
 
   // Guard months of practice from storage eviction — ask the browser once per boot.
   useEffect(() => { requestPersistentStorage(); }, []);
@@ -194,7 +248,10 @@ export default function App() {
   // cleanup covers both orders — the effect torn down before the module lands
   // (nothing to uninstall, and the late arrival installs nothing) and after.
   useEffect(() => {
-    if (!user?.id) return undefined;
+    // Installed only once the gate has let this profile in: the first sync is
+    // the gate's own step, and nothing syncs for a profile the server has not
+    // said may enter.
+    if (!user?.id || activated?.profileId !== user.id) return undefined;
     const pid = user.id;
     let uninstall = null;
     let torn = false;
@@ -205,7 +262,7 @@ export default function App() {
       });
     }).catch(() => { });
     return () => { torn = true; if (uninstall) uninstall(); };
-  }, [user?.id, refreshUser, refreshDue, refreshRecent]);
+  }, [user?.id, activated?.profileId, refreshUser, refreshDue, refreshRecent]);
 
   // The interface follows the profile's own language. Before a profile is
   // chosen there is nothing to follow, so the sign-in screen falls back to the
@@ -317,7 +374,9 @@ export default function App() {
   // student mid-question: no pop-ups, no emoji, nothing between them and the maths.
   const celebrate = useCallback(() => { }, []);
 
-  const ctx = useMemo(() => ({ user, setUser, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent }),
+  // `activate` is how onboarding hands over the activation it has just had
+  // confirmed by the server, together with the profile it is for.
+  const ctx = useMemo(() => ({ user, setUser, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent, activate: setActivated }),
     [user, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent]);
 
   if (user === undefined) {
@@ -342,6 +401,42 @@ export default function App() {
             <Route path="/refund-policy" element={<Legal />} />
             <Route path="/grievance" element={<Legal />} />
             <Route path="*" element={<Login />} />
+          </Routes>
+        </React.Suspense>
+        <ToastLayer toasts={toasts} />
+      </AppCtx.Provider>
+    );
+  }
+
+  // A profile is chosen, but the server has not (in this session) said that
+  // its account may enter. Every route is this gate until it has — a deep
+  // link, a reload, the back button, an app opened offline — and the legal
+  // pages stay public. The gate holds the sign-in card for a profile with no
+  // account or session, the waiting screen for a child whose guardian has not
+  // approved, and a retry when the server cannot be reached.
+  if (activated?.profileId !== user.id) {
+    const switchLocal = async () => {
+      try { await api.post('/auth/logout'); } catch { /* the local sign-out is best effort */ }
+      nav('/', { replace: true });
+      setActivated(null);
+      setUser(null);
+    };
+    return (
+      <AppCtx.Provider value={ctx}>
+        <React.Suspense fallback={(
+          <div className="auth-wrap">
+            <div style={{ textAlign: 'center' }}>
+              <Logo large />
+              <div className="goalbar" style={{ width: 120, margin: '26px auto 0' }}><i style={{ width: '40%' }} /></div>
+            </div>
+          </div>
+        )}>
+          <Routes>
+            <Route path="/privacy" element={<Legal />} />
+            <Route path="/terms" element={<Legal />} />
+            <Route path="/refund-policy" element={<Legal />} />
+            <Route path="/grievance" element={<Legal />} />
+            <Route path="*" element={<AccountActivationGate key={user.id} user={user} onReady={setActivated} onSwitch={switchLocal} />} />
           </Routes>
         </React.Suspense>
         <ToastLayer toasts={toasts} />
@@ -383,6 +478,7 @@ export default function App() {
     // Neutralise it before showing the picker so selecting a different role
     // cannot inherit a stale /teach (or other guarded) redirect.
     nav('/', { replace: true });
+    setActivated(null);
     setUser(null);
   };
 
