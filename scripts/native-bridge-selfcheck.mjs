@@ -19,6 +19,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { installApp, keepOnlySimulator } from './simulator-fleet.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, '../ios/PriLearning.swiftpm');
@@ -73,15 +74,11 @@ function pickDevice() {
 
 function ensureBooted({ name, udid }) {
   const booted = () => run('xcrun', ['simctl', 'list', 'devices']).split('\n').some(l => l.includes(udid) && /\(Booted\)/.test(l));
+  // A CI runner carries one booted simulator, whether or not this one must
+  // boot: the other family left booted by an earlier step starves this one
+  // (scripts/simulator-fleet.mjs). A person's own simulators are never touched.
+  keepOnlySimulator(udid);
   if (booted()) return;
-  // On a CI runner a second booted simulator (the iPad from earlier steps)
-  // starves this boot; a person's own simulators are never touched locally.
-  if (process.env.CI) {
-    for (const line of run('xcrun', ['simctl', 'list', 'devices']).split('\n')) {
-      const other = line.match(/\(([0-9A-F-]{36})\) \(Booted\)/i)?.[1];
-      if (other && other !== udid) { console.log(`  shutting down booted simulator ${other} (CI)`); try { run('xcrun', ['simctl', 'shutdown', other]); } catch { /* already down */ } }
-    }
-  }
   console.log(`Booting ${name}…`);
   if (process.env.CI) { try { console.log(run('xcrun', ['simctl', 'list', 'runtimes']).trim().split('\n').map(l => `  ${l}`).join('\n')); } catch { /* diagnostics only */ } }
   try { run('xcrun', ['simctl', 'boot', udid], { timeout: 900_000 }); } catch { /* already booting */ }
@@ -114,7 +111,7 @@ if (!app) {
 }
 const bundleId = run('/usr/bin/plutil', ['-extract', 'CFBundleIdentifier', 'raw', '-o', '-', join(app, 'Info.plist')]).trim();
 try { run('xcrun', ['simctl', 'terminate', device, bundleId]); } catch { /* not running */ }
-run('xcrun', ['simctl', 'install', device, app]);
+installApp(device, app);
 const started = localStamp(new Date(Date.now() - 2000));
 launchApp(device, bundleId, ['--bridge-selfcheck']);
 

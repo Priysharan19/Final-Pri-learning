@@ -34,18 +34,34 @@ jobs:
 
           echo "Auditing main commit ${SHA}"
 
-          prs="$(curl --fail --silent --show-error "${auth[@]}" \
-            "${API}/repos/${REPO}/commits/${SHA}/pulls")"
+          # The commits/{sha}/pulls listing is eventually consistent: a run that
+          # starts seconds after the merge can see no merged pull request yet
+          # (e1d0f08c2, run 39046063072, started 3 s after #515 merged and was
+          # wrongly reported as a direct push). Look again, briefly, before
+          # declaring the commit out of band: 5 attempts, 10 s apart.
+          pr=""
+          for attempt in 1 2 3 4 5; do
+            prs="$(curl --fail --silent --show-error "${auth[@]}" \
+              "${API}/repos/${REPO}/commits/${SHA}/pulls")"
 
-          pr="$(printf '%s' "$prs" | jq -c --arg sha "$SHA" '
-            [ .[]
-              | select(.base.ref == "main")
-              | select(.merged_at != null)
-              | select(.merge_commit_sha == $sha)
-            ]
-            | sort_by(.merged_at)
-            | last // empty
-          ')"
+            pr="$(printf '%s' "$prs" | jq -c --arg sha "$SHA" '
+              [ .[]
+                | select(.base.ref == "main")
+                | select(.merged_at != null)
+                | select(.merge_commit_sha == $sha)
+              ]
+              | sort_by(.merged_at)
+              | last // empty
+            ')"
+
+            if [[ -n "$pr" ]]; then
+              break
+            fi
+            if [[ "$attempt" -lt 5 ]]; then
+              echo "no merged pull request recorded for ${SHA} yet (attempt ${attempt} of 5); retrying in 10 s"
+              sleep 10
+            fi
+          done
 
           if [[ -z "$pr" ]]; then
             echo "::error::main commit ${SHA} is not the recorded merge result of a merged pull request targeting main. Direct pushes and out-of-band ref updates are not an approved release path."
