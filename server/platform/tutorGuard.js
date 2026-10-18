@@ -36,7 +36,28 @@
 //
 // All of this errs towards refusal. A false alarm costs one regenerated message
 // or the authored hint; a miss costs a student the exercise.
+//
+// Every pattern here runs in time linear in the text (#538). The inputs are
+// attacker-sized within the tutor body cap, so a pattern that backtracks
+// quadratically on a crafted digit, bracket or whitespace run is a denial of
+// service on the guard itself. The rule for a pattern that may start anywhere:
+// it must only START at the first character of a run it would consume (a
+// lookbehind on the digit class), and a run it consumes is never trimmed by a
+// second end-anchored pattern (that is a loop). server/test/
+// tutor-guard-complexity-check.mjs holds the timing contract with the shapes
+// that used to take seconds. Nothing is truncated to get there: cutting the
+// text would hide a value past the cut, so a message longer than
+// MAX_GUARD_CHARS is refused outright instead (leakedExpressions).
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The most text the guard will judge in one message. Replies are bounded far
+ * below this by the providers (MAX_STREAM_CHARS, the /help reply) and every
+ * question field by tutor.js LIMITS (≤ 8,000); a message beyond it is refused as
+ * a leak rather than read in part, because a partial read could miss the
+ * value it is meant to catch.
+ */
+export const MAX_GUARD_CHARS = 8_000;
 
 const DEVANAGARI_DIGITS = /[०-९]/g;
 const MATH_SPAN = /\$([^$]+)\$/g;
@@ -266,7 +287,19 @@ export function valueOf(expression) {
   return evaluate(rhs);
 }
 
-const RUN = /[-+]?\s*(?:\d|\.\d|π|√|\()[\d.\s+\-*/^()√π%]*/g;
+// A sign may be followed by whitespace ("- 3"), but a run never starts on bare
+// whitespace: `[-+]?\s*` let every position inside a long blank stretch scan to
+// its end and backtrack (quadratic). After .trim() the matches are the same.
+const RUN = /(?:[-+]\s*)?(?:\d|\.\d|π|√|\()[\d.\s+\-*/^()√π%]*/g;
+// Characters a run may not end on. Stripped with a loop rather than an
+// end-anchored pattern: `[…]+$` on "((((…(1" scans from every bracket to the
+// end before failing, once per bracket.
+const RUN_TAIL = new Set(['-', '+', '*', '/', '^', '(', '.', ' ', '\t', '\n', '\r', '\f', '\v', ' ']);
+function trimRunTail(run) {
+  let end = run.length;
+  while (end > 0 && (RUN_TAIL.has(run[end - 1]) || /\s/.test(run[end - 1]))) end -= 1;
+  return run.slice(0, end);
+}
 
 /**
  * Every numeric value a piece of text states: each number, each fraction,
@@ -280,14 +313,17 @@ export function statedValues(text) {
   for (const m of s.matchAll(/(-?)\b(\d+)\s+(\d+)\s*\/\s*(\d+)\b/g)) {
     add((m[1] ? -1 : 1) * (Number(m[2]) + Number(m[3]) / Number(m[4])));
   }
-  for (const m of s.matchAll(/(-?\d+(?:\.\d+)?)\s*%/g)) add(Number(m[1]) / 100);
+  // The digits may only start a match at the start of their run: a digit run
+  // with no % after it would otherwise be re-scanned from every digit. A sign
+  // is still taken wherever it stands ("3-5%" states -0.05, as before).
+  for (const m of s.matchAll(/(-?)(?<!\d)(\d+(?:\.\d+)?)\s*%/g)) add(Number(`${m[1]}${m[2]}`) / 100);
   for (const m of s.matchAll(/(?<!\d|\d\.)(-?)(\d*\.(\d+)|\d+)(?!\d|\.\d)/g)) {
     const n = Number(`${m[1]}${m[2]}`);
     const decimals = m[3] ? m[3].length : 0;
     add(n, decimals >= 2 ? 0.5 * 10 ** -decimals + 1e-12 : 1e-9);
   }
   for (const m of s.matchAll(RUN)) {
-    const run = m[0].replace(/%/g, ' ').trim().replace(/[-+*/^(.\s]+$/, '');
+    const run = trimRunTail(m[0].replace(/%/g, ' ').trim());
     if (!run) continue;
     add(evaluate(run));
     // Additive terms: "1 + 3/4" states 3/4 as well as 7/4.
@@ -306,7 +342,11 @@ export function statedValues(text) {
   return values;
 }
 
-const NUM = String.raw`(-?\d+(?:\.\d+)?(?:\s*\/\s*\d+)?)`;
+// The digits of a number may only begin a match at the start of their run (the
+// lookbehind); the sign is still read wherever it stands. Without it the two
+// patterns below that begin with a number tried every digit of a long run as a
+// start and scanned to its end each time.
+const NUM = String.raw`(-?(?<!\d)\d+(?:\.\d+)?(?:\s*\/\s*\d+)?)`;
 const RANGES = [
   new RegExp(String.raw`between\s+${NUM}\s+(?:and|&)\s+${NUM}`, 'gi'),
   new RegExp(String.raw`${NUM}\s+(?:और|तथा)\s+${NUM}\s+के\s+बीच`, 'g'),
@@ -409,6 +449,9 @@ export function proseKey(text) {
  * Why this message may not be shown, or an empty list when it may.
  */
 export function leakedExpressions(message, guard, { prompt = '' } = {}) {
+  // Fail closed on size: a reply this long is never shown. Reading only a
+  // prefix of it could miss the protected value, so it is refused whole.
+  if (String(message ?? '').length > MAX_GUARD_CHARS) return [`length:${String(message).length}`];
   const m = normalizeMath(message);
   if (!m) return [];
   const p = normalizeMath(prompt);

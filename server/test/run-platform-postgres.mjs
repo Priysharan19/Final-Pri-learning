@@ -62,6 +62,11 @@ export const ENGINE_SUITES = [
   'account-lifecycle-contract-check.mjs',
   'account-lifecycle-journey-check.mjs',
   'account-deletion-reauth-check.mjs',
+  'account-deletion-session-binding-check.mjs',
+  // The data export behind fresh proof of the credential, and the new-device
+  // sign-in notice: session rows, audit rows and the step-up on Postgres too.
+  'export-reauth-check.mjs',
+  'session-alerts-check.mjs',
   'guardian-consent-lifecycle-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',

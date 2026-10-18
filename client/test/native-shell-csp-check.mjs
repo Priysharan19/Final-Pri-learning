@@ -63,6 +63,10 @@ ok(server.size >= 13, `server policy parsed into ${server.size} directives`);
 ok(server.get('script-src')?.join(' ') === "'self'", "server script-src is exactly 'self'");
 ok(server.get('object-src')?.join(' ') === "'none'", "server object-src is exactly 'none'");
 ok(server.get('frame-ancestors')?.join(' ') === "'none'", "server frame-ancestors is exactly 'none'");
+// #260: no nested browsing context, so no same-origin child frame can reach the
+// parent's bridge handlers (parent.webkit.messageHandlers.*) and be credited to
+// the main frame by the shells' sender gate.
+ok(server.get('frame-src')?.join(' ') === "'none'", "server frame-src is exactly 'none'");
 
 function notWeakerThanServer(label, directives) {
   ok(Array.isArray(directives) && directives.length > 0, `${label}: CSP directive list found in source`);
@@ -86,6 +90,7 @@ function notWeakerThanServer(label, directives) {
   ok(!script.some(src => WEAKENERS.has(src) || HOST_SOURCE.test(src)), `${label}: script-src carries no weakening source`);
   ok((shell.get('object-src') || []).join(' ') === "'none'", `${label}: object-src 'none'`);
   ok((shell.get('frame-ancestors') || []).join(' ') === "'none'", `${label}: frame-ancestors 'none'`);
+  ok((shell.get('frame-src') || []).join(' ') === "'none'", `${label}: frame-src 'none' (no child frame can reach the parent's bridge)`);
   ok((shell.get('base-uri') || []).join(' ') === "'self'", `${label}: base-uri 'self'`);
   ok((shell.get('default-src') || []).join(' ') === "'self'", `${label}: default-src 'self'`);
   // The native shells route every /v1 call through the native cloud bridge

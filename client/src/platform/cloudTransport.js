@@ -212,6 +212,11 @@ async function nativeRequest(path, {
   }
 }
 
+// The proofs a REAUTH_REQUIRED refusal names (server/platform/accounts.js
+// proofMethods): only the known kinds, so a hostile body cannot grow the list.
+const PROOF_KINDS = new Set(['password', 'otp', 'google', 'apple']);
+const proofList = list => list.filter(kind => typeof kind === 'string' && PROOF_KINDS.has(kind)).slice(0, PROOF_KINDS.size);
+
 export async function cloudRequest(path, {
   method = 'GET', body = undefined, idempotencyKey = null, timeoutMs = DEFAULT_TIMEOUT_MS, signal = null
 } = {}) {
@@ -245,6 +250,7 @@ export async function cloudRequest(path, {
       for (const k of ['nextAt', 'used', 'limit', 'windowDays']) if (Number.isFinite(Number(data?.error?.[k]))) err[k] = Number(data.error[k]);
       if (typeof data?.error?.timeZone === 'string' && TIME_ZONE.test(data.error.timeZone)) err.timeZone = data.error.timeZone;
       if (typeof data?.error?.openExamId === 'string' && SAFE_ID.test(data.error.openExamId)) err.openExamId = data.error.openExamId;
+      if (Array.isArray(data?.error?.proofs)) err.proofs = proofList(data.error.proofs);
       err.requestId = result?.requestId || rid;
       throw err;
     }
@@ -308,6 +314,7 @@ export async function cloudRequest(path, {
       for (const k of ['nextAt', 'used', 'limit', 'windowDays']) if (Number.isFinite(Number(data?.error?.[k]))) err[k] = Number(data.error[k]);
       if (typeof data?.error?.timeZone === 'string' && TIME_ZONE.test(data.error.timeZone)) err.timeZone = data.error.timeZone;
       if (typeof data?.error?.openExamId === 'string' && SAFE_ID.test(data.error.openExamId)) err.openExamId = data.error.openExamId;
+      if (Array.isArray(data?.error?.proofs)) err.proofs = proofList(data.error.proofs);
       err.requestId = response.headers.get('x-pri-request-id') || rid;
       throw err;
     }
@@ -510,6 +517,11 @@ export const cloud = Object.freeze({
   devices: () => cloudRequest('/v1/account/devices'),
   revokeDevice: sessionId => cloudRequest(`/v1/account/devices/${pathId(sessionId, 'session id')}`, { method: 'DELETE' }),
   exportAccount: () => cloudRequest('/v1/account/export'),
+  // Fresh proof of the credential for the export (server/platform/accounts.js
+  // POST /reauth): the same proofs deletion takes. The server answers with a
+  // session-bound step-up cookie the browser or native jar holds for 10 minutes;
+  // the page keeps nothing.
+  reauth: body => cloudRequest('/v1/account/reauth', { method: 'POST', body }),
   // Server-side handwriting reading. The body carries the student's own ink as
   // a picture and nothing else: no question, no expected answer, no profile.
   handwritingStatus: ({ signal = null, timeoutMs = 7000 } = {}) =>

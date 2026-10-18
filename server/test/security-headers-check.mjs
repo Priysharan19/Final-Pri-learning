@@ -49,6 +49,9 @@ function expectHardened(headers, label, { hsts = true } = {}) {
   c.ok(csp, `${label}: Content-Security-Policy present`);
   const d = directives(csp);
   c.deq(d['frame-ancestors'], ["'none'"], `${label}: frame-ancestors 'none'`);
+  // #260: no nested browsing context, so no same-origin child frame can reach
+  // the parent's native bridge handlers through parent.webkit.*.
+  c.deq(d['frame-src'], ["'none'"], `${label}: frame-src 'none'`);
   c.eq(headers.get('x-content-type-options'), 'nosniff', `${label}: nosniff`);
   c.eq(headers.get('referrer-policy'), 'no-referrer', `${label}: Referrer-Policy`);
   c.match(headers.get('permissions-policy'), /microphone=\(\)/, `${label}: Permissions-Policy`);
@@ -129,6 +132,7 @@ try {
   const dev = securityHeaderValues({ production: false });
   c.eq(dev['Strict-Transport-Security'], undefined, 'HSTS is only sent in production');
   c.ok(dev['Content-Security-Policy'].includes("frame-ancestors 'none'"), 'CSP is enforced in development too');
+  c.ok(dev['Content-Security-Policy'].includes("frame-src 'none'"), "development CSP forbids child frames too (frame-src 'none')");
   c.eq(dev['Cross-Origin-Opener-Policy'], 'same-origin-allow-popups', 'COOP keeps sign-in popups working');
 
   // Production cookies: the session bearer is HttpOnly + Secure + SameSite.
