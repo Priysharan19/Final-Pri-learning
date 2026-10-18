@@ -142,7 +142,17 @@ export const flow = {
     // ── 3b · offline: no reading, the ink is kept, and it is read on reconnect
     reader.text = answer;
     await ctx.setOffline(true);
-    await handwrite(page, box, answer);
+    // The rasteriser crops to the written bounds, so moving identical ink to
+    // another position does NOT change its server image identity. Give the
+    // first numeral a short pen flourish WITHIN its existing line, so the
+    // image is new but line segmentation and later ink annotations still refer
+    // to the same single answer line. This tests a genuine uncached outage.
+    const earlierImages = new Set((await readCalls()).map(call => call.body?.image).filter(Boolean));
+    await handwrite(page, box, answer, { x: 85, y: 65 });
+    await page.mouse.move(box.x + 96, box.y + 108);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 128, box.y + 108);
+    await page.mouse.up();
     await page.waitForSelector('.ink-status', { timeout: 10000 }).catch(() => {});
     const offlineNote = (await page.locator('.ink-status').innerText().catch(() => '')) || '';
     await check('offline, nothing is read or offered for marking, and the student is told why',
@@ -200,6 +210,9 @@ export const flow = {
     await page.waitForTimeout(1500);
     const readsAfter = await readCalls();
     const restoredSent = readsAfter.at(-1);
+    await check('offline recovery fixture is a new image, not an earlier cached read',
+      !!restoredSent?.body?.image && !earlierImages.has(restoredSent.body.image),
+      `had ${earlierImages.size} earlier image(s); cached-image collision ${earlierImages.has(restoredSent?.body?.image)}`);
     const providerCalls = reader.requests.length - requestsBeforeReload;
     await check('the kept strokes were restored and offered to the reader (one request, a picture, nothing else)',
       readsAfter.length === readsBeforeReload + 1 && providerCalls >= 1 && providerCalls <= 2 &&
