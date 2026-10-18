@@ -98,15 +98,27 @@ export function assertNoOpenTransaction(what = 'This network call') {
  * WHERE account_id = ?. On SQLite it is recorded only.
  *
  * Every other statement the Postgres store runs — joined to no transaction, or
- * in a transaction without an account scope — runs with `pri.scope = 'system'`,
- * set transaction-locally too. A statement that reaches the database any other
- * way (a raw client, a pooled connection after its transaction ended) has no
- * declared scope and the policies give it no rows: RLS fails closed.
+ * in a transaction without an account scope — runs in `pri.scope = 'system'`:
+ * each of the store's pooled sessions is put in system scope once, by
+ * sessionSetup(), before its first statement, and every transaction re-declares
+ * its own scope (account or system) with SET LOCAL in its BEGIN, which reverts
+ * to the session's system scope at COMMIT/ROLLBACK. A connection that did not
+ * come from this store's pool (a raw pri_server client, psql, another service
+ * holding the credential) has no declared scope and the policies give it no
+ * rows: RLS fails closed. See docs/security/threat-model.md §7 for what this
+ * boundary is and is not.
  */
+// Server account ids are `acct_<uuid>` (accounts.js id('acct')). The scope
+// accepts only this charset, so an id can never carry a quote, a backslash, a
+// NUL or whitespace into the SET LOCAL text below — there is nothing to escape.
+// scopeLiteral() still quotes the value as defence in depth.
+const ACCOUNT_SCOPE_ID = /^[A-Za-z0-9_.:-]{1,200}$/;
+const SCOPE_INVALID = () => storeError('STORE_ACCOUNT_SCOPE_INVALID',
+  'A transaction account scope must be 1–200 characters of A–Z, a–z, 0–9, "_", ".", ":" or "-".');
 function accountScopeOption(options) {
   const scope = options?.accountScope;
   if (scope === undefined || scope === null) return null;
-  if (typeof scope !== 'string' || !scope || scope.length > 200) throw storeError('STORE_ACCOUNT_SCOPE_INVALID', 'A transaction account scope must be a non-empty string of at most 200 characters.');
+  if (typeof scope !== 'string' || !ACCOUNT_SCOPE_ID.test(scope)) throw SCOPE_INVALID();
   return scope;
 }
 // Both GUCs are always set together, transaction-locally, so a transaction can
@@ -117,13 +129,15 @@ function accountScopeOption(options) {
 // own first statement, exactly as before the scope existed. (Taking it one round
 // trip early widened every serializable transaction's conflict window and
 // exhausted the 40001 retries on the hot rate_limits rows under a sync burst.)
-const SCOPE_INVALID = () => storeError('STORE_ACCOUNT_SCOPE_INVALID', 'A transaction account scope must be a non-empty string of at most 200 characters.');
-/** A Postgres string literal that is correct whatever standard_conforming_strings is. */
+/**
+ * A Postgres string literal for a scope value. The value has already passed
+ * ACCOUNT_SCOPE_ID (or is the empty system account), so it contains no quote or
+ * backslash; the check is repeated here so this function is safe on its own.
+ */
 function scopeLiteral(value) {
   const text = String(value);
-  if (text.includes('\0')) throw SCOPE_INVALID();
-  const quoted = text.replace(/'/g, "''");
-  return text.includes('\\') ? `E'${quoted.replace(/\\/g, '\\\\')}'` : `'${quoted}'`;
+  if (text !== '' && !ACCOUNT_SCOPE_ID.test(text)) throw SCOPE_INVALID();
+  return `'${text}'`;
 }
 function scopeParams(accountScope) {
   return accountScope ? ['account', accountScope] : ['system', ''];
@@ -133,11 +147,16 @@ export function scopeStatement(accountScope) {
   const [scope, account] = scopeParams(accountScope);
   return `SET LOCAL pri.scope = '${scope}'; SET LOCAL pri.account_id = ${scopeLiteral(account)}`;
 }
-/** The statement that opens a store statement run outside any transaction, in system scope. */
-export const BEGIN_SYSTEM_STATEMENT = `BEGIN; ${scopeStatement(null)}`;
-/** exec() runs a script that may manage its own transactions: session-level system scope, reset after. */
-export const SET_SESSION_SYSTEM_SCOPE = "SELECT set_config('pri.scope', 'system', false), set_config('pri.account_id', '', false)";
-export const RESET_SESSION_SCOPE = 'RESET pri.scope; RESET pri.account_id';
+/**
+ * The session scope of every pooled connection of the store, set once by
+ * sessionSetup() (and again after exec(), following DISCARD ALL). A statement outside any
+ * transaction then runs as one round trip in system scope; a transaction's
+ * SET LOCAL overrides it only until COMMIT/ROLLBACK. This needs a real session
+ * per connection — a transaction-mode pooler is refused (assertSessionModeUrl).
+ */
+export const SET_SESSION_SYSTEM_SCOPE = "SET pri.scope = 'system'; SET pri.account_id = ''";
+/** After exec(): refused inside an open or aborted transaction, so such a client is destroyed. */
+export const RESET_SESSION = 'DISCARD ALL';
 
 function lockOption(options) {
   const lock = options?.lock;
@@ -697,7 +716,7 @@ export class PostgresStore {
 
   /** The session statements every pooled connection runs before first use. */
   sessionSetup() {
-    const statements = [`SET search_path TO ${this.schema}`];
+    const statements = [`SET search_path TO ${this.schema}`, SET_SESSION_SYSTEM_SCOPE];
     // Integers validated in the constructor; SET cannot take a bind parameter.
     if (this.session.statementTimeoutMs !== null) statements.push(`SET statement_timeout = ${this.session.statementTimeoutMs}`);
     if (this.session.idleInTransactionTimeoutMs !== null) statements.push(`SET idle_in_transaction_session_timeout = ${this.session.idleInTransactionTimeoutMs}`);
@@ -740,35 +759,22 @@ export class PostgresStore {
   }
 
   /**
-   * One statement outside any transaction. It runs in its own short READ
-   * COMMITTED transaction (the isolation an autocommit statement has) that
-   * declares system scope first, so the scope is transaction-local and can never
-   * outlive the statement on the pooled connection.
+   * One statement outside any transaction: a single round trip, autocommit
+   * (READ COMMITTED), in the session's system scope from sessionSetup(). It
+   * opens no transaction, so a failed statement leaves nothing to roll back.
    */
   async #query(sql, params) {
     const values = asParams(params);
     const client = await this._client();
     let broken;
-    let begun = false;
     try {
-      // Set before the query: if BEGIN succeeds and the SET LOCAL after it does
-      // not, the session is in an aborted transaction and still needs ROLLBACK.
-      begun = true;
-      await client.query(BEGIN_SYSTEM_STATEMENT);
-      const result = await client.query(toPostgresPlaceholders(sql), values);
-      await client.query('COMMIT');
-      begun = false;
-      return result;
+      return await client.query(toPostgresPlaceholders(sql), values);
     } catch (error) {
       // A statement error leaves the session usable; a lost connection does not.
       if (client.__priLost) { broken = client.__priLost; throw databaseOverload(client.__priLost); }
       if (!error?.code || String(error.code).startsWith('08') || error.code === '57P01' || error.code === '25P03') broken = error;
       throw databaseOverload(error);
     } finally {
-      if (begun && !broken) {
-        // A client whose ROLLBACK fails is in an unknown state: destroy it.
-        try { await client.query('ROLLBACK'); } catch (rollbackError) { broken = rollbackError; }
-      }
       client.release(broken);
     }
   }
@@ -794,16 +800,24 @@ export class PostgresStore {
   async exec(sql) {
     const tx = this.#joined();
     if (tx) return tx.exec(sql);
-    // A script (tests/tools) may BEGIN/COMMIT itself, so the scope is set for
-    // the session and reset afterwards; a client that cannot prove the reset is
-    // destroyed rather than returned to the pool still in system scope.
+    // A script (tests/tools) may BEGIN/COMMIT, SET or RESET itself. It runs in
+    // the session's system scope; afterwards the session is reset to exactly
+    // what sessionSetup() gives a new connection. DISCARD ALL comes first, on
+    // its own: Postgres refuses it inside a transaction block (25001) or an
+    // aborted one (25P02), so a script that left a transaction open — whose
+    // session-level SETs would otherwise ride into the next request — fails
+    // the reset and the client is destroyed, never pooled.
     const client = await this._client();
     let broken;
     try {
-      await client.query(SET_SESSION_SYSTEM_SCOPE);
       await client.query(sql);
     } finally {
-      try { await client.query(RESET_SESSION_SCOPE); } catch (resetError) { broken = resetError; }
+      try {
+        await client.query(RESET_SESSION);
+        await client.query(this.sessionSetup());
+      } catch (resetError) {
+        broken = resetError;
+      }
       client.release(broken);
     }
   }

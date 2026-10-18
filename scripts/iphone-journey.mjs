@@ -142,7 +142,13 @@ function builtApp(derived) {
   return join(products, apps[0]);
 }
 
-function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = null, duringAfterMs = 20_000, tick = null, loops = 75 } = {}) {
+// `during` runs once while the phase is live: after `duringAfterMs`, or —
+// with `duringWhen` — as soon as the page asks for it. While a page-gated
+// `during` is still due, the (slow, up to 90 s) log read is not started: a
+// read that blocks the runner would hold the switch back past the page's own
+// wait (#528). `duringDeadlineMs` bounds that hold; after it the log is read
+// as usual and the page reports its own failure.
+function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = null, duringAfterMs = 20_000, duringWhen = null, duringDeadlineMs = 240_000, tick = null, loops = 75 } = {}) {
   const started = localStamp(new Date(Date.now() - 2000));
   // SIMCTL_CHILD_* reaches the app's environment (DEBUG builds read the cloud
   // origin override and the journey's fixture account from it).
@@ -155,7 +161,15 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
   for (let i = 0; i < loops; i++) {
     // With an oracle to serve, look twice a second-and-a-half rather than
     // letting the page wait on the (slow) log read.
-    if (tick) { for (let k = 0; k < 4; k++) { execSync('sleep 0.5'); tick(); } } else execSync('sleep 2');
+    if (duringWhen && !duringDone) {
+      // Poll the page's request every half second, without reading the log.
+      while (!duringDone && Date.now() - t0 < duringDeadlineMs) {
+        execSync('sleep 0.5');
+        if (tick) tick();
+        if (duringWhen()) { duringDone = true; during(); }
+      }
+      duringDone = true;
+    } else if (tick) { for (let k = 0; k < 4; k++) { execSync('sleep 0.5'); tick(); } } else execSync('sleep 2');
     if (!duringDone && Date.now() - t0 >= duringAfterMs) { duringDone = true; during(); }
     // One read is bounded: on a loaded machine `log show` inside a simulator
     // has hung for many minutes, and an unbounded read then hangs the whole
@@ -287,14 +301,21 @@ let backgroundLines = [];
 let a11yLines = [];
 if (WANT_LIFECYCLE) {
   console.log('\nBackground → foreground …');
-  backgroundLines = launchAndRead(udid, bundleId, '--journey-background', 'background', {}, {
+  // The page types an unsent answer and then asks (ask-1.json through the
+  // journey relay) to be backgrounded; the switch follows that request, not a
+  // fixed delay, and the reply tells the page whether it happened.
+  const relay = mkdtempSync(join(tmpdir(), 'pri-background-'));
+  backgroundLines = launchAndRead(udid, bundleId, '--journey-background', 'background', { PRI_JOURNEY_ORACLE_DIR: relay }, {
+    duringWhen: () => existsSync(join(relay, 'ask-1.json')),
     during: () => {
-      // The phase needs ~30 s to reach a typed question; switch apps after it.
-      try { run('xcrun', ['simctl', 'launch', udid, 'com.apple.Preferences']); } catch { /* best effort */ }
+      const t = Date.now();
+      let switched = true, reason = '';
+      try { run('xcrun', ['simctl', 'launch', udid, 'com.apple.Preferences'], { timeout: 240_000 }); } catch (e) { switched = false; reason = String(e?.message || e).split('\n')[0].slice(0, 80); }
       execSync('sleep 4');
-      try { run('xcrun', ['simctl', 'launch', udid, bundleId]); } catch { /* already running: brought forward */ }
+      try { run('xcrun', ['simctl', 'launch', udid, bundleId], { timeout: 240_000 }); } catch { /* already running: brought forward */ }
+      writeFileSync(join(relay, 'reply-1.json'), JSON.stringify({ n: 1, switched, reason, ms: Date.now() - t }));
+      console.log(`  (switched to Settings and back in ${((Date.now() - t) / 1000).toFixed(1)} s)`);
     },
-    duringAfterMs: 35_000,
   });
   for (const line of backgroundLines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
 }

@@ -94,6 +94,61 @@ function boundedInteger(env, name, fallback, min, max) {
   return value;
 }
 
+// ── Session-mode connections only (#524) ─────────────────────────────────────
+//
+// The store keeps per-connection SESSION state and relies on it: search_path,
+// statement/idle timeouts, the session-level `pri.scope = 'system'` that every
+// statement outside a transaction runs under (store.js sessionSetup), and
+// session advisory locks held across a transaction. A transaction-mode pooler
+// (Supabase Supavisor on port 6543, PgBouncer pool_mode=transaction) hands each
+// transaction to whichever backend is free, so that state would apply to some
+// other client's backend — wrong scope, lost locks, wrong schema. Such URLs are
+// refused before a pool exists. Supabase's session pooler (port 5432 on
+// *.pooler.supabase.com) or a direct connection (db.<ref>.supabase.co:5432) is
+// required; see docs/operations/postgres-cutover.md.
+export const SUPAVISOR_TRANSACTION_PORT = '6543';
+const TRANSACTION_POOL_MODES = new Set(['transaction', 'statement']);
+const POOL_MODE_KEYS = new Set(['pool_mode', 'pool-mode', 'poolmode']);
+/**
+ * The port node-postgres will actually connect to, from every source it reads,
+ * in its own order (pg-connection-string, then pg's ConnectionParameters): a
+ * `port` query parameter (the last one wins) overrides the authority port, and
+ * a URL with neither falls back to PGPORT, then 5432. Every candidate is
+ * returned so a refusal does not depend on which one pg ends up preferring.
+ */
+function effectivePorts(url, env) {
+  const query = [];
+  for (const [key, value] of url.searchParams.entries()) if (key.toLowerCase() === 'port') query.push(String(value).trim());
+  const ports = [...query];
+  if (url.port) ports.push(url.port);
+  if (!query.some(Boolean) && !url.port) {
+    for (const source of new Set([env, process.env])) {
+      const value = String(source?.PGPORT ?? '').trim();
+      if (value) ports.push(value);
+    }
+  }
+  return ports;
+}
+export function assertSessionModeUrl(connectionString, env = process.env) {
+  const url = new URL(String(connectionString));
+  const refuse = why => {
+    throw configError('PLATFORM_DB_TRANSACTION_POOLER',
+      `PRI_DATABASE_URL points at a transaction-mode pooler (${why}). The server needs a session per connection: use Supabase's session pooler (port 5432) or a direct connection.`);
+  };
+  if (effectivePorts(url, env).some(port => port.replace(/^0+/, '') === SUPAVISOR_TRANSACTION_PORT)) {
+    refuse(`port ${SUPAVISOR_TRANSACTION_PORT} is Supabase Supavisor transaction mode`);
+  }
+  // Parameter keys in any case: pg passes unknown keys through, and a pooler or
+  // a client library may read a variant spelling.
+  for (const [rawKey, rawValue] of url.searchParams.entries()) {
+    const key = rawKey.toLowerCase();
+    const value = String(rawValue).trim().toLowerCase();
+    if (key === 'pgbouncer' && value !== 'false') refuse('pgbouncer= is set');
+    if (POOL_MODE_KEYS.has(key) && TRANSACTION_POOL_MODES.has(value)) refuse(`${key}=${value}`);
+  }
+  return true;
+}
+
 /** Per-connection limits and pool size, from the environment, validated. */
 export function postgresSessionLimits(env = process.env) {
   return Object.freeze({
@@ -120,6 +175,7 @@ export function postgresSessionLimits(env = process.env) {
  */
 export function postgresConnectionSettings(connectionString, env = process.env) {
   if (!validPostgresUrl(connectionString)) throw configError('PLATFORM_DB_URL_INVALID', 'PRI_DATABASE_URL must be a postgres:// or postgresql:// URL with a host.');
+  assertSessionModeUrl(connectionString, env);
   const url = new URL(String(connectionString));
   for (const name of URL_TLS_FILES) {
     if (url.searchParams.has(name)) {

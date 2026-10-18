@@ -135,7 +135,7 @@ Form factors follow `docs/cross-platform/FORM_FACTOR_SPEC.md`: COMPACT < 600px, 
 | Progress | One column; facts 2×2; the table drops its "Correct" column | One column | 900px column |
 | Sheets and dialogs | Bottom sheet | Centred | Centred |
 
-The page is the only scroller, with a sticky bar above and a sticky action bar below. The question column scrolls on its own only in the split layout and contains its overscroll. Full-height surfaces use `100dvh` with a `100vh` fallback. Safe-area insets are applied on the bars.
+The page is the only scroller, with a sticky bar above and a sticky action bar below. The question column scrolls on its own only in the split layout and contains its overscroll. Full-height surfaces use `100dvh` with a `100vh` fallback. Safe-area insets are applied on the bars, always through the `--pri-inset-*` tokens (`env(safe-area-inset-*)`). On iPhone the native shell runs the page edge to edge, so the paper fills the status-bar and home-indicator strips; on COMPACT the workspace action bar is sticky in the page's flow and is therefore its own spacer (nothing at the foot of the page sits under it), Type · Write · Photo spans the column, the workspace top bar is a fixed `--ws-bar-h` with the topic allowed two lines, and choosing Write scrolls just enough to show the whole sheet. `client/test/tour-iphone-layout.js` holds these to account at 393 × 852 and checks iPad and desktop keep their composition.
 
 ## 9. Components
 

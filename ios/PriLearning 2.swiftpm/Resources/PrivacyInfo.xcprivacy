@@ -16,7 +16,7 @@
     <!--
       Data the app sends off the device, and only with a cloud account that the person
       creates (docs/legal/privacy.md "What we receive if you create a cloud account").
-      Without an account nothing leaves the device. Nothing is used for tracking or
+      Without an account nothing leaves the device (and nothing is marked: grading is online-only). Nothing is used for tracking or
       advertising; nothing is sold.
     -->
     <key>NSPrivacyCollectedDataTypes</key>
@@ -47,7 +47,7 @@
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
             </array>
         </dict>
-        <!-- Account id, session and the random app-generated device identifier that keeps the person signed in (not the device's own id). -->
+        <!-- The opaque account id (acct_...) and the session it is bound to. The per-install device identifier has its own DeviceID entry below. -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeUserID</string>
@@ -73,7 +73,7 @@
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
             </array>
         </dict>
-        <!-- Only when the person switches on server reading / working check: an image of their handwriting or photographed working, and the lines of working with the question text. Passed to the reading service through the server, which keeps no copy; the mark is decided on the device. -->
+        <!-- An image drawn from the person's handwriting strokes (server reading is on by default for a signed-in account, switchable off; off for a child until a guardian confirms), typed answers and working sent for server grading, the transcription the server keeps with its grading receipt (90 days), and, if the opt-in working check is on, the working lines with the question text. Images are passed to the reading service (OpenAI) and not kept by the server; the deterministic server engine decides every mark. -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypeOtherUserContent</string>
@@ -110,6 +110,86 @@
             <key>NSPrivacyCollectedDataTypePurposes</key>
             <array>
                 <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <!-- Mobile number, if the person signs in with an SMS code, or a guardian's mobile number for a child's account (server/platform/otp.js account_phones, guardian-phone-otp; only when PRI_SMS_PROVIDER is configured). Passed to the SMS delivery provider to send the code. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypePhoneNumber</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <!-- The random per-install identifier the app generates (client/src/platform/cloudAccount.js device-<uuid>; not IDFV/IDFA), stored with each session and each synced learning event. Declared conservatively as a device-level id. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeDeviceID</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <!-- A camera photo of paper working, or of a textbook/worksheet question ("Practise this"), sent through the server to the model provider (OpenAI) to be read, answer-blind; the server keeps no copy of the image (server/platform/questionPhoto.js, practice.js /recognize, handwritingProvider.js). -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypePhotosorVideos</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <!-- Allow-listed telemetry events that describe use of the app (feature-used, exam-completed, trial-started, subscription-state), kept 90 days; blocked for a child until a guardian confirms (server/platform/telemetry.js). -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeProductInteraction</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <!-- Allow-listed performance-sample telemetry (duration, status, network, version), kept 90 days (server/platform/telemetry.js). -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypePerformanceData</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <!-- The person's "18 or older" declaration (accounts.age_basis), class and track, and the guardian-consent record for a child's account (method, notice version, confirmation/withdrawal times; server/platform/guardianConsent.js). -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeOtherDataTypes</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
             </array>
         </dict>

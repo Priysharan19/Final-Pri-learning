@@ -146,6 +146,156 @@ const claimOf = async q => `${me.id}:resolved:${await blindHash(`practice-resolu
     'and submit takes that lock before it reads the row');
 }
 
+// 3h · a pull that lands while a submit holds the question writes nothing until
+//      the submit is done, and never puts the question back to unanswered
+//      (production: Sync · a pull overlapping a submit — the pull kept the
+//      server event by rewriting the whole row it had read before the submit
+//      resolved it; the finished question was served again and refused as
+//      "already finished").
+{
+  const { withMutationLock } = await import('../src/local/mutationLock.js');
+  const q = await question({});
+  const count = attemptsOf().length;
+  const rawRow = () => JSON.stringify(rawRows().questions.find(r => r.id === q.id));
+  let pulled = null, during = null, before = null;
+  // What a submit does, under the question lock it takes before it reads the
+  // row (3f): the grade goes in flight, the server answers, the row resolves.
+  await withMutationLock(`question:${q.id}`, async () => {
+    const row = await idb.get('questions', q.id);
+    await idb.put('questions', { ...row, pendingGrade: { submissionId: 's-overlapped-001', at: Date.now() } });
+    before = rawRow();
+    const pull = applyRemoteLearningEvents(me.id, [eventFor(q)]).then(out => { pulled = out; return out; });
+    for (let i = 0; i < 20; i++) await new Promise(r => setTimeout(r, 5));
+    during = { row: rawRow(), settled: pulled !== null };
+    await idb.put('questions', { ...row, answered: 1, resolvedAt: Date.now(), pendingGrade: null, serverReceipt: { attemptId: `attempt-${q.id}` } });
+    void pull;
+  });
+  while (pulled === null) await new Promise(r => setTimeout(r, 5));
+  eq([during.row === before, during.settled], [true, false],
+    'while the submit holds the question, the pull waits and writes nothing to its row');
+  const settled = await idb.get('questions', q.id);
+  eq([settled.answered, settled.pendingGrade ?? null, 'deferredGrade' in settled, !!settled.resolvedAt], [1, null, false, true],
+    'after it the question is still answered: the submit\'s resolution is not undone by the pull');
+  eq([pulled.applied, attemptsOf().length], [0, count], 'and the pull records nothing more');
+}
+// 3i · the stale write itself, staged: the pull reads the row while the submit
+//      is in flight; the submit then resolves the row and releases the lock
+//      BEFORE the pull writes. The question must still be answered after the
+//      pull (on the old code the pull put its pre-resolution copy back).
+//      Played for a practice row and for a Rush row — a Rush answer is a
+//      server-marked resolution of an issued row too.
+const { withMutationLock } = await import('../src/local/mutationLock.js');
+// The fake IndexedDB's own read, hooked: the first read of one question row
+// runs `then` right after the row is read (the moment a submit could land).
+const fakeDb = globalThis.indexedDB.open().result;
+const Handle = Object.getPrototypeOf(fakeDb.transaction(['questions']).objectStore('questions'));
+const plainGet = Handle.get;
+let onceRead = null;
+Handle.get = function get(key) {
+  if (this.store.name !== 'questions') return plainGet.call(this, key);
+  return this.req(() => {
+    const value = this.store.rows.get(key);
+    const copy = value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+    if (onceRead && value?.id === onceRead.id) { const hook = onceRead; onceRead = null; hook.then(this.store, key); }
+    return copy;
+  });
+};
+for (const mode of ['practice', 'rush']) {
+  const q = await question({ mode });
+  const count = attemptsOf().length;
+  let release = null, resolvedRow = null;
+  // The submit (or Rush answer): under the question lock, grade in flight, waiting on the server.
+  const submit = withMutationLock(`question:${q.id}`, async () => {
+    const row = await idb.get('questions', q.id);
+    const inFlight = { ...row, pendingGrade: { submissionId: `s-staged-${mode}-01`, at: Date.now() } };
+    await idb.put('questions', inFlight);
+    resolvedRow = { ...inFlight, answered: 1, resolvedAt: Date.now(), pendingGrade: null, serverReceipt: { attemptId: `attempt-${q.id}`, correct: true } };
+    await new Promise(r => { release = r; });
+  });
+  while (!release) await new Promise(r => setTimeout(r, 1));
+  // The server answers just after the pull has read the in-flight row: the
+  // submit's resolution lands, and the submit lets go of the question.
+  onceRead = { id: q.id, then: (store, key) => { store.rows.set(key, JSON.parse(JSON.stringify(resolvedRow))); release(); } };
+  const out = await applyRemoteLearningEvents(me.id, [eventFor(q)]);
+  await submit;
+  const after = await idb.get('questions', q.id);
+  eq([onceRead, after.answered, after.pendingGrade ?? null, 'deferredGrade' in after, !!after.resolvedAt], [null, 1, null, false, true],
+    `${mode}: a pull that read the row before the submit resolved it does not put the question back to unanswered`);
+  eq([out.applied, attemptsOf().length], [0, count], `${mode}: and records nothing more`);
+}
+Handle.get = plainGet;
+
+// 3j · a Rush/Match answer and a misconception proposal take the question lock:
+//      while a submit or a pull holds the question they wait their turn.
+{
+  for (const [label, row, call] of [
+    ['a Rush answer', { mode: 'rush' }, q => dispatch('POST', '/rush/answer', { id: q.id, answer: '1' })],
+    ['a Match answer', { mode: 'match' }, q => dispatch('POST', '/rush/answer', { id: q.id, answer: '1' })],
+    ['a misconception proposal', { answered: 1 }, q => dispatch('POST', `/practice/${q.id}/misconception`, { misconceptionId: 'x', lines: [] })]
+  ]) {
+    const q = await question(row);
+    let settled = false;
+    let call$ = null;
+    await withMutationLock(`question:${q.id}`, async () => {
+      call$ = call(q).then(() => {}, () => {}).finally(() => { settled = true; });
+      for (let i = 0; i < 20; i++) await new Promise(r => setTimeout(r, 2));
+      ok(!settled, `${label} waits while the question is held (it takes the question lock)`);
+    });
+    await call$;
+    ok(settled, `${label} runs once the question is free`);
+  }
+}
+
+// 3k · every write of a question row in the sync restore and in the backend's
+//      routes is accounted for: under the question lock, or a route that only
+//      writes rows it creates (or exam-paper rows, under the paper's lock).
+{
+  const fs = await import('node:fs');
+  const restore = fs.readFileSync(new URL('../src/platform/cloudSyncRestore.js', import.meta.url), 'utf8');
+  const writes = [...restore.matchAll(/await put\('questions'/g)].length;
+  const locked = [...restore.matchAll(/withMutationLock\(`question:\$\{(?:rowId|row\.id)\}`, async \(\) => \{\s*const (?:row|after) = await get\('questions'/g)].length;
+  eq([writes, locked], [2, 2], 'every question-row write in the sync restore reads and writes under the question lock');
+
+  const backend = fs.readFileSync(new URL('../src/local/backend.js', import.meta.url), 'utf8');
+  const gated = backend.slice(backend.indexOf('async function runGated('));
+  const lockedSet = new Set([...gated.slice(0, gated.indexOf('withMutationLock(`question:${params.id}`')).matchAll(/key === '([^']+)'/g)].map(m => m[1]));
+  if (/key === 'POST \/rush\/answer' && body\?\.id\) \{\s*return withMutationLock\(`question:\$\{body\.id\}`/.test(gated)) lockedSet.add('POST /rush/answer');
+  // A route that only writes rows it has just created (nothing can be settling
+  // them yet), or exam-paper rows (never a practice event's row; the paper has its own lock).
+  const creates = {
+    'POST /exams': 'creates the paper\'s rows', 'GET /exams/:id': 'exam-paper rows, under the exam lock',
+    'POST /exams/:id/submit': 'exam-paper rows, under the exam lock', 'POST /rush/start': 'creates the run\'s rows',
+    'POST /match/start': 'creates the match\'s rows', 'POST /history/:id/retry': 'creates a new row'
+  };
+  const writer = /put\('questions'|store: 'questions'|\bresolve\(|gradeOnServer\(|revealOnServer\(|requireServerIssue\(|adoptPaperResult\(/;
+  const table = backend.slice(0, backend.indexOf('\n};\n', backend.indexOf("'POST /practice/:id/submit'")));
+  const starts = [...table.matchAll(/^ {2}'((?:GET|POST|PUT|PATCH|DELETE) [^']+)': async/mg)];
+  const unaccounted = [], writers = [];
+  starts.forEach((m, i) => {
+    const body = table.slice(m.index, i + 1 < starts.length ? starts[i + 1].index : table.length);
+    if (!writer.test(body)) return;
+    writers.push(m[1]);
+    if (!lockedSet.has(m[1]) && !creates[m[1]]) unaccounted.push(m[1]);
+  });
+  eq(unaccounted, [], 'every backend route that writes a question row holds the question lock (or only writes rows it creates)');
+  ok(writers.length >= 13 && Object.keys(creates).every(r => writers.includes(r)), `the scan found the writers it should (${writers.length}) and no stale exemption`);
+  for (const route of ['POST /practice/:id/submit', 'POST /practice/:id/reveal', 'POST /practice/:id/hint', 'POST /practice/:id/tutor', 'POST /practice/:id/discard', 'POST /practice/:id/misconception', 'POST /rush/answer']) {
+    ok(lockedSet.has(route), `${route} is under the question lock`);
+  }
+  // The helpers that rewrite an existing row are reached only from those routes or the locked recorder.
+  for (const helper of ['gradeOnServer', 'revealOnServer', 'requireServerIssue']) {
+    const callers = [];
+    starts.forEach((m, i) => {
+      const body = table.slice(m.index, i + 1 < starts.length ? starts[i + 1].index : table.length);
+      if (new RegExp(`\\b${helper}\\(`).test(body)) callers.push(m[1]);
+    });
+    eq(callers.filter(r => !lockedSet.has(r)), [], `${helper} is called only from routes under the question lock`);
+  }
+  const creditXp = restore.slice(restore.indexOf('async function creditXp'), restore.indexOf('async function creditXp') + 600);
+  ok(/withMutationLock\(`profile-row:\$\{pid\}`/.test(creditXp) && !/locks\?\.request|return work\(\)/.test(creditXp),
+    'restored XP is added under the profile-row lock backend.js uses, with no unlocked fallback');
+}
+
 // 4 · another device's attempt (no local question) is imported as before
 {
   const foreign = { id: 'local-none', serverQuestionId: '11111111-1111-4111-8111-111111111111' };

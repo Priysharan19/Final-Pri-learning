@@ -62,6 +62,7 @@ import { requestTutorHelp } from './tutorBridge.js';
 import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
 import { cloud, nativeCloudAvailable } from '../platform/cloudTransport.js';
+import { withMutationLock } from './mutationLock.js';
 import { registerIssuedAttemptRecorder, registerRestoreSanitisers } from '../platform/cloudSyncRestore.js';
 import { publicQuestionFields } from '../engine/publicQuestion.js';
 import {
@@ -5797,25 +5798,6 @@ registerIssuedAttemptRecorder((pid, rowId, event) => withMutationLock(`question:
   return { applied: true, xp: 0 };
 }));
 
-const mutationQueues = new Map();
-
-async function withMutationLock(name, work) {
-  if (globalThis.navigator?.locks?.request) {
-    return globalThis.navigator.locks.request(`pri-learning:${name}`, work);
-  }
-  const prior = mutationQueues.get(name) || Promise.resolve();
-  let release;
-  const gate = new Promise(resolve => { release = resolve; });
-  const tail = prior.catch(() => undefined).then(() => gate);
-  mutationQueues.set(name, tail);
-  await prior.catch(() => undefined);
-  try { return await work(); }
-  finally {
-    release();
-    if (mutationQueues.get(name) === tail) mutationQueues.delete(name);
-  }
-}
-
 async function runGated(method, pattern, handler, body, params) {
   const key = `${method} ${pattern}`;
   const work = async () => {
@@ -5830,7 +5812,15 @@ async function runGated(method, pattern, handler, body, params) {
     || key === 'POST /practice/:id/hint'
     || key === 'POST /practice/:id/tutor'
     || key === 'POST /practice/:id/discard'
+    || key === 'POST /practice/:id/misconception'
   )) return withMutationLock(`question:${params.id}`, work);
+
+  // A Rush or Match answer is marked by the server and resolves its row with
+  // a whole-row write, like a practice submit: it holds the same question lock
+  // so a sync pull settling that row can never interleave with it.
+  if (key === 'POST /rush/answer' && body?.id) {
+    return withMutationLock(`question:${body.id}`, work);
+  }
 
   if (key === 'POST /practice/next') {
     return withMutationLock(`next:${currentPid() || 'none'}`, work);

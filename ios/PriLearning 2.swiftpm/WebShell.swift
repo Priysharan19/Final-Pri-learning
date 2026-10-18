@@ -198,6 +198,8 @@ struct WebShell: UIViewRepresentable {
 
         func attachHost(to webView: WKWebView) {
             host.attach(to: webView)
+            // Only iPhone runs the page under the status bar (PriLearningApp.swift).
+            if UIDevice.current.userInterfaceIdiom == .phone { attachPageTone(to: webView) }
             openURLObserver = NotificationCenter.default.addObserver(forName: .priOpenURL, object: nil, queue: .main) { [weak self] note in
                 guard let url = note.object as? URL else { return }
                 self?.route(deepLink: url)
@@ -206,6 +208,42 @@ struct WebShell: UIViewRepresentable {
                 forName: UIContentSizeCategory.didChangeNotification, object: nil, queue: .main
             ) { [weak self] _ in self?.applyTextSize() }
             applyTextSize()
+        }
+
+        private var themeColorObservation: NSKeyValueObservation?
+        private var becameActiveObserver: NSObjectProtocol?
+
+        /// Reports the tone of the page's paper to ContentView, which sets the
+        /// status bar's ink from it. The page states its paper as theme-color
+        /// (client/src/lib/theme.js); WebKit exposes it as `themeColor`.
+        func attachPageTone(to webView: WKWebView) {
+            pinDeviceAppearance(webView)
+            becameActiveObserver = NotificationCenter.default.addObserver(
+                forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
+            ) { [weak self, weak webView] _ in
+                guard let webView else { return }
+                self?.pinDeviceAppearance(webView)
+            }
+            themeColorObservation = webView.observe(\.themeColor, options: [.initial, .new]) { webView, _ in
+                var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+                let tone: PageTone? = webView.themeColor?.getRed(&red, green: &green, blue: &blue, alpha: &alpha) == true
+                    ? StatusBarAppearance.tone(red: Double(red), green: Double(green), blue: Double(blue))
+                    : nil
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .priPageTone, object: tone?.rawValue)
+                }
+            }
+        }
+
+        /// ContentView's preferredColorScheme would otherwise reach the web view
+        /// and answer the page's prefers-color-scheme with the shell's choice: a
+        /// profile following the device would then follow the status bar, which
+        /// follows the page — a loop that sticks on the first paper. The web
+        /// view keeps the device's own appearance (the screen's, which no window
+        /// override reaches), refreshed whenever the app becomes active.
+        private func pinDeviceAppearance(_ webView: WKWebView) {
+            let device = (webView.window?.windowScene?.screen ?? UIScreen.main).traitCollection.userInterfaceStyle
+            if webView.overrideUserInterfaceStyle != device { webView.overrideUserInterfaceStyle = device }
         }
 
         /// Only `https://<signed cloud host>/account-action#…` is accepted, and it
