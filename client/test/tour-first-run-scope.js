@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · E2E · first run → correctly scoped practice (V1 §04/§05)
 //
-// A new student picks class and track in onboarding and the very first
+// A new student picks class and track on the sign-in card and the very first
 // Practice question is from that class/track's syllabus; the choice survives a
 // reload; changing class later in Settings re-scopes Practice (the unfinished
 // question from the old class is not resumed under the new one); "Past papers
@@ -22,10 +22,6 @@ const scopeNames = (track, year) => {
   return new Set([...own, ...ahead].map(c => c.name));
 };
 
-async function next(page) {
-  await page.locator('.auth-card .btn-primary').click();
-}
-
 async function servedChapter(page) {
   await page.waitForSelector('.q-prompt', { timeout: 30000 });
   return (await page.locator('.qpage .tag[lang="en"]').first().innerText()).trim();
@@ -35,26 +31,13 @@ export const flow = {
   id: 'first-run-scope',
   name: 'First run · class/track scope, reload, class change, past papers empty state',
 
-  async run({ page, check, goto, settle }) {
+  async run({ page, check, goto, settle, createProfile }) {
     await page.setViewportSize(IPAD_PORTRAIT);
     await goto('/');
-    await page.getByRole('button', { name: 'Use without an account' }).click();
-    await page.waitForSelector('[data-onboarding-step="1"]');
-    await page.getByRole('button', { name: 'Student', exact: true }).click();
-    await next(page);
-
-    await page.waitForSelector('[data-onboarding-step="2"]');
-    await page.locator('#signup-track').selectOption('jee-main');
-    await page.locator('#signup-year').selectOption('12');
-    await next(page);
-    await page.waitForSelector('[data-onboarding-step="3"]');
-    await page.locator('#signup-name').fill('Scope Student');
-    await next(page);
-    await page.waitForSelector('[data-onboarding-step="4"]');
-    await next(page);
-    await page.waitForSelector('[data-onboarding-step="5"]');
-    await page.locator('.auth-card .btn-primary').click();
-    await page.waitForSelector('.home-greet', { timeout: 30000 });
+    // The student enters the way every student does (issue #477): the one
+    // sign-in card — email, the server's emailed code, name, age, agreement —
+    // then class and track on the same card, and the activation gate.
+    await createProfile({ name: 'Scope Student', year: 12, course: 'in', track: 'jee-main' });
 
     // ── the first question is from Class 12 JEE Main ──
     await goto('/practice');

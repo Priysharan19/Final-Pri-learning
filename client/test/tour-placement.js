@@ -31,21 +31,14 @@ export const flow = {
     const enabled = await page.evaluate(() => window.__PRI_BUILD_FEATURES__?.placement === true);
     if (!enabled) {
       // A production build without PRI_FEATURE_PLACEMENT: outside the frozen
-      // V1 scope, so there must be no placement surface anywhere.
-      await page.getByRole('button', { name: 'Use without an account' }).click();
-      await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
-      await page.getByRole('button', { name: 'Student', exact: true }).click();
-      await page.locator('.auth-card .btn-primary').click();
-      await page.locator('#signup-track').selectOption('11');
-      await page.locator('.auth-card .btn-primary').click();
-      await page.locator('#signup-name').fill('Nisha Rao');
-      await page.locator('.auth-card .btn-primary').click();
-      await page.locator('.auth-card .btn-primary').click();
-      await page.waitForSelector('[data-onboarding-step="5"]', { timeout: 15000 });
-      await check('flag off: onboarding keeps the no-diagnostic copy',
-        /does not currently have a separate placement diagnostic/.test(await page.locator('.auth-card').innerText()));
-      await page.locator('.auth-card .btn-primary').click();
-      await page.waitForSelector('.home-greet', { timeout: 30000 });
+      // V1 scope, so there must be no placement surface anywhere. The student
+      // enters the way every student does (issue #477): the one sign-in card,
+      // the server's emailed code, then the activation gate.
+      const card = page.locator('[data-signin-card="page"]');
+      await card.waitFor({ timeout: 30000 });
+      await check('flag off: the sign-in card promises no placement diagnostic',
+        !/placement|diagnostic/i.test(await page.locator('.auth-col').innerText()));
+      await createProfile({ name: 'Nisha Rao', year: 11, course: 'in' });
       await settle();
       await check('flag off: Home offers no placement check', await page.locator('[data-placement-card]').count() === 0);
       await goto('/placement');

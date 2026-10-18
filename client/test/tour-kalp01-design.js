@@ -5,9 +5,10 @@
 //
 // Only Pri's server marks (owner decision 2026-10-10), so the flow runs
 // against the real in-process platform server (support/online-session.mjs).
-// It first proves the signed-out student is honestly refused — nothing marked,
-// nothing sent — then signs in through the app and proves the feedback on the
-// card is the server's own authoritative receipt.
+// The student enters through the one sign-in card and the activation gate
+// (issue #477) — there is no signed-out student inside the app — so the flow
+// proves the question on the card was issued by the server to this account
+// before any work, then that the feedback is the server's own receipt.
 
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -58,25 +59,6 @@ async function contrast(page) {
   });
 }
 
-async function createStudentThroughUI(page, settle) {
-  await page.getByRole('button', { name: 'Use without an account' }).click();
-  await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
-  await page.getByRole('button', { name: 'Student', exact: true }).click();
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="2"]');
-  await page.locator('#signup-track').selectOption('10');
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="3"]');
-  await page.locator('#signup-name').fill('KALP Demo Student');
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="4"]');
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="5"]');
-  await page.getByRole('button', { name: 'Start learning' }).click();
-  await page.waitForSelector('.home-greet', { timeout: 30000 });
-  await settle();
-}
-
 async function forceTypedAnswerMode(page) {
   const typeButton = page.getByRole('button', { name: /Answer by typing/i }).first();
   if (await typeButton.count()) await typeButton.click();
@@ -110,23 +92,21 @@ async function enterAnAnswer(page, check) {
 }
 
 /**
- * Signed out, the card says so BEFORE anything is submitted, and nothing is
- * marked. Submit is deliberately not pressed here: the refusal after a press is
- * tour-online-check's subject, and this flow goes on to mark this same question.
+ * Signed in through the gate, the card says nothing about needing an account
+ * BEFORE anything is submitted, and nothing is marked yet: the question was
+ * issued by the server to this account. Submit is deliberately not pressed
+ * here: this flow goes on to mark this same question.
  */
-async function signedOutSaysSo(page, check, online) {
+async function issuedBeforeWork(page, check, online) {
   await forceTypedAnswerMode(page);
-  const notice = page.locator('[data-check-needs-account]');
-  await notice.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
   const row = await online.shownRow();
   const shown = await nothingMarkedOnCard(page);
-  const sent = (await online.practiceCalls(MARKING)).map(c => c.path);
-  const words = await notice.innerText().catch(() => '');
-  return check('signed out, the question says checking needs a Pri account: sign-in in the card, no verdict, nothing issued or sent to be marked',
-    /needs a Pri account/i.test(words) && await notice.locator('[data-check-sign-in]').isEnabled().catch(() => false)
-      && row?.checkState === 'prepared' && !row.serverQuestionId && shown.none && sent.length === 0
+  const sent = (await online.practiceCalls(MARKING)).filter(c => !/\/v1\/practice\/issue$/.test(c.path)).map(c => c.path);
+  return check('signed in through the gate, the question was issued by the server to this account: no sign-in notice, no verdict, nothing sent to be marked',
+    await page.locator('[data-check-needs-account], [data-check-sign-in]').count() === 0
+      && row?.checkState === 'issued' && !!row.serverQuestionId && shown.none && sent.length === 0
       && !/marked on this device|checked on this device/i.test(await page.locator('.qpage').innerText()),
-    JSON.stringify({ words: words.slice(0, 160), row: row && { checkState: row.checkState, issued: !!row.serverQuestionId }, card: shown.card, sent }));
+    JSON.stringify({ row: row && { checkState: row.checkState, issued: !!row.serverQuestionId }, card: shown.card, sent }));
 }
 
 async function reachFeedback(page, check, online) {
@@ -152,13 +132,13 @@ export const flow = {
   name: 'KALP-01 · visual system, tablet and real demo journey',
   online: true,
 
-  async run({ page, check, goto, settle, online }) {
+  async run({ page, check, goto, settle, online, createProfile }) {
     // The flow now runs against the real server, and a browser logs every
-    // non-2xx reply as a console error of its own. While the student is signed
-    // out, the server answering 401 to the app's "is anyone signed in?" reads
-    // is the correct reply, not a fault: only those — a 401, from this
-    // server's /v1, before sign-in — are set aside. Every other console error,
-    // and any 401 once signed in, still fails the flow.
+    // non-2xx reply as a console error of its own. Before the student has
+    // signed in on the card, the server answering 401 to the app's "is anyone
+    // signed in?" reads is the correct reply, not a fault: only those — a 401,
+    // from this server's /v1, before sign-in — are set aside. Every other
+    // console error, and any 401 once signed in, still fails the flow.
     const consoleErrors = [];
     let signedIn = false;
     page.on('console', msg => {
@@ -178,7 +158,11 @@ export const flow = {
     await check('the real first-entry hero renders', await page.locator('.hero-title').isVisible());
     await snap(page, '01-login-tablet-dark');
 
-    await createStudentThroughUI(page, settle);
+    // The one sign-in card: email, the server's emailed code, name, age and
+    // agreement, class — then the activation gate (support/verified-onboarding.mjs).
+    await createProfile({ name: 'KALP Demo Student', year: 10, course: 'in' });
+    signedIn = true;
+    await settle();
     await check('a student profile created through the product reaches Home', await page.locator('.home-greet').isVisible());
     await snap(page, '02-home-tablet-dark');
 
@@ -222,15 +206,10 @@ export const flow = {
     await goto('/practice');
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
     await settle();
-    await signedOutSaysSo(page, check, online);
-    await snap(page, '03a-practice-sign-in-needed-tablet');
-
-    // Sign in through the app (Settings → Pri account), then mark for real.
+    // The session the card made is the one that marks (online.signIn reuses it).
     await online.signIn({ name: 'KALP Demo Student' });
-    signedIn = true;
-    await goto('/practice');
-    await page.waitForSelector('.q-prompt', { timeout: 30000 });
-    await settle();
+    await issuedBeforeWork(page, check, online);
+    await snap(page, '03a-practice-issued-tablet');
     if (await reachFeedback(page, check, online)) {
       await snap(page, '03-practice-feedback-tablet-dark');
       const explain = page.locator('.pri-explain-launch:visible, .pri-explain-play:visible').first();

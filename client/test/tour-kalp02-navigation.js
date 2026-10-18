@@ -20,22 +20,6 @@ async function visibleSidebarLabels(page) {
   return page.locator('.sidebar .nav-label').allTextContents();
 }
 
-async function createTeacher(page) {
-  await page.getByRole('button', { name: /Add another/i }).click();
-  await page.waitForSelector('[data-onboarding-step="1"]');
-  await page.getByRole('button', { name: 'Teacher', exact: true }).click();
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="2"]');
-  await page.locator('#signup-track').selectOption('10');
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="3"]');
-  await page.locator('#signup-name').fill('KALP02 Teacher');
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="4"]');
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="5"]');
-  await page.getByRole('button', { name: 'Open Teacher Workspace' }).click();
-}
 export const flow = {
   id: 'kalp02-navigation',
   name: 'KALP-02 · role-aware IA, deep links and navigation',
@@ -114,7 +98,10 @@ export const flow = {
     await page.locator('#acct-menu-btn').click();
     await page.getByRole('menuitem', { name: /Switch profile/i }).click();
     await page.waitForSelector('.acct-list');
-    await createTeacher(page);
+    // A teacher device profile, made from the picker's device-profile wizard,
+    // passes the same activation gate (issue #477): the gate's sign-in card
+    // links it to a verified account before the workspace opens.
+    await createProfile({ role: 'teacher', name: 'KALP02 Teacher', year: 10 });
     await page.waitForSelector('.teacher-workspace-head', { timeout: 30000 });
     await check('teacher profile lands in Teacher Workspace', (await pathState(page)) === '/teach', await pathState(page));
 
