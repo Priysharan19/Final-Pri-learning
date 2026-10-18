@@ -132,6 +132,23 @@ ok(swiftSources[0] === swiftSources[1], 'LocalSchemeHandler.swift is byte-identi
   ok(/index\.html/.test(swift), `${label}: SPA index.html fallback is untouched`);
 }
 
+// ── iOS: no subframe navigation at all (#260) ───────────────────────────────
+// WebKit does not apply frame-src to about:srcdoc, and a same-origin child
+// calling parent.webkit.messageHandlers.* is credited to the main frame by the
+// sender gate (proven on the simulator by BridgeSelfCheck's
+// subframeReachThroughRefused). The navigation policy must cancel every
+// non-main-frame navigation before any other decision.
+{
+  const shells = IOS_PACKAGES.map(pkg => read(`${pkg}/WebShell.swift`));
+  ok(shells[0] === shells[1], 'WebShell.swift is byte-identical in PriLearning.swiftpm and PriLearning 2.swiftpm');
+  const policy = shells[0].match(/decidePolicyFor navigationAction: WKNavigationAction,[\s\S]*?decisionHandler\(\.allow\)/);
+  const body = policy ? policy[0] : '';
+  const guard = body.search(/if let target = navigationAction\.targetFrame, !target\.isMainFrame \{\s*decisionHandler\(\.cancel\)\s*return\s*\}/);
+  ok(guard >= 0, 'iOS WebShell: every subframe navigation is cancelled');
+  ok(guard >= 0 && guard < body.indexOf('shouldPerformDownload') && guard < body.indexOf('UIApplication.shared.open'),
+    'iOS WebShell: the subframe guard runs before the download and outbound-link branches');
+}
+
 // ── Android: WebViewAssetLoader path handler ────────────────────────────────
 {
   const rel = 'android/app/src/main/java/com/prilearning/app/shell/AssetOrigin.kt';

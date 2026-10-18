@@ -8,8 +8,9 @@
 //   · it advertises capabilities and carries no OS identity;
 //   · a main-frame envelope round-trips through priBridge;
 //   · a same-origin SUBFRAME is refused (no reply, ever);
-//   · the shell CSP (frame-src 'none') keeps a child frame from existing at
-//     all, so no child frame can reach the parent's bridge through
+//   · WebShell's navigation policy (and the CSP's frame-src 'none' for
+//     fetched frames) keeps a child frame from loading at all, so no child
+//     frame can reach the parent's bridge through
 //     `parent.webkit.messageHandlers.*` and be credited to the main frame (#260).
 //     If a frame does load, the reach-through is attempted and must be refused.
 // Synthetic simulator evidence only; it says nothing about physical devices.
@@ -35,9 +36,9 @@ enum BridgeSelfCheck {
     const original = window.__priNativeReceive;
     window.__priNativeReceive = msg => { if (msg && msg.id) replies[msg.id] = msg; if (original) original(msg); };
     send(window, 'selfcheck-main', 'storage', 'status');
-    // A child frame under the shell CSP (frame-src 'none'): WebKit refuses the
-    // navigation, so the load event never fires and no document exists. The
-    // violation event is the positive signal; a 1.5 s silence is the fallback.
+    // A child frame: WebShell cancels every subframe navigation (#260), so the
+    // about:srcdoc document never loads (WebKit does not apply the CSP's
+    // frame-src to srcdoc). A CSP violation event or a 1.5 s silence counts.
     const cspBlocked = [];
     const onViolation = e => { if (e.effectiveDirective === 'frame-src' || e.violatedDirective === 'frame-src') cspBlocked.push(e.blockedURI || 'frame'); };
     document.addEventListener('securitypolicyviolation', onViolation);
@@ -117,7 +118,7 @@ enum BridgeSelfCheck {
                 if subframeHost { failures += 1 }
                 NSLog("PRIBRIDGE %@ subframeHasNoHost", subframeHost ? "FAIL" : "ok")
                 // Informational: whether the shell CSP stopped the child frame from
-                // existing (expected under frame-src 'none'); the gate above is the pass/fail.
+                // loading (expected: subframe navigations are cancelled); the gate above is the pass/fail.
                 NSLog("PRIBRIDGE info subframeBlockedByCsp %@", out["subframeBlockedByCsp"] as? Bool == true ? "true" : "false")
                 NSLog("PRIBRIDGE capabilities %@", out["capabilities"] as? String ?? "")
                 NSLog("PRIBRIDGE summary %d failure(s)", failures)
