@@ -266,6 +266,49 @@ server.push = null;
   ok('with the origin back, the same profile is let in again', !!(await gate('p1')).ready);
 }
 
+// ── 8 · lifecycle regressions (independent review of #477) ──────────────────
+// A first sync whose full rescan the server only partly takes is still the
+// account's binding: the returning student enters, and the rest stays queued.
+await put('profiles', { id: 'p4', name: 'Dev', avatar: '🙂', year: 10, role: 'student', course: 'in', indiaTrack: 'cbse', theme: 'dark', dailyGoal: 10, handwriting: true });
+await loginCloudAccount('p4', { email: 'a@example.test', password: 'test-password-only' });
+server.push = () => json({ schemaVersion: 1, cursor: (serverCursor += 100), acceptedEvents: [], acceptedEntities: [], fullRescanAccepted: true });
+{
+  const r = await gate('p4');
+  ok('a first sync the server only partly accepted still lets the returning student in', !!r.ready && r.ready.accountId === 'acct-A', JSON.stringify(r));
+  ok('the sync is recorded for this account', Number((await cloudAccountLink('p4')).lastSyncAt) > 0);
+  ok('and what the server did not take is still owed, for the scheduler', (await profileOutboxStats('p4')).requiresFullRescan === true);
+}
+server.push = null;
+// Two first syncs at once (the card finishing while the gate mounts) are one run.
+{
+  const { syncNow } = await import('../src/platform/syncWorker.js');
+  await put('profiles', { id: 'p5', name: 'Isha', avatar: '🙂', year: 10, role: 'student', course: 'in', indiaTrack: 'cbse', theme: 'dark', dailyGoal: 10, handwriting: true });
+  await loginCloudAccount('p5', { email: 'a@example.test', password: 'test-password-only' });
+  server.calls.length = 0;
+  const first = syncNow('p5');
+  const second = syncNow('p5');
+  ok('a second syncNow for the same profile while one runs shares it', first === second);
+  const [a, b] = await Promise.all([first, second]);
+  ok('both callers get the same completed report', a === b && Number(a?.lastSyncAt) > 0);
+  const pushes = server.calls.filter(c => c === 'POST /v1/sync/push').length;
+  const third = await syncNow('p5');
+  ok('once finished, the next call is a new sync', third !== a && Number(third?.lastSyncAt) >= Number(a.lastSyncAt), `pushes during the shared run: ${pushes}`);
+}
+// A storage read that fails is "not now", never "unlinked": it must not eject.
+{
+  // The stand-in IndexedDB (backend-check.mjs) hands every open the same database.
+  const proto = globalThis.indexedDB.open().result;
+  if (ok('the test environment exposes IndexedDB to fault', typeof proto?.transaction === 'function')) {
+    const original = proto.transaction;
+    proto.transaction = function () { throw new DOMException('The database connection is closing.', 'InvalidStateError'); };
+    let r;
+    try { r = await gate('p1', { sync: false }); } finally { proto.transaction = original; }
+    eq('a failed read of the link row is SESSION_UNAVAILABLE', r.code, 'SESSION_UNAVAILABLE');
+    ok('retryable, not an authoritative refusal: a student inside stays inside', r.retryable && !r.denied);
+    ok('with storage back, the same profile is let in again', !!(await gate('p1', { sync: false })).ready);
+  }
+}
+
 if (failures.length) {
   console.log(`ACCOUNT ACTIVATION: FAIL — ${failures.length} of ${pass + failures.length} checks failed`);
   for (const f of failures) console.log(`  · ${f}`);

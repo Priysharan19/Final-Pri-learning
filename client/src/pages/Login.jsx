@@ -9,7 +9,7 @@
 // one still passes the same gate before anything opens.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
 import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLanguage, useT } from '../i18n/index.js';
@@ -256,6 +256,10 @@ function LanguagePicker() {
 export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
   const { setUser, refreshDue, activate } = useApp();
   const nav = useNavigate();
+  // Where the student was going when the card stopped them (a deep link
+  // opened signed out). Read once, at mount: signing in returns them there.
+  const location = useLocation();
+  const intended = useRef(location.pathname && location.pathname !== '/' ? `${location.pathname}${location.search || ''}${location.hash || ''}` : '/practice');
   const t = useT();
   // Resolved per render, not at module load, so a development override of the
   // flag (features.js) is honoured; a production build compiles it to a constant.
@@ -521,7 +525,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     if (linkedUser?.id !== pid || !linkedUser.cloudLinked) throw new Error(t('signup.linkIncomplete'));
     accountProfileRef.current = null;
     localStorage.setItem('pri-seen-hero', '1');
-    nav('/practice', { replace: true, flushSync: true });
+    nav(intended.current, { replace: true, flushSync: true });
     // The profile and its confirmed activation are handed over together, so
     // the gate does not ask the server the same question a second time.
     flushSync(() => { setUser(linkedUser); activate?.(ready); });

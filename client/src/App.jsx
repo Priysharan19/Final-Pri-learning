@@ -376,8 +376,13 @@ export default function App() {
 
   // `activate` is how onboarding hands over the activation it has just had
   // confirmed by the server, together with the profile it is for.
-  const ctx = useMemo(() => ({ user, setUser, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent, activate: setActivated }),
-    [user, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent]);
+  // It accepts only an ensureAccountActivated result for the profile that is
+  // current; anything else leaves the gate shut.
+  const activate = useCallback((ready) => {
+    setActivated(ready && ready.profileId && ready.accountId && String(ready.profileId) === String(latestActivation.current?.profileId) ? ready : null);
+  }, []);
+  const ctx = useMemo(() => ({ user, setUser, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent, activate }),
+    [user, refreshUser, toast, celebrate, dueCount, refreshDue, refreshRecent, activate]);
 
   if (user === undefined) {
     return (

@@ -77,7 +77,11 @@ export async function ensureAccountActivated(pid, { expectedAccountId = null, sy
     }
   }
 
-  const link = await cloudAccountLink(pid);
+  // A failed read of the device's own storage is "not now", never "unlinked":
+  // only a row confirmed absent may send a student back to sign in.
+  let link;
+  try { link = await cloudAccountLink(pid, { strict: true }); }
+  catch (error) { throw new ActivationBlocked('SESSION_UNAVAILABLE', { cause: error, retryable: true }); }
   if (!link?.accountId) throw new ActivationBlocked('ACCOUNT_NOT_LINKED');
   if (expectedAccountId && String(link.accountId) !== String(expectedAccountId)) throw new ActivationBlocked('ACCOUNT_MISMATCH');
 
@@ -125,7 +129,10 @@ export async function ensureAccountActivated(pid, { expectedAccountId = null, sy
 
   // The first sync: a profile that has never synced to this account does so
   // now, before the shell opens, and the result must be acknowledged for this
-  // account. A profile that has synced before is kept in step by the
+  // account. What the gate requires is that binding — a completed sync for
+  // this account — not that every item of an older device history was
+  // accepted: a full rescan the server only partly takes stays queued for the
+  // scheduler, and must not keep a returning student out of their own work. A profile that has synced before is kept in step by the
   // auto-sync scheduler; a transient sync failure then is not a reason to
   // shut a student out of work that is already on the device.
   if (sync && !link.lastSyncAt) {
@@ -133,7 +140,7 @@ export async function ensureAccountActivated(pid, { expectedAccountId = null, sy
       const { syncNow, cloudSyncStatus } = await import('./syncWorker.js');
       const report = await syncNow(pid);
       const status = await cloudSyncStatus(pid);
-      if (!report?.lastSyncAt || !status?.lastSyncAt || String(status.accountId) !== String(link.accountId) || status.requiresFullRescan) {
+      if (!report?.lastSyncAt || !status?.lastSyncAt || String(status.accountId) !== String(link.accountId)) {
         throw Object.assign(new Error('first sync did not complete'), { code: 'FIRST_SYNC_INCOMPLETE' });
       }
     } catch (error) {

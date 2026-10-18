@@ -41,8 +41,11 @@ export async function cloudDeviceId() {
   return deviceId;
 }
 
-export async function cloudAccountLink(pid) {
-  const row = await get('device', linkRowId(pid)).catch(() => null);
+// `strict` lets a storage failure surface instead of reading as "no link":
+// the activation gate must not mistake a dropped IndexedDB connection (WebKit,
+// after the app sat in the background) for an account that was unlinked.
+export async function cloudAccountLink(pid, { strict = false } = {}) {
+  const row = await (strict ? get('device', linkRowId(pid)) : get('device', linkRowId(pid)).catch(() => null));
   if (!row) return null;
   return {
     localProfileId: pid,

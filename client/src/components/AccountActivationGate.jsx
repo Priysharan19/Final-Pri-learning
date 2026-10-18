@@ -96,7 +96,7 @@ export default function AccountActivationGate({ user, onReady, onSwitch }) {
       if (nonce === generation.current) onReady(ready);
     } catch (err) {
       if (nonce === generation.current) classify(err);
-    } finally { checking.current = false; }
+    } finally { if (nonce === generation.current) checking.current = false; }
   }, [user.id, onReady, classify]);
 
   useEffect(() => {
@@ -109,7 +109,9 @@ export default function AccountActivationGate({ user, onReady, onSwitch }) {
   }, [check, user.id]);
 
   // Each new state names itself to a screen reader.
-  useEffect(() => { if (status !== 'checking') headingRef.current?.focus({ preventScroll: true }); }, [status]);
+  // The checking heading takes focus too, so the button just pressed (which
+  // unmounts) never drops focus to the page body.
+  useEffect(() => { headingRef.current?.focus({ preventScroll: true }); }, [status]);
 
   // Back online: the retry screen tries again by itself.
   useEffect(() => {
@@ -125,6 +127,9 @@ export default function AccountActivationGate({ user, onReady, onSwitch }) {
     if (status !== 'guardian') return undefined;
     let live = true;
     const poll = () => {
+      // Not while the tab is hidden: the return to the foreground is noticed
+      // by the next tick, and a hidden tab should not keep the server busy.
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       void cloud.guardianState().then(state => {
         if (!live) return;
         if (state?.state === 'given' || state?.required === false) void check();
@@ -211,7 +216,7 @@ export default function AccountActivationGate({ user, onReady, onSwitch }) {
 
           {status === 'checking' && (
             <div className="card" aria-busy="true">
-              <h1 className="signup-title" id="activation-title">{t('activation.checkingTitle')}</h1>
+              {heading('activation.checkingTitle')}
               <p className="activation-status" role="status" data-testid="activation-checking">{t('activation.checking', { name: user.name })}</p>
             </div>
           )}
@@ -222,7 +227,7 @@ export default function AccountActivationGate({ user, onReady, onSwitch }) {
               <p className="activation-status" role="status">{reason}</p>
               <p className="activation-status">{t('activation.signInFor', { name: user.name })}</p>
               <SignUpFlow variant="inline" initialName={user.name || ''} knownYear={user.year ?? null} knownTrack={user.indiaTrack || null}
-                allowCreate={!link?.accountId} onFinish={finishSignIn} />
+                allowCreate={link !== undefined && !link?.accountId} onFinish={finishSignIn} />
               {appleOffered && (
                 <div style={{ marginTop: 14 }}>
                   <AppleSignInButton onClick={appleSignIn} disabled={!!busy} busy={busy === 'apple'} />
@@ -267,9 +272,9 @@ export default function AccountActivationGate({ user, onReady, onSwitch }) {
           )}
 
           {status === 'blocked' && (
-            <div className="card" role="alert" data-testid="activation-blocked">
+            <div className="card" data-testid="activation-blocked">
               {heading('activation.needsAttention')}
-              <p className="activation-status">{reason}</p>
+              <p className="activation-status" role="status">{reason}</p>
               <p className="activation-status">{t('activation.ageCorrection')}</p>
               <div className="activation-actions">
                 <button className="btn btn-ghost" type="button" data-testid="activation-check-again" onClick={() => void check()}>{t('activation.checkAgain')}</button>
@@ -278,9 +283,9 @@ export default function AccountActivationGate({ user, onReady, onSwitch }) {
           )}
 
           {status === 'retry' && (
-            <div className="card" role="alert" data-testid="activation-retry">
+            <div className="card" data-testid="activation-retry">
               {heading('activation.notComplete')}
-              <p className="activation-status">{reason}</p>
+              <p className="activation-status" role="status">{reason}</p>
               <p className="activation-status">{t('activation.workSafe')}</p>
               <div className="activation-actions">
                 <button className="btn btn-primary" type="button" data-testid="activation-retry-button" onClick={() => void check()}>{t('activation.retrySetup')}</button>
