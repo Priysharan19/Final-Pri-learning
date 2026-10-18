@@ -304,6 +304,26 @@ function onlineSession(platform, ctx, page) {
    * session cookie are written by product code, not by the test.
    */
   async function signIn({ name = 'Online Student', account = null } = {}) {
+    // The first-run fixture (support/verified-onboarding.mjs) has already
+    // signed the student in through the landing card, and the gate has let
+    // the profile in. That proven session is the one every flow marks with:
+    // it is reused here rather than replaced by a second account's.
+    const currentId = await page.evaluate(async () => {
+      try {
+        const r = await fetch('/v1/account/me', { credentials: 'include' });
+        return r.ok ? String((await r.json()).account?.id || '') : null;
+      } catch { return null; }
+    });
+    if (currentId && await page.locator('.shell').count()) {
+      if (account && String(account.id) !== currentId) {
+        throw new Error('online-session: another account was asked for while this profile is signed in — sign out first');
+      }
+      const row = platform.h.db.prepare('SELECT id, name, email FROM accounts WHERE id=?').get(currentId);
+      if (!row) throw new Error('online-session: the browser session names an account the platform database does not hold');
+      const who = { id: String(row.id), name: row.name, email: row.email, password: null };
+      session.account = who;
+      return who;
+    }
     const who = account || await platform.newAccount({ name });
     await page.goto(`${platform.origin}/settings`, { waitUntil: 'domcontentloaded' });
     const panel = page.locator('section', { has: page.locator('#cloud-account-title') });
