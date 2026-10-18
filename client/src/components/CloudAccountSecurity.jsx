@@ -22,6 +22,15 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  // The export asks for fresh proof of the credential (401 REAUTH_REQUIRED
+  // naming the proofs this account can offer). The proof is sent once to
+  // POST /v1/account/reauth and kept nowhere: the server answers with a
+  // step-up cookie the browser or native jar holds for 10 minutes.
+  const [exportProof, setExportProof] = useState(null); // null | { proofs: string[] }
+  const [exportPassword, setExportPassword] = useState('');
+  const [exportChallenge, setExportChallenge] = useState(null);
+  const [exportCode, setExportCode] = useState('');
+  const [exportCodeInvalid, setExportCodeInvalid] = useState(false);
 
   const hasPassword = providers.some(row => row.provider === 'password');
   const socialProviders = providers.filter(row => row.provider === 'google' || row.provider === 'apple');
@@ -116,15 +125,94 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
     finally { setBusy(''); }
   }
 
+  function resetExportProof() {
+    setExportProof(null);
+    setExportPassword('');
+    setExportChallenge(null);
+    setExportCode('');
+    setExportCodeInvalid(false);
+  }
+
+  async function deliverExport(result) {
+    const suffix = new Date().toISOString().slice(0, 10);
+    await downloadJSON(result, `pri-learning-account-export-${suffix}.json`);
+    resetExportProof();
+    setMessage(tLater('cloudSecurity.exported'));
+  }
+
   async function exportAccount() {
     start('export');
     try {
-      const result = await cloud.exportAccount();
-      const suffix = new Date().toISOString().slice(0, 10);
-      await downloadJSON(result, `pri-learning-account-export-${suffix}.json`);
-      setMessage(tLater('cloudSecurity.exported'));
+      await deliverExport(await cloud.exportAccount());
+    } catch (err) {
+      // The server wants the credential proven again: ask for the proof it
+      // names, inline, and try again with it (exportWithProof).
+      if (err?.code === 'REAUTH_REQUIRED') {
+        setExportProof({ proofs: Array.isArray(err.proofs) ? err.proofs : [] });
+        setMessage(tLater('cloudSecurity.exportConfirmFirst'));
+      } else setError(cloudErrorText(err, tLater, err.message || tLater('cloudSecurity.exportFailed')));
+    } finally { setBusy(''); }
+  }
+
+  /** Prove the credential (one request, nothing kept), then export. */
+  async function exportWithProof(proof) {
+    start('export');
+    try {
+      await cloud.reauth(proof);
+      await deliverExport(await cloud.exportAccount());
+    } catch (err) {
+      const wrongCode = err?.code === 'OTP_REAUTH_FAILED';
+      setExportCodeInvalid(wrongCode);
+      if (wrongCode) setExportCode('');
+      setError(wrongCode ? tLater('cloudSecurity.codeInvalid')
+        : err?.code === 'SOCIAL_CANCELLED' ? tLater('cloud.socialCancelled')
+          : err?.code === 'SOCIAL_POPUP_BLOCKED' ? tLater('cloud.socialPopupBlocked')
+            : err?.code?.startsWith?.('SOCIAL_') ? tLater('cloud.socialFailed')
+              : cloudErrorText(err, tLater, err.message || tLater('cloudSecurity.exportFailed')));
+    } finally { setBusy(''); }
+  }
+
+  async function exportWithPassword(e) {
+    e.preventDefault();
+    if (!exportPassword || busy) return;
+    const password = exportPassword;
+    setExportPassword('');
+    await exportWithProof({ password });
+  }
+
+  async function requestExportCode() {
+    if (busy) return;
+    start('code');
+    try {
+      const sent = await cloud.otpReauthRequest();
+      setExportChallenge(sent?.challengeId || null);
+      setExportCode('');
+      setExportCodeInvalid(false);
+      setMessage(tLater('cloudSecurity.codeSent'));
     } catch (err) { setError(err.message || tLater('cloudSecurity.exportFailed')); }
     finally { setBusy(''); }
+  }
+
+  async function exportWithCode() {
+    if (!exportChallenge || exportCode.length !== OTP_LENGTH || busy) return;
+    await exportWithProof({ otpChallengeId: exportChallenge, otpCode: exportCode });
+  }
+
+  // Straight from the click, so the provider window is not blocked.
+  async function exportWithProvider(provider) {
+    if (!webProviders[provider] || busy) return;
+    start('export');
+    let token;
+    try {
+      token = await requestIdentityToken(provider, webProviders[provider]);
+    } catch (err) {
+      setError(err?.code === 'SOCIAL_CANCELLED' ? tLater('cloud.socialCancelled')
+        : err?.code === 'SOCIAL_POPUP_BLOCKED' ? tLater('cloud.socialPopupBlocked')
+          : tLater('cloud.socialFailed'));
+      setBusy('');
+      return;
+    }
+    await exportWithProof({ provider, idToken: token.idToken, nonce: token.nonce });
   }
 
   // Straight from the click, so the provider window is not blocked.
@@ -228,9 +316,46 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
           <p className="muted" style={{ fontSize: 13, margin: '6px 0 10px' }}>
             {t('cloudSecurity.exportHelp')}
           </p>
-          <button className="btn btn-ghost btn-sm" type="button" onClick={exportAccount} disabled={!!busy}>
+          {!exportProof && <button className="btn btn-ghost btn-sm" type="button" onClick={exportAccount} disabled={!!busy}>
             {busy === 'export' ? t('cloudSecurity.preparing') : t('cloudSecurity.exportButton')}
-          </button>
+          </button>}
+          {exportProof && <form onSubmit={exportWithPassword} data-testid="cloud-export-proof" style={{ marginTop: 4 }}>
+            <p className="muted" style={{ fontSize: 13, margin: '0 0 8px' }}>{t('cloudSecurity.exportReauthHelp')}</p>
+            {exportProof.proofs.includes('password') && <>
+              <div className="field" style={{ maxWidth: 320 }}>
+                <label className="label" htmlFor="cloud-export-password">{t('cloudSecurity.confirmPassword')}</label>
+                <input className="input" id="cloud-export-password" type="password" autoComplete="current-password" maxLength={200} value={exportPassword} onChange={e => setExportPassword(e.target.value)} required />
+              </div>
+              <button className="btn btn-ghost btn-sm" type="submit" data-testid="cloud-export-with-password" disabled={!exportPassword || !!busy} style={{ marginTop: 8 }}>
+                {busy === 'export' ? t('cloudSecurity.preparing') : t('cloudSecurity.exportConfirm')}
+              </button>
+            </>}
+            {exportProof.proofs.some(kind => webProviders[kind]) && <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+              {exportProof.proofs.filter(kind => webProviders[kind]).map(kind => (
+                <button key={kind} className="btn btn-ghost btn-sm" type="button" data-export-provider={kind} disabled={!!busy} onClick={() => exportWithProvider(kind)}>
+                  {busy === 'export' ? t('cloudSecurity.preparing') : t('cloudSecurity.exportWithProvider', { provider: providerLabel[kind] })}
+                </button>
+              ))}
+            </div>}
+            {exportProof.proofs.includes('otp') && (exportChallenge ? <>
+              <p className="label" id="cloud-export-code-label" style={{ margin: '8px 0 6px' }}>{t('cloudSecurity.codeLabel')}</p>
+              <OtpInput value={exportCode} onChange={value => { setExportCode(value); setExportCodeInvalid(false); setError(''); }} autoFocus={false}
+                disabled={!!busy} invalid={exportCodeInvalid} idPrefix="cloud-export-code" labelledBy="cloud-export-code-label" />
+              <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                <button className="btn btn-ghost btn-sm" type="button" data-testid="cloud-export-with-code" disabled={exportCode.length !== OTP_LENGTH || !!busy} onClick={exportWithCode}>
+                  {busy === 'export' ? t('cloudSecurity.preparing') : t('cloudSecurity.exportWithCode')}
+                </button>
+                <button className="btn btn-ghost btn-sm" type="button" disabled={!!busy} onClick={requestExportCode}>
+                  {busy === 'code' ? t('cloudSecurity.sendingCode') : t('cloudSecurity.sendCode')}
+                </button>
+              </div>
+            </> : <button className="btn btn-ghost btn-sm" type="button" data-testid="cloud-export-send-code" disabled={!!busy} onClick={requestExportCode} style={{ marginTop: 8 }}>
+              {busy === 'code' ? t('cloudSecurity.sendingCode') : t('cloudSecurity.sendCode')}
+            </button>)}
+            <div style={{ marginTop: 8 }}>
+              <button className="btn btn-quiet btn-sm" type="button" disabled={!!busy} onClick={resetExportProof}>{t('cloudSecurity.exportCancel')}</button>
+            </div>
+          </form>}
         </div>
       </div>
 
