@@ -592,7 +592,7 @@ TalkBack, font scale) is assigned to Kalp and stays open under §22.4.
 
 | Area | Emulator evidence | Still needed |
 | --- | --- | --- |
-| Shell journeys (#278, #327) | `android-shell.yml` green on `main` for API 26 floor, API 33/36 `pixel_6` phone and API 36 `pixel_tablet` | physical phone and tablet |
+| Shell journeys (#278, #327) | `android-shell.yml` green on `main` (run 39151531722, merge train 2026-10-19-4) for API 26 floor, API 33/36 `pixel_6` phone and API 36 `pixel_tablet` | physical phone and tablet |
 | Layout | `WebViewAccessibilityTest#noScreenClipsHorizontally`: Home, Practice, Progress, Review and Settings do not scroll sideways or cut a control or heading, phone portrait and tablet landscape, at font scale 1.0 and 1.3 | physical devices; Samsung DeX / split screen not covered |
 | Ink | `InkInputTest`: finger arrives as `touch`, stylus as `pen` with pressure, `TOOL_TYPE_ERASER` erases on the shared canvas | a real S Pen (hover, side button, eraser end) |
 | Camera | `FileExchangeTest`: the photo picker offers the camera app's capture activity with a scoped `FileProvider` grant; no camera permission is declared, so there is no runtime permission prompt | a real camera capture on device |

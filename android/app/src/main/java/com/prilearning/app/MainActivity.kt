@@ -284,6 +284,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        smsCode.cancel() // unregister the receiver; a recreated activity starts a new request
         webView?.let { view ->
             root.removeView(view)
             // A WebView print adapter owns native WebView state until onFinish().

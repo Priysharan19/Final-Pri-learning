@@ -136,6 +136,9 @@ class WebViewAccessibilityTest {
         val ui = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
         fun sh(c: String) = ui.executeShellCommand(c).close()
         val tablet = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.resources.configuration.smallestScreenWidthDp >= 600
+        fun get(k: String): String = ui.executeShellCommand("settings get system $k").let { fd ->
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(fd).bufferedReader().readText().trim() }
+        val saved = listOf("font_scale", "accelerometer_rotation", "user_rotation").associateWith { get(it) }
         // Natural orientation: portrait on a phone, landscape on pixel_tablet.
         sh("settings put system accelerometer_rotation 0"); sh("settings put system user_rotation 0")
         try {
@@ -161,7 +164,7 @@ class WebViewAccessibilityTest {
                 }
             }
         } finally {
-            sh("settings put system font_scale 1.0"); sh("settings put system accelerometer_rotation 1")
+            for ((k, v) in saved) if (v.isNotEmpty() && v != "null") sh("settings put system $k $v") else sh("settings delete system $k")
         }
     }
 }
