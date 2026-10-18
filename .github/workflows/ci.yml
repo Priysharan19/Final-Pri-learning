@@ -110,6 +110,10 @@ jobs:
           grep -Fq 'nothing emitted left uncovered.' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 66/66 checks' suites.log
+          # The device meets the SERVER's daily practice cap (#537): refused
+          # through the real dispatcher, no fallback, a prepared question
+          # stays unbound and unmarked, a second device is refused at zero.
+          grep -Fq 'SERVER DAILY CAP (CLIENT): PASS — 27/27 checks' suites.log
           grep -Fq 'JEE ADVANCED GATE: PASS — 27/27 checks' suites.log
           grep -Fq 'RESTORE FIDELITY: PASS — 45/45 checks' suites.log
           grep -Fq 'STREAK CALENDAR: PASS — 19/19 checks' suites.log
@@ -545,6 +549,13 @@ jobs:
           grep -Fq 'India exam · signed out: a simulation does not start; sign in in place, then it does' browser.log
           grep -Fq "Exam · finished offline: submitted, no score; reconnected: the server's result" browser.log
           grep -Eq 'E2E SUITE.*97/97.*10 flows' browser.log
+          # The free plan's daily cap is the server's (#537): with nineteen of
+          # the day's questions used on another device, Next shows the cap
+          # screen from the server's 402 and fetches nothing instead; a capped
+          # account cannot have a signed-out question bound and marked.
+          grep -Fq 'Free cap · nineteen used on another device: the twentieth is issued, Next shows the cap screen from the server, nothing fetched instead' browser.log
+          grep -Fq 'Free cap · a prepared question, signed in on the card to a capped account: Submit refused as the free cap, nothing marked, work kept' browser.log
+          grep -Eq 'E2E SUITE.*24/24.*2 flows' browser.log
           grep -Fq 'Pri Explain V8 · adaptive board-style reasoning playback' browser.log
           grep -Eq 'E2E SUITE.*18/18.*1 flows' browser.log
           # The handwriting reader behind the real server is a scripted
