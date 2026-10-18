@@ -5,13 +5,23 @@
 # This is the one macOS lane. It is path-filtered to the native shell, the ink
 # runtime and its own harness scripts so a docs-only or curriculum PR does not
 # queue a 60-minute macOS run; superseded heads on the same ref are cancelled.
+# Pull requests validate through `pull_request` alone and `push` runs only on
+# main: the push + pull_request pair cost two macOS jobs per PR commit and, on
+# 2026-10-17, saturated the macOS queue for seven hours (Pri App Health on main
+# was cancelled seven times while its macOS job waited for a runner).
 # When this workflow does not trigger for a PR head there is no run to wait on,
 # which Main Integrity must treat as "not pending" (docs/release/release-policy.md).
+#
+# The job keeps ONE simulator booted at a time and builds the Swift package
+# ONCE (scripts/simulator-fleet.mjs): hosted macOS runners are 3-core/7 GB, and
+# two booted simulators plus three xcodebuilds stalled `simctl install` for 24
+# minutes and pushed `log show` reads past their bound.
 name: Native Ink
 
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - 'ios/**'
       - 'client/src/ink/**'
@@ -24,6 +34,7 @@ on:
       - 'scripts/synthetic-reader-server.mjs'
       - 'scripts/apple-shipping-target.mjs'
       - 'scripts/ci-provision-simulators.mjs'
+      - 'scripts/simulator-fleet.mjs'
       - 'client/test/apple-shipping-target-check.mjs'
       - 'scripts/ink-native-check.mjs'
       - 'scripts/check-native-package-sync.mjs'
@@ -41,6 +52,7 @@ on:
       - 'scripts/synthetic-reader-server.mjs'
       - 'scripts/apple-shipping-target.mjs'
       - 'scripts/ci-provision-simulators.mjs'
+      - 'scripts/simulator-fleet.mjs'
       - 'client/test/apple-shipping-target-check.mjs'
       - 'scripts/ink-native-check.mjs'
       - 'scripts/check-native-package-sync.mjs'
@@ -69,25 +81,39 @@ jobs:
         run: node scripts/check-native-package-sync.mjs
 
       # V1 needs both families (#504). Hosted images do not always ship an
-      # iPad device, so create any missing one from the installed iOS runtime
-      # and boot both; fails only when no runtime/device type exists.
+      # iPad device, so create any missing one from the installed iOS runtime.
+      # Only the iPad is booted here — the first simulator steps use it — and
+      # each later step boots its own family and shuts the other down, so the
+      # runner never carries two booted simulators. Fails only when no
+      # runtime/device type exists.
       - name: Apple toolchain, iPad and iPhone simulators
         run: |
           set -euo pipefail
           xcodebuild -version
-          node scripts/ci-provision-simulators.mjs
+          node scripts/ci-provision-simulators.mjs --boot ipad
 
       - name: JS ↔ Swift ink contract
         run: npm run test:ink:bridge
 
+      # One simulator build of the canonical shipping package itself (no
+      # scratch copy), reused by every simulator step below on iPhone and iPad.
+      # A generic destination needs no booted simulator.
+      - name: Build the simulator app (canonical iPhone + iPad package)
+        run: |
+          set -euo pipefail
+          (cd ios/PriLearning.swiftpm && xcodebuild -scheme PriLearning -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/dd" build -quiet)
+          APP="$(find "$RUNNER_TEMP/dd/Build/Products" -maxdepth 2 -name '*.app' -path '*iphonesimulator*' | head -1)"
+          test -n "$APP"
+          echo "PRI_SIM_APP=$APP" >> "$GITHUB_ENV"
+
       - name: Native PencilKit + Vision self-check
-        run: npm run test:ink:native
+        run: node scripts/ink-native-check.mjs --app "$PRI_SIM_APP"
 
       # CP-02: the priNative contract inside real WebKit — deep-frozen host
       # descriptor, no OS identity, main-frame envelope round trip, and a
       # same-origin subframe refused by the sender gate. Simulator evidence.
       - name: priNative bridge self-check (iPad simulator)
-        run: node scripts/native-bridge-selfcheck.mjs --family ipad
+        run: node scripts/native-bridge-selfcheck.mjs --family ipad --app "$PRI_SIM_APP"
 
       # CP-04 × #504: main is the V1 Apple shipping target — iPhone (portrait)
       # and iPad (all orientations), bundle id com.prilearning.app
@@ -97,16 +123,6 @@ jobs:
 
       - name: Apple shipping-target gate refuses wrong declarations
         run: node client/test/apple-shipping-target-check.mjs
-
-      # One simulator build of the canonical shipping package itself (no
-      # scratch copy), reused by every step below on iPhone and iPad.
-      - name: Build the simulator app (canonical iPhone + iPad package)
-        run: |
-          set -euo pipefail
-          (cd ios/PriLearning.swiftpm && xcodebuild -scheme PriLearning -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/dd" build -quiet)
-          APP="$(find "$RUNNER_TEMP/dd/Build/Products" -maxdepth 2 -name '*.app' -path '*iphonesimulator*' | head -1)"
-          test -n "$APP"
-          echo "PRI_SIM_APP=$APP" >> "$GITHUB_ENV"
 
       # The same shell on an iPhone simulator, and the native student journey
       # on iPhone and iPad. Grading is online-only and server-authoritative

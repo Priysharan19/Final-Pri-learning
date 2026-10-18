@@ -35,3 +35,14 @@ updates:
       interval: weekly
       day: monday
     open-pull-requests-limit: 5
+    groups:
+      # github/codeql-action/init and /analyze are separate dependencies to
+      # Dependabot but must run the same version (#466 bumped only analyze
+      # and CodeQL failed on all eleven of its heads).
+      codeql-action:
+        patterns: ['github/codeql-action*']
+      # actions/checkout, actions/setup-node, upload/download-artifact and
+      # github-script move in one PR instead of one rebase storm each (#462
+      # and #468 restarted ~40 workflows per rebase, cancelling each other).
+      github-actions-core:
+        patterns: ['actions/*']
