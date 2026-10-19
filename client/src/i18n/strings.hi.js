@@ -3013,4 +3013,8 @@ export default {
   "inst.cmdThemeSystem": "डिवाइस की थीम अपनाएँ",
   "inst.online": "ऑनलाइन",
   "inst.offline": "ऑफ़लाइन",
+  "inst.workingStep": "विधि अंक {n}",
+  "inst.stepMarksOrder": "विधि अंक उन पंक्तियों को गिनते हैं जिन्हें Pri के इंजन ने सत्यापित किया, किसी विशेष चरण को नहीं।",
+  "inst.stepMarksNote": "बोर्ड-शैली के रूप में Pri की अभ्यास प्रतिक्रिया — यह CBSE की मार्किंग स्कीम नहीं है।",
+  "inst.stepMarksAfterHints": "ये संकेत के शुल्क से पहले के अंक हैं। संकेतों के बाद मिले अंक: {credited}।",
 };

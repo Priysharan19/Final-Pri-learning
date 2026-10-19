@@ -52,6 +52,9 @@ import TypedAnswerFields from './TypedAnswerFields.jsx';
 import { finalAnswerGuidance, moveToWorking, workingAreaMode } from './typedAnswerGuide.js';
 import '../workspace.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
+import { featureEnabled } from '../platform/features.js';
+import StepMarks from '../instrument/StepMarks.jsx';
+const INSTRUMENT_STEP_MARKS = featureEnabled('instrument');
 // True in a production build made with the tutor off (see src/tutor/flag.js).
 // A literal test of the build constants, not a helper imported from flag.js:
 // the bundler folds only what it can see in this module, and that fold is what
@@ -2863,6 +2866,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   <div className="eval-expected">{t('verdict.expected')} <b><MathText text={res.solution.answerText} /></b></div>
                 )}
                 {res.stepReport && <StepReport report={res.stepReport} />}
+                {/* v1.1 instrument: the server's mark as CBSE-style step rows. */}
+                {!boardAward && INSTRUMENT_STEP_MARKS && res.markRows && <StepMarks markRows={res.markRows} />}
                 {boardAward && (
                   <div className="board-award" style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--hairline)' }}>
                     {/* The header above already states the total. It is repeated here
