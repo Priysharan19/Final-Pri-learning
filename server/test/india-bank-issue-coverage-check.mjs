@@ -24,13 +24,24 @@ const h = await startApp();
 const refused = [];
 let issued = 0;
 try {
-  const student = await registerAccount(h, { email: 'known.red.3d@example.test', deviceId: 'known-red-3d' });
-  assert.equal(student.status, 201, 'the harness account registers');
-  assert.equal((await verifyEmail(h, student.account.id)).status, 200, 'and verifies its email');
+  // The issue route is bounded per account (200 an hour, practice.js); the
+  // banks outnumber that, so each account here is issued at most PER_ACCOUNT.
+  const PER_ACCOUNT = 150;
+  let student = null;
+  let served = 0;
+  const nextStudent = async () => {
+    const n = Math.floor(served / PER_ACCOUNT);
+    const made = await registerAccount(h, { email: `known.red.3d.${n}@example.test`, deviceId: `known-red-3d-${n}` });
+    assert.equal(made.status, 201, 'the harness account registers');
+    assert.equal((await verifyEmail(h, made.account.id)).status, 200, 'and verifies its email');
+    return made;
+  };
   // Every India class bank the client ships, at a difficulty it authors.
   const banks = Object.keys(GENERATORS).filter(id => /^c(?:[7-9]|1[0-2])-/.test(id));
   for (const generator of banks) {
     try { generateQuestion(generator, 1, 104729); } catch { continue; }
+    if (served % PER_ACCOUNT === 0) student = await nextStudent();
+    served++;
     // The product never sends a seed: the server chooses the question.
     const res = await h.request('/v1/practice/issue', { method: 'POST', jar: student.jar, body: { generator, difficulty: 1, curriculum: 'in', mode: 'practice' } });
     // Each issue names the account it was issued under, so a shared device can

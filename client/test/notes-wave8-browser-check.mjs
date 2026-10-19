@@ -1,15 +1,15 @@
 // Wave8: test all eight original figure types as actually rendered, not just source receipts.
 // Browser-only synthetic demo, NOT real handwriting provider or physical iPad evidence.
 import assert from 'node:assert/strict';
-import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { dirname, extname, join, normalize, sep } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { chromium, webkit } from '@playwright/test';
 import { IN_CURRICULUM } from '../src/engine/curriculum-in.js';
 import { loadNotesForGrade } from '../src/notes/notesIndex.js';
+import { startOnlinePlatform } from './support/online-session.mjs';
+import { createVerifiedProfile } from './support/verified-onboarding.mjs';
 const root=join(dirname(fileURLToPath(import.meta.url)),'..');
 const dist=join(root,'dist');
 if (!process.argv.includes('--no-build')) {
@@ -17,16 +17,6 @@ if (!process.argv.includes('--no-build')) {
  assert.equal(b.status,0,'client must build at exact release SHA');
 }
 assert.ok(existsSync(join(dist,'index.html')),'build output missing');
-const types={'.html':'text/html; charset=utf-8','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.json':'application/json','.png':'image/png','.woff2':'font/woff2'};
-const server=createServer(async(req,res)=>{
- const pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
- const safe=normalize(pathname).replace(/^\/+/, '');
- if(safe==='..'||safe.startsWith('..'+sep)){res.writeHead(403).end();return;}
- let file=join(dist,safe);
- if(!existsSync(file)||safe==='') file=join(dist,'index.html');
- try {res.writeHead(200,{'Content-Type':types[extname(file)]||'application/octet-stream'}).end(await readFile(file));}
- catch {res.writeHead(404).end();}
-});
 const typesToCheck=['dot-plot','stem-leaf','pie','motion','network','ellipse','two-box','plane'];
 const selected=new Map;
 let gradeInstances=0,allInstances=0;
@@ -51,8 +41,11 @@ for(const group of IN_CURRICULUM){
 assert.equal(gradeInstances,600,'exact 600 authored Wave8 investigations expected');
 assert.equal(allInstances,600,'every Wave8 investigation must carry an illustration');
 assert.equal(selected.size,typesToCheck.length,'some SVG family missing');
-await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-const rootUrl='http://127.0.0.1:'+server.address().port;
+// The built app is served by the real platform server from one origin: the
+// app opens for nobody without a verified account (issue #477), so the
+// learner enters through the landing card, as notes-illustrated does.
+const platform=await startOnlinePlatform({ dist });
+const rootUrl=platform.origin;
 let checks=0;
 try {
  for(const [engineName,engine] of [['Chromium desktop',chromium],['WebKit phone',webkit]]){
@@ -60,7 +53,7 @@ try {
   try {
    const page=await browser.newPage({viewport:{width:engineName.includes('phone')?390:1024,height:844},reducedMotion:'reduce'});
    await page.goto(rootUrl+'/',{waitUntil:'domcontentloaded'});
-   await page.getByText('Try the demo',{exact:false}).first().click();
+   await createVerifiedProfile(page,platform,{name:'Wave8 Notes Learner',year:12,landing:'practice'});
    await page.locator('.shell').waitFor({state:'visible',timeout:20000});
    for(const item of selected.values()){
     await page.goto(rootUrl+'/notes/'+item.chapter+'?track=cbse',{waitUntil:'domcontentloaded'});
@@ -89,4 +82,4 @@ try {
   } finally {await browser.close();}
  }
  console.log('WAVE8 CROSS-BROWSER: PASS — '+checks+' assertions, '+selected.size+' Wave8 figure families, 600 imported source investigations, Chromium desktop and WebKit phone');
-} finally {await new Promise(resolve=>server.close(resolve));}
+} finally {await platform.close();}
