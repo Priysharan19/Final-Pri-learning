@@ -137,3 +137,27 @@
   .otp-boxes { gap: 6px; }
   .otp-box { font-size: 21px; min-height: 44px; }
 }
+
+/* ── v1.1 sign-in card (docs/design/PRI-V1.1-REDESIGN.md §3) ───────────────
+   One quiet column on the v1.1 tokens: precise radii instead of 10–12px
+   pillows, the title in the maths serif like every screen title, weights
+   capped at 600, the 3:1 control border on every control a student touches,
+   and the token focus ring. Layout and sizes are unchanged. */
+.signup-title { font: var(--t-title); letter-spacing: 0; }
+.signup-subhead { font: var(--t-heading); }
+.signup-lead { font: var(--t-body); color: var(--text-secondary); }
+.signup-hint { font: var(--t-compact); color: var(--text-tertiary); }
+.signup-or { font: var(--t-caption); }
+.signup-back, .signup-cc, .otp-box { border-radius: var(--radius-sm); border-color: var(--border-control); }
+.signup-choice { border-radius: var(--radius); border-color: var(--border-control); font: var(--t-control); font-size: 16px; }
+.signup-choice.is-selected { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.signup-segment { border-radius: var(--radius); border-color: var(--hairline); background: var(--surface-sunken); }
+.signup-seg { border-radius: var(--radius-sm); font: var(--t-control); font-size: 14px; }
+.signup-seg.is-selected { background: var(--surface-raised); color: var(--text-primary); box-shadow: var(--elev-1); }
+.otp-box { font-weight: 600; font-family: var(--font-mono); }
+.signup-notice, .signup-wait-page, .inline-sign-in { border-radius: var(--radius); border-color: var(--hairline); }
+.signup-back:focus-visible, .signup-choice:focus-visible, .signup-seg:focus-visible, .otp-box:focus-visible {
+  outline: var(--focus-ring); outline-offset: var(--focus-offset);
+}
+.auth-card { border-radius: var(--radius-lg); background: var(--surface-raised); }
+@media (prefers-reduced-motion: reduce) { .signup-choice:active { transform: none; } }
