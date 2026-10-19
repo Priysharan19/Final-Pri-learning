@@ -2059,6 +2059,27 @@ async function run() {
         const events = await online.db.all("SELECT payload_json FROM learning_events WHERE kind='graded-attempt' AND entity_id=?", [stored.serverQuestionId]);
         ok('— as does the server’s own graded-attempt record', !stored.answered || (events.length === 1 && JSON.parse(events[0].payload_json).repeat === true), show(events.map(e => JSON.parse(e.payload_json).repeat)));
         eq('the first sitting’s receipt is not a repeat', row.serverReceipt?.repeat === true, false);
+
+        // Marks per chapter (v1.1 Report and Map): server-certified receipts
+        // only, a repeat left out entirely (it would read as marks lost), and
+        // nothing from a row without a certified receipt.
+        const byChapter = (await GET('/marks/by-chapter')).chapters;
+        const meNow = (await GET('/me')).user;
+        const expected = {};
+        for (const q of rawRows().questions.filter(r => r.pid === meNow.id && r.answered)) {
+          const rec = q.serverReceipt;
+          if (!rec || rec.authoritative !== true || !Number.isInteger(rec.marksEarned) || !Number.isInteger(rec.marksPossible)) continue;
+          const id = q.india?.chapterId || q.subtopic;
+          const c = expected[id] ||= { earned: 0, possible: 0, questions: 0, repeats: 0 };
+          if (rec.repeat === true || q.repeatOf) { c.repeats += 1; continue; }
+          c.earned += rec.marksEarned; c.possible += rec.marksPossible; c.questions += 1;
+        }
+        eq('marks per chapter are the certified receipts’ totals, repeats left out', JSON.stringify(Object.entries(byChapter).sort()), JSON.stringify(Object.entries(expected).sort()));
+        const owner = row.india?.chapterId || row.subtopic;
+        ok('the repeat is counted as a repeat, not as marks lost', byChapter[owner]?.repeats >= (stored.answered ? 1 : 0), show(byChapter[owner]));
+        ok('no chapter claims more marks than it could have earned', Object.values(byChapter).every(c => c.earned <= c.possible && c.earned >= 0), show(byChapter));
+        const listed = (await POST('/history/list', { pageSize: 100 })).items.find(i => i.id === again.value.question.id);
+        ok('a repeat’s history row says it was a repeat', !stored.answered || listed?.repeat === true, show(listed && { repeat: listed.repeat, marks: listed.marksEarned }));
       }
     }
 
