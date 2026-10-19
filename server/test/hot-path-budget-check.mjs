@@ -201,6 +201,10 @@ try {
     const { variable, root } = answerOf(issued.data.question);
     const image = picture(`${variable} = ${root}`, `legacy-${i}`);
     const readsBefore = provider.calls;
+    // Read on request (#440): the student pressed Read my answer first; that is
+    // the one paid read. /recognize at Submit replays it and never calls the reader.
+    const shown = await counted('/v1/handwriting/transcribe', { method: 'POST', jar: a.jar, body: { image, questionId: qid } });
+    c.eq(shown.status, 200, `legacy ink ${i}: Read my answer 200`);
     const recognized = await counted(`/v1/practice/${qid}/recognize`, { method: 'POST', jar: a.jar, body: { mode: 'ink', image } });
     c.eq(recognized.status, 201, `legacy ink ${i}: /recognize 201`);
     const confirmed = await counted(`/v1/practice/${qid}/recognition/${recognized.data.receipt}/confirm`, { method: 'POST', jar: a.jar, body: { text: root } });
@@ -212,7 +216,7 @@ try {
     });
     c.eq(graded.status, 200, `legacy ink ${i}: /submit 200`);
     c.ok(graded.data?.correct === true, `legacy ink ${i}: marked right`);
-    c.eq(provider.calls - readsBefore, 1, `legacy ink ${i}: one provider read`);
+    c.eq(provider.calls - readsBefore, 1, `legacy ink ${i}: one provider read, at Read my answer`);
     record('ink Submit, three requests (recognize + confirm + submit)', { trips: recognized.trips + confirmed.trips + graded.trips, ms: recognized.ms + confirmed.ms + graded.ms }, 3);
   }
 
@@ -410,7 +414,9 @@ try {
     sqlite: {
       'POST /v1/practice/issue': 11,                                     // was 13 (7 before the #537 cap)
       'POST /v1/practice/:id/submit (typed, resolves)': 17,              // was 34
-      'ink Submit, three requests (recognize + confirm + submit)': 45,   // was 86
+      // #440 read on request: the paid read is Read my answer (/handwriting/transcribe,
+      // not counted here); /recognize at Submit replays it — 45 -> 35, --report on sqlite.
+      'ink Submit, three requests (recognize + confirm + submit)': 35,   // was 86
       'ink Submit, one request (picture with the submission)': 29,       // was 86 (three requests)
       'POST /v1/sync/push (5 events + 1 entity)': 32,                    // was 37
       'GET /v1/sync/pull/0': 9,                                          // was 14

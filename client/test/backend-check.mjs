@@ -901,11 +901,12 @@ async function run() {
       answer: worked.right, ms: 5000, viaInk: true,
       ink: { strokes: [{ points: [{ x: 1, y: 2 }, { x: 3, y: 4 }] }], recognized: canaryInk }
     });
-    // One-request Submit (#441 port): the picture travels with the submission,
-    // so a handwritten Submit is ONE request to the server — no separate
-    // /recognize (and no /confirm) before it.
-    eq('a handwritten Submit is one request: one /submit, no separate /recognize',
-      [online.traffic.grade - inkTraffic.grade, online.traffic.recognize - inkTraffic.recognize], [1, 0]);
+    // Read on request (#440): the page was read when the student asked, so
+    // Submit sends no picture to be read. It is one /recognize that replays the
+    // kept reading (no provider call — server/test/recognition-dedupe-check.mjs)
+    // and one /submit carrying its receipt.
+    eq('a handwritten Submit sends no picture to mark: one /recognize replay, one /submit',
+      [online.traffic.grade - inkTraffic.grade, online.traffic.recognize - inkTraffic.recognize], [1, 1]);
 
     const disk = JSON.stringify(rawRows());
     ok('the question is on disk at all', disk.includes(sealed.id), 'no row on disk names this profile — nothing was written');
