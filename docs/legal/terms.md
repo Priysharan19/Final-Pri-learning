@@ -78,6 +78,6 @@ your access if you break these terms.
 ## Law
 
 These terms are governed by the laws of India, and the courts of
-{{JURISDICTION_CITY}} have exclusive jurisdiction.
+New Delhi have exclusive jurisdiction.
 
 Questions: impriysharan@icloud.com.
