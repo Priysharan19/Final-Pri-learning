@@ -46,7 +46,6 @@ import { ri, rc, gcd, makeRng } from '../qhelpers.js';
 import { IN_NAMES, IN_CITIES } from './india-native-helpers.js';
 import { FALLBACK_SEED, traps, texNum, dec, numericAnswer, pick, shuffled, linearTex } from './india-class7-hardest-kit.js';
 
-const list = items => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`);
 const deg = v => `$${v}^\\circ$`;
 const isSquare = n => n >= 0 && Math.round(Math.sqrt(n)) ** 2 === n;
 /** n / 10^p as text when it terminates within `max` places, else null. */
@@ -574,7 +573,8 @@ function cubeMultiplier(rng) {
 // ratio and two pass percentages.
 function percentage(rng) {
   const v = rc(rng, ['markup', 'successive', 'ratio']);
-  const name = rc(rng, IN_NAMES), city = rc(rng, IN_CITIES);
+  rc(rng, IN_NAMES); // a draw the prompt no longer uses, kept so every later draw (and so the issued content) is unchanged
+  const city = rc(rng, IN_CITIES);
   if (v === 'markup') {
     for (let guard = 0; guard < 800; guard++) {
       const p = rc(rng, [20, 25, 30, 40, 50, 60]), d = rc(rng, [5, 10, 12, 15, 20, 25]);

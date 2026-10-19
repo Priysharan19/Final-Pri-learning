@@ -21,7 +21,6 @@ const same = (q, got, what) => {
 const unread = what => [`could not read the ${what} prompt`];
 const gcdN = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a; };
 const gcdB = (a, b) => { a = a < 0n ? -a : a; b = b < 0n ? -b : b; while (b) [a, b] = [b, a % b]; return a; };
-const ORD = /(\d+)(?:st|nd|rd|th)/;
 const others = (q, list) => [...new Set(list.filter(v => Number.isFinite(v) && !close(v, keyed(q))).map(v => String(Number(v.toFixed(6)))))];
 
 /** "3x - 12", "x + 5", "-x", "2x" → [coefficient, constant] */

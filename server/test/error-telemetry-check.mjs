@@ -28,7 +28,7 @@ delete process.env.PRI_SENTRY_DSN;
 delete process.env.PRI_METRICS_TOKEN;
 
 const { startApp, registerAccount, checks } = await import('./support/app-harness.mjs');
-const { createErrorSink, parseSentryDsn, sentryEnvelope, sinkEvent, errorSinkConfigProblems, setErrorSink, captureError } = await import('../platform/errorSink.js');
+const { createErrorSink, parseSentryDsn, sentryEnvelope, sinkEvent, errorSinkConfigProblems, setErrorSink } = await import('../platform/errorSink.js');
 const { metrics, createMetrics } = await import('../platform/metrics.js');
 const { setLogSink } = await import('../platform/observability.js');
 const { cleanErrorReport, ERROR_REPORT_RATE_LIMIT } = await import('../platform/telemetry.js');

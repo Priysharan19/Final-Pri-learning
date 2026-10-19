@@ -102,7 +102,6 @@ function piTex(n, d = 1) {
 }
 
 /** A rational written for a sentence: 3, -\dfrac{2}{5}. */
-const q = f => rTex(f);
 
 const FALLBACK_SEED = 0x4d41494e;   // "MAIN"
 
