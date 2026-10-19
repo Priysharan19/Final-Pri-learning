@@ -2441,3 +2441,25 @@ html { background-color: var(--page); }
 .verdict-title { font: var(--t-heading); font-size: 15px; }
 .verdict-body { font: var(--t-body); }
 .verdict-next { font: var(--t-compact); font-size: 14px; }
+
+/* ── v1.1 History and Progress (spec §3) ───────────────────────────────────
+   History reads as a dense ledger: compact rows, the attempt's result in the
+   mark colours (a wrong answer is a correction, copper, never the red kept
+   for technical failures). Progress keeps one reading column; figures in
+   tabular mono so columns line up. */
+.hist-row { padding-block: 12px; transition: background var(--motion-fast) var(--ease-standard); }
+.hist-row:hover { background: var(--surface-sunken); }
+.hist-name { font: var(--t-control); font-size: 14.5px; }
+.hist-prompt { font: var(--t-compact); }
+.hist-verdict { font-weight: 600; }
+.hist-verdict.bad { color: var(--correction); }
+.hist-main:focus-visible, .hist-star:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.hist-detail { border-radius: var(--radius); }
+.pg-head h1 { font: var(--t-display); letter-spacing: 0; }
+.pg-sentence { font: var(--t-body); font-size: 16px; }
+.pg-facts .big { font: var(--t-title); font-family: var(--font-mono); font-size: 24px; font-variant-numeric: tabular-nums; }
+.pg-coverage-note, .pg-table td, .pg-table th { font-family: var(--font); font-variant-numeric: tabular-nums; }
+.pg-table th { font: var(--t-label); letter-spacing: var(--tracking-label); text-transform: uppercase; }
+.pg-chapter { font-weight: 500; }
+@media (max-width: 760px) { .pg-head h1 { font: var(--t-title); } }
+@media (prefers-reduced-motion: reduce) { .hist-row { transition: none; } }
