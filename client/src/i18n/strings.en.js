@@ -2797,6 +2797,7 @@ export default {
   'activation.checkAgain': "Check again",
   'activation.notComplete': "Not ready yet",
   'activation.retrySetup': "Try again",
+  'activation.offlineEntry': "You’re offline. Your work and History are here, but nothing is checked or saved to your account until you reconnect.",
   'activation.workSafe': "Nothing is lost: what you wrote stays on this device.",
   'activation.switchProfile': "Use another profile",
   'activation.appleNeedsEmail': "This Apple ID has no Pri account yet. Continue with your email above to create one.",

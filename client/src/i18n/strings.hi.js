@@ -2866,6 +2866,7 @@ export default {
   'activation.checkAgain': "फिर जाँचें",
   'activation.notComplete': "अभी तैयार नहीं",
   'activation.retrySetup': "दोबारा प्रयास करें",
+  'activation.offlineEntry': "आप ऑफ़लाइन हैं। आपका काम और इतिहास यहाँ है, पर दोबारा जुड़ने तक कुछ भी जाँचा या आपके खाते में सहेजा नहीं जाता।",
   'activation.workSafe': "कुछ भी खोया नहीं है: आपने जो लिखा वह इस डिवाइस पर रहता है।",
   'activation.switchProfile': "दूसरी प्रोफ़ाइल चुनें",
   'activation.appleNeedsEmail': "इस Apple ID से अभी कोई Pri खाता नहीं है। खाता बनाने के लिए ऊपर अपने ईमेल से जारी रखें।",

@@ -233,6 +233,13 @@ export default function App() {
   // Only the server's own refusal — the session revoked, the account unlinked
   // or swapped, a guardian's approval withdrawn — closes the shell; a 429, a
   // 503, a timeout or a dropped connection never does (work on screen stays).
+  //
+  // A profile let in on the offline grace (activated.offline, see
+  // OFFLINE_GRACE_MS) is asked again as soon as the connection returns: the
+  // server's answer then replaces the grace, or its refusal closes the shell.
+  // A grace that runs out while the app is open closes it too.
+  const offlineEntry = activated?.offline === true;
+  const offlineVerifiedAt = activated?.verifiedAt ?? null;
   useEffect(() => {
     if (!user?.id || activated?.profileId !== user.id) return undefined;
     let live = true;
@@ -240,16 +247,21 @@ export default function App() {
       let activation;
       try { activation = await import('./platform/accountActivation.js'); } catch { return; }
       try {
-        await activation.ensureAccountActivated(user.id, { sync: false });
+        const ready = await activation.ensureAccountActivated(user.id, { sync: false });
+        if (live && offlineEntry && ready?.profileId === user.id) setActivated(ready);
       } catch (error) {
-        if (live && activation.isActivationDenied(error)) setActivated(null);
+        if (!live) return;
+        if (activation.isActivationDenied(error)) setActivated(null);
+        else if (offlineEntry && !(Date.now() - offlineVerifiedAt < activation.OFFLINE_GRACE_MS)) setActivated(null);
       }
     };
     const visible = () => { if (document.visibilityState === 'visible') void recheck(); };
+    const online = () => void recheck();
     document.addEventListener('visibilitychange', visible);
+    window.addEventListener('online', online);
     const timer = setInterval(() => { if (document.visibilityState === 'visible') void recheck(); }, 60_000);
-    return () => { live = false; clearInterval(timer); document.removeEventListener('visibilitychange', visible); };
-  }, [user?.id, activated?.profileId]);
+    return () => { live = false; clearInterval(timer); document.removeEventListener('visibilitychange', visible); window.removeEventListener('online', online); };
+  }, [user?.id, activated?.profileId, offlineEntry, offlineVerifiedAt]);
 
   // Guard months of practice from storage eviction — ask the browser once per boot.
   useEffect(() => { requestPersistentStorage(); }, []);
@@ -539,6 +551,11 @@ export default function App() {
           </aside>
 
           <div className="main">
+            {activated?.offline && (
+              <p className="muted offline-entry" role="status" data-testid="offline-entry">
+                {t('activation.offlineEntry')}
+              </p>
+            )}
             <main className="content fade-in" id="main" tabIndex={-1} ref={mainRef}
               aria-label={pageTitle || 'Pri Learning'} key={loc.pathname}>
               <ErrorBoundary scope="route" resetKey={loc.pathname} onHome={() => nav('/')}>

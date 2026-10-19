@@ -61,10 +61,10 @@ globalThis.fetch = async (url, options = {}) => {
 };
 
 const { put } = await import('../src/local/idb.js');
-const { loginCloudAccount, cloudAccountLink } = await import('../src/platform/cloudAccount.js');
+const { loginCloudAccount, cloudAccountLink, recordCloudActivation } = await import('../src/platform/cloudAccount.js');
 const { profileOutboxStats } = await import('../src/platform/profileOutbox.js');
 const {
-  ensureAccountActivated, ActivationBlocked, isActivationDenied,
+  ensureAccountActivated, ActivationBlocked, isActivationDenied, OFFLINE_GRACE_MS, offlineGraceFor,
   ACTIVATION_DENIED_CODES, ACTIVATION_SIGN_IN_CODES, ACTIVATION_GUARDIAN_CODES, ACTIVATION_BLOCKED_CODES
 } = await import('../src/platform/accountActivation.js');
 
@@ -307,6 +307,50 @@ server.push = null;
     ok('retryable, not an authoritative refusal: a student inside stays inside', r.retryable && !r.denied);
     ok('with storage back, the same profile is let in again', !!(await gate('p1', { sync: false })).ready);
   }
+}
+
+// ── 9 · the bounded offline grace (72 h, from the server's own last answer) ──
+reset();
+{
+  const offlineFetch = globalThis.fetch;
+  const dropAll = async () => { throw new TypeError('Failed to fetch'); };
+  eq('the grace is 72 hours', OFFLINE_GRACE_MS, 72 * 60 * 60 * 1000);
+  const ok1 = await gate('p1', { sync: false });
+  ok('an online success records the server\'s answer on the link row', !!ok1.ready && !ok1.ready.offline &&
+    Number((await cloudAccountLink('p1')).activatedAt) > 0 && (await cloudAccountLink('p1')).activatedAccountId === 'acct-A');
+  globalThis.fetch = dropAll;
+  try {
+    const plain = await gate('p1', { sync: false });
+    ok('without the grace option, an unreachable server is still "not now"', plain.code === 'SESSION_UNAVAILABLE' && plain.retryable);
+    const graced = await gate('p1', { offlineGrace: true });
+    ok('with it, an unreachable server and a fresh answer let the same account in, marked offline',
+      graced.ready?.offline === true && graced.ready.accountId === 'acct-A' && graced.ready.guardian === null, JSON.stringify(graced));
+    const link = await cloudAccountLink('p1');
+    await recordCloudActivation('p1', 'acct-A', Date.now() - OFFLINE_GRACE_MS - 1000);
+    eq('an answer older than 72 hours is not a grace', (await gate('p1', { offlineGrace: true })).code, 'SESSION_UNAVAILABLE');
+    await recordCloudActivation('p1', 'acct-A', Date.now() + 60 * 60 * 1000);
+    eq('an answer from the future (a clock moved) is not a grace', (await gate('p1', { offlineGrace: true })).code, 'SESSION_UNAVAILABLE');
+    ok('offlineGraceFor agrees: none for a stale or future answer', (await offlineGraceFor('p1')) === null);
+    await recordCloudActivation('p1', 'acct-A', link.activatedAt);
+  } finally { globalThis.fetch = offlineFetch; }
+  // A 503 is the server answering: no grace, the retry screen as before.
+  server.me = () => ({ status: 503, code: 'SERVICE_UNAVAILABLE' });
+  eq('a server that answers 503 gets no grace', (await gate('p1', { offlineGrace: true })).code, 'SESSION_UNAVAILABLE');
+  reset();
+  // An authoritative refusal clears the record: a withdrawal seen once closes
+  // the grace for good, even if the device is offline the next time it opens.
+  server.guardian = () => ({ status: 200, body: { accountId: 'acct-A', required: true, state: 'withdrawn', eligible: false, emailVerified: true, blockerCode: 'GUARDIAN_CONSENT_WITHDRAWN' } });
+  eq('a withdrawal is refused', (await gate('p1', { sync: false })).code, 'GUARDIAN_CONSENT_WITHDRAWN');
+  ok('and the recorded answer is cleared', (await cloudAccountLink('p1')).activatedAt === null);
+  globalThis.fetch = dropAll;
+  try { eq('so offline afterwards there is no grace', (await gate('p1', { offlineGrace: true })).code, 'SESSION_UNAVAILABLE'); }
+  finally { globalThis.fetch = offlineFetch; }
+  reset();
+  ok('back online and approved again, the same profile is let in and recorded afresh', !!(await gate('p1', { sync: false })).ready && Number((await cloudAccountLink('p1')).activatedAt) > 0);
+  // Another account's record never graces this link.
+  const row = await cloudAccountLink('p1');
+  await recordCloudActivation('p1', 'acct-B');
+  ok('a record naming another account is ignored by the writer', (await cloudAccountLink('p1')).activatedAccountId === 'acct-A' && (await cloudAccountLink('p1')).activatedAt === row.activatedAt);
 }
 
 if (failures.length) {

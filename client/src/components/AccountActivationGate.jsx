@@ -92,7 +92,9 @@ export default function AccountActivationGate({ user, onReady, onSwitch }) {
     setStatus('checking');
     setError('');
     try {
-      const ready = await ensureAccountActivated(user.id);
+      // An app opened where the server cannot be reached at all may enter on
+      // the bounded offline grace (accountActivation.js OFFLINE_GRACE_MS).
+      const ready = await ensureAccountActivated(user.id, { offlineGrace: true });
       if (nonce === generation.current) onReady(ready);
     } catch (err) {
       if (nonce === generation.current) classify(err);

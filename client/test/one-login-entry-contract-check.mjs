@@ -94,8 +94,8 @@ assert.match(gate, /data-testid="account-activation-gate" data-activation-status
 for (const status of ['checking', 'signin', 'guardian', 'blocked', 'retry']) {
   assert.match(gate, new RegExp(`status === '${status}' && \\(`), `the gate has a "${status}" screen`);
 }
-assert.match(gate, /<SignUpFlow variant="inline"[^>]*allowCreate=\{!link\?\.accountId\} onFinish=\{finishSignIn\} \/>/,
-  'the gate\'s sign-in is the same card, inline, and never makes a second account for a profile already linked');
+assert.match(gate, /<SignUpFlow variant="inline"[^>]*allowCreate=\{link !== undefined && !link\?\.accountId\} onFinish=\{finishSignIn\} \/>/,
+  'the gate\'s sign-in is the same card, inline, and never makes a second account for a profile already linked (nor before its link row has been read)');
 assert.match(gate, /const ready = await ensureAccountActivated\(user\.id, \{ expectedAccountId: account\.id \}\);\s*onReady\(ready\);/,
   'the gate opens only on the server\'s confirmation, never on the link alone');
 assert.match(gate, /if \(state\?\.state === 'given' \|\| state\?\.required === false\) void check\(\);/,

@@ -55,6 +55,12 @@ export async function cloudAccountLink(pid, { strict = false } = {}) {
     linkedAt: Number(row.linkedAt) || null,
     lastVerifiedAt: Number(row.lastVerifiedAt) || null,
     lastSyncAt: Number(row.lastSyncAt) || null,
+    // When the server last let THIS account in on this device (the activation
+    // gate's full answer), and for which account. Not permission by itself:
+    // only the gate's bounded offline grace reads it, and only when the server
+    // cannot be reached at all.
+    activatedAt: Number(row.activatedAt) || null,
+    activatedAccountId: row.activatedAccountId ? String(row.activatedAccountId) : null,
     entitlement: normalizeEntitlementSnapshot(row.entitlement || {})
   };
 }
@@ -77,6 +83,10 @@ async function saveAccount(pid, account, patch = {}) {
     lastVerifiedAt: Date.now(),
     lastSyncAt: prior?.lastSyncAt || null,
     entitlement: prior?.entitlement || null,
+    // Kept across a session refresh of the same account (the conflict check
+    // above guarantees it is the same one); a new link starts without it.
+    activatedAt: prior?.accountId ? prior.activatedAt || null : null,
+    activatedAccountId: prior?.accountId ? prior.activatedAccountId || null : null,
     ...patch
   };
   // Defense in depth for rows written by an earlier development build.
@@ -192,6 +202,18 @@ export async function markCloudSynced(pid, at = Date.now()) {
   const prior = await get('device', id).catch(() => null);
   if (!prior) return;
   await put('device', { ...prior, lastSyncAt: at });
+}
+
+/**
+ * Record (at) or clear (null) the server's last full "this account may enter"
+ * for this profile. Written only by platform/accountActivation.js.
+ */
+export async function recordCloudActivation(pid, accountId, at = Date.now()) {
+  const id = linkRowId(pid);
+  const prior = await get('device', id);
+  if (!prior) return;
+  if (accountId && String(prior.accountId) !== String(accountId)) return;
+  await put('device', { ...prior, activatedAt: accountId ? at : null, activatedAccountId: accountId ? String(accountId) : null });
 }
 
 /** The device half of ending a link: native session, replica state, link row. */

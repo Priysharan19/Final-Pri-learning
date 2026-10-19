@@ -28,7 +28,7 @@
 // retry, never as a sign-out.
 // ─────────────────────────────────────────────────────────────────────────────
 import { cloud, cloudAvailable, discoverCloudOrigin } from './cloudTransport.js';
-import { cloudAccountLink, verifyCloudSession } from './cloudAccount.js';
+import { cloudAccountLink, recordCloudActivation, verifyCloudSession } from './cloudAccount.js';
 import { decideOnboardingAuthority } from '../components/onboardingAuthority.js';
 
 export class ActivationBlocked extends Error {
@@ -56,12 +56,71 @@ export const ACTIVATION_BLOCKED_CODES = Object.freeze(['GUARDIAN_CONSENT_WITHDRA
 export const isActivationDenied = (error) => ACTIVATION_DENIED_CODES.includes(error?.code);
 
 /**
+ * The bounded offline grace. A device the server let in, as this same
+ * account, less than this long ago may open while the server cannot be
+ * reached at all, with its local work and History. It is a reading of the
+ * server's own last answer (the time and account recorded on the link row
+ * when ensureAccountActivated last succeeded online), never a flag the client
+ * sets for itself; any authoritative refusal clears it, signing out deletes
+ * the row it lives on, and nothing is server-marked or credited until the
+ * connection returns and the gate asks the server again.
+ */
+export const OFFLINE_GRACE_MS = 72 * 60 * 60 * 1000;
+
+/** The server could not be reached at all (no HTTP answer) — the only case the grace covers. */
+function serverUnreachable(error) {
+  if (error?.code === 'CLOUD_UNAVAILABLE') return true;
+  if (error?.code !== 'SESSION_UNAVAILABLE' && error?.code !== 'CONSENT_UNAVAILABLE') return false;
+  const cause = error.cause;
+  if (!cause) return false;
+  return !(Number(cause.status) > 0);
+}
+
+/** The activation the grace allows for `pid` now, or null. */
+export async function offlineGraceFor(pid, now = Date.now()) {
+  let link;
+  try { link = await cloudAccountLink(pid, { strict: true }); } catch { return null; }
+  if (!link?.accountId || !link.lastSyncAt || !link.activatedAt) return null;
+  if (String(link.activatedAccountId) !== String(link.accountId)) return null;
+  const age = now - link.activatedAt;
+  // A timestamp from the future is a clock that moved, not a fresh answer.
+  if (!(age >= 0 && age < OFFLINE_GRACE_MS)) return null;
+  return { profileId: pid, accountId: String(link.accountId), guardian: null, offline: true, verifiedAt: link.activatedAt };
+}
+
+/**
+ * Resolve, or throw ActivationBlocked — see activateOnline below for what the
+ * server must confirm. A success is recorded on the link row; an
+ * authoritative refusal clears that record. With `offlineGrace`, a server
+ * that cannot be reached at all is answered from the recorded success when it
+ * is under OFFLINE_GRACE_MS old (the result then carries `offline: true`).
+ */
+export async function ensureAccountActivated(pid, options = {}) {
+  try {
+    const ready = await activateOnline(pid, options);
+    await recordCloudActivation(pid, ready.accountId).catch(() => {});
+    return ready;
+  } catch (error) {
+    if (!(error instanceof ActivationBlocked)) throw error;
+    if (isActivationDenied(error)) {
+      if (pid) await recordCloudActivation(pid, null).catch(() => {});
+      throw error;
+    }
+    if (options.offlineGrace && serverUnreachable(error)) {
+      const grace = await offlineGraceFor(pid);
+      if (grace) return grace;
+    }
+    throw error;
+  }
+}
+
+/**
  * Resolve, or throw ActivationBlocked. `expectedAccountId` is the account the
  * caller has just linked (onboarding); `sync:false` is the foreground recheck
  * of a profile already inside, which the auto-sync scheduler keeps in step.
  * Returns { profileId, accountId, guardian } — what the gate hands the app.
  */
-export async function ensureAccountActivated(pid, { expectedAccountId = null, sync = true } = {}) {
+async function activateOnline(pid, { expectedAccountId = null, sync = true } = {}) {
   if (!pid) throw new ActivationBlocked('PROFILE_MISSING');
   if (!cloudAvailable()) {
     // The serving origin is found by probing /v1/health at boot

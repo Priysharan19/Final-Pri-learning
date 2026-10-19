@@ -22,15 +22,18 @@
 //      guardian approves; then the app.
 //   4  signed out on a saved device: a deep link opens the gate's sign-in, not
 //      the page; a revoked session is noticed and relocks; a 503 never does.
-//   5  an existing activated student is not disturbed: reload, back button,
-//      opened offline (the gate says "retry", the shell does not open, and the
-//      connection's return opens it).
+//   5  an existing activated student is not disturbed: reload, back button;
+//      opened offline within 72 hours of the server's last yes they are
+//      inside with their History and an offline line, and the server is asked
+//      again when the connection returns; a guardian's withdrawal while the
+//      device is offline closes the app on reconnect and ends the grace;
+//      past 72 hours an offline open is the gate's retry.
 //
 // Run on its own:  node client/test/tour-activation-gate.js [--no-build] [--browser=webkit]
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
 import { onlinePlatform } from './support/online-session.mjs';
-import { freshEmail, lastEmailCode, resetOtpLimits, signInOnCard, typeCode } from './support/verified-onboarding.mjs';
+import { createVerifiedProfile, freshEmail, lastEmailCode, resetOtpLimits, signInOnCard, typeCode } from './support/verified-onboarding.mjs';
 
 const GATE = '[data-testid="account-activation-gate"]';
 const CARD = '[data-signin-card="page"]';
@@ -366,17 +369,27 @@ export const flow = {
     await signInOnCard(page.locator(`${GATE} ${INLINE}`), platform, { email: adultEmail });
     await page.locator('.shell').waitFor({ timeout: 60000 });
 
-    // ── 5 · opened offline: the gate says retry; the connection's return opens it ─
+    // ── 5 · opened offline: the 72-hour grace ───────────────────────────────
+    // A device the server let in, as this account, under 72 hours ago opens
+    // offline into the app with its own work and History; nothing is checked
+    // until the connection returns and the server is asked again. Past 72
+    // hours, or after any refusal the server gave, it is the gate's retry.
+    const offlineReload = async (p, c) => {
+      await c.setOffline(true);
+      // Marks this document, so a reload that never happened cannot be read
+      // as the app's answer: the old shell would still be on screen.
+      await p.evaluate(() => { window.__beforeOfflineReload = true; });
+      await p.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+      return !(await p.evaluate(() => window.__beforeOfflineReload === true).catch(() => false));
+    };
+    const backOnline = async (p, c) => { await c.setOffline(false); await p.evaluate(() => window.dispatchEvent(new Event('online'))); };
+    const inApp = (p, path) => p.evaluate(to => { history.pushState({}, '', to); dispatchEvent(new PopStateEvent('popstate')); }, path);
+    const OFFLINE_LINE = '[data-testid="offline-entry"]';
     await goto('/');
     await page.locator('.shell').waitFor({ timeout: 30000 });
     const claimed = await workerInCharge(page);
     if (await check('the service worker is in charge of the page, so an offline open can paint anything at all', claimed)) {
-      await ctx.setOffline(true);
-      // Marks this document, so a reload that never happened cannot be read
-      // as the app's answer: the old shell would still be on screen.
-      await page.evaluate(() => { window.__beforeOfflineReload = true; });
-      await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
-      const reloaded = !(await page.evaluate(() => window.__beforeOfflineReload === true).catch(() => false));
+      const reloaded = await offlineReload(page, ctx);
       if (!reloaded && browserName === 'webkit') {
         // Playwright's offline emulation in WebKit fails the service worker's
         // navigation ("WebKit encountered an internal error"): no offline
@@ -385,19 +398,67 @@ export const flow = {
         note('offline open: NOT exercised in WebKit — Playwright\'s offline emulation fails the service-worker navigation, so the page never reloaded');
         await ctx.setOffline(false);
       } else {
-      const shown = await page.locator(`${GATE}, .shell, .auth-wrap`).first().waitFor({ timeout: 30000 }).then(() => true).catch(() => false);
-      await check('opened offline, the app paints — and it is the gate, not the shell: the server could not confirm anything',
-        reloaded && shown && await page.locator('.shell').count() === 0 && await page.locator(GATE).count() === 1, shown ? `status ${await gateStatus(page)}` : 'nothing painted');
-      await page.locator(`${GATE}[data-activation-status="retry"]`).waitFor({ timeout: 30000 }).catch(() => {});
-      await check('it says the server cannot be reached, that nothing is lost, and offers a retry — never a sign-out',
-        await gateStatus(page) === 'retry' && /can’t be reached|isn’t answering/.test(await page.locator(GATE).innerText()) &&
-          await page.getByTestId('activation-retry-button').isVisible() && await page.locator(`${GATE} ${INLINE}`).count() === 0, (await page.locator(GATE).innerText()).slice(0, 200));
-      await ctx.setOffline(false);
-      await page.evaluate(() => window.dispatchEvent(new Event('online')));
+      // 5a · under 72 hours: inside, with the offline line, History from the device
+      await page.locator(`.shell, ${GATE}`).first().waitFor({ timeout: 30000 }).catch(() => {});
+      await page.locator(OFFLINE_LINE).waitFor({ timeout: 30000 }).catch(() => {});
+      await check('opened offline within 72 hours of the server\'s last yes, the same student is inside, told that nothing is checked until they reconnect',
+        reloaded && await page.locator('.shell').count() === 1 && await page.locator(GATE).count() === 0 &&
+          /nothing is checked/.test(await page.locator(OFFLINE_LINE).innerText().catch(() => '')), `gate ${await gateStatus(page)}`);
+      await inApp(page, '/history');
+      await page.locator('main#main').waitFor({ timeout: 20000 }).catch(() => {});
+      await check('History opens offline, from the device', new URL(page.url()).pathname === '/history' &&
+        await page.locator('.shell').count() === 1 && (await page.locator('main#main').innerText().catch(() => '')).trim().length > 0);
+      await backOnline(page, ctx);
+      await page.waitForFunction(sel => !document.querySelector(sel), OFFLINE_LINE, { timeout: 60000 }).catch(() => {});
+      await check('back online, the server answers again: the offline line goes and the same student stays inside, with no sign-in asked for',
+        await page.locator(OFFLINE_LINE).count() === 0 && await page.locator('.shell').count() === 1 && await page.locator(GATE).count() === 0 && await meStatus(page) === 200);
+
+      // 5b · a guardian withdraws while the child's device is offline
+      await page.locator('.user-chip').click();
+      await page.getByRole('menuitem', { name: 'Switch profile' }).click();
+      await page.locator('.acct-row', { hasText: 'Kabir Child' }).waitFor({ timeout: 15000 });
+      await page.locator('.acct-row', { hasText: 'Kabir Child' }).click();
       await page.locator('.shell').waitFor({ timeout: 60000 }).catch(() => {});
-      if (!(await page.locator('.shell').count())) { await page.getByTestId('activation-retry-button').click().catch(() => {}); await page.locator('.shell').waitFor({ timeout: 60000 }).catch(() => {}); }
-      await check('back online, the gate asks again and the same student is inside, with no sign-in asked for',
-        await page.locator('.shell').count() === 1 && await page.locator(GATE).count() === 0 && await meStatus(page) === 200);
+      await check('the approved child\'s saved profile is let in online', await page.locator('.shell').count() === 1 && await page.locator(GATE).count() === 0);
+      const childReloaded = await offlineReload(page, ctx);
+      await page.locator(OFFLINE_LINE).waitFor({ timeout: 30000 }).catch(() => {});
+      await check('opened offline inside the grace, the child is inside on the device\'s last server answer',
+        childReloaded && await page.locator('.shell').count() === 1 && await page.locator(OFFLINE_LINE).count() === 1);
+      platform.h.db.prepare('UPDATE guardian_consents SET withdrawn_at=? WHERE account_id=?').run(Date.now(), kabir.id);
+      await backOnline(page, ctx);
+      await page.locator(`${GATE}[data-activation-status="blocked"]`).waitFor({ timeout: 60000 }).catch(() => {});
+      await check('the guardian withdrew while the device was offline; the moment the connection returns the server is asked, and the app closes on its refusal',
+        await gateStatus(page) === 'blocked' && await page.locator('.shell').count() === 0);
+      const afterWithdrawal = await offlineReload(page, ctx);
+      await page.locator(GATE).waitFor({ timeout: 30000 }).catch(() => {});
+      await page.locator(`${GATE}[data-activation-status="retry"]`).waitFor({ timeout: 30000 }).catch(() => {});
+      await check('opened offline after that refusal there is no grace: the gate\'s retry, not the shell',
+        afterWithdrawal && await page.locator('.shell').count() === 0 && await gateStatus(page) === 'retry', `status ${await gateStatus(page)}`);
+      await ctx.setOffline(false);
+
+      // 5c · past 72 hours: the gate's retry; the connection's return lets them in
+      const staleCtx = await ctx.browser().newContext({ viewport: { width: 1180, height: 820 }, reducedMotion: 'reduce' });
+      try {
+        await staleCtx.clock.install({ time: new Date() });
+        const stale = await staleCtx.newPage();
+        await stale.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
+        await createVerifiedProfile(stale, platform, { name: 'Ravi Stale', year: 10, email: freshEmail('stale'), age: 19, note });
+        await stale.locator('.shell').waitFor({ timeout: 60000 });
+        if (await check('a second adult\'s device is inside, with the service worker in charge', await workerInCharge(stale))) {
+          await staleCtx.clock.setSystemTime(new Date(Date.now() + 73 * 60 * 60 * 1000));
+          const staleReloaded = await offlineReload(stale, staleCtx);
+          await stale.locator(GATE).waitFor({ timeout: 30000 }).catch(() => {});
+          await stale.locator(`${GATE}[data-activation-status="retry"]`).waitFor({ timeout: 30000 }).catch(() => {});
+          await check('opened offline 73 hours after the server\'s last yes, it is the gate\'s retry — the server could not confirm anything, and nothing is lost',
+            staleReloaded && await stale.locator('.shell').count() === 0 && await stale.locator(GATE).getAttribute('data-activation-status') === 'retry' &&
+              /can’t be reached|isn’t answering/.test(await stale.locator(GATE).innerText()) && await stale.getByTestId('activation-retry-button').isVisible());
+          await backOnline(stale, staleCtx);
+          await stale.locator('.shell').waitFor({ timeout: 60000 }).catch(() => {});
+          if (!(await stale.locator('.shell').count())) { await stale.getByTestId('activation-retry-button').click().catch(() => {}); await stale.locator('.shell').waitFor({ timeout: 60000 }).catch(() => {}); }
+          await check('back online, the gate asks again and the same student is inside, with no offline line and no sign-in asked for',
+            await stale.locator('.shell').count() === 1 && await stale.locator(OFFLINE_LINE).count() === 0 && await meStatus(stale) === 200);
+        }
+      } finally { await staleCtx.close(); }
       }
     }
     await check('throughout, one account per address: nothing was duplicated', accountsFor(platform, adultEmail) === 1 && accountsFor(platform, kabirEmail) === 1);
