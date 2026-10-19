@@ -16,6 +16,7 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
   const [q, setQ] = useState('');
   const [sel, setSel] = useState(0);
   const [chapters, setChapters] = useState([]);
+  const [scripts, setScripts] = useState([]);
   const input = useRef(null);
 
   useEffect(() => {
@@ -28,6 +29,7 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
       const scope = scopeFor(c, user);
       setChapters((scope?.chapters || scope?.subtopics || []).map((row, i) => ({ row, colour: colourFor(i) })));
     }).catch(() => { });
+    api.post('/history/list', { page: 0, pageSize: 5 }).then(r => { if (live) setScripts(r?.items || []); }).catch(() => { });
     // Focus goes back to whatever opened the bar (recorded by the opener,
     // since the field has already taken focus by the time this runs).
     return () => { live = false; cancelAnimationFrame(id); returnFocus?.current?.focus?.(); };
@@ -43,12 +45,17 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
         id: `ch-${c.row.id}`, label: c.row.name, hint: t('inst.cmdPractise'), colour: c.colour,
         run: () => nav(practiceHref({ subtopic: c.row.id, track }))
       })) },
+      { key: 'scripts', label: t('inst.cmdScripts'), rows: scripts.filter(s => match(`${s.subtopicName} ${s.prompt}`)).slice(0, 4).map(s => ({
+        id: `sc-${s.id}`, label: String(s.prompt || '').replace(/\$+/g, '').replace(/\\[a-z]+/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 90) || s.subtopicName,
+        hint: Number.isInteger(s.marksPossible) && !s.repeat ? `${s.marksEarned}/${s.marksPossible}` : '', content: true,
+        run: () => nav('/review')
+      })) },
       { key: 'pages', label: t('inst.cmdPages'), rows: pages.filter(p => match(p.label)).map(p => ({ id: `pg-${p.to}`, label: p.label, run: () => nav(p.to) })) },
       { key: 'actions', label: t('inst.cmdActions'), rows: actions.filter(a => match(a.label)).map(a => ({ id: `ac-${a.id}`, label: a.label, run: a.run })) }
     ];
     return groups.filter(g => g.rows.length);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, chapters, pages, actions, nav, t, user?.indiaTrack, user?.country, user?.course]);
+  }, [q, chapters, scripts, pages, actions, nav, t, user?.indiaTrack, user?.country, user?.course]);
 
   const flat = items.flatMap(g => g.rows);
   useEffect(() => { setSel(s => Math.min(s, Math.max(0, flat.length - 1))); }, [flat.length]);
@@ -88,7 +95,7 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
                     className="in-pal-item" tabIndex={-1} onMouseMove={() => setSel(mine)} onClick={() => choose(row)}
                     style={row.colour ? { '--cc': `var(${row.colour})` } : undefined}>
                     {row.colour && <i className="in-pal-swatch" aria-hidden="true" />}
-                    <b lang={row.colour ? 'en' : undefined}>{row.label}</b>
+                    <b lang={row.colour || row.content ? 'en' : undefined}>{row.label}</b>
                     {row.hint && <small>{row.hint}</small>}
                   </button>
                 );

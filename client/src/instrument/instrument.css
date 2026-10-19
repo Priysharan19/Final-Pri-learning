@@ -551,3 +551,15 @@ html.ui-instrument .error-box { border-radius: 6px; }
   html.ui-instrument .in-plate { padding: 22px 22px 20px; }
   html.ui-instrument .in-cmd { width: min(260px, 28vw); }
 }
+
+/* The plate's dot points: the design's exercise row, each one a way in. */
+.in-exs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.in-ex { display: grid; gap: 6px; height: 100%; padding: 12px; border-radius: 6px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge); color: var(--in-tx); text-decoration: none; transition: box-shadow 140ms cubic-bezier(.2, 0, 0, 1); }
+@media (hover: hover) { .in-ex:hover { box-shadow: 0 0 0 1px var(--in-edge-3); } }
+.in-ex-h { display: flex; justify-content: space-between; font: 500 12px var(--in-mono); color: var(--in-tx-3); }
+.in-ex-h span:first-child { color: var(--cc); }
+.in-ex-bar { height: 3px; border-radius: 2px; background: var(--in-l4); overflow: hidden; }
+.in-ex-bar i { display: block; height: 100%; background: var(--cc); }
+.in-ex b { font: 500 13.5px/1.35 var(--in-ui); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+@media (max-width: 980px) { .in-exs { grid-template-columns: 1fr 1fr; } }
+@media (prefers-reduced-motion: reduce) { .in-ex { transition: none; } }
