@@ -2379,3 +2379,46 @@ html { background-color: var(--page); }
 
 /* The offline grace (issue 477): one quiet line above the page. */
 .offline-entry { margin: 8px 16px 0; font-size: 13px; }
+
+/* ── v1.1 shell and navigation (docs/design/PRI-V1.1-REDESIGN.md §3–4) ─────
+   Refines the rail, top bar, tab bar and More sheet on the v1.1 tokens.
+   Geometry (rail widths, bar heights, breakpoints) is unchanged on purpose so
+   layout tours and hit-target checks keep their meaning; this layer changes
+   type, state and depth only. */
+.topbar { z-index: var(--z-nav); background: var(--page); }
+.nav-item { font: var(--t-control); }
+.nav-item.active {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.nav-item:focus-visible,
+.mnav-item:focus-visible,
+.mnav-sheet-item:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: calc(var(--focus-offset) * -1);
+}
+.nav-section-label { font: var(--t-label); letter-spacing: var(--tracking-label); }
+.nav-badge { font: var(--t-mono); font-size: 11px; }
+
+.mobilenav { background: var(--surface-default); z-index: var(--z-nav); }
+.mnav-item { font: var(--t-label); font-size: 11px; letter-spacing: 0; position: relative; }
+.mnav-item.active { color: var(--accent); }
+.mnav-item.active::before {
+  content: ""; position: absolute; top: 0; left: 30%; right: 30%;
+  height: 2px; background: var(--accent); border-radius: 0 0 var(--radius-xs) var(--radius-xs);
+}
+
+.mnav-sheet-scrim { background: var(--scrim); backdrop-filter: none; z-index: calc(var(--z-sheet) - 1); }
+.mnav-sheet {
+  z-index: var(--z-sheet);
+  background: var(--surface-overlay);
+  border-color: var(--hairline);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--elev-3);
+  animation: pri-sheet-in var(--motion-sheet) var(--ease-emphasized) both;
+}
+.mnav-sheet-title { font: var(--t-label); letter-spacing: var(--tracking-label); }
+.mnav-sheet-item { font: var(--t-control); }
+@keyframes pri-sheet-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .mnav-sheet { animation: none; } }
