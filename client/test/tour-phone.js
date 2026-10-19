@@ -206,42 +206,30 @@ export const flow = {
     });
     await check('no block on Home hides content it gives no way to scroll to', stripped.length === 0, JSON.stringify(stripped));
 
-    // ── 10 · and it still works with the network gone ────────────────────────
-    // This is the check that guards the install budget. Six years of question
-    // banks are no longer written by the install: api.js pulls the two a
-    // profile actually practises from — its own year and the revision year
-    // below it — the moment that profile signs in, and the worker's runtime
-    // rule keeps them. If that ever stops happening, the saving turns into a
-    // student who cannot practise on the bus, and this goes red rather than
-    // the byte count going quietly up.
+    // ── 10 · a dropped connection never throws the student out ──────────────
+    // Only the server lets a profile in (the activation gate, issue #477), so
+    // an app OPENED offline is the gate's retry screen — tour-activation-gate.js
+    // proves that. What a phone on a bus needs is different: a connection that
+    // drops while the student is inside must not unmount the question, and must
+    // not read as a sign-out. The gate's foreground recheck is what would do
+    // either, so it is provoked here with the network down.
     await goto('/practice');
-    await page.waitForSelector('.q-prompt', { timeout: 30000 }).catch(() => null);
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
     await settle();
-    const claimed = await page.waitForFunction(() => !!navigator.serviceWorker?.controller, null, { timeout: 30000 })
-      .then(() => true).catch(() => false);
-    if (await check('a worker is in charge before the network is cut', claimed,
-      'no worker claimed the page, so nothing below would prove anything')) {
-      // Let the second pass finish, so this measures the state a student is in
-      // a few seconds after arriving rather than a race.
-      await page.evaluate(() => new Promise((done) => {
-        const channel = new MessageChannel();
-        channel.port1.onmessage = () => done(true);
-        navigator.serviceWorker.controller.postMessage({ type: 'pri-warm' }, [channel.port2]);
-        setTimeout(() => done(false), 60000);
-      })).catch(() => false);
-
-      await ctx.setOffline(true);
-      await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => { });
-      // /practice is a thinking-mode route: its shell is the workspace bar, not the bottom nav.
-      const shell = await page.waitForSelector('.ws-bar, .mobilenav', { timeout: 30000 }).then(() => true).catch(() => false);
-      await check('the app opens with the network switched off', shell, 'a reload with the network down never painted the shell');
-
-      await page.goto(`${base}/practice`, { waitUntil: 'domcontentloaded' }).catch(() => { });
-      const offlineQuestion = await page.waitForSelector('.q-prompt', { timeout: 30000 }).then(() => true).catch(() => false);
-      await check('and a question can still be drawn from the offline banks', offlineQuestion,
-        'the practice page did not produce a question with the network down — the year bank was not in the cache');
-      await ctx.setOffline(false);
-    }
+    await page.evaluate(() => { window.__phoneShell = document.querySelector('.shell'); window.__phoneQuestion = document.querySelector('.q-prompt'); });
+    await ctx.setOffline(true);
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await settle(); await settle();
+    await check('with the network down, the shell stays mounted — the gate does not relock on a connection it cannot reach',
+      await page.evaluate(() => document.querySelector('.shell') === window.__phoneShell) &&
+        await page.locator('[data-testid="account-activation-gate"]').count() === 0, 'a dropped connection ejected the student');
+    await check('and the question on screen is not discarded',
+      await page.evaluate(() => document.querySelector('.q-prompt') === window.__phoneQuestion), 'the current question was unmounted');
+    await ctx.setOffline(false);
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await settle(); await settle();
+    await check('when the connection returns, practice is still there and nothing asked for a sign-in',
+      await page.locator('.q-prompt').count() === 1 && await page.locator('[data-testid="account-activation-gate"]').count() === 0);
   }
 };
 

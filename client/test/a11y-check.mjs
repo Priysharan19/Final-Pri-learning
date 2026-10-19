@@ -66,6 +66,7 @@ import { join, extname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startOnlinePlatform } from './support/online-session.mjs';
+import { createVerifiedProfile, freshEmail, signInOnCard } from './support/verified-onboarding.mjs';
 
 const CLIENT = fileURLToPath(new URL('../', import.meta.url));
 const APP_JSX = join(CLIENT, 'src', 'App.jsx');
@@ -460,33 +461,23 @@ async function click(page, selector, { text = null, timeout = 5000 } = {}) {
   await wait(page, SETTLE);
 }
 
+// The platform this walk runs against, for the first-run fixture below.
+let platformForWalk = null;
+
+/**
+ * A student inside the app, made as a student makes one: the landing card,
+ * the server's emailed code, name, age and agreement, class — then the gate
+ * (support/verified-onboarding.mjs). On a device with saved profiles the
+ * picker offers another Pri account through the same card. The NSW Year 10
+ * syllabus the walk audits is chosen afterwards in Settings, by the fixture.
+ */
 async function signInToDemo(page, base) {
   await page.goto(base, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.auth-wrap, .shell', { timeout: 20000 });
   await wait(page, 500);
   if (await page.locator('.shell').count()) return;
-
-  const started = page.getByRole('button', { name: 'Use without an account' });
-  if (await started.count()) { await started.click(); await wait(page, 300); }
-  const addAnother = page.getByRole('button', { name: /Add another profile/ });
-  if (await addAnother.count()) { await addAnother.click(); await wait(page, 300); }
-
-  await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 10000 });
-  await page.getByRole('button', { name: 'Student', exact: true }).click();
-  await click(page, '.auth-card .btn-primary');
-  await page.waitForSelector('[data-onboarding-step="2"]');
-  await page.getByRole('button', { name: /Studying in Australia/ }).click();
-  await page.locator('#signup-course').selectOption('nsw');
-  await page.locator('#signup-year').selectOption('10');
-  await click(page, '.auth-card .btn-primary');
-  await page.waitForSelector('[data-onboarding-step="3"]');
-  await page.locator('#signup-name').fill('Accessibility Student');
-  await click(page, '.auth-card .btn-primary');
-  await page.waitForSelector('[data-onboarding-step="4"]');
-  await click(page, '.auth-card .btn-primary');
-  await page.waitForSelector('[data-onboarding-step="5"]');
-  await page.getByRole('button', { name: 'Start learning' }).click();
-  await page.waitForSelector('.shell', { timeout: 30000 });
+  const fromPicker = await page.getByTestId('picker-create-account').count() > 0;
+  await createVerifiedProfile(page, platformForWalk, { name: 'Accessibility Student', year: 10, course: 'nsw', fromPicker, landing: 'home' });
   await wait(page, 900);
 }
 
@@ -500,7 +491,22 @@ async function goTo(page, base, path) {
   const watch = watchBoot(page);
   try {
     await page.goto(base + path, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.shell, .auth-wrap', { timeout: 20000 });
+    await page.waitForSelector('.shell, .auth-wrap, #root .qpage h1', { timeout: 20000 });
+    // The boot screen is an .auth-wrap too (a logo and a progress bar), and so
+    // is the activation gate while it is still asking the server. Neither is
+    // a view: a step that changes the server's state next (ending the
+    // session) would race the gate's own boot check. Wait until the app has
+    // settled — the shell, the gate's answer, the sign-in card, or a public
+    // legal page (rendered on its own, outside the shell, until the gate has
+    // let the profile in).
+    await page.waitForFunction(() => {
+      const gate = document.querySelector('[data-testid="account-activation-gate"]');
+      if (gate) return gate.getAttribute('data-activation-status') !== 'checking';
+      if (document.querySelector('.shell')) return true;
+      const wrap = document.querySelector('.auth-wrap');
+      if (wrap) return !!wrap.querySelector('h1, h2, button, input, form');
+      return !!document.querySelector('#root .qpage h1');
+    }, null, { timeout: 30000 });
   } catch (err) {
     throw await bootFailure(err, watch, `${path} never showed the app`);
   }
@@ -559,6 +565,7 @@ async function run() {
     // The walk starts signed out — every screen up to the first refused check
     // is audited as a signed-out student sees it — and signs in on the card.
     platform = await startOnlinePlatform({ dist });
+    platformForWalk = platform;
     const BASE = platform.origin;
     ok('the build is being served', !!BASE);
 
@@ -633,6 +640,7 @@ async function run() {
     // ── the skip link, measured on a page nothing has focused yet ────────────
     try {
       await signInToDemo(page, BASE);
+      await online.signIn({ name: 'Accessibility Student' });
       await page.evaluate(() => document.body.focus());
       await page.keyboard.press('Tab');
       const first = await page.evaluate(() => {
@@ -679,6 +687,7 @@ async function run() {
 
     // ── signed in ────────────────────────────────────────────────────────────
     await signInToDemo(page, BASE);
+    await online.signIn({ name: 'Accessibility Student' });
 
     await step('home', '/', async () => { await goTo(page, BASE, '/'); });
 
@@ -789,21 +798,20 @@ async function run() {
       await wait(page, 400);
     };
 
-    // signed out, before Submit: the card already says checking needs an account
-    await step('practice · signed out, account needed', '/practice', async () => {
+    // Nobody is inside the app signed out any more (the activation gate, issue
+    // #477): "signed out" happens to a student who is already working, when the
+    // server ends the session. That is what each refused state below is: the
+    // session is revoked at the desk (the server's own table), the next check
+    // is refused in place, and the one sign-in card reopens it. Each state is
+    // reached from a fresh page load, so the gate's own minute-long recheck
+    // never runs inside the few seconds the session is gone.
+    const endSession = () => platform.db.prepare('DELETE FROM account_sessions WHERE account_id=?').run(online.account.id).changes;
+
+    // the session ended, Submit pressed: refused, with the sign-in in the card
+    await step('practice · session ended, check refused', '/practice', async () => {
       const input = await typedQuestion();
       await input.fill('99901');
-      await page.waitForSelector('[data-check-needs-account]', { timeout: 15000 });
-      refusals.notice = await page.evaluate(() => {
-        const g = document.querySelector('[data-check-needs-account]');
-        const b = g?.querySelector('[data-check-sign-in]');
-        return { role: g?.getAttribute('role'), label: g?.getAttribute('aria-label'), text: (g?.textContent || '').replace(/\s+/g, ' ').trim(),
-          button: b ? { tag: b.tagName.toLowerCase(), expanded: b.getAttribute('aria-expanded'), name: (b.textContent || '').trim() } : null };
-      });
-    });
-
-    // signed out, Submit pressed: refused, with the sign-in in the card
-    await step('practice · signed out, check refused', '/practice', async () => {
+      endSession();
       await pressSubmit();
       refusals.signIn = {
         kind: await page.locator('[data-check-refusal]').first().getAttribute('data-check-refusal'),
@@ -817,7 +825,7 @@ async function run() {
       const button = page.locator('.verdict [data-check-sign-in]');
       await button.focus();
       await page.keyboard.press('Enter');
-      await page.waitForSelector('.qpage #cloud-password', { timeout: 20000 });
+      await page.waitForSelector('.qpage [data-signin-card="inline"] #signup-destination', { timeout: 20000 });
       await wait(page, 500);
       // Focus order: from the button that opened it, Tab goes into the panel
       // it opened (inside the card), not on past it to the rest of the page.
@@ -834,10 +842,10 @@ async function run() {
       refusals.focus = { expanded: await button.getAttribute('aria-expanded'), stops };
     });
 
-    // signed in on the card (the real server, a real verified account)
+    // signed in again on the card (the real server, the same verified account)
     try {
-      await online.signInHere(page.locator('.qpage'), { name: 'Accessibility Student' });
-      await page.waitForFunction(() => !document.querySelector('.qpage #cloud-password'), null, { timeout: 30000 }).catch(() => { });
+      await online.signInHere(page.locator('.qpage'), { account: online.account });
+      await page.waitForFunction(() => !document.querySelector('.qpage [data-signin-card="inline"]'), null, { timeout: 30000 }).catch(() => { });
       refusals.signedIn = true;
     } catch (err) {
       skipped.push(`practice · signing in on the card — ${String(err.message || err).split('\n')[0].slice(0, 130)}`);
@@ -845,11 +853,16 @@ async function run() {
 
     // signed in, but the account may not check yet: the server's own refusal
     // (email not verified), produced by the real server for this account.
+    // The question is opened first, while the account is verified: since the
+    // activation gate (issue #477) a load with an unverified account is the
+    // gate's sign-in (EMAIL_UNVERIFIED), never the page. The verification is
+    // withdrawn on the server only once the student is already working, which
+    // is when the check card's own refusal is what they meet.
     await step('practice · account blocker', '/practice', async () => {
+      const input = await typedQuestion();
       const verifiedAt = platform.db.prepare('SELECT email_verified_at AS at FROM accounts WHERE id=?').get(online.account.id).at;
       platform.db.prepare('UPDATE accounts SET email_verified_at=NULL WHERE id=?').run(online.account.id);
       try {
-        const input = await typedQuestion();
         await input.fill('99902');
         await pressSubmit();
         refusals.blocker = {
@@ -1162,7 +1175,7 @@ async function run() {
       } : null;
     }, selector);
 
-    await step('exams · refused signed out', '/exams', async () => {
+    await step('exams · refused, session ended', '/exams', async () => {
       await goTo(page, BASE, '/');
       await click(page, '.user-chip');
       await click(page, '[role="menuitem"]', { text: 'Switch profile' });
@@ -1178,32 +1191,60 @@ async function run() {
       await click(page, '.auth-card .btn-primary');
       await page.waitForSelector('[data-onboarding-step="5"]');
       await page.getByRole('button', { name: 'Start learning' }).click();
-      await page.waitForSelector('.shell', { timeout: 30000 });
-      // Signed out, a paper does not start: the refusal is the state audited here.
+      // A device profile is not an account: the gate asks for one, and the
+      // card inside it makes the JEE student's.
+      await page.waitForSelector('[data-testid="account-activation-gate"] [data-signin-card="inline"]', { timeout: 30000 });
+      await signInOnCard(page.locator('[data-testid="account-activation-gate"] [data-signin-card="inline"]'), platform, { email: freshEmail('a11y-jee'), age: 18 });
+      await page.waitForSelector('.shell', { timeout: 60000 });
+      await online.signIn({ name: 'Accessibility JEE Student' });
+      // The session ended, a paper does not start: the refusal is the state audited here.
       await goTo(page, BASE, '/exams');
+      endSession();
       await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
       await page.waitForSelector('[data-exam-start-refused]', { timeout: 30000 });
       await wait(page, 400);
       refusals.exam = { ...(await refusalBlock('[data-exam-start-refused]')), room: await page.locator('.exam-nav').count() };
     });
 
-    await step('placement · refused signed out', '/placement', async () => {
-      await goTo(page, BASE, '/placement?go=1');
+    // Each refusal below starts from a student who is inside the app with a
+    // live session, which the server then ends. The step before ended it
+    // already, and since the activation gate (issue #477) a load without a
+    // session is the gate's sign-in, never the page: so the student signs in
+    // on the gate first (the same account, the server's emailed code), and
+    // only then is the session ended under them.
+    const insideLive = async (path) => {
+      await goTo(page, BASE, path);
+      const gateCard = page.locator('[data-testid="account-activation-gate"][data-activation-status="signin"]');
+      if (await gateCard.count()) {
+        await online.signInHere(gateCard, { account: online.account });
+        await page.waitForSelector('.shell', { timeout: 60000 });
+        await wait(page, SETTLE);
+      }
+    };
+
+    await step('placement · refused, session ended', '/placement', async () => {
+      // ?go=1 starts the check as the page mounts, so the session is ended
+      // first and the page is then opened inside the app, without a reload.
+      await insideLive('/');
+      endSession();
+      await page.evaluate(() => { history.pushState({}, '', '/placement?go=1'); dispatchEvent(new PopStateEvent('popstate')); });
       await page.waitForSelector('[data-placement-refused]', { timeout: 30000 });
       await wait(page, 400);
       refusals.placement = await refusalBlock('[data-placement-refused]');
     });
 
-    await step('rapid fire · refused signed out', '/rush', async () => {
-      await goTo(page, BASE, '/rush');
+    await step('rapid fire · refused, session ended', '/rush', async () => {
+      await insideLive('/rush');
+      endSession();
       await click(page, '.qcard .btn-primary.btn-lg');
       await page.waitForSelector('[data-game-refused]', { timeout: 30000 });
       await wait(page, 400);
       refusals.rush = { ...(await refusalBlock('[data-game-refused]')), clock: await page.locator('.rush-timer').count() };
     });
 
-    await step('match · refused signed out', '/match', async () => {
-      await goTo(page, BASE, '/match');
+    await step('match · refused, session ended', '/match', async () => {
+      await insideLive('/match');
+      endSession();
       await click(page, '.btn-glow');
       await page.waitForSelector('[data-game-refused]', { timeout: 30000 });
       await wait(page, 400);
@@ -1213,12 +1254,13 @@ async function run() {
     // The India student signs in where the paper was refused (a real account on
     // the real server), and the paper — issued and marked by the server — opens.
     await step('india exam room · writing a numerical answer', '/exams/:id', async () => {
-      await goTo(page, BASE, '/exams');
+      await insideLive('/exams');
+      endSession();
       await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
       const refusedStart = page.locator('[data-exam-start-refused]');
       await refusedStart.waitFor({ state: 'visible', timeout: 30000 });
       await refusedStart.locator('[data-check-sign-in]').click();
-      await online.signInHere(refusedStart, { name: 'Accessibility JEE Student' });
+      await online.signInHere(refusedStart, { account: online.account });
       await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
       await page.waitForSelector('.exam-nav', { timeout: 60000 });
       await click(page, '.mcq .mcq-opt');
@@ -1238,7 +1280,7 @@ async function run() {
 
     // ── teacher-only workspace, exercised under a real teacher profile ──────
     await step('teacher studio', '/teach', async () => {
-      await goTo(page, BASE, '/');
+      await insideLive('/');
       await click(page, '.user-chip');
       await click(page, '[role="menuitem"]', { text: 'Switch profile' });
       await page.waitForSelector('.auth-wrap', { timeout: 15000 });
@@ -1252,7 +1294,10 @@ async function run() {
       await click(page, '.auth-card .btn-primary');
       await page.waitForSelector('[data-onboarding-step="5"]');
       await page.getByRole('button', { name: 'Open Teacher Workspace' }).click();
-      await page.waitForSelector('.teacher-workspace-head', { timeout: 30000 });
+      // A teacher is a device role; the gate still asks for an account first.
+      await page.waitForSelector('[data-testid="account-activation-gate"] [data-signin-card="inline"]', { timeout: 30000 });
+      await signInOnCard(page.locator('[data-testid="account-activation-gate"] [data-signin-card="inline"]'), platform, { email: freshEmail('a11y-teacher'), age: 18 });
+      await page.waitForSelector('.teacher-workspace-head', { timeout: 60000 });
       await wait(page, 700);
     });
 
@@ -1339,17 +1384,13 @@ async function run() {
     }
 
     section('online-only checking');
-    ok('signed out, the card says before Submit that checking needs an account: a labelled group holding a real, named sign-in button',
-      refusals.notice?.role === 'group' && !!refusals.notice.label && /needs a Pri account/i.test(refusals.notice.text) &&
-        refusals.notice.button?.tag === 'button' && /\p{L}/u.test(refusals.notice.button.name) && refusals.notice.button.expanded === 'false',
-      JSON.stringify(refusals.notice));
-    ok('a refused check (signed out) is announced in a live region, in words — and nothing is marked',
+    ok('a refused check (the session ended) is announced in a live region, in words — and nothing is marked',
       refusals.signIn?.kind === 'sign-in' && /has not been checked/i.test((refusals.signIn.spoken || []).join(' ')) && refusals.signIn.result === 0,
       JSON.stringify(refusals.signIn));
     ok('opening the sign-in sets aria-expanded, and Tab from its button goes into the panel it opened, inside the card',
       refusals.focus?.expanded === 'true' && refusals.focus.stops.length === 4 && refusals.focus.stops.every(stop => stop.inRefusal),
       JSON.stringify(refusals.focus));
-    ok('the walk signed in on the card, on the real server', refusals.signedIn === true);
+    ok('the walk signed in again on the one card, on the real server, as the same account', refusals.signedIn === true);
     ok('an account blocker (email not verified) is announced in a live region and offers a named link to Account settings — and nothing is marked',
       refusals.blocker?.kind === 'verify-email' && /has not been checked/i.test((refusals.blocker.spoken || []).join(' ')) &&
         refusals.blocker.link?.tag === 'a' && refusals.blocker.link.href === '/settings' && /\p{L}/u.test(refusals.blocker.link.name) && refusals.blocker.result === 0,
@@ -1361,12 +1402,12 @@ async function run() {
 
     const announced = r => r?.kind === 'sign-in' && r.role === 'alert' && /\p{L}/u.test(r.iconWord || '') &&
       r.button?.tag === 'button' && /\p{L}/u.test(r.button.name) && r.button.expanded === 'false' && r.button.disabled === false;
-    ok('signed out, a placement check that does not start is an alert in words (its icon named), with a real, named sign-in button in place',
+    ok('the session ended, a placement check that does not start is an alert in words (its icon named), with a real, named sign-in button in place',
       announced(refusals.placement), JSON.stringify(refusals.placement));
-    ok('signed out, an exam paper that does not start is an alert in words with the same named sign-in — and no exam room opens',
+    ok('the session ended, an exam paper that does not start is an alert in words with the same named sign-in — and no exam room opens',
       // (Its icon alone has no word yet — Exams.jsx:82, tracked under "owned elsewhere".)
       announced({ ...refusals.exam, iconWord: refusals.exam?.iconWord || 'tracked elsewhere' }) && refusals.exam.room === 0, JSON.stringify(refusals.exam));
-    ok('signed out, Rapid Fire and Match that do not start are alerts in words with the same named sign-in — and no clock or question appears',
+    ok('the session ended, Rapid Fire and Match that do not start are alerts in words with the same named sign-in — and no clock or question appears',
       announced(refusals.rush) && refusals.rush.clock === 0 && announced(refusals.match) && refusals.match.question === 0,
       JSON.stringify({ rush: refusals.rush, match: refusals.match }));
 

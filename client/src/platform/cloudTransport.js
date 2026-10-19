@@ -74,15 +74,26 @@ export async function readReleaseIdentityManifest({ timeoutMs = 1500 } = {}) {
  * the hands of whatever was answering the request — a service worker, a
  * captive portal, an in-app browser — and the first render waits on this.
  */
+// What the last health probe heard: `answered` is true when ANY HTTP answer
+// came back (a 503, a non-JSON page, another service), false when none did
+// (a network error or the time limit). The activation gate's offline grace is
+// for "nothing answered" only: a live server that answered is not offline.
+let lastProbe = { answered: null, at: 0 };
+export const lastCloudProbe = () => ({ ...lastProbe });
+
 export function discoverCloudOrigin({ timeoutMs = 1500 } = {}) {
   if (discovery) return discovery;
   discovery = (async () => {
+    // Each attempt says only what IT heard: a probe that never runs (an
+    // injected origin, a native shell, no web origin) leaves "unknown".
+    lastProbe = { answered: null, at: 0 };
     const injected = String(globalThis.__PRI_CLOUD_ORIGIN__ || '').trim();
     if (injected) return injected;
     if (nativeCloudAvailable()) return null;
     const loc = globalThis.location;
     if (!loc || !/^https?:$/.test(String(loc.protocol || '')) || typeof fetch !== 'function') return null;
     const controller = new AbortController();
+    let answered = false;
     let timer;
     const limit = new Promise(resolve => {
       timer = setTimeout(() => {
@@ -99,6 +110,7 @@ export function discoverCloudOrigin({ timeoutMs = 1500 } = {}) {
         redirect: 'error',
         signal: controller.signal
       });
+      answered = true;
       if (!response.ok || !/json/i.test(response.headers.get('content-type') || '')) return null;
       const text = await response.text();
       if (byteLength(text) > 64 * 1024) return null;
@@ -112,6 +124,7 @@ export function discoverCloudOrigin({ timeoutMs = 1500 } = {}) {
       return await Promise.race([asked, limit]);
     } finally {
       clearTimeout(timer);
+      lastProbe = { answered, at: Date.now() };
     }
   })();
   // A page loaded while the server was unreachable must find it again once it
@@ -247,7 +260,7 @@ export async function cloudRequest(path, {
       if (data?.error?.quota && typeof data.error.quota === 'object') err.quota = data.error.quota;
       // An entitlement refusal names what it is about and when it lifts.
       if (typeof data?.error?.capability === 'string') err.capability = data.error.capability.slice(0, 60);
-      for (const k of ['nextAt', 'used', 'limit', 'windowDays']) if (Number.isFinite(Number(data?.error?.[k]))) err[k] = Number(data.error[k]);
+      for (const k of ['nextAt', 'used', 'limit', 'windowDays', 'attemptsRemaining']) if (Number.isFinite(Number(data?.error?.[k]))) err[k] = Number(data.error[k]);
       if (typeof data?.error?.timeZone === 'string' && TIME_ZONE.test(data.error.timeZone)) err.timeZone = data.error.timeZone;
       if (typeof data?.error?.openExamId === 'string' && SAFE_ID.test(data.error.openExamId)) err.openExamId = data.error.openExamId;
       if (Array.isArray(data?.error?.proofs)) err.proofs = proofList(data.error.proofs);
@@ -308,10 +321,14 @@ export async function cloudRequest(path, {
         const reset = Number(response.headers?.get?.('ratelimit-reset'));
         if ((response.status === 429 || response.status === 503) && Number.isFinite(reset) && reset > 0) err.resetAt = reset * 1000;
       }
+      // A one-time-code cooldown answers with Retry-After (seconds): how long
+      // until another code may be asked for.
+      const retryAfter = Number(response.headers?.get?.('retry-after'));
+      if (response.status === 429 && Number.isFinite(retryAfter) && retryAfter > 0) err.retryAfterMs = Math.min(retryAfter, 3600) * 1000;
       if (data?.error?.quota && typeof data.error.quota === 'object') err.quota = data.error.quota;
       // An entitlement refusal names what it is about and when it lifts.
       if (typeof data?.error?.capability === 'string') err.capability = data.error.capability.slice(0, 60);
-      for (const k of ['nextAt', 'used', 'limit', 'windowDays']) if (Number.isFinite(Number(data?.error?.[k]))) err[k] = Number(data.error[k]);
+      for (const k of ['nextAt', 'used', 'limit', 'windowDays', 'attemptsRemaining']) if (Number.isFinite(Number(data?.error?.[k]))) err[k] = Number(data.error[k]);
       if (typeof data?.error?.timeZone === 'string' && TIME_ZONE.test(data.error.timeZone)) err.timeZone = data.error.timeZone;
       if (typeof data?.error?.openExamId === 'string' && SAFE_ID.test(data.error.openExamId)) err.openExamId = data.error.openExamId;
       if (Array.isArray(data?.error?.proofs)) err.proofs = proofList(data.error.proofs);
@@ -502,6 +519,8 @@ export const cloud = Object.freeze({
   // address with or without an account; /verify proves it.
   otpRequest: body => cloudRequest('/v1/account/otp/request', { method: 'POST', body }),
   otpVerify: body => cloudRequest('/v1/account/otp/verify', { method: 'POST', body }),
+  // Which code channels this deployment can send on (email, sms): configuration only.
+  otpChannels: () => cloudRequest('/v1/account/otp/channels'),
   otpReauthRequest: () => cloudRequest('/v1/account/otp/reauth-request', { method: 'POST', body: {} }),
   // Deletion from the public page (/account/delete-request), no session: a code
   // to the account's own email, then the same deletion as DELETE /v1/account.
@@ -512,6 +531,8 @@ export const cloud = Object.freeze({
   guardianWithdrawRequest: body => cloudRequest('/v1/account/otp/guardian/withdraw-request', { method: 'POST', body }),
   guardianWithdrawByPhone: body => cloudRequest('/v1/account/otp/guardian/withdraw', { method: 'POST', body }),
   logout: () => cloudRequest('/v1/account/logout', { method: 'POST', body: {} }),
+  // Every session of this account, on every device, this one included.
+  logoutAll: () => cloudRequest('/v1/account/logout-all', { method: 'POST', body: {} }),
   requestEmailVerification: () => cloudRequest('/v1/account/email/verification-request', { method: 'POST', body: {} }),
   requestPasswordReset: body => cloudRequest('/v1/account/password/reset-request', { method: 'POST', body }),
   resetPassword: body => cloudRequest('/v1/account/password/reset', { method: 'POST', body }),

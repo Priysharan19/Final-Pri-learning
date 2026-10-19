@@ -486,14 +486,24 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     res.json({ ok: true, withdrawn });
   });
 
+  // One statement binds WHO this session is and WHETHER it may enter: the
+  // account id, the consent state and `eligible` (no consent blocker and a
+  // verified contact) are computed for the same session in the same reply.
+  // The client's activation gate refuses to combine two separate replies
+  // (/me, then this) because a second tab can change the device-wide cookie
+  // between them, which would let account B's "not required" admit account A.
   router.get('/guardian/state', requireSession(db), async (req, res) => {
     const state = await consentState(db, req.platformSession.account_id);
+    res.set('Cache-Control', 'no-store');
     res.json({
+      accountId: String(req.platformSession.account_id),
       required: state.required,
       state: state.state,
       ageBasis: state.ageBasis,
       blockerCode: consentBlockerCode(state),
-      // Read with the session a moment ago, in this request, from the same row.
+      // Read with the session a moment ago, in this request, from the same row,
+      // so `eligible` describes exactly the account this reply names.
+      eligible: consentBlockerCode(state) === null && !!req.platformSession.email_verified_at,
       emailVerified: !!req.platformSession.email_verified_at,
       guardianEmail: state.row ? maskEmail(state.row.guardian_email) : null,
       noticeVersion: state.row?.notice_version || null,

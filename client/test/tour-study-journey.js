@@ -1,9 +1,10 @@
 // Browser integration: existing reviewed Complex Numbers notes → worked examples
 // → same exact practice filters. Does not simulate server recognition/marking.
 import { chromium } from '@playwright/test';
-import { serveDist } from './e2e.mjs';
+import { startOnlinePlatform } from './support/online-session.mjs';
+import { createVerifiedProfile } from './support/verified-onboarding.mjs';
 
-const server=await serveDist();
+const server=await startOnlinePlatform();
 const browser=await chromium.launch();
 let checks=0;
 const check=(name,ok)=>{ if(!ok) throw Error(name); checks++; };
@@ -14,21 +15,8 @@ try {
   const errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto(server.origin,{waitUntil:'domcontentloaded'});
-  await page.getByRole('button',{name:'Use without an account'}).click();
-  await page.waitForSelector('[data-onboarding-step="1"]');
-  await page.getByRole('button',{name:'Student',exact:true}).click();
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="2"]');
-  await page.locator('#signup-track').selectOption('11');
-  await page.locator('.auth-card .btn-primary').click();
-  await page.waitForSelector('[data-onboarding-step="3"]');
-  await page.locator('#signup-name').fill('Study Test');
-  await page.locator('.auth-card .btn-primary').click();
-  for(const step of [4,5]){
-    await page.waitForSelector(`[data-onboarding-step="${step}"]`);
-    await page.locator('.auth-card .btn-primary').click();
-  }
-  await page.waitForSelector('.home-greet',{timeout:30000});
+  // The one sign-in card and the activation gate (issue #477).
+  await createVerifiedProfile(page,server,{name:'Study Test',year:11,course:'in'});
 
   // Reach real Home topic chooser; no direct URL injected until it has produced one.
   await page.getByTestId('choose-topic').click();

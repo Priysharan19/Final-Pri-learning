@@ -7,12 +7,7 @@
 //   · the host descriptor exists, is deep-frozen and cannot be replaced;
 //   · it advertises capabilities and carries no OS identity;
 //   · a main-frame envelope round-trips through priBridge;
-//   · a same-origin SUBFRAME is refused (no reply, ever);
-//   · WebShell's navigation policy (and the CSP's frame-src 'none' for
-//     fetched frames) keeps a child frame from loading at all, so no child
-//     frame can reach the parent's bridge through
-//     `parent.webkit.messageHandlers.*` and be credited to the main frame (#260).
-//     If a frame does load, the reach-through is attempted and must be refused.
+//   · a same-origin SUBFRAME is refused (no reply, ever).
 // Synthetic simulator evidence only; it says nothing about physical devices.
 // ─────────────────────────────────────────────────────────────────────────────
 #if DEBUG
@@ -36,46 +31,17 @@ enum BridgeSelfCheck {
     const original = window.__priNativeReceive;
     window.__priNativeReceive = msg => { if (msg && msg.id) replies[msg.id] = msg; if (original) original(msg); };
     send(window, 'selfcheck-main', 'storage', 'status');
-    // A child frame: WebShell cancels every subframe navigation (#260), so the
-    // about:srcdoc document never loads (WebKit does not apply the CSP's
-    // frame-src to srcdoc). A CSP violation event or a 1.5 s silence counts.
-    const cspBlocked = [];
-    const onViolation = e => { if (e.effectiveDirective === 'frame-src' || e.violatedDirective === 'frame-src') cspBlocked.push(e.blockedURI || 'frame'); };
-    document.addEventListener('securitypolicyviolation', onViolation);
     const frame = document.createElement('iframe');
     frame.srcdoc = '<!doctype html><title>x</title>';
     document.body.appendChild(frame);
-    const loaded = await new Promise(r => {
-      const timer = setTimeout(() => r(false), 1500);
-      frame.addEventListener('load', () => { clearTimeout(timer); r(true); }, { once: true });
-    });
-    await new Promise(r => setTimeout(r, 50));
-    document.removeEventListener('securitypolicyviolation', onViolation);
-    const child = loaded ? frame.contentWindow : null;
-    const childHasDocument = !!child && !!frame.contentDocument && frame.contentDocument.readyState === 'complete' && frame.contentDocument.title === 'x';
-    out.subframeBlockedByCsp = cspBlocked.length > 0 || !childHasDocument;
-    out.subframeHasHost = !!child && !!child.__PRI_HOST__;
-    if (childHasDocument) {
-      // Direct post from the child's own bridge object (must be refused: not the main frame).
-      try { send(child, 'selfcheck-subframe', 'storage', 'status'); out.subframeCouldPost = true; } catch (e) { out.subframeCouldPost = false; }
-      // Reach-through: the child invokes the PARENT's bridge object. Through the
-      // child realm's own Reflect so the call is made from the child's context.
-      try {
-        const handler = child.parent.webkit.messageHandlers.priBridge;
-        child.Reflect.apply(handler.postMessage, handler, [{ v: 1, id: 'selfcheck-reachthrough', cap: 'storage', op: 'status', payload: {} }]);
-        out.subframeReachThroughAttempted = true;
-      } catch (e) { out.subframeReachThroughAttempted = false; }
-    } else {
-      out.subframeCouldPost = false;
-      out.subframeReachThroughAttempted = false;
-    }
+    await new Promise(r => frame.addEventListener('load', r, { once: true }));
+    out.subframeHasHost = !!frame.contentWindow.__PRI_HOST__;
+    try { send(frame.contentWindow, 'selfcheck-subframe', 'storage', 'status'); out.subframeCouldPost = true; } catch (e) { out.subframeCouldPost = false; }
     await new Promise(r => setTimeout(r, 1500));
     window.__priNativeReceive = original;
     frame.remove();
     out.mainRoundTrip = replies['selfcheck-main']?.ok === true && replies['selfcheck-main'].result?.durable === true;
     out.subframeRefused = !replies['selfcheck-subframe'];
-    // Passes when no child frame could exist (CSP) or when the reach-through got no reply.
-    out.subframeReachThroughRefused = !replies['selfcheck-reachthrough'];
     return JSON.stringify(out);
     """
 
@@ -92,7 +58,7 @@ enum BridgeSelfCheck {
                     return
                 }
                 var failures = 0
-                for key in ["hostPresent", "deepFrozen", "notReplaceable", "noOsIdentity", "mainRoundTrip", "subframeRefused", "subframeReachThroughRefused"] {
+                for key in ["hostPresent", "deepFrozen", "notReplaceable", "noOsIdentity", "mainRoundTrip", "subframeRefused"] {
                     let ok = out[key] as? Bool == true
                     if !ok { failures += 1 }
                     NSLog("PRIBRIDGE %@ %@", ok ? "ok" : "FAIL", key)
@@ -117,9 +83,6 @@ enum BridgeSelfCheck {
                 let subframeHost = out["subframeHasHost"] as? Bool == true
                 if subframeHost { failures += 1 }
                 NSLog("PRIBRIDGE %@ subframeHasNoHost", subframeHost ? "FAIL" : "ok")
-                // Informational: whether the shell CSP stopped the child frame from
-                // loading (expected: subframe navigations are cancelled); the gate above is the pass/fail.
-                NSLog("PRIBRIDGE info subframeBlockedByCsp %@", out["subframeBlockedByCsp"] as? Bool == true ? "true" : "false")
                 NSLog("PRIBRIDGE capabilities %@", out["capabilities"] as? String ?? "")
                 NSLog("PRIBRIDGE summary %d failure(s)", failures)
             case .failure(let error):

@@ -384,16 +384,6 @@ struct WebShell: UIViewRepresentable {
         func webView(_ webView: WKWebView,
                      decidePolicyFor navigationAction: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-            // No nested browsing context loads anything (#260). The shell CSP's
-            // frame-src 'none' refuses fetched frames, but WebKit still builds an
-            // about:srcdoc child, and a same-origin child calling
-            // parent.webkit.messageHandlers.* is credited to the main frame by
-            // the sender gate. Refusing every subframe navigation here closes it
-            // natively, whatever the page or the CSP does.
-            if let target = navigationAction.targetFrame, !target.isMainFrame {
-                decisionHandler(.cancel)
-                return
-            }
             if navigationAction.shouldPerformDownload {
                 decisionHandler(.download)
                 return

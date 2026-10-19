@@ -157,19 +157,25 @@ export const flow = {
         await page.locator('.ink-answer [role="note"]').count() === 0);
 
       // One stroke. Handwriting is read only by the server reader (owner
-      // decision); this device has none, so nothing is read on the device and
-      // the student is told why — in Hindi.
+      // decision), and the student entered signed in (the activation gate,
+      // issue #477): the page is sent to the server's reader — a scripted
+      // stand-in in this suite — and what came back is said in Hindi: either an
+      // ink.* reader status or InkAnswer's cloud provenance note
+      // (verdict.readOnServer, drawn in .ink-status when rec.cloud is true).
       const box = await page.locator('.ink-canvas-live').boundingBox();
       await page.mouse.move(box.x + 60, box.y + 30);
       await page.mouse.down();
       for (let i = 1; i <= 12; i++) await page.mouse.move(box.x + 60 + i * 0.4, box.y + 30 + i * 6);
       await page.mouse.up();
-      await page.waitForSelector('.ink-status', { timeout: 15000 }).catch(() => {});
-      const inkStatus = (await page.locator('.ink-status').innerText().catch(() => '')) || '';
-      await check('Handwriting: nothing is read on the device without the server reader',
-        await page.locator('.ink-preview').count() === 0);
-      await check('Handwriting: the student is told why, in Hindi',
-        DEVANAGARI.test(inkStatus) && Object.keys(hi).some(k => k.startsWith('ink.waiting') && hi[k] === inkStatus), JSON.stringify(inkStatus));
+      await page.waitForSelector('.ink-status, .ink-line', { timeout: 20000 }).catch(() => {});
+      await settle();
+      const inkStatus = (await page.locator('.ink-status').first().innerText().catch(() => '')) || '';
+      await online.settled();
+      await check('Handwriting: the page was read by the server, not on the device',
+        online.calls.some(c => /^\/v1\/handwriting\//.test(c.path) || /\/recogni[sz]e$/.test(c.path)) && await page.locator('.ink-answer [role="note"]').count() === 0,
+        JSON.stringify(online.calls.slice(-4).map(c => `${c.status} ${c.path}`)));
+      await check('Handwriting: what the reader did is said in Hindi',
+        DEVANAGARI.test(inkStatus) && Object.keys(hi).some(k => (k.startsWith('ink.') || k === 'verdict.readOnServer') && hi[k] === inkStatus), JSON.stringify(inkStatus));
       await audit('Practice handwriting');
       await page.locator(`.ink-tool[title="${hi['ink.clear']}"]`).click();
       await settle();

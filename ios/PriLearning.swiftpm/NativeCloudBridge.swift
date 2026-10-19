@@ -165,7 +165,7 @@ final class NativeCloudBridge {
         taskLock.unlock()
         running.forEach { $0.cancel() }
         guard let origin = Self.configuredOrigin else { return }
-        for cookie in cookieStorage.cookies(for: origin) ?? [] where cookie.name == "pri_csrf" || cookie.name == "pri_cloud_session" || cookie.name == "pri_step_up" {
+        for cookie in cookieStorage.cookies(for: origin) ?? [] where cookie.name == "pri_csrf" || cookie.name == "pri_cloud_session" {
             cookieStorage.deleteCookie(cookie)
         }
     }

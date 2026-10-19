@@ -38,6 +38,7 @@ import { tmpdir } from 'node:os';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { chromium, webkit } from '@playwright/test';
 import { onlinePlatform, closeOnlinePlatform } from './support/online-session.mjs';
+import { createVerifiedProfile } from './support/verified-onboarding.mjs';
 import { watchBoot, bootFailure, bootRecovery } from './support/boot-diagnostics.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -255,58 +256,14 @@ function helpers(page, base, flowId) {
   };
 
   /**
-   * Make a real local profile through KALP-03's staged first-run flow. No test
-   * reaches into IndexedDB: the same UI and /profiles authority a learner uses
-   * must create the identity that powers the rest of the journey.
+   * A student inside the app, made the way a student makes one: a verified
+   * account on the landing card (email → the server's code → name, age and
+   * agreement → class), then the server's statement and the first sync behind
+   * the activation gate (support/verified-onboarding.mjs). There is no
+   * device-only entry any more, so no flow reaches the shell without this.
+   * Every flow therefore runs against the real platform server.
    */
-  const createProfile = async ({
-    name = 'E2E Student', year = 9, email = null, password = null,
-    course = 'nsw', track = null, role = 'student', language = 'en',
-    avatar = null, cloud = false, fromPicker = false
-  } = {}) => {
-    await page.getByRole('button', { name: fromPicker ? 'Add another profile' : 'Use without an account' }).click();
-    await page.waitForSelector('[data-onboarding-step="1"]', { timeout: 15000 });
-    await page.getByRole('button', { name: role === 'teacher' ? 'Teacher' : 'Student', exact: true }).click();
-    await page.locator('.auth-card .btn-primary').click();
-
-    await page.waitForSelector('[data-onboarding-step="2"]', { timeout: 15000 });
-    if (course === 'in') {
-      await page.locator('#signup-track').selectOption(track || String(year));
-      if (track) await page.locator('#signup-year').selectOption(String(year));
-    } else {
-      await page.getByRole('button', { name: role === 'teacher' ? /Teaching in Australia/ : /Studying in Australia/ }).click();
-      await page.locator('#signup-course').selectOption(course);
-      await page.locator('#signup-year').selectOption(String(year));
-    }
-    await page.locator('.auth-card .btn-primary').click();
-
-    await page.waitForSelector('[data-onboarding-step="3"]', { timeout: 15000 });
-    await page.locator('#signup-name').fill(name);
-    if (language !== 'en') await page.locator('.auth-card button[lang="' + language + '"]').click();
-    if (avatar) await page.locator('.avatar-pick').filter({ hasText: avatar }).click();
-    await page.locator('.auth-card .btn-primary').click();
-
-    await page.waitForSelector('[data-onboarding-step="4"]', { timeout: 15000 });
-    if (email) await page.locator('#signup-email').fill(email);
-    if (password) {
-      await page.locator('.check-row input[type=checkbox]').check();
-      await page.getByLabel('Password', { exact: true }).fill(password);
-      await page.getByLabel('Repeat password').fill(password);
-    }
-    if (cloud) await page.getByRole('button', { name: /Connect a Pri cloud account next/i }).click();
-    await page.locator('.auth-card .btn-primary').click();
-
-    await page.waitForSelector('[data-onboarding-step="5"]', { timeout: 15000 });
-    await page.locator('.auth-card .btn-primary').click();
-    if (cloud) {
-      await page.waitForSelector('#cloud-account-title', { timeout: 30000 });
-    } else if (role === 'teacher') {
-      await page.waitForURL(/\/teach(?:#.*)?$/, { timeout: 30000 });
-      await page.waitForSelector('.shell', { timeout: 30000 });
-    } else {
-      await page.waitForSelector('.home-greet', { timeout: 30000 });
-    }
-  };
+  const createProfile = async (options = {}) => createVerifiedProfile(page, await onlinePlatform(), { note, ...options });
 
   return { shot, check, mathText, goto, createProfile, settle: () => page.waitForTimeout(SETTLE) };
 }
@@ -332,7 +289,7 @@ async function loadFlows() {
  * localStorage and a fresh service-worker registration, so no flow can pass
  * because of something an earlier one left behind.
  */
-async function runFlow(flow, { browser, base, opts }) {
+async function runFlow(flow, { browser, opts }) {
   const g = section(flow.name || flow.id);
   const started = Date.now();
   const ctx = await browser.newContext({
@@ -345,17 +302,14 @@ async function runFlow(flow, { browser, base, opts }) {
   const crashes = [];
   page.on('pageerror', e => crashes.push(String(e?.message || e).slice(0, 200)));
 
-  // A flow that marks anything declares `online: true` and runs against the
-  // real platform server, which serves this same build from its own origin
-  // (support/online-session.mjs). Its `online` session signs the profile in
-  // through the app. Every other flow keeps the plain file server: a device
-  // with no Pri server behind it, which is what "signed out" means here.
-  let online = null;
-  if (flow.online) {
-    const platform = await onlinePlatform();
-    base = platform.origin;
-    online = platform.session(ctx, page);
-  }
+  // Every flow runs against the real platform server, which serves this same
+  // build from its own origin (support/online-session.mjs): the app opens for
+  // nobody without a verified account, so there is no flow left for a plain
+  // file server. A flow that marks anything declares `online: true` and gets
+  // the session oracle (sealed answers, the server's own ledger) as well.
+  const platform = await onlinePlatform();
+  const base = platform.origin;
+  const online = flow.online ? platform.session(ctx, page) : null;
   const api = helpers(page, base, flow.id);
   try {
     await flow.run({ page, ctx, base, note, online, browserName: opts.browser, ...api });
@@ -389,9 +343,9 @@ async function run(flows, opts) {
   if (build.built) built = build.ms;
   else notes.push('--no-build: this ran against whatever was already in client/dist');
 
-  const server = await serveDist();
-  // Chromium by default; --browser=webkit runs the same flows in WebKit, the
-  // engine behind every Apple web view (CP-03).
+  // The build is served by the real platform server from its own origin, for
+  // every flow (runFlow). Chromium by default; --browser=webkit runs the same
+  // flows in WebKit, the engine behind every Apple web view (CP-03).
   const engine = opts.browser === 'webkit' ? webkit : chromium;
   console.log(`E2E BROWSER: ${opts.browser}`);
   const browser = await engine.launch({ headless: !opts.headed });
@@ -399,7 +353,7 @@ async function run(flows, opts) {
     for (const flow of flows) {
       // Every flow runs even after one fails. A run that stops at the first red
       // line makes the next fix a guess about what else is broken.
-      const failed = await runFlow(flow, { browser, base: server.origin, opts });
+      const failed = await runFlow(flow, { browser, opts });
       if (failed && opts.bail) {
         notes.push(`--bail: stopped after "${flow.name}", ${flows.length - flows.indexOf(flow) - 1} flows never ran`);
         break;
@@ -407,7 +361,6 @@ async function run(flows, opts) {
     }
   } finally {
     await browser.close();
-    await server.close();
     await closeOnlinePlatform();
   }
   return report();

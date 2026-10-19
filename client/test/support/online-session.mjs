@@ -300,12 +300,36 @@ function onlineSession(platform, ctx, page) {
   }
 
   /**
-   * Sign in WITHOUT leaving the page: `scope` is where the app has already
-   * opened its account panel in place (a question card, the Exams page).
+   * Sign in again WITHOUT leaving the page: `scope` is where the app has
+   * opened the one sign-in card in place (a question card, the Exams page,
+   * the Rapid Fire lobby) after the session ended. The card signs the SAME
+   * account in — the profile is linked to it, and the card makes no second
+   * account for a linked profile — with the server's emailed code, read from
+   * its test adapter at the desk. Proven by readback: the link row names the
+   * account and the server has a live session for it.
    */
-  async function signInHere(scope, { name = 'Online Student', account = null } = {}) {
-    const who = account || await platform.newAccount({ name });
-    await completeSignIn(scope, who);
+  async function signInHere(scope, { account = null } = {}) {
+    const who = account || session.account;
+    if (!who?.email) throw new Error('online-session: signInHere needs the account this profile is linked to (pass { account } or sign in first)');
+    const card = scope.locator('[data-signin-card="inline"]');
+    await card.waitFor({ state: 'visible', timeout: 30000 });
+    platform.h.db.prepare("DELETE FROM rate_limits WHERE bucket LIKE 'otp-%'").run();
+    await card.locator('#signup-destination').fill(who.email);
+    await card.getByTestId('signup-send-code').click();
+    await card.locator('#signup-code-0').waitFor({ timeout: 20000 });
+    const code = platform.sms.readTestOutbox({ to: who.email, channel: 'email' }).filter(m => m.purpose === 'sign-in').at(-1)?.code;
+    if (!/^\d{6}$/.test(code || '')) throw new Error(`online-session: the server sent no six-digit code to ${who.email}`);
+    await card.locator('#signup-code-0').focus();
+    await page.keyboard.type(code);
+    let live = false;
+    for (let i = 0; i < 300 && !live; i++) {
+      const linked = await linkedAccounts();
+      if (linked?.includes(who.id)) {
+        live = await page.evaluate(async () => { try { return (await fetch('/v1/account/me', { credentials: 'include' })).status === 200; } catch { return false; } });
+      }
+      if (!live) await page.waitForTimeout(100);
+    }
+    if (!live) throw new Error(`online-session: the card did not restore a live session for ${who.email}`);
     session.account = who;
     return who;
   }
@@ -317,6 +341,26 @@ function onlineSession(platform, ctx, page) {
    * session cookie are written by product code, not by the test.
    */
   async function signIn({ name = 'Online Student', account = null } = {}) {
+    // The first-run fixture (support/verified-onboarding.mjs) has already
+    // signed the student in through the landing card, and the gate has let
+    // the profile in. That proven session is the one every flow marks with:
+    // it is reused here rather than replaced by a second account's.
+    const currentId = await page.evaluate(async () => {
+      try {
+        const r = await fetch('/v1/account/me', { credentials: 'include' });
+        return r.ok ? String((await r.json()).account?.id || '') : null;
+      } catch { return null; }
+    });
+    if (currentId && await page.locator('.shell').count()) {
+      if (account && String(account.id) !== currentId) {
+        throw new Error('online-session: another account was asked for while this profile is signed in — sign out first');
+      }
+      const row = platform.h.db.prepare('SELECT id, name, email FROM accounts WHERE id=?').get(currentId);
+      if (!row) throw new Error('online-session: the browser session names an account the platform database does not hold');
+      const who = { id: String(row.id), name: row.name, email: row.email, password: null };
+      session.account = who;
+      return who;
+    }
     const who = account || await platform.newAccount({ name });
     await page.goto(`${platform.origin}/settings`, { waitUntil: 'domcontentloaded' });
     const panel = page.locator('section', { has: page.locator('#cloud-account-title') });

@@ -225,16 +225,17 @@ export const flow = {
       await page.locator('[data-home-primary-cta]').evaluate(el => el.textContent.length > 0));
     await snap(page, '09-task-resume-state');
 
-    // Returning demo data is created by the real /profiles/demo product path.
-    // It carries genuine seeded attempts and four due review rows.
+    // There is no account-less demo any more (issue #477): the picker offers the
+    // saved profile and another Pri account, and a saved profile reopens its
+    // own Home on the same live session.
     await switchProfile(page);
-    await page.getByRole('button', { name: /Try the demo/i }).click();
+    await check('the picker offers no demo', await page.getByRole('button', { name: /Try the demo/i }).count() === 0);
+    await page.locator('.acct-row', { hasText: 'KALP04 Class 10 Student' }).click();
     await page.waitForSelector('[data-home-primary]', { timeout: 30000 });
-    await check('returning learner Home differs from brand-new learner',
-      !/first Class 10 practice/i.test(await page.locator('#home-next-title').innerText()));
-    await check('real due-review state changes the recommendation',
-      /review/i.test(await page.locator('#home-next-title').innerText()));
-    await snap(page, '10-reviews-due-returning');
+    await check('the saved learner reopens their own Home without a second sign-in',
+      await page.locator('[data-testid="account-activation-gate"]').count() === 0 && /KALP04/.test(await page.locator('.home-greet').innerText()));
+    await check('and their unfinished task is still the primary recommendation',
+      ['task-resume', 'task'].includes(await page.locator('[data-home-primary]').getAttribute('data-kind')));
     // Alternatives share CTA words, so each alternative button must carry its
     // own accessible name (CTA + card title) and a description (its reason).
     const altNames = await page.locator('[data-home-alt] button').evaluateAll(buttons => buttons.map(b => {

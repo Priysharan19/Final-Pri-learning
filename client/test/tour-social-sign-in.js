@@ -10,6 +10,7 @@
 // oidc-verification-check.mjs.
 
 import { pathToFileURL } from 'node:url';
+import { mockAccountServer } from './support/mock-account.mjs';
 
 const ACCOUNT = {
   id: 'acct_e2e_social',
@@ -25,8 +26,10 @@ export const flow = {
   id: 'social',
   name: 'Cloud · Continue with Google signs in, and Google confirms deletion',
 
-  async run({ page, ctx, base, check, goto, createProfile }) {
-    let authenticated = false;
+  async run({ page, ctx, base, check, goto }) {
+    // The account, its session and the activation handshake (gate, first sync)
+    // are the shared stand-in's; Google's part of the conversation is below.
+    const mock = mockAccountServer({ account: ACCOUNT, providers: { google: { clientId: 'pri-e2e.apps.googleusercontent.com' }, apple: null } });
     const requests = [];
     let authorizeUrl = null;
 
@@ -49,53 +52,47 @@ export const flow = {
       const path = new URL(request.url()).pathname;
       const method = request.method();
       requests.push({ path, method, body: request.postData() || '', headers: request.headers() });
-      if (path === '/v1/billing/config') return respond(route, 200, { display: null, webCheckout: { configured: false } });
-      if (path === '/v1/account/identity/providers') {
-        return respond(route, 200, { providers: { google: { clientId: 'pri-e2e.apps.googleusercontent.com' }, apple: null } });
-      }
       if (path === '/v1/account/identity/nonce' && method === 'POST') return respond(route, 201, { nonce: NONCE, expiresAt: Date.now() + 600000 });
       if (path === '/v1/account/identity/google/sign-in' && method === 'POST') {
-        authenticated = true;
+        mock.state.authenticated = true;
         return respond(route, 200, { account: ACCOUNT, created: false }, { 'set-cookie': 'pri_csrf=e2e-csrf; Path=/; SameSite=Lax' });
       }
-      if (path === '/v1/account/me') {
-        return authenticated ? respond(route, 200, { account: ACCOUNT }) : respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
-      }
-      if (path === '/v1/entitlements') {
-        return authenticated
-          ? respond(route, 200, { accountId: ACCOUNT.id, entitlement: { plan: 'free', status: 'free', provider: 'none', sourceVersion: 1, issuedAt: Date.now() } })
-          : respond(route, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in is required.' } });
-      }
       if (path === '/v1/account' && method === 'DELETE') {
-        authenticated = false;
+        mock.state.authenticated = false;
         return respond(route, 200, { deleted: true });
       }
-      if (path === '/v1/account/logout' && method === 'POST') return respond(route, 200, { ok: true });
+      if (await mock.handle(route)) return;
+      const authenticated = mock.state.authenticated;
       if (path === '/v1/account/identity') return respond(route, 200, { providers: [{ provider: 'google', linkedAt: Date.now() }] });
       if (path === '/v1/account/devices') return respond(route, 200, { devices: [] });
-      if (path === '/v1/account/guardian/state') return respond(route, 200, { required: false, state: 'not-required' });
       if (path === '/v1/assignments') return respond(route, 200, { assignments: [] });
       if (path === '/v1/classes') return respond(route, 200, { classes: [] });
       return respond(route, authenticated ? 404 : 401, { error: { code: authenticated ? 'NOT_FOUND' : 'AUTH_REQUIRED', message: `Unhandled E2E route ${method} ${path}` } });
     });
 
+    // Google is offered on the landing card itself, beneath the email field:
+    // the one card is where every sign-in happens now.
     await goto('/');
-    await createProfile({ name: 'Social Student', year: 9 });
-    await goto('/settings');
-    const panel = page.locator('section', { has: page.locator('#cloud-account-title') });
-    const google = panel.getByRole('button', { name: 'Continue with Google' });
+    const card = page.locator('[data-signin-card="page"]');
+    const google = card.locator('[data-provider="google"]');
     await google.waitFor({ state: 'visible', timeout: 15000 });
-    await check('Continue with Google is offered when the deployment configures it', await google.isVisible());
-    await check('Apple is not offered when the deployment names no Apple web client id',
-      !(await panel.getByRole('button', { name: 'Continue with Apple' }).isVisible()));
+    await check('Continue with Google is offered on the landing card when the deployment configures it', await google.isVisible());
+    await check('Apple is not offered when the deployment names no Apple web client id', await card.locator('[data-provider="apple"]').count() === 0);
 
     const popupOpened = page.waitForEvent('popup', { timeout: 15000 });
     await google.click();
     const popup = await popupOpened;
     await check('the click opens a sign-in window (not blocked: it opens before any await)', !!popup);
-    await panel.getByText('Connected', { exact: true }).waitFor({ timeout: 20000 });
-    await check('the profile ends up connected without leaving Settings',
-      new URL(page.url()).pathname === '/settings' && await panel.getByText('Connected', { exact: true }).isVisible());
+    // A returning Google account on a device with no profile: the class is the
+    // only thing asked, then the gate (session, statement, first sync) opens the app.
+    await card.locator('[data-testid="signup-class-9"]').waitFor({ timeout: 20000 });
+    await card.getByTestId('signup-class-9').click();
+    await card.getByTestId('signup-class-next').click();
+    await page.locator('.shell').waitFor({ timeout: 60000 });
+    await check('Google signs the student in on the landing card; the class is asked once and the app opens, past the gate',
+      new URL(page.url()).pathname === '/practice' && await page.locator('[data-testid="account-activation-gate"]').count() === 0,
+      page.url());
+    await check('the gate confirmed the account and ran the first sync before opening', mock.state.syncPushes >= 1 && mock.state.syncPulls >= 1);
 
     await check('the popup went to Google with this deployment\'s client id and the server nonce',
       authorizeUrl?.searchParams.get('client_id') === 'pri-e2e.apps.googleusercontent.com' &&
@@ -117,6 +114,8 @@ export const flow = {
 
     // A Google-only account has no password: deleting it is a fresh Google
     // sign-in, with the same nonce gate, after typing DELETE.
+    await goto('/settings');
+    const panel = page.locator('section', { has: page.locator('#cloud-account-title') });
     const remove = panel.getByRole('button', { name: 'Confirm with Google and delete' });
     await remove.waitFor({ state: 'visible', timeout: 15000 });
     await check('a Google-only account is offered deletion through Google', await remove.isVisible());
@@ -126,14 +125,16 @@ export const flow = {
     const secondPopup = page.waitForEvent('popup', { timeout: 15000 });
     await remove.click();
     await secondPopup;
-    await panel.getByText('Not connected', { exact: true }).waitFor({ timeout: 20000 });
+    // The account is gone: the device profile is unlinked and the app relocks
+    // at once — the gate, not a disconnected Settings page.
+    await page.locator('[data-testid="account-activation-gate"]').waitFor({ timeout: 20000 });
     const deletion = requests.find(row => row.path === '/v1/account' && row.method === 'DELETE');
     const deletionBody = deletion ? JSON.parse(deletion.body || '{}') : {};
     await check('deletion carries a fresh Google token and nonce, never a bare session',
       deletionBody.provider === 'google' && deletionBody.idToken === ID_TOKEN && deletionBody.nonce === NONCE &&
         authorizeUrl?.searchParams.get('nonce') === NONCE, JSON.stringify(deletionBody));
-    await check('after deletion the local profile is disconnected and stays on this device',
-      await panel.getByText('Not connected', { exact: true }).isVisible());
+    await check('after deletion the device profile is unlinked and the app is relocked: the gate asks for an account, nothing of the shell shows',
+      await page.locator('.shell').count() === 0 && await page.locator('[data-testid="account-activation-gate"]').getAttribute('data-activation-status') === 'signin');
   }
 };
 

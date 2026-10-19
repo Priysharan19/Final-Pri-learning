@@ -41,8 +41,11 @@ export async function cloudDeviceId() {
   return deviceId;
 }
 
-export async function cloudAccountLink(pid) {
-  const row = await get('device', linkRowId(pid)).catch(() => null);
+// `strict` lets a storage failure surface instead of reading as "no link":
+// the activation gate must not mistake a dropped IndexedDB connection (WebKit,
+// after the app sat in the background) for an account that was unlinked.
+export async function cloudAccountLink(pid, { strict = false } = {}) {
+  const row = await (strict ? get('device', linkRowId(pid)) : get('device', linkRowId(pid)).catch(() => null));
   if (!row) return null;
   return {
     localProfileId: pid,
@@ -56,6 +59,15 @@ export async function cloudAccountLink(pid) {
     // (deleteCloudAccount). Cleared by a reply either way; read by
     // verifyCloudSession to settle a half-done deletion (#521).
     deleteRequestedAt: Number(row.deleteRequestedAt) || null,
+    // When the server last let THIS account in on this device (the activation
+    // gate's full answer), and for which account. Not permission by itself:
+    // only the gate's bounded offline grace reads it, and only when the server
+    // cannot be reached at all.
+    activatedAt: Number(row.activatedAt) || null,
+    activatedAccountId: row.activatedAccountId ? String(row.activatedAccountId) : null,
+    // The latest device time the grace has seen: a clock earlier than this
+    // has moved backwards, and the grace refuses it.
+    clockSeenAt: Number(row.clockSeenAt) || null,
     entitlement: normalizeEntitlementSnapshot(row.entitlement || {})
   };
 }
@@ -86,6 +98,11 @@ async function saveAccount(pid, account, patch = {}) {
     lastVerifiedAt: Date.now(),
     lastSyncAt: prior?.lastSyncAt || null,
     entitlement: prior?.entitlement || null,
+    // Kept across a session refresh of the same account (the conflict check
+    // above guarantees it is the same one); a new link starts without it.
+    activatedAt: prior?.accountId ? prior.activatedAt || null : null,
+    activatedAccountId: prior?.accountId ? prior.activatedAccountId || null : null,
+    clockSeenAt: prior?.clockSeenAt || null,
     ...patch
   };
   // Defense in depth for rows written by an earlier development build.
@@ -224,6 +241,29 @@ export async function markCloudSynced(pid, at = Date.now()) {
   const prior = await get('device', id).catch(() => null);
   if (!prior) return;
   await put('device', { ...prior, lastSyncAt: at });
+}
+
+/**
+ * Record (at) or clear (null) the server's last full "this account may enter"
+ * for this profile. Written only by platform/accountActivation.js.
+ */
+export async function recordCloudActivation(pid, accountId, at = Date.now()) {
+  const id = linkRowId(pid);
+  const prior = await get('device', id);
+  if (!prior) return;
+  if (accountId && String(prior.accountId) !== String(accountId)) return;
+  await put('device', {
+    ...prior, activatedAt: accountId ? at : null, activatedAccountId: accountId ? String(accountId) : null,
+    clockSeenAt: Math.max(Number(prior.clockSeenAt) || 0, at)
+  });
+}
+
+/** Raise the clock high-water mark the offline grace checks against. */
+export async function noteCloudClock(pid, at = Date.now()) {
+  const id = linkRowId(pid);
+  const prior = await get('device', id);
+  if (!prior || (Number(prior.clockSeenAt) || 0) >= at) return;
+  await put('device', { ...prior, clockSeenAt: at });
 }
 
 /** The device half of ending a link: native session, replica state, link row. */

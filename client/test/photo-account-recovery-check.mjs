@@ -19,7 +19,9 @@ function has(text, pattern, description) {
 
 has(photo, /data-photo-sign-in/, 'Photo must show a real sign-in action');
 has(photo, /aria-expanded=\{photoSignInOpen\}/, 'Sign-in action must expose expansion state');
-has(photo, /React\.lazy\(\(\) => import\('\.\/CloudAccountPanel\.jsx'\)\)/, 'Sign-in uses existing account implementation, lazy-loaded');
+// Issue #477: the one sign-in card (CheckRefusal.jsx SignInChoices), in place,
+// with the photo and the question still mounted around it.
+has(photo, /photoSignInOpen && photoOCR\.blockedKey === 'verdict\.photoReadingSignIn' && \([\s\S]{0,400}<SignInChoices user=\{user\}/, 'Sign-in uses the one sign-in card, in place');
 has(photo, /photoSignInOpen && photoOCR\.blockedKey === 'verdict\.photoReadingSignIn'/, 'Only a genuine auth refusal opens account recovery');
 has(photo, /onCloudSessionChange\(event =>/, 'Photo must subscribe to verified session updates');
 has(photo, /event\?\.detail\?\.connected === true/, 'Retry is triggered by connected event, never mere profile display');

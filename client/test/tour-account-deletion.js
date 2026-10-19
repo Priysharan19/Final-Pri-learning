@@ -183,25 +183,24 @@ export const flows = [
 
         // Sign up as an adult with an email code, through the shipped flow.
         await goto('/');
-        await page.getByRole('button', { name: 'Create your account' }).click();
-        await page.waitForSelector('[data-signup-step="role"]', { timeout: 15000 });
-        await page.getByTestId('signup-role-student').click();
-        await page.waitForSelector('[data-signup-step="age"]');
-        await page.getByTestId('signup-age-18').click();
-        await page.waitForSelector('[data-signup-step="class"]');
-        await page.getByTestId('signup-class-12').click();
-        await page.getByTestId('signup-class-next').click();
-        await page.waitForSelector('[data-signup-step="method"]');
-        await page.getByTestId('signup-channel-email').click();
-        await page.locator('#signup-flow-name').fill('Ravi');
+        await page.locator('[data-signin-card="page"] #signup-destination').waitFor({ timeout: 15000 });
         await page.locator('#signup-destination').fill('ravi.leaver@example.test');
         sms.clearTestOutbox();
         await page.getByTestId('signup-send-code').click();
-        await page.waitForSelector('[data-signup-step="code"]');
+        await page.locator('#signup-code-0').waitFor({ timeout: 15000 });
         const signIn = lastCode(sms, 'ravi.leaver@example.test');
         await check('a sign-up code went to the email address', /^\d{6}$/.test(signIn || ''));
         await typeCode(page, 'signup-code-0', signIn);
-        await page.waitForSelector('.shell', { timeout: 30000 });
+        // A new address: who they are (name, age, the agreement), then the class.
+        await page.locator('#signup-flow-name').waitFor({ timeout: 15000 });
+        await page.locator('#signup-flow-name').fill('Ravi');
+        await page.getByTestId('signup-age-18').click();
+        await page.getByTestId('signup-agree').check();
+        await page.getByTestId('signup-age-next').click();
+        await page.getByTestId('signup-class-12').waitFor({ timeout: 15000 });
+        await page.getByTestId('signup-class-12').click();
+        await page.getByTestId('signup-class-next').click();
+        await page.waitForSelector('.shell', { timeout: 60000 });
         const account = h.db.prepare("SELECT id, password_hash FROM accounts WHERE email='ravi.leaver@example.test'").get();
         await check('the account exists with no password and no Apple/Google link',
           !!account && account.password_hash === null
@@ -256,17 +255,18 @@ export const flows = [
         await shot('deleted');
 
         // A real reload (same URL, so goto would only move the hash): the panel
-        // now reads its state back from IndexedDB, as a relaunch does.
+        // now reads its state back from IndexedDB, as a relaunch does. With
+        // the account gone the device profile has no account: the app is the
+        // activation gate (issue #477), never Settings for a deleted account.
         await page.reload({ waitUntil: 'domcontentloaded' });
-        await page.waitForSelector('#cloud-account-title', { timeout: 30000 });
-        await page.getByText('Not connected', { exact: true }).waitFor({ timeout: 30000 }).catch(() => {});
+        await page.waitForSelector('[data-testid="account-activation-gate"]', { timeout: 30000 });
         await check('the reload is a fresh page: the deletion message is not carried over',
           await page.getByText('Cloud account deleted.', { exact: false }).count() === 0);
         await check('after a relaunch no link to the deleted account is restored',
           (await accountLinkRows(page)).length === 0);
-        await check('and the Account panel says not connected, never “sign-in required” for the deleted account',
-          await page.getByText('Not connected', { exact: true }).isVisible()
-          && await page.getByText('Linked · sign-in required', { exact: true }).count() === 0);
+        await check('and the gate says the profile has no account, never “sign-in required” for the deleted account',
+          await page.getByText('not connected to a Pri account', { exact: false }).isVisible()
+          && await page.getByText('You’ve been signed out', { exact: false }).count() === 0 && await page.locator('.shell').count() === 0);
         await shot('relaunched');
       } finally {
         await h.close();

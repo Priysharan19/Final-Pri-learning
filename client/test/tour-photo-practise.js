@@ -33,7 +33,9 @@ export const flow = {
           candidates: [{ chapterId: 'c10-quadratic-equations', chapterName: 'Quadratic Equations', grade: 10, skillId: 'c10-quadratic-discriminant', dotpoint: 2, confidence: 0.91 }]
         } });
       }
-      return json(route, 404, { error: { code: 'NOT_FOUND', message: url.pathname } });
+      // Accounts, the gate and grading are the real server's; only the
+      // question-photo identification route is scripted here.
+      return route.continue();
     });
 
     await goto('/');

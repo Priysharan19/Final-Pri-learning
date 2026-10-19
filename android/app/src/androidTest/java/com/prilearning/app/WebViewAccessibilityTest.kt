@@ -71,14 +71,12 @@ class WebViewAccessibilityTest {
     @Test
     fun theProductPassesTheAccessibilitySmokeInTheShell() {
         var supported = false
+        AccountFirst.useFixtureServer()
         ActivityScenario.launch(MainActivity::class.java).use { s ->
             s.onActivity { supported = it.webView != null }
             assumeTrue("the WebView is below the floor on this image", supported)
-            val state = waitFor(s, """(function(){if(document.querySelector('.home-greet'))return 'home';
-                var b=[].slice.call(document.querySelectorAll('.auth-card button')).find(function(x){return /Android Student/.test(x.textContent);});
-                if(b){b.click();return 'picker';}return false;})()""")
-            assertTrue(state, state == "\"home\"" || state == "\"picker\"")
-            waitFor(s, "document.querySelector('.home-greet')")
+            // Account-first (#477): Home only once the gate has let the signed-in student in.
+            waitFor(s, AccountFirst.HOME_OPEN, 90_000)
             // Each screen is audited only once its own landmark has rendered.
             for ((path, landmark) in listOf("/" to ".home-greet", "/practice" to ".q-prompt", "/progress" to ".card .sc-label", "/settings" to "#cloud-account-title")) {
                 eval(s, "(function(){history.pushState({},'','$path');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
@@ -96,14 +94,13 @@ class WebViewAccessibilityTest {
         fun fontScale(v: String) { ui.executeShellCommand("settings put system font_scale $v").close(); Thread.sleep(1500) }
         fun greetHeight(): Float {
             var h = -1f
+            AccountFirst.useFixtureServer()
             ActivityScenario.launch(MainActivity::class.java).use { s ->
                 var ok = false
                 s.onActivity { ok = it.webView != null }
                 assumeTrue("the WebView is below the floor on this image", ok)
-                val state = waitFor(s, """(function(){if(document.querySelector('.home-greet'))return 'home';
-                    var b=[].slice.call(document.querySelectorAll('.auth-card button')).find(function(x){return /Android Student/.test(x.textContent);});
-                    if(b){b.click();return 'picker';}return false;})()""")
-                assertTrue(state, state == "\"home\"" || state == "\"picker\"")
+                // Account-first (#477): Home only once the gate has let the signed-in student in.
+                waitFor(s, AccountFirst.HOME_OPEN, 90_000)
                 // A paragraph of fixed text, measured in CSS px.
                 h = waitFor(s, "(function(){var p=document.createElement('p');p.id='pri-fs';p.style.cssText='position:absolute;left:0;top:0;width:200px;margin:0';p.textContent='Pri Learning measures the system font size here.';document.body.appendChild(p);var r=p.getBoundingClientRect().height;p.remove();return String(r);})()").trim('"').toFloat()
             }
@@ -144,15 +141,14 @@ class WebViewAccessibilityTest {
         try {
             for (scale in listOf("1.0", "1.3")) {
                 sh("settings put system font_scale $scale"); Thread.sleep(1500)
+                AccountFirst.useFixtureServer()
                 ActivityScenario.launch(MainActivity::class.java).use { s ->
                     var ok = false
                     s.onActivity { ok = it.webView != null }
                     assumeTrue("the WebView is below the floor on this image", ok)
-                    val state = waitFor(s, """(function(){if(document.querySelector('.home-greet'))return 'home';
-                        var b=[].slice.call(document.querySelectorAll('.auth-card button')).find(function(x){return /Android Student/.test(x.textContent);});
-                        if(b){b.click();return 'picker';}return false;})()""")
-                    assertTrue(state, state == "\"home\"" || state == "\"picker\"")
-                    waitFor(s, "document.querySelector('.home-greet')")
+                    // Account-first (#477): enter only once the gate has let the
+                    // student CloudJourneyTest signed in on the card through to Home.
+                    waitFor(s, AccountFirst.HOME_OPEN, 90_000)
                     val landscape = eval(s, "window.innerWidth > window.innerHeight")
                     assertEquals(if (tablet) "the tablet runs landscape" else "the phone runs portrait", if (tablet) "true" else "false", landscape)
                     for ((path, landmark) in listOf("/" to ".home-greet", "/practice" to ".q-prompt", "/progress" to ".card .sc-label", "/review" to "h1, h2", "/settings" to "#cloud-account-title")) {
