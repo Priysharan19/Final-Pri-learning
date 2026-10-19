@@ -298,7 +298,9 @@ if (engine === 'postgres') {
       accounts: Number((await store.get('SELECT COUNT(*)::int AS n FROM accounts')).n)
     }), { accountScope: 'acct-a' });
     eq([scoped.own, scoped.other, scoped.all, scoped.entities], [1, 0, 1, 1], 'account scope: only the account\'s own owned rows are visible, even to a query that asks for another\'s');
-    eq(scoped.accounts, 2, 'account scope: shared tables (accounts) stay readable, for the handlers\' own joins');
+    // 20261019000000_rls_account_coverage.sql: accounts is account-scoped too —
+    // account scope sees only its own account row (rls-account-coverage-check).
+    eq(scoped.accounts, 1, 'account scope: accounts shows only the account\'s own row (20261019000000_rls_account_coverage.sql)');
     await rejects(() => store.transaction(tx => tx.run("INSERT INTO operational_events(id,account_id,event_type,metadata_json,created_at) VALUES ('op-smuggle-2','acct-b','smuggle','{}',1)"), { accountScope: 'acct-a' }),
       error => String(error.dbCode || error.code) === '42501', 'account scope: inserting another account\'s row is refused');
     const moved = await store.transaction(tx => tx.run("UPDATE operational_events SET account_id = 'acct-b' WHERE account_id = 'acct-a'"), { accountScope: 'acct-a' }).catch(error => error);
@@ -424,7 +426,12 @@ if (engine === 'postgres') {
   const FORWARD = '20261016000000_rls_fail_closed.sql';
   const all = migrationFiles();
   const forward = all.find(m => m.name === FORWARD);
-  ok(!!forward && all.at(-1).name === FORWARD, `${FORWARD} is the last migration, after every existing one`);
+  // Part 4 applies this migration alone on a schema-11 database, so the shared-table
+  // pins below describe exactly 20261016000000; the one later migration
+  // (account RLS for the shared account-bearing tables) is proven by
+  // rls-account-coverage-check.mjs. A further migration must be added here deliberately.
+  ok(!!forward && all.at(-1).name === '20261019000000_rls_account_coverage.sql' && all.findIndex(m => m.name === FORWARD) === all.length - 2,
+    `${FORWARD} runs after every earlier migration; only 20261019000000_rls_account_coverage.sql follows it`);
   const scratch = await scratchDatabase('rls_upgrade', { migrations: all.filter(m => m.name < FORWARD) });
   const su = scratch.client;
   const url = await serverRoleUrl(scratch.name);
