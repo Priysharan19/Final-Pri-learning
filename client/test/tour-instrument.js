@@ -91,7 +91,7 @@ export const flow = {
     await check('the plate is titled with that chapter', (await page.locator('#in-plate-title').textContent()).trim() === name, name);
     await check('the chosen chapter is announced as pressed', await second.getAttribute('aria-pressed') === 'true');
     const kpis = await page.locator('.in-kpis b').allTextContents();
-    await check('a new student’s plate states 0 answers and withholds accuracy', kpis[0] === '0' && kpis[2] === '—', JSON.stringify(kpis));
+    await check('a new student’s plate states 0 answers and withholds accuracy', kpis[1] === '0' && kpis[3] === '—', JSON.stringify(kpis));
     const drawn = await page.evaluate(() => {
       const c = document.querySelector('[data-instrument-scope] canvas'); if (!c || !c.width) return 0;
       const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let ink = 0;
@@ -101,6 +101,15 @@ export const flow = {
     await check('the scope draws the chapter’s mathematics', drawn > 200, `${drawn} painted samples`);
     await check('the scope is labelled for assistive tech', !!(await page.locator('[data-instrument-scope]').getAttribute('aria-label')));
     writeFileSync(join(outDir, 'index-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
+
+    // The plate's topic row: the chapter's own dot points, each a way into practice.
+    const dot = page.locator('[data-plate-dotpoint]').first();
+    if (await check('the plate shows the chapter’s topics', await dot.count() === 1)) {
+      await check('each topic is named, not an object', !/object Object/.test(await page.locator('.in-exs').textContent()));
+      const href = await dot.getAttribute('href');
+      await check('a topic opens practice for exactly that topic', /subtopic=/.test(href) && /dotpoint=0/.test(href), href);
+    }
+    await check('the plate states certified marks (none yet: —)', (await page.locator('[data-plate-marks] b').textContent()).trim() === '—');
 
     // Practise this chapter → Practice for that chapter.
     await page.locator('[data-instrument-practise]').click();
@@ -314,6 +323,18 @@ export const writeFlow = {
       await check('the Report’s certified marks are the receipts’ total', fig === `${reply.marksEarned}/${reply.marksPossible}`, fig);
       await check('today’s practice is lit on the heat-map', await page.locator('.in-heat i.is-on').count() >= 1);
       writeFileSync(join(outDir, 'report-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
+    }
+
+    // The command bar lists the attempt under "Your scripts" with its certified mark.
+    if (reply) {
+      await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.in-cmd', { timeout: 15000 });
+      await page.locator('.in-cmd').click();
+      await page.waitForSelector('[data-instrument-command] [id^="in-pal-sc-"]', { timeout: 10000 }).catch(() => {});
+      const scriptRow = page.locator('[data-instrument-command] [id^="in-pal-sc-"]').first();
+      await check('the command bar lists your scripts', await scriptRow.count() === 1);
+      await check('— with the certified mark', (await scriptRow.locator('small').textContent().catch(() => '')).trim() === `${reply.marksEarned}/${reply.marksPossible}`);
+      await page.keyboard.press('Escape');
     }
 
     // The map's marks are the server-certified receipts, nothing else.

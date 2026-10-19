@@ -35,11 +35,13 @@ export default function IndexPage() {
   const [recent, setRecent] = useState(undefined);
   const [error, setError] = useState('');
   const [pick, setPick] = useState(null);
+  const [marks, setMarks] = useState({});
 
   useEffect(() => {
     let live = true;
     api.get('/curriculum').then(c => { if (live) setCurriculum(c); })
       .catch(err => { if (live) setError(err?.message || tLater('inst.indexError')); });
+    api.get('/marks/by-chapter').then(r => { if (live) setMarks(r?.chapters || {}); }).catch(() => { });
     api.post('/history/list', { limit: 1 }).then(r => { if (live) setRecent(r?.items?.[0] || null); })
       .catch(() => { if (live) setRecent(null); });
     return () => { live = false; };
@@ -129,12 +131,32 @@ export default function IndexPage() {
               <h2 id="in-plate-title" lang="en"><TermGloss text={current.row.name} /></h2>
             </div>
             <div className="in-kpis">
+              <div data-plate-marks><b>{marks[current.row.id]?.possible ? `${marks[current.row.id].earned}/${marks[current.row.id].possible}` : '—'}</b><small>{t('inst.mapMarks')}</small></div>
               <div><b>{current.evidence.attempts}</b><small>{t('inst.kpiAnswered')}</small></div>
               <div><b>{current.evidence.correct}</b><small>{t('inst.kpiCorrect')}</small></div>
               <div><b>{current.evidence.accuracy == null ? '—' : `${current.evidence.accuracy}%`}</b><small>{t('inst.kpiAccuracy')}</small></div>
             </div>
           </div>
           <ChapterScope figure={current.figure} colourVar={current.colour} label={t('inst.scopeLabel', { name: current.row.name })} />
+          {Array.isArray(current.row.dotpoints) && current.row.dotpoints.length > 0 && (
+            <ul className="in-exs" aria-label={t('inst.dotpoints')}>
+              {current.row.dotpoints.slice(0, 4).map((dp, i) => {
+                // A dot point is a string (India) or a row with its own evidence.
+                const text = typeof dp === 'string' ? dp : String(dp?.text || '');
+                const ev = typeof dp === 'object' && dp ? chapterEvidence(dp, accuracyClaim, PROGRESS_THRESHOLDS.chapterAccuracy) : null;
+                const figure = ev?.accuracy != null ? `${ev.accuracy}%` : ev?.attempts ? t('inst.answered', { n: ev.attempts }) : t('inst.cmdPractise');
+                return (
+                  <li key={i}>
+                    <Link className="in-ex" to={practiceHref({ subtopic: current.row.id, dotpoint: i, track })} data-plate-dotpoint={i}>
+                      <span className="in-ex-h"><span>{`${current.index + 1}.${i + 1}`}</span><span>{figure}</span></span>
+                      <b lang="en"><TermGloss text={text} /></b>
+                      {ev?.accuracy != null && <span className="in-ex-bar" aria-hidden="true"><i style={{ width: `${ev.mastery}%` }} /></span>}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
           <div>
             <div className="in-plate-acts">
               <Link className="in-btn is-primary" to={practiceHref({ subtopic: current.row.id, track })} data-instrument-practise>{t('inst.practise')}</Link>

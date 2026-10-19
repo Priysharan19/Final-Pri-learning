@@ -2984,4 +2984,6 @@ export default {
   "inst.reportHeatCell": "{date}: {n} questions",
   "inst.plotTitle": "Your lines, drawn",
   "inst.plotNote": "A drawing of what Pri read from your writing. It never sets a mark.",
+  "inst.dotpoints": "Topics in this chapter",
+  "inst.cmdScripts": "Your scripts",
 };
