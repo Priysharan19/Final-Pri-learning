@@ -16,6 +16,7 @@ import { startAuthDeliveryWorker } from './platform/authDelivery.js';
 import { startGoogleNotificationWorker } from './platform/googleBilling.js';
 import { applyVerifiedEntitlement } from './platform/entitlements.js';
 import { startHousekeeping } from './platform/housekeeping.js';
+import { startAlertNotifier } from './platform/alertNotifier.js';
 import { createServerApp } from './app.js';
 
 // The platform store: Supabase Postgres when PRI_DATABASE_URL is set (ADR-0001),
@@ -55,6 +56,10 @@ startHousekeeping(platformDb);
 // from the Play Developer API here, outside any database transaction.
 const googleWorker = startGoogleNotificationWorker(platformDb, { apply: event => applyVerifiedEntitlement(platformDb, event) });
 
+// In-process alert rules (metrics.js) are emailed to PRI_ALERT_EMAIL through
+// the auth-email Resend transport; unset = disabled. Never on a request path.
+const alertNotifier = startAlertNotifier();
+
 const PORT = process.env.PORT || 4000;
 const server = app.listen(PORT, () => console.log(`Pri Learning server running on port ${server.address().port}`));
 
@@ -70,6 +75,7 @@ function shutdown(signal) {
   console.log('platform_shutdown', { signal, deadlineMs: SHUTDOWN_DEADLINE_MS });
   deliveryWorker.stop();
   googleWorker.stop();
+  alertNotifier.stop();
   let finished = false;
   const finish = reason => {
     if (finished) return;

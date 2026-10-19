@@ -896,10 +896,16 @@ async function run() {
     }
     const canaryPrompt = worked.payload.prompt;
     ok('the served prompt is distinctive enough to search for', String(canaryPrompt).length >= 20, show(canaryPrompt));
+    const inkTraffic = { ...online.traffic };
     await POST(`/practice/${worked.question.id}/submit`, {
       answer: worked.right, ms: 5000, viaInk: true,
       ink: { strokes: [{ points: [{ x: 1, y: 2 }, { x: 3, y: 4 }] }], recognized: canaryInk }
     });
+    // One-request Submit (#441 port): the picture travels with the submission,
+    // so a handwritten Submit is ONE request to the server — no separate
+    // /recognize (and no /confirm) before it.
+    eq('a handwritten Submit is one request: one /submit, no separate /recognize',
+      [online.traffic.grade - inkTraffic.grade, online.traffic.recognize - inkTraffic.recognize], [1, 0]);
 
     const disk = JSON.stringify(rawRows());
     ok('the question is on disk at all', disk.includes(sealed.id), 'no row on disk names this profile — nothing was written');

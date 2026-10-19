@@ -21,7 +21,10 @@ import { securityHeaders } from './platform/headers.js';
 import { rateLimit } from './platform/security.js';
 import { asStore } from './platform/store.js';
 import { logEvent, requestContext, routeTemplate, safeCode, safeLogFields } from './platform/observability.js';
-import { recordHttpResponse } from './platform/metrics.js';
+import { requestTiming, timingLogFields } from './platform/requestTiming.js';
+import { recordHttpResponse, recordRouteTiming, recordServerError } from './platform/metrics.js';
+import { captureError } from './platform/errorSink.js';
+import { staticCacheHeaders } from './platform/staticCache.js';
 import { releaseShaForLogs } from './platform/releaseIdentity.js';
 import { rejectUnsafeText } from './platform/text.js';
 
@@ -58,16 +61,22 @@ export function requestLogger(log = null, { engine = null } = {}) {
     res.on('finish', () => {
       const ms = Number(process.hrtime.bigint() - started) / 1e6;
       recordHttpResponse(res.statusCode, ms);
+      const route = res.locals.route || routeTemplate(req);
+      // Per route template: the request's latency and its database numbers
+      // (requestTiming.js) — counts and milliseconds only.
+      if (req.priTiming) recordRouteTiming(req.method, route, ms, req.priTiming);
       if (log === false) return;
       const fields = {
         requestId: req.requestId,
         method: req.method,
-        route: res.locals.route || routeTemplate(req),
+        route,
         status: res.statusCode,
         ms,
         code: res.locals.errorCode || undefined,
         release: releaseShaForLogs(),
-        db
+        db,
+        // Where the time went (requestTiming.js): counts and milliseconds only.
+        ...timingLogFields(req.priTiming)
       };
       const level = res.statusCode >= 500 ? 'error' : 'info';
       if (typeof log === 'function') log(safeLogFields({ ts: new Date().toISOString(), level, event: 'http_request', ...fields }));
@@ -114,6 +123,9 @@ export async function createServerApp(db, {
   // bytes and store only provider ids, statuses and digests; a 400 for a NUL in
   // a customer-controlled field (subscription notes) would make the provider
   // retry until it gives up, losing the entitlement change.
+  // After the body parsers: the timing context must be entered on the path
+  // that actually reaches the handlers (requestTiming.js).
+  app.use('/v1', requestTiming());
   app.use('/v1', rejectUnsafeText({ exemptBody: [/^\/sync\/push\/?$/, /^\/billing\/webhook\/[^/]+\/?$/] }));
 
   ensureBillingSchema(db);
@@ -146,9 +158,15 @@ export async function createServerApp(db, {
     const status = bodyError ? bodyError.status
       : Number.isInteger(err?.status) && err.status >= 400 && err.status <= 599 ? err.status : 500;
     const code = err?.type === 'entity.too.large' ? 'REQUEST_BODY_TOO_LARGE' : bodyError ? bodyError.code : safeCode(err?.code);
-    logEvent(status >= 500 ? 'error' : 'warn', 'server_error', {
+    const line = logEvent(status >= 500 ? 'error' : 'warn', 'server_error', {
       requestId: req.requestId, method: req.method, route: routeTemplate(req), status, code
     });
+    // Every 5xx reaches the error sink (platform/errorSink.js) as the same
+    // allowlisted fields plus the release — never the error message.
+    if (status >= 500) {
+      recordServerError(code);
+      captureError({ ...line, release: releaseShaForLogs(), source: 'app' });
+    }
     if (res.headersSent) return next(err);
     // An over-large body dies in the parser before any route sees it, so this is
     // the only place that can say so. It gets a real code: "shrink the picture
@@ -172,8 +190,15 @@ export async function createServerApp(db, {
   });
 
   if (dist && existsSync(dist)) {
-    app.use(express.static(dist));
-    app.get(/^(?!\/(?:api|v1)).*/, (req, res) => res.sendFile(join(dist, 'index.html')));
+    // Caching policy (platform/staticCache.js): hashed assets are immutable for
+    // a year; the shell, sw.js and release.json are always revalidated;
+    // everything else is briefly cached. compression() above negotiates
+    // Brotli/gzip and adds Vary: Accept-Encoding.
+    app.use(express.static(dist, { etag: true, lastModified: true, index: 'index.html', setHeaders: staticCacheHeaders }));
+    app.get(/^(?!\/(?:api|v1)).*/, (req, res) => {
+      res.set('Cache-Control', 'no-cache');
+      res.sendFile(join(dist, 'index.html'));
+    });
   }
 
   return app;

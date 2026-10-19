@@ -94,6 +94,7 @@ jobs:
           grep -Fq 'CLOUD WORKING CLIENT: PASS — 47/47 checks' suites.log
           grep -Fq 'CLOUD PHOTO CLIENT: PASS — 65/65 checks' suites.log
           grep -Fq 'TUTOR UI: PASS — 71/71 checks' suites.log
+          grep -Fq 'ERROR REPORTS: PASS — 36/36 checks' suites.log
           grep -Fq 'APPLE SIGN IN: PASS — 66/66 checks' suites.log
           grep -Fq 'ONBOARDING SCOPE: PASS — 40/40 checks' suites.log
           grep -Fq 'STUDY PLAN: PASS — 211/211 checks' suites.log
@@ -275,6 +276,11 @@ jobs:
           # transcript-then-Submit; never shared across accounts.
           node server/test/recognition-dedupe-check.mjs 2>&1 | tee recognition-dedupe.log
           grep -Fq 'RECOGNITION DEDUPE: PASS — 201/201 checks' recognition-dedupe.log
+          # Round trips pinned per hot request; ink Submit is one request with one
+          # paid read, answer-blind; the request meter is numbers only and
+          # Server-Timing is opt-in for signed-in callers (#441 port).
+          node server/test/hot-path-budget-check.mjs 2>&1 | tee hot-path-budget.log
+          grep -Fq 'HOT PATH BUDGET: PASS — 108/108 checks' hot-path-budget.log
           # A photographed page: the answer proposed is mathematics, never a sentence;
           # unrelated lines are left out by default and never break the working.
           node client/test/photo-pipeline-check.mjs 2>&1 | tee photo-pipeline.log
@@ -335,8 +341,14 @@ jobs:
           set -o pipefail
           node server/test/observability-check.mjs 2>&1 | tee ops.log
           node server/test/failure-drills-check.mjs 2>&1 | tee -a ops.log
+          node server/test/alert-notifier-check.mjs 2>&1 | tee -a ops.log
+          node server/test/error-telemetry-check.mjs 2>&1 | tee -a ops.log
+          node server/test/static-caching-check.mjs 2>&1 | tee -a ops.log
           grep -Fq 'OBSERVABILITY: PASS' ops.log
+          grep -Fq 'ALERT NOTIFIER: PASS — 15/15 checks' ops.log
           grep -Fq 'FAILURE DRILLS: PASS' ops.log
+          grep -Fq 'ERROR TELEMETRY: PASS — 73/73 checks' ops.log
+          grep -Fq 'STATIC CACHING: PASS — 55/55 checks' ops.log
       # V1 blocker #14: every /v1 route is in the reviewed inventory with the
       # guards really mounted on it; every object-level route fails closed for
       # no session, revoked sessions, wrong account, wrong role, unverified
@@ -369,13 +381,14 @@ jobs:
           node server/test/platform-sync-burst-check.mjs
           set -o pipefail
           node server/test/postgres-connection-config-check.mjs | tee postgres-connection-config.log
-          grep -Fq 'POSTGRES CONNECTION CONFIG: PASS — 132/132 checks' postgres-connection-config.log
+          grep -Fq 'POSTGRES CONNECTION CONFIG: PASS — 230/230 checks' postgres-connection-config.log
           node server/test/platform-startup-check.mjs
       - name: Supabase migrations and every engine-agnostic platform suite on real Postgres
         run: |
           set -o pipefail
           node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
           grep -Fq 'PLATFORM ON POSTGRES: PASS — 52/52 suites' platform-postgres.log
+          grep -Fq '✓ hot-path-budget-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-device-journey-check.mjs' platform-postgres.log
           grep -Fq '✓ tutor-issued-grounding-check.mjs' platform-postgres.log
           grep -Fq '✓ online-marking-authority-check.mjs' platform-postgres.log

@@ -564,6 +564,9 @@ export default {
   'settings.secCourses': 'Courses',
   'settings.secData': 'Data & Backup',
   'settings.secHelp': 'Help & Safety',
+  'settings.crashReportsTitle': 'Crash reports',
+  'settings.crashReportsLabel': 'Send a report when the app breaks',
+  'settings.crashReportsCopy': 'If a screen stops working, Pri sends a short report to its own server so the problem can be fixed: the name of the screen, an error code and a fingerprint of the fault. Never the question, your answer, your writing, your name or what was on the screen. Reports are sent only while you are signed in, and you can turn them off here for this device.',
 
   'settings.localPlan': 'Local Plan',
   'settings.localPlanSub': 'No subscription needed — {limit} practice questions a day, and everything else unlimited. Checking answers needs a Pri account and a connection.',

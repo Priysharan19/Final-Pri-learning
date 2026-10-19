@@ -89,7 +89,7 @@ to boot — with a coded error, never printing the URL — unless (`docs/operati
   port 5432) — never the transaction pooler (6543).
 
 Session limits and pool size: `PRI_DATABASE_STATEMENT_TIMEOUT_MS`, `PRI_DATABASE_IDLE_TX_TIMEOUT_MS`,
-`PRI_DATABASE_LOCK_WAIT_MS`, `PRI_DATABASE_POOL_MAX` (ranges in the cutover document §1).
+`PRI_DATABASE_LOCK_WAIT_MS`, `PRI_DATABASE_POOL_MAX`, `PRI_DATABASE_POOL_IDLE_MS` (ranges in the cutover document §1).
 `PRI_DATABASE_SCHEMA` defaults to `pri`. Every table is behind Row-Level Security and the server's
 login role is only a member of `pri_server`; Supabase client API roles (`anon`, `authenticated`)
 hold no privilege on `pri`. Backups and PITR are the Supabase project's, and a restore drill is
@@ -122,7 +122,7 @@ closed while anything in the **required** rows is missing or malformed.
 |---|---|---|
 | Identity of the deployment | `NODE_ENV`, `PORT`, `PRI_PUBLIC_ORIGIN`, `PRI_TRUSTED_PROXY_HOPS`, `PRI_SHUTDOWN_DEADLINE_MS`, `PRI_CSP_CONNECT_SRC`, `PRI_BUILD_TIMESTAMP` (build arg) | **required:** `PRI_PUBLIC_ORIGIN` (clean `https://` origin), `PRI_TRUSTED_PROXY_HOPS` (§5) |
 | Security material | `PRI_CSRF_SECRET`, `PRI_AUTH_DELIVERY_KEY`, `PRI_METRICS_TOKEN`, `PRI_MFA_KEY`, `PRI_SESSION_MAX_AGE_DAYS` | **required:** `PRI_CSRF_SECRET`, `PRI_AUTH_DELIVERY_KEY`; `PRI_MFA_KEY` (32-byte key) is required in production as soon as `PRI_BOOTSTRAP_ADMIN_EMAIL` is set or a staff account exists (`/v1/ready staffMfa`); `/v1/metrics` and the operator detail of `/v1/health` are closed in production until `PRI_METRICS_TOKEN` is set |
-| Database (target) | `PRI_DATABASE_URL`, `PRI_DATABASE_SSL_ROOT_CERT`, `PRI_DATABASE_SCHEMA`, `PRI_DATABASE_STATEMENT_TIMEOUT_MS`, `PRI_DATABASE_IDLE_TX_TIMEOUT_MS`, `PRI_DATABASE_LOCK_WAIT_MS`, `PRI_DATABASE_POOL_MAX` | one of `PRI_DATABASE_URL` (verified TLS) **or** `PRI_PLATFORM_DB` is required |
+| Database (target) | `PRI_DATABASE_URL`, `PRI_DATABASE_SSL_ROOT_CERT`, `PRI_DATABASE_SCHEMA`, `PRI_DATABASE_STATEMENT_TIMEOUT_MS`, `PRI_DATABASE_IDLE_TX_TIMEOUT_MS`, `PRI_DATABASE_LOCK_WAIT_MS`, `PRI_DATABASE_POOL_MAX`, `PRI_DATABASE_POOL_IDLE_MS` | one of `PRI_DATABASE_URL` (verified TLS) **or** `PRI_PLATFORM_DB` is required |
 | Database (pre-cutover) | `PRI_PLATFORM_DB` | absolute persistent path; ignored once `PRI_DATABASE_URL` is set |
 | Auth email | `PRI_AUTH_EMAIL_PROVIDER`, `PRI_RESEND_API_KEY`, `PRI_AUTH_EMAIL_FROM`, `PRI_AUTH_EMAIL_POLL_MS` | `/v1/ready` reports `authEmail` **required** in production: no verification or password reset without a transport |
 | Sign-in providers | `PRI_GOOGLE_CLIENT_IDS`, `PRI_APPLE_CLIENT_IDS` | optional; client ids only, never a provider secret |

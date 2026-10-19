@@ -454,7 +454,10 @@ export const cloud = Object.freeze({
   // Needs no session: the question a signed-out student may start working on.
   preparePractice: body => cloudRequest('/v1/practice/prepare', { method: 'POST', body }),
   gradePractice: (questionId, body) => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/submit', {
-    method: 'POST', body, idempotencyKey: body.submissionId
+    method: 'POST', body, idempotencyKey: body.submissionId,
+    // A submission that carries its picture is read by the server before it
+    // is marked: the same budget as the separate reading request.
+    ...(typeof body?.image === 'string' ? { timeoutMs: 55000 } : {})
   }),
   // Examination papers are issued, collected and marked by the server
   // (server/platform/exams.js). The device sends a paper spec and answers; it
@@ -603,5 +606,7 @@ export const cloud = Object.freeze({
   updateUserRole: (accountId, role) => cloudRequest(`/v1/admin/users/${pathId(accountId, 'account id')}/role`, { method: 'PATCH', body: { role } }),
   adminAudit: () => cloudRequest('/v1/admin/audit'),
   reportIssue: (body, idempotencyKey) => cloudRequest('/v1/reports', { method: 'POST', body, idempotencyKey }),
-  telemetry: events => cloudRequest('/v1/telemetry', { method: 'POST', body: { events } })
+  telemetry: events => cloudRequest('/v1/telemetry', { method: 'POST', body: { events } }),
+  // A coded crash report (platform/telemetry.js reportCrash): no message, stack or URL.
+  reportError: report => cloudRequest('/v1/telemetry/error', { method: 'POST', body: report, timeoutMs: 8000 })
 });
