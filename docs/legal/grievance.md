@@ -1,16 +1,16 @@
 # Grievances
 
-**Last updated: {{LAST_UPDATED}}**
+**Last updated: 19 October 2026**
 
 If something about your data or your subscription is wrong, tell us. This page
 says who reads it and what happens next.
 
 ## Grievance officer
 
-- {{GRIEVANCE_OFFICER_NAME}}
-- {{OWNER_LEGAL_NAME}}
-- {{OWNER_ADDRESS}}
-- {{GRIEVANCE_OFFICER_EMAIL}}
+- Priysharan Tripathi
+- Priysharan Tripathi
+- 5 Juniper Pl, Oakville NSW 2765, Australia
+- impriysharan@icloud.com
 
 Publishing this contact is required of us by India's Digital Personal Data
 Protection Act 2023.
@@ -40,6 +40,6 @@ have raised it with us first, which is what this page is for.
 
 ## Subscriptions
 
-For billing questions write to {{SUPPORT_EMAIL}}; see the
+For billing questions write to impriysharan@icloud.com; see the
 [refund policy](/refund-policy). If a payment provider handled the charge, you
 may also raise it with them.

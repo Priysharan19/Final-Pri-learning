@@ -1,9 +1,9 @@
 # Terms of use
 
-**Last updated: {{LAST_UPDATED}}**
+**Last updated: 19 October 2026**
 
-These terms are an agreement between you and {{OWNER_LEGAL_NAME}},
-{{OWNER_ADDRESS}}, about your use of Pri Learning.
+These terms are an agreement between you and Priysharan Tripathi,
+5 Juniper Pl, Oakville NSW 2765, Australia, about your use of Pri Learning.
 
 ## Using Pri Learning
 
@@ -14,7 +14,7 @@ If you are under 18, a parent or guardian must agree to these terms for you.
 
 ## Your account
 
-You are responsible for keeping your password. Tell us at {{SUPPORT_EMAIL}} if
+You are responsible for keeping your password. Tell us at impriysharan@icloud.com if
 you think someone else has used your account. We may suspend an account that is
 being used to attack the service or to harm other users.
 
@@ -80,4 +80,4 @@ your access if you break these terms.
 These terms are governed by the laws of India, and the courts of
 {{JURISDICTION_CITY}} have exclusive jurisdiction.
 
-Questions: {{SUPPORT_EMAIL}}.
+Questions: impriysharan@icloud.com.
