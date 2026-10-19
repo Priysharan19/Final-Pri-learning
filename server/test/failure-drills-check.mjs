@@ -296,6 +296,8 @@ try {
     const midQuery = Object.assign(new Error('internal error'), { code: 'XX000' });
     c.ok(databaseOverload(midQuery) === midQuery, 'drill 1b: XX000 from a running statement stays an error (500), not a 503');
     c.eq(connectionFailure(midQuery).code, 'PLATFORM_DB_UNAVAILABLE', 'drill 1b: the same code while opening a connection is unavailable');
+    const setupBug = Object.assign(new Error('syntax error'), { code: '42601' });
+    c.ok(connectionFailure(setupBug) === setupBug, 'drill 1b: a syntax error in session setup stays a 500, not an outage');
     c.eq(connectionFailure(new Error('timeout exceeded when trying to connect')).code, 'PLATFORM_DB_BUSY', 'drill 1b: a pool wait timeout keeps its own code');
   }
 

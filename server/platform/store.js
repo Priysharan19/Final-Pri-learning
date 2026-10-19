@@ -252,6 +252,8 @@ export function isDatabaseOverload(error) {
 export function connectionFailure(error) {
   const mapped = databaseOverload(error);
   if (isDatabaseOverload(mapped) || mapped?.status) return mapped;
+  // Class 42 (syntax / undefined object) in the session setup is our bug, not an outage.
+  if (String(error?.code || '').startsWith('42')) return error;
   return overloaded('PLATFORM_DB_UNAVAILABLE', 5, error);
 }
 
