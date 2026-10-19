@@ -91,8 +91,8 @@ export default function MapPage() {
         if (from) edges.push({ from, to: node, skill: pre.skill, earlier: !byId.has(pre.id) });
       }
     }
-    const rows = used.map((id, i) => ({ id, y: 46 + i * ROW_H }));
-    return { nodes, edges, foundations, rows, height: 46 * 2 + Math.max(0, used.length - 1) * ROW_H, byId, foundationById };
+    const strandRows = used.map((id, i) => ({ id, y: 46 + i * ROW_H }));
+    return { nodes, edges, foundations, rows: strandRows, height: 46 * 2 + Math.max(0, used.length - 1) * ROW_H, byId, foundationById };
   }, [curriculum, marks, user]);
 
   const track = practiceTrack(user);
